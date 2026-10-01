@@ -1,15 +1,42 @@
 {
   "name": "faz-ai",
   "displayName": "Faz AI Kanban",
-  "description": "Quadro kanban com histórias e sub-tarefas dentro do VSCode",
+  "description": "Board kanban para Spec-Driven Development com IA, dentro do editor: histórias, sub-tarefas e um servidor MCP para a IA ler e atualizar o board",
   "version": "0.11.0",
   "publisher": "euclidesgc",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/euclidesgc/faz-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/euclidesgc/faz-ai/issues"
+  },
+  "homepage": "https://github.com/euclidesgc/faz-ai#readme",
+  "keywords": [
+    "kanban",
+    "board",
+    "sdd",
+    "spec-driven development",
+    "mcp",
+    "ai",
+    "claude",
+    "cursor",
+    "codex",
+    "kimi"
+  ],
+  "galleryBanner": {
+    "color": "#1f2a44",
+    "theme": "dark"
+  },
   "private": true,
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "AI"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
