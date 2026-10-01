@@ -338,3 +338,10 @@ body[data-theme=dark] {
   --vscode-inputValidation-warningBackground: #3a2d00; --vscode-inputValidation-warningBorder: #d29922;
   --vscode-testing-iconPassed: #3fb950;
 }
+
+/* cabeçalho do detalhe: o fechar fica isolado das ações do card */
+.drawer-divider { align-self: stretch; width: 1px; background: var(--border); margin: 2px 8px 2px 10px; }
+.drawer-close { min-width: 30px; height: 30px; font-size: 15px; border-radius: 4px; }
+.drawer-close:hover { background: var(--hover); }
+.drawer-header .menu-trigger { padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px; color: var(--fg); }
+.drawer-header .menu-trigger:hover { background: var(--hover); }

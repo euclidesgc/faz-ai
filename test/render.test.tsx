@@ -100,6 +100,11 @@ describe('telas montam sem erro', () => {
     expect(html(<TrashView />)).toContain('Lixo');
     const drawer = html(<CardDrawer cardId={storyId} />);
     expect(drawer).toContain('História');
+    // arquivar e excluir não ficam soltos ao lado do fechar: estão dentro do menu de ações
+    expect(drawer).toContain('Ações ▾');
+    expect(drawer).not.toContain('🗑 Excluir');
+    expect(drawer.indexOf('Ações ▾')).toBeLessThan(drawer.indexOf('drawer-divider'));
+    expect(drawer.indexOf('drawer-divider')).toBeLessThan(drawer.indexOf('drawer-close'));
     // comentário de outro autor (ex.: a IA): pode ser apagado, mas não editado
     const st = useBoardStore.getState().state!;
     useBoardStore.setState({ state: { ...st, comments: st.comments.map((c) => ({ ...c, author: 'Claude Code' })) } });

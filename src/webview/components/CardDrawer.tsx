@@ -6,6 +6,7 @@ import { requestArchive, requestMove, requestTrash } from '../store/actions';
 import { AttachmentsTab } from './AttachmentsTab';
 import { CommentsTab } from './CommentsTab';
 import { FieldEditor, ModelEditor } from './FieldRenderer';
+import { Menu } from './Menu';
 import { MarkdownEditor, renderMarkdown } from './MarkdownEditor';
 
 type Tab = 'details' | 'comments' | 'attachments';
@@ -91,13 +92,24 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             {columns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <span className="spacer" />
-          {!trashed && (archived
-            ? <button onClick={() => send({ type: 'card.unarchive', cardId })}>Desarquivar</button>
-            : <button title="Tira o card do board sem apagar" onClick={() => requestArchive(cardId, () => openCard(null))}>Arquivar</button>)}
-          {trashed
-            ? <button className="primary" onClick={() => send({ type: 'card.restore', cardId })}>Restaurar</button>
-            : <button className="ghost danger" title="Mover para a lixeira" onClick={() => requestTrash(cardId, () => openCard(null))}>🗑 Excluir</button>}
-          <button className="icon" title="Fechar (Esc)" onClick={() => openCard(null)}>✕</button>
+          {trashed && <button className="primary" onClick={() => send({ type: 'card.restore', cardId })}>Restaurar</button>}
+          {/* arquivar e excluir ficam num menu, longe do botão de fechar, para não serem clicados por engano */}
+          {!trashed && (
+            <Menu
+              title="Ações do card"
+              items={[
+                archived
+                  ? { label: 'Desarquivar', onClick: () => send({ type: 'card.unarchive', cardId }) }
+                  : { label: 'Arquivar', onClick: () => requestArchive(cardId, () => openCard(null)) },
+                'sep',
+                { label: 'Mover para a lixeira', danger: true, onClick: () => requestTrash(cardId, () => openCard(null)) },
+              ]}
+            >
+              Ações ▾
+            </Menu>
+          )}
+          <span className="drawer-divider" />
+          <button className="icon drawer-close" title="Fechar (Esc)" aria-label="Fechar" onClick={() => openCard(null)}>✕</button>
         </header>
 
         {trashed && <div className="banner warn">Este card está na lixeira.</div>}
