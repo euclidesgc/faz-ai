@@ -7,6 +7,8 @@ import { openFile, type DbHandle } from './db/database';
 import { BoardPanel } from './panel/BoardPanel';
 import { MessageRouter } from './panel/messageRouter';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
+import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
+import { ViewStateStore } from './viewState';
 
 let handle: DbHandle | null = null;
 
@@ -23,6 +25,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const storage = context.globalStorageUri.fsPath;
   const wasmDir = path.join(context.extensionPath, 'dist');
   let routerPromise: Promise<MessageRouter> | undefined;
+  const viewState = new ViewStateStore(context.workspaceState);
 
   const folder = () => vscode.workspace.workspaceFolders?.[0];
 
@@ -53,11 +56,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
       return;
     }
-    BoardPanel.show(context, router, f.name, cardId);
+    BoardPanel.show(context, router, viewState, f.name, cardId);
   };
 
   context.subscriptions.push(
     treeView,
+    vscode.window.registerWebviewViewProvider('fazai.filters', new FiltersViewProvider(context, getRouter, viewState), {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
     // clicar no ícone da barra lateral já abre o board
     treeView.onDidChangeVisibility((e) => {
       if (e.visible && folder()) void openBoard();

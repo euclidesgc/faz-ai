@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { create } from 'zustand';
 import type { BoardState, Card, Column, FieldDef, Id } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
-import { getUiState, postToHost, setUiState } from '../vscode';
-import { EMPTY_FILTERS, applyFilters, type Filters } from './filters';
+import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../../shared/filters';
+import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 
 export type View = 'board' | 'trash' | 'settings';
 
@@ -15,30 +15,30 @@ export interface DialogSpec {
   /** quando presente, mostra um seletor e passa o valor escolhido ao confirmar */
   choices?: { label: string; options: { value: string; label: string }[] };
   onConfirm(choice?: string): void;
+  /** ação alternativa, mostrada entre Voltar e a confirmação */
+  secondary?: { label: string; onClick(): void };
+  cancelLabel?: string;
 }
 
+/** Estado só deste webview (o que é compartilhado com a barra lateral vive em ViewState, no host). */
 interface UiState {
   view: View;
-  selectedParentId: Id | null;
   openCardId: Id | null;
-  filters: Filters;
-  filtersOpen: boolean;
-  showArchived: boolean;
 }
 
-interface BoardStore extends UiState {
+interface BoardStore extends UiState, ViewState {
   state: BoardState | null;
   attachmentsBaseUri: string;
   error: string | null;
   dialog: DialogSpec | null;
   setState(state: BoardState, attachmentsBaseUri: string): void;
+  setViewState(view: ViewState): void;
   setError(msg: string | null): void;
   setView(view: View): void;
   selectParent(id: Id | null): void;
   openCard(id: Id | null): void;
   setFilters(patch: Partial<Filters>): void;
   clearFilters(): void;
-  toggleFiltersOpen(): void;
   toggleArchived(): void;
   ask(dialog: DialogSpec | null): void;
   send(msg: WebviewToHost): void;
@@ -46,70 +46,72 @@ interface BoardStore extends UiState {
 
 const persisted = getUiState<Partial<UiState>>();
 
-export const useBoardStore = create<BoardStore>((set, get) => ({
-  state: null,
-  attachmentsBaseUri: '',
-  error: null,
-  dialog: null,
-  view: persisted?.view ?? 'board',
-  selectedParentId: persisted?.selectedParentId ?? null,
-  openCardId: persisted?.openCardId ?? null,
-  filters: { ...EMPTY_FILTERS, ...persisted?.filters },
-  filtersOpen: persisted?.filtersOpen ?? false,
-  showArchived: persisted?.showArchived ?? false,
+export const useBoardStore = create<BoardStore>((set, get) => {
+  /** aplica localmente e avisa o host, que repassa aos outros webviews */
+  const setShared = (patch: Partial<ViewState>) => {
+    set(patch);
+    postToHost({ type: 'view.set', patch });
+  };
 
-  setState(state, attachmentsBaseUri) {
-    const ids = new Set(state.cards.map((c) => c.id));
-    const live = new Set(state.cards.filter(isLive).map((c) => c.id));
-    const { selectedParentId, openCardId } = get();
-    set({
-      state,
-      attachmentsBaseUri,
-      error: null,
-      selectedParentId: selectedParentId && live.has(selectedParentId) ? selectedParentId : null,
-      openCardId: openCardId && ids.has(openCardId) ? openCardId : null,
-    });
-    persist(get());
-  },
-  setError: (error) => set({ error }),
-  setView(view) {
-    set({ view });
-    persist(get());
-  },
-  selectParent(id) {
-    set((s) => ({ selectedParentId: s.selectedParentId === id ? null : id }));
-    persist(get());
-  },
-  openCard(id) {
-    set({ openCardId: id });
-    persist(get());
-  },
-  setFilters(patch) {
-    set((s) => ({ filters: { ...s.filters, ...patch } }));
-    persist(get());
-  },
-  clearFilters() {
-    set({ filters: EMPTY_FILTERS, selectedParentId: null });
-    persist(get());
-  },
-  toggleFiltersOpen() {
-    set((s) => ({ filtersOpen: !s.filtersOpen }));
-    persist(get());
-  },
-  toggleArchived() {
-    set((s) => ({ showArchived: !s.showArchived }));
-    persist(get());
-  },
-  ask: (dialog) => set({ dialog }),
-  send: (msg) => postToHost(msg),
-}));
+  return {
+    state: null,
+    attachmentsBaseUri: '',
+    error: null,
+    dialog: null,
+    view: persisted?.view ?? 'board',
+    openCardId: persisted?.openCardId ?? null,
+    filters: EMPTY_FILTERS,
+    selectedParentId: null,
+    showArchived: false,
+
+    setState(state, attachmentsBaseUri) {
+      const ids = new Set(state.cards.map((c) => c.id));
+      const { selectedParentId, openCardId } = get();
+      set({ state, attachmentsBaseUri, openCardId: openCardId && ids.has(openCardId) ? openCardId : null });
+      // a história selecionada saiu do board (lixeira, arquivo ou apagada): limpa o filtro
+      if (selectedParentId && !state.cards.some((c) => c.id === selectedParentId && isLive(c))) setShared({ selectedParentId: null });
+      persist(get());
+    },
+    setViewState: (view) => set({ filters: { ...EMPTY_FILTERS, ...view.filters }, selectedParentId: view.selectedParentId, showArchived: view.showArchived }),
+    setError: (error) => set({ error }),
+    setView(view) {
+      set({ view });
+      persist(get());
+    },
+    selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
+    openCard(id) {
+      set({ openCardId: id });
+      persist(get());
+    },
+    setFilters: (patch) => setShared({ filters: { ...get().filters, ...patch } }),
+    clearFilters: () => setShared({ filters: EMPTY_FILTERS, selectedParentId: null }),
+    toggleArchived: () => setShared({ showArchived: !get().showArchived }),
+    ask: (dialog) => set({ dialog }),
+    send: (msg) => postToHost(msg),
+  };
+});
 
 function persist(s: BoardStore): void {
-  const ui: UiState = {
-    view: s.view, selectedParentId: s.selectedParentId, openCardId: s.openCardId,
-    filters: s.filters, filtersOpen: s.filtersOpen, showArchived: s.showArchived,
-  };
+  const ui: UiState = { view: s.view, openCardId: s.openCardId };
   setUiState(ui);
+}
+
+/** Liga o store às mensagens do host. Usado pelo board e pela view de filtros. */
+export function useHostSync(): void {
+  useEffect(() => {
+    const off = onHostMessage((msg) => {
+      const s = useBoardStore.getState();
+      if (msg.type === 'boardState') s.setState(msg.state, msg.attachmentsBaseUri);
+      else if (msg.type === 'viewState') s.setViewState(msg.view);
+      else if (msg.type === 'error') s.setError(msg.message);
+      else if (msg.type === 'ui.openCard') {
+        s.setView('board');
+        s.openCard(msg.cardId);
+      }
+    });
+    postToHost({ type: 'ready' });
+    return off;
+  }, []);
 }
 
 // ---- seletores utilitários ----
@@ -133,7 +135,7 @@ export const fieldsForType = (state: BoardState, typeId: Id): FieldDef[] =>
 export const valueOf = (state: BoardState, cardId: Id, fieldId: Id) =>
   state.fieldValues.find((v) => v.cardId === cardId && v.fieldId === fieldId)?.value ?? null;
 
-/** Ids que passam nos filtros da barra, ou null quando não há filtro ativo. */
+/** Ids que passam nos filtros, ou null quando não há filtro ativo. */
 export function useFilteredIds(): Set<Id> | null {
   const state = useBoardStore((s) => s.state);
   const filters = useBoardStore((s) => s.filters);
