@@ -18,9 +18,11 @@ const options = {
 mkdirSync('dist', { recursive: true });
 cpSync('node_modules/sql.js/dist/sql-wasm.wasm', 'dist/sql-wasm.wasm');
 
+// ponte stdio usada pelos clientes de IA para falar com o servidor MCP da extensão
+const bridge = { ...options, entryPoints: ['src/mcp-bridge/bridge.ts'], outfile: 'dist/mcp-bridge.js', external: [], sourcemap: false };
+
 if (watch) {
-  const ctx = await context(options);
-  await ctx.watch();
+  for (const o of [options, bridge]) await (await context(o)).watch();
 } else {
-  await build(options);
+  await Promise.all([build(options), build(bridge)]);
 }

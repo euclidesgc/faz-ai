@@ -9,18 +9,24 @@ export type CompleteParentMode = 'ask' | 'auto' | 'off';
 export interface BoardRules {
   /** história não entra em coluna de conclusão com sub-tarefas em aberto */
   blockDoneWithOpenChildren: boolean;
+  /** história não avança de coluna enquanto houver sub-tarefas em aberto cuja Fase é a coluna atual */
+  blockPhaseAdvanceWithOpenChildren: boolean;
   onCancelParent: CancelChildrenMode;
   onAllChildrenDone: CompleteParentMode;
   confirmTrash: ConfirmMode;
   confirmArchive: ConfirmMode;
+  /** preenche o campo de modelo com a sugestão enquanto ele não foi escolhido à mão */
+  autoApplyModelSuggestion: boolean;
 }
 
 export const DEFAULT_RULES: BoardRules = {
   blockDoneWithOpenChildren: true,
+  blockPhaseAdvanceWithOpenChildren: true,
   onCancelParent: 'ask',
   onAllChildrenDone: 'ask',
   confirmTrash: 'whenDependents',
   confirmArchive: 'whenDependents',
+  autoApplyModelSuggestion: true,
 };
 
 /** Lê o JSON salvo, completando com os padrões o que faltar ou for inválido. */
@@ -36,9 +42,12 @@ export function parseRules(json: string | null | undefined): BoardRules {
   const confirm = ['whenDependents', 'always', 'never'] as const;
   return {
     blockDoneWithOpenChildren: typeof raw.blockDoneWithOpenChildren === 'boolean' ? raw.blockDoneWithOpenChildren : DEFAULT_RULES.blockDoneWithOpenChildren,
+    blockPhaseAdvanceWithOpenChildren:
+      typeof raw.blockPhaseAdvanceWithOpenChildren === 'boolean' ? raw.blockPhaseAdvanceWithOpenChildren : DEFAULT_RULES.blockPhaseAdvanceWithOpenChildren,
     onCancelParent: pick(raw.onCancelParent, ['ask', 'cascade', 'keep'] as const, DEFAULT_RULES.onCancelParent),
     onAllChildrenDone: pick(raw.onAllChildrenDone, ['ask', 'auto', 'off'] as const, DEFAULT_RULES.onAllChildrenDone),
     confirmTrash: pick(raw.confirmTrash, confirm, DEFAULT_RULES.confirmTrash),
     confirmArchive: pick(raw.confirmArchive, confirm, DEFAULT_RULES.confirmArchive),
+    autoApplyModelSuggestion: typeof raw.autoApplyModelSuggestion === 'boolean' ? raw.autoApplyModelSuggestion : DEFAULT_RULES.autoApplyModelSuggestion,
   };
 }

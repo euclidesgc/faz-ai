@@ -1,8 +1,20 @@
 import type { FieldDef, FieldValue } from '../../shared/model';
+import { AI_TOOLS } from '../../shared/harness';
+import { modelLabel, modelValue, parseModelValue } from '../../shared/models';
+import { useBoardStore } from '../store/boardStore';
 
 /** Exibição compacta no card. */
 export function FieldBadge({ field, value }: { field: FieldDef; value: FieldValue }) {
+  const catalog = useBoardStore((s) => s.state?.board.modelCatalog ?? []);
   if (value === null || value === '' || value === false || (Array.isArray(value) && value.length === 0)) return null;
+  if (field.kind === 'model') {
+    return (
+      <span className={field.display === 'chip' ? 'chip' : field.display === 'inline' ? 'inline-field' : 'badge'} title={`${field.name}: ${modelLabel(catalog, value, true)}`}>
+        {field.display === 'inline' && <em>{field.name}: </em>}
+        {modelLabel(catalog, value)}
+      </span>
+    );
+  }
   const items = Array.isArray(value) ? value : [value];
   const cls = field.display === 'badge' ? 'badge' : field.display === 'chip' ? 'chip' : 'inline-field';
   return (
@@ -51,6 +63,8 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
           {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       );
+    case 'model':
+      return <ModelEditor value={value} onChange={onChange} />;
     case 'multiselect': {
       const current = Array.isArray(value) ? value : [];
       return (
@@ -67,4 +81,47 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
       );
     }
   }
+}
+
+/** Modelo + nível de esforço, escolhidos no catálogo do board. */
+/** `part` mostra só o seletor de modelo ou só o de esforço, para telas que os colocam em linhas separadas. */
+export function ModelEditor({ value, onChange, part = 'both' }: { value: FieldValue; onChange: (v: FieldValue) => void; part?: 'both' | 'model' | 'effort' }) {
+  const all = useBoardStore((s) => s.state?.board.modelCatalog ?? []);
+  const tool = useBoardStore((s) => s.state?.board.aiTool);
+  const current = parseModelValue(value);
+  // oferece os modelos da ferramenta em uso; um valor de outra ferramenta continua visível até ser trocado
+  const catalog = all.filter((o) => o.tool === tool || o.id === current?.id);
+  const option = current ? catalog.find((o) => o.id === current.id) : undefined;
+  const modelSelect = (
+    <select
+      value={current?.id ?? ''}
+      onChange={(e) => {
+        const o = catalog.find((x) => x.id === e.target.value);
+        onChange(o ? modelValue(o.id, o.defaultEffort) : null);
+      }}
+    >
+      <option value="">—</option>
+      {current && !option && <option value={current.id}>{current.id} (fora do catálogo)</option>}
+      {AI_TOOLS.filter((t) => catalog.some((o) => o.tool === t.id)).map((t) => (
+        <optgroup key={t.id} label={t.label}>
+          {catalog.filter((o) => o.tool === t.id).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </optgroup>
+      ))}
+    </select>
+  );
+  const effortSelect =
+    option && option.efforts.length > 0 ? (
+      <select title="Esforço do modelo" value={current?.effort ?? ''} onChange={(e) => onChange(modelValue(option.id, e.target.value || null))}>
+        {option.efforts.map((e) => <option key={e} value={e}>{e}</option>)}
+      </select>
+    ) : null;
+
+  if (part === 'model') return modelSelect;
+  if (part === 'effort') return effortSelect ?? <span className="muted small">{option ? 'Este modelo não tem ajuste de esforço.' : 'Escolha um modelo primeiro.'}</span>;
+  return (
+    <div className="row model-editor">
+      {modelSelect}
+      {effortSelect}
+    </div>
+  );
 }

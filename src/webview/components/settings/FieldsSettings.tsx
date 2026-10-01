@@ -5,7 +5,7 @@ import { useBoardStore } from '../../store/boardStore';
 const KINDS: { value: FieldKind; label: string }[] = [
   { value: 'text', label: 'Texto' }, { value: 'number', label: 'Número' }, { value: 'date', label: 'Data' },
   { value: 'select', label: 'Seleção' }, { value: 'multiselect', label: 'Múltipla seleção' },
-  { value: 'checkbox', label: 'Checkbox' }, { value: 'url', label: 'URL' },
+  { value: 'checkbox', label: 'Checkbox' }, { value: 'url', label: 'URL' }, { value: 'model', label: 'Modelo de IA' },
 ];
 const DISPLAYS: { value: FieldDisplay; label: string }[] = [
   { value: 'badge', label: 'Badge' }, { value: 'chip', label: 'Chip' }, { value: 'inline', label: 'Nome: valor' }, { value: 'hidden', label: 'Só no detalhe' },

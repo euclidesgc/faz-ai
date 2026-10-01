@@ -3,6 +3,9 @@ import type { Attachment, Board, BoardState, Card, CardType, ChecklistItem, Colu
 import { all, bool, num, one, run, str } from '../db/query';
 import { parseRules, type BoardRules } from '../../shared/rules';
 import { seedBoard } from '../db/seed';
+import { parseAppearance, type Appearance } from '../../shared/appearance';
+import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
+import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool } from '../../shared/harness';
 
 export class BoardRepo {
   constructor(private db: Database) {}
@@ -14,7 +17,7 @@ export class BoardRepo {
       seedBoard(this.db, workspaceKey, name);
       row = one(this.db, 'SELECT * FROM boards WHERE workspace_key = ?', [workspaceKey])!;
     }
-    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)) };
+    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTool: parseAiTool(str(row.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)), modelRules: parseModelRules(str(row.model_rules_json)), appearance: parseAppearance(str(row.appearance_json)) };
   }
 
   updateRules(boardId: string, patch: Partial<BoardRules>): void {
@@ -25,32 +28,57 @@ export class BoardRepo {
     run(this.db, 'UPDATE boards SET rules_json = ? WHERE id = ?', [JSON.stringify(next), boardId]);
   }
 
-  updateBoard(boardId: string, patch: { name?: string }): void {
-    if (patch.name !== undefined) run(this.db, 'UPDATE boards SET name = ? WHERE id = ?', [patch.name, boardId]);
+  setModelCatalog(boardId: string, catalog: ModelOption[]): void {
+    run(this.db, 'UPDATE boards SET model_catalog_json = ? WHERE id = ?', [JSON.stringify(catalog), boardId]);
   }
 
-  updateWorkflow(workflowId: string, patch: { name?: string }): void {
+  setModelRules(boardId: string, rules: ModelRule[]): void {
+    run(this.db, 'UPDATE boards SET model_rules_json = ? WHERE id = ?', [JSON.stringify(rules), boardId]);
+  }
+
+  /** Apaga o board com tudo o que há nele. Devolve os ids dos cards (para limpar anexos). */
+  deleteBoard(boardId: string): string[] {
+    const ids = all(this.db, 'SELECT id FROM cards WHERE board_id = ?', [boardId]).map((r) => str(r.id));
+    run(this.db, 'DELETE FROM boards WHERE id = ?', [boardId]);
+    return ids;
+  }
+
+  updateBoard(boardId: string, patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance> }): void {
+    if (patch.name !== undefined) run(this.db, 'UPDATE boards SET name = ? WHERE id = ?', [patch.name, boardId]);
+    if (patch.appearance !== undefined) {
+      const current = parseAppearance(str(one(this.db, 'SELECT appearance_json FROM boards WHERE id = ?', [boardId])?.appearance_json));
+      // parseAppearance valida o resultado: valores fora do permitido voltam ao padrão
+      run(this.db, 'UPDATE boards SET appearance_json = ? WHERE id = ?', [JSON.stringify(parseAppearance(JSON.stringify({ ...current, ...patch.appearance }))), boardId]);
+    }
+    if (patch.aiTool !== undefined && ALL_AI_TOOLS.includes(patch.aiTool)) run(this.db, 'UPDATE boards SET ai_tools_json = ? WHERE id = ?', [JSON.stringify(patch.aiTool), boardId]);
+  }
+
+  updateWorkflow(workflowId: string, patch: { name?: string; collapsed?: boolean; archiveCollapsed?: boolean }): void {
     if (patch.name !== undefined) run(this.db, 'UPDATE workflows SET name = ? WHERE id = ?', [patch.name, workflowId]);
+    if (patch.collapsed !== undefined) run(this.db, 'UPDATE workflows SET collapsed = ? WHERE id = ?', [patch.collapsed ? 1 : 0, workflowId]);
+    if (patch.archiveCollapsed !== undefined) run(this.db, 'UPDATE workflows SET archive_collapsed = ? WHERE id = ?', [patch.archiveCollapsed ? 1 : 0, workflowId]);
   }
 
   snapshot(boardId: string, currentUser = ''): BoardState {
     const db = this.db;
     const b = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
     if (!b) throw new Error('Board não encontrado');
-    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)) };
+    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTool: parseAiTool(str(b.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)), modelRules: parseModelRules(str(b.model_rules_json)), appearance: parseAppearance(str(b.appearance_json)) };
 
     const workflows: Workflow[] = all(db, 'SELECT * FROM workflows WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), position: num(r.position), kind: str(r.kind) as Workflow['kind'],
+      collapsed: bool(r.collapsed), archiveCollapsed: bool(r.archive_collapsed),
     }));
 
     const columns: Column[] = all(
       db,
       'SELECT c.* FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? ORDER BY c.position',
       [boardId],
-    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), category: str(r.category) as Column['category'], isTerminal: str(r.category) !== 'open' }));
+    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), category: str(r.category) as Column['category'], isTerminal: str(r.category) !== 'open', collapsed: bool(r.collapsed) }));
 
     const cardTypes: CardType[] = all(db, 'SELECT * FROM card_types WHERE board_id = ? ORDER BY rowid', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), color: str(r.color), defaultWorkflowId: str(r.default_workflow_id),
+      defaults: JSON.parse(str(r.defaults_json) || '{}') as CardType['defaults'],
     }));
 
     const cards: Card[] = all(db, 'SELECT * FROM cards WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
@@ -91,6 +119,6 @@ export class BoardRepo {
       [boardId],
     ).map((r) => ({ id: str(r.id), cardId: str(r.card_id), filename: str(r.filename), storedName: str(r.stored_name), mime: str(r.mime), size: num(r.size), createdAt: num(r.created_at) }));
 
-    return { board, workflows, columns, cardTypes, cards, fieldDefs, fieldValues, checklistItems, comments, attachments, currentUser };
+    return { board, workflows, columns, cardTypes, cards, fieldDefs, fieldValues, checklistItems, comments, attachments, currentUser, harness: EMPTY_HARNESS };
   }
 }

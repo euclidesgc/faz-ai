@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useAppearance } from './appearance';
 import { useBoardStore, useHostSync } from './store/boardStore';
 import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
@@ -9,6 +10,7 @@ import { Settings } from './components/settings/Settings';
 
 export function App() {
   useHostSync();
+  useAppearance();
   const { state, error, view, setError, setView, openCardId } = useBoardStore();
 
   // erros (ex.: regra de conclusão) somem sozinhos

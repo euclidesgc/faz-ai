@@ -80,6 +80,9 @@ export class WebviewBridge implements vscode.Disposable {
         case 'ui.showFilters':
           await vscode.commands.executeCommand('fazai.filters.focus');
           return;
+        case 'ui.connectAI':
+          await vscode.commands.executeCommand('fazai.connectAI');
+          return;
         case 'attachment.pick': {
           const uris = await vscode.window.showOpenDialog({ canSelectMany: true, openLabel: 'Anexar', title: 'Anexar arquivos ao card' });
           if (uris?.length) this.router.addAttachmentFiles(msg.cardId, uris.map((u) => u.fsPath));

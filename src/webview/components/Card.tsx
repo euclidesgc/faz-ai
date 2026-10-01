@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cardRef, type Card } from '../../shared/model';
+import { modelFieldOf, modelLabel, suggestModel } from '../../shared/models';
 import { childrenOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
 import { requestArchive, requestTrash } from '../store/actions';
 import { FieldBadge } from './FieldRenderer';
@@ -36,6 +37,10 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const fields = fieldsForType(state, card.typeId).filter((f) => f.display !== 'hidden');
   const parent = card.parentId ? state.cards.find((c) => c.id === card.parentId) : undefined;
   const selected = isParent && selectedParentId === card.id;
+  // sugestão das regras, oferecida quando difere do modelo que está no card
+  const modelField = modelFieldOf(state, card);
+  const suggestion = modelField ? suggestModel(state, card) : null;
+  const offerSuggestion = modelField && suggestion && suggestion !== valueOf(state, card.id, modelField.id) ? suggestion : null;
 
   return (
     <article
@@ -85,6 +90,17 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         {comments > 0 && <span title="Comentários">💬 {comments}</span>}
         {attachments > 0 && <span title="Anexos">📎 {attachments}</span>}
         {card.description && <span title="Tem descrição">≡</span>}
+        {offerSuggestion && !overlay && (
+          <button
+            className="suggest-model"
+            title={`Modelo sugerido pelas regras: ${modelLabel(state.board.modelCatalog, offerSuggestion, true)}. Clique para usar.`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              send({ type: 'field.setValue', cardId: card.id, fieldId: modelField!.id, value: offerSuggestion });
+            }}
+          >✦ {modelLabel(state.board.modelCatalog, offerSuggestion)}</button>
+        )}
       </div>
     </article>
   );

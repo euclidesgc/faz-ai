@@ -1,5 +1,5 @@
 import type { Database } from 'sql.js';
-import type { ColumnCategory, FieldDisplay, FieldKind } from '../../shared/model';
+import type { ColumnCategory, FieldDisplay, FieldKind, FieldValue } from '../../shared/model';
 import { newId } from '../db/ids';
 import { all, num, one, run, str, transaction } from '../db/query';
 
@@ -14,10 +14,11 @@ export class SettingsRepo {
     return id;
   }
 
-  updateColumn(columnId: string, patch: { name?: string; category?: ColumnCategory; position?: number }): void {
+  updateColumn(columnId: string, patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean }): void {
     const db = this.db;
     transaction(db, () => {
       if (patch.name !== undefined) run(db, 'UPDATE columns SET name = ? WHERE id = ?', [patch.name, columnId]);
+      if (patch.collapsed !== undefined) run(db, 'UPDATE columns SET collapsed = ? WHERE id = ?', [patch.collapsed ? 1 : 0, columnId]);
       if (patch.category !== undefined)
         run(db, 'UPDATE columns SET category = ?, is_terminal = ? WHERE id = ?', [patch.category, patch.category === 'open' ? 0 : 1, columnId]);
       if (patch.position !== undefined) {
@@ -55,10 +56,14 @@ export class SettingsRepo {
     return id;
   }
 
-  updateType(typeId: string, patch: { name?: string; color?: string; defaultWorkflowId?: string }): void {
+  updateType(typeId: string, patch: { name?: string; color?: string; defaultWorkflowId?: string; defaults?: Record<string, FieldValue> }): void {
     if (patch.name !== undefined) run(this.db, 'UPDATE card_types SET name = ? WHERE id = ?', [patch.name, typeId]);
     if (patch.color !== undefined) run(this.db, 'UPDATE card_types SET color = ? WHERE id = ?', [patch.color, typeId]);
     if (patch.defaultWorkflowId !== undefined) run(this.db, 'UPDATE card_types SET default_workflow_id = ? WHERE id = ?', [patch.defaultWorkflowId, typeId]);
+    if (patch.defaults !== undefined) {
+      const clean = Object.fromEntries(Object.entries(patch.defaults).filter(([, v]) => v !== null && v !== '' && v !== false && !(Array.isArray(v) && v.length === 0)));
+      run(this.db, 'UPDATE card_types SET defaults_json = ? WHERE id = ?', [JSON.stringify(clean), typeId]);
+    }
   }
 
   deleteType(typeId: string): void {

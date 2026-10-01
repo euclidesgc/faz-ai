@@ -47,8 +47,8 @@ describe('categoria de coluna', () => {
   });
 
   it('updateColumn troca a categoria', () => {
-    new SettingsRepo(db).updateColumn(col('parent', 'Em andamento').id, { category: 'done' });
-    expect(col('parent', 'Em andamento').category).toBe('done');
+    new SettingsRepo(db).updateColumn(col('parent', 'PRD').id, { category: 'done' });
+    expect(col('parent', 'PRD').category).toBe('done');
   });
 
   it('migração 2 → 3 deriva a categoria de is_terminal e do nome', async () => {
@@ -58,6 +58,10 @@ describe('categoria de coluna', () => {
       INSERT INTO meta VALUES ('schema_version','2');
       CREATE TABLE boards (id TEXT PRIMARY KEY, workspace_key TEXT NOT NULL UNIQUE, name TEXT NOT NULL);
       CREATE TABLE cards (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, created_at INTEGER NOT NULL);
+      CREATE TABLE field_defs (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, options_json TEXT NOT NULL DEFAULT '[]', applies_to_types_json TEXT, display TEXT NOT NULL DEFAULT 'inline', position INTEGER NOT NULL);
+      CREATE TABLE card_types (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL, default_workflow_id TEXT NOT NULL);
+      CREATE TABLE field_values (card_id TEXT NOT NULL, field_id TEXT NOT NULL, value_json TEXT NOT NULL, PRIMARY KEY (card_id, field_id));
+      CREATE TABLE workflows (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, name TEXT NOT NULL, position INTEGER NOT NULL, kind TEXT NOT NULL);
       CREATE TABLE columns (id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, name TEXT NOT NULL, position INTEGER NOT NULL, is_terminal INTEGER NOT NULL DEFAULT 0);
       INSERT INTO columns VALUES ('a','w','Backlog',0,0), ('b','w','Concluído',1,1), ('c','w','Cancelado',2,1), ('d','w','Entregue',3,1);`);
     migrate(old);
@@ -75,7 +79,7 @@ describe('regra: pai só conclui sem sub-tarefas em aberto', () => {
   });
 
   it('permite outras colunas, inclusive cancelar', () => {
-    cards.move(story, col('parent', 'Em andamento').id, 0);
+    cards.move(story, col('parent', 'PRD').id, 0);
     cards.move(story, col('parent', 'Cancelado').id, 0);
     expect(columnOf(story)).toBe('Cancelado');
   });
@@ -132,7 +136,7 @@ describe('cancelar história levando as sub-tarefas', () => {
   });
 
   it('a opção não tem efeito fora de colunas de cancelamento', () => {
-    cards.move(story, col('parent', 'Em andamento').id, 0, { cancelChildren: true });
+    cards.move(story, col('parent', 'PRD').id, 0, { cancelChildren: true });
     expect(columnOf(sub1)).toBe('A fazer');
   });
 });
@@ -159,5 +163,37 @@ describe('regras configuráveis', () => {
     cards.move(story, done, 0);
     expect(columnOf(story)).toBe('Concluído');
     expect(columnOf(sub1)).toBe('A fazer');
+  });
+});
+
+describe('regra: história só avança de fase sem sub-tarefas da fase em aberto', () => {
+  const setFase = (cardId: string, fase: string) => cards.setFieldValue(cardId, snap().fieldDefs.find((f) => f.name === 'Fase')!.id, fase);
+  const mk = (title: string, parentId: string | null) =>
+    cards.create(boardId, { typeId: snap().cardTypes.find((t) => t.name === (parentId ? 'Sub-tarefa' : 'História'))!.id, columnId: col(parentId ? 'child' : 'parent', parentId ? 'A fazer' : 'PRD').id, parentId, title });
+
+  it('bloqueia avançar, mas deixa voltar, cancelar e avançar com sub-tarefas de outra fase', () => {
+    const story = mk('h', null);
+    const prdTask = mk('escrever prd', story);
+    setFase(prdTask, 'PRD');
+    const specTask = mk('escrever spec', story);
+    setFase(specTask, 'Spec');
+    mk('sem fase', story);
+
+    expect(() => cards.move(story, col('parent', 'Spec').id, 0)).toThrow(/1 sub-tarefa\(s\) da fase PRD/);
+    cards.move(story, col('parent', 'Backlog').id, 0); // voltar é livre
+    cards.move(story, col('parent', 'PRD').id, 0);
+    cards.move(prdTask, col('child', 'Concluído').id, 0);
+    cards.move(story, col('parent', 'Spec').id, 0); // a sub-tarefa de Spec e a sem fase não seguram a saída do PRD
+    expect(() => cards.move(story, col('parent', 'Plan').id, 0)).toThrow(/fase Spec/);
+    cards.move(story, col('parent', 'Cancelado').id, 0); // cancelar é livre
+    expect(columnOf(story)).toBe('Cancelado');
+  });
+
+  it('pode ser desligada', () => {
+    const story = mk('h', null);
+    setFase(mk('t', story), 'PRD');
+    boards.updateRules(boardId, { blockPhaseAdvanceWithOpenChildren: false });
+    cards.move(story, col('parent', 'Spec').id, 0);
+    expect(columnOf(story)).toBe('Spec');
   });
 });

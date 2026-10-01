@@ -1,3 +1,6 @@
+import type { AiTool, Harness } from './harness';
+import type { ModelOption, ModelRule } from './models';
+import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
 
 export type Id = string;
@@ -5,7 +8,7 @@ export type Id = string;
 export type WorkflowKind = 'parent' | 'child';
 /** O que a coluna representa no fluxo. */
 export type ColumnCategory = 'open' | 'done' | 'cancelled';
-export type FieldKind = 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'url';
+export type FieldKind = 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'url' | 'model';
 export type FieldDisplay = 'badge' | 'chip' | 'inline' | 'hidden';
 
 export interface Board {
@@ -13,6 +16,14 @@ export interface Board {
   workspaceKey: string;
   name: string;
   rules: BoardRules;
+  /** ferramenta de IA com que o projeto trabalha; define regras, pasta de skills, MCP e modelos */
+  aiTool: AiTool;
+  /** modelos de LLM disponíveis, por ferramenta */
+  modelCatalog: ModelOption[];
+  /** sugestão de modelo conforme os campos do card */
+  modelRules: ModelRule[];
+  /** tema e tipografia do board */
+  appearance: Appearance;
 }
 
 export interface Workflow {
@@ -21,6 +32,10 @@ export interface Workflow {
   name: string;
   position: number;
   kind: WorkflowKind;
+  /** a linha começa colapsada no board */
+  collapsed: boolean;
+  /** a coluna de arquivados desta linha começa colapsada */
+  archiveCollapsed: boolean;
 }
 
 export interface Column {
@@ -31,6 +46,8 @@ export interface Column {
   category: ColumnCategory;
   /** derivado: category !== 'open' */
   isTerminal: boolean;
+  /** a coluna começa colapsada no board */
+  collapsed: boolean;
 }
 
 export interface CardType {
@@ -39,6 +56,8 @@ export interface CardType {
   name: string;
   color: string;
   defaultWorkflowId: Id;
+  /** valores de campos aplicados a cada card novo deste tipo (fieldId → valor) */
+  defaults: Record<Id, FieldValue>;
 }
 
 export interface Card {
@@ -127,4 +146,6 @@ export interface BoardState {
   attachments: Attachment[];
   /** autor usado em novos comentários */
   currentUser: string;
+  /** arquivos de regras e skills do projeto */
+  harness: Harness;
 }

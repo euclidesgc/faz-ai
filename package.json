@@ -2,7 +2,7 @@
   "name": "faz-ai",
   "displayName": "Faz AI Kanban",
   "description": "Quadro kanban com histórias e sub-tarefas dentro do VSCode",
-  "version": "0.3.1",
+  "version": "0.11.0",
   "publisher": "euclidesgc",
   "private": true,
   "engines": {
@@ -12,7 +12,9 @@
     "Other"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "commands": [
       {
@@ -28,6 +30,11 @@
       {
         "command": "fazai.openCard",
         "title": "Faz AI: Abrir Card"
+      },
+      {
+        "command": "fazai.connectAI",
+        "title": "Faz AI: Conectar IA (MCP)",
+        "icon": "$(plug)"
       }
     ],
     "viewsContainers": {
@@ -93,13 +100,14 @@
     "watch:ext": "node esbuild.mjs --watch",
     "watch:web": "vite build --watch",
     "typecheck": "tsc -p tsconfig.extension.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
-    "test": "vitest run",
+    "test": "npm run build:ext && vitest run",
     "package": "vsce package"
   },
   "devDependencies": {
     "@dnd-kit/core": "^6.1.0",
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -115,6 +123,7 @@
     "typescript": "^5.5.3",
     "vite": "^5.3.3",
     "vitest": "^2.0.3",
+    "zod": "^4.6.5",
     "zustand": "^4.5.4"
   }
 }

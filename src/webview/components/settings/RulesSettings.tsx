@@ -84,6 +84,19 @@ export function RulesSettings() {
       />
 
       <Rule
+        title="Avançar de fase com sub-tarefas da fase em aberto"
+        active={rules.blockPhaseAdvanceWithOpenChildren}
+        when={'uma história é movida para uma coluna mais adiante e ainda tem sub-tarefas em aberto cujo campo "Fase" é a coluna atual'}
+        then={rules.blockPhaseAdvanceWithOpenChildren ? 'bloquear o movimento e avisar quantas sub-tarefas da fase faltam. Voltar de coluna e cancelar continuam livres.' : 'permitir. As sub-tarefas ficam onde estão.'}
+        control={
+          <label className="switch">
+            <input type="checkbox" checked={rules.blockPhaseAdvanceWithOpenChildren} onChange={(e) => set({ blockPhaseAdvanceWithOpenChildren: e.target.checked })} />
+            Bloquear
+          </label>
+        }
+      />
+
+      <Rule
         title="Cancelar história com sub-tarefas em aberto"
         active={rules.onCancelParent !== 'keep'}
         when={`uma história é movida para uma coluna de cancelamento (${names('cancelled')}) e ainda tem sub-tarefas em aberto`}
@@ -112,6 +125,19 @@ export function RulesSettings() {
           <select value={rules.onAllChildrenDone} onChange={(e) => set({ onAllChildrenDone: e.target.value as CompleteParentMode })}>
             {COMPLETE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+        }
+      />
+
+      <Rule
+        title="Preencher o modelo sugerido"
+        active={rules.autoApplyModelSuggestion}
+        when="um card é criado ou um atributo dele muda, e o campo de modelo está vazio ou ainda tem a sugestão anterior"
+        then={rules.autoApplyModelSuggestion ? 'preencher o modelo com a sugestão das regras. Um modelo escolhido à mão nunca é trocado.' : 'não mexer no modelo. A sugestão só é aplicada pelo botão no card.'}
+        control={
+          <label className="switch">
+            <input type="checkbox" checked={rules.autoApplyModelSuggestion} onChange={(e) => set({ autoApplyModelSuggestion: e.target.checked })} />
+            Preencher
+          </label>
         }
       />
 

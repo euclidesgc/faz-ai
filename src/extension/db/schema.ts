@@ -1,6 +1,11 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 11;
+
+/** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
+/** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
+export const SKILLS_FIELD = 'Skills';
+export const MODEL_FIELD = 'Modelo';
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -121,6 +126,51 @@ const MIGRATIONS: Record<number, string> = {
     );
     UPDATE boards SET next_card_number = (SELECT COALESCE(MAX(number), 0) + 1 FROM cards WHERE board_id = boards.id);
     CREATE INDEX IF NOT EXISTS idx_cards_number ON cards(board_id, number);
+  `,
+  6: `
+    INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position)
+    SELECT lower(hex(randomblob(16))), b.id, '${MODEL_FIELD}', 'select', '[]', NULL, 'badge',
+           (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
+    FROM boards b
+    WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'modelo');
+  `,
+  7: `
+    ALTER TABLE card_types ADD COLUMN defaults_json TEXT NOT NULL DEFAULT '{}';
+    INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position)
+    SELECT lower(hex(randomblob(16))), b.id, '${SKILLS_FIELD}', 'multiselect', '[]', NULL, 'chip',
+           (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
+    FROM boards b
+    WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'skills');
+  `,
+  8: `
+    ALTER TABLE boards ADD COLUMN ai_tools_json TEXT NOT NULL DEFAULT '["claude","codex","cursor","kimi"]';
+  `,
+  9: `
+    ALTER TABLE boards ADD COLUMN model_catalog_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE boards ADD COLUMN model_rules_json TEXT NOT NULL DEFAULT '[]';
+    -- o campo Modelo vira do tipo "modelo" (modelo + esforço, vindos do catálogo); os valores antigos eram só rótulos
+    DELETE FROM field_values WHERE field_id IN (SELECT id FROM field_defs WHERE lower(name) = 'modelo' AND kind = 'select');
+    UPDATE card_types SET defaults_json = '{}' WHERE defaults_json != '{}';
+    UPDATE field_defs SET kind = 'model', options_json = '[]' WHERE lower(name) = 'modelo' AND kind = 'select';
+    INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position)
+    SELECT lower(hex(randomblob(16))), b.id, 'Esforço', 'select', '["Baixo","Médio","Alto"]', NULL, 'badge',
+           (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
+    FROM boards b
+    WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'esforço');
+  `,
+  10: `
+    ALTER TABLE columns ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE workflows ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE workflows ADD COLUMN archive_collapsed INTEGER NOT NULL DEFAULT 1;
+  `,
+  11: `
+    ALTER TABLE boards ADD COLUMN appearance_json TEXT NOT NULL DEFAULT '{}';
+    -- "Esforço" vira "Esforço da atividade" e passa a vir logo antes do campo de modelo
+    UPDATE field_defs SET name = 'Esforço da atividade' WHERE lower(name) = 'esforço';
+    UPDATE field_defs SET position = position * 2;
+    UPDATE field_defs SET position = (
+      SELECT MIN(m.position) - 1 FROM field_defs m WHERE m.board_id = field_defs.board_id AND m.kind = 'model'
+    ) WHERE name = 'Esforço da atividade' AND EXISTS (SELECT 1 FROM field_defs m WHERE m.board_id = field_defs.board_id AND m.kind = 'model');
   `,
 };
 

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { cardRef } from '../../shared/model';
+import { cardRef, type FieldValue } from '../../shared/model';
+import { MODEL_EFFORT_LABEL, modelLabel, suggestModel } from '../../shared/models';
 import { cardsIn, childrenOf, columnsOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
 import { requestArchive, requestMove, requestTrash } from '../store/actions';
 import { AttachmentsTab } from './AttachmentsTab';
 import { CommentsTab } from './CommentsTab';
-import { FieldEditor } from './FieldRenderer';
+import { FieldEditor, ModelEditor } from './FieldRenderer';
+import { Menu } from './Menu';
 import { MarkdownEditor, renderMarkdown } from './MarkdownEditor';
 
 type Tab = 'details' | 'comments' | 'attachments';
@@ -57,6 +59,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
   const columns = columnsOf(state, workflow.id);
   const types = state.cardTypes.filter((t) => t.defaultWorkflowId === workflow.id);
   const fields = fieldsForType(state, card.typeId);
+  const suggested = suggestModel(state, card);
   const checklist = state.checklistItems.filter((i) => i.cardId === card.id).sort((a, b) => a.position - b.position);
   const children = workflow.kind === 'parent' ? childrenOf(state, card.id) : [];
   const childWf = state.workflows.find((w) => w.kind === 'child');
@@ -89,13 +92,24 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             {columns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <span className="spacer" />
-          {!trashed && (archived
-            ? <button onClick={() => send({ type: 'card.unarchive', cardId })}>Desarquivar</button>
-            : <button title="Tira o card do board sem apagar" onClick={() => requestArchive(cardId, () => openCard(null))}>Arquivar</button>)}
-          {trashed
-            ? <button className="primary" onClick={() => send({ type: 'card.restore', cardId })}>Restaurar</button>
-            : <button className="ghost danger" title="Mover para a lixeira" onClick={() => requestTrash(cardId, () => openCard(null))}>🗑 Excluir</button>}
-          <button className="icon" title="Fechar (Esc)" onClick={() => openCard(null)}>✕</button>
+          {trashed && <button className="primary" onClick={() => send({ type: 'card.restore', cardId })}>Restaurar</button>}
+          {/* arquivar e excluir ficam num menu, longe do botão de fechar, para não serem clicados por engano */}
+          {!trashed && (
+            <Menu
+              title="Ações do card"
+              items={[
+                archived
+                  ? { label: 'Desarquivar', onClick: () => send({ type: 'card.unarchive', cardId }) }
+                  : { label: 'Arquivar', onClick: () => requestArchive(cardId, () => openCard(null)) },
+                'sep',
+                { label: 'Mover para a lixeira', danger: true, onClick: () => requestTrash(cardId, () => openCard(null)) },
+              ]}
+            >
+              Ações ▾
+            </Menu>
+          )}
+          <span className="drawer-divider" />
+          <button className="icon drawer-close" title="Fechar (Esc)" aria-label="Fechar" onClick={() => openCard(null)}>✕</button>
         </header>
 
         {trashed && <div className="banner warn">Este card está na lixeira.</div>}
@@ -125,12 +139,40 @@ export function CardDrawer({ cardId }: { cardId: string }) {
               <section className="drawer-section">
                 <h3>Campos</h3>
                 <div className="fields-grid">
-                  {fields.map((f) => (
-                    <label key={f.id} className="field-row">
-                      <span>{f.name}</span>
-                      <FieldEditor field={f} value={valueOf(state, card.id, f.id)} onChange={(v) => send({ type: 'field.setValue', cardId, fieldId: f.id, value: v })} />
-                    </label>
-                  ))}
+                  {fields.map((f) => {
+                    const value = valueOf(state, card.id, f.id);
+                    const set = (v: FieldValue) => send({ type: 'field.setValue', cardId, fieldId: f.id, value: v });
+                    if (f.kind !== 'model') {
+                      return (
+                        <label key={f.id} className="field-row">
+                          <span>{f.name}</span>
+                          <FieldEditor field={f} value={value} onChange={set} />
+                        </label>
+                      );
+                    }
+                    // modelo e esforço do modelo em linhas separadas, para não confundir com o esforço da atividade
+                    return (
+                      <div key={f.id} className="model-rows">
+                        <label className="field-row">
+                          <span>{f.name}</span>
+                          <ModelEditor part="model" value={value} onChange={set} />
+                        </label>
+                        <label className="field-row">
+                          <span>{MODEL_EFFORT_LABEL}</span>
+                          <ModelEditor part="effort" value={value} onChange={set} />
+                        </label>
+                        {suggested && suggested !== value && (
+                          <div className="field-row">
+                            <span />
+                            <span className="muted small suggestion">
+                              Sugerido pelas regras: {modelLabel(state.board.modelCatalog, suggested, true)}{' '}
+                              <a onClick={(e) => { e.preventDefault(); set(suggested); }}>Usar</a>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
             )}

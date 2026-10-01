@@ -39,7 +39,10 @@ interface BoardStore extends UiState, ViewState {
   openCard(id: Id | null): void;
   setFilters(patch: Partial<Filters>): void;
   clearFilters(): void;
-  toggleArchived(): void;
+  /** abre/fecha uma linha ou coluna; `current` é o estado que está na tela */
+  setCollapsed(key: string, collapsed: boolean): void;
+  /** esquece a escolha manual, voltando ao padrão das configurações */
+  resetCollapsed(key: string): void;
   ask(dialog: DialogSpec | null): void;
   send(msg: WebviewToHost): void;
 }
@@ -62,7 +65,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     openCardId: persisted?.openCardId ?? null,
     filters: EMPTY_FILTERS,
     selectedParentId: null,
-    showArchived: false,
+    collapsed: {},
 
     setState(state, attachmentsBaseUri) {
       const ids = new Set(state.cards.map((c) => c.id));
@@ -72,7 +75,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       if (selectedParentId && !state.cards.some((c) => c.id === selectedParentId && isLive(c))) setShared({ selectedParentId: null });
       persist(get());
     },
-    setViewState: (view) => set({ filters: { ...EMPTY_FILTERS, ...view.filters }, selectedParentId: view.selectedParentId, showArchived: view.showArchived }),
+    setViewState: (view) => set({ filters: { ...EMPTY_FILTERS, ...view.filters }, selectedParentId: view.selectedParentId, collapsed: view.collapsed ?? {} }),
     setError: (error) => set({ error }),
     setView(view) {
       set({ view });
@@ -85,7 +88,11 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     },
     setFilters: (patch) => setShared({ filters: { ...get().filters, ...patch } }),
     clearFilters: () => setShared({ filters: EMPTY_FILTERS, selectedParentId: null }),
-    toggleArchived: () => setShared({ showArchived: !get().showArchived }),
+    setCollapsed: (key, collapsed) => setShared({ collapsed: { ...get().collapsed, [key]: collapsed } }),
+    resetCollapsed(key) {
+      const { [key]: _drop, ...rest } = get().collapsed;
+      setShared({ collapsed: rest });
+    },
     ask: (dialog) => set({ dialog }),
     send: (msg) => postToHost(msg),
   };

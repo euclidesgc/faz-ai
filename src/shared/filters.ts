@@ -28,10 +28,17 @@ export const EMPTY_FILTERS: Filters = {
 export interface ViewState {
   filters: Filters;
   selectedParentId: Id | null;
-  showArchived: boolean;
+  /**
+   * Linhas e colunas abertas ou fechadas à mão, por id (linha, coluna ou `archive:<id da linha>`).
+   * O que não está aqui segue o padrão definido nas configurações.
+   */
+  collapsed: Record<string, boolean>;
 }
 
-export const EMPTY_VIEW_STATE: ViewState = { filters: EMPTY_FILTERS, selectedParentId: null, showArchived: false };
+/** Chave da coluna de arquivados de uma linha em `ViewState.collapsed`. */
+export const archiveKey = (workflowId: Id): string => `archive:${workflowId}`;
+
+export const EMPTY_VIEW_STATE: ViewState = { filters: EMPTY_FILTERS, selectedParentId: null, collapsed: {} };
 
 const DAY = 24 * 60 * 60 * 1000;
 

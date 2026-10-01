@@ -1,3 +1,4 @@
+import { useAppearance } from './appearance';
 import { activeFilterCount } from '../shared/filters';
 import { FilterPanel } from './components/FilterPanel';
 import { useBoardStore, useFilteredIds, useHostSync } from './store/boardStore';
@@ -5,11 +6,11 @@ import { useBoardStore, useFilteredIds, useHostSync } from './store/boardStore';
 /** Conteúdo da seção "Filtros" na barra lateral. */
 export function FiltersApp() {
   useHostSync();
+  useAppearance();
   const state = useBoardStore((s) => s.state);
   const filters = useBoardStore((s) => s.filters);
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
-  const showArchived = useBoardStore((s) => s.showArchived);
-  const { setFilters, clearFilters, toggleArchived } = useBoardStore();
+  const { setFilters, clearFilters } = useBoardStore();
   const matched = useFilteredIds();
 
   if (!state) return <div className="loading">Carregando…</div>;
@@ -26,10 +27,6 @@ export function FiltersApp() {
         {active > 0 && <button className="ghost small" onClick={clearFilters}>Limpar ({active})</button>}
       </div>
       <FilterPanel />
-      <label className="row">
-        <input type="checkbox" checked={showArchived} onChange={toggleArchived} />
-        Mostrar coluna de arquivados
-      </label>
     </div>
   );
 }
