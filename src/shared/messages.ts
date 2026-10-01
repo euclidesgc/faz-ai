@@ -1,10 +1,14 @@
-import type { BoardState, FieldDisplay, FieldKind, FieldValue, Id, WorkflowKind } from './model';
+import type { ViewState } from './filters';
+import type { BoardRules } from './rules';
+import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, WorkflowKind } from './model';
 
 export type WebviewToHost =
   | { type: 'ready' }
+  | { type: 'view.set'; patch: Partial<ViewState> }
+  | { type: 'ui.showFilters' }
   | { type: 'card.create'; typeId: Id; columnId: Id; parentId: Id | null; title: string }
   | { type: 'card.update'; cardId: Id; patch: { title?: string; description?: string; typeId?: Id } }
-  | { type: 'card.move'; cardId: Id; columnId: Id; position: number }
+  | { type: 'card.move'; cardId: Id; columnId: Id; position: number; /** ao cancelar uma história, cancela também as sub-tarefas em aberto */ cancelChildren?: boolean }
   | { type: 'card.trash'; cardId: Id }
   | { type: 'card.restore'; cardId: Id }
   | { type: 'card.archive'; cardId: Id }
@@ -24,7 +28,7 @@ export type WebviewToHost =
   | { type: 'checklist.update'; itemId: Id; patch: { text?: string; done?: boolean } }
   | { type: 'checklist.delete'; itemId: Id }
   | { type: 'settings.column.create'; workflowId: Id; name: string }
-  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; isTerminal?: boolean; position?: number } }
+  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number } }
   | { type: 'settings.column.delete'; columnId: Id; moveCardsTo: Id }
   | { type: 'settings.type.create'; name: string; color: string; defaultWorkflowId: Id }
   | { type: 'settings.type.update'; typeId: Id; patch: { name?: string; color?: string; defaultWorkflowId?: Id } }
@@ -44,11 +48,13 @@ export type WebviewToHost =
     }
   | { type: 'settings.field.delete'; fieldId: Id }
   | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string } }
-  | { type: 'settings.board.update'; patch: { name?: string } };
+  | { type: 'settings.board.update'; patch: { name?: string } }
+  | { type: 'settings.rules.update'; patch: Partial<BoardRules> };
 
 export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }
   | { type: 'ui.openCard'; cardId: Id }
+  | { type: 'viewState'; view: ViewState }
   | { type: 'error'; message: string };
 
 export type { WorkflowKind };

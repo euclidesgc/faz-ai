@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
-import { onHostMessage } from './vscode';
-import { useBoardStore } from './store/boardStore';
+import { useBoardStore, useHostSync } from './store/boardStore';
 import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
 import { Dialog } from './components/Dialog';
@@ -9,20 +8,15 @@ import { TrashView } from './components/TrashView';
 import { Settings } from './components/settings/Settings';
 
 export function App() {
-  const { state, error, view, setState, setError, setView, send, openCardId, openCard } = useBoardStore();
+  useHostSync();
+  const { state, error, view, setError, setView, openCardId } = useBoardStore();
 
+  // erros (ex.: regra de conclusão) somem sozinhos
   useEffect(() => {
-    const off = onHostMessage((msg) => {
-      if (msg.type === 'boardState') setState(msg.state, msg.attachmentsBaseUri);
-      else if (msg.type === 'error') setError(msg.message);
-      else if (msg.type === 'ui.openCard') {
-        setView('board');
-        openCard(msg.cardId);
-      }
-    });
-    send({ type: 'ready' });
-    return off;
-  }, [setState, setError, setView, openCard, send]);
+    if (!error) return;
+    const t = setTimeout(() => setError(null), 7000);
+    return () => clearTimeout(t);
+  }, [error, setError]);
 
   if (!state) return <div className="loading">Carregando board…</div>;
   const trashCount = state.cards.filter((c) => c.deletedAt !== null).length;

@@ -1,4 +1,5 @@
 import type { Database } from 'sql.js';
+import type { ColumnCategory } from '../../shared/model';
 import { newId } from './ids';
 
 /** Cria o board padrão para um workspace e devolve seu id. */
@@ -13,12 +14,12 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
     db.run('INSERT INTO workflows(id, board_id, name, position, kind) VALUES (?,?,?,?,?)', [parentWf, boardId, 'Histórias', 0, 'parent']);
     db.run('INSERT INTO workflows(id, board_id, name, position, kind) VALUES (?,?,?,?,?)', [childWf, boardId, 'Sub-tarefas', 1, 'child']);
 
-    const cols = (wf: string, names: [string, boolean][]) =>
-      names.forEach(([n, terminal], i) =>
-        db.run('INSERT INTO columns(id, workflow_id, name, position, is_terminal) VALUES (?,?,?,?,?)', [newId(), wf, n, i, terminal ? 1 : 0]),
+    const cols = (wf: string, names: [string, ColumnCategory][]) =>
+      names.forEach(([n, category], i) =>
+        db.run('INSERT INTO columns(id, workflow_id, name, position, is_terminal, category) VALUES (?,?,?,?,?,?)', [newId(), wf, n, i, category === 'open' ? 0 : 1, category]),
       );
-    cols(parentWf, [['Backlog', false], ['Em andamento', false], ['Concluído', true], ['Cancelado', true]]);
-    cols(childWf, [['A fazer', false], ['Em andamento', false], ['Concluído', true]]);
+    cols(parentWf, [['Backlog', 'open'], ['Em andamento', 'open'], ['Concluído', 'done'], ['Cancelado', 'cancelled']]);
+    cols(childWf, [['A fazer', 'open'], ['Em andamento', 'open'], ['Concluído', 'done']]);
 
     const subtaskType = newId();
     const types: [string, string, string, string][] = [

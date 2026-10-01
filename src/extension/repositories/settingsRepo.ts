@@ -1,5 +1,5 @@
 import type { Database } from 'sql.js';
-import type { FieldDisplay, FieldKind } from '../../shared/model';
+import type { ColumnCategory, FieldDisplay, FieldKind } from '../../shared/model';
 import { newId } from '../db/ids';
 import { all, num, one, run, str, transaction } from '../db/query';
 
@@ -14,11 +14,12 @@ export class SettingsRepo {
     return id;
   }
 
-  updateColumn(columnId: string, patch: { name?: string; isTerminal?: boolean; position?: number }): void {
+  updateColumn(columnId: string, patch: { name?: string; category?: ColumnCategory; position?: number }): void {
     const db = this.db;
     transaction(db, () => {
       if (patch.name !== undefined) run(db, 'UPDATE columns SET name = ? WHERE id = ?', [patch.name, columnId]);
-      if (patch.isTerminal !== undefined) run(db, 'UPDATE columns SET is_terminal = ? WHERE id = ?', [patch.isTerminal ? 1 : 0, columnId]);
+      if (patch.category !== undefined)
+        run(db, 'UPDATE columns SET category = ?, is_terminal = ? WHERE id = ?', [patch.category, patch.category === 'open' ? 0 : 1, columnId]);
       if (patch.position !== undefined) {
         const col = one(db, 'SELECT workflow_id FROM columns WHERE id = ?', [columnId]);
         if (!col) throw new Error('Coluna não encontrada');

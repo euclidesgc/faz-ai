@@ -1,6 +1,7 @@
 import type { Database } from 'sql.js';
 import type { Attachment, Board, BoardState, Card, CardType, ChecklistItem, Column, Comment, FieldDef, FieldValueRow, Workflow } from '../../shared/model';
 import { all, bool, num, one, run, str } from '../db/query';
+import { parseRules, type BoardRules } from '../../shared/rules';
 import { seedBoard } from '../db/seed';
 
 export class BoardRepo {
@@ -13,7 +14,15 @@ export class BoardRepo {
       seedBoard(this.db, workspaceKey, name);
       row = one(this.db, 'SELECT * FROM boards WHERE workspace_key = ?', [workspaceKey])!;
     }
-    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name) };
+    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)) };
+  }
+
+  updateRules(boardId: string, patch: Partial<BoardRules>): void {
+    const row = one(this.db, 'SELECT rules_json FROM boards WHERE id = ?', [boardId]);
+    if (!row) throw new Error('Board não encontrado');
+    // parseRules valida o resultado: valores desconhecidos voltam ao padrão
+    const next = parseRules(JSON.stringify({ ...parseRules(str(row.rules_json)), ...patch }));
+    run(this.db, 'UPDATE boards SET rules_json = ? WHERE id = ?', [JSON.stringify(next), boardId]);
   }
 
   updateBoard(boardId: string, patch: { name?: string }): void {
@@ -28,7 +37,7 @@ export class BoardRepo {
     const db = this.db;
     const b = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
     if (!b) throw new Error('Board não encontrado');
-    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name) };
+    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)) };
 
     const workflows: Workflow[] = all(db, 'SELECT * FROM workflows WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), position: num(r.position), kind: str(r.kind) as Workflow['kind'],
@@ -38,7 +47,7 @@ export class BoardRepo {
       db,
       'SELECT c.* FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? ORDER BY c.position',
       [boardId],
-    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), isTerminal: bool(r.is_terminal) }));
+    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), category: str(r.category) as Column['category'], isTerminal: str(r.category) !== 'open' }));
 
     const cardTypes: CardType[] = all(db, 'SELECT * FROM card_types WHERE board_id = ? ORDER BY rowid', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), color: str(r.color), defaultWorkflowId: str(r.default_workflow_id),

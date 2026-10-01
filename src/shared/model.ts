@@ -1,6 +1,10 @@
+import type { BoardRules } from './rules';
+
 export type Id = string;
 
 export type WorkflowKind = 'parent' | 'child';
+/** O que a coluna representa no fluxo. */
+export type ColumnCategory = 'open' | 'done' | 'cancelled';
 export type FieldKind = 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'url';
 export type FieldDisplay = 'badge' | 'chip' | 'inline' | 'hidden';
 
@@ -8,6 +12,7 @@ export interface Board {
   id: Id;
   workspaceKey: string;
   name: string;
+  rules: BoardRules;
 }
 
 export interface Workflow {
@@ -23,6 +28,8 @@ export interface Column {
   workflowId: Id;
   name: string;
   position: number;
+  category: ColumnCategory;
+  /** derivado: category !== 'open' */
   isTerminal: boolean;
 }
 

@@ -2,7 +2,7 @@
   "name": "faz-ai",
   "displayName": "Faz AI Kanban",
   "description": "Quadro kanban com histórias e sub-tarefas dentro do VSCode",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "euclidesgc",
   "private": true,
   "engines": {
@@ -44,6 +44,12 @@
         {
           "id": "fazai.sidebar",
           "name": "Board",
+          "icon": "media/kanban.svg"
+        },
+        {
+          "id": "fazai.filters",
+          "name": "Filtros",
+          "type": "webview",
           "icon": "media/kanban.svg"
         }
       ]

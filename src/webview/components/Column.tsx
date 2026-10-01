@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import type { Card, Column as ColumnModel, Workflow } from '../../shared/model';
+import type { Card, Column as ColumnModel, ColumnCategory, Workflow } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
 import { SortableCard } from './Card';
 import { Menu } from './Menu';
+
+const CATEGORIES: { value: ColumnCategory; label: string; hint: string }[] = [
+  { value: 'open', label: 'Trabalho em aberto', hint: '' },
+  { value: 'done', label: 'Conclusão', hint: 'Coluna de conclusão: cards aqui contam como concluídos. Uma história só entra quando não tem sub-tarefas em aberto.' },
+  { value: 'cancelled', label: 'Cancelamento', hint: 'Coluna de cancelamento: cards aqui contam como encerrados sem conclusão.' },
+];
 
 interface Props {
   column: ColumnModel;
@@ -76,7 +82,9 @@ export function Column({ column, workflow, cards, total, index, siblings }: Prop
           />
         ) : (
           <span className="column-name" title="Duplo clique para renomear" onDoubleClick={() => setRenaming(column.name)}>
-            {column.isTerminal && <span className="terminal-mark" title="Coluna de conclusão">✓ </span>}
+            {column.category !== 'open' && (
+              <span className={`terminal-mark ${column.category}`} title={CATEGORIES.find((c) => c.value === column.category)!.hint}>{column.category === 'done' ? '✓ ' : '✕ '}</span>
+            )}
             {column.name}
           </span>
         )}
@@ -85,8 +93,14 @@ export function Column({ column, workflow, cards, total, index, siblings }: Prop
           title="Ações da coluna"
           items={[
             { label: 'Renomear', onClick: () => setRenaming(column.name) },
-            { label: column.isTerminal ? 'Desmarcar como concluída' : 'Marcar como concluída', onClick: () => send({ type: 'settings.column.update', columnId: column.id, patch: { isTerminal: !column.isTerminal } }) },
             'sep',
+            { header: 'Esta coluna representa' },
+            ...CATEGORIES.map((c) => ({
+              label: c.label,
+              checked: column.category === c.value,
+              onClick: () => send({ type: 'settings.column.update', columnId: column.id, patch: { category: c.value } }),
+            })),
+            'sep' as const,
             { label: '← Mover para a esquerda', disabled: index === 0, onClick: () => send({ type: 'settings.column.update', columnId: column.id, patch: { position: index - 1 } }) },
             { label: '→ Mover para a direita', disabled: index === siblings.length - 1, onClick: () => send({ type: 'settings.column.update', columnId: column.id, patch: { position: index + 1 } }) },
             'sep',
