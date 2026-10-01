@@ -17,7 +17,7 @@ na linha de baixo, campos personalizáveis e checklist por card.
    ela para arquivar, ou de volta para uma coluna para desarquivar.
 5. **Lixeira:** aba no topo, com restaurar, apagar de vez e esvaziar.
 6. **Filtros:** busca por palavra-chave no board; a seção **Filtros** da barra lateral tem tipo, campos,
-   data/período, relacionamentos e um seletor de história com busca. Os filtros ativos aparecem como
+   data/período e relacionamentos. Os filtros ativos aparecem como
    chips no board e são lembrados por workspace.
 7. **Regras:** em Configurações → Regras, cada regra aparece como "quando… então…" com seu controle:
    bloquear conclusão com sub-tarefas em aberto, o que fazer com as sub-tarefas ao cancelar uma

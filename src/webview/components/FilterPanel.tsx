@@ -1,7 +1,6 @@
 import type { DatePreset, Relation } from '../../shared/filters';
 import type { FieldDef } from '../../shared/model';
-import { isLive, useBoardStore } from '../store/boardStore';
-import { CardPicker } from './CardPicker';
+import { useBoardStore } from '../store/boardStore';
 
 const toggle = (list: string[], v: string): string[] => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
@@ -9,12 +8,10 @@ const toggle = (list: string[], v: string): string[] => (list.includes(v) ? list
 export function FilterPanel() {
   const state = useBoardStore((s) => s.state)!;
   const filters = useBoardStore((s) => s.filters);
-  const selectedParentId = useBoardStore((s) => s.selectedParentId);
-  const { setFilters, selectParent } = useBoardStore();
+  const setFilters = useBoardStore((s) => s.setFilters);
 
   const optionFields = state.fieldDefs.filter((f) => f.kind === 'select' || f.kind === 'multiselect' || f.kind === 'checkbox');
   const dateFields = state.fieldDefs.filter((f) => f.kind === 'date');
-  const stories = state.cards.filter((c) => !c.parentId && isLive(c));
   const setField = (f: FieldDef, value: string) => setFilters({ fields: { ...filters.fields, [f.id]: toggle(filters.fields[f.id] ?? [], value) } });
 
   return (
@@ -78,10 +75,6 @@ export function FilterPanel() {
         </label>
       </div>
 
-      <div className="filter-group">
-        <h3>Sub-tarefas de uma história</h3>
-        <CardPicker cards={stories} selectedId={selectedParentId} onSelect={selectParent} />
-      </div>
     </div>
   );
 }

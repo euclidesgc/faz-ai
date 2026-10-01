@@ -253,16 +253,9 @@ button.ghost.on { background: var(--hover); color: var(--fg); }
 /* view de filtros na barra lateral */
 body.sidebar-view { background: transparent; }
 .filters-view { display: flex; flex-direction: column; gap: 12px; padding: 10px 14px 20px; }
-.filters-view .search, .filter-group select, .card-picker input { width: 100%; }
+.filters-view .search, .filter-group select { width: 100%; }
 .filter-group { gap: 6px; }
 
-.card-picker { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
-.card-picker ul { list-style: none; margin: 0; padding: 0; width: 100%; border: 1px solid var(--border); border-radius: 4px; max-height: 260px; overflow-y: auto; }
-.card-picker li { padding: 4px 8px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-picker li:hover { background: var(--hover); }
-.card-picker li.on { background: var(--vscode-list-activeSelectionBackground, var(--btn-bg)); color: var(--vscode-list-activeSelectionForeground, var(--btn-fg)); }
-.card-picker li.none { cursor: default; }
-.card-picker .filter-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* regras (Configurações → Regras) */
 .rule { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; align-items: center; }
