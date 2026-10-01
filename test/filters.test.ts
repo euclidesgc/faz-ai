@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BoardState, Card } from '../src/shared/model';
-import { EMPTY_FILTERS, applyFilters, activeFilterCount, type Filters } from '../src/webview/store/filters';
+import { DEFAULT_RULES } from '../src/shared/rules';
+import { EMPTY_FILTERS, applyFilters, activeFilterCount, type Filters } from '../src/shared/filters';
 
 const NOW = new Date(2026, 9, 1, 12).getTime();
 const DAY = 86400000;
@@ -11,12 +12,12 @@ const card = (id: string, over: Partial<Card> = {}): Card => ({
 });
 
 const state: BoardState = {
-  board: { id: 'b', workspaceKey: 'k', name: 'B' },
+  board: { id: 'b', workspaceKey: 'k', name: 'B', rules: DEFAULT_RULES },
   workflows: [{ id: 'wp', boardId: 'b', name: 'H', position: 0, kind: 'parent' }, { id: 'wc', boardId: 'b', name: 'S', position: 1, kind: 'child' }],
   columns: [
-    { id: 'todo', workflowId: 'wp', name: 'Backlog', position: 0, isTerminal: false },
-    { id: 'c-todo', workflowId: 'wc', name: 'A fazer', position: 0, isTerminal: false },
-    { id: 'c-done', workflowId: 'wc', name: 'Concluído', position: 1, isTerminal: true },
+    { id: 'todo', workflowId: 'wp', name: 'Backlog', position: 0, category: 'open', isTerminal: false },
+    { id: 'c-todo', workflowId: 'wc', name: 'A fazer', position: 0, category: 'open', isTerminal: false },
+    { id: 'c-done', workflowId: 'wc', name: 'Concluído', position: 1, category: 'done', isTerminal: true },
   ],
   cardTypes: [],
   cards: [

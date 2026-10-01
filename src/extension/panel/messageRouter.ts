@@ -74,10 +74,12 @@ export class MessageRouter {
   private apply(msg: WebviewToHost): boolean {
     switch (msg.type) {
       case 'ready':
+      case 'view.set':
+      case 'ui.showFilters':
       case 'attachment.pick':
       case 'attachment.open':
       case 'attachment.reveal':
-        return false; // tratados pelo painel (dependem do VSCode)
+        return false; // tratados pela ponte do webview (dependem do VSCode)
       case 'card.create':
         this.cards.create(this.boardId, msg);
         return true;
@@ -85,7 +87,7 @@ export class MessageRouter {
         this.cards.update(msg.cardId, msg.patch);
         return true;
       case 'card.move':
-        this.cards.move(msg.cardId, msg.columnId, msg.position);
+        this.cards.move(msg.cardId, msg.columnId, msg.position, { cancelChildren: msg.cancelChildren });
         return true;
       case 'card.trash':
         this.cards.trash(msg.cardId);
@@ -166,6 +168,9 @@ export class MessageRouter {
         return true;
       case 'settings.workflow.update':
         this.boards.updateWorkflow(msg.workflowId, msg.patch);
+        return true;
+      case 'settings.rules.update':
+        this.boards.updateRules(this.boardId, msg.patch);
         return true;
       case 'settings.board.update':
         this.boards.updateBoard(this.boardId, msg.patch);

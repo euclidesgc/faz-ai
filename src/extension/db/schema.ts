@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 4;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -102,6 +102,14 @@ const MIGRATIONS: Record<number, string> = {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_attachments_card ON attachments(card_id);
+  `,
+  3: `
+    ALTER TABLE columns ADD COLUMN category TEXT NOT NULL DEFAULT 'open';
+    UPDATE columns SET category = 'done' WHERE is_terminal = 1;
+    UPDATE columns SET category = 'cancelled' WHERE is_terminal = 1 AND lower(name) LIKE 'cancel%';
+  `,
+  4: `
+    ALTER TABLE boards ADD COLUMN rules_json TEXT NOT NULL DEFAULT '{}';
   `,
 };
 

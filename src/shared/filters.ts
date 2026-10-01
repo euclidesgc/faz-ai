@@ -1,4 +1,4 @@
-import type { BoardState, Card, FieldValue, Id } from '../../shared/model';
+import type { BoardState, Card, FieldValue, Id } from './model';
 
 export type DatePreset = 'today' | '7d' | '30d' | 'custom';
 export type Relation = 'any' | 'withChildren' | 'withoutChildren' | 'pendingChildren';
@@ -23,6 +23,15 @@ export interface Filters {
 export const EMPTY_FILTERS: Filters = {
   text: '', typeIds: [], fields: {}, dateField: null, datePreset: null, dateFrom: '', dateTo: '', relation: 'any', includeRelated: true,
 };
+
+/** Estado de visualização compartilhado entre o board e a barra lateral. */
+export interface ViewState {
+  filters: Filters;
+  selectedParentId: Id | null;
+  showArchived: boolean;
+}
+
+export const EMPTY_VIEW_STATE: ViewState = { filters: EMPTY_FILTERS, selectedParentId: null, showArchived: false };
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -63,7 +72,7 @@ function parseDay(s: string): number | null {
 }
 
 const valueText = (v: FieldValue): string => (v === null ? '' : Array.isArray(v) ? v.join(' ') : String(v));
-const norm = (s: string): string => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+export const norm = (s: string): string => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 /**
  * Devolve os ids dos cards que passam nos filtros, ou null quando nenhum filtro está ativo.

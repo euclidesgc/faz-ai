@@ -1,5 +1,6 @@
 import type { Database } from 'sql.js';
 import type { FieldValue } from '../../shared/model';
+import { parseRules } from '../../shared/rules';
 import { newId, now } from '../db/ids';
 import { all, num, one, run, str, transaction } from '../db/query';
 
@@ -42,16 +43,65 @@ export class CardRepo {
   }
 
   /** Move para coluna (mesmo workflow) e reindexa as posições das colunas afetadas. */
-  move(cardId: string, columnId: string, position: number): void {
+  move(cardId: string, columnId: string, position: number, opts: { cancelChildren?: boolean } = {}): void {
+    transaction(this.db, () => {
+      this.moveInner(cardId, columnId, position);
+      if (opts.cancelChildren) this.cancelOpenChildren(cardId, columnId);
+    });
+  }
+
+  /**
+   * Se a história foi para uma coluna de cancelamento, leva as sub-tarefas em aberto para a coluna
+   * de cancelamento do workflow delas (criada como "Cancelado" se ainda não existir).
+   */
+  private cancelOpenChildren(parentId: string, parentColumnId: string): void {
     const db = this.db;
-    transaction(db, () => {
-      const card = one(db, 'SELECT workflow_id, column_id FROM cards WHERE id = ?', [cardId]);
+    if (str(one(db, 'SELECT category FROM columns WHERE id = ?', [parentColumnId])?.category) !== 'cancelled') return;
+    const kids = all(
+      db,
+      `SELECT c.id, c.workflow_id FROM cards c JOIN columns k ON k.id = c.column_id
+       WHERE c.parent_id = ? AND c.deleted_at IS NULL AND c.archived_at IS NULL AND k.category = 'open' ORDER BY c.position`,
+      [parentId],
+    );
+    const target = new Map<string, string>();
+    for (const kid of kids) {
+      const wf = str(kid.workflow_id);
+      if (!target.has(wf)) {
+        let col = one(db, "SELECT id FROM columns WHERE workflow_id = ? AND category = 'cancelled' ORDER BY position LIMIT 1", [wf]);
+        if (!col) {
+          const id = newId();
+          const pos = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM columns WHERE workflow_id = ?', [wf])?.p);
+          run(db, "INSERT INTO columns(id, workflow_id, name, position, is_terminal, category) VALUES (?,?,?,?,1,'cancelled')", [id, wf, 'Cancelado', pos]);
+          col = { id };
+        }
+        target.set(wf, str(col.id));
+      }
+      this.moveInner(str(kid.id), target.get(wf)!, Number.MAX_SAFE_INTEGER);
+    }
+  }
+
+  private moveInner(cardId: string, columnId: string, position: number): void {
+    const db = this.db;
+    {
+      const card = one(db, 'SELECT board_id, workflow_id, column_id, parent_id, title FROM cards WHERE id = ?', [cardId]);
       if (!card) throw new Error('Card não encontrado');
-      const col = one(db, 'SELECT workflow_id FROM columns WHERE id = ?', [columnId]);
+      const col = one(db, 'SELECT workflow_id, category FROM columns WHERE id = ?', [columnId]);
       if (!col) throw new Error('Coluna não encontrada');
       if (str(col.workflow_id) !== str(card.workflow_id)) throw new Error('Não é possível mover entre workflows');
 
       const fromCol = str(card.column_id);
+      // regra: um card pai só vai para uma coluna de conclusão quando não restam sub-tarefas em aberto
+      if (str(col.category) === 'done' && card.parent_id == null && fromCol !== columnId && this.rules(str(card.board_id)).blockDoneWithOpenChildren) {
+        const open = num(
+          one(
+            db,
+            `SELECT COUNT(*) AS n FROM cards c JOIN columns k ON k.id = c.column_id
+             WHERE c.parent_id = ? AND c.deleted_at IS NULL AND c.archived_at IS NULL AND k.category = 'open'`,
+            [cardId],
+          )?.n,
+        );
+        if (open > 0) throw new Error(`Não é possível concluir "${str(card.title)}": ${open} sub-tarefa(s) ainda em aberto.`);
+      }
       const ids = all(db, 'SELECT id FROM cards WHERE column_id = ? AND id != ? ORDER BY position', [columnId, cardId]).map((r) => str(r.id));
       const idx = Math.max(0, Math.min(position, ids.length));
       ids.splice(idx, 0, cardId);
@@ -62,7 +112,7 @@ export class CardRepo {
           run(db, 'UPDATE cards SET position = ? WHERE id = ?', [i, str(r.id)]),
         );
       }
-    });
+    }
   }
 
   /** Manda o card (e suas sub-tarefas ainda ativas) para a lixeira. */
@@ -80,8 +130,10 @@ export class CardRepo {
 
   /** Desarquiva; opcionalmente já move para uma coluna/posição. */
   unarchive(cardId: string, columnId?: string, position?: number): void {
-    this.unmark('archived_at', cardId, 'Desarquive a história pai primeiro');
-    if (columnId) this.move(cardId, columnId, position ?? Number.MAX_SAFE_INTEGER);
+    transaction(this.db, () => {
+      this.unmark('archived_at', cardId, 'Desarquive a história pai primeiro');
+      if (columnId) this.moveInner(cardId, columnId, position ?? Number.MAX_SAFE_INTEGER);
+    });
   }
 
   /** Apaga de vez o card e seus filhos. Devolve os ids removidos (para limpar anexos). */
@@ -103,6 +155,10 @@ export class CardRepo {
       run(db, 'DELETE FROM cards WHERE board_id = ? AND deleted_at IS NOT NULL', [boardId]);
       return ids;
     });
+  }
+
+  private rules(boardId: string) {
+    return parseRules(str(one(this.db, 'SELECT rules_json FROM boards WHERE id = ?', [boardId])?.rules_json));
   }
 
   private mark(col: 'deleted_at' | 'archived_at', cardId: string): void {
