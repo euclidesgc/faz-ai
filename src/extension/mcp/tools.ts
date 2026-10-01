@@ -512,9 +512,9 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   tool(
     'detect_models',
     'Relê os modelos de uma ferramenta e os junta ao catálogo. Para o Kimi, lê a lista real do config.toml local; para as demais, usa a lista embutida na extensão.',
-    { tool: toolArg },
+    { tool: toolArg.optional().describe('Por padrão, a ferramenta em uso no projeto') },
     (a, router) => {
-      router.handle({ type: 'settings.models.detect', tool: a.tool as AiTool });
+      router.handle({ type: 'settings.models.detect', tool: (a.tool as AiTool | undefined) ?? router.snapshot().board.aiTool });
       return models(router);
     },
   );
@@ -592,9 +592,9 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   tool(
     'suggest_model_rules',
     'Recria as regras "Esforço da tarefa → modelo" (Baixo, Médio, Alto) com um modelo leve, um intermediário e um forte da ferramenta indicada.',
-    { tool: toolArg },
+    { tool: toolArg.optional().describe('Por padrão, a ferramenta em uso no projeto') },
     (a, router) => {
-      router.handle({ type: 'settings.modelRules.suggest', tool: a.tool as AiTool });
+      router.handle({ type: 'settings.modelRules.suggest', tool: (a.tool as AiTool | undefined) ?? router.snapshot().board.aiTool });
       return models(router);
     },
   );
@@ -612,18 +612,18 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'get_harness',
-    'Lista o harness de IA do projeto: ferramentas em uso, arquivos de regras (CLAUDE.md, AGENTS.md…) e skills, ligadas e desligadas, com descrição e caminho.',
+    'Lista o harness de IA do projeto: a ferramenta em uso, os arquivos de regras (CLAUDE.md, AGENTS.md) e as skills dela, ligadas e desligadas, com descrição e caminho.',
     {},
     (_a, router) => harness(router),
     true,
   );
 
   tool(
-    'set_ai_tools',
-    'Define quais ferramentas de IA são usadas no projeto. Isso decide em que pastas as skills ficam: .claude/skills para o Claude Code, .agents/skills para o Codex (Cursor e Kimi leem as duas).',
-    { tools: z.array(z.enum(ALL_AI_TOOLS as [string, ...string[]])) },
+    'set_ai_tool',
+    'Define a ferramenta de IA com que o projeto trabalha (uma por vez). Isso troca a pasta de skills (.claude/skills, .agents/skills, .cursor/skills ou .kimi/skills), o arquivo de regras, os modelos e as regras de esforço.',
+    { tool: z.enum(ALL_AI_TOOLS as [string, ...string[]]) },
     (a, router) => {
-      router.handle({ type: 'settings.board.update', patch: { aiTools: a.tools as typeof ALL_AI_TOOLS } });
+      router.handle({ type: 'settings.board.update', patch: { aiTool: a.tool as AiTool } });
       return harness(router);
     },
   );
@@ -648,7 +648,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'create_skill',
-    'Cria uma skill no projeto, na pasta lida pelas ferramentas de IA em uso (.claude/skills e/ou .agents/skills). Ela passa a ser uma opção do campo "Skills" dos cards.',
+    'Cria uma skill no projeto, na pasta de skills da ferramenta de IA em uso. Ela passa a ser uma opção do campo "Skills" dos cards.',
     {
       name: z.string().describe('Letras minúsculas, números e hífens'),
       description: z.string().min(1).describe('Quando a skill deve ser usada; é por ela que a IA decide invocá-la'),

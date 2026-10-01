@@ -85,8 +85,11 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
 
 /** Modelo + nível de esforço, escolhidos no catálogo do board. */
 export function ModelEditor({ value, onChange }: { value: FieldValue; onChange: (v: FieldValue) => void }) {
-  const catalog = useBoardStore((s) => s.state?.board.modelCatalog ?? []);
+  const all = useBoardStore((s) => s.state?.board.modelCatalog ?? []);
+  const tool = useBoardStore((s) => s.state?.board.aiTool);
   const current = parseModelValue(value);
+  // oferece os modelos da ferramenta em uso; um valor de outra ferramenta continua visível até ser trocado
+  const catalog = all.filter((o) => o.tool === tool || o.id === current?.id);
   const option = current ? catalog.find((o) => o.id === current.id) : undefined;
   return (
     <div className="row model-editor">

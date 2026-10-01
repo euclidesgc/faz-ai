@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AI_TOOLS } from '../../../shared/harness';
+import { aiToolInfo } from '../../../shared/harness';
 import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelLabel, modelValue, type ModelRule, type RuleCondition } from '../../../shared/models';
 import type { BoardState } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
@@ -92,7 +92,8 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
 export function ModelRulesEditor() {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
-  const { modelRules: rules, modelCatalog: catalog, aiTools } = state.board;
+  const { modelRules: rules, modelCatalog: allModels, aiTool } = state.board;
+  const catalog = allModels.filter((o) => o.tool === aiTool);
   const [editing, setEditing] = useState<ModelRule | null>(null);
 
   const setRules = (next: ModelRule[]) => send({ type: 'settings.modelRules.set', rules: next });
@@ -112,7 +113,7 @@ export function ModelRulesEditor() {
     const o = catalog[0];
     setEditing({ id: newId(), name: '', enabled: true, groups: [[{ fieldId: first.id, op: 'is', value: first.values[0] ?? '' }]], model: o ? modelValue(o.id, o.defaultEffort) : '' });
   };
-  const tools = AI_TOOLS.filter((t) => aiTools.includes(t.id) || catalog.some((o) => o.tool === t.id));
+  const tool = aiToolInfo(aiTool);
   const hasEffort = state.fieldDefs.some((f) => f.name.toLowerCase() === EFFORT_FIELD.toLowerCase());
 
   return (
@@ -131,7 +132,7 @@ export function ModelRulesEditor() {
               <td className="narrow"><input type="checkbox" title={r.enabled ? 'Regra em uso' : 'Regra desligada'} checked={r.enabled} onChange={(e) => setRules(rules.map((x) => (x.id === r.id ? { ...x, enabled: e.target.checked } : x)))} /></td>
               <td>{r.name || <span className="muted">(sem nome)</span>}</td>
               <td>{describeRule(state, r)}</td>
-              <td>{modelLabel(catalog, r.model, true)}</td>
+              <td>{modelLabel(allModels, r.model, true)}</td>
               <td className="narrow">
                 <button className="icon" title="Subir (tem prioridade sobre as de baixo)" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
                 <button className="icon" title="Descer" disabled={i === rules.length - 1} onClick={() => move(i, 1)}>↓</button>
@@ -150,8 +151,9 @@ export function ModelRulesEditor() {
           <div className="row">
             <button className="primary" disabled={!catalog.length} onClick={startNew}>Montar nova regra</button>
             <span className="spacer" />
-            <span className="muted small">Recriar as regras de "{EFFORT_FIELD}" (Baixo, Médio, Alto) com os modelos de:</span>
-            {tools.map((t) => <button key={t.id} disabled={!hasEffort} onClick={() => send({ type: 'settings.modelRules.suggest', tool: t.id })}>{t.label}</button>)}
+            <button disabled={!hasEffort} title={`Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do ${tool.label}`} onClick={() => send({ type: 'settings.modelRules.suggest', tool: aiTool })}>
+              Recriar as regras de "{EFFORT_FIELD}"
+            </button>
           </div>
         )}
     </div>

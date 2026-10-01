@@ -51,7 +51,7 @@ export class MessageRouter {
     this.store = new AttachmentStore(opts.attachmentsDir);
     const board = this.boards.getOrCreate(opts.workspaceKey, opts.folderName);
     this.boardId = board.id;
-    this.harnessStore = opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTools) : null;
+    this.harnessStore = opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTool) : null;
     this.loadHarness();
     this.initModels();
     dbHandle.scheduleSave();
@@ -86,15 +86,25 @@ export class MessageRouter {
     return this.opts.homeDir ?? '';
   }
 
-  /** Board sem catálogo (novo ou vindo de versão anterior): preenche com os modelos das ferramentas em uso. */
+  /**
+   * Board sem catálogo (novo ou vindo de versão anterior): escolhe a ferramenta instalada nesta
+   * máquina e preenche os modelos e as regras de esforço dela.
+   */
   private initModels(): void {
     const { board } = this.boards.snapshot(this.boardId);
     if (board.modelCatalog.length) return;
-    this.boards.setModelCatalog(this.boardId, board.aiTools.flatMap((t) => modelsFor(t, this.home)));
-    // as regras iniciais usam a primeira ferramenta em uso que está instalada nesta máquina
     const installed = detectTools(this.home);
-    const main = board.aiTools.find((t) => installed.includes(t)) ?? board.aiTools[0];
-    if (main && !board.modelRules.length) this.suggestRules(main);
+    const tool = installed.includes(board.aiTool) ? board.aiTool : installed[0] ?? board.aiTool;
+    if (tool !== board.aiTool) this.boards.updateBoard(this.boardId, { aiTool: tool });
+    this.useTool(tool);
+  }
+
+  /** Passa a trabalhar com a ferramenta: pasta de skills, modelos e regras de esforço dela. */
+  private useTool(tool: AiTool): void {
+    this.harnessStore?.setTool(tool);
+    this.loadHarness();
+    this.detectModels(tool);
+    this.suggestRules(tool);
   }
 
   /** Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. */
@@ -290,8 +300,6 @@ export class MessageRouter {
       case 'settings.board.reset':
         this.boards.deleteBoard(this.boardId).forEach((id) => this.store.removeCard(id));
         this.boardId = this.boards.getOrCreate(this.opts.workspaceKey, this.opts.folderName).id;
-        this.harnessStore?.setTools(this.boards.snapshot(this.boardId).board.aiTools);
-        this.loadHarness();
         this.initModels();
         return true;
       case 'settings.models.set':
@@ -320,11 +328,7 @@ export class MessageRouter {
         return this.harnessOp((h) => h.deleteSkill(msg.name));
       case 'settings.board.update':
         this.boards.updateBoard(this.boardId, msg.patch);
-        if (msg.patch.aiTools && this.harnessStore) {
-          // as ferramentas em uso definem em que pastas as skills precisam estar
-          this.harnessStore.setTools(this.boards.snapshot(this.boardId).board.aiTools);
-          this.loadHarness();
-        }
+        if (msg.patch.aiTool) this.useTool(this.boards.snapshot(this.boardId).board.aiTool);
         return true;
     }
   }

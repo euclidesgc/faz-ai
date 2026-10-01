@@ -51,7 +51,7 @@ export type WebviewToHost =
     }
   | { type: 'settings.field.delete'; fieldId: Id }
   | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string; collapsed?: boolean; archiveCollapsed?: boolean } }
-  | { type: 'settings.board.update'; patch: { name?: string; aiTools?: AiTool[] } }
+  | { type: 'settings.board.update'; patch: { name?: string; aiTool?: AiTool } }
   /** apaga tudo e recria o board com o padrão atual */
   | { type: 'settings.board.reset' }
   | { type: 'settings.models.set'; catalog: ModelOption[] }

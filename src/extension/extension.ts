@@ -4,7 +4,6 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { execFile } from 'node:child_process';
 import { openFile, type DbHandle } from './db/database';
-import { AI_TOOLS } from '../shared/harness';
 import { registerClients, type Registration } from './mcp/clientConfig';
 import { startMcpServer } from './mcp/server';
 import { socketPath, workspaceKey } from './mcp/socketPath';
@@ -84,7 +83,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // regras e skills editadas por fora (editor, IA, git) aparecem no board
   const wf = folder();
   if (wf) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(wf, '{CLAUDE.md,AGENTS.md,GEMINI.md,.claude/skills/**,.claude/skills-disabled/**,.agents/skills/**,.agents/skills-disabled/**}'));
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(wf, '{CLAUDE.md,AGENTS.md,.claude/skills*/**,.agents/skills*/**,.cursor/skills*/**,.kimi/skills*/**}'));
     let timer: NodeJS.Timeout | undefined;
     const refresh = () => {
       clearTimeout(timer);
@@ -111,7 +110,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 }
 
-/** Registra o servidor MCP do board na configuração de cada ferramenta de IA escolhida. */
+/** Registra o servidor MCP do board na configuração da ferramenta de IA em uso no projeto. */
 async function connectAI(bridgePath: string, getRouter: () => Promise<MessageRouter | undefined>): Promise<void> {
   const f = vscode.workspace.workspaceFolders?.[0];
   const router = await getRouter();
@@ -119,16 +118,11 @@ async function connectAI(bridgePath: string, getRouter: () => Promise<MessageRou
     vscode.window.showWarningMessage('Abra uma pasta para conectar uma IA ao board.');
     return;
   }
-  const inUse = router.snapshot().board.aiTools;
-  const picked = await vscode.window.showQuickPick(
-    AI_TOOLS.map((t) => ({ label: t.label, description: t.mcp, picked: inUse.includes(t.id), id: t.id })),
-    { canPickMany: true, title: 'Conectar IA ao board (MCP)', placeHolder: 'Em quais ferramentas registrar o servidor do board?' },
-  );
-  if (!picked?.length) return;
+  const tool = router.snapshot().board.aiTool;
 
   let done: Registration[];
   try {
-    done = registerClients(picked.map((p) => p.id), { bridgePath, workspaceDir: f.uri.fsPath, homeDir: os.homedir() });
+    done = registerClients([tool], { bridgePath, workspaceDir: f.uri.fsPath, homeDir: os.homedir() });
   } catch (e) {
     vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
     return;

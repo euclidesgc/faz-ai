@@ -138,7 +138,7 @@ describe('servidor MCP', () => {
 
 describe('harness e padrões pelo MCP', () => {
   it('gerencia regras e skills do projeto e sincroniza o campo Skills', async () => {
-    expect((await call('get_harness')).data.ruleFiles.map((r: any) => [r.name, r.exists])).toEqual([['CLAUDE.md', false], ['AGENTS.md', false], ['GEMINI.md', false]]);
+    expect((await call('get_harness')).data.ruleFiles.map((r: any) => [r.name, r.exists])).toEqual([['CLAUDE.md', false], ['AGENTS.md', false]]);
     await call('write_rule_file', { file: 'AGENTS.md', content: '# Regras\n' });
     expect(fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8')).toBe('# Regras\n');
     expect((await call('read_rule_file', { file: 'AGENTS.md' })).text).toBe('# Regras\n');
@@ -190,14 +190,22 @@ describe('modelos de IA', () => {
   it('monta o catálogo por ferramenta e interpreta modelo + esforço', async () => {
     const m = (await call('get_models')).data;
     expect(m.catalog.find((o: any) => o.value === 'claude:opus')).toMatchObject({ tool: 'claude', model: 'opus', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' });
-    expect(new Set(m.catalog.map((o: any) => o.tool))).toEqual(new Set(['claude', 'codex', 'cursor', 'kimi']));
+    expect(new Set(m.catalog.map((o: any) => o.tool))).toEqual(new Set(['claude'])); // só a ferramenta em uso
 
     await call('create_card', { title: 'História' });
     const set = async (modelo: string) => (await call('update_card', { card: 1, fields: { Modelo: modelo } }));
     expect((await set('Fable 5.1 low')).data.model).toMatchObject({ tool: 'claude', model: 'fable', effort: 'low' });
     expect((await set('claude:opus@high')).data.model).toMatchObject({ model: 'opus', effort: 'high', label: 'Claude Code · Opus 5.5 · high' });
     expect((await set('opus')).data.model.effort).toBe('medium'); // sem esforço informado, vale o padrão do modelo
+    expect((await set('Kimi Code K3 max')).text).toContain('não está no catálogo'); // modelo de outra ferramenta
+
+    // trocar de ferramenta traz os modelos e as regras de esforço dela
+    await call('set_ai_tool', { tool: 'kimi' });
+    const kimi = (await call('get_models')).data;
+    expect(kimi.catalog.some((o: any) => o.tool === 'kimi')).toBe(true);
+    expect(kimi.rules.map((r: any) => r.value)).toEqual(['kimi:kimi-code/k3@low', 'kimi:kimi-code/k3@high', 'kimi:kimi-code/k3@max']);
     expect((await set('Kimi Code K3 max')).data.model).toMatchObject({ tool: 'kimi', effort: 'max' });
+    await call('set_ai_tool', { tool: 'claude' });
     expect((await set('opus turbo')).text).toContain('não aceita o esforço');
     expect((await set('modelo-que-nao-existe')).text).toContain('não está no catálogo');
   });
@@ -314,31 +322,34 @@ describe('linhas e colunas colapsadas por padrão', () => {
 
 describe('ferramentas de IA', () => {
   const skillMd = (base: string) => path.join(dir, base, 'revisar-spec', 'SKILL.md');
-  const isLink = (p: string) => fs.lstatSync(p).isSymbolicLink();
 
-  it('grava as skills onde cada ferramenta lê', async () => {
-    // padrão: as quatro ferramentas → principal em .claude/skills com atalho em .agents/skills (Codex)
+  it('trabalha só com a pasta de skills da ferramenta em uso', async () => {
+    const names = async () => (await call('get_harness')).data.skills.map((k: any) => k.name);
     await call('create_skill', { name: 'revisar-spec', description: 'd', content: 'c' });
     expect(fs.existsSync(skillMd('.claude/skills'))).toBe(true);
-    expect(isLink(path.join(dir, '.agents/skills/revisar-spec'))).toBe(true);
-    expect(fs.readFileSync(skillMd('.agents/skills'), 'utf8')).toContain('name: revisar-spec');
-    expect((await call('get_harness')).data.skills).toHaveLength(1); // o atalho não conta em dobro
+    expect(fs.existsSync(path.join(dir, '.agents'))).toBe(false); // nada de cópia ou atalho em outra pasta
 
-    await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
-    expect(fs.existsSync(path.join(dir, '.agents/skills/revisar-spec'))).toBe(false);
-    expect(fs.existsSync(skillMd('.claude/skills-disabled'))).toBe(true);
-    await call('set_skill_enabled', { skill: 'revisar-spec', enabled: true });
-    expect(isLink(path.join(dir, '.agents/skills/revisar-spec'))).toBe(true);
+    // Codex: a pasta do Claude continua no disco, mas fica fora do board
+    const h = (await call('set_ai_tool', { tool: 'codex' })).data;
+    expect(h.aiTool).toBe('codex');
+    expect(h.skills).toEqual([]);
+    expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual([]);
+    await call('create_skill', { name: 'do-codex', description: 'd', content: 'c' });
+    expect(fs.existsSync(path.join(dir, '.agents/skills/do-codex/SKILL.md'))).toBe(true);
+    expect(fs.existsSync(skillMd('.claude/skills'))).toBe(true);
+    await call('set_skill_enabled', { skill: 'do-codex', enabled: false });
+    expect(fs.existsSync(path.join(dir, '.agents/skills-disabled/do-codex/SKILL.md'))).toBe(true);
+    expect((await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false })).error).toBe(true); // skill de outra ferramenta
 
-    // sem Codex o atalho some; sem Claude as skills novas vão para .agents/skills
-    await call('set_ai_tools', { tools: ['claude', 'cursor'] });
-    expect(fs.existsSync(path.join(dir, '.agents/skills/revisar-spec'))).toBe(false);
-    const h = (await call('set_ai_tools', { tools: ['codex', 'kimi'] })).data;
-    expect(h.aiTools).toEqual(['codex', 'kimi']);
-    expect(h.skills.map((k: any) => k.name)).toEqual(['revisar-spec']); // a que já existia continua visível
-    await call('create_skill', { name: 'outra', description: 'd', content: 'c' });
-    expect(fs.existsSync(path.join(dir, '.agents/skills/outra/SKILL.md'))).toBe(true);
-    expect(fs.existsSync(path.join(dir, '.claude/skills/outra'))).toBe(false);
+    for (const [tool, base] of [['cursor', '.cursor/skills'], ['kimi', '.kimi/skills']] as const) {
+      await call('set_ai_tool', { tool });
+      await call('create_skill', { name: `do-${tool}`, description: 'd', content: 'c' });
+      expect(fs.existsSync(path.join(dir, base, `do-${tool}`, 'SKILL.md'))).toBe(true);
+      expect(await names()).toEqual([`do-${tool}`]);
+    }
+    await call('set_ai_tool', { tool: 'claude' });
+    expect(await names()).toEqual(['revisar-spec']);
+    expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['revisar-spec']);
   });
 
   it('registra o servidor MCP no formato de cada ferramenta', async () => {

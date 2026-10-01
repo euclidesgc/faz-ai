@@ -60,8 +60,8 @@ apaga todos os cards e configurações do board.
 
 Configurações → **Modelos de IA** tem duas partes.
 
-**Catálogo.** Os modelos que cada ferramenta oferece, com os níveis de esforço que cada um aceita e
-o esforço padrão. O botão **Detectar modelos** de cada ferramenta atualiza a lista:
+**Catálogo.** Os modelos da ferramenta em uso no projeto, com os níveis de esforço que cada um
+aceita e o esforço padrão. O botão **Detectar modelos** atualiza a lista:
 
 | Ferramenta | De onde vem a lista ao detectar |
 | --- | --- |
@@ -79,8 +79,8 @@ os modelos que ela tem (`upsert_model`). Modelos acrescentados à mão são mant
   grupo alternativo é um **OU**. Exemplo: `Esforço = Alto E Tags = backend OU Tipo = Bug`.
 - **Adicionar à lista** põe a regra em uso. Na lista, cada regra pode ser ligada, desligada,
   editada, removida e reordenada; a primeira regra ligada que casa vence.
-- Os botões "Recriar as regras de Esforço com os modelos de…" geram as três regras (Baixo, Médio,
-  Alto) com um modelo leve, um intermediário e um forte da ferramenta escolhida.
+- O botão "Recriar as regras de Esforço" gera as três regras (Baixo, Médio, Alto) com um modelo
+  leve, um intermediário e um forte da ferramenta em uso.
 
 O resultado é sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer
 momento.
@@ -90,35 +90,36 @@ momento.
 - Um modelo escolhido à mão nunca é trocado. Quando ele difere da sugestão, o card mostra um
   botão pequeno (✦ com o modelo sugerido) que aplica a sugestão, e o detalhe mostra o link "Usar".
 
-Um board novo já nasce com o catálogo das ferramentas em uso e com as regras de Esforço da primeira
-ferramenta instalada na máquina.
+Um board novo já nasce com a primeira ferramenta instalada na máquina, o catálogo dela e as regras
+de Esforço correspondentes.
 
 ## Harness de IA
 
-Configurações → **Harness de IA** gerencia, pelo board, o que as ferramentas de IA leem no projeto.
+Configurações → **Harness de IA** gerencia, pelo board, o que a ferramenta de IA lê no projeto.
 
-**Ferramentas usadas neste projeto.** Marque Claude Code, Codex, Cursor e/ou Kimi Code. Cada uma lê
-lugares diferentes, e o board usa essa escolha para gravar tudo onde elas enxergam:
+**Ferramenta deste projeto.** O projeto trabalha com uma ferramenta por vez: Claude Code, Codex,
+Cursor ou Kimi Code. A escolhida define o arquivo de regras, a pasta das skills, onde o servidor MCP
+é registrado e os modelos oferecidos nos cards:
 
-| Ferramenta | Regras | Skills do projeto |
-| --- | --- | --- |
-| Claude Code | `CLAUDE.md` | `.claude/skills` |
-| Codex | `AGENTS.md` | `.agents/skills` |
-| Cursor | `AGENTS.md` | `.agents/skills`, `.cursor/skills`, `.claude/skills` |
-| Kimi Code | `AGENTS.md` | `.kimi/skills`, `.claude/skills`, `.agents/skills` |
+| Ferramenta | Regras | Skills do projeto | Servidor MCP |
+| --- | --- | --- | --- |
+| Claude Code | `CLAUDE.md` | `.claude/skills` | `.mcp.json` |
+| Codex | `AGENTS.md` | `.agents/skills` | `.codex/config.toml` |
+| Cursor | `AGENTS.md` | `.cursor/skills` | `.cursor/mcp.json` |
+| Kimi Code | `AGENTS.md` | `.kimi/skills` | `~/.kimi-code/mcp.json` ou `~/.kimi/mcp.json` |
 
-**Regras do projeto.** Cria, edita e apaga `CLAUDE.md`, `AGENTS.md` e `GEMINI.md` na raiz. Para
-manter as regras num arquivo só, escreva no `AGENTS.md` e use o botão **Usar o AGENTS.md** no
-`CLAUDE.md`: ele cria um `CLAUDE.md` que apenas importa o outro (`@AGENTS.md`).
+Pastas de outras ferramentas podem existir no projeto, mas o board não as mostra nem mexe nelas. Ao
+trocar de ferramenta, o board passa a listar as skills da pasta dela, carrega os modelos dela e
+recria as regras de Esforço com esses modelos. Nada é copiado nem apagado: voltar à ferramenta
+anterior traz de volta as skills que estavam na pasta dela.
 
-**Skills.** Cria, edita, liga, desliga e apaga skills (`<pasta>/<nome>/SKILL.md`).
+**Regras do projeto.** Cria, edita e apaga o arquivo de regras da ferramenta em uso. Com o Claude
+Code, se já existe um `AGENTS.md`, o botão **Usar o AGENTS.md** cria um `CLAUDE.md` que apenas o
+importa (`@AGENTS.md`), para as regras ficarem num arquivo só.
 
-- Com o Claude Code marcado, as skills ficam em `.claude/skills`. Se o Codex também estiver
-  marcado, cada skill ganha um atalho (symlink) em `.agents/skills`, que é o único lugar que o Codex
-  lê. Sem o Claude Code, as skills ficam em `.agents/skills`.
-- Desligar move a pasta para `<pasta>-disabled` e remove o atalho: a skill sai do contexto de todas
-  as ferramentas e o conteúdo fica guardado. Manter ligado só o necessário economiza contexto.
-- Skills que já existiam em qualquer uma das duas pastas aparecem no board.
+**Skills.** Cria, edita, liga, desliga e apaga skills (`<pasta>/<nome>/SKILL.md`) na pasta da
+ferramenta em uso. Desligar move a pasta para `<pasta>-disabled`: a skill sai do contexto da
+ferramenta e o conteúdo fica guardado. Manter ligado só o necessário economiza contexto.
 
 São arquivos da pasta do projeto, então entram no git normalmente, e mudanças feitas por fora (no
 editor, pela IA, por um `git pull`) aparecem no board.
@@ -131,8 +132,8 @@ board na hora, e as regras do board valem para ela também.
 
 ### Como conectar
 
-Rode **Faz AI: Conectar IA (MCP)** (ou o botão em Configurações → Harness de IA), marque as
-ferramentas que você usa e o board grava a configuração no lugar e no formato que cada uma lê:
+Rode **Faz AI: Conectar IA (MCP)** (ou o botão em Configurações → Harness de IA). O board registra
+o servidor na ferramenta em uso no projeto, no lugar e no formato que ela lê:
 
 | Ferramenta | Onde o servidor é registrado | Depois de registrar |
 | --- | --- | --- |

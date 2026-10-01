@@ -114,7 +114,8 @@ describe('telas montam sem erro', () => {
     expect(rules).toContain('Avançar de fase');
     expect(rules).toContain('Preencher o modelo sugerido');
     const models = html(<ModelsSettings />);
-    for (const text of ['Detectar modelos', 'Fable 5.1', 'gpt-6.1-sol', 'Sugestão de modelo', 'Esforço = Baixo', 'Montar nova regra', 'xhigh']) expect(models).toContain(text);
+    expect(models).not.toContain('gpt-6.1-sol'); // só a ferramenta em uso
+    for (const text of ['Detectar modelos', 'Fable 5.1', 'Sugestão de modelo', 'Esforço = Baixo', 'Montar nova regra', 'xhigh']) expect(models).toContain(text);
     const s = useBoardStore.getState().state!;
     const tags = s.fieldDefs.find((f) => f.name === 'Tags')!.id;
     const builder = html(
@@ -127,6 +128,6 @@ describe('telas montam sem erro', () => {
     for (const text of ['Tipo do card', 'OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
 
     const harness = html(<HarnessSettings />);
-    for (const text of ['Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.agents/skills']) expect(harness).toContain(text);
+    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)']) expect(harness).toContain(text);
   });
 });

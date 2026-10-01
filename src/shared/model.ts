@@ -15,8 +15,8 @@ export interface Board {
   workspaceKey: string;
   name: string;
   rules: BoardRules;
-  /** ferramentas de IA usadas no projeto; define onde skills e MCP são configurados */
-  aiTools: AiTool[];
+  /** ferramenta de IA com que o projeto trabalha; define regras, pasta de skills, MCP e modelos */
+  aiTool: AiTool;
   /** modelos de LLM disponíveis, por ferramenta */
   modelCatalog: ModelOption[];
   /** sugestão de modelo conforme os campos do card */

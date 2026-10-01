@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, skillDirs, type AiTool, type RuleFile, type Skill } from '../../../shared/harness';
+import { AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type RuleFile, type Skill } from '../../../shared/harness';
 import { useBoardStore } from '../../store/boardStore';
 
 type Editing = { kind: 'rule'; name: string } | { kind: 'skill'; name: string } | { kind: 'newSkill' } | null;
@@ -30,11 +30,12 @@ function FileEditor({ saved, onSave, onClose }: { saved: string; onSave: (conten
 export function HarnessSettings() {
   const state = useBoardStore((s) => s.state)!;
   const harness = state.harness;
-  const tools = state.board.aiTools;
-  const dirs = skillDirs(tools);
-  const agents = harness.rules.find((r) => r.name === 'AGENTS.md');
-  const toggleTool = (id: AiTool, on: boolean) => send({ type: 'settings.board.update', patch: { aiTools: on ? [...tools, id] : tools.filter((t) => t !== id) } });
   const send = useBoardStore((s) => s.send);
+  const tool = aiToolInfo(state.board.aiTool);
+  const agents = harness.rules.find((r) => r.name === 'AGENTS.md');
+  const useTool = (id: AiTool) => id !== tool.id && send({ type: 'settings.board.update', patch: { aiTool: id } });
+  // o arquivo de regras da ferramenta em uso; com o Claude Code, o AGENTS.md também aparece porque pode ser importado
+  const rules = harness.rules.filter((r) => r.name === tool.rules || (tool.id === 'claude' && r.name === 'AGENTS.md' && r.exists));
   const ask = useBoardStore((s) => s.ask);
   const [editing, setEditing] = useState<Editing>(null);
   const [name, setName] = useState('');
@@ -108,14 +109,17 @@ export function HarnessSettings() {
         Regras e skills que as ferramentas de IA leem neste projeto. Tudo aqui são arquivos da pasta do projeto: o board só os edita.
       </p>
 
-      <h3>Ferramentas usadas neste projeto</h3>
-      <p className="muted small">Cada ferramenta lê regras, skills e servidores MCP em lugares diferentes. Marque as que você usa: o board grava as skills onde elas enxergam.</p>
+      <h3>Ferramenta deste projeto</h3>
+      <p className="muted small">
+        O projeto trabalha com uma ferramenta de IA por vez. Ela define o arquivo de regras, a pasta das skills, onde o servidor MCP é registrado e
+        os modelos oferecidos nos cards. Pastas de outras ferramentas podem existir no projeto, mas o board não mexe nelas.
+      </p>
       <table className="table">
         <thead><tr><th></th><th>Ferramenta</th><th>Regras</th><th>Skills</th><th>MCP</th></tr></thead>
         <tbody>
           {AI_TOOLS.map((t) => (
-            <tr key={t.id}>
-              <td><input type="checkbox" checked={tools.includes(t.id)} onChange={(e) => toggleTool(t.id, e.target.checked)} /></td>
+            <tr key={t.id} className={t.id === tool.id ? '' : 'off'}>
+              <td><input type="radio" name="ai-tool" checked={t.id === tool.id} onChange={() => useTool(t.id)} /></td>
               <td>{t.label}</td>
               <td><code>{t.rules}</code></td>
               <td><code>{t.skills}</code></td>
@@ -125,13 +129,13 @@ export function HarnessSettings() {
         </tbody>
       </table>
       <div className="row">
-        <button className="primary" onClick={() => send({ type: 'ui.connectAI' })}>Conectar ao board (MCP)…</button>
-        <span className="muted small">Registra o servidor do board na configuração de cada ferramenta escolhida.</span>
+        <button className="primary" onClick={() => send({ type: 'ui.connectAI' })}>Conectar o {tool.label} ao board (MCP)</button>
+        <span className="muted small">Registra o servidor do board em {tool.mcp}.</span>
       </div>
 
       <h3 className="section-head">Regras do projeto</h3>
       <p className="muted small">Instruções carregadas em toda sessão de IA. Quanto mais curtas, menos contexto consomem.</p>
-      <div className="stack">{harness.rules.map(ruleRow)}</div>
+      <div className="stack">{rules.map(ruleRow)}</div>
 
       <div className="row section-head">
         <h3>Skills</h3>
@@ -139,8 +143,8 @@ export function HarnessSettings() {
         <button className="primary" onClick={() => setEditing(editing?.kind === 'newSkill' ? null : { kind: 'newSkill' })}>Nova skill</button>
       </div>
       <p className="muted small">
-        Skills ligadas ficam em <code>{dirs.primary}</code>{dirs.mirror && <> (com um atalho em <code>{dirs.mirror}</code>, que é onde o Codex procura)</>} e
-        viram opções do campo "Skills" dos cards. Desligar move a skill para <code>{dirs.primary}-disabled</code>: ela sai do contexto das ferramentas, mas o conteúdo é preservado.
+        Skills do {tool.label}: as ligadas ficam em <code>{tool.skills}</code> e viram opções do campo "Skills" dos cards. Desligar move a skill
+        para <code>{tool.skills}-disabled</code>: ela sai do contexto da ferramenta, mas o conteúdo é preservado.
       </p>
 
       {editing?.kind === 'newSkill' && (
@@ -164,7 +168,7 @@ export function HarnessSettings() {
 
       <div className="stack">
         {harness.skills.map(skillRow)}
-        {harness.skills.length === 0 && <p className="muted">Nenhuma skill neste projeto ainda.</p>}
+        {harness.skills.length === 0 && <p className="muted">Nenhuma skill em <code>{tool.skills}</code> ainda.</p>}
       </div>
     </div>
   );

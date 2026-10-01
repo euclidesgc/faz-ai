@@ -17,13 +17,14 @@ const SOURCES: Record<AiTool, string> = {
 export function ModelsSettings() {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
-  const { modelCatalog: catalog, aiTools } = state.board;
+  const { modelCatalog: catalog, aiTool } = state.board;
   const [draft, setDraft] = useState<Record<string, { model: string; label: string; efforts: string }>>({});
 
   const setCatalog = (next: ModelOption[]) => send({ type: 'settings.models.set', catalog: next });
   const patchModel = (id: string, patch: Partial<ModelOption>) => setCatalog(catalog.map((o) => (o.id === id ? { ...o, ...patch } : o)));
 
-  const tools = AI_TOOLS.filter((t) => aiTools.includes(t.id) || catalog.some((o) => o.tool === t.id));
+  // o projeto trabalha com uma ferramenta por vez: só os modelos dela aparecem
+  const tools = AI_TOOLS.filter((t) => t.id === aiTool);
 
   const addModel = (tool: AiTool) => {
     const d = draft[tool];
@@ -37,7 +38,7 @@ export function ModelsSettings() {
     <div>
       <h2>Modelos de IA</h2>
       <p className="muted">
-        Catálogo dos modelos que cada ferramenta oferece, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards.
+        Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness de IA.
       </p>
 
       <div className="stack">

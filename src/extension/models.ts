@@ -76,7 +76,7 @@ export function parseKimiModels(toml: string): ModelOption[] {
 
 /** Modelos lidos da configuração local da ferramenta, quando ela guarda a lista em arquivo. */
 export function discoverModels(tool: AiTool, homeDir: string): ModelOption[] {
-  if (tool !== 'kimi') return [];
+  if (tool !== 'kimi' || !homeDir) return [];
   for (const dir of ['.kimi-code', '.kimi']) {
     const file = path.join(homeDir, dir, 'config.toml');
     try {
@@ -97,6 +97,7 @@ export function modelsFor(tool: AiTool, homeDir: string): ModelOption[] {
 
 /** Ferramentas com sinal de instalação nesta máquina (pasta de configuração na home). */
 export function detectTools(homeDir: string): AiTool[] {
+  if (!homeDir) return [];
   const dirs: Record<AiTool, string[]> = { claude: ['.claude'], codex: ['.codex'], cursor: ['.cursor'], kimi: ['.kimi-code', '.kimi'] };
   return (Object.keys(dirs) as AiTool[]).filter((t) => dirs[t].some((d) => fs.existsSync(path.join(homeDir, d))));
 }
