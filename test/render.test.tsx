@@ -7,6 +7,7 @@ import { renderToString } from 'react-dom/server';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { Board } from '../src/webview/components/Board';
+import { CommentsTab } from '../src/webview/components/CommentsTab';
 import { CardDrawer } from '../src/webview/components/CardDrawer';
 import { FilterBar } from '../src/webview/components/FilterBar';
 import { TrashView } from '../src/webview/components/TrashView';
@@ -98,6 +99,16 @@ describe('telas montam sem erro', () => {
     expect(html(<TrashView />)).toContain('Lixo');
     const drawer = html(<CardDrawer cardId={storyId} />);
     expect(drawer).toContain('História');
+    // comentário de outro autor (ex.: a IA): pode ser apagado, mas não editado
+    const st = useBoardStore.getState().state!;
+    useBoardStore.setState({ state: { ...st, comments: st.comments.map((c) => ({ ...c, author: 'Claude Code' })) } });
+    const foreign = html(<CommentsTab cardId={storyId} />);
+    expect(foreign).toContain('Apagar');
+    expect(foreign).not.toContain('Editar');
+    useBoardStore.setState({ state: st });
+    const own = html(<CommentsTab cardId={storyId} />);
+    expect(own).toContain('Apagar');
+    expect(own).toContain('Editar');
     expect(drawer).toContain('Sugerido pelas regras');
     expect(drawer).toContain('Claude Code · Haiku 4.5');
   });

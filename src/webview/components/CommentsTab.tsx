@@ -46,12 +46,13 @@ function CommentItem({ comment, mine }: { comment: Comment; mine: boolean }) {
         <strong>{comment.author}</strong>
         <span className="muted small">{new Date(comment.createdAt).toLocaleString()}{comment.updatedAt > comment.createdAt && ' · editado'}</span>
         <span className="spacer" />
-        {mine && editing === null && (
+        {/* editar só o próprio comentário; apagar vale para qualquer um, inclusive os escritos pela IA */}
+        {editing === null && (
           <>
-            <button className="ghost small" onClick={() => setEditing(comment.body)}>Editar</button>
+            {mine && <button className="ghost small" onClick={() => setEditing(comment.body)}>Editar</button>}
             <button
               className="ghost small danger"
-              onClick={() => ask({ title: 'Apagar este comentário?', confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'comment.delete', commentId: comment.id }) })}
+              onClick={() => ask({ title: mine ? 'Apagar este comentário?' : `Apagar o comentário de ${comment.author}?`, confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'comment.delete', commentId: comment.id }) })}
             >
               Apagar
             </button>
