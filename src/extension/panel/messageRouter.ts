@@ -60,9 +60,16 @@ export class MessageRouter {
     return this.changed();
   }
 
-  /** Aplica a mutação e devolve o snapshot atualizado. */
-  handle(msg: WebviewToHost): BoardState {
-    return this.apply(msg) ? this.changed() : this.snapshot();
+  /** Aplica a mutação e devolve o snapshot atualizado. `ctx.author` assina comentários feitos por outra origem (ex.: IA via MCP). */
+  handle(msg: WebviewToHost, ctx: { author?: string } = {}): BoardState {
+    return this.apply(msg, ctx.author ?? this.opts.author) ? this.changed() : this.snapshot();
+  }
+
+  /** Como `card.create`, mas devolve o id do card criado. */
+  createCard(input: { typeId: string; columnId: string; parentId: string | null; title: string }): string {
+    const id = this.cards.create(this.boardId, input);
+    this.changed();
+    return id;
   }
 
   private changed(): BoardState {
@@ -71,11 +78,12 @@ export class MessageRouter {
     return this.snapshot();
   }
 
-  private apply(msg: WebviewToHost): boolean {
+  private apply(msg: WebviewToHost, author: string): boolean {
     switch (msg.type) {
       case 'ready':
       case 'view.set':
       case 'ui.showFilters':
+      case 'ui.connectAI':
       case 'attachment.pick':
       case 'attachment.open':
       case 'attachment.reveal':
@@ -120,7 +128,7 @@ export class MessageRouter {
         this.checklist.delete(msg.itemId);
         return true;
       case 'comment.add':
-        if (msg.body.trim()) this.comments.add(msg.cardId, this.opts.author, msg.body.trim());
+        if (msg.body.trim()) this.comments.add(msg.cardId, author, msg.body.trim());
         return true;
       case 'comment.update':
         this.comments.update(msg.commentId, msg.body);
