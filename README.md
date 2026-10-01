@@ -35,11 +35,117 @@ O board pode ser consultado e editado por uma IA (Claude Code, Cursor, Copilot o
 MCP). A extensão roda um servidor MCP local para a pasta aberta; tudo o que a IA faz aparece no
 board na hora, e as regras do board valem para ela também.
 
-1. Rode o comando **Faz AI: Conectar IA (MCP)** (ou o botão em Configurações). Ele registra o
-   servidor `faz-ai` no `.mcp.json` da pasta.
-2. Reinicie a sessão do Claude Code na pasta e aprove o servidor (`/mcp` mostra o estado). Em outros
-   clientes, use a mesma configuração do `.mcp.json`.
-3. O VSCode precisa estar aberto nessa pasta enquanto a IA usa o board.
+### Como conectar
+
+O servidor é iniciado por um comando só, igual em todos os clientes:
+
+```sh
+node "<bridge.js>" "<pasta do projeto>"
+```
+
+- `<bridge.js>` fica no armazenamento da extensão:
+  - macOS: `~/Library/Application Support/Code/User/globalStorage/euclidesgc.faz-ai/mcp/bridge.js`
+  - Linux: `~/.config/Code/User/globalStorage/euclidesgc.faz-ai/mcp/bridge.js`
+  - Windows: `%APPDATA%\Code\User\globalStorage\euclidesgc.faz-ai\mcp\bridge.js`
+- `<pasta do projeto>` é opcional. Sem ela, vale a variável `FAZAI_WORKSPACE` ou o diretório em que
+  o cliente foi iniciado (subindo pelas pastas pais até achar um board ativo). Use sem a pasta em
+  configurações globais, para o mesmo registro servir a todos os projetos.
+
+O comando **Faz AI: Conectar IA (MCP)** (ou o botão em Configurações) grava o `.mcp.json` da pasta
+e, em "Copiar configuração", entrega o trecho JSON com os caminhos já preenchidos.
+
+Atenção: o `.mcp.json` do projeto só é lido por alguns clientes (Claude Code, por exemplo). Os
+demais leem a própria configuração, e o servidor precisa ser registrado nela.
+Nos exemplos abaixo, `BRIDGE` é o caminho do `bridge.js`:
+
+```sh
+BRIDGE="$HOME/Library/Application Support/Code/User/globalStorage/euclidesgc.faz-ai/mcp/bridge.js"
+```
+
+**Claude Code** — lê o `.mcp.json` do projeto (reinicie a sessão e aprove o servidor). Ou, para
+todos os projetos:
+
+```sh
+claude mcp add --scope user faz-ai -- node "$BRIDGE"
+```
+
+**Kimi Code** — usa a própria configuração, não o `.mcp.json`. Registre pela CLI:
+
+```sh
+kimi mcp add --transport stdio faz-ai -- node "$BRIDGE"
+```
+
+ou acrescente em `~/.kimi-code/mcp.json` (`~/.kimi/mcp.json` na Kimi CLI), dentro de `mcpServers`,
+e abra uma sessão nova:
+
+```json
+"faz-ai": {
+  "transport": "stdio",
+  "command": "node",
+  "args": ["/Users/VOCE/Library/Application Support/Code/User/globalStorage/euclidesgc.faz-ai/mcp/bridge.js"]
+}
+```
+
+**Codex** — pela CLI:
+
+```sh
+codex mcp add faz-ai -- node "$BRIDGE"
+```
+
+ou em `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.faz-ai]
+command = "node"
+args = ["/Users/VOCE/Library/Application Support/Code/User/globalStorage/euclidesgc.faz-ai/mcp/bridge.js"]
+```
+
+**Cursor** — `.cursor/mcp.json` na pasta do projeto (ou `~/.cursor/mcp.json` para todos), com o
+mesmo conteúdo do `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "faz-ai": { "command": "node", "args": ["<bridge.js>", "<pasta do projeto>"] }
+  }
+}
+```
+
+**VS Code (Copilot)** — `.vscode/mcp.json` na pasta do projeto; note a chave `servers`:
+
+```json
+{
+  "servers": {
+    "faz-ai": { "type": "stdio", "command": "node", "args": ["<bridge.js>", "${workspaceFolder}"] }
+  }
+}
+```
+
+**Gemini CLI** — em `~/.gemini/settings.json` (ou `.gemini/settings.json` no projeto), a mesma
+entrada `mcpServers` do Cursor.
+
+**Outros clientes** — qualquer cliente MCP com transporte stdio funciona com o comando acima.
+
+Depois de registrar, reinicie a sessão do cliente: a lista de ferramentas só é carregada no início.
+
+### Se as ferramentas não aparecem
+
+1. O VSCode precisa estar aberto na pasta do projeto, com a extensão ativa. O servidor existe
+   enquanto houver um socket em `~/.faz-ai/` (um arquivo `.sock` por pasta aberta).
+2. Teste o servidor fora do cliente; a resposta deve conter `"name":"faz-ai"`:
+
+   ```sh
+   cd <pasta do projeto>
+   echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"teste","version":"1"}}}' | node "$BRIDGE"
+   ```
+
+   Se vier "O board do Faz AI não está acessível", a extensão não está ativa para essa pasta.
+3. Se o teste passa e o cliente não mostra as ferramentas, o servidor não está registrado na
+   configuração que esse cliente lê, ou a sessão não foi reiniciada depois do registro.
+4. Se o cliente inicia servidores a partir de outro diretório, passe a pasta do projeto como
+   segundo argumento ou em `FAZAI_WORKSPACE`.
+
+### O que a IA pode fazer
 
 A IA pode fazer tudo o que a interface faz: listar e ler cards (`get_board`, `list_cards`,
 `get_card`), criar histórias e sub-tarefas, editar, mover, arquivar, mandar para a lixeira e apagar

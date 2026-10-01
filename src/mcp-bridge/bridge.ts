@@ -2,11 +2,27 @@
  * Ponte stdio → socket local. O cliente de IA (Claude Code, Cursor…) inicia este script e fala MCP
  * por stdin/stdout; aqui as mensagens são só repassadas ao servidor que roda dentro da extensão.
  */
+import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
 import { socketPath } from '../extension/mcp/socketPath';
 
-const folder = path.resolve(process.argv[2] ?? process.cwd());
+/**
+ * Pasta do board: o argumento, a variável FAZAI_WORKSPACE ou o diretório atual. Neste último caso
+ * sobe pelos diretórios pais até achar uma pasta com servidor ativo, para funcionar em clientes
+ * configurados globalmente (sem a pasta fixa) e iniciados de dentro de uma subpasta do projeto.
+ */
+function resolveFolder(): string {
+  const explicit = process.argv[2] ?? process.env.FAZAI_WORKSPACE;
+  if (explicit) return path.resolve(explicit);
+  const cwd = process.cwd();
+  for (let dir = cwd; ; dir = path.dirname(dir)) {
+    if (fs.existsSync(socketPath(dir))) return dir;
+    if (dir === path.dirname(dir)) return cwd;
+  }
+}
+
+const folder = resolveFolder();
 const target = socketPath(folder);
 const OFFLINE = `O board do Faz AI não está acessível. Abra a pasta "${folder}" no VSCode com a extensão Faz AI ativa e reconecte.`;
 
