@@ -27,8 +27,8 @@ export function Settings() {
           <button className={tab === 'types' ? 'active' : ''} onClick={() => setTab('types')}>Tipos de card</button>
           <button className={tab === 'fields' ? 'active' : ''} onClick={() => setTab('fields')}>Campos</button>
           <button className={tab === 'rules' ? 'active' : ''} onClick={() => setTab('rules')}>Regras do board</button>
-          <button className={tab === 'models' ? 'active' : ''} onClick={() => setTab('models')}>Modelos de IA</button>
           <button className={tab === 'harness' ? 'active' : ''} onClick={() => setTab('harness')}>Harness de IA</button>
+          <button className={tab === 'models' ? 'active' : ''} onClick={() => setTab('models')}>Modelos de IA</button>
         </nav>
         <button title="Registra o board como servidor MCP para o Claude Code e outros clientes de IA" onClick={() => send({ type: 'ui.connectAI' })}>Conectar IA (MCP)</button>
         <button
