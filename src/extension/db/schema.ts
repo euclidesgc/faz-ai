@@ -1,8 +1,10 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
+/** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
+export const SKILLS_FIELD = 'Skills';
 export const MODEL_FIELD = { name: 'Modelo', options: ['Claude Fable 5.1', 'Claude Opus 5.5', 'Claude Sonnet 5.5', 'Claude Haiku 4.5'] };
 
 const MIGRATIONS: Record<number, string> = {
@@ -131,6 +133,14 @@ const MIGRATIONS: Record<number, string> = {
            (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
     FROM boards b
     WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'modelo');
+  `,
+  7: `
+    ALTER TABLE card_types ADD COLUMN defaults_json TEXT NOT NULL DEFAULT '{}';
+    INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position)
+    SELECT lower(hex(randomblob(16))), b.id, '${SKILLS_FIELD}', 'multiselect', '[]', NULL, 'chip',
+           (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
+    FROM boards b
+    WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'skills');
   `,
 };
 

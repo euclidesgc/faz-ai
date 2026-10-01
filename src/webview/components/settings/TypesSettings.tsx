@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useBoardStore } from '../../store/boardStore';
+import { fieldsForType, useBoardStore } from '../../store/boardStore';
+import { FieldEditor } from '../FieldRenderer';
 
 export function TypesSettings() {
   const state = useBoardStore((s) => s.state)!;
@@ -47,6 +48,28 @@ export function TypesSettings() {
           {state.workflows.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
         <button className="primary" disabled={!name.trim()} onClick={add}>Adicionar</button>
+      </div>
+
+      <h2 className="section-head">Padrões por tipo</h2>
+      <p className="muted">Valores preenchidos automaticamente em cada card novo do tipo — por exemplo, o modelo e as skills que devem executar aquele tipo de trabalho. Cards já criados não mudam.</p>
+      <div className="stack">
+        {state.cardTypes.map((t) => {
+          const fields = fieldsForType(state, t.id);
+          return (
+            <section key={t.id} className="settings-block">
+              <div className="row"><span className="type-badge" style={{ background: t.color }}>{t.name}</span></div>
+              {fields.length === 0 && <span className="muted small">Nenhum campo se aplica a este tipo.</span>}
+              {fields.map((f) => (
+                <label key={f.id} className="field-row">
+                  <span>{f.name}</span>
+                  {f.kind === 'multiselect' && f.options.length === 0
+                    ? <span className="muted small">Sem opções ainda.</span>
+                    : <FieldEditor field={f} value={t.defaults[f.id] ?? null} onChange={(v) => send({ type: 'settings.type.update', typeId: t.id, patch: { defaults: { ...t.defaults, [f.id]: v } } })} />}
+                </label>
+              ))}
+            </section>
+          );
+        })}
       </div>
     </div>
   );

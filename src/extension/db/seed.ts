@@ -1,7 +1,9 @@
 import type { Database } from 'sql.js';
 import type { ColumnCategory } from '../../shared/model';
 import { newId } from './ids';
-import { MODEL_FIELD } from './schema';
+import { MODEL_FIELD, SKILLS_FIELD } from './schema';
+
+const SDD_PHASES = ['PRD', 'Spec', 'Plan', 'Implementação'];
 
 /** Cria o board padrão para um workspace e devolve seu id. */
 export function seedBoard(db: Database, workspaceKey: string, name: string): string {
@@ -19,7 +21,8 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
       names.forEach(([n, category], i) =>
         db.run('INSERT INTO columns(id, workflow_id, name, position, is_terminal, category) VALUES (?,?,?,?,?,?)', [newId(), wf, n, i, category === 'open' ? 0 : 1, category]),
       );
-    cols(parentWf, [['Backlog', 'open'], ['Em andamento', 'open'], ['Concluído', 'done'], ['Cancelado', 'cancelled']]);
+    // as colunas das histórias são as fases do SDD; as mesmas fases são as opções do campo "Fase" das sub-tarefas
+    cols(parentWf, [['Backlog', 'open'], ...SDD_PHASES.map((p): [string, ColumnCategory] => [p, 'open']), ['Concluído', 'done'], ['Cancelado', 'cancelled']]);
     cols(childWf, [['A fazer', 'open'], ['Em andamento', 'open'], ['Concluído', 'done']]);
 
     const subtaskType = newId();
@@ -36,7 +39,7 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
 
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
-      [newId(), boardId, 'Fase', 'select', JSON.stringify(['PRD', 'Spec', 'Plan', 'Implementação']), JSON.stringify([subtaskType]), 'badge', 0],
+      [newId(), boardId, 'Fase', 'select', JSON.stringify(SDD_PHASES), JSON.stringify([subtaskType]), 'badge', 0],
     );
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
@@ -45,6 +48,11 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
       [newId(), boardId, MODEL_FIELD.name, 'select', JSON.stringify(MODEL_FIELD.options), null, 'badge', 2],
+    );
+    // as opções vêm das skills do projeto e são sincronizadas pelo roteador
+    db.run(
+      'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
+      [newId(), boardId, SKILLS_FIELD, 'multiselect', '[]', null, 'chip', 3],
     );
     db.exec('COMMIT;');
   } catch (e) {

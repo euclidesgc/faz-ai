@@ -32,7 +32,7 @@ export type WebviewToHost =
   | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number } }
   | { type: 'settings.column.delete'; columnId: Id; moveCardsTo: Id }
   | { type: 'settings.type.create'; name: string; color: string; defaultWorkflowId: Id }
-  | { type: 'settings.type.update'; typeId: Id; patch: { name?: string; color?: string; defaultWorkflowId?: Id } }
+  | { type: 'settings.type.update'; typeId: Id; patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue> } }
   | { type: 'settings.type.delete'; typeId: Id }
   | {
       type: 'settings.field.create';
@@ -50,7 +50,15 @@ export type WebviewToHost =
   | { type: 'settings.field.delete'; fieldId: Id }
   | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string } }
   | { type: 'settings.board.update'; patch: { name?: string } }
-  | { type: 'settings.rules.update'; patch: Partial<BoardRules> };
+  /** apaga tudo e recria o board com o padrão atual */
+  | { type: 'settings.board.reset' }
+  | { type: 'settings.rules.update'; patch: Partial<BoardRules> }
+  | { type: 'harness.rule.write'; name: string; content: string }
+  | { type: 'harness.rule.delete'; name: string }
+  | { type: 'harness.skill.create'; name: string; description: string; content: string }
+  | { type: 'harness.skill.write'; name: string; content: string }
+  | { type: 'harness.skill.setEnabled'; name: string; enabled: boolean }
+  | { type: 'harness.skill.delete'; name: string };
 
 export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }

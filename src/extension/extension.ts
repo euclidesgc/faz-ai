@@ -42,6 +42,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         folderName: f.name,
         author: await gitUserName(f.uri.fsPath),
         attachmentsDir: path.join(storage, 'attachments'),
+        workspaceDir: f.uri.fsPath,
       });
       router.onDidChange(() => tree.refresh());
       return router;
@@ -76,6 +77,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
     vscode.commands.registerCommand('fazai.connectAI', () => connectAI(bridgePath)),
   );
+
+  // regras e skills editadas por fora (editor, IA, git) aparecem no board
+  const wf = folder();
+  if (wf) {
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(wf, '{CLAUDE.md,AGENTS.md,GEMINI.md,.claude/skills/**,.claude/skills-disabled/**}'));
+    let timer: NodeJS.Timeout | undefined;
+    const refresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => void routerPromise?.then((r) => r.refreshHarness()), 300);
+    };
+    context.subscriptions.push(watcher, watcher.onDidCreate(refresh), watcher.onDidChange(refresh), watcher.onDidDelete(refresh));
+  }
 
   // servidor MCP: deixa uma IA consultar e editar o board desta pasta (o banco só é aberto no primeiro uso)
   const bridgePath = path.join(storage, 'mcp', 'bridge.js');

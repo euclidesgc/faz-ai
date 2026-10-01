@@ -1,3 +1,4 @@
+import type { Harness } from './harness';
 import type { BoardRules } from './rules';
 
 export type Id = string;
@@ -39,6 +40,8 @@ export interface CardType {
   name: string;
   color: string;
   defaultWorkflowId: Id;
+  /** valores de campos aplicados a cada card novo deste tipo (fieldId → valor) */
+  defaults: Record<Id, FieldValue>;
 }
 
 export interface Card {
@@ -127,4 +130,6 @@ export interface BoardState {
   attachments: Attachment[];
   /** autor usado em novos comentários */
   currentUser: string;
+  /** arquivos de regras e skills do projeto */
+  harness: Harness;
 }

@@ -1,7 +1,10 @@
 import type { DbHandle } from '../db/database';
 import type { Attachment, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
+import { EMPTY_HARNESS, type Harness } from '../../shared/harness';
 import { AttachmentStore } from '../attachments';
+import { SKILLS_FIELD } from '../db/schema';
+import { HarnessStore } from '../harness';
 import { AttachmentRepo } from '../repositories/attachmentRepo';
 import { BoardRepo } from '../repositories/boardRepo';
 import { CardRepo } from '../repositories/cardRepo';
@@ -14,6 +17,8 @@ export interface RouterOptions {
   folderName: string;
   author: string;
   attachmentsDir: string;
+  /** pasta do projeto; sem ela o harness (regras e skills) fica vazio */
+  workspaceDir?: string;
 }
 
 /** Aplica mensagens do webview no banco. Não depende da API do VSCode. */
@@ -26,7 +31,9 @@ export class MessageRouter {
   private attachments: AttachmentRepo;
   private listeners = new Set<() => void>();
   readonly store: AttachmentStore;
-  readonly boardId: string;
+  readonly harnessStore: HarnessStore | null;
+  private harness: Harness = EMPTY_HARNESS;
+  boardId: string;
 
   constructor(private dbHandle: DbHandle, private opts: RouterOptions) {
     const db = dbHandle.db;
@@ -37,7 +44,9 @@ export class MessageRouter {
     this.comments = new CommentRepo(db);
     this.attachments = new AttachmentRepo(db);
     this.store = new AttachmentStore(opts.attachmentsDir);
+    this.harnessStore = opts.workspaceDir ? new HarnessStore(opts.workspaceDir) : null;
     this.boardId = this.boards.getOrCreate(opts.workspaceKey, opts.folderName).id;
+    this.loadHarness();
     dbHandle.scheduleSave();
   }
 
@@ -47,7 +56,30 @@ export class MessageRouter {
   }
 
   snapshot(): BoardState {
-    return this.boards.snapshot(this.boardId, this.opts.author);
+    return { ...this.boards.snapshot(this.boardId, this.opts.author), harness: this.harness };
+  }
+
+  /** Relê regras e skills do disco (chamado quando os arquivos mudam por fora) e avisa os webviews se algo mudou. */
+  refreshHarness(): void {
+    const before = JSON.stringify(this.harness);
+    this.loadHarness();
+    if (JSON.stringify(this.harness) !== before) this.changed();
+  }
+
+  /** As opções do campo "Skills" acompanham as skills ligadas do projeto. */
+  private loadHarness(): void {
+    if (!this.harnessStore) return;
+    this.harness = this.harnessStore.scan();
+    const names = this.harness.skills.filter((s) => s.enabled).map((s) => s.name);
+    const field = this.boards.snapshot(this.boardId).fieldDefs.find((f) => f.name.toLowerCase() === SKILLS_FIELD.toLowerCase() && f.kind === 'multiselect');
+    if (field && JSON.stringify(field.options) !== JSON.stringify(names)) this.settings.updateField(field.id, { options: names });
+  }
+
+  private harnessOp(fn: (store: HarnessStore) => void): boolean {
+    if (!this.harnessStore) throw new Error('Nenhuma pasta de projeto aberta.');
+    fn(this.harnessStore);
+    this.loadHarness();
+    return true;
   }
 
   getAttachment(id: string): Attachment | undefined {
@@ -180,6 +212,23 @@ export class MessageRouter {
       case 'settings.rules.update':
         this.boards.updateRules(this.boardId, msg.patch);
         return true;
+      case 'settings.board.reset':
+        this.boards.deleteBoard(this.boardId).forEach((id) => this.store.removeCard(id));
+        this.boardId = this.boards.getOrCreate(this.opts.workspaceKey, this.opts.folderName).id;
+        this.loadHarness();
+        return true;
+      case 'harness.rule.write':
+        return this.harnessOp((h) => h.writeRule(msg.name, msg.content));
+      case 'harness.rule.delete':
+        return this.harnessOp((h) => h.deleteRule(msg.name));
+      case 'harness.skill.create':
+        return this.harnessOp((h) => h.createSkill(msg.name, msg.description, msg.content));
+      case 'harness.skill.write':
+        return this.harnessOp((h) => h.writeSkill(msg.name, msg.content));
+      case 'harness.skill.setEnabled':
+        return this.harnessOp((h) => h.setSkillEnabled(msg.name, msg.enabled));
+      case 'harness.skill.delete':
+        return this.harnessOp((h) => h.deleteSkill(msg.name));
       case 'settings.board.update':
         this.boards.updateBoard(this.boardId, msg.patch);
         return true;

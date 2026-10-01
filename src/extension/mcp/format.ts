@@ -107,9 +107,22 @@ export function cardSummary(s: BoardState, c: Card) {
   };
 }
 
+/** Skills marcadas no campo "Skills" do card: obrigatórias na execução. */
+function requiredSkills(s: BoardState, c: Card) {
+  const value = fieldsOf(s, c)['Skills'];
+  return (Array.isArray(value) ? value : []).map((name) => {
+    const skill = s.harness.skills.find((k) => k.name === name);
+    return skill ? { name, path: skill.path, ...(skill.enabled ? {} : { note: 'skill desligada no projeto' }) } : { name, note: 'skill não encontrada no projeto' };
+  });
+}
+
 export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardState['attachments'][number]) => string) {
+  const skills = requiredSkills(s, c);
+  const model = fieldsOf(s, c)['Modelo'];
   return {
     ...cardSummary(s, c),
+    ...(model ? { model: `${String(model)} (modelo que deve executar este card)` } : {}),
+    ...(skills.length ? { requiredSkills: skills, requiredSkillsNote: 'Carregue cada skill (leia o SKILL.md em `path`) antes de executar este card.' } : {}),
     description: c.description,
     createdAt: iso(c.createdAt),
     updatedAt: iso(c.updatedAt),
@@ -135,7 +148,15 @@ export function boardOverview(s: BoardState) {
         .filter((c) => c.workflowId === w.id)
         .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length })),
     })),
-    cardTypes: s.cardTypes.map((t) => ({ name: t.name, color: t.color, workflow: s.workflows.find((w) => w.id === t.defaultWorkflowId)?.name })),
+    cardTypes: s.cardTypes.map((t) => {
+      const defaults = Object.fromEntries(
+        Object.entries(t.defaults).flatMap(([id, v]) => {
+          const f = s.fieldDefs.find((x) => x.id === id);
+          return f ? [[f.name, v]] : [];
+        }),
+      );
+      return { name: t.name, color: t.color, workflow: s.workflows.find((w) => w.id === t.defaultWorkflowId)?.name, ...(Object.keys(defaults).length ? { defaultFields: defaults } : {}) };
+    }),
     fields: s.fieldDefs.map((f) => ({
       name: f.name,
       kind: f.kind,
@@ -144,7 +165,16 @@ export function boardOverview(s: BoardState) {
       display: f.display,
     })),
     rules: s.board.rules,
+    harness: harnessOverview(s),
     archivedCards: s.cards.filter((c) => c.deletedAt === null && c.archivedAt !== null).length,
     trashedCards: s.cards.filter((c) => c.deletedAt !== null).length,
+  };
+}
+
+/** Arquivos de regras e skills do projeto, sem o conteúdo. */
+export function harnessOverview(s: BoardState) {
+  return {
+    ruleFiles: s.harness.rules.map((r) => ({ name: r.name, exists: r.exists, ...(r.exists ? { bytes: r.content.length } : {}) })),
+    skills: s.harness.skills.map((k) => ({ name: k.name, enabled: k.enabled, description: k.description, path: k.path })),
   };
 }

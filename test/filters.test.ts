@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BoardState, Card } from '../src/shared/model';
+import { EMPTY_HARNESS } from '../src/shared/harness';
 import { DEFAULT_RULES } from '../src/shared/rules';
 import { EMPTY_FILTERS, applyFilters, activeFilterCount, type Filters } from '../src/shared/filters';
 
@@ -40,6 +41,7 @@ const state: BoardState = {
   comments: [{ id: 'c1', cardId: 'solo', author: 'a', body: 'ver com a Júlia', createdAt: NOW, updatedAt: NOW }],
   attachments: [],
   currentUser: 'a',
+  harness: EMPTY_HARNESS,
 };
 
 const run = (f: Partial<Filters>) => [...(applyFilters(state, { ...EMPTY_FILTERS, includeRelated: false, ...f }, NOW) ?? [])].sort();

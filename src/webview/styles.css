@@ -270,3 +270,10 @@ body.sidebar-view { background: transparent; }
 .switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .pill { font-size: 10px; font-weight: 600; padding: 1px 8px; border-radius: 10px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
 .pill.off { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+
+/* harness e padrões por tipo */
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.section-head { margin-top: 20px; }
+h3.plain { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--fg); margin: 0; }
+.file-editor { display: flex; flex-direction: column; gap: 6px; }
+.file-editor textarea, .settings-block > textarea { width: 100%; font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; resize: vertical; }

@@ -1,5 +1,6 @@
 import type { Database } from 'sql.js';
 import type { FieldValue } from '../../shared/model';
+import { norm } from '../../shared/filters';
 import { parseRules } from '../../shared/rules';
 import { newId, now } from '../db/ids';
 import { all, num, one, run, str, transaction } from '../db/query';
@@ -31,6 +32,12 @@ export class CardRepo {
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
         [id, number, boardId, str(col.workflow_id), input.columnId, input.typeId, input.parentId, input.title.trim() || 'Sem título', '', pos, t, t],
       );
+      // padrões do tipo (ex.: modelo e skills), só para campos que ainda existem
+      const defaults = JSON.parse(str(one(db, 'SELECT defaults_json FROM card_types WHERE id = ?', [input.typeId])?.defaults_json) || '{}') as Record<string, FieldValue>;
+      for (const [fieldId, value] of Object.entries(defaults)) {
+        if (one(db, 'SELECT id FROM field_defs WHERE id = ? AND board_id = ?', [fieldId, boardId]))
+          run(db, 'INSERT INTO field_values(card_id, field_id, value_json) VALUES (?,?,?)', [id, fieldId, JSON.stringify(value)]);
+      }
       return id;
     });
   }
@@ -90,7 +97,7 @@ export class CardRepo {
     {
       const card = one(db, 'SELECT board_id, workflow_id, column_id, parent_id, title FROM cards WHERE id = ?', [cardId]);
       if (!card) throw new Error('Card não encontrado');
-      const col = one(db, 'SELECT workflow_id, category FROM columns WHERE id = ?', [columnId]);
+      const col = one(db, 'SELECT workflow_id, category, position FROM columns WHERE id = ?', [columnId]);
       if (!col) throw new Error('Coluna não encontrada');
       if (str(col.workflow_id) !== str(card.workflow_id)) throw new Error('Não é possível mover entre workflows');
 
@@ -106,6 +113,21 @@ export class CardRepo {
           )?.n,
         );
         if (open > 0) throw new Error(`Não é possível concluir "${str(card.title)}": ${open} sub-tarefa(s) ainda em aberto.`);
+      }
+      // regra: a história só avança de fase quando as sub-tarefas daquela fase (campo "Fase" = coluna atual) saíram de aberto
+      if (card.parent_id == null && fromCol !== columnId && str(col.category) !== 'cancelled' && this.rules(str(card.board_id)).blockPhaseAdvanceWithOpenChildren) {
+        const from = one(db, 'SELECT name, position FROM columns WHERE id = ?', [fromCol]);
+        if (from && num(col.position) > num(from.position)) {
+          const phase = norm(str(from.name));
+          const pending = all(
+            db,
+            `SELECT fv.value_json FROM cards c JOIN columns k ON k.id = c.column_id
+             JOIN field_values fv ON fv.card_id = c.id JOIN field_defs f ON f.id = fv.field_id
+             WHERE c.parent_id = ? AND c.deleted_at IS NULL AND c.archived_at IS NULL AND k.category = 'open' AND lower(f.name) = 'fase'`,
+            [cardId],
+          ).filter((r) => norm(String(JSON.parse(str(r.value_json)))) === phase).length;
+          if (pending > 0) throw new Error(`Não é possível avançar "${str(card.title)}": ${pending} sub-tarefa(s) da fase ${str(from.name)} ainda em aberto.`);
+        }
       }
       const ids = all(db, 'SELECT id FROM cards WHERE column_id = ? AND id != ? ORDER BY position', [columnId, cardId]).map((r) => str(r.id));
       const idx = Math.max(0, Math.min(position, ids.length));

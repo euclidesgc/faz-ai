@@ -70,7 +70,7 @@ describe('arquivo', () => {
   it('arquiva com filhos e desarquiva movendo de coluna', () => {
     cards.archive(story);
     expect(card(sub1).archivedAt).not.toBeNull();
-    const doing = snap().columns.find((c) => c.name === 'Em andamento' && c.workflowId === card(story).workflowId)!;
+    const doing = snap().columns.find((c) => c.name === 'PRD' && c.workflowId === card(story).workflowId)!;
     cards.unarchive(story, doing.id, 0);
     expect(card(story).archivedAt).toBeNull();
     expect(card(story).columnId).toBe(doing.id);
@@ -141,6 +141,6 @@ describe('migração v1 → v2', () => {
     expect(new BoardRepo(old).snapshot('b').cards.find((c) => c.id === novo)?.number).toBe(3);
     expect(s.comments).toEqual([]);
     // boards existentes ganham o campo padrão "Modelo"
-    expect(s.fieldDefs.map((f) => f.name)).toEqual(['Modelo']);
+    expect(s.fieldDefs.map((f) => f.name)).toEqual(['Modelo', 'Skills']);
   });
 });

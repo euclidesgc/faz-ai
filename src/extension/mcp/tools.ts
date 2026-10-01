@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { EMPTY_FILTERS, applyFilters } from '../../shared/filters';
 import type { BoardState, Card } from '../../shared/model';
 import type { MessageRouter } from '../panel/messageRouter';
-import { boardOverview, cardDetail, cardStatus, cardSummary, coerceFieldValue, findCard, findColumn, findField, findType, findWorkflow } from './format';
+import { RULE_FILES } from '../../shared/harness';
+import { boardOverview, harnessOverview, cardDetail, cardStatus, cardSummary, coerceFieldValue, findCard, findColumn, findField, findType, findWorkflow } from './format';
 
 export interface ToolContext {
   getRouter: () => Promise<MessageRouter>;
@@ -399,10 +400,24 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     return overview(router);
   });
 
-  tool('update_card_type', 'Renomeia um tipo de card ou muda a sua cor.', { type: z.string(), name: z.string().min(1).optional(), color: colorArg.optional() }, (a, router) => {
-    router.handle({ type: 'settings.type.update', typeId: findType(router.snapshot(), a.type).id, patch: { name: a.name, color: a.color } });
-    return overview(router);
-  });
+  tool(
+    'update_card_type',
+    'Renomeia um tipo de card, muda a sua cor ou define os valores padrão de campos (ex.: Modelo e Skills) aplicados a cada card novo desse tipo.',
+    {
+      type: z.string(),
+      name: z.string().min(1).optional(),
+      color: colorArg.optional(),
+      default_fields: fieldsArg.optional().describe('Padrões por nome do campo, ex.: {"Modelo": "Claude Sonnet 5.5", "Skills": ["revisar-spec"]}. Substitui todos os padrões do tipo; {} limpa.'),
+    },
+    (a, router) => {
+      const s = router.snapshot();
+      const defaults = a.default_fields
+        ? Object.fromEntries(Object.entries(a.default_fields).map(([name, value]) => { const f = findField(s, name); return [f.id, coerceFieldValue(f, value)]; }))
+        : undefined;
+      router.handle({ type: 'settings.type.update', typeId: findType(s, a.type).id, patch: { name: a.name, color: a.color, defaults } });
+      return overview(router);
+    },
+  );
 
   tool('delete_card_type', 'Exclui um tipo de card que não esteja em uso.', { type: z.string() }, (a, router) => {
     router.handle({ type: 'settings.type.delete', typeId: findType(router.snapshot(), a.type).id });
@@ -446,6 +461,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     'Altera as regras do board. Só o que for informado é alterado.',
     {
       blockDoneWithOpenChildren: z.boolean().optional().describe('História não entra em coluna de conclusão com sub-tarefas em aberto'),
+      blockPhaseAdvanceWithOpenChildren: z.boolean().optional().describe('História não avança de coluna enquanto houver sub-tarefas em aberto cuja Fase é a coluna atual'),
       onCancelParent: z.enum(['ask', 'cascade', 'keep']).optional().describe('Sub-tarefas em aberto quando a história é cancelada'),
       onAllChildrenDone: z.enum(['ask', 'auto', 'off']).optional().describe('História quando a última sub-tarefa em aberto é concluída'),
       confirmTrash: z.enum(['whenDependents', 'always', 'never']).optional(),
@@ -456,6 +472,90 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       return router.handle({ type: 'settings.rules.update', patch }).board.rules;
     },
   );
+
+  tool(
+    'reset_board',
+    'APAGA o board inteiro (cards, comentários, anexos e configurações) e recria com o padrão. Não pode ser desfeito: confirme com a pessoa antes.',
+    {},
+    (_a, router) => {
+      router.handle({ type: 'settings.board.reset' });
+      return overview(router);
+    },
+  );
+
+  // ---------- harness: regras e skills do projeto ----------
+
+  const ruleArg = z.enum(RULE_FILES.map((r) => r.name) as [string, ...string[]]).describe('Arquivo de regras na raiz do projeto');
+  const skillArg = z.string().describe('Nome da skill (nome da pasta), ex.: "revisar-spec"');
+  const harness = (router: MessageRouter) => harnessOverview(router.snapshot());
+  const skill = (router: MessageRouter, name: string) => {
+    const k = router.snapshot().harness.skills.find((x) => x.name === name);
+    if (!k) throw new Error(`Skill "${name}" não encontrada.`);
+    return k;
+  };
+
+  tool(
+    'get_harness',
+    'Lista o harness de IA do projeto: arquivos de regras (CLAUDE.md, AGENTS.md…) e skills, ligadas e desligadas, com descrição e caminho.',
+    {},
+    (_a, router) => harness(router),
+    true,
+  );
+
+  tool('read_rule_file', 'Lê um arquivo de regras do projeto.', { file: ruleArg }, (a, router) => {
+    const r = router.snapshot().harness.rules.find((x) => x.name === a.file);
+    if (!r?.exists) throw new Error(`${a.file} não existe neste projeto.`);
+    return r.content;
+  }, true);
+
+  tool('write_rule_file', 'Cria ou substitui por inteiro um arquivo de regras do projeto.', { file: ruleArg, content: z.string() }, (a, router) => {
+    router.handle({ type: 'harness.rule.write', name: a.file, content: a.content });
+    return harness(router);
+  });
+
+  tool('delete_rule_file', 'Apaga um arquivo de regras do projeto. Não pode ser desfeito pelo board.', { file: ruleArg }, (a, router) => {
+    router.handle({ type: 'harness.rule.delete', name: a.file });
+    return harness(router);
+  });
+
+  tool('get_skill', 'Lê o SKILL.md completo de uma skill do projeto.', { skill: skillArg }, (a, router) => skill(router, a.skill).content, true);
+
+  tool(
+    'create_skill',
+    'Cria uma skill no projeto (.claude/skills/<nome>/SKILL.md). Ela passa a ser uma opção do campo "Skills" dos cards.',
+    {
+      name: z.string().describe('Letras minúsculas, números e hífens'),
+      description: z.string().min(1).describe('Quando a skill deve ser usada; é por ela que a IA decide invocá-la'),
+      content: z.string().describe('Instruções da skill em markdown (sem o frontmatter)'),
+    },
+    (a, router) => {
+      router.handle({ type: 'harness.skill.create', name: a.name, description: a.description, content: a.content });
+      return harness(router);
+    },
+  );
+
+  tool('update_skill', 'Substitui o SKILL.md inteiro de uma skill, incluindo o frontmatter (name, description).', { skill: skillArg, content: z.string().min(1) }, (a, router) => {
+    skill(router, a.skill);
+    router.handle({ type: 'harness.skill.write', name: a.skill, content: a.content });
+    return harness(router);
+  });
+
+  tool(
+    'set_skill_enabled',
+    'Liga ou desliga uma skill. Desligada, ela sai da pasta que as ferramentas de IA leem (economiza contexto) mas o conteúdo é preservado.',
+    { skill: skillArg, enabled: z.boolean() },
+    (a, router) => {
+      skill(router, a.skill);
+      router.handle({ type: 'harness.skill.setEnabled', name: a.skill, enabled: a.enabled });
+      return harness(router);
+    },
+  );
+
+  tool('delete_skill', 'Apaga uma skill do projeto, com todos os arquivos da pasta. Não pode ser desfeito pelo board.', { skill: skillArg }, (a, router) => {
+    skill(router, a.skill);
+    router.handle({ type: 'harness.skill.delete', name: a.skill });
+    return harness(router);
+  });
 }
 
 /** Ids das colunas com esse nome (pode haver uma em cada workflow). */

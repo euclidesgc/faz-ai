@@ -32,7 +32,7 @@ beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-mcp-'));
   const db = await openInMemory(WASM_DIR);
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
-    workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(dir, 'attachments'),
+    workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(dir, 'attachments'), workspaceDir: dir,
   });
   changes = 0;
   router.onDidChange(() => changes++);
@@ -51,7 +51,7 @@ describe('servidor MCP', () => {
     expect(names).toEqual(expect.arrayContaining(['get_board', 'list_cards', 'get_card', 'create_card', 'move_card', 'add_comment', 'add_attachment', 'update_rules']));
     const board = (await call('get_board')).data;
     expect(board.workflows.map((w: any) => w.columns.map((c: any) => c.name))).toEqual([
-      ['Backlog', 'Em andamento', 'Concluído', 'Cancelado'],
+      ['Backlog', 'PRD', 'Spec', 'Plan', 'Implementação', 'Concluído', 'Cancelado'],
       ['A fazer', 'Em andamento', 'Concluído'],
     ]);
   });
@@ -98,7 +98,7 @@ describe('servidor MCP', () => {
 
     await call('trash_card', { card: 1 });
     expect((await call('list_cards')).data.total).toBe(0);
-    expect((await call('move_card', { card: 1, column: 'Em andamento' })).text).toContain('lixeira');
+    expect((await call('move_card', { card: 1, column: 'PRD' })).text).toContain('lixeira');
     await call('restore_card', { card: 1 });
     expect((await call('list_cards')).data.total).toBe(1);
     expect((await call('get_card', { card: 99 })).error).toBe(true);
@@ -127,12 +127,62 @@ describe('servidor MCP', () => {
   it('configura colunas, campos e regras', async () => {
     let board = (await call('create_column', { workflow: 'child', name: 'Em revisão' })).data;
     expect(board.workflows[1].columns.map((c: any) => c.name)).toContain('Em revisão');
-    expect((await call('update_column', { column: 'Em andamento', name: 'Fazendo' })).text).toContain('informe também o workflow');
-    board = (await call('update_column', { column: 'Em andamento', workflow: 'parent', name: 'Fazendo' })).data;
-    expect(board.workflows[0].columns[1].name).toBe('Fazendo');
+    expect((await call('update_column', { column: 'Concluído', name: 'Feito' })).text).toContain('informe também o workflow');
+    board = (await call('update_column', { column: 'Concluído', workflow: 'parent', name: 'Feito' })).data;
+    expect(board.workflows[0].columns[5].name).toBe('Feito');
     board = (await call('create_field', { name: 'Estimativa', kind: 'number', applies_to_types: ['História'] })).data;
     expect(board.fields.at(-1)).toMatchObject({ name: 'Estimativa', appliesTo: ['História'] });
     expect((await call('update_rules', { blockDoneWithOpenChildren: false })).data.blockDoneWithOpenChildren).toBe(false);
+  });
+});
+
+describe('harness e padrões pelo MCP', () => {
+  it('gerencia regras e skills do projeto e sincroniza o campo Skills', async () => {
+    expect((await call('get_harness')).data.ruleFiles.map((r: any) => [r.name, r.exists])).toEqual([['CLAUDE.md', false], ['AGENTS.md', false], ['GEMINI.md', false]]);
+    await call('write_rule_file', { file: 'AGENTS.md', content: '# Regras\n' });
+    expect(fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8')).toBe('# Regras\n');
+    expect((await call('read_rule_file', { file: 'AGENTS.md' })).text).toBe('# Regras\n');
+    expect((await call('write_rule_file', { file: '../fora.md', content: 'x' })).error).toBe(true);
+
+    expect((await call('create_skill', { name: 'Nome Ruim', description: 'd', content: 'c' })).error).toBe(true);
+    const h = (await call('create_skill', { name: 'revisar-spec', description: 'Use ao revisar uma spec', content: 'Passos…' })).data;
+    expect(h.skills).toEqual([{ name: 'revisar-spec', enabled: true, description: 'Use ao revisar uma spec', path: path.join('.claude', 'skills', 'revisar-spec', 'SKILL.md') }]);
+    expect((await call('get_skill', { skill: 'revisar-spec' })).text).toContain('name: revisar-spec');
+    const skillsField = () => router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
+    expect(skillsField().options).toEqual(['revisar-spec']);
+
+    // skill marcada no card aparece como obrigatória, com o caminho do SKILL.md
+    const card = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 4.5' } })).data;
+    expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', path: path.join('.claude', 'skills', 'revisar-spec', 'SKILL.md') }]);
+    expect(card.model).toContain('Claude Haiku 4.5');
+
+    await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
+    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'revisar-spec'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, '.claude', 'skills-disabled', 'revisar-spec', 'SKILL.md'))).toBe(true);
+    expect(skillsField().options).toEqual([]);
+    expect((await call('get_card', { card: 1 })).data.requiredSkills[0].note).toContain('desligada');
+    await call('set_skill_enabled', { skill: 'revisar-spec', enabled: true });
+    await call('delete_skill', { skill: 'revisar-spec' });
+    expect((await call('get_harness')).data.skills).toEqual([]);
+
+    // arquivo criado por fora aparece depois de refreshHarness
+    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'oi');
+    router.refreshHarness();
+    expect((await call('read_rule_file', { file: 'CLAUDE.md' })).text).toBe('oi');
+  });
+
+  it('aplica os padrões do tipo aos cards novos e recria o board', async () => {
+    const board = (await call('update_card_type', { type: 'Sub-tarefa', default_fields: { Modelo: 'claude sonnet 5.5', Fase: 'Implementação' } })).data;
+    expect(board.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toEqual({ Modelo: 'Claude Sonnet 5.5', Fase: 'Implementação' });
+    await call('create_card', { title: 'História' });
+    const sub = (await call('create_card', { title: 'Tarefa', parent: 1, fields: { Fase: 'Spec' } })).data;
+    expect(sub.fields).toEqual({ Modelo: 'Claude Sonnet 5.5', Fase: 'Spec' }); // o valor informado vence o padrão
+    expect((await call('get_card', { card: 1 })).data.fields).toBeUndefined();
+
+    const fresh = (await call('reset_board')).data;
+    expect(fresh.workflows[0].columns.every((c: any) => c.cards === 0)).toBe(true);
+    expect(fresh.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toBeUndefined();
+    expect((await call('create_card', { title: 'Nova' })).data.id).toBe('#1');
   });
 });
 

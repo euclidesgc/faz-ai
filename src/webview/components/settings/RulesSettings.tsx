@@ -84,6 +84,19 @@ export function RulesSettings() {
       />
 
       <Rule
+        title="Avançar de fase com sub-tarefas da fase em aberto"
+        active={rules.blockPhaseAdvanceWithOpenChildren}
+        when={'uma história é movida para uma coluna mais adiante e ainda tem sub-tarefas em aberto cujo campo "Fase" é a coluna atual'}
+        then={rules.blockPhaseAdvanceWithOpenChildren ? 'bloquear o movimento e avisar quantas sub-tarefas da fase faltam. Voltar de coluna e cancelar continuam livres.' : 'permitir. As sub-tarefas ficam onde estão.'}
+        control={
+          <label className="switch">
+            <input type="checkbox" checked={rules.blockPhaseAdvanceWithOpenChildren} onChange={(e) => set({ blockPhaseAdvanceWithOpenChildren: e.target.checked })} />
+            Bloquear
+          </label>
+        }
+      />
+
+      <Rule
         title="Cancelar história com sub-tarefas em aberto"
         active={rules.onCancelParent !== 'keep'}
         when={`uma história é movida para uma coluna de cancelamento (${names('cancelled')}) e ainda tem sub-tarefas em aberto`}

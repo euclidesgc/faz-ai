@@ -27,7 +27,11 @@ export function createMcpServer(opts: McpOptions): McpServer {
         'Sinalize o progresso movendo os cards entre colunas e registre decisões e resultados em comentários ou anexos. ' +
         'O campo "Modelo" de um card indica qual modelo de IA deve executá-lo: antes de trabalhar em um card, leia esse campo e, ' +
         'se ele estiver preenchido com um modelo diferente do seu, delegue o trabalho a um subagente com esse modelo; ' +
-        'se não for possível, avise a pessoa em vez de executar com outro modelo.',
+        'se não for possível, avise a pessoa em vez de executar com outro modelo. ' +
+        'O campo "Skills" lista as skills obrigatórias do card: get_card devolve `requiredSkills` com o caminho de cada SKILL.md, ' +
+        'e todas devem ser carregadas antes de executar o card (outras skills continuam podendo ser usadas normalmente). ' +
+        'As colunas das histórias são as fases do SDD; mova a história para a próxima coluna ao concluir cada fase. ' +
+        'O harness do projeto (arquivos de regras e skills) também é gerenciado por aqui: veja get_harness.',
     },
   );
   registerTools(server, {

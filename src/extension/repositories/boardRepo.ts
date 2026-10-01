@@ -3,6 +3,7 @@ import type { Attachment, Board, BoardState, Card, CardType, ChecklistItem, Colu
 import { all, bool, num, one, run, str } from '../db/query';
 import { parseRules, type BoardRules } from '../../shared/rules';
 import { seedBoard } from '../db/seed';
+import { EMPTY_HARNESS } from '../../shared/harness';
 
 export class BoardRepo {
   constructor(private db: Database) {}
@@ -23,6 +24,13 @@ export class BoardRepo {
     // parseRules valida o resultado: valores desconhecidos voltam ao padrão
     const next = parseRules(JSON.stringify({ ...parseRules(str(row.rules_json)), ...patch }));
     run(this.db, 'UPDATE boards SET rules_json = ? WHERE id = ?', [JSON.stringify(next), boardId]);
+  }
+
+  /** Apaga o board com tudo o que há nele. Devolve os ids dos cards (para limpar anexos). */
+  deleteBoard(boardId: string): string[] {
+    const ids = all(this.db, 'SELECT id FROM cards WHERE board_id = ?', [boardId]).map((r) => str(r.id));
+    run(this.db, 'DELETE FROM boards WHERE id = ?', [boardId]);
+    return ids;
   }
 
   updateBoard(boardId: string, patch: { name?: string }): void {
@@ -51,6 +59,7 @@ export class BoardRepo {
 
     const cardTypes: CardType[] = all(db, 'SELECT * FROM card_types WHERE board_id = ? ORDER BY rowid', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), color: str(r.color), defaultWorkflowId: str(r.default_workflow_id),
+      defaults: JSON.parse(str(r.defaults_json) || '{}') as CardType['defaults'],
     }));
 
     const cards: Card[] = all(db, 'SELECT * FROM cards WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
@@ -91,6 +100,6 @@ export class BoardRepo {
       [boardId],
     ).map((r) => ({ id: str(r.id), cardId: str(r.card_id), filename: str(r.filename), storedName: str(r.stored_name), mime: str(r.mime), size: num(r.size), createdAt: num(r.created_at) }));
 
-    return { board, workflows, columns, cardTypes, cards, fieldDefs, fieldValues, checklistItems, comments, attachments, currentUser };
+    return { board, workflows, columns, cardTypes, cards, fieldDefs, fieldValues, checklistItems, comments, attachments, currentUser, harness: EMPTY_HARNESS };
   }
 }
