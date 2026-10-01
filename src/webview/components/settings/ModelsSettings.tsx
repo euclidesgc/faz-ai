@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { AI_TOOLS, type AiTool } from '../../../shared/harness';
-import { EFFORT_FIELD, modelId, modelLabel, type ModelOption, type ModelRule } from '../../../shared/models';
+import { modelId, type ModelOption } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
-import { ModelEditor } from '../FieldRenderer';
+import { ModelRulesEditor } from './ModelRulesEditor';
 
 const splitList = (s: string): string[] => s.split(',').map((x) => x.trim()).filter(Boolean);
-const newId = (): string => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 /** De onde vem a lista de modelos de cada ferramenta ao clicar em "Detectar". */
 const SOURCES: Record<AiTool, string> = {
@@ -18,17 +17,12 @@ const SOURCES: Record<AiTool, string> = {
 export function ModelsSettings() {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
-  const { modelCatalog: catalog, modelRules: rules, aiTools } = state.board;
+  const { modelCatalog: catalog, aiTools } = state.board;
   const [draft, setDraft] = useState<Record<string, { model: string; label: string; efforts: string }>>({});
 
   const setCatalog = (next: ModelOption[]) => send({ type: 'settings.models.set', catalog: next });
-  const setRules = (next: ModelRule[]) => send({ type: 'settings.modelRules.set', rules: next });
   const patchModel = (id: string, patch: Partial<ModelOption>) => setCatalog(catalog.map((o) => (o.id === id ? { ...o, ...patch } : o)));
-  const patchRule = (id: string, patch: Partial<ModelRule>) => setRules(rules.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
-  // campos que podem disparar uma regra: os de opções fixas e as tags
-  const ruleFields = state.fieldDefs.filter((f) => f.kind === 'select' || f.kind === 'multiselect');
-  const effortField = state.fieldDefs.find((f) => f.name.toLowerCase() === EFFORT_FIELD.toLowerCase());
   const tools = AI_TOOLS.filter((t) => aiTools.includes(t.id) || catalog.some((o) => o.tool === t.id));
 
   const addModel = (tool: AiTool) => {
@@ -101,51 +95,7 @@ export function ModelsSettings() {
         })}
       </div>
 
-      <h2 className="section-head">Sugestão de modelo</h2>
-      <p className="muted">
-        Quando um campo do card tem certo valor, o board sugere um modelo. A primeira regra que casa vence. A sugestão preenche o campo "Modelo"
-        enquanto ele está vazio ou ainda tem a sugestão anterior; um modelo escolhido à mão não é trocado.
-      </p>
-      <table className="table">
-        <thead><tr><th>Quando o campo</th><th>tem o valor</th><th>sugerir</th><th></th></tr></thead>
-        <tbody>
-          {rules.map((r) => {
-            const field = state.fieldDefs.find((f) => f.id === r.fieldId);
-            return (
-              <tr key={r.id}>
-                <td>
-                  <select value={r.fieldId} onChange={(e) => patchRule(r.id, { fieldId: e.target.value, value: state.fieldDefs.find((f) => f.id === e.target.value)?.options[0] ?? '' })}>
-                    {!field && <option value={r.fieldId}>(campo apagado)</option>}
-                    {ruleFields.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                  </select>
-                </td>
-                <td>
-                  <select value={r.value} onChange={(e) => patchRule(r.id, { value: e.target.value })}>
-                    {field && !field.options.includes(r.value) && <option value={r.value}>{r.value}</option>}
-                    {field?.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </td>
-                <td title={modelLabel(catalog, r.model, true)}><ModelEditor value={r.model} onChange={(v) => typeof v === 'string' && patchRule(r.id, { model: v })} /></td>
-                <td className="narrow"><button className="icon danger" title="Remover a regra" onClick={() => setRules(rules.filter((x) => x.id !== r.id))}>🗑</button></td>
-              </tr>
-            );
-          })}
-          {rules.length === 0 && <tr><td colSpan={4} className="muted">Nenhuma regra: o campo "Modelo" só é preenchido à mão ou pelos padrões do tipo de card.</td></tr>}
-        </tbody>
-      </table>
-      <div className="row">
-        <button
-          disabled={!ruleFields.length || !catalog.length}
-          onClick={() => {
-            const f = effortField ?? ruleFields[0]!;
-            const o = catalog[0]!;
-            setRules([...rules, { id: newId(), fieldId: f.id, value: f.options[0] ?? '', model: o.defaultEffort ? `${o.id}@${o.defaultEffort}` : o.id }]);
-          }}
-        >Nova regra</button>
-        <span className="spacer" />
-        <span className="muted small">Recriar as regras de "{EFFORT_FIELD}" (Baixo, Médio, Alto) com os modelos de:</span>
-        {tools.map((t) => <button key={t.id} disabled={!effortField} onClick={() => send({ type: 'settings.modelRules.suggest', tool: t.id })}>{t.label}</button>)}
-      </div>
+      <ModelRulesEditor />
     </div>
   );
 }

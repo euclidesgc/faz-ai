@@ -129,6 +129,19 @@ export function RulesSettings() {
       />
 
       <Rule
+        title="Preencher o modelo sugerido"
+        active={rules.autoApplyModelSuggestion}
+        when="um card é criado ou um atributo dele muda, e o campo de modelo está vazio ou ainda tem a sugestão anterior"
+        then={rules.autoApplyModelSuggestion ? 'preencher o modelo com a sugestão das regras. Um modelo escolhido à mão nunca é trocado.' : 'não mexer no modelo. A sugestão só é aplicada pelo botão no card.'}
+        control={
+          <label className="switch">
+            <input type="checkbox" checked={rules.autoApplyModelSuggestion} onChange={(e) => set({ autoApplyModelSuggestion: e.target.checked })} />
+            Preencher
+          </label>
+        }
+      />
+
+      <Rule
         title="Excluir card"
         active={rules.confirmTrash !== 'never'}
         when="um card é movido para a lixeira"

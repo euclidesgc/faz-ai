@@ -1,5 +1,5 @@
 import { norm } from '../../shared/filters';
-import { modelFieldOf, modelLabel, parseModelValue, resolveModelInput, suggestModel, type ModelOption } from '../../shared/models';
+import { describeRule, modelFieldOf, modelLabel, parseModelValue, resolveModelInput, suggestModel, type ModelOption } from '../../shared/models';
 import { cardRef, type BoardState, type Card, type CardType, type Column, type FieldDef, type FieldValue, type Workflow } from '../../shared/model';
 
 /** Converte o snapshot em respostas enxutas para o modelo: nomes e números no lugar de UUIDs. */
@@ -122,7 +122,7 @@ export function describeModel(s: BoardState, value: FieldValue) {
 export function modelsOverview(s: BoardState) {
   return {
     catalog: s.board.modelCatalog.map((o) => ({ value: o.id, tool: o.tool, model: o.model, label: o.label, efforts: o.efforts, defaultEffort: o.defaultEffort })),
-    rules: s.board.modelRules.map((r) => ({ when: `${s.fieldDefs.find((f) => f.id === r.fieldId)?.name ?? '?'} = ${r.value}`, suggest: modelLabel(s.board.modelCatalog, r.model, true), value: r.model })),
+    rules: s.board.modelRules.map((r) => ({ ...(r.name ? { name: r.name } : {}), when: describeRule(s, r), suggest: modelLabel(s.board.modelCatalog, r.model, true), value: r.model, enabled: r.enabled })),
     note: 'Num card, o campo de modelo aceita `<value>@<esforço>` (ex.: "claude:opus@high") ou o nome do modelo seguido do esforço.',
   };
 }

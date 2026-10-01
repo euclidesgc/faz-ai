@@ -117,8 +117,12 @@ export class MessageRouter {
     }
     const field = s.fieldDefs.find((f) => f.name.toLowerCase() === EFFORT_FIELD.toLowerCase());
     if (!field) throw new Error(`O board não tem o campo "${EFFORT_FIELD}".`);
-    const tiers = effortTiers(tool, s.board.modelCatalog).map(([value, model]): ModelRule => ({ id: newId(), fieldId: field.id, value, model }));
-    this.boards.setModelRules(this.boardId, [...s.board.modelRules.filter((r) => r.fieldId !== field.id), ...tiers]);
+    const tiers = effortTiers(tool, s.board.modelCatalog).map(
+      ([value, model]): ModelRule => ({ id: newId(), name: `${EFFORT_FIELD} ${value.toLowerCase()}`, enabled: true, groups: [[{ fieldId: field.id, op: 'is', value }]], model }),
+    );
+    // sai o que era só "Esforço = X"; regras montadas pela pessoa ficam, e na frente (a primeira que casa vence)
+    const onlyEffort = (r: ModelRule) => r.groups.length === 1 && r.groups[0]!.length === 1 && r.groups[0]![0]!.fieldId === field.id && r.groups[0]![0]!.op === 'is';
+    this.boards.setModelRules(this.boardId, [...s.board.modelRules.filter((r) => !onlyEffort(r)), ...tiers]);
   }
 
   private suggestionFor(cardId: string): { field: FieldDef | undefined; suggestion: string | null } {
@@ -135,7 +139,7 @@ export class MessageRouter {
     const s = this.boards.snapshot(this.boardId);
     const card = s.cards.find((c) => c.id === cardId);
     const field = card && modelFieldOf(s, card);
-    if (!card || !field) return;
+    if (!card || !field || !s.board.rules.autoApplyModelSuggestion) return;
     const current = s.fieldValues.find((v) => v.cardId === cardId && v.fieldId === field.id)?.value ?? null;
     const next = suggestModel(s, card);
     if ((current === null || current === previous) && next !== current) this.cards.setFieldValue(cardId, field.id, next);

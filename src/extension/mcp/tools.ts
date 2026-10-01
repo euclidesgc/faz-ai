@@ -6,7 +6,7 @@ import { EMPTY_FILTERS, applyFilters } from '../../shared/filters';
 import type { BoardState, Card } from '../../shared/model';
 import type { MessageRouter } from '../panel/messageRouter';
 import { ALL_AI_TOOLS, RULE_FILES, type AiTool } from '../../shared/harness';
-import { modelId, resolveModelInput, type ModelRule } from '../../shared/models';
+import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../../shared/models';
 import { newId } from '../db/ids';
 import { boardOverview, harnessOverview, modelsOverview, cardDetail, cardStatus, cardSummary, coerceFieldValue, findCard, findColumn, findField, findType, findWorkflow } from './format';
 
@@ -468,6 +468,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       onAllChildrenDone: z.enum(['ask', 'auto', 'off']).optional().describe('História quando a última sub-tarefa em aberto é concluída'),
       confirmTrash: z.enum(['whenDependents', 'always', 'never']).optional(),
       confirmArchive: z.enum(['whenDependents', 'always', 'never']).optional(),
+      autoApplyModelSuggestion: z.boolean().optional().describe('Preencher o campo de modelo com a sugestão enquanto ele não foi escolhido à mão'),
     },
     (a, router) => {
       const patch = Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined));
@@ -541,19 +542,38 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'set_model_rules',
-    'Substitui as regras de sugestão de modelo. Cada regra diz: quando o campo tem esse valor, sugerir esse modelo. A primeira que casa vence. A sugestão preenche o campo de modelo do card enquanto ele não foi escolhido à mão.',
+    'Substitui a lista de regras de sugestão de modelo. Em cada regra, `when` é uma lista de alternativas (OU); cada alternativa é uma lista de condições que precisam valer juntas (E). A primeira regra ligada que casa vence. O modelo é sempre uma sugestão: a pessoa pode escolher outro no card a qualquer momento.',
     {
       rules: z.array(
         z.object({
-          field: z.string().describe('Nome do campo, ex.: "Esforço" ou "Tags"'),
-          value: z.string().describe('Valor do campo que dispara a regra, ex.: "Alto" ou "backend"'),
+          name: z.string().optional(),
+          when: z
+            .array(
+              z.array(
+                z.object({
+                  field: z.string().describe('Nome do campo (ex.: "Esforço", "Tags") ou "Tipo" para o tipo do card'),
+                  value: z.string().describe('Valor comparado, ex.: "Alto", "backend", "Bug"'),
+                  not: z.boolean().optional().describe('true = a condição vale quando o campo NÃO tem esse valor'),
+                }),
+              ).min(1),
+            )
+            .min(1)
+            .describe('Ex.: [[{Esforço=Alto},{Tags=backend}], [{Tipo=Bug}]] significa (Esforço=Alto E Tags=backend) OU Tipo=Bug'),
           model: z.string().describe('Modelo e esforço, ex.: "claude:opus@high" ou "Opus 5.5 high"'),
+          enabled: z.boolean().optional(),
         }),
       ),
     },
     (a, router) => {
       const s = router.snapshot();
-      const rules: ModelRule[] = a.rules.map((r) => ({ id: newId(), fieldId: findField(s, r.field).id, value: r.value, model: resolveModelInput(s.board.modelCatalog, r.model) }));
+      const fieldId = (name: string) => (['tipo', 'type', TYPE_CONDITION].includes(name.trim().toLowerCase()) ? TYPE_CONDITION : findField(s, name).id);
+      const rules: ModelRule[] = a.rules.map((r) => ({
+        id: newId(),
+        name: r.name ?? '',
+        enabled: r.enabled !== false,
+        groups: r.when.map((g) => g.map((c) => ({ fieldId: fieldId(c.field), op: c.not ? ('isNot' as const) : ('is' as const), value: c.value }))),
+        model: resolveModelInput(s.board.modelCatalog, r.model),
+      }));
       router.handle({ type: 'settings.modelRules.set', rules });
       return models(router);
     },

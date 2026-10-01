@@ -283,3 +283,12 @@ h3.plain { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(
 .field-row .suggestion { grid-column: 2; }
 .suggestion a { cursor: pointer; }
 .table td.narrow { width: 1%; white-space: nowrap; }
+
+/* regras de sugestão de modelo */
+.suggest-model { margin-left: auto; font-size: 10px; padding: 0 6px; border-radius: 8px; border: 1px dashed var(--border); background: transparent; color: var(--vscode-textLink-foreground); cursor: pointer; }
+.suggest-model:hover { border-style: solid; background: var(--hover); }
+.rule-builder .condition-group { border-left: 2px solid var(--vscode-textLink-foreground); padding: 4px 0 4px 10px; display: flex; flex-direction: column; gap: 4px; }
+.rule-builder .condition select { min-width: 0; }
+.joiner { font-size: 10px; font-weight: 700; color: var(--muted); padding: 2px 0; }
+.joiner.or { color: var(--vscode-textLink-foreground); padding: 6px 0; }
+.table tr.off td { opacity: .55; }

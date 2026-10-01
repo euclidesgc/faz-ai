@@ -218,7 +218,7 @@ describe('modelos de IA', () => {
     expect(manual.suggestedModel.value).toBe('claude:sonnet@medium');
 
     // regras por tag e por ferramenta
-    await call('set_model_rules', { rules: [{ field: 'Tags', value: 'docs', model: 'haiku' }, { field: 'Esforço', value: 'Alto', model: 'Opus 5.5 max' }] });
+    await call('set_model_rules', { rules: [{ when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku' }, { when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'Opus 5.5 max' }] });
     expect((await call('create_card', { title: 'Doc', fields: { Tags: ['docs'], Esforço: 'Alto' } })).data.model.value).toBe('claude:haiku');
     const kimi = (await call('suggest_model_rules', { tool: 'kimi' })).data.rules;
     expect(kimi.filter((r: any) => r.when.startsWith('Esforço')).map((r: any) => r.value)).toEqual(['kimi:kimi-code/k3@low', 'kimi:kimi-code/k3@high', 'kimi:kimi-code/k3@max']);
@@ -256,6 +256,43 @@ effort = "high"
     expect(found.map((o) => o.label)).toEqual(['K3', 'K2.7 Highspeed']);
     expect(effortTiers('kimi', found).map(([, v]) => v)).toEqual(['kimi:kimi-code/k3@low', 'kimi:kimi-code/k3@high', 'kimi:kimi-code/k3@max']);
     expect(modelsFor('kimi', path.join(dir, 'vazio')).length).toBeGreaterThan(0); // sem config local, lista embutida
+  });
+});
+
+describe('regras de modelo com E e OU', () => {
+  const modelOf = async (fields: Record<string, unknown>, type?: string) => (await call('create_card', { title: 'x', type, fields })).data.model?.value;
+
+  it('avalia grupos E/OU, negação, tipo do card, ordem e regras desligadas', async () => {
+    const res = await call('set_model_rules', {
+      rules: [
+        { name: 'Backend pesado', when: [[{ field: 'Esforço', value: 'Alto' }, { field: 'Tags', value: 'backend' }], [{ field: 'Tipo', value: 'Bug' }, { field: 'Esforço', value: 'Baixo', not: true }]], model: 'fable max' },
+        { name: 'Desligada', when: [[{ field: 'Tags', value: 'docs' }]], model: 'opus low', enabled: false },
+        { name: 'Docs', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku' },
+        { name: 'Alto', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus high' },
+      ],
+    });
+    expect(res.data.rules[0]).toMatchObject({ name: 'Backend pesado', when: 'Esforço = Alto E Tags = backend OU Tipo = Bug E Esforço ≠ Baixo', enabled: true });
+
+    expect(await modelOf({ Esforço: 'Alto', Tags: ['backend', 'frontend'] })).toBe('claude:fable@max'); // E: as duas condições
+    expect(await modelOf({ Esforço: 'Alto', Tags: ['frontend'] })).toBe('claude:opus@high'); // só uma: cai na regra seguinte
+    expect(await modelOf({ Esforço: 'Médio' }, 'Bug')).toBe('claude:fable@max'); // OU: segundo grupo, com negação
+    expect(await modelOf({ Esforço: 'Baixo' }, 'Bug')).toBeUndefined(); // a negação falha e nenhuma outra casa
+    expect(await modelOf({ Tags: ['docs'] })).toBe('claude:haiku'); // a regra desligada é pulada
+    expect((await call('set_model_rules', { rules: [{ when: [[{ field: 'Inexistente', value: 'x' }]], model: 'haiku' }] })).error).toBe(true);
+  });
+
+  it('com o preenchimento automático desligado, só sugere', async () => {
+    await call('update_rules', { autoApplyModelSuggestion: false });
+    const card = (await call('create_card', { title: 'x', fields: { Esforço: 'Alto' } })).data;
+    expect(card.model).toBeUndefined();
+    expect(card.suggestedModel.value).toBe('claude:opus@high');
+  });
+
+  it('converte regras salvas no formato antigo', async () => {
+    const { parseModelRules } = await import('../src/shared/models');
+    expect(parseModelRules(JSON.stringify([{ id: 'a', fieldId: 'f1', value: 'Alto', model: 'claude:opus@high' }, { nada: true }]))).toEqual([
+      { id: 'a', name: '', enabled: true, groups: [[{ fieldId: 'f1', op: 'is', value: 'Alto' }]], model: 'claude:opus@high' },
+    ]);
   });
 });
 

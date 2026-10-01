@@ -13,6 +13,7 @@ import { TrashView } from '../src/webview/components/TrashView';
 import { ColumnsSettings } from '../src/webview/components/settings/ColumnsSettings';
 import { FieldsSettings } from '../src/webview/components/settings/FieldsSettings';
 import { HarnessSettings } from '../src/webview/components/settings/HarnessSettings';
+import { RuleBuilder } from '../src/webview/components/settings/ModelRulesEditor';
 import { ModelsSettings } from '../src/webview/components/settings/ModelsSettings';
 import { RulesSettings } from '../src/webview/components/settings/RulesSettings';
 import { Settings } from '../src/webview/components/settings/Settings';
@@ -78,6 +79,7 @@ describe('telas montam sem erro', () => {
     expect(board).toContain('#1');
     expect(board).toContain('revisar-spec');
     expect(board).toContain('Opus 5.5 · high');
+    expect(board).toContain('suggest-model'); // a história tem modelo manual diferente da sugestão
     expect(html(<FilterBar />)).toContain('Filtros');
     expect(html(<FiltersApp />).length).toBeGreaterThan(100);
     expect(html(<TrashView />)).toContain('Lixo');
@@ -94,9 +96,22 @@ describe('telas montam sem erro', () => {
     expect(types).toContain('Padrões por tipo');
     expect(types).toContain('Modelo');
     expect(html(<FieldsSettings />)).toContain('Skills');
-    expect(html(<RulesSettings />)).toContain('Avançar de fase');
+    const rules = html(<RulesSettings />);
+    expect(rules).toContain('Avançar de fase');
+    expect(rules).toContain('Preencher o modelo sugerido');
     const models = html(<ModelsSettings />);
-    for (const text of ['Detectar modelos', 'Fable 5.1', 'gpt-6.1-sol', 'Sugestão de modelo', 'Esforço', 'xhigh']) expect(models).toContain(text);
+    for (const text of ['Detectar modelos', 'Fable 5.1', 'gpt-6.1-sol', 'Sugestão de modelo', 'Esforço = Baixo', 'Montar nova regra', 'xhigh']) expect(models).toContain(text);
+    const s = useBoardStore.getState().state!;
+    const tags = s.fieldDefs.find((f) => f.name === 'Tags')!.id;
+    const builder = html(
+      <RuleBuilder
+        initial={{ id: 'r', name: 'Teste', enabled: true, model: 'claude:opus@high', groups: [[{ fieldId: tags, op: 'is', value: 'backend' }, { fieldId: '@type', op: 'isNot', value: 'Bug' }], [{ fieldId: tags, op: 'is', value: 'docs' }]] }}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    for (const text of ['Tipo do card', 'OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
+
     const harness = html(<HarnessSettings />);
     for (const text of ['Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.agents/skills']) expect(harness).toContain(text);
   });

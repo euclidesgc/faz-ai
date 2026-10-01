@@ -68,14 +68,23 @@ Essas três ferramentas não guardam a lista de modelos em arquivo, então a lis
 desatualizada. Para corrigir, edite o catálogo à mão ou peça à própria IA, pelo MCP, que registre
 os modelos que ela tem (`upsert_model`). Modelos acrescentados à mão são mantidos ao detectar.
 
-**Sugestão de modelo.** Regras no formato "quando o campo X tem o valor Y, sugerir o modelo Z".
-Valem para qualquer campo de seleção, como Esforço ou Tags; a primeira regra que casa vence.
+**Sugestão de modelo.** Uma lista de regras que sugerem um modelo a partir dos atributos do card.
 
-- A sugestão preenche o campo Modelo enquanto ele está vazio ou ainda tem a sugestão anterior. Ao
-  mudar o Esforço de Baixo para Alto, o modelo sugerido muda junto.
-- Um modelo escolhido à mão nunca é trocado; o detalhe do card mostra a sugestão com um link "Usar".
+- **Montar nova regra** abre o montador: condições sobre o tipo do card e os campos de seleção
+  (Esforço, Tags, Fase…), com "é" ou "não é". As condições de um grupo valem juntas (**E**); cada
+  grupo alternativo é um **OU**. Exemplo: `Esforço = Alto E Tags = backend OU Tipo = Bug`.
+- **Adicionar à lista** põe a regra em uso. Na lista, cada regra pode ser ligada, desligada,
+  editada, removida e reordenada; a primeira regra ligada que casa vence.
 - Os botões "Recriar as regras de Esforço com os modelos de…" geram as três regras (Baixo, Médio,
   Alto) com um modelo leve, um intermediário e um forte da ferramenta escolhida.
+
+O resultado é sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer
+momento.
+
+- Por padrão, a sugestão preenche o campo Modelo enquanto ele está vazio ou ainda tem a sugestão
+  anterior. Isso desliga em Configurações → Regras do board ("Preencher o modelo sugerido").
+- Um modelo escolhido à mão nunca é trocado. Quando ele difere da sugestão, o card mostra um
+  botão pequeno (✦ com o modelo sugerido) que aplica a sugestão, e o detalhe mostra o link "Usar".
 
 Um board novo já nasce com o catálogo das ferramentas em uso e com as regras de Esforço da primeira
 ferramenta instalada na máquina.

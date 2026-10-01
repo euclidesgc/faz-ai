@@ -15,13 +15,38 @@ export interface ModelOption {
   defaultEffort: string | null;
 }
 
-/** "Quando o campo X tem o valor Y, sugerir o modelo Z". A primeira regra que casa vence. */
+/** Campo especial usado em condições: o tipo do card. */
+export const TYPE_CONDITION = '@type';
+
+export interface RuleCondition {
+  /** id de um campo, ou TYPE_CONDITION */
+  fieldId: Id;
+  op: 'is' | 'isNot';
+  value: string;
+}
+
+/**
+ * Regra de sugestão de modelo. `groups` é uma lista de alternativas (OU); cada alternativa é uma
+ * lista de condições que precisam valer juntas (E). A primeira regra ligada que casa vence.
+ */
 export interface ModelRule {
   id: string;
-  fieldId: Id;
-  value: string;
+  name: string;
+  enabled: boolean;
+  groups: RuleCondition[][];
   /** valor de campo do tipo modelo: `<id do modelo>@<esforço>` */
   model: string;
+}
+
+/** Lê as regras salvas, convertendo o formato antigo (um campo = um valor) para o atual. */
+export function parseModelRules(json: string | null | undefined): ModelRule[] {
+  return parseJsonArray<Partial<ModelRule> & { fieldId?: string; value?: string }>(json).flatMap((r) => {
+    if (!r || typeof r.id !== 'string' || typeof r.model !== 'string') return [];
+    const groups = Array.isArray(r.groups)
+      ? r.groups.map((g) => (Array.isArray(g) ? g.filter((c) => c && typeof c.fieldId === 'string') : [])).filter((g) => g.length)
+      : r.fieldId ? [[{ fieldId: r.fieldId, op: 'is' as const, value: r.value ?? '' }]] : [];
+    return [{ id: r.id, name: r.name ?? '', enabled: r.enabled !== false, groups, model: r.model }];
+  });
 }
 
 export const EFFORT_FIELD = 'Esforço';
@@ -79,15 +104,30 @@ export function modelFieldOf(state: BoardState, card: Card): FieldDef | undefine
   return state.fieldDefs.find((f) => f.kind === 'model' && (f.appliesToTypes === null || f.appliesToTypes.includes(card.typeId)));
 }
 
+function conditionHolds(state: BoardState, card: Card, c: RuleCondition): boolean {
+  let values: string[];
+  if (c.fieldId === TYPE_CONDITION) values = [state.cardTypes.find((t) => t.id === card.typeId)?.name ?? ''];
+  else {
+    const v = state.fieldValues.find((x) => x.cardId === card.id && x.fieldId === c.fieldId)?.value;
+    // checkbox desmarcado não tem valor salvo: conta como "false"
+    values = v === undefined || v === null ? (state.fieldDefs.find((f) => f.id === c.fieldId)?.kind === 'checkbox' ? ['false'] : []) : Array.isArray(v) ? v : [String(v)];
+  }
+  const has = values.some((x) => norm(x) === norm(c.value));
+  return c.op === 'is' ? has : !has;
+}
+
+export const ruleMatches = (state: BoardState, card: Card, rule: ModelRule): boolean =>
+  rule.groups.some((group) => group.length > 0 && group.every((c) => conditionHolds(state, card, c)));
+
 /** Modelo sugerido para o card pelas regras do board, ou null se nenhuma casa. */
 export function suggestModel(state: BoardState, card: Card): string | null {
-  for (const rule of state.board.modelRules) {
-    const v = state.fieldValues.find((x) => x.cardId === card.id && x.fieldId === rule.fieldId)?.value;
-    if (v === undefined || v === null) continue;
-    const values = Array.isArray(v) ? v : [String(v)];
-    if (values.some((x) => norm(x) === norm(rule.value))) return rule.model;
-  }
-  return null;
+  return state.board.modelRules.find((r) => r.enabled && ruleMatches(state, card, r))?.model ?? null;
+}
+
+/** Texto de uma regra, ex.: `Esforço = Alto E Tags = backend OU Tipo = Bug`. */
+export function describeRule(state: BoardState, rule: ModelRule): string {
+  const name = (c: RuleCondition) => (c.fieldId === TYPE_CONDITION ? 'Tipo' : state.fieldDefs.find((f) => f.id === c.fieldId)?.name ?? '(campo apagado)');
+  return rule.groups.map((g) => g.map((c) => `${name(c)} ${c.op === 'is' ? '=' : '≠'} ${c.value}`).join(' E ')).join(' OU ') || '(sem condições)';
 }
 
 export function parseJsonArray<T>(json: string | null | undefined): T[] {
