@@ -1,4 +1,5 @@
 import type { ViewState } from './filters';
+import type { AiTool } from './harness';
 import type { BoardRules } from './rules';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, WorkflowKind } from './model';
 
@@ -49,7 +50,7 @@ export type WebviewToHost =
     }
   | { type: 'settings.field.delete'; fieldId: Id }
   | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string } }
-  | { type: 'settings.board.update'; patch: { name?: string } }
+  | { type: 'settings.board.update'; patch: { name?: string; aiTools?: AiTool[] } }
   /** apaga tudo e recria o board com o padrão atual */
   | { type: 'settings.board.reset' }
   | { type: 'settings.rules.update'; patch: Partial<BoardRules> }

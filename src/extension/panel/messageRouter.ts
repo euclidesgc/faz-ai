@@ -44,8 +44,9 @@ export class MessageRouter {
     this.comments = new CommentRepo(db);
     this.attachments = new AttachmentRepo(db);
     this.store = new AttachmentStore(opts.attachmentsDir);
-    this.harnessStore = opts.workspaceDir ? new HarnessStore(opts.workspaceDir) : null;
-    this.boardId = this.boards.getOrCreate(opts.workspaceKey, opts.folderName).id;
+    const board = this.boards.getOrCreate(opts.workspaceKey, opts.folderName);
+    this.boardId = board.id;
+    this.harnessStore = opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTools) : null;
     this.loadHarness();
     dbHandle.scheduleSave();
   }
@@ -215,6 +216,7 @@ export class MessageRouter {
       case 'settings.board.reset':
         this.boards.deleteBoard(this.boardId).forEach((id) => this.store.removeCard(id));
         this.boardId = this.boards.getOrCreate(this.opts.workspaceKey, this.opts.folderName).id;
+        this.harnessStore?.setTools(this.boards.snapshot(this.boardId).board.aiTools);
         this.loadHarness();
         return true;
       case 'harness.rule.write':
@@ -231,6 +233,11 @@ export class MessageRouter {
         return this.harnessOp((h) => h.deleteSkill(msg.name));
       case 'settings.board.update':
         this.boards.updateBoard(this.boardId, msg.patch);
+        if (msg.patch.aiTools && this.harnessStore) {
+          // as ferramentas em uso definem em que pastas as skills precisam estar
+          this.harnessStore.setTools(this.boards.snapshot(this.boardId).board.aiTools);
+          this.loadHarness();
+        }
         return true;
     }
   }

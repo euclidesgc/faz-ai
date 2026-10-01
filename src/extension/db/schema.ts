@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -141,6 +141,9 @@ const MIGRATIONS: Record<number, string> = {
            (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
     FROM boards b
     WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'skills');
+  `,
+  8: `
+    ALTER TABLE boards ADD COLUMN ai_tools_json TEXT NOT NULL DEFAULT '["claude","codex","cursor","kimi"]';
   `,
 };
 

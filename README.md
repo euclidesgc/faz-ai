@@ -51,16 +51,33 @@ apaga todos os cards e configurações do board.
 
 ## Harness de IA
 
-Configurações → **Harness de IA** gerencia, pelo board, o que as ferramentas de IA leem no projeto:
+Configurações → **Harness de IA** gerencia, pelo board, o que as ferramentas de IA leem no projeto.
 
-- **Regras do projeto:** cria, edita e apaga `CLAUDE.md`, `AGENTS.md` e `GEMINI.md` na raiz da pasta.
-- **Skills:** cria, edita, liga, desliga e apaga skills em `.claude/skills/<nome>/SKILL.md`. Desligar
-  move a pasta para `.claude/skills-disabled/`: a skill sai do contexto das ferramentas e o conteúdo
-  fica guardado. Manter ligado só o necessário economiza contexto.
+**Ferramentas usadas neste projeto.** Marque Claude Code, Codex, Cursor e/ou Kimi Code. Cada uma lê
+lugares diferentes, e o board usa essa escolha para gravar tudo onde elas enxergam:
+
+| Ferramenta | Regras | Skills do projeto |
+| --- | --- | --- |
+| Claude Code | `CLAUDE.md` | `.claude/skills` |
+| Codex | `AGENTS.md` | `.agents/skills` |
+| Cursor | `AGENTS.md` | `.agents/skills`, `.cursor/skills`, `.claude/skills` |
+| Kimi Code | `AGENTS.md` | `.kimi/skills`, `.claude/skills`, `.agents/skills` |
+
+**Regras do projeto.** Cria, edita e apaga `CLAUDE.md`, `AGENTS.md` e `GEMINI.md` na raiz. Para
+manter as regras num arquivo só, escreva no `AGENTS.md` e use o botão **Usar o AGENTS.md** no
+`CLAUDE.md`: ele cria um `CLAUDE.md` que apenas importa o outro (`@AGENTS.md`).
+
+**Skills.** Cria, edita, liga, desliga e apaga skills (`<pasta>/<nome>/SKILL.md`).
+
+- Com o Claude Code marcado, as skills ficam em `.claude/skills`. Se o Codex também estiver
+  marcado, cada skill ganha um atalho (symlink) em `.agents/skills`, que é o único lugar que o Codex
+  lê. Sem o Claude Code, as skills ficam em `.agents/skills`.
+- Desligar move a pasta para `<pasta>-disabled` e remove o atalho: a skill sai do contexto de todas
+  as ferramentas e o conteúdo fica guardado. Manter ligado só o necessário economiza contexto.
+- Skills que já existiam em qualquer uma das duas pastas aparecem no board.
 
 São arquivos da pasta do projeto, então entram no git normalmente, e mudanças feitas por fora (no
-editor, pela IA, por um `git pull`) aparecem no board. Ferramentas que não leem `.claude/skills`
-ainda conseguem usar as skills marcadas num card: o MCP entrega o caminho de cada `SKILL.md`.
+editor, pela IA, por um `git pull`) aparecem no board.
 
 ## Usando com IA (MCP)
 
@@ -70,7 +87,25 @@ board na hora, e as regras do board valem para ela também.
 
 ### Como conectar
 
-O servidor é iniciado por um comando só, igual em todos os clientes:
+Rode **Faz AI: Conectar IA (MCP)** (ou o botão em Configurações → Harness de IA), marque as
+ferramentas que você usa e o board grava a configuração no lugar e no formato que cada uma lê:
+
+| Ferramenta | Onde o servidor é registrado | Depois de registrar |
+| --- | --- | --- |
+| Claude Code | `.mcp.json` na pasta do projeto | Abra uma sessão nova e aprove o servidor (`/mcp` mostra o estado) |
+| Codex | `.codex/config.toml` na pasta do projeto | O projeto precisa estar marcado como confiável; `codex mcp list` confere |
+| Cursor | `.cursor/mcp.json` na pasta do projeto | Ative o servidor em Settings → MCP |
+| Kimi Code | `~/.kimi-code/mcp.json` e/ou `~/.kimi/mcp.json` (global) | Abra uma sessão nova a partir da pasta do projeto |
+
+Os arquivos do projeto guardam caminhos desta máquina; o comando oferece colocá-los no `.gitignore`.
+A lista de ferramentas só é carregada no início da sessão, então sempre abra uma sessão nova.
+
+O Kimi só tem configuração global, por isso o registro dele não fixa a pasta: a ponte descobre o
+projeto pelo diretório em que a sessão foi aberta.
+
+#### Registro manual
+
+O servidor é sempre o mesmo comando:
 
 ```sh
 node "<bridge.js>" "<pasta do projeto>"
@@ -82,84 +117,40 @@ node "<bridge.js>" "<pasta do projeto>"
   - Windows: `%APPDATA%\Code\User\globalStorage\euclidesgc.faz-ai\mcp\bridge.js`
 - `<pasta do projeto>` é opcional. Sem ela, vale a variável `FAZAI_WORKSPACE` ou o diretório em que
   o cliente foi iniciado (subindo pelas pastas pais até achar um board ativo). Use sem a pasta em
-  configurações globais, para o mesmo registro servir a todos os projetos.
+  registros globais, para o mesmo registro servir a todos os projetos.
 
-O comando **Faz AI: Conectar IA (MCP)** (ou o botão em Configurações) grava o `.mcp.json` da pasta
-e, em "Copiar configuração", entrega o trecho JSON com os caminhos já preenchidos.
-
-Atenção: o `.mcp.json` do projeto só é lido por alguns clientes (Claude Code, por exemplo). Os
-demais leem a própria configuração, e o servidor precisa ser registrado nela.
-Nos exemplos abaixo, `BRIDGE` é o caminho do `bridge.js`:
+Pelas CLIs, com `BRIDGE` apontando para o `bridge.js`:
 
 ```sh
 BRIDGE="$HOME/Library/Application Support/Code/User/globalStorage/euclidesgc.faz-ai/mcp/bridge.js"
+
+claude mcp add --scope user faz-ai -- node "$BRIDGE"        # Claude Code, todos os projetos
+codex mcp add faz-ai -- node "$BRIDGE"                      # Codex, global (~/.codex/config.toml)
+kimi mcp add --transport stdio faz-ai -- node "$BRIDGE"     # Kimi, global
 ```
 
-**Claude Code** — lê o `.mcp.json` do projeto (reinicie a sessão e aprove o servidor). Ou, para
-todos os projetos:
-
-```sh
-claude mcp add --scope user faz-ai -- node "$BRIDGE"
-```
-
-**Kimi Code** — usa a própria configuração, não o `.mcp.json`. Registre pela CLI:
-
-```sh
-kimi mcp add --transport stdio faz-ai -- node "$BRIDGE"
-```
-
-ou acrescente em `~/.kimi-code/mcp.json` (`~/.kimi/mcp.json` na Kimi CLI), dentro de `mcpServers`,
-e abra uma sessão nova:
+O Cursor não tem comando de CLI para isso: edite `.cursor/mcp.json` (projeto) ou `~/.cursor/mcp.json`
+(global). Os formatos gravados pelo board:
 
 ```json
-"faz-ai": {
-  "transport": "stdio",
-  "command": "node",
-  "args": ["/Users/VOCE/Library/Application Support/Code/User/globalStorage/euclidesgc.faz-ai/mcp/bridge.js"]
-}
+// .mcp.json (Claude Code) e .cursor/mcp.json (Cursor)
+{ "mcpServers": { "faz-ai": { "type": "stdio", "command": "node", "args": ["<bridge.js>", "<pasta do projeto>"] } } }
 ```
-
-**Codex** — pela CLI:
-
-```sh
-codex mcp add faz-ai -- node "$BRIDGE"
-```
-
-ou em `~/.codex/config.toml`:
 
 ```toml
+# .codex/config.toml (Codex)
 [mcp_servers.faz-ai]
 command = "node"
-args = ["/Users/VOCE/Library/Application Support/Code/User/globalStorage/euclidesgc.faz-ai/mcp/bridge.js"]
+args = ["<bridge.js>", "<pasta do projeto>"]
 ```
-
-**Cursor** — `.cursor/mcp.json` na pasta do projeto (ou `~/.cursor/mcp.json` para todos), com o
-mesmo conteúdo do `.mcp.json`:
 
 ```json
-{
-  "mcpServers": {
-    "faz-ai": { "command": "node", "args": ["<bridge.js>", "<pasta do projeto>"] }
-  }
-}
+// ~/.kimi-code/mcp.json (Kimi Code)
+{ "mcpServers": { "faz-ai": { "transport": "stdio", "command": "node", "args": ["<bridge.js>"] } } }
 ```
 
-**VS Code (Copilot)** — `.vscode/mcp.json` na pasta do projeto; note a chave `servers`:
-
-```json
-{
-  "servers": {
-    "faz-ai": { "type": "stdio", "command": "node", "args": ["<bridge.js>", "${workspaceFolder}"] }
-  }
-}
-```
-
-**Gemini CLI** — em `~/.gemini/settings.json` (ou `.gemini/settings.json` no projeto), a mesma
-entrada `mcpServers` do Cursor.
-
-**Outros clientes** — qualquer cliente MCP com transporte stdio funciona com o comando acima.
-
-Depois de registrar, reinicie a sessão do cliente: a lista de ferramentas só é carregada no início.
+Outros clientes MCP com transporte stdio (VS Code/Copilot em `.vscode/mcp.json` com a chave
+`servers`, Gemini CLI em `~/.gemini/settings.json`) funcionam com o mesmo comando.
 
 ### Se as ferramentas não aparecem
 

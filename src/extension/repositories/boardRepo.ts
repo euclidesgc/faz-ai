@@ -3,7 +3,7 @@ import type { Attachment, Board, BoardState, Card, CardType, ChecklistItem, Colu
 import { all, bool, num, one, run, str } from '../db/query';
 import { parseRules, type BoardRules } from '../../shared/rules';
 import { seedBoard } from '../db/seed';
-import { EMPTY_HARNESS } from '../../shared/harness';
+import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTools, type AiTool } from '../../shared/harness';
 
 export class BoardRepo {
   constructor(private db: Database) {}
@@ -15,7 +15,7 @@ export class BoardRepo {
       seedBoard(this.db, workspaceKey, name);
       row = one(this.db, 'SELECT * FROM boards WHERE workspace_key = ?', [workspaceKey])!;
     }
-    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)) };
+    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTools: parseAiTools(str(row.ai_tools_json)) };
   }
 
   updateRules(boardId: string, patch: Partial<BoardRules>): void {
@@ -33,8 +33,9 @@ export class BoardRepo {
     return ids;
   }
 
-  updateBoard(boardId: string, patch: { name?: string }): void {
+  updateBoard(boardId: string, patch: { name?: string; aiTools?: AiTool[] }): void {
     if (patch.name !== undefined) run(this.db, 'UPDATE boards SET name = ? WHERE id = ?', [patch.name, boardId]);
+    if (patch.aiTools !== undefined) run(this.db, 'UPDATE boards SET ai_tools_json = ? WHERE id = ?', [JSON.stringify(ALL_AI_TOOLS.filter((t) => patch.aiTools!.includes(t))), boardId]);
   }
 
   updateWorkflow(workflowId: string, patch: { name?: string }): void {
@@ -45,7 +46,7 @@ export class BoardRepo {
     const db = this.db;
     const b = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
     if (!b) throw new Error('Board não encontrado');
-    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)) };
+    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTools: parseAiTools(str(b.ai_tools_json)) };
 
     const workflows: Workflow[] = all(db, 'SELECT * FROM workflows WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), position: num(r.position), kind: str(r.kind) as Workflow['kind'],

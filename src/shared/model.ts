@@ -1,4 +1,4 @@
-import type { Harness } from './harness';
+import type { AiTool, Harness } from './harness';
 import type { BoardRules } from './rules';
 
 export type Id = string;
@@ -14,6 +14,8 @@ export interface Board {
   workspaceKey: string;
   name: string;
   rules: BoardRules;
+  /** ferramentas de IA usadas no projeto; define onde skills e MCP são configurados */
+  aiTools: AiTool[];
 }
 
 export interface Workflow {

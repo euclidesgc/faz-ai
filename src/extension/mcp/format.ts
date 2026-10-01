@@ -174,6 +174,7 @@ export function boardOverview(s: BoardState) {
 /** Arquivos de regras e skills do projeto, sem o conteúdo. */
 export function harnessOverview(s: BoardState) {
   return {
+    aiTools: s.board.aiTools,
     ruleFiles: s.harness.rules.map((r) => ({ name: r.name, exists: r.exists, ...(r.exists ? { bytes: r.content.length } : {}) })),
     skills: s.harness.skills.map((k) => ({ name: k.name, enabled: k.enabled, description: k.description, path: k.path })),
   };

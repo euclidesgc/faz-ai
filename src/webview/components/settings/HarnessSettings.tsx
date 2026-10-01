@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RULE_FILES, SKILL_NAME_PATTERN, type RuleFile, type Skill } from '../../../shared/harness';
+import { AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, skillDirs, type AiTool, type RuleFile, type Skill } from '../../../shared/harness';
 import { useBoardStore } from '../../store/boardStore';
 
 type Editing = { kind: 'rule'; name: string } | { kind: 'skill'; name: string } | { kind: 'newSkill' } | null;
@@ -28,7 +28,12 @@ function FileEditor({ saved, onSave, onClose }: { saved: string; onSave: (conten
 }
 
 export function HarnessSettings() {
-  const harness = useBoardStore((s) => s.state)!.harness;
+  const state = useBoardStore((s) => s.state)!;
+  const harness = state.harness;
+  const tools = state.board.aiTools;
+  const dirs = skillDirs(tools);
+  const agents = harness.rules.find((r) => r.name === 'AGENTS.md');
+  const toggleTool = (id: AiTool, on: boolean) => send({ type: 'settings.board.update', patch: { aiTools: on ? [...tools, id] : tools.filter((t) => t !== id) } });
   const send = useBoardStore((s) => s.send);
   const ask = useBoardStore((s) => s.ask);
   const [editing, setEditing] = useState<Editing>(null);
@@ -57,6 +62,9 @@ export function HarnessSettings() {
           <span className={`pill ${r.exists ? '' : 'off'}`}>{r.exists ? 'Existe' : 'Não existe'}</span>
           <span className="muted small">Lido por: {readBy}</span>
           <span className="spacer" />
+          {r.name === 'CLAUDE.md' && !r.exists && agents?.exists && (
+            <button title="Cria um CLAUDE.md que só importa o AGENTS.md, para as regras ficarem num arquivo só" onClick={() => send({ type: 'harness.rule.write', name: 'CLAUDE.md', content: '@AGENTS.md\n' })}>Usar o AGENTS.md</button>
+          )}
           <button onClick={() => toggle('rule', r.name)}>{isEditing('rule', r.name) ? 'Fechar' : r.exists ? 'Editar' : 'Criar'}</button>
           {r.exists && (
             <button
@@ -100,7 +108,28 @@ export function HarnessSettings() {
         Regras e skills que as ferramentas de IA leem neste projeto. Tudo aqui são arquivos da pasta do projeto: o board só os edita.
       </p>
 
-      <h3>Regras do projeto</h3>
+      <h3>Ferramentas usadas neste projeto</h3>
+      <p className="muted small">Cada ferramenta lê regras, skills e servidores MCP em lugares diferentes. Marque as que você usa: o board grava as skills onde elas enxergam.</p>
+      <table className="table">
+        <thead><tr><th></th><th>Ferramenta</th><th>Regras</th><th>Skills</th><th>MCP</th></tr></thead>
+        <tbody>
+          {AI_TOOLS.map((t) => (
+            <tr key={t.id}>
+              <td><input type="checkbox" checked={tools.includes(t.id)} onChange={(e) => toggleTool(t.id, e.target.checked)} /></td>
+              <td>{t.label}</td>
+              <td><code>{t.rules}</code></td>
+              <td><code>{t.skills}</code></td>
+              <td><code>{t.mcp}</code></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="row">
+        <button className="primary" onClick={() => send({ type: 'ui.connectAI' })}>Conectar ao board (MCP)…</button>
+        <span className="muted small">Registra o servidor do board na configuração de cada ferramenta escolhida.</span>
+      </div>
+
+      <h3 className="section-head">Regras do projeto</h3>
       <p className="muted small">Instruções carregadas em toda sessão de IA. Quanto mais curtas, menos contexto consomem.</p>
       <div className="stack">{harness.rules.map(ruleRow)}</div>
 
@@ -110,8 +139,8 @@ export function HarnessSettings() {
         <button className="primary" onClick={() => setEditing(editing?.kind === 'newSkill' ? null : { kind: 'newSkill' })}>Nova skill</button>
       </div>
       <p className="muted small">
-        Skills ligadas ficam em <code>.claude/skills</code> e viram opções do campo "Skills" dos cards. Desligar move a skill para
-        <code> .claude/skills-disabled</code>: ela sai do contexto das ferramentas, mas o conteúdo é preservado.
+        Skills ligadas ficam em <code>{dirs.primary}</code>{dirs.mirror && <> (com um atalho em <code>{dirs.mirror}</code>, que é onde o Codex procura)</>} e
+        viram opções do campo "Skills" dos cards. Desligar move a skill para <code>{dirs.primary}-disabled</code>: ela sai do contexto das ferramentas, mas o conteúdo é preservado.
       </p>
 
       {editing?.kind === 'newSkill' && (

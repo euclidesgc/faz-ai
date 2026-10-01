@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { EMPTY_FILTERS, applyFilters } from '../../shared/filters';
 import type { BoardState, Card } from '../../shared/model';
 import type { MessageRouter } from '../panel/messageRouter';
-import { RULE_FILES } from '../../shared/harness';
+import { ALL_AI_TOOLS, RULE_FILES } from '../../shared/harness';
 import { boardOverview, harnessOverview, cardDetail, cardStatus, cardSummary, coerceFieldValue, findCard, findColumn, findField, findType, findWorkflow } from './format';
 
 export interface ToolContext {
@@ -496,10 +496,20 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'get_harness',
-    'Lista o harness de IA do projeto: arquivos de regras (CLAUDE.md, AGENTS.md…) e skills, ligadas e desligadas, com descrição e caminho.',
+    'Lista o harness de IA do projeto: ferramentas em uso, arquivos de regras (CLAUDE.md, AGENTS.md…) e skills, ligadas e desligadas, com descrição e caminho.',
     {},
     (_a, router) => harness(router),
     true,
+  );
+
+  tool(
+    'set_ai_tools',
+    'Define quais ferramentas de IA são usadas no projeto. Isso decide em que pastas as skills ficam: .claude/skills para o Claude Code, .agents/skills para o Codex (Cursor e Kimi leem as duas).',
+    { tools: z.array(z.enum(ALL_AI_TOOLS as [string, ...string[]])) },
+    (a, router) => {
+      router.handle({ type: 'settings.board.update', patch: { aiTools: a.tools as typeof ALL_AI_TOOLS } });
+      return harness(router);
+    },
   );
 
   tool('read_rule_file', 'Lê um arquivo de regras do projeto.', { file: ruleArg }, (a, router) => {
@@ -522,7 +532,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'create_skill',
-    'Cria uma skill no projeto (.claude/skills/<nome>/SKILL.md). Ela passa a ser uma opção do campo "Skills" dos cards.',
+    'Cria uma skill no projeto, na pasta lida pelas ferramentas de IA em uso (.claude/skills e/ou .agents/skills). Ela passa a ser uma opção do campo "Skills" dos cards.',
     {
       name: z.string().describe('Letras minúsculas, números e hífens'),
       description: z.string().min(1).describe('Quando a skill deve ser usada; é por ela que a IA decide invocá-la'),

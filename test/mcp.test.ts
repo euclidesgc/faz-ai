@@ -146,14 +146,14 @@ describe('harness e padrões pelo MCP', () => {
 
     expect((await call('create_skill', { name: 'Nome Ruim', description: 'd', content: 'c' })).error).toBe(true);
     const h = (await call('create_skill', { name: 'revisar-spec', description: 'Use ao revisar uma spec', content: 'Passos…' })).data;
-    expect(h.skills).toEqual([{ name: 'revisar-spec', enabled: true, description: 'Use ao revisar uma spec', path: path.join('.claude', 'skills', 'revisar-spec', 'SKILL.md') }]);
+    expect(h.skills).toEqual([{ name: 'revisar-spec', enabled: true, description: 'Use ao revisar uma spec', path: '.claude/skills/revisar-spec/SKILL.md' }]);
     expect((await call('get_skill', { skill: 'revisar-spec' })).text).toContain('name: revisar-spec');
     const skillsField = () => router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
     expect(skillsField().options).toEqual(['revisar-spec']);
 
     // skill marcada no card aparece como obrigatória, com o caminho do SKILL.md
     const card = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 4.5' } })).data;
-    expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', path: path.join('.claude', 'skills', 'revisar-spec', 'SKILL.md') }]);
+    expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', path: '.claude/skills/revisar-spec/SKILL.md' }]);
     expect(card.model).toContain('Claude Haiku 4.5');
 
     await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
@@ -183,6 +183,63 @@ describe('harness e padrões pelo MCP', () => {
     expect(fresh.workflows[0].columns.every((c: any) => c.cards === 0)).toBe(true);
     expect(fresh.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toBeUndefined();
     expect((await call('create_card', { title: 'Nova' })).data.id).toBe('#1');
+  });
+});
+
+describe('ferramentas de IA', () => {
+  const skillMd = (base: string) => path.join(dir, base, 'revisar-spec', 'SKILL.md');
+  const isLink = (p: string) => fs.lstatSync(p).isSymbolicLink();
+
+  it('grava as skills onde cada ferramenta lê', async () => {
+    // padrão: as quatro ferramentas → principal em .claude/skills com atalho em .agents/skills (Codex)
+    await call('create_skill', { name: 'revisar-spec', description: 'd', content: 'c' });
+    expect(fs.existsSync(skillMd('.claude/skills'))).toBe(true);
+    expect(isLink(path.join(dir, '.agents/skills/revisar-spec'))).toBe(true);
+    expect(fs.readFileSync(skillMd('.agents/skills'), 'utf8')).toContain('name: revisar-spec');
+    expect((await call('get_harness')).data.skills).toHaveLength(1); // o atalho não conta em dobro
+
+    await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
+    expect(fs.existsSync(path.join(dir, '.agents/skills/revisar-spec'))).toBe(false);
+    expect(fs.existsSync(skillMd('.claude/skills-disabled'))).toBe(true);
+    await call('set_skill_enabled', { skill: 'revisar-spec', enabled: true });
+    expect(isLink(path.join(dir, '.agents/skills/revisar-spec'))).toBe(true);
+
+    // sem Codex o atalho some; sem Claude as skills novas vão para .agents/skills
+    await call('set_ai_tools', { tools: ['claude', 'cursor'] });
+    expect(fs.existsSync(path.join(dir, '.agents/skills/revisar-spec'))).toBe(false);
+    const h = (await call('set_ai_tools', { tools: ['codex', 'kimi'] })).data;
+    expect(h.aiTools).toEqual(['codex', 'kimi']);
+    expect(h.skills.map((k: any) => k.name)).toEqual(['revisar-spec']); // a que já existia continua visível
+    await call('create_skill', { name: 'outra', description: 'd', content: 'c' });
+    expect(fs.existsSync(path.join(dir, '.agents/skills/outra/SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, '.claude/skills/outra'))).toBe(false);
+  });
+
+  it('registra o servidor MCP no formato de cada ferramenta', async () => {
+    const { registerClients } = await import('../src/extension/mcp/clientConfig');
+    const home = path.join(dir, 'home');
+    fs.mkdirSync(path.join(home, '.kimi-code'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.kimi-code', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
+    fs.mkdirSync(path.join(dir, '.codex'));
+    fs.writeFileSync(path.join(dir, '.codex', 'config.toml'), 'model = "x"\n\n[mcp_servers.faz-ai]\ncommand = "velho"\nargs = ["a"]\n\n[mcp_servers.outro]\ncommand = "y"\n');
+    const bridge = '/b/com espaço/bridge.js';
+    const done = registerClients(['claude', 'codex', 'cursor', 'kimi'], { bridgePath: bridge, workspaceDir: dir, homeDir: home });
+    expect(done.map((d) => d.projectFile)).toEqual(['.mcp.json', '.codex/config.toml', '.cursor/mcp.json', null]);
+
+    const json = (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')).mcpServers;
+    expect(json(path.join(dir, '.mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir] });
+    expect(json(path.join(dir, '.cursor', 'mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir] });
+    const kimi = json(path.join(home, '.kimi-code', 'mcp.json'));
+    expect(kimi.outro).toEqual({ command: 'x' });
+    expect(kimi['faz-ai']).toEqual({ transport: 'stdio', command: 'node', args: [bridge] });
+    expect(fs.existsSync(path.join(home, '.kimi'))).toBe(false);
+
+    const toml = fs.readFileSync(path.join(dir, '.codex', 'config.toml'), 'utf8');
+    expect(toml).toContain('model = "x"');
+    expect(toml).toContain('[mcp_servers.outro]\ncommand = "y"');
+    expect(toml).not.toContain('velho');
+    expect(toml.match(/\[mcp_servers\.faz-ai\]/g)).toHaveLength(1);
+    expect(toml).toContain(`args = ["${bridge}", "${dir}"]`);
   });
 });
 

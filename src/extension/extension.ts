@@ -4,6 +4,8 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { execFile } from 'node:child_process';
 import { openFile, type DbHandle } from './db/database';
+import { AI_TOOLS } from '../shared/harness';
+import { registerClients, type Registration } from './mcp/clientConfig';
 import { startMcpServer } from './mcp/server';
 import { socketPath, workspaceKey } from './mcp/socketPath';
 import { BoardPanel } from './panel/BoardPanel';
@@ -75,13 +77,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.openBoard', () => openBoard()),
     vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard(cardId)),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
-    vscode.commands.registerCommand('fazai.connectAI', () => connectAI(bridgePath)),
+    vscode.commands.registerCommand('fazai.connectAI', () => connectAI(bridgePath, getRouter)),
   );
 
   // regras e skills editadas por fora (editor, IA, git) aparecem no board
   const wf = folder();
   if (wf) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(wf, '{CLAUDE.md,AGENTS.md,GEMINI.md,.claude/skills/**,.claude/skills-disabled/**}'));
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(wf, '{CLAUDE.md,AGENTS.md,GEMINI.md,.claude/skills/**,.claude/skills-disabled/**,.agents/skills/**,.agents/skills-disabled/**}'));
     let timer: NodeJS.Timeout | undefined;
     const refresh = () => {
       clearTimeout(timer);
@@ -108,39 +110,42 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 }
 
-/** Registra o servidor MCP do board no .mcp.json da pasta, que o Claude Code e outros clientes leem. */
-async function connectAI(bridgePath: string): Promise<void> {
+/** Registra o servidor MCP do board na configuração de cada ferramenta de IA escolhida. */
+async function connectAI(bridgePath: string, getRouter: () => Promise<MessageRouter | undefined>): Promise<void> {
   const f = vscode.workspace.workspaceFolders?.[0];
-  if (!f) {
+  const router = await getRouter();
+  if (!f || !router) {
     vscode.window.showWarningMessage('Abra uma pasta para conectar uma IA ao board.');
     return;
   }
-  const file = path.join(f.uri.fsPath, '.mcp.json');
-  let config: { mcpServers?: Record<string, unknown> } = {};
-  if (fs.existsSync(file)) {
-    try {
-      config = JSON.parse(fs.readFileSync(file, 'utf8')) as typeof config;
-    } catch {
-      vscode.window.showErrorMessage('O .mcp.json desta pasta não é um JSON válido; corrija-o e tente de novo.');
-      return;
-    }
-  }
-  const entry = { command: 'node', args: [bridgePath, f.uri.fsPath] };
-  config.mcpServers = { ...config.mcpServers, 'faz-ai': entry };
-  fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n');
-
-  // o arquivo guarda caminhos desta máquina, então normalmente não deve ir para o repositório
-  const gitignore = path.join(f.uri.fsPath, '.gitignore');
-  const ignored = fs.existsSync(gitignore) && fs.readFileSync(gitignore, 'utf8').split(/\r?\n/).some((l) => l.trim() === '.mcp.json');
-  const actions = ['Copiar configuração', ...(ignored ? [] : ['Adicionar ao .gitignore'])];
-  const choice = await vscode.window.showInformationMessage(
-    'Servidor "faz-ai" registrado em .mcp.json. Reinicie a sessão do Claude Code nesta pasta e aprove o servidor; em outros clientes MCP, use a mesma configuração.',
-    ...actions,
+  const inUse = router.snapshot().board.aiTools;
+  const picked = await vscode.window.showQuickPick(
+    AI_TOOLS.map((t) => ({ label: t.label, description: t.mcp, picked: inUse.includes(t.id), id: t.id })),
+    { canPickMany: true, title: 'Conectar IA ao board (MCP)', placeHolder: 'Em quais ferramentas registrar o servidor do board?' },
   );
-  if (choice === 'Copiar configuração') await vscode.env.clipboard.writeText(JSON.stringify({ mcpServers: { 'faz-ai': entry } }, null, 2));
+  if (!picked?.length) return;
+
+  let done: Registration[];
+  try {
+    done = registerClients(picked.map((p) => p.id), { bridgePath, workspaceDir: f.uri.fsPath, homeDir: os.homedir() });
+  } catch (e) {
+    vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
+    return;
+  }
+
+  // arquivos do projeto guardam caminhos desta máquina, então normalmente não devem ir para o repositório
+  const gitignore = path.join(f.uri.fsPath, '.gitignore');
+  const ignoredLines = fs.existsSync(gitignore) ? fs.readFileSync(gitignore, 'utf8').split(/\r?\n/).map((l) => l.trim()) : [];
+  const toIgnore = done.flatMap((d) => (d.projectFile && !ignoredLines.includes(d.projectFile) ? [d.projectFile] : []));
+  const summary = [...new Set(done.map((d) => d.next))].join(' ');
+  const files = done.map((d) => d.projectFile ?? d.file.replace(os.homedir(), '~')).join(', ');
+  const choice = await vscode.window.showInformationMessage(
+    `Servidor "faz-ai" registrado em: ${files}. ${summary}`,
+    ...(toIgnore.length ? ['Adicionar ao .gitignore'] : []),
+  );
   if (choice === 'Adicionar ao .gitignore') {
     const current = fs.existsSync(gitignore) ? fs.readFileSync(gitignore, 'utf8') : '';
-    fs.writeFileSync(gitignore, `${current}${current && !current.endsWith('\n') ? '\n' : ''}.mcp.json\n`);
+    fs.writeFileSync(gitignore, `${current}${current && !current.endsWith('\n') ? '\n' : ''}${toIgnore.join('\n')}\n`);
   }
 }
 
