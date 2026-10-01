@@ -29,6 +29,27 @@ Os dados ficam no `globalStorageUri` da extensão: `fazai.db` (SQLite, um board 
 e `attachments/<cardId>/`. Nada é gravado dentro do repositório. Evite editar o mesmo board em duas
 janelas do VSCode ao mesmo tempo: cada janela mantém o banco em memória e a última a salvar vence.
 
+## Usando com IA (MCP)
+
+O board pode ser consultado e editado por uma IA (Claude Code, Cursor, Copilot ou qualquer cliente
+MCP). A extensão roda um servidor MCP local para a pasta aberta; tudo o que a IA faz aparece no
+board na hora, e as regras do board valem para ela também.
+
+1. Rode o comando **Faz AI: Conectar IA (MCP)** (ou o botão em Configurações). Ele registra o
+   servidor `faz-ai` no `.mcp.json` da pasta.
+2. Reinicie a sessão do Claude Code na pasta e aprove o servidor (`/mcp` mostra o estado). Em outros
+   clientes, use a mesma configuração do `.mcp.json`.
+3. O VSCode precisa estar aberto nessa pasta enquanto a IA usa o board.
+
+A IA pode fazer tudo o que a interface faz: listar e ler cards (`get_board`, `list_cards`,
+`get_card`), criar histórias e sub-tarefas, editar, mover, arquivar, mandar para a lixeira e apagar
+de vez, mexer em checklist, comentários e anexos (inclusive ler anexos de texto), e configurar
+colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
+pelo nome. Comentários feitos pela IA saem assinados com o nome do cliente (ex.: "Claude Code").
+
+Fluxo SDD sugerido: a IA lê a história, anexa PRD/Spec/Plan ao card, cria as sub-tarefas com o
+campo Fase, move cada uma conforme avança e comenta o resultado.
+
 ## Desenvolvimento
 
 ```sh
