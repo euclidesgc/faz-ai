@@ -1,3 +1,5 @@
+<img src="media/icon.png" width="96" alt="Ícone do Faz AI Kanban">
+
 # Faz AI Kanban
 
 Um board kanban dentro do editor (VS Code e Cursor), feito para conduzir Spec-Driven Development
