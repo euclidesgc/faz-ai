@@ -1,7 +1,10 @@
 import type { DbHandle } from '../db/database';
-import type { Attachment, BoardState } from '../../shared/model';
+import type { Attachment, BoardState, FieldDef } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
-import { EMPTY_HARNESS, type Harness } from '../../shared/harness';
+import { EMPTY_HARNESS, type AiTool, type Harness } from '../../shared/harness';
+import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelRule } from '../../shared/models';
+import { newId } from '../db/ids';
+import { detectTools, effortTiers, modelsFor } from '../models';
 import { AttachmentStore } from '../attachments';
 import { SKILLS_FIELD } from '../db/schema';
 import { HarnessStore } from '../harness';
@@ -19,6 +22,8 @@ export interface RouterOptions {
   attachmentsDir: string;
   /** pasta do projeto; sem ela o harness (regras e skills) fica vazio */
   workspaceDir?: string;
+  /** home do usuário, de onde se leem os modelos configurados nas ferramentas; sem ela vale só a lista embutida */
+  homeDir?: string;
 }
 
 /** Aplica mensagens do webview no banco. Não depende da API do VSCode. */
@@ -48,6 +53,7 @@ export class MessageRouter {
     this.boardId = board.id;
     this.harnessStore = opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTools) : null;
     this.loadHarness();
+    this.initModels();
     dbHandle.scheduleSave();
   }
 
@@ -76,6 +82,65 @@ export class MessageRouter {
     if (field && JSON.stringify(field.options) !== JSON.stringify(names)) this.settings.updateField(field.id, { options: names });
   }
 
+  private get home(): string {
+    return this.opts.homeDir ?? '';
+  }
+
+  /** Board sem catálogo (novo ou vindo de versão anterior): preenche com os modelos das ferramentas em uso. */
+  private initModels(): void {
+    const { board } = this.boards.snapshot(this.boardId);
+    if (board.modelCatalog.length) return;
+    this.boards.setModelCatalog(this.boardId, board.aiTools.flatMap((t) => modelsFor(t, this.home)));
+    // as regras iniciais usam a primeira ferramenta em uso que está instalada nesta máquina
+    const installed = detectTools(this.home);
+    const main = board.aiTools.find((t) => installed.includes(t)) ?? board.aiTools[0];
+    if (main && !board.modelRules.length) this.suggestRules(main);
+  }
+
+  /** Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. */
+  private detectModels(tool: AiTool): void {
+    const { board } = this.boards.snapshot(this.boardId);
+    const found = modelsFor(tool, this.home);
+    const ids = new Set(found.map((o) => o.id));
+    const rest = board.modelCatalog.filter((o) => !ids.has(o.id));
+    const at = rest.findIndex((o) => o.tool === tool);
+    rest.splice(at < 0 ? rest.length : at, 0, ...found);
+    this.boards.setModelCatalog(this.boardId, rest);
+  }
+
+  /** Troca as regras do campo "Esforço" por um modelo leve, um intermediário e um forte da ferramenta. */
+  private suggestRules(tool: AiTool): void {
+    let s = this.boards.snapshot(this.boardId);
+    if (!s.board.modelCatalog.some((o) => o.tool === tool)) {
+      this.detectModels(tool);
+      s = this.boards.snapshot(this.boardId);
+    }
+    const field = s.fieldDefs.find((f) => f.name.toLowerCase() === EFFORT_FIELD.toLowerCase());
+    if (!field) throw new Error(`O board não tem o campo "${EFFORT_FIELD}".`);
+    const tiers = effortTiers(tool, s.board.modelCatalog).map(([value, model]): ModelRule => ({ id: newId(), fieldId: field.id, value, model }));
+    this.boards.setModelRules(this.boardId, [...s.board.modelRules.filter((r) => r.fieldId !== field.id), ...tiers]);
+  }
+
+  private suggestionFor(cardId: string): { field: FieldDef | undefined; suggestion: string | null } {
+    const s = this.boards.snapshot(this.boardId);
+    const card = s.cards.find((c) => c.id === cardId);
+    return card ? { field: modelFieldOf(s, card), suggestion: suggestModel(s, card) } : { field: undefined, suggestion: null };
+  }
+
+  /**
+   * Preenche o campo de modelo com a sugestão das regras quando ele está vazio ou ainda tem a
+   * sugestão anterior (`previous`). Um modelo escolhido à mão nunca é trocado.
+   */
+  private applySuggestion(cardId: string, previous: string | null): void {
+    const s = this.boards.snapshot(this.boardId);
+    const card = s.cards.find((c) => c.id === cardId);
+    const field = card && modelFieldOf(s, card);
+    if (!card || !field) return;
+    const current = s.fieldValues.find((v) => v.cardId === cardId && v.fieldId === field.id)?.value ?? null;
+    const next = suggestModel(s, card);
+    if ((current === null || current === previous) && next !== current) this.cards.setFieldValue(cardId, field.id, next);
+  }
+
   private harnessOp(fn: (store: HarnessStore) => void): boolean {
     if (!this.harnessStore) throw new Error('Nenhuma pasta de projeto aberta.');
     fn(this.harnessStore);
@@ -101,6 +166,7 @@ export class MessageRouter {
   /** Como `card.create`, mas devolve o id do card criado. */
   createCard(input: { typeId: string; columnId: string; parentId: string | null; title: string }): string {
     const id = this.cards.create(this.boardId, input);
+    this.applySuggestion(id, null);
     this.changed();
     return id;
   }
@@ -122,7 +188,7 @@ export class MessageRouter {
       case 'attachment.reveal':
         return false; // tratados pela ponte do webview (dependem do VSCode)
       case 'card.create':
-        this.cards.create(this.boardId, msg);
+        this.applySuggestion(this.cards.create(this.boardId, msg), null);
         return true;
       case 'card.update':
         this.cards.update(msg.cardId, msg.patch);
@@ -148,9 +214,13 @@ export class MessageRouter {
       case 'trash.empty':
         this.cards.emptyTrash(this.boardId).forEach((id) => this.store.removeCard(id));
         return true;
-      case 'field.setValue':
+      case 'field.setValue': {
+        // se o modelo atual veio da sugestão (ou está vazio), ele acompanha a nova sugestão
+        const before = this.suggestionFor(msg.cardId);
         this.cards.setFieldValue(msg.cardId, msg.fieldId, msg.value);
+        if (before.field && before.field.id !== msg.fieldId) this.applySuggestion(msg.cardId, before.suggestion);
         return true;
+      }
       case 'checklist.add':
         this.checklist.add(msg.cardId, msg.text);
         return true;
@@ -218,6 +288,19 @@ export class MessageRouter {
         this.boardId = this.boards.getOrCreate(this.opts.workspaceKey, this.opts.folderName).id;
         this.harnessStore?.setTools(this.boards.snapshot(this.boardId).board.aiTools);
         this.loadHarness();
+        this.initModels();
+        return true;
+      case 'settings.models.set':
+        this.boards.setModelCatalog(this.boardId, msg.catalog);
+        return true;
+      case 'settings.models.detect':
+        this.detectModels(msg.tool);
+        return true;
+      case 'settings.modelRules.set':
+        this.boards.setModelRules(this.boardId, msg.rules);
+        return true;
+      case 'settings.modelRules.suggest':
+        this.suggestRules(msg.tool);
         return true;
       case 'harness.rule.write':
         return this.harnessOp((h) => h.writeRule(msg.name, msg.content));

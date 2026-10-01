@@ -154,7 +154,7 @@ describe('harness e padrões pelo MCP', () => {
     // skill marcada no card aparece como obrigatória, com o caminho do SKILL.md
     const card = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 4.5' } })).data;
     expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', path: '.claude/skills/revisar-spec/SKILL.md' }]);
-    expect(card.model).toContain('Claude Haiku 4.5');
+    expect(card.model).toMatchObject({ tool: 'claude', model: 'haiku', effort: null, value: 'claude:haiku' });
 
     await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
     expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'revisar-spec'))).toBe(false);
@@ -172,17 +172,90 @@ describe('harness e padrões pelo MCP', () => {
   });
 
   it('aplica os padrões do tipo aos cards novos e recria o board', async () => {
-    const board = (await call('update_card_type', { type: 'Sub-tarefa', default_fields: { Modelo: 'claude sonnet 5.5', Fase: 'Implementação' } })).data;
-    expect(board.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toEqual({ Modelo: 'Claude Sonnet 5.5', Fase: 'Implementação' });
+    const board = (await call('update_card_type', { type: 'Sub-tarefa', default_fields: { Modelo: 'claude sonnet 5.5 high', Fase: 'Implementação' } })).data;
+    expect(board.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toEqual({ Modelo: 'claude:sonnet@high', Fase: 'Implementação' });
     await call('create_card', { title: 'História' });
     const sub = (await call('create_card', { title: 'Tarefa', parent: 1, fields: { Fase: 'Spec' } })).data;
-    expect(sub.fields).toEqual({ Modelo: 'Claude Sonnet 5.5', Fase: 'Spec' }); // o valor informado vence o padrão
+    expect(sub.fields).toEqual({ Modelo: 'Claude Code · Sonnet 5.5 · high', Fase: 'Spec' }); // o valor informado vence o padrão
     expect((await call('get_card', { card: 1 })).data.fields).toBeUndefined();
 
     const fresh = (await call('reset_board')).data;
     expect(fresh.workflows[0].columns.every((c: any) => c.cards === 0)).toBe(true);
     expect(fresh.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toBeUndefined();
     expect((await call('create_card', { title: 'Nova' })).data.id).toBe('#1');
+  });
+});
+
+describe('modelos de IA', () => {
+  it('monta o catálogo por ferramenta e interpreta modelo + esforço', async () => {
+    const m = (await call('get_models')).data;
+    expect(m.catalog.find((o: any) => o.value === 'claude:opus')).toMatchObject({ tool: 'claude', model: 'opus', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' });
+    expect(new Set(m.catalog.map((o: any) => o.tool))).toEqual(new Set(['claude', 'codex', 'cursor', 'kimi']));
+
+    await call('create_card', { title: 'História' });
+    const set = async (modelo: string) => (await call('update_card', { card: 1, fields: { Modelo: modelo } }));
+    expect((await set('Fable 5.1 low')).data.model).toMatchObject({ tool: 'claude', model: 'fable', effort: 'low' });
+    expect((await set('claude:opus@high')).data.model).toMatchObject({ model: 'opus', effort: 'high', label: 'Claude Code · Opus 5.5 · high' });
+    expect((await set('opus')).data.model.effort).toBe('medium'); // sem esforço informado, vale o padrão do modelo
+    expect((await set('Kimi Code K3 max')).data.model).toMatchObject({ tool: 'kimi', effort: 'max' });
+    expect((await set('opus turbo')).text).toContain('não aceita o esforço');
+    expect((await set('modelo-que-nao-existe')).text).toContain('não está no catálogo');
+  });
+
+  it('sugere o modelo pelo esforço da tarefa sem trocar uma escolha manual', async () => {
+    // regras iniciais: Esforço Baixo/Médio/Alto → modelo leve/intermediário/forte da primeira ferramenta
+    const rules = (await call('get_models')).data.rules;
+    expect(rules.map((r: any) => [r.when, r.value])).toEqual([['Esforço = Baixo', 'claude:haiku'], ['Esforço = Médio', 'claude:sonnet@medium'], ['Esforço = Alto', 'claude:opus@high']]);
+
+    const card = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
+    expect(card.model.value).toBe('claude:haiku');
+    // o modelo veio da sugestão, então acompanha a mudança de esforço
+    expect((await call('update_card', { card: 1, fields: { Esforço: 'Alto' } })).data.model.value).toBe('claude:opus@high');
+    // escolhido à mão: não é mais trocado, mas a sugestão continua visível
+    await call('update_card', { card: 1, fields: { Modelo: 'fable low' } });
+    const manual = (await call('update_card', { card: 1, fields: { Esforço: 'Médio' } })).data;
+    expect(manual.model.value).toBe('claude:fable@low');
+    expect(manual.suggestedModel.value).toBe('claude:sonnet@medium');
+
+    // regras por tag e por ferramenta
+    await call('set_model_rules', { rules: [{ field: 'Tags', value: 'docs', model: 'haiku' }, { field: 'Esforço', value: 'Alto', model: 'Opus 5.5 max' }] });
+    expect((await call('create_card', { title: 'Doc', fields: { Tags: ['docs'], Esforço: 'Alto' } })).data.model.value).toBe('claude:haiku');
+    const kimi = (await call('suggest_model_rules', { tool: 'kimi' })).data.rules;
+    expect(kimi.filter((r: any) => r.when.startsWith('Esforço')).map((r: any) => r.value)).toEqual(['kimi:kimi-code/k3@low', 'kimi:kimi-code/k3@high', 'kimi:kimi-code/k3@max']);
+    expect(kimi[0].when).toBe('Tags = docs'); // regras de outros campos são preservadas
+  });
+
+  it('lê os modelos e esforços reais do config.toml do Kimi', async () => {
+    const { parseKimiModels, modelsFor, effortTiers } = await import('../src/extension/models');
+    const toml = `default_model = "kimi-code/k3"
+[providers."managed:kimi-code"]
+api_key = "segredo"
+
+[models."kimi-code/k3"]
+provider = "managed:kimi-code"
+model = "k3"
+display_name = "K3"
+support_efforts = [ "low", "high", "max" ]
+default_effort = "high"
+
+[models."kimi-code/rapido"]
+model = "rapido"
+display_name = "K2.7 Highspeed"
+
+[thinking]
+effort = "high"
+`;
+    expect(parseKimiModels(toml)).toEqual([
+      { id: 'kimi:kimi-code/k3', tool: 'kimi', model: 'kimi-code/k3', label: 'K3', efforts: ['low', 'high', 'max'], defaultEffort: 'high' },
+      { id: 'kimi:kimi-code/rapido', tool: 'kimi', model: 'kimi-code/rapido', label: 'K2.7 Highspeed', efforts: [], defaultEffort: null },
+    ]);
+    const home = path.join(dir, 'home');
+    fs.mkdirSync(path.join(home, '.kimi-code'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.kimi-code', 'config.toml'), toml);
+    const found = modelsFor('kimi', home);
+    expect(found.map((o) => o.label)).toEqual(['K3', 'K2.7 Highspeed']);
+    expect(effortTiers('kimi', found).map(([, v]) => v)).toEqual(['kimi:kimi-code/k3@low', 'kimi:kimi-code/k3@high', 'kimi:kimi-code/k3@max']);
+    expect(modelsFor('kimi', path.join(dir, 'vazio')).length).toBeGreaterThan(0); // sem config local, lista embutida
   });
 });
 

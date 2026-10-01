@@ -1,6 +1,7 @@
 import type { Database } from 'sql.js';
 import type { ColumnCategory } from '../../shared/model';
 import { newId } from './ids';
+import { EFFORT_FIELD, EFFORT_LEVELS } from '../../shared/models';
 import { MODEL_FIELD, SKILLS_FIELD } from './schema';
 
 const SDD_PHASES = ['PRD', 'Spec', 'Plan', 'Implementação'];
@@ -47,12 +48,17 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
     );
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
-      [newId(), boardId, MODEL_FIELD.name, 'select', JSON.stringify(MODEL_FIELD.options), null, 'badge', 2],
+      [newId(), boardId, MODEL_FIELD, 'model', '[]', null, 'badge', 2],
     );
     // as opções vêm das skills do projeto e são sincronizadas pelo roteador
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
       [newId(), boardId, SKILLS_FIELD, 'multiselect', '[]', null, 'chip', 3],
+    );
+    // esforço da tarefa: as regras de modelo sugerem um modelo a partir dele
+    db.run(
+      'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
+      [newId(), boardId, EFFORT_FIELD, 'select', JSON.stringify(EFFORT_LEVELS), null, 'badge', 4],
     );
     db.exec('COMMIT;');
   } catch (e) {

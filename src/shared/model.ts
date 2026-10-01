@@ -1,4 +1,5 @@
 import type { AiTool, Harness } from './harness';
+import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 
 export type Id = string;
@@ -6,7 +7,7 @@ export type Id = string;
 export type WorkflowKind = 'parent' | 'child';
 /** O que a coluna representa no fluxo. */
 export type ColumnCategory = 'open' | 'done' | 'cancelled';
-export type FieldKind = 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'url';
+export type FieldKind = 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'url' | 'model';
 export type FieldDisplay = 'badge' | 'chip' | 'inline' | 'hidden';
 
 export interface Board {
@@ -16,6 +17,10 @@ export interface Board {
   rules: BoardRules;
   /** ferramentas de IA usadas no projeto; define onde skills e MCP são configurados */
   aiTools: AiTool[];
+  /** modelos de LLM disponíveis, por ferramenta */
+  modelCatalog: ModelOption[];
+  /** sugestão de modelo conforme os campos do card */
+  modelRules: ModelRule[];
 }
 
 export interface Workflow {

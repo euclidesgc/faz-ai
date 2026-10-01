@@ -1,11 +1,11 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
 export const SKILLS_FIELD = 'Skills';
-export const MODEL_FIELD = { name: 'Modelo', options: ['Claude Fable 5.1', 'Claude Opus 5.5', 'Claude Sonnet 5.5', 'Claude Haiku 4.5'] };
+export const MODEL_FIELD = 'Modelo';
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -129,7 +129,7 @@ const MIGRATIONS: Record<number, string> = {
   `,
   6: `
     INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position)
-    SELECT lower(hex(randomblob(16))), b.id, '${MODEL_FIELD.name}', 'select', '${JSON.stringify(MODEL_FIELD.options)}', NULL, 'badge',
+    SELECT lower(hex(randomblob(16))), b.id, '${MODEL_FIELD}', 'select', '[]', NULL, 'badge',
            (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
     FROM boards b
     WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'modelo');
@@ -144,6 +144,19 @@ const MIGRATIONS: Record<number, string> = {
   `,
   8: `
     ALTER TABLE boards ADD COLUMN ai_tools_json TEXT NOT NULL DEFAULT '["claude","codex","cursor","kimi"]';
+  `,
+  9: `
+    ALTER TABLE boards ADD COLUMN model_catalog_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE boards ADD COLUMN model_rules_json TEXT NOT NULL DEFAULT '[]';
+    -- o campo Modelo vira do tipo "modelo" (modelo + esforço, vindos do catálogo); os valores antigos eram só rótulos
+    DELETE FROM field_values WHERE field_id IN (SELECT id FROM field_defs WHERE lower(name) = 'modelo' AND kind = 'select');
+    UPDATE card_types SET defaults_json = '{}' WHERE defaults_json != '{}';
+    UPDATE field_defs SET kind = 'model', options_json = '[]' WHERE lower(name) = 'modelo' AND kind = 'select';
+    INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position)
+    SELECT lower(hex(randomblob(16))), b.id, 'Esforço', 'select', '["Baixo","Médio","Alto"]', NULL, 'badge',
+           (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
+    FROM boards b
+    WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'esforço');
   `,
 };
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { cardRef } from '../../shared/model';
+import { modelLabel, suggestModel } from '../../shared/models';
 import { cardsIn, childrenOf, columnsOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
 import { requestArchive, requestMove, requestTrash } from '../store/actions';
 import { AttachmentsTab } from './AttachmentsTab';
@@ -57,6 +58,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
   const columns = columnsOf(state, workflow.id);
   const types = state.cardTypes.filter((t) => t.defaultWorkflowId === workflow.id);
   const fields = fieldsForType(state, card.typeId);
+  const suggested = suggestModel(state, card);
   const checklist = state.checklistItems.filter((i) => i.cardId === card.id).sort((a, b) => a.position - b.position);
   const children = workflow.kind === 'parent' ? childrenOf(state, card.id) : [];
   const childWf = state.workflows.find((w) => w.kind === 'child');
@@ -129,6 +131,12 @@ export function CardDrawer({ cardId }: { cardId: string }) {
                     <label key={f.id} className="field-row">
                       <span>{f.name}</span>
                       <FieldEditor field={f} value={valueOf(state, card.id, f.id)} onChange={(v) => send({ type: 'field.setValue', cardId, fieldId: f.id, value: v })} />
+                      {f.kind === 'model' && suggested && suggested !== valueOf(state, card.id, f.id) && (
+                        <span className="muted small suggestion">
+                          Sugerido pelas regras: {modelLabel(state.board.modelCatalog, suggested, true)}{' '}
+                          <a onClick={(e) => { e.preventDefault(); send({ type: 'field.setValue', cardId, fieldId: f.id, value: suggested }); }}>Usar</a>
+                        </span>
+                      )}
                     </label>
                   ))}
                 </div>

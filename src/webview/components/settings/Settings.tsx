@@ -5,8 +5,9 @@ import { TypesSettings } from './TypesSettings';
 import { FieldsSettings } from './FieldsSettings';
 import { RulesSettings } from './RulesSettings';
 import { HarnessSettings } from './HarnessSettings';
+import { ModelsSettings } from './ModelsSettings';
 
-type Tab = 'columns' | 'types' | 'fields' | 'rules' | 'harness';
+type Tab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness';
 
 export function Settings() {
   const state = useBoardStore((s) => s.state)!;
@@ -26,6 +27,7 @@ export function Settings() {
           <button className={tab === 'types' ? 'active' : ''} onClick={() => setTab('types')}>Tipos de card</button>
           <button className={tab === 'fields' ? 'active' : ''} onClick={() => setTab('fields')}>Campos</button>
           <button className={tab === 'rules' ? 'active' : ''} onClick={() => setTab('rules')}>Regras do board</button>
+          <button className={tab === 'models' ? 'active' : ''} onClick={() => setTab('models')}>Modelos de IA</button>
           <button className={tab === 'harness' ? 'active' : ''} onClick={() => setTab('harness')}>Harness de IA</button>
         </nav>
         <button title="Registra o board como servidor MCP para o Claude Code e outros clientes de IA" onClick={() => send({ type: 'ui.connectAI' })}>Conectar IA (MCP)</button>
@@ -48,6 +50,7 @@ export function Settings() {
         {tab === 'types' && <TypesSettings />}
         {tab === 'fields' && <FieldsSettings />}
         {tab === 'rules' && <RulesSettings />}
+        {tab === 'models' && <ModelsSettings />}
         {tab === 'harness' && <HarnessSettings />}
       </div>
     </div>

@@ -1,5 +1,6 @@
 import type { ViewState } from './filters';
 import type { AiTool } from './harness';
+import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, WorkflowKind } from './model';
 
@@ -53,6 +54,12 @@ export type WebviewToHost =
   | { type: 'settings.board.update'; patch: { name?: string; aiTools?: AiTool[] } }
   /** apaga tudo e recria o board com o padrão atual */
   | { type: 'settings.board.reset' }
+  | { type: 'settings.models.set'; catalog: ModelOption[] }
+  /** relê os modelos da ferramenta (configuração local ou lista embutida) e os junta ao catálogo */
+  | { type: 'settings.models.detect'; tool: AiTool }
+  | { type: 'settings.modelRules.set'; rules: ModelRule[] }
+  /** recria as regras "Esforço → modelo" com os modelos da ferramenta */
+  | { type: 'settings.modelRules.suggest'; tool: AiTool }
   | { type: 'settings.rules.update'; patch: Partial<BoardRules> }
   | { type: 'harness.rule.write'; name: string; content: string }
   | { type: 'harness.rule.delete'; name: string }

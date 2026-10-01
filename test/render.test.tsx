@@ -13,6 +13,7 @@ import { TrashView } from '../src/webview/components/TrashView';
 import { ColumnsSettings } from '../src/webview/components/settings/ColumnsSettings';
 import { FieldsSettings } from '../src/webview/components/settings/FieldsSettings';
 import { HarnessSettings } from '../src/webview/components/settings/HarnessSettings';
+import { ModelsSettings } from '../src/webview/components/settings/ModelsSettings';
 import { RulesSettings } from '../src/webview/components/settings/RulesSettings';
 import { Settings } from '../src/webview/components/settings/Settings';
 import { TypesSettings } from '../src/webview/components/settings/TypesSettings';
@@ -56,8 +57,10 @@ beforeAll(async () => {
   s = router.snapshot();
   const field = (n: string) => s.fieldDefs.find((f) => f.name === n)!;
   router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Skills').id, value: ['revisar-spec'] });
-  router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Modelo').id, value: field('Modelo').options[0]! });
-  router.handle({ type: 'settings.type.update', typeId: typeOf(childWf.id).id, patch: { defaults: { [field('Modelo').id]: field('Modelo').options[1]! } } });
+  router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Modelo').id, value: 'claude:opus@high' });
+  router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Esforço').id, value: 'Baixo' });
+  router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Modelo').id, value: 'kimi:kimi-code/k3@max' });
+  router.handle({ type: 'settings.type.update', typeId: typeOf(childWf.id).id, patch: { defaults: { [field('Modelo').id]: 'claude:sonnet@medium' } } });
   router.handle({ type: 'checklist.add', cardId: storyId, text: 'item' });
   router.handle({ type: 'comment.add', cardId: storyId, body: 'oi' });
   router.handle({ type: 'attachment.addData', cardId: storyId, filename: 'spec.md', base64: Buffer.from('x').toString('base64') });
@@ -74,10 +77,14 @@ describe('telas montam sem erro', () => {
     expect(board).toContain('Implementação');
     expect(board).toContain('#1');
     expect(board).toContain('revisar-spec');
+    expect(board).toContain('Opus 5.5 · high');
     expect(html(<FilterBar />)).toContain('Filtros');
     expect(html(<FiltersApp />).length).toBeGreaterThan(100);
     expect(html(<TrashView />)).toContain('Lixo');
-    expect(html(<CardDrawer cardId={storyId} />)).toContain('História');
+    const drawer = html(<CardDrawer cardId={storyId} />);
+    expect(drawer).toContain('História');
+    expect(drawer).toContain('Sugerido pelas regras');
+    expect(drawer).toContain('Claude Code · Haiku 4.5');
   });
 
   it('configurações', () => {
@@ -88,6 +95,8 @@ describe('telas montam sem erro', () => {
     expect(types).toContain('Modelo');
     expect(html(<FieldsSettings />)).toContain('Skills');
     expect(html(<RulesSettings />)).toContain('Avançar de fase');
+    const models = html(<ModelsSettings />);
+    for (const text of ['Detectar modelos', 'Fable 5.1', 'gpt-6.1-sol', 'Sugestão de modelo', 'Esforço', 'xhigh']) expect(models).toContain(text);
     const harness = html(<HarnessSettings />);
     for (const text of ['Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.agents/skills']) expect(harness).toContain(text);
   });

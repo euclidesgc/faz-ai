@@ -277,3 +277,9 @@ body.sidebar-view { background: transparent; }
 h3.plain { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--fg); margin: 0; }
 .file-editor { display: flex; flex-direction: column; gap: 6px; }
 .file-editor textarea, .settings-block > textarea { width: 100%; font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; resize: vertical; }
+
+/* modelos de IA */
+.model-editor select { min-width: 0; }
+.field-row .suggestion { grid-column: 2; }
+.suggestion a { cursor: pointer; }
+.table td.narrow { width: 1%; white-space: nowrap; }

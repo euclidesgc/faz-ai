@@ -45,6 +45,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         author: await gitUserName(f.uri.fsPath),
         attachmentsDir: path.join(storage, 'attachments'),
         workspaceDir: f.uri.fsPath,
+        homeDir: os.homedir(),
       });
       router.onDidChange(() => tree.refresh());
       return router;

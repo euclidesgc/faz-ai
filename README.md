@@ -40,7 +40,10 @@ Um board novo já nasce preparado para Spec-Driven Development:
 - **Regra de avanço de fase:** uma história não avança de coluna enquanto houver sub-tarefas em
   aberto cuja Fase é a coluna atual. Voltar de coluna e cancelar continuam livres. Liga e desliga em
   Configurações → Regras do board.
-- **Campo Modelo:** qual modelo de IA deve executar o card.
+- **Campo Modelo:** qual modelo de IA deve executar o card e com que nível de esforço (por exemplo
+  "Fable 5.1 · low" ou "Opus 5.5 · high"). As opções vêm do catálogo de modelos do board.
+- **Campo Esforço:** tamanho da tarefa (Baixo, Médio, Alto). As regras de sugestão escolhem o modelo
+  a partir dele.
 - **Campo Skills:** skills que devem ser carregadas obrigatoriamente na execução do card. As opções
   são as skills ligadas do projeto. Outras skills continuam podendo ser usadas normalmente.
 - **Padrões por tipo:** em Configurações → Tipos de card, cada tipo pode ter valores padrão de campos
@@ -48,6 +51,34 @@ Um board novo já nasce preparado para Spec-Driven Development:
 
 Para trazer um board antigo para esse padrão, use **Recriar board padrão** em Configurações. Isso
 apaga todos os cards e configurações do board.
+
+## Modelos de IA
+
+Configurações → **Modelos de IA** tem duas partes.
+
+**Catálogo.** Os modelos que cada ferramenta oferece, com os níveis de esforço que cada um aceita e
+o esforço padrão. O botão **Detectar modelos** de cada ferramenta atualiza a lista:
+
+| Ferramenta | De onde vem a lista ao detectar |
+| --- | --- |
+| Kimi Code | Do `config.toml` do Kimi nesta máquina: os modelos reais da sua conta e os esforços de cada um |
+| Claude Code, Codex, Cursor | Lista embutida na extensão, tirada da documentação de cada ferramenta |
+
+Essas três ferramentas não guardam a lista de modelos em arquivo, então a lista embutida pode ficar
+desatualizada. Para corrigir, edite o catálogo à mão ou peça à própria IA, pelo MCP, que registre
+os modelos que ela tem (`upsert_model`). Modelos acrescentados à mão são mantidos ao detectar.
+
+**Sugestão de modelo.** Regras no formato "quando o campo X tem o valor Y, sugerir o modelo Z".
+Valem para qualquer campo de seleção, como Esforço ou Tags; a primeira regra que casa vence.
+
+- A sugestão preenche o campo Modelo enquanto ele está vazio ou ainda tem a sugestão anterior. Ao
+  mudar o Esforço de Baixo para Alto, o modelo sugerido muda junto.
+- Um modelo escolhido à mão nunca é trocado; o detalhe do card mostra a sugestão com um link "Usar".
+- Os botões "Recriar as regras de Esforço com os modelos de…" geram as três regras (Baixo, Médio,
+  Alto) com um modelo leve, um intermediário e um forte da ferramenta escolhida.
+
+Um board novo já nasce com o catálogo das ferramentas em uso e com as regras de Esforço da primeira
+ferramenta instalada na máquina.
 
 ## Harness de IA
 
@@ -177,11 +208,12 @@ de vez, mexer em checklist, comentários e anexos (inclusive ler anexos de texto
 colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
 pelo nome. Comentários feitos pela IA saem assinados com o nome do cliente (ex.: "Claude Code").
 
-Também pelo MCP: padrões por tipo de card (`update_card_type`), recriar o board (`reset_board`) e o
+Também pelo MCP: catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
+`set_model_rules`), padrões por tipo de card (`update_card_type`), recriar o board (`reset_board`) e o
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
 `set_skill_enabled`, `delete_skill`…).
 
-Ao ler um card (`get_card`), a IA recebe o **Modelo** que deve executá-lo e as **Skills**
+Ao ler um card (`get_card`), a IA recebe a ferramenta, o **modelo** e o **esforço** que devem executá-lo e as **Skills**
 obrigatórias com o caminho de cada `SKILL.md`. Ela é instruída a carregar essas skills antes de
 executar e a delegar o trabalho a um subagente com o modelo escolhido, ou avisar quando o cliente
 não permite. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue.

@@ -1,4 +1,5 @@
 import { norm } from '../../shared/filters';
+import { modelFieldOf, modelLabel, parseModelValue, resolveModelInput, suggestModel, type ModelOption } from '../../shared/models';
 import { cardRef, type BoardState, type Card, type CardType, type Column, type FieldDef, type FieldValue, type Workflow } from '../../shared/model';
 
 /** Converte o snapshot em respostas enxutas para o modelo: nomes e números no lugar de UUIDs. */
@@ -41,7 +42,7 @@ export function findField(s: BoardState, name: string): FieldDef {
 }
 
 /** Valida e normaliza o valor de um campo conforme o seu tipo. */
-export function coerceFieldValue(f: FieldDef, value: unknown): FieldValue {
+export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOption[]): FieldValue {
   if (value === null || value === undefined || value === '') return null;
   const option = (v: unknown): string => {
     const o = f.options.find((x) => same(x, String(v)));
@@ -60,6 +61,8 @@ export function coerceFieldValue(f: FieldDef, value: unknown): FieldValue {
       return option(value);
     case 'multiselect':
       return (Array.isArray(value) ? value : [value]).map(option);
+    case 'model':
+      return resolveModelInput(catalog, String(value));
     case 'date':
       if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) throw new Error(`O campo "${f.name}" espera uma data no formato AAAA-MM-DD.`);
       return String(value);
@@ -81,7 +84,7 @@ function fieldsOf(s: BoardState, c: Card): Record<string, FieldValue> {
   for (const v of s.fieldValues) {
     if (v.cardId !== c.id) continue;
     const def = s.fieldDefs.find((f) => f.id === v.fieldId);
-    if (def) out[def.name] = v.value;
+    if (def) out[def.name] = def.kind === 'model' ? modelLabel(s.board.modelCatalog, v.value, true) : v.value;
   }
   return out;
 }
@@ -107,6 +110,23 @@ export function cardSummary(s: BoardState, c: Card) {
   };
 }
 
+/** Um valor de modelo aberto em partes que a IA consegue usar para escolher o subagente. */
+export function describeModel(s: BoardState, value: FieldValue) {
+  const v = parseModelValue(value);
+  const o = v && s.board.modelCatalog.find((x) => x.id === v.id);
+  if (!v || !o) return { value };
+  return { tool: o.tool, model: o.model, effort: v.effort, label: modelLabel(s.board.modelCatalog, value, true), value };
+}
+
+/** Catálogo de modelos e regras de sugestão do board. */
+export function modelsOverview(s: BoardState) {
+  return {
+    catalog: s.board.modelCatalog.map((o) => ({ value: o.id, tool: o.tool, model: o.model, label: o.label, efforts: o.efforts, defaultEffort: o.defaultEffort })),
+    rules: s.board.modelRules.map((r) => ({ when: `${s.fieldDefs.find((f) => f.id === r.fieldId)?.name ?? '?'} = ${r.value}`, suggest: modelLabel(s.board.modelCatalog, r.model, true), value: r.model })),
+    note: 'Num card, o campo de modelo aceita `<value>@<esforço>` (ex.: "claude:opus@high") ou o nome do modelo seguido do esforço.',
+  };
+}
+
 /** Skills marcadas no campo "Skills" do card: obrigatórias na execução. */
 function requiredSkills(s: BoardState, c: Card) {
   const value = fieldsOf(s, c)['Skills'];
@@ -118,10 +138,13 @@ function requiredSkills(s: BoardState, c: Card) {
 
 export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardState['attachments'][number]) => string) {
   const skills = requiredSkills(s, c);
-  const model = fieldsOf(s, c)['Modelo'];
+  const field = modelFieldOf(s, c);
+  const chosen = field ? s.fieldValues.find((v) => v.cardId === c.id && v.fieldId === field.id)?.value : undefined;
+  const suggested = suggestModel(s, c);
   return {
     ...cardSummary(s, c),
-    ...(model ? { model: `${String(model)} (modelo que deve executar este card)` } : {}),
+    ...(chosen ? { model: { ...describeModel(s, chosen), note: 'Modelo e esforço que devem executar este card.' } } : {}),
+    ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     ...(skills.length ? { requiredSkills: skills, requiredSkillsNote: 'Carregue cada skill (leia o SKILL.md em `path`) antes de executar este card.' } : {}),
     description: c.description,
     createdAt: iso(c.createdAt),

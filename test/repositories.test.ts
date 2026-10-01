@@ -38,7 +38,7 @@ describe('seed', () => {
     expect(colsOf(parentWf().id).map((c) => c.name)).toEqual(['Backlog', 'PRD', 'Spec', 'Plan', 'Implementação', 'Concluído', 'Cancelado']);
     expect(colsOf(childWf().id).map((c) => c.name)).toEqual(['A fazer', 'Em andamento', 'Concluído']);
     expect(s.cardTypes.map((t) => t.name)).toContain('Sub-tarefa');
-    expect(s.fieldDefs.map((f) => f.name)).toEqual(['Fase', 'Tags', 'Modelo', 'Skills']);
+    expect(s.fieldDefs.map((f) => f.name)).toEqual(['Fase', 'Tags', 'Modelo', 'Skills', 'Esforço']);
   });
 
   it('getOrCreate é idempotente por workspace', () => {

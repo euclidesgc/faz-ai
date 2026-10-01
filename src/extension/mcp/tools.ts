@@ -5,8 +5,10 @@ import { z } from 'zod';
 import { EMPTY_FILTERS, applyFilters } from '../../shared/filters';
 import type { BoardState, Card } from '../../shared/model';
 import type { MessageRouter } from '../panel/messageRouter';
-import { ALL_AI_TOOLS, RULE_FILES } from '../../shared/harness';
-import { boardOverview, harnessOverview, cardDetail, cardStatus, cardSummary, coerceFieldValue, findCard, findColumn, findField, findType, findWorkflow } from './format';
+import { ALL_AI_TOOLS, RULE_FILES, type AiTool } from '../../shared/harness';
+import { modelId, resolveModelInput, type ModelRule } from '../../shared/models';
+import { newId } from '../db/ids';
+import { boardOverview, harnessOverview, modelsOverview, cardDetail, cardStatus, cardSummary, coerceFieldValue, findCard, findColumn, findField, findType, findWorkflow } from './format';
 
 export interface ToolContext {
   getRouter: () => Promise<MessageRouter>;
@@ -52,7 +54,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     // valida tudo antes de gravar qualquer coisa
     const values = Object.entries(fields ?? {}).map(([name, value]) => {
       const f = findField(s, name);
-      return { fieldId: f.id, value: coerceFieldValue(f, value) };
+      return { fieldId: f.id, value: coerceFieldValue(f, value, s.board.modelCatalog) };
     });
     for (const v of values) router.handle({ type: 'field.setValue', cardId, ...v });
   };
@@ -154,7 +156,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       const column = a.column ? findColumn(s, a.column, wf.id) : s.columns.filter((c) => c.workflowId === wf.id).sort((x, y) => x.position - y.position)[0];
       if (!column) throw new Error(`O workflow "${wf.name}" não tem colunas.`);
       // valida os campos antes de criar, para não deixar um card pela metade
-      for (const [name, value] of Object.entries(a.fields ?? {})) coerceFieldValue(findField(s, name), value);
+      for (const [name, value] of Object.entries(a.fields ?? {})) coerceFieldValue(findField(s, name), value, s.board.modelCatalog);
       const id = router.createCard({ typeId: type.id, columnId: column.id, parentId: parent?.id ?? null, title: a.title });
       if (a.description) router.handle({ type: 'card.update', cardId: id, patch: { description: a.description } });
       setFields(router, s, id, a.fields);
@@ -176,7 +178,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       const s = router.snapshot();
       const card = findCard(s, a.card);
       const typeId = a.type ? findType(s, a.type).id : undefined;
-      for (const [name, value] of Object.entries(a.fields ?? {})) coerceFieldValue(findField(s, name), value);
+      for (const [name, value] of Object.entries(a.fields ?? {})) coerceFieldValue(findField(s, name), value, s.board.modelCatalog);
       if (a.title !== undefined || a.description !== undefined || typeId) {
         router.handle({ type: 'card.update', cardId: card.id, patch: { title: a.title, description: a.description, typeId } });
       }
@@ -407,12 +409,12 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       type: z.string(),
       name: z.string().min(1).optional(),
       color: colorArg.optional(),
-      default_fields: fieldsArg.optional().describe('Padrões por nome do campo, ex.: {"Modelo": "Claude Sonnet 5.5", "Skills": ["revisar-spec"]}. Substitui todos os padrões do tipo; {} limpa.'),
+      default_fields: fieldsArg.optional().describe('Padrões por nome do campo, ex.: {"Modelo": "claude:sonnet@medium", "Skills": ["revisar-spec"]}. Substitui todos os padrões do tipo; {} limpa.'),
     },
     (a, router) => {
       const s = router.snapshot();
       const defaults = a.default_fields
-        ? Object.fromEntries(Object.entries(a.default_fields).map(([name, value]) => { const f = findField(s, name); return [f.id, coerceFieldValue(f, value)]; }))
+        ? Object.fromEntries(Object.entries(a.default_fields).map(([name, value]) => { const f = findField(s, name); return [f.id, coerceFieldValue(f, value, s.board.modelCatalog)]; }))
         : undefined;
       router.handle({ type: 'settings.type.update', typeId: findType(s, a.type).id, patch: { name: a.name, color: a.color, defaults } });
       return overview(router);
@@ -480,6 +482,90 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     (_a, router) => {
       router.handle({ type: 'settings.board.reset' });
       return overview(router);
+    },
+  );
+
+  // ---------- modelos de LLM ----------
+
+  const toolArg = z.enum(ALL_AI_TOOLS as [string, ...string[]]).describe('Ferramenta de IA: claude, codex, cursor ou kimi');
+  const models = (router: MessageRouter) => modelsOverview(router.snapshot());
+
+  tool(
+    'get_models',
+    'Catálogo de modelos de LLM do board (por ferramenta, com os níveis de esforço que cada um aceita) e as regras que sugerem um modelo a partir dos campos do card.',
+    {},
+    (_a, router) => models(router),
+    true,
+  );
+
+  tool(
+    'detect_models',
+    'Relê os modelos de uma ferramenta e os junta ao catálogo. Para o Kimi, lê a lista real do config.toml local; para as demais, usa a lista embutida na extensão.',
+    { tool: toolArg },
+    (a, router) => {
+      router.handle({ type: 'settings.models.detect', tool: a.tool as AiTool });
+      return models(router);
+    },
+  );
+
+  tool(
+    'upsert_model',
+    'Cria ou atualiza um modelo no catálogo. Use para registrar os modelos e níveis de esforço que você (a ferramenta de IA em uso) realmente tem disponíveis.',
+    {
+      tool: toolArg,
+      model: z.string().min(1).describe('Identificador usado pela ferramenta para escolher o modelo, ex.: "opus", "k3", "gpt-6.1-sol"'),
+      label: z.string().optional().describe('Nome para exibição; por padrão, o identificador'),
+      efforts: z.array(z.string()).optional().describe('Níveis de esforço/raciocínio aceitos, do menor para o maior; vazio se o modelo não tem esse ajuste'),
+      default_effort: z.string().optional(),
+    },
+    (a, router) => {
+      const catalog = [...router.snapshot().board.modelCatalog];
+      const id = modelId(a.tool as AiTool, a.model);
+      const efforts = a.efforts ?? [];
+      if (a.default_effort && !efforts.includes(a.default_effort)) throw new Error('default_effort precisa ser um dos efforts.');
+      const entry = { id, tool: a.tool as AiTool, model: a.model, label: a.label ?? a.model, efforts, defaultEffort: a.default_effort ?? null };
+      const at = catalog.findIndex((o) => o.id === id);
+      if (at >= 0) catalog[at] = entry;
+      else catalog.push(entry);
+      router.handle({ type: 'settings.models.set', catalog });
+      return models(router);
+    },
+  );
+
+  tool('delete_model', 'Remove um modelo do catálogo.', { model: z.string().describe('`value` do modelo no catálogo, ex.: "claude:opus"') }, (a, router) => {
+    const catalog = router.snapshot().board.modelCatalog;
+    if (!catalog.some((o) => o.id === a.model)) throw new Error(`Modelo "${a.model}" não está no catálogo.`);
+    router.handle({ type: 'settings.models.set', catalog: catalog.filter((o) => o.id !== a.model) });
+    return models(router);
+  });
+
+  tool(
+    'set_model_rules',
+    'Substitui as regras de sugestão de modelo. Cada regra diz: quando o campo tem esse valor, sugerir esse modelo. A primeira que casa vence. A sugestão preenche o campo de modelo do card enquanto ele não foi escolhido à mão.',
+    {
+      rules: z.array(
+        z.object({
+          field: z.string().describe('Nome do campo, ex.: "Esforço" ou "Tags"'),
+          value: z.string().describe('Valor do campo que dispara a regra, ex.: "Alto" ou "backend"'),
+          model: z.string().describe('Modelo e esforço, ex.: "claude:opus@high" ou "Opus 5.5 high"'),
+        }),
+      ),
+    },
+    (a, router) => {
+      const s = router.snapshot();
+      const rules: ModelRule[] = a.rules.map((r) => ({ id: newId(), fieldId: findField(s, r.field).id, value: r.value, model: resolveModelInput(s.board.modelCatalog, r.model) }));
+      router.handle({ type: 'settings.modelRules.set', rules });
+      return models(router);
+    },
+  );
+
+  tool(
+    'suggest_model_rules',
+    'Recria as regras "Esforço da tarefa → modelo" (Baixo, Médio, Alto) com um modelo leve, um intermediário e um forte da ferramenta indicada.',
+    { tool: toolArg },
+    (a, router) => {
+      router.handle({ type: 'settings.modelRules.suggest', tool: a.tool as AiTool });
+      return models(router);
     },
   );
 

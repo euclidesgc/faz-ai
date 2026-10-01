@@ -25,9 +25,10 @@ export function createMcpServer(opts: McpOptions): McpServer {
         'Board kanban do projeto (Faz AI). Histórias ficam no workflow pai e sub-tarefas no workflow filho, ligadas a uma história. ' +
         'Cards são identificados pelo número (#12). Comece por get_board para conhecer colunas, tipos e campos. ' +
         'Sinalize o progresso movendo os cards entre colunas e registre decisões e resultados em comentários ou anexos. ' +
-        'O campo "Modelo" de um card indica qual modelo de IA deve executá-lo: antes de trabalhar em um card, leia esse campo e, ' +
-        'se ele estiver preenchido com um modelo diferente do seu, delegue o trabalho a um subagente com esse modelo; ' +
-        'se não for possível, avise a pessoa em vez de executar com outro modelo. ' +
+        'get_card devolve em `model` a ferramenta, o modelo e o nível de esforço que devem executar o card: antes de trabalhar nele, ' +
+        'se o modelo ou o esforço forem diferentes dos seus, delegue o trabalho a um subagente com esse modelo e esforço; ' +
+        'se não for possível, avise a pessoa em vez de executar com outra configuração. ' +
+        'O campo "Esforço" é o tamanho da tarefa; as regras do board sugerem o modelo a partir dele (get_models). ' +
         'O campo "Skills" lista as skills obrigatórias do card: get_card devolve `requiredSkills` com o caminho de cada SKILL.md, ' +
         'e todas devem ser carregadas antes de executar o card (outras skills continuam podendo ser usadas normalmente). ' +
         'As colunas das histórias são as fases do SDD; mova a história para a próxima coluna ao concluir cada fase. ' +

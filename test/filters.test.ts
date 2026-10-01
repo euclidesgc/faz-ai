@@ -13,7 +13,7 @@ const card = (id: string, over: Partial<Card> = {}): Card => ({
 });
 
 const state: BoardState = {
-  board: { id: 'b', workspaceKey: 'k', name: 'B', rules: DEFAULT_RULES, aiTools: [] },
+  board: { id: 'b', workspaceKey: 'k', name: 'B', rules: DEFAULT_RULES, aiTools: [], modelCatalog: [], modelRules: [] },
   workflows: [{ id: 'wp', boardId: 'b', name: 'H', position: 0, kind: 'parent' }, { id: 'wc', boardId: 'b', name: 'S', position: 1, kind: 'child' }],
   columns: [
     { id: 'todo', workflowId: 'wp', name: 'Backlog', position: 0, category: 'open', isTerminal: false },

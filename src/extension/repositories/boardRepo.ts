@@ -3,6 +3,7 @@ import type { Attachment, Board, BoardState, Card, CardType, ChecklistItem, Colu
 import { all, bool, num, one, run, str } from '../db/query';
 import { parseRules, type BoardRules } from '../../shared/rules';
 import { seedBoard } from '../db/seed';
+import { parseJsonArray, type ModelOption, type ModelRule } from '../../shared/models';
 import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTools, type AiTool } from '../../shared/harness';
 
 export class BoardRepo {
@@ -15,7 +16,7 @@ export class BoardRepo {
       seedBoard(this.db, workspaceKey, name);
       row = one(this.db, 'SELECT * FROM boards WHERE workspace_key = ?', [workspaceKey])!;
     }
-    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTools: parseAiTools(str(row.ai_tools_json)) };
+    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTools: parseAiTools(str(row.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)), modelRules: parseJsonArray<ModelRule>(str(row.model_rules_json)) };
   }
 
   updateRules(boardId: string, patch: Partial<BoardRules>): void {
@@ -24,6 +25,14 @@ export class BoardRepo {
     // parseRules valida o resultado: valores desconhecidos voltam ao padrão
     const next = parseRules(JSON.stringify({ ...parseRules(str(row.rules_json)), ...patch }));
     run(this.db, 'UPDATE boards SET rules_json = ? WHERE id = ?', [JSON.stringify(next), boardId]);
+  }
+
+  setModelCatalog(boardId: string, catalog: ModelOption[]): void {
+    run(this.db, 'UPDATE boards SET model_catalog_json = ? WHERE id = ?', [JSON.stringify(catalog), boardId]);
+  }
+
+  setModelRules(boardId: string, rules: ModelRule[]): void {
+    run(this.db, 'UPDATE boards SET model_rules_json = ? WHERE id = ?', [JSON.stringify(rules), boardId]);
   }
 
   /** Apaga o board com tudo o que há nele. Devolve os ids dos cards (para limpar anexos). */
@@ -46,7 +55,7 @@ export class BoardRepo {
     const db = this.db;
     const b = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
     if (!b) throw new Error('Board não encontrado');
-    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTools: parseAiTools(str(b.ai_tools_json)) };
+    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTools: parseAiTools(str(b.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)), modelRules: parseJsonArray<ModelRule>(str(b.model_rules_json)) };
 
     const workflows: Workflow[] = all(db, 'SELECT * FROM workflows WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), position: num(r.position), kind: str(r.kind) as Workflow['kind'],
