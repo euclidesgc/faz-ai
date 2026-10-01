@@ -1,0 +1,10 @@
+!media/**
+src/**
+test/**
+node_modules/**
+.vscode/**
+esbuild.mjs
+vite.config.ts
+tsconfig*.json
+vitest.config.ts
+**/*.map

@@ -1,0 +1,64 @@
+import { useState } from 'react';
+import { columnsOf, useBoardStore } from '../../store/boardStore';
+
+export function ColumnsSettings() {
+  const state = useBoardStore((s) => s.state)!;
+  const send = useBoardStore((s) => s.send);
+  const ask = useBoardStore((s) => s.ask);
+  const [newName, setNewName] = useState<Record<string, string>>({});
+
+  return (
+    <div>
+      <h2>Workflows e colunas</h2>
+      <p className="muted">A linha de cima recebe histórias, bugs, retrabalho e débitos. A linha de baixo recebe as sub-tarefas de cada história.</p>
+      {state.workflows.map((wf) => {
+        const cols = columnsOf(state, wf.id);
+        return (
+          <section key={wf.id} className="settings-block">
+            <div className="row">
+              <input className="h3-input" defaultValue={wf.name} onBlur={(e) => e.target.value.trim() && e.target.value !== wf.name && send({ type: 'settings.workflow.update', workflowId: wf.id, patch: { name: e.target.value.trim() } })} />
+              <span className="muted">{wf.kind === 'parent' ? 'linha de cima' : 'linha de baixo'}</span>
+            </div>
+            <table className="table">
+              <thead><tr><th>Coluna</th><th>Concluída?</th><th>Ordem</th><th></th></tr></thead>
+              <tbody>
+                {cols.map((c, i) => (
+                  <tr key={c.id}>
+                    <td><input defaultValue={c.name} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && send({ type: 'settings.column.update', columnId: c.id, patch: { name: e.target.value.trim() } })} /></td>
+                    <td><input type="checkbox" checked={c.isTerminal} onChange={(e) => send({ type: 'settings.column.update', columnId: c.id, patch: { isTerminal: e.target.checked } })} /></td>
+                    <td>
+                      <button className="icon" disabled={i === 0} onClick={() => send({ type: 'settings.column.update', columnId: c.id, patch: { position: i - 1 } })}>←</button>
+                      <button className="icon" disabled={i === cols.length - 1} onClick={() => send({ type: 'settings.column.update', columnId: c.id, patch: { position: i + 1 } })}>→</button>
+                    </td>
+                    <td>
+                      <button
+                        className="icon danger"
+                        disabled={cols.length <= 1}
+                        onClick={() => {
+                          const others = cols.filter((x) => x.id !== c.id);
+                          const n = state.cards.filter((k) => k.columnId === c.id).length;
+                          ask({
+                            title: `Excluir a coluna "${c.name}"?`,
+                            message: n ? `${n} card(s) serão movidos para a coluna escolhida.` : 'A coluna está vazia.',
+                            confirmLabel: 'Excluir coluna',
+                            danger: true,
+                            choices: n ? { label: 'Mover cards para', options: others.map((x) => ({ value: x.id, label: x.name })) } : undefined,
+                            onConfirm: (dest) => send({ type: 'settings.column.delete', columnId: c.id, moveCardsTo: dest ?? others[0]!.id }),
+                          });
+                        }}
+                      >🗑</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="row">
+              <input placeholder="Nova coluna" value={newName[wf.id] ?? ''} onChange={(e) => setNewName({ ...newName, [wf.id]: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter' && newName[wf.id]?.trim()) { send({ type: 'settings.column.create', workflowId: wf.id, name: newName[wf.id]!.trim() }); setNewName({ ...newName, [wf.id]: '' }); } }} />
+              <button className="primary" disabled={!newName[wf.id]?.trim()} onClick={() => { send({ type: 'settings.column.create', workflowId: wf.id, name: newName[wf.id]!.trim() }); setNewName({ ...newName, [wf.id]: '' }); }}>Adicionar</button>
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
