@@ -21,9 +21,22 @@ interface Props {
   total: number;
   index: number;
   siblings: ColumnModel[];
+  collapsed: boolean;
+  onToggle: () => void;
 }
 
-export function Column({ column, workflow, cards, total, index, siblings }: Props) {
+/** Coluna fechada: uma faixa estreita com o nome na vertical, que ainda aceita cards arrastados. */
+export function CollapsedColumn({ setNodeRef, isOver, name, count, className = '', onExpand }: { setNodeRef: (el: HTMLElement | null) => void; isOver: boolean; name: string; count: string; className?: string; onExpand: () => void }) {
+  return (
+    <div ref={setNodeRef} className={`column collapsed ${className} ${isOver ? 'over' : ''}`} onClick={onExpand} title={`Expandir "${name}"`}>
+      <button className="icon collapse-toggle" aria-expanded={false}>›</button>
+      <span className="column-count">{count}</span>
+      <span className="column-name-vertical">{name}</span>
+    </div>
+  );
+}
+
+export function Column({ column, workflow, cards, total, index, siblings, collapsed, onToggle }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const state = useBoardStore((s) => s.state)!;
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
@@ -64,9 +77,16 @@ export function Column({ column, workflow, cards, total, index, siblings }: Prop
     });
   };
 
+  const count = cards.length === total ? String(total) : `${cards.length}/${total}`;
+  if (collapsed) {
+    const mark = column.category === 'done' ? '✓ ' : column.category === 'cancelled' ? '✕ ' : '';
+    return <CollapsedColumn setNodeRef={setNodeRef} isOver={isOver} name={`${mark}${column.name}`} count={count} className={column.isTerminal ? 'terminal' : ''} onExpand={onToggle} />;
+  }
+
   return (
     <div ref={setNodeRef} className={`column ${isOver ? 'over' : ''} ${column.isTerminal ? 'terminal' : ''}`}>
       <header className="column-header">
+        <button className="icon collapse-toggle" title="Colapsar a coluna" onClick={onToggle}>‹</button>
         {renaming !== null ? (
           <input
             autoFocus
@@ -88,11 +108,12 @@ export function Column({ column, workflow, cards, total, index, siblings }: Prop
             {column.name}
           </span>
         )}
-        <span className="column-count">{cards.length === total ? total : `${cards.length}/${total}`}</span>
+        <span className="column-count">{count}</span>
         <Menu
           title="Ações da coluna"
           items={[
             { label: 'Renomear', onClick: () => setRenaming(column.name) },
+            { label: 'Colapsar', onClick: onToggle },
             'sep',
             { header: 'Esta coluna representa' },
             ...CATEGORIES.map((c) => ({

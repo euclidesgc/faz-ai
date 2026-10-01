@@ -14,10 +14,11 @@ export class SettingsRepo {
     return id;
   }
 
-  updateColumn(columnId: string, patch: { name?: string; category?: ColumnCategory; position?: number }): void {
+  updateColumn(columnId: string, patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean }): void {
     const db = this.db;
     transaction(db, () => {
       if (patch.name !== undefined) run(db, 'UPDATE columns SET name = ? WHERE id = ?', [patch.name, columnId]);
+      if (patch.collapsed !== undefined) run(db, 'UPDATE columns SET collapsed = ? WHERE id = ?', [patch.collapsed ? 1 : 0, columnId]);
       if (patch.category !== undefined)
         run(db, 'UPDATE columns SET category = ?, is_terminal = ? WHERE id = ?', [patch.category, patch.category === 'open' ? 0 : 1, columnId]);
       if (patch.position !== undefined) {

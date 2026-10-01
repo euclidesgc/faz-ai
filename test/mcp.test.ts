@@ -296,6 +296,22 @@ describe('regras de modelo com E e OU', () => {
   });
 });
 
+describe('linhas e colunas colapsadas por padrão', () => {
+  it('guarda o padrão de cada coluna, da linha e da coluna de arquivados', async () => {
+    let b = (await call('get_board')).data;
+    expect(b.workflows[0].archivedColumnCollapsed).toBe(true); // arquivados começa colapsada
+    expect(b.workflows[0].collapsed).toBeUndefined();
+    expect(b.workflows[0].columns.every((c: any) => c.collapsed === undefined)).toBe(true);
+    await call('update_column', { column: 'Cancelado', collapsed: true });
+    b = (await call('set_workflow_layout', { workflow: 'child', collapsed: true, archive_collapsed: false })).data;
+    expect(b.workflows[0].columns.find((c: any) => c.name === 'Cancelado').collapsed).toBe(true);
+    expect(b.workflows[1]).toMatchObject({ collapsed: true, archivedColumnCollapsed: false });
+    const s = router.snapshot();
+    expect(s.columns.find((c) => c.name === 'Cancelado')!.collapsed).toBe(true);
+    expect(s.workflows.find((w) => w.kind === 'child')).toMatchObject({ collapsed: true, archiveCollapsed: false });
+  });
+});
+
 describe('ferramentas de IA', () => {
   const skillMd = (base: string) => path.join(dir, base, 'revisar-spec', 'SKILL.md');
   const isLink = (p: string) => fs.lstatSync(p).isSymbolicLink();

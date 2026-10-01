@@ -11,18 +11,20 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { archiveKey } from '../../shared/filters';
 import type { Card as CardModel, Workflow } from '../../shared/model';
 import { archivedIn, cardsIn, columnsOf, useBoardStore, useFilteredIds } from '../store/boardStore';
 import { requestArchive, requestMove } from '../store/actions';
-import { Column } from './Column';
+import { CollapsedColumn, Column } from './Column';
 import { CardView, SortableCard } from './Card';
 
-const archiveId = (workflowId: string) => `archive:${workflowId}`;
+const archiveId = archiveKey;
 
 export function WorkflowRow({ workflow }: { workflow: Workflow }) {
   const state = useBoardStore((s) => s.state)!;
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
-  const showArchived = useBoardStore((s) => s.showArchived);
+  const overrides = useBoardStore((s) => s.collapsed);
+  const setCollapsed = useBoardStore((s) => s.setCollapsed);
   const send = useBoardStore((s) => s.send);
   const filtered = useFilteredIds();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -81,9 +83,15 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
       <div className="columns">
         {columns.map((col, i) => {
           const all = cardsIn(state, col.id);
-          return <Column key={col.id} column={col} workflow={workflow} cards={visible(all)} total={all.length} index={i} siblings={columns} />;
+          const collapsed = overrides[col.id] ?? col.collapsed;
+          return <Column key={col.id} column={col} workflow={workflow} cards={visible(all)} total={all.length} index={i} siblings={columns} collapsed={collapsed} onToggle={() => setCollapsed(col.id, !collapsed)} />;
         })}
-        {showArchived && <ArchiveColumn workflowId={workflow.id} cards={visible(archivedIn(state, workflow.id))} />}
+        <ArchiveColumn
+          workflowId={workflow.id}
+          cards={visible(archivedIn(state, workflow.id))}
+          collapsed={overrides[archiveKey(workflow.id)] ?? workflow.archiveCollapsed}
+          onToggle={(now) => setCollapsed(archiveKey(workflow.id), !now)}
+        />
         <div className="column-add">
           {newColumn === null ? (
             <button className="ghost" title="Nova coluna" onClick={() => setNewColumn('')}>+ Coluna</button>
@@ -107,11 +115,13 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
   );
 }
 
-function ArchiveColumn({ workflowId, cards }: { workflowId: string; cards: CardModel[] }) {
+function ArchiveColumn({ workflowId, cards, collapsed, onToggle }: { workflowId: string; cards: CardModel[]; collapsed: boolean; onToggle: (collapsed: boolean) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: archiveId(workflowId) });
+  if (collapsed) return <CollapsedColumn setNodeRef={setNodeRef} isOver={isOver} name="Arquivados" count={String(cards.length)} className="archive" onExpand={() => onToggle(true)} />;
   return (
     <div ref={setNodeRef} className={`column archive ${isOver ? 'over' : ''}`}>
       <header className="column-header">
+        <button className="icon collapse-toggle" title="Colapsar a coluna" onClick={() => onToggle(false)}>‹</button>
         <span className="column-name">Arquivados</span>
         <span className="column-count">{cards.length}</span>
       </header>

@@ -169,7 +169,9 @@ export function boardOverview(s: BoardState) {
       kind: w.kind === 'parent' ? 'parent (histórias)' : 'child (sub-tarefas, sempre ligadas a uma história)',
       columns: s.columns
         .filter((c) => c.workflowId === w.id)
-        .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length })),
+        .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length, ...(c.collapsed ? { collapsed: true } : {}) })),
+      ...(w.collapsed ? { collapsed: true } : {}),
+      archivedColumnCollapsed: w.archiveCollapsed,
     })),
     cardTypes: s.cardTypes.map((t) => {
       const defaults = Object.fromEntries(

@@ -8,13 +8,11 @@ const RELATIONS: Record<string, string> = { withChildren: 'Com sub-tarefas', wit
 export function FilterBar() {
   const state = useBoardStore((s) => s.state)!;
   const filters = useBoardStore((s) => s.filters);
-  const showArchived = useBoardStore((s) => s.showArchived);
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
-  const { setFilters, clearFilters, toggleArchived, selectParent, send } = useBoardStore();
+  const { setFilters, clearFilters, selectParent, send } = useBoardStore();
 
   const count = activeFilterCount(filters);
   const parent = state.cards.find((c) => c.id === selectedParentId);
-  const archivedCount = state.cards.filter((c) => c.archivedAt !== null && c.deletedAt === null).length;
 
   const chips: { key: string; label: string; clear(): void }[] = [];
   for (const id of filters.typeIds) {
@@ -40,9 +38,6 @@ export function FilterBar() {
       <div className="filterbar-main">
         <input className="search" type="search" placeholder="Buscar em título, descrição, comentários e campos…" value={filters.text} onChange={(e) => setFilters({ text: e.target.value })} />
         <button onClick={() => send({ type: 'ui.showFilters' })} title="Abrir os filtros na barra lateral">Filtros{count > 0 && ` (${count})`}</button>
-        <button className={showArchived ? 'active' : ''} onClick={toggleArchived} title="Mostrar ou esconder a coluna de arquivados">
-          Arquivados{archivedCount > 0 && ` (${archivedCount})`}
-        </button>
         {chips.map((c) => (
           <span key={c.key} className="filter-chip" onClick={c.clear} title="Remover este filtro">{c.label} ✕</span>
         ))}

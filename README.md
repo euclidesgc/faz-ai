@@ -13,8 +13,12 @@ na linha de baixo, campos personalizáveis e checklist por card.
    **Regra:** uma história só entra numa coluna de conclusão quando não tem sub-tarefas em aberto.
 3. **Cards:** clique numa história filtra as sub-tarefas dela; duplo clique (ou ⤢) abre o detalhe.
    O menu `⋯` do card arquiva ou move para a lixeira.
-4. **Arquivados:** o botão "Arquivados" mostra uma coluna extra em cada linha. Arraste um card para
-   ela para arquivar, ou de volta para uma coluna para desarquivar.
+4. **Arquivados:** cada linha tem uma coluna "Arquivados" no fim, colapsada por padrão. Arraste um
+   card para ela (mesmo colapsada) para arquivar, ou de volta para uma coluna para desarquivar. Os
+   arquivados também aparecem num grupo próprio na barra lateral.
+   **Colapsar:** linhas e colunas abrem e fecham com um clique no cabeçalho, e a escolha fica
+   lembrada por workspace. O estado inicial de cada uma ("Começa colapsada") fica em
+   Configurações → Workflows e colunas.
 5. **Lixeira:** aba no topo, com restaurar, apagar de vez e esvaziar.
 6. **Filtros:** busca por palavra-chave ou pelo ID do card (`#12`) no board; a seção **Filtros** da barra lateral tem tipo, campos,
    data/período e relacionamentos. Os filtros ativos aparecem como

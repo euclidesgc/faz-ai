@@ -292,3 +292,13 @@ h3.plain { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(
 .joiner { font-size: 10px; font-weight: 700; color: var(--muted); padding: 2px 0; }
 .joiner.or { color: var(--vscode-textLink-foreground); padding: 6px 0; }
 .table tr.off td { opacity: .55; }
+
+/* linhas e colunas colapsáveis */
+.workflow-header { cursor: pointer; user-select: none; }
+.workflow.collapsed { flex: 0 0 auto; }
+.workflow.collapsed .workflow-header { margin-bottom: 0; }
+.collapse-toggle { padding: 0 4px; color: var(--muted); }
+.column.collapsed { flex: 0 0 34px; width: 34px; min-width: 34px; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; }
+.column.collapsed:hover { background: var(--hover); }
+.column-name-vertical { writing-mode: vertical-rl; white-space: nowrap; font-weight: 600; overflow: hidden; text-overflow: ellipsis; max-height: 100%; }
+.column.collapsed.terminal .column-name-vertical { opacity: .75; }

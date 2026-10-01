@@ -47,8 +47,10 @@ export class BoardRepo {
     if (patch.aiTools !== undefined) run(this.db, 'UPDATE boards SET ai_tools_json = ? WHERE id = ?', [JSON.stringify(ALL_AI_TOOLS.filter((t) => patch.aiTools!.includes(t))), boardId]);
   }
 
-  updateWorkflow(workflowId: string, patch: { name?: string }): void {
+  updateWorkflow(workflowId: string, patch: { name?: string; collapsed?: boolean; archiveCollapsed?: boolean }): void {
     if (patch.name !== undefined) run(this.db, 'UPDATE workflows SET name = ? WHERE id = ?', [patch.name, workflowId]);
+    if (patch.collapsed !== undefined) run(this.db, 'UPDATE workflows SET collapsed = ? WHERE id = ?', [patch.collapsed ? 1 : 0, workflowId]);
+    if (patch.archiveCollapsed !== undefined) run(this.db, 'UPDATE workflows SET archive_collapsed = ? WHERE id = ?', [patch.archiveCollapsed ? 1 : 0, workflowId]);
   }
 
   snapshot(boardId: string, currentUser = ''): BoardState {
@@ -59,13 +61,14 @@ export class BoardRepo {
 
     const workflows: Workflow[] = all(db, 'SELECT * FROM workflows WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), position: num(r.position), kind: str(r.kind) as Workflow['kind'],
+      collapsed: bool(r.collapsed), archiveCollapsed: bool(r.archive_collapsed),
     }));
 
     const columns: Column[] = all(
       db,
       'SELECT c.* FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? ORDER BY c.position',
       [boardId],
-    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), category: str(r.category) as Column['category'], isTerminal: str(r.category) !== 'open' }));
+    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), category: str(r.category) as Column['category'], isTerminal: str(r.category) !== 'open', collapsed: bool(r.collapsed) }));
 
     const cardTypes: CardType[] = all(db, 'SELECT * FROM card_types WHERE board_id = ? ORDER BY rowid', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), color: str(r.color), defaultWorkflowId: str(r.default_workflow_id),

@@ -61,6 +61,7 @@ describe('categoria de coluna', () => {
       CREATE TABLE field_defs (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, options_json TEXT NOT NULL DEFAULT '[]', applies_to_types_json TEXT, display TEXT NOT NULL DEFAULT 'inline', position INTEGER NOT NULL);
       CREATE TABLE card_types (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL, default_workflow_id TEXT NOT NULL);
       CREATE TABLE field_values (card_id TEXT NOT NULL, field_id TEXT NOT NULL, value_json TEXT NOT NULL, PRIMARY KEY (card_id, field_id));
+      CREATE TABLE workflows (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, name TEXT NOT NULL, position INTEGER NOT NULL, kind TEXT NOT NULL);
       CREATE TABLE columns (id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, name TEXT NOT NULL, position INTEGER NOT NULL, is_terminal INTEGER NOT NULL DEFAULT 0);
       INSERT INTO columns VALUES ('a','w','Backlog',0,0), ('b','w','Concluído',1,1), ('c','w','Cancelado',2,1), ('d','w','Entregue',3,1);`);
     migrate(old);

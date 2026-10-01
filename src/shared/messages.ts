@@ -31,7 +31,7 @@ export type WebviewToHost =
   | { type: 'checklist.update'; itemId: Id; patch: { text?: string; done?: boolean } }
   | { type: 'checklist.delete'; itemId: Id }
   | { type: 'settings.column.create'; workflowId: Id; name: string }
-  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number } }
+  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean } }
   | { type: 'settings.column.delete'; columnId: Id; moveCardsTo: Id }
   | { type: 'settings.type.create'; name: string; color: string; defaultWorkflowId: Id }
   | { type: 'settings.type.update'; typeId: Id; patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue> } }
@@ -50,7 +50,7 @@ export type WebviewToHost =
       patch: { name?: string; options?: string[]; appliesToTypes?: Id[] | null; display?: FieldDisplay };
     }
   | { type: 'settings.field.delete'; fieldId: Id }
-  | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string } }
+  | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string; collapsed?: boolean; archiveCollapsed?: boolean } }
   | { type: 'settings.board.update'; patch: { name?: string; aiTools?: AiTool[] } }
   /** apaga tudo e recria o board com o padrão atual */
   | { type: 'settings.board.reset' }

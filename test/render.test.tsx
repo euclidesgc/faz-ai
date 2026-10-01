@@ -79,7 +79,20 @@ describe('telas montam sem erro', () => {
     expect(board).toContain('#1');
     expect(board).toContain('revisar-spec');
     expect(board).toContain('Opus 5.5 · high');
-    expect(board).toContain('suggest-model'); // a história tem modelo manual diferente da sugestão
+    expect(board).toContain('suggest-model');
+    // a coluna de arquivados está sempre no board, colapsada por padrão; as demais abertas
+    expect(board.match(/column collapsed archive/g)).toHaveLength(2);
+    expect(board).not.toContain('Arraste um card para cá para arquivar');
+    const s = useBoardStore.getState().state!;
+    const prd = s.columns.find((c) => c.name === 'PRD')!;
+    const child = s.workflows.find((w) => w.kind === 'child')!;
+    useBoardStore.setState({ collapsed: { [prd.id]: true, [`archive:${s.workflows[0]!.id}`]: false, [child.id]: true } });
+    const custom = html(<Board />);
+    expect(custom).toContain('Expandir &quot;PRD&quot;');
+    expect(custom).toContain('Arraste um card para cá para arquivar'); // arquivados da linha de cima aberto
+    expect(custom).toContain('workflow workflow-child collapsed');
+    expect(custom).not.toContain('A fazer'); // linha de baixo fechada não mostra as colunas
+    useBoardStore.setState({ collapsed: {} }); // a história tem modelo manual diferente da sugestão
     expect(html(<FilterBar />)).toContain('Filtros');
     expect(html(<FiltersApp />).length).toBeGreaterThan(100);
     expect(html(<TrashView />)).toContain('Lixo');
@@ -91,7 +104,8 @@ describe('telas montam sem erro', () => {
 
   it('configurações', () => {
     expect(html(<Settings />)).toContain('Harness de IA');
-    expect(html(<ColumnsSettings />)).toContain('PRD');
+    const cols = html(<ColumnsSettings />);
+    for (const text of ['PRD', 'Começa colapsada', 'Linha começa colapsada', 'Arquivados']) expect(cols).toContain(text);
     const types = html(<TypesSettings />);
     expect(types).toContain('Padrões por tipo');
     expect(types).toContain('Modelo');

@@ -29,6 +29,10 @@ export interface Workflow {
   name: string;
   position: number;
   kind: WorkflowKind;
+  /** a linha começa colapsada no board */
+  collapsed: boolean;
+  /** a coluna de arquivados desta linha começa colapsada */
+  archiveCollapsed: boolean;
 }
 
 export interface Column {
@@ -39,6 +43,8 @@ export interface Column {
   category: ColumnCategory;
   /** derivado: category !== 'open' */
   isTerminal: boolean;
+  /** a coluna começa colapsada no board */
+  collapsed: boolean;
 }
 
 export interface CardType {

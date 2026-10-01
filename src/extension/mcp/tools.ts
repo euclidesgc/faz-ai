@@ -363,11 +363,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   tool(
     'update_column',
     'Renomeia uma coluna, muda o que ela representa (categoria) ou a sua posição no workflow.',
-    { column: z.string(), workflow: columnWorkflowArg, name: z.string().min(1).optional(), category: categoryArg.optional(), position: z.number().int().min(0).optional() },
+    { column: z.string(), workflow: columnWorkflowArg, name: z.string().min(1).optional(), category: categoryArg.optional(), position: z.number().int().min(0).optional(), collapsed: z.boolean().optional().describe('A coluna começa colapsada ao abrir o board') },
     (a, router) => {
       const s = router.snapshot();
       const col = findColumn(s, a.column, a.workflow ? findWorkflow(s, a.workflow).id : undefined);
-      router.handle({ type: 'settings.column.update', columnId: col.id, patch: { name: a.name, category: a.category, position: a.position } });
+      router.handle({ type: 'settings.column.update', columnId: col.id, patch: { name: a.name, category: a.category, position: a.position, collapsed: a.collapsed } });
       return overview(router);
     },
   );
@@ -389,6 +389,16 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     router.handle({ type: 'settings.workflow.update', workflowId: findWorkflow(router.snapshot(), a.workflow).id, patch: { name: a.name } });
     return overview(router);
   });
+
+  tool(
+    'set_workflow_layout',
+    'Define como uma linha do board aparece ao abrir: a linha inteira colapsada ou não, e a coluna de arquivados dela colapsada ou não.',
+    { workflow: workflowArg, collapsed: z.boolean().optional(), archive_collapsed: z.boolean().optional() },
+    (a, router) => {
+      router.handle({ type: 'settings.workflow.update', workflowId: findWorkflow(router.snapshot(), a.workflow).id, patch: { collapsed: a.collapsed, archiveCollapsed: a.archive_collapsed } });
+      return overview(router);
+    },
+  );
 
   tool('rename_board', 'Renomeia o board.', { name: z.string().min(1) }, (a, router) => {
     router.handle({ type: 'settings.board.update', patch: { name: a.name } });
