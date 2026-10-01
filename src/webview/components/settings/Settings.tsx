@@ -25,6 +25,7 @@ export function Settings() {
           <button className={tab === 'fields' ? 'active' : ''} onClick={() => setTab('fields')}>Campos</button>
           <button className={tab === 'rules' ? 'active' : ''} onClick={() => setTab('rules')}>Regras</button>
         </nav>
+        <button title="Registra o board como servidor MCP para o Claude Code e outros clientes de IA" onClick={() => send({ type: 'ui.connectAI' })}>Conectar IA (MCP)</button>
       </div>
       <div className="settings-main">
         {tab === 'columns' && <ColumnsSettings />}

@@ -6,6 +6,7 @@ export type WebviewToHost =
   | { type: 'ready' }
   | { type: 'view.set'; patch: Partial<ViewState> }
   | { type: 'ui.showFilters' }
+  | { type: 'ui.connectAI' }
   | { type: 'card.create'; typeId: Id; columnId: Id; parentId: Id | null; title: string }
   | { type: 'card.update'; cardId: Id; patch: { title?: string; description?: string; typeId?: Id } }
   | { type: 'card.move'; cardId: Id; columnId: Id; position: number; /** ao cancelar uma história, cancela também as sub-tarefas em aberto */ cancelChildren?: boolean }
