@@ -2,7 +2,7 @@
   "name": "faz-ai",
   "displayName": "Faz AI Kanban",
   "description": "Board kanban para Spec-Driven Development com IA, dentro do editor: histórias, sub-tarefas e um servidor MCP para a IA ler e atualizar o board",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "publisher": "euclidesgc",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -27,7 +27,7 @@
     "kimi"
   ],
   "galleryBanner": {
-    "color": "#1f2a44",
+    "color": "#1e1b4b",
     "theme": "dark"
   },
   "private": true,
