@@ -213,7 +213,7 @@ describe('modelos de IA', () => {
   it('sugere o modelo pelo esforço da tarefa sem trocar uma escolha manual', async () => {
     // regras iniciais: Esforço Baixo/Médio/Alto → modelo leve/intermediário/forte da primeira ferramenta
     const rules = (await call('get_models')).data.rules;
-    expect(rules.map((r: any) => [r.when, r.value])).toEqual([['Esforço = Baixo', 'claude:haiku'], ['Esforço = Médio', 'claude:sonnet@medium'], ['Esforço = Alto', 'claude:opus@high']]);
+    expect(rules.map((r: any) => [r.when, r.value])).toEqual([['Esforço da atividade = Baixo', 'claude:haiku'], ['Esforço da atividade = Médio', 'claude:sonnet@medium'], ['Esforço da atividade = Alto', 'claude:opus@high']]);
 
     const card = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
     expect(card.model.value).toBe('claude:haiku');
@@ -279,7 +279,7 @@ describe('regras de modelo com E e OU', () => {
         { name: 'Alto', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus high' },
       ],
     });
-    expect(res.data.rules[0]).toMatchObject({ name: 'Backend pesado', when: 'Esforço = Alto E Tags = backend OU Tipo = Bug E Esforço ≠ Baixo', enabled: true });
+    expect(res.data.rules[0]).toMatchObject({ name: 'Backend pesado', when: 'Esforço da atividade = Alto E Tags = backend OU Tipo = Bug E Esforço da atividade ≠ Baixo', enabled: true });
 
     expect(await modelOf({ Esforço: 'Alto', Tags: ['backend', 'frontend'] })).toBe('claude:fable@max'); // E: as duas condições
     expect(await modelOf({ Esforço: 'Alto', Tags: ['frontend'] })).toBe('claude:opus@high'); // só uma: cai na regra seguinte
@@ -317,6 +317,17 @@ describe('linhas e colunas colapsadas por padrão', () => {
     const s = router.snapshot();
     expect(s.columns.find((c) => c.name === 'Cancelado')!.collapsed).toBe(true);
     expect(s.workflows.find((w) => w.kind === 'child')).toMatchObject({ collapsed: true, archiveCollapsed: false });
+  });
+});
+
+describe('aparência', () => {
+  it('guarda tema, fonte e tamanho, recusando valores fora do permitido', async () => {
+    expect((await call('get_board')).data.appearance).toEqual({ theme: 'system', font: 'sans', fontSize: 14 });
+    expect((await call('set_appearance', { theme: 'dark', font_size: 16 })).data).toEqual({ theme: 'dark', font: 'sans', fontSize: 16 });
+    expect((await call('set_appearance', { font: 'serif' })).data).toEqual({ theme: 'dark', font: 'serif', fontSize: 16 });
+    expect((await call('set_appearance', { font_size: 40 })).error).toBe(true);
+    router.handle({ type: 'settings.board.update', patch: { appearance: { fontSize: 99, theme: 'neon' as never } } });
+    expect(router.snapshot().board.appearance).toEqual({ theme: 'system', font: 'serif', fontSize: 22 });
   });
 });
 

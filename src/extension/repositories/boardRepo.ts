@@ -3,6 +3,7 @@ import type { Attachment, Board, BoardState, Card, CardType, ChecklistItem, Colu
 import { all, bool, num, one, run, str } from '../db/query';
 import { parseRules, type BoardRules } from '../../shared/rules';
 import { seedBoard } from '../db/seed';
+import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
 import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool } from '../../shared/harness';
 
@@ -16,7 +17,7 @@ export class BoardRepo {
       seedBoard(this.db, workspaceKey, name);
       row = one(this.db, 'SELECT * FROM boards WHERE workspace_key = ?', [workspaceKey])!;
     }
-    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTool: parseAiTool(str(row.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)), modelRules: parseModelRules(str(row.model_rules_json)) };
+    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTool: parseAiTool(str(row.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)), modelRules: parseModelRules(str(row.model_rules_json)), appearance: parseAppearance(str(row.appearance_json)) };
   }
 
   updateRules(boardId: string, patch: Partial<BoardRules>): void {
@@ -42,8 +43,13 @@ export class BoardRepo {
     return ids;
   }
 
-  updateBoard(boardId: string, patch: { name?: string; aiTool?: AiTool }): void {
+  updateBoard(boardId: string, patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance> }): void {
     if (patch.name !== undefined) run(this.db, 'UPDATE boards SET name = ? WHERE id = ?', [patch.name, boardId]);
+    if (patch.appearance !== undefined) {
+      const current = parseAppearance(str(one(this.db, 'SELECT appearance_json FROM boards WHERE id = ?', [boardId])?.appearance_json));
+      // parseAppearance valida o resultado: valores fora do permitido voltam ao padrão
+      run(this.db, 'UPDATE boards SET appearance_json = ? WHERE id = ?', [JSON.stringify(parseAppearance(JSON.stringify({ ...current, ...patch.appearance }))), boardId]);
+    }
     if (patch.aiTool !== undefined && ALL_AI_TOOLS.includes(patch.aiTool)) run(this.db, 'UPDATE boards SET ai_tools_json = ? WHERE id = ?', [JSON.stringify(patch.aiTool), boardId]);
   }
 
@@ -57,7 +63,7 @@ export class BoardRepo {
     const db = this.db;
     const b = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
     if (!b) throw new Error('Board não encontrado');
-    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTool: parseAiTool(str(b.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)), modelRules: parseModelRules(str(b.model_rules_json)) };
+    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTool: parseAiTool(str(b.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)), modelRules: parseModelRules(str(b.model_rules_json)), appearance: parseAppearance(str(b.appearance_json)) };
 
     const workflows: Workflow[] = all(db, 'SELECT * FROM workflows WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), position: num(r.position), kind: str(r.kind) as Workflow['kind'],

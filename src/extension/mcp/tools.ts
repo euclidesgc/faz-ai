@@ -400,6 +400,20 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
   );
 
+  tool(
+    'set_appearance',
+    'Ajusta a aparência do board: tema (system acompanha o VS Code, light, dark) e a fonte e o tamanho dos textos longos (descrição e comentários).',
+    {
+      theme: z.enum(['system', 'light', 'dark']).optional(),
+      font: z.enum(['sans', 'ui', 'serif', 'mono', 'editor']).optional().describe('sans = sem serifa do sistema; ui = fonte da interface do VS Code; editor = fonte do editor do VS Code'),
+      font_size: z.number().int().min(11).max(22).optional().describe('Tamanho em px'),
+    },
+    (a, router) => {
+      const patch = Object.fromEntries(Object.entries({ theme: a.theme, font: a.font, fontSize: a.font_size }).filter(([, v]) => v !== undefined));
+      return router.handle({ type: 'settings.board.update', patch: { appearance: patch } }).board.appearance;
+    },
+  );
+
   tool('rename_board', 'Renomeia o board.', { name: z.string().min(1) }, (a, router) => {
     router.handle({ type: 'settings.board.update', patch: { name: a.name } });
     return overview(router);

@@ -48,17 +48,17 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
     );
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
-      [newId(), boardId, MODEL_FIELD, 'model', '[]', null, 'badge', 2],
+      [newId(), boardId, MODEL_FIELD, 'model', '[]', null, 'badge', 3],
     );
     // as opções vêm das skills do projeto e são sincronizadas pelo roteador
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
-      [newId(), boardId, SKILLS_FIELD, 'multiselect', '[]', null, 'chip', 3],
+      [newId(), boardId, SKILLS_FIELD, 'multiselect', '[]', null, 'chip', 4],
     );
     // esforço da tarefa: as regras de modelo sugerem um modelo a partir dele
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
-      [newId(), boardId, EFFORT_FIELD, 'select', JSON.stringify(EFFORT_LEVELS), null, 'badge', 4],
+      [newId(), boardId, EFFORT_FIELD, 'select', JSON.stringify(EFFORT_LEVELS), null, 'badge', 2],
     );
     db.exec('COMMIT;');
   } catch (e) {

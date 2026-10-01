@@ -46,8 +46,9 @@ Um board novo já nasce preparado para Spec-Driven Development:
   Configurações → Regras do board.
 - **Campo Modelo:** qual modelo de IA deve executar o card e com que nível de esforço (por exemplo
   "Fable 5.1 · low" ou "Opus 5.5 · high"). As opções vêm do catálogo de modelos do board.
-- **Campo Esforço:** tamanho da tarefa (Baixo, Médio, Alto). As regras de sugestão escolhem o modelo
-  a partir dele.
+- **Campo Esforço da atividade:** tamanho da tarefa (Baixo, Médio, Alto). As regras de sugestão
+  escolhem o modelo a partir dele. Não é o mesmo que o **Esforço do modelo**, que é o nível de
+  raciocínio escolhido junto com o modelo; no detalhe do card eles aparecem em linhas separadas.
 - **Campo Skills:** skills que devem ser carregadas obrigatoriamente na execução do card. As opções
   são as skills ligadas do projeto. Outras skills continuam podendo ser usadas normalmente.
 - **Padrões por tipo:** em Configurações → Tipos de card, cada tipo pode ter valores padrão de campos
@@ -55,6 +56,14 @@ Um board novo já nasce preparado para Spec-Driven Development:
 
 Para trazer um board antigo para esse padrão, use **Recriar board padrão** em Configurações. Isso
 apaga todos os cards e configurações do board.
+
+## Aparência
+
+Configurações → **Aparência** ajusta o visual do board:
+
+- **Tema:** Sistema (acompanha o tema do VS Code), Claro ou Escuro.
+- **Fonte dos textos** e **tamanho da fonte:** valem para os textos longos, isto é, a descrição dos
+  cards e os comentários, ao escrever e ao ler. O padrão é a fonte sem serifa do sistema, 14px.
 
 ## Modelos de IA
 
@@ -79,7 +88,7 @@ os modelos que ela tem (`upsert_model`). Modelos acrescentados à mão são mant
   grupo alternativo é um **OU**. Exemplo: `Esforço = Alto E Tags = backend OU Tipo = Bug`.
 - **Adicionar à lista** põe a regra em uso. Na lista, cada regra pode ser ligada, desligada,
   editada, removida e reordenada; a primeira regra ligada que casa vence.
-- O botão "Recriar as regras de Esforço" gera as três regras (Baixo, Médio, Alto) com um modelo
+- O botão "Recriar as regras de Esforço da atividade" gera as três regras (Baixo, Médio, Alto) com um modelo
   leve, um intermediário e um forte da ferramenta em uso.
 
 O resultado é sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { cardRef } from '../../shared/model';
-import { modelLabel, suggestModel } from '../../shared/models';
+import { cardRef, type FieldValue } from '../../shared/model';
+import { MODEL_EFFORT_LABEL, modelLabel, suggestModel } from '../../shared/models';
 import { cardsIn, childrenOf, columnsOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
 import { requestArchive, requestMove, requestTrash } from '../store/actions';
 import { AttachmentsTab } from './AttachmentsTab';
 import { CommentsTab } from './CommentsTab';
-import { FieldEditor } from './FieldRenderer';
+import { FieldEditor, ModelEditor } from './FieldRenderer';
 import { MarkdownEditor, renderMarkdown } from './MarkdownEditor';
 
 type Tab = 'details' | 'comments' | 'attachments';
@@ -127,18 +127,40 @@ export function CardDrawer({ cardId }: { cardId: string }) {
               <section className="drawer-section">
                 <h3>Campos</h3>
                 <div className="fields-grid">
-                  {fields.map((f) => (
-                    <label key={f.id} className="field-row">
-                      <span>{f.name}</span>
-                      <FieldEditor field={f} value={valueOf(state, card.id, f.id)} onChange={(v) => send({ type: 'field.setValue', cardId, fieldId: f.id, value: v })} />
-                      {f.kind === 'model' && suggested && suggested !== valueOf(state, card.id, f.id) && (
-                        <span className="muted small suggestion">
-                          Sugerido pelas regras: {modelLabel(state.board.modelCatalog, suggested, true)}{' '}
-                          <a onClick={(e) => { e.preventDefault(); send({ type: 'field.setValue', cardId, fieldId: f.id, value: suggested }); }}>Usar</a>
-                        </span>
-                      )}
-                    </label>
-                  ))}
+                  {fields.map((f) => {
+                    const value = valueOf(state, card.id, f.id);
+                    const set = (v: FieldValue) => send({ type: 'field.setValue', cardId, fieldId: f.id, value: v });
+                    if (f.kind !== 'model') {
+                      return (
+                        <label key={f.id} className="field-row">
+                          <span>{f.name}</span>
+                          <FieldEditor field={f} value={value} onChange={set} />
+                        </label>
+                      );
+                    }
+                    // modelo e esforço do modelo em linhas separadas, para não confundir com o esforço da atividade
+                    return (
+                      <div key={f.id} className="model-rows">
+                        <label className="field-row">
+                          <span>{f.name}</span>
+                          <ModelEditor part="model" value={value} onChange={set} />
+                        </label>
+                        <label className="field-row">
+                          <span>{MODEL_EFFORT_LABEL}</span>
+                          <ModelEditor part="effort" value={value} onChange={set} />
+                        </label>
+                        {suggested && suggested !== value && (
+                          <div className="field-row">
+                            <span />
+                            <span className="muted small suggestion">
+                              Sugerido pelas regras: {modelLabel(state.board.modelCatalog, suggested, true)}{' '}
+                              <a onClick={(e) => { e.preventDefault(); set(suggested); }}>Usar</a>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
             )}

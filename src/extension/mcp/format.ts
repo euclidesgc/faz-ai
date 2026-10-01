@@ -36,7 +36,9 @@ export function findType(s: BoardState, name: string): CardType {
 }
 
 export function findField(s: BoardState, name: string): FieldDef {
-  const f = s.fieldDefs.find((x) => x.id === name || same(x.name, name));
+  // aceita o nome exato ou um começo de nome que só um campo tenha (ex.: "Esforço" → "Esforço da atividade")
+  const starts = s.fieldDefs.filter((x) => norm(x.name).startsWith(norm(name.trim())));
+  const f = s.fieldDefs.find((x) => x.id === name || same(x.name, name)) ?? (name.trim() && starts.length === 1 ? starts[0] : undefined);
   if (!f) throw new Error(`Campo "${name}" não encontrado. Existentes: ${list(s.fieldDefs.map((x) => x.name))}.`);
   return f;
 }
@@ -190,6 +192,7 @@ export function boardOverview(s: BoardState) {
       display: f.display,
     })),
     rules: s.board.rules,
+    appearance: s.board.appearance,
     harness: harnessOverview(s),
     archivedCards: s.cards.filter((c) => c.deletedAt === null && c.archivedAt !== null).length,
     trashedCards: s.cards.filter((c) => c.deletedAt !== null).length,

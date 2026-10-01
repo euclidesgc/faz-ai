@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -162,6 +162,15 @@ const MIGRATIONS: Record<number, string> = {
     ALTER TABLE columns ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE workflows ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE workflows ADD COLUMN archive_collapsed INTEGER NOT NULL DEFAULT 1;
+  `,
+  11: `
+    ALTER TABLE boards ADD COLUMN appearance_json TEXT NOT NULL DEFAULT '{}';
+    -- "Esforço" vira "Esforço da atividade" e passa a vir logo antes do campo de modelo
+    UPDATE field_defs SET name = 'Esforço da atividade' WHERE lower(name) = 'esforço';
+    UPDATE field_defs SET position = position * 2;
+    UPDATE field_defs SET position = (
+      SELECT MIN(m.position) - 1 FROM field_defs m WHERE m.board_id = field_defs.board_id AND m.kind = 'model'
+    ) WHERE name = 'Esforço da atividade' AND EXISTS (SELECT 1 FROM field_defs m WHERE m.board_id = field_defs.board_id AND m.kind = 'model');
   `,
 };
 

@@ -1,5 +1,6 @@
 import type { AiTool, Harness } from './harness';
 import type { ModelOption, ModelRule } from './models';
+import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
 
 export type Id = string;
@@ -21,6 +22,8 @@ export interface Board {
   modelCatalog: ModelOption[];
   /** sugestão de modelo conforme os campos do card */
   modelRules: ModelRule[];
+  /** tema e tipografia do board */
+  appearance: Appearance;
 }
 
 export interface Workflow {

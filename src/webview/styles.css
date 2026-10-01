@@ -216,7 +216,7 @@ button.ghost.on { background: var(--hover); color: var(--fg); }
 .md-toolbar { display: flex; align-items: center; gap: 2px; padding: 3px 4px; border-bottom: 1px solid var(--border); background: var(--col-bg); }
 .md-toolbar .icon { min-width: 26px; color: var(--fg); }
 .md-bold { font-weight: 700; } .md-italic { font-style: italic; } .md-code { font-family: var(--vscode-editor-font-family, monospace); font-size: 11px; }
-.md-editor textarea { border: none; border-radius: 0; padding: 10px 12px; min-height: 140px; line-height: 1.5; font-family: var(--vscode-editor-font-family, monospace); font-size: var(--vscode-editor-font-size, 13px); resize: vertical; }
+.md-editor textarea { border: none; border-radius: 0; padding: 10px 12px; min-height: 140px; line-height: 1.5; resize: vertical; }
 .md-editor textarea:focus { outline: none; }
 .md-editor > .markdown { border: none; border-radius: 0; cursor: auto; min-height: 140px; }
 .md-expanded { position: fixed; inset: 0; z-index: 40; background: var(--bg); padding: 16px; display: flex; }
@@ -302,3 +302,39 @@ h3.plain { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(
 .column.collapsed:hover { background: var(--hover); }
 .column-name-vertical { writing-mode: vertical-rl; white-space: nowrap; font-weight: 600; overflow: hidden; text-overflow: ellipsis; max-height: 100%; }
 .column.collapsed.terminal .column-name-vertical { opacity: .75; }
+
+/* tipografia dos textos longos (descrição, comentários), configurável em Configurações → Aparência */
+.markdown, .md-editor textarea {
+  font-family: var(--text-font, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif);
+  font-size: var(--text-size, 14px);
+}
+.markdown code, .markdown pre { font-family: var(--vscode-editor-font-family, ui-monospace, monospace); font-size: .92em; }
+.model-rows { display: grid; gap: 6px; }
+.model-editor select { flex: 1; }
+.field-row select, .field-row input:not([type=checkbox]):not([type=range]):not([type=color]) { width: 100%; }
+
+/* temas próprios: redefinem as cores no body, por cima das que o VS Code fornece */
+body[data-theme=light] {
+  color-scheme: light;
+  --bg: #ffffff; --fg: #1f2328; --muted: #59636e; --border: #d1d9e0; --card-bg: #ffffff; --col-bg: #f6f8fa;
+  --accent: #0969da; --hover: rgba(129,139,152,.15); --input-bg: #ffffff; --input-fg: #1f2328; --input-border: #d1d9e0;
+  --btn-bg: #0969da; --btn-fg: #ffffff; --btn2-bg: #eaeef2; --btn2-fg: #1f2328; --error: #cf222e;
+  --vscode-textLink-foreground: #0969da; --vscode-badge-background: #eaeef2; --vscode-badge-foreground: #1f2328;
+  --vscode-textCodeBlock-background: #f0f3f6; --vscode-menu-background: #ffffff; --vscode-menu-foreground: #1f2328;
+  --vscode-menu-border: #d1d9e0; --vscode-menu-selectionBackground: #0969da; --vscode-menu-selectionForeground: #ffffff;
+  --vscode-inputValidation-errorBackground: #ffebe9; --vscode-inputValidation-errorBorder: #cf222e;
+  --vscode-inputValidation-warningBackground: #fff8c5; --vscode-inputValidation-warningBorder: #9a6700;
+  --vscode-testing-iconPassed: #1a7f37;
+}
+body[data-theme=dark] {
+  color-scheme: dark;
+  --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --border: #3d444d; --card-bg: #161b22; --col-bg: #010409;
+  --accent: #4493f8; --hover: rgba(101,108,118,.2); --input-bg: #0d1117; --input-fg: #e6edf3; --input-border: #3d444d;
+  --btn-bg: #238636; --btn-fg: #ffffff; --btn2-bg: #21262d; --btn2-fg: #e6edf3; --error: #f85149;
+  --vscode-textLink-foreground: #4493f8; --vscode-badge-background: #30363d; --vscode-badge-foreground: #e6edf3;
+  --vscode-textCodeBlock-background: #161b22; --vscode-menu-background: #161b22; --vscode-menu-foreground: #e6edf3;
+  --vscode-menu-border: #3d444d; --vscode-menu-selectionBackground: #1f6feb; --vscode-menu-selectionForeground: #ffffff;
+  --vscode-inputValidation-errorBackground: #490202; --vscode-inputValidation-errorBorder: #f85149;
+  --vscode-inputValidation-warningBackground: #3a2d00; --vscode-inputValidation-warningBorder: #d29922;
+  --vscode-testing-iconPassed: #3fb950;
+}

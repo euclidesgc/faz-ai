@@ -49,7 +49,9 @@ export function parseModelRules(json: string | null | undefined): ModelRule[] {
   });
 }
 
-export const EFFORT_FIELD = 'Esforço';
+/** Tamanho da tarefa; não confundir com o esforço (nível de raciocínio) do modelo. */
+export const EFFORT_FIELD = 'Esforço da atividade';
+export const MODEL_EFFORT_LABEL = 'Esforço do modelo';
 export const EFFORT_LEVELS = ['Baixo', 'Médio', 'Alto'] as const;
 
 export const modelId = (tool: AiTool, model: string): string => `${tool}:${model}`;

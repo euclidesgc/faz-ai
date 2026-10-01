@@ -141,6 +141,6 @@ describe('migração v1 → v2', () => {
     expect(new BoardRepo(old).snapshot('b').cards.find((c) => c.id === novo)?.number).toBe(3);
     expect(s.comments).toEqual([]);
     // boards existentes ganham o campo padrão "Modelo"
-    expect(s.fieldDefs.map((f) => f.name)).toEqual(['Modelo', 'Skills', 'Esforço']);
+    expect(s.fieldDefs.map((f) => f.name)).toEqual(['Esforço da atividade', 'Modelo', 'Skills']); // o esforço vem antes do modelo
   });
 });

@@ -28,7 +28,7 @@ export function createMcpServer(opts: McpOptions): McpServer {
         'get_card devolve em `model` a ferramenta, o modelo e o nível de esforço que devem executar o card: antes de trabalhar nele, ' +
         'se o modelo ou o esforço forem diferentes dos seus, delegue o trabalho a um subagente com esse modelo e esforço; ' +
         'se não for possível, avise a pessoa em vez de executar com outra configuração. ' +
-        'O campo "Esforço" é o tamanho da tarefa; as regras do board sugerem o modelo a partir dele (get_models). ' +
+        'O campo "Esforço da atividade" é o tamanho da tarefa (não é o esforço do modelo); as regras do board sugerem o modelo a partir dele (get_models). ' +
         'O campo "Skills" lista as skills obrigatórias do card: get_card devolve `requiredSkills` com o caminho de cada SKILL.md, ' +
         'e todas devem ser carregadas antes de executar o card (outras skills continuam podendo ser usadas normalmente). ' +
         'As colunas das histórias são as fases do SDD; mova a história para a próxima coluna ao concluir cada fase. ' +

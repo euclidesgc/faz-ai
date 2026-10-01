@@ -15,6 +15,7 @@ import { ColumnsSettings } from '../src/webview/components/settings/ColumnsSetti
 import { FieldsSettings } from '../src/webview/components/settings/FieldsSettings';
 import { HarnessSettings } from '../src/webview/components/settings/HarnessSettings';
 import { RuleBuilder } from '../src/webview/components/settings/ModelRulesEditor';
+import { AppearanceSettings } from '../src/webview/components/settings/AppearanceSettings';
 import { ModelsSettings } from '../src/webview/components/settings/ModelsSettings';
 import { RulesSettings } from '../src/webview/components/settings/RulesSettings';
 import { Settings } from '../src/webview/components/settings/Settings';
@@ -60,7 +61,7 @@ beforeAll(async () => {
   const field = (n: string) => s.fieldDefs.find((f) => f.name === n)!;
   router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Skills').id, value: ['revisar-spec'] });
   router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Modelo').id, value: 'claude:opus@high' });
-  router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Esforço').id, value: 'Baixo' });
+  router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Esforço da atividade').id, value: 'Baixo' });
   router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Modelo').id, value: 'kimi:kimi-code/k3@max' });
   router.handle({ type: 'settings.type.update', typeId: typeOf(childWf.id).id, patch: { defaults: { [field('Modelo').id]: 'claude:sonnet@medium' } } });
   router.handle({ type: 'checklist.add', cardId: storyId, text: 'item' });
@@ -110,6 +111,9 @@ describe('telas montam sem erro', () => {
     expect(own).toContain('Apagar');
     expect(own).toContain('Editar');
     expect(drawer).toContain('Sugerido pelas regras');
+    // esforço da atividade antes do modelo, e o esforço do modelo numa linha própria
+    expect(drawer.indexOf('Esforço da atividade')).toBeLessThan(drawer.indexOf('>Modelo<'));
+    expect(drawer.indexOf('>Modelo<')).toBeLessThan(drawer.indexOf('Esforço do modelo'));
     expect(drawer).toContain('Claude Code · Haiku 4.5');
   });
 
@@ -126,7 +130,7 @@ describe('telas montam sem erro', () => {
     expect(rules).toContain('Preencher o modelo sugerido');
     const models = html(<ModelsSettings />);
     expect(models).not.toContain('gpt-6.1-sol'); // só a ferramenta em uso
-    for (const text of ['Detectar modelos', 'Fable 5.1', 'Sugestão de modelo', 'Esforço = Baixo', 'Montar nova regra', 'xhigh']) expect(models).toContain(text);
+    for (const text of ['Detectar modelos', 'Fable 5.1', 'Sugestão de modelo', 'Esforço da atividade = Baixo', 'Montar nova regra', 'xhigh']) expect(models).toContain(text);
     const s = useBoardStore.getState().state!;
     const tags = s.fieldDefs.find((f) => f.name === 'Tags')!.id;
     const builder = html(
@@ -138,6 +142,8 @@ describe('telas montam sem erro', () => {
     );
     for (const text of ['Tipo do card', 'OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
 
+    const look = html(<AppearanceSettings />);
+    for (const text of ['Tema', 'Sistema (acompanha o VS Code)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia']) expect(look).toContain(text);
     const harness = html(<HarnessSettings />);
     for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)']) expect(harness).toContain(text);
   });
