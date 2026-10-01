@@ -93,7 +93,7 @@ export function applyFilters(state: BoardState, f: Filters, now: number = Date.n
   const childWorkflows = new Set(state.workflows.filter((w) => w.kind === 'child').map((w) => w.id));
 
   const haystack = (c: Card): string => {
-    const parts = [c.title, c.description];
+    const parts = [`#${c.number}`, c.title, c.description];
     for (const cm of state.comments) if (cm.cardId === c.id) parts.push(cm.body);
     for (const fv of state.fieldValues) if (fv.cardId === c.id) parts.push(valueText(fv.value));
     return norm(parts.join('\n'));

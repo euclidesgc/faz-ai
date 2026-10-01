@@ -96,6 +96,9 @@ button.active { background: var(--btn-bg); color: var(--btn-fg); }
 .card:hover .card-actions, .card-actions:focus-within { opacity: 1; }
 .card.archived { opacity: .7; border-style: dashed; border-left-style: solid; }
 .type-badge { font-size: 10px; font-weight: 600; color: #fff; padding: 1px 6px; border-radius: 8px; text-shadow: 0 0 2px rgba(0,0,0,.5); }
+.card-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.card-id { font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; font-weight: 700; color: var(--vscode-textLink-foreground); white-space: nowrap; }
+.drawer-id { font-family: var(--vscode-editor-font-family, monospace); font-size: 13px; font-weight: 700; color: var(--vscode-textLink-foreground); padding: 0 4px; }
 .card-title { font-weight: 500; line-height: 1.3; word-break: break-word; }
 .card-parent { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-fields { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }

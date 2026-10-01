@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { cardRef } from '../../shared/model';
 import { cardsIn, childrenOf, columnsOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
 import { requestArchive, requestMove, requestTrash } from '../store/actions';
 import { AttachmentsTab } from './AttachmentsTab';
@@ -102,10 +103,11 @@ export function CardDrawer({ cardId }: { cardId: string }) {
 
         {parent && (
           <div className="drawer-parent">
-            Sub-tarefa de <a onClick={() => openCard(parent.id)}>{parent.title}</a>
+            Sub-tarefa de <a onClick={() => openCard(parent.id)}>{cardRef(parent)} {parent.title}</a>
           </div>
         )}
 
+        <div className="drawer-id" title="ID do card">{cardRef(card)}</div>
         <input className="drawer-title" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveTitle} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
 
         <nav className="tabs">
@@ -181,7 +183,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
                     const col = state.columns.find((x) => x.id === c.columnId);
                     return (
                       <li key={c.id} className={col?.isTerminal ? 'done' : ''}>
-                        <a onClick={() => openCard(c.id)}>{c.title}</a>
+                        <a onClick={() => openCard(c.id)}><span className="card-id">{cardRef(c)}</span> {c.title}</a>
                         <span className="muted">{c.archivedAt ? 'Arquivada' : col?.name}</span>
                       </li>
                     );

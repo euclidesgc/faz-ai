@@ -132,3 +132,21 @@ describe('settings', () => {
     expect(f.appliesToTypes).toEqual([typeNamed('Bug').id]);
   });
 });
+
+describe('número do card', () => {
+  it('é sequencial por board e não é reutilizado depois de apagar', () => {
+    const mk = (title: string) => cards.create(boardId, { typeId: typeNamed('História').id, columnId: colsOf(parentWf().id)[0]!.id, parentId: null, title });
+    const numberOf = (id: string) => snap().cards.find((c) => c.id === id)?.number;
+    const a = mk('a');
+    const b = mk('b');
+    expect([numberOf(a), numberOf(b)]).toEqual([1, 2]);
+    cards.deletePermanent(b);
+    expect(numberOf(mk('c'))).toBe(3);
+
+    const other = boards.getOrCreate('ws-2', 'Outro').id;
+    const s = boards.snapshot(other);
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const id = cards.create(other, { typeId: s.cardTypes.find((t) => t.name === 'História')!.id, columnId: s.columns.find((c) => c.workflowId === wf.id)!.id, parentId: null, title: 'x' });
+    expect(boards.snapshot(other).cards.find((c) => c.id === id)?.number).toBe(1);
+  });
+});

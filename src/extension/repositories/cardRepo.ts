@@ -21,13 +21,18 @@ export class CardRepo {
     const pos = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM cards WHERE column_id = ?', [input.columnId])?.p);
     const id = newId();
     const t = now();
-    run(
-      db,
-      `INSERT INTO cards(id, board_id, workflow_id, column_id, type_id, parent_id, title, description, position, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-      [id, boardId, str(col.workflow_id), input.columnId, input.typeId, input.parentId, input.title.trim() || 'Sem título', '', pos, t, t],
-    );
-    return id;
+    return transaction(db, () => {
+      // o contador fica no board para que o número de um card apagado nunca volte a ser usado
+      const number = num(one(db, 'SELECT next_card_number AS n FROM boards WHERE id = ?', [boardId])?.n);
+      run(db, 'UPDATE boards SET next_card_number = ? WHERE id = ?', [number + 1, boardId]);
+      run(
+        db,
+        `INSERT INTO cards(id, number, board_id, workflow_id, column_id, type_id, parent_id, title, description, position, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [id, number, boardId, str(col.workflow_id), input.columnId, input.typeId, input.parentId, input.title.trim() || 'Sem título', '', pos, t, t],
+      );
+      return id;
+    });
   }
 
   update(cardId: string, patch: { title?: string; description?: string; typeId?: string }): void {

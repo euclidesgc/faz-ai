@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { Card } from '../../shared/model';
+import { cardRef, type Card } from '../../shared/model';
 import { childrenOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
 import { requestArchive, requestTrash } from '../store/actions';
 import { FieldBadge } from './FieldRenderer';
@@ -51,7 +51,10 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       }}
     >
       <div className="card-top">
-        <span className="type-badge" style={{ background: type?.color }}>{type?.name}</span>
+        <span className="card-head">
+          <span className="card-id" title="ID do card">{cardRef(card)}</span>
+          <span className="type-badge" style={{ background: type?.color }}>{type?.name}</span>
+        </span>
         {!overlay && (
           <span className="card-actions">
             <button className="icon" title="Abrir detalhes" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); openCard(card.id); }}>⤢</button>
@@ -70,7 +73,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         )}
       </div>
       <div className="card-title">{card.title}</div>
-      {parent && <div className="card-parent" title={parent.title}>↳ {parent.title}</div>}
+      {parent && <div className="card-parent" title={parent.title}>↳ {cardRef(parent)} {parent.title}</div>}
       {fields.length > 0 && (
         <div className="card-fields">
           {fields.map((f) => <FieldBadge key={f.id} field={f} value={valueOf(state, card.id, f.id)} />)}

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { BoardState, Card, Column } from '../../shared/model';
+import { cardRef, type BoardState, type Card, type Column } from '../../shared/model';
 import type { MessageRouter } from '../panel/messageRouter';
 
 type Node = { kind: 'column'; column: Column } | { kind: 'card'; card: Card };
@@ -47,7 +47,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<Node> {
     const { card } = node;
     const children = s.cards.filter((c) => c.parentId === card.id && c.deletedAt === null && c.archivedAt === null);
     const column = s.columns.find((c) => c.id === card.columnId);
-    const item = new vscode.TreeItem(card.title, children.length ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
+    const item = new vscode.TreeItem(`${cardRef(card)} ${card.title}`, children.length ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
     const type = s.cardTypes.find((t) => t.id === card.typeId);
     if (card.parentId) {
       item.description = column?.name;

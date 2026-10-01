@@ -128,10 +128,17 @@ describe('migração v1 → v2', () => {
       INSERT INTO workflows VALUES ('w','b','Histórias',0,'parent');
       INSERT INTO columns VALUES ('c','w','Backlog',0,0);
       INSERT INTO card_types VALUES ('t','b','História','#fff','w');
-      INSERT INTO cards VALUES ('k','b','w','c','t',NULL,'antigo','',0,1,1);`);
+      INSERT INTO cards VALUES ('k2','b','w','c','t',NULL,'mais novo','',0,5,5);
+      INSERT INTO cards VALUES ('k','b','w','c','t',NULL,'antigo','',1,1,1);`);
     migrate(old);
     const s = new BoardRepo(old).snapshot('b');
-    expect(s.cards[0]).toMatchObject({ title: 'antigo', deletedAt: null, archivedAt: null });
+    const antigo = s.cards.find((c) => c.id === 'k');
+    expect(antigo).toMatchObject({ title: 'antigo', deletedAt: null, archivedAt: null });
+    // os cards existentes são numerados pela ordem de criação, e o próximo continua a sequência
+    expect(antigo?.number).toBe(1);
+    expect(s.cards.find((c) => c.id === 'k2')?.number).toBe(2);
+    const novo = new CardRepo(old).create('b', { typeId: 't', columnId: 'c', parentId: null, title: 'novo' });
+    expect(new BoardRepo(old).snapshot('b').cards.find((c) => c.id === novo)?.number).toBe(3);
     expect(s.comments).toEqual([]);
   });
 });

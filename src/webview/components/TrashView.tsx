@@ -1,3 +1,4 @@
+import { cardRef } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
 
 export function TrashView() {
@@ -44,9 +45,9 @@ export function TrashView() {
               return (
                 <tr key={c.id}>
                   <td>
-                    <strong>{c.title}</strong>
+                    <span className="card-id">{cardRef(c)}</span> <strong>{c.title}</strong>
                     {kids > 0 && <span className="muted"> + {kids} sub-tarefa(s)</span>}
-                    {parent && <div className="muted small">↳ {parent.title}</div>}
+                    {parent && <div className="muted small">↳ {cardRef(parent)} {parent.title}</div>}
                   </td>
                   <td><span className="type-badge" style={{ background: type?.color }}>{type?.name}</span></td>
                   <td>{column?.name}</td>

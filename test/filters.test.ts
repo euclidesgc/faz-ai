@@ -7,7 +7,7 @@ const NOW = new Date(2026, 9, 1, 12).getTime();
 const DAY = 86400000;
 
 const card = (id: string, over: Partial<Card> = {}): Card => ({
-  id, boardId: 'b', workflowId: 'wp', columnId: 'todo', typeId: 'story', parentId: null, title: id, description: '',
+  id, number: 0, boardId: 'b', workflowId: 'wp', columnId: 'todo', typeId: 'story', parentId: null, title: id, description: '',
   position: 0, createdAt: NOW, updatedAt: NOW, deletedAt: null, archivedAt: null, ...over,
 });
 

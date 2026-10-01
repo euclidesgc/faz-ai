@@ -43,6 +43,8 @@ export interface CardType {
 
 export interface Card {
   id: Id;
+  /** identificador visível (#12): sequencial por board, nunca reutilizado */
+  number: number;
   boardId: Id;
   workflowId: Id;
   columnId: Id;
@@ -58,6 +60,9 @@ export interface Card {
   /** arquivado desde (ms) */
   archivedAt: number | null;
 }
+
+/** ID do card como aparece na interface. */
+export const cardRef = (card: Pick<Card, 'number'>): string => `#${card.number}`;
 
 export interface Comment {
   id: Id;

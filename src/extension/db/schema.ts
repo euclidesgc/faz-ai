@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -110,6 +110,17 @@ const MIGRATIONS: Record<number, string> = {
   `,
   4: `
     ALTER TABLE boards ADD COLUMN rules_json TEXT NOT NULL DEFAULT '{}';
+  `,
+  5: `
+    ALTER TABLE cards ADD COLUMN number INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE boards ADD COLUMN next_card_number INTEGER NOT NULL DEFAULT 1;
+    UPDATE cards SET number = (
+      SELECT COUNT(*) FROM cards c2
+      WHERE c2.board_id = cards.board_id
+        AND (c2.created_at < cards.created_at OR (c2.created_at = cards.created_at AND c2.rowid <= cards.rowid))
+    );
+    UPDATE boards SET next_card_number = (SELECT COALESCE(MAX(number), 0) + 1 FROM cards WHERE board_id = boards.id);
+    CREATE INDEX IF NOT EXISTS idx_cards_number ON cards(board_id, number);
   `,
 };
 

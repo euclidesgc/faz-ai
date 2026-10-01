@@ -54,7 +54,7 @@ export class BoardRepo {
     }));
 
     const cards: Card[] = all(db, 'SELECT * FROM cards WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
-      id: str(r.id), boardId, workflowId: str(r.workflow_id), columnId: str(r.column_id), typeId: str(r.type_id),
+      id: str(r.id), number: num(r.number), boardId, workflowId: str(r.workflow_id), columnId: str(r.column_id), typeId: str(r.type_id),
       parentId: r.parent_id == null ? null : str(r.parent_id), title: str(r.title), description: str(r.description),
       position: num(r.position), createdAt: num(r.created_at), updatedAt: num(r.updated_at),
       deletedAt: r.deleted_at == null ? null : num(r.deleted_at), archivedAt: r.archived_at == null ? null : num(r.archived_at),
