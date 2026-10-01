@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ColumnCategory } from '../../../shared/model';
 import { columnsOf, useBoardStore } from '../../store/boardStore';
 
 export function ColumnsSettings() {
@@ -10,7 +11,7 @@ export function ColumnsSettings() {
   return (
     <div>
       <h2>Workflows e colunas</h2>
-      <p className="muted">A linha de cima recebe histórias, bugs, retrabalho e débitos. A linha de baixo recebe as sub-tarefas de cada história.</p>
+      <p className="muted">A linha de cima recebe histórias, bugs, retrabalho e débitos. A linha de baixo recebe as sub-tarefas de cada história. Uma história só pode entrar numa coluna de conclusão quando não tem sub-tarefas em aberto.</p>
       {state.workflows.map((wf) => {
         const cols = columnsOf(state, wf.id);
         return (
@@ -20,12 +21,18 @@ export function ColumnsSettings() {
               <span className="muted">{wf.kind === 'parent' ? 'linha de cima' : 'linha de baixo'}</span>
             </div>
             <table className="table">
-              <thead><tr><th>Coluna</th><th>Concluída?</th><th>Ordem</th><th></th></tr></thead>
+              <thead><tr><th>Coluna</th><th>Representa</th><th>Ordem</th><th></th></tr></thead>
               <tbody>
                 {cols.map((c, i) => (
                   <tr key={c.id}>
                     <td><input defaultValue={c.name} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && send({ type: 'settings.column.update', columnId: c.id, patch: { name: e.target.value.trim() } })} /></td>
-                    <td><input type="checkbox" checked={c.isTerminal} onChange={(e) => send({ type: 'settings.column.update', columnId: c.id, patch: { isTerminal: e.target.checked } })} /></td>
+                    <td>
+                      <select value={c.category} onChange={(e) => send({ type: 'settings.column.update', columnId: c.id, patch: { category: e.target.value as ColumnCategory } })}>
+                        <option value="open">Trabalho em aberto</option>
+                        <option value="done">Conclusão</option>
+                        <option value="cancelled">Cancelamento</option>
+                      </select>
+                    </td>
                     <td>
                       <button className="icon" disabled={i === 0} onClick={() => send({ type: 'settings.column.update', columnId: c.id, patch: { position: i - 1 } })}>←</button>
                       <button className="icon" disabled={i === cols.length - 1} onClick={() => send({ type: 'settings.column.update', columnId: c.id, patch: { position: i + 1 } })}>→</button>

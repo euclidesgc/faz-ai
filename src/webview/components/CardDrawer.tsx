@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { cardsIn, childrenOf, columnsOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
+import { requestArchive, requestMove, requestTrash } from '../store/actions';
 import { AttachmentsTab } from './AttachmentsTab';
 import { CommentsTab } from './CommentsTab';
 import { FieldEditor } from './FieldRenderer';
@@ -83,16 +84,16 @@ export function CardDrawer({ cardId }: { cardId: string }) {
           <select value={card.typeId} onChange={(e) => send({ type: 'card.update', cardId, patch: { typeId: e.target.value } })}>
             {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-          <select disabled={trashed || archived} value={card.columnId} onChange={(e) => send({ type: 'card.move', cardId, columnId: e.target.value, position: cardsIn(state, e.target.value).length })}>
+          <select disabled={trashed || archived} value={card.columnId} onChange={(e) => requestMove(cardId, e.target.value, cardsIn(state, e.target.value).length)}>
             {columns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <span className="spacer" />
           {!trashed && (archived
             ? <button onClick={() => send({ type: 'card.unarchive', cardId })}>Desarquivar</button>
-            : <button title="Tira o card do board sem apagar" onClick={() => { send({ type: 'card.archive', cardId }); openCard(null); }}>Arquivar</button>)}
+            : <button title="Tira o card do board sem apagar" onClick={() => requestArchive(cardId, () => openCard(null))}>Arquivar</button>)}
           {trashed
             ? <button className="primary" onClick={() => send({ type: 'card.restore', cardId })}>Restaurar</button>
-            : <button className="ghost danger" title="Mover para a lixeira" onClick={() => { send({ type: 'card.trash', cardId }); openCard(null); }}>🗑 Excluir</button>}
+            : <button className="ghost danger" title="Mover para a lixeira" onClick={() => requestTrash(cardId, () => openCard(null))}>🗑 Excluir</button>}
           <button className="icon" title="Fechar (Esc)" onClick={() => openCard(null)}>✕</button>
         </header>
 

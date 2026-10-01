@@ -13,6 +13,7 @@ import {
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Card as CardModel, Workflow } from '../../shared/model';
 import { archivedIn, cardsIn, columnsOf, useBoardStore, useFilteredIds } from '../store/boardStore';
+import { requestArchive, requestMove } from '../store/actions';
 import { Column } from './Column';
 import { CardView, SortableCard } from './Card';
 
@@ -47,7 +48,7 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
 
     // soltar na coluna de arquivados (ou sobre um card arquivado) = arquivar
     if (overId === archiveId(workflow.id) || overCard?.archivedAt) {
-      if (!current.archivedAt) send({ type: 'card.archive', cardId });
+      if (!current.archivedAt) requestArchive(cardId);
       return;
     }
 
@@ -65,7 +66,7 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
       return;
     }
     if (current.columnId === targetColumnId && current.position === position) return;
-    send({ type: 'card.move', cardId, columnId: targetColumnId, position });
+    requestMove(cardId, targetColumnId, position);
   };
 
   const addColumn = () => {

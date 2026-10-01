@@ -40,8 +40,9 @@ export function Dialog() {
             </select>
           </label>
         )}
-        <div className="row end">
-          <button onClick={() => ask(null)}>Cancelar</button>
+        <div className="row end wrap">
+          <button onClick={() => ask(null)}>{dialog.cancelLabel ?? 'Cancelar'}</button>
+          {dialog.secondary && <button onClick={() => { ask(null); dialog.secondary!.onClick(); }}>{dialog.secondary.label}</button>}
           <button autoFocus className={dialog.danger ? 'primary danger-bg' : 'primary'} onClick={confirm}>{dialog.confirmLabel ?? 'Confirmar'}</button>
         </div>
       </div>

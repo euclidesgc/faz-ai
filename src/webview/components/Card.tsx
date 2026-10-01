@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Card } from '../../shared/model';
 import { childrenOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
+import { requestArchive, requestTrash } from '../store/actions';
 import { FieldBadge } from './FieldRenderer';
 import { Menu } from './Menu';
 
@@ -60,9 +61,9 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
                 { label: 'Abrir detalhes', onClick: () => openCard(card.id) },
                 archived
                   ? { label: 'Desarquivar', onClick: () => send({ type: 'card.unarchive', cardId: card.id }) }
-                  : { label: 'Arquivar', onClick: () => send({ type: 'card.archive', cardId: card.id }) },
+                  : { label: 'Arquivar', onClick: () => requestArchive(card.id) },
                 'sep',
-                { label: 'Mover para a lixeira', danger: true, onClick: () => send({ type: 'card.trash', cardId: card.id }) },
+                { label: 'Mover para a lixeira', danger: true, onClick: () => requestTrash(card.id) },
               ]}
             />
           </span>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-export type MenuItem = { label: string; onClick(): void; danger?: boolean; disabled?: boolean } | 'sep';
+export type MenuItem = { label: string; onClick(): void; danger?: boolean; disabled?: boolean; checked?: boolean } | { header: string } | 'sep';
 
 /** Botão que abre um menu flutuante. Renderizado em portal para não ser cortado nem afetado por transforms. */
 export function Menu({ items, title = 'Mais ações', children = '⋯' }: { items: MenuItem[]; title?: string; children?: ReactNode }) {
@@ -27,7 +27,7 @@ export function Menu({ items, title = 'Mais ações', children = '⋯' }: { item
   const toggle = () => {
     if (pos) return setPos(null);
     const r = btn.current!.getBoundingClientRect();
-    const width = 200;
+    const width = 230;
     setPos({ top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)) });
   };
 
@@ -53,6 +53,8 @@ export function Menu({ items, title = 'Mais ações', children = '⋯' }: { item
             {items.map((it, i) =>
               it === 'sep' ? (
                 <hr key={i} />
+              ) : 'header' in it ? (
+                <span key={i} className="menu-header">{it.header}</span>
               ) : (
                 <button
                   key={i}
@@ -64,6 +66,7 @@ export function Menu({ items, title = 'Mais ações', children = '⋯' }: { item
                     it.onClick();
                   }}
                 >
+                  <span className="menu-check">{it.checked ? '✓' : ''}</span>
                   {it.label}
                 </button>
               ),
