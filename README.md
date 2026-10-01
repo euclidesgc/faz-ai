@@ -25,9 +25,42 @@ na linha de baixo, campos personalizáveis e checklist por card.
 8. **Detalhe do card:** abas Detalhes (campos, descrição com editor Markdown e modo expandido,
    checklist, sub-tarefas), Comentários e Anexos (seletor, arrastar com Shift, ou colar).
 
-Os dados ficam no `globalStorageUri` da extensão: `fazai.db` (SQLite, um board por pasta de workspace)
-e `attachments/<cardId>/`. Nada é gravado dentro do repositório. Evite editar o mesmo board em duas
-janelas do VSCode ao mesmo tempo: cada janela mantém o banco em memória e a última a salvar vence.
+Os dados do board ficam no `globalStorageUri` da extensão: `fazai.db` (SQLite, um board por pasta de
+workspace) e `attachments/<cardId>/`. Evite editar o mesmo board em duas janelas do VSCode ao mesmo
+tempo: cada janela mantém o banco em memória e a última a salvar vence.
+
+## Board padrão para SDD
+
+Um board novo já nasce preparado para Spec-Driven Development:
+
+- **Colunas das histórias = fases do SDD:** Backlog, PRD, Spec, Plan, Implementação, Concluído e
+  Cancelado. As sub-tarefas usam A fazer, Em andamento e Concluído.
+- **Campo Fase** nas sub-tarefas (PRD, Spec, Plan, Implementação): diz a qual fase da história a
+  sub-tarefa pertence.
+- **Regra de avanço de fase:** uma história não avança de coluna enquanto houver sub-tarefas em
+  aberto cuja Fase é a coluna atual. Voltar de coluna e cancelar continuam livres. Liga e desliga em
+  Configurações → Regras do board.
+- **Campo Modelo:** qual modelo de IA deve executar o card.
+- **Campo Skills:** skills que devem ser carregadas obrigatoriamente na execução do card. As opções
+  são as skills ligadas do projeto. Outras skills continuam podendo ser usadas normalmente.
+- **Padrões por tipo:** em Configurações → Tipos de card, cada tipo pode ter valores padrão de campos
+  (por exemplo Modelo e Skills), preenchidos em todo card novo daquele tipo.
+
+Para trazer um board antigo para esse padrão, use **Recriar board padrão** em Configurações. Isso
+apaga todos os cards e configurações do board.
+
+## Harness de IA
+
+Configurações → **Harness de IA** gerencia, pelo board, o que as ferramentas de IA leem no projeto:
+
+- **Regras do projeto:** cria, edita e apaga `CLAUDE.md`, `AGENTS.md` e `GEMINI.md` na raiz da pasta.
+- **Skills:** cria, edita, liga, desliga e apaga skills em `.claude/skills/<nome>/SKILL.md`. Desligar
+  move a pasta para `.claude/skills-disabled/`: a skill sai do contexto das ferramentas e o conteúdo
+  fica guardado. Manter ligado só o necessário economiza contexto.
+
+São arquivos da pasta do projeto, então entram no git normalmente, e mudanças feitas por fora (no
+editor, pela IA, por um `git pull`) aparecem no board. Ferramentas que não leem `.claude/skills`
+ainda conseguem usar as skills marcadas num card: o MCP entrega o caminho de cada `SKILL.md`.
 
 ## Usando com IA (MCP)
 
@@ -153,12 +186,18 @@ de vez, mexer em checklist, comentários e anexos (inclusive ler anexos de texto
 colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
 pelo nome. Comentários feitos pela IA saem assinados com o nome do cliente (ex.: "Claude Code").
 
-O campo **Modelo** (seleção, criado por padrão) diz qual modelo de IA deve executar o card. A IA é
-instruída a ler esse campo e delegar o trabalho a um subagente com o modelo escolhido, ou avisar
-quando o cliente não permite. As opções são editáveis em Configurações → Campos.
+Também pelo MCP: padrões por tipo de card (`update_card_type`), recriar o board (`reset_board`) e o
+harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
+`set_skill_enabled`, `delete_skill`…).
 
-Fluxo SDD sugerido: a IA lê a história, anexa PRD/Spec/Plan ao card, cria as sub-tarefas com o
-campo Fase, move cada uma conforme avança e comenta o resultado.
+Ao ler um card (`get_card`), a IA recebe o **Modelo** que deve executá-lo e as **Skills**
+obrigatórias com o caminho de cada `SKILL.md`. Ela é instruída a carregar essas skills antes de
+executar e a delegar o trabalho a um subagente com o modelo escolhido, ou avisar quando o cliente
+não permite. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue.
+
+Fluxo SDD sugerido: a IA lê a história, produz o artefato da fase (PRD, Spec, Plan) e o anexa ao
+card, cria as sub-tarefas com o campo Fase, move cada uma conforme avança, comenta o resultado e
+move a história para a próxima coluna ao fechar a fase.
 
 ## Desenvolvimento
 
