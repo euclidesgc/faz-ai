@@ -1,6 +1,7 @@
 import type { Database } from 'sql.js';
 import type { ColumnCategory } from '../../shared/model';
 import { newId } from './ids';
+import { MODEL_FIELD } from './schema';
 
 /** Cria o board padrão para um workspace e devolve seu id. */
 export function seedBoard(db: Database, workspaceKey: string, name: string): string {
@@ -40,6 +41,10 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
       [newId(), boardId, 'Tags', 'multiselect', JSON.stringify(['frontend', 'backend', 'infra', 'docs']), null, 'chip', 1],
+    );
+    db.run(
+      'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
+      [newId(), boardId, MODEL_FIELD.name, 'select', JSON.stringify(MODEL_FIELD.options), null, 'badge', 2],
     );
     db.exec('COMMIT;');
   } catch (e) {

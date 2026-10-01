@@ -140,5 +140,7 @@ describe('migração v1 → v2', () => {
     const novo = new CardRepo(old).create('b', { typeId: 't', columnId: 'c', parentId: null, title: 'novo' });
     expect(new BoardRepo(old).snapshot('b').cards.find((c) => c.id === novo)?.number).toBe(3);
     expect(s.comments).toEqual([]);
+    // boards existentes ganham o campo padrão "Modelo"
+    expect(s.fieldDefs.map((f) => f.name)).toEqual(['Modelo']);
   });
 });

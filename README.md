@@ -153,6 +153,10 @@ de vez, mexer em checklist, comentários e anexos (inclusive ler anexos de texto
 colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
 pelo nome. Comentários feitos pela IA saem assinados com o nome do cliente (ex.: "Claude Code").
 
+O campo **Modelo** (seleção, criado por padrão) diz qual modelo de IA deve executar o card. A IA é
+instruída a ler esse campo e delegar o trabalho a um subagente com o modelo escolhido, ou avisar
+quando o cliente não permite. As opções são editáveis em Configurações → Campos.
+
 Fluxo SDD sugerido: a IA lê a história, anexa PRD/Spec/Plan ao card, cria as sub-tarefas com o
 campo Fase, move cada uma conforme avança e comenta o resultado.
 

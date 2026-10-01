@@ -24,7 +24,10 @@ export function createMcpServer(opts: McpOptions): McpServer {
       instructions:
         'Board kanban do projeto (Faz AI). Histórias ficam no workflow pai e sub-tarefas no workflow filho, ligadas a uma história. ' +
         'Cards são identificados pelo número (#12). Comece por get_board para conhecer colunas, tipos e campos. ' +
-        'Sinalize o progresso movendo os cards entre colunas e registre decisões e resultados em comentários ou anexos.',
+        'Sinalize o progresso movendo os cards entre colunas e registre decisões e resultados em comentários ou anexos. ' +
+        'O campo "Modelo" de um card indica qual modelo de IA deve executá-lo: antes de trabalhar em um card, leia esse campo e, ' +
+        'se ele estiver preenchido com um modelo diferente do seu, delegue o trabalho a um subagente com esse modelo; ' +
+        'se não for possível, avise a pessoa em vez de executar com outro modelo.',
     },
   );
   registerTools(server, {

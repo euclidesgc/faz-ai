@@ -1,6 +1,9 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
+
+/** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
+export const MODEL_FIELD = { name: 'Modelo', options: ['Claude Fable 5.1', 'Claude Opus 5.5', 'Claude Sonnet 5.5', 'Claude Haiku 4.5'] };
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -121,6 +124,13 @@ const MIGRATIONS: Record<number, string> = {
     );
     UPDATE boards SET next_card_number = (SELECT COALESCE(MAX(number), 0) + 1 FROM cards WHERE board_id = boards.id);
     CREATE INDEX IF NOT EXISTS idx_cards_number ON cards(board_id, number);
+  `,
+  6: `
+    INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position)
+    SELECT lower(hex(randomblob(16))), b.id, '${MODEL_FIELD.name}', 'select', '${JSON.stringify(MODEL_FIELD.options)}', NULL, 'badge',
+           (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
+    FROM boards b
+    WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'modelo');
   `,
 };
 
