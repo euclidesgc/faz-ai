@@ -141,6 +141,8 @@ describe('regras configuráveis', () => {
     expect(snap().board.rules).toEqual(DEFAULT_RULES);
     expect(parseRules('{"onCancelParent":"xyz","confirmTrash":"never","blockDoneWithOpenChildren":"sim"}')).toEqual({ ...DEFAULT_RULES, confirmTrash: 'never' });
     expect(parseRules('não é json')).toEqual(DEFAULT_RULES);
+    expect(DEFAULT_RULES.onAllChildrenDone).toBe('ask');
+    expect(parseRules('{"onAllChildrenDone":"auto"}').onAllChildrenDone).toBe('auto');
   });
 
   it('updateRules persiste só o que foi alterado', () => {

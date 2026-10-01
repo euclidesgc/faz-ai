@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type ConfirmMode } from '../../../shared/rules';
+import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type CompleteParentMode, type ConfirmMode } from '../../../shared/rules';
 import { columnsOf, useBoardStore } from '../../store/boardStore';
 
 const CONFIRM_OPTIONS: { value: ConfirmMode; label: string }[] = [
@@ -12,6 +12,12 @@ const CANCEL_OPTIONS: { value: CancelChildrenMode; label: string }[] = [
   { value: 'ask', label: 'Perguntar o que fazer' },
   { value: 'cascade', label: 'Cancelar as sub-tarefas junto' },
   { value: 'keep', label: 'Manter as sub-tarefas como estão' },
+];
+
+const COMPLETE_OPTIONS: { value: CompleteParentMode; label: string }[] = [
+  { value: 'ask', label: 'Perguntar se move a história' },
+  { value: 'auto', label: 'Mover a história automaticamente' },
+  { value: 'off', label: 'Não fazer nada' },
 ];
 
 function Rule({ title, when, then, active, control }: { title: string; when: string; then: string; active: boolean; control: ReactNode }) {
@@ -89,6 +95,22 @@ export function RulesSettings() {
         control={
           <select value={rules.onCancelParent} onChange={(e) => set({ onCancelParent: e.target.value as CancelChildrenMode })}>
             {CANCEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        }
+      />
+
+      <Rule
+        title="Última sub-tarefa concluída"
+        active={rules.onAllChildrenDone !== 'off'}
+        when="uma sub-tarefa é concluída e a história não tem mais nenhuma sub-tarefa em aberto"
+        then={
+          rules.onAllChildrenDone === 'ask' ? `perguntar se a história deve ir para a coluna de conclusão (${names('done')}).`
+          : rules.onAllChildrenDone === 'auto' ? `mover a história para a coluna de conclusão (${names('done')}), sem perguntar.`
+          : 'deixar a história onde está.'
+        }
+        control={
+          <select value={rules.onAllChildrenDone} onChange={(e) => set({ onAllChildrenDone: e.target.value as CompleteParentMode })}>
+            {COMPLETE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         }
       />

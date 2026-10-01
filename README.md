@@ -21,7 +21,7 @@ na linha de baixo, campos personalizáveis e checklist por card.
    chips no board e são lembrados por workspace.
 7. **Regras:** em Configurações → Regras, cada regra aparece como "quando… então…" com seu controle:
    bloquear conclusão com sub-tarefas em aberto, o que fazer com as sub-tarefas ao cancelar uma
-   história, e quando pedir confirmação ao excluir ou arquivar.
+   história, o que fazer com a história ao concluir a última sub-tarefa, e quando pedir confirmação ao excluir ou arquivar.
 8. **Detalhe do card:** abas Detalhes (campos, descrição com editor Markdown e modo expandido,
    checklist, sub-tarefas), Comentários e Anexos (seletor, arrastar com Shift, ou colar).
 

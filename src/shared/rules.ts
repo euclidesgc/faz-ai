@@ -2,12 +2,15 @@
 export type ConfirmMode = 'whenDependents' | 'always' | 'never';
 /** O que fazer com as sub-tarefas em aberto quando a história é cancelada. */
 export type CancelChildrenMode = 'ask' | 'cascade' | 'keep';
+/** O que fazer com a história quando a última sub-tarefa em aberto é concluída. */
+export type CompleteParentMode = 'ask' | 'auto' | 'off';
 
 /** Regras do board, configuráveis em Configurações → Regras. */
 export interface BoardRules {
   /** história não entra em coluna de conclusão com sub-tarefas em aberto */
   blockDoneWithOpenChildren: boolean;
   onCancelParent: CancelChildrenMode;
+  onAllChildrenDone: CompleteParentMode;
   confirmTrash: ConfirmMode;
   confirmArchive: ConfirmMode;
 }
@@ -15,6 +18,7 @@ export interface BoardRules {
 export const DEFAULT_RULES: BoardRules = {
   blockDoneWithOpenChildren: true,
   onCancelParent: 'ask',
+  onAllChildrenDone: 'ask',
   confirmTrash: 'whenDependents',
   confirmArchive: 'whenDependents',
 };
@@ -33,6 +37,7 @@ export function parseRules(json: string | null | undefined): BoardRules {
   return {
     blockDoneWithOpenChildren: typeof raw.blockDoneWithOpenChildren === 'boolean' ? raw.blockDoneWithOpenChildren : DEFAULT_RULES.blockDoneWithOpenChildren,
     onCancelParent: pick(raw.onCancelParent, ['ask', 'cascade', 'keep'] as const, DEFAULT_RULES.onCancelParent),
+    onAllChildrenDone: pick(raw.onAllChildrenDone, ['ask', 'auto', 'off'] as const, DEFAULT_RULES.onAllChildrenDone),
     confirmTrash: pick(raw.confirmTrash, confirm, DEFAULT_RULES.confirmTrash),
     confirmArchive: pick(raw.confirmArchive, confirm, DEFAULT_RULES.confirmArchive),
   };

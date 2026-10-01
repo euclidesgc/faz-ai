@@ -47,6 +47,34 @@ export function requestMove(cardId: Id, columnId: Id, position: number): void {
     }
   }
   send({ type: 'card.move', cardId, columnId, position });
+  if (target.category === 'done' && card.parentId && card.columnId !== columnId) offerToCompleteParent(card);
+}
+
+/**
+ * Chamado depois de concluir uma sub-tarefa: se era a última em aberto e a história ainda não está
+ * encerrada, pergunta (ou move direto, conforme a regra) se a história vai para a coluna de conclusão.
+ */
+function offerToCompleteParent(child: Card): void {
+  const { state, send, ask } = useBoardStore.getState();
+  const mode = state!.board.rules.onAllChildrenDone;
+  const parent = state!.cards.find((c) => c.id === child.parentId);
+  if (mode === 'off' || !parent || !isLive(parent)) return;
+  const category = (c: Card) => state!.columns.find((k) => k.id === c.columnId)?.category;
+  if (category(parent) !== 'open') return;
+  const siblings = state!.cards.filter((c) => c.parentId === parent.id && c.id !== child.id && isLive(c));
+  if (siblings.some((c) => category(c) === 'open')) return;
+  const done = state!.columns.filter((k) => k.workflowId === parent.workflowId && k.category === 'done').sort((a, b) => a.position - b.position)[0];
+  if (!done) return;
+
+  const complete = () => send({ type: 'card.move', cardId: parent.id, columnId: done.id, position: state!.cards.filter((c) => c.columnId === done.id && isLive(c)).length });
+  if (mode === 'auto') return complete();
+  ask({
+    title: 'Todas as sub-tarefas foram concluídas',
+    message: `"${parent.title}" não tem mais sub-tarefas em aberto. Quer mover a história para "${done.name}" também?`,
+    cancelLabel: 'Agora não',
+    confirmLabel: `Mover para "${done.name}"`,
+    onConfirm: complete,
+  });
 }
 
 /** Manda para a lixeira; avisa antes quando o card leva sub-tarefas ou anexos junto. */
