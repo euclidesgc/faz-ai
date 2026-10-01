@@ -8,3 +8,8 @@ vite.config.ts
 tsconfig*.json
 vitest.config.ts
 **/*.map
+.claude/**
+.gitignore
+.github/**
+*.vsix
+docs/**
