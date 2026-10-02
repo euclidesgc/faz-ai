@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { badgeStyle } from '../../shared/color';
 import type { Card } from '../../shared/model';
 import { CARD_STATUSES, OWNER_LABEL, statusInfo, type CardStatus } from '../../shared/status';
 import { aiToolInfo } from '../../shared/harness';
@@ -10,7 +11,7 @@ export function StatusBadge({ status, short = false }: { status: CardStatus; sho
   const style = useBoardStore((s) => s.state)!.board.appearance.statuses[status];
   const info = statusInfo(status);
   return (
-    <span className="status-badge" style={{ background: style.color }} title={`${info.hint} — ${OWNER_LABEL[info.owner]}`}>
+    <span className="status-badge" style={badgeStyle(style.color)} title={`${info.hint} — ${OWNER_LABEL[info.owner]}`}>
       {style.label}{!short && ` · ${OWNER_LABEL[info.owner]}`}
     </span>
   );

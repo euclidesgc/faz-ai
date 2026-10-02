@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { badgeStyle } from '../../../shared/color';
 import { fieldsForType, useBoardStore } from '../../store/boardStore';
 import { FieldEditor } from '../FieldRenderer';
 
@@ -57,7 +58,7 @@ export function TypesSettings() {
           const fields = fieldsForType(state, t.id);
           return (
             <section key={t.id} className="settings-block">
-              <div className="row"><span className="type-badge" style={{ background: t.color }}>{t.name}</span></div>
+              <div className="row"><span className="type-badge" style={badgeStyle(t.color)}>{t.name}</span></div>
               {fields.length === 0 && <span className="muted small">Nenhum campo se aplica a este tipo.</span>}
               {fields.map((f) => (
                 <label key={f.id} className="field-row">

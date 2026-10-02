@@ -1,3 +1,4 @@
+import { badgeStyle } from '../../shared/color';
 import { cardRef } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
 
@@ -49,7 +50,7 @@ export function TrashView() {
                     {kids > 0 && <span className="muted"> + {kids} sub-tarefa(s)</span>}
                     {parent && <div className="muted small">↳ {cardRef(parent)} {parent.title}</div>}
                   </td>
-                  <td><span className="type-badge" style={{ background: type?.color }}>{type?.name}</span></td>
+                  <td><span className="type-badge" style={badgeStyle(type?.color)}>{type?.name}</span></td>
                   <td>{column?.name}</td>
                   <td>{new Date(c.deletedAt!).toLocaleString()}</td>
                   <td className="row end">

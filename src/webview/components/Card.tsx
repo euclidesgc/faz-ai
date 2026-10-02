@@ -1,5 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { badgeStyle } from '../../shared/color';
 import { cardRef, type Card } from '../../shared/model';
 import { modelFieldOf, modelLabel, suggestModel } from '../../shared/models';
 import { childrenOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
@@ -46,7 +47,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   return (
     <article
       className={`card ${selected ? 'selected' : ''} ${overlay ? 'overlay' : ''} ${archived ? 'archived' : ''}`}
-      style={{ borderLeftColor: type?.color ?? 'var(--vscode-focusBorder)' }}
+      style={{ borderLeftColor: type?.color ?? 'var(--accent)' }}
       onClick={(e) => {
         e.stopPropagation();
         if (isParent && !archived) selectParent(card.id);
@@ -66,7 +67,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       <div className="card-top">
         <span className="card-head">
           <span className="card-id" title="ID do card">{cardRef(card)}</span>
-          <span className="type-badge" style={{ background: type?.color }}>{type?.name}</span>
+          <span className="type-badge" style={badgeStyle(type?.color)}>{type?.name}</span>
         </span>
         {!overlay && (
           <span className="card-actions">
