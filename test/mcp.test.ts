@@ -126,7 +126,10 @@ describe('servidor MCP', () => {
 
   it('configura colunas, campos e regras', async () => {
     let board = (await call('create_column', { workflow: 'child', name: 'Em revisão' })).data;
-    expect(board.workflows[1].columns.map((c: any) => c.name)).toContain('Em revisão');
+    // sem posição, a coluna entra antes da conclusão
+    expect(board.workflows[1].columns.map((c: any) => c.name)).toEqual(['A fazer', 'Em andamento', 'Em revisão', 'Concluído']);
+    board = (await call('create_column', { workflow: 'child', name: 'Triagem', position: 0 })).data;
+    expect(board.workflows[1].columns[0].name).toBe('Triagem');
     expect((await call('update_column', { column: 'Concluído', name: 'Feito' })).text).toContain('informe também o workflow');
     board = (await call('update_column', { column: 'Concluído', workflow: 'parent', name: 'Feito' })).data;
     expect(board.workflows[0].columns[7].name).toBe('Feito');

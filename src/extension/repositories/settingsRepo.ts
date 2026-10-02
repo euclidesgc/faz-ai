@@ -7,10 +7,20 @@ export class SettingsRepo {
   constructor(private db: Database) {}
 
   // ---- Colunas ----
-  createColumn(workflowId: string, name: string): string {
-    const pos = num(one(this.db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM columns WHERE workflow_id = ?', [workflowId])?.p);
+  /** Cria a coluna na posição dada; sem posição, ela entra antes da primeira coluna de conclusão ou cancelamento. */
+  createColumn(workflowId: string, name: string, position?: number): string {
+    const db = this.db;
     const id = newId();
-    run(this.db, 'INSERT INTO columns(id, workflow_id, name, position, is_terminal) VALUES (?,?,?,?,0)', [id, workflowId, name, pos]);
+    transaction(db, () => {
+      const cols = all(db, 'SELECT id, category FROM columns WHERE workflow_id = ? ORDER BY position', [workflowId]);
+      const firstTerminal = cols.findIndex((r) => str(r.category) !== 'open');
+      const index = Math.max(0, Math.min(position ?? (firstTerminal === -1 ? cols.length : firstTerminal), cols.length));
+      run(db, 'INSERT INTO columns(id, workflow_id, name, position, is_terminal) VALUES (?,?,?,?,0)', [id, workflowId, name, index]);
+      // renumera a linha inteira: as posições gravadas podem ter buracos
+      const ids = cols.map((r) => str(r.id));
+      ids.splice(index, 0, id);
+      ids.forEach((c, i) => run(db, 'UPDATE columns SET position = ? WHERE id = ?', [i, c]));
+    });
     return id;
   }
 

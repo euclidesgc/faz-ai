@@ -423,11 +423,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   const workflowArg = z.string().describe('Nome do workflow, ou "parent" (histórias) / "child" (sub-tarefas)');
   const columnWorkflowArg = workflowArg.optional().describe('Workflow da coluna; necessário quando há colunas de mesmo nome nos dois workflows');
 
-  tool('create_column', 'Cria uma coluna no fim de um workflow.', { workflow: workflowArg, name: z.string().min(1), category: categoryArg.optional() }, (a, router) => {
+  tool('create_column', 'Cria uma coluna em um workflow. Sem `position`, ela entra antes da primeira coluna de conclusão ou cancelamento.', { workflow: workflowArg, name: z.string().min(1), category: categoryArg.optional(), position: z.number().int().min(0).optional().describe('Índice da coluna na linha (0 = primeira)') }, (a, router) => {
     const s = router.snapshot();
     const wf = findWorkflow(s, a.workflow);
     const before = new Set(s.columns.map((c) => c.id));
-    const created = router.handle({ type: 'settings.column.create', workflowId: wf.id, name: a.name }).columns.find((c) => !before.has(c.id));
+    const created = router.handle({ type: 'settings.column.create', workflowId: wf.id, name: a.name, position: a.position }).columns.find((c) => !before.has(c.id));
     if (created && a.category) router.handle({ type: 'settings.column.update', columnId: created.id, patch: { category: a.category } });
     return overview(router);
   });

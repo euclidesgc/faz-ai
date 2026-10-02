@@ -1,4 +1,7 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { Column, ColumnCategory } from '../../../shared/model';
 import { PHASE_DEFAULTS } from '../../../shared/phaseDefaults';
 import { archiveKey } from '../../../shared/filters';
@@ -36,6 +39,31 @@ function PhaseEditor({ column }: { column: Column }) {
   );
 }
 
+/** Linha da tabela que pode ser arrastada pela alça; com a alça em foco, ↑ e ↓ movem uma posição. */
+function SortableRow({ id, name, onStep, children }: { id: string; name: string; onStep: (delta: number) => void; children: ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <tr ref={setNodeRef} className={isDragging ? 'dragging' : ''} style={{ transform: CSS.Translate.toString(transform), transition }}>
+      <td className="drag-cell">
+        <button
+          className="icon drag-handle"
+          title={`Arraste para mudar a posição de "${name}" (ou use ↑ e ↓)`}
+          {...attributes}
+          {...listeners}
+          onKeyDown={(e) => {
+            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+            e.preventDefault();
+            onStep(e.key === 'ArrowUp' ? -1 : 1);
+          }}
+        >⠿</button>
+      </td>
+      {children}
+    </tr>
+  );
+}
+
+const START = '__start';
+
 export function ColumnsSettings() {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
@@ -43,14 +71,33 @@ export function ColumnsSettings() {
   const resetCollapsed = useBoardStore((s) => s.resetCollapsed);
   const [newName, setNewName] = useState<Record<string, string>>({});
   const [phaseOpen, setPhaseOpen] = useState<string | null>(null);
+  /** coluna depois da qual a nova entra, por workflow; sem escolha, vale o padrão */
+  const [newAfter, setNewAfter] = useState<Record<string, string>>({});
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const moveTo = (columnId: string, position: number) => send({ type: 'settings.column.update', columnId, patch: { position } });
 
   return (
     <div>
       <h2>Workflows e colunas</h2>
-      <p className="muted">A linha de cima recebe histórias, bugs, retrabalho e débitos. A linha de baixo recebe as sub-tarefas de cada história. Uma história só pode entrar numa coluna de conclusão quando não tem sub-tarefas em aberto. "Começa colapsada" é o padrão ao abrir o board; lá, cada linha e coluna abre e fecha com um clique, e essa escolha fica lembrada.</p>
+      <p className="muted">A linha de cima recebe histórias, bugs, retrabalho e débitos. A linha de baixo recebe as sub-tarefas de cada história. Uma história só pode entrar numa coluna de conclusão quando não tem sub-tarefas em aberto. "Começa colapsada" é o padrão ao abrir o board; lá, cada linha e coluna abre e fecha com um clique, e essa escolha fica lembrada. Para mudar a ordem das colunas, arraste a linha pela alça ⠿.</p>
       <p className="muted">"IA atua" marca as colunas em que a IA trabalha: ao entrar nelas o card fica Pronto. "Exige aprovação" é o ponto de revisão: a IA termina, pede a revisão e só avança o card depois que você aprova. Em "Fase" ficam a instrução da IA para a coluna e o modelo do documento que ela produz (PRD, Spec…).</p>
       {state.workflows.map((wf) => {
         const cols = columnsOf(state, wf.id);
+        const firstTerminal = cols.findIndex((c) => c.category !== 'open');
+        // padrão: antes da primeira coluna de conclusão, que é onde uma fase nova costuma entrar
+        const defaultAfter = (firstTerminal === -1 ? cols[cols.length - 1] : cols[firstTerminal - 1])?.id ?? START;
+        const after = newAfter[wf.id] && (newAfter[wf.id] === START || cols.some((c) => c.id === newAfter[wf.id])) ? newAfter[wf.id]! : defaultAfter;
+        const create = () => {
+          const name = newName[wf.id]?.trim();
+          if (!name) return;
+          send({ type: 'settings.column.create', workflowId: wf.id, name, position: after === START ? 0 : cols.findIndex((c) => c.id === after) + 1 });
+          setNewName({ ...newName, [wf.id]: '' });
+          setNewAfter({ ...newAfter, [wf.id]: '' });
+        };
+        const onDragEnd = (e: DragEndEvent) => {
+          const to = cols.findIndex((c) => c.id === e.over?.id);
+          if (e.over && e.active.id !== e.over.id && to !== -1) moveTo(String(e.active.id), to);
+        };
         return (
           <section key={wf.id} className="settings-block">
             <div className="row">
@@ -62,12 +109,14 @@ export function ColumnsSettings() {
                 Linha começa colapsada
               </label>
             </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <table className="table">
-              <thead><tr><th>Coluna</th><th>Representa</th><th>IA atua</th><th>Exige aprovação</th><th>Fase</th><th>Começa colapsada</th><th>Ordem</th><th></th></tr></thead>
+              <thead><tr><th></th><th>Coluna</th><th>Representa</th><th>IA atua</th><th>Exige aprovação</th><th>Fase</th><th>Começa colapsada</th><th></th></tr></thead>
               <tbody>
+                <SortableContext items={cols.map((c) => c.id)} strategy={verticalListSortingStrategy}>
                 {cols.map((c, i) => (
                   <Fragment key={c.id}>
-                  <tr>
+                  <SortableRow id={c.id} name={c.name} onStep={(d) => i + d >= 0 && i + d < cols.length && moveTo(c.id, i + d)}>
                     <td><input defaultValue={c.name} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && send({ type: 'settings.column.update', columnId: c.id, patch: { name: e.target.value.trim() } })} /></td>
                     <td>
                       <select value={c.category} onChange={(e) => send({ type: 'settings.column.update', columnId: c.id, patch: { category: e.target.value as ColumnCategory } })}>
@@ -84,10 +133,6 @@ export function ColumnsSettings() {
                       </button>
                     </td>
                     <td><input type="checkbox" checked={c.collapsed} onChange={(e) => { send({ type: 'settings.column.update', columnId: c.id, patch: { collapsed: e.target.checked } }); resetCollapsed(c.id); }} /></td>
-                    <td>
-                      <button className="icon" disabled={i === 0} onClick={() => send({ type: 'settings.column.update', columnId: c.id, patch: { position: i - 1 } })}>←</button>
-                      <button className="icon" disabled={i === cols.length - 1} onClick={() => send({ type: 'settings.column.update', columnId: c.id, patch: { position: i + 1 } })}>→</button>
-                    </td>
                     <td>
                       <button
                         className="icon danger"
@@ -106,11 +151,13 @@ export function ColumnsSettings() {
                         }}
                       >🗑</button>
                     </td>
-                  </tr>
+                  </SortableRow>
                   {phaseOpen === c.id && <tr><td colSpan={8}><PhaseEditor column={c} /></td></tr>}
                   </Fragment>
                 ))}
+                </SortableContext>
                 <tr>
+                  <td></td>
                   <td className="muted">Arquivados</td>
                   <td className="muted">Cards arquivados desta linha</td>
                   <td></td>
@@ -118,13 +165,17 @@ export function ColumnsSettings() {
                   <td></td>
                   <td><input type="checkbox" checked={wf.archiveCollapsed} onChange={(e) => { send({ type: 'settings.workflow.update', workflowId: wf.id, patch: { archiveCollapsed: e.target.checked } }); resetCollapsed(archiveKey(wf.id)); }} /></td>
                   <td></td>
-                  <td></td>
                 </tr>
               </tbody>
             </table>
+            </DndContext>
             <div className="row">
-              <input placeholder="Nova coluna" value={newName[wf.id] ?? ''} onChange={(e) => setNewName({ ...newName, [wf.id]: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter' && newName[wf.id]?.trim()) { send({ type: 'settings.column.create', workflowId: wf.id, name: newName[wf.id]!.trim() }); setNewName({ ...newName, [wf.id]: '' }); } }} />
-              <button className="primary" disabled={!newName[wf.id]?.trim()} onClick={() => { send({ type: 'settings.column.create', workflowId: wf.id, name: newName[wf.id]!.trim() }); setNewName({ ...newName, [wf.id]: '' }); }}>Adicionar</button>
+              <input placeholder="Nova coluna" value={newName[wf.id] ?? ''} onChange={(e) => setNewName({ ...newName, [wf.id]: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && create()} />
+              <select title="Onde a nova coluna entra" value={after} onChange={(e) => setNewAfter({ ...newAfter, [wf.id]: e.target.value })}>
+                <option value={START}>No início</option>
+                {cols.map((c) => <option key={c.id} value={c.id}>Depois de {c.name}</option>)}
+              </select>
+              <button className="primary" disabled={!newName[wf.id]?.trim()} onClick={create}>Adicionar</button>
             </div>
           </section>
         );

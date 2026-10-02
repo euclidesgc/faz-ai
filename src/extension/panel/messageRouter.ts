@@ -386,7 +386,7 @@ export class MessageRouter {
         return true;
       }
       case 'settings.column.create':
-        this.settings.createColumn(msg.workflowId, msg.name);
+        this.settings.createColumn(msg.workflowId, msg.name, msg.position);
         return true;
       case 'settings.column.update':
         this.settings.updateColumn(msg.columnId, msg.patch);

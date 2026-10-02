@@ -50,7 +50,7 @@ export type WebviewToHost =
   | { type: 'checklist.add'; cardId: Id; text: string }
   | { type: 'checklist.update'; itemId: Id; patch: { text?: string; done?: boolean } }
   | { type: 'checklist.delete'; itemId: Id }
-  | { type: 'settings.column.create'; workflowId: Id; name: string }
+  | { type: 'settings.column.create'; workflowId: Id; name: string; /** índice na linha; por padrão, antes da primeira coluna de conclusão */ position?: number }
   | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean; aiInstruction?: string; artifactName?: string; artifactTemplate?: string } }
   | { type: 'settings.column.delete'; columnId: Id; moveCardsTo: Id }
   | { type: 'settings.type.create'; name: string; color: string; defaultWorkflowId: Id }
