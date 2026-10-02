@@ -118,6 +118,15 @@ describe('settings', () => {
     expect(() => settings.deleteColumn(done.id, colsOf(childWf().id)[0]!.id)).toThrow();
   });
 
+  it('cria a coluna antes da conclusão por padrão, ou na posição pedida', () => {
+    const wf = parentWf().id;
+    settings.createColumn(wf, 'QA');
+    settings.createColumn(wf, 'Triagem', 1);
+    settings.createColumn(wf, 'Fim', 99);
+    expect(colsOf(wf).map((c) => c.name)).toEqual(['Backlog', 'Triagem', 'Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação', 'QA', 'Concluído', 'Cancelado', 'Fim']);
+    expect(colsOf(wf).map((c) => c.position)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  });
+
   it('não apaga tipo em uso', () => {
     const t = typeNamed('Bug');
     cards.create(boardId, { typeId: t.id, columnId: colsOf(parentWf().id)[0]!.id, parentId: null, title: 'a' });

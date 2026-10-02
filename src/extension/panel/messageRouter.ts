@@ -5,7 +5,9 @@ import type { Attachment, BoardState, Card, FieldDef } from '../../shared/model'
 import { branchName, slug } from '../../shared/git';
 import { prepareWorkspace } from '../git';
 import type { WebviewToHost } from '../../shared/messages';
-import { EMPTY_HARNESS, type AiTool, type Harness } from '../../shared/harness';
+import { EMPTY_HARNESS, REFERENCE_SKILL, aiToolInfo, type AiTool, type Harness, type HarnessItem, type HarnessKind, type InstallableSkill } from '../../shared/harness';
+import { copyTarget } from '../../shared/harnessCatalog';
+import { findSkills, installSkills } from '../skillInstall';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelRule } from '../../shared/models';
 import { newId } from '../db/ids';
 import { detectTools, effortTiers, modelsFor } from '../models';
@@ -13,6 +15,9 @@ import { AttachmentStore } from '../attachments';
 import { SKILLS_FIELD } from '../db/schema';
 import { pendingUpgrade, upgradeBoard } from '../db/boardTemplate';
 import { HarnessStore } from '../harness';
+import { HarnessOps } from '../harnessOps';
+import { HooksAndPermissions } from '../hooksAndPermissions';
+import { McpServers } from '../mcpServers';
 import { FLOW_SKILL } from '../flowSkill';
 import { headlessUnsupported } from '../headless';
 import { AttachmentRepo } from '../repositories/attachmentRepo';
@@ -46,6 +51,8 @@ export class MessageRouter {
   readonly harnessStore: HarnessStore | null;
   private harness: Harness = EMPTY_HARNESS;
   private aiRuns: string[] = [];
+  /** origem de skills já baixada, à espera da escolha do que instalar */
+  private install: { source: string; dir: string; skills: InstallableSkill[]; cleanup: () => void } | null = null;
   private approved: string[] = [];
   private approveListeners: ((cardId: string) => void)[] = [];
   boardId: string;
@@ -63,7 +70,7 @@ export class MessageRouter {
     this.boardId = board.id;
     // nada a mudar para chegar ao padrão atual: só registra a versão, sem perguntar
     if (!pendingUpgrade(db, board.id).length) upgradeBoard(db, board.id);
-    this.harnessStore = opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTool) : null;
+    this.harnessStore = opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTool, opts.homeDir ?? '') : null;
     this.loadHarness();
     this.initModels();
     dbHandle.scheduleSave();
@@ -76,7 +83,7 @@ export class MessageRouter {
 
   snapshot(): BoardState {
     const s = this.boards.snapshot(this.boardId, this.opts.author);
-    return { ...s, harness: this.harness, aiRuns: this.aiRuns, aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission) };
+    return { ...s, harness: this.harness, aiRuns: this.aiRuns, aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission), harnessInstall: this.install ? { source: this.install.source, skills: this.install.skills } : null };
   }
 
   /** Cards em que a extensão está executando a IA (informado pelo executor). */
@@ -92,11 +99,17 @@ export class MessageRouter {
     if (JSON.stringify(this.harness) !== before) this.changed();
   }
 
-  /** As opções do campo "Skills" acompanham as skills ligadas do projeto. */
+  /**
+   * As opções do campo "Skills" acompanham as skills do projeto (ligadas ou não) e as globais e de plugins da
+   * ferramenta em uso. Uma skill desligada pode ser indicada: o card entrega o caminho do SKILL.md.
+   */
   private loadHarness(): void {
     if (!this.harnessStore) return;
     this.harness = this.harnessStore.scan();
-    const names = this.harness.skills.filter((s) => s.enabled).map((s) => s.name);
+    const tool = this.boards.snapshot(this.boardId).board.aiTool;
+    const outside = (this.harness.inventory.find((t) => t.tool === tool)?.items ?? []).filter((i) => i.kind === 'skill' && i.scope !== 'project').map((i) => i.name);
+    const project = this.harness.skills.map((s) => s.name);
+    const names = [...project, ...[...new Set(outside)].filter((n) => !project.includes(n)).sort()];
     const field = this.boards.snapshot(this.boardId).fieldDefs.find((f) => f.name.toLowerCase() === SKILLS_FIELD.toLowerCase() && f.kind === 'multiselect');
     if (field && JSON.stringify(field.options) !== JSON.stringify(names)) this.settings.updateField(field.id, { options: names });
   }
@@ -172,6 +185,74 @@ export class MessageRouter {
     const current = s.fieldValues.find((v) => v.cardId === cardId && v.fieldId === field.id)?.value ?? null;
     const next = suggestModel(s, card);
     if ((current === null || current === previous) && next !== current) this.cards.setFieldValue(cardId, field.id, next);
+  }
+
+  private get harnessOps(): HarnessOps {
+    return new HarnessOps(this.opts.workspaceDir ?? '', this.home);
+  }
+
+  /** Item listado pela varredura; as operações só valem para o que está no inventário. */
+  private harnessItem(tool: AiTool, kind: HarnessKind, file: string): HarnessItem {
+    const item = this.harness.inventory.find((t) => t.tool === tool)?.items.find((i) => i.kind === kind && i.path === file);
+    if (!item) throw new Error('Item não encontrado no harness. Atualize a lista e tente de novo.');
+    return item;
+  }
+
+  private get hooksAndPermissions(): HooksAndPermissions {
+    return new HooksAndPermissions(this.opts.workspaceDir ?? '', this.home);
+  }
+
+  /** Entrada de um arquivo de configuração (hook ou regra de permissão) listada pela varredura. */
+  private harnessEntry(tool: AiTool, kind: HarnessKind, file: string, name: string, detail: string): HarnessItem {
+    const item = this.harness.inventory.find((t) => t.tool === tool)?.items.find((i) => i.kind === kind && i.layout === 'entry' && i.path === file && i.name === name && (i.detail ?? '') === detail);
+    if (!item) throw new Error('Item não encontrado no harness. Atualize a lista e tente de novo.');
+    return item;
+  }
+
+  /** Guarda a origem de skills já disponível numa pasta, para a pessoa escolher o que instalar. */
+  setInstall(source: string, dir: string, cleanup: () => void): void {
+    this.clearInstall();
+    this.install = { source, dir, cleanup, skills: findSkills(dir) };
+    this.listeners.forEach((fn) => fn());
+  }
+
+  clearInstall(): void {
+    this.install?.cleanup();
+    this.install = null;
+  }
+
+  /** Cria um arquivo de apoio numa skill e devolve o caminho dele, para abrir no editor. */
+  createSkillFile(tool: AiTool, skillMd: string, rel: string, link: boolean): string {
+    const file = this.harnessOps.addSkillFile(this.harnessItem(tool, 'skill', skillMd), rel, '', link);
+    this.loadHarness();
+    this.changed();
+    return file;
+  }
+
+  /** Grava um arquivo de apoio numa skill do projeto (usado pela IA). */
+  writeSkillFile(name: string, rel: string, content: string): string {
+    const tool = this.boards.snapshot(this.boardId).board.aiTool;
+    const item = this.harness.inventory.find((t) => t.tool === tool)?.items.find((i) => i.kind === 'skill' && i.scope === 'project' && i.name === name);
+    if (!item) throw new Error(`Skill "${name}" não encontrada no projeto.`);
+    const file = this.harnessOps.writeSkillFile(item, rel, content);
+    this.loadHarness();
+    this.changed();
+    return file;
+  }
+
+  /** Caminho de um arquivo de apoio que a varredura listou. */
+  skillFilePath(tool: AiTool, skillMd: string, rel: string): string {
+    const item = this.harnessItem(tool, 'skill', skillMd);
+    if (!item.files?.includes(rel)) throw new Error('Arquivo fora do harness.');
+    return path.join(path.dirname(skillMd), ...rel.split('/'));
+  }
+
+  /** Cria um item do harness e devolve o caminho do arquivo, para abrir no editor. */
+  createHarnessItem(tool: AiTool, source: number, name: string, description: string): string {
+    const file = this.harnessOps.create(tool, source, name, description);
+    this.loadHarness();
+    this.changed();
+    return file;
   }
 
   private harnessOp(fn: (store: HarnessStore) => void): boolean {
@@ -298,6 +379,11 @@ export class MessageRouter {
       case 'ai.stop':
       case 'ai.heartbeat.run':
       case 'card.workspace.open':
+      case 'harness.item.open':
+      case 'harness.item.create':
+      case 'harness.skill.file.create':
+      case 'harness.skill.file.open':
+      case 'harness.install.scan':
       case 'attachment.pick':
       case 'attachment.open':
       case 'attachment.reveal':
@@ -356,6 +442,12 @@ export class MessageRouter {
         this.cards.setWorkspace(story.id, story.branch, '');
         return true;
       }
+      case 'card.execProfile.set':
+        this.cards.setExecProfile(msg.cardId, msg.profileId);
+        return true;
+      case 'settings.execProfiles.set':
+        this.boards.setExecProfiles(this.boardId, msg.profiles);
+        return true;
       case 'card.pr.set': {
         const url = msg.url.trim();
         if (url && !/^https?:\/\/\S+$/.test(url)) throw new Error('Informe o endereço (URL) do pull request.');
@@ -386,7 +478,7 @@ export class MessageRouter {
         return true;
       }
       case 'settings.column.create':
-        this.settings.createColumn(msg.workflowId, msg.name);
+        this.settings.createColumn(msg.workflowId, msg.name, msg.position);
         return true;
       case 'settings.column.update':
         this.settings.updateColumn(msg.columnId, msg.patch);
@@ -439,6 +531,73 @@ export class MessageRouter {
       case 'settings.modelRules.suggest':
         this.suggestRules(msg.tool);
         return true;
+      case 'harness.refresh':
+        this.refreshHarness();
+        return false;
+      case 'harness.install.apply': {
+        if (!this.install) throw new Error('Nenhuma origem de skills carregada. Procure de novo.');
+        const target = copyTarget(msg.tool, 'skill', 'skills', msg.to);
+        const base = msg.to === 'project' ? this.opts.workspaceDir : this.home;
+        if (!target || !base) throw new Error('Esta ferramenta não tem uma pasta de skills nesse escopo.');
+        installSkills(this.install.dir, msg.rels, path.join(base, target.path));
+        this.clearInstall();
+        this.loadHarness();
+        return true;
+      }
+      case 'harness.install.cancel':
+        this.clearInstall();
+        return true;
+      case 'harness.skill.file.delete':
+        this.harnessOps.removeSkillFile(this.harnessItem(msg.tool, 'skill', msg.path), msg.file);
+        this.loadHarness();
+        return true;
+      case 'harness.referenceSkill.create':
+        return this.harnessOp((h) => {
+          h.createSkill(REFERENCE_SKILL.name, REFERENCE_SKILL.description, REFERENCE_SKILL.body);
+          h.setSkillMode(REFERENCE_SKILL.name, 'manual');
+          fs.mkdirSync(path.join(h.workspaceDir, aiToolInfo(this.boards.snapshot(this.boardId).board.aiTool).skills, REFERENCE_SKILL.name, 'references'), { recursive: true });
+        });
+      case 'harness.hook.add':
+        this.hooksAndPermissions.addHook(msg.tool, msg.source, msg.hook);
+        this.loadHarness();
+        return true;
+      case 'harness.hook.remove':
+        this.hooksAndPermissions.removeHook(msg.tool, this.harnessEntry(msg.tool, 'hook', msg.path, msg.event, msg.command));
+        this.loadHarness();
+        return true;
+      case 'harness.permission.add':
+        this.hooksAndPermissions.addPermission(msg.tool, msg.source, msg.list, msg.rule);
+        this.loadHarness();
+        return true;
+      case 'harness.permission.remove':
+        this.hooksAndPermissions.removePermission(msg.tool, this.harnessEntry(msg.tool, 'settings', msg.path, msg.rule, msg.list));
+        this.loadHarness();
+        return true;
+      case 'harness.mcp.add':
+        new McpServers(this.opts.workspaceDir ?? '', this.home).add(msg.tool, msg.source, msg.server);
+        this.loadHarness();
+        return true;
+      case 'harness.mcp.remove': {
+        const item = this.harness.inventory.find((t) => t.tool === msg.tool)?.items.find((i) => i.kind === 'mcp' && i.path === msg.path && i.name === msg.name);
+        if (!item) throw new Error('Servidor não encontrado no harness. Atualize a lista e tente de novo.');
+        new McpServers(this.opts.workspaceDir ?? '', this.home).remove(msg.tool, item);
+        this.loadHarness();
+        return true;
+      }
+      case 'harness.item.delete':
+        this.harnessOps.remove(this.harnessItem(msg.tool, msg.kind, msg.path));
+        this.loadHarness();
+        return true;
+      case 'harness.item.copy': {
+        const items = msg.items.map((i) => this.harnessItem(msg.tool, i.kind, i.path));
+        try {
+          for (const item of items) this.harnessOps.copy(msg.tool, item, msg.to);
+        } finally {
+          // se uma cópia falhar no meio, as anteriores já estão no disco
+          this.loadHarness();
+        }
+        return true;
+      }
       case 'harness.rule.write':
         return this.harnessOp((h) => h.writeRule(msg.name, msg.content));
       case 'harness.rule.delete':
@@ -451,6 +610,15 @@ export class MessageRouter {
         return this.harnessOp((h) => h.setSkillEnabled(msg.name, msg.enabled));
       case 'harness.skill.delete':
         return this.harnessOp((h) => h.deleteSkill(msg.name));
+      case 'harness.skill.setMode': {
+        const items = msg.paths.map((p) => this.harnessItem(msg.tool, 'skill', p));
+        try {
+          for (const item of items) this.harnessOps.setSkillMode(msg.tool, item, msg.mode);
+        } finally {
+          this.loadHarness();
+        }
+        return true;
+      }
       case 'harness.agent.create':
         return this.harnessOp((h) => h.createAgent(msg.name, msg.description, msg.content, msg.model));
       case 'harness.agent.write':

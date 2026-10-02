@@ -6,6 +6,7 @@ import { seedBoard } from '../db/seed';
 import { pendingUpgrade } from '../db/boardTemplate';
 import { isCardStatus } from '../../shared/status';
 import { parseRunner, type RunnerConfig } from '../../shared/runner';
+import { parseProfiles, type ExecProfile } from '../../shared/execution';
 import { parseGit, type GitConfig } from '../../shared/git';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
@@ -21,7 +22,7 @@ export class BoardRepo {
       seedBoard(this.db, workspaceKey, name);
       row = one(this.db, 'SELECT * FROM boards WHERE workspace_key = ?', [workspaceKey])!;
     }
-    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTool: parseAiTool(str(row.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)), modelRules: parseModelRules(str(row.model_rules_json)), appearance: parseAppearance(str(row.appearance_json)), templateVersion: num(row.template_version), runner: parseRunner(str(row.runner_json)), git: parseGit(str(row.git_json)) };
+    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTool: parseAiTool(str(row.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)), modelRules: parseModelRules(str(row.model_rules_json)), appearance: parseAppearance(str(row.appearance_json)), templateVersion: num(row.template_version), runner: parseRunner(str(row.runner_json)), git: parseGit(str(row.git_json)), execProfiles: parseProfiles(str(row.exec_profiles_json)) };
   }
 
   updateRules(boardId: string, patch: Partial<BoardRules>): void {
@@ -65,6 +66,16 @@ export class BoardRepo {
     if (patch.aiTool !== undefined && ALL_AI_TOOLS.includes(patch.aiTool)) run(this.db, 'UPDATE boards SET ai_tools_json = ? WHERE id = ?', [JSON.stringify(patch.aiTool), boardId]);
   }
 
+  /** Grava os perfis de execução e solta as colunas e os cards que apontavam para um perfil removido. */
+  setExecProfiles(boardId: string, profiles: ExecProfile[]): void {
+    const clean = parseProfiles(JSON.stringify(profiles));
+    run(this.db, 'UPDATE boards SET exec_profiles_json = ? WHERE id = ?', [JSON.stringify(clean), boardId]);
+    const ids = clean.map((p) => p.id);
+    const keep = ids.length ? `AND exec_profile NOT IN (${ids.map(() => '?').join(',')})` : '';
+    run(this.db, `UPDATE columns SET exec_profile = NULL WHERE exec_profile IS NOT NULL ${keep} AND workflow_id IN (SELECT id FROM workflows WHERE board_id = ?)`, [...ids, boardId]);
+    run(this.db, `UPDATE cards SET exec_profile = NULL WHERE exec_profile IS NOT NULL ${keep} AND board_id = ?`, [...ids, boardId]);
+  }
+
   updateWorkflow(workflowId: string, patch: { name?: string; collapsed?: boolean; archiveCollapsed?: boolean }): void {
     if (patch.name !== undefined) run(this.db, 'UPDATE workflows SET name = ? WHERE id = ?', [patch.name, workflowId]);
     if (patch.collapsed !== undefined) run(this.db, 'UPDATE workflows SET collapsed = ? WHERE id = ?', [patch.collapsed ? 1 : 0, workflowId]);
@@ -75,7 +86,7 @@ export class BoardRepo {
     const db = this.db;
     const b = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
     if (!b) throw new Error('Board não encontrado');
-    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTool: parseAiTool(str(b.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)), modelRules: parseModelRules(str(b.model_rules_json)), appearance: parseAppearance(str(b.appearance_json)), templateVersion: num(b.template_version), runner: parseRunner(str(b.runner_json)), git: parseGit(str(b.git_json)) };
+    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTool: parseAiTool(str(b.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)), modelRules: parseModelRules(str(b.model_rules_json)), appearance: parseAppearance(str(b.appearance_json)), templateVersion: num(b.template_version), runner: parseRunner(str(b.runner_json)), git: parseGit(str(b.git_json)), execProfiles: parseProfiles(str(b.exec_profiles_json)) };
 
     const workflows: Workflow[] = all(db, 'SELECT * FROM workflows WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), position: num(r.position), kind: str(r.kind) as Workflow['kind'],
@@ -86,7 +97,7 @@ export class BoardRepo {
       db,
       'SELECT c.* FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? ORDER BY c.position',
       [boardId],
-    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), category: str(r.category) as Column['category'], isTerminal: str(r.category) !== 'open', collapsed: bool(r.collapsed), aiActive: bool(r.ai_active), requiresApproval: bool(r.requires_approval), aiInstruction: str(r.ai_instruction), artifactName: str(r.artifact_name), artifactTemplate: str(r.artifact_template) }));
+    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), category: str(r.category) as Column['category'], isTerminal: str(r.category) !== 'open', collapsed: bool(r.collapsed), aiActive: bool(r.ai_active), requiresApproval: bool(r.requires_approval), aiInstruction: str(r.ai_instruction), artifactName: str(r.artifact_name), artifactTemplate: str(r.artifact_template), execProfile: r.exec_profile == null ? null : str(r.exec_profile) }));
 
     const cardTypes: CardType[] = all(db, 'SELECT * FROM card_types WHERE board_id = ? ORDER BY rowid', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), color: str(r.color), defaultWorkflowId: str(r.default_workflow_id),
@@ -98,7 +109,7 @@ export class BoardRepo {
       parentId: r.parent_id == null ? null : str(r.parent_id), title: str(r.title), description: str(r.description),
       position: num(r.position), createdAt: num(r.created_at), updatedAt: num(r.updated_at),
       deletedAt: r.deleted_at == null ? null : num(r.deleted_at), archivedAt: r.archived_at == null ? null : num(r.archived_at),
-      status: isCardStatus(r.status) ? r.status : null, statusReason: str(r.status_reason), statusAt: r.status_at == null ? null : num(r.status_at), statusBy: str(r.status_by), branch: str(r.branch), worktreePath: str(r.worktree_path), prUrl: str(r.pr_url),
+      status: isCardStatus(r.status) ? r.status : null, statusReason: str(r.status_reason), statusAt: r.status_at == null ? null : num(r.status_at), statusBy: str(r.status_by), branch: str(r.branch), worktreePath: str(r.worktree_path), prUrl: str(r.pr_url), execProfile: r.exec_profile == null ? null : str(r.exec_profile),
     }));
 
     const fieldDefs: FieldDef[] = all(db, 'SELECT * FROM field_defs WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
@@ -132,6 +143,6 @@ export class BoardRepo {
       [boardId],
     ).map((r) => ({ id: str(r.id), cardId: str(r.card_id), filename: str(r.filename), storedName: str(r.stored_name), mime: str(r.mime), size: num(r.size), createdAt: num(r.created_at), artifact: bool(r.artifact) }));
 
-    return { board, workflows, columns, cardTypes, cards, fieldDefs, fieldValues, checklistItems, comments, attachments, currentUser, harness: EMPTY_HARNESS, pendingUpgrade: pendingUpgrade(db, boardId), aiRuns: [], aiRunUnsupported: null };
+    return { board, workflows, columns, cardTypes, cards, fieldDefs, fieldValues, checklistItems, comments, attachments, currentUser, harness: EMPTY_HARNESS, pendingUpgrade: pendingUpgrade(db, boardId), aiRuns: [], aiRunUnsupported: null, harnessInstall: null };
   }
 }

@@ -7,14 +7,24 @@ export class SettingsRepo {
   constructor(private db: Database) {}
 
   // ---- Colunas ----
-  createColumn(workflowId: string, name: string): string {
-    const pos = num(one(this.db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM columns WHERE workflow_id = ?', [workflowId])?.p);
+  /** Cria a coluna na posição dada; sem posição, ela entra antes da primeira coluna de conclusão ou cancelamento. */
+  createColumn(workflowId: string, name: string, position?: number): string {
+    const db = this.db;
     const id = newId();
-    run(this.db, 'INSERT INTO columns(id, workflow_id, name, position, is_terminal) VALUES (?,?,?,?,0)', [id, workflowId, name, pos]);
+    transaction(db, () => {
+      const cols = all(db, 'SELECT id, category FROM columns WHERE workflow_id = ? ORDER BY position', [workflowId]);
+      const firstTerminal = cols.findIndex((r) => str(r.category) !== 'open');
+      const index = Math.max(0, Math.min(position ?? (firstTerminal === -1 ? cols.length : firstTerminal), cols.length));
+      run(db, 'INSERT INTO columns(id, workflow_id, name, position, is_terminal) VALUES (?,?,?,?,0)', [id, workflowId, name, index]);
+      // renumera a linha inteira: as posições gravadas podem ter buracos
+      const ids = cols.map((r) => str(r.id));
+      ids.splice(index, 0, id);
+      ids.forEach((c, i) => run(db, 'UPDATE columns SET position = ? WHERE id = ?', [i, c]));
+    });
     return id;
   }
 
-  updateColumn(columnId: string, patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean; aiInstruction?: string; artifactName?: string; artifactTemplate?: string }): void {
+  updateColumn(columnId: string, patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean; aiInstruction?: string; artifactName?: string; artifactTemplate?: string; execProfile?: string | null }): void {
     const db = this.db;
     transaction(db, () => {
       if (patch.name !== undefined) run(db, 'UPDATE columns SET name = ? WHERE id = ?', [patch.name, columnId]);
@@ -22,6 +32,7 @@ export class SettingsRepo {
       if (patch.aiInstruction !== undefined) run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [patch.aiInstruction, columnId]);
       if (patch.artifactName !== undefined) run(db, 'UPDATE columns SET artifact_name = ? WHERE id = ?', [patch.artifactName.trim(), columnId]);
       if (patch.artifactTemplate !== undefined) run(db, 'UPDATE columns SET artifact_template = ? WHERE id = ?', [patch.artifactTemplate, columnId]);
+      if (patch.execProfile !== undefined) run(db, 'UPDATE columns SET exec_profile = ? WHERE id = ?', [patch.execProfile || null, columnId]);
       if (patch.aiActive !== undefined) run(db, 'UPDATE columns SET ai_active = ? WHERE id = ?', [patch.aiActive ? 1 : 0, columnId]);
       if (patch.requiresApproval !== undefined) run(db, 'UPDATE columns SET requires_approval = ? WHERE id = ?', [patch.requiresApproval ? 1 : 0, columnId]);
       if (patch.category !== undefined)

@@ -7,9 +7,10 @@ import { RulesSettings } from './RulesSettings';
 import { HarnessSettings } from './HarnessSettings';
 import { ModelsSettings } from './ModelsSettings';
 import { AppearanceSettings } from './AppearanceSettings';
+import { ExecProfilesSettings } from './ExecProfilesSettings';
 import { GitSettings } from './GitSettings';
 
-type Tab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'git' | 'appearance';
+type Tab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'profiles' | 'git' | 'appearance';
 
 export function Settings() {
   const state = useBoardStore((s) => s.state)!;
@@ -30,6 +31,7 @@ export function Settings() {
           <button className={tab === 'fields' ? 'active' : ''} onClick={() => setTab('fields')}>Campos</button>
           <button className={tab === 'rules' ? 'active' : ''} onClick={() => setTab('rules')}>Regras do board</button>
           <button className={tab === 'harness' ? 'active' : ''} onClick={() => setTab('harness')}>Harness de IA</button>
+          <button className={tab === 'profiles' ? 'active' : ''} onClick={() => setTab('profiles')}>Perfis de execução</button>
           <button className={tab === 'models' ? 'active' : ''} onClick={() => setTab('models')}>Modelos de IA</button>
           <button className={tab === 'git' ? 'active' : ''} onClick={() => setTab('git')}>Git</button>
           <button className={tab === 'appearance' ? 'active' : ''} onClick={() => setTab('appearance')}>Aparência</button>
@@ -72,6 +74,7 @@ export function Settings() {
         {tab === 'appearance' && <AppearanceSettings />}
         {tab === 'harness' && <HarnessSettings />}
         {tab === 'git' && <GitSettings />}
+        {tab === 'profiles' && <ExecProfilesSettings />}
       </div>
     </div>
   );

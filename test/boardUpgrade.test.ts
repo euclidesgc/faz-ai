@@ -55,7 +55,7 @@ describe('atualização do board para o padrão atual', () => {
     const sub = s.cardTypes.find((t) => t.name === 'Sub-tarefa')!.id;
     // personalizações: coluna renomeada, coluna criada pela pessoa e uma coluna já configurada à mão
     settings.updateColumn(col('PRD').id, { name: 'Requisitos' });
-    const custom = settings.createColumn(s.workflows.find((w) => w.kind === 'parent')!.id, 'Revisão de segurança');
+    const custom = settings.createColumn(s.workflows.find((w) => w.kind === 'parent')!.id, 'Revisão de segurança', 99); // no fim da linha
     settings.updateColumn(col('Spec').id, { aiActive: true });
     const parents = ['Backlog', 'Requisitos', 'Spec', 'Plan', 'Implementação', 'Concluído'].map((name, i) => {
       const id = cards.create(boardId, { typeId: story, columnId: col(name).id, parentId: null, title: `H${i}` });

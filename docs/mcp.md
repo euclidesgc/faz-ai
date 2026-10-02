@@ -147,6 +147,57 @@ e `delete_agent` os gerenciam. Cada ferramenta guarda os seus numa pasta própri
 | Kimi Code | `.kimi-code/agents` | `<nome>.md` | não tem |
 | GitHub Copilot | `.github/agents` | `<nome>.agent.md` | `model` |
 
+### Projeto, global e plugins
+
+O board lê o harness de cada ferramenta em três escopos: a pasta do projeto (`project`), a pasta do
+usuário (`user`, vale em todos os projetos) e os plugins instalados (`plugin`). `get_harness` devolve
+em `inventory` tudo que a ferramenta do projeto carrega (instruções e regras, skills, agentes,
+comandos, hooks, servidores MCP, plugins e arquivos de configuração), com o escopo e o caminho de
+cada item. De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
+
+O campo "Skills" dos cards oferece as skills do projeto e também as globais e de plugins. Em
+`get_card`, cada item de `requiredSkills` traz `scope`; para skills fora do projeto, `path` é o
+caminho absoluto do `SKILL.md`. Quando uma skill existe no projeto e fora dele com o mesmo nome,
+vale a do projeto. As ferramentas de escrita (`create_skill`, `create_agent`…) continuam atuando só
+na pasta do projeto.
+
+### Skills sob demanda
+
+Cada skill do projeto ou da pasta do usuário tem um modo: `auto` (a IA vê a descrição e decide quando
+usar) ou `manual` (só quando indicada num card ou chamada pelo nome). O modo é gravado no formato de
+cada ferramenta: `disable-model-invocation: true` no frontmatter (Claude Code, Cursor, Kimi Code,
+Copilot) ou `policy.allow_implicit_invocation: false` em `agents/openai.yaml` (Codex). Uma skill
+desligada ou em modo `manual` continua valendo nos cards que a indicam: `requiredSkills` traz o
+caminho do `SKILL.md`, e a execução pelo board passa esses caminhos no prompt.
+
+### Modelos e referências
+
+Modelos de classe, exemplos de código e outros arquivos de apoio ficam na pasta da skill
+(`references/`, `assets/`, `scripts/`), como as ferramentas preveem: só são lidos quando o `SKILL.md`
+aponta para eles. `get_harness` lista os arquivos de cada skill em `files`, `write_skill_file` grava
+um arquivo numa skill do projeto, e em `get_card` cada skill de `requiredSkills` traz em `files` os
+caminhos dos arquivos de apoio dela.
+
+### Perfis de execução
+
+Um perfil de execução define antes o que a sessão usa num card: agente, skills, servidores MCP,
+ferramentas, modelo e se a sessão é limpa (sem as personalizações da pasta do usuário). Os perfis
+são criados em Configurações → Perfis de execução; `get_board` os lista em `execProfiles`. O perfil
+de um card é o do próprio card (`set_card_profile`), senão o da coluna (`update_column` com
+`exec_profile`), senão o da coluna da história (numa sub-tarefa), senão o padrão do board.
+
+`get_card` devolve o perfil resolvido em `execution`, e `requiredSkills` já soma as skills do perfil
+às do card. Numa sessão aberta pela pessoa, `execution` é orientação. Na execução pelo board, o que
+a linha de comando da ferramenta aceita é imposto por parâmetro (`enforcedByBoardRun`):
+
+| Ferramenta | Imposto por parâmetro | Só orientado |
+| --- | --- | --- |
+| Claude Code | agente, servidores MCP, ferramentas, modelo e esforço, sessão limpa | skills (vão pelo caminho do arquivo) |
+| GitHub Copilot | agente, servidores MCP, ferramentas, modelo e esforço | skills, sessão limpa |
+| Kimi Code | agente, modelo | skills, servidores MCP, ferramentas, sessão limpa |
+| Codex | servidores MCP, modelo e esforço | agente, skills, ferramentas, sessão limpa |
+| Cursor | modelo | todo o resto |
+
 ### Pendências
 
 `get_pending_work` é o ponto de partida de uma sessão sem pedido específico. Ele devolve, em

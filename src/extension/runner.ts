@@ -1,7 +1,12 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { cardRef } from '../shared/model';
 import { aiToolInfo } from '../shared/harness';
 import type { CardStatus } from '../shared/status';
-import { headlessCommand, type HeadlessCommand } from './headless';
+import { executionPlan } from './execution';
+import { headlessCommand, tmpArg, type HeadlessCommand } from './headless';
+import { requiredSkills } from './mcp/format';
 import type { MessageRouter } from './panel/messageRouter';
 
 /** Processo da ferramenta de IA em execução. */
@@ -16,6 +21,8 @@ export interface RunnerDeps {
   spawn(command: HeadlessCommand, cwd: string, log: (text: string) => void): RunningProcess;
   log(line: string): void;
   cwd: string;
+  /** home do usuário, de onde se lê a configuração de servidores MCP da ferramenta */
+  homeDir?: string;
 }
 
 interface Run {
@@ -29,13 +36,31 @@ interface Run {
 
 const RUNNER_AUTHOR = 'Faz AI';
 
+/** Grava os arquivos temporários do comando numa pasta só do usuário e troca os `{tmp:nome}` dos argumentos pelos caminhos. */
+function materialize(command: HeadlessCommand): { command: HeadlessCommand; cleanup: () => void } {
+  const files = Object.entries(command.tempFiles ?? {});
+  if (!files.length) return { command, cleanup: () => {} };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-run-'));
+  let args = command.args;
+  for (const [name, content] of files) {
+    const file = path.join(dir, name);
+    // pode ter segredos (variáveis dos servidores MCP): só o dono lê
+    fs.writeFileSync(file, content, { mode: 0o600 });
+    args = args.map((a) => a.split(tmpArg(name)).join(file));
+  }
+  return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+}
+
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
-export const cardPrompt = (ref: string): string =>
+export const cardPrompt = (ref: string, skills: { name: string; path?: string }[] = [], advice: string[] = []): string =>
   [
     `Trabalhe no card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai".`,
+    // as skills do card vão pelo caminho: valem mesmo desligadas ou fora da invocação automática
+    ...(skills.some((k) => k.path) ? [`Antes de começar, leia estas skills, obrigatórias para este card: ${skills.filter((k) => k.path).map((k) => `${k.name} (${k.path})`).join('; ')}.`] : []),
     'Se a skill "faz-ai-fluxo" existir no projeto, siga-a.',
     `Leia o card com get_card (descrição, conversa, anexos e a fase em \`phase\`). Se a última mensagem da conversa for da pessoa, responda a ela pela conversa do card.`,
     'Faça o trabalho da fase em que o card está e termine passando a vez: request_review quando houver algo para revisar, ask_question quando precisar de uma resposta, block_card se houver um impedimento, ou mova o card se a fase não exigir aprovação.',
+    ...advice,
     'Trabalhe só neste card e nas sub-tarefas dele. Não pergunte nada fora da conversa do card: ninguém está acompanhando esta sessão.',
   ].join('\n');
 
@@ -64,13 +89,22 @@ export class AiRunner {
     if (!card || card.deletedAt !== null || card.archivedAt !== null) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
     const tool = aiToolInfo(state.board.aiTool);
-    const command = headlessCommand(state.board.aiTool, { prompt: cardPrompt(cardRef(card)), permission: state.board.runner.permission, addDirs: this.router.aiWorkDirs() });
-    if ('unsupported' in command) throw new Error(command.unsupported);
+    const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '');
+    const built = headlessCommand(state.board.aiTool, { prompt: cardPrompt(cardRef(card), requiredSkills(state, card), plan.advice), permission: state.board.runner.permission, addDirs: this.router.aiWorkDirs(), exec: plan.input });
+    if ('unsupported' in built) throw new Error(built.unsupported);
+    const { command, cleanup } = materialize(built);
 
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const messagesBefore = this.aiMessages(cardId);
+    if (plan.manifest.profile || plan.manifest.model) log(plan.summary.join(' | '));
     log(`Chamando ${tool.label}: ${command.command} ${command.args.map((a) => (a.length > 80 ? `${a.slice(0, 80)}…` : a)).join(' ')}`);
-    const proc = this.deps.spawn(command, this.deps.cwd, (text) => text.split(/\r?\n/).filter(Boolean).forEach(log));
+    let proc: RunningProcess;
+    try {
+      proc = this.deps.spawn(command, this.deps.cwd, (text) => text.split(/\r?\n/).filter(Boolean).forEach(log));
+    } catch (e) {
+      cleanup();
+      throw e;
+    }
     const run: Run = {
       proc,
       previous: card.status,
@@ -87,6 +121,7 @@ export class AiRunner {
 
     proc.onExit((code, error) => {
       clearTimeout(run.timer);
+      cleanup();
       this.runs.delete(cardId);
       log(error ? `Falhou: ${error.message}` : run.stopped ? 'Interrompida.' : run.timedOut ? 'Encerrada por tempo limite.' : `Terminou (código ${code}).`);
       this.settle(cardId, run, code, error, this.aiMessages(cardId) > messagesBefore, tool.label);

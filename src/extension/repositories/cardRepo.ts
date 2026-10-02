@@ -183,6 +183,10 @@ export class CardRepo {
     run(this.db, 'UPDATE cards SET branch = ?, worktree_path = ? WHERE id = ?', [branch, worktreePath, cardId]);
   }
 
+  setExecProfile(cardId: string, profileId: string | null): void {
+    run(this.db, 'UPDATE cards SET exec_profile = ? WHERE id = ?', [profileId || null, cardId]);
+  }
+
   setPullRequest(cardId: string, url: string): void {
     run(this.db, 'UPDATE cards SET pr_url = ? WHERE id = ?', [url, cardId]);
   }
