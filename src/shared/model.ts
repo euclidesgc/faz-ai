@@ -55,6 +55,12 @@ export interface Column {
   aiActive: boolean;
   /** a IA só avança o card para a frente depois que uma pessoa aprova */
   requiresApproval: boolean;
+  /** o que a IA faz quando um card entra nesta coluna (fase) */
+  aiInstruction: string;
+  /** nome do arquivo do documento que a fase produz, ex.: PRD.md; vazio se não produz */
+  artifactName: string;
+  /** modelo do documento, em markdown */
+  artifactTemplate: string;
 }
 
 export interface CardType {
@@ -115,6 +121,8 @@ export interface Attachment {
   mime: string;
   size: number;
   createdAt: number;
+  /** artefato de uma fase (PRD, Spec…): fica sempre no card da história */
+  artifact: boolean;
 }
 
 export interface FieldDef {

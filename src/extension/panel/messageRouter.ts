@@ -170,9 +170,26 @@ export class MessageRouter {
   }
 
   /** Copia arquivos do disco como anexos do card (usado pelo seletor de arquivos). */
-  addAttachmentFiles(cardId: string, paths: string[]): BoardState {
-    for (const p of paths) this.attachments.add(this.store.importFile(cardId, p));
+  addAttachmentFiles(cardId: string, paths: string[], artifact = false): BoardState {
+    for (const p of paths) this.addAttachment(cardId, artifact, (target) => this.store.importFile(target, p));
     return this.changed();
+  }
+
+  /**
+   * Grava um anexo. Um artefato de fase fica sempre na história (mesmo quando é construído numa
+   * sub-tarefa) e substitui o artefato de mesmo nome, para a revisão não duplicar o documento.
+   */
+  private addAttachment(cardId: string, artifact: boolean, importTo: (cardId: string) => Omit<Attachment, 'createdAt' | 'artifact'>): void {
+    const card = this.boards.snapshot(this.boardId).cards.find((c) => c.id === cardId);
+    if (!card) throw new Error('Card não encontrado');
+    const rec = importTo(artifact ? card.parentId ?? card.id : card.id);
+    if (artifact) {
+      for (const old of this.attachments.artifactsNamed(rec.cardId, rec.filename)) {
+        this.attachments.delete(old.id);
+        this.store.remove(old);
+      }
+    }
+    this.attachments.add(rec, artifact);
   }
 
   /**
@@ -275,7 +292,7 @@ export class MessageRouter {
         this.comments.delete(msg.commentId);
         return true;
       case 'attachment.addData':
-        this.attachments.add(this.store.importData(msg.cardId, msg.filename, msg.base64));
+        this.addAttachment(msg.cardId, msg.artifact === true, (target) => this.store.importData(target, msg.filename, msg.base64));
         return true;
       case 'attachment.delete': {
         const a = this.attachments.get(msg.attachmentId);

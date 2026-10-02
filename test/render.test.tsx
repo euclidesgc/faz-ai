@@ -6,6 +6,7 @@ import type { ReactElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { AttachmentsTab } from '../src/webview/components/AttachmentsTab';
 import { Board } from '../src/webview/components/Board';
 import { CommentsTab } from '../src/webview/components/CommentsTab';
 import { CardDrawer } from '../src/webview/components/CardDrawer';
@@ -117,6 +118,12 @@ describe('telas montam sem erro', () => {
     const reviewing = html(<CardDrawer cardId={storyId} />);
     for (const text of ['Aguardando revisão', 'com você', 'Aprovar', 'Pedir ajustes', 'Conversa']) expect(reviewing).toContain(text);
     expect(html(<Board />)).toContain('status-badge');
+    // o artefato fica na história; a sub-tarefa mostra um link para ele
+    useBoardStore.setState({ state: { ...st, attachments: st.attachments.map((a) => ({ ...a, artifact: true })) } });
+    const subId = st.cards.find((c) => c.parentId === storyId)!.id;
+    const subAttachments = html(<AttachmentsTab cardId={subId} />);
+    for (const text of ['Artefatos da história', 'spec.md', 'anexado à história', 'Nenhum anexo.']) expect(subAttachments).toContain(text);
+    expect(html(<AttachmentsTab cardId={storyId} />)).toContain('artefato');
     useBoardStore.setState({ state: st });
     const own = html(<CommentsTab cardId={storyId} />);
     expect(own).toContain('Apagar');
@@ -131,7 +138,7 @@ describe('telas montam sem erro', () => {
   it('configurações', () => {
     expect(html(<Settings />)).toContain('Harness de IA');
     const cols = html(<ColumnsSettings />);
-    for (const text of ['PRD', 'Começa colapsada', 'Linha começa colapsada', 'Arquivados', 'IA atua', 'Exige aprovação']) expect(cols).toContain(text);
+    for (const text of ['PRD', 'Começa colapsada', 'Linha começa colapsada', 'Arquivados', 'IA atua', 'Exige aprovação', 'Fase', 'PRD.md', 'Discovery', 'Homologação']) expect(cols).toContain(text);
     const types = html(<TypesSettings />);
     expect(types).toContain('Padrões por tipo');
     expect(types).toContain('Modelo');

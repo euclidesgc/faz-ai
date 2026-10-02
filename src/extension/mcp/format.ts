@@ -151,8 +151,32 @@ function requiredSkills(s: BoardState, c: Card) {
   });
 }
 
+/**
+ * A fase em que o card está: o que a IA deve fazer e o documento que a fase produz. Numa
+ * sub-tarefa, é a fase da história, porque o artefato é construído na sub-tarefa mas pertence à história.
+ */
+function phaseOf(s: BoardState, c: Card) {
+  const story = c.parentId ? s.cards.find((p) => p.id === c.parentId) ?? c : c;
+  const col = s.columns.find((x) => x.id === story.columnId);
+  if (!col || !col.aiActive || (!col.aiInstruction && !col.artifactName)) return undefined;
+  return {
+    name: col.name,
+    ...(col.aiInstruction ? { instruction: col.aiInstruction } : {}),
+    ...(col.artifactName
+      ? {
+          artifact: { filename: col.artifactName, ...(col.artifactTemplate ? { template: col.artifactTemplate } : {}) },
+          artifactNote: `Construa o documento numa sub-tarefa da história com Fase = "${col.name}" e grave-o com add_attachment (artifact: true, filename: "${col.artifactName}"): ele fica anexado à história e substitui a versão anterior.`,
+        }
+      : {}),
+    requiresApproval: col.requiresApproval,
+    ...(col.requiresApproval ? { reviewNote: `Ao terminar, chame request_review na história ${cardRef(story)} e pare.` } : {}),
+  };
+}
+
 export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardState['attachments'][number]) => string) {
   const skills = requiredSkills(s, c);
+  const phase = c.deletedAt === null && c.archivedAt === null ? phaseOf(s, c) : undefined;
+  const attachment = (a: BoardState['attachments'][number]) => ({ attachmentId: a.id, filename: a.filename, mime: a.mime, size: a.size, path: attachmentPath(a), ...(a.artifact ? { artifact: true } : {}) });
   const field = modelFieldOf(s, c);
   const chosen = field ? s.fieldValues.find((v) => v.cardId === c.id && v.fieldId === field.id)?.value : undefined;
   const suggested = suggestModel(s, c);
@@ -161,6 +185,7 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...(chosen ? { model: { ...describeModel(s, chosen), note: 'Modelo e esforço que devem executar este card.' } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     ...(skills.length ? { requiredSkills: skills, requiredSkillsNote: 'Carregue cada skill (leia o SKILL.md em `path`) antes de executar este card.' } : {}),
+    ...(phase ? { phase } : {}),
     description: c.description,
     createdAt: iso(c.createdAt),
     updatedAt: iso(c.updatedAt),
@@ -169,9 +194,9 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
       .map((k) => ({ id: cardRef(k), title: k.title, column: s.columns.find((col) => col.id === k.columnId)?.name, status: cardStatus(s, k), fields: fieldsOf(s, k) })),
     checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })),
     comments: s.comments.filter((m) => m.cardId === c.id).map((m) => ({ commentId: m.id, author: m.author, at: iso(m.createdAt), body: m.body })),
-    attachments: s.attachments
-      .filter((a) => a.cardId === c.id)
-      .map((a) => ({ attachmentId: a.id, filename: a.filename, mime: a.mime, size: a.size, path: attachmentPath(a) })),
+    attachments: s.attachments.filter((a) => a.cardId === c.id).map(attachment),
+    // os artefatos das fases ficam na história; a sub-tarefa os enxerga por aqui
+    ...(c.parentId ? { storyArtifacts: s.attachments.filter((a) => a.cardId === c.parentId && a.artifact).map(attachment) } : {}),
   };
 }
 
@@ -184,7 +209,7 @@ export function boardOverview(s: BoardState) {
       kind: w.kind === 'parent' ? 'parent (histórias)' : 'child (sub-tarefas, sempre ligadas a uma história)',
       columns: s.columns
         .filter((c) => c.workflowId === w.id)
-        .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length, ...(c.aiActive ? { aiActive: true } : {}), ...(c.requiresApproval ? { requiresApproval: true } : {}), ...(c.collapsed ? { collapsed: true } : {}) })),
+        .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length, ...(c.aiActive ? { aiActive: true } : {}), ...(c.requiresApproval ? { requiresApproval: true } : {}), ...(c.artifactName ? { artifact: c.artifactName } : {}), ...(c.collapsed ? { collapsed: true } : {}) })),
       ...(w.collapsed ? { collapsed: true } : {}),
       archivedColumnCollapsed: w.archiveCollapsed,
     })),

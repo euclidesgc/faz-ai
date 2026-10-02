@@ -22,12 +22,14 @@ const col = (name: string, kind: 'parent' | 'child' = 'parent') => {
 };
 const places = () => snap().cards.map((c) => [c.title, c.columnId, c.position, c.status]).sort();
 
-/** Deixa o board como os criados antes do status de card: colunas sem papel da IA e versão 0. */
+/** Deixa o board como os criados antes do status de card: sem Discovery e Homologação, colunas sem papel da IA nem fase, e versão 0. */
 beforeEach(async () => {
   db = await openInMemory(WASM_DIR);
   boards = new BoardRepo(db);
   boardId = boards.getOrCreate('ws', 'Projeto').id;
-  db.run('UPDATE columns SET ai_active = 0, requires_approval = 0');
+  db.run("DELETE FROM columns WHERE name IN ('Discovery', 'Homologação')");
+  db.run("UPDATE columns SET ai_active = 0, requires_approval = 0, ai_instruction = '', artifact_name = '', artifact_template = ''");
+  db.run(`UPDATE field_defs SET options_json = '["PRD","Spec","Plan","Implementação"]' WHERE name = 'Fase'`);
   db.run('UPDATE boards SET template_version = 0');
   db.run('UPDATE cards SET status = NULL');
 });
@@ -38,8 +40,11 @@ describe('atualização do board para o padrão atual', () => {
     const s = fresh.snapshot(fresh.getOrCreate('ws', 'Projeto').id);
     expect(s.board.templateVersion).toBe(BOARD_TEMPLATE_VERSION);
     expect(s.pendingUpgrade).toEqual([]);
-    expect(s.columns.filter((c) => c.requiresApproval).map((c) => c.name)).toEqual(['PRD', 'Spec', 'Plan']);
-    expect(s.columns.filter((c) => c.aiActive).map((c) => c.name).sort()).toEqual(['A fazer', 'Em andamento', 'Implementação', 'PRD', 'Plan', 'Spec']);
+    expect(s.columns.filter((c) => c.requiresApproval).map((c) => c.name)).toEqual(['Discovery', 'PRD', 'Spec', 'Plan', 'Homologação']);
+    expect(s.columns.filter((c) => c.aiActive).map((c) => c.name).sort()).toEqual(['A fazer', 'Discovery', 'Em andamento', 'Homologação', 'Implementação', 'PRD', 'Plan', 'Spec']);
+    expect(s.columns.find((c) => c.name === 'PRD')).toMatchObject({ artifactName: 'PRD.md' });
+    expect(s.columns.find((c) => c.name === 'Discovery')!.aiInstruction).toContain('ask_question');
+    expect(s.fieldDefs.find((f) => f.name === 'Fase')!.options).toEqual(['Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação']);
   });
 
   it('completa as colunas sem mover cards nem mexer no que foi personalizado', () => {
@@ -66,6 +71,12 @@ describe('atualização do board para o padrão atual', () => {
       'Coluna "Implementação": a IA atua.',
       'Coluna "A fazer": a IA atua.',
       'Coluna "Em andamento": a IA atua.',
+      'Nova coluna "Discovery" depois do Backlog: a IA analisa o problema e conversa com você antes do PRD.',
+      'Nova coluna "Homologação" antes da conclusão: a história só é concluída com a sua aprovação.',
+      'Coluna "Spec": instrução para a IA e modelo do documento SPEC.md.',
+      'Coluna "Plan": instrução para a IA e modelo do documento PLAN.md.',
+      'Coluna "Implementação": instrução para a IA.',
+      'Campo "Fase" das sub-tarefas: novas opções Discovery e Homologação.',
     ]);
     upgradeBoard(db, boardId);
 
@@ -77,6 +88,15 @@ describe('atualização do board para o padrão atual', () => {
     expect(col('Requisitos')).toMatchObject({ aiActive: false, requiresApproval: false }); // renomeada: não é mais a coluna do padrão
     expect(col('Spec')).toMatchObject({ aiActive: true, requiresApproval: false }); // já configurada pela pessoa
     expect(col('Revisão de segurança')).toMatchObject({ aiActive: false, requiresApproval: false });
+    // colunas novas entram no lugar certo, já configuradas; as demais só são renumeradas
+    const s2 = snap();
+    const parentWf = s2.workflows.find((w) => w.kind === 'parent')!.id;
+    expect(s2.columns.filter((c) => c.workflowId === parentWf).map((c) => c.name)).toEqual(['Backlog', 'Discovery', 'Requisitos', 'Spec', 'Plan', 'Implementação', 'Homologação', 'Concluído', 'Cancelado', 'Revisão de segurança']);
+    expect(col('Discovery')).toMatchObject({ aiActive: true, requiresApproval: true, artifactName: 'DISCOVERY.md' });
+    expect(col('Homologação')).toMatchObject({ aiActive: true, requiresApproval: true, artifactName: '' });
+    expect(col('Requisitos')).toMatchObject({ aiInstruction: '', artifactName: '' });
+    expect(col('Plan').artifactTemplate).toContain('# Plano');
+    expect(s2.fieldDefs.find((f) => f.name === 'Fase')!.options).toEqual(['Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação']);
 
     // rodar de novo não muda nada
     expect(pendingUpgrade(db, boardId)).toEqual([]);

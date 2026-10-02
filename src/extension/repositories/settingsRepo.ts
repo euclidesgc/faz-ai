@@ -14,11 +14,14 @@ export class SettingsRepo {
     return id;
   }
 
-  updateColumn(columnId: string, patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean }): void {
+  updateColumn(columnId: string, patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean; aiInstruction?: string; artifactName?: string; artifactTemplate?: string }): void {
     const db = this.db;
     transaction(db, () => {
       if (patch.name !== undefined) run(db, 'UPDATE columns SET name = ? WHERE id = ?', [patch.name, columnId]);
       if (patch.collapsed !== undefined) run(db, 'UPDATE columns SET collapsed = ? WHERE id = ?', [patch.collapsed ? 1 : 0, columnId]);
+      if (patch.aiInstruction !== undefined) run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [patch.aiInstruction, columnId]);
+      if (patch.artifactName !== undefined) run(db, 'UPDATE columns SET artifact_name = ? WHERE id = ?', [patch.artifactName.trim(), columnId]);
+      if (patch.artifactTemplate !== undefined) run(db, 'UPDATE columns SET artifact_template = ? WHERE id = ?', [patch.artifactTemplate, columnId]);
       if (patch.aiActive !== undefined) run(db, 'UPDATE columns SET ai_active = ? WHERE id = ?', [patch.aiActive ? 1 : 0, columnId]);
       if (patch.requiresApproval !== undefined) run(db, 'UPDATE columns SET requires_approval = ? WHERE id = ?', [patch.requiresApproval ? 1 : 0, columnId]);
       if (patch.category !== undefined)

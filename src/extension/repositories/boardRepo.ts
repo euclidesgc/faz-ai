@@ -76,7 +76,7 @@ export class BoardRepo {
       db,
       'SELECT c.* FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? ORDER BY c.position',
       [boardId],
-    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), category: str(r.category) as Column['category'], isTerminal: str(r.category) !== 'open', collapsed: bool(r.collapsed), aiActive: bool(r.ai_active), requiresApproval: bool(r.requires_approval) }));
+    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), category: str(r.category) as Column['category'], isTerminal: str(r.category) !== 'open', collapsed: bool(r.collapsed), aiActive: bool(r.ai_active), requiresApproval: bool(r.requires_approval), aiInstruction: str(r.ai_instruction), artifactName: str(r.artifact_name), artifactTemplate: str(r.artifact_template) }));
 
     const cardTypes: CardType[] = all(db, 'SELECT * FROM card_types WHERE board_id = ? ORDER BY rowid', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), color: str(r.color), defaultWorkflowId: str(r.default_workflow_id),
@@ -120,7 +120,7 @@ export class BoardRepo {
       db,
       'SELECT a.* FROM attachments a JOIN cards c ON c.id = a.card_id WHERE c.board_id = ? ORDER BY a.created_at',
       [boardId],
-    ).map((r) => ({ id: str(r.id), cardId: str(r.card_id), filename: str(r.filename), storedName: str(r.stored_name), mime: str(r.mime), size: num(r.size), createdAt: num(r.created_at) }));
+    ).map((r) => ({ id: str(r.id), cardId: str(r.card_id), filename: str(r.filename), storedName: str(r.stored_name), mime: str(r.mime), size: num(r.size), createdAt: num(r.created_at), artifact: bool(r.artifact) }));
 
     return { board, workflows, columns, cardTypes, cards, fieldDefs, fieldValues, checklistItems, comments, attachments, currentUser, harness: EMPTY_HARNESS, pendingUpgrade: pendingUpgrade(db, boardId) };
   }
