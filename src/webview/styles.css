@@ -75,7 +75,7 @@ button.active { background: var(--btn-bg); color: var(--btn-fg); }
 .workflow-child { flex: 1; }
 .workflow-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .filter-chip { font-size: var(--fs-sm); background: var(--hover); padding: 2px 8px; border-radius: 10px; cursor: pointer; }
-.columns { display: flex; gap: 10px; align-items: stretch; overflow-x: auto; min-height: 160px; }
+.columns { display: flex; gap: 10px; align-items: stretch; overflow-x: auto; min-height: 160px; padding-bottom: 12px; }
 .column {
   flex: 1 0 220px; max-width: 320px; background: var(--col-bg); border: 1px solid var(--border);
   border-radius: var(--radius); display: flex; flex-direction: column; transition: border-color .1s;

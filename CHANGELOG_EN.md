@@ -10,6 +10,7 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 - **Theme button in the board's top bar**: the icon in the top-right corner cycles between
   **Sistema** (system), **Claro** (light) and **Escuro** (dark). It is the same preference as
   Configurações > Aparência, so the choice is saved and applies in the editor and in the browser.
+- The columns' horizontal scrollbar now has breathing room below the cards.
 
 ## 0.29.1
 

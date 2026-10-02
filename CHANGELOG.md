@@ -9,6 +9,7 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - **Botão de tema no topo do board**: o ícone no canto superior direito alterna entre **Sistema**,
   **Claro** e **Escuro**. É a mesma preferência de Configurações > Aparência, então a escolha fica
   salva e vale no editor e no navegador.
+- A barra de rolagem horizontal das colunas ganhou um espaço de respiro abaixo dos cards.
 
 ## 0.29.1
 
