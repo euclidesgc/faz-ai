@@ -6,6 +6,7 @@ import { childrenOf, fieldsForType, useBoardStore, valueOf } from '../store/boar
 import { requestArchive, requestTrash } from '../store/actions';
 import { FieldBadge } from './FieldRenderer';
 import { Menu } from './Menu';
+import { StatusBadge } from './StatusBar';
 
 export function SortableCard({ card }: { card: Card }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
@@ -79,6 +80,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       </div>
       <div className="card-title">{card.title}</div>
       {parent && <div className="card-parent" title={parent.title}>↳ {cardRef(parent)} {parent.title}</div>}
+      {card.status && !archived && <div className="card-status"><StatusBadge status={card.status} /></div>}
       {fields.length > 0 && (
         <div className="card-fields">
           {fields.map((f) => <FieldBadge key={f.id} field={f} value={valueOf(state, card.id, f.id)} />)}
@@ -87,7 +89,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       <div className="card-meta">
         {children.length > 0 && <span title="Sub-tarefas concluídas">⑂ {doneChildren}/{children.length}</span>}
         {checklist.length > 0 && <span title="Checklist">☑ {checklistDone}/{checklist.length}</span>}
-        {comments > 0 && <span title="Comentários">💬 {comments}</span>}
+        {comments > 0 && <span title="Mensagens na conversa">💬 {comments}</span>}
         {attachments > 0 && <span title="Anexos">📎 {attachments}</span>}
         {card.description && <span title="Tem descrição">≡</span>}
         {offerSuggestion && !overlay && (

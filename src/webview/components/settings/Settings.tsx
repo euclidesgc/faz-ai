@@ -32,6 +32,20 @@ export function Settings() {
           <button className={tab === 'models' ? 'active' : ''} onClick={() => setTab('models')}>Modelos de IA</button>
           <button className={tab === 'appearance' ? 'active' : ''} onClick={() => setTab('appearance')}>Aparência</button>
         </nav>
+        {state.pendingUpgrade.length > 0 && (
+          <button
+            className="primary"
+            title="Leva este board ao padrão atual da extensão, sem mover nenhum card"
+            onClick={() =>
+              ask({
+                title: 'Atualizar o board para o padrão atual?',
+                message: `Nenhum card sai do lugar e o que você personalizou é mantido. O que muda: ${state.pendingUpgrade.join(' ')}`,
+                confirmLabel: 'Atualizar board',
+                onConfirm: () => send({ type: 'settings.board.upgrade' }),
+              })
+            }
+          >Atualizar board</button>
+        )}
         <button title="Registra o board como servidor MCP para o Claude Code e outros clientes de IA" onClick={() => send({ type: 'ui.connectAI' })}>Conectar IA (MCP)</button>
         <button
           className="ghost danger"
@@ -39,7 +53,7 @@ export function Settings() {
           onClick={() =>
             ask({
               title: 'Recriar o board do zero?',
-              message: `Todos os ${state.cards.length} card(s), comentários, anexos e configurações deste board serão apagados, e o board volta ao padrão. Isso não pode ser desfeito. Regras e skills do projeto não são afetadas.`,
+              message: `Todos os ${state.cards.length} card(s), conversas, anexos e configurações deste board serão apagados, e o board volta ao padrão. Isso não pode ser desfeito. Regras e skills do projeto não são afetadas.`,
               confirmLabel: 'Apagar tudo e recriar',
               danger: true,
               onConfirm: () => send({ type: 'settings.board.reset' }),

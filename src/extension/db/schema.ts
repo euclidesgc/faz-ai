@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -171,6 +171,17 @@ const MIGRATIONS: Record<number, string> = {
     UPDATE field_defs SET position = (
       SELECT MIN(m.position) - 1 FROM field_defs m WHERE m.board_id = field_defs.board_id AND m.kind = 'model'
     ) WHERE name = 'Esforço da atividade' AND EXISTS (SELECT 1 FROM field_defs m WHERE m.board_id = field_defs.board_id AND m.kind = 'model');
+  `,
+  12: `
+    -- status de trabalho do card (com quem está a pendência) e o papel da IA em cada coluna
+    ALTER TABLE cards ADD COLUMN status TEXT;
+    ALTER TABLE cards ADD COLUMN status_reason TEXT NOT NULL DEFAULT '';
+    ALTER TABLE cards ADD COLUMN status_at INTEGER;
+    ALTER TABLE cards ADD COLUMN status_by TEXT NOT NULL DEFAULT '';
+    ALTER TABLE columns ADD COLUMN ai_active INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE columns ADD COLUMN requires_approval INTEGER NOT NULL DEFAULT 0;
+    -- versão do board padrão aplicada; boards anteriores ficam em 0 e são atualizados com confirmação
+    ALTER TABLE boards ADD COLUMN template_version INTEGER NOT NULL DEFAULT 0;
   `,
 };
 

@@ -8,6 +8,7 @@ import { CommentsTab } from './CommentsTab';
 import { FieldEditor, ModelEditor } from './FieldRenderer';
 import { Menu } from './Menu';
 import { MarkdownEditor, renderMarkdown } from './MarkdownEditor';
+import { StatusBar } from './StatusBar';
 
 type Tab = 'details' | 'comments' | 'attachments';
 
@@ -124,9 +125,11 @@ export function CardDrawer({ cardId }: { cardId: string }) {
         <div className="drawer-id" title="ID do card">{cardRef(card)}</div>
         <input className="drawer-title" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveTitle} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
 
+        {!trashed && !archived && <StatusBar card={card} />}
+
         <nav className="tabs">
           <button className={tab === 'details' ? 'active' : ''} onClick={() => setTab('details')}>Detalhes</button>
-          <button className={tab === 'comments' ? 'active' : ''} onClick={() => setTab('comments')}>Comentários{commentCount > 0 && ` (${commentCount})`}</button>
+          <button className={tab === 'comments' ? 'active' : ''} onClick={() => setTab('comments')}>Conversa{commentCount > 0 && ` (${commentCount})`}</button>
           <button className={tab === 'attachments' ? 'active' : ''} onClick={() => setTab('attachments')}>Anexos{attachmentCount > 0 && ` (${attachmentCount})`}</button>
         </nav>
 

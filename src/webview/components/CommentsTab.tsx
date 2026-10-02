@@ -3,6 +3,7 @@ import type { Comment } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
 import { MarkdownEditor, renderMarkdown } from './MarkdownEditor';
 
+/** Conversa do card: é por aqui que a pessoa e a IA falam sobre o trabalho. */
 export function CommentsTab({ cardId }: { cardId: string }) {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
@@ -17,12 +18,12 @@ export function CommentsTab({ cardId }: { cardId: string }) {
 
   return (
     <section className="drawer-section comments">
-      {comments.length === 0 && <p className="muted">Nenhum comentário ainda.</p>}
+      {comments.length === 0 && <p className="muted">Nenhuma mensagem ainda. A conversa com a IA sobre este card acontece aqui.</p>}
       {comments.map((c) => <CommentItem key={c.id} comment={c} mine={c.author === state.currentUser} />)}
       <div className="comment-new">
-        <MarkdownEditor compact minRows={3} value={draft} onChange={setDraft} onSubmit={submit} placeholder="Escreva um comentário… (Cmd+Enter envia)" />
+        <MarkdownEditor compact minRows={3} value={draft} onChange={setDraft} onSubmit={submit} placeholder="Escreva uma mensagem… (Cmd+Enter envia)" />
         <div className="row end">
-          <button className="primary" disabled={!draft.trim()} onClick={submit}>Comentar</button>
+          <button className="primary" disabled={!draft.trim()} onClick={submit}>Enviar</button>
         </div>
       </div>
     </section>
@@ -46,13 +47,13 @@ function CommentItem({ comment, mine }: { comment: Comment; mine: boolean }) {
         <strong>{comment.author}</strong>
         <span className="muted small">{new Date(comment.createdAt).toLocaleString()}{comment.updatedAt > comment.createdAt && ' · editado'}</span>
         <span className="spacer" />
-        {/* editar só o próprio comentário; apagar vale para qualquer um, inclusive os escritos pela IA */}
+        {/* editar só a própria mensagem; apagar vale para qualquer um, inclusive os escritos pela IA */}
         {editing === null && (
           <>
             {mine && <button className="ghost small" onClick={() => setEditing(comment.body)}>Editar</button>}
             <button
               className="ghost small danger"
-              onClick={() => ask({ title: mine ? 'Apagar este comentário?' : `Apagar o comentário de ${comment.author}?`, confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'comment.delete', commentId: comment.id }) })}
+              onClick={() => ask({ title: mine ? 'Apagar esta mensagem?' : `Apagar a mensagem de ${comment.author}?`, confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'comment.delete', commentId: comment.id }) })}
             >
               Apagar
             </button>

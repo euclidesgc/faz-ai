@@ -7,6 +7,7 @@ import { newId } from '../db/ids';
 import { detectTools, effortTiers, modelsFor } from '../models';
 import { AttachmentStore } from '../attachments';
 import { SKILLS_FIELD } from '../db/schema';
+import { pendingUpgrade, upgradeBoard } from '../db/boardTemplate';
 import { HarnessStore } from '../harness';
 import { AttachmentRepo } from '../repositories/attachmentRepo';
 import { BoardRepo } from '../repositories/boardRepo';
@@ -51,6 +52,8 @@ export class MessageRouter {
     this.store = new AttachmentStore(opts.attachmentsDir);
     const board = this.boards.getOrCreate(opts.workspaceKey, opts.folderName);
     this.boardId = board.id;
+    // nada a mudar para chegar ao padrão atual: só registra a versão, sem perguntar
+    if (!pendingUpgrade(db, board.id).length) upgradeBoard(db, board.id);
     this.harnessStore = opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTool) : null;
     this.loadHarness();
     this.initModels();
@@ -172,9 +175,21 @@ export class MessageRouter {
     return this.changed();
   }
 
-  /** Aplica a mutação e devolve o snapshot atualizado. `ctx.author` assina comentários feitos por outra origem (ex.: IA via MCP). */
-  handle(msg: WebviewToHost, ctx: { author?: string } = {}): BoardState {
-    return this.apply(msg, ctx.author ?? this.opts.author) ? this.changed() : this.snapshot();
+  /**
+   * Aplica a mutação e devolve o snapshot atualizado. `ctx.author` assina o que vem de outra origem
+   * (ex.: IA via MCP) e `ctx.source` diz se quem age é a pessoa (padrão) ou a IA.
+   */
+  handle(msg: WebviewToHost, ctx: { author?: string; source?: 'human' | 'ai' } = {}): BoardState {
+    return this.apply(msg, ctx.author ?? this.opts.author, ctx.source === 'ai') ? this.changed() : this.snapshot();
+  }
+
+  /** Muda o status de trabalho do card. Aprovar é só da pessoa; bloquear exige o motivo. */
+  private setStatus(msg: Extract<WebviewToHost, { type: 'card.status.set' }>, author: string, byAi: boolean): void {
+    const note = msg.note?.trim() ?? '';
+    if (msg.status === 'approved' && byAi) throw new Error('Só uma pessoa pode aprovar um card.');
+    if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
+    this.cards.setStatus(msg.cardId, msg.status, msg.status === 'blocked' ? note : '', author);
+    if (note) this.comments.add(msg.cardId, author, note);
   }
 
   /** Como `card.create`, mas devolve o id do card criado. */
@@ -191,7 +206,7 @@ export class MessageRouter {
     return this.snapshot();
   }
 
-  private apply(msg: WebviewToHost, author: string): boolean {
+  private apply(msg: WebviewToHost, author: string, byAi: boolean): boolean {
     switch (msg.type) {
       case 'ready':
       case 'view.set':
@@ -208,7 +223,7 @@ export class MessageRouter {
         this.cards.update(msg.cardId, msg.patch);
         return true;
       case 'card.move':
-        this.cards.move(msg.cardId, msg.columnId, msg.position, { cancelChildren: msg.cancelChildren });
+        this.cards.move(msg.cardId, msg.columnId, msg.position, { cancelChildren: msg.cancelChildren, byAi });
         return true;
       case 'card.trash':
         this.cards.trash(msg.cardId);
@@ -220,7 +235,7 @@ export class MessageRouter {
         this.cards.archive(msg.cardId);
         return true;
       case 'card.unarchive':
-        this.cards.unarchive(msg.cardId, msg.columnId, msg.position);
+        this.cards.unarchive(msg.cardId, msg.columnId, msg.position, byAi);
         return true;
       case 'card.deletePermanent':
         this.cards.deletePermanent(msg.cardId).forEach((id) => this.store.removeCard(id));
@@ -244,8 +259,14 @@ export class MessageRouter {
       case 'checklist.delete':
         this.checklist.delete(msg.itemId);
         return true;
+      case 'card.status.set':
+        this.setStatus(msg, author, byAi);
+        return true;
       case 'comment.add':
-        if (msg.body.trim()) this.comments.add(msg.cardId, author, msg.body.trim());
+        if (!msg.body.trim()) return true;
+        this.comments.add(msg.cardId, author, msg.body.trim());
+        // a pessoa respondeu à pergunta da IA: a vez volta para a IA
+        if (!byAi && this.cards.status(msg.cardId) === 'waiting_answer') this.cards.setStatus(msg.cardId, 'ready', '', author);
         return true;
       case 'comment.update':
         this.comments.update(msg.commentId, msg.body);
@@ -301,6 +322,10 @@ export class MessageRouter {
         this.boards.deleteBoard(this.boardId).forEach((id) => this.store.removeCard(id));
         this.boardId = this.boards.getOrCreate(this.opts.workspaceKey, this.opts.folderName).id;
         this.initModels();
+        return true;
+      case 'settings.board.upgrade':
+        this.dbHandle.backup?.();
+        upgradeBoard(this.dbHandle.db, this.boardId);
         return true;
       case 'settings.models.set':
         this.boards.setModelCatalog(this.boardId, msg.catalog);

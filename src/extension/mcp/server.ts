@@ -25,6 +25,11 @@ export function createMcpServer(opts: McpOptions): McpServer {
         'Board kanban do projeto (Faz AI). Histórias ficam no workflow pai e sub-tarefas no workflow filho, ligadas a uma história. ' +
         'Cards são identificados pelo número (#12). Comece por get_board para conhecer colunas, tipos e campos. ' +
         'Sinalize o progresso movendo os cards entre colunas e registre decisões e resultados em comentários ou anexos. ' +
+        'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_question). ' +
+        'Cada card tem um status de trabalho em `work`: "ready" e "approved" estão com você, "waiting_review", "waiting_answer" e "blocked" estão com a pessoa. ' +
+        'Ao começar um card chame start_work. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
+        'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
+        'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +
         'get_card devolve em `model` a ferramenta, o modelo e o nível de esforço que devem executar o card: antes de trabalhar nele, ' +
         'se o modelo ou o esforço forem diferentes dos seus, delegue o trabalho a um subagente com esse modelo e esforço; ' +
         'se não for possível, avise a pessoa em vez de executar com outra configuração. ' +

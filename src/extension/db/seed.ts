@@ -1,5 +1,6 @@
 import type { Database } from 'sql.js';
-import type { ColumnCategory } from '../../shared/model';
+import type { WorkflowKind } from '../../shared/model';
+import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION } from './boardTemplate';
 import { newId } from './ids';
 import { EFFORT_FIELD, EFFORT_LEVELS } from '../../shared/models';
 import { MODEL_FIELD, SKILLS_FIELD } from './schema';
@@ -11,20 +12,22 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
   const boardId = newId();
   db.exec('BEGIN;');
   try {
-    db.run('INSERT INTO boards(id, workspace_key, name) VALUES (?,?,?)', [boardId, workspaceKey, name]);
+    db.run('INSERT INTO boards(id, workspace_key, name, template_version) VALUES (?,?,?,?)', [boardId, workspaceKey, name, BOARD_TEMPLATE_VERSION]);
 
     const parentWf = newId();
     const childWf = newId();
     db.run('INSERT INTO workflows(id, board_id, name, position, kind) VALUES (?,?,?,?,?)', [parentWf, boardId, 'Histórias', 0, 'parent']);
     db.run('INSERT INTO workflows(id, board_id, name, position, kind) VALUES (?,?,?,?,?)', [childWf, boardId, 'Sub-tarefas', 1, 'child']);
 
-    const cols = (wf: string, names: [string, ColumnCategory][]) =>
-      names.forEach(([n, category], i) =>
-        db.run('INSERT INTO columns(id, workflow_id, name, position, is_terminal, category) VALUES (?,?,?,?,?,?)', [newId(), wf, n, i, category === 'open' ? 0 : 1, category]),
+    const cols = (wf: string, kind: WorkflowKind) =>
+      BOARD_TEMPLATE[kind].forEach((c, i) =>
+        db.run('INSERT INTO columns(id, workflow_id, name, position, is_terminal, category, ai_active, requires_approval) VALUES (?,?,?,?,?,?,?,?)', [
+          newId(), wf, c.name, i, c.category === 'open' ? 0 : 1, c.category, c.aiActive ? 1 : 0, c.requiresApproval ? 1 : 0,
+        ]),
       );
     // as colunas das histórias são as fases do SDD; as mesmas fases são as opções do campo "Fase" das sub-tarefas
-    cols(parentWf, [['Backlog', 'open'], ...SDD_PHASES.map((p): [string, ColumnCategory] => [p, 'open']), ['Concluído', 'done'], ['Cancelado', 'cancelled']]);
-    cols(childWf, [['A fazer', 'open'], ['Em andamento', 'open'], ['Concluído', 'done']]);
+    cols(parentWf, 'parent');
+    cols(childWf, 'child');
 
     const subtaskType = newId();
     const types: [string, string, string, string][] = [

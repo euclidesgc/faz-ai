@@ -3,6 +3,8 @@ import type { Attachment, Board, BoardState, Card, CardType, ChecklistItem, Colu
 import { all, bool, num, one, run, str } from '../db/query';
 import { parseRules, type BoardRules } from '../../shared/rules';
 import { seedBoard } from '../db/seed';
+import { pendingUpgrade } from '../db/boardTemplate';
+import { isCardStatus } from '../../shared/status';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
 import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool } from '../../shared/harness';
@@ -17,7 +19,7 @@ export class BoardRepo {
       seedBoard(this.db, workspaceKey, name);
       row = one(this.db, 'SELECT * FROM boards WHERE workspace_key = ?', [workspaceKey])!;
     }
-    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTool: parseAiTool(str(row.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)), modelRules: parseModelRules(str(row.model_rules_json)), appearance: parseAppearance(str(row.appearance_json)) };
+    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTool: parseAiTool(str(row.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)), modelRules: parseModelRules(str(row.model_rules_json)), appearance: parseAppearance(str(row.appearance_json)), templateVersion: num(row.template_version) };
   }
 
   updateRules(boardId: string, patch: Partial<BoardRules>): void {
@@ -63,7 +65,7 @@ export class BoardRepo {
     const db = this.db;
     const b = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
     if (!b) throw new Error('Board não encontrado');
-    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTool: parseAiTool(str(b.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)), modelRules: parseModelRules(str(b.model_rules_json)), appearance: parseAppearance(str(b.appearance_json)) };
+    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTool: parseAiTool(str(b.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)), modelRules: parseModelRules(str(b.model_rules_json)), appearance: parseAppearance(str(b.appearance_json)), templateVersion: num(b.template_version) };
 
     const workflows: Workflow[] = all(db, 'SELECT * FROM workflows WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), position: num(r.position), kind: str(r.kind) as Workflow['kind'],
@@ -74,7 +76,7 @@ export class BoardRepo {
       db,
       'SELECT c.* FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? ORDER BY c.position',
       [boardId],
-    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), category: str(r.category) as Column['category'], isTerminal: str(r.category) !== 'open', collapsed: bool(r.collapsed) }));
+    ).map((r) => ({ id: str(r.id), workflowId: str(r.workflow_id), name: str(r.name), position: num(r.position), category: str(r.category) as Column['category'], isTerminal: str(r.category) !== 'open', collapsed: bool(r.collapsed), aiActive: bool(r.ai_active), requiresApproval: bool(r.requires_approval) }));
 
     const cardTypes: CardType[] = all(db, 'SELECT * FROM card_types WHERE board_id = ? ORDER BY rowid', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), color: str(r.color), defaultWorkflowId: str(r.default_workflow_id),
@@ -86,6 +88,7 @@ export class BoardRepo {
       parentId: r.parent_id == null ? null : str(r.parent_id), title: str(r.title), description: str(r.description),
       position: num(r.position), createdAt: num(r.created_at), updatedAt: num(r.updated_at),
       deletedAt: r.deleted_at == null ? null : num(r.deleted_at), archivedAt: r.archived_at == null ? null : num(r.archived_at),
+      status: isCardStatus(r.status) ? r.status : null, statusReason: str(r.status_reason), statusAt: r.status_at == null ? null : num(r.status_at), statusBy: str(r.status_by),
     }));
 
     const fieldDefs: FieldDef[] = all(db, 'SELECT * FROM field_defs WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
@@ -119,6 +122,6 @@ export class BoardRepo {
       [boardId],
     ).map((r) => ({ id: str(r.id), cardId: str(r.card_id), filename: str(r.filename), storedName: str(r.stored_name), mime: str(r.mime), size: num(r.size), createdAt: num(r.created_at) }));
 
-    return { board, workflows, columns, cardTypes, cards, fieldDefs, fieldValues, checklistItems, comments, attachments, currentUser, harness: EMPTY_HARNESS };
+    return { board, workflows, columns, cardTypes, cards, fieldDefs, fieldValues, checklistItems, comments, attachments, currentUser, harness: EMPTY_HARNESS, pendingUpgrade: pendingUpgrade(db, boardId) };
   }
 }

@@ -47,6 +47,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         homeDir: os.homedir(),
       });
       router.onDidChange(() => tree.refresh());
+      void offerBoardUpgrade(context, router);
       return router;
     })();
     return routerPromise;
@@ -78,6 +79,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard(cardId)),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
     vscode.commands.registerCommand('fazai.connectAI', () => connectAI(bridgePath, getRouter)),
+    vscode.commands.registerCommand('fazai.upgradeBoard', async () => {
+      const router = await getRouter();
+      if (!router) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
+      if (!router.snapshot().pendingUpgrade.length) return void vscode.window.showInformationMessage('Este board já está no padrão atual.');
+      await offerBoardUpgrade(context, router, true);
+    }),
   );
 
   // regras e skills editadas por fora (editor, IA, git) aparecem no board
@@ -108,6 +115,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       console.warn(`Faz AI: servidor MCP não iniciado: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
+}
+
+/**
+ * Board criado por uma versão anterior: pergunta se a pessoa quer levá-lo ao padrão atual. A
+ * atualização só acrescenta e completa (nenhum card sai do lugar). "Agora não" vale até a próxima
+ * versão da extensão; `force` pergunta de novo mesmo assim (comando manual).
+ */
+async function offerBoardUpgrade(context: vscode.ExtensionContext, router: MessageRouter, force = false): Promise<void> {
+  const { board, pendingUpgrade } = router.snapshot();
+  if (!pendingUpgrade.length) return;
+  const key = `fazai.upgradeDismissed.${board.id}`;
+  const version = String(context.extension.packageJSON.version);
+  if (!force && context.globalState.get<string>(key) === version) return;
+  const choice = await vscode.window.showInformationMessage(
+    `O board padrão do Faz AI mudou. Atualizar o board "${board.name}"? Nenhum card sai do lugar e o que você personalizou é mantido.`,
+    { modal: true, detail: pendingUpgrade.join('\n') },
+    'Atualizar board',
+    'Agora não',
+  );
+  if (choice === 'Atualizar board') router.handle({ type: 'settings.board.upgrade' });
+  else await context.globalState.update(key, version);
 }
 
 /** Registra o servidor MCP do board na configuração da ferramenta de IA em uso no projeto. */
