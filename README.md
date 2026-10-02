@@ -10,17 +10,21 @@ os artefatos de cada fase e move os cards conforme avança.
 
 ## Para que serve
 
-- **Planejar em fases.** As colunas das histórias são as fases do SDD: Backlog, PRD, Spec, Plan,
-  Implementação, Concluído e Cancelado. Cada história se desdobra em sub-tarefas, que têm um fluxo
-  próprio (A fazer, Em andamento, Concluído).
+- **Planejar em fases.** As colunas das histórias são as fases do fluxo: Backlog, Discovery, PRD,
+  Spec, Plan, Implementação, Homologação, Concluído e Cancelado. Cada história se desdobra em
+  sub-tarefas, que têm um fluxo próprio (A fazer, Em andamento, Concluído).
+- **Dizer à IA o que fazer em cada fase.** Cada coluna tem uma instrução para a IA e, se a fase
+  gera um documento (Discovery, PRD, Spec, Plan), o modelo desse documento. No Discovery a IA
+  analisa o problema e conversa com você antes de qualquer requisito; na Homologação a história só
+  é concluída com a sua aprovação.
 - **Trabalhar com a IA no mesmo quadro.** A extensão expõe o board por MCP. Claude Code, Codex,
   Cursor, Kimi Code, GitHub Copilot ou outro cliente MCP podem consultar e editar tudo o que a interface permite, e
   as mudanças aparecem no board na hora.
 - **Saber com quem está cada card.** Todo card em que a IA atua tem um status (Pronto, Em execução,
   Aguardando resposta, Aguardando revisão, Aprovado, Bloqueado) que mostra se a pendência está com
   você ou com a IA.
-- **Revisar antes de a IA avançar.** Nas colunas que exigem aprovação (PRD, Spec e Plan, por
-  padrão), a IA termina o trabalho, pede a revisão e para. Ela só move o card depois que você aprova.
+- **Revisar antes de a IA avançar.** Nas colunas que exigem aprovação (Discovery, PRD, Spec, Plan
+  e Homologação, por padrão), a IA termina o trabalho, pede a revisão e para. Ela só move o card depois que você aprova.
 - **Dizer à IA como executar cada card.** Cada card pode indicar o modelo, o nível de esforço e as
   skills obrigatórias. O modelo pode ser sugerido por regras a partir do tamanho da tarefa.
 - **Cuidar do harness do projeto.** O arquivo de regras (`CLAUDE.md` ou `AGENTS.md`) e as skills
@@ -32,8 +36,9 @@ os artefatos de cada fase e move os cards conforme avança.
 2. Crie histórias com **+ Novo card** e arraste-as entre as colunas. Clicar numa história mostra só
    as sub-tarefas dela; duplo clique abre o detalhe.
 3. No detalhe do card ficam o status, a descrição em Markdown, os campos, o checklist, as
-   sub-tarefas, a conversa e os anexos (é onde entram PRD, Spec e Plan). A conversa é o lugar em
-   que você e a IA falam sobre o card.
+   sub-tarefas, a conversa e os anexos. A conversa é o lugar em que você e a IA falam sobre o card.
+   Os documentos das fases (PRD, Spec, Plan…) são construídos nas sub-tarefas, mas ficam anexados à
+   história; nas sub-tarefas eles aparecem como links.
 4. Busque por texto ou pelo ID (`#12`). A seção **Filtros** da barra lateral filtra por tipo,
    campos, datas e relacionamentos.
 5. Cards podem ser arquivados (coluna "Arquivados" no fim de cada linha) ou enviados para a
@@ -50,9 +55,9 @@ daquela fase. Essas regras podem ser desligadas nas configurações.
 3. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
    board" ou "pegue a história #1 e escreva o PRD".
 
-Fluxo sugerido: a IA lê a história, produz o artefato da fase e o anexa ao card, cria as
-sub-tarefas, move cada uma conforme avança e, ao fechar a fase, pede a revisão pela conversa do
-card. Você responde no próprio card:
+Fluxo sugerido: a IA lê a história e a instrução da fase, cria uma sub-tarefa para construir o
+documento da fase, anexa o documento à história e pede a revisão pela conversa do card. Você
+responde no próprio card:
 
 - **Aprovar** deixa o card Aprovado, e a IA o leva para a próxima coluna.
 - **Pedir ajustes** devolve o card para a IA com o seu texto na conversa.
@@ -72,7 +77,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 
 | Seção | O que ajusta |
 | --- | --- |
-| Workflows e colunas | Nomes, ordem e significado das colunas; em quais a IA atua e quais exigem aprovação; quais começam colapsadas |
+| Workflows e colunas | Nomes, ordem e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento); quais começam colapsadas |
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos | Campos personalizados (texto, seleção, data, modelo…) e onde aparecem |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |

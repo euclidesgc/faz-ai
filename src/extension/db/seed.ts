@@ -1,11 +1,9 @@
 import type { Database } from 'sql.js';
 import type { WorkflowKind } from '../../shared/model';
-import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION } from './boardTemplate';
+import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION, STORY_PHASES, insertColumn } from './boardTemplate';
 import { newId } from './ids';
 import { EFFORT_FIELD, EFFORT_LEVELS } from '../../shared/models';
 import { MODEL_FIELD, SKILLS_FIELD } from './schema';
-
-const SDD_PHASES = ['PRD', 'Spec', 'Plan', 'Implementação'];
 
 /** Cria o board padrão para um workspace e devolve seu id. */
 export function seedBoard(db: Database, workspaceKey: string, name: string): string {
@@ -19,12 +17,7 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
     db.run('INSERT INTO workflows(id, board_id, name, position, kind) VALUES (?,?,?,?,?)', [parentWf, boardId, 'Histórias', 0, 'parent']);
     db.run('INSERT INTO workflows(id, board_id, name, position, kind) VALUES (?,?,?,?,?)', [childWf, boardId, 'Sub-tarefas', 1, 'child']);
 
-    const cols = (wf: string, kind: WorkflowKind) =>
-      BOARD_TEMPLATE[kind].forEach((c, i) =>
-        db.run('INSERT INTO columns(id, workflow_id, name, position, is_terminal, category, ai_active, requires_approval) VALUES (?,?,?,?,?,?,?,?)', [
-          newId(), wf, c.name, i, c.category === 'open' ? 0 : 1, c.category, c.aiActive ? 1 : 0, c.requiresApproval ? 1 : 0,
-        ]),
-      );
+    const cols = (wf: string, kind: WorkflowKind) => BOARD_TEMPLATE[kind].forEach((c, i) => insertColumn(db, wf, c, i));
     // as colunas das histórias são as fases do SDD; as mesmas fases são as opções do campo "Fase" das sub-tarefas
     cols(parentWf, 'parent');
     cols(childWf, 'child');
@@ -43,7 +36,7 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
 
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
-      [newId(), boardId, 'Fase', 'select', JSON.stringify(SDD_PHASES), JSON.stringify([subtaskType]), 'badge', 0],
+      [newId(), boardId, 'Fase', 'select', JSON.stringify(STORY_PHASES), JSON.stringify([subtaskType]), 'badge', 0],
     );
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',

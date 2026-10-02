@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -182,6 +182,14 @@ const MIGRATIONS: Record<number, string> = {
     ALTER TABLE columns ADD COLUMN requires_approval INTEGER NOT NULL DEFAULT 0;
     -- versão do board padrão aplicada; boards anteriores ficam em 0 e são atualizados com confirmação
     ALTER TABLE boards ADD COLUMN template_version INTEGER NOT NULL DEFAULT 0;
+  `,
+  13: `
+    -- cada coluna é uma fase: o que a IA faz nela e o documento (artefato) que a fase produz
+    ALTER TABLE columns ADD COLUMN ai_instruction TEXT NOT NULL DEFAULT '';
+    ALTER TABLE columns ADD COLUMN artifact_name TEXT NOT NULL DEFAULT '';
+    ALTER TABLE columns ADD COLUMN artifact_template TEXT NOT NULL DEFAULT '';
+    -- anexo que é o artefato de uma fase; fica sempre no card da história
+    ALTER TABLE attachments ADD COLUMN artifact INTEGER NOT NULL DEFAULT 0;
   `,
 };
 

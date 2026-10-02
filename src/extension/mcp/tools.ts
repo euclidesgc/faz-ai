@@ -116,7 +116,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'get_card',
-    'Detalhe completo de um card: descrição (markdown), campos, sub-tarefas, checklist, comentários e anexos.',
+    'Detalhe completo de um card: descrição (markdown), campos, sub-tarefas, checklist, conversa e anexos. Em `phase` vem o que fazer na fase em que o card está e o modelo do documento que ela produz; numa sub-tarefa, `storyArtifacts` traz os documentos já anexados à história.',
     { card: cardArg },
     (a, router) => detail(router, findCard(router.snapshot(), a.card).id),
     true,
@@ -354,26 +354,29 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'add_attachment',
-    'Anexa um artefato ao card (ex.: PRD, Spec, Plan). Informe `path` para copiar um arquivo existente, ou `filename` + `content` para gravar um texto como anexo.',
+    'Anexa um arquivo ao card. Informe `path` para copiar um arquivo existente, ou `filename` + `content` para gravar um texto como anexo. Para o documento de uma fase (PRD, Spec, Plan…) use `artifact: true`: ele fica anexado à história, mesmo quando enviado de uma sub-tarefa, e substitui a versão anterior de mesmo nome.',
     {
       card: cardArg,
       path: z.string().optional().describe('Caminho de um arquivo; relativo à pasta do projeto ou absoluto'),
       filename: z.string().optional().describe('Nome do anexo ao usar `content`, ex.: "spec.md"'),
       content: z.string().optional().describe('Conteúdo em texto do anexo'),
+      artifact: z.boolean().optional().describe('É o documento de uma fase: vai para a história e substitui o artefato de mesmo nome'),
     },
     (a, router) => {
       const card = findCard(router.snapshot(), a.card);
+      const target = a.artifact ? card.parentId ?? card.id : card.id;
       const before = new Set(router.snapshot().attachments.map((x) => x.id));
       if (a.path) {
         const file = path.resolve(ctx.workspaceDir, a.path);
         if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`Arquivo não encontrado: ${file}`);
-        router.addAttachmentFiles(card.id, [file]);
+        router.addAttachmentFiles(card.id, [file], a.artifact);
       } else if (a.filename && a.content !== undefined) {
-        router.handle({ type: 'attachment.addData', cardId: card.id, filename: a.filename, base64: Buffer.from(a.content, 'utf8').toString('base64') });
+        router.handle({ type: 'attachment.addData', cardId: card.id, filename: a.filename, base64: Buffer.from(a.content, 'utf8').toString('base64'), artifact: a.artifact });
       } else {
         throw new Error('Informe `path`, ou `filename` e `content`.');
       }
-      return detail(router, card.id).attachments.find((x) => !before.has(x.attachmentId));
+      const added = detail(router, target).attachments.find((x) => !before.has(x.attachmentId));
+      return target === card.id ? added : { ...added, attachedTo: `#${router.snapshot().cards.find((c) => c.id === target)!.number}` };
     },
   );
 
@@ -400,12 +403,12 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'update_column',
-    'Altera uma coluna: nome, o que ela representa (categoria), posição no workflow, se a IA atua nela e se ela exige aprovação de uma pessoa para o card avançar.',
-    { column: z.string(), workflow: columnWorkflowArg, name: z.string().min(1).optional(), category: categoryArg.optional(), position: z.number().int().min(0).optional(), collapsed: z.boolean().optional().describe('A coluna começa colapsada ao abrir o board'), ai_active: z.boolean().optional().describe('A IA trabalha nos cards desta coluna: ao entrar nela o card fica "ready"'), requires_approval: z.boolean().optional().describe('A IA só avança o card depois que uma pessoa aprova') },
+    'Altera uma coluna: nome, o que ela representa (categoria), posição no workflow, se a IA atua nela, se ela exige aprovação de uma pessoa para o card avançar, e a fase (instrução para a IA e modelo do documento que a fase produz).',
+    { column: z.string(), workflow: columnWorkflowArg, name: z.string().min(1).optional(), category: categoryArg.optional(), position: z.number().int().min(0).optional(), collapsed: z.boolean().optional().describe('A coluna começa colapsada ao abrir o board'), ai_active: z.boolean().optional().describe('A IA trabalha nos cards desta coluna: ao entrar nela o card fica "ready"'), requires_approval: z.boolean().optional().describe('A IA só avança o card depois que uma pessoa aprova'), ai_instruction: z.string().optional().describe('O que a IA faz quando um card entra nesta coluna (fase)'), artifact_name: z.string().optional().describe('Nome do arquivo do documento que a fase produz, ex.: "PRD.md"; vazio se não produz'), artifact_template: z.string().optional().describe('Modelo do documento, em markdown') },
     (a, router) => {
       const s = router.snapshot();
       const col = findColumn(s, a.column, a.workflow ? findWorkflow(s, a.workflow).id : undefined);
-      router.handle({ type: 'settings.column.update', columnId: col.id, patch: { name: a.name, category: a.category, position: a.position, collapsed: a.collapsed, aiActive: a.ai_active, requiresApproval: a.requires_approval } });
+      router.handle({ type: 'settings.column.update', columnId: col.id, patch: { name: a.name, category: a.category, position: a.position, collapsed: a.collapsed, aiActive: a.ai_active, requiresApproval: a.requires_approval, aiInstruction: a.ai_instruction, artifactName: a.artifact_name, artifactTemplate: a.artifact_template } });
       return overview(router);
     },
   );

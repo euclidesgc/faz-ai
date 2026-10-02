@@ -24,7 +24,7 @@ export class AttachmentStore {
     return path.join(this.baseDir, a.cardId, a.storedName);
   }
 
-  importFile(cardId: string, srcPath: string): Omit<Attachment, 'createdAt'> {
+  importFile(cardId: string, srcPath: string): Omit<Attachment, 'createdAt' | 'artifact'> {
     const size = fs.statSync(srcPath).size;
     this.checkSize(size);
     const rec = this.record(cardId, path.basename(srcPath), size);
@@ -33,7 +33,7 @@ export class AttachmentStore {
     return rec;
   }
 
-  importData(cardId: string, filename: string, base64: string): Omit<Attachment, 'createdAt'> {
+  importData(cardId: string, filename: string, base64: string): Omit<Attachment, 'createdAt' | 'artifact'> {
     const buf = Buffer.from(base64, 'base64');
     this.checkSize(buf.length);
     const rec = this.record(cardId, filename, buf.length);
@@ -54,7 +54,7 @@ export class AttachmentStore {
     if (size > MAX_ATTACHMENT_BYTES) throw new Error('Anexo maior que 20 MB');
   }
 
-  private record(cardId: string, filename: string, size: number): Omit<Attachment, 'createdAt'> {
+  private record(cardId: string, filename: string, size: number): Omit<Attachment, 'createdAt' | 'artifact'> {
     const id = newId();
     const clean = safeName(filename);
     return { id, cardId, filename: clean, storedName: `${id.slice(0, 8)}-${clean}`, mime: mimeOf(clean), size };

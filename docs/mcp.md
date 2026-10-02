@@ -134,11 +134,23 @@ Nas colunas com `requiresApproval` (em `get_board`), `move_card` só leva o card
 o status é `approved`. Voltar de coluna ou cancelar é livre. `update_column` liga e desliga
 `ai_active` e `requires_approval`.
 
+### Fases e documentos
+
+Cada coluna em que a IA atua é uma fase. `get_card` devolve em `phase` a instrução da fase, o nome
+e o modelo do documento que ela produz e se a coluna exige aprovação. Numa sub-tarefa, `phase` é a
+fase da história e `storyArtifacts` lista os documentos já anexados a ela.
+
+O documento é construído numa sub-tarefa (campo Fase = nome da coluna), mas fica na história:
+`add_attachment` com `artifact: true` grava o arquivo no card da história, mesmo quando chamado na
+sub-tarefa, e substitui a versão anterior de mesmo nome. A fase de cada coluna é editável em
+Configurações → Workflows e colunas ou por `update_column` (`ai_instruction`, `artifact_name`,
+`artifact_template`).
+
 Ao ler um card (`get_card`), a IA recebe a ferramenta, o **modelo** e o **esforço** que devem executá-lo e as **Skills**
 obrigatórias com o caminho de cada `SKILL.md`. Ela é instruída a carregar essas skills antes de
 executar e a delegar o trabalho a um subagente com o modelo escolhido, ou avisar quando o cliente
 não permite. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue.
 
-Fluxo SDD sugerido: a IA lê a história, produz o artefato da fase (PRD, Spec, Plan) e o anexa ao
-card, cria as sub-tarefas com o campo Fase, move cada uma conforme avança, comenta o resultado e
-move a história para a próxima coluna ao fechar a fase.
+Fluxo SDD sugerido: a IA lê a história e a fase (`phase`), cria uma sub-tarefa com o campo Fase,
+constrói nela o documento da fase e o anexa à história (`artifact: true`), pede a revisão na
+história e para. Com a aprovação, move a história para a próxima coluna.

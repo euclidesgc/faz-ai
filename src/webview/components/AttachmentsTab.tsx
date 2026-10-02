@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { cardRef } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
 
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -22,6 +23,9 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
   const setError = useBoardStore((s) => s.setError);
   const [over, setOver] = useState(false);
   const attachments = state.attachments.filter((a) => a.cardId === cardId);
+  // os documentos das fases ficam na história; a sub-tarefa só aponta para eles
+  const parent = state.cards.find((c) => c.id === state.cards.find((x) => x.id === cardId)?.parentId);
+  const storyArtifacts = parent ? state.attachments.filter((a) => a.cardId === parent.id && a.artifact) : [];
 
   const addFiles = async (files: File[]) => {
     for (const file of files) {
@@ -49,6 +53,22 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
 
   return (
     <section className="drawer-section">
+      {parent && storyArtifacts.length > 0 && (
+        <div className="story-artifacts">
+          <h3>Artefatos da história <small>{cardRef(parent)} {parent.title}</small></h3>
+          <ul className="attachments">
+            {storyArtifacts.map((a) => (
+              <li key={a.id}>
+                <span className="thumb file" onClick={() => send({ type: 'attachment.open', attachmentId: a.id })}>{(a.filename.split('.').pop() ?? '').slice(0, 4).toUpperCase() || '?'}</span>
+                <div className="att-info">
+                  <a title="Abre o documento anexado à história" onClick={() => send({ type: 'attachment.open', attachmentId: a.id })}>{a.filename}</a>
+                  <span className="muted small">anexado à história · {new Date(a.createdAt).toLocaleString()}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div
         className={`dropzone ${over ? 'over' : ''}`}
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
@@ -69,7 +89,7 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
               <span className="thumb file" onClick={() => send({ type: 'attachment.open', attachmentId: a.id })}>{(a.filename.split('.').pop() ?? '').slice(0, 4).toUpperCase() || '?'}</span>
             )}
             <div className="att-info">
-              <a onClick={() => send({ type: 'attachment.open', attachmentId: a.id })}>{a.filename}</a>
+              <a onClick={() => send({ type: 'attachment.open', attachmentId: a.id })}>{a.filename}</a>{a.artifact && <span className="badge artifact-badge" title="Documento de uma fase">artefato</span>}
               <span className="muted small">{formatSize(a.size)} · {new Date(a.createdAt).toLocaleString()}</span>
             </div>
             <button className="ghost small" onClick={() => send({ type: 'attachment.reveal', attachmentId: a.id })}>Mostrar na pasta</button>

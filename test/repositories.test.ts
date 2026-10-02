@@ -35,7 +35,7 @@ describe('seed', () => {
   it('cria board com dois workflows, colunas, tipos e campos padrão', () => {
     const s = snap();
     expect(s.workflows).toHaveLength(2);
-    expect(colsOf(parentWf().id).map((c) => c.name)).toEqual(['Backlog', 'PRD', 'Spec', 'Plan', 'Implementação', 'Concluído', 'Cancelado']);
+    expect(colsOf(parentWf().id).map((c) => c.name)).toEqual(['Backlog', 'Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação', 'Concluído', 'Cancelado']);
     expect(colsOf(childWf().id).map((c) => c.name)).toEqual(['A fazer', 'Em andamento', 'Concluído']);
     expect(s.cardTypes.map((t) => t.name)).toContain('Sub-tarefa');
     expect(s.fieldDefs.map((f) => f.name)).toEqual(['Fase', 'Tags', 'Esforço da atividade', 'Modelo', 'Skills']);
@@ -110,7 +110,7 @@ describe('settings', () => {
     const wf = parentWf().id;
     const review = settings.createColumn(wf, 'Review');
     settings.updateColumn(review, { position: 2 });
-    expect(colsOf(wf).map((c) => c.name)).toEqual(['Backlog', 'PRD', 'Review', 'Spec', 'Plan', 'Implementação', 'Concluído', 'Cancelado']);
+    expect(colsOf(wf).map((c) => c.name)).toEqual(['Backlog', 'Discovery', 'Review', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação', 'Concluído', 'Cancelado']);
     const card = cards.create(boardId, { typeId: typeNamed('História').id, columnId: review, parentId: null, title: 'a' });
     const done = colsOf(wf).find((c) => c.name === 'Concluído')!;
     settings.deleteColumn(review, done.id);

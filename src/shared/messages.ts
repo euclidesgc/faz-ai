@@ -26,7 +26,8 @@ export type WebviewToHost =
   | { type: 'comment.update'; commentId: Id; body: string }
   | { type: 'comment.delete'; commentId: Id }
   | { type: 'attachment.pick'; cardId: Id }
-  | { type: 'attachment.addData'; cardId: Id; filename: string; base64: string }
+  /** `artifact`: é o documento de uma fase; vai para a história (mesmo enviado de uma sub-tarefa) e substitui o artefato de mesmo nome */
+  | { type: 'attachment.addData'; cardId: Id; filename: string; base64: string; artifact?: boolean }
   | { type: 'attachment.open'; attachmentId: Id }
   | { type: 'attachment.reveal'; attachmentId: Id }
   | { type: 'attachment.delete'; attachmentId: Id }
@@ -35,7 +36,7 @@ export type WebviewToHost =
   | { type: 'checklist.update'; itemId: Id; patch: { text?: string; done?: boolean } }
   | { type: 'checklist.delete'; itemId: Id }
   | { type: 'settings.column.create'; workflowId: Id; name: string }
-  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean } }
+  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean; aiInstruction?: string; artifactName?: string; artifactTemplate?: string } }
   | { type: 'settings.column.delete'; columnId: Id; moveCardsTo: Id }
   | { type: 'settings.type.create'; name: string; color: string; defaultWorkflowId: Id }
   | { type: 'settings.type.update'; typeId: Id; patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue> } }

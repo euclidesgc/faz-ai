@@ -17,9 +17,9 @@ const state: BoardState = {
   board: { id: 'b', workspaceKey: 'k', name: 'B', rules: DEFAULT_RULES, aiTool: 'claude', modelCatalog: [], modelRules: [], appearance: DEFAULT_APPEARANCE, templateVersion: 1 },
   workflows: [{ id: 'wp', boardId: 'b', name: 'H', position: 0, kind: 'parent', collapsed: false, archiveCollapsed: true }, { id: 'wc', boardId: 'b', name: 'S', position: 1, kind: 'child', collapsed: false, archiveCollapsed: true }],
   columns: [
-    { id: 'todo', workflowId: 'wp', name: 'Backlog', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false },
-    { id: 'c-todo', workflowId: 'wc', name: 'A fazer', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false },
-    { id: 'c-done', workflowId: 'wc', name: 'Concluído', position: 1, category: 'done', isTerminal: true, collapsed: false, aiActive: false, requiresApproval: false },
+    { id: 'todo', workflowId: 'wp', name: 'Backlog', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '' },
+    { id: 'c-todo', workflowId: 'wc', name: 'A fazer', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '' },
+    { id: 'c-done', workflowId: 'wc', name: 'Concluído', position: 1, category: 'done', isTerminal: true, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '' },
   ],
   cardTypes: [],
   cards: [

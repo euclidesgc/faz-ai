@@ -58,6 +58,7 @@ describe('categoria de coluna', () => {
       INSERT INTO meta VALUES ('schema_version','2');
       CREATE TABLE boards (id TEXT PRIMARY KEY, workspace_key TEXT NOT NULL UNIQUE, name TEXT NOT NULL);
       CREATE TABLE cards (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, created_at INTEGER NOT NULL);
+      CREATE TABLE attachments (id TEXT PRIMARY KEY, card_id TEXT NOT NULL);
       CREATE TABLE field_defs (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, options_json TEXT NOT NULL DEFAULT '[]', applies_to_types_json TEXT, display TEXT NOT NULL DEFAULT 'inline', position INTEGER NOT NULL);
       CREATE TABLE card_types (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL, default_workflow_id TEXT NOT NULL);
       CREATE TABLE field_values (card_id TEXT NOT NULL, field_id TEXT NOT NULL, value_json TEXT NOT NULL, PRIMARY KEY (card_id, field_id));

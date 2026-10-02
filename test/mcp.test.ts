@@ -51,7 +51,7 @@ describe('servidor MCP', () => {
     expect(names).toEqual(expect.arrayContaining(['get_board', 'list_cards', 'get_card', 'create_card', 'move_card', 'add_comment', 'add_attachment', 'update_rules']));
     const board = (await call('get_board')).data;
     expect(board.workflows.map((w: any) => w.columns.map((c: any) => c.name))).toEqual([
-      ['Backlog', 'PRD', 'Spec', 'Plan', 'Implementação', 'Concluído', 'Cancelado'],
+      ['Backlog', 'Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação', 'Concluído', 'Cancelado'],
       ['A fazer', 'Em andamento', 'Concluído'],
     ]);
   });
@@ -129,7 +129,7 @@ describe('servidor MCP', () => {
     expect(board.workflows[1].columns.map((c: any) => c.name)).toContain('Em revisão');
     expect((await call('update_column', { column: 'Concluído', name: 'Feito' })).text).toContain('informe também o workflow');
     board = (await call('update_column', { column: 'Concluído', workflow: 'parent', name: 'Feito' })).data;
-    expect(board.workflows[0].columns[5].name).toBe('Feito');
+    expect(board.workflows[0].columns[7].name).toBe('Feito');
     board = (await call('create_field', { name: 'Estimativa', kind: 'number', applies_to_types: ['História'] })).data;
     expect(board.fields.at(-1)).toMatchObject({ name: 'Estimativa', appliesTo: ['História'] });
     expect((await call('update_rules', { blockDoneWithOpenChildren: false })).data.blockDoneWithOpenChildren).toBe(false);
@@ -379,6 +379,38 @@ describe('status do card e checkpoint de revisão', () => {
     router.handle({ type: 'card.move', cardId: card(1).id, columnId: router.snapshot().columns.find((c) => c.name === 'Plan')!.id, position: 0 });
     expect(card(1).status).toBe('ready');
     expect((await call('move_card', { card: 1, column: 'Cancelado' })).data.card.work).toBeUndefined();
+  });
+
+  it('entrega a fase do card e guarda o artefato na história, mesmo vindo da sub-tarefa', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD' });
+    const story = (await call('get_card', { card: 1 })).data;
+    expect(story.phase).toMatchObject({ name: 'PRD', artifact: { filename: 'PRD.md' }, requiresApproval: true });
+    expect(story.phase.instruction).toContain('requisitos');
+    expect(story.phase.artifact.template).toContain('# PRD');
+    expect(story.phase.reviewNote).toContain('#1');
+
+    // a sub-tarefa da fase enxerga a fase da história e grava o artefato nela
+    const sub = (await call('create_card', { title: 'Escrever PRD', parent: 1, fields: { Fase: 'PRD' } })).data;
+    expect(sub.phase.name).toBe('PRD');
+    expect(sub.storyArtifacts).toEqual([]);
+    const first = (await call('add_attachment', { card: 2, filename: 'PRD.md', content: 'v1', artifact: true })).data;
+    expect(first).toMatchObject({ filename: 'PRD.md', artifact: true, attachedTo: '#1' });
+    await call('add_attachment', { card: 2, filename: 'rascunho.md', content: 'notas' }); // anexo comum fica na sub-tarefa
+    const second = (await call('add_attachment', { card: 2, filename: 'PRD.md', content: 'v2', artifact: true })).data;
+    expect(fs.existsSync(first.path)).toBe(false); // a revisão substitui o arquivo anterior
+
+    const after = (await call('get_card', { card: 1 })).data;
+    expect(after.attachments.map((a: any) => [a.filename, a.artifact])).toEqual([['PRD.md', true]]);
+    expect((await call('read_attachment', { attachment_id: second.attachmentId })).text).toBe('v2');
+    const subAfter = (await call('get_card', { card: 2 })).data;
+    expect(subAfter.attachments.map((a: any) => a.filename)).toEqual(['rascunho.md']);
+    expect(subAfter.storyArtifacts.map((a: any) => a.attachmentId)).toEqual([second.attachmentId]);
+
+    // a fase é configurável por coluna
+    await call('update_column', { column: 'PRD', ai_instruction: 'Escreva um one-pager', artifact_name: 'ONEPAGER.md', artifact_template: '# One-pager' });
+    expect((await call('get_card', { card: 1 })).data.phase).toMatchObject({ instruction: 'Escreva um one-pager', artifact: { filename: 'ONEPAGER.md', template: '# One-pager' } });
+    await call('create_card', { title: 'No backlog' });
+    expect((await call('get_card', { card: 3 })).data.phase).toBeUndefined();
   });
 
   it('pergunta, bloqueio e colunas configuráveis', async () => {

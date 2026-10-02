@@ -1,13 +1,15 @@
 import type { Database } from 'sql.js';
 import { norm } from '../../shared/filters';
 import type { ColumnCategory, WorkflowKind } from '../../shared/model';
+import { newId } from './ids';
+import { PHASE_DEFAULTS } from '../../shared/phaseDefaults';
 import { all, bool, num, one, run, str, transaction } from './query';
 
 /**
  * Board padrão. Cada mudança no padrão sobe a versão; boards criados antes são atualizados no
  * lugar (com confirmação), sem recriar nada: os cards continuam na coluna em que estavam.
  */
-export const BOARD_TEMPLATE_VERSION = 1;
+export const BOARD_TEMPLATE_VERSION = 2;
 
 export interface TemplateColumn {
   name: string;
@@ -21,10 +23,12 @@ export interface TemplateColumn {
 export const BOARD_TEMPLATE: Record<WorkflowKind, TemplateColumn[]> = {
   parent: [
     { name: 'Backlog', category: 'open' },
+    { name: 'Discovery', category: 'open', aiActive: true, requiresApproval: true },
     { name: 'PRD', category: 'open', aiActive: true, requiresApproval: true },
     { name: 'Spec', category: 'open', aiActive: true, requiresApproval: true },
     { name: 'Plan', category: 'open', aiActive: true, requiresApproval: true },
     { name: 'Implementação', category: 'open', aiActive: true },
+    { name: 'Homologação', category: 'open', aiActive: true, requiresApproval: true },
     { name: 'Concluído', category: 'done' },
     { name: 'Cancelado', category: 'cancelled' },
   ],
@@ -34,6 +38,21 @@ export const BOARD_TEMPLATE: Record<WorkflowKind, TemplateColumn[]> = {
     { name: 'Concluído', category: 'done' },
   ],
 };
+
+/** Fases das histórias: as opções do campo "Fase" das sub-tarefas. */
+export const STORY_PHASES: string[] = BOARD_TEMPLATE.parent.filter((c) => c.aiActive).map((c) => c.name);
+
+/** Insere uma coluna na posição dada, empurrando as seguintes. Os cards não são tocados. */
+export function insertColumn(db: Database, workflowId: string, c: TemplateColumn, position: number): void {
+  const phase = PHASE_DEFAULTS[c.name];
+  run(db, 'UPDATE columns SET position = position + 1 WHERE workflow_id = ? AND position >= ?', [workflowId, position]);
+  run(
+    db,
+    `INSERT INTO columns(id, workflow_id, name, position, is_terminal, category, ai_active, requires_approval, ai_instruction, artifact_name, artifact_template)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    [newId(), workflowId, c.name, position, c.category === 'open' ? 0 : 1, c.category, c.aiActive ? 1 : 0, c.requiresApproval ? 1 : 0, phase?.instruction ?? '', phase?.artifactName ?? '', phase?.artifactTemplate ?? ''],
+  );
+}
 
 interface Step {
   description: string;
@@ -55,6 +74,54 @@ function steps(db: Database, boardId: string): Step[] {
         out.push({
           description: `Coluna "${str(col.name)}": a IA atua${t.requiresApproval ? ' e só avança o card com a sua aprovação' : ''}.`,
           apply: () => run(db, 'UPDATE columns SET ai_active = 1, requires_approval = ? WHERE id = ?', [t.requiresApproval ? 1 : 0, str(col.id)]),
+        });
+      }
+    }
+  }
+  if (version < 2) {
+    const parent = one(db, "SELECT id FROM workflows WHERE board_id = ? AND kind = 'parent' ORDER BY position LIMIT 1", [boardId]);
+    const wf = parent ? str(parent.id) : null;
+    const cols = wf ? all(db, 'SELECT id, name, ai_instruction, artifact_name, artifact_template FROM columns WHERE workflow_id = ?', [wf]) : [];
+    const named = (name: string) => cols.find((c) => norm(str(c.name)) === norm(name));
+    const template = (name: string) => BOARD_TEMPLATE.parent.find((c) => c.name === name)!;
+    if (wf && !named('Discovery')) {
+      out.push({
+        description: 'Nova coluna "Discovery" depois do Backlog: a IA analisa o problema e conversa com você antes do PRD.',
+        // a posição é lida na hora de aplicar, porque um passo anterior pode ter mexido nas colunas
+        apply: () => {
+          const backlog = one(db, "SELECT position FROM columns WHERE workflow_id = ? AND lower(name) = 'backlog'", [wf]);
+          insertColumn(db, wf, template('Discovery'), backlog ? num(backlog.position) + 1 : 0);
+        },
+      });
+    }
+    if (wf && !named('Homologação')) {
+      out.push({
+        description: 'Nova coluna "Homologação" antes da conclusão: a história só é concluída com a sua aprovação.',
+        apply: () => {
+          const firstTerminal = one(db, "SELECT MIN(position) AS p FROM columns WHERE workflow_id = ? AND category != 'open'", [wf])?.p;
+          const end = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM columns WHERE workflow_id = ?', [wf])?.p);
+          insertColumn(db, wf, template('Homologação'), firstTerminal == null ? end : num(firstTerminal));
+        },
+      });
+    }
+    for (const col of cols) {
+      const phase = Object.entries(PHASE_DEFAULTS).find(([name]) => norm(name) === norm(str(col.name)))?.[1];
+      // só preenche as fases que a pessoa ainda não configurou
+      if (!phase || str(col.ai_instruction) || str(col.artifact_name) || str(col.artifact_template)) continue;
+      out.push({
+        description: `Coluna "${str(col.name)}": instrução para a IA${phase.artifactName ? ` e modelo do documento ${phase.artifactName}` : ''}.`,
+        apply: () => run(db, 'UPDATE columns SET ai_instruction = ?, artifact_name = ?, artifact_template = ? WHERE id = ?', [phase.instruction, phase.artifactName, phase.artifactTemplate, str(col.id)]),
+      });
+    }
+    const fase = one(db, "SELECT id, options_json FROM field_defs WHERE board_id = ? AND lower(name) = 'fase' AND kind = 'select'", [boardId]);
+    if (fase) {
+      const options = JSON.parse(str(fase.options_json) || '[]') as string[];
+      const has = (name: string) => options.some((o) => norm(o) === norm(name));
+      const next = [...(has('Discovery') ? [] : ['Discovery']), ...options, ...(has('Homologação') ? [] : ['Homologação'])];
+      if (next.length !== options.length) {
+        out.push({
+          description: 'Campo "Fase" das sub-tarefas: novas opções Discovery e Homologação.',
+          apply: () => run(db, 'UPDATE field_defs SET options_json = ? WHERE id = ?', [JSON.stringify(next), str(fase.id)]),
         });
       }
     }
