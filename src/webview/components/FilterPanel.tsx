@@ -1,4 +1,4 @@
-import type { DatePreset, Relation } from '../../shared/filters';
+import type { DatePreset, Filters, Relation } from '../../shared/filters';
 import type { FieldDef } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
 
@@ -16,6 +16,15 @@ export function FilterPanel() {
 
   return (
     <div className="filter-panel">
+      <div className="filter-group">
+        <h3>Pendência</h3>
+        <select value={filters.owner} onChange={(e) => setFilters({ owner: e.target.value as Filters['owner'] })}>
+          <option value="any">Qualquer</option>
+          <option value="human">Com você (revisar, responder, desbloquear)</option>
+          <option value="ai">Com a IA</option>
+        </select>
+      </div>
+
       <div className="filter-group">
         <h3>Tipo</h3>
         <div className="chips-editor">

@@ -39,7 +39,7 @@ const state: BoardState = {
     { cardId: 'solo', fieldId: 'prazo', value: '2026-10-05' },
   ],
   checklistItems: [],
-  comments: [{ id: 'c1', cardId: 'solo', author: 'a', body: 'ver com a Júlia', createdAt: NOW, updatedAt: NOW }],
+  comments: [{ id: 'c1', cardId: 'solo', author: 'a', source: 'human', body: 'ver com a Júlia', createdAt: NOW, updatedAt: NOW }],
   attachments: [],
   currentUser: 'a',
   harness: EMPTY_HARNESS,
@@ -81,6 +81,15 @@ describe('applyFilters', () => {
     expect(run({ relation: 'withChildren' })).toEqual(['bug', 'login']);
     expect(run({ relation: 'withoutChildren' })).toEqual(['solo']);
     expect(run({ relation: 'pendingChildren' })).toEqual(['login']);
+  });
+
+  it('pendência: com a pessoa ou com a IA', () => {
+    const cards = state.cards.map((c, i) => ({ ...c, status: (['waiting_review', 'ready', 'blocked'] as const)[i] ?? null }));
+    const owned = (owner: Filters['owner']) => [...(applyFilters({ ...state, cards }, { ...EMPTY_FILTERS, includeRelated: false, owner }, NOW) ?? [])].sort();
+    const idOf = (status: string) => cards.filter((c) => c.status === status && c.deletedAt === null).map((c) => c.id);
+    expect(owned('human')).toEqual([...idOf('waiting_review'), ...idOf('blocked')].sort());
+    expect(owned('ai')).toEqual(idOf('ready'));
+    expect(activeFilterCount({ ...EMPTY_FILTERS, owner: 'human' })).toBe(1);
   });
 
   it('includeRelated traz pai e filhos dos resultados', () => {

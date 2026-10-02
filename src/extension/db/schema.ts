@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -190,6 +190,10 @@ const MIGRATIONS: Record<number, string> = {
     ALTER TABLE columns ADD COLUMN artifact_template TEXT NOT NULL DEFAULT '';
     -- anexo que é o artefato de uma fase; fica sempre no card da história
     ALTER TABLE attachments ADD COLUMN artifact INTEGER NOT NULL DEFAULT 0;
+  `,
+  14: `
+    -- quem escreveu a mensagem na conversa: 'human' ou 'ai'; mensagens antigas ficam sem origem
+    ALTER TABLE comments ADD COLUMN source TEXT;
   `,
 };
 

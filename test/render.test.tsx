@@ -97,7 +97,7 @@ describe('telas montam sem erro', () => {
     expect(custom).not.toContain('A fazer'); // linha de baixo fechada não mostra as colunas
     useBoardStore.setState({ collapsed: {} }); // a história tem modelo manual diferente da sugestão
     expect(html(<FilterBar />)).toContain('Filtros');
-    expect(html(<FiltersApp />).length).toBeGreaterThan(100);
+    expect(html(<FiltersApp />)).toContain('Com você (revisar, responder, desbloquear)');
     expect(html(<TrashView />)).toContain('Lixo');
     const drawer = html(<CardDrawer cardId={storyId} />);
     expect(drawer).toContain('História');
@@ -163,6 +163,6 @@ describe('telas montam sem erro', () => {
     const look = html(<AppearanceSettings />);
     for (const text of ['Tema', 'Sistema (acompanha o VS Code)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia', 'Status dos cards', 'Aguardando resposta']) expect(look).toContain(text);
     const harness = html(<HarnessSettings />);
-    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)']) expect(harness).toContain(text);
+    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)', 'Instalar skill do fluxo']) expect(harness).toContain(text);
   });
 });

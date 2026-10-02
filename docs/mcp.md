@@ -134,6 +134,19 @@ Nas colunas com `requiresApproval` (em `get_board`), `move_card` só leva o card
 o status é `approved`. Voltar de coluna ou cancelar é livre. `update_column` liga e desliga
 `ai_active` e `requires_approval`.
 
+### Pendências
+
+`get_pending_work` é o ponto de partida de uma sessão sem pedido específico. Ele devolve, em
+`forYou`, o que está com a IA:
+
+- `approved`: cards aprovados, para mover para a próxima coluna;
+- `unanswered`: cards em que a pessoa escreveu por último na conversa, com a mensagem;
+- `ready`: cards prontos para trabalhar (sub-tarefas de uma história que está com a pessoa ficam de fora).
+
+`withPerson` lista o que espera a pessoa. Cada mensagem da conversa traz `from` (`human` ou `ai`).
+A skill `faz-ai-fluxo`, instalada por `install_flow_skill` ou pelo botão em Harness de IA, descreve
+o ciclo completo para a IA.
+
 ### Fases e documentos
 
 Cada coluna em que a IA atua é uma fase. `get_card` devolve em `phase` a instrução da fase, o nome

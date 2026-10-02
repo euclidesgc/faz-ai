@@ -413,6 +413,62 @@ describe('status do card e checkpoint de revisão', () => {
     expect((await call('get_card', { card: 3 })).data.phase).toBeUndefined();
   });
 
+  it('fila de pendências: o que está com a IA e o que está com a pessoa', async () => {
+    const { humanQueueStatuses, turnsPassedToHuman } = await import('../src/shared/pending');
+    const pending = async () => (await call('get_pending_work')).data;
+    const ids = (list: any[]) => list.map((c) => c.id);
+    expect((await pending()).next).toContain('Nada pendente');
+
+    await call('create_card', { title: 'A', column: 'PRD' }); // #1
+    await call('create_card', { title: 'B', column: 'Spec' }); // #2
+    await call('create_card', { title: 'C' }); // #3, no Backlog: a IA não atua
+    await call('create_card', { title: 'Sub de A', parent: 1 }); // #4
+    let p = await pending();
+    expect(ids(p.forYou.ready)).toEqual(['#1', '#2', '#4']);
+    expect(p.withPerson).toEqual([]);
+
+    // a IA entrega #1 para revisão: sai da fila dela, entra na da pessoa, e a sub-tarefa espera junto
+    const before = humanQueueStatuses(router.snapshot());
+    await call('request_review', { card: 1, summary: 'pronto' });
+    expect(turnsPassedToHuman(before, router.snapshot()).map((c) => c.number)).toEqual([1]);
+    expect(turnsPassedToHuman(humanQueueStatuses(router.snapshot()), router.snapshot())).toEqual([]); // já avisado
+    p = await pending();
+    expect(ids(p.forYou.ready)).toEqual(['#2']);
+    expect(ids(p.withPerson)).toEqual(['#1']);
+
+    // a pessoa escreve num card do Backlog e num que aguarda revisão: são mensagens sem resposta
+    router.handle({ type: 'comment.add', cardId: card(3).id, body: 'Isso depende do #2?' });
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Por que essa abordagem?' });
+    p = await pending();
+    expect(ids(p.forYou.unanswered)).toEqual(['#1', '#3']);
+    expect(p.forYou.unanswered[1].lastMessage).toMatchObject({ author: 'Pessoa', body: 'Isso depende do #2?' });
+    expect((await call('get_card', { card: 3 })).data.comments[0].from).toBe('human');
+    await call('add_comment', { card: 3, body: 'Não depende.' });
+    expect(ids((await pending()).forYou.unanswered)).toEqual(['#1']);
+
+    // aprovado vai para o topo da fila; bloqueio feito pela própria pessoa não gera aviso
+    human(1, 'approved');
+    p = await pending();
+    expect(ids(p.forYou.approved)).toEqual(['#1']);
+    expect(ids(p.forYou.ready)).toEqual(['#2', '#4']);
+    expect(p.next).toContain('approved');
+    const quiet = humanQueueStatuses(router.snapshot());
+    human(2, 'blocked', 'Sem acesso');
+    expect(turnsPassedToHuman(quiet, router.snapshot())).toEqual([]);
+    expect(ids((await pending()).withPerson)).toEqual(['#2']);
+    expect((await call('list_cards', { work_status: 'blocked' })).data.total).toBe(1);
+  });
+
+  it('instala a skill do fluxo sem sobrescrever', async () => {
+    const first = (await call('install_flow_skill')).data;
+    expect(first).toMatchObject({ installed: true, skill: '.claude/skills/faz-ai-fluxo/SKILL.md' });
+    const file = path.join(dir, first.skill);
+    expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
+    fs.writeFileSync(file, '---\nname: faz-ai-fluxo\ndescription: minha versão\n---\nmeu texto');
+    expect((await call('install_flow_skill')).data.installed).toBe(false);
+    expect(fs.readFileSync(file, 'utf8')).toContain('meu texto');
+  });
+
   it('pergunta, bloqueio e colunas configuráveis', async () => {
     await call('create_card', { title: 'Login', column: 'Implementação' });
     expect((await call('ask_question', { card: 1, question: 'Qual provedor de login?' })).data.card.work).toMatchObject({ status: 'waiting_answer', with: 'human' });

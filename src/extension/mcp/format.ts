@@ -1,5 +1,6 @@
 import { norm } from '../../shared/filters';
 import { describeRule, modelFieldOf, modelLabel, parseModelValue, resolveModelInput, suggestModel, type ModelOption } from '../../shared/models';
+import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
 import { statusInfo } from '../../shared/status';
 import { cardRef, type BoardState, type Card, type CardType, type Column, type FieldDef, type FieldValue, type Workflow } from '../../shared/model';
 
@@ -193,10 +194,31 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
       .sort((a, b) => a.number - b.number)
       .map((k) => ({ id: cardRef(k), title: k.title, column: s.columns.find((col) => col.id === k.columnId)?.name, status: cardStatus(s, k), fields: fieldsOf(s, k) })),
     checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })),
-    comments: s.comments.filter((m) => m.cardId === c.id).map((m) => ({ commentId: m.id, author: m.author, at: iso(m.createdAt), body: m.body })),
+    comments: s.comments.filter((m) => m.cardId === c.id).map((m) => ({ commentId: m.id, author: m.author, ...(m.source ? { from: m.source } : {}), at: iso(m.createdAt), body: m.body })),
     attachments: s.attachments.filter((a) => a.cardId === c.id).map(attachment),
     // os artefatos das fases ficam na história; a sub-tarefa os enxerga por aqui
     ...(c.parentId ? { storyArtifacts: s.attachments.filter((a) => a.cardId === c.parentId && a.artifact).map(attachment) } : {}),
+  };
+}
+
+/** A fila da IA (o que fazer agora) e, para contexto, o que está esperando a pessoa. */
+export function pendingOverview(s: BoardState) {
+  const p = pendingWork(s);
+  const lastHuman = (c: Card) => {
+    const m = s.comments.filter((x) => x.cardId === c.id).at(-1);
+    return m ? { lastMessage: { author: m.author, at: iso(m.createdAt), body: m.body } } : {};
+  };
+  const total = aiQueue(p).length;
+  return {
+    forYou: {
+      approved: p.ai.approved.map((c) => cardSummary(s, c)),
+      unanswered: p.ai.unanswered.map((c) => ({ ...cardSummary(s, c), ...lastHuman(c) })),
+      ready: p.ai.ready.map((c) => cardSummary(s, c)),
+    },
+    withPerson: humanQueue(p).map((c) => cardSummary(s, c)),
+    next: total
+      ? 'Trate nesta ordem: approved (mova para a próxima coluna e siga o trabalho), unanswered (responda na conversa do card), ready (trabalhe no card). Não mexa no que está em withPerson.'
+      : 'Nada pendente com você. Encerre sem alterar o board.',
   };
 }
 

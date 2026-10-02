@@ -12,6 +12,8 @@ import { MessageRouter } from './panel/messageRouter';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
 import { ViewStateStore } from './viewState';
+import { cardRef } from '../shared/model';
+import { humanQueueStatuses, turnsPassedToHuman } from '../shared/pending';
 
 let handle: DbHandle | null = null;
 let stopMcp: (() => void) | null = null;
@@ -46,7 +48,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         workspaceDir: f.uri.fsPath,
         homeDir: os.homedir(),
       });
-      router.onDidChange(() => tree.refresh());
+      // o que já estava com a pessoa ao abrir não gera aviso; só o que a IA passar daqui em diante
+      let withHuman = humanQueueStatuses(router.snapshot());
+      const onBoardChange = () => {
+        tree.refresh();
+        const state = router.snapshot();
+        const passed = turnsPassedToHuman(withHuman, state);
+        withHuman = humanQueueStatuses(state);
+        treeView.badge = withHuman.size ? { value: withHuman.size, tooltip: `${withHuman.size} card(s) esperando por você` } : undefined;
+        for (const card of passed) {
+          const label = state.board.appearance.statuses[card.status!].label;
+          void vscode.window.showInformationMessage(`${cardRef(card)} ${card.title}: ${label}`, 'Abrir card').then((choice) => choice && openBoard(card.id));
+        }
+      };
+      router.onDidChange(onBoardChange);
+      onBoardChange();
       void offerBoardUpgrade(context, router);
       return router;
     })();

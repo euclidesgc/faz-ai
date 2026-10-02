@@ -27,6 +27,8 @@ function FileEditor({ saved, onSave, onClose }: { saved: string; onSave: (conten
   );
 }
 
+const FLOW_SKILL_NAME = 'faz-ai-fluxo';
+
 export function HarnessSettings() {
   const state = useBoardStore((s) => s.state)!;
   const harness = state.harness;
@@ -140,6 +142,9 @@ export function HarnessSettings() {
       <div className="row section-head">
         <h3>Skills</h3>
         <span className="spacer" />
+        {!harness.skills.some((k) => k.name === FLOW_SKILL_NAME) && (
+          <button title="Cria a skill que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências" onClick={() => send({ type: 'harness.flowSkill.install' })}>Instalar skill do fluxo</button>
+        )}
         <button className="primary" onClick={() => setEditing(editing?.kind === 'newSkill' ? null : { kind: 'newSkill' })}>Nova skill</button>
       </div>
       <p className="muted small">

@@ -73,7 +73,9 @@ export type WebviewToHost =
   | { type: 'harness.skill.create'; name: string; description: string; content: string }
   | { type: 'harness.skill.write'; name: string; content: string }
   | { type: 'harness.skill.setEnabled'; name: string; enabled: boolean }
-  | { type: 'harness.skill.delete'; name: string };
+  | { type: 'harness.skill.delete'; name: string }
+  /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
+  | { type: 'harness.flowSkill.install' };
 
 export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }
