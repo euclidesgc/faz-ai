@@ -85,6 +85,21 @@ conversa quando a execução termina, e enquanto isso o card fica "Em execução
 - Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo. O log
   completo está no painel **Saída → Faz AI**.
 
+### Heartbeat
+
+Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
+intervalo, enquanto o editor estiver aberto na pasta do projeto. Em cada rodada ela avança os cards
+aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez.
+
+- Sem pendência com a IA, nada é executado.
+- Cards que estão com você (aguardando revisão ou resposta, bloqueados) não são tocados, a menos
+  que você tenha deixado uma mensagem sem resposta na conversa.
+- **Rodar agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
+  uma rodada na hora, mesmo com o heartbeat desligado. **Faz AI: Parar as execuções da IA**
+  interrompe tudo.
+- A barra de status mostra os cards em execução e a hora da próxima rodada.
+- As execuções usam a mesma permissão e o mesmo tempo limite do botão "Chamar IA".
+
 Quais colunas exigem aprovação, e em quais a IA atua, se define em Configurações → Workflows e
 colunas. Você mesmo pode mover qualquer card sem aprovação.
 

@@ -45,6 +45,7 @@ export const cardPrompt = (ref: string): string =>
  */
 export class AiRunner {
   private runs = new Map<string, Run>();
+  private finishListeners: ((cardId: string) => void)[] = [];
 
   constructor(private router: MessageRouter, private deps: RunnerDeps) {}
 
@@ -90,7 +91,13 @@ export class AiRunner {
       log(error ? `Falhou: ${error.message}` : run.stopped ? 'Interrompida.' : run.timedOut ? 'Encerrada por tempo limite.' : `Terminou (código ${code}).`);
       this.settle(cardId, run, code, error, this.aiMessages(cardId) > messagesBefore, tool.label);
       this.publish();
+      this.finishListeners.forEach((fn) => fn(cardId));
     });
+  }
+
+  /** Avisa quando a execução de um card termina, seja como for. */
+  onDidFinish(listener: (cardId: string) => void): void {
+    this.finishListeners.push(listener);
   }
 
   /** Interrompe a execução do card; o status volta ao que era. */

@@ -142,9 +142,11 @@ describe('executor da IA', () => {
   });
 
   it('guarda permissão e tempo limite, recusando valores inválidos', () => {
-    expect(router.snapshot().board.runner).toEqual({ permission: 'board', timeoutMinutes: 30 });
+    expect(router.snapshot().board.runner).toEqual({ permission: 'board', timeoutMinutes: 30, heartbeat: false, heartbeatMinutes: 60 });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'edits', timeoutMinutes: 999 } } });
-    expect(router.snapshot().board.runner).toEqual({ permission: 'edits', timeoutMinutes: 240 });
+    expect(router.snapshot().board.runner).toMatchObject({ permission: 'edits', timeoutMinutes: 240 });
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true, heartbeatMinutes: 1 } } });
+    expect(router.snapshot().board.runner).toMatchObject({ heartbeat: true, heartbeatMinutes: 5 });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'tudo' as never } } });
     expect(router.snapshot().board.runner.permission).toBe('board'); // valor desconhecido volta ao mais restrito
   });

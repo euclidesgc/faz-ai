@@ -35,7 +35,8 @@ export function pendingWork(s: BoardState): PendingWork {
       approved: withStatus('approved'),
       // sub-tarefa de uma história que está com a pessoa espera a decisão dela
       ready: withStatus('ready').filter((c) => !c.parentId || !withHuman(byId.get(c.parentId))),
-      unanswered: cards.filter((c) => lastSource.get(c.id) === 'human' && c.status !== 'ready' && c.status !== 'approved' && c.status !== 'running'),
+      // card bloqueado fica parado até a pessoa desbloquear, mesmo que o motivo esteja na conversa
+      unanswered: cards.filter((c) => lastSource.get(c.id) === 'human' && !['ready', 'approved', 'running', 'blocked'].includes(c.status ?? '')),
     },
     human: {
       waitingReview: withStatus('waiting_review'),

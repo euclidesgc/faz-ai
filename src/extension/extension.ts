@@ -13,6 +13,7 @@ import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
 import { ViewStateStore } from './viewState';
 import { AiRunner } from './runner';
+import { Heartbeat } from './heartbeat';
 import { loginShellPath, spawnHeadless } from './spawn';
 import { cardRef } from '../shared/model';
 import { humanQueueStatuses, turnsPassedToHuman } from '../shared/pending';
@@ -20,6 +21,9 @@ import { humanQueueStatuses, turnsPassedToHuman } from '../shared/pending';
 let handle: DbHandle | null = null;
 let stopMcp: (() => void) | null = null;
 let runner: AiRunner | null = null;
+let heartbeat: Heartbeat | null = null;
+let heartbeatTimer: NodeJS.Timeout | undefined;
+const HEARTBEAT_KEY = 'fazai.heartbeatEnabled';
 
 function gitUserName(cwd: string): Promise<string> {
   return new Promise((resolve) => {
@@ -72,6 +76,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         log: (line) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`),
         spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
       });
+      heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: (line) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`) });
+      heartbeat.onDidChange(updateStatusBar);
+      router.onDidChange(updateStatusBar);
+      // lembra, por pasta, se o heartbeat está ligado: só nesse caso o board é carregado ao abrir o editor
+      const rememberHeartbeat = () => void context.workspaceState.update(HEARTBEAT_KEY, router.snapshot().board.runner.heartbeat);
+      router.onDidChange(rememberHeartbeat);
+      rememberHeartbeat();
+      updateStatusBar();
+      // só a janela que serve o board desta pasta (dona do servidor MCP) roda o heartbeat, para duas janelas não chamarem a IA em dobro
+      heartbeatTimer = setInterval(() => stopMcp && heartbeat?.tick(), 60_000);
       void offerBoardUpgrade(context, router);
       return router;
     })();
@@ -87,6 +101,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     } catch (e) {
       vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
     }
+  };
+
+  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+  statusBar.command = 'fazai.showLog';
+  /** Mostra na barra de status o heartbeat ligado e as execuções em andamento. */
+  const updateStatusBar = () => {
+    if (!routerPromise || !heartbeat || !runner) return statusBar.hide();
+    void routerPromise.then((router) => {
+      const s = router.snapshot();
+      const running = s.cards.filter((c) => s.aiRuns.includes(c.id)).map(cardRef);
+      const next = heartbeat?.nextRoundAt;
+      if (!running.length && !next) return statusBar.hide();
+      statusBar.text = running.length ? `$(sync~spin) Faz AI: ${running.join(', ')}${heartbeat!.queued ? ` +${heartbeat!.queued}` : ''}` : '$(pulse) Faz AI';
+      statusBar.tooltip = [
+        running.length ? `A IA está trabalhando em ${running.join(', ')}.` : 'Nenhuma execução em andamento.',
+        next ? `Heartbeat ligado: próxima rodada às ${new Date(next).toLocaleTimeString()}.` : 'Heartbeat desligado.',
+        'Clique para ver o log.',
+      ].join('\n');
+      statusBar.show();
+    });
   };
 
   const tree = new BoardTreeProvider(getRouter);
@@ -118,6 +152,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     output,
     vscode.commands.registerCommand('fazai.ai.run', aiCommand('start')),
     vscode.commands.registerCommand('fazai.ai.stop', aiCommand('stop')),
+    statusBar,
+    vscode.commands.registerCommand('fazai.showLog', () => output.show(true)),
+    vscode.commands.registerCommand('fazai.heartbeat.runNow', async () => {
+      if (!(await getRouter()) || !heartbeat) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
+      const n = heartbeat.runNow();
+      vscode.window.showInformationMessage(n ? `Faz AI: a IA vai tratar ${n} história(s) com pendência. O andamento aparece nos cards e em Saída → Faz AI.` : 'Faz AI: nada pendente com a IA.');
+    }),
+    vscode.commands.registerCommand('fazai.heartbeat.stop', () => heartbeat?.stop()),
     vscode.commands.registerCommand('fazai.upgradeBoard', async () => {
       const router = await getRouter();
       if (!router) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
@@ -153,6 +195,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     } catch (e) {
       console.warn(`Faz AI: servidor MCP não iniciado: ${e instanceof Error ? e.message : String(e)}`);
     }
+    // com o heartbeat ligado nesta pasta, o board precisa estar carregado para a rotina rodar sem ninguém abri-lo
+    if (context.workspaceState.get<boolean>(HEARTBEAT_KEY)) void getRouter();
   }
 }
 
@@ -212,6 +256,9 @@ async function connectAI(bridgePath: string, getRouter: () => Promise<MessageRou
 }
 
 export async function deactivate(): Promise<void> {
+  clearInterval(heartbeatTimer);
+  heartbeat?.stop();
+  heartbeat = null;
   runner?.dispose();
   runner = null;
   stopMcp?.();

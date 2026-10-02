@@ -241,6 +241,7 @@ export class MessageRouter {
       case 'ui.connectAI':
       case 'ai.run':
       case 'ai.stop':
+      case 'ai.heartbeat.run':
       case 'attachment.pick':
       case 'attachment.open':
       case 'attachment.reveal':

@@ -2,7 +2,7 @@
   "name": "faz-ai",
   "displayName": "Faz AI Kanban",
   "description": "Board kanban para Spec-Driven Development com IA, dentro do editor: histórias, sub-tarefas e um servidor MCP para a IA ler e atualizar o board",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "publisher": "euclidesgc",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -67,6 +67,18 @@
       {
         "command": "fazai.upgradeBoard",
         "title": "Faz AI: Atualizar board para o padrão atual"
+      },
+      {
+        "command": "fazai.heartbeat.runNow",
+        "title": "Faz AI: Rodar o heartbeat agora (tratar pendências com a IA)"
+      },
+      {
+        "command": "fazai.heartbeat.stop",
+        "title": "Faz AI: Parar as execuções da IA"
+      },
+      {
+        "command": "fazai.showLog",
+        "title": "Faz AI: Mostrar o log das execuções"
       }
     ],
     "viewsContainers": {

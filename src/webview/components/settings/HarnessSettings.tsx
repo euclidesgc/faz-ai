@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type RuleFile, type Skill } from '../../../shared/harness';
-import { RUNNER_PERMISSIONS, TIMEOUT_RANGE, type RunnerPermission } from '../../../shared/runner';
+import { HEARTBEAT_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE, type RunnerPermission } from '../../../shared/runner';
 import { useBoardStore } from '../../store/boardStore';
 
 type Editing = { kind: 'rule'; name: string } | { kind: 'skill'; name: string } | { kind: 'newSkill' } | null;
@@ -136,7 +136,7 @@ export function HarnessSettings() {
         <span className="muted small">Registra o servidor do board em {tool.mcp}.</span>
       </div>
 
-      <h3 className="section-head">Execução pela conversa</h3>
+      <h3 className="section-head">Execução pela conversa e heartbeat</h3>
       <p className="muted small">
         O botão "Chamar IA" da conversa de um card roda o {tool.label} em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define
         o que ele pode fazer nessas execuções. O servidor do board precisa estar conectado (botão acima) e o {tool.label} instalado e autenticado.
@@ -157,6 +157,23 @@ export function HarnessSettings() {
             <div className="row">
               <input type="number" min={TIMEOUT_RANGE.min} max={TIMEOUT_RANGE.max} key={state.board.runner.timeoutMinutes} defaultValue={state.board.runner.timeoutMinutes} onBlur={(e) => Number(e.target.value) !== state.board.runner.timeoutMinutes && send({ type: 'settings.board.update', patch: { runner: { timeoutMinutes: Number(e.target.value) } } })} />
               <span className="muted">minutos</span>
+            </div>
+          </label>
+          <h4>Heartbeat</h4>
+          <p className="muted small">
+            Com o heartbeat ligado e o editor aberto nesta pasta, o board chama o {tool.label} sozinho a cada intervalo: ele avança os cards aprovados,
+            responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. Sem pendência, nada é executado.
+          </p>
+          <label className="switch">
+            <input type="checkbox" checked={state.board.runner.heartbeat} onChange={(e) => send({ type: 'settings.board.update', patch: { runner: { heartbeat: e.target.checked } } })} />
+            Heartbeat ligado
+          </label>
+          <label className="field-row">
+            <span>Intervalo</span>
+            <div className="row">
+              <input type="number" min={HEARTBEAT_RANGE.min} max={HEARTBEAT_RANGE.max} key={state.board.runner.heartbeatMinutes} defaultValue={state.board.runner.heartbeatMinutes} onBlur={(e) => Number(e.target.value) !== state.board.runner.heartbeatMinutes && send({ type: 'settings.board.update', patch: { runner: { heartbeatMinutes: Number(e.target.value) } } })} />
+              <span className="muted">minutos</span>
+              <button title="Começa uma rodada agora, mesmo com o heartbeat desligado" onClick={() => send({ type: 'ai.heartbeat.run' })}>Rodar agora</button>
             </div>
           </label>
         </section>
