@@ -1,3 +1,5 @@
+🇧🇷 Português · [🇺🇸 English](CHANGELOG_EN.md)
+
 # Changelog
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.

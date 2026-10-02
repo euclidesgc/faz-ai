@@ -1,6 +1,22 @@
+🇧🇷 Português · [🇺🇸 English](README_EN.md)
+
 <img src="media/icon.png" width="96" alt="Ícone do Faz AI Kanban">
 
 # Faz AI Kanban
+
+> **Obrigado a quem está baixando e testando.**
+>
+> Publiquei a extensão no marketplace do Cursor e fui dormir. Quando acordei para instalá-la na
+> minha máquina de trabalho, ela já tinha 160 downloads. Eu não esperava isso, e fiquei muito feliz.
+>
+> A cada pessoa que instalou, abriu o board e deu uma chance a um projeto que acabou de nascer:
+> muito obrigado. É por vocês que ele continua.
+>
+> O Faz AI é **totalmente gratuito e open source** (licença MIT), e contribuições são bem-vindas:
+> conte o que funcionou e o que não funcionou, [abra uma issue](https://github.com/euclidesgc/faz-ai/issues)
+> ou [mande um pull request](https://github.com/euclidesgc/faz-ai/pulls).
+>
+> Euclides
 
 Um board kanban dentro do editor (VS Code e Cursor), feito para conduzir Spec-Driven Development
 (SDD) junto com uma IA. Você organiza o trabalho em histórias e sub-tarefas; a IA lê o board, produz
@@ -251,6 +267,10 @@ npm run typecheck
 Pressione `F5` para abrir o Extension Development Host. O código fica em `src/extension` (host e
 servidor MCP), `src/webview` (interface em React), `src/shared` (modelo e protocolo) e
 `src/mcp-bridge` (ponte stdio usada pelos clientes de IA).
+
+## Histórico de versões
+
+O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md).
 
 ## Licença
 
