@@ -6,6 +6,70 @@ import { openInMemory } from '../src/extension/db/database';
 import { headlessCommand, headlessUnsupported } from '../src/extension/headless';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiRunner, cardPrompt } from '../src/extension/runner';
+
+it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP num arquivo temporário e o resto no prompt', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { executionPlan } = await import('../src/extension/execution');
+  const { openInMemory } = await import('../src/extension/db/database');
+  const { MessageRouter } = await import('../src/extension/panel/messageRouter');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-exec-')));
+  const project = path.join(root, 'p');
+  const home = path.join(root, 'h');
+  fs.mkdirSync(project);
+  fs.mkdirSync(home);
+  fs.writeFileSync(path.join(project, '.mcp.json'), JSON.stringify({ mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } }, slack: { command: 'slack' } } }));
+  const db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
+  const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, { workspaceKey: 'ws', folderName: 'P', author: 'Pessoa', attachmentsDir: path.join(root, 'a'), workspaceDir: project, homeDir: home });
+  const base = { agent: '', skills: [], tools: [], deniedTools: [], model: '', clean: false, isDefault: true };
+  router.handle({ type: 'settings.execProfiles.set', profiles: [{ ...base, id: 'p', name: 'Restrito', mcpServers: ['github'], deniedTools: ['WebFetch'] }] });
+  const s0 = router.snapshot();
+  const cardId = router.createCard({ typeId: s0.cardTypes[0]!.id, columnId: s0.columns[0]!.id, parentId: null, title: 'x' });
+  const card = () => router.snapshot().cards.find((c) => c.id === cardId)!;
+
+  const plan = executionPlan(router.snapshot(), card(), project, home);
+  expect(JSON.parse(plan.input.mcpConfig!)).toEqual({ mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } } });
+  expect(plan.input.mcpBlocked).toEqual(['slack']);
+  expect(plan.advice).toEqual([]); // no Claude Code tudo isso vai por parâmetro
+  expect(plan.summary.join(' | ')).toContain('Servidores MCP: faz-ai, github (imposto)');
+  expect(plan.summary.join(' | ')).not.toContain('segredo');
+
+  // o arquivo temporário existe enquanto o processo roda, só para o dono, e some ao terminar
+  let exit: (code: number | null) => void = () => {};
+  let seen: { file: string; mode: number; content: string } | undefined;
+  const runner = new AiRunner(router, {
+    cwd: project,
+    homeDir: home,
+    log: () => {},
+    spawn: (command) => {
+      const file = command.args[command.args.indexOf('--mcp-config') + 1]!;
+      seen = { file, mode: fs.statSync(file).mode & 0o777, content: fs.readFileSync(file, 'utf8') };
+      return { kill: () => {}, onExit: (fn) => { exit = (code) => fn(code); } };
+    },
+  });
+  runner.start(cardId);
+  expect(seen!.mode).toBe(0o600);
+  expect(JSON.parse(seen!.content).mcpServers.slack).toBeUndefined();
+  exit(0);
+  expect(fs.existsSync(seen!.file)).toBe(false);
+
+  // noutra ferramenta, o que não vai por parâmetro vira instrução no prompt
+  router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
+  expect(executionPlan(router.snapshot(), card(), project, home).advice).toEqual(['De servidores MCP, use só o do board e: github.', 'Não use estas ferramentas: WebFetch.']);
+
+  // sem o servidor do board registrado, a execução restrita não começa
+  router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude' } });
+  fs.writeFileSync(path.join(project, '.mcp.json'), JSON.stringify({ mcpServers: { github: { command: 'gh-mcp' } } }));
+  router.refreshHarness();
+  expect(() => executionPlan(router.snapshot(), card(), project, home)).toThrow('servidor do board não está registrado');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+it('o prompt da execução leva as skills do card pelo caminho', () => {
+  expect(cardPrompt('#1')).not.toContain('skills, obrigatórias');
+  expect(cardPrompt('#1', [{ name: 'commit', path: '/home/.claude/skills/commit/SKILL.md' }, { name: 'sumida' }])).toContain('leia estas skills, obrigatórias para este card: commit (/home/.claude/skills/commit/SKILL.md).');
+});
 import type { HeadlessCommand } from '../src/extension/headless';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');

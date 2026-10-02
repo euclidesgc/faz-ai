@@ -37,7 +37,7 @@ export function createMcpServer(opts: McpOptions): McpServer {
         'se não for possível, avise a pessoa em vez de executar com outra configuração. ' +
         'O campo "Esforço da atividade" é o tamanho da tarefa (não é o esforço do modelo); as regras do board sugerem o modelo a partir dele (get_models). ' +
         'O campo "Skills" lista as skills obrigatórias do card: get_card devolve `requiredSkills` com o caminho de cada SKILL.md, ' +
-        'e todas devem ser carregadas antes de executar o card (outras skills continuam podendo ser usadas normalmente). ' +
+        'e todas devem ser lidas nesse caminho antes de executar o card, mesmo que não apareçam na sua lista de skills (podem estar desligadas ou fora da invocação automática). ' +
         'As colunas das histórias são as fases do fluxo; sua intenção é sempre levar a história até a conclusão, uma coluna por vez. ' +
         'get_card devolve em `phase` o que fazer na fase atual e o modelo do documento que ela produz. ' +
         'O documento de cada fase é construído numa sub-tarefa (campo Fase = nome da coluna), mas fica anexado à história: grave-o com add_attachment e artifact: true. ' +

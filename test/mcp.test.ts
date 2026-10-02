@@ -32,7 +32,7 @@ beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-mcp-'));
   const db = await openInMemory(WASM_DIR);
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
-    workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(dir, 'attachments'), workspaceDir: dir,
+    workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(dir, 'attachments'), workspaceDir: dir, homeDir: path.join(dir, 'home-do-usuario'),
   });
   changes = 0;
   router.onDidChange(() => changes++);
@@ -126,7 +126,10 @@ describe('servidor MCP', () => {
 
   it('configura colunas, campos e regras', async () => {
     let board = (await call('create_column', { workflow: 'child', name: 'Em revisão' })).data;
-    expect(board.workflows[1].columns.map((c: any) => c.name)).toContain('Em revisão');
+    // sem posição, a coluna entra antes da conclusão
+    expect(board.workflows[1].columns.map((c: any) => c.name)).toEqual(['A fazer', 'Em andamento', 'Em revisão', 'Concluído']);
+    board = (await call('create_column', { workflow: 'child', name: 'Triagem', position: 0 })).data;
+    expect(board.workflows[1].columns[0].name).toBe('Triagem');
     expect((await call('update_column', { column: 'Concluído', name: 'Feito' })).text).toContain('informe também o workflow');
     board = (await call('update_column', { column: 'Concluído', workflow: 'parent', name: 'Feito' })).data;
     expect(board.workflows[0].columns[7].name).toBe('Feito');
@@ -136,7 +139,116 @@ describe('servidor MCP', () => {
   });
 });
 
+describe('instalar skills pelo board', () => {
+  it('mostra o que foi encontrado, instala as escolhidas e as oferece nos cards', async () => {
+    const src = path.join(dir, 'origem');
+    for (const name of ['commit', 'deploy']) {
+      fs.mkdirSync(path.join(src, name), { recursive: true });
+      fs.writeFileSync(path.join(src, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Skill ${name}\n---\n`);
+    }
+    let cleaned = false;
+    router.setInstall('origem', src, () => { cleaned = true; });
+    expect(router.snapshot().harnessInstall).toEqual({ source: 'origem', skills: [{ rel: 'commit', name: 'commit', description: 'Skill commit', files: 0, valid: true }, { rel: 'deploy', name: 'deploy', description: 'Skill deploy', files: 0, valid: true }] });
+    router.handle({ type: 'harness.install.apply', tool: 'claude', to: 'project', rels: ['commit'] });
+    expect(fs.existsSync(path.join(dir, '.claude/skills/commit/SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, '.claude/skills/deploy'))).toBe(false);
+    expect(router.snapshot().harnessInstall).toBeNull();
+    expect(cleaned).toBe(true);
+    expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toContain('commit');
+    expect(() => router.handle({ type: 'harness.install.apply', tool: 'claude', to: 'project', rels: ['deploy'] })).toThrow('Procure de novo');
+  });
+});
+
+describe('modelos e referências nas skills', () => {
+  it('a skill de modelos nasce só quando indicada, e o card entrega os arquivos dela', async () => {
+    router.handle({ type: 'harness.referenceSkill.create' });
+    const skill = router.snapshot().harness.skills.find((k) => k.name === 'modelos-do-projeto')!;
+    expect(skill).toMatchObject({ enabled: true, mode: 'manual' });
+    expect(fs.existsSync(path.join(dir, '.claude/skills/modelos-do-projeto/references'))).toBe(true);
+
+    const written = (await call('write_skill_file', { skill: 'modelos-do-projeto', file: 'references/repositorio.ts', content: 'export class Repo {}' })).data;
+    expect(written.files).toEqual(['references/repositorio.ts']);
+    expect((await call('write_skill_file', { skill: 'modelos-do-projeto', file: '../fora.ts', content: 'x' })).error).toBe(true);
+    expect((await call('write_skill_file', { skill: 'nao-existe', file: 'references/a.ts', content: 'x' })).error).toBe(true);
+
+    const card = (await call('create_card', { title: 'História', fields: { Skills: ['modelos-do-projeto'] } })).data;
+    expect(card.requiredSkills).toEqual([{ name: 'modelos-do-projeto', scope: 'project', path: '.claude/skills/modelos-do-projeto/SKILL.md', files: ['.claude/skills/modelos-do-projeto/references/repositorio.ts'] }]);
+  });
+});
+
+describe('perfis de execução', () => {
+  const profile = (over: Record<string, unknown>) => ({ id: 'p', name: 'Perfil', agent: '', skills: [], mcpServers: null, tools: [], deniedTools: [], model: '', clean: false, isDefault: false, ...over });
+
+  it('resolve o perfil do card, da coluna e o padrão, e entrega em get_card', async () => {
+    await call('create_skill', { name: 'planejar', description: 'Planeja', content: 'Passos' });
+    await call('create_skill', { name: 'testar', description: 'Testa', content: 'Passos' });
+    await call('create_agent', { name: 'planejador', description: 'Planeja', content: 'Instruções' });
+    router.handle({ type: 'settings.execProfiles.set', profiles: [
+      profile({ id: 'geral', name: 'Geral', isDefault: true, skills: ['testar'] }),
+      profile({ id: 'plan', name: 'Planejamento', agent: 'planejador', skills: ['planejar'], mcpServers: ['github'], deniedTools: ['WebFetch'], model: 'claude:opus@high', clean: true }),
+    ] });
+    await call('create_card', { title: 'História', fields: { Skills: ['testar'] } });
+    // sem escolha no card nem na coluna: vale o padrão do board, e as skills do card somam às do perfil sem repetir
+    let card = (await call('get_card', { card: 1 })).data;
+    expect(card.execution).toMatchObject({ profile: 'Geral' });
+    expect(card.requiredSkills.map((k: any) => k.name)).toEqual(['testar']);
+
+    // o perfil da coluna vale para os cards dela, e também para as sub-tarefas da história
+    expect((await call('update_column', { column: 'Backlog', exec_profile: 'Não existe' })).error).toBe(true);
+    const board = (await call('update_column', { column: 'Backlog', exec_profile: 'Planejamento' })).data;
+    expect(board.execProfiles.map((p: any) => p.name)).toEqual(['Geral', 'Planejamento']);
+    expect(board.workflows[0].columns[0].execProfile).toBe('Planejamento');
+    card = (await call('get_card', { card: 1 })).data;
+    expect(card.execution).toMatchObject({ profile: 'Planejamento', agent: { name: 'planejador', path: path.join(dir, '.claude/agents/planejador.md') }, mcpServers: ['faz-ai', 'github'], deniedTools: ['WebFetch'], clean: true });
+    expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model', 'clean']);
+    expect(card.requiredSkills.map((k: any) => k.name)).toEqual(['planejar', 'testar']);
+    await call('create_card', { title: 'Sub', type: 'Sub-tarefa', parent: 1 });
+    expect((await call('get_card', { card: 2 })).data.execution.profile).toBe('Planejamento');
+
+    // o card pode trocar de perfil, e voltar ao da coluna
+    expect((await call('set_card_profile', { card: 1, profile: 'Geral' })).data.execution.profile).toBe('Geral');
+    expect((await call('set_card_profile', { card: 1 })).data.execution.profile).toBe('Planejamento');
+
+    // apagar um perfil solta as colunas e os cards que o usavam
+    await call('set_card_profile', { card: 1, profile: 'Planejamento' });
+    router.handle({ type: 'settings.execProfiles.set', profiles: [profile({ id: 'geral', name: 'Geral', isDefault: true })] });
+    const s = router.snapshot();
+    expect(s.columns.every((c) => c.execProfile === null)).toBe(true);
+    expect(s.cards.every((c) => c.execProfile === null)).toBe(true);
+    expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('Geral');
+  });
+});
+
 describe('harness e padrões pelo MCP', () => {
+  it('oferece nos cards as skills globais e de plugins da ferramenta em uso', async () => {
+    const home = path.join(dir, 'home-do-usuario');
+    const put = (rel: string, text: string) => {
+      fs.mkdirSync(path.dirname(path.join(home, rel)), { recursive: true });
+      fs.writeFileSync(path.join(home, rel), text);
+    };
+    put('.claude/skills/commit/SKILL.md', '---\nname: commit\ndescription: Escreve o commit\n---\n');
+    put('.claude/plugins/cache/loja/design/.claude-plugin/plugin.json', '{"name":"design"}');
+    put('.claude/plugins/cache/loja/design/skills/critica/SKILL.md', '---\nname: critica\ndescription: Critica\n---\n');
+    put('.codex/skills/de-outra-ferramenta/SKILL.md', '---\nname: x\ndescription: x\n---\n');
+    await call('create_skill', { name: 'revisar-spec', description: 'Revisa', content: 'Passos' });
+    router.refreshHarness();
+    const field = router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
+    expect(field.options).toEqual(['revisar-spec', 'commit', 'critica']);
+    const card = (await call('create_card', { title: 'História', fields: { Skills: ['commit', 'critica', 'revisar-spec'] } })).data;
+    expect(card.requiredSkills).toEqual([
+      { name: 'commit', scope: 'user', path: path.join(home, '.claude/skills/commit/SKILL.md') },
+      { name: 'critica', scope: 'plugin', path: path.join(home, '.claude/plugins/cache/loja/design/skills/critica/SKILL.md'), plugin: 'design' },
+      { name: 'revisar-spec', scope: 'project', path: '.claude/skills/revisar-spec/SKILL.md' },
+    ]);
+    // copiar a skill global para o projeto: ela passa a existir nos dois escopos e o card usa a do projeto
+    const global = router.snapshot().harness.inventory.find((t) => t.tool === 'claude')!.items.find((i) => i.name === 'commit')!;
+    router.handle({ type: 'harness.item.copy', tool: 'claude', items: [{ kind: 'skill', path: global.path }], to: 'project' });
+    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({ name: 'commit', scope: 'project', path: '.claude/skills/commit/SKILL.md' });
+    expect(() => router.handle({ type: 'harness.item.delete', tool: 'claude', kind: 'skill', path: '/etc/passwd' })).toThrow('não encontrado');
+    const inventory = (await call('get_harness')).data.inventory;
+    expect(inventory.find((i: any) => i.name === 'commit' && i.scope === 'user')).toEqual({ kind: 'skill', scope: 'user', name: 'commit', mode: 'auto', description: 'Escreve o commit', path: '~/.claude/skills/commit/SKILL.md' });
+  });
+
   it('gerencia regras e skills do projeto e sincroniza o campo Skills', async () => {
     expect((await call('get_harness')).data.ruleFiles.map((r: any) => [r.name, r.exists])).toEqual([['CLAUDE.md', false], ['AGENTS.md', false]]);
     await call('write_rule_file', { file: 'AGENTS.md', content: '# Regras\n' });
@@ -146,21 +258,22 @@ describe('harness e padrões pelo MCP', () => {
 
     expect((await call('create_skill', { name: 'Nome Ruim', description: 'd', content: 'c' })).error).toBe(true);
     const h = (await call('create_skill', { name: 'revisar-spec', description: 'Use ao revisar uma spec', content: 'Passos…' })).data;
-    expect(h.skills).toEqual([{ name: 'revisar-spec', enabled: true, description: 'Use ao revisar uma spec', path: '.claude/skills/revisar-spec/SKILL.md' }]);
+    expect(h.skills).toEqual([{ name: 'revisar-spec', enabled: true, mode: 'auto', description: 'Use ao revisar uma spec', path: '.claude/skills/revisar-spec/SKILL.md' }]);
     expect((await call('get_skill', { skill: 'revisar-spec' })).text).toContain('name: revisar-spec');
     const skillsField = () => router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
     expect(skillsField().options).toEqual(['revisar-spec']);
 
     // skill marcada no card aparece como obrigatória, com o caminho do SKILL.md
     const card = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 4.5' } })).data;
-    expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', path: '.claude/skills/revisar-spec/SKILL.md' }]);
+    expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', scope: 'project', path: '.claude/skills/revisar-spec/SKILL.md' }]);
     expect(card.model).toMatchObject({ tool: 'claude', model: 'haiku', effort: null, value: 'claude:haiku' });
 
     await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
     expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'revisar-spec'))).toBe(false);
     expect(fs.existsSync(path.join(dir, '.claude', 'skills-disabled', 'revisar-spec', 'SKILL.md'))).toBe(true);
-    expect(skillsField().options).toEqual([]);
-    expect((await call('get_card', { card: 1 })).data.requiredSkills[0].note).toContain('desligada');
+    // desligada, a skill continua podendo ser indicada: o card entrega o caminho do arquivo
+    expect(skillsField().options).toEqual(['revisar-spec']);
+    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({ name: 'revisar-spec', scope: 'project', path: '.claude/skills-disabled/revisar-spec/SKILL.md' });
     await call('set_skill_enabled', { skill: 'revisar-spec', enabled: true });
     await call('delete_skill', { skill: 'revisar-spec' });
     expect((await call('get_harness')).data.skills).toEqual([]);
@@ -556,7 +669,7 @@ describe('ferramentas de IA', () => {
     expect(fs.existsSync(path.join(dir, '.agents/skills-disabled/do-codex/SKILL.md'))).toBe(true);
     expect((await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false })).error).toBe(true); // skill de outra ferramenta
 
-    for (const [tool, base] of [['cursor', '.cursor/skills'], ['kimi', '.kimi/skills'], ['copilot', '.github/skills']] as const) {
+    for (const [tool, base] of [['cursor', '.cursor/skills'], ['kimi', '.kimi-code/skills'], ['copilot', '.github/skills']] as const) {
       await call('set_ai_tool', { tool });
       await call('create_skill', { name: `do-${tool}`, description: 'd', content: 'c' });
       expect(fs.existsSync(path.join(dir, base, `do-${tool}`, 'SKILL.md'))).toBe(true);

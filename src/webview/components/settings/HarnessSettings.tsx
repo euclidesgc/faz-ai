@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type Agent, type AiTool, type RuleFile, type Skill } from '../../../shared/harness';
+import { AI_TOOLS, RULE_FILES, SKILL_MODES, SKILL_NAME_PATTERN, aiToolInfo, type Agent, type AiTool, type RuleFile, type Skill, type SkillMode } from '../../../shared/harness';
 import { HEARTBEAT_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE, type RunnerPermission } from '../../../shared/runner';
 import { useBoardStore } from '../../store/boardStore';
+import { HarnessInventory } from './HarnessInventory';
 
 type Editing = { kind: 'rule'; name: string } | { kind: 'skill'; name: string } | { kind: 'agent'; name: string } | { kind: 'newSkill' } | { kind: 'newAgent' } | null;
 
@@ -116,6 +117,14 @@ export function HarnessSettings() {
     );
   };
 
+  /** o modo é gravado pelo caminho do SKILL.md, como o inventário o lista */
+  const skillPath = (k: Skill) => state.harness.inventory.find((t) => t.tool === tool.id)?.items.find((i) => i.kind === 'skill' && i.scope === 'project' && i.location === k.path)?.path;
+  const setMode = (skills: Skill[], mode: SkillMode) => {
+    const paths = skills.map(skillPath).filter((p): p is string => !!p);
+    if (paths.length) send({ type: 'harness.skill.setMode', tool: tool.id, paths, mode });
+  };
+  const automatic = harness.skills.filter((k) => k.enabled && k.mode === 'auto');
+
   const skillRow = (k: Skill) => (
     <section key={k.name} className={`settings-block ${k.enabled ? '' : 'rule off'}`}>
       <div className="row">
@@ -125,6 +134,11 @@ export function HarnessSettings() {
         <h3 className="plain">{k.name}</h3>
         <span className={`pill ${k.enabled ? '' : 'off'}`}>{k.enabled ? 'Ligada' : 'Desligada'}</span>
         <span className="spacer" />
+        {k.enabled && (
+          <select title={SKILL_MODES.find((m) => m.id === k.mode)!.hint} value={k.mode} onChange={(e) => setMode([k], e.target.value as SkillMode)}>
+            {SKILL_MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        )}
         <button onClick={() => toggle('skill', k.name)}>{isEditing('skill', k.name) ? 'Fechar' : 'Editar'}</button>
         <button
           className="icon danger"
@@ -142,7 +156,8 @@ export function HarnessSettings() {
     <div>
       <h2>Harness de IA</h2>
       <p className="muted">
-        Regras e skills que as ferramentas de IA leem neste projeto. Tudo aqui são arquivos da pasta do projeto: o board só os edita.
+        Regras, skills e agentes que a ferramenta deste projeto lê na pasta do projeto, editáveis aqui. No fim da página está tudo que cada
+        ferramenta carrega, incluindo o que vem da sua pasta de usuário e de plugins.
       </p>
 
       <h3>Ferramenta deste projeto</h3>
@@ -225,9 +240,20 @@ export function HarnessSettings() {
         <button className="primary" onClick={() => setEditing(editing?.kind === 'newSkill' ? null : { kind: 'newSkill' })}>Nova skill</button>
       </div>
       <p className="muted small">
-        Skills do {tool.label}: as ligadas ficam em <code>{tool.skills}</code> e viram opções do campo "Skills" dos cards. Desligar move a skill
-        para <code>{tool.skills}-disabled</code>: ela sai do contexto da ferramenta, mas o conteúdo é preservado.
+        Skills do {tool.label} em <code>{tool.skills}</code>. Todas viram opções do campo "Skills" dos cards, e um card que indica uma skill
+        entrega à IA o caminho do arquivo. Por isso uma skill não precisa ficar à vista da IA para ser usada:
       </p>
+      <ul className="muted small">
+        <li><b>Automática</b>: a IA vê a descrição em toda sessão e decide quando usar.</li>
+        <li><b>Só quando indicada</b>: a IA não a invoca sozinha; vale quando um card a indica ou quando é chamada pelo nome.</li>
+        <li><b>Desligada</b>: movida para <code>{tool.skills}-disabled</code>; a ferramenta não a enxerga, mas um card ainda pode indicá-la.</li>
+      </ul>
+      {automatic.length > 1 && (
+        <div className="row">
+          <span className="muted small">{automatic.length} skills automáticas no projeto.</span>
+          <button className="ghost small" title="A IA deixa de invocar essas skills sozinha; elas continuam valendo nos cards que as indicam" onClick={() => setMode(automatic, 'manual')}>Deixar todas só quando indicadas</button>
+        </div>
+      )}
 
       {editing?.kind === 'newSkill' && (
         <section className="settings-block">
@@ -296,6 +322,8 @@ export function HarnessSettings() {
       ) : (
         <p className="muted small">O {tool.label} não define agentes em arquivos do projeto.</p>
       )}
+
+      <HarnessInventory />
     </div>
   );
 }

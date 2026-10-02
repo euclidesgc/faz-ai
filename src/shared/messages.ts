@@ -1,6 +1,8 @@
 import type { Appearance } from './appearance';
 import type { ViewState } from './filters';
-import type { AiTool } from './harness';
+import type { ExecProfile } from './execution';
+import type { AiTool, HarnessKind, SkillMode } from './harness';
+import type { HookInput, McpServerInput } from './harnessCatalog';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
@@ -31,6 +33,9 @@ export type WebviewToHost =
   | { type: 'card.workspace.prepare'; cardId: Id }
   /** registra o pull request da história do card */
   | { type: 'card.pr.set'; cardId: Id; url: string }
+  /** perfil de execução do card; null volta ao da coluna */
+  | { type: 'card.execProfile.set'; cardId: Id; profileId: Id | null }
+  | { type: 'settings.execProfiles.set'; profiles: ExecProfile[] }
   /** a pasta de trabalho da história foi removida (a branch continua registrada) */
   | { type: 'card.workspace.clear'; cardId: Id }
   /** abre a pasta de trabalho da história numa janela nova do editor */
@@ -50,8 +55,8 @@ export type WebviewToHost =
   | { type: 'checklist.add'; cardId: Id; text: string }
   | { type: 'checklist.update'; itemId: Id; patch: { text?: string; done?: boolean } }
   | { type: 'checklist.delete'; itemId: Id }
-  | { type: 'settings.column.create'; workflowId: Id; name: string }
-  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean; aiInstruction?: string; artifactName?: string; artifactTemplate?: string } }
+  | { type: 'settings.column.create'; workflowId: Id; name: string; /** índice na linha; por padrão, antes da primeira coluna de conclusão */ position?: number }
+  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean; aiInstruction?: string; artifactName?: string; artifactTemplate?: string; execProfile?: Id | null } }
   | { type: 'settings.column.delete'; columnId: Id; moveCardsTo: Id }
   | { type: 'settings.type.create'; name: string; color: string; defaultWorkflowId: Id }
   | { type: 'settings.type.update'; typeId: Id; patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue> } }
@@ -83,12 +88,45 @@ export type WebviewToHost =
   /** recria as regras "Esforço → modelo" com os modelos da ferramenta */
   | { type: 'settings.modelRules.suggest'; tool: AiTool }
   | { type: 'settings.rules.update'; patch: Partial<BoardRules> }
+  /** relê o harness do disco (a pasta do usuário não é vigiada) */
+  | { type: 'harness.refresh' }
+  /** abre no editor o arquivo de um item do harness */
+  | { type: 'harness.item.open'; path: string }
+  /** cria um item num lugar do catálogo da ferramenta (`source` é o índice em HARNESS_CATALOG) e abre o arquivo no editor */
+  | { type: 'harness.item.create'; tool: AiTool; source: number; name: string; description: string }
+  /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
+  | { type: 'harness.item.delete'; tool: AiTool; kind: HarnessKind; path: string }
+  /** copia skills, agentes, comandos ou regras para o projeto ou para a pasta do usuário */
+  | { type: 'harness.item.copy'; tool: AiTool; items: { kind: HarnessKind; path: string }[]; to: 'project' | 'user' }
   | { type: 'harness.rule.write'; name: string; content: string }
   | { type: 'harness.rule.delete'; name: string }
   | { type: 'harness.skill.create'; name: string; description: string; content: string }
   | { type: 'harness.skill.write'; name: string; content: string }
   | { type: 'harness.skill.setEnabled'; name: string; enabled: boolean }
   | { type: 'harness.skill.delete'; name: string }
+  /** acrescenta um servidor MCP a um arquivo de configuração da ferramenta (`source` é o índice em HARNESS_CATALOG) */
+  | { type: 'harness.mcp.add'; tool: AiTool; source: number; server: McpServerInput }
+  | { type: 'harness.mcp.remove'; tool: AiTool; path: string; name: string }
+  /** acrescenta um hook a um arquivo de hooks da ferramenta (`source` é o índice em HARNESS_CATALOG) */
+  | { type: 'harness.hook.add'; tool: AiTool; source: number; hook: HookInput }
+  /** remove o hook listado: `event` é o nome do item e `command` o detalhe dele */
+  | { type: 'harness.hook.remove'; tool: AiTool; path: string; event: string; command: string }
+  /** regra de permissão numa das listas (allow, ask, deny) do arquivo de configuração */
+  | { type: 'harness.permission.add'; tool: AiTool; source: number; list: string; rule: string }
+  | { type: 'harness.permission.remove'; tool: AiTool; path: string; list: string; rule: string }
+  /** arquivo de apoio de uma skill (`path` é o SKILL.md, `file` o caminho dentro da pasta dela); criar abre o arquivo no editor */
+  | { type: 'harness.skill.file.create'; tool: AiTool; path: string; file: string; link: boolean }
+  | { type: 'harness.skill.file.open'; tool: AiTool; path: string; file: string }
+  | { type: 'harness.skill.file.delete'; tool: AiTool; path: string; file: string }
+  /** cria no projeto a skill de modelos e exemplos de código, só quando indicada */
+  | { type: 'harness.referenceSkill.create' }
+  /** procura skills numa pasta ou num repositório git (clonado numa pasta temporária); o resultado vem em `harnessInstall` */
+  | { type: 'harness.install.scan'; source: string }
+  /** copia as skills escolhidas para a pasta de skills da ferramenta, no projeto ou na pasta do usuário */
+  | { type: 'harness.install.apply'; tool: AiTool; to: 'project' | 'user'; rels: string[] }
+  | { type: 'harness.install.cancel' }
+  /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
+  | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
   | { type: 'harness.agent.create'; name: string; description: string; content: string; model?: string }
   | { type: 'harness.agent.write'; name: string; content: string }
   | { type: 'harness.agent.delete'; name: string }

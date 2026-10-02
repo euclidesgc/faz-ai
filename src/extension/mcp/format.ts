@@ -1,3 +1,4 @@
+import { EXEC_ASPECTS, EXEC_ENFORCEMENT, manifestOf } from '../../shared/execution';
 import { norm } from '../../shared/filters';
 import { describeRule, modelFieldOf, modelLabel, parseModelValue, resolveModelInput, suggestModel, type ModelOption } from '../../shared/models';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
@@ -143,12 +144,47 @@ export function modelsOverview(s: BoardState) {
   };
 }
 
+/** O que a sessão deve usar neste card, segundo o perfil de execução; vazio quando não há perfil. */
+function executionOf(s: BoardState, c: Card) {
+  const m = manifestOf(s, c);
+  if (!m.profile) return {};
+  const how = EXEC_ENFORCEMENT[s.board.aiTool];
+  const agent = m.agent ? toolItems(s).find((i) => i.kind === 'agent' && i.name === m.agent) : undefined;
+  return {
+    execution: {
+      profile: m.profile,
+      ...(m.agent ? { agent: { name: m.agent, ...(agent ? { path: agent.path } : {}) } } : {}),
+      ...(m.mcpServers ? { mcpServers: ['faz-ai', ...m.mcpServers] } : {}),
+      ...(m.tools.length ? { tools: m.tools } : {}),
+      ...(m.deniedTools.length ? { deniedTools: m.deniedTools } : {}),
+      ...(m.clean ? { clean: true } : {}),
+      enforcedByBoardRun: EXEC_ASPECTS.filter((a) => how[a.id] === 'enforced').map((a) => a.id),
+      note: 'Perfil de execução do card. Numa sessão aberta pela pessoa nada disto é imposto: siga como instrução (use só o agente, os servidores MCP e as ferramentas listados; com `clean`, só as skills de requiredSkills). Na execução pelo board, os itens de `enforcedByBoardRun` são impostos por parâmetro.',
+    },
+  };
+}
+
+/** Itens do harness da ferramenta com que o projeto trabalha. */
+const toolItems = (s: BoardState) => s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
+
+/** Arquivos de apoio da skill (referências, modelos, scripts), com o caminho ao lado do SKILL.md. */
+function supportFiles(skillMd: string, files: string[]) {
+  const dir = skillMd.replace(/\/?SKILL\.md$/, '');
+  return files.length ? { files: files.map((f) => `${dir}/${f}`) } : {};
+}
+
 /** Skills marcadas no campo "Skills" do card: obrigatórias na execução. */
-function requiredSkills(s: BoardState, c: Card) {
-  const value = fieldsOf(s, c)['Skills'];
-  return (Array.isArray(value) ? value : []).map((name) => {
+export function requiredSkills(s: BoardState, c: Card) {
+  // as skills do card somam às do perfil de execução
+  return manifestOf(s, c).skills.map((name) => {
     const skill = s.harness.skills.find((k) => k.name === name);
-    return skill ? { name, path: skill.path, ...(skill.enabled ? {} : { note: 'skill desligada no projeto' }) } : { name, note: 'skill não encontrada no projeto' };
+    if (skill) {
+      const files = toolItems(s).find((i) => i.kind === 'skill' && i.scope === 'project' && i.location === skill.path)?.files ?? [];
+      return { name, scope: 'project', path: skill.path, ...supportFiles(skill.path, files) };
+    }
+    // fora do projeto: skill global ou de plugin da ferramenta em uso, com o caminho absoluto
+    const outside = toolItems(s).find((i) => i.kind === 'skill' && i.scope !== 'project' && i.name === name);
+    return outside ? { name, scope: outside.scope, path: outside.path, ...(outside.plugin ? { plugin: outside.plugin } : {}), ...supportFiles(outside.path, outside.files ?? []) } : { name, note: 'skill não encontrada' };
   });
 }
 
@@ -204,8 +240,9 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...cardSummary(s, c),
     ...(chosen ? { model: { ...describeModel(s, chosen), note: 'Modelo e esforço que devem executar este card.' } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
-    ...(skills.length ? { requiredSkills: skills, requiredSkillsNote: 'Carregue cada skill (leia o SKILL.md em `path`) antes de executar este card.' } : {}),
+    ...(skills.length ? { requiredSkills: skills, requiredSkillsNote: 'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em `files` estão os arquivos de apoio de cada skill (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.' } : {}),
     ...(phase ? { phase } : {}),
+    ...executionOf(s, c),
     ...workspaceOf(s, c),
     description: c.description,
     createdAt: iso(c.createdAt),
@@ -242,6 +279,8 @@ export function pendingOverview(s: BoardState) {
   };
 }
 
+const profileName = (s: BoardState, id: string | null) => (id ? s.board.execProfiles.find((p) => p.id === id)?.name : undefined);
+
 export function boardOverview(s: BoardState) {
   const active = s.cards.filter((c) => c.deletedAt === null && c.archivedAt === null);
   return {
@@ -251,10 +290,11 @@ export function boardOverview(s: BoardState) {
       kind: w.kind === 'parent' ? 'parent (histórias)' : 'child (sub-tarefas, sempre ligadas a uma história)',
       columns: s.columns
         .filter((c) => c.workflowId === w.id)
-        .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length, ...(c.aiActive ? { aiActive: true } : {}), ...(c.requiresApproval ? { requiresApproval: true } : {}), ...(c.artifactName ? { artifact: c.artifactName } : {}), ...(c.collapsed ? { collapsed: true } : {}) })),
+        .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length, ...(c.aiActive ? { aiActive: true } : {}), ...(c.requiresApproval ? { requiresApproval: true } : {}), ...(c.artifactName ? { artifact: c.artifactName } : {}), ...(profileName(s, c.execProfile) ? { execProfile: profileName(s, c.execProfile) } : {}), ...(c.collapsed ? { collapsed: true } : {}) })),
       ...(w.collapsed ? { collapsed: true } : {}),
       archivedColumnCollapsed: w.archiveCollapsed,
     })),
+    ...(s.board.execProfiles.length ? { execProfiles: s.board.execProfiles.map((p) => ({ name: p.name, ...(p.isDefault ? { default: true } : {}), ...(p.agent ? { agent: p.agent } : {}), ...(p.skills.length ? { skills: p.skills } : {}), ...(p.mcpServers ? { mcpServers: p.mcpServers } : {}), ...(p.model ? { model: p.model } : {}), ...(p.clean ? { clean: true } : {}) })) } : {}),
     cardTypes: s.cardTypes.map((t) => {
       const defaults = Object.fromEntries(
         Object.entries(t.defaults).flatMap(([id, v]) => {
@@ -284,7 +324,9 @@ export function harnessOverview(s: BoardState) {
   return {
     aiTool: s.board.aiTool,
     ruleFiles: s.harness.rules.map((r) => ({ name: r.name, exists: r.exists, ...(r.exists ? { bytes: r.content.length } : {}) })),
-    skills: s.harness.skills.map((k) => ({ name: k.name, enabled: k.enabled, description: k.description, path: k.path })),
+    skills: s.harness.skills.map((k) => ({ name: k.name, enabled: k.enabled, mode: k.mode, description: k.description, path: k.path })),
     agents: s.harness.agents.map((a) => ({ name: a.name, description: a.description, ...(a.model ? { model: a.model } : {}), path: a.path })),
+    // tudo que a ferramenta em uso carrega, com o escopo: project, user (global) ou plugin
+    inventory: toolItems(s).map((i) => ({ kind: i.kind, scope: i.scope, name: i.name, ...(i.mode ? { mode: i.mode } : {}), ...(i.files?.length ? { files: i.files } : {}), ...(i.description ? { description: i.description } : {}), path: i.location, ...(i.plugin ? { plugin: i.plugin } : {}) })),
   };
 }
