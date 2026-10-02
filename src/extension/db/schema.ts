@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -208,6 +208,12 @@ const MIGRATIONS: Record<number, string> = {
   17: `
     -- pull request da história
     ALTER TABLE cards ADD COLUMN pr_url TEXT NOT NULL DEFAULT '';
+  `,
+  18: `
+    -- perfis de execução: o que a sessão de IA recebe para trabalhar num card
+    ALTER TABLE boards ADD COLUMN exec_profiles_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE columns ADD COLUMN exec_profile TEXT;
+    ALTER TABLE cards ADD COLUMN exec_profile TEXT;
   `,
 };
 

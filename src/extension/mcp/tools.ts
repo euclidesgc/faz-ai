@@ -273,6 +273,17 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   );
 
   tool(
+    'set_card_profile',
+    'Escolhe o perfil de execução de um card (agente, skills, servidores MCP, ferramentas e modelo que a sessão deve usar); os perfis estão em get_board. Sem `profile`, o card volta a usar o perfil da coluna.',
+    { card: cardArg, profile: z.string().optional().describe('Nome do perfil; omita para voltar ao da coluna') },
+    (a, router) => {
+      const card = live(findCard(router.snapshot(), a.card));
+      router.handle({ type: 'card.execProfile.set', cardId: card.id, profileId: a.profile ? findProfile(router.snapshot(), a.profile).id : null }, ai());
+      return detail(router, card.id);
+    },
+  );
+
+  tool(
     'set_pull_request',
     'Registra na história o endereço do pull request aberto para a branch dela. Chame logo depois de abrir o PR (ex.: com `gh pr create`); pode ser chamada de uma sub-tarefa. Não faça o merge: ele depende da aprovação da pessoa na homologação.',
     { card: cardArg, url: z.string().url().describe('Endereço do pull request') },
@@ -435,11 +446,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   tool(
     'update_column',
     'Altera uma coluna: nome, o que ela representa (categoria), posição no workflow, se a IA atua nela, se ela exige aprovação de uma pessoa para o card avançar, e a fase (instrução para a IA e modelo do documento que a fase produz).',
-    { column: z.string(), workflow: columnWorkflowArg, name: z.string().min(1).optional(), category: categoryArg.optional(), position: z.number().int().min(0).optional(), collapsed: z.boolean().optional().describe('A coluna começa colapsada ao abrir o board'), ai_active: z.boolean().optional().describe('A IA trabalha nos cards desta coluna: ao entrar nela o card fica "ready"'), requires_approval: z.boolean().optional().describe('A IA só avança o card depois que uma pessoa aprova'), ai_instruction: z.string().optional().describe('O que a IA faz quando um card entra nesta coluna (fase)'), artifact_name: z.string().optional().describe('Nome do arquivo do documento que a fase produz, ex.: "PRD.md"; vazio se não produz'), artifact_template: z.string().optional().describe('Modelo do documento, em markdown') },
+    { column: z.string(), workflow: columnWorkflowArg, name: z.string().min(1).optional(), category: categoryArg.optional(), position: z.number().int().min(0).optional(), collapsed: z.boolean().optional().describe('A coluna começa colapsada ao abrir o board'), ai_active: z.boolean().optional().describe('A IA trabalha nos cards desta coluna: ao entrar nela o card fica "ready"'), requires_approval: z.boolean().optional().describe('A IA só avança o card depois que uma pessoa aprova'), ai_instruction: z.string().optional().describe('O que a IA faz quando um card entra nesta coluna (fase)'), artifact_name: z.string().optional().describe('Nome do arquivo do documento que a fase produz, ex.: "PRD.md"; vazio se não produz'), artifact_template: z.string().optional().describe('Modelo do documento, em markdown'), exec_profile: z.string().optional().describe('Nome do perfil de execução dos cards desta coluna (ver get_board); vazio volta ao padrão do board') },
     (a, router) => {
       const s = router.snapshot();
       const col = findColumn(s, a.column, a.workflow ? findWorkflow(s, a.workflow).id : undefined);
-      router.handle({ type: 'settings.column.update', columnId: col.id, patch: { name: a.name, category: a.category, position: a.position, collapsed: a.collapsed, aiActive: a.ai_active, requiresApproval: a.requires_approval, aiInstruction: a.ai_instruction, artifactName: a.artifact_name, artifactTemplate: a.artifact_template } });
+      router.handle({ type: 'settings.column.update', columnId: col.id, patch: { name: a.name, category: a.category, position: a.position, collapsed: a.collapsed, aiActive: a.ai_active, requiresApproval: a.requires_approval, aiInstruction: a.ai_instruction, artifactName: a.artifact_name, artifactTemplate: a.artifact_template, execProfile: a.exec_profile === undefined ? undefined : a.exec_profile ? findProfile(router.snapshot(), a.exec_profile).id : null } });
       return overview(router);
     },
   );
@@ -820,6 +831,12 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 }
 
 /** Ids das colunas com esse nome (pode haver uma em cada workflow). */
+function findProfile(s: BoardState, name: string) {
+  const profile = s.board.execProfiles.find((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
+  if (!profile) throw new Error(`Perfil de execução "${name}" não encontrado. Perfis: ${s.board.execProfiles.map((p) => p.name).join(', ') || 'nenhum'}.`);
+  return profile;
+}
+
 function findColumnIds(s: BoardState, name: string, workflowId?: string): Set<string> {
   if (workflowId) return new Set([findColumn(s, name, workflowId).id]);
   const ids = s.workflows.flatMap((w) => {

@@ -1,5 +1,6 @@
 import type { Appearance } from './appearance';
 import type { ViewState } from './filters';
+import type { ExecProfile } from './execution';
 import type { AiTool, HarnessKind, SkillMode } from './harness';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
@@ -31,6 +32,9 @@ export type WebviewToHost =
   | { type: 'card.workspace.prepare'; cardId: Id }
   /** registra o pull request da história do card */
   | { type: 'card.pr.set'; cardId: Id; url: string }
+  /** perfil de execução do card; null volta ao da coluna */
+  | { type: 'card.execProfile.set'; cardId: Id; profileId: Id | null }
+  | { type: 'settings.execProfiles.set'; profiles: ExecProfile[] }
   /** a pasta de trabalho da história foi removida (a branch continua registrada) */
   | { type: 'card.workspace.clear'; cardId: Id }
   /** abre a pasta de trabalho da história numa janela nova do editor */
@@ -51,7 +55,7 @@ export type WebviewToHost =
   | { type: 'checklist.update'; itemId: Id; patch: { text?: string; done?: boolean } }
   | { type: 'checklist.delete'; itemId: Id }
   | { type: 'settings.column.create'; workflowId: Id; name: string; /** índice na linha; por padrão, antes da primeira coluna de conclusão */ position?: number }
-  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean; aiInstruction?: string; artifactName?: string; artifactTemplate?: string } }
+  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean; aiInstruction?: string; artifactName?: string; artifactTemplate?: string; execProfile?: Id | null } }
   | { type: 'settings.column.delete'; columnId: Id; moveCardsTo: Id }
   | { type: 'settings.type.create'; name: string; color: string; defaultWorkflowId: Id }
   | { type: 'settings.type.update'; typeId: Id; patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue> } }

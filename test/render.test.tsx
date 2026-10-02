@@ -14,6 +14,7 @@ import { FilterBar } from '../src/webview/components/FilterBar';
 import { TrashView } from '../src/webview/components/TrashView';
 import { ColumnsSettings } from '../src/webview/components/settings/ColumnsSettings';
 import { FieldsSettings } from '../src/webview/components/settings/FieldsSettings';
+import { ExecProfilesSettings } from '../src/webview/components/settings/ExecProfilesSettings';
 import { HarnessSettings } from '../src/webview/components/settings/HarnessSettings';
 import { RuleBuilder } from '../src/webview/components/settings/ModelRulesEditor';
 import { AppearanceSettings } from '../src/webview/components/settings/AppearanceSettings';
@@ -176,6 +177,8 @@ describe('telas montam sem erro', () => {
 
     const look = html(<AppearanceSettings />);
     for (const text of ['Tema', 'Sistema (acompanha o VS Code)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia', 'Status dos cards', 'Aguardando resposta']) expect(look).toContain(text);
+    const profiles = html(<ExecProfilesSettings />);
+    for (const text of ['Perfis de execução', 'na execução pelo board', 'imposto', 'orientado', 'Novo perfil', 'Nenhum perfil ainda']) expect(profiles).toContain(text);
     const harness = html(<HarnessSettings />);
     for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi-code/skills', 'Tudo que cada ferramenta carrega', 'Servidores MCP', 'Hooks', 'deste projeto', 'não encontrada', 'ao board (MCP)', 'Instalar skill do fluxo', 'Execução pela conversa e heartbeat', 'Só o board', 'Tempo limite por execução', 'Heartbeat ligado', 'Rodar agora', 'Agentes', 'Novo agente', 'revisor-de-spec', '.claude/agents/revisor-de-spec.md']) expect(harness).toContain(text);
   });

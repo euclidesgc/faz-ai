@@ -12,7 +12,8 @@ import { MarkdownEditor } from '../MarkdownEditor';
 function PhaseEditor({ column }: { column: Column }) {
   const send = useBoardStore((s) => s.send);
   const [template, setTemplate] = useState(column.artifactTemplate);
-  const patch = (p: { aiInstruction?: string; artifactName?: string; artifactTemplate?: string }) => send({ type: 'settings.column.update', columnId: column.id, patch: p });
+  const profiles = useBoardStore((s) => s.state)!.board.execProfiles;
+  const patch = (p: { aiInstruction?: string; artifactName?: string; artifactTemplate?: string; execProfile?: string | null }) => send({ type: 'settings.column.update', columnId: column.id, patch: p });
   const preset = PHASE_DEFAULTS[column.name];
   const isDefault = preset && preset.instruction === column.aiInstruction && preset.artifactName === column.artifactName && preset.artifactTemplate === column.artifactTemplate;
 
@@ -30,6 +31,15 @@ function PhaseEditor({ column }: { column: Column }) {
         <span>Modelo do documento <small className="muted">a IA preenche este modelo ao gerar o documento</small></span>
         <MarkdownEditor key={column.artifactTemplate} minRows={8} value={template} onChange={setTemplate} onCommit={() => template !== column.artifactTemplate && patch({ artifactTemplate: template })} placeholder="Markdown com as seções do documento." />
       </div>
+      {profiles.length > 0 && (
+        <label className="field-col">
+          <span>Perfil de execução <small className="muted">agente, skills, servidores MCP, ferramentas e modelo dos cards desta fase; cada card pode trocar</small></span>
+          <select value={column.execProfile ?? ''} onChange={(e) => patch({ execProfile: e.target.value || null })}>
+            <option value="">Padrão do board{profiles.find((p) => p.isDefault) ? ` (${profiles.find((p) => p.isDefault)!.name})` : ' (nenhum)'}</option>
+            {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+      )}
       {preset && (
         <div className="row end">
           <button className="ghost small" disabled={isDefault} onClick={() => patch({ aiInstruction: preset.instruction, artifactName: preset.artifactName, artifactTemplate: preset.artifactTemplate })}>Restaurar o padrão desta fase</button>

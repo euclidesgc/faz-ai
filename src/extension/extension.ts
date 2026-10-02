@@ -74,6 +74,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const pathEnv = await loginShellPath();
       runner = new AiRunner(router, {
         cwd: f.uri.fsPath,
+        homeDir: os.homedir(),
         log: (line) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`),
         spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
       });

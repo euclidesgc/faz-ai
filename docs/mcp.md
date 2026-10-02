@@ -170,6 +170,26 @@ Copilot) ou `policy.allow_implicit_invocation: false` em `agents/openai.yaml` (C
 desligada ou em modo `manual` continua valendo nos cards que a indicam: `requiredSkills` traz o
 caminho do `SKILL.md`, e a execução pelo board passa esses caminhos no prompt.
 
+### Perfis de execução
+
+Um perfil de execução define antes o que a sessão usa num card: agente, skills, servidores MCP,
+ferramentas, modelo e se a sessão é limpa (sem as personalizações da pasta do usuário). Os perfis
+são criados em Configurações → Perfis de execução; `get_board` os lista em `execProfiles`. O perfil
+de um card é o do próprio card (`set_card_profile`), senão o da coluna (`update_column` com
+`exec_profile`), senão o da coluna da história (numa sub-tarefa), senão o padrão do board.
+
+`get_card` devolve o perfil resolvido em `execution`, e `requiredSkills` já soma as skills do perfil
+às do card. Numa sessão aberta pela pessoa, `execution` é orientação. Na execução pelo board, o que
+a linha de comando da ferramenta aceita é imposto por parâmetro (`enforcedByBoardRun`):
+
+| Ferramenta | Imposto por parâmetro | Só orientado |
+| --- | --- | --- |
+| Claude Code | agente, servidores MCP, ferramentas, modelo e esforço, sessão limpa | skills (vão pelo caminho do arquivo) |
+| GitHub Copilot | agente, servidores MCP, ferramentas, modelo e esforço | skills, sessão limpa |
+| Kimi Code | agente, modelo | skills, servidores MCP, ferramentas, sessão limpa |
+| Codex | servidores MCP, modelo e esforço | agente, skills, ferramentas, sessão limpa |
+| Cursor | modelo | todo o resto |
+
 ### Pendências
 
 `get_pending_work` é o ponto de partida de uma sessão sem pedido específico. Ele devolve, em

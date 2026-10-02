@@ -139,6 +139,49 @@ describe('servidor MCP', () => {
   });
 });
 
+describe('perfis de execução', () => {
+  const profile = (over: Record<string, unknown>) => ({ id: 'p', name: 'Perfil', agent: '', skills: [], mcpServers: null, tools: [], deniedTools: [], model: '', clean: false, isDefault: false, ...over });
+
+  it('resolve o perfil do card, da coluna e o padrão, e entrega em get_card', async () => {
+    await call('create_skill', { name: 'planejar', description: 'Planeja', content: 'Passos' });
+    await call('create_skill', { name: 'testar', description: 'Testa', content: 'Passos' });
+    await call('create_agent', { name: 'planejador', description: 'Planeja', content: 'Instruções' });
+    router.handle({ type: 'settings.execProfiles.set', profiles: [
+      profile({ id: 'geral', name: 'Geral', isDefault: true, skills: ['testar'] }),
+      profile({ id: 'plan', name: 'Planejamento', agent: 'planejador', skills: ['planejar'], mcpServers: ['github'], deniedTools: ['WebFetch'], model: 'claude:opus@high', clean: true }),
+    ] });
+    await call('create_card', { title: 'História', fields: { Skills: ['testar'] } });
+    // sem escolha no card nem na coluna: vale o padrão do board, e as skills do card somam às do perfil sem repetir
+    let card = (await call('get_card', { card: 1 })).data;
+    expect(card.execution).toMatchObject({ profile: 'Geral' });
+    expect(card.requiredSkills.map((k: any) => k.name)).toEqual(['testar']);
+
+    // o perfil da coluna vale para os cards dela, e também para as sub-tarefas da história
+    expect((await call('update_column', { column: 'Backlog', exec_profile: 'Não existe' })).error).toBe(true);
+    const board = (await call('update_column', { column: 'Backlog', exec_profile: 'Planejamento' })).data;
+    expect(board.execProfiles.map((p: any) => p.name)).toEqual(['Geral', 'Planejamento']);
+    expect(board.workflows[0].columns[0].execProfile).toBe('Planejamento');
+    card = (await call('get_card', { card: 1 })).data;
+    expect(card.execution).toMatchObject({ profile: 'Planejamento', agent: { name: 'planejador', path: path.join(dir, '.claude/agents/planejador.md') }, mcpServers: ['faz-ai', 'github'], deniedTools: ['WebFetch'], clean: true });
+    expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model', 'clean']);
+    expect(card.requiredSkills.map((k: any) => k.name)).toEqual(['planejar', 'testar']);
+    await call('create_card', { title: 'Sub', type: 'Sub-tarefa', parent: 1 });
+    expect((await call('get_card', { card: 2 })).data.execution.profile).toBe('Planejamento');
+
+    // o card pode trocar de perfil, e voltar ao da coluna
+    expect((await call('set_card_profile', { card: 1, profile: 'Geral' })).data.execution.profile).toBe('Geral');
+    expect((await call('set_card_profile', { card: 1 })).data.execution.profile).toBe('Planejamento');
+
+    // apagar um perfil solta as colunas e os cards que o usavam
+    await call('set_card_profile', { card: 1, profile: 'Planejamento' });
+    router.handle({ type: 'settings.execProfiles.set', profiles: [profile({ id: 'geral', name: 'Geral', isDefault: true })] });
+    const s = router.snapshot();
+    expect(s.columns.every((c) => c.execProfile === null)).toBe(true);
+    expect(s.cards.every((c) => c.execProfile === null)).toBe(true);
+    expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('Geral');
+  });
+});
+
 describe('harness e padrões pelo MCP', () => {
   it('oferece nos cards as skills globais e de plugins da ferramenta em uso', async () => {
     const home = path.join(dir, 'home-do-usuario');

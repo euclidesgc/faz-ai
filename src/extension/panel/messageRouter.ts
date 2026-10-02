@@ -384,6 +384,12 @@ export class MessageRouter {
         this.cards.setWorkspace(story.id, story.branch, '');
         return true;
       }
+      case 'card.execProfile.set':
+        this.cards.setExecProfile(msg.cardId, msg.profileId);
+        return true;
+      case 'settings.execProfiles.set':
+        this.boards.setExecProfiles(this.boardId, msg.profiles);
+        return true;
       case 'card.pr.set': {
         const url = msg.url.trim();
         if (url && !/^https?:\/\/\S+$/.test(url)) throw new Error('Informe o endereço (URL) do pull request.');

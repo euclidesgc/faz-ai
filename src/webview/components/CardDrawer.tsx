@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { manifestOf, profileOf } from '../../shared/execution';
 import { cardRef, type FieldValue } from '../../shared/model';
 import { MODEL_EFFORT_LABEL, modelLabel, suggestModel } from '../../shared/models';
 import { cardsIn, childrenOf, columnsOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
@@ -67,6 +68,9 @@ export function CardDrawer({ cardId }: { cardId: string }) {
   const childFirstCol = childWf ? columnsOf(state, childWf.id)[0] : undefined;
   const subType = childWf ? state.cardTypes.find((t) => t.defaultWorkflowId === childWf.id) : undefined;
   const parent = card.parentId ? state.cards.find((c) => c.id === card.parentId) : undefined;
+  const manifest = manifestOf(state, card);
+  // o perfil que vale quando o card não escolhe um: o da fase ou o padrão do board
+  const inherited = profileOf(state, { ...card, execProfile: null });
   // branch e pasta de trabalho são da história; a sub-tarefa mostra as do pai
   const story = parent ?? card;
   const commentCount = state.comments.filter((c) => c.cardId === card.id).length;
@@ -140,6 +144,21 @@ export function CardDrawer({ cardId }: { cardId: string }) {
               <button className="ghost small" title="Cria a branch da história e, no modo worktree, a pasta de trabalho dela" onClick={() => send({ type: 'card.workspace.prepare', cardId })}>Criar branch da história</button>
             )}
             {story.prUrl && <a href={story.prUrl} title={story.prUrl}>Pull request ↗</a>}
+          </div>
+        )}
+
+        {!trashed && state.board.execProfiles.length > 0 && (
+          <div className="drawer-workspace" title="O que a sessão de IA usa para trabalhar neste card: agente, skills, servidores MCP, ferramentas e modelo">
+            <span>Perfil de execução</span>
+            <select value={card.execProfile ?? ''} onChange={(e) => send({ type: 'card.execProfile.set', cardId, profileId: e.target.value || null })}>
+              <option value="">Da fase{inherited ? ` (${inherited.name})` : ' (nenhum)'}</option>
+              {state.board.execProfiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            {manifest.profile && (
+              <span className="muted small">
+                {[manifest.agent && `agente ${manifest.agent}`, manifest.skills.length && `skills: ${manifest.skills.join(', ')}`, manifest.mcpServers && `MCP: board${manifest.mcpServers.length ? ` + ${manifest.mcpServers.join(', ')}` : ''}`, manifest.model && `modelo ${manifest.model.name}${manifest.model.effort ? ` · ${manifest.model.effort}` : ''}`, manifest.clean && 'sessão limpa'].filter(Boolean).join(' · ')}
+              </span>
+            )}
           </div>
         )}
 

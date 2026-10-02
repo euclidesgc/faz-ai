@@ -1,3 +1,4 @@
+import { EXEC_ASPECTS, EXEC_ENFORCEMENT, manifestOf } from '../../shared/execution';
 import { norm } from '../../shared/filters';
 import { describeRule, modelFieldOf, modelLabel, parseModelValue, resolveModelInput, suggestModel, type ModelOption } from '../../shared/models';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
@@ -143,13 +144,33 @@ export function modelsOverview(s: BoardState) {
   };
 }
 
+/** O que a sessão deve usar neste card, segundo o perfil de execução; vazio quando não há perfil. */
+function executionOf(s: BoardState, c: Card) {
+  const m = manifestOf(s, c);
+  if (!m.profile) return {};
+  const how = EXEC_ENFORCEMENT[s.board.aiTool];
+  const agent = m.agent ? toolItems(s).find((i) => i.kind === 'agent' && i.name === m.agent) : undefined;
+  return {
+    execution: {
+      profile: m.profile,
+      ...(m.agent ? { agent: { name: m.agent, ...(agent ? { path: agent.path } : {}) } } : {}),
+      ...(m.mcpServers ? { mcpServers: ['faz-ai', ...m.mcpServers] } : {}),
+      ...(m.tools.length ? { tools: m.tools } : {}),
+      ...(m.deniedTools.length ? { deniedTools: m.deniedTools } : {}),
+      ...(m.clean ? { clean: true } : {}),
+      enforcedByBoardRun: EXEC_ASPECTS.filter((a) => how[a.id] === 'enforced').map((a) => a.id),
+      note: 'Perfil de execução do card. Numa sessão aberta pela pessoa nada disto é imposto: siga como instrução (use só o agente, os servidores MCP e as ferramentas listados; com `clean`, só as skills de requiredSkills). Na execução pelo board, os itens de `enforcedByBoardRun` são impostos por parâmetro.',
+    },
+  };
+}
+
 /** Itens do harness da ferramenta com que o projeto trabalha. */
 const toolItems = (s: BoardState) => s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
 
 /** Skills marcadas no campo "Skills" do card: obrigatórias na execução. */
 export function requiredSkills(s: BoardState, c: Card) {
-  const value = fieldsOf(s, c)['Skills'];
-  return (Array.isArray(value) ? value : []).map((name) => {
+  // as skills do card somam às do perfil de execução
+  return manifestOf(s, c).skills.map((name) => {
     const skill = s.harness.skills.find((k) => k.name === name);
     if (skill) return { name, scope: 'project', path: skill.path };
     // fora do projeto: skill global ou de plugin da ferramenta em uso, com o caminho absoluto
@@ -212,6 +233,7 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     ...(skills.length ? { requiredSkills: skills, requiredSkillsNote: 'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática.' } : {}),
     ...(phase ? { phase } : {}),
+    ...executionOf(s, c),
     ...workspaceOf(s, c),
     description: c.description,
     createdAt: iso(c.createdAt),
@@ -248,6 +270,8 @@ export function pendingOverview(s: BoardState) {
   };
 }
 
+const profileName = (s: BoardState, id: string | null) => (id ? s.board.execProfiles.find((p) => p.id === id)?.name : undefined);
+
 export function boardOverview(s: BoardState) {
   const active = s.cards.filter((c) => c.deletedAt === null && c.archivedAt === null);
   return {
@@ -257,10 +281,11 @@ export function boardOverview(s: BoardState) {
       kind: w.kind === 'parent' ? 'parent (histórias)' : 'child (sub-tarefas, sempre ligadas a uma história)',
       columns: s.columns
         .filter((c) => c.workflowId === w.id)
-        .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length, ...(c.aiActive ? { aiActive: true } : {}), ...(c.requiresApproval ? { requiresApproval: true } : {}), ...(c.artifactName ? { artifact: c.artifactName } : {}), ...(c.collapsed ? { collapsed: true } : {}) })),
+        .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length, ...(c.aiActive ? { aiActive: true } : {}), ...(c.requiresApproval ? { requiresApproval: true } : {}), ...(c.artifactName ? { artifact: c.artifactName } : {}), ...(profileName(s, c.execProfile) ? { execProfile: profileName(s, c.execProfile) } : {}), ...(c.collapsed ? { collapsed: true } : {}) })),
       ...(w.collapsed ? { collapsed: true } : {}),
       archivedColumnCollapsed: w.archiveCollapsed,
     })),
+    ...(s.board.execProfiles.length ? { execProfiles: s.board.execProfiles.map((p) => ({ name: p.name, ...(p.isDefault ? { default: true } : {}), ...(p.agent ? { agent: p.agent } : {}), ...(p.skills.length ? { skills: p.skills } : {}), ...(p.mcpServers ? { mcpServers: p.mcpServers } : {}), ...(p.model ? { model: p.model } : {}), ...(p.clean ? { clean: true } : {}) })) } : {}),
     cardTypes: s.cardTypes.map((t) => {
       const defaults = Object.fromEntries(
         Object.entries(t.defaults).flatMap(([id, v]) => {

@@ -12,16 +12,16 @@ const DAY = 86400000;
 
 const card = (id: string, over: Partial<Card> = {}): Card => ({
   id, number: 0, boardId: 'b', workflowId: 'wp', columnId: 'todo', typeId: 'story', parentId: null, title: id, description: '',
-  position: 0, createdAt: NOW, updatedAt: NOW, deletedAt: null, archivedAt: null, status: null, statusReason: '', statusAt: null, statusBy: '', branch: '', worktreePath: '', prUrl: '', ...over,
+  position: 0, createdAt: NOW, updatedAt: NOW, deletedAt: null, archivedAt: null, status: null, statusReason: '', statusAt: null, statusBy: '', branch: '', worktreePath: '', prUrl: '', execProfile: null, ...over,
 });
 
 const state: BoardState = {
-  board: { id: 'b', workspaceKey: 'k', name: 'B', rules: DEFAULT_RULES, aiTool: 'claude', modelCatalog: [], modelRules: [], appearance: DEFAULT_APPEARANCE, templateVersion: 1, runner: DEFAULT_RUNNER, git: DEFAULT_GIT },
+  board: { id: 'b', workspaceKey: 'k', name: 'B', rules: DEFAULT_RULES, aiTool: 'claude', modelCatalog: [], modelRules: [], appearance: DEFAULT_APPEARANCE, templateVersion: 1, runner: DEFAULT_RUNNER, git: DEFAULT_GIT, execProfiles: [] },
   workflows: [{ id: 'wp', boardId: 'b', name: 'H', position: 0, kind: 'parent', collapsed: false, archiveCollapsed: true }, { id: 'wc', boardId: 'b', name: 'S', position: 1, kind: 'child', collapsed: false, archiveCollapsed: true }],
   columns: [
-    { id: 'todo', workflowId: 'wp', name: 'Backlog', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '' },
-    { id: 'c-todo', workflowId: 'wc', name: 'A fazer', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '' },
-    { id: 'c-done', workflowId: 'wc', name: 'Concluído', position: 1, category: 'done', isTerminal: true, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '' },
+    { id: 'todo', workflowId: 'wp', name: 'Backlog', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '', execProfile: null },
+    { id: 'c-todo', workflowId: 'wc', name: 'A fazer', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '', execProfile: null },
+    { id: 'c-done', workflowId: 'wc', name: 'Concluído', position: 1, category: 'done', isTerminal: true, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '', execProfile: null },
   ],
   cardTypes: [],
   cards: [
