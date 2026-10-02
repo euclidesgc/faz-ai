@@ -322,9 +322,10 @@ To try the interface without the editor, `node dist/cli.js <folder> --data <test
 serves the board in the browser. The tests cover the extension's activation (with a fake editor in
 `test/fakes/vscode.ts`) and the page server (`test/webServer.test.ts`).
 
-### Continuing on another machine
+### Setting up the development environment
 
-The repository has all the code, but a few items live outside git and must be set up again:
+The repository has all the code, but a few items live outside git. On a fresh clone (another
+machine, for example), they must be set up again:
 
 | Item | What it is for | How to get it |
 |---|---|---|

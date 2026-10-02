@@ -305,9 +305,10 @@ Para testar a interface sem o editor, `node dist/cli.js <pasta> --data <pasta de
 serve o board no navegador. Os testes cobrem a ativação da extensão (com um editor de mentira em
 `test/fakes/vscode.ts`) e o servidor da página (`test/webServer.test.ts`).
 
-### Continuar em outra máquina
+### Preparar o ambiente de desenvolvimento
 
-O repositório tem todo o código, mas alguns itens ficam fora do git e precisam ser refeitos:
+O repositório tem todo o código, mas alguns itens ficam fora do git. Num clone novo (outra máquina,
+por exemplo), eles precisam ser refeitos:
 
 | Item | Para que serve | Como obter |
 |---|---|---|
