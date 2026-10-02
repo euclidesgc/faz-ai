@@ -87,6 +87,8 @@ export interface HarnessItem {
   digest?: string;
   /** só nas skills: invocação automática ou só quando indicada */
   mode?: SkillMode;
+  /** valor inteiro da entrada, quando `description` o resume: o comando de um hook, ou a lista (allow, deny, ask) de uma regra de permissão */
+  detail?: string;
 }
 
 export interface ToolInventory {

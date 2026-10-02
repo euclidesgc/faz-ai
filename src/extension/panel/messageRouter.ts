@@ -14,6 +14,7 @@ import { SKILLS_FIELD } from '../db/schema';
 import { pendingUpgrade, upgradeBoard } from '../db/boardTemplate';
 import { HarnessStore } from '../harness';
 import { HarnessOps } from '../harnessOps';
+import { HooksAndPermissions } from '../hooksAndPermissions';
 import { McpServers } from '../mcpServers';
 import { FLOW_SKILL } from '../flowSkill';
 import { headlessUnsupported } from '../headless';
@@ -189,6 +190,17 @@ export class MessageRouter {
   /** Item listado pela varredura; as operações só valem para o que está no inventário. */
   private harnessItem(tool: AiTool, kind: HarnessKind, file: string): HarnessItem {
     const item = this.harness.inventory.find((t) => t.tool === tool)?.items.find((i) => i.kind === kind && i.path === file);
+    if (!item) throw new Error('Item não encontrado no harness. Atualize a lista e tente de novo.');
+    return item;
+  }
+
+  private get hooksAndPermissions(): HooksAndPermissions {
+    return new HooksAndPermissions(this.opts.workspaceDir ?? '', this.home);
+  }
+
+  /** Entrada de um arquivo de configuração (hook ou regra de permissão) listada pela varredura. */
+  private harnessEntry(tool: AiTool, kind: HarnessKind, file: string, name: string, detail: string): HarnessItem {
+    const item = this.harness.inventory.find((t) => t.tool === tool)?.items.find((i) => i.kind === kind && i.layout === 'entry' && i.path === file && i.name === name && (i.detail ?? '') === detail);
     if (!item) throw new Error('Item não encontrado no harness. Atualize a lista e tente de novo.');
     return item;
   }
@@ -477,6 +489,22 @@ export class MessageRouter {
       case 'harness.refresh':
         this.refreshHarness();
         return false;
+      case 'harness.hook.add':
+        this.hooksAndPermissions.addHook(msg.tool, msg.source, msg.hook);
+        this.loadHarness();
+        return true;
+      case 'harness.hook.remove':
+        this.hooksAndPermissions.removeHook(msg.tool, this.harnessEntry(msg.tool, 'hook', msg.path, msg.event, msg.command));
+        this.loadHarness();
+        return true;
+      case 'harness.permission.add':
+        this.hooksAndPermissions.addPermission(msg.tool, msg.source, msg.list, msg.rule);
+        this.loadHarness();
+        return true;
+      case 'harness.permission.remove':
+        this.hooksAndPermissions.removePermission(msg.tool, this.harnessEntry(msg.tool, 'settings', msg.path, msg.rule, msg.list));
+        this.loadHarness();
+        return true;
       case 'harness.mcp.add':
         new McpServers(this.opts.workspaceDir ?? '', this.home).add(msg.tool, msg.source, msg.server);
         this.loadHarness();

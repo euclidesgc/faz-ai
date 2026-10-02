@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool, HarnessItem, HarnessScope } from '../shared/harness';
-import { HARNESS_CATALOG, PLUGIN_ROOTS, type HarnessSource } from '../shared/harnessCatalog';
+import { HARNESS_CATALOG, PERMISSION_LIST_LABEL, PLUGIN_ROOTS, type HarnessSource } from '../shared/harnessCatalog';
 import { skillMode } from './skillMode';
 
 const HEAD_BYTES = 4096;
@@ -74,16 +74,19 @@ function walk(dir: string, ext: string, depth = 0): string[] {
   });
 }
 
-/** Comandos de uma entrada de hook, em qualquer dos formatos das ferramentas (command, bash, powershell). */
-function hookCommands(v: unknown, out: string[] = []): string[] {
-  if (Array.isArray(v)) v.forEach((x) => hookCommands(x, out));
-  else if (v && typeof v === 'object') {
-    for (const [k, x] of Object.entries(v)) {
-      if ((k === 'command' || k === 'bash' || k === 'powershell') && typeof x === 'string') out.push(x);
-      else hookCommands(x, out);
-    }
-  }
-  return out;
+/** O comando de um hook, em qualquer dos formatos das ferramentas (command, bash, powershell). */
+export const hookCommand = (h: Record<string, unknown>): string => [h.command, h.bash, h.powershell].find((x): x is string => typeof x === 'string') ?? '';
+
+/** Hooks de um evento, um por comando, com o filtro do grupo ou da própria entrada. */
+function hookEntries(value: unknown): { matcher: string; command: string; type: string }[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) => {
+    const e = obj(raw);
+    const matcher = typeof e.matcher === 'string' ? e.matcher : '';
+    // Claude Code e Codex agrupam por filtro; Cursor e Copilot põem o comando direto na entrada
+    const handlers = Array.isArray(e.hooks) ? e.hooks.map(obj) : [e];
+    return handlers.map((h) => ({ matcher, command: hookCommand(h), type: typeof h.type === 'string' ? h.type : 'command' }));
+  });
 }
 
 /** O que o servidor MCP roda ou onde ele está, sem argumentos, variáveis ou cabeçalhos (podem ter segredos). */
@@ -128,6 +131,10 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
     ...(src.builtin ? { plugin: src.builtin } : {}),
     ...(layout === 'files' || layout === 'skills' ? { digest: digest(file) } : {}),
   });
+  const hookItem = (event: string, h: { matcher: string; command: string; type: string }, file: string): Found => ({
+    ...item(event, short(`${h.matcher ? `${h.matcher} → ` : ''}${h.command || `(${h.type})`}`), file),
+    detail: h.command,
+  });
   switch (src.layout) {
     case 'file':
       return isFile(target) ? [item(path.basename(target), src.kind === 'settings' ? '' : descriptionOf(target), target)] : [];
@@ -139,7 +146,8 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
         .map((n) => ({ ...item(n, descriptionOf(path.join(target, n, 'SKILL.md')), path.join(target, n, 'SKILL.md')), mode: skillMode(path.join(target, n, 'SKILL.md')) }));
     case 'json-keys': {
       const section = obj(readJson(target)?.[src.key]);
-      return Object.entries(section).map(([name, v]) => item(name, short(src.kind === 'hook' ? hookCommands(v).join(' · ') : mcpSummary(v)), target));
+      if (src.kind === 'hook') return Object.entries(section).flatMap(([event, v]) => hookEntries(v).map((h) => hookItem(event, h, target)));
+      return Object.entries(section).map(([name, v]) => item(name, short(mcpSummary(v)), target));
     }
     case 'claude-json': {
       const json = readJson(target);
@@ -166,10 +174,14 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
         .split(new RegExp(`^\\[\\[${src.table}\\]\\]\\s*$`, 'm'))
         .slice(1)
         .map((raw) => raw.split(/^\[/m)[0]!)
-        .map((block) => item(tomlString(block, 'event') || 'hook', short(tomlString(block, 'command')), target));
+        .map((block) => ({ ...item(tomlString(block, 'event') || 'hook', short(tomlString(block, 'command')), target), detail: tomlString(block, 'command') }));
     }
     case 'hook-files':
-      return walk(target, '.json').flatMap((f) => Object.entries(obj(readJson(f)?.hooks)).map(([name, v]) => item(name, short(hookCommands(v).join(' · ')), f)));
+      return walk(target, '.json').flatMap((f) => Object.entries(obj(readJson(f)?.hooks)).flatMap(([event, v]) => hookEntries(v).map((h) => hookItem(event, h, f))));
+    case 'json-permissions': {
+      const permissions = obj(readJson(target)?.permissions);
+      return src.lists.flatMap((list) => (Array.isArray(permissions[list]) ? (permissions[list] as unknown[]) : []).filter((r): r is string => typeof r === 'string').map((rule) => ({ ...item(rule, PERMISSION_LIST_LABEL[list] ?? list, target), detail: list })));
+    }
   }
 }
 
@@ -237,7 +249,7 @@ export function scanInventory(tool: AiTool, projectDir: string, homeDir: string)
   return found
     .filter((i) => {
       // o mesmo arquivo pode ser alcançado por dois caminhos do catálogo
-      const key = `${i.kind}|${i.path}|${i.name}`;
+      const key = `${i.kind}|${i.path}|${i.name}|${i.detail ?? ''}`;
       return seen.has(key) ? false : (seen.add(key), true);
     })
     .map((i) => ({ ...i, location: location(i.path) }));

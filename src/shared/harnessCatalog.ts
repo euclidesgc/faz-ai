@@ -27,6 +27,8 @@ export type HarnessSource = { kind: HarnessKind; scope: 'project' | 'user'; path
   | { layout: 'toml-array'; table: string }
   /** pasta de arquivos JSON, cada um com um objeto `hooks` */
   | { layout: 'hook-files' }
+  /** regras de permissão: as listas (`allow`, `deny`…) do objeto `permissions` de um arquivo JSON */
+  | { layout: 'json-permissions'; lists: string[] }
 );
 
 type Src = HarnessSource;
@@ -57,6 +59,9 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
     { kind: 'mcp', scope: 'user', layout: 'claude-json', path: '.claude.json' },
     file('settings', 'project', '.claude/settings.json'),
     file('settings', 'project', '.claude/settings.local.json'),
+    { kind: 'settings', scope: 'project', layout: 'json-permissions', path: '.claude/settings.json', lists: ['allow', 'ask', 'deny'] },
+    { kind: 'settings', scope: 'project', layout: 'json-permissions', path: '.claude/settings.local.json', lists: ['allow', 'ask', 'deny'] },
+    { kind: 'settings', scope: 'user', layout: 'json-permissions', path: '.claude/settings.json', lists: ['allow', 'ask', 'deny'] },
     files('settings', 'project', '.claude/output-styles', '.md'),
     file('settings', 'user', '.claude/settings.json'),
     files('settings', 'user', '.claude/output-styles', '.md'),
@@ -95,6 +100,8 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
     { kind: 'mcp', scope: 'user', layout: 'json-keys', path: '.cursor/mcp.json', key: 'mcpServers' },
     file('settings', 'project', '.cursor/cli.json'),
     file('settings', 'user', '.cursor/cli-config.json'),
+    { kind: 'settings', scope: 'project', layout: 'json-permissions', path: '.cursor/cli.json', lists: ['allow', 'deny'] },
+    { kind: 'settings', scope: 'user', layout: 'json-permissions', path: '.cursor/cli-config.json', lists: ['allow', 'deny'] },
   ],
   kimi: [
     file('instructions', 'project', 'AGENTS.md'),
@@ -203,3 +210,65 @@ export interface McpServerInput {
 }
 
 export const MCP_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
+
+/**
+ * Formato dos hooks em cada arquivo (páginas de hooks de cada ferramenta, lidas em 2026-10-02):
+ * - `nested` (Claude Code e Codex): evento → grupos `{ matcher, hooks: [{ type: "command", command, timeout }] }`
+ * - `flat` (Cursor): `{ version: 1, hooks: { evento: [{ command, matcher, timeout }] } }`
+ * - `copilot` (Copilot CLI): `{ version: 1, hooks: { evento: [{ type: "command", bash, timeoutSec }] } }`, um arquivo por pasta de hooks
+ */
+export type HookFormat = 'nested' | 'flat' | 'copilot';
+
+const HOOK_FORMAT: Record<AiTool, HookFormat | null> = { claude: 'nested', codex: 'nested', cursor: 'flat', copilot: 'copilot', kimi: null };
+
+/** Arquivo que o board grava dentro de uma pasta de hooks (Copilot). */
+export const HOOK_FILE = 'faz-ai.json';
+
+export interface HookTarget {
+  source: number;
+  scope: 'project' | 'user';
+  label: string;
+  format: HookFormat;
+}
+
+/** Arquivos de hooks que o board edita. Os hooks do Kimi ficam no config.toml e são só listados. */
+export function hookTargets(tool: AiTool): HookTarget[] {
+  const format = HOOK_FORMAT[tool];
+  if (!format) return [];
+  return HARNESS_CATALOG[tool].flatMap((src, source): HookTarget[] => {
+    if (src.kind !== 'hook' || (src.layout !== 'json-keys' && src.layout !== 'hook-files')) return [];
+    const base = `${src.scope === 'user' ? '~/' : ''}${src.path}`;
+    return [{ source, scope: src.scope, label: src.layout === 'hook-files' ? `${base}/${HOOK_FILE}` : base, format }];
+  });
+}
+
+/** Eventos de hook de cada ferramenta, conforme as páginas de hooks delas. */
+export const HOOK_EVENTS: Record<AiTool, string[]> = {
+  claude: ['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'UserPromptSubmit', 'PermissionRequest', 'Notification', 'SessionStart', 'SessionEnd', 'Stop', 'SubagentStart', 'SubagentStop', 'PreCompact', 'PostCompact', 'InstructionsLoaded', 'ConfigChange', 'FileChanged'],
+  codex: ['PreToolUse', 'PostToolUse', 'PermissionRequest', 'UserPromptSubmit', 'SessionStart', 'SessionEnd', 'Stop', 'Interrupt', 'SubagentStart', 'SubagentStop', 'PreCompact', 'PostCompact'],
+  cursor: ['preToolUse', 'postToolUse', 'postToolUseFailure', 'beforeShellExecution', 'afterShellExecution', 'beforeMCPExecution', 'afterMCPExecution', 'beforeReadFile', 'afterFileEdit', 'beforeSubmitPrompt', 'sessionStart', 'sessionEnd', 'subagentStart', 'subagentStop', 'preCompact', 'stop', 'afterAgentResponse'],
+  copilot: ['preToolUse', 'postToolUse', 'postToolUseFailure', 'userPromptSubmitted', 'sessionStart', 'agentStop', 'subagentStart', 'errorOccurred'],
+  kimi: [],
+};
+
+export interface HookInput {
+  event: string;
+  /** filtro do evento (ex.: o nome da ferramenta); vazio = sempre */
+  matcher: string;
+  command: string;
+  /** tempo limite em segundos; 0 = o padrão da ferramenta */
+  timeout: number;
+}
+
+export interface PermissionTarget {
+  source: number;
+  scope: 'project' | 'user';
+  label: string;
+  lists: string[];
+}
+
+export function permissionTargets(tool: AiTool): PermissionTarget[] {
+  return HARNESS_CATALOG[tool].flatMap((src, source): PermissionTarget[] => (src.layout === 'json-permissions' ? [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}`, lists: src.lists }] : []));
+}
+
+export const PERMISSION_LIST_LABEL: Record<string, string> = { allow: 'permitir', ask: 'perguntar', deny: 'negar' };

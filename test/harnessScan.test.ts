@@ -4,9 +4,10 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { HarnessOps } from '../src/extension/harnessOps';
 import { scanInventory } from '../src/extension/harnessScan';
+import { HooksAndPermissions } from '../src/extension/hooksAndPermissions';
 import { McpServers } from '../src/extension/mcpServers';
 import { setSkillMode, skillMode } from '../src/extension/skillMode';
-import { HARNESS_CATALOG, createTargets, mcpTargets } from '../src/shared/harnessCatalog';
+import { HARNESS_CATALOG, createTargets, hookTargets, mcpTargets, permissionTargets } from '../src/shared/harnessCatalog';
 
 let root: string;
 let project: string;
@@ -55,7 +56,7 @@ describe('varredura do harness por ferramenta e escopo', () => {
     expect(names(items, 'skill', 'user')).toEqual(['commit']);
     expect(names(items, 'agent', 'project')).toEqual(['revisor']);
     expect(names(items, 'command', 'project')).toEqual(['deploy']);
-    expect(items.find((i) => i.kind === 'hook')).toMatchObject({ name: 'PreToolUse', description: './check.sh', location: '.claude/settings.json' });
+    expect(items.find((i) => i.kind === 'hook')).toMatchObject({ name: 'PreToolUse', description: 'Bash → ./check.sh', detail: './check.sh', location: '.claude/settings.json' });
     expect(names(items, 'mcp', 'user')).toEqual(['remoto', 'local']);
     expect(names(items, 'plugin', 'plugin')).toEqual(['design']);
     expect(items.find((i) => i.kind === 'skill' && i.scope === 'plugin')).toMatchObject({ name: 'critica', description: 'design~g3', plugin: 'design' });
@@ -291,5 +292,77 @@ describe('servidores MCP nos arquivos de cada ferramenta', () => {
     expect(() => mcp.remove('claude', item('deplugin'))).toThrow('plugin');
     mcp.remove('claude', item('github'));
     expect(json(project, '.mcp.json')).toEqual({ mcpServers: {} });
+  });
+});
+
+describe('hooks e permissões nos arquivos de cada ferramenta', () => {
+  const json = (base: string, rel: string) => JSON.parse(fs.readFileSync(path.join(base, rel), 'utf8'));
+  const hookAt = (tool: 'claude' | 'codex' | 'cursor' | 'copilot' | 'kimi', label: string) => hookTargets(tool).find((t) => t.label === label)!.source;
+  const hooksOf = (tool: 'claude' | 'codex' | 'cursor' | 'copilot' | 'kimi') => scanInventory(tool, project, home).filter((i) => i.kind === 'hook');
+
+  it('Claude Code e Codex: agrupa por filtro e preserva o resto do arquivo', () => {
+    const ops = new HooksAndPermissions(project, home);
+    write(project, '.claude/settings.json', JSON.stringify({ model: 'opus', hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: './a.sh' }] }] } }));
+    const src = hookAt('claude', '.claude/settings.json');
+    ops.addHook('claude', src, { event: 'PreToolUse', matcher: 'Bash', command: './b.sh', timeout: 10 });
+    ops.addHook('claude', src, { event: 'PreToolUse', matcher: 'Edit|Write', command: './c.sh', timeout: 0 });
+    ops.addHook('claude', src, { event: 'Stop', matcher: '', command: './fim.sh', timeout: 0 });
+    expect(json(project, '.claude/settings.json')).toEqual({
+      model: 'opus',
+      hooks: {
+        PreToolUse: [
+          { matcher: 'Bash', hooks: [{ type: 'command', command: './a.sh' }, { type: 'command', command: './b.sh', timeout: 10 }] },
+          { matcher: 'Edit|Write', hooks: [{ type: 'command', command: './c.sh' }] },
+        ],
+        Stop: [{ hooks: [{ type: 'command', command: './fim.sh' }] }],
+      },
+    });
+    expect(hooksOf('claude').map((i) => [i.name, i.description])).toEqual([['PreToolUse', 'Bash → ./a.sh'], ['PreToolUse', 'Bash → ./b.sh'], ['PreToolUse', 'Edit|Write → ./c.sh'], ['Stop', './fim.sh']]);
+    // remover tira só o comando pedido; grupo e evento vazios somem
+    ops.removeHook('claude', hooksOf('claude').find((i) => i.detail === './a.sh')!);
+    ops.removeHook('claude', hooksOf('claude').find((i) => i.detail === './fim.sh')!);
+    expect(json(project, '.claude/settings.json').hooks).toEqual({ PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: './b.sh', timeout: 10 }] }, { matcher: 'Edit|Write', hooks: [{ type: 'command', command: './c.sh' }] }] });
+    expect(json(project, '.claude/settings.json').model).toBe('opus');
+
+    ops.addHook('codex', hookAt('codex', '~/.codex/hooks.json'), { event: 'SessionStart', matcher: 'startup', command: 'python3 a.py', timeout: 0 });
+    expect(json(home, '.codex/hooks.json')).toEqual({ hooks: { SessionStart: [{ matcher: 'startup', hooks: [{ type: 'command', command: 'python3 a.py' }] }] } });
+  });
+
+  it('Cursor e Copilot: entradas diretas, com a versão do arquivo', () => {
+    const ops = new HooksAndPermissions(project, home);
+    ops.addHook('cursor', hookAt('cursor', '.cursor/hooks.json'), { event: 'afterFileEdit', matcher: '', command: './fmt.sh', timeout: 5 });
+    expect(json(project, '.cursor/hooks.json')).toEqual({ version: 1, hooks: { afterFileEdit: [{ command: './fmt.sh', timeout: 5 }] } });
+    ops.addHook('copilot', hookAt('copilot', '.github/hooks/faz-ai.json'), { event: 'preToolUse', matcher: 'ignorado', command: './scan.sh', timeout: 30 });
+    expect(json(project, '.github/hooks/faz-ai.json')).toEqual({ version: 1, hooks: { preToolUse: [{ type: 'command', bash: './scan.sh', timeoutSec: 30 }] } });
+    ops.removeHook('copilot', hooksOf('copilot')[0]!);
+    expect(json(project, '.github/hooks/faz-ai.json')).toEqual({ version: 1, hooks: {} });
+    expect(hookTargets('kimi')).toEqual([]);
+  });
+
+  it('recusa hook de plugin, arquivo com comentários e dados incompletos', () => {
+    const ops = new HooksAndPermissions(project, home);
+    write(home, '.claude/plugins/loja/p/.claude-plugin/plugin.json', '{"name":"p"}');
+    write(home, '.claude/plugins/loja/p/hooks/hooks.json', JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: './x.sh' }] }] } }));
+    expect(() => ops.removeHook('claude', hooksOf('claude')[0]!)).toThrow('plugin');
+    write(project, '.claude/settings.json', '{\n  // comentário\n  "hooks": {}\n}');
+    expect(() => ops.addHook('claude', hookAt('claude', '.claude/settings.json'), { event: 'Stop', matcher: '', command: './x.sh', timeout: 0 })).toThrow('edite-o à mão');
+    expect(() => ops.addHook('claude', hookAt('claude', '~/.claude/settings.json'), { event: 'Stop', matcher: '', command: ' ', timeout: 0 })).toThrow('comando');
+    expect(() => ops.addHook('claude', hookAt('claude', '~/.claude/settings.json'), { event: 'com espaço', matcher: '', command: 'x', timeout: 0 })).toThrow('evento');
+  });
+
+  it('regras de permissão: lista, acrescenta e remove por lista', () => {
+    const ops = new HooksAndPermissions(project, home);
+    write(project, '.claude/settings.json', JSON.stringify({ permissions: { allow: ['Bash(npm test)'], defaultMode: 'acceptEdits' }, hooks: {} }));
+    const src = permissionTargets('claude').find((t) => t.label === '.claude/settings.json')!.source;
+    ops.addPermission('claude', src, 'deny', 'Read(./.env)');
+    ops.addPermission('claude', src, 'allow', 'Bash(git status)');
+    expect(() => ops.addPermission('claude', src, 'allow', 'Bash(git status)')).toThrow('já está');
+    expect(() => ops.addPermission('claude', src, 'inventada', 'x')).toThrow();
+    const rules = () => scanInventory('claude', project, home).filter((i) => i.kind === 'settings' && i.layout === 'entry');
+    expect(rules().map((i) => [i.name, i.description, i.detail])).toEqual([['Bash(npm test)', 'permitir', 'allow'], ['Bash(git status)', 'permitir', 'allow'], ['Read(./.env)', 'negar', 'deny']]);
+    ops.removePermission('claude', rules().find((i) => i.name === 'Bash(npm test)')!);
+    expect(json(project, '.claude/settings.json')).toEqual({ permissions: { allow: ['Bash(git status)'], defaultMode: 'acceptEdits', deny: ['Read(./.env)'] }, hooks: {} });
+    ops.addPermission('cursor', permissionTargets('cursor').find((t) => t.scope === 'user')!.source, 'deny', 'Shell(rm)');
+    expect(json(home, '.cursor/cli-config.json')).toEqual({ permissions: { deny: ['Shell(rm)'] } });
   });
 });

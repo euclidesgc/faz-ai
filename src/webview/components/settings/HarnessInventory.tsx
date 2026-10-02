@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, SKILL_MODES, SKILL_NAME_PATTERN, type AiTool, type HarnessItem, type HarnessKind, type SkillMode } from '../../../shared/harness';
-import { MCP_NAME_PATTERN, copyTarget, createTargets, mcpTargets, type CreateTarget, type McpTarget } from '../../../shared/harnessCatalog';
+import { HOOK_EVENTS, MCP_NAME_PATTERN, PERMISSION_LIST_LABEL, copyTarget, createTargets, hookTargets, mcpTargets, permissionTargets, type CreateTarget, type HookTarget, type McpTarget, type PermissionTarget } from '../../../shared/harnessCatalog';
 import { useBoardStore } from '../../store/boardStore';
 
 const GLOBAL_WARNING = 'O arquivo fica na sua pasta de usuário e vale para todos os seus projetos.';
@@ -118,6 +118,95 @@ function NewMcpServer({ tool, targets, onClose }: { tool: AiTool; targets: McpTa
   );
 }
 
+/** Formulário de um hook novo: em que arquivo, em que evento, com que filtro e que comando roda. */
+function NewHook({ tool, targets, onClose }: { tool: AiTool; targets: HookTarget[]; onClose: () => void }) {
+  const send = useBoardStore((s) => s.send);
+  const ask = useBoardStore((s) => s.ask);
+  const [source, setSource] = useState(targets[0]!.source);
+  const [event, setEvent] = useState(HOOK_EVENTS[tool][0] ?? '');
+  const [matcher, setMatcher] = useState('');
+  const [command, setCommand] = useState('');
+  const [timeout, setTimeout_] = useState('');
+  const target = targets.find((t) => t.source === source)!;
+  const add = () =>
+    ask({
+      title: 'Acrescentar este hook?',
+      message: `O ${AI_TOOLS.find((t) => t.id === tool)!.label} vai rodar este comando sozinho, no seu computador, a cada "${event}":\n\n${command}\n\nArquivo: ${target.label}${target.scope === 'user' ? `\n\n${GLOBAL_WARNING}` : ''}`,
+      confirmLabel: 'Acrescentar hook',
+      onConfirm: () => {
+        send({ type: 'harness.hook.add', tool, source, hook: { event, matcher, command, timeout: Number(timeout) || 0 } });
+        onClose();
+      },
+    });
+  return (
+    <div className="harness-new">
+      <label className="field-row">
+        <span>Arquivo</span>
+        <select value={source} onChange={(e) => setSource(Number(e.target.value))}>
+          {targets.map((t) => <option key={t.source} value={t.source}>{t.scope === 'user' ? 'Global' : 'Projeto'}: {t.label}</option>)}
+        </select>
+      </label>
+      <label className="field-row">
+        <span>Evento</span>
+        <select value={event} onChange={(e) => setEvent(e.target.value)}>
+          {HOOK_EVENTS[tool].map((e) => <option key={e} value={e}>{e}</option>)}
+        </select>
+      </label>
+      {target.format !== 'copilot' && (
+        <label className="field-row">
+          <span>Filtro (opcional)</span>
+          <input value={matcher} onChange={(e) => setMatcher(e.target.value)} placeholder="Ex.: Bash, ou Edit|Write; vazio = sempre" />
+        </label>
+      )}
+      <label className="field-row"><span>Comando</span><input value={command} onChange={(e) => setCommand(e.target.value)} placeholder="./scripts/verificar.sh" spellCheck={false} /></label>
+      <label className="field-row"><span>Tempo limite (s)</span><input type="number" min={0} value={timeout} onChange={(e) => setTimeout_(e.target.value)} placeholder="padrão da ferramenta" /></label>
+      <div className="row">
+        <button className="primary" disabled={!event || !command.trim()} onClick={add}>Acrescentar hook</button>
+        <button className="ghost" onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+/** Formulário de uma regra de permissão: o arquivo, a lista (permitir, perguntar, negar) e a regra. */
+function NewPermission({ tool, targets, onClose }: { tool: AiTool; targets: PermissionTarget[]; onClose: () => void }) {
+  const send = useBoardStore((s) => s.send);
+  const ask = useBoardStore((s) => s.ask);
+  const [source, setSource] = useState(targets[0]!.source);
+  const target = targets.find((t) => t.source === source)!;
+  const [list, setList] = useState(target.lists[0]!);
+  const [rule, setRule] = useState('');
+  const add = () => {
+    const run = () => {
+      send({ type: 'harness.permission.add', tool, source, list: target.lists.includes(list) ? list : target.lists[0]!, rule });
+      onClose();
+    };
+    if (target.scope === 'user') ask({ title: 'Acrescentar regra na pasta do usuário?', message: `${target.label}\n\n${GLOBAL_WARNING}`, confirmLabel: 'Acrescentar', onConfirm: run });
+    else run();
+  };
+  return (
+    <div className="harness-new">
+      <label className="field-row">
+        <span>Arquivo</span>
+        <select value={source} onChange={(e) => setSource(Number(e.target.value))}>
+          {targets.map((t) => <option key={t.source} value={t.source}>{t.scope === 'user' ? 'Global' : 'Projeto'}: {t.label}</option>)}
+        </select>
+      </label>
+      <label className="field-row">
+        <span>Lista</span>
+        <select value={list} onChange={(e) => setList(e.target.value)}>
+          {target.lists.map((l) => <option key={l} value={l}>{PERMISSION_LIST_LABEL[l] ?? l} ({l})</option>)}
+        </select>
+      </label>
+      <label className="field-row"><span>Regra</span><input value={rule} onChange={(e) => setRule(e.target.value)} placeholder={tool === 'cursor' ? 'Ex.: Shell(git), Read(src/**)' : 'Ex.: Bash(npm run test *), Read(./.env)'} spellCheck={false} /></label>
+      <div className="row">
+        <button className="primary" disabled={!rule.trim()} onClick={add}>Acrescentar regra</button>
+        <button className="ghost" onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 /** Tudo que cada ferramenta de IA carrega: por tipo de componente e por escopo (projeto, global, plugins). */
 export function HarnessInventory() {
   const state = useBoardStore((s) => s.state)!;
@@ -134,6 +223,9 @@ export function HarnessInventory() {
   const missing = inventory.filter((t) => !t.installed && t.items.length === 0).map((t) => label(t.tool));
   const targets = createTargets(tool);
   const mcpFiles = mcpTargets(tool);
+  const hookFiles = hookTargets(tool);
+  const permissionFiles = permissionTargets(tool);
+  const [addingRule, setAddingRule] = useState(false);
 
   const copyable = (i: HarnessItem, to: 'project' | 'user') => (i.layout === 'files' || i.layout === 'skills') && i.scope !== to && !!copyTarget(tool, i.kind, i.layout, to);
   /** o mesmo item no outro escopo: dá para ver se já foi copiado e se a cópia divergiu */
@@ -165,7 +257,7 @@ export function HarnessInventory() {
     const inProject = i.scope !== 'project' ? twin(i, 'project') : undefined;
     const editable = i.scope !== 'plugin' && i.layout !== 'entry';
     return (
-      <tr key={`${i.path}|${i.name}`}>
+      <tr key={`${i.path}|${i.name}|${i.detail ?? ''}`}>
         <td>
           {i.name}
           {i.plugin && <span className="pill off">{i.plugin}</span>}
@@ -185,6 +277,12 @@ export function HarnessInventory() {
           {copyable(i, 'project') && !inProject && <button className="ghost small" title="Cria uma cópia independente na pasta do projeto" onClick={() => copy([i], 'project')}>Copiar para o projeto</button>}
           {copyable(i, 'user') && !twin(i, 'user') && <button className="ghost small" title="Cria uma cópia na sua pasta de usuário, que vale em todos os projetos" onClick={() => copy([i], 'user')}>Copiar para o global</button>}
           {editable && i.kind !== 'settings' && <button className="icon danger" title="Apagar" onClick={() => remove(i)}>🗑</button>}
+          {i.kind === 'hook' && i.scope !== 'plugin' && hookFiles.length > 0 && i.path.endsWith('.json') && (
+            <button className="icon danger" title="Remover o hook deste arquivo" onClick={() => ask({ title: `Remover o hook de "${i.name}"?`, message: `${i.detail ?? ''}\n\nA entrada sai de ${i.location}.`, confirmLabel: 'Remover', danger: true, onConfirm: () => send({ type: 'harness.hook.remove', tool, path: i.path, event: i.name, command: i.detail ?? '' }) })}>🗑</button>
+          )}
+          {i.kind === 'settings' && i.layout === 'entry' && i.scope !== 'plugin' && (
+            <button className="icon danger" title="Remover a regra deste arquivo" onClick={() => ask({ title: 'Remover a regra de permissão?', message: `${i.description}: ${i.name}\n\nA regra sai de ${i.location}.`, confirmLabel: 'Remover', danger: true, onConfirm: () => send({ type: 'harness.permission.remove', tool, path: i.path, list: i.detail ?? '', rule: i.name }) })}>🗑</button>
+          )}
           {i.kind === 'mcp' && i.scope !== 'plugin' && mcpFiles.some((t) => t.label === i.location) && (
             <button
               className="icon danger"
@@ -230,11 +328,16 @@ export function HarnessInventory() {
               <span className="pill off">{ofKind.length}</span>
               <span className="muted small">{k.hint}</span>
               <span className="spacer" />
-              {(places.length > 0 || (k.id === 'mcp' && mcpFiles.length > 0)) && <button className="small" onClick={() => setCreating(creating === k.id ? null : k.id)}>Novo</button>}
+              {k.id === 'settings' && permissionFiles.length > 0 && <button className="small" onClick={() => { setAddingRule(!addingRule); setCreating(null); }}>Nova regra de permissão</button>}
+              {(places.length > 0 || (k.id === 'mcp' && mcpFiles.length > 0) || (k.id === 'hook' && hookFiles.length > 0)) && <button className="small" onClick={() => { setCreating(creating === k.id ? null : k.id); setAddingRule(false); }}>{k.id === 'settings' ? 'Novo arquivo' : 'Novo'}</button>}
             </div>
+            {k.id === 'hook' && <p className="banner warn small">Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.</p>}
+            {creating === 'hook' && k.id === 'hook' && hookFiles.length > 0 && <NewHook key={tool} tool={tool} targets={hookFiles} onClose={() => setCreating(null)} />}
+            {k.id === 'hook' && tool === 'kimi' && <p className="muted small">Os hooks do Kimi Code ficam no <code>~/.kimi-code/config.toml</code> (<code>[[hooks]]</code>): aparecem aqui e são editados no arquivo.</p>}
+            {k.id === 'settings' && addingRule && permissionFiles.length > 0 && <NewPermission key={tool} tool={tool} targets={permissionFiles} onClose={() => setAddingRule(false)} />}
             {creating === 'mcp' && k.id === 'mcp' && mcpFiles.length > 0 && <NewMcpServer key={tool} tool={tool} targets={mcpFiles} onClose={() => setCreating(null)} />}
             {k.id === 'mcp' && tool === 'claude' && <p className="muted small">Os servidores do <code>~/.claude.json</code> aparecem aqui, mas são alterados pelo Claude Code: <code>claude mcp add --scope user …</code> e <code>claude mcp remove …</code>.</p>}
-            {creating === k.id && places.length > 0 && <NewItem key={tool} tool={tool} kind={k.id} targets={places} onClose={() => setCreating(null)} />}
+            {creating === k.id && k.id !== 'hook' && k.id !== 'mcp' && places.length > 0 && <NewItem key={tool} tool={tool} kind={k.id} targets={places} onClose={() => setCreating(null)} />}
             {k.id === 'skill' && automatic.length > 0 && (
               <p className="muted small">
                 {automatic.length} skills automáticas: as descrições delas, {automatic.reduce((n, i) => n + i.description.length, 0).toLocaleString('pt-BR')} caracteres

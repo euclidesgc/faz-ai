@@ -2,7 +2,7 @@ import type { Appearance } from './appearance';
 import type { ViewState } from './filters';
 import type { ExecProfile } from './execution';
 import type { AiTool, HarnessKind, SkillMode } from './harness';
-import type { McpServerInput } from './harnessCatalog';
+import type { HookInput, McpServerInput } from './harnessCatalog';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
@@ -107,6 +107,13 @@ export type WebviewToHost =
   /** acrescenta um servidor MCP a um arquivo de configuração da ferramenta (`source` é o índice em HARNESS_CATALOG) */
   | { type: 'harness.mcp.add'; tool: AiTool; source: number; server: McpServerInput }
   | { type: 'harness.mcp.remove'; tool: AiTool; path: string; name: string }
+  /** acrescenta um hook a um arquivo de hooks da ferramenta (`source` é o índice em HARNESS_CATALOG) */
+  | { type: 'harness.hook.add'; tool: AiTool; source: number; hook: HookInput }
+  /** remove o hook listado: `event` é o nome do item e `command` o detalhe dele */
+  | { type: 'harness.hook.remove'; tool: AiTool; path: string; event: string; command: string }
+  /** regra de permissão numa das listas (allow, ask, deny) do arquivo de configuração */
+  | { type: 'harness.permission.add'; tool: AiTool; source: number; list: string; rule: string }
+  | { type: 'harness.permission.remove'; tool: AiTool; path: string; list: string; rule: string }
   /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
   | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
   | { type: 'harness.agent.create'; name: string; description: string; content: string; model?: string }
