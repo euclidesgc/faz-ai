@@ -107,14 +107,32 @@ funcionam com o mesmo comando.
 
 A IA pode fazer tudo o que a interface faz: listar e ler cards (`get_board`, `list_cards`,
 `get_card`), criar histórias e sub-tarefas, editar, mover, arquivar, mandar para a lixeira e apagar
-de vez, mexer em checklist, comentários e anexos (inclusive ler anexos de texto), e configurar
+de vez, mexer em checklist, na conversa do card e em anexos (inclusive ler anexos de texto), e configurar
 colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
-pelo nome. Comentários feitos pela IA saem assinados com o nome do cliente (ex.: "Claude Code").
+pelo nome. Mensagens da IA na conversa saem assinadas com o nome do cliente (ex.: "Claude Code").
 
 Também pelo MCP: catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
 `set_model_rules`), padrões por tipo de card (`update_card_type`), recriar o board (`reset_board`) e o
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
 `set_skill_enabled`, `delete_skill`…).
+
+### Status e revisão
+
+Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `get_card` e
+`list_cards` (que filtra por `work_status`):
+
+| Status | Com quem | Como chega nele |
+| --- | --- | --- |
+| `ready` | IA | O card entrou numa coluna em que a IA atua, a pessoa pediu ajustes ou respondeu a uma pergunta |
+| `running` | IA | `start_work` |
+| `waiting_answer` | Pessoa | `ask_question` |
+| `waiting_review` | Pessoa | `request_review` |
+| `approved` | IA | A pessoa aprovou (não há ferramenta para a IA aprovar) |
+| `blocked` | Pessoa | `block_card`, ou a pessoa bloqueou |
+
+Nas colunas com `requiresApproval` (em `get_board`), `move_card` só leva o card para a frente quando
+o status é `approved`. Voltar de coluna ou cancelar é livre. `update_column` liga e desliga
+`ai_active` e `requires_approval`.
 
 Ao ler um card (`get_card`), a IA recebe a ferramenta, o **modelo** e o **esforço** que devem executá-lo e as **Skills**
 obrigatórias com o caminho de cada `SKILL.md`. Ela é instruída a carregar essas skills antes de

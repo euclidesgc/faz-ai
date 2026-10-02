@@ -14,6 +14,7 @@ export function ColumnsSettings() {
     <div>
       <h2>Workflows e colunas</h2>
       <p className="muted">A linha de cima recebe histórias, bugs, retrabalho e débitos. A linha de baixo recebe as sub-tarefas de cada história. Uma história só pode entrar numa coluna de conclusão quando não tem sub-tarefas em aberto. "Começa colapsada" é o padrão ao abrir o board; lá, cada linha e coluna abre e fecha com um clique, e essa escolha fica lembrada.</p>
+      <p className="muted">"IA atua" marca as colunas em que a IA trabalha: ao entrar nelas o card fica Pronto. "Exige aprovação" é o ponto de revisão: a IA termina, pede a revisão e só avança o card depois que você aprova.</p>
       {state.workflows.map((wf) => {
         const cols = columnsOf(state, wf.id);
         return (
@@ -28,7 +29,7 @@ export function ColumnsSettings() {
               </label>
             </div>
             <table className="table">
-              <thead><tr><th>Coluna</th><th>Representa</th><th>Começa colapsada</th><th>Ordem</th><th></th></tr></thead>
+              <thead><tr><th>Coluna</th><th>Representa</th><th>IA atua</th><th>Exige aprovação</th><th>Começa colapsada</th><th>Ordem</th><th></th></tr></thead>
               <tbody>
                 {cols.map((c, i) => (
                   <tr key={c.id}>
@@ -40,6 +41,8 @@ export function ColumnsSettings() {
                         <option value="cancelled">Cancelamento</option>
                       </select>
                     </td>
+                    <td><input type="checkbox" disabled={c.category !== 'open'} checked={c.aiActive} onChange={(e) => send({ type: 'settings.column.update', columnId: c.id, patch: { aiActive: e.target.checked } })} /></td>
+                    <td><input type="checkbox" disabled={c.category !== 'open'} checked={c.requiresApproval} onChange={(e) => send({ type: 'settings.column.update', columnId: c.id, patch: { requiresApproval: e.target.checked } })} /></td>
                     <td><input type="checkbox" checked={c.collapsed} onChange={(e) => { send({ type: 'settings.column.update', columnId: c.id, patch: { collapsed: e.target.checked } }); resetCollapsed(c.id); }} /></td>
                     <td>
                       <button className="icon" disabled={i === 0} onClick={() => send({ type: 'settings.column.update', columnId: c.id, patch: { position: i - 1 } })}>←</button>
@@ -68,6 +71,8 @@ export function ColumnsSettings() {
                 <tr>
                   <td className="muted">Arquivados</td>
                   <td className="muted">Cards arquivados desta linha</td>
+                  <td></td>
+                  <td></td>
                   <td><input type="checkbox" checked={wf.archiveCollapsed} onChange={(e) => { send({ type: 'settings.workflow.update', workflowId: wf.id, patch: { archiveCollapsed: e.target.checked } }); resetCollapsed(archiveKey(wf.id)); }} /></td>
                   <td></td>
                   <td></td>

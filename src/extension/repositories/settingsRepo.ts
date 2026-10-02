@@ -14,11 +14,13 @@ export class SettingsRepo {
     return id;
   }
 
-  updateColumn(columnId: string, patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean }): void {
+  updateColumn(columnId: string, patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean }): void {
     const db = this.db;
     transaction(db, () => {
       if (patch.name !== undefined) run(db, 'UPDATE columns SET name = ? WHERE id = ?', [patch.name, columnId]);
       if (patch.collapsed !== undefined) run(db, 'UPDATE columns SET collapsed = ? WHERE id = ?', [patch.collapsed ? 1 : 0, columnId]);
+      if (patch.aiActive !== undefined) run(db, 'UPDATE columns SET ai_active = ? WHERE id = ?', [patch.aiActive ? 1 : 0, columnId]);
+      if (patch.requiresApproval !== undefined) run(db, 'UPDATE columns SET requires_approval = ? WHERE id = ?', [patch.requiresApproval ? 1 : 0, columnId]);
       if (patch.category !== undefined)
         run(db, 'UPDATE columns SET category = ?, is_terminal = ? WHERE id = ?', [patch.category, patch.category === 'open' ? 0 : 1, columnId]);
       if (patch.position !== undefined) {

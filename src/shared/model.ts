@@ -2,6 +2,7 @@ import type { AiTool, Harness } from './harness';
 import type { ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
+import type { CardStatus } from './status';
 
 export type Id = string;
 
@@ -24,6 +25,8 @@ export interface Board {
   modelRules: ModelRule[];
   /** tema e tipografia do board */
   appearance: Appearance;
+  /** versão do board padrão aplicada a este board */
+  templateVersion: number;
 }
 
 export interface Workflow {
@@ -48,6 +51,10 @@ export interface Column {
   isTerminal: boolean;
   /** a coluna começa colapsada no board */
   collapsed: boolean;
+  /** a IA trabalha nos cards desta coluna: ao entrar nela o card fica "Pronto" */
+  aiActive: boolean;
+  /** a IA só avança o card para a frente depois que uma pessoa aprova */
+  requiresApproval: boolean;
 }
 
 export interface CardType {
@@ -78,6 +85,13 @@ export interface Card {
   deletedAt: number | null;
   /** arquivado desde (ms) */
   archivedAt: number | null;
+  /** status de trabalho; null nas colunas em que a IA não atua */
+  status: CardStatus | null;
+  /** motivo do bloqueio */
+  statusReason: string;
+  statusAt: number | null;
+  /** quem definiu o status */
+  statusBy: string;
 }
 
 /** ID do card como aparece na interface. */
@@ -148,4 +162,6 @@ export interface BoardState {
   currentUser: string;
   /** arquivos de regras e skills do projeto */
   harness: Harness;
+  /** mudanças que a atualização para o board padrão atual faria; vazio quando não há o que atualizar */
+  pendingUpgrade: string[];
 }

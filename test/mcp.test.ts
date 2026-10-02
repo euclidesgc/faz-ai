@@ -322,13 +322,89 @@ describe('linhas e colunas colapsadas por padrão', () => {
 
 describe('aparência', () => {
   it('guarda tema, fonte e tamanho, recusando valores fora do permitido', async () => {
-    expect((await call('get_board')).data.appearance).toEqual({ theme: 'system', font: 'sans', fontSize: 14 });
-    expect((await call('set_appearance', { theme: 'dark', font_size: 16 })).data).toEqual({ theme: 'dark', font: 'sans', fontSize: 16 });
-    expect((await call('set_appearance', { font: 'serif' })).data).toEqual({ theme: 'dark', font: 'serif', fontSize: 16 });
+    expect((await call('get_board')).data.appearance).toMatchObject({ theme: 'system', font: 'sans', fontSize: 14 });
+    expect((await call('set_appearance', { theme: 'dark', font_size: 16 })).data).toMatchObject({ theme: 'dark', font: 'sans', fontSize: 16 });
+    expect((await call('set_appearance', { font: 'serif' })).data).toMatchObject({ theme: 'dark', font: 'serif', fontSize: 16 });
     expect((await call('set_appearance', { font_size: 40 })).error).toBe(true);
     router.handle({ type: 'settings.board.update', patch: { appearance: { fontSize: 99, theme: 'neon' as never } } });
-    expect(router.snapshot().board.appearance).toEqual({ theme: 'system', font: 'serif', fontSize: 22 });
+    expect(router.snapshot().board.appearance).toMatchObject({ theme: 'system', font: 'serif', fontSize: 22 });
+
+    // rótulo e cor dos status: o que for inválido volta ao padrão
+    const statuses = router.snapshot().board.appearance.statuses;
+    router.handle({ type: 'settings.board.update', patch: { appearance: { statuses: { ...statuses, ready: { label: 'Na fila', color: 'vermelho' } } } } });
+    expect(router.snapshot().board.appearance.statuses.ready).toEqual({ label: 'Na fila', color: '#4c8dff' });
+    expect(router.snapshot().board.appearance.statuses.blocked.label).toBe('Bloqueado');
   });
+});
+
+describe('status do card e checkpoint de revisão', () => {
+  const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
+  const human = (n: number, status: any, note?: string) => router.handle({ type: 'card.status.set', cardId: card(n).id, status, note });
+
+  it('a IA pede revisão e só avança depois da aprovação de uma pessoa', async () => {
+    const story = (await call('create_card', { title: 'Login' })).data;
+    expect(story.work).toBeUndefined(); // Backlog: a IA não atua
+    expect((await call('get_board')).data.workflows[0].columns.find((c: any) => c.name === 'PRD')).toMatchObject({ aiActive: true, requiresApproval: true });
+
+    // sair do Backlog não exige aprovação; ao entrar numa coluna em que a IA atua o card fica pronto
+    expect((await call('move_card', { card: 1, column: 'PRD' })).data.card.work).toEqual({ status: 'ready', label: 'Pronto', with: 'ai' });
+    const early = await call('move_card', { card: 1, column: 'Spec' });
+    expect(early.error).toBe(true);
+    expect(early.text).toContain('aprovação de uma pessoa');
+    expect(card(1).columnId).toBe(router.snapshot().columns.find((c) => c.name === 'PRD')!.id);
+
+    expect((await call('start_work', { card: 1 })).data.card.work.status).toBe('running');
+    const asked = (await call('request_review', { card: 1, summary: 'PRD anexado' })).data;
+    expect(asked.card.work).toMatchObject({ status: 'waiting_review', with: 'human' });
+    expect(asked.next).toContain('Pare aqui');
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1)).toMatchObject({ author: 'Claude Code', body: 'PRD anexado' });
+    expect((await call('list_cards', { work_status: 'waiting_review' })).data.cards.map((c: any) => c.id)).toEqual(['#1']);
+
+    // pedir ajustes: volta para a IA, com o pedido na conversa
+    human(1, 'ready', 'Faltou o critério de aceite');
+    expect((await call('get_card', { card: 1 })).data).toMatchObject({ work: { status: 'ready', with: 'ai' } });
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1)).toMatchObject({ author: 'Pessoa', body: 'Faltou o critério de aceite' });
+    expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(true);
+
+    // a IA não aprova; a pessoa sim
+    await call('request_review', { card: 1, summary: 'Ajustado' });
+    expect(() => router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'approved' }, { source: 'ai' })).toThrow('Só uma pessoa');
+    human(1, 'approved');
+    expect(card(1)).toMatchObject({ status: 'approved', statusBy: 'Pessoa' });
+    const moved = (await call('move_card', { card: 1, column: 'Spec' })).data.card;
+    expect(moved).toMatchObject({ column: 'Spec', work: { status: 'ready' } }); // o status recomeça na coluna nova
+
+    // voltar e cancelar são livres; a pessoa move sem aprovação
+    expect((await call('move_card', { card: 1, column: 'PRD' })).error).toBe(false);
+    router.handle({ type: 'card.move', cardId: card(1).id, columnId: router.snapshot().columns.find((c) => c.name === 'Plan')!.id, position: 0 });
+    expect(card(1).status).toBe('ready');
+    expect((await call('move_card', { card: 1, column: 'Cancelado' })).data.card.work).toBeUndefined();
+  });
+
+  it('pergunta, bloqueio e colunas configuráveis', async () => {
+    await call('create_card', { title: 'Login', column: 'Implementação' });
+    expect((await call('ask_question', { card: 1, question: 'Qual provedor de login?' })).data.card.work).toMatchObject({ status: 'waiting_answer', with: 'human' });
+    await call('add_comment', { card: 1, body: 'Enquanto isso, li o código.' });
+    expect(card(1).status).toBe('waiting_answer'); // mensagem da IA não devolve a vez
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Google' });
+    expect(card(1).status).toBe('ready');
+
+    expect((await call('block_card', { card: 1, reason: 'Sem acesso ao ambiente' })).data.card.work).toMatchObject({ status: 'blocked', with: 'human', reason: 'Sem acesso ao ambiente' });
+    expect(() => human(1, 'blocked')).toThrow('motivo');
+    human(1, 'ready');
+    expect(card(1)).toMatchObject({ status: 'ready', statusReason: '' });
+
+    // Implementação não exige aprovação por padrão; ligando, passa a exigir
+    const cols = (await call('update_column', { column: 'Implementação', requires_approval: true })).data.workflows[0].columns;
+    expect(cols.find((c: any) => c.name === 'Implementação').requiresApproval).toBe(true);
+    expect((await call('move_card', { card: 1, column: 'Concluído' })).text).toContain('aprovação de uma pessoa');
+    await call('update_column', { column: 'Implementação', requires_approval: false, ai_active: false });
+    expect((await call('move_card', { card: 1, column: 'Concluído' })).error).toBe(false);
+    // sub-tarefas nascem prontas na coluna "A fazer"
+    await call('create_card', { title: 'H2' });
+    expect((await call('create_card', { title: 'Tarefa', parent: 2 })).data.work).toMatchObject({ status: 'ready' });
+  });
+
 });
 
 describe('ferramentas de IA', () => {

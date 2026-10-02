@@ -1,5 +1,6 @@
 import { norm } from '../../shared/filters';
 import { describeRule, modelFieldOf, modelLabel, parseModelValue, resolveModelInput, suggestModel, type ModelOption } from '../../shared/models';
+import { statusInfo } from '../../shared/status';
 import { cardRef, type BoardState, type Card, type CardType, type Column, type FieldDef, type FieldValue, type Workflow } from '../../shared/model';
 
 /** Converte o snapshot em respostas enxutas para o modelo: nomes e números no lugar de UUIDs. */
@@ -91,6 +92,17 @@ function fieldsOf(s: BoardState, c: Card): Record<string, FieldValue> {
   return out;
 }
 
+/** Status de trabalho do card e com quem está a pendência. */
+export function workStatus(s: BoardState, c: Card) {
+  if (!c.status) return undefined;
+  return {
+    status: c.status,
+    label: s.board.appearance.statuses[c.status].label,
+    with: statusInfo(c.status).owner,
+    ...(c.statusReason ? { reason: c.statusReason } : {}),
+  };
+}
+
 const activeChildren = (s: BoardState, c: Card): Card[] => s.cards.filter((k) => k.parentId === c.id && k.deletedAt === null);
 
 /** Linha de listagem: o suficiente para decidir qual card abrir. */
@@ -105,6 +117,7 @@ export function cardSummary(s: BoardState, c: Card) {
     workflow: s.workflows.find((w) => w.id === c.workflowId)?.name,
     column: s.columns.find((col) => col.id === c.columnId)?.name,
     status: cardStatus(s, c),
+    ...(workStatus(s, c) ? { work: workStatus(s, c) } : {}),
     ...(parent ? { parent: `${cardRef(parent)} ${parent.title}` } : {}),
     ...(Object.keys(fieldsOf(s, c)).length ? { fields: fieldsOf(s, c) } : {}),
     ...(kids.length ? { subtasks: `${kids.filter((k) => cardStatus(s, k) !== 'open').length}/${kids.length} fora de aberto` } : {}),
@@ -171,7 +184,7 @@ export function boardOverview(s: BoardState) {
       kind: w.kind === 'parent' ? 'parent (histórias)' : 'child (sub-tarefas, sempre ligadas a uma história)',
       columns: s.columns
         .filter((c) => c.workflowId === w.id)
-        .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length, ...(c.collapsed ? { collapsed: true } : {}) })),
+        .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length, ...(c.aiActive ? { aiActive: true } : {}), ...(c.requiresApproval ? { requiresApproval: true } : {}), ...(c.collapsed ? { collapsed: true } : {}) })),
       ...(w.collapsed ? { collapsed: true } : {}),
       archivedColumnCollapsed: w.archiveCollapsed,
     })),

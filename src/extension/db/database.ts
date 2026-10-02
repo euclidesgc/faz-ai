@@ -1,5 +1,5 @@
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js';
-import { promises as fs } from 'node:fs';
+import { promises as fs, mkdirSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { migrate } from './schema';
 
@@ -9,6 +9,8 @@ export interface DbHandle {
   scheduleSave(): void;
   /** Grava imediatamente e cancela qualquer gravação pendente. */
   flush(): Promise<void>;
+  /** Grava uma cópia do banco como está agora, ao lado do arquivo (`.bak`), antes de uma mudança em massa. */
+  backup(): void;
   close(): Promise<void>;
 }
 
@@ -71,6 +73,10 @@ export async function openFile(filePath: string, wasmDir: string, debounceMs = 5
       }, debounceMs);
     },
     flush,
+    backup() {
+      mkdirSync(path.dirname(filePath), { recursive: true });
+      writeFileSync(`${filePath}.bak`, Buffer.from(db.export()));
+    },
     async close() {
       await flush();
       db.close();

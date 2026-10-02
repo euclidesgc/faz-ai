@@ -8,6 +8,7 @@ import type { MessageRouter } from '../panel/messageRouter';
 import { ALL_AI_TOOLS, RULE_FILES, type AiTool } from '../../shared/harness';
 import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../../shared/models';
 import { newId } from '../db/ids';
+import { ALL_CARD_STATUSES } from '../../shared/status';
 import { boardOverview, harnessOverview, modelsOverview, cardDetail, cardStatus, cardSummary, coerceFieldValue, findCard, findColumn, findField, findType, findWorkflow } from './format';
 
 export interface ToolContext {
@@ -58,6 +59,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     });
     for (const v of values) router.handle({ type: 'field.setValue', cardId, ...v });
   };
+  /** origem das ações desta sessão: a IA, assinando com o nome do cliente */
+  const ai = () => ({ author: ctx.author(), source: 'ai' as const });
   const live = (c: Card): Card => {
     if (c.deletedAt !== null) throw new Error(`O card #${c.number} está na lixeira; use restore_card antes.`);
     return c;
@@ -82,6 +85,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       type: z.string().optional().describe('Nome do tipo de card'),
       parent: cardArg.optional().describe('Só as sub-tarefas desta história'),
       status: z.enum(['open', 'done', 'cancelled']).optional().describe('Categoria da coluna em que o card está'),
+      work_status: z.enum(ALL_CARD_STATUSES as [string, ...string[]]).optional().describe('Status de trabalho do card (campo `work.status`)'),
       text: z.string().optional().describe('Palavras-chave buscadas em título, descrição, comentários e campos'),
       fields: z.record(z.string(), z.array(z.string())).optional().describe('Campo → valores aceitos, ex.: {"Fase": ["PRD", "Spec"]}'),
       include_archived: z.boolean().optional(),
@@ -102,6 +106,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         .filter((c) => !columnIds || columnIds.includes(c.columnId))
         .filter((c) => !parentId || c.parentId === parentId)
         .filter((c) => !a.status || cardStatus(s, c) === a.status)
+        .filter((c) => !a.work_status || c.status === a.work_status)
         .filter((c) => !matched || matched.has(c.id))
         .sort((x, y) => x.number - y.number);
       return { total: cards.length, cards: cards.map((c) => cardSummary(s, c)) };
@@ -189,7 +194,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'move_card',
-    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto. Um card arquivado é desarquivado ao ser movido.',
+    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Um card arquivado é desarquivado ao ser movido.',
     {
       card: cardArg,
       column: z.string().describe('Nome da coluna de destino'),
@@ -200,8 +205,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       const s = router.snapshot();
       const card = live(findCard(s, a.card));
       const column = findColumn(s, a.column, card.workflowId);
-      if (card.archivedAt !== null) router.handle({ type: 'card.unarchive', cardId: card.id, columnId: column.id, position: a.position ?? END });
-      else router.handle({ type: 'card.move', cardId: card.id, columnId: column.id, position: a.position ?? END, cancelChildren: a.cancel_subtasks });
+      if (card.archivedAt !== null) router.handle({ type: 'card.unarchive', cardId: card.id, columnId: column.id, position: a.position ?? END }, ai());
+      else router.handle({ type: 'card.move', cardId: card.id, columnId: column.id, position: a.position ?? END, cancelChildren: a.cancel_subtasks }, ai());
       const after = router.snapshot();
       const result: Record<string, unknown> = { card: cardSummary(after, after.cards.find((c) => c.id === card.id)!) };
       // equivalente ao aviso que a interface dá quando a última sub-tarefa em aberto termina
@@ -212,6 +217,39 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       }
       return result;
     },
+  );
+
+  // ---------- status de trabalho ----------
+
+  const setStatus = (router: MessageRouter, ref: string | number, status: 'running' | 'waiting_review' | 'waiting_answer' | 'blocked', note: string | undefined, next: string) => {
+    const card = live(findCard(router.snapshot(), ref));
+    const after = router.handle({ type: 'card.status.set', cardId: card.id, status, note }, ai());
+    return { card: cardSummary(after, after.cards.find((c) => c.id === card.id)!), next };
+  };
+
+  tool('start_work', 'Marca que você começou a trabalhar no card (status "running"). Chame antes de executar o trabalho de um card.', { card: cardArg }, (a, router) =>
+    setStatus(router, a.card, 'running', undefined, 'Ao terminar, peça a revisão com request_review, pergunte com ask_question ou mova o card.'),
+  );
+
+  tool(
+    'request_review',
+    'Entrega o trabalho da fase para revisão de uma pessoa (status "waiting_review") e registra o resumo na conversa do card. Depois de chamar, PARE: só uma pessoa aprova. Se ela pedir ajustes, o card volta para "ready" com o pedido na conversa; quando aprovar, o status vira "approved" e você move o card.',
+    { card: cardArg, summary: z.string().min(1).describe('O que foi feito e o que a pessoa deve revisar (markdown)') },
+    (a, router) => setStatus(router, a.card, 'waiting_review', a.summary, 'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.'),
+  );
+
+  tool(
+    'ask_question',
+    'Faz uma pergunta à pessoa na conversa do card e passa a vez para ela (status "waiting_answer"). Use quando faltar uma informação ou decisão. Depois de chamar, pare de trabalhar neste card até a resposta chegar.',
+    { card: cardArg, question: z.string().min(1).describe('A pergunta (markdown)') },
+    (a, router) => setStatus(router, a.card, 'waiting_answer', a.question, 'Pare aqui. Quando a pessoa responder na conversa, o card volta para "ready".'),
+  );
+
+  tool(
+    'block_card',
+    'Marca o card como bloqueado por um impedimento que você não consegue resolver (acesso, dependência externa, erro de ambiente) e registra o motivo na conversa.',
+    { card: cardArg, reason: z.string().min(1).describe('O que impede o trabalho e o que é preciso para destravar') },
+    (a, router) => setStatus(router, a.card, 'blocked', a.reason, 'Pare aqui. Uma pessoa precisa desbloquear o card.'),
   );
 
   tool('archive_card', 'Arquiva um card (e suas sub-tarefas): sai do board sem ser apagado.', { card: cardArg }, (a, router) => {
@@ -293,11 +331,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'add_comment',
-    'Comenta em um card (markdown). Use para registrar decisões, dúvidas e o resultado do trabalho. O comentário é assinado com o nome do cliente de IA.',
+    'Escreve na conversa do card (markdown). Use para registrar decisões e o resultado do trabalho e para responder à pessoa. A mensagem é assinada com o nome do cliente de IA. Para pedir revisão use request_review; para perguntar, ask_question.',
     { card: cardArg, body: z.string().min(1) },
     (a, router) => {
       const card = findCard(router.snapshot(), a.card);
-      router.handle({ type: 'comment.add', cardId: card.id, body: a.body }, { author: ctx.author() });
+      router.handle({ type: 'comment.add', cardId: card.id, body: a.body }, ai());
       return detail(router, card.id).comments.at(-1);
     },
   );
@@ -362,12 +400,12 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'update_column',
-    'Renomeia uma coluna, muda o que ela representa (categoria) ou a sua posição no workflow.',
-    { column: z.string(), workflow: columnWorkflowArg, name: z.string().min(1).optional(), category: categoryArg.optional(), position: z.number().int().min(0).optional(), collapsed: z.boolean().optional().describe('A coluna começa colapsada ao abrir o board') },
+    'Altera uma coluna: nome, o que ela representa (categoria), posição no workflow, se a IA atua nela e se ela exige aprovação de uma pessoa para o card avançar.',
+    { column: z.string(), workflow: columnWorkflowArg, name: z.string().min(1).optional(), category: categoryArg.optional(), position: z.number().int().min(0).optional(), collapsed: z.boolean().optional().describe('A coluna começa colapsada ao abrir o board'), ai_active: z.boolean().optional().describe('A IA trabalha nos cards desta coluna: ao entrar nela o card fica "ready"'), requires_approval: z.boolean().optional().describe('A IA só avança o card depois que uma pessoa aprova') },
     (a, router) => {
       const s = router.snapshot();
       const col = findColumn(s, a.column, a.workflow ? findWorkflow(s, a.workflow).id : undefined);
-      router.handle({ type: 'settings.column.update', columnId: col.id, patch: { name: a.name, category: a.category, position: a.position, collapsed: a.collapsed } });
+      router.handle({ type: 'settings.column.update', columnId: col.id, patch: { name: a.name, category: a.category, position: a.position, collapsed: a.collapsed, aiActive: a.ai_active, requiresApproval: a.requires_approval } });
       return overview(router);
     },
   );

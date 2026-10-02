@@ -1,4 +1,6 @@
-/** Aparência do board: tema e tipografia dos textos longos (descrição, comentários). */
+import { DEFAULT_STATUS_STYLES, parseStatusStyles, type StatusStyles } from './status';
+
+/** Aparência do board: tema, tipografia dos textos longos (descrição, conversa) e os status dos cards. */
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type TextFont = 'sans' | 'ui' | 'serif' | 'mono' | 'editor';
@@ -10,9 +12,11 @@ export interface Appearance {
   font: TextFont;
   /** tamanho, em px, da fonte dos campos de texto longo */
   fontSize: number;
+  /** rótulo e cor de cada status de card */
+  statuses: StatusStyles;
 }
 
-export const DEFAULT_APPEARANCE: Appearance = { theme: 'system', font: 'sans', fontSize: 14 };
+export const DEFAULT_APPEARANCE: Appearance = { theme: 'system', font: 'sans', fontSize: 14, statuses: DEFAULT_STATUS_STYLES };
 export const FONT_SIZE_RANGE = { min: 11, max: 22 };
 
 export const THEMES: { value: ThemeMode; label: string }[] = [
@@ -45,5 +49,6 @@ export function parseAppearance(json: string | null | undefined): Appearance {
     theme: THEMES.some((t) => t.value === raw.theme) ? (raw.theme as ThemeMode) : DEFAULT_APPEARANCE.theme,
     font: FONTS.some((f) => f.value === raw.font) ? (raw.font as TextFont) : DEFAULT_APPEARANCE.font,
     fontSize: Number.isFinite(size) && size > 0 ? Math.min(FONT_SIZE_RANGE.max, Math.max(FONT_SIZE_RANGE.min, size)) : DEFAULT_APPEARANCE.fontSize,
+    statuses: parseStatusStyles(raw.statuses),
   };
 }

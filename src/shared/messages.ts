@@ -3,6 +3,7 @@ import type { ViewState } from './filters';
 import type { AiTool } from './harness';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
+import type { CardStatus } from './status';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, WorkflowKind } from './model';
 
 export type WebviewToHost =
@@ -19,6 +20,8 @@ export type WebviewToHost =
   | { type: 'card.unarchive'; cardId: Id; columnId?: Id; position?: number }
   | { type: 'card.deletePermanent'; cardId: Id }
   | { type: 'trash.empty' }
+  /** muda o status de trabalho do card; `note` é o motivo do bloqueio ou o texto que vai junto para a conversa */
+  | { type: 'card.status.set'; cardId: Id; status: CardStatus | null; note?: string }
   | { type: 'comment.add'; cardId: Id; body: string }
   | { type: 'comment.update'; commentId: Id; body: string }
   | { type: 'comment.delete'; commentId: Id }
@@ -32,7 +35,7 @@ export type WebviewToHost =
   | { type: 'checklist.update'; itemId: Id; patch: { text?: string; done?: boolean } }
   | { type: 'checklist.delete'; itemId: Id }
   | { type: 'settings.column.create'; workflowId: Id; name: string }
-  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean } }
+  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean } }
   | { type: 'settings.column.delete'; columnId: Id; moveCardsTo: Id }
   | { type: 'settings.type.create'; name: string; color: string; defaultWorkflowId: Id }
   | { type: 'settings.type.update'; typeId: Id; patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue> } }
@@ -55,6 +58,8 @@ export type WebviewToHost =
   | { type: 'settings.board.update'; patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance> } }
   /** apaga tudo e recria o board com o padrão atual */
   | { type: 'settings.board.reset' }
+  /** leva o board ao padrão atual sem recriá-lo: só acrescenta e completa, os cards não saem do lugar */
+  | { type: 'settings.board.upgrade' }
   | { type: 'settings.models.set'; catalog: ModelOption[] }
   /** relê os modelos da ferramenta (configuração local ou lista embutida) e os junta ao catálogo */
   | { type: 'settings.models.detect'; tool: AiTool }

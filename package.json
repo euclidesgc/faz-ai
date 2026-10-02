@@ -2,7 +2,7 @@
   "name": "faz-ai",
   "displayName": "Faz AI Kanban",
   "description": "Board kanban para Spec-Driven Development com IA, dentro do editor: histórias, sub-tarefas e um servidor MCP para a IA ler e atualizar o board",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "publisher": "euclidesgc",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -63,6 +63,10 @@
         "command": "fazai.connectAI",
         "title": "Faz AI: Conectar IA (MCP)",
         "icon": "$(plug)"
+      },
+      {
+        "command": "fazai.upgradeBoard",
+        "title": "Faz AI: Atualizar board para o padrão atual"
       }
     ],
     "viewsContainers": {

@@ -16,6 +16,11 @@ os artefatos de cada fase e move os cards conforme avança.
 - **Trabalhar com a IA no mesmo quadro.** A extensão expõe o board por MCP. Claude Code, Codex,
   Cursor, Kimi Code, GitHub Copilot ou outro cliente MCP podem consultar e editar tudo o que a interface permite, e
   as mudanças aparecem no board na hora.
+- **Saber com quem está cada card.** Todo card em que a IA atua tem um status (Pronto, Em execução,
+  Aguardando resposta, Aguardando revisão, Aprovado, Bloqueado) que mostra se a pendência está com
+  você ou com a IA.
+- **Revisar antes de a IA avançar.** Nas colunas que exigem aprovação (PRD, Spec e Plan, por
+  padrão), a IA termina o trabalho, pede a revisão e para. Ela só move o card depois que você aprova.
 - **Dizer à IA como executar cada card.** Cada card pode indicar o modelo, o nível de esforço e as
   skills obrigatórias. O modelo pode ser sugerido por regras a partir do tamanho da tarefa.
 - **Cuidar do harness do projeto.** O arquivo de regras (`CLAUDE.md` ou `AGENTS.md`) e as skills
@@ -26,8 +31,9 @@ os artefatos de cada fase e move os cards conforme avança.
 1. Abra uma pasta no editor e clique no ícone **Faz AI** na barra lateral. Cada pasta tem o seu board.
 2. Crie histórias com **+ Novo card** e arraste-as entre as colunas. Clicar numa história mostra só
    as sub-tarefas dela; duplo clique abre o detalhe.
-3. No detalhe do card ficam a descrição em Markdown, os campos, o checklist, as sub-tarefas, os
-   comentários e os anexos (é onde entram PRD, Spec e Plan).
+3. No detalhe do card ficam o status, a descrição em Markdown, os campos, o checklist, as
+   sub-tarefas, a conversa e os anexos (é onde entram PRD, Spec e Plan). A conversa é o lugar em
+   que você e a IA falam sobre o card.
 4. Busque por texto ou pelo ID (`#12`). A seção **Filtros** da barra lateral filtra por tipo,
    campos, datas e relacionamentos.
 5. Cards podem ser arquivados (coluna "Arquivados" no fim de cada linha) ou enviados para a
@@ -45,8 +51,17 @@ daquela fase. Essas regras podem ser desligadas nas configurações.
    board" ou "pegue a história #1 e escreva o PRD".
 
 Fluxo sugerido: a IA lê a história, produz o artefato da fase e o anexa ao card, cria as
-sub-tarefas, move cada uma conforme avança, comenta o resultado e leva a história para a próxima
-coluna ao fechar a fase.
+sub-tarefas, move cada uma conforme avança e, ao fechar a fase, pede a revisão pela conversa do
+card. Você responde no próprio card:
+
+- **Aprovar** deixa o card Aprovado, e a IA o leva para a próxima coluna.
+- **Pedir ajustes** devolve o card para a IA com o seu texto na conversa.
+- Se a IA fizer uma pergunta, o card fica Aguardando resposta; ao responder na conversa, ele volta
+  para a IA.
+- **Bloquear** registra um impedimento, com o motivo.
+
+Quais colunas exigem aprovação, e em quais a IA atua, se define em Configurações → Workflows e
+colunas. Você mesmo pode mover qualquer card sem aprovação.
 
 O editor precisa estar aberto na pasta do projeto para a IA alcançar o board. O registro manual, os
 formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](docs/mcp.md).
@@ -57,18 +72,22 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 
 | Seção | O que ajusta |
 | --- | --- |
-| Workflows e colunas | Nomes, ordem e significado das colunas; quais começam colapsadas |
+| Workflows e colunas | Nomes, ordem e significado das colunas; em quais a IA atua e quais exigem aprovação; quais começam colapsadas |
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos | Campos personalizados (texto, seleção, data, modelo…) e onde aparecem |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
 | Harness de IA | Ferramenta do projeto, arquivo de regras e skills |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
-| Aparência | Tema (sistema, claro, escuro), fonte e tamanho dos textos longos |
+| Aparência | Tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
 
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração
 local; nas outras, uma lista embutida que pode ser editada). As regras de sugestão combinam
 condições com E e OU, por exemplo `Esforço da atividade = Alto E Tags = backend`. O resultado é
 sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.
+
+Quando uma versão nova da extensão muda o board padrão, o board pergunta se você quer atualizá-lo
+(ou use **Faz AI: Atualizar board para o padrão atual**). A atualização só acrescenta o que falta:
+nenhum card sai do lugar e o que você personalizou é mantido. Uma cópia do banco é gravada antes.
 
 ## Onde ficam os dados
 

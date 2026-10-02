@@ -112,6 +112,12 @@ describe('telas montam sem erro', () => {
     expect(foreign).toContain('Apagar');
     expect(foreign).not.toContain('Editar');
     useBoardStore.setState({ state: st });
+    // card aguardando revisão: selo com quem está a pendência e as ações de revisão
+    useBoardStore.setState({ state: { ...st, cards: st.cards.map((c) => (c.id === storyId ? { ...c, status: 'waiting_review' as const } : c)) } });
+    const reviewing = html(<CardDrawer cardId={storyId} />);
+    for (const text of ['Aguardando revisão', 'com você', 'Aprovar', 'Pedir ajustes', 'Conversa']) expect(reviewing).toContain(text);
+    expect(html(<Board />)).toContain('status-badge');
+    useBoardStore.setState({ state: st });
     const own = html(<CommentsTab cardId={storyId} />);
     expect(own).toContain('Apagar');
     expect(own).toContain('Editar');
@@ -125,7 +131,7 @@ describe('telas montam sem erro', () => {
   it('configurações', () => {
     expect(html(<Settings />)).toContain('Harness de IA');
     const cols = html(<ColumnsSettings />);
-    for (const text of ['PRD', 'Começa colapsada', 'Linha começa colapsada', 'Arquivados']) expect(cols).toContain(text);
+    for (const text of ['PRD', 'Começa colapsada', 'Linha começa colapsada', 'Arquivados', 'IA atua', 'Exige aprovação']) expect(cols).toContain(text);
     const types = html(<TypesSettings />);
     expect(types).toContain('Padrões por tipo');
     expect(types).toContain('Modelo');
@@ -148,7 +154,7 @@ describe('telas montam sem erro', () => {
     for (const text of ['Tipo do card', 'OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
 
     const look = html(<AppearanceSettings />);
-    for (const text of ['Tema', 'Sistema (acompanha o VS Code)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia']) expect(look).toContain(text);
+    for (const text of ['Tema', 'Sistema (acompanha o VS Code)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia', 'Status dos cards', 'Aguardando resposta']) expect(look).toContain(text);
     const harness = html(<HarnessSettings />);
     for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)']) expect(harness).toContain(text);
   });

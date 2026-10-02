@@ -106,6 +106,7 @@ export function Column({ column, workflow, cards, total, index, siblings, collap
               <span className={`terminal-mark ${column.category}`} title={CATEGORIES.find((c) => c.value === column.category)!.hint}>{column.category === 'done' ? '✓ ' : '✕ '}</span>
             )}
             {column.name}
+            {column.requiresApproval && <span className="approval-mark" title="Exige aprovação: a IA só avança o card desta coluna depois que você aprova"> ✋</span>}
           </span>
         )}
         <span className="column-count">{count}</span>

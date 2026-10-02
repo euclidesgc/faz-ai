@@ -2,15 +2,19 @@ import type { Database } from 'sql.js';
 import type { FieldValue } from '../../shared/model';
 import { norm } from '../../shared/filters';
 import { parseRules } from '../../shared/rules';
+import type { CardStatus } from '../../shared/status';
 import { newId, now } from '../db/ids';
-import { all, num, one, run, str, transaction } from '../db/query';
+import { all, num, one, run, str, transaction, type Row } from '../db/query';
+
+/** Status de um card ao entrar numa coluna: "Pronto" onde a IA atua, vazio nas demais. */
+const entryStatus = (col: Row): CardStatus | null => (num(col.ai_active) === 1 && str(col.category) === 'open' ? 'ready' : null);
 
 export class CardRepo {
   constructor(private db: Database) {}
 
   create(boardId: string, input: { typeId: string; columnId: string; parentId: string | null; title: string }): string {
     const db = this.db;
-    const col = one(db, 'SELECT c.workflow_id, w.kind FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE c.id = ?', [input.columnId]);
+    const col = one(db, 'SELECT c.workflow_id, c.category, c.ai_active, w.kind FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE c.id = ?', [input.columnId]);
     if (!col) throw new Error('Coluna não encontrada');
     const kind = str(col.kind);
     if (kind === 'child' && !input.parentId) throw new Error('Sub-tarefa precisa de um card pai');
@@ -28,9 +32,9 @@ export class CardRepo {
       run(db, 'UPDATE boards SET next_card_number = ? WHERE id = ?', [number + 1, boardId]);
       run(
         db,
-        `INSERT INTO cards(id, number, board_id, workflow_id, column_id, type_id, parent_id, title, description, position, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [id, number, boardId, str(col.workflow_id), input.columnId, input.typeId, input.parentId, input.title.trim() || 'Sem título', '', pos, t, t],
+        `INSERT INTO cards(id, number, board_id, workflow_id, column_id, type_id, parent_id, title, description, position, created_at, updated_at, status, status_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [id, number, boardId, str(col.workflow_id), input.columnId, input.typeId, input.parentId, input.title.trim() || 'Sem título', '', pos, t, t, entryStatus(col), t],
       );
       // padrões do tipo (ex.: modelo e skills), só para campos que ainda existem
       const defaults = JSON.parse(str(one(db, 'SELECT defaults_json FROM card_types WHERE id = ?', [input.typeId])?.defaults_json) || '{}') as Record<string, FieldValue>;
@@ -55,9 +59,9 @@ export class CardRepo {
   }
 
   /** Move para coluna (mesmo workflow) e reindexa as posições das colunas afetadas. */
-  move(cardId: string, columnId: string, position: number, opts: { cancelChildren?: boolean } = {}): void {
+  move(cardId: string, columnId: string, position: number, opts: { cancelChildren?: boolean; byAi?: boolean } = {}): void {
     transaction(this.db, () => {
-      this.moveInner(cardId, columnId, position);
+      this.moveInner(cardId, columnId, position, opts.byAi);
       if (opts.cancelChildren) this.cancelOpenChildren(cardId, columnId);
     });
   }
@@ -92,12 +96,12 @@ export class CardRepo {
     }
   }
 
-  private moveInner(cardId: string, columnId: string, position: number): void {
+  private moveInner(cardId: string, columnId: string, position: number, byAi = false): void {
     const db = this.db;
     {
-      const card = one(db, 'SELECT board_id, workflow_id, column_id, parent_id, title FROM cards WHERE id = ?', [cardId]);
+      const card = one(db, 'SELECT board_id, workflow_id, column_id, parent_id, title, status FROM cards WHERE id = ?', [cardId]);
       if (!card) throw new Error('Card não encontrado');
-      const col = one(db, 'SELECT workflow_id, category, position FROM columns WHERE id = ?', [columnId]);
+      const col = one(db, 'SELECT workflow_id, category, position, ai_active FROM columns WHERE id = ?', [columnId]);
       if (!col) throw new Error('Coluna não encontrada');
       if (str(col.workflow_id) !== str(card.workflow_id)) throw new Error('Não é possível mover entre workflows');
 
@@ -129,6 +133,12 @@ export class CardRepo {
           if (pending > 0) throw new Error(`Não é possível avançar "${str(card.title)}": ${pending} sub-tarefa(s) da fase ${str(from.name)} ainda em aberto.`);
         }
       }
+      // regra: a IA só avança um card de uma coluna que exige aprovação depois que uma pessoa aprova; voltar ou cancelar é livre
+      if (byAi && fromCol !== columnId && str(col.category) !== 'cancelled') {
+        const from = one(db, 'SELECT name, position, requires_approval FROM columns WHERE id = ?', [fromCol]);
+        if (from && num(from.requires_approval) === 1 && num(col.position) > num(from.position) && str(card.status) !== 'approved')
+          throw new Error(`"${str(card.title)}" só sai de ${str(from.name)} com a aprovação de uma pessoa. Peça a revisão com request_review e pare; quando o status for "approved", mova o card.`);
+      }
       const ids = all(db, 'SELECT id FROM cards WHERE column_id = ? AND id != ? ORDER BY position', [columnId, cardId]).map((r) => str(r.id));
       const idx = Math.max(0, Math.min(position, ids.length));
       ids.splice(idx, 0, cardId);
@@ -138,6 +148,8 @@ export class CardRepo {
         all(db, 'SELECT id FROM cards WHERE column_id = ? ORDER BY position', [fromCol]).forEach((r, i) =>
           run(db, 'UPDATE cards SET position = ? WHERE id = ?', [i, str(r.id)]),
         );
+        // o status vale para a coluna: ao entrar em outra, recomeça
+        run(db, "UPDATE cards SET status = ?, status_reason = '', status_at = ?, status_by = '' WHERE id = ?", [entryStatus(col), now(), cardId]);
       }
     }
   }
@@ -156,11 +168,20 @@ export class CardRepo {
   }
 
   /** Desarquiva; opcionalmente já move para uma coluna/posição. */
-  unarchive(cardId: string, columnId?: string, position?: number): void {
+  unarchive(cardId: string, columnId?: string, position?: number, byAi = false): void {
     transaction(this.db, () => {
       this.unmark('archived_at', cardId, 'Desarquive a história pai primeiro');
-      if (columnId) this.moveInner(cardId, columnId, position ?? Number.MAX_SAFE_INTEGER);
+      if (columnId) this.moveInner(cardId, columnId, position ?? Number.MAX_SAFE_INTEGER, byAi);
     });
+  }
+
+  setStatus(cardId: string, status: CardStatus | null, reason: string, by: string): void {
+    run(this.db, 'UPDATE cards SET status = ?, status_reason = ?, status_at = ?, status_by = ? WHERE id = ?', [status, reason, now(), by, cardId]);
+  }
+
+  status(cardId: string): CardStatus | null {
+    const v = one(this.db, 'SELECT status FROM cards WHERE id = ?', [cardId])?.status;
+    return v == null ? null : (str(v) as CardStatus);
   }
 
   /** Apaga de vez o card e seus filhos. Devolve os ids removidos (para limpar anexos). */
