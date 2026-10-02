@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, SKILL_MODES, SKILL_NAME_PATTERN, type AiTool, type HarnessItem, type HarnessKind, type SkillMode } from '../../../shared/harness';
-import { copyTarget, createTargets, type CreateTarget } from '../../../shared/harnessCatalog';
+import { MCP_NAME_PATTERN, copyTarget, createTargets, mcpTargets, type CreateTarget, type McpTarget } from '../../../shared/harnessCatalog';
 import { useBoardStore } from '../../store/boardStore';
 
 const GLOBAL_WARNING = 'O arquivo fica na sua pasta de usuário e vale para todos os seus projetos.';
@@ -52,6 +52,72 @@ function NewItem({ tool, kind, targets, onClose }: { tool: AiTool; kind: Harness
   );
 }
 
+/** `CHAVE=valor`, um por linha. */
+const pairs = (text: string): Record<string, string> =>
+  Object.fromEntries(text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]));
+
+/** Formulário de um servidor MCP novo: em que arquivo gravar, e o comando ou o endereço. */
+function NewMcpServer({ tool, targets, onClose }: { tool: AiTool; targets: McpTarget[]; onClose: () => void }) {
+  const send = useBoardStore((s) => s.send);
+  const ask = useBoardStore((s) => s.ask);
+  const [source, setSource] = useState(targets[0]!.source);
+  const [name, setName] = useState('');
+  const [transport, setTransport] = useState<'stdio' | 'http'>('stdio');
+  const [command, setCommand] = useState('');
+  const [args, setArgs] = useState('');
+  const [url, setUrl] = useState('');
+  const [extra, setExtra] = useState('');
+  const target = targets.find((t) => t.source === source)!;
+  const ok = MCP_NAME_PATTERN.test(name) && (transport === 'stdio' ? command.trim() !== '' : /^https?:\/\/\S+$/.test(url.trim()));
+  const add = () => {
+    const run = () => {
+      const server = { name, transport, command, args: args.split(/\r?\n/).map((a) => a.trim()).filter(Boolean), env: transport === 'stdio' ? pairs(extra) : {}, url, headers: transport === 'http' ? pairs(extra) : {} };
+      send({ type: 'harness.mcp.add', tool, source, server });
+      onClose();
+    };
+    if (target.scope === 'user') ask({ title: 'Acrescentar servidor na pasta do usuário?', message: `${target.label}\n\n${GLOBAL_WARNING}`, confirmLabel: 'Acrescentar', onConfirm: run });
+    else run();
+  };
+  return (
+    <div className="harness-new">
+      <label className="field-row">
+        <span>Arquivo</span>
+        <select value={source} onChange={(e) => setSource(Number(e.target.value))}>
+          {targets.map((t) => <option key={t.source} value={t.source}>{t.scope === 'user' ? 'Global' : 'Projeto'}: {t.label}</option>)}
+        </select>
+      </label>
+      <label className="field-row">
+        <span>Nome</span>
+        <input value={name} onChange={(e) => setName(e.target.value.trim())} placeholder="github" />
+      </label>
+      <label className="field-row">
+        <span>Tipo</span>
+        <select value={transport} onChange={(e) => setTransport(e.target.value as 'stdio' | 'http')}>
+          <option value="stdio">Comando local (stdio)</option>
+          <option value="http">Endereço (HTTP)</option>
+        </select>
+      </label>
+      {transport === 'stdio' ? (
+        <>
+          <label className="field-row"><span>Comando</span><input value={command} onChange={(e) => setCommand(e.target.value)} placeholder="npx" /></label>
+          <label className="field-row"><span>Argumentos</span><textarea rows={2} value={args} onChange={(e) => setArgs(e.target.value)} placeholder="um por linha" spellCheck={false} /></label>
+        </>
+      ) : (
+        <label className="field-row"><span>Endereço</span><input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://exemplo.dev/mcp" /></label>
+      )}
+      <label className="field-row">
+        <span>{transport === 'stdio' ? 'Variáveis de ambiente' : 'Cabeçalhos'}</span>
+        <textarea rows={2} value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="CHAVE=valor, um por linha" spellCheck={false} />
+      </label>
+      <p className="muted small">Variáveis e cabeçalhos são gravados no arquivo como estão. Se o arquivo vai para o repositório, não ponha segredos nele.</p>
+      <div className="row">
+        <button className="primary" disabled={!ok} onClick={add}>Acrescentar servidor</button>
+        <button className="ghost" onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 /** Tudo que cada ferramenta de IA carrega: por tipo de componente e por escopo (projeto, global, plugins). */
 export function HarnessInventory() {
   const state = useBoardStore((s) => s.state)!;
@@ -67,6 +133,7 @@ export function HarnessInventory() {
   const label = (id: AiTool) => AI_TOOLS.find((t) => t.id === id)!.label;
   const missing = inventory.filter((t) => !t.installed && t.items.length === 0).map((t) => label(t.tool));
   const targets = createTargets(tool);
+  const mcpFiles = mcpTargets(tool);
 
   const copyable = (i: HarnessItem, to: 'project' | 'user') => (i.layout === 'files' || i.layout === 'skills') && i.scope !== to && !!copyTarget(tool, i.kind, i.layout, to);
   /** o mesmo item no outro escopo: dá para ver se já foi copiado e se a cópia divergiu */
@@ -118,6 +185,13 @@ export function HarnessInventory() {
           {copyable(i, 'project') && !inProject && <button className="ghost small" title="Cria uma cópia independente na pasta do projeto" onClick={() => copy([i], 'project')}>Copiar para o projeto</button>}
           {copyable(i, 'user') && !twin(i, 'user') && <button className="ghost small" title="Cria uma cópia na sua pasta de usuário, que vale em todos os projetos" onClick={() => copy([i], 'user')}>Copiar para o global</button>}
           {editable && i.kind !== 'settings' && <button className="icon danger" title="Apagar" onClick={() => remove(i)}>🗑</button>}
+          {i.kind === 'mcp' && i.scope !== 'plugin' && mcpFiles.some((t) => t.label === i.location) && (
+            <button
+              className="icon danger"
+              title="Remover o servidor deste arquivo"
+              onClick={() => ask({ title: `Remover o servidor "${i.name}"?`, message: `A entrada sai de ${i.location}.${i.scope === 'user' ? `\n\n${GLOBAL_WARNING}` : ''}`, confirmLabel: 'Remover', danger: true, onConfirm: () => send({ type: 'harness.mcp.remove', tool, path: i.path, name: i.name }) })}
+            >🗑</button>
+          )}
         </td>
       </tr>
     );
@@ -156,8 +230,10 @@ export function HarnessInventory() {
               <span className="pill off">{ofKind.length}</span>
               <span className="muted small">{k.hint}</span>
               <span className="spacer" />
-              {places.length > 0 && <button className="small" onClick={() => setCreating(creating === k.id ? null : k.id)}>Novo</button>}
+              {(places.length > 0 || (k.id === 'mcp' && mcpFiles.length > 0)) && <button className="small" onClick={() => setCreating(creating === k.id ? null : k.id)}>Novo</button>}
             </div>
+            {creating === 'mcp' && k.id === 'mcp' && mcpFiles.length > 0 && <NewMcpServer key={tool} tool={tool} targets={mcpFiles} onClose={() => setCreating(null)} />}
+            {k.id === 'mcp' && tool === 'claude' && <p className="muted small">Os servidores do <code>~/.claude.json</code> aparecem aqui, mas são alterados pelo Claude Code: <code>claude mcp add --scope user …</code> e <code>claude mcp remove …</code>.</p>}
             {creating === k.id && places.length > 0 && <NewItem key={tool} tool={tool} kind={k.id} targets={places} onClose={() => setCreating(null)} />}
             {k.id === 'skill' && automatic.length > 0 && (
               <p className="muted small">

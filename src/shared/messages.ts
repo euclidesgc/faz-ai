@@ -2,6 +2,7 @@ import type { Appearance } from './appearance';
 import type { ViewState } from './filters';
 import type { ExecProfile } from './execution';
 import type { AiTool, HarnessKind, SkillMode } from './harness';
+import type { McpServerInput } from './harnessCatalog';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
@@ -103,6 +104,9 @@ export type WebviewToHost =
   | { type: 'harness.skill.write'; name: string; content: string }
   | { type: 'harness.skill.setEnabled'; name: string; enabled: boolean }
   | { type: 'harness.skill.delete'; name: string }
+  /** acrescenta um servidor MCP a um arquivo de configuração da ferramenta (`source` é o índice em HARNESS_CATALOG) */
+  | { type: 'harness.mcp.add'; tool: AiTool; source: number; server: McpServerInput }
+  | { type: 'harness.mcp.remove'; tool: AiTool; path: string; name: string }
   /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
   | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
   | { type: 'harness.agent.create'; name: string; description: string; content: string; model?: string }

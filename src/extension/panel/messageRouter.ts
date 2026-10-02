@@ -14,6 +14,7 @@ import { SKILLS_FIELD } from '../db/schema';
 import { pendingUpgrade, upgradeBoard } from '../db/boardTemplate';
 import { HarnessStore } from '../harness';
 import { HarnessOps } from '../harnessOps';
+import { McpServers } from '../mcpServers';
 import { FLOW_SKILL } from '../flowSkill';
 import { headlessUnsupported } from '../headless';
 import { AttachmentRepo } from '../repositories/attachmentRepo';
@@ -476,6 +477,17 @@ export class MessageRouter {
       case 'harness.refresh':
         this.refreshHarness();
         return false;
+      case 'harness.mcp.add':
+        new McpServers(this.opts.workspaceDir ?? '', this.home).add(msg.tool, msg.source, msg.server);
+        this.loadHarness();
+        return true;
+      case 'harness.mcp.remove': {
+        const item = this.harness.inventory.find((t) => t.tool === msg.tool)?.items.find((i) => i.kind === 'mcp' && i.path === msg.path && i.name === msg.name);
+        if (!item) throw new Error('Servidor não encontrado no harness. Atualize a lista e tente de novo.');
+        new McpServers(this.opts.workspaceDir ?? '', this.home).remove(msg.tool, item);
+        this.loadHarness();
+        return true;
+      }
       case 'harness.item.delete':
         this.harnessOps.remove(this.harnessItem(msg.tool, msg.kind, msg.path));
         this.loadHarness();

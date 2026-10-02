@@ -171,3 +171,35 @@ export function createTargets(tool: AiTool): CreateTarget[] {
 export function copyTarget(tool: AiTool, kind: HarnessKind, layout: 'files' | 'skills', scope: 'project' | 'user'): HarnessSource | undefined {
   return HARNESS_CATALOG[tool].find((s) => !s.builtin && s.kind === kind && s.scope === scope && s.layout === layout);
 }
+
+/** Um arquivo de configuração em que o board pode acrescentar e remover servidores MCP. */
+export interface McpTarget {
+  /** índice da fonte em `HARNESS_CATALOG[tool]` */
+  source: number;
+  scope: 'project' | 'user';
+  /** caminho do arquivo, a partir do projeto ou de `~` */
+  label: string;
+}
+
+/**
+ * Arquivos de servidores MCP que o board edita. O ~/.claude.json fica de fora: o Claude Code o regrava
+ * o tempo todo com outros dados, e o caminho documentado para ele é `claude mcp add --scope user`.
+ */
+export function mcpTargets(tool: AiTool): McpTarget[] {
+  return HARNESS_CATALOG[tool].flatMap((src, source): McpTarget[] =>
+    src.kind === 'mcp' && (src.layout === 'json-keys' || src.layout === 'toml-tables') ? [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}` }] : [],
+  );
+}
+
+/** Servidor MCP informado na tela: um comando local ou um endereço. */
+export interface McpServerInput {
+  name: string;
+  transport: 'stdio' | 'http';
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  url: string;
+  headers: Record<string, string>;
+}
+
+export const MCP_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
