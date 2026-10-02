@@ -698,7 +698,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'get_harness',
-    'Lista o harness de IA do projeto: a ferramenta em uso, os arquivos de regras (CLAUDE.md, AGENTS.md) e as skills dela, ligadas e desligadas, com descrição e caminho.',
+    'Lista o harness de IA do projeto: a ferramenta em uso, os arquivos de regras (CLAUDE.md, AGENTS.md), as skills dela, ligadas e desligadas, e os agentes, com descrição e caminho.',
     {},
     (_a, router) => harness(router),
     true,
@@ -777,6 +777,44 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   tool('delete_skill', 'Apaga uma skill do projeto, com todos os arquivos da pasta. Não pode ser desfeito pelo board.', { skill: skillArg }, (a, router) => {
     skill(router, a.skill);
     router.handle({ type: 'harness.skill.delete', name: a.skill });
+    return harness(router);
+  });
+
+  // ---------- harness: agentes do projeto ----------
+
+  const agentArg = z.string().describe('Nome do agente (nome do arquivo, sem a extensão), ex.: "revisor-de-spec"');
+  const agent = (router: MessageRouter, name: string) => {
+    const found = router.snapshot().harness.agents.find((x) => x.name === name);
+    if (!found) throw new Error(`Agente "${name}" não encontrado. Existentes: ${router.snapshot().harness.agents.map((x) => `"${x.name}"`).join(', ') || 'nenhum'}.`);
+    return found;
+  };
+
+  tool('get_agent', 'Lê o arquivo completo de um agente (subagente) do projeto, listado em get_harness.', { agent: agentArg }, (a, router) => agent(router, a.agent).content, true);
+
+  tool(
+    'create_agent',
+    'Cria um agente (subagente) no projeto, na pasta de agentes da ferramenta de IA em uso. A ferramenta delega trabalho a ele pela descrição.',
+    {
+      name: z.string().describe('Letras minúsculas, números e hífens'),
+      description: z.string().min(1).describe('Quando delegar a este agente; é por ela que a IA decide usá-lo'),
+      content: z.string().describe('Instruções do agente em markdown (sem o frontmatter)'),
+      model: z.string().optional().describe('Modelo fixado no agente, no formato que a ferramenta aceita no frontmatter; sem ele o agente usa o modelo da sessão'),
+    },
+    (a, router) => {
+      router.handle({ type: 'harness.agent.create', name: a.name, description: a.description, content: a.content, model: a.model });
+      return harness(router);
+    },
+  );
+
+  tool('update_agent', 'Substitui o arquivo inteiro de um agente, incluindo o frontmatter.', { agent: agentArg, content: z.string().min(1) }, (a, router) => {
+    agent(router, a.agent);
+    router.handle({ type: 'harness.agent.write', name: a.agent, content: a.content });
+    return harness(router);
+  });
+
+  tool('delete_agent', 'Apaga um agente do projeto. Não pode ser desfeito pelo board.', { agent: agentArg }, (a, router) => {
+    agent(router, a.agent);
+    router.handle({ type: 'harness.agent.delete', name: a.agent });
     return harness(router);
   });
 }

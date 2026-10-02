@@ -134,6 +134,19 @@ Nas colunas com `requiresApproval` (em `get_board`), `move_card` só leva o card
 o status é `approved`. Voltar de coluna ou cancelar é livre. `update_column` liga e desliga
 `ai_active` e `requires_approval`.
 
+### Agentes
+
+`get_harness` lista os agentes (subagentes) do projeto, e `get_agent`, `create_agent`, `update_agent`
+e `delete_agent` os gerenciam. Cada ferramenta guarda os seus numa pasta própria:
+
+| Ferramenta | Pasta | Arquivo | Modelo por agente |
+| --- | --- | --- | --- |
+| Claude Code | `.claude/agents` | `<nome>.md` (frontmatter YAML) | `model` |
+| Codex | `.codex/agents` | `<nome>.toml` | `model` |
+| Cursor | `.cursor/agents` | `<nome>.md` | `model` |
+| Kimi Code | `.kimi-code/agents` | `<nome>.md` | não tem |
+| GitHub Copilot | `.github/agents` | `<nome>.agent.md` | `model` |
+
 ### Pendências
 
 `get_pending_work` é o ponto de partida de uma sessão sem pedido específico. Ele devolve, em

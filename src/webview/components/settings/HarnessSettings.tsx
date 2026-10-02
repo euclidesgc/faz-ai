@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type RuleFile, type Skill } from '../../../shared/harness';
+import { AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type Agent, type AiTool, type RuleFile, type Skill } from '../../../shared/harness';
 import { HEARTBEAT_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE, type RunnerPermission } from '../../../shared/runner';
 import { useBoardStore } from '../../store/boardStore';
 
-type Editing = { kind: 'rule'; name: string } | { kind: 'skill'; name: string } | { kind: 'newSkill' } | null;
+type Editing = { kind: 'rule'; name: string } | { kind: 'skill'; name: string } | { kind: 'agent'; name: string } | { kind: 'newSkill' } | { kind: 'newAgent' } | null;
 
 /** Editor de texto simples com salvar/descartar; `saved` é o conteúdo que está no disco. */
 function FileEditor({ saved, onSave, onClose }: { saved: string; onSave: (content: string) => void; onClose: () => void }) {
@@ -45,9 +45,42 @@ export function HarnessSettings() {
   const [description, setDescription] = useState('');
   const [body, setBody] = useState('');
 
-  const isEditing = (kind: 'rule' | 'skill', n: string) => editing !== null && editing.kind === kind && editing.name === n;
-  const toggle = (kind: 'rule' | 'skill', n: string) => setEditing(isEditing(kind, n) ? null : { kind, name: n });
+  const isEditing = (kind: 'rule' | 'skill' | 'agent', n: string) => editing !== null && editing.kind === kind && editing.name === n;
+  const toggle = (kind: 'rule' | 'skill' | 'agent', n: string) => setEditing(isEditing(kind, n) ? null : { kind, name: n });
   const nameOk = SKILL_NAME_PATTERN.test(name) && !harness.skills.some((k) => k.name === name);
+
+  const [model, setModel] = useState('');
+  const agentNameOk = SKILL_NAME_PATTERN.test(name) && !harness.agents.some((a) => a.name === name);
+  const clearForm = () => {
+    setName('');
+    setDescription('');
+    setBody('');
+    setModel('');
+    setEditing(null);
+  };
+  const createAgent = () => {
+    send({ type: 'harness.agent.create', name, description: description.trim(), content: body, model: model.trim() || undefined });
+    clearForm();
+  };
+
+  const agentRow = (a: Agent) => (
+    <section key={a.name} className="settings-block">
+      <div className="row">
+        <h3 className="plain">{a.name}</h3>
+        {a.model && <span className="pill">{a.model}</span>}
+        <span className="spacer" />
+        <button onClick={() => toggle('agent', a.name)}>{isEditing('agent', a.name) ? 'Fechar' : 'Editar'}</button>
+        <button
+          className="icon danger"
+          title="Apagar o agente"
+          onClick={() => ask({ title: `Apagar o agente "${a.name}"?`, message: 'O arquivo do agente é removido do projeto.', confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'harness.agent.delete', name: a.name }) })}
+        >🗑</button>
+      </div>
+      <div className="muted small">{a.description || 'Sem descrição no frontmatter.'}</div>
+      <div className="muted small"><code>{a.path}</code></div>
+      {isEditing('agent', a.name) && <FileEditor saved={a.content} onSave={(content) => send({ type: 'harness.agent.write', name: a.name, content })} onClose={() => setEditing(null)} />}
+    </section>
+  );
 
   const createSkill = () => {
     send({ type: 'harness.skill.create', name, description: description.trim(), content: body });
@@ -219,6 +252,50 @@ export function HarnessSettings() {
         {harness.skills.map(skillRow)}
         {harness.skills.length === 0 && <p className="muted">Nenhuma skill em <code>{tool.skills}</code> ainda.</p>}
       </div>
+
+      <div className="row section-head">
+        <h3>Agentes</h3>
+        <span className="spacer" />
+        {tool.agents && <button className="primary" onClick={() => setEditing(editing?.kind === 'newAgent' ? null : { kind: 'newAgent' })}>Novo agente</button>}
+      </div>
+      {tool.agents ? (
+        <>
+          <p className="muted small">
+            Agentes (subagentes) do {tool.label}: cada arquivo em <code>{tool.agents.dir}</code> define um ajudante com instruções próprias, e a ferramenta
+            delega trabalho a ele pela descrição.{tool.agents.modelField ? ' Um agente pode fixar o modelo que usa, o que serve para executar um card com o modelo indicado nele.' : ''}
+          </p>
+          {editing?.kind === 'newAgent' && (
+            <section className="settings-block">
+              <label className="field-row">
+                <span>Nome</span>
+                <input value={name} onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} placeholder="revisor-de-spec" />
+              </label>
+              <label className="field-row">
+                <span>Descrição (quando delegar)</span>
+                <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Revisa uma Spec e aponta lacunas antes do Plan" />
+              </label>
+              {tool.agents.modelField && (
+                <label className="field-row">
+                  <span>Modelo (opcional)</span>
+                  <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="vazio = o modelo da sessão" />
+                </label>
+              )}
+              <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10} placeholder="Instruções do agente" spellCheck={false} />
+              <div className="row">
+                <button className="primary" disabled={!agentNameOk || !description.trim()} onClick={createAgent}>Criar agente</button>
+                <button className="ghost" onClick={clearForm}>Cancelar</button>
+                {name && !agentNameOk && <span className="muted small">Nome inválido ou já usado.</span>}
+              </div>
+            </section>
+          )}
+          <div className="stack">
+            {harness.agents.map(agentRow)}
+            {harness.agents.length === 0 && <p className="muted">Nenhum agente em <code>{tool.agents.dir}</code> ainda.</p>}
+          </div>
+        </>
+      ) : (
+        <p className="muted small">O {tool.label} não define agentes em arquivos do projeto.</p>
+      )}
     </div>
   );
 }

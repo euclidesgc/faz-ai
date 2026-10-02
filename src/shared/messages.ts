@@ -89,6 +89,9 @@ export type WebviewToHost =
   | { type: 'harness.skill.write'; name: string; content: string }
   | { type: 'harness.skill.setEnabled'; name: string; enabled: boolean }
   | { type: 'harness.skill.delete'; name: string }
+  | { type: 'harness.agent.create'; name: string; description: string; content: string; model?: string }
+  | { type: 'harness.agent.write'; name: string; content: string }
+  | { type: 'harness.agent.delete'; name: string }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
   | { type: 'harness.flowSkill.install' };
 
