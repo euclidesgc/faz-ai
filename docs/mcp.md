@@ -171,6 +171,14 @@ Cuidados por ferramenta:
 Uma imagem colada numa mensagem aparece no texto como `attachment:<nome>`; o arquivo é o anexo de
 mesmo nome em `attachments` de `get_card`.
 
+### Branch e pasta de trabalho
+
+`prepare_workspace` cria (ou reaproveita) a branch da história e, no modo worktree, a pasta de
+trabalho dela; pode ser chamada de uma sub-tarefa. `get_card` devolve em `workspace` a branch e a
+pasta em que o código deve ser alterado. O nome da branch e a pasta são definidos pelo board; a IA
+não deve criar branches por conta própria. Nas execuções pelo board, a pasta das worktrees é
+passada à ferramenta como pasta de trabalho extra (`--add-dir`).
+
 ### Fases e documentos
 
 Cada coluna em que a IA atua é uma fase. `get_card` devolve em `phase` a instrução da fase, o nome

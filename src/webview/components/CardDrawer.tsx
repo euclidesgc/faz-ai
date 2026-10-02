@@ -67,6 +67,8 @@ export function CardDrawer({ cardId }: { cardId: string }) {
   const childFirstCol = childWf ? columnsOf(state, childWf.id)[0] : undefined;
   const subType = childWf ? state.cardTypes.find((t) => t.defaultWorkflowId === childWf.id) : undefined;
   const parent = card.parentId ? state.cards.find((c) => c.id === card.parentId) : undefined;
+  // branch e pasta de trabalho são da história; a sub-tarefa mostra as do pai
+  const story = parent ?? card;
   const commentCount = state.comments.filter((c) => c.cardId === card.id).length;
   const attachmentCount = state.attachments.filter((a) => a.cardId === card.id).length;
   const trashed = card.deletedAt !== null;
@@ -126,6 +128,19 @@ export function CardDrawer({ cardId }: { cardId: string }) {
         <input className="drawer-title" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveTitle} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
 
         {!trashed && !archived && <StatusBar card={card} />}
+
+        {!trashed && state.board.git.mode !== 'off' && (
+          <div className="drawer-workspace">
+            {story.branch ? (
+              <>
+                <span title="Branch da história">⎇ <code>{story.branch}</code></span>
+                {state.board.git.mode === 'worktree' && <button className="ghost small" title={story.worktreePath} onClick={() => send({ type: 'card.workspace.open', cardId })}>Abrir a pasta de trabalho</button>}
+              </>
+            ) : (
+              <button className="ghost small" title="Cria a branch da história e, no modo worktree, a pasta de trabalho dela" onClick={() => send({ type: 'card.workspace.prepare', cardId })}>Criar branch da história</button>
+            )}
+          </div>
+        )}
 
         <nav className="tabs">
           <button className={tab === 'details' ? 'active' : ''} onClick={() => setTab('details')}>Detalhes</button>

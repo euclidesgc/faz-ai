@@ -4,6 +4,7 @@ import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
 import type { RunnerConfig } from './runner';
+import type { GitConfig } from './git';
 
 export type Id = string;
 
@@ -30,6 +31,8 @@ export interface Board {
   templateVersion: number;
   /** como a extensão executa a IA para um card */
   runner: RunnerConfig;
+  /** branch e worktree das histórias */
+  git: GitConfig;
 }
 
 export interface Workflow {
@@ -101,6 +104,10 @@ export interface Card {
   statusAt: number | null;
   /** quem definiu o status */
   statusBy: string;
+  /** branch da história; vazio enquanto não foi criada (sub-tarefas usam a da história) */
+  branch: string;
+  /** pasta em que o código da história é alterado: a worktree, ou a pasta do projeto no modo "branch" */
+  worktreePath: string;
 }
 
 /** ID do card como aparece na interface. */

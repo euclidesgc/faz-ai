@@ -46,7 +46,13 @@ conversa dizendo o que mudou e chame \`request_review\` de novo.
 
 No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da
 atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e as Skills
-necessárias. Na Implementação, execute uma por vez: \`start_work\`, mova para "Em andamento", faça o
+necessárias.
+
+Antes de alterar código do projeto, chame \`prepare_workspace\` na história: o board cria a branch e a
+pasta de trabalho dela e devolve onde trabalhar (também em \`workspace\` no \`get_card\`). Altere o
+código só ali e não crie branches por conta própria.
+
+Na Implementação, execute uma sub-tarefa por vez: \`start_work\`, mova para "Em andamento", faça o
 trabalho, verifique e mova para a coluna de conclusão, registrando na conversa o que foi feito.
 
 ## Quando parar

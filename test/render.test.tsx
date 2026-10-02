@@ -20,6 +20,7 @@ import { AppearanceSettings } from '../src/webview/components/settings/Appearanc
 import { ModelsSettings } from '../src/webview/components/settings/ModelsSettings';
 import { RulesSettings } from '../src/webview/components/settings/RulesSettings';
 import { Settings } from '../src/webview/components/settings/Settings';
+import { GitSettings } from '../src/webview/components/settings/GitSettings';
 import { TypesSettings } from '../src/webview/components/settings/TypesSettings';
 import { FiltersApp } from '../src/webview/FiltersApp';
 import { useBoardStore } from '../src/webview/store/boardStore';
@@ -116,7 +117,7 @@ describe('telas montam sem erro', () => {
     // card aguardando revisão: selo com quem está a pendência e as ações de revisão
     useBoardStore.setState({ state: { ...st, cards: st.cards.map((c) => (c.id === storyId ? { ...c, status: 'waiting_review' as const } : c)) } });
     const reviewing = html(<CardDrawer cardId={storyId} />);
-    for (const text of ['Aguardando revisão', 'com você', 'Aprovar', 'Pedir ajustes', 'Conversa']) expect(reviewing).toContain(text);
+    for (const text of ['Aguardando revisão', 'com você', 'Aprovar', 'Pedir ajustes', 'Conversa', 'Criar branch da história']) expect(reviewing).toContain(text);
     expect(html(<Board />)).toContain('status-badge');
     // o artefato fica na história; a sub-tarefa mostra um link para ele
     useBoardStore.setState({ state: { ...st, attachments: st.attachments.map((a) => ({ ...a, artifact: true })) } });
@@ -148,6 +149,7 @@ describe('telas montam sem erro', () => {
 
   it('configurações', () => {
     expect(html(<Settings />)).toContain('Harness de IA');
+    for (const text of ['Worktree por história', 'Nome da branch', 'historia/12-login-com-google', 'Pasta das worktrees']) expect(html(<GitSettings />)).toContain(text);
     const cols = html(<ColumnsSettings />);
     for (const text of ['PRD', 'Começa colapsada', 'Linha começa colapsada', 'Arquivados', 'IA atua', 'Exige aprovação', 'Fase', 'PRD.md', 'Discovery', 'Homologação']) expect(cols).toContain(text);
     const types = html(<TypesSettings />);

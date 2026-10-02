@@ -85,6 +85,20 @@ conversa quando a execução termina, e enquanto isso o card fica "Em execução
 - Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo. O log
   completo está no painel **Saída → Faz AI**.
 
+### Branch e pasta de trabalho por história
+
+Cada história trabalha numa branch própria, criada pelo board (ex.: `historia/12-login-com-google`).
+Por padrão ela vem com uma worktree: uma pasta de trabalho separada, ao lado do projeto, onde a IA
+altera o código sem tocar na sua pasta nem nas suas alterações em andamento. As sub-tarefas fazem
+commits na branch da história.
+
+- A branch é criada quando a IA começa a implementação (ela chama `prepare_workspace`) ou pelo
+  botão **Criar branch da história** no card.
+- O card mostra a branch e abre a pasta de trabalho numa janela nova.
+- Em Configurações → **Git** ficam o modo (worktree, branch na própria pasta ou desligado), o
+  padrão do nome da branch e a pasta das worktrees.
+- Cada worktree é uma cópia de trabalho: as dependências precisam ser instaladas nela.
+
 ### Heartbeat
 
 Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
@@ -118,6 +132,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
 | Harness de IA | Ferramenta do projeto, arquivo de regras e skills |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
+| Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta |
 | Aparência | Tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
 
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração

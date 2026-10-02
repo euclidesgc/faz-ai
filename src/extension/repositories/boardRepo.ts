@@ -6,6 +6,7 @@ import { seedBoard } from '../db/seed';
 import { pendingUpgrade } from '../db/boardTemplate';
 import { isCardStatus } from '../../shared/status';
 import { parseRunner, type RunnerConfig } from '../../shared/runner';
+import { parseGit, type GitConfig } from '../../shared/git';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
 import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool } from '../../shared/harness';
@@ -20,7 +21,7 @@ export class BoardRepo {
       seedBoard(this.db, workspaceKey, name);
       row = one(this.db, 'SELECT * FROM boards WHERE workspace_key = ?', [workspaceKey])!;
     }
-    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTool: parseAiTool(str(row.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)), modelRules: parseModelRules(str(row.model_rules_json)), appearance: parseAppearance(str(row.appearance_json)), templateVersion: num(row.template_version), runner: parseRunner(str(row.runner_json)) };
+    return { id: str(row.id), workspaceKey: str(row.workspace_key), name: str(row.name), rules: parseRules(str(row.rules_json)), aiTool: parseAiTool(str(row.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)), modelRules: parseModelRules(str(row.model_rules_json)), appearance: parseAppearance(str(row.appearance_json)), templateVersion: num(row.template_version), runner: parseRunner(str(row.runner_json)), git: parseGit(str(row.git_json)) };
   }
 
   updateRules(boardId: string, patch: Partial<BoardRules>): void {
@@ -46,7 +47,11 @@ export class BoardRepo {
     return ids;
   }
 
-  updateBoard(boardId: string, patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance>; runner?: Partial<RunnerConfig> }): void {
+  updateBoard(boardId: string, patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance>; runner?: Partial<RunnerConfig>; git?: Partial<GitConfig> }): void {
+    if (patch.git !== undefined) {
+      const current = parseGit(str(one(this.db, 'SELECT git_json FROM boards WHERE id = ?', [boardId])?.git_json));
+      run(this.db, 'UPDATE boards SET git_json = ? WHERE id = ?', [JSON.stringify(parseGit(JSON.stringify({ ...current, ...patch.git }))), boardId]);
+    }
     if (patch.runner !== undefined) {
       const current = parseRunner(str(one(this.db, 'SELECT runner_json FROM boards WHERE id = ?', [boardId])?.runner_json));
       run(this.db, 'UPDATE boards SET runner_json = ? WHERE id = ?', [JSON.stringify(parseRunner(JSON.stringify({ ...current, ...patch.runner }))), boardId]);
@@ -70,7 +75,7 @@ export class BoardRepo {
     const db = this.db;
     const b = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
     if (!b) throw new Error('Board não encontrado');
-    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTool: parseAiTool(str(b.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)), modelRules: parseModelRules(str(b.model_rules_json)), appearance: parseAppearance(str(b.appearance_json)), templateVersion: num(b.template_version), runner: parseRunner(str(b.runner_json)) };
+    const board: Board = { id: str(b.id), workspaceKey: str(b.workspace_key), name: str(b.name), rules: parseRules(str(b.rules_json)), aiTool: parseAiTool(str(b.ai_tools_json)), modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)), modelRules: parseModelRules(str(b.model_rules_json)), appearance: parseAppearance(str(b.appearance_json)), templateVersion: num(b.template_version), runner: parseRunner(str(b.runner_json)), git: parseGit(str(b.git_json)) };
 
     const workflows: Workflow[] = all(db, 'SELECT * FROM workflows WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id), boardId, name: str(r.name), position: num(r.position), kind: str(r.kind) as Workflow['kind'],
@@ -93,7 +98,7 @@ export class BoardRepo {
       parentId: r.parent_id == null ? null : str(r.parent_id), title: str(r.title), description: str(r.description),
       position: num(r.position), createdAt: num(r.created_at), updatedAt: num(r.updated_at),
       deletedAt: r.deleted_at == null ? null : num(r.deleted_at), archivedAt: r.archived_at == null ? null : num(r.archived_at),
-      status: isCardStatus(r.status) ? r.status : null, statusReason: str(r.status_reason), statusAt: r.status_at == null ? null : num(r.status_at), statusBy: str(r.status_by),
+      status: isCardStatus(r.status) ? r.status : null, statusReason: str(r.status_reason), statusAt: r.status_at == null ? null : num(r.status_at), statusBy: str(r.status_by), branch: str(r.branch), worktreePath: str(r.worktree_path),
     }));
 
     const fieldDefs: FieldDef[] = all(db, 'SELECT * FROM field_defs WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({

@@ -12,6 +12,13 @@ export interface PhaseDefault {
 
 const NO_ARTIFACT = { artifactName: '', artifactTemplate: '' };
 
+/** Instrução da Implementação antes de o board criar branches (versão 2 do padrão); boards que ainda a têm recebem a nova. */
+export const IMPLEMENTATION_INSTRUCTION_V2 = [
+  'Execute as sub-tarefas de implementação da história, uma por vez, na ordem do plano.',
+  'Em cada uma: chame start_work, mova para "Em andamento", use o modelo e as skills indicados no card, verifique o resultado e mova para a coluna de conclusão, registrando na conversa o que foi feito.',
+  'Quando todas estiverem concluídas, mova a história para a próxima coluna.',
+].join('\n');
+
 export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   Discovery: {
     instruction: [
@@ -120,8 +127,9 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   },
   Implementação: {
     instruction: [
+      'Antes de alterar qualquer código, chame prepare_workspace na história: o board cria a branch e a pasta de trabalho dela. Altere o código só nessa pasta e nessa branch.',
       'Execute as sub-tarefas de implementação da história, uma por vez, na ordem do plano.',
-      'Em cada uma: chame start_work, mova para "Em andamento", use o modelo e as skills indicados no card, verifique o resultado e mova para a coluna de conclusão, registrando na conversa o que foi feito.',
+      'Em cada uma: chame start_work, mova para "Em andamento", use o modelo e as skills indicados no card, verifique o resultado, faça o commit na branch da história e mova para a coluna de conclusão, registrando na conversa o que foi feito.',
       'Quando todas estiverem concluídas, mova a história para a próxima coluna.',
     ].join('\n'),
     ...NO_ARTIFACT,

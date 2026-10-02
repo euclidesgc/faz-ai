@@ -261,6 +261,17 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     (a, router) => setStatus(router, a.card, 'blocked', a.reason, 'Pare aqui. Uma pessoa precisa desbloquear o card.'),
   );
 
+  tool(
+    'prepare_workspace',
+    'Cria (ou reaproveita) a branch da história e a pasta em que o código dela deve ser alterado. Chame antes de mexer em código do projeto; pode ser chamada de uma sub-tarefa. O nome da branch e a pasta são definidos pelo board: não crie branches por conta própria.',
+    { card: cardArg },
+    (a, router) => {
+      const card = live(findCard(router.snapshot(), a.card));
+      router.handle({ type: 'card.workspace.prepare', cardId: card.id }, ai());
+      return detail(router, card.id).workspace;
+    },
+  );
+
   tool('archive_card', 'Arquiva um card (e suas sub-tarefas): sai do board sem ser apagado.', { card: cardArg }, (a, router) => {
     const card = live(findCard(router.snapshot(), a.card));
     router.handle({ type: 'card.archive', cardId: card.id });

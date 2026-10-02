@@ -174,6 +174,24 @@ function phaseOf(s: BoardState, c: Card) {
   };
 }
 
+/** Onde o código da história deve ser alterado (sub-tarefas usam a branch e a pasta da história). */
+function workspaceOf(s: BoardState, c: Card) {
+  const story = c.parentId ? s.cards.find((p) => p.id === c.parentId) ?? c : c;
+  if (story.branch) {
+    return {
+      workspace: {
+        branch: story.branch,
+        path: story.worktreePath,
+        note:
+          s.board.git.mode === 'worktree'
+            ? `Altere o código só dentro de ${story.worktreePath} (worktree da história, já na branch ${story.branch}) e faça os commits lá. Não mexa na pasta principal do projeto.`
+            : `Trabalhe na branch ${story.branch}: troque para ela (git switch) antes de alterar o código.`,
+      },
+    };
+  }
+  return s.board.git.mode === 'off' ? {} : { workspaceNote: 'Esta história ainda não tem branch. Antes de alterar código do projeto, chame prepare_workspace: o board cria a branch e a pasta de trabalho.' };
+}
+
 export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardState['attachments'][number]) => string) {
   const skills = requiredSkills(s, c);
   const phase = c.deletedAt === null && c.archivedAt === null ? phaseOf(s, c) : undefined;
@@ -187,6 +205,7 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     ...(skills.length ? { requiredSkills: skills, requiredSkillsNote: 'Carregue cada skill (leia o SKILL.md em `path`) antes de executar este card.' } : {}),
     ...(phase ? { phase } : {}),
+    ...workspaceOf(s, c),
     description: c.description,
     createdAt: iso(c.createdAt),
     updatedAt: iso(c.updatedAt),
