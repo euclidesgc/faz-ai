@@ -5,6 +5,12 @@
 What changed in each version of Faz AI Kanban, newest first. The extension's interface is in
 Portuguese, so names of screens and buttons appear as you see them on screen.
 
+## Unreleased
+
+- **Theme button in the board's top bar**: the icon in the top-right corner cycles between
+  **Sistema** (system), **Claro** (light) and **Escuro** (dark). It is the same preference as
+  Configurações > Aparência, so the choice is saved and applies in the editor and in the browser.
+
 ## 0.29.1
 
 - The README warns that the project is in **alpha**: bugs and changes between versions can happen.

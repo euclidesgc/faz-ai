@@ -11,6 +11,7 @@ import { Board } from '../src/webview/components/Board';
 import { CommentsTab } from '../src/webview/components/CommentsTab';
 import { CardDrawer } from '../src/webview/components/CardDrawer';
 import { FilterBar } from '../src/webview/components/FilterBar';
+import { ThemeToggle, nextTheme } from '../src/webview/components/ThemeToggle';
 import { TrashView } from '../src/webview/components/TrashView';
 import { ColumnsSettings } from '../src/webview/components/settings/ColumnsSettings';
 import { FieldsSettings } from '../src/webview/components/settings/FieldsSettings';
@@ -177,6 +178,9 @@ describe('telas montam sem erro', () => {
 
     const look = html(<AppearanceSettings />);
     for (const text of ['Tema', 'Sistema (acompanha o editor ou o sistema)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia', 'Status dos cards', 'Aguardando resposta']) expect(look).toContain(text);
+    const toggle = html(<ThemeToggle />);
+    for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);
+    expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
     const profiles = html(<ExecProfilesSettings />);
     for (const text of ['Perfis de execução', 'na execução pelo board', 'imposto', 'orientado', 'Novo perfil', 'Nenhum perfil ainda']) expect(profiles).toContain(text);
     const harness = html(<HarnessSettings />);

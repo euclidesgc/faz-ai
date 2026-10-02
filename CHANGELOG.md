@@ -4,6 +4,12 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **Botão de tema no topo do board**: o ícone no canto superior direito alterna entre **Sistema**,
+  **Claro** e **Escuro**. É a mesma preferência de Configurações > Aparência, então a escolha fica
+  salva e vale no editor e no navegador.
+
 ## 0.29.1
 
 - O README avisa que o projeto está em **fase alpha**: erros e mudanças entre versões podem acontecer.
