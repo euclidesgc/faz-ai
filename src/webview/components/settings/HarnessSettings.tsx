@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type RuleFile, type Skill } from '../../../shared/harness';
+import { RUNNER_PERMISSIONS, TIMEOUT_RANGE, type RunnerPermission } from '../../../shared/runner';
 import { useBoardStore } from '../../store/boardStore';
 
 type Editing = { kind: 'rule'; name: string } | { kind: 'skill'; name: string } | { kind: 'newSkill' } | null;
@@ -134,6 +135,32 @@ export function HarnessSettings() {
         <button className="primary" onClick={() => send({ type: 'ui.connectAI' })}>Conectar o {tool.label} ao board (MCP)</button>
         <span className="muted small">Registra o servidor do board em {tool.mcp}.</span>
       </div>
+
+      <h3 className="section-head">Execução pela conversa</h3>
+      <p className="muted small">
+        O botão "Chamar IA" da conversa de um card roda o {tool.label} em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define
+        o que ele pode fazer nessas execuções. O servidor do board precisa estar conectado (botão acima) e o {tool.label} instalado e autenticado.
+      </p>
+      {state.aiRunUnsupported ? (
+        <p className="banner warn">{state.aiRunUnsupported}</p>
+      ) : (
+        <section className="settings-block runner-settings">
+          <label className="field-row">
+            <span>O que a IA pode fazer</span>
+            <select value={state.board.runner.permission} onChange={(e) => send({ type: 'settings.board.update', patch: { runner: { permission: e.target.value as RunnerPermission } } })}>
+              {RUNNER_PERMISSIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </label>
+          <p className={`small ${state.board.runner.permission === 'full' ? 'banner warn' : 'muted'}`}>{RUNNER_PERMISSIONS.find((p) => p.value === state.board.runner.permission)!.hint}</p>
+          <label className="field-row">
+            <span>Tempo limite por execução</span>
+            <div className="row">
+              <input type="number" min={TIMEOUT_RANGE.min} max={TIMEOUT_RANGE.max} key={state.board.runner.timeoutMinutes} defaultValue={state.board.runner.timeoutMinutes} onBlur={(e) => Number(e.target.value) !== state.board.runner.timeoutMinutes && send({ type: 'settings.board.update', patch: { runner: { timeoutMinutes: Number(e.target.value) } } })} />
+              <span className="muted">minutos</span>
+            </div>
+          </label>
+        </section>
+      )}
 
       <h3 className="section-head">Regras do projeto</h3>
       <p className="muted small">Instruções carregadas em toda sessão de IA. Quanto mais curtas, menos contexto consomem.</p>

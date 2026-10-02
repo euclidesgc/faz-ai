@@ -147,6 +147,30 @@ o status é `approved`. Voltar de coluna ou cancelar é livre. `update_column` l
 A skill `faz-ai-fluxo`, instalada por `install_flow_skill` ou pelo botão em Harness de IA, descreve
 o ciclo completo para a IA.
 
+### Execução pela conversa
+
+O botão "Chamar IA" roda a CLI da ferramenta do projeto na pasta do projeto, com um prompt que
+manda trabalhar no card. Os comandos, conforme a documentação de cada ferramenta em 2026-10-02:
+
+| Ferramenta | Comando | Permissões |
+| --- | --- | --- |
+| Claude Code | `claude -p` (prompt pela entrada padrão) | `--permission-mode dontAsk` com `--allowedTools "mcp__faz-ai__*" Read Glob Grep`; `acceptEdits`; `bypassPermissions` |
+| Codex | `codex exec -` | `--sandbox read-only`; `workspace-write`; `--dangerously-bypass-approvals-and-sandbox` |
+| GitHub Copilot | `copilot -p "<prompt>" --no-ask-user` | `--allow-tool=faz-ai --allow-tool=read`; mais `--allow-tool=write`; `--allow-all` |
+| Cursor | `agent -p --force --approve-mcps --trust` | só "sem restrições" |
+| Kimi Code | `kimi -p` | só "sem restrições" (o `-p` não aceita flags de permissão) |
+
+Cuidados por ferramenta:
+
+- **Codex** só lê o `.codex/config.toml` do projeto se o projeto estiver marcado como confiável.
+- **Copilot** só carrega o `.mcp.json` do projeto no modo `-p` com a variável
+  `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP=true`, que o board define.
+- **Kimi** precisa do servidor registrado no arquivo global (`~/.kimi-code/mcp.json`), que é onde
+  o board o registra.
+
+Uma imagem colada numa mensagem aparece no texto como `attachment:<nome>`; o arquivo é o anexo de
+mesmo nome em `attachments` de `get_card`.
+
 ### Fases e documentos
 
 Cada coluna em que a IA atua é uma fase. `get_card` devolve em `phase` a instrução da fase, o nome

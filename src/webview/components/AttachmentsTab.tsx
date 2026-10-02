@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { cardRef } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
 
-const MAX_BYTES = 20 * 1024 * 1024;
+export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
 const formatSize = (n: number): string => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
-function toBase64(file: File): Promise<string> {
+export function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
@@ -29,7 +29,7 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
 
   const addFiles = async (files: File[]) => {
     for (const file of files) {
-      if (file.size > MAX_BYTES) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
         setError(`"${file.name}" tem mais de 20 MB e não foi anexado.`);
         continue;
       }

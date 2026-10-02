@@ -4,6 +4,7 @@ import type { AiTool } from './harness';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
+import type { RunnerConfig } from './runner';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, WorkflowKind } from './model';
 
 export type WebviewToHost =
@@ -11,6 +12,9 @@ export type WebviewToHost =
   | { type: 'view.set'; patch: Partial<ViewState> }
   | { type: 'ui.showFilters' }
   | { type: 'ui.connectAI' }
+  /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */
+  | { type: 'ai.run'; cardId: Id }
+  | { type: 'ai.stop'; cardId: Id }
   | { type: 'card.create'; typeId: Id; columnId: Id; parentId: Id | null; title: string }
   | { type: 'card.update'; cardId: Id; patch: { title?: string; description?: string; typeId?: Id } }
   | { type: 'card.move'; cardId: Id; columnId: Id; position: number; /** ao cancelar uma história, cancela também as sub-tarefas em aberto */ cancelChildren?: boolean }
@@ -56,7 +60,7 @@ export type WebviewToHost =
     }
   | { type: 'settings.field.delete'; fieldId: Id }
   | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string; collapsed?: boolean; archiveCollapsed?: boolean } }
-  | { type: 'settings.board.update'; patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance> } }
+  | { type: 'settings.board.update'; patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance>; runner?: Partial<RunnerConfig> } }
   /** apaga tudo e recria o board com o padrão atual */
   | { type: 'settings.board.reset' }
   /** leva o board ao padrão atual sem recriá-lo: só acrescenta e completa, os cards não saem do lugar */

@@ -71,6 +71,20 @@ responde no próprio card:
   para a IA.
 - **Bloquear** registra um impedimento, com o motivo.
 
+### Chamar a IA pela conversa
+
+Na conversa de qualquer card, **Chamar IA** roda a ferramenta do projeto em segundo plano para ler
+a conversa e trabalhar naquele card. Não é um chat ao vivo: a resposta chega como mensagem na
+conversa quando a execução termina, e enquanto isso o card fica "Em execução" (com um botão
+**Parar**). Imagens coladas na mensagem viram anexos do card e a IA as recebe.
+
+- O que a IA pode fazer nessas execuções se define em Configurações → Harness de IA → **Execução
+  pela conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições.
+- Cursor e Kimi Code, quando rodam em segundo plano, só funcionam no nível "sem restrições".
+- A ferramenta precisa estar instalada e autenticada, e o servidor do board conectado.
+- Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo. O log
+  completo está no painel **Saída → Faz AI**.
+
 Quais colunas exigem aprovação, e em quais a IA atua, se define em Configurações → Workflows e
 colunas. Você mesmo pode mover qualquer card sem aprovação.
 

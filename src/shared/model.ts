@@ -3,6 +3,7 @@ import type { ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
+import type { RunnerConfig } from './runner';
 
 export type Id = string;
 
@@ -27,6 +28,8 @@ export interface Board {
   appearance: Appearance;
   /** versão do board padrão aplicada a este board */
   templateVersion: number;
+  /** como a extensão executa a IA para um card */
+  runner: RunnerConfig;
 }
 
 export interface Workflow {
@@ -174,4 +177,8 @@ export interface BoardState {
   harness: Harness;
   /** mudanças que a atualização para o board padrão atual faria; vazio quando não há o que atualizar */
   pendingUpgrade: string[];
+  /** cards em que a extensão está executando a IA agora */
+  aiRuns: Id[];
+  /** por que a ferramenta do projeto não pode ser executada pelo board; null quando pode */
+  aiRunUnsupported: string | null;
 }

@@ -10,6 +10,7 @@ import { SKILLS_FIELD } from '../db/schema';
 import { pendingUpgrade, upgradeBoard } from '../db/boardTemplate';
 import { HarnessStore } from '../harness';
 import { FLOW_SKILL } from '../flowSkill';
+import { headlessUnsupported } from '../headless';
 import { AttachmentRepo } from '../repositories/attachmentRepo';
 import { BoardRepo } from '../repositories/boardRepo';
 import { CardRepo } from '../repositories/cardRepo';
@@ -40,6 +41,7 @@ export class MessageRouter {
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
   private harness: Harness = EMPTY_HARNESS;
+  private aiRuns: string[] = [];
   boardId: string;
 
   constructor(private dbHandle: DbHandle, private opts: RouterOptions) {
@@ -67,7 +69,14 @@ export class MessageRouter {
   }
 
   snapshot(): BoardState {
-    return { ...this.boards.snapshot(this.boardId, this.opts.author), harness: this.harness };
+    const s = this.boards.snapshot(this.boardId, this.opts.author);
+    return { ...s, harness: this.harness, aiRuns: this.aiRuns, aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission) };
+  }
+
+  /** Cards em que a extensão está executando a IA (informado pelo executor). */
+  setAiRuns(cardIds: string[]): void {
+    this.aiRuns = cardIds;
+    this.listeners.forEach((fn) => fn());
   }
 
   /** Relê regras e skills do disco (chamado quando os arquivos mudam por fora) e avisa os webviews se algo mudou. */
@@ -230,6 +239,8 @@ export class MessageRouter {
       case 'view.set':
       case 'ui.showFilters':
       case 'ui.connectAI':
+      case 'ai.run':
+      case 'ai.stop':
       case 'attachment.pick':
       case 'attachment.open':
       case 'attachment.reveal':

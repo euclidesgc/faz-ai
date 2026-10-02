@@ -56,11 +56,13 @@ interface Props {
   autoFocus?: boolean;
   /** Cmd/Ctrl+Enter */
   onSubmit?(): void;
+  /** arquivos colados (ex.: uma imagem): devolve o markdown a inserir no lugar do cursor */
+  onPasteFiles?(files: File[]): string;
   /** esconde o botão de expandir (usado dentro do próprio modo expandido e nos comentários) */
   compact?: boolean;
 }
 
-export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows = 8, autoFocus, onSubmit, compact }: Props) {
+export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows = 8, autoFocus, onSubmit, onPasteFiles, compact }: Props) {
   const [mode, setMode] = useState<'write' | 'preview'>('write');
   const [expanded, setExpanded] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -142,6 +144,14 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
       onChange={(e) => onChange(e.target.value)}
       onBlur={() => onCommit?.()}
       onKeyDown={onKeyDown}
+      onPaste={(e) => {
+        const files = Array.from(e.clipboardData.files);
+        if (!onPasteFiles || !files.length) return;
+        e.preventDefault();
+        const el = e.currentTarget;
+        const text = onPasteFiles(files);
+        if (text) onChange(`${value.slice(0, el.selectionStart)}${text}${value.slice(el.selectionEnd)}`);
+      }}
     />
   );
 

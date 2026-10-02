@@ -378,3 +378,8 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--vscode
 .field-col textarea, .field-col input { width: 100%; }
 .story-artifacts { margin-bottom: 12px; }
 .artifact-badge { margin-left: 6px; }
+
+/* IA em execução no card e imagens na conversa */
+.banner.ai-running { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--hover); }
+.comment .markdown img { max-width: 100%; border-radius: 4px; }
+.runner-settings select { max-width: 280px; }
