@@ -2,3 +2,8 @@ node_modules
 dist
 *.vsix
 .vscode-test
+.env.release
+releases/
+.claude/skills/publicar-extensao/
+.mcp.json
+.claude/settings.local.json

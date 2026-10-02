@@ -16,7 +16,7 @@
 > me what worked and what did not, [open an issue](https://github.com/euclidesgc/faz-ai/issues) or
 > [send a pull request](https://github.com/euclidesgc/faz-ai/pulls).
 >
-> Euclides
+> Euclides G Catunda
 
 A kanban board inside your editor (VS Code and Cursor), built to run Spec-Driven Development (SDD)
 together with an AI. You organize the work into stories and sub-tasks; the AI reads the board,

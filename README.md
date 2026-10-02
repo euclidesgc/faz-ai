@@ -16,7 +16,7 @@
 > conte o que funcionou e o que não funcionou, [abra uma issue](https://github.com/euclidesgc/faz-ai/issues)
 > ou [mande um pull request](https://github.com/euclidesgc/faz-ai/pulls).
 >
-> Euclides
+> Euclides G Catunda
 
 Um board kanban dentro do editor (VS Code e Cursor), feito para conduzir Spec-Driven Development
 (SDD) junto com uma IA. Você organiza o trabalho em histórias e sub-tarefas; a IA lê o board, produz
