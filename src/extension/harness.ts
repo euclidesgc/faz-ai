@@ -1,6 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type Agent, type AgentSpec, type AiTool, type Harness, type RuleFile, type Skill } from '../shared/harness';
+import { ALL_AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type Agent, type AgentSpec, type AiTool, type Harness, type RuleFile, type Skill, type ToolInventory } from '../shared/harness';
+import { scanInventory } from './harnessScan';
+import { detectTools } from './models';
 
 const MAX_BYTES = 512 * 1024;
 
@@ -48,7 +50,7 @@ function agentMeta(spec: AgentSpec, content: string): { description: string; mod
  * Não depende da API do VSCode.
  */
 export class HarnessStore {
-  constructor(readonly workspaceDir: string, private tool: AiTool) {}
+  constructor(readonly workspaceDir: string, private tool: AiTool, private homeDir = '') {}
 
   setTool(tool: AiTool): void {
     this.tool = tool;
@@ -67,7 +69,13 @@ export class HarnessStore {
       return { name, exists, content: exists ? this.read(file) : '' };
     });
     const skills = [...this.skillsIn(this.dirs.enabled, true), ...this.skillsIn(this.dirs.disabled, false)].sort((a, b) => a.name.localeCompare(b.name));
-    return { rules, skills, agents: this.agents() };
+    return { rules, skills, agents: this.agents(), inventory: this.inventory() };
+  }
+
+  /** O que cada ferramenta carrega, no projeto, na pasta do usuário e em plugins. */
+  private inventory(): ToolInventory[] {
+    const installed = detectTools(this.homeDir);
+    return ALL_AI_TOOLS.map((tool) => ({ tool, installed: installed.includes(tool), items: scanInventory(tool, this.workspaceDir, this.homeDir) }));
   }
 
   /** Onde a ferramenta em uso guarda os agentes do projeto; lança erro se ela não tem agentes em arquivo. */

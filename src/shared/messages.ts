@@ -83,6 +83,10 @@ export type WebviewToHost =
   /** recria as regras "Esforço → modelo" com os modelos da ferramenta */
   | { type: 'settings.modelRules.suggest'; tool: AiTool }
   | { type: 'settings.rules.update'; patch: Partial<BoardRules> }
+  /** relê o harness do disco (a pasta do usuário não é vigiada) */
+  | { type: 'harness.refresh' }
+  /** abre no editor o arquivo de um item do harness */
+  | { type: 'harness.item.open'; path: string }
   | { type: 'harness.rule.write'; name: string; content: string }
   | { type: 'harness.rule.delete'; name: string }
   | { type: 'harness.skill.create'; name: string; description: string; content: string }

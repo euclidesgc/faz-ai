@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { FieldDef, FieldValue } from '../../shared/model';
 import { AI_TOOLS } from '../../shared/harness';
 import { modelLabel, modelValue, parseModelValue } from '../../shared/models';
@@ -67,6 +68,7 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
       return <ModelEditor value={value} onChange={onChange} />;
     case 'multiselect': {
       const current = Array.isArray(value) ? value : [];
+      if (field.name.toLowerCase() === 'skills') return <SkillsPicker options={field.options} current={current} onChange={onChange} />;
       return (
         <div className="chips-editor">
           {field.options.map((o) => {
@@ -122,6 +124,46 @@ export function ModelEditor({ value, onChange, part = 'both' }: { value: FieldVa
     <div className="row model-editor">
       {modelSelect}
       {effortSelect}
+    </div>
+  );
+}
+
+type SkillScope = 'all' | 'project' | 'global';
+
+/** Campo "Skills": as do projeto e as globais (pasta do usuário e plugins) da ferramenta em uso, com filtro por origem. */
+function SkillsPicker({ options, current, onChange }: { options: string[]; current: string[]; onChange: (v: FieldValue) => void }) {
+  const state = useBoardStore((s) => s.state)!;
+  const [scope, setScope] = useState<SkillScope>('all');
+  const items = (state.harness.inventory.find((t) => t.tool === state.board.aiTool)?.items ?? []).filter((i) => i.kind === 'skill');
+  const inProject = new Set([...state.harness.skills.map((k) => k.name), ...items.filter((i) => i.scope === 'project').map((i) => i.name)]);
+  const global = new Map(items.filter((i) => i.scope !== 'project').map((i) => [i.name, i]));
+  // um valor marcado continua visível mesmo que a skill tenha saído das opções
+  const all = [...options, ...current.filter((c) => !options.includes(c))];
+  const shown = all.filter((o) => scope === 'all' || (scope === 'project' ? inProject.has(o) : global.has(o)));
+  const count = (s: SkillScope) => all.filter((o) => (s === 'all' ? true : s === 'project' ? inProject.has(o) : global.has(o))).length;
+  const scopes: { id: SkillScope; label: string }[] = [{ id: 'all', label: 'Todas' }, { id: 'project', label: 'Projeto' }, { id: 'global', label: 'Globais' }];
+  return (
+    <div className="skills-picker">
+      {global.size > 0 && (
+        <div className="segmented">
+          {scopes.map((s) => (
+            <button key={s.id} className={scope === s.id ? 'on' : ''} onClick={() => setScope(s.id)}>{s.label} ({count(s.id)})</button>
+          ))}
+        </div>
+      )}
+      <div className="chips-editor">
+        {shown.map((o) => {
+          const on = current.includes(o);
+          const g = global.get(o);
+          const where = [inProject.has(o) ? 'projeto' : '', g ? (g.plugin ? `plugin ${g.plugin}` : 'global') : ''].filter(Boolean).join(' e ');
+          return (
+            <button key={o} className={`chip ${on ? 'on' : ''}`} title={`${where ? `Skill de: ${where}. ` : ''}${g && !inProject.has(o) ? g.description : ''}`.trim()} onClick={() => onChange(on ? current.filter((x) => x !== o) : [...current, o])}>
+              {o}{!inProject.has(o) && g && <small className="chip-scope">{g.plugin ? 'plugin' : 'global'}</small>}
+            </button>
+          );
+        })}
+        {shown.length === 0 && <span className="muted small">Nenhuma skill {scope === 'project' ? 'no projeto' : scope === 'global' ? 'global' : ''}.</span>}
+      </div>
     </div>
   );
 }

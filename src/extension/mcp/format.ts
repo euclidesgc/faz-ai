@@ -143,12 +143,18 @@ export function modelsOverview(s: BoardState) {
   };
 }
 
+/** Itens do harness da ferramenta com que o projeto trabalha. */
+const toolItems = (s: BoardState) => s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
+
 /** Skills marcadas no campo "Skills" do card: obrigatórias na execução. */
 function requiredSkills(s: BoardState, c: Card) {
   const value = fieldsOf(s, c)['Skills'];
   return (Array.isArray(value) ? value : []).map((name) => {
     const skill = s.harness.skills.find((k) => k.name === name);
-    return skill ? { name, path: skill.path, ...(skill.enabled ? {} : { note: 'skill desligada no projeto' }) } : { name, note: 'skill não encontrada no projeto' };
+    if (skill) return { name, scope: 'project', path: skill.path, ...(skill.enabled ? {} : { note: 'skill desligada no projeto' }) };
+    // fora do projeto: skill global ou de plugin da ferramenta em uso, com o caminho absoluto
+    const outside = toolItems(s).find((i) => i.kind === 'skill' && i.scope !== 'project' && i.name === name);
+    return outside ? { name, scope: outside.scope, path: outside.path, ...(outside.plugin ? { plugin: outside.plugin } : {}) } : { name, note: 'skill não encontrada' };
   });
 }
 
@@ -286,5 +292,7 @@ export function harnessOverview(s: BoardState) {
     ruleFiles: s.harness.rules.map((r) => ({ name: r.name, exists: r.exists, ...(r.exists ? { bytes: r.content.length } : {}) })),
     skills: s.harness.skills.map((k) => ({ name: k.name, enabled: k.enabled, description: k.description, path: k.path })),
     agents: s.harness.agents.map((a) => ({ name: a.name, description: a.description, ...(a.model ? { model: a.model } : {}), path: a.path })),
+    // tudo que a ferramenta em uso carrega, com o escopo: project, user (global) ou plugin
+    inventory: toolItems(s).map((i) => ({ kind: i.kind, scope: i.scope, name: i.name, ...(i.description ? { description: i.description } : {}), path: i.location, ...(i.plugin ? { plugin: i.plugin } : {}) })),
   };
 }

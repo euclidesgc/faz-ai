@@ -393,3 +393,22 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--vscode
 .drag-handle:hover, .drag-handle:focus-visible { opacity: 1; }
 tr.dragging { position: relative; z-index: 1; background: var(--vscode-list-hoverBackground); }
 tr.dragging .drag-handle { cursor: grabbing; }
+
+/* Harness: inventário por ferramenta e escopo */
+.harness-inventory .tabs { flex-wrap: wrap; margin-bottom: 10px; }
+.harness-inventory .tabs .pill { margin-left: 6px; }
+.harness-inventory details { margin-top: 6px; }
+.harness-inventory summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.harness-inventory td:first-child { white-space: nowrap; }
+.harness-inventory td:first-child .pill { margin-left: 6px; }
+.harness-inventory td code { word-break: break-all; }
+
+/* Campo Skills do card: filtro por origem */
+.skills-picker { display: flex; flex-direction: column; gap: 6px; }
+.segmented { display: inline-flex; gap: 0; align-self: flex-start; }
+.segmented button { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 0; padding: 2px 8px; font-size: 0.85em; }
+.segmented button:first-child { border-radius: 4px 0 0 4px; }
+.segmented button:last-child { border-radius: 0 4px 4px 0; }
+.segmented button + button { border-left: 0; }
+.segmented button.on { background: var(--btn-bg); color: var(--btn-fg); }
+.chip-scope { margin-left: 4px; opacity: 0.7; font-size: 0.8em; }

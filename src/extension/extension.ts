@@ -182,7 +182,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // regras e skills editadas por fora (editor, IA, git) aparecem no board
   const wf = folder();
   if (wf) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(wf, '{CLAUDE.md,AGENTS.md,.claude/skills*/**,.agents/skills*/**,.cursor/skills*/**,.kimi/skills*/**,.github/skills*/**,.claude/agents/**,.github/agents/**,.codex/agents/**,.cursor/agents/**,.kimi-code/agents/**}'));
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(wf, '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.codex/**,.cursor/**,.kimi/**,.kimi-code/**,.github/{skills*,agents,instructions,prompts,hooks,copilot}/**,.github/copilot-instructions.md,.github/mcp.json}'));
     let timer: NodeJS.Timeout | undefined;
     const refresh = () => {
       clearTimeout(timer);

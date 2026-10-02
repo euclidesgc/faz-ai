@@ -32,7 +32,7 @@ beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-mcp-'));
   const db = await openInMemory(WASM_DIR);
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
-    workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(dir, 'attachments'), workspaceDir: dir,
+    workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(dir, 'attachments'), workspaceDir: dir, homeDir: path.join(dir, 'home-do-usuario'),
   });
   changes = 0;
   router.onDidChange(() => changes++);
@@ -140,6 +140,30 @@ describe('servidor MCP', () => {
 });
 
 describe('harness e padrões pelo MCP', () => {
+  it('oferece nos cards as skills globais e de plugins da ferramenta em uso', async () => {
+    const home = path.join(dir, 'home-do-usuario');
+    const put = (rel: string, text: string) => {
+      fs.mkdirSync(path.dirname(path.join(home, rel)), { recursive: true });
+      fs.writeFileSync(path.join(home, rel), text);
+    };
+    put('.claude/skills/commit/SKILL.md', '---\nname: commit\ndescription: Escreve o commit\n---\n');
+    put('.claude/plugins/cache/loja/design/.claude-plugin/plugin.json', '{"name":"design"}');
+    put('.claude/plugins/cache/loja/design/skills/critica/SKILL.md', '---\nname: critica\ndescription: Critica\n---\n');
+    put('.codex/skills/de-outra-ferramenta/SKILL.md', '---\nname: x\ndescription: x\n---\n');
+    await call('create_skill', { name: 'revisar-spec', description: 'Revisa', content: 'Passos' });
+    router.refreshHarness();
+    const field = router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
+    expect(field.options).toEqual(['revisar-spec', 'commit', 'critica']);
+    const card = (await call('create_card', { title: 'História', fields: { Skills: ['commit', 'critica', 'revisar-spec'] } })).data;
+    expect(card.requiredSkills).toEqual([
+      { name: 'commit', scope: 'user', path: path.join(home, '.claude/skills/commit/SKILL.md') },
+      { name: 'critica', scope: 'plugin', path: path.join(home, '.claude/plugins/cache/loja/design/skills/critica/SKILL.md'), plugin: 'design' },
+      { name: 'revisar-spec', scope: 'project', path: '.claude/skills/revisar-spec/SKILL.md' },
+    ]);
+    const inventory = (await call('get_harness')).data.inventory;
+    expect(inventory.find((i: any) => i.name === 'commit')).toEqual({ kind: 'skill', scope: 'user', name: 'commit', description: 'Escreve o commit', path: '~/.claude/skills/commit/SKILL.md' });
+  });
+
   it('gerencia regras e skills do projeto e sincroniza o campo Skills', async () => {
     expect((await call('get_harness')).data.ruleFiles.map((r: any) => [r.name, r.exists])).toEqual([['CLAUDE.md', false], ['AGENTS.md', false]]);
     await call('write_rule_file', { file: 'AGENTS.md', content: '# Regras\n' });
@@ -156,7 +180,7 @@ describe('harness e padrões pelo MCP', () => {
 
     // skill marcada no card aparece como obrigatória, com o caminho do SKILL.md
     const card = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 4.5' } })).data;
-    expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', path: '.claude/skills/revisar-spec/SKILL.md' }]);
+    expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', scope: 'project', path: '.claude/skills/revisar-spec/SKILL.md' }]);
     expect(card.model).toMatchObject({ tool: 'claude', model: 'haiku', effort: null, value: 'claude:haiku' });
 
     await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
@@ -559,7 +583,7 @@ describe('ferramentas de IA', () => {
     expect(fs.existsSync(path.join(dir, '.agents/skills-disabled/do-codex/SKILL.md'))).toBe(true);
     expect((await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false })).error).toBe(true); // skill de outra ferramenta
 
-    for (const [tool, base] of [['cursor', '.cursor/skills'], ['kimi', '.kimi/skills'], ['copilot', '.github/skills']] as const) {
+    for (const [tool, base] of [['cursor', '.cursor/skills'], ['kimi', '.kimi-code/skills'], ['copilot', '.github/skills']] as const) {
       await call('set_ai_tool', { tool });
       await call('create_skill', { name: `do-${tool}`, description: 'd', content: 'c' });
       expect(fs.existsSync(path.join(dir, base, `do-${tool}`, 'SKILL.md'))).toBe(true);

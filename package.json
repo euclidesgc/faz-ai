@@ -2,7 +2,7 @@
   "name": "faz-ai",
   "displayName": "Faz AI Kanban",
   "description": "Board kanban para Spec-Driven Development com IA, dentro do editor: histórias, sub-tarefas e um servidor MCP para a IA ler e atualizar o board",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "publisher": "euclidesgc",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -145,7 +145,9 @@
     "watch:web": "vite build --watch",
     "typecheck": "tsc -p tsconfig.extension.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
     "test": "npm run build:ext && vitest run",
-    "package": "vsce package"
+    "package": "vsce package",
+    "vscode:prepublish": "npm run build",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@dnd-kit/core": "^6.1.0",
@@ -161,6 +163,7 @@
     "@vscode/vsce": "^3.0.0",
     "esbuild": "^0.23.0",
     "marked": "^13.0.2",
+    "ovsx": "^1.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "sql.js": "^1.11.0",

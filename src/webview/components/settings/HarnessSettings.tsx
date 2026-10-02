@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type Agent, type AiTool, type RuleFile, type Skill } from '../../../shared/harness';
 import { HEARTBEAT_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE, type RunnerPermission } from '../../../shared/runner';
 import { useBoardStore } from '../../store/boardStore';
+import { HarnessInventory } from './HarnessInventory';
 
 type Editing = { kind: 'rule'; name: string } | { kind: 'skill'; name: string } | { kind: 'agent'; name: string } | { kind: 'newSkill' } | { kind: 'newAgent' } | null;
 
@@ -142,7 +143,8 @@ export function HarnessSettings() {
     <div>
       <h2>Harness de IA</h2>
       <p className="muted">
-        Regras e skills que as ferramentas de IA leem neste projeto. Tudo aqui são arquivos da pasta do projeto: o board só os edita.
+        Regras, skills e agentes que a ferramenta deste projeto lê na pasta do projeto, editáveis aqui. No fim da página está tudo que cada
+        ferramenta carrega, incluindo o que vem da sua pasta de usuário e de plugins.
       </p>
 
       <h3>Ferramenta deste projeto</h3>
@@ -296,6 +298,8 @@ export function HarnessSettings() {
       ) : (
         <p className="muted small">O {tool.label} não define agentes em arquivos do projeto.</p>
       )}
+
+      <HarnessInventory />
     </div>
   );
 }

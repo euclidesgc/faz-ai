@@ -147,6 +147,20 @@ e `delete_agent` os gerenciam. Cada ferramenta guarda os seus numa pasta própri
 | Kimi Code | `.kimi-code/agents` | `<nome>.md` | não tem |
 | GitHub Copilot | `.github/agents` | `<nome>.agent.md` | `model` |
 
+### Projeto, global e plugins
+
+O board lê o harness de cada ferramenta em três escopos: a pasta do projeto (`project`), a pasta do
+usuário (`user`, vale em todos os projetos) e os plugins instalados (`plugin`). `get_harness` devolve
+em `inventory` tudo que a ferramenta do projeto carrega (instruções e regras, skills, agentes,
+comandos, hooks, servidores MCP, plugins e arquivos de configuração), com o escopo e o caminho de
+cada item. De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
+
+O campo "Skills" dos cards oferece as skills do projeto e também as globais e de plugins. Em
+`get_card`, cada item de `requiredSkills` traz `scope`; para skills fora do projeto, `path` é o
+caminho absoluto do `SKILL.md`. Quando uma skill existe no projeto e fora dele com o mesmo nome,
+vale a do projeto. As ferramentas de escrita (`create_skill`, `create_agent`…) continuam atuando só
+na pasta do projeto.
+
 ### Pendências
 
 `get_pending_work` é o ponto de partida de uma sessão sem pedido específico. Ele devolve, em

@@ -63,7 +63,7 @@ export class MessageRouter {
     this.boardId = board.id;
     // nada a mudar para chegar ao padrão atual: só registra a versão, sem perguntar
     if (!pendingUpgrade(db, board.id).length) upgradeBoard(db, board.id);
-    this.harnessStore = opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTool) : null;
+    this.harnessStore = opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTool, opts.homeDir ?? '') : null;
     this.loadHarness();
     this.initModels();
     dbHandle.scheduleSave();
@@ -92,11 +92,14 @@ export class MessageRouter {
     if (JSON.stringify(this.harness) !== before) this.changed();
   }
 
-  /** As opções do campo "Skills" acompanham as skills ligadas do projeto. */
+  /** As opções do campo "Skills" acompanham as skills ligadas do projeto e as globais e de plugins da ferramenta em uso. */
   private loadHarness(): void {
     if (!this.harnessStore) return;
     this.harness = this.harnessStore.scan();
-    const names = this.harness.skills.filter((s) => s.enabled).map((s) => s.name);
+    const tool = this.boards.snapshot(this.boardId).board.aiTool;
+    const outside = (this.harness.inventory.find((t) => t.tool === tool)?.items ?? []).filter((i) => i.kind === 'skill' && i.scope !== 'project').map((i) => i.name);
+    const project = this.harness.skills.filter((s) => s.enabled).map((s) => s.name);
+    const names = [...project, ...[...new Set(outside)].filter((n) => !project.includes(n)).sort()];
     const field = this.boards.snapshot(this.boardId).fieldDefs.find((f) => f.name.toLowerCase() === SKILLS_FIELD.toLowerCase() && f.kind === 'multiselect');
     if (field && JSON.stringify(field.options) !== JSON.stringify(names)) this.settings.updateField(field.id, { options: names });
   }
@@ -298,6 +301,7 @@ export class MessageRouter {
       case 'ai.stop':
       case 'ai.heartbeat.run':
       case 'card.workspace.open':
+      case 'harness.item.open':
       case 'attachment.pick':
       case 'attachment.open':
       case 'attachment.reveal':
@@ -439,6 +443,9 @@ export class MessageRouter {
       case 'settings.modelRules.suggest':
         this.suggestRules(msg.tool);
         return true;
+      case 'harness.refresh':
+        this.refreshHarness();
+        return false;
       case 'harness.rule.write':
         return this.harnessOp((h) => h.writeRule(msg.name, msg.content));
       case 'harness.rule.delete':

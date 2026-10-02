@@ -97,6 +97,13 @@ export class WebviewBridge implements vscode.Disposable {
           await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(story.worktreePath), { forceNewWindow: true });
           return;
         }
+        case 'harness.item.open': {
+          // só abre arquivos que a varredura do harness listou
+          const known = this.router.snapshot().harness.inventory.some((t) => t.items.some((i) => i.path === msg.path));
+          if (!known) throw new Error('Arquivo fora do harness.');
+          await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path), vscode.ViewColumn.Beside);
+          return;
+        }
         case 'ai.heartbeat.run':
           await vscode.commands.executeCommand('fazai.heartbeat.runNow');
           return;
