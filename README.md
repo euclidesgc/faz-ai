@@ -97,10 +97,11 @@ O board não depende da janela do editor:
   `faz-ai --help` lista as opções (`--port`, `--data`, `--no-open`).
 
 A página só responde em `127.0.0.1` e exige o segredo que vem no link aberto pelo editor ou pelo
-terminal (ele fica guardado num cookie, então o endereço pode ir para os favoritos). No navegador,
-o tema "Sistema" acompanha o claro ou escuro do sistema operacional e os filtros abrem na própria
-barra do board. Um board é servido por um lugar de cada vez: com o editor aberto na pasta, use
-**Abrir no navegador**; o `faz-ai` do terminal avisa e não inicia.
+terminal (ele fica guardado num cookie, então o endereço pode ir para os favoritos). O tema
+"Sistema" acompanha o claro ou escuro do VS Code no editor e o do sistema operacional no navegador,
+sempre com as cores do próprio board. No navegador, os filtros abrem na própria barra do board. Um
+board é servido por um lugar de cada vez: com o editor aberto na pasta, use **Abrir no navegador**;
+o `faz-ai` do terminal avisa e não inicia.
 
 ## Usando com IA
 

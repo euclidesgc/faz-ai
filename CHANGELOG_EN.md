@@ -10,7 +10,19 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 - **Theme button in the board's top bar**: the icon in the top-right corner cycles between
   **Sistema** (system), **Claro** (light) and **Escuro** (dark). It is the same preference as
   Configurações > Aparência, so the choice is saved and applies in the editor and in the browser.
-- The columns' horizontal scrollbar now has breathing room below the cards.
+- **The board has its own colors**: the board now uses the same palette in the editor and in the
+  browser, in light and dark, instead of inheriting the colors of the VS Code theme. With
+  **Sistema**, it only follows whether the editor is in a light or a dark theme. High-contrast
+  themes use the board's light or dark palette with stronger borders.
+- The **Filtros** panel in the sidebar uses the board theme's background. Before, with a dark VS
+  Code and a light board, the filters were almost invisible.
+- Status and card type badges stay readable in any chosen color: the text turns black or white
+  depending on the background color.
+- The primary button is indigo in both themes (it was green in dark).
+- Scrollbars use the board's colors, and the columns' horizontal scrollbar now has breathing room
+  below the cards.
+- The contrast of text, controls and keyboard focus is checked by an automated test in both
+  themes. The color rules are in `DESIGN.md`.
 
 ## 0.29.1
 

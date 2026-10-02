@@ -104,10 +104,11 @@ The board does not depend on the editor window:
   `faz-ai --help` lists the options (`--port`, `--data`, `--no-open`).
 
 The page only answers on `127.0.0.1` and requires the secret in the link opened by the editor or
-the terminal (it is then kept in a cookie, so the address can be bookmarked). In the browser, the
-"Sistema" theme follows the operating system's light or dark mode and the filters open in the
-board's own bar. A board is served from one place at a time: with the editor open on the folder,
-use **Abrir no navegador**; the terminal `faz-ai` warns and does not start.
+the terminal (it is then kept in a cookie, so the address can be bookmarked). The "Sistema" theme
+follows VS Code's light or dark mode in the editor and the operating system's in the browser,
+always with the board's own colors. In the browser, the filters open in the board's own bar. A
+board is served from one place at a time: with the editor open on the folder, use **Abrir no
+navegador**; the terminal `faz-ai` warns and does not start.
 
 ## Using it with AI
 

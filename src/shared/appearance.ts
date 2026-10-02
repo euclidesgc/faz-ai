@@ -6,7 +6,7 @@ export type ThemeMode = 'system' | 'light' | 'dark';
 export type TextFont = 'sans' | 'ui' | 'serif' | 'mono' | 'editor';
 
 export interface Appearance {
-  /** 'system' acompanha o tema do VS Code; no navegador, o claro ou escuro do sistema operacional */
+  /** 'system' acompanha só o claro ou escuro do VS Code (no navegador, o do sistema operacional); as cores são sempre as do board */
   theme: ThemeMode;
   /** fonte dos campos de texto longo */
   font: TextFont;
