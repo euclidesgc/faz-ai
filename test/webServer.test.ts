@@ -109,6 +109,9 @@ it('só entrega o board a quem chega com o segredo do link, pelo endereço local
   // nada fora da pasta da interface
   expect((await request('GET', '/../segredo.txt', { headers: { cookie } })).status).toBe(404);
   expect((await request('GET', '/%2e%2e/segredo.txt', { headers: { cookie } })).status).toBe(404);
+  // caminho malformado é recusado sem derrubar o servidor
+  expect((await request('GET', '/%E0%A4%A', { headers: { cookie } })).status).toBe(400);
+  expect((await request('GET', '/main.js', { headers: { cookie } })).status).toBe(200);
   // o segredo continua o mesmo entre reinícios, para o endereço salvo seguir valendo
   expect(fs.readFileSync(path.join(dir, 'token'), 'utf8')).toBe(new URL(web.url).searchParams.get('t'));
 });

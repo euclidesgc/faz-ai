@@ -102,6 +102,16 @@ export async function startWebServer(o: WebServerOptions): Promise<WebServer> {
   };
 
   const server = http.createServer((req, res) => {
+    try {
+      serve(req, res);
+    } catch {
+      // pedido malformado (ex.: % inválido no caminho) não pode derrubar quem serve o board
+      if (!res.headersSent) res.writeHead(400);
+      res.end();
+    }
+  });
+
+  const serve = (req: http.IncomingMessage, res: http.ServerResponse): void => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
     // só atende quem chega pelo endereço local: barra páginas de fora que apontem um domínio para 127.0.0.1
     if (!new Set([`127.0.0.1:${port}`, `localhost:${port}`]).has(req.headers.host ?? '')) return void res.writeHead(403).end('Endereço não permitido');
@@ -185,7 +195,7 @@ export async function startWebServer(o: WebServerOptions): Promise<WebServer> {
     }
     const asset = inside(path.resolve(o.webviewDir), decodeURIComponent(url.pathname).replace(/^\/+/, ''));
     return asset ? sendFile(res, asset) : void res.writeHead(404).end('Não encontrado');
-  });
+  };
 
   const listen = (p: number) =>
     new Promise<void>((resolve, reject) => {
