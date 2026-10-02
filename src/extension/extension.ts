@@ -40,7 +40,7 @@ function installLauncher(extensionPath: string, storage: string): void {
       fs.writeFileSync(path.join(bin, 'faz-ai.cmd'), `@echo off\r\nif not defined FAZAI_DATA set "FAZAI_DATA=${storage}"\r\nnode "${cli}" %*\r\n`);
     } else {
       const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
-      fs.writeFileSync(path.join(bin, 'faz-ai'), `#!/bin/sh\n# Gerado pela extensão Faz AI: abre o board de uma pasta no navegador, sem o editor.\nFAZAI_DATA="\${FAZAI_DATA:-${storage.replace(/(["$\`\\])/g, '\\$1')}}" exec node ${quote(cli)} "$@"\n`, { mode: 0o755 });
+      fs.writeFileSync(path.join(bin, 'faz-ai'), `#!/bin/sh\n# Gerado pela extensão Faz AI: abre o board de uma pasta no navegador, sem o editor.\nFAZAI_DATA="\${FAZAI_DATA:-${storage.replace(/(["$`\\])/g, '\\$1')}}" exec node ${quote(cli)} "$@"\n`, { mode: 0o755 });
     }
   } catch (e) {
     console.warn(`Faz AI: atalho de terminal não instalado: ${e instanceof Error ? e.message : String(e)}`);

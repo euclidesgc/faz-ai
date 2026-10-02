@@ -22,6 +22,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   respiro abaixo dos cards.
 - O contraste de textos, controles e foco do teclado é verificado por teste automático nos dois
   temas. As regras de cor estão em `DESIGN.md`.
+- Interno: lint (ESLint) e formatação (Prettier) configurados, e testes de interação (cliques e
+  teclado) do board. Nada muda para quem usa.
 
 ## 0.29.1
 

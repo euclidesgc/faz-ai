@@ -23,6 +23,8 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   below the cards.
 - The contrast of text, controls and keyboard focus is checked by an automated test in both
   themes. The color rules are in `DESIGN.md`.
+- Internal: lint (ESLint) and formatting (Prettier) set up, plus interaction tests (clicks and
+  keyboard) for the board. Nothing changes for users.
 
 ## 0.29.1
 
