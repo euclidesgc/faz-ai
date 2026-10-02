@@ -89,6 +89,14 @@ export class WebviewBridge implements vscode.Disposable {
         case 'ai.stop':
           await vscode.commands.executeCommand('fazai.ai.stop', msg.cardId);
           return;
+        case 'card.workspace.open': {
+          const cards = this.router.snapshot().cards;
+          const card = cards.find((c) => c.id === msg.cardId);
+          const story = card?.parentId ? cards.find((c) => c.id === card.parentId) : card;
+          if (!story?.worktreePath) throw new Error('Esta história ainda não tem pasta de trabalho.');
+          await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(story.worktreePath), { forceNewWindow: true });
+          return;
+        }
         case 'ai.heartbeat.run':
           await vscode.commands.executeCommand('fazai.heartbeat.runNow');
           return;

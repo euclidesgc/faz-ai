@@ -2,14 +2,14 @@ import type { Database } from 'sql.js';
 import { norm } from '../../shared/filters';
 import type { ColumnCategory, WorkflowKind } from '../../shared/model';
 import { newId } from './ids';
-import { PHASE_DEFAULTS } from '../../shared/phaseDefaults';
+import { IMPLEMENTATION_INSTRUCTION_V2, PHASE_DEFAULTS } from '../../shared/phaseDefaults';
 import { all, bool, num, one, run, str, transaction } from './query';
 
 /**
  * Board padrão. Cada mudança no padrão sobe a versão; boards criados antes são atualizados no
  * lugar (com confirmação), sem recriar nada: os cards continuam na coluna em que estavam.
  */
-export const BOARD_TEMPLATE_VERSION = 2;
+export const BOARD_TEMPLATE_VERSION = 3;
 
 export interface TemplateColumn {
   name: string;
@@ -124,6 +124,16 @@ function steps(db: Database, boardId: string): Step[] {
           apply: () => run(db, 'UPDATE field_defs SET options_json = ? WHERE id = ?', [JSON.stringify(next), str(fase.id)]),
         });
       }
+    }
+  }
+  if (version < 3) {
+    // quem já estava na versão 2 tem a instrução antiga; nas anteriores o passo acima já grava a nova
+    const cols = all(db, 'SELECT c.id, c.name FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? AND c.ai_instruction = ?', [boardId, IMPLEMENTATION_INSTRUCTION_V2]);
+    for (const col of cols) {
+      out.push({
+        description: `Coluna "${str(col.name)}": a instrução passa a pedir a branch e a pasta de trabalho da história antes de alterar código.`,
+        apply: () => run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [PHASE_DEFAULTS['Implementação']!.instruction, str(col.id)]),
+      });
     }
   }
   return out;

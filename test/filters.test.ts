@@ -1,4 +1,5 @@
 import { DEFAULT_RUNNER } from '../src/shared/runner';
+import { DEFAULT_GIT } from '../src/shared/git';
 import { describe, expect, it } from 'vitest';
 import type { BoardState, Card } from '../src/shared/model';
 import { DEFAULT_APPEARANCE } from '../src/shared/appearance';
@@ -11,11 +12,11 @@ const DAY = 86400000;
 
 const card = (id: string, over: Partial<Card> = {}): Card => ({
   id, number: 0, boardId: 'b', workflowId: 'wp', columnId: 'todo', typeId: 'story', parentId: null, title: id, description: '',
-  position: 0, createdAt: NOW, updatedAt: NOW, deletedAt: null, archivedAt: null, status: null, statusReason: '', statusAt: null, statusBy: '', ...over,
+  position: 0, createdAt: NOW, updatedAt: NOW, deletedAt: null, archivedAt: null, status: null, statusReason: '', statusAt: null, statusBy: '', branch: '', worktreePath: '', ...over,
 });
 
 const state: BoardState = {
-  board: { id: 'b', workspaceKey: 'k', name: 'B', rules: DEFAULT_RULES, aiTool: 'claude', modelCatalog: [], modelRules: [], appearance: DEFAULT_APPEARANCE, templateVersion: 1, runner: DEFAULT_RUNNER },
+  board: { id: 'b', workspaceKey: 'k', name: 'B', rules: DEFAULT_RULES, aiTool: 'claude', modelCatalog: [], modelRules: [], appearance: DEFAULT_APPEARANCE, templateVersion: 1, runner: DEFAULT_RUNNER, git: DEFAULT_GIT },
   workflows: [{ id: 'wp', boardId: 'b', name: 'H', position: 0, kind: 'parent', collapsed: false, archiveCollapsed: true }, { id: 'wc', boardId: 'b', name: 'S', position: 1, kind: 'child', collapsed: false, archiveCollapsed: true }],
   columns: [
     { id: 'todo', workflowId: 'wp', name: 'Backlog', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '' },

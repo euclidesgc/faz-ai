@@ -53,6 +53,7 @@ beforeEach(async () => {
 afterEach(() => {
   vi.useRealTimers();
   fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(`${dir}.worktrees`, { recursive: true, force: true });
 });
 
 describe('executor da IA', () => {
@@ -60,7 +61,7 @@ describe('executor da IA', () => {
     runner.start(storyId);
     expect(procs).toHaveLength(1);
     expect(procs[0]!.cwd).toBe(dir);
-    expect(procs[0]!.command).toEqual(headlessCommand('claude', { prompt: cardPrompt('#1'), permission: 'board' }));
+    expect(procs[0]!.command).toEqual(headlessCommand('claude', { prompt: cardPrompt('#1'), permission: 'board', addDirs: [`${dir}.worktrees`] }));
     expect(card()).toMatchObject({ status: 'running', statusBy: 'Claude Code' });
     expect(router.snapshot().aiRuns).toEqual([storyId]);
     expect(log.join('\n')).toContain('[#1] saída da ferramenta');
@@ -126,7 +127,7 @@ describe('executor da IA', () => {
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
     expect(router.snapshot().aiRunUnsupported).toBeNull();
     runner.start(storyId);
-    expect(procs[0]!.command).toEqual({ command: 'kimi', args: ['-p', cardPrompt('#1')] });
+    expect(procs[0]!.command).toEqual({ command: 'kimi', args: ['-p', cardPrompt('#1'), '--add-dir', `${dir}.worktrees`] });
   });
 
   it('monta o comando de cada ferramenta conforme a permissão', () => {

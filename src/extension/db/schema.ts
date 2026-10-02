@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -198,6 +198,12 @@ const MIGRATIONS: Record<number, string> = {
   15: `
     -- como a extensão executa a IA para um card (permissões, tempo limite)
     ALTER TABLE boards ADD COLUMN runner_json TEXT NOT NULL DEFAULT '{}';
+  `,
+  16: `
+    -- branch e pasta de trabalho (worktree) de cada história
+    ALTER TABLE boards ADD COLUMN git_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE cards ADD COLUMN branch TEXT NOT NULL DEFAULT '';
+    ALTER TABLE cards ADD COLUMN worktree_path TEXT NOT NULL DEFAULT '';
   `,
 };
 

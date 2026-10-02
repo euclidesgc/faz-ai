@@ -5,6 +5,7 @@ import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
 import type { RunnerConfig } from './runner';
+import type { GitConfig } from './git';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, WorkflowKind } from './model';
 
 export type WebviewToHost =
@@ -26,6 +27,10 @@ export type WebviewToHost =
   | { type: 'card.unarchive'; cardId: Id; columnId?: Id; position?: number }
   | { type: 'card.deletePermanent'; cardId: Id }
   | { type: 'trash.empty' }
+  /** cria (ou reaproveita) a branch e a worktree da história do card */
+  | { type: 'card.workspace.prepare'; cardId: Id }
+  /** abre a pasta de trabalho da história numa janela nova do editor */
+  | { type: 'card.workspace.open'; cardId: Id }
   /** muda o status de trabalho do card; `note` é o motivo do bloqueio ou o texto que vai junto para a conversa */
   | { type: 'card.status.set'; cardId: Id; status: CardStatus | null; note?: string }
   | { type: 'comment.add'; cardId: Id; body: string }
@@ -62,7 +67,7 @@ export type WebviewToHost =
     }
   | { type: 'settings.field.delete'; fieldId: Id }
   | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string; collapsed?: boolean; archiveCollapsed?: boolean } }
-  | { type: 'settings.board.update'; patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance>; runner?: Partial<RunnerConfig> } }
+  | { type: 'settings.board.update'; patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance>; runner?: Partial<RunnerConfig>; git?: Partial<GitConfig> } }
   /** apaga tudo e recria o board com o padrão atual */
   | { type: 'settings.board.reset' }
   /** leva o board ao padrão atual sem recriá-lo: só acrescenta e completa, os cards não saem do lugar */

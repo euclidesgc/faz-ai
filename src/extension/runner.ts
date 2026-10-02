@@ -64,7 +64,7 @@ export class AiRunner {
     if (!card || card.deletedAt !== null || card.archivedAt !== null) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
     const tool = aiToolInfo(state.board.aiTool);
-    const command = headlessCommand(state.board.aiTool, { prompt: cardPrompt(cardRef(card)), permission: state.board.runner.permission });
+    const command = headlessCommand(state.board.aiTool, { prompt: cardPrompt(cardRef(card)), permission: state.board.runner.permission, addDirs: this.router.aiWorkDirs() });
     if ('unsupported' in command) throw new Error(command.unsupported);
 
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);

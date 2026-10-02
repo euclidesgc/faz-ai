@@ -1,5 +1,9 @@
 import type { DbHandle } from '../db/database';
-import type { Attachment, BoardState, FieldDef } from '../../shared/model';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type { Attachment, BoardState, Card, FieldDef } from '../../shared/model';
+import { branchName, slug } from '../../shared/git';
+import { prepareWorkspace } from '../git';
 import type { WebviewToHost } from '../../shared/messages';
 import { EMPTY_HARNESS, type AiTool, type Harness } from '../../shared/harness';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelRule } from '../../shared/models';
@@ -210,6 +214,47 @@ export class MessageRouter {
     return this.apply(msg, ctx.author ?? this.opts.author, ctx.source === 'ai') ? this.changed() : this.snapshot();
   }
 
+  /** Pasta onde ficam as worktrees das histórias. */
+  private get worktreeRoot(): string | null {
+    const dir = this.opts.workspaceDir;
+    const { git } = this.boards.snapshot(this.boardId).board;
+    return dir && git.mode === 'worktree' ? path.resolve(dir, git.worktreeDir.replace(/\{repo\}/g, path.basename(dir))) : null;
+  }
+
+  /**
+   * Pastas fora do projeto em que a IA precisa poder trabalhar: a das worktrees. Vai inteira (e
+   * não a de uma história) porque a worktree pode ser criada no meio da execução.
+   */
+  aiWorkDirs(): string[] {
+    const root = this.worktreeRoot;
+    if (!root) return [];
+    fs.mkdirSync(root, { recursive: true });
+    return [root];
+  }
+
+  /** A história do card: ele mesmo, ou o pai quando é uma sub-tarefa. */
+  private storyOf(cardId: string): Card {
+    const cards = this.boards.snapshot(this.boardId).cards;
+    const card = cards.find((c) => c.id === cardId);
+    const story = card?.parentId ? cards.find((c) => c.id === card.parentId) : card;
+    if (!story) throw new Error('Card não encontrado');
+    return story;
+  }
+
+  /** Cria (ou reaproveita) a branch e a pasta de trabalho da história, com nomes definidos pelo board. */
+  private prepareWorkspace(cardId: string): void {
+    const s = this.boards.snapshot(this.boardId);
+    const { git } = s.board;
+    if (git.mode === 'off') throw new Error('A criação de branches está desligada neste board (Configurações → Git).');
+    if (!this.opts.workspaceDir) throw new Error('Nenhuma pasta de projeto aberta.');
+    const story = this.storyOf(cardId);
+    // a branch já registrada vale mesmo que o título ou o padrão tenham mudado depois
+    const branch = story.branch || branchName(git.branchPattern, { type: s.cardTypes.find((t) => t.id === story.typeId)?.name ?? '', number: story.number, title: story.title });
+    const worktreePath = story.worktreePath || path.join(this.worktreeRoot ?? this.opts.workspaceDir, `${story.number}-${slug(story.title) || 'historia'}`);
+    const ws = prepareWorkspace({ projectDir: this.opts.workspaceDir, mode: git.mode, branch, worktreePath });
+    this.cards.setWorkspace(story.id, ws.branch, ws.path);
+  }
+
   /** Muda o status de trabalho do card. Aprovar é só da pessoa; bloquear exige o motivo. */
   private setStatus(msg: Extract<WebviewToHost, { type: 'card.status.set' }>, author: string, byAi: boolean): void {
     const note = msg.note?.trim() ?? '';
@@ -242,6 +287,7 @@ export class MessageRouter {
       case 'ai.run':
       case 'ai.stop':
       case 'ai.heartbeat.run':
+      case 'card.workspace.open':
       case 'attachment.pick':
       case 'attachment.open':
       case 'attachment.reveal':
@@ -291,6 +337,9 @@ export class MessageRouter {
         return true;
       case 'card.status.set':
         this.setStatus(msg, author, byAi);
+        return true;
+      case 'card.workspace.prepare':
+        this.prepareWorkspace(msg.cardId);
         return true;
       case 'comment.add':
         if (!msg.body.trim()) return true;

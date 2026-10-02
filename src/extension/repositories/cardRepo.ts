@@ -179,6 +179,10 @@ export class CardRepo {
     run(this.db, 'UPDATE cards SET status = ?, status_reason = ?, status_at = ?, status_by = ? WHERE id = ?', [status, reason, now(), by, cardId]);
   }
 
+  setWorkspace(cardId: string, branch: string, worktreePath: string): void {
+    run(this.db, 'UPDATE cards SET branch = ?, worktree_path = ? WHERE id = ?', [branch, worktreePath, cardId]);
+  }
+
   status(cardId: string): CardStatus | null {
     const v = one(this.db, 'SELECT status FROM cards WHERE id = ?', [cardId])?.status;
     return v == null ? null : (str(v) as CardStatus);
