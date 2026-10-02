@@ -183,6 +183,10 @@ export class CardRepo {
     run(this.db, 'UPDATE cards SET branch = ?, worktree_path = ? WHERE id = ?', [branch, worktreePath, cardId]);
   }
 
+  setPullRequest(cardId: string, url: string): void {
+    run(this.db, 'UPDATE cards SET pr_url = ? WHERE id = ?', [url, cardId]);
+  }
+
   status(cardId: string): CardStatus | null {
     const v = one(this.db, 'SELECT status FROM cards WHERE id = ?', [cardId])?.status;
     return v == null ? null : (str(v) as CardStatus);

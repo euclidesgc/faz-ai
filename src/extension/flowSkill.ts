@@ -55,6 +55,12 @@ código só ali e não crie branches por conta própria.
 Na Implementação, execute uma sub-tarefa por vez: \`start_work\`, mova para "Em andamento", faça o
 trabalho, verifique e mova para a coluna de conclusão, registrando na conversa o que foi feito.
 
+## Homologação
+
+Envie a branch da história, abra o pull request (se ainda não existir) e registre o endereço com
+\`set_pull_request\`. Resuma na conversa o que foi feito e como testar, e chame \`request_review\`.
+Não faça o merge: ele depende da aprovação da pessoa e pode ser feito pelo próprio board.
+
 ## Quando parar
 
 - Faltou uma informação ou decisão: \`ask_question\` no card, e pare de trabalhar nele.

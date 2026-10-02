@@ -99,6 +99,22 @@ commits na branch da história.
   padrão do nome da branch e a pasta das worktrees.
 - Cada worktree é uma cópia de trabalho: as dependências precisam ser instaladas nela.
 
+### Pull request e merge na Homologação
+
+Na Homologação a IA envia a branch, abre o pull request da história, registra o endereço no card e
+pede a sua revisão. O card mostra o link do PR.
+
+O merge automático é opcional e começa desligado (Configurações → Git). Com ele ligado, quando você
+aprova uma história que está na última coluna antes da conclusão:
+
+1. o board faz o merge do PR pelo GitHub CLI (`gh`), no tipo configurado (squash, merge ou rebase);
+2. só com o merge feito o card vai para Concluído, e a pasta de trabalho da história é removida;
+3. se o merge falhar (conflito, checks obrigatórios, sem acesso), o card fica Bloqueado com o erro
+   e continua na Homologação.
+
+O merge não acontece se a história não tiver PR registrado ou ainda tiver sub-tarefas em aberto. Com
+o merge automático desligado, aprovar só marca o card, e a IA o move para Concluído.
+
 ### Heartbeat
 
 Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
@@ -132,7 +148,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
 | Harness de IA | Ferramenta do projeto, arquivo de regras e skills |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
-| Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta |
+| Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
 | Aparência | Tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
 
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração

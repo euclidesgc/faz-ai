@@ -12,7 +12,7 @@ const DAY = 86400000;
 
 const card = (id: string, over: Partial<Card> = {}): Card => ({
   id, number: 0, boardId: 'b', workflowId: 'wp', columnId: 'todo', typeId: 'story', parentId: null, title: id, description: '',
-  position: 0, createdAt: NOW, updatedAt: NOW, deletedAt: null, archivedAt: null, status: null, statusReason: '', statusAt: null, statusBy: '', branch: '', worktreePath: '', ...over,
+  position: 0, createdAt: NOW, updatedAt: NOW, deletedAt: null, archivedAt: null, status: null, statusReason: '', statusAt: null, statusBy: '', branch: '', worktreePath: '', prUrl: '', ...over,
 });
 
 const state: BoardState = {

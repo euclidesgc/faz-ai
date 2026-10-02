@@ -272,6 +272,17 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
   );
 
+  tool(
+    'set_pull_request',
+    'Registra na história o endereço do pull request aberto para a branch dela. Chame logo depois de abrir o PR (ex.: com `gh pr create`); pode ser chamada de uma sub-tarefa. Não faça o merge: ele depende da aprovação da pessoa na homologação.',
+    { card: cardArg, url: z.string().url().describe('Endereço do pull request') },
+    (a, router) => {
+      const card = live(findCard(router.snapshot(), a.card));
+      router.handle({ type: 'card.pr.set', cardId: card.id, url: a.url }, ai());
+      return detail(router, card.id).workspace ?? { pullRequest: a.url };
+    },
+  );
+
   tool('archive_card', 'Arquiva um card (e suas sub-tarefas): sai do board sem ser apagado.', { card: cardArg }, (a, router) => {
     const card = live(findCard(router.snapshot(), a.card));
     router.handle({ type: 'card.archive', cardId: card.id });

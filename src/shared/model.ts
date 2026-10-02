@@ -108,6 +108,8 @@ export interface Card {
   branch: string;
   /** pasta em que o código da história é alterado: a worktree, ou a pasta do projeto no modo "branch" */
   worktreePath: string;
+  /** endereço do pull request da história; vazio enquanto não foi aberto */
+  prUrl: string;
 }
 
 /** ID do card como aparece na interface. */

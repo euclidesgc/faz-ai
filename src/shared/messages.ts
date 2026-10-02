@@ -29,6 +29,10 @@ export type WebviewToHost =
   | { type: 'trash.empty' }
   /** cria (ou reaproveita) a branch e a worktree da história do card */
   | { type: 'card.workspace.prepare'; cardId: Id }
+  /** registra o pull request da história do card */
+  | { type: 'card.pr.set'; cardId: Id; url: string }
+  /** a pasta de trabalho da história foi removida (a branch continua registrada) */
+  | { type: 'card.workspace.clear'; cardId: Id }
   /** abre a pasta de trabalho da história numa janela nova do editor */
   | { type: 'card.workspace.open'; cardId: Id }
   /** muda o status de trabalho do card; `note` é o motivo do bloqueio ou o texto que vai junto para a conversa */

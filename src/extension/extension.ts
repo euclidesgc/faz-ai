@@ -14,6 +14,7 @@ import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
 import { ViewStateStore } from './viewState';
 import { AiRunner } from './runner';
 import { Heartbeat } from './heartbeat';
+import { AutoMerger } from './merge';
 import { loginShellPath, spawnHeadless } from './spawn';
 import { cardRef } from '../shared/model';
 import { humanQueueStatuses, turnsPassedToHuman } from '../shared/pending';
@@ -75,6 +76,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         cwd: f.uri.fsPath,
         log: (line) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`),
         spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
+      });
+      new AutoMerger(router, {
+        cwd: f.uri.fsPath,
+        log: (line) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`),
+        gh: (args, cwd) =>
+          new Promise((resolve, reject) => {
+            execFile('gh', args, { cwd, timeout: 120_000, env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) } }, (err, stdout, stderr) =>
+              err ? reject(new Error((err as NodeJS.ErrnoException).code === 'ENOENT' ? 'o comando "gh" (GitHub CLI) não foi encontrado.' : stderr.trim() || err.message)) : resolve(stdout),
+            );
+          }),
       });
       heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: (line) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`) });
       heartbeat.onDidChange(updateStatusBar);

@@ -8,7 +8,17 @@ export interface GitConfig {
   branchPattern: string;
   /** pasta onde ficam as worktrees, relativa à pasta do projeto; aceita {repo} */
   worktreeDir: string;
+  /** ao aprovar a história na última coluna antes da conclusão, faz o merge do PR dela e conclui o card */
+  autoMerge: boolean;
+  mergeMethod: MergeMethod;
 }
+
+export type MergeMethod = 'squash' | 'merge' | 'rebase';
+export const MERGE_METHODS: { value: MergeMethod; label: string }[] = [
+  { value: 'squash', label: 'Squash (um commit só)' },
+  { value: 'merge', label: 'Merge commit' },
+  { value: 'rebase', label: 'Rebase' },
+];
 
 export const WORKSPACE_MODES: { value: WorkspaceMode; label: string; hint: string }[] = [
   { value: 'worktree', label: 'Worktree por história', hint: 'Cada história ganha uma branch e uma pasta de trabalho própria. A IA mexe no código lá, sem tocar na sua pasta nem nas suas alterações em andamento.' },
@@ -16,7 +26,7 @@ export const WORKSPACE_MODES: { value: WorkspaceMode; label: string; hint: strin
   { value: 'off', label: 'Desligado', hint: 'O board não cria branches nem worktrees.' },
 ];
 
-export const DEFAULT_GIT: GitConfig = { mode: 'worktree', branchPattern: '{tipo}/{numero}-{titulo}', worktreeDir: '../{repo}.worktrees' };
+export const DEFAULT_GIT: GitConfig = { mode: 'worktree', branchPattern: '{tipo}/{numero}-{titulo}', worktreeDir: '../{repo}.worktrees', autoMerge: false, mergeMethod: 'squash' };
 
 const text = (v: unknown, fallback: string): string => (typeof v === 'string' && v.trim() ? v.trim() : fallback);
 
@@ -35,6 +45,8 @@ export function parseGit(json: string | null | undefined): GitConfig {
     // sem o número, duas histórias de mesmo título disputariam a mesma branch
     branchPattern: pattern.includes('{numero}') ? pattern : DEFAULT_GIT.branchPattern,
     worktreeDir: text(raw.worktreeDir, DEFAULT_GIT.worktreeDir),
+    autoMerge: raw.autoMerge === true,
+    mergeMethod: MERGE_METHODS.some((m) => m.value === raw.mergeMethod) ? (raw.mergeMethod as MergeMethod) : DEFAULT_GIT.mergeMethod,
   };
 }
 

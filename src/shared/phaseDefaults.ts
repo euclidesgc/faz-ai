@@ -19,6 +19,13 @@ export const IMPLEMENTATION_INSTRUCTION_V2 = [
   'Quando todas estiverem concluídas, mova a história para a próxima coluna.',
 ].join('\n');
 
+/** Instrução da Homologação antes do pull request (versões 2 e 3 do padrão). */
+export const HOMOLOGATION_INSTRUCTION_V2 = [
+  'Prepare a entrega para a validação da pessoa.',
+  'Resuma na conversa o que foi construído, como testar passo a passo e o que ficou de fora, e peça a revisão.',
+  'A conclusão depende da aprovação: depois de aprovado, mova a história para a coluna de conclusão.',
+].join('\n');
+
 export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   Discovery: {
     instruction: [
@@ -137,8 +144,9 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   Homologação: {
     instruction: [
       'Prepare a entrega para a validação da pessoa.',
+      'Envie a branch da história (git push) e abra o pull request dela, se ainda não existir (ex.: gh pr create), com um resumo do que foi feito. Registre o endereço com set_pull_request.',
       'Resuma na conversa o que foi construído, como testar passo a passo e o que ficou de fora, e peça a revisão.',
-      'A conclusão depende da aprovação: depois de aprovado, mova a história para a coluna de conclusão.',
+      'Não faça o merge: a conclusão depende da aprovação da pessoa. Depois de aprovado, se o card continuar nesta coluna, mova a história para a coluna de conclusão.',
     ].join('\n'),
     ...NO_ARTIFACT,
   },
