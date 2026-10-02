@@ -487,5 +487,7 @@ h4 { margin: 8px 0 0; font-size: var(--fs-md); font-weight: 600; }
 
 /* no navegador a barra de rolagem padrão destoa do tema escuro */
 body.host-web { scrollbar-color: var(--border) transparent; }
-body.host-web .content, body.host-web .drawer, body.host-web .columns { scrollbar-width: thin; }
+body.host-web .content, body.host-web .drawer { scrollbar-width: thin; }
+/* a barra das colunas usa as cores do tema do board (não as do VS Code), para ter contraste também no tema claro */
+.columns { scrollbar-color: var(--muted) var(--hover); scrollbar-width: auto; }
 .filterbar-panel .filter-group { max-height: 170px; overflow: auto; }
