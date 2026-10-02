@@ -167,15 +167,24 @@ function executionOf(s: BoardState, c: Card) {
 /** Itens do harness da ferramenta com que o projeto trabalha. */
 const toolItems = (s: BoardState) => s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
 
+/** Arquivos de apoio da skill (referências, modelos, scripts), com o caminho ao lado do SKILL.md. */
+function supportFiles(skillMd: string, files: string[]) {
+  const dir = skillMd.replace(/\/?SKILL\.md$/, '');
+  return files.length ? { files: files.map((f) => `${dir}/${f}`) } : {};
+}
+
 /** Skills marcadas no campo "Skills" do card: obrigatórias na execução. */
 export function requiredSkills(s: BoardState, c: Card) {
   // as skills do card somam às do perfil de execução
   return manifestOf(s, c).skills.map((name) => {
     const skill = s.harness.skills.find((k) => k.name === name);
-    if (skill) return { name, scope: 'project', path: skill.path };
+    if (skill) {
+      const files = toolItems(s).find((i) => i.kind === 'skill' && i.scope === 'project' && i.location === skill.path)?.files ?? [];
+      return { name, scope: 'project', path: skill.path, ...supportFiles(skill.path, files) };
+    }
     // fora do projeto: skill global ou de plugin da ferramenta em uso, com o caminho absoluto
     const outside = toolItems(s).find((i) => i.kind === 'skill' && i.scope !== 'project' && i.name === name);
-    return outside ? { name, scope: outside.scope, path: outside.path, ...(outside.plugin ? { plugin: outside.plugin } : {}) } : { name, note: 'skill não encontrada' };
+    return outside ? { name, scope: outside.scope, path: outside.path, ...(outside.plugin ? { plugin: outside.plugin } : {}), ...supportFiles(outside.path, outside.files ?? []) } : { name, note: 'skill não encontrada' };
   });
 }
 
@@ -231,7 +240,7 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...cardSummary(s, c),
     ...(chosen ? { model: { ...describeModel(s, chosen), note: 'Modelo e esforço que devem executar este card.' } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
-    ...(skills.length ? { requiredSkills: skills, requiredSkillsNote: 'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática.' } : {}),
+    ...(skills.length ? { requiredSkills: skills, requiredSkillsNote: 'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em `files` estão os arquivos de apoio de cada skill (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.' } : {}),
     ...(phase ? { phase } : {}),
     ...executionOf(s, c),
     ...workspaceOf(s, c),
@@ -318,6 +327,6 @@ export function harnessOverview(s: BoardState) {
     skills: s.harness.skills.map((k) => ({ name: k.name, enabled: k.enabled, mode: k.mode, description: k.description, path: k.path })),
     agents: s.harness.agents.map((a) => ({ name: a.name, description: a.description, ...(a.model ? { model: a.model } : {}), path: a.path })),
     // tudo que a ferramenta em uso carrega, com o escopo: project, user (global) ou plugin
-    inventory: toolItems(s).map((i) => ({ kind: i.kind, scope: i.scope, name: i.name, ...(i.mode ? { mode: i.mode } : {}), ...(i.description ? { description: i.description } : {}), path: i.location, ...(i.plugin ? { plugin: i.plugin } : {}) })),
+    inventory: toolItems(s).map((i) => ({ kind: i.kind, scope: i.scope, name: i.name, ...(i.mode ? { mode: i.mode } : {}), ...(i.files?.length ? { files: i.files } : {}), ...(i.description ? { description: i.description } : {}), path: i.location, ...(i.plugin ? { plugin: i.plugin } : {}) })),
   };
 }

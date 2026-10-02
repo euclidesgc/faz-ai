@@ -114,6 +114,12 @@ export type WebviewToHost =
   /** regra de permissão numa das listas (allow, ask, deny) do arquivo de configuração */
   | { type: 'harness.permission.add'; tool: AiTool; source: number; list: string; rule: string }
   | { type: 'harness.permission.remove'; tool: AiTool; path: string; list: string; rule: string }
+  /** arquivo de apoio de uma skill (`path` é o SKILL.md, `file` o caminho dentro da pasta dela); criar abre o arquivo no editor */
+  | { type: 'harness.skill.file.create'; tool: AiTool; path: string; file: string; link: boolean }
+  | { type: 'harness.skill.file.open'; tool: AiTool; path: string; file: string }
+  | { type: 'harness.skill.file.delete'; tool: AiTool; path: string; file: string }
+  /** cria no projeto a skill de modelos e exemplos de código, só quando indicada */
+  | { type: 'harness.referenceSkill.create' }
   /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
   | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
   | { type: 'harness.agent.create'; name: string; description: string; content: string; model?: string }

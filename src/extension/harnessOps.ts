@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type HarnessItem, type SkillMode } from '../shared/harness';
+import { SKILL_FILE_PATTERN, SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type HarnessItem, type SkillMode } from '../shared/harness';
 import { HARNESS_CATALOG, copyTarget, type HarnessSource } from '../shared/harnessCatalog';
 import { agentTemplate, skillTemplate } from './harness';
 import { setSkillMode } from './skillMode';
@@ -63,6 +63,42 @@ export class HarnessOps {
     this.own(item);
     if (item.layout !== 'skills') throw new Error('Só skills têm modo de invocação.');
     setSkillMode(tool, item.path, mode);
+  }
+
+  /** Caminho de um arquivo de apoio dentro da pasta da skill; recusa o que sairia dela. */
+  private skillFile(item: HarnessItem, rel: string): string {
+    this.own(item);
+    if (item.layout !== 'skills') throw new Error('Só skills têm arquivos de apoio.');
+    if (!SKILL_FILE_PATTERN.test(rel) || rel.split('/').includes('..') || rel === 'SKILL.md') throw new Error('Nome de arquivo inválido: use pasta/arquivo.ext, com letras, números, hífen, ponto e sublinhado.');
+    return path.join(path.dirname(item.path), ...rel.split('/'));
+  }
+
+  /** Cria um arquivo de apoio na pasta da skill e, se pedido, acrescenta ao SKILL.md o link para ele. */
+  addSkillFile(item: HarnessItem, rel: string, content: string, link: boolean): string {
+    const file = this.skillFile(item, rel);
+    if (fs.existsSync(file)) throw new Error(`Já existe "${rel}" nesta skill.`);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, content);
+    // as ferramentas só leem um arquivo de apoio quando o SKILL.md aponta para ele
+    if (link) {
+      const text = fs.readFileSync(item.path, 'utf8');
+      if (!text.includes(`(${rel})`)) fs.writeFileSync(item.path, `${text}${text.endsWith('\n') ? '' : '\n'}- [${rel}](${rel})\n`);
+    }
+    return file;
+  }
+
+  /** Substitui o conteúdo de um arquivo de apoio (cria se não existir). */
+  writeSkillFile(item: HarnessItem, rel: string, content: string): string {
+    const file = this.skillFile(item, rel);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, content);
+    return file;
+  }
+
+  removeSkillFile(item: HarnessItem, rel: string): void {
+    const file = this.skillFile(item, rel);
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`Arquivo "${rel}" não encontrado nesta skill.`);
+    fs.rmSync(file);
   }
 
   remove(item: HarnessItem): void {

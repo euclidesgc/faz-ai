@@ -366,3 +366,31 @@ describe('hooks e permissões nos arquivos de cada ferramenta', () => {
     expect(json(home, '.cursor/cli-config.json')).toEqual({ permissions: { deny: ['Shell(rm)'] } });
   });
 });
+
+describe('arquivos de apoio das skills', () => {
+  it('lista, cria com o link no SKILL.md e apaga, sem sair da pasta da skill', () => {
+    write(project, '.claude/skills/api/SKILL.md', skill('API'));
+    write(project, '.claude/skills/api/references/modelo.ts', 'export class Modelo {}');
+    write(project, '.claude/skills/api/.oculto', 'x');
+    const item = () => scanInventory('claude', project, home).find((i) => i.kind === 'skill' && i.name === 'api')!;
+    expect(item().files).toEqual(['references/modelo.ts']);
+    const ops = new HarnessOps(project, home);
+    ops.addSkillFile(item(), 'assets/arquivo.tpl', 'conteúdo', true);
+    ops.addSkillFile(item(), 'scripts/checar.sh', '', false);
+    expect(item().files).toEqual(['assets/arquivo.tpl', 'references/modelo.ts', 'scripts/checar.sh']);
+    const md = fs.readFileSync(path.join(project, '.claude/skills/api/SKILL.md'), 'utf8');
+    expect(md.endsWith('- [assets/arquivo.tpl](assets/arquivo.tpl)\n')).toBe(true);
+    expect(md).not.toContain('checar.sh');
+    expect(() => ops.addSkillFile(item(), 'assets/arquivo.tpl', '', false)).toThrow('Já existe');
+    for (const bad of ['../fora.md', '/etc/passwd', 'SKILL.md', 'a/../../b', 'com espaço.md', 'a/b/c/d/e.md']) expect(() => ops.addSkillFile(item(), bad, '', false)).toThrow('inválido');
+    ops.writeSkillFile(item(), 'references/modelo.ts', 'novo');
+    expect(fs.readFileSync(path.join(project, '.claude/skills/api/references/modelo.ts'), 'utf8')).toBe('novo');
+    ops.removeSkillFile(item(), 'scripts/checar.sh');
+    expect(item().files).toEqual(['assets/arquivo.tpl', 'references/modelo.ts']);
+    expect(() => ops.removeSkillFile(item(), 'nao-existe.md')).toThrow('não encontrado');
+    // skill de plugin: só leitura
+    write(home, '.claude/plugins/loja/p/.claude-plugin/plugin.json', '{"name":"p"}');
+    write(home, '.claude/plugins/loja/p/skills/de-plugin/SKILL.md', skill('x'));
+    expect(() => ops.addSkillFile(scanInventory('claude', project, home).find((i) => i.name === 'de-plugin')!, 'references/a.md', '', false)).toThrow('plugin');
+  });
+});

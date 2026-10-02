@@ -170,6 +170,14 @@ Copilot) ou `policy.allow_implicit_invocation: false` em `agents/openai.yaml` (C
 desligada ou em modo `manual` continua valendo nos cards que a indicam: `requiredSkills` traz o
 caminho do `SKILL.md`, e a execução pelo board passa esses caminhos no prompt.
 
+### Modelos e referências
+
+Modelos de classe, exemplos de código e outros arquivos de apoio ficam na pasta da skill
+(`references/`, `assets/`, `scripts/`), como as ferramentas preveem: só são lidos quando o `SKILL.md`
+aponta para eles. `get_harness` lista os arquivos de cada skill em `files`, `write_skill_file` grava
+um arquivo numa skill do projeto, e em `get_card` cada skill de `requiredSkills` traz em `files` os
+caminhos dos arquivos de apoio dela.
+
 ### Perfis de execução
 
 Um perfil de execução define antes o que a sessão usa num card: agente, skills, servidores MCP,

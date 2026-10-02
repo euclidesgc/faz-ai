@@ -415,3 +415,5 @@ tr.dragging .drag-handle { cursor: grabbing; }
 .harness-inventory td.actions { white-space: nowrap; text-align: right; }
 .harness-inventory summary button { margin-left: 8px; font-weight: normal; }
 .harness-new { border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin: 6px 0; display: flex; flex-direction: column; gap: 6px; }
+.skill-files { display: flex; flex-direction: column; gap: 4px; padding: 4px 0 4px 16px; }
+.skill-files input { flex: 1; min-width: 160px; }

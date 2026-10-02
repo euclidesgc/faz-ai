@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, SKILL_MODES, SKILL_NAME_PATTERN, type AiTool, type HarnessItem, type HarnessKind, type SkillMode } from '../../../shared/harness';
+import { Fragment, useEffect, useState } from 'react';
+import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, REFERENCE_SKILL, SKILL_FILE_PATTERN, SKILL_FOLDERS, SKILL_MODES, SKILL_NAME_PATTERN, type AiTool, type HarnessItem, type HarnessKind, type SkillMode } from '../../../shared/harness';
 import { HOOK_EVENTS, MCP_NAME_PATTERN, PERMISSION_LIST_LABEL, copyTarget, createTargets, hookTargets, mcpTargets, permissionTargets, type CreateTarget, type HookTarget, type McpTarget, type PermissionTarget } from '../../../shared/harnessCatalog';
 import { useBoardStore } from '../../store/boardStore';
 
@@ -118,6 +118,52 @@ function NewMcpServer({ tool, targets, onClose }: { tool: AiTool; targets: McpTa
   );
 }
 
+/** Arquivos de apoio de uma skill: referências, modelos e scripts que o SKILL.md indica. */
+function SkillFiles({ tool, skill, editable }: { tool: AiTool; skill: HarnessItem; editable: boolean }) {
+  const send = useBoardStore((s) => s.send);
+  const ask = useBoardStore((s) => s.ask);
+  const [folder, setFolder] = useState(SKILL_FOLDERS[0]!.id);
+  const [name, setName] = useState('');
+  const [link, setLink] = useState(true);
+  const files = skill.files ?? [];
+  const rel = `${folder}/${name.trim()}`;
+  const ok = name.trim() !== '' && SKILL_FILE_PATTERN.test(rel) && !files.includes(rel);
+  const create = () => {
+    const run = () => {
+      send({ type: 'harness.skill.file.create', tool, path: skill.path, file: rel, link });
+      setName('');
+    };
+    if (skill.scope === 'user') ask({ title: 'Criar arquivo numa skill da pasta do usuário?', message: GLOBAL_WARNING, confirmLabel: 'Criar', onConfirm: run });
+    else run();
+  };
+  return (
+    <div className="skill-files">
+      {files.length === 0 && <span className="muted small">Sem arquivos de apoio.</span>}
+      {files.map((f) => (
+        <div key={f} className="row">
+          <code>{f}</code>
+          <span className="spacer" />
+          <button className="ghost small" onClick={() => send({ type: 'harness.skill.file.open', tool, path: skill.path, file: f })}>Abrir</button>
+          {editable && <button className="icon danger" title="Apagar o arquivo" onClick={() => ask({ title: `Apagar "${f}"?`, message: `O arquivo sai da skill "${skill.name}". Se o SKILL.md aponta para ele, ajuste o texto.`, confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'harness.skill.file.delete', tool, path: skill.path, file: f }) })}>🗑</button>}
+        </div>
+      ))}
+      {editable && (
+        <div className="row">
+          <select title={SKILL_FOLDERS.find((x) => x.id === folder)!.hint} value={folder} onChange={(e) => setFolder(e.target.value)}>
+            {SKILL_FOLDERS.map((x) => <option key={x.id} value={x.id}>{x.label}/</option>)}
+          </select>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="modelo-de-repositorio.ts" spellCheck={false} />
+          <label className="switch" title="As ferramentas só leem um arquivo de apoio quando o SKILL.md aponta para ele">
+            <input type="checkbox" checked={link} onChange={(e) => setLink(e.target.checked)} />
+            Citar no SKILL.md
+          </label>
+          <button className="small" disabled={!ok} onClick={create}>Novo arquivo</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Formulário de um hook novo: em que arquivo, em que evento, com que filtro e que comando roda. */
 function NewHook({ tool, targets, onClose }: { tool: AiTool; targets: HookTarget[]; onClose: () => void }) {
   const send = useBoardStore((s) => s.send);
@@ -226,6 +272,7 @@ export function HarnessInventory() {
   const hookFiles = hookTargets(tool);
   const permissionFiles = permissionTargets(tool);
   const [addingRule, setAddingRule] = useState(false);
+  const [filesOpen, setFilesOpen] = useState<string | null>(null);
 
   const copyable = (i: HarnessItem, to: 'project' | 'user') => (i.layout === 'files' || i.layout === 'skills') && i.scope !== to && !!copyTarget(tool, i.kind, i.layout, to);
   /** o mesmo item no outro escopo: dá para ver se já foi copiado e se a cópia divergiu */
@@ -257,7 +304,8 @@ export function HarnessInventory() {
     const inProject = i.scope !== 'project' ? twin(i, 'project') : undefined;
     const editable = i.scope !== 'plugin' && i.layout !== 'entry';
     return (
-      <tr key={`${i.path}|${i.name}|${i.detail ?? ''}`}>
+      <Fragment key={`${i.path}|${i.name}|${i.detail ?? ''}`}>
+      <tr>
         <td>
           {i.name}
           {i.plugin && <span className="pill off">{i.plugin}</span>}
@@ -273,6 +321,7 @@ export function HarnessInventory() {
           ) : (
             <span className="pill off" title="Skill de plugin: o modo não pode ser alterado aqui. Para mudar, copie a skill para o projeto.">{SKILL_MODES.find((m) => m.id === i.mode)!.label}</span>
           ))}
+          {i.layout === 'skills' && <button className={`ghost small ${filesOpen === i.path ? 'on' : ''}`} title="Referências, modelos e scripts da pasta da skill" onClick={() => setFilesOpen(filesOpen === i.path ? null : i.path)}>Arquivos ({i.files?.length ?? 0})</button>}
           <button className="ghost small" title={editable ? 'Abre o arquivo no editor, onde ele pode ser alterado' : 'Abre o arquivo no editor'} onClick={() => send({ type: 'harness.item.open', path: i.path })}>Abrir</button>
           {copyable(i, 'project') && !inProject && <button className="ghost small" title="Cria uma cópia independente na pasta do projeto" onClick={() => copy([i], 'project')}>Copiar para o projeto</button>}
           {copyable(i, 'user') && !twin(i, 'user') && <button className="ghost small" title="Cria uma cópia na sua pasta de usuário, que vale em todos os projetos" onClick={() => copy([i], 'user')}>Copiar para o global</button>}
@@ -292,6 +341,8 @@ export function HarnessInventory() {
           )}
         </td>
       </tr>
+      {filesOpen === i.path && i.layout === 'skills' && <tr><td colSpan={4}><SkillFiles tool={tool} skill={i} editable={editable} /></td></tr>}
+      </Fragment>
     );
   };
 
@@ -331,6 +382,12 @@ export function HarnessInventory() {
               {k.id === 'settings' && permissionFiles.length > 0 && <button className="small" onClick={() => { setAddingRule(!addingRule); setCreating(null); }}>Nova regra de permissão</button>}
               {(places.length > 0 || (k.id === 'mcp' && mcpFiles.length > 0) || (k.id === 'hook' && hookFiles.length > 0)) && <button className="small" onClick={() => { setCreating(creating === k.id ? null : k.id); setAddingRule(false); }}>{k.id === 'settings' ? 'Novo arquivo' : 'Novo'}</button>}
             </div>
+            {k.id === 'skill' && tool === state.board.aiTool && !items.some((i) => i.kind === 'skill' && i.scope === 'project' && i.name === REFERENCE_SKILL.name) && (
+              <div className="row">
+                <span className="muted small">Modelos de classe e exemplos de código ficam bem numa skill própria, só quando indicada: os arquivos vão em <code>references/</code> e os cards que a indicam recebem os caminhos.</span>
+                <button className="ghost small" onClick={() => send({ type: 'harness.referenceSkill.create' })}>Criar skill de modelos</button>
+              </div>
+            )}
             {k.id === 'hook' && <p className="banner warn small">Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.</p>}
             {creating === 'hook' && k.id === 'hook' && hookFiles.length > 0 && <NewHook key={tool} tool={tool} targets={hookFiles} onClose={() => setCreating(null)} />}
             {k.id === 'hook' && tool === 'kimi' && <p className="muted small">Os hooks do Kimi Code ficam no <code>~/.kimi-code/config.toml</code> (<code>[[hooks]]</code>): aparecem aqui e são editados no arquivo.</p>}

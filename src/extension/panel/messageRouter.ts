@@ -5,7 +5,7 @@ import type { Attachment, BoardState, Card, FieldDef } from '../../shared/model'
 import { branchName, slug } from '../../shared/git';
 import { prepareWorkspace } from '../git';
 import type { WebviewToHost } from '../../shared/messages';
-import { EMPTY_HARNESS, type AiTool, type Harness, type HarnessItem, type HarnessKind } from '../../shared/harness';
+import { EMPTY_HARNESS, REFERENCE_SKILL, aiToolInfo, type AiTool, type Harness, type HarnessItem, type HarnessKind } from '../../shared/harness';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelRule } from '../../shared/models';
 import { newId } from '../db/ids';
 import { detectTools, effortTiers, modelsFor } from '../models';
@@ -205,6 +205,32 @@ export class MessageRouter {
     return item;
   }
 
+  /** Cria um arquivo de apoio numa skill e devolve o caminho dele, para abrir no editor. */
+  createSkillFile(tool: AiTool, skillMd: string, rel: string, link: boolean): string {
+    const file = this.harnessOps.addSkillFile(this.harnessItem(tool, 'skill', skillMd), rel, '', link);
+    this.loadHarness();
+    this.changed();
+    return file;
+  }
+
+  /** Grava um arquivo de apoio numa skill do projeto (usado pela IA). */
+  writeSkillFile(name: string, rel: string, content: string): string {
+    const tool = this.boards.snapshot(this.boardId).board.aiTool;
+    const item = this.harness.inventory.find((t) => t.tool === tool)?.items.find((i) => i.kind === 'skill' && i.scope === 'project' && i.name === name);
+    if (!item) throw new Error(`Skill "${name}" não encontrada no projeto.`);
+    const file = this.harnessOps.writeSkillFile(item, rel, content);
+    this.loadHarness();
+    this.changed();
+    return file;
+  }
+
+  /** Caminho de um arquivo de apoio que a varredura listou. */
+  skillFilePath(tool: AiTool, skillMd: string, rel: string): string {
+    const item = this.harnessItem(tool, 'skill', skillMd);
+    if (!item.files?.includes(rel)) throw new Error('Arquivo fora do harness.');
+    return path.join(path.dirname(skillMd), ...rel.split('/'));
+  }
+
   /** Cria um item do harness e devolve o caminho do arquivo, para abrir no editor. */
   createHarnessItem(tool: AiTool, source: number, name: string, description: string): string {
     const file = this.harnessOps.create(tool, source, name, description);
@@ -339,6 +365,8 @@ export class MessageRouter {
       case 'card.workspace.open':
       case 'harness.item.open':
       case 'harness.item.create':
+      case 'harness.skill.file.create':
+      case 'harness.skill.file.open':
       case 'attachment.pick':
       case 'attachment.open':
       case 'attachment.reveal':
@@ -489,6 +517,16 @@ export class MessageRouter {
       case 'harness.refresh':
         this.refreshHarness();
         return false;
+      case 'harness.skill.file.delete':
+        this.harnessOps.removeSkillFile(this.harnessItem(msg.tool, 'skill', msg.path), msg.file);
+        this.loadHarness();
+        return true;
+      case 'harness.referenceSkill.create':
+        return this.harnessOp((h) => {
+          h.createSkill(REFERENCE_SKILL.name, REFERENCE_SKILL.description, REFERENCE_SKILL.body);
+          h.setSkillMode(REFERENCE_SKILL.name, 'manual');
+          fs.mkdirSync(path.join(h.workspaceDir, aiToolInfo(this.boards.snapshot(this.boardId).board.aiTool).skills, REFERENCE_SKILL.name, 'references'), { recursive: true });
+        });
       case 'harness.hook.add':
         this.hooksAndPermissions.addHook(msg.tool, msg.source, msg.hook);
         this.loadHarness();

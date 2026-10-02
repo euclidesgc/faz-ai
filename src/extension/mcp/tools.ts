@@ -800,6 +800,16 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     return found;
   };
 
+  tool(
+    'write_skill_file',
+    'Grava um arquivo de apoio numa skill do projeto: um modelo de classe ou exemplo de código em `references/`, um modelo de arquivo em `assets/` ou um script em `scripts/`. Substitui o arquivo se ele já existir. Para a IA ler o arquivo quando usar a skill, o SKILL.md precisa apontar para ele (use update_skill).',
+    { skill: z.string().describe('Nome da skill do projeto'), file: z.string().describe('Caminho dentro da pasta da skill, ex.: "references/modelo-de-repositorio.ts"'), content: z.string() },
+    (a, router) => {
+      router.writeSkillFile(a.skill, a.file, a.content);
+      return harnessOverview(router.snapshot()).inventory.find((i) => i.kind === 'skill' && i.scope === 'project' && i.name === a.skill);
+    },
+  );
+
   tool('get_agent', 'Lê o arquivo completo de um agente (subagente) do projeto, listado em get_harness.', { agent: agentArg }, (a, router) => agent(router, a.agent).content, true);
 
   tool(

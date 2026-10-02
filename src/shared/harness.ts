@@ -87,6 +87,8 @@ export interface HarnessItem {
   digest?: string;
   /** só nas skills: invocação automática ou só quando indicada */
   mode?: SkillMode;
+  /** só nas skills: arquivos de apoio da pasta (referências, modelos, scripts), relativos a ela */
+  files?: string[];
   /** valor inteiro da entrada, quando `description` o resume: o comando de um hook, ou a lista (allow, deny, ask) de uma regra de permissão */
   detail?: string;
 }
@@ -152,3 +154,23 @@ export const RULE_FILES: { name: string; readBy: string }[] = [
 ];
 
 export const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/**
+ * Pastas de apoio de uma skill, como as ferramentas as descrevem: documentação lida sob demanda,
+ * modelos e outros arquivos estáticos, e scripts que a IA pode rodar.
+ */
+export const SKILL_FOLDERS: { id: string; label: string; hint: string }[] = [
+  { id: 'references', label: 'references', hint: 'Documentação e exemplos de código, lidos só quando a skill aponta para eles.' },
+  { id: 'assets', label: 'assets', hint: 'Modelos de arquivo e outros recursos estáticos.' },
+  { id: 'scripts', label: 'scripts', hint: 'Scripts que a IA pode executar.' },
+];
+
+/** Caminho de um arquivo de apoio dentro da pasta da skill: `pasta/arquivo.ext`, sem subir de pasta. */
+export const SKILL_FILE_PATTERN = /^(?:[A-Za-z0-9_][A-Za-z0-9_.-]*\/){0,3}[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
+
+/** Skill sugerida para guardar modelos de classe e exemplos de código do projeto. */
+export const REFERENCE_SKILL = {
+  name: 'modelos-do-projeto',
+  description: 'Modelos de classe e exemplos de código deste projeto. Use como referência ao criar código novo do mesmo tipo.',
+  body: 'Os arquivos em `references/` são exemplos reais ou modelos de como o código deste projeto deve ser escrito.\n\nAo criar algo novo, procure aqui o modelo do mesmo tipo e siga a estrutura, os nomes e o estilo dele.\n\n## Modelos\n\nListe aqui cada arquivo de `references/` com uma linha dizendo quando usar.',
+};

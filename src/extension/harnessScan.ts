@@ -74,6 +74,20 @@ function walk(dir: string, ext: string, depth = 0): string[] {
   });
 }
 
+const MAX_SKILL_FILES = 100;
+
+/** Arquivos de apoio da pasta de uma skill (tudo menos o SKILL.md e arquivos ocultos), relativos a ela. */
+function skillFiles(dir: string, rel = '', depth = 0): string[] {
+  if (depth > 3) return [];
+  return entries(rel ? path.join(dir, rel) : dir)
+    .flatMap((n) => {
+      if (n.startsWith('.') || n === 'node_modules' || (!rel && n === 'SKILL.md')) return [];
+      const child = rel ? `${rel}/${n}` : n;
+      return isDir(path.join(dir, child)) ? skillFiles(dir, child, depth + 1) : [child];
+    })
+    .slice(0, MAX_SKILL_FILES);
+}
+
 /** O comando de um hook, em qualquer dos formatos das ferramentas (command, bash, powershell). */
 export const hookCommand = (h: Record<string, unknown>): string => [h.command, h.bash, h.powershell].find((x): x is string => typeof x === 'string') ?? '';
 
@@ -143,7 +157,7 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
     case 'skills':
       return entries(target)
         .filter((n) => !n.startsWith('.') && isFile(path.join(target, n, 'SKILL.md')))
-        .map((n) => ({ ...item(n, descriptionOf(path.join(target, n, 'SKILL.md')), path.join(target, n, 'SKILL.md')), mode: skillMode(path.join(target, n, 'SKILL.md')) }));
+        .map((n) => ({ ...item(n, descriptionOf(path.join(target, n, 'SKILL.md')), path.join(target, n, 'SKILL.md')), mode: skillMode(path.join(target, n, 'SKILL.md')), files: skillFiles(path.join(target, n)) }));
     case 'json-keys': {
       const section = obj(readJson(target)?.[src.key]);
       if (src.kind === 'hook') return Object.entries(section).flatMap(([event, v]) => hookEntries(v).map((h) => hookItem(event, h, target)));

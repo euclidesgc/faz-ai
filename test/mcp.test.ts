@@ -139,6 +139,23 @@ describe('servidor MCP', () => {
   });
 });
 
+describe('modelos e referências nas skills', () => {
+  it('a skill de modelos nasce só quando indicada, e o card entrega os arquivos dela', async () => {
+    router.handle({ type: 'harness.referenceSkill.create' });
+    const skill = router.snapshot().harness.skills.find((k) => k.name === 'modelos-do-projeto')!;
+    expect(skill).toMatchObject({ enabled: true, mode: 'manual' });
+    expect(fs.existsSync(path.join(dir, '.claude/skills/modelos-do-projeto/references'))).toBe(true);
+
+    const written = (await call('write_skill_file', { skill: 'modelos-do-projeto', file: 'references/repositorio.ts', content: 'export class Repo {}' })).data;
+    expect(written.files).toEqual(['references/repositorio.ts']);
+    expect((await call('write_skill_file', { skill: 'modelos-do-projeto', file: '../fora.ts', content: 'x' })).error).toBe(true);
+    expect((await call('write_skill_file', { skill: 'nao-existe', file: 'references/a.ts', content: 'x' })).error).toBe(true);
+
+    const card = (await call('create_card', { title: 'História', fields: { Skills: ['modelos-do-projeto'] } })).data;
+    expect(card.requiredSkills).toEqual([{ name: 'modelos-do-projeto', scope: 'project', path: '.claude/skills/modelos-do-projeto/SKILL.md', files: ['.claude/skills/modelos-do-projeto/references/repositorio.ts'] }]);
+  });
+});
+
 describe('perfis de execução', () => {
   const profile = (over: Record<string, unknown>) => ({ id: 'p', name: 'Perfil', agent: '', skills: [], mcpServers: null, tools: [], deniedTools: [], model: '', clean: false, isDefault: false, ...over });
 
