@@ -1,7 +1,6 @@
-import * as os from 'node:os';
 import * as vscode from 'vscode';
-import { fetchSource, parseSource } from '../skillInstall';
 import type { HostToWebview, WebviewToHost } from '../../shared/messages';
+import { HostBridge, type HostEnv } from '../host/hostBridge';
 import type { ViewStateStore } from '../viewState';
 import type { MessageRouter } from './messageRouter';
 
@@ -29,122 +28,47 @@ export function webviewHtml(context: vscode.ExtensionContext, w: vscode.Webview,
 <title>Faz AI</title>
 </head>
 <body>
-<div id="root" data-view="${kind}"></div>
+<div id="root" data-view="${kind}" data-host="vscode"></div>
 <script nonce="${nonce}" type="module" src="${script}"></script>
 </body>
 </html>`;
 }
 
-/**
- * Liga um webview (board ou filtros) ao roteador e ao estado de visualização:
- * recebe mensagens, e reenvia o board e os filtros sempre que mudam, venha a mudança de onde vier.
- */
+/** O que o board pede ao editor quando roda num webview do VS Code. */
+function vscodeEnv(webview: vscode.Webview, router: MessageRouter): HostEnv {
+  const open = (file: string) => vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file), vscode.ViewColumn.Beside);
+  return {
+    attachmentsBaseUri: () => webview.asWebviewUri(vscode.Uri.file(router.store.baseDir)).toString(),
+    showFilters: () => vscode.commands.executeCommand('fazai.filters.focus'),
+    connectAI: () => vscode.commands.executeCommand('fazai.connectAI'),
+    openInBrowser: () => vscode.commands.executeCommand('fazai.openInBrowser'),
+    runAi: (cardId) => vscode.commands.executeCommand('fazai.ai.run', cardId),
+    stopAi: (cardId) => vscode.commands.executeCommand('fazai.ai.stop', cardId),
+    runHeartbeat: () => vscode.commands.executeCommand('fazai.heartbeat.runNow'),
+    openFolder: (dir) => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(dir), { forceNewWindow: true }),
+    openFile: async (file) => void (await open(file)),
+    openExternal: async (file) => void (await vscode.env.openExternal(vscode.Uri.file(file))),
+    revealFile: (file) => vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(file)),
+    pickFiles: async () => (await vscode.window.showOpenDialog({ canSelectMany: true, openLabel: 'Anexar', title: 'Anexar arquivos ao card' }))?.map((u) => u.fsPath),
+  };
+}
+
+/** Liga um webview do editor (board ou filtros) ao roteador e ao estado de visualização. */
 export class WebviewBridge implements vscode.Disposable {
-  private subs: (() => void)[] = [];
+  private bridge: HostBridge;
   private disposables: vscode.Disposable[] = [];
 
-  constructor(
-    private webview: vscode.Webview,
-    private router: MessageRouter,
-    private viewState: ViewStateStore,
-    private onReady?: () => void,
-  ) {
-    webview.onDidReceiveMessage((msg: WebviewToHost) => void this.handle(msg), null, this.disposables);
-    this.subs.push(router.onDidChange(() => this.postBoard()));
-    this.subs.push(viewState.onDidChange((view, origin) => origin !== this && this.post({ type: 'viewState', view })));
+  constructor(webview: vscode.Webview, router: MessageRouter, viewState: ViewStateStore, onReady?: () => void) {
+    this.bridge = new HostBridge((msg) => void webview.postMessage(msg), router, viewState, vscodeEnv(webview, router), onReady);
+    webview.onDidReceiveMessage((msg: WebviewToHost) => void this.bridge.handle(msg), null, this.disposables);
   }
 
   post(msg: HostToWebview): void {
-    void this.webview.postMessage(msg);
+    this.bridge.post(msg);
   }
 
   dispose(): void {
-    this.router.clearInstall();
-    this.subs.forEach((off) => off());
+    this.bridge.dispose();
     this.disposables.forEach((d) => d.dispose());
-  }
-
-  private postBoard(): void {
-    const attachmentsBaseUri = this.webview.asWebviewUri(vscode.Uri.file(this.router.store.baseDir)).toString();
-    this.post({ type: 'boardState', state: this.router.snapshot(), attachmentsBaseUri });
-  }
-
-  private async handle(msg: WebviewToHost): Promise<void> {
-    try {
-      switch (msg.type) {
-        case 'ready':
-          this.post({ type: 'viewState', view: this.viewState.get() });
-          this.postBoard();
-          this.onReady?.();
-          return;
-        case 'view.set':
-          this.viewState.update(msg.patch, this);
-          return;
-        case 'ui.showFilters':
-          await vscode.commands.executeCommand('fazai.filters.focus');
-          return;
-        case 'ui.connectAI':
-          await vscode.commands.executeCommand('fazai.connectAI');
-          return;
-        case 'ai.run':
-          await vscode.commands.executeCommand('fazai.ai.run', msg.cardId);
-          return;
-        case 'ai.stop':
-          await vscode.commands.executeCommand('fazai.ai.stop', msg.cardId);
-          return;
-        case 'card.workspace.open': {
-          const cards = this.router.snapshot().cards;
-          const card = cards.find((c) => c.id === msg.cardId);
-          const story = card?.parentId ? cards.find((c) => c.id === card.parentId) : card;
-          if (!story?.worktreePath) throw new Error('Esta história ainda não tem pasta de trabalho.');
-          await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(story.worktreePath), { forceNewWindow: true });
-          return;
-        }
-        case 'harness.item.open': {
-          // só abre arquivos que a varredura do harness listou
-          const known = this.router.snapshot().harness.inventory.some((t) => t.items.some((i) => i.path === msg.path));
-          if (!known) throw new Error('Arquivo fora do harness.');
-          await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path), vscode.ViewColumn.Beside);
-          return;
-        }
-        case 'harness.skill.file.create':
-          await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(this.router.createSkillFile(msg.tool, msg.path, msg.file, msg.link)), vscode.ViewColumn.Beside);
-          return;
-        case 'harness.skill.file.open':
-          await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(this.router.skillFilePath(msg.tool, msg.path, msg.file)), vscode.ViewColumn.Beside);
-          return;
-        case 'harness.install.scan': {
-          const fetched = await fetchSource(parseSource(msg.source, os.homedir()));
-          this.router.setInstall(msg.source.trim(), fetched.dir, fetched.cleanup);
-          return;
-        }
-        case 'harness.item.create':
-          await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description)), vscode.ViewColumn.Beside);
-          return;
-        case 'ai.heartbeat.run':
-          await vscode.commands.executeCommand('fazai.heartbeat.runNow');
-          return;
-        case 'attachment.pick': {
-          const uris = await vscode.window.showOpenDialog({ canSelectMany: true, openLabel: 'Anexar', title: 'Anexar arquivos ao card' });
-          if (uris?.length) this.router.addAttachmentFiles(msg.cardId, uris.map((u) => u.fsPath));
-          return;
-        }
-        case 'attachment.open':
-        case 'attachment.reveal': {
-          const a = this.router.getAttachment(msg.attachmentId);
-          if (!a) throw new Error('Anexo não encontrado');
-          const uri = vscode.Uri.file(this.router.store.pathOf(a));
-          if (msg.type === 'attachment.reveal') await vscode.commands.executeCommand('revealFileInOS', uri);
-          else if (/^(text\/|application\/json)/.test(a.mime)) await vscode.commands.executeCommand('vscode.open', uri, vscode.ViewColumn.Beside);
-          else await vscode.env.openExternal(uri);
-          return;
-        }
-        default:
-          // mutações disparam router.onDidChange, que reenvia o board para todos os webviews
-          this.router.handle(msg);
-      }
-    } catch (e) {
-      this.post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
-    }
   }
 }

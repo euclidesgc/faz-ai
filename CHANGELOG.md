@@ -4,6 +4,28 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## 0.29.0
+
+- **Board no navegador, fora do editor**: **Abrir no navegador ↗** (ou o comando **Faz AI: Abrir
+  board no navegador**) abre o mesmo board numa aba, sincronizado com o editor. Sem o editor, o
+  comando `~/.faz-ai/bin/faz-ai` serve o board de uma pasta com o servidor MCP, a execução da IA e
+  o heartbeat. A página só responde em `127.0.0.1` e exige o segredo do link.
+- **Chamar a IA funciona sem a CLI no PATH**: o board procura o executável nas pastas de instalação
+  usuais e dentro das extensões do editor (Claude Code, Codex). Antes, quem só usava a extensão do
+  Claude Code recebia "comando não encontrado".
+- Com o Claude Code, o servidor do board vai na linha de comando de cada execução: chamar a IA não
+  depende mais de **Conectar IA (MCP)** nem da aprovação do `.mcp.json`.
+- A IA é avisada do nível de permissão da execução e, quando ele não basta, bloqueia o card dizendo
+  qual opção escolher. O nível aparece ao lado do botão **Chamar IA**, com atalho para mudar.
+- Falhas da execução levam o fim da saída da ferramenta para o card, e o motivo do bloqueio é
+  mostrado formatado.
+- **Usabilidade**: botão **Chamar IA** no cabeçalho do card; avisos e erros em caixas flutuantes
+  que não empurram o board; contador **N com você** e indicador de IA trabalhando no topo; campo
+  Skills recolhido, com busca; cabeçalho do card fixo; orientação no board vazio e na linha de
+  sub-tarefas; abrir card com Enter; foco visível pelo teclado; abas do topo mais discretas.
+- **Um banco por pasta**: janelas em projetos diferentes não gravam mais uma por cima da outra. O
+  board parte de uma cópia do banco das versões anteriores, que fica intacto.
+
 ## 0.28.0
 
 - **Buscar e instalar skills**: a partir de uma pasta, de `dono/repositorio` do GitHub ou de um

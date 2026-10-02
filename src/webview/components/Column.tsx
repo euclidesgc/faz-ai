@@ -163,8 +163,8 @@ export function Column({ column, workflow, cards, total, index, siblings, collap
             </div>
           </div>
         ) : (
-          <button className="ghost" disabled={!canAdd} title={canAdd ? '' : 'Selecione uma história para adicionar sub-tarefas'} onClick={() => setAdding(true)}>
-            + Novo card
+          <button className="ghost" disabled={!canAdd} title={canAdd ? '' : 'Clique numa história, na linha de cima, para criar sub-tarefas dela'} onClick={() => setAdding(true)}>
+            {workflow.kind === 'child' ? '+ Nova sub-tarefa' : '+ Novo card'}
           </button>
         )}
       </footer>

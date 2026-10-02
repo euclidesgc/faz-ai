@@ -2,37 +2,49 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
-import { execFile } from 'node:child_process';
-import { openFile, type DbHandle } from './db/database';
-import { registerClients, type Registration } from './mcp/clientConfig';
+import { createBoardHost, type BoardHost } from './host/boardHost';
 import { startMcpServer } from './mcp/server';
 import { socketPath, workspaceKey } from './mcp/socketPath';
 import { BoardPanel } from './panel/BoardPanel';
-import { MessageRouter } from './panel/messageRouter';
+import type { MessageRouter } from './panel/messageRouter';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
 import { ViewStateStore } from './viewState';
-import { AiRunner } from './runner';
-import { Heartbeat } from './heartbeat';
-import { AutoMerger } from './merge';
-import { loginShellPath, spawnHeadless } from './spawn';
+import type { AiRunner } from './runner';
+import type { Heartbeat } from './heartbeat';
+import { revealInSystem } from './web/osOpen';
+import { preferredPort, startWebServer, type WebServer } from './web/webServer';
 import { cardRef } from '../shared/model';
 import { humanQueueStatuses, turnsPassedToHuman } from '../shared/pending';
 
-let handle: DbHandle | null = null;
+let host: BoardHost | null = null;
 let stopMcp: (() => void) | null = null;
 let runner: AiRunner | null = null;
 let heartbeat: Heartbeat | null = null;
 let heartbeatTimer: NodeJS.Timeout | undefined;
+let web: WebServer | null = null;
+/** outra janela do editor (ou o faz-ai do terminal) já serve o board desta pasta */
+let servedElsewhere = false;
 const HEARTBEAT_KEY = 'fazai.heartbeatEnabled';
 
-function gitUserName(cwd: string): Promise<string> {
-  return new Promise((resolve) => {
-    execFile('git', ['config', 'user.name'], { cwd, timeout: 3000 }, (err, stdout) => {
-      const name = err ? '' : stdout.trim();
-      resolve(name || os.userInfo().username || 'Eu');
-    });
-  });
+/**
+ * Deixa em ~/.faz-ai/bin um atalho para abrir o board fora do editor (`faz-ai [pasta]`), apontando
+ * para esta versão da extensão e para os mesmos dados.
+ */
+function installLauncher(extensionPath: string, storage: string): void {
+  try {
+    const bin = path.join(os.homedir(), '.faz-ai', 'bin');
+    const cli = path.join(extensionPath, 'dist', 'cli.js');
+    fs.mkdirSync(bin, { recursive: true });
+    if (process.platform === 'win32') {
+      fs.writeFileSync(path.join(bin, 'faz-ai.cmd'), `@echo off\r\nif not defined FAZAI_DATA set "FAZAI_DATA=${storage}"\r\nnode "${cli}" %*\r\n`);
+    } else {
+      const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+      fs.writeFileSync(path.join(bin, 'faz-ai'), `#!/bin/sh\n# Gerado pela extensão Faz AI: abre o board de uma pasta no navegador, sem o editor.\nFAZAI_DATA="\${FAZAI_DATA:-${storage.replace(/(["$\`\\])/g, '\\$1')}}" exec node ${quote(cli)} "$@"\n`, { mode: 0o755 });
+    }
+  } catch (e) {
+    console.warn(`Faz AI: atalho de terminal não instalado: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -40,6 +52,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const wasmDir = path.join(context.extensionPath, 'dist');
   let routerPromise: Promise<MessageRouter> | undefined;
   const viewState = new ViewStateStore(context.workspaceState);
+  const bridgePath = path.join(storage, 'mcp', 'bridge.js');
+  installLauncher(context.extensionPath, storage);
 
   const folder = () => vscode.workspace.workspaceFolders?.[0];
 
@@ -47,15 +61,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const f = folder();
     if (!f) return Promise.resolve(undefined);
     routerPromise ??= (async () => {
-      handle ??= await openFile(path.join(storage, 'fazai.db'), wasmDir);
-      const router = new MessageRouter(handle, {
-        workspaceKey: workspaceKey(f.uri.fsPath),
-        folderName: f.name,
-        author: await gitUserName(f.uri.fsPath),
-        attachmentsDir: path.join(storage, 'attachments'),
-        workspaceDir: f.uri.fsPath,
-        homeDir: os.homedir(),
-      });
+      const log = (line: string) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`);
+      host = await createBoardHost({ storageDir: storage, wasmDir, folderPath: f.uri.fsPath, folderName: f.name, bridgePath, log });
+      const router = host.router;
       // o que já estava com a pessoa ao abrir não gera aviso; só o que a IA passar daqui em diante
       let withHuman = humanQueueStatuses(router.snapshot());
       const onBoardChange = () => {
@@ -71,24 +79,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       };
       router.onDidChange(onBoardChange);
       onBoardChange();
-      const pathEnv = await loginShellPath();
-      runner = new AiRunner(router, {
-        cwd: f.uri.fsPath,
-        homeDir: os.homedir(),
-        log: (line) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`),
-        spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
-      });
-      new AutoMerger(router, {
-        cwd: f.uri.fsPath,
-        log: (line) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`),
-        gh: (args, cwd) =>
-          new Promise((resolve, reject) => {
-            execFile('gh', args, { cwd, timeout: 120_000, env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) } }, (err, stdout, stderr) =>
-              err ? reject(new Error((err as NodeJS.ErrnoException).code === 'ENOENT' ? 'o comando "gh" (GitHub CLI) não foi encontrado.' : stderr.trim() || err.message)) : resolve(stdout),
-            );
-          }),
-      });
-      heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: (line) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`) });
+      runner = host.runner;
+      heartbeat = host.heartbeat;
       heartbeat.onDidChange(updateStatusBar);
       router.onDidChange(updateStatusBar);
       // lembra, por pasta, se o heartbeat está ligado: só nesse caso o board é carregado ao abrir o editor
@@ -146,6 +138,44 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       return;
     }
     BoardPanel.show(context, router, viewState, f.name, cardId);
+    if (servedElsewhere) {
+      servedElsewhere = false; // avisa uma vez
+      void vscode.window.showWarningMessage('O board desta pasta já está aberto em outro lugar (outra janela do editor ou o comando faz-ai no terminal). Use só um deles por vez: o que for alterado aqui pode ser sobrescrito pelo outro.');
+    }
+  };
+
+  /** Serve o board desta janela numa página local e a abre no navegador; o editor continua sendo quem guarda o board. */
+  const openInBrowser = async () => {
+    const f = folder();
+    const router = await getRouter();
+    if (!f || !router || !host) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
+    const h = host;
+    try {
+      web ??= await startWebServer({
+        webviewDir: path.join(context.extensionPath, 'dist', 'webview'),
+        router,
+        viewState,
+        port: preferredPort(workspaceKey(f.uri.fsPath)),
+        tokenFile: path.join(os.homedir(), '.faz-ai', 'web-token'),
+        iconFile: path.join(context.extensionPath, 'media', 'icon.png'),
+        env: {
+          connectAI() {
+            const { message, toIgnore } = h.connectAI();
+            return toIgnore.length ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.` : message;
+          },
+          runAi: (cardId) => h.runner.start(cardId),
+          stopAi: (cardId) => h.runner.stop(cardId),
+          runHeartbeat: () => vscode.commands.executeCommand('fazai.heartbeat.runNow'),
+          openFolder: (dir) => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(dir), { forceNewWindow: true }),
+          openFile: (file) => vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file)),
+          openExternal: (file) => vscode.env.openExternal(vscode.Uri.file(file)),
+          revealFile: revealInSystem,
+        },
+      });
+      await vscode.env.openExternal(vscode.Uri.parse(web.url));
+    } catch (e) {
+      vscode.window.showErrorMessage(`Faz AI: não foi possível abrir o board no navegador: ${e instanceof Error ? e.message : String(e)}`);
+    }
   };
 
   context.subscriptions.push(
@@ -160,7 +190,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.openBoard', () => openBoard()),
     vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard(cardId)),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
-    vscode.commands.registerCommand('fazai.connectAI', () => connectAI(bridgePath, getRouter)),
+    vscode.commands.registerCommand('fazai.openInBrowser', openInBrowser),
+    vscode.commands.registerCommand('fazai.connectAI', () => connectAI(getRouter)),
     output,
     vscode.commands.registerCommand('fazai.ai.run', aiCommand('start')),
     vscode.commands.registerCommand('fazai.ai.stop', aiCommand('stop')),
@@ -193,7 +224,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   // servidor MCP: deixa uma IA consultar e editar o board desta pasta (o banco só é aberto no primeiro uso)
-  const bridgePath = path.join(storage, 'mcp', 'bridge.js');
   const f = folder();
   if (f) {
     try {
@@ -205,6 +235,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         version: String((context.extension.packageJSON as { version?: string }).version ?? '0'),
       });
     } catch (e) {
+      servedElsewhere = e instanceof Error && e.message.startsWith('Já existe');
       console.warn(`Faz AI: servidor MCP não iniciado: ${e instanceof Error ? e.message : String(e)}`);
     }
     // com o heartbeat ligado nesta pasta, o board precisa estar carregado para a rotina rodar sem ninguém abri-lo
@@ -234,47 +265,30 @@ async function offerBoardUpgrade(context: vscode.ExtensionContext, router: Messa
 }
 
 /** Registra o servidor MCP do board na configuração da ferramenta de IA em uso no projeto. */
-async function connectAI(bridgePath: string, getRouter: () => Promise<MessageRouter | undefined>): Promise<void> {
-  const f = vscode.workspace.workspaceFolders?.[0];
-  const router = await getRouter();
-  if (!f || !router) {
+async function connectAI(getRouter: () => Promise<MessageRouter | undefined>): Promise<void> {
+  if (!(await getRouter()) || !host) {
     vscode.window.showWarningMessage('Abra uma pasta para conectar uma IA ao board.');
     return;
   }
-  const tool = router.snapshot().board.aiTool;
-
-  let done: Registration[];
+  let done: ReturnType<BoardHost['connectAI']>;
   try {
-    done = registerClients([tool], { bridgePath, workspaceDir: f.uri.fsPath, homeDir: os.homedir() });
+    done = host.connectAI();
   } catch (e) {
     vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
     return;
   }
-
-  // arquivos do projeto guardam caminhos desta máquina, então normalmente não devem ir para o repositório
-  const gitignore = path.join(f.uri.fsPath, '.gitignore');
-  const ignoredLines = fs.existsSync(gitignore) ? fs.readFileSync(gitignore, 'utf8').split(/\r?\n/).map((l) => l.trim()) : [];
-  const toIgnore = done.flatMap((d) => (d.projectFile && !ignoredLines.includes(d.projectFile) ? [d.projectFile] : []));
-  const summary = [...new Set(done.map((d) => d.next))].join(' ');
-  const files = done.map((d) => d.projectFile ?? d.file.replace(os.homedir(), '~')).join(', ');
-  const choice = await vscode.window.showInformationMessage(
-    `Servidor "faz-ai" registrado em: ${files}. ${summary}`,
-    ...(toIgnore.length ? ['Adicionar ao .gitignore'] : []),
-  );
-  if (choice === 'Adicionar ao .gitignore') {
-    const current = fs.existsSync(gitignore) ? fs.readFileSync(gitignore, 'utf8') : '';
-    fs.writeFileSync(gitignore, `${current}${current && !current.endsWith('\n') ? '\n' : ''}${toIgnore.join('\n')}\n`);
-  }
+  const choice = await vscode.window.showInformationMessage(done.message, ...(done.toIgnore.length ? ['Adicionar ao .gitignore'] : []));
+  if (choice === 'Adicionar ao .gitignore') host.addToGitignore(done.toIgnore);
 }
 
 export async function deactivate(): Promise<void> {
   clearInterval(heartbeatTimer);
-  heartbeat?.stop();
+  web?.close();
+  web = null;
   heartbeat = null;
-  runner?.dispose();
   runner = null;
   stopMcp?.();
   stopMcp = null;
-  await handle?.close();
-  handle = null;
+  await host?.dispose();
+  host = null;
 }

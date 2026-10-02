@@ -187,7 +187,7 @@ export function HarnessSettings() {
       <h3 className="section-head">Execução pela conversa e heartbeat</h3>
       <p className="muted small">
         O botão "Chamar IA" da conversa de um card roda o {tool.label} em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define
-        o que ele pode fazer nessas execuções. O servidor do board precisa estar conectado (botão acima) e o {tool.label} instalado e autenticado.
+        o que ele pode fazer nessas execuções. O {tool.label} precisa estar instalado e autenticado nesta máquina{state.board.aiTool === 'claude' ? '; o board é entregue a ele em cada execução, sem depender do botão acima' : ', e o servidor do board conectado (botão acima)'}.
       </p>
       {state.aiRunUnsupported ? (
         <p className="banner warn">{state.aiRunUnsupported}</p>
@@ -209,7 +209,7 @@ export function HarnessSettings() {
           </label>
           <h4>Heartbeat</h4>
           <p className="muted small">
-            Com o heartbeat ligado e o editor aberto nesta pasta, o board chama o {tool.label} sozinho a cada intervalo: ele avança os cards aprovados,
+            Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool.label} sozinho a cada intervalo: ele avança os cards aprovados,
             responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. Sem pendência, nada é executado.
           </p>
           <label className="switch">

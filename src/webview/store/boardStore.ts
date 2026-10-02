@@ -6,6 +6,7 @@ import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../..
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 
 export type View = 'board' | 'trash' | 'settings';
+export type SettingsTab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'profiles' | 'git' | 'appearance';
 
 export interface DialogSpec {
   title: string;
@@ -23,6 +24,7 @@ export interface DialogSpec {
 /** Estado só deste webview (o que é compartilhado com a barra lateral vive em ViewState, no host). */
 interface UiState {
   view: View;
+  settingsTab: SettingsTab;
   openCardId: Id | null;
 }
 
@@ -30,11 +32,16 @@ interface BoardStore extends UiState, ViewState {
   state: BoardState | null;
   attachmentsBaseUri: string;
   error: string | null;
+  /** aviso informativo vindo do host */
+  notice: string | null;
   dialog: DialogSpec | null;
   setState(state: BoardState, attachmentsBaseUri: string): void;
   setViewState(view: ViewState): void;
   setError(msg: string | null): void;
+  setNotice(msg: string | null): void;
   setView(view: View): void;
+  /** abre as configurações numa seção (fecha o card aberto) */
+  openSettings(tab: SettingsTab): void;
   selectParent(id: Id | null): void;
   openCard(id: Id | null): void;
   setFilters(patch: Partial<Filters>): void;
@@ -60,8 +67,10 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     state: null,
     attachmentsBaseUri: '',
     error: null,
+    notice: null,
     dialog: null,
     view: persisted?.view ?? 'board',
+    settingsTab: persisted?.settingsTab ?? 'columns',
     openCardId: persisted?.openCardId ?? null,
     filters: EMPTY_FILTERS,
     selectedParentId: null,
@@ -77,8 +86,13 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     },
     setViewState: (view) => set({ filters: { ...EMPTY_FILTERS, ...view.filters }, selectedParentId: view.selectedParentId, collapsed: view.collapsed ?? {} }),
     setError: (error) => set({ error }),
+    setNotice: (notice) => set({ notice }),
     setView(view) {
       set({ view });
+      persist(get());
+    },
+    openSettings(settingsTab) {
+      set({ view: 'settings', settingsTab, openCardId: null });
       persist(get());
     },
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
@@ -99,7 +113,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
 });
 
 function persist(s: BoardStore): void {
-  const ui: UiState = { view: s.view, openCardId: s.openCardId };
+  const ui: UiState = { view: s.view, settingsTab: s.settingsTab, openCardId: s.openCardId };
   setUiState(ui);
 }
 
@@ -111,6 +125,7 @@ export function useHostSync(): void {
       if (msg.type === 'boardState') s.setState(msg.state, msg.attachmentsBaseUri);
       else if (msg.type === 'viewState') s.setViewState(msg.view);
       else if (msg.type === 'error') s.setError(msg.message);
+      else if (msg.type === 'notice') s.setNotice(msg.message);
       else if (msg.type === 'ui.openCard') {
         s.setView('board');
         s.openCard(msg.cardId);

@@ -19,7 +19,7 @@
 
   /* Tipografia. Duas famílias: a da interface para tudo, e a monoespaçada só para código e nomes de arquivo.
      A mono não usa a fonte do editor do VS Code: quando ela não está disponível no webview, o navegador cai numa serifada. */
-  --font-ui: var(--vscode-font-family), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-ui: var(--vscode-font-family, system-ui), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   /* Escala: micro = rótulos em maiúsculas; xs = selos e metadados; sm = rótulos e texto de apoio; md = texto base;
      h = títulos de seção; lg = título da tela; xl = título do card aberto */
@@ -417,3 +417,73 @@ tr.dragging .drag-handle { cursor: grabbing; }
 .harness-new { border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin: 6px 0; display: flex; flex-direction: column; gap: 6px; }
 .skill-files { display: flex; flex-direction: column; gap: 4px; padding: 4px 0 4px 16px; }
 .skill-files input { flex: 1; min-width: 160px; }
+
+/* ---- board no navegador: as variáveis que o VS Code forneceria ---- */
+body.host-web { --vscode-font-family: system-ui; --vscode-editor-font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+body[data-theme=light] { --vscode-list-hoverBackground: rgba(129,139,152,.15); --vscode-focusBorder: #0969da; }
+body[data-theme=dark] { --vscode-list-hoverBackground: rgba(101,108,118,.2); --vscode-focusBorder: #4493f8; }
+.filterbar-panel { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: var(--col-bg); max-height: 45vh; overflow: auto; }
+.filterbar-panel .filter-panel { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px 20px; }
+
+/* barra do topo: avisos do que está acontecendo */
+.topbar h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 32vw; }
+.topbar-info { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; }
+.topbar-pending { background: transparent; color: var(--fg); border: 1px solid #f5a623; border-radius: 12px; padding: 2px 10px; font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
+.topbar-pending.on { background: #f5a623; color: #1f2328; }
+.spinner { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--muted); border-top-color: transparent; display: inline-block; animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+.banner.offline { border-radius: 0; border-left: none; border-right: none; }
+
+/* avisos flutuantes: não empurram o board nem somem atrás do card aberto */
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 80; display: flex; flex-direction: column; gap: 8px; width: min(460px, calc(100vw - 32px)); pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 8px; padding: 10px 10px 10px 14px; border-radius: var(--radius); border: 1px solid var(--border); border-left: 4px solid var(--accent); background: var(--card-bg); color: var(--fg); box-shadow: 0 6px 24px rgba(0,0,0,.35); line-height: 1.45; }
+.toast > span { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.toast.error { border-left-color: var(--error); }
+
+/* ---- revisão de usabilidade (0.29) ---- */
+/* controles: mesma altura, foco visível pelo teclado, sem brilho em botão desligado */
+button, select, input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]) { min-height: 26px; }
+button.small, button.icon, .segmented button, .chip, .suggest-model, .collapse-toggle, .inline-edit, .tabs button { min-height: 0; }
+button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+button:disabled:hover { filter: none; }
+button:focus-visible, a:focus-visible, .card:focus-visible, .filter-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.column-footer .ghost, .tabs-vertical button, .menu button { justify-content: flex-start; }
+.tabs-vertical button { white-space: normal; text-align: left; }
+h4 { margin: 8px 0 0; font-size: var(--fs-md); font-weight: 600; }
+
+/* navegação do topo: abas discretas, para o verde ficar só nas ações principais */
+.topbar { gap: 12px; min-height: 42px; }
+.topbar nav button { background: transparent; color: var(--muted); border-bottom: 2px solid transparent; border-radius: 4px 4px 0 0; padding: 4px 10px; }
+.topbar nav button:hover { color: var(--fg); background: var(--hover); filter: none; }
+.topbar nav button.active { background: transparent; color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
+
+/* board */
+.board-hint { margin: 12px 14px 0; padding: 10px 14px; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--muted); line-height: 1.5; }
+.board-hint strong { color: var(--fg); }
+.board-hint em { font-style: normal; color: var(--fg); }
+.workflow-header .filter-chip { max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.column-header { min-height: 34px; }
+.column-body { padding-bottom: 2px; }
+.card { cursor: pointer; }
+.card-actions { opacity: .45; }
+.card:hover .card-actions, .card:focus-within .card-actions, .card.selected .card-actions { opacity: 1; }
+.card-title { margin-top: 2px; }
+
+/* card aberto: cabeçalho fixo, para fechar e mover sem rolar de volta */
+.drawer { padding-top: 0; }
+.drawer-header { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 12px 0 8px; margin-bottom: -6px; border-bottom: 1px solid var(--border); }
+.status-bar .row { flex-wrap: wrap; }
+.status-reason { max-height: 180px; overflow: auto; font-size: var(--fs-sm); }
+.status-reason.markdown { padding: 8px 10px; border: 1px solid var(--vscode-inputValidation-warningBorder); }
+.status-reason pre { max-height: none; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment-new .row { gap: 8px; }
+.ai-permission a { white-space: nowrap; }
+.skills-picker input[type=search] { flex: 1 1 160px; }
+.skills-picker .chips-editor { align-items: center; max-height: 220px; overflow: auto; }
+.banner.ai-running .spinner { margin-left: 2px; }
+
+/* no navegador a barra de rolagem padrão destoa do tema escuro */
+body.host-web { scrollbar-color: var(--border) transparent; }
+body.host-web .content, body.host-web .drawer, body.host-web .columns { scrollbar-width: thin; }
+.filterbar-panel .filter-group { max-height: 170px; overflow: auto; }

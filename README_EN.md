@@ -76,6 +76,29 @@ gives the English meaning next to them.
 By default, a story is not completed and does not advance a phase while it has open sub-tasks of
 that phase. These rules can be turned off in the settings.
 
+At the top of the board, **N com você** (N with you) shows how many cards are waiting for your
+review, answer or unblocking (one click filters to them), and an indicator appears while the AI is
+working on a card.
+
+### The board in the browser, outside the editor
+
+The board does not depend on the editor window:
+
+- **Abrir no navegador ↗** (open in browser, at the top of the board, or the command **Faz AI:
+  Abrir board no navegador**) opens the same board in a browser tab. The editor stays open and
+  keeps the board; both screens stay in sync.
+- **Without the editor**: run `~/.faz-ai/bin/faz-ai` in the project folder (or `faz-ai <folder>`).
+  It serves the board in the browser, with the MCP server, AI runs and the heartbeat, and keeps
+  running until you stop it with Ctrl+C. The launcher is created by the extension and uses the same
+  data; it needs Node.js on the PATH. To call just `faz-ai`, add `~/.faz-ai/bin` to your PATH.
+  `faz-ai --help` lists the options (`--port`, `--data`, `--no-open`).
+
+The page only answers on `127.0.0.1` and requires the secret in the link opened by the editor or
+the terminal (it is then kept in a cookie, so the address can be bookmarked). In the browser, the
+"Sistema" theme follows the operating system's light or dark mode and the filters open in the
+board's own bar. A board is served from one place at a time: with the editor open on the folder,
+use **Abrir no navegador**; the terminal `faz-ai` warns and does not start.
+
 ## Using it with AI
 
 1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code, Codex,
@@ -107,12 +130,21 @@ read the conversation and work on that card. It is not a live chat: the answer a
 in the conversation when the run ends, and meanwhile the card shows "Em execução" (with a **Parar**
 button to stop it). Images pasted into the message become card attachments and the AI receives them.
 
+The button is also in the card header, next to the status.
+
 - What the AI may do in these runs is set in Configurações → Harness de IA → **Execução pela
-  conversa**: only the board (default), the board and project files, or no restrictions.
+  conversa**: only the board (default), the board and project files, or no restrictions. The level
+  in use is shown next to the button, with a shortcut to change it. The AI is told about the limit:
+  if the work needs more than the level allows, it blocks the card saying which option to choose.
 - Cursor and Kimi Code, when running in the background, only work at the "no restrictions" level.
-- The tool must be installed and signed in, and the board's server connected.
-- If the run fails or exceeds the time limit, the card becomes blocked, with the reason. The full
-  log is in the **Output → Faz AI** panel.
+- The tool must be installed and signed in. Its CLI does not need to be on the PATH: the board also
+  looks in the usual install folders and inside editor extensions (if you only use the Claude Code
+  or Codex extension, you already have the executable).
+- With Claude Code, the board's server is passed on the command line of each run: it does not
+  depend on **Conectar IA (MCP)** or on approving `.mcp.json`. For the other tools, connect first.
+- If the run fails or exceeds the time limit, the card becomes blocked, with the reason and the end
+  of the tool's output. The full log is in the **Output → Faz AI** panel (or in the `faz-ai`
+  terminal).
 
 ### Branch and working folder per story
 
@@ -266,9 +298,12 @@ first.
 
 ## Where the data lives
 
-The board and the attachments live in the extension's storage, outside the repository. Rules and
-skills are files in the project folder and go into git as usual. Avoid editing the same board in
-two windows at the same time: the last one to save wins.
+The board and the attachments live in the extension's storage, outside the repository. Each folder
+has its own database file (`boards/<folder key>.db`), so windows on different projects do not
+interfere with each other. The first time, the board starts from a copy of the single database of
+earlier versions (`fazai.db`), which is left untouched. Rules and skills are files in the project
+folder and go into git as usual. Avoid opening the same folder in two editor windows at the same
+time: the last one to save wins (the extension warns when that happens).
 
 ## Development
 
@@ -280,8 +315,12 @@ npm run typecheck
 ```
 
 Press `F5` to open the Extension Development Host. The code is in `src/extension` (host and MCP
-server), `src/webview` (React interface), `src/shared` (model and protocol) and `src/mcp-bridge`
-(the stdio bridge used by AI clients).
+server), `src/webview` (React interface), `src/shared` (model and protocol), `src/mcp-bridge`
+(the stdio bridge used by AI clients) and `src/cli` (the board outside the editor).
+
+To try the interface without the editor, `node dist/cli.js <folder> --data <test data folder>`
+serves the board in the browser. The tests cover the extension's activation (with a fake editor in
+`test/fakes/vscode.ts`) and the page server (`test/webServer.test.ts`).
 
 ## Version history
 

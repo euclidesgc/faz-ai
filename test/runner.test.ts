@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { headlessCommand, headlessUnsupported } from '../src/extension/headless';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { AiRunner, cardPrompt } from '../src/extension/runner';
+import { AiRunner, PERMISSION_ADVICE, cardPrompt } from '../src/extension/runner';
 
 it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP num arquivo temporário e o resto no prompt', async () => {
   const fs = await import('node:fs');
@@ -125,7 +125,7 @@ describe('executor da IA', () => {
     runner.start(storyId);
     expect(procs).toHaveLength(1);
     expect(procs[0]!.cwd).toBe(dir);
-    expect(procs[0]!.command).toEqual(headlessCommand('claude', { prompt: cardPrompt('#1'), permission: 'board', addDirs: [`${dir}.worktrees`] }));
+    expect(procs[0]!.command).toEqual(headlessCommand('claude', { prompt: cardPrompt('#1', [], [PERMISSION_ADVICE.board!]), permission: 'board', addDirs: [`${dir}.worktrees`] }));
     expect(card()).toMatchObject({ status: 'running', statusBy: 'Claude Code' });
     expect(router.snapshot().aiRuns).toEqual([storyId]);
     expect(log.join('\n')).toContain('[#1] saída da ferramenta');
@@ -151,6 +151,8 @@ describe('executor da IA', () => {
     procs[0]!.exit(2);
     expect(card()).toMatchObject({ status: 'blocked' });
     expect(card().statusReason).toContain('código 2');
+    // o fim da saída da ferramenta vai junto, para a falha ser entendida no próprio card
+    expect(card().statusReason).toContain('saída da ferramenta');
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
 
     runner.start(storyId);
@@ -204,6 +206,25 @@ describe('executor da IA', () => {
     expect(cmd('cursor', 'full')).toEqual({ command: 'agent', args: ['-p', '--force', '--approve-mcps', '--trust', 'P'] });
     expect(headlessUnsupported('claude', 'board')).toBeNull();
     expect(headlessUnsupported('cursor', 'board')).toContain('Cursor');
+  });
+
+  it('o Claude Code recebe o servidor do board na linha de comando, sem depender do registro no projeto', () => {
+    const boardServer = { command: 'node', args: ['/dados/mcp/bridge.js', '/projeto'] };
+    const built = headlessCommand('claude', { prompt: 'P', permission: 'board', boardServer }) as HeadlessCommand;
+    expect(built.args.slice(-2)).toEqual(['--mcp-config', '{tmp:mcp.json}']);
+    expect(built.args).not.toContain('--strict-mcp-config');
+    expect(JSON.parse(built.tempFiles!['mcp.json']!)).toEqual({ mcpServers: { 'faz-ai': { type: 'stdio', ...boardServer } } });
+    // as outras ferramentas continuam lendo o registro feito por "Conectar ao board"
+    expect(headlessCommand('codex', { prompt: 'P', permission: 'board', boardServer })).not.toHaveProperty('tempFiles');
+  });
+
+  it('avisa a IA do limite da execução, para ela explicar à pessoa onde mudar', () => {
+    runner.start(storyId);
+    expect(procs[0]!.command.stdin).toContain('alterar arquivos e rodar comandos está bloqueado');
+    procs[0]!.exit(0);
+    router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
+    runner.start(storyId);
+    expect(procs[1]!.command.stdin).not.toContain('block_card explicando');
   });
 
   it('guarda permissão e tempo limite, recusando valores inválidos', () => {

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import type { Card } from '../../shared/model';
 import { CARD_STATUSES, OWNER_LABEL, statusInfo, type CardStatus } from '../../shared/status';
+import { aiToolInfo } from '../../shared/harness';
 import { useBoardStore } from '../store/boardStore';
+import { renderMarkdown } from './MarkdownEditor';
 
 /** Selo do status de trabalho, com quem está a pendência. */
 export function StatusBadge({ status, short = false }: { status: CardStatus; short?: boolean }) {
@@ -24,6 +26,8 @@ export function StatusBar({ card }: { card: Card }) {
   const [note, setNote] = useState('');
   const column = state.columns.find((c) => c.id === card.columnId);
   const styles = state.board.appearance.statuses;
+  const running = state.aiRuns.includes(card.id);
+  const toolLabel = aiToolInfo(state.board.aiTool).label;
 
   const set = (status: CardStatus | null, text?: string) => send({ type: 'card.status.set', cardId: card.id, status, note: text });
   const start = (p: Pending) => {
@@ -48,6 +52,15 @@ export function StatusBar({ card }: { card: Card }) {
           </>
         )}
         {card.status === 'blocked' && <button className="primary" onClick={() => set('ready')}>Desbloquear</button>}
+        {running ? (
+          <button title={`Interrompe o ${toolLabel}; o status volta ao que era`} onClick={() => send({ type: 'ai.stop', cardId: card.id })}><span className="spinner" /> Parar a IA</button>
+        ) : (
+          <button
+            disabled={!!state.aiRunUnsupported}
+            title={state.aiRunUnsupported ?? `Roda o ${toolLabel} em segundo plano para trabalhar neste card. A resposta chega na conversa.`}
+            onClick={() => send({ type: 'ai.run', cardId: card.id })}
+          >▶ Chamar IA</button>
+        )}
         {card.status !== 'blocked' && <button className="ghost small" onClick={() => start({ status: 'blocked', title: 'O que está impedindo o trabalho?', confirm: 'Bloquear', required: true })}>Bloquear</button>}
         <select
           className="status-select"
@@ -63,7 +76,7 @@ export function StatusBar({ card }: { card: Card }) {
           {CARD_STATUSES.map((s) => <option key={s.id} value={s.id}>{styles[s.id].label}</option>)}
         </select>
       </div>
-      {card.status === 'blocked' && card.statusReason && <div className="banner warn">{card.statusReason}</div>}
+      {card.status === 'blocked' && card.statusReason && <div className="banner warn status-reason markdown plain" dangerouslySetInnerHTML={{ __html: renderMarkdown(card.statusReason) }} />}
       {pending && (
         <div className="status-note">
           <textarea autoFocus rows={3} placeholder={`${pending.title} O texto vai para a conversa do card.`} value={note} onChange={(e) => setNote(e.target.value)} />

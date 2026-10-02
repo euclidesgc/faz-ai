@@ -176,7 +176,7 @@ describe('telas montam sem erro', () => {
     for (const text of ['Tipo do card', 'OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
 
     const look = html(<AppearanceSettings />);
-    for (const text of ['Tema', 'Sistema (acompanha o VS Code)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia', 'Status dos cards', 'Aguardando resposta']) expect(look).toContain(text);
+    for (const text of ['Tema', 'Sistema (acompanha o editor ou o sistema)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia', 'Status dos cards', 'Aguardando resposta']) expect(look).toContain(text);
     const profiles = html(<ExecProfilesSettings />);
     for (const text of ['Perfis de execução', 'na execução pelo board', 'imposto', 'orientado', 'Novo perfil', 'Nenhum perfil ainda']) expect(profiles).toContain(text);
     const harness = html(<HarnessSettings />);

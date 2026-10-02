@@ -134,21 +134,30 @@ type SkillScope = 'all' | 'project' | 'global';
 function SkillsPicker({ options, current, onChange }: { options: string[]; current: string[]; onChange: (v: FieldValue) => void }) {
   const state = useBoardStore((s) => s.state)!;
   const [scope, setScope] = useState<SkillScope>('all');
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const items = (state.harness.inventory.find((t) => t.tool === state.board.aiTool)?.items ?? []).filter((i) => i.kind === 'skill');
   const inProject = new Set([...state.harness.skills.map((k) => k.name), ...items.filter((i) => i.scope === 'project').map((i) => i.name)]);
   const global = new Map(items.filter((i) => i.scope !== 'project').map((i) => [i.name, i]));
   // um valor marcado continua visível mesmo que a skill tenha saído das opções
   const all = [...options, ...current.filter((c) => !options.includes(c))];
-  const shown = all.filter((o) => scope === 'all' || (scope === 'project' ? inProject.has(o) : global.has(o)));
+  const q = query.trim().toLowerCase();
+  // fechado, mostra só as skills marcadas: a lista inteira (dezenas, com plugins) empurrava o resto do card para baixo
+  const shown = open ? all.filter((o) => (scope === 'all' || (scope === 'project' ? inProject.has(o) : global.has(o))) && (!q || o.toLowerCase().includes(q))) : all.filter((o) => current.includes(o));
   const count = (s: SkillScope) => all.filter((o) => (s === 'all' ? true : s === 'project' ? inProject.has(o) : global.has(o))).length;
   const scopes: { id: SkillScope; label: string }[] = [{ id: 'all', label: 'Todas' }, { id: 'project', label: 'Projeto' }, { id: 'global', label: 'Globais' }];
   return (
     <div className="skills-picker">
-      {global.size > 0 && (
-        <div className="segmented">
-          {scopes.map((s) => (
-            <button key={s.id} className={scope === s.id ? 'on' : ''} onClick={() => setScope(s.id)}>{s.label} ({count(s.id)})</button>
-          ))}
+      {open && (
+        <div className="row wrap">
+          <input autoFocus type="search" placeholder="Buscar skill…" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setOpen(false))} />
+          {global.size > 0 && (
+            <div className="segmented">
+              {scopes.map((s) => (
+                <button key={s.id} className={scope === s.id ? 'on' : ''} onClick={() => setScope(s.id)}>{s.label} ({count(s.id)})</button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       <div className="chips-editor">
@@ -162,7 +171,9 @@ function SkillsPicker({ options, current, onChange }: { options: string[]; curre
             </button>
           );
         })}
-        {shown.length === 0 && <span className="muted small">Nenhuma skill {scope === 'project' ? 'no projeto' : scope === 'global' ? 'global' : ''}.</span>}
+        {open && shown.length === 0 && <span className="muted small">Nenhuma skill {q ? `com "${query.trim()}"` : scope === 'project' ? 'no projeto' : scope === 'global' ? 'global' : ''}.</span>}
+        {!open && shown.length === 0 && <span className="muted small">Nenhuma skill obrigatória.</span>}
+        {all.length > 0 && <button className="ghost small" onClick={() => { setOpen(!open); setQuery(''); }}>{open ? 'Concluir' : `Escolher skills (${all.length})`}</button>}
       </div>
     </div>
   );

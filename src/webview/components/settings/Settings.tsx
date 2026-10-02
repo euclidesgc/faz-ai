@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { ColumnsSettings } from './ColumnsSettings';
 import { TypesSettings } from './TypesSettings';
@@ -10,13 +9,12 @@ import { AppearanceSettings } from './AppearanceSettings';
 import { ExecProfilesSettings } from './ExecProfilesSettings';
 import { GitSettings } from './GitSettings';
 
-type Tab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'profiles' | 'git' | 'appearance';
-
 export function Settings() {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
   const ask = useBoardStore((s) => s.ask);
-  const [tab, setTab] = useState<Tab>('columns');
+  const tab = useBoardStore((s) => s.settingsTab);
+  const setTab = useBoardStore((s) => s.openSettings);
 
   return (
     <div className="settings">

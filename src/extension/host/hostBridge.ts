@@ -1,0 +1,148 @@
+import * as os from 'node:os';
+import { fetchSource, parseSource } from '../skillInstall';
+import type { HostToWebview, WebviewToHost } from '../../shared/messages';
+import type { ViewStateStore } from '../viewState';
+import type { MessageRouter } from '../panel/messageRouter';
+
+/** O que depende de onde o board está rodando: dentro do editor ou num navegador. */
+export interface HostEnv {
+  /** endereço base dos arquivos de anexos, como a interface os enxerga */
+  attachmentsBaseUri(): string;
+  showFilters(): unknown;
+  /** registra o servidor MCP do board na ferramenta de IA do projeto; o texto devolvido vira um aviso na interface */
+  connectAI(): unknown;
+  runAi(cardId: string): unknown;
+  stopAi(cardId: string): unknown;
+  /** começa uma rodada do heartbeat; o texto devolvido vira um aviso na interface */
+  runHeartbeat(): unknown;
+  /** abre uma pasta (a worktree de uma história) numa janela do editor ou no sistema */
+  openFolder(dir: string): unknown;
+  /** abre um arquivo de texto para edição */
+  openFile(file: string): unknown;
+  /** abre um arquivo qualquer com o programa padrão do sistema */
+  openExternal(file: string): unknown;
+  revealFile(file: string): unknown;
+  /** deixa a pessoa escolher arquivos do disco; undefined quando ela desiste */
+  pickFiles(): Promise<string[] | undefined>;
+  /** abre o board no navegador (só faz sentido dentro do editor) */
+  openInBrowser?(): unknown;
+}
+
+/**
+ * Liga uma interface (webview do editor ou página no navegador) ao roteador e ao estado de
+ * visualização: recebe mensagens, e reenvia o board e os filtros sempre que mudam, venha a mudança
+ * de onde vier. Não depende da API do VSCode.
+ */
+export class HostBridge {
+  private subs: (() => void)[] = [];
+
+  constructor(
+    private send: (msg: HostToWebview) => void,
+    private router: MessageRouter,
+    private viewState: ViewStateStore,
+    private env: HostEnv,
+    private onReady?: () => void,
+  ) {
+    this.subs.push(router.onDidChange(() => this.postBoard()));
+    this.subs.push(viewState.onDidChange((view, origin) => origin !== this && this.post({ type: 'viewState', view })));
+  }
+
+  post(msg: HostToWebview): void {
+    this.send(msg);
+  }
+
+  dispose(): void {
+    this.router.clearInstall();
+    this.subs.forEach((off) => off());
+  }
+
+  private postBoard(): void {
+    this.post({ type: 'boardState', state: this.router.snapshot(), attachmentsBaseUri: this.env.attachmentsBaseUri() });
+  }
+
+  async handle(msg: WebviewToHost): Promise<void> {
+    try {
+      switch (msg.type) {
+        case 'ready':
+          this.post({ type: 'viewState', view: this.viewState.get() });
+          this.postBoard();
+          this.onReady?.();
+          return;
+        case 'view.set':
+          this.viewState.update(msg.patch, this);
+          return;
+        case 'ui.showFilters':
+          await this.env.showFilters();
+          return;
+        case 'ui.connectAI': {
+          const notice = await this.env.connectAI();
+          if (typeof notice === 'string') this.post({ type: 'notice', message: notice });
+          return;
+        }
+        case 'ui.openInBrowser':
+          await this.env.openInBrowser?.();
+          return;
+        case 'ai.run':
+          await this.env.runAi(msg.cardId);
+          return;
+        case 'ai.stop':
+          await this.env.stopAi(msg.cardId);
+          return;
+        case 'card.workspace.open': {
+          const cards = this.router.snapshot().cards;
+          const card = cards.find((c) => c.id === msg.cardId);
+          const story = card?.parentId ? cards.find((c) => c.id === card.parentId) : card;
+          if (!story?.worktreePath) throw new Error('Esta história ainda não tem pasta de trabalho.');
+          await this.env.openFolder(story.worktreePath);
+          return;
+        }
+        case 'harness.item.open': {
+          // só abre arquivos que a varredura do harness listou
+          const known = this.router.snapshot().harness.inventory.some((t) => t.items.some((i) => i.path === msg.path));
+          if (!known) throw new Error('Arquivo fora do harness.');
+          await this.env.openFile(msg.path);
+          return;
+        }
+        case 'harness.skill.file.create':
+          await this.env.openFile(this.router.createSkillFile(msg.tool, msg.path, msg.file, msg.link));
+          return;
+        case 'harness.skill.file.open':
+          await this.env.openFile(this.router.skillFilePath(msg.tool, msg.path, msg.file));
+          return;
+        case 'harness.install.scan': {
+          const fetched = await fetchSource(parseSource(msg.source, os.homedir()));
+          this.router.setInstall(msg.source.trim(), fetched.dir, fetched.cleanup);
+          return;
+        }
+        case 'harness.item.create':
+          await this.env.openFile(this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description));
+          return;
+        case 'ai.heartbeat.run': {
+          const notice = await this.env.runHeartbeat();
+          if (typeof notice === 'string') this.post({ type: 'notice', message: notice });
+          return;
+        }
+        case 'attachment.pick': {
+          const files = await this.env.pickFiles();
+          if (files?.length) this.router.addAttachmentFiles(msg.cardId, files);
+          return;
+        }
+        case 'attachment.open':
+        case 'attachment.reveal': {
+          const a = this.router.getAttachment(msg.attachmentId);
+          if (!a) throw new Error('Anexo não encontrado');
+          const file = this.router.store.pathOf(a);
+          if (msg.type === 'attachment.reveal') await this.env.revealFile(file);
+          else if (/^(text\/|application\/json)/.test(a.mime)) await this.env.openFile(file);
+          else await this.env.openExternal(file);
+          return;
+        }
+        default:
+          // mutações disparam router.onDidChange, que reenvia o board para todas as interfaces
+          this.router.handle(msg);
+      }
+    } catch (e) {
+      this.post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+}
