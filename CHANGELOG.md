@@ -4,6 +4,12 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## 0.29.1
+
+- O README avisa que o projeto está em **fase alpha**: erros e mudanças entre versões podem acontecer.
+- Nova seção **Preparar o ambiente de desenvolvimento**, com o que fica fora do git e precisa ser
+  refeito num clone novo, e como publicar com a `main` aceitando só pull requests.
+
 ## 0.29.0
 
 - **Board no navegador, fora do editor**: **Abrir no navegador ↗** (ou o comando **Faz AI: Abrir

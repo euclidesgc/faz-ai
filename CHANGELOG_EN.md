@@ -5,6 +5,12 @@
 What changed in each version of Faz AI Kanban, newest first. The extension's interface is in
 Portuguese, so names of screens and buttons appear as you see them on screen.
 
+## 0.29.1
+
+- The README warns that the project is in **alpha**: bugs and changes between versions can happen.
+- New section **Setting up the development environment**, with what lives outside git and must be
+  set up again on a fresh clone, and how to publish with `main` accepting only pull requests.
+
 ## 0.29.0
 
 - **The board in the browser, outside the editor**: **Abrir no navegador ↗** (or the command **Faz
