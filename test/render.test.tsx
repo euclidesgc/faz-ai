@@ -59,6 +59,7 @@ beforeAll(async () => {
   router.handle({ type: 'harness.skill.create', name: 'revisar-spec', description: 'Quando revisar', content: 'Passos' });
   router.handle({ type: 'harness.skill.create', name: 'desligada', description: 'x', content: 'y' });
   router.handle({ type: 'harness.skill.setEnabled', name: 'desligada', enabled: false });
+  router.handle({ type: 'harness.agent.create', name: 'revisor-de-spec', description: 'Revisa a spec', content: 'Passos', model: 'opus' });
   s = router.snapshot();
   const field = (n: string) => s.fieldDefs.find((f) => f.name === n)!;
   router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Skills').id, value: ['revisar-spec'] });
@@ -176,6 +177,6 @@ describe('telas montam sem erro', () => {
     const look = html(<AppearanceSettings />);
     for (const text of ['Tema', 'Sistema (acompanha o VS Code)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia', 'Status dos cards', 'Aguardando resposta']) expect(look).toContain(text);
     const harness = html(<HarnessSettings />);
-    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)', 'Instalar skill do fluxo', 'Execução pela conversa e heartbeat', 'Só o board', 'Tempo limite por execução', 'Heartbeat ligado', 'Rodar agora']) expect(harness).toContain(text);
+    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)', 'Instalar skill do fluxo', 'Execução pela conversa e heartbeat', 'Só o board', 'Tempo limite por execução', 'Heartbeat ligado', 'Rodar agora', 'Agentes', 'Novo agente', 'revisor-de-spec', '.claude/agents/revisor-de-spec.md']) expect(harness).toContain(text);
   });
 });

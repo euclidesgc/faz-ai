@@ -459,6 +459,46 @@ describe('status do card e checkpoint de revisão', () => {
     expect((await call('list_cards', { work_status: 'blocked' })).data.total).toBe(1);
   });
 
+  it('cria, edita e apaga agentes na pasta da ferramenta em uso', async () => {
+    expect((await call('get_harness')).data.agents).toEqual([]);
+    const h = (await call('create_agent', { name: 'revisor-de-spec', description: 'Revisa uma Spec antes do Plan', content: 'Leia a spec e aponte lacunas.', model: 'opus' })).data;
+    expect(h.agents).toEqual([{ name: 'revisor-de-spec', description: 'Revisa uma Spec antes do Plan', model: 'opus', path: '.claude/agents/revisor-de-spec.md' }]);
+    const file = path.join(dir, '.claude/agents/revisor-de-spec.md');
+    expect(fs.readFileSync(file, 'utf8')).toBe('---\nname: revisor-de-spec\ndescription: Revisa uma Spec antes do Plan\nmodel: opus\n---\n\nLeia a spec e aponte lacunas.\n');
+    expect((await call('get_agent', { agent: 'revisor-de-spec' })).text).toContain('aponte lacunas');
+    expect((await call('create_agent', { name: 'revisor-de-spec', description: 'd', content: 'c' })).text).toContain('Já existe');
+    expect((await call('create_agent', { name: 'Nome Inválido', description: 'd', content: 'c' })).error).toBe(true);
+
+    await call('update_agent', { agent: 'revisor-de-spec', content: '---\nname: revisor-de-spec\ndescription: Nova descrição\n---\nNovo corpo' });
+    expect((await call('get_harness')).data.agents[0]).toEqual({ name: 'revisor-de-spec', description: 'Nova descrição', path: '.claude/agents/revisor-de-spec.md' });
+
+    // agente criado por fora aparece; cada ferramenta tem a sua pasta e extensão
+    fs.writeFileSync(path.join(dir, '.claude/agents/planejador.md'), '---\nname: planejador\ndescription: Quebra a spec em passos\n---\nx');
+    router.refreshHarness();
+    expect((await call('get_harness')).data.agents.map((a: any) => a.name)).toEqual(['planejador', 'revisor-de-spec']);
+    await call('set_ai_tool', { tool: 'copilot' });
+    expect((await call('get_harness')).data.agents).toEqual([]);
+    await call('create_agent', { name: 'do-copilot', description: 'd', content: 'c' });
+    expect(fs.existsSync(path.join(dir, '.github/agents/do-copilot.agent.md'))).toBe(true);
+    // Codex guarda agentes em TOML; o Kimi não tem modelo por agente
+    await call('set_ai_tool', { tool: 'codex' });
+    const codex = (await call('create_agent', { name: 'explorador', description: 'Explora o código "antes" de mudar', content: 'Só leia.', model: 'gpt-6-luna' })).data;
+    expect(codex.agents).toEqual([{ name: 'explorador', description: 'Explora o código "antes" de mudar', model: 'gpt-6-luna', path: '.codex/agents/explorador.toml' }]);
+    expect(fs.readFileSync(path.join(dir, '.codex/agents/explorador.toml'), 'utf8')).toBe('name = "explorador"\ndescription = "Explora o código \\"antes\\" de mudar"\nmodel = "gpt-6-luna"\ndeveloper_instructions = """\nSó leia.\n"""\n');
+    await call('set_ai_tool', { tool: 'kimi' });
+    expect((await call('create_agent', { name: 'revisor', description: 'd', content: 'c', model: 'k3' })).text).toContain('não permite fixar o modelo');
+    await call('create_agent', { name: 'revisor', description: 'd', content: 'c' });
+    expect(fs.existsSync(path.join(dir, '.kimi-code/agents/revisor.md'))).toBe(true);
+    await call('set_ai_tool', { tool: 'cursor' });
+    await call('create_agent', { name: 'verificador', description: 'd', content: 'c' });
+    expect(fs.existsSync(path.join(dir, '.cursor/agents/verificador.md'))).toBe(true);
+    await call('set_ai_tool', { tool: 'claude' });
+
+    await call('delete_agent', { agent: 'planejador' });
+    expect(fs.existsSync(path.join(dir, '.claude/agents/planejador.md'))).toBe(false);
+    expect((await call('delete_agent', { agent: 'planejador' })).text).toContain('não encontrado');
+  });
+
   it('instala a skill do fluxo sem sobrescrever', async () => {
     const first = (await call('install_flow_skill')).data;
     expect(first).toMatchObject({ installed: true, skill: '.claude/skills/faz-ai-fluxo/SKILL.md' });

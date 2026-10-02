@@ -451,6 +451,12 @@ export class MessageRouter {
         return this.harnessOp((h) => h.setSkillEnabled(msg.name, msg.enabled));
       case 'harness.skill.delete':
         return this.harnessOp((h) => h.deleteSkill(msg.name));
+      case 'harness.agent.create':
+        return this.harnessOp((h) => h.createAgent(msg.name, msg.description, msg.content, msg.model));
+      case 'harness.agent.write':
+        return this.harnessOp((h) => h.writeAgent(msg.name, msg.content));
+      case 'harness.agent.delete':
+        return this.harnessOp((h) => h.deleteAgent(msg.name));
       case 'harness.flowSkill.install':
         // não sobrescreve: se a pessoa já ajustou a skill, a versão dela fica
         return this.harnessOp((h) => {
