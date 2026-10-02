@@ -13,3 +13,7 @@ vitest.config.ts
 .github/**
 *.vsix
 docs/**
+scripts/**
+.env*
+.mcp.json
+releases/**
