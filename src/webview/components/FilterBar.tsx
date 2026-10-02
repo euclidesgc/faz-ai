@@ -1,15 +1,20 @@
 import { activeFilterCount, dateRange } from '../../shared/filters';
+import { useState } from 'react';
 import { useBoardStore } from '../store/boardStore';
+import { isWeb } from '../vscode';
+import { FilterPanel } from './FilterPanel';
 
 const PRESETS: Record<string, string> = { today: 'hoje', '7d': 'últimos 7 dias', '30d': 'últimos 30 dias', custom: 'período' };
 const RELATIONS: Record<string, string> = { withChildren: 'Com sub-tarefas', withoutChildren: 'Sem sub-tarefas', pendingChildren: 'Com sub-tarefas pendentes' };
 
-/** Barra do board: busca e resumo dos filtros ativos. O painel completo fica na barra lateral. */
+/** Barra do board: busca e resumo dos filtros ativos. O painel completo fica na barra lateral do editor; no navegador, abre aqui mesmo. */
 export function FilterBar() {
   const state = useBoardStore((s) => s.state)!;
   const filters = useBoardStore((s) => s.filters);
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
   const { setFilters, clearFilters, selectParent, send } = useBoardStore();
+
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const count = activeFilterCount(filters);
   const parent = state.cards.find((c) => c.id === selectedParentId);
@@ -38,12 +43,13 @@ export function FilterBar() {
     <div className="filterbar">
       <div className="filterbar-main">
         <input className="search" type="search" placeholder="Buscar em título, descrição, conversa e campos…" value={filters.text} onChange={(e) => setFilters({ text: e.target.value })} />
-        <button onClick={() => send({ type: 'ui.showFilters' })} title="Abrir os filtros na barra lateral">Filtros{count > 0 && ` (${count})`}</button>
+        <button className={panelOpen ? 'active' : ''} aria-expanded={isWeb ? panelOpen : undefined} onClick={() => (isWeb ? setPanelOpen(!panelOpen) : send({ type: 'ui.showFilters' }))} title={isWeb ? 'Mostrar ou esconder os filtros' : 'Abrir os filtros na barra lateral'}>Filtros{count > 0 && ` (${count})`}</button>
         {chips.map((c) => (
           <span key={c.key} className="filter-chip" onClick={c.clear} title="Remover este filtro">{c.label} ✕</span>
         ))}
         {(count > 0 || parent) && <button className="ghost" onClick={clearFilters}>Limpar</button>}
       </div>
+      {isWeb && panelOpen && <div className="filterbar-panel"><FilterPanel /></div>}
     </div>
   );
 }

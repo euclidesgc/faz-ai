@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { cardRef } from '../shared/model';
 import { aiToolInfo } from '../shared/harness';
+import type { RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
 import { headlessCommand, tmpArg, type HeadlessCommand } from './headless';
@@ -23,6 +24,8 @@ export interface RunnerDeps {
   cwd: string;
   /** home do usuário, de onde se lê a configuração de servidores MCP da ferramenta */
   homeDir?: string;
+  /** bridge.js do servidor MCP do board: com ele a ferramenta alcança o board mesmo sem estar registrada no projeto */
+  bridgePath?: string;
 }
 
 interface Run {
@@ -32,9 +35,20 @@ interface Run {
   previous: CardStatus | null;
   stopped: boolean;
   timedOut: boolean;
+  /** últimas linhas que a ferramenta escreveu, para explicar uma falha no próprio card */
+  tail: string[];
 }
 
 const RUNNER_AUTHOR = 'Faz AI';
+const TAIL_LINES = 12;
+const WHERE = 'Configurações → Harness de IA → "O que a IA pode fazer"';
+
+/** O que a IA precisa saber sobre o limite da execução, para explicar à pessoa em vez de falhar sem contexto. */
+export const PERMISSION_ADVICE: Record<RunnerPermission, string | null> = {
+  board: `Nesta execução você só lê o projeto e usa as ferramentas do board: alterar arquivos e rodar comandos está bloqueado. Se o trabalho pedir isso, não tente contornar: chame block_card explicando que a pessoa precisa escolher "Board e arquivos do projeto" ou "Sem restrições" em ${WHERE} e chamar a IA de novo.`,
+  edits: `Nesta execução você cria e altera arquivos do projeto, mas não roda comandos de terminal (testes, git, instalações). Se o trabalho exigir comandos, faça o que der e chame block_card explicando que a pessoa precisa escolher "Sem restrições" em ${WHERE}.`,
+  full: null,
+};
 
 /** Grava os arquivos temporários do comando numa pasta só do usuário e troca os `{tmp:nome}` dos argumentos pelos caminhos. */
 function materialize(command: HeadlessCommand): { command: HeadlessCommand; cleanup: () => void } {
@@ -90,7 +104,8 @@ export class AiRunner {
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
     const tool = aiToolInfo(state.board.aiTool);
     const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '');
-    const built = headlessCommand(state.board.aiTool, { prompt: cardPrompt(cardRef(card), requiredSkills(state, card), plan.advice), permission: state.board.runner.permission, addDirs: this.router.aiWorkDirs(), exec: plan.input });
+    const permissionAdvice = PERMISSION_ADVICE[state.board.runner.permission];
+    const built = headlessCommand(state.board.aiTool, { prompt: cardPrompt(cardRef(card), requiredSkills(state, card), [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])]), permission: state.board.runner.permission, addDirs: this.router.aiWorkDirs(), exec: plan.input, boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined });
     if ('unsupported' in built) throw new Error(built.unsupported);
     const { command, cleanup } = materialize(built);
 
@@ -98,9 +113,16 @@ export class AiRunner {
     const messagesBefore = this.aiMessages(cardId);
     if (plan.manifest.profile || plan.manifest.model) log(plan.summary.join(' | '));
     log(`Chamando ${tool.label}: ${command.command} ${command.args.map((a) => (a.length > 80 ? `${a.slice(0, 80)}…` : a)).join(' ')}`);
+    const tail: string[] = [];
     let proc: RunningProcess;
     try {
-      proc = this.deps.spawn(command, this.deps.cwd, (text) => text.split(/\r?\n/).filter(Boolean).forEach(log));
+      proc = this.deps.spawn(command, this.deps.cwd, (text) =>
+        text.split(/\r?\n/).filter(Boolean).forEach((line) => {
+          log(line);
+          tail.push(line.length > 300 ? `${line.slice(0, 300)}…` : line);
+          if (tail.length > TAIL_LINES) tail.shift();
+        }),
+      );
     } catch (e) {
       cleanup();
       throw e;
@@ -110,6 +132,7 @@ export class AiRunner {
       previous: card.status,
       stopped: false,
       timedOut: false,
+      tail,
       timer: setTimeout(() => {
         run.timedOut = true;
         proc.kill();
@@ -154,12 +177,14 @@ export class AiRunner {
     if (!card || card.status !== 'running') return;
     // restaurar não passa pelas regras da IA (o status anterior pode ser "Aprovado")
     if (run.stopped) return void this.router.handle({ type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous }, { author: RUNNER_AUTHOR });
-    if (run.timedOut) return this.block(cardId, `A execução do ${toolLabel} passou do tempo limite e foi encerrada. O log está em Saída → Faz AI.`);
+    // o fim do que a ferramenta escreveu vai junto: a pessoa entende a falha sem sair do card
+    const output = run.tail.length ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${run.tail.join('\n').replace(/```/g, "'''")}\n\`\`\`` : '';
+    if (run.timedOut) return this.block(cardId, `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness de IA.${output}`);
     if (error) return this.block(cardId, `Não foi possível executar o ${toolLabel}: ${error.message}`);
-    if (code !== 0) return this.block(cardId, `O ${toolLabel} terminou com erro (código ${code}). O log está em Saída → Faz AI.`);
+    if (code !== 0) return this.block(cardId, `O ${toolLabel} terminou com erro (código ${code}).${output}`);
     // respondeu na conversa e encerrou: a vez é da pessoa
     if (replied) return this.setStatus(cardId, 'waiting_answer', toolLabel);
-    this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card. O log está em Saída → Faz AI.`);
+    this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);
   }
 
   private aiMessages(cardId: string): number {

@@ -1,8 +1,8 @@
 {
   "name": "faz-ai",
   "displayName": "Faz AI Kanban",
-  "description": "Board kanban para Spec-Driven Development com IA, dentro do editor: histórias, sub-tarefas e um servidor MCP para a IA ler e atualizar o board",
-  "version": "0.28.0",
+  "description": "Board kanban para Spec-Driven Development com IA, no editor ou no navegador: histórias, sub-tarefas e um servidor MCP para a IA ler e atualizar o board",
+  "version": "0.29.0",
   "publisher": "euclidesgc",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -49,6 +49,11 @@
         "command": "fazai.openBoard",
         "title": "Faz AI: Abrir Board",
         "icon": "$(project)"
+      },
+      {
+        "command": "fazai.openInBrowser",
+        "title": "Faz AI: Abrir board no navegador",
+        "icon": "$(globe)"
       },
       {
         "command": "fazai.refreshSidebar",
@@ -130,9 +135,14 @@
           "group": "navigation@1"
         },
         {
-          "command": "fazai.refreshSidebar",
+          "command": "fazai.openInBrowser",
           "when": "view == fazai.sidebar",
           "group": "navigation@2"
+        },
+        {
+          "command": "fazai.refreshSidebar",
+          "when": "view == fazai.sidebar",
+          "group": "navigation@3"
         }
       ]
     }

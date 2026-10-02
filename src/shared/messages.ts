@@ -15,6 +15,8 @@ export type WebviewToHost =
   | { type: 'view.set'; patch: Partial<ViewState> }
   | { type: 'ui.showFilters' }
   | { type: 'ui.connectAI' }
+  /** abre este board no navegador, fora do editor */
+  | { type: 'ui.openInBrowser' }
   /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */
   | { type: 'ai.run'; cardId: Id }
   | { type: 'ai.stop'; cardId: Id }
@@ -137,6 +139,8 @@ export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }
   | { type: 'ui.openCard'; cardId: Id }
   | { type: 'viewState'; view: ViewState }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  /** aviso informativo (algo deu certo ou precisa de atenção, sem ser erro) */
+  | { type: 'notice'; message: string };
 
 export type { WorkflowKind };

@@ -70,6 +70,28 @@ os artefatos de cada fase e move os cards conforme avança.
 Por padrão, uma história não é concluída nem avança de fase enquanto tiver sub-tarefas em aberto
 daquela fase. Essas regras podem ser desligadas nas configurações.
 
+No topo do board, **N com você** mostra quantos cards esperam revisão, resposta ou desbloqueio (um
+clique filtra só eles), e um indicador aparece enquanto a IA trabalha em algum card.
+
+### Board no navegador, fora do editor
+
+O board não depende da janela do editor:
+
+- **Abrir no navegador ↗** (no topo do board, ou o comando **Faz AI: Abrir board no navegador**)
+  abre o mesmo board numa aba do navegador. O editor continua aberto e é ele que guarda o board;
+  as duas telas ficam sincronizadas.
+- **Sem o editor**: rode `~/.faz-ai/bin/faz-ai` na pasta do projeto (ou `faz-ai <pasta>`). O
+  comando serve o board no navegador, com o servidor MCP, a execução da IA e o heartbeat, e fica
+  rodando até você encerrar com Ctrl+C. O atalho é criado pela extensão e usa os mesmos dados dela;
+  precisa do Node.js no PATH. Para chamar só `faz-ai`, ponha `~/.faz-ai/bin` no PATH.
+  `faz-ai --help` lista as opções (`--port`, `--data`, `--no-open`).
+
+A página só responde em `127.0.0.1` e exige o segredo que vem no link aberto pelo editor ou pelo
+terminal (ele fica guardado num cookie, então o endereço pode ir para os favoritos). No navegador,
+o tema "Sistema" acompanha o claro ou escuro do sistema operacional e os filtros abrem na própria
+barra do board. Um board é servido por um lugar de cada vez: com o editor aberto na pasta, use
+**Abrir no navegador**; o `faz-ai` do terminal avisa e não inicia.
+
 ## Usando com IA
 
 1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Codex,
@@ -98,12 +120,20 @@ a conversa e trabalhar naquele card. Não é um chat ao vivo: a resposta chega c
 conversa quando a execução termina, e enquanto isso o card fica "Em execução" (com um botão
 **Parar**). Imagens coladas na mensagem viram anexos do card e a IA as recebe.
 
+O botão também fica no cabeçalho do card, ao lado do status.
+
 - O que a IA pode fazer nessas execuções se define em Configurações → Harness de IA → **Execução
-  pela conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições.
+  pela conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em
+  uso aparece ao lado do botão, com um atalho para mudar. A IA é avisada do limite: se o trabalho
+  pedir mais do que o nível permite, ela bloqueia o card dizendo qual opção escolher.
 - Cursor e Kimi Code, quando rodam em segundo plano, só funcionam no nível "sem restrições".
-- A ferramenta precisa estar instalada e autenticada, e o servidor do board conectado.
-- Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo. O log
-  completo está no painel **Saída → Faz AI**.
+- A ferramenta precisa estar instalada e autenticada. A CLI não precisa estar no PATH: o board a
+  procura também nas pastas de instalação usuais e dentro das extensões do editor (quem só usa a
+  extensão do Claude Code ou do Codex já tem o executável).
+- Com o Claude Code, o servidor do board vai na linha de comando de cada execução: não depende de
+  **Conectar IA (MCP)** nem da aprovação do `.mcp.json`. Nas outras ferramentas, conecte antes.
+- Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo e o fim da
+  saída da ferramenta. O log completo está no painel **Saída → Faz AI** (ou no terminal do `faz-ai`).
 
 ### Branch e pasta de trabalho por história
 
@@ -251,9 +281,12 @@ nenhum card sai do lugar e o que você personalizou é mantido. Uma cópia do ba
 
 ## Onde ficam os dados
 
-O board e os anexos ficam no armazenamento da extensão, fora do repositório. Regras e skills são
-arquivos da pasta do projeto e entram no git normalmente. Evite editar o mesmo board em duas janelas
-ao mesmo tempo: a última a salvar vence.
+O board e os anexos ficam no armazenamento da extensão, fora do repositório. Cada pasta tem o seu
+arquivo de banco (`boards/<chave da pasta>.db`), então janelas em projetos diferentes não
+interferem uma na outra. Na primeira vez, o board parte de uma cópia do banco único das versões
+anteriores (`fazai.db`), que fica intacto. Regras e skills são arquivos da pasta do projeto e
+entram no git normalmente. Evite abrir a mesma pasta em duas janelas do editor ao mesmo tempo: a
+última a salvar vence (a extensão avisa quando isso acontece).
 
 ## Desenvolvimento
 
@@ -265,8 +298,12 @@ npm run typecheck
 ```
 
 Pressione `F5` para abrir o Extension Development Host. O código fica em `src/extension` (host e
-servidor MCP), `src/webview` (interface em React), `src/shared` (modelo e protocolo) e
-`src/mcp-bridge` (ponte stdio usada pelos clientes de IA).
+servidor MCP), `src/webview` (interface em React), `src/shared` (modelo e protocolo),
+`src/mcp-bridge` (ponte stdio usada pelos clientes de IA) e `src/cli` (o board fora do editor).
+
+Para testar a interface sem o editor, `node dist/cli.js <pasta> --data <pasta de dados de teste>`
+serve o board no navegador. Os testes cobrem a ativação da extensão (com um editor de mentira em
+`test/fakes/vscode.ts`) e o servidor da página (`test/webServer.test.ts`).
 
 ## Histórico de versões
 

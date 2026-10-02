@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Comment } from '../../shared/model';
 import { aiToolInfo } from '../../shared/harness';
+import { RUNNER_PERMISSIONS } from '../../shared/runner';
 import { useBoardStore } from '../store/boardStore';
 import { MAX_ATTACHMENT_BYTES, toBase64 } from './AttachmentsTab';
 
@@ -15,11 +16,13 @@ export function CommentsTab({ cardId }: { cardId: string }) {
   const send = useBoardStore((s) => s.send);
   const baseUri = useBoardStore((s) => s.attachmentsBaseUri);
   const setError = useBoardStore((s) => s.setError);
+  const openSettings = useBoardStore((s) => s.openSettings);
   const [draft, setDraft] = useState('');
   const comments = state.comments.filter((c) => c.cardId === cardId);
   const card = state.cards.find((c) => c.id === cardId);
   const running = state.aiRuns.includes(cardId);
   const toolLabel = aiToolInfo(state.board.aiTool).label;
+  const permission = RUNNER_PERMISSIONS.find((p) => p.value === state.board.runner.permission)!;
   const canCall = !!card && card.deletedAt === null && card.archivedAt === null && !state.aiRunUnsupported;
 
   const submit = () => {
@@ -63,6 +66,7 @@ export function CommentsTab({ cardId }: { cardId: string }) {
       {comments.map((c) => <CommentItem key={c.id} comment={c} mine={c.author === state.currentUser} render={resolve} />)}
       {running && (
         <div className="banner ai-running">
+          <span className="spinner" />
           <span>{toolLabel} está trabalhando neste card… A resposta aparece aqui quando terminar.</span>
           <span className="spacer" />
           <button className="ghost small" onClick={() => send({ type: 'ai.stop', cardId })}>Parar</button>
@@ -70,14 +74,19 @@ export function CommentsTab({ cardId }: { cardId: string }) {
       )}
       <div className="comment-new">
         <MarkdownEditor compact minRows={3} value={draft} onChange={setDraft} onSubmit={submit} onPasteFiles={pasteFiles} placeholder="Escreva uma mensagem… (Cmd+Enter envia; cole imagens direto aqui)" />
-        <div className="row end">
-          {state.aiRunUnsupported && <span className="muted small" title={state.aiRunUnsupported}>Chamar a IA daqui não está disponível para o {toolLabel}.</span>}
-          <button className="primary" disabled={!draft.trim()} onClick={submit}>Enviar</button>
+        <div className="row wrap">
+          <span className="muted small ai-permission" title={state.aiRunUnsupported ?? permission.hint}>
+            {state.aiRunUnsupported ? `Chamar a IA daqui não está disponível para o ${toolLabel}.` : `Permissão do ${toolLabel} ao ser chamado: ${permission.label}.`}{' '}
+            <a onClick={() => openSettings('harness')}>Mudar</a>
+          </span>
+          <span className="spacer" />
+          <button disabled={!draft.trim()} onClick={submit}>Enviar</button>
           <button
+            className="primary"
             disabled={!canCall || running}
             title={state.aiRunUnsupported ?? `Roda o ${toolLabel} em segundo plano para ler a conversa e trabalhar neste card. A resposta chega aqui, sem acompanhamento ao vivo.`}
             onClick={callAi}
-          >{draft.trim() ? 'Enviar e chamar IA' : 'Chamar IA'}</button>
+          >{draft.trim() ? 'Enviar e chamar IA' : '▶ Chamar IA'}</button>
         </div>
       </div>
     </section>

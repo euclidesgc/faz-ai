@@ -1,13 +1,24 @@
-import { cardsIn, columnsOf, useBoardStore } from '../store/boardStore';
+import { cardRef } from '../../shared/model';
+import { cardsIn, columnsOf, isLive, useBoardStore } from '../store/boardStore';
 import { WorkflowRow } from './WorkflowRow';
 
 export function Board() {
   const state = useBoardStore((s) => s.state)!;
   const overrides = useBoardStore((s) => s.collapsed);
   const setCollapsed = useBoardStore((s) => s.setCollapsed);
+  const selectedParentId = useBoardStore((s) => s.selectedParentId);
+  const selectParent = useBoardStore((s) => s.selectParent);
+  const selected = state.cards.find((c) => c.id === selectedParentId);
+  const empty = !state.cards.some(isLive);
 
   return (
     <div className="board">
+      {empty && (
+        <div className="board-hint">
+          <strong>Este board ainda não tem cards.</strong> Crie uma história em <em>+ Novo card</em>, na primeira coluna. Um clique na história mostra as sub-tarefas dela na linha de baixo; dois cliques abrem o card,
+          onde ficam a descrição, a conversa com a IA e o botão <em>Chamar IA</em>.
+        </div>
+      )}
       {state.workflows
         .slice()
         .sort((a, b) => a.position - b.position)
@@ -19,7 +30,13 @@ export function Board() {
               <header className="workflow-header" onClick={() => setCollapsed(wf.id, !collapsed)} title={collapsed ? 'Expandir a linha' : 'Colapsar a linha'}>
                 <button className="icon collapse-toggle" aria-expanded={!collapsed}>{collapsed ? '▸' : '▾'}</button>
                 <h2>{wf.name}</h2>
-                <span className="column-count">{total} card(s)</span>
+                <span className="column-count">{total} {total === 1 ? 'card' : 'cards'}</span>
+                {wf.kind === 'child' && !empty &&
+                  (selected ? (
+                    <span className="filter-chip" title="Mostrar as sub-tarefas de todas as histórias" onClick={(e) => { e.stopPropagation(); selectParent(null); }}>de {cardRef(selected)} {selected.title} ✕</span>
+                  ) : (
+                    <span className="muted small">de todas as histórias · clique numa história para ver e criar as dela</span>
+                  ))}
               </header>
               {!collapsed && <WorkflowRow workflow={wf} />}
             </section>

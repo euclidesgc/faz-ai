@@ -88,7 +88,8 @@ funcionam com o mesmo comando.
 
 ## Se as ferramentas não aparecem
 
-1. O VSCode precisa estar aberto na pasta do projeto, com a extensão ativa. O servidor existe
+1. O VSCode precisa estar aberto na pasta do projeto, com a extensão ativa, ou o comando `faz-ai`
+   rodando nela (o board fora do editor). O servidor existe
    enquanto houver um socket em `~/.faz-ai/` (um arquivo `.sock` por pasta aberta).
 2. Teste o servidor fora do cliente; a resposta deve conter `"name":"faz-ai"`:
 

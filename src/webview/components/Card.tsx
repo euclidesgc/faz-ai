@@ -55,6 +55,13 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         e.stopPropagation();
         openCard(card.id);
       }}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' || e.target !== e.currentTarget) return;
+        e.stopPropagation();
+        openCard(card.id);
+      }}
+      tabIndex={overlay ? undefined : 0}
+      title={overlay ? undefined : 'Dois cliques (ou Enter) abrem o card'}
     >
       <div className="card-top">
         <span className="card-head">
@@ -63,7 +70,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         </span>
         {!overlay && (
           <span className="card-actions">
-            <button className="icon" title="Abrir detalhes" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); openCard(card.id); }}>⤢</button>
+            <button className="icon" title="Abrir o card" aria-label="Abrir o card" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); openCard(card.id); }}>⤢</button>
             <Menu
               title="Ações do card"
               items={[

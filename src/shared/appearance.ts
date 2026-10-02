@@ -6,7 +6,7 @@ export type ThemeMode = 'system' | 'light' | 'dark';
 export type TextFont = 'sans' | 'ui' | 'serif' | 'mono' | 'editor';
 
 export interface Appearance {
-  /** 'system' acompanha o tema do VS Code */
+  /** 'system' acompanha o tema do VS Code; no navegador, o claro ou escuro do sistema operacional */
   theme: ThemeMode;
   /** fonte dos campos de texto longo */
   font: TextFont;
@@ -20,7 +20,7 @@ export const DEFAULT_APPEARANCE: Appearance = { theme: 'system', font: 'sans', f
 export const FONT_SIZE_RANGE = { min: 11, max: 22 };
 
 export const THEMES: { value: ThemeMode; label: string }[] = [
-  { value: 'system', label: 'Sistema (acompanha o VS Code)' },
+  { value: 'system', label: 'Sistema (acompanha o editor ou o sistema)' },
   { value: 'light', label: 'Claro' },
   { value: 'dark', label: 'Escuro' },
 ];

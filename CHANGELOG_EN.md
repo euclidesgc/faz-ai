@@ -5,6 +5,29 @@
 What changed in each version of Faz AI Kanban, newest first. The extension's interface is in
 Portuguese, so names of screens and buttons appear as you see them on screen.
 
+## 0.29.0
+
+- **The board in the browser, outside the editor**: **Abrir no navegador ↗** (or the command **Faz
+  AI: Abrir board no navegador**) opens the same board in a tab, in sync with the editor. Without
+  the editor, the `~/.faz-ai/bin/faz-ai` command serves a folder's board with the MCP server, AI
+  runs and the heartbeat. The page only answers on `127.0.0.1` and requires the link's secret.
+- **Calling the AI works without the CLI on the PATH**: the board looks for the executable in the
+  usual install folders and inside editor extensions (Claude Code, Codex). Before, people who only
+  used the Claude Code extension got "command not found".
+- With Claude Code, the board's server is passed on the command line of each run: calling the AI no
+  longer depends on **Conectar IA (MCP)** or on approving `.mcp.json`.
+- The AI is told the run's permission level and, when it is not enough, blocks the card saying
+  which option to choose. The level is shown next to the **Chamar IA** button, with a shortcut to
+  change it.
+- Run failures bring the end of the tool's output into the card, and the block reason is shown
+  formatted.
+- **Usability**: a **Chamar IA** button in the card header; notices and errors in floating boxes
+  that do not push the board; an **N com você** counter and an AI-working indicator at the top; the
+  Skills field collapsed, with search; a fixed card header; guidance on the empty board and on the
+  sub-task row; open a card with Enter; visible keyboard focus; quieter top tabs.
+- **One database per folder**: windows on different projects no longer overwrite each other. The
+  board starts from a copy of the earlier versions' database, which is left untouched.
+
 ## 0.28.0
 
 - **Find and install skills** from a folder, a GitHub `owner/repository` or a git address. The

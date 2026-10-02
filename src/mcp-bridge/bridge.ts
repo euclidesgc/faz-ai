@@ -24,7 +24,7 @@ function resolveFolder(): string {
 
 const folder = resolveFolder();
 const target = socketPath(folder);
-const OFFLINE = `O board do Faz AI não está acessível. Abra a pasta "${folder}" no VSCode com a extensão Faz AI ativa e reconecte.`;
+const OFFLINE = `O board do Faz AI não está acessível. Abra a pasta "${folder}" no editor com a extensão Faz AI ativa, ou rode "faz-ai" nessa pasta, e reconecte.`;
 
 function connect(attempt = 0): void {
   const socket = net.connect(target);

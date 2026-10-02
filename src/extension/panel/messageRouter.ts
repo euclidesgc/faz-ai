@@ -375,6 +375,7 @@ export class MessageRouter {
       case 'view.set':
       case 'ui.showFilters':
       case 'ui.connectAI':
+      case 'ui.openInBrowser':
       case 'ai.run':
       case 'ai.stop':
       case 'ai.heartbeat.run':
