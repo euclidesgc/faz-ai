@@ -1,5 +1,16 @@
 /** Harness de IA do projeto: arquivos de regras e skills, gerenciados pelo board. */
 
+/**
+ * Como a ferramenta chega a uma skill: `auto` deixa a descrição à vista da IA, que decide quando usar;
+ * `manual` tira a skill da invocação automática, e ela só é usada quando indicada no card ou chamada pelo nome.
+ */
+export type SkillMode = 'auto' | 'manual';
+
+export const SKILL_MODES: { id: SkillMode; label: string; hint: string }[] = [
+  { id: 'auto', label: 'Automática', hint: 'A IA vê a descrição em toda sessão e decide quando usar a skill.' },
+  { id: 'manual', label: 'Só quando indicada', hint: 'A IA não invoca a skill sozinha: ela só é usada quando um card a indica ou quando é chamada pelo nome.' },
+];
+
 export interface RuleFile {
   /** nome do arquivo na raiz do projeto, ex.: CLAUDE.md */
   name: string;
@@ -13,6 +24,8 @@ export interface Skill {
   description: string;
   /** desligada = movida para fora da pasta que as ferramentas de IA leem */
   enabled: boolean;
+  /** se a ferramenta pode invocar a skill sozinha, ou só quando ela é indicada (no card ou pelo nome) */
+  mode: SkillMode;
   /** caminho do SKILL.md, relativo à raiz do projeto */
   path: string;
   /** conteúdo completo do SKILL.md (com o frontmatter) */
@@ -72,6 +85,8 @@ export interface HarnessItem {
   layout: 'file' | 'files' | 'skills' | 'entry';
   /** resumo do conteúdo do arquivo, para saber se uma cópia divergiu do original */
   digest?: string;
+  /** só nas skills: invocação automática ou só quando indicada */
+  mode?: SkillMode;
 }
 
 export interface ToolInventory {

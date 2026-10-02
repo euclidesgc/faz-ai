@@ -93,13 +93,16 @@ export class MessageRouter {
     if (JSON.stringify(this.harness) !== before) this.changed();
   }
 
-  /** As opções do campo "Skills" acompanham as skills ligadas do projeto e as globais e de plugins da ferramenta em uso. */
+  /**
+   * As opções do campo "Skills" acompanham as skills do projeto (ligadas ou não) e as globais e de plugins da
+   * ferramenta em uso. Uma skill desligada pode ser indicada: o card entrega o caminho do SKILL.md.
+   */
   private loadHarness(): void {
     if (!this.harnessStore) return;
     this.harness = this.harnessStore.scan();
     const tool = this.boards.snapshot(this.boardId).board.aiTool;
     const outside = (this.harness.inventory.find((t) => t.tool === tool)?.items ?? []).filter((i) => i.kind === 'skill' && i.scope !== 'project').map((i) => i.name);
-    const project = this.harness.skills.filter((s) => s.enabled).map((s) => s.name);
+    const project = this.harness.skills.map((s) => s.name);
     const names = [...project, ...[...new Set(outside)].filter((n) => !project.includes(n)).sort()];
     const field = this.boards.snapshot(this.boardId).fieldDefs.find((f) => f.name.toLowerCase() === SKILLS_FIELD.toLowerCase() && f.kind === 'multiselect');
     if (field && JSON.stringify(field.options) !== JSON.stringify(names)) this.settings.updateField(field.id, { options: names });
@@ -493,6 +496,15 @@ export class MessageRouter {
         return this.harnessOp((h) => h.setSkillEnabled(msg.name, msg.enabled));
       case 'harness.skill.delete':
         return this.harnessOp((h) => h.deleteSkill(msg.name));
+      case 'harness.skill.setMode': {
+        const items = msg.paths.map((p) => this.harnessItem(msg.tool, 'skill', p));
+        try {
+          for (const item of items) this.harnessOps.setSkillMode(msg.tool, item, msg.mode);
+        } finally {
+          this.loadHarness();
+        }
+        return true;
+      }
       case 'harness.agent.create':
         return this.harnessOp((h) => h.createAgent(msg.name, msg.description, msg.content, msg.model));
       case 'harness.agent.write':

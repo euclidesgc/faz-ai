@@ -1,8 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ALL_AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type Agent, type AgentSpec, type AiTool, type Harness, type RuleFile, type Skill, type ToolInventory } from '../shared/harness';
+import { ALL_AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type Agent, type AgentSpec, type AiTool, type Harness, type RuleFile, type Skill, type SkillMode, type ToolInventory } from '../shared/harness';
 import { scanInventory } from './harnessScan';
 import { detectTools } from './models';
+import { setSkillMode, skillMode } from './skillMode';
 
 const MAX_BYTES = 512 * 1024;
 
@@ -160,6 +161,11 @@ export class HarnessStore {
     fs.renameSync(found.dir, to);
   }
 
+  /** Invocação automática ou só quando indicada, gravado no formato da ferramenta em uso. */
+  setSkillMode(name: string, mode: SkillMode): void {
+    setSkillMode(this.tool, path.join(this.dirOf(name).dir, 'SKILL.md'), mode);
+  }
+
   deleteSkill(name: string): void {
     fs.rmSync(this.dirOf(name).dir, { recursive: true, force: true });
   }
@@ -201,7 +207,7 @@ export class HarnessStore {
       .map((n) => {
         const rel = `${relDir}/${n}/SKILL.md`;
         const content = this.read(path.join(this.workspaceDir, rel));
-        return { name: n, description: parseFrontmatter(content).description ?? '', enabled, path: rel, content };
+        return { name: n, description: parseFrontmatter(content).description ?? '', enabled, mode: skillMode(path.join(this.workspaceDir, rel)), path: rel, content };
       });
   }
 }

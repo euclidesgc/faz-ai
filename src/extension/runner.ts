@@ -2,6 +2,7 @@ import { cardRef } from '../shared/model';
 import { aiToolInfo } from '../shared/harness';
 import type { CardStatus } from '../shared/status';
 import { headlessCommand, type HeadlessCommand } from './headless';
+import { requiredSkills } from './mcp/format';
 import type { MessageRouter } from './panel/messageRouter';
 
 /** Processo da ferramenta de IA em execução. */
@@ -30,9 +31,11 @@ interface Run {
 const RUNNER_AUTHOR = 'Faz AI';
 
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
-export const cardPrompt = (ref: string): string =>
+export const cardPrompt = (ref: string, skills: { name: string; path?: string }[] = []): string =>
   [
     `Trabalhe no card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai".`,
+    // as skills do card vão pelo caminho: valem mesmo desligadas ou fora da invocação automática
+    ...(skills.some((k) => k.path) ? [`Antes de começar, leia estas skills, obrigatórias para este card: ${skills.filter((k) => k.path).map((k) => `${k.name} (${k.path})`).join('; ')}.`] : []),
     'Se a skill "faz-ai-fluxo" existir no projeto, siga-a.',
     `Leia o card com get_card (descrição, conversa, anexos e a fase em \`phase\`). Se a última mensagem da conversa for da pessoa, responda a ela pela conversa do card.`,
     'Faça o trabalho da fase em que o card está e termine passando a vez: request_review quando houver algo para revisar, ask_question quando precisar de uma resposta, block_card se houver um impedimento, ou mova o card se a fase não exigir aprovação.',
@@ -64,7 +67,7 @@ export class AiRunner {
     if (!card || card.deletedAt !== null || card.archivedAt !== null) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
     const tool = aiToolInfo(state.board.aiTool);
-    const command = headlessCommand(state.board.aiTool, { prompt: cardPrompt(cardRef(card)), permission: state.board.runner.permission, addDirs: this.router.aiWorkDirs() });
+    const command = headlessCommand(state.board.aiTool, { prompt: cardPrompt(cardRef(card), requiredSkills(state, card)), permission: state.board.runner.permission, addDirs: this.router.aiWorkDirs() });
     if ('unsupported' in command) throw new Error(command.unsupported);
 
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);

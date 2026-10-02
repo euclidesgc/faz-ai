@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, SKILL_NAME_PATTERN, type AiTool, type HarnessItem, type HarnessKind } from '../../../shared/harness';
+import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, SKILL_MODES, SKILL_NAME_PATTERN, type AiTool, type HarnessItem, type HarnessKind, type SkillMode } from '../../../shared/harness';
 import { copyTarget, createTargets, type CreateTarget } from '../../../shared/harnessCatalog';
 import { useBoardStore } from '../../store/boardStore';
 
@@ -78,6 +78,13 @@ export function HarnessInventory() {
     else if (list.length > 1) ask({ title: `Copiar ${what} para o projeto?`, message: 'Cada item vira uma cópia independente na pasta do projeto.', confirmLabel: 'Copiar', onConfirm: run });
     else run();
   };
+  const setMode = (list: HarnessItem[], mode: SkillMode) => {
+    const run = () => send({ type: 'harness.skill.setMode', tool, paths: list.map((i) => i.path), mode });
+    if (list.some((i) => i.scope === 'user')) ask({ title: 'Alterar skills da pasta do usuário?', message: `A mudança é gravada no arquivo da skill. ${GLOBAL_WARNING}`, confirmLabel: 'Alterar', onConfirm: run });
+    else run();
+  };
+  /** skills cuja descrição a ferramenta carrega em toda sessão */
+  const automatic = items.filter((i) => i.kind === 'skill' && i.mode === 'auto');
   const remove = (i: HarnessItem) =>
     ask({
       title: `Apagar "${i.name}"?`,
@@ -100,6 +107,13 @@ export function HarnessInventory() {
         <td className="muted small">{i.description || '—'}</td>
         <td className="muted small"><code>{i.location}</code></td>
         <td className="actions">
+          {i.mode && (editable ? (
+            <select title={SKILL_MODES.find((m) => m.id === i.mode)!.hint} value={i.mode} onChange={(e) => setMode([i], e.target.value as SkillMode)}>
+              {SKILL_MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          ) : (
+            <span className="pill off" title="Skill de plugin: o modo não pode ser alterado aqui. Para mudar, copie a skill para o projeto.">{SKILL_MODES.find((m) => m.id === i.mode)!.label}</span>
+          ))}
           <button className="ghost small" title={editable ? 'Abre o arquivo no editor, onde ele pode ser alterado' : 'Abre o arquivo no editor'} onClick={() => send({ type: 'harness.item.open', path: i.path })}>Abrir</button>
           {copyable(i, 'project') && !inProject && <button className="ghost small" title="Cria uma cópia independente na pasta do projeto" onClick={() => copy([i], 'project')}>Copiar para o projeto</button>}
           {copyable(i, 'user') && !twin(i, 'user') && <button className="ghost small" title="Cria uma cópia na sua pasta de usuário, que vale em todos os projetos" onClick={() => copy([i], 'user')}>Copiar para o global</button>}
@@ -145,6 +159,12 @@ export function HarnessInventory() {
               {places.length > 0 && <button className="small" onClick={() => setCreating(creating === k.id ? null : k.id)}>Novo</button>}
             </div>
             {creating === k.id && places.length > 0 && <NewItem key={tool} tool={tool} kind={k.id} targets={places} onClose={() => setCreating(null)} />}
+            {k.id === 'skill' && automatic.length > 0 && (
+              <p className="muted small">
+                {automatic.length} skills automáticas: as descrições delas, {automatic.reduce((n, i) => n + i.description.length, 0).toLocaleString('pt-BR')} caracteres
+                ao todo, entram em toda sessão do {label(tool)}. As demais só são lidas quando indicadas.
+              </p>
+            )}
             {ofKind.length === 0 && <p className="muted small">Nada encontrado para o {label(tool)}.</p>}
             {HARNESS_SCOPES.map((s) => {
               const group = ofKind.filter((i) => i.scope === s.id);
@@ -154,6 +174,9 @@ export function HarnessInventory() {
                 <details key={s.id} open={s.id !== 'plugin' || group.length <= 12}>
                   <summary title={s.hint}>
                     {s.label} <span className="muted small">({group.length})</span>
+                    {s.id !== 'plugin' && group.filter((i) => i.mode === 'auto').length > 1 && (
+                      <button className="ghost small" title="A IA deixa de invocar essas skills sozinha; elas continuam valendo nos cards que as indicam" onClick={(e) => { e.preventDefault(); setMode(group.filter((i) => i.mode === 'auto'), 'manual'); }}>Deixar todas só quando indicadas</button>
+                    )}
                     {toProject.length > 1 && <button className="ghost small" onClick={(e) => { e.preventDefault(); copy(toProject, 'project'); }}>Copiar todas para o projeto ({toProject.length})</button>}
                   </summary>
                   <table className="table">

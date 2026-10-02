@@ -166,7 +166,7 @@ describe('harness e padrões pelo MCP', () => {
     expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({ name: 'commit', scope: 'project', path: '.claude/skills/commit/SKILL.md' });
     expect(() => router.handle({ type: 'harness.item.delete', tool: 'claude', kind: 'skill', path: '/etc/passwd' })).toThrow('não encontrado');
     const inventory = (await call('get_harness')).data.inventory;
-    expect(inventory.find((i: any) => i.name === 'commit' && i.scope === 'user')).toEqual({ kind: 'skill', scope: 'user', name: 'commit', description: 'Escreve o commit', path: '~/.claude/skills/commit/SKILL.md' });
+    expect(inventory.find((i: any) => i.name === 'commit' && i.scope === 'user')).toEqual({ kind: 'skill', scope: 'user', name: 'commit', mode: 'auto', description: 'Escreve o commit', path: '~/.claude/skills/commit/SKILL.md' });
   });
 
   it('gerencia regras e skills do projeto e sincroniza o campo Skills', async () => {
@@ -178,7 +178,7 @@ describe('harness e padrões pelo MCP', () => {
 
     expect((await call('create_skill', { name: 'Nome Ruim', description: 'd', content: 'c' })).error).toBe(true);
     const h = (await call('create_skill', { name: 'revisar-spec', description: 'Use ao revisar uma spec', content: 'Passos…' })).data;
-    expect(h.skills).toEqual([{ name: 'revisar-spec', enabled: true, description: 'Use ao revisar uma spec', path: '.claude/skills/revisar-spec/SKILL.md' }]);
+    expect(h.skills).toEqual([{ name: 'revisar-spec', enabled: true, mode: 'auto', description: 'Use ao revisar uma spec', path: '.claude/skills/revisar-spec/SKILL.md' }]);
     expect((await call('get_skill', { skill: 'revisar-spec' })).text).toContain('name: revisar-spec');
     const skillsField = () => router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
     expect(skillsField().options).toEqual(['revisar-spec']);
@@ -191,8 +191,9 @@ describe('harness e padrões pelo MCP', () => {
     await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
     expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'revisar-spec'))).toBe(false);
     expect(fs.existsSync(path.join(dir, '.claude', 'skills-disabled', 'revisar-spec', 'SKILL.md'))).toBe(true);
-    expect(skillsField().options).toEqual([]);
-    expect((await call('get_card', { card: 1 })).data.requiredSkills[0].note).toContain('desligada');
+    // desligada, a skill continua podendo ser indicada: o card entrega o caminho do arquivo
+    expect(skillsField().options).toEqual(['revisar-spec']);
+    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({ name: 'revisar-spec', scope: 'project', path: '.claude/skills-disabled/revisar-spec/SKILL.md' });
     await call('set_skill_enabled', { skill: 'revisar-spec', enabled: true });
     await call('delete_skill', { skill: 'revisar-spec' });
     expect((await call('get_harness')).data.skills).toEqual([]);

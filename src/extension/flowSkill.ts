@@ -25,7 +25,7 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
 1. \`get_card\` traz a descrição, a conversa, os anexos e:
    - \`phase\`: a instrução da fase e, se houver, o documento que ela produz e o modelo dele;
    - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, delegue a um subagente com essa configuração; se não for possível, avise a pessoa na conversa;
-   - \`requiredSkills\`: skills que você deve carregar antes de executar.
+   - \`requiredSkills\`: skills obrigatórias do card. Leia o SKILL.md de cada uma no caminho indicado, mesmo que ela não apareça na sua lista de skills.
 2. Chame \`start_work\` antes de começar.
 3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história).
 4. Ao terminar:

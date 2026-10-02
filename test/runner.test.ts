@@ -6,6 +6,11 @@ import { openInMemory } from '../src/extension/db/database';
 import { headlessCommand, headlessUnsupported } from '../src/extension/headless';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiRunner, cardPrompt } from '../src/extension/runner';
+
+it('o prompt da execução leva as skills do card pelo caminho', () => {
+  expect(cardPrompt('#1')).not.toContain('skills, obrigatórias');
+  expect(cardPrompt('#1', [{ name: 'commit', path: '/home/.claude/skills/commit/SKILL.md' }, { name: 'sumida' }])).toContain('leia estas skills, obrigatórias para este card: commit (/home/.claude/skills/commit/SKILL.md).');
+});
 import type { HeadlessCommand } from '../src/extension/headless';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');

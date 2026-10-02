@@ -161,6 +161,15 @@ caminho absoluto do `SKILL.md`. Quando uma skill existe no projeto e fora dele c
 vale a do projeto. As ferramentas de escrita (`create_skill`, `create_agent`…) continuam atuando só
 na pasta do projeto.
 
+### Skills sob demanda
+
+Cada skill do projeto ou da pasta do usuário tem um modo: `auto` (a IA vê a descrição e decide quando
+usar) ou `manual` (só quando indicada num card ou chamada pelo nome). O modo é gravado no formato de
+cada ferramenta: `disable-model-invocation: true` no frontmatter (Claude Code, Cursor, Kimi Code,
+Copilot) ou `policy.allow_implicit_invocation: false` em `agents/openai.yaml` (Codex). Uma skill
+desligada ou em modo `manual` continua valendo nos cards que a indicam: `requiredSkills` traz o
+caminho do `SKILL.md`, e a execução pelo board passa esses caminhos no prompt.
+
 ### Pendências
 
 `get_pending_work` é o ponto de partida de uma sessão sem pedido específico. Ele devolve, em

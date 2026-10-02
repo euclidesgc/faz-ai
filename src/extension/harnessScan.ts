@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool, HarnessItem, HarnessScope } from '../shared/harness';
 import { HARNESS_CATALOG, PLUGIN_ROOTS, type HarnessSource } from '../shared/harnessCatalog';
+import { skillMode } from './skillMode';
 
 const HEAD_BYTES = 4096;
 const MAX_CONFIG_BYTES = 2 * 1024 * 1024;
@@ -135,7 +136,7 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
     case 'skills':
       return entries(target)
         .filter((n) => !n.startsWith('.') && isFile(path.join(target, n, 'SKILL.md')))
-        .map((n) => item(n, descriptionOf(path.join(target, n, 'SKILL.md')), path.join(target, n, 'SKILL.md')));
+        .map((n) => ({ ...item(n, descriptionOf(path.join(target, n, 'SKILL.md')), path.join(target, n, 'SKILL.md')), mode: skillMode(path.join(target, n, 'SKILL.md')) }));
     case 'json-keys': {
       const section = obj(readJson(target)?.[src.key]);
       return Object.entries(section).map(([name, v]) => item(name, short(src.kind === 'hook' ? hookCommands(v).join(' · ') : mcpSummary(v)), target));

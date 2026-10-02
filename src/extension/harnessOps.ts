@@ -1,8 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type HarnessItem } from '../shared/harness';
+import { SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type HarnessItem, type SkillMode } from '../shared/harness';
 import { HARNESS_CATALOG, copyTarget, type HarnessSource } from '../shared/harnessCatalog';
 import { agentTemplate, skillTemplate } from './harness';
+import { setSkillMode } from './skillMode';
 
 /** Conteúdo inicial de um arquivo novo do harness, no formato que a ferramenta espera. */
 function template(tool: AiTool, src: HarnessSource, file: string, name: string, description: string): string {
@@ -56,6 +57,12 @@ export class HarnessOps {
     if (item.scope === 'plugin') throw new Error('Itens de plugin não podem ser alterados pelo board.');
     const inside = [this.projectDir, this.homeDir].some((b) => b && item.path.startsWith(b + path.sep));
     if (!inside || item.layout === 'entry') throw new Error('Este item não pode ser alterado pelo board.');
+  }
+
+  setSkillMode(tool: AiTool, item: HarnessItem, mode: SkillMode): void {
+    this.own(item);
+    if (item.layout !== 'skills') throw new Error('Só skills têm modo de invocação.');
+    setSkillMode(tool, item.path, mode);
   }
 
   remove(item: HarnessItem): void {

@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { HarnessOps } from '../src/extension/harnessOps';
 import { scanInventory } from '../src/extension/harnessScan';
+import { setSkillMode, skillMode } from '../src/extension/skillMode';
 import { HARNESS_CATALOG, createTargets } from '../src/shared/harnessCatalog';
 
 let root: string;
@@ -178,5 +179,48 @@ describe('criar, copiar e apagar itens do harness', () => {
     expect(() => ops.remove(find('claude', 'settings', 'settings.json', 'user'))).toThrow('configuração');
     expect(() => ops.remove(find('claude', 'mcp', 'board', 'project'))).toThrow('não pode ser alterado');
     expect(fs.existsSync(path.join(project, '.mcp.json'))).toBe(true);
+  });
+});
+
+describe('modo de invocação das skills', () => {
+  it('grava e lê no formato de cada ferramenta, preservando o resto do arquivo', () => {
+    write(project, '.claude/skills/deploy/SKILL.md', '---\nname: deploy\ndescription: Faz o deploy\n---\n\nPassos\n');
+    const md = path.join(project, '.claude/skills/deploy/SKILL.md');
+    expect(skillMode(md)).toBe('auto');
+    setSkillMode('claude', md, 'manual');
+    expect(fs.readFileSync(md, 'utf8')).toBe('---\nname: deploy\ndescription: Faz o deploy\ndisable-model-invocation: true\n---\n\nPassos\n');
+    expect(skillMode(md)).toBe('manual');
+    setSkillMode('claude', md, 'manual'); // repetir não duplica a chave
+    expect(fs.readFileSync(md, 'utf8').match(/disable-model-invocation/g)).toHaveLength(1);
+    setSkillMode('claude', md, 'auto');
+    expect(fs.readFileSync(md, 'utf8')).toBe('---\nname: deploy\ndescription: Faz o deploy\n---\n\nPassos\n');
+
+    // a grafia do Kimi também é lida, e voltar para automática a remove
+    write(project, '.kimi-code/skills/estilo/SKILL.md', '---\nname: estilo\ndescription: x\ndisableModelInvocation: true\n---\n');
+    const kimi = path.join(project, '.kimi-code/skills/estilo/SKILL.md');
+    expect(skillMode(kimi)).toBe('manual');
+    setSkillMode('kimi', kimi, 'auto');
+    expect(fs.readFileSync(kimi, 'utf8')).toBe('---\nname: estilo\ndescription: x\n---\n');
+
+    // SKILL.md sem frontmatter ganha um
+    write(project, '.claude/skills/solta/SKILL.md', 'Só o corpo');
+    setSkillMode('claude', path.join(project, '.claude/skills/solta/SKILL.md'), 'manual');
+    expect(fs.readFileSync(path.join(project, '.claude/skills/solta/SKILL.md'), 'utf8')).toBe('---\ndisable-model-invocation: true\n---\n\nSó o corpo');
+  });
+
+  it('Codex: grava a política em agents/openai.yaml sem mexer no SKILL.md', () => {
+    write(project, '.agents/skills/testar/SKILL.md', skill('Testa'));
+    const md = path.join(project, '.agents/skills/testar/SKILL.md');
+    const yaml = path.join(project, '.agents/skills/testar/agents/openai.yaml');
+    setSkillMode('codex', md, 'manual');
+    expect(fs.readFileSync(yaml, 'utf8')).toBe('policy:\n  allow_implicit_invocation: false\n');
+    expect(fs.readFileSync(md, 'utf8')).toBe(skill('Testa'));
+    expect(scanInventory('codex', project, home).find((i) => i.name === 'testar')?.mode).toBe('manual');
+    setSkillMode('codex', md, 'auto');
+    expect(fs.readFileSync(yaml, 'utf8')).toBe('policy:\n  allow_implicit_invocation: true\n');
+    // arquivo que já tem outras chaves: só a política entra
+    fs.writeFileSync(yaml, 'interface:\n  display_name: "Testar"\n');
+    setSkillMode('codex', md, 'manual');
+    expect(fs.readFileSync(yaml, 'utf8')).toBe('interface:\n  display_name: "Testar"\npolicy:\n  allow_implicit_invocation: false\n');
   });
 });

@@ -1,6 +1,6 @@
 import type { Appearance } from './appearance';
 import type { ViewState } from './filters';
-import type { AiTool, HarnessKind } from './harness';
+import type { AiTool, HarnessKind, SkillMode } from './harness';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
@@ -99,6 +99,8 @@ export type WebviewToHost =
   | { type: 'harness.skill.write'; name: string; content: string }
   | { type: 'harness.skill.setEnabled'; name: string; enabled: boolean }
   | { type: 'harness.skill.delete'; name: string }
+  /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
+  | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
   | { type: 'harness.agent.create'; name: string; description: string; content: string; model?: string }
   | { type: 'harness.agent.write'; name: string; content: string }
   | { type: 'harness.agent.delete'; name: string }
