@@ -12,6 +12,7 @@ const SOURCES: Record<AiTool, string> = {
   codex: 'lista embutida na extensão (o Codex não guarda a lista em arquivo)',
   cursor: 'lista embutida na extensão (o Cursor não guarda a lista em arquivo)',
   kimi: 'lida do config.toml do Kimi nesta máquina, com os esforços de cada modelo',
+  copilot: 'lista embutida na extensão (o GitHub Copilot não guarda a lista em arquivo)',
 };
 
 export function ModelsSettings() {

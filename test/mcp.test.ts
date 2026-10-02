@@ -352,7 +352,7 @@ describe('ferramentas de IA', () => {
     expect(fs.existsSync(path.join(dir, '.agents/skills-disabled/do-codex/SKILL.md'))).toBe(true);
     expect((await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false })).error).toBe(true); // skill de outra ferramenta
 
-    for (const [tool, base] of [['cursor', '.cursor/skills'], ['kimi', '.kimi/skills']] as const) {
+    for (const [tool, base] of [['cursor', '.cursor/skills'], ['kimi', '.kimi/skills'], ['copilot', '.github/skills']] as const) {
       await call('set_ai_tool', { tool });
       await call('create_skill', { name: `do-${tool}`, description: 'd', content: 'c' });
       expect(fs.existsSync(path.join(dir, base, `do-${tool}`, 'SKILL.md'))).toBe(true);
@@ -388,6 +388,25 @@ describe('ferramentas de IA', () => {
     expect(toml).not.toContain('velho');
     expect(toml.match(/\[mcp_servers\.faz-ai\]/g)).toHaveLength(1);
     expect(toml).toContain(`args = ["${bridge}", "${dir}"]`);
+
+    // Copilot: .vscode/mcp.json (chave `servers`) para o VS Code e .mcp.json para a Copilot CLI
+    fs.mkdirSync(path.join(dir, '.vscode'));
+    fs.writeFileSync(path.join(dir, '.vscode', 'mcp.json'), JSON.stringify({ servers: { outro: { command: 'x' } }, inputs: [] }));
+    const copilot = registerClients(['copilot'], { bridgePath: bridge, workspaceDir: dir, homeDir: home });
+    expect(copilot.map((d) => d.projectFile)).toEqual(['.vscode/mcp.json', '.mcp.json']);
+    const vscode = JSON.parse(fs.readFileSync(path.join(dir, '.vscode', 'mcp.json'), 'utf8'));
+    expect(vscode).toEqual({ servers: { outro: { command: 'x' }, 'faz-ai': { type: 'stdio', command: 'node', args: [bridge, dir] } }, inputs: [] });
+    expect(json(path.join(dir, '.mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir], tools: ['*'] });
+  });
+
+  it('sugere modelos do Copilot e o detecta pela CLI ou pela extensão do VS Code', async () => {
+    const { detectTools, modelsFor, effortTiers } = await import('../src/extension/models');
+    const home = path.join(dir, 'home-copilot');
+    expect(effortTiers('copilot', modelsFor('copilot', home)).map(([, v]) => v)).toEqual(['copilot:gpt-5.6-luna@low', 'copilot:gpt-5.6-terra@medium', 'copilot:gpt-5.6-sol@high']);
+    fs.mkdirSync(path.join(home, '.vscode', 'extensions', 'ms-python.python-1.0.0'), { recursive: true });
+    expect(detectTools(home)).toEqual([]);
+    fs.mkdirSync(path.join(home, '.vscode', 'extensions', 'github.copilot-chat-0.40.0'));
+    expect(detectTools(home)).toEqual(['copilot']);
   });
 });
 

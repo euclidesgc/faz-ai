@@ -7,6 +7,8 @@ type Seed = [model: string, label: string, efforts: string[], defaultEffort: str
 
 const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 const CODEX_EFFORTS = ['light', 'medium', 'high', 'xhigh', 'max', 'ultra'];
+// níveis comuns ao seletor do VS Code e à Copilot CLI
+const COPILOT_EFFORTS = ['low', 'medium', 'high'];
 
 /**
  * Modelos conhecidos de cada ferramenta, conforme a documentação delas quando isto foi escrito.
@@ -34,6 +36,17 @@ const BUILTIN: Record<AiTool, Seed[]> = {
     ['kimi-code/k3', 'K3', ['low', 'high', 'max'], 'high'],
     ['kimi-code/kimi-for-coding', 'Kimi for Coding', ['low', 'high', 'max'], 'high'],
   ],
+  copilot: [
+    ['gpt-5.6-luna', 'GPT-5.6 Luna', COPILOT_EFFORTS, 'medium'],
+    ['gpt-5.6-terra', 'GPT-5.6 Terra', COPILOT_EFFORTS, 'medium'],
+    ['gpt-5.6-sol', 'GPT-5.6 Sol', COPILOT_EFFORTS, 'medium'],
+    ['gpt-5-mini', 'GPT-5 mini', COPILOT_EFFORTS, 'medium'],
+    ['claude-haiku-4.5', 'Claude Haiku 4.5', [], null],
+    ['claude-sonnet-5.5', 'Claude Sonnet 5.5', COPILOT_EFFORTS, 'medium'],
+    ['claude-opus-5.5', 'Claude Opus 5.5', COPILOT_EFFORTS, 'medium'],
+    ['claude-fable-5.1', 'Claude Fable 5.1', COPILOT_EFFORTS, 'medium'],
+    ['gemini-3.8-flash', 'Gemini 3.8 Flash', [], null],
+  ],
 };
 
 /** Modelo sugerido por nível de esforço da tarefa (Baixo, Médio, Alto), como [modelo, esforço]. */
@@ -42,6 +55,7 @@ const TIERS: Record<AiTool, [string, string | null][]> = {
   codex: [['gpt-6-luna', 'light'], ['gpt-6.1-sol', 'medium'], ['gpt-6-astra', 'high']],
   cursor: [['auto', null], ['composer-2.5', null], ['composer-2.5', null]],
   kimi: [['kimi-code/k3', 'low'], ['kimi-code/k3', 'high'], ['kimi-code/k3', 'max']],
+  copilot: [['gpt-5.6-luna', 'low'], ['gpt-5.6-terra', 'medium'], ['gpt-5.6-sol', 'high']],
 };
 
 const option = (tool: AiTool, [model, label, efforts, defaultEffort]: Seed): ModelOption => ({ id: modelId(tool, model), tool, model, label, efforts, defaultEffort });
@@ -98,8 +112,19 @@ export function modelsFor(tool: AiTool, homeDir: string): ModelOption[] {
 /** Ferramentas com sinal de instalação nesta máquina (pasta de configuração na home). */
 export function detectTools(homeDir: string): AiTool[] {
   if (!homeDir) return [];
-  const dirs: Record<AiTool, string[]> = { claude: ['.claude'], codex: ['.codex'], cursor: ['.cursor'], kimi: ['.kimi-code', '.kimi'] };
-  return (Object.keys(dirs) as AiTool[]).filter((t) => dirs[t].some((d) => fs.existsSync(path.join(homeDir, d))));
+  const dirs: Record<AiTool, string[]> = { claude: ['.claude'], codex: ['.codex'], cursor: ['.cursor'], kimi: ['.kimi-code', '.kimi'], copilot: ['.copilot'] };
+  return (Object.keys(dirs) as AiTool[]).filter((t) => dirs[t].some((d) => fs.existsSync(path.join(homeDir, d))) || (t === 'copilot' && hasCopilotExtension(homeDir)));
+}
+
+/** O Copilot no VS Code é uma extensão; a pasta ~/.copilot só existe para quem usa a Copilot CLI. */
+function hasCopilotExtension(homeDir: string): boolean {
+  return ['.vscode', '.vscode-insiders'].some((d) => {
+    try {
+      return fs.readdirSync(path.join(homeDir, d, 'extensions')).some((e) => e.startsWith('github.copilot-chat-'));
+    } catch {
+      return false;
+    }
+  });
 }
 
 /**

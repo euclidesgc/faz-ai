@@ -1,6 +1,6 @@
 # Faz AI Kanban: conexão com IA (MCP) em detalhe
 
-O board pode ser consultado e editado por uma IA (Claude Code, Cursor, Copilot ou qualquer cliente
+O board pode ser consultado e editado por uma IA (Claude Code, Codex, Cursor, Kimi Code, GitHub Copilot ou qualquer cliente
 MCP). A extensão roda um servidor MCP local para a pasta aberta; tudo o que a IA faz aparece no
 board na hora, e as regras do board valem para ela também.
 
@@ -15,12 +15,16 @@ o servidor na ferramenta em uso no projeto, no lugar e no formato que ela lê:
 | Codex | `.codex/config.toml` na pasta do projeto | O projeto precisa estar marcado como confiável; `codex mcp list` confere |
 | Cursor | `.cursor/mcp.json` na pasta do projeto | Ative o servidor em Settings → MCP |
 | Kimi Code | `~/.kimi-code/mcp.json` e/ou `~/.kimi/mcp.json` (global) | Abra uma sessão nova a partir da pasta do projeto |
+| GitHub Copilot | `.vscode/mcp.json` (VS Code) e `.mcp.json` (Copilot CLI) na pasta do projeto | No VS Code, confirme a confiança e inicie o servidor (**MCP: List Servers**); na CLI, abra uma sessão nova e confirme a confiança na pasta |
 
 Os arquivos do projeto guardam caminhos desta máquina; o comando oferece colocá-los no `.gitignore`.
 A lista de ferramentas só é carregada no início da sessão, então sempre abra uma sessão nova.
 
 O Kimi só tem configuração global, por isso o registro dele não fixa a pasta: a ponte descobre o
 projeto pelo diretório em que a sessão foi aberta.
+
+O Copilot tem dois arquivos porque a Copilot CLI não lê o `.vscode/mcp.json`. O agente do Copilot que
+roda no GitHub (cloud agent) não é atendido: ele executa fora desta máquina e não alcança o servidor local.
 
 ### Registro manual
 
@@ -46,6 +50,7 @@ BRIDGE="$HOME/Library/Application Support/Code/User/globalStorage/euclidesgc.faz
 claude mcp add --scope user faz-ai -- node "$BRIDGE"        # Claude Code, todos os projetos
 codex mcp add faz-ai -- node "$BRIDGE"                      # Codex, global (~/.codex/config.toml)
 kimi mcp add --transport stdio faz-ai -- node "$BRIDGE"     # Kimi, global
+copilot mcp add faz-ai -- node "$BRIDGE"                    # Copilot CLI, global (~/.copilot/mcp-config.json)
 ```
 
 O Cursor não tem comando de CLI para isso: edite `.cursor/mcp.json` (projeto) ou `~/.cursor/mcp.json`
@@ -68,8 +73,18 @@ args = ["<bridge.js>", "<pasta do projeto>"]
 { "mcpServers": { "faz-ai": { "transport": "stdio", "command": "node", "args": ["<bridge.js>"] } } }
 ```
 
-Outros clientes MCP com transporte stdio (VS Code/Copilot em `.vscode/mcp.json` com a chave
-`servers`, Gemini CLI em `~/.gemini/settings.json`) funcionam com o mesmo comando.
+```json
+// .vscode/mcp.json (GitHub Copilot no VS Code); a chave é `servers`
+{ "servers": { "faz-ai": { "type": "stdio", "command": "node", "args": ["<bridge.js>", "<pasta do projeto>"] } } }
+```
+
+```json
+// .mcp.json (Copilot CLI)
+{ "mcpServers": { "faz-ai": { "type": "stdio", "command": "node", "args": ["<bridge.js>", "<pasta do projeto>"], "tools": ["*"] } } }
+```
+
+Outros clientes MCP com transporte stdio (Gemini CLI em `~/.gemini/settings.json`, por exemplo)
+funcionam com o mesmo comando.
 
 ## Se as ferramentas não aparecem
 

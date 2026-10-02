@@ -512,7 +512,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   // ---------- modelos de LLM ----------
 
-  const toolArg = z.enum(ALL_AI_TOOLS as [string, ...string[]]).describe('Ferramenta de IA: claude, codex, cursor ou kimi');
+  const toolArg = z.enum(ALL_AI_TOOLS as [string, ...string[]]).describe('Ferramenta de IA: claude, codex, cursor, kimi ou copilot');
   const models = (router: MessageRouter) => modelsOverview(router.snapshot());
 
   tool(
@@ -634,7 +634,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'set_ai_tool',
-    'Define a ferramenta de IA com que o projeto trabalha (uma por vez). Isso troca a pasta de skills (.claude/skills, .agents/skills, .cursor/skills ou .kimi/skills), o arquivo de regras, os modelos e as regras de esforço.',
+    'Define a ferramenta de IA com que o projeto trabalha (uma por vez). Isso troca a pasta de skills (.claude/skills, .agents/skills, .cursor/skills, .kimi/skills ou .github/skills), o arquivo de regras, os modelos e as regras de esforço.',
     { tool: z.enum(ALL_AI_TOOLS as [string, ...string[]]) },
     (a, router) => {
       router.handle({ type: 'settings.board.update', patch: { aiTool: a.tool as AiTool } });
