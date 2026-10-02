@@ -68,6 +68,10 @@ export interface HarnessItem {
   location: string;
   /** plugin de onde o item vem, quando `scope` é `plugin` */
   plugin?: string;
+  /** como o item está no disco: um arquivo fixo, um arquivo de uma pasta, uma pasta de skill, ou uma entrada dentro de um arquivo de configuração */
+  layout: 'file' | 'files' | 'skills' | 'entry';
+  /** resumo do conteúdo do arquivo, para saber se uma cópia divergiu do original */
+  digest?: string;
 }
 
 export interface ToolInventory {

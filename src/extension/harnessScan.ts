@@ -1,6 +1,7 @@
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { AiTool, HarnessItem, HarnessKind, HarnessScope } from '../shared/harness';
+import type { AiTool, HarnessItem, HarnessScope } from '../shared/harness';
 import { HARNESS_CATALOG, PLUGIN_ROOTS, type HarnessSource } from '../shared/harnessCatalog';
 
 const HEAD_BYTES = 4096;
@@ -102,10 +103,30 @@ interface Ctx {
 
 type Found = Omit<HarnessItem, 'location'>;
 
+const MAX_DIGEST_BYTES = 256 * 1024;
+
+function digest(file: string): string | undefined {
+  try {
+    return fs.statSync(file).size > MAX_DIGEST_BYTES ? undefined : createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 12);
+  } catch {
+    return undefined;
+  }
+}
+
 function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
   const target = path.join(base, src.path);
   const scope: HarnessScope = src.builtin ? 'plugin' : src.scope;
-  const item = (name: string, description: string, file: string, kind: HarnessKind = src.kind): Found => ({ kind, scope, name, description, path: file, ...(src.builtin ? { plugin: src.builtin } : {}) });
+  const layout = src.layout === 'file' || src.layout === 'files' || src.layout === 'skills' ? src.layout : 'entry';
+  const item = (name: string, description: string, file: string): Found => ({
+    kind: src.kind,
+    scope,
+    name,
+    description,
+    path: file,
+    layout,
+    ...(src.builtin ? { plugin: src.builtin } : {}),
+    ...(layout === 'files' || layout === 'skills' ? { digest: digest(file) } : {}),
+  });
   switch (src.layout) {
     case 'file':
       return isFile(target) ? [item(path.basename(target), src.kind === 'settings' ? '' : descriptionOf(target), target)] : [];
@@ -179,7 +200,7 @@ function scanPlugins(tool: AiTool, ctx: Ctx): Found[] {
     for (const { dir, manifest } of latestGenerations(pluginDirs(path.join(ctx.homeDir, root.path), root.manifests))) {
       const meta = readJson(manifest) ?? {};
       const plugin = typeof meta.name === 'string' && meta.name ? meta.name : path.basename(dir).replace(/~g\d+$/, '');
-      out.push({ kind: 'plugin', scope: 'plugin', name: plugin, description: typeof meta.description === 'string' ? short(meta.description) : '', path: manifest, plugin });
+      out.push({ kind: 'plugin', scope: 'plugin', name: plugin, description: typeof meta.description === 'string' ? short(meta.description) : '', path: manifest, plugin, layout: 'entry' });
       const parts: HarnessSource[] = [
         { kind: 'skill', scope: 'user', layout: 'skills', path: 'skills' },
         { kind: 'agent', scope: 'user', layout: 'files', path: 'agents', ext: '.md' },

@@ -104,6 +104,9 @@ export class WebviewBridge implements vscode.Disposable {
           await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path), vscode.ViewColumn.Beside);
           return;
         }
+        case 'harness.item.create':
+          await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description)), vscode.ViewColumn.Beside);
+          return;
         case 'ai.heartbeat.run':
           await vscode.commands.executeCommand('fazai.heartbeat.runNow');
           return;

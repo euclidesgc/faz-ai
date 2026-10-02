@@ -2,7 +2,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { HarnessOps } from '../src/extension/harnessOps';
 import { scanInventory } from '../src/extension/harnessScan';
+import { HARNESS_CATALOG, createTargets } from '../src/shared/harnessCatalog';
 
 let root: string;
 let project: string;
@@ -118,5 +120,63 @@ describe('varredura do harness por ferramenta e escopo', () => {
     write(project, '.mcp.json', '{ isto não é json');
     expect(scanInventory('claude', project, home)).toEqual([]);
     expect(scanInventory('claude', project, '')).toEqual([]);
+  });
+});
+
+describe('criar, copiar e apagar itens do harness', () => {
+  const find = (tool: 'claude' | 'codex' | 'copilot' | 'cursor', kind: string, name: string, scope: string) => scanInventory(tool, project, home).find((i) => i.kind === kind && i.name === name && i.scope === scope)!;
+  const target = (tool: 'claude' | 'codex' | 'copilot' | 'cursor', label: string) => createTargets(tool).find((t) => t.label === label)!.source;
+
+  it('cria no projeto e na pasta do usuário, no formato de cada ferramenta', () => {
+    const ops = new HarnessOps(project, home);
+    const skillFile = ops.create('claude', target('claude', '~/.claude/skills/<nome>/SKILL.md'), 'commit', 'Escreve o commit');
+    expect(skillFile).toBe(path.join(home, '.claude/skills/commit/SKILL.md'));
+    expect(fs.readFileSync(skillFile, 'utf8')).toContain('description: Escreve o commit');
+    expect(fs.readFileSync(ops.create('codex', target('codex', '.codex/agents/<nome>.toml'), 'revisor', 'Revisa'), 'utf8')).toContain('developer_instructions = """');
+    expect(ops.create('copilot', target('copilot', '.github/agents/<nome>.agent.md'), 'revisor', 'Revisa')).toBe(path.join(project, '.github/agents/revisor.agent.md'));
+    expect(fs.readFileSync(ops.create('cursor', target('cursor', '.cursor/rules/<nome>.mdc'), 'estilo', 'Estilo'), 'utf8')).toBe('---\ndescription: Estilo\nalwaysApply: false\n---\n\n');
+    expect(ops.create('claude', target('claude', '~/.claude/CLAUDE.md'), '', '')).toBe(path.join(home, '.claude/CLAUDE.md'));
+    // não sobrescreve, não aceita nome fora do padrão e exige descrição em skill e agente
+    expect(() => ops.create('claude', target('claude', '~/.claude/skills/<nome>/SKILL.md'), 'commit', 'x')).toThrow('Já existe');
+    expect(() => ops.create('claude', target('claude', '.claude/skills/<nome>/SKILL.md'), '../fora', 'x')).toThrow('Nome inválido');
+    expect(() => ops.create('claude', target('claude', '.claude/agents/<nome>.md'), 'sem-descricao', ' ')).toThrow('descrição');
+    // entradas de arquivo de configuração não são lugares de criação
+    expect(() => ops.create('claude', HARNESS_CATALOG.claude.findIndex((s) => s.layout === 'json-keys'), 'x', 'x')).toThrow();
+  });
+
+  it('copia do global e de plugin para o projeto, com a pasta inteira da skill', () => {
+    write(home, '.claude/skills/commit/SKILL.md', skill('Global'));
+    write(home, '.claude/skills/commit/references/modelo.md', 'Modelo');
+    write(home, '.claude/plugins/loja/design/.claude-plugin/plugin.json', '{"name":"design"}');
+    write(home, '.claude/plugins/loja/design/agents/critico.md', '---\ndescription: Critica\n---\n');
+    const ops = new HarnessOps(project, home);
+    ops.copy('claude', find('claude', 'skill', 'commit', 'user'), 'project');
+    ops.copy('claude', find('claude', 'agent', 'critico', 'plugin'), 'project');
+    expect(fs.readFileSync(path.join(project, '.claude/skills/commit/references/modelo.md'), 'utf8')).toBe('Modelo');
+    expect(fs.existsSync(path.join(project, '.claude/agents/critico.md'))).toBe(true);
+    // a cópia aparece nos dois escopos, com o mesmo resumo de conteúdo até alguém editar uma delas
+    expect(find('claude', 'skill', 'commit', 'project').digest).toBe(find('claude', 'skill', 'commit', 'user').digest);
+    fs.appendFileSync(path.join(project, '.claude/skills/commit/SKILL.md'), 'ajuste');
+    expect(find('claude', 'skill', 'commit', 'project').digest).not.toBe(find('claude', 'skill', 'commit', 'user').digest);
+    expect(() => ops.copy('claude', find('claude', 'skill', 'commit', 'user'), 'project')).toThrow('Já existe');
+  });
+
+  it('apaga do projeto e do global, mas nunca de um plugin nem um arquivo de configuração', () => {
+    write(project, '.claude/skills/velha/SKILL.md', skill('x'));
+    write(project, '.claude/skills/velha/assets/a.txt', 'a');
+    write(home, '.claude/agents/global.md', '---\ndescription: x\n---\n');
+    write(home, '.claude/settings.json', '{}');
+    write(home, '.claude/plugins/loja/design/.claude-plugin/plugin.json', '{"name":"design"}');
+    write(home, '.claude/plugins/loja/design/skills/critica/SKILL.md', skill('x'));
+    write(project, '.mcp.json', JSON.stringify({ mcpServers: { board: { command: 'node' } } }));
+    const ops = new HarnessOps(project, home);
+    ops.remove(find('claude', 'skill', 'velha', 'project'));
+    ops.remove(find('claude', 'agent', 'global', 'user'));
+    expect(fs.existsSync(path.join(project, '.claude/skills/velha'))).toBe(false);
+    expect(fs.existsSync(path.join(home, '.claude/agents/global.md'))).toBe(false);
+    expect(() => ops.remove(find('claude', 'skill', 'critica', 'plugin'))).toThrow('plugin');
+    expect(() => ops.remove(find('claude', 'settings', 'settings.json', 'user'))).toThrow('configuração');
+    expect(() => ops.remove(find('claude', 'mcp', 'board', 'project'))).toThrow('não pode ser alterado');
+    expect(fs.existsSync(path.join(project, '.mcp.json'))).toBe(true);
   });
 });

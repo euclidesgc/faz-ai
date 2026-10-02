@@ -11,7 +11,7 @@ import type { AiTool, HarnessKind } from './harness';
  *
  * A varredura e a tela são genéricas sobre esta tabela: mudar um caminho é mudar um dado aqui.
  */
-export type HarnessSource = { kind: HarnessKind; scope: 'project' | 'user'; path: string; /** rótulo de origem para itens que vêm com a ferramenta */ builtin?: string } & (
+export type HarnessSource = { kind: HarnessKind; scope: 'project' | 'user'; path: string; /** rótulo de origem para itens que vêm com a ferramenta */ builtin?: string; /** extensão dos arquivos novos, quando difere da que é listada */ createExt?: string } & (
   | { layout: 'file' }
   /** todos os arquivos da pasta (e subpastas) com a extensão */
   | { layout: 'files'; ext: string }
@@ -121,8 +121,8 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
     file('instructions', 'user', '.copilot/copilot-instructions.md'),
     files('instructions', 'user', '.copilot/instructions', '.instructions.md'),
     ...both('skill', 'skills', [['.github/skills', '.claude/skills', '.agents/skills'], ['.copilot/skills', '.agents/skills']]),
-    files('agent', 'project', '.github/agents', '.md'),
-    files('agent', 'user', '.copilot/agents', '.md'),
+    { ...files('agent', 'project', '.github/agents', '.md'), createExt: '.agent.md' },
+    { ...files('agent', 'user', '.copilot/agents', '.md'), createExt: '.agent.md' },
     files('command', 'project', '.github/prompts', '.prompt.md'),
     { kind: 'hook', scope: 'project', layout: 'hook-files', path: '.github/hooks' },
     { kind: 'hook', scope: 'user', layout: 'hook-files', path: '.copilot/hooks' },
@@ -146,3 +146,28 @@ export const PLUGIN_ROOTS: Record<AiTool, { path: string; manifests: string[] }[
   kimi: [{ path: '.kimi-code/plugins/managed', manifests: ['kimi.plugin.json', '.kimi-plugin/plugin.json'] }],
   copilot: [{ path: '.copilot/installed-plugins', manifests: ['plugin.json', '.plugin/plugin.json', '.claude-plugin/plugin.json', '.github/plugin/plugin.json'] }],
 };
+
+/** Um lugar onde o board pode criar um item novo: arquivo fixo que ainda não existe, arquivo de uma pasta ou pasta de skill. */
+export interface CreateTarget {
+  /** índice da fonte em `HARNESS_CATALOG[tool]` */
+  source: number;
+  kind: HarnessKind;
+  scope: 'project' | 'user';
+  layout: 'file' | 'files' | 'skills';
+  /** caminho do arquivo que será criado, com `<nome>` onde entra o nome */
+  label: string;
+}
+
+export function createTargets(tool: AiTool): CreateTarget[] {
+  return HARNESS_CATALOG[tool].flatMap((src, source): CreateTarget[] => {
+    if (src.builtin || (src.layout !== 'file' && src.layout !== 'files' && src.layout !== 'skills')) return [];
+    const base = `${src.scope === 'user' ? '~/' : ''}${src.path}`;
+    const label = src.layout === 'file' ? base : src.layout === 'skills' ? `${base}/<nome>/SKILL.md` : `${base}/<nome>${src.createExt ?? src.ext}`;
+    return [{ source, kind: src.kind, scope: src.scope, layout: src.layout, label }];
+  });
+}
+
+/** Pasta para onde vai a cópia de um item: a primeira pasta do catálogo para o tipo e o escopo de destino. */
+export function copyTarget(tool: AiTool, kind: HarnessKind, layout: 'files' | 'skills', scope: 'project' | 'user'): HarnessSource | undefined {
+  return HARNESS_CATALOG[tool].find((s) => !s.builtin && s.kind === kind && s.scope === scope && s.layout === layout);
+}

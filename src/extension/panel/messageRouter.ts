@@ -5,7 +5,7 @@ import type { Attachment, BoardState, Card, FieldDef } from '../../shared/model'
 import { branchName, slug } from '../../shared/git';
 import { prepareWorkspace } from '../git';
 import type { WebviewToHost } from '../../shared/messages';
-import { EMPTY_HARNESS, type AiTool, type Harness } from '../../shared/harness';
+import { EMPTY_HARNESS, type AiTool, type Harness, type HarnessItem, type HarnessKind } from '../../shared/harness';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelRule } from '../../shared/models';
 import { newId } from '../db/ids';
 import { detectTools, effortTiers, modelsFor } from '../models';
@@ -13,6 +13,7 @@ import { AttachmentStore } from '../attachments';
 import { SKILLS_FIELD } from '../db/schema';
 import { pendingUpgrade, upgradeBoard } from '../db/boardTemplate';
 import { HarnessStore } from '../harness';
+import { HarnessOps } from '../harnessOps';
 import { FLOW_SKILL } from '../flowSkill';
 import { headlessUnsupported } from '../headless';
 import { AttachmentRepo } from '../repositories/attachmentRepo';
@@ -177,6 +178,25 @@ export class MessageRouter {
     if ((current === null || current === previous) && next !== current) this.cards.setFieldValue(cardId, field.id, next);
   }
 
+  private get harnessOps(): HarnessOps {
+    return new HarnessOps(this.opts.workspaceDir ?? '', this.home);
+  }
+
+  /** Item listado pela varredura; as operações só valem para o que está no inventário. */
+  private harnessItem(tool: AiTool, kind: HarnessKind, file: string): HarnessItem {
+    const item = this.harness.inventory.find((t) => t.tool === tool)?.items.find((i) => i.kind === kind && i.path === file);
+    if (!item) throw new Error('Item não encontrado no harness. Atualize a lista e tente de novo.');
+    return item;
+  }
+
+  /** Cria um item do harness e devolve o caminho do arquivo, para abrir no editor. */
+  createHarnessItem(tool: AiTool, source: number, name: string, description: string): string {
+    const file = this.harnessOps.create(tool, source, name, description);
+    this.loadHarness();
+    this.changed();
+    return file;
+  }
+
   private harnessOp(fn: (store: HarnessStore) => void): boolean {
     if (!this.harnessStore) throw new Error('Nenhuma pasta de projeto aberta.');
     fn(this.harnessStore);
@@ -302,6 +322,7 @@ export class MessageRouter {
       case 'ai.heartbeat.run':
       case 'card.workspace.open':
       case 'harness.item.open':
+      case 'harness.item.create':
       case 'attachment.pick':
       case 'attachment.open':
       case 'attachment.reveal':
@@ -446,6 +467,20 @@ export class MessageRouter {
       case 'harness.refresh':
         this.refreshHarness();
         return false;
+      case 'harness.item.delete':
+        this.harnessOps.remove(this.harnessItem(msg.tool, msg.kind, msg.path));
+        this.loadHarness();
+        return true;
+      case 'harness.item.copy': {
+        const items = msg.items.map((i) => this.harnessItem(msg.tool, i.kind, i.path));
+        try {
+          for (const item of items) this.harnessOps.copy(msg.tool, item, msg.to);
+        } finally {
+          // se uma cópia falhar no meio, as anteriores já estão no disco
+          this.loadHarness();
+        }
+        return true;
+      }
       case 'harness.rule.write':
         return this.harnessOp((h) => h.writeRule(msg.name, msg.content));
       case 'harness.rule.delete':

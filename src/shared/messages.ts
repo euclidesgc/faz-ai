@@ -1,6 +1,6 @@
 import type { Appearance } from './appearance';
 import type { ViewState } from './filters';
-import type { AiTool } from './harness';
+import type { AiTool, HarnessKind } from './harness';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
@@ -87,6 +87,12 @@ export type WebviewToHost =
   | { type: 'harness.refresh' }
   /** abre no editor o arquivo de um item do harness */
   | { type: 'harness.item.open'; path: string }
+  /** cria um item num lugar do catálogo da ferramenta (`source` é o índice em HARNESS_CATALOG) e abre o arquivo no editor */
+  | { type: 'harness.item.create'; tool: AiTool; source: number; name: string; description: string }
+  /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
+  | { type: 'harness.item.delete'; tool: AiTool; kind: HarnessKind; path: string }
+  /** copia skills, agentes, comandos ou regras para o projeto ou para a pasta do usuário */
+  | { type: 'harness.item.copy'; tool: AiTool; items: { kind: HarnessKind; path: string }[]; to: 'project' | 'user' }
   | { type: 'harness.rule.write'; name: string; content: string }
   | { type: 'harness.rule.delete'; name: string }
   | { type: 'harness.skill.create'; name: string; description: string; content: string }

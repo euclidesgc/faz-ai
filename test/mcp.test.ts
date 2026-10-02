@@ -160,8 +160,13 @@ describe('harness e padrões pelo MCP', () => {
       { name: 'critica', scope: 'plugin', path: path.join(home, '.claude/plugins/cache/loja/design/skills/critica/SKILL.md'), plugin: 'design' },
       { name: 'revisar-spec', scope: 'project', path: '.claude/skills/revisar-spec/SKILL.md' },
     ]);
+    // copiar a skill global para o projeto: ela passa a existir nos dois escopos e o card usa a do projeto
+    const global = router.snapshot().harness.inventory.find((t) => t.tool === 'claude')!.items.find((i) => i.name === 'commit')!;
+    router.handle({ type: 'harness.item.copy', tool: 'claude', items: [{ kind: 'skill', path: global.path }], to: 'project' });
+    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({ name: 'commit', scope: 'project', path: '.claude/skills/commit/SKILL.md' });
+    expect(() => router.handle({ type: 'harness.item.delete', tool: 'claude', kind: 'skill', path: '/etc/passwd' })).toThrow('não encontrado');
     const inventory = (await call('get_harness')).data.inventory;
-    expect(inventory.find((i: any) => i.name === 'commit')).toEqual({ kind: 'skill', scope: 'user', name: 'commit', description: 'Escreve o commit', path: '~/.claude/skills/commit/SKILL.md' });
+    expect(inventory.find((i: any) => i.name === 'commit' && i.scope === 'user')).toEqual({ kind: 'skill', scope: 'user', name: 'commit', description: 'Escreve o commit', path: '~/.claude/skills/commit/SKILL.md' });
   });
 
   it('gerencia regras e skills do projeto e sincroniza o campo Skills', async () => {

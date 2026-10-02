@@ -1,29 +1,113 @@
 import { useEffect, useState } from 'react';
-import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, type AiTool, type HarnessItem } from '../../../shared/harness';
+import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, SKILL_NAME_PATTERN, type AiTool, type HarnessItem, type HarnessKind } from '../../../shared/harness';
+import { copyTarget, createTargets, type CreateTarget } from '../../../shared/harnessCatalog';
 import { useBoardStore } from '../../store/boardStore';
+
+const GLOBAL_WARNING = 'O arquivo fica na sua pasta de usuário e vale para todos os seus projetos.';
+
+/** Formulário de um item novo: onde criar e, quando o lugar pede, nome e descrição. */
+function NewItem({ tool, kind, targets, onClose }: { tool: AiTool; kind: HarnessKind; targets: CreateTarget[]; onClose: () => void }) {
+  const send = useBoardStore((s) => s.send);
+  const ask = useBoardStore((s) => s.ask);
+  const [source, setSource] = useState(targets[0]!.source);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const target = targets.find((t) => t.source === source)!;
+  const named = target.layout !== 'file';
+  const needsDescription = target.layout === 'skills' || kind === 'agent';
+  const ok = (!named || SKILL_NAME_PATTERN.test(name)) && (!needsDescription || description.trim() !== '');
+  const create = () => {
+    const run = () => {
+      send({ type: 'harness.item.create', tool, source, name, description: description.trim() });
+      onClose();
+    };
+    if (target.scope === 'user') ask({ title: 'Criar na pasta do usuário?', message: `${target.label.replace('<nome>', name)}\n\n${GLOBAL_WARNING}`, confirmLabel: 'Criar', onConfirm: run });
+    else run();
+  };
+  return (
+    <div className="harness-new">
+      <label className="field-row">
+        <span>Onde</span>
+        <select value={source} onChange={(e) => setSource(Number(e.target.value))}>
+          {targets.map((t) => <option key={t.source} value={t.source}>{t.scope === 'user' ? 'Global' : 'Projeto'}: {t.label}</option>)}
+        </select>
+      </label>
+      {named && (
+        <label className="field-row">
+          <span>Nome</span>
+          <input value={name} onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} placeholder="revisar-spec" />
+        </label>
+      )}
+      {named && (
+        <label className="field-row">
+          <span>Descrição{needsDescription ? '' : ' (opcional)'}</span>
+          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Quando a IA deve usar" />
+        </label>
+      )}
+      <div className="row">
+        <button className="primary" disabled={!ok} onClick={create}>Criar e abrir no editor</button>
+        <button className="ghost" onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
 
 /** Tudo que cada ferramenta de IA carrega: por tipo de componente e por escopo (projeto, global, plugins). */
 export function HarnessInventory() {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
+  const ask = useBoardStore((s) => s.ask);
   const [tool, setTool] = useState<AiTool>(state.board.aiTool);
+  const [creating, setCreating] = useState<HarnessKind | null>(null);
   // a pasta do usuário não é vigiada: relê ao abrir a tela
   useEffect(() => send({ type: 'harness.refresh' }), [send]);
 
   const inventory = state.harness.inventory;
-  const current = inventory.find((t) => t.tool === tool);
-  const items = current?.items ?? [];
+  const items = inventory.find((t) => t.tool === tool)?.items ?? [];
   const label = (id: AiTool) => AI_TOOLS.find((t) => t.id === id)!.label;
   const missing = inventory.filter((t) => !t.installed && t.items.length === 0).map((t) => label(t.tool));
+  const targets = createTargets(tool);
 
-  const row = (i: HarnessItem) => (
-    <tr key={`${i.path}|${i.name}`}>
-      <td>{i.name}{i.plugin && <span className="pill off">{i.plugin}</span>}</td>
-      <td className="muted small">{i.description || '—'}</td>
-      <td className="muted small"><code>{i.location}</code></td>
-      <td><button className="ghost small" title="Abre o arquivo no editor" onClick={() => send({ type: 'harness.item.open', path: i.path })}>Abrir</button></td>
-    </tr>
-  );
+  const copyable = (i: HarnessItem, to: 'project' | 'user') => (i.layout === 'files' || i.layout === 'skills') && i.scope !== to && !!copyTarget(tool, i.kind, i.layout, to);
+  /** o mesmo item no outro escopo: dá para ver se já foi copiado e se a cópia divergiu */
+  const twin = (i: HarnessItem, scope: 'project' | 'user') => items.find((x) => x.kind === i.kind && x.name === i.name && x.scope === scope && x.layout === i.layout);
+  const copy = (list: HarnessItem[], to: 'project' | 'user') => {
+    const run = () => send({ type: 'harness.item.copy', tool, items: list.map((i) => ({ kind: i.kind, path: i.path })), to });
+    const what = list.length === 1 ? `"${list[0]!.name}"` : `${list.length} itens`;
+    if (to === 'user') ask({ title: `Copiar ${what} para a pasta do usuário?`, message: GLOBAL_WARNING, confirmLabel: 'Copiar', onConfirm: run });
+    else if (list.length > 1) ask({ title: `Copiar ${what} para o projeto?`, message: 'Cada item vira uma cópia independente na pasta do projeto.', confirmLabel: 'Copiar', onConfirm: run });
+    else run();
+  };
+  const remove = (i: HarnessItem) =>
+    ask({
+      title: `Apagar "${i.name}"?`,
+      message: `${i.layout === 'skills' ? 'A pasta da skill é removida, com todos os arquivos dela' : 'O arquivo é removido'}: ${i.location}${i.scope === 'user' ? `\n\n${GLOBAL_WARNING}` : ''}`,
+      confirmLabel: 'Apagar',
+      danger: true,
+      onConfirm: () => send({ type: 'harness.item.delete', tool, kind: i.kind, path: i.path }),
+    });
+
+  const row = (i: HarnessItem) => {
+    const inProject = i.scope !== 'project' ? twin(i, 'project') : undefined;
+    const editable = i.scope !== 'plugin' && i.layout !== 'entry';
+    return (
+      <tr key={`${i.path}|${i.name}`}>
+        <td>
+          {i.name}
+          {i.plugin && <span className="pill off">{i.plugin}</span>}
+          {inProject && <span className="pill" title={inProject.location}>{inProject.digest === i.digest ? 'copiada no projeto' : 'no projeto, com conteúdo diferente'}</span>}
+        </td>
+        <td className="muted small">{i.description || '—'}</td>
+        <td className="muted small"><code>{i.location}</code></td>
+        <td className="actions">
+          <button className="ghost small" title={editable ? 'Abre o arquivo no editor, onde ele pode ser alterado' : 'Abre o arquivo no editor'} onClick={() => send({ type: 'harness.item.open', path: i.path })}>Abrir</button>
+          {copyable(i, 'project') && !inProject && <button className="ghost small" title="Cria uma cópia independente na pasta do projeto" onClick={() => copy([i], 'project')}>Copiar para o projeto</button>}
+          {copyable(i, 'user') && !twin(i, 'user') && <button className="ghost small" title="Cria uma cópia na sua pasta de usuário, que vale em todos os projetos" onClick={() => copy([i], 'user')}>Copiar para o global</button>}
+          {editable && i.kind !== 'settings' && <button className="icon danger" title="Apagar" onClick={() => remove(i)}>🗑</button>}
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <div className="harness-inventory">
@@ -34,11 +118,12 @@ export function HarnessInventory() {
       </div>
       <p className="muted small">
         O que cada ferramenta de IA lê neste projeto e na sua pasta de usuário, separado por escopo. <b>Projeto</b> vale só aqui; <b>Global</b> vale
-        em todos os seus projetos; <b>Plugins</b> vem de pacotes instalados. "Abrir" mostra o arquivo no editor.
+        em todos os seus projetos; <b>Plugins</b> vem de pacotes instalados e não pode ser alterado, mas pode ser copiado. "Abrir" mostra o arquivo no
+        editor, onde ele também é editado.
       </p>
       <div className="tabs">
         {inventory.map((t) => (
-          <button key={t.tool} className={t.tool === tool ? 'active' : ''} onClick={() => setTool(t.tool)}>
+          <button key={t.tool} className={t.tool === tool ? 'active' : ''} onClick={() => { setTool(t.tool); setCreating(null); }}>
             {label(t.tool)}
             {t.tool === state.board.aiTool && <span className="pill">deste projeto</span>}
             {!t.installed && <span className="pill off">não encontrada</span>}
@@ -48,20 +133,29 @@ export function HarnessInventory() {
       {missing.length > 0 && <p className="muted small">Sem sinal de instalação nesta máquina: {missing.join(', ')}.</p>}
       {HARNESS_KINDS.map((k) => {
         const ofKind = items.filter((i) => i.kind === k.id);
+        // arquivo fixo que já existe não é oferecido de novo
+        const places = targets.filter((t) => t.kind === k.id && !(t.layout === 'file' && ofKind.some((i) => i.location === t.label)));
         return (
           <section key={k.id} className="settings-block">
             <div className="row">
               <h3 className="plain">{k.label}</h3>
               <span className="pill off">{ofKind.length}</span>
               <span className="muted small">{k.hint}</span>
+              <span className="spacer" />
+              {places.length > 0 && <button className="small" onClick={() => setCreating(creating === k.id ? null : k.id)}>Novo</button>}
             </div>
+            {creating === k.id && places.length > 0 && <NewItem key={tool} tool={tool} kind={k.id} targets={places} onClose={() => setCreating(null)} />}
             {ofKind.length === 0 && <p className="muted small">Nada encontrado para o {label(tool)}.</p>}
             {HARNESS_SCOPES.map((s) => {
               const group = ofKind.filter((i) => i.scope === s.id);
               if (!group.length) return null;
+              const toProject = s.id === 'project' ? [] : group.filter((i) => copyable(i, 'project') && !twin(i, 'project'));
               return (
                 <details key={s.id} open={s.id !== 'plugin' || group.length <= 12}>
-                  <summary title={s.hint}>{s.label} <span className="muted small">({group.length})</span></summary>
+                  <summary title={s.hint}>
+                    {s.label} <span className="muted small">({group.length})</span>
+                    {toProject.length > 1 && <button className="ghost small" onClick={(e) => { e.preventDefault(); copy(toProject, 'project'); }}>Copiar todas para o projeto ({toProject.length})</button>}
+                  </summary>
                   <table className="table">
                     <tbody>{group.map(row)}</tbody>
                   </table>
