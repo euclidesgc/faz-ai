@@ -120,6 +120,11 @@ export type WebviewToHost =
   | { type: 'harness.skill.file.delete'; tool: AiTool; path: string; file: string }
   /** cria no projeto a skill de modelos e exemplos de código, só quando indicada */
   | { type: 'harness.referenceSkill.create' }
+  /** procura skills numa pasta ou num repositório git (clonado numa pasta temporária); o resultado vem em `harnessInstall` */
+  | { type: 'harness.install.scan'; source: string }
+  /** copia as skills escolhidas para a pasta de skills da ferramenta, no projeto ou na pasta do usuário */
+  | { type: 'harness.install.apply'; tool: AiTool; to: 'project' | 'user'; rels: string[] }
+  | { type: 'harness.install.cancel' }
   /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
   | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
   | { type: 'harness.agent.create'; name: string; description: string; content: string; model?: string }

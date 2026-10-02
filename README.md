@@ -148,7 +148,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Campos | Campos personalizados (texto, seleção, data, modelo…) e onde aparecem |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
 | Perfis de execução | O que a sessão de IA usa em cada card: agente, skills, servidores MCP, ferramentas e modelo; por fase, com troca por card |
-| Harness de IA | Ferramenta do projeto, arquivo de regras, skills e agentes; execução pela conversa e heartbeat; tudo que cada ferramenta carrega, separado em projeto, global e plugins, com criar, apagar e copiar entre global e projeto |
+| Harness de IA | Ferramenta do projeto, arquivo de regras, skills e agentes; execução pela conversa e heartbeat; tudo que cada ferramenta carrega, separado em projeto, global e plugins, com criar, apagar e copiar entre global e projeto, servidores MCP, hooks, permissões e instalação de skills de uma pasta ou repositório |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
 | Aparência | Tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |

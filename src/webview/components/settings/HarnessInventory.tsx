@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, REFERENCE_SKILL, SKILL_FILE_PATTERN, SKILL_FOLDERS, SKILL_MODES, SKILL_NAME_PATTERN, type AiTool, type HarnessItem, type HarnessKind, type SkillMode } from '../../../shared/harness';
-import { HOOK_EVENTS, MCP_NAME_PATTERN, PERMISSION_LIST_LABEL, copyTarget, createTargets, hookTargets, mcpTargets, permissionTargets, type CreateTarget, type HookTarget, type McpTarget, type PermissionTarget } from '../../../shared/harnessCatalog';
+import { HOOK_EVENTS, MCP_NAME_PATTERN, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS, copyTarget, createTargets, hookTargets, mcpTargets, permissionTargets, type CreateTarget, type HookTarget, type McpTarget, type PermissionTarget } from '../../../shared/harnessCatalog';
 import { useBoardStore } from '../../store/boardStore';
 
 const GLOBAL_WARNING = 'O arquivo fica na sua pasta de usuário e vale para todos os seus projetos.';
@@ -114,6 +114,74 @@ function NewMcpServer({ tool, targets, onClose }: { tool: AiTool; targets: McpTa
         <button className="primary" disabled={!ok} onClick={add}>Acrescentar servidor</button>
         <button className="ghost" onClick={onClose}>Cancelar</button>
       </div>
+    </div>
+  );
+}
+
+/** Instalar skills de uma pasta ou de um repositório git: procurar, revisar a lista e escolher o que copiar. */
+function InstallSkills({ tool }: { tool: AiTool }) {
+  const state = useBoardStore((s) => s.state)!;
+  const send = useBoardStore((s) => s.send);
+  const ask = useBoardStore((s) => s.ask);
+  const [source, setSource] = useState('');
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [to, setTo] = useState<'project' | 'user'>('project');
+  const preview = state.harnessInstall;
+  const existing = new Set(state.harness.inventory.find((t) => t.tool === tool)?.items.filter((i) => i.kind === 'skill' && i.scope === to).map((i) => i.name));
+  const installable = preview?.skills.filter((k) => k.valid && !existing.has(k.name)) ?? [];
+  const picked = chosen.filter((rel) => installable.some((k) => k.rel === rel));
+  const apply = () => {
+    const run = () => {
+      send({ type: 'harness.install.apply', tool, to, rels: picked });
+      setChosen([]);
+    };
+    ask({
+      title: `Instalar ${picked.length} skill(s)?`,
+      message: `As pastas são copiadas para ${to === 'user' ? 'a sua pasta de usuário' : 'o projeto'}. Nada é executado na instalação, mas uma skill são instruções (e às vezes scripts) que a IA vai seguir: leia o que vem de fontes que você não conhece.${to === 'user' ? `\n\n${GLOBAL_WARNING}` : ''}`,
+      confirmLabel: 'Instalar',
+      onConfirm: run,
+    });
+  };
+  return (
+    <div className="harness-new">
+      <div className="row">
+        <input value={source} onChange={(e) => setSource(e.target.value)} placeholder="dono/repositorio, endereço git (https ou ssh) ou o caminho de uma pasta" spellCheck={false} onKeyDown={(e) => e.key === 'Enter' && source.trim() && send({ type: 'harness.install.scan', source })} />
+        <button disabled={!source.trim()} onClick={() => send({ type: 'harness.install.scan', source })}>Procurar skills</button>
+      </div>
+      <p className="muted small">Um repositório é clonado numa pasta temporária, sem rodar nada dele. Você vê as skills encontradas antes de copiar qualquer coisa.</p>
+      {preview && (
+        <>
+          <div className="row">
+            <b>{preview.skills.length} skill(s) em {preview.source}</b>
+            <span className="spacer" />
+            <select value={to} onChange={(e) => setTo(e.target.value as 'project' | 'user')}>
+              <option value="project">Instalar no projeto</option>
+              <option value="user">Instalar no global</option>
+            </select>
+          </div>
+          <table className="table">
+            <tbody>
+              {preview.skills.map((k) => {
+                const blocked = !k.valid ? 'nome de pasta inválido para skill' : existing.has(k.name) ? 'já existe no destino' : '';
+                return (
+                  <tr key={k.rel} className={blocked ? 'off' : ''}>
+                    <td><input type="checkbox" disabled={!!blocked} checked={picked.includes(k.rel)} onChange={(e) => setChosen(e.target.checked ? [...picked, k.rel] : picked.filter((r) => r !== k.rel))} /></td>
+                    <td>{k.name}{blocked && <span className="pill off">{blocked}</span>}</td>
+                    <td className="muted small">{k.description || '—'}</td>
+                    <td className="muted small"><code>{k.rel}</code>{k.files > 0 && ` · ${k.files} arquivo(s) de apoio`}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {preview.skills.length === 0 && <p className="muted small">Nenhuma pasta com SKILL.md nessa origem.</p>}
+          <div className="row">
+            <button className="primary" disabled={picked.length === 0} onClick={apply}>Instalar {picked.length || ''} selecionada(s)</button>
+            {installable.length > 1 && <button className="ghost small" onClick={() => setChosen(installable.map((k) => k.rel))}>Selecionar todas</button>}
+            <button className="ghost" onClick={() => { send({ type: 'harness.install.cancel' }); setChosen([]); }}>Fechar</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -273,6 +341,7 @@ export function HarnessInventory() {
   const permissionFiles = permissionTargets(tool);
   const [addingRule, setAddingRule] = useState(false);
   const [filesOpen, setFilesOpen] = useState<string | null>(null);
+  const [installing, setInstalling] = useState(false);
 
   const copyable = (i: HarnessItem, to: 'project' | 'user') => (i.layout === 'files' || i.layout === 'skills') && i.scope !== to && !!copyTarget(tool, i.kind, i.layout, to);
   /** o mesmo item no outro escopo: dá para ver se já foi copiado e se a cópia divergiu */
@@ -379,6 +448,7 @@ export function HarnessInventory() {
               <span className="pill off">{ofKind.length}</span>
               <span className="muted small">{k.hint}</span>
               <span className="spacer" />
+              {k.id === 'skill' && <button className="small" onClick={() => setInstalling(!installing)}>Buscar e instalar</button>}
               {k.id === 'settings' && permissionFiles.length > 0 && <button className="small" onClick={() => { setAddingRule(!addingRule); setCreating(null); }}>Nova regra de permissão</button>}
               {(places.length > 0 || (k.id === 'mcp' && mcpFiles.length > 0) || (k.id === 'hook' && hookFiles.length > 0)) && <button className="small" onClick={() => { setCreating(creating === k.id ? null : k.id); setAddingRule(false); }}>{k.id === 'settings' ? 'Novo arquivo' : 'Novo'}</button>}
             </div>
@@ -386,6 +456,14 @@ export function HarnessInventory() {
               <div className="row">
                 <span className="muted small">Modelos de classe e exemplos de código ficam bem numa skill própria, só quando indicada: os arquivos vão em <code>references/</code> e os cards que a indicam recebem os caminhos.</span>
                 <button className="ghost small" onClick={() => send({ type: 'harness.referenceSkill.create' })}>Criar skill de modelos</button>
+              </div>
+            )}
+            {k.id === 'skill' && (installing || state.harnessInstall) && <InstallSkills key={tool} tool={tool} />}
+            {k.id === 'plugin' && (
+              <div className="muted small">
+                Plugins são instalados e removidos pela própria ferramenta, {PLUGIN_COMMANDS[tool].where}:
+                <ul>{PLUGIN_COMMANDS[tool].commands.map((c) => <li key={c}><code>{c}</code></li>)}</ul>
+                Para aproveitar só uma skill de um plugin ou de um repositório, use "Buscar e instalar" na seção Skills, ou "Copiar para o projeto" na skill do plugin.
               </div>
             )}
             {k.id === 'hook' && <p className="banner warn small">Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.</p>}

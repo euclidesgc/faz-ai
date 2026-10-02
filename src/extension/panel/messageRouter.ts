@@ -5,7 +5,9 @@ import type { Attachment, BoardState, Card, FieldDef } from '../../shared/model'
 import { branchName, slug } from '../../shared/git';
 import { prepareWorkspace } from '../git';
 import type { WebviewToHost } from '../../shared/messages';
-import { EMPTY_HARNESS, REFERENCE_SKILL, aiToolInfo, type AiTool, type Harness, type HarnessItem, type HarnessKind } from '../../shared/harness';
+import { EMPTY_HARNESS, REFERENCE_SKILL, aiToolInfo, type AiTool, type Harness, type HarnessItem, type HarnessKind, type InstallableSkill } from '../../shared/harness';
+import { copyTarget } from '../../shared/harnessCatalog';
+import { findSkills, installSkills } from '../skillInstall';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelRule } from '../../shared/models';
 import { newId } from '../db/ids';
 import { detectTools, effortTiers, modelsFor } from '../models';
@@ -49,6 +51,8 @@ export class MessageRouter {
   readonly harnessStore: HarnessStore | null;
   private harness: Harness = EMPTY_HARNESS;
   private aiRuns: string[] = [];
+  /** origem de skills já baixada, à espera da escolha do que instalar */
+  private install: { source: string; dir: string; skills: InstallableSkill[]; cleanup: () => void } | null = null;
   private approved: string[] = [];
   private approveListeners: ((cardId: string) => void)[] = [];
   boardId: string;
@@ -79,7 +83,7 @@ export class MessageRouter {
 
   snapshot(): BoardState {
     const s = this.boards.snapshot(this.boardId, this.opts.author);
-    return { ...s, harness: this.harness, aiRuns: this.aiRuns, aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission) };
+    return { ...s, harness: this.harness, aiRuns: this.aiRuns, aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission), harnessInstall: this.install ? { source: this.install.source, skills: this.install.skills } : null };
   }
 
   /** Cards em que a extensão está executando a IA (informado pelo executor). */
@@ -203,6 +207,18 @@ export class MessageRouter {
     const item = this.harness.inventory.find((t) => t.tool === tool)?.items.find((i) => i.kind === kind && i.layout === 'entry' && i.path === file && i.name === name && (i.detail ?? '') === detail);
     if (!item) throw new Error('Item não encontrado no harness. Atualize a lista e tente de novo.');
     return item;
+  }
+
+  /** Guarda a origem de skills já disponível numa pasta, para a pessoa escolher o que instalar. */
+  setInstall(source: string, dir: string, cleanup: () => void): void {
+    this.clearInstall();
+    this.install = { source, dir, cleanup, skills: findSkills(dir) };
+    this.listeners.forEach((fn) => fn());
+  }
+
+  clearInstall(): void {
+    this.install?.cleanup();
+    this.install = null;
   }
 
   /** Cria um arquivo de apoio numa skill e devolve o caminho dele, para abrir no editor. */
@@ -367,6 +383,7 @@ export class MessageRouter {
       case 'harness.item.create':
       case 'harness.skill.file.create':
       case 'harness.skill.file.open':
+      case 'harness.install.scan':
       case 'attachment.pick':
       case 'attachment.open':
       case 'attachment.reveal':
@@ -517,6 +534,19 @@ export class MessageRouter {
       case 'harness.refresh':
         this.refreshHarness();
         return false;
+      case 'harness.install.apply': {
+        if (!this.install) throw new Error('Nenhuma origem de skills carregada. Procure de novo.');
+        const target = copyTarget(msg.tool, 'skill', 'skills', msg.to);
+        const base = msg.to === 'project' ? this.opts.workspaceDir : this.home;
+        if (!target || !base) throw new Error('Esta ferramenta não tem uma pasta de skills nesse escopo.');
+        installSkills(this.install.dir, msg.rels, path.join(base, target.path));
+        this.clearInstall();
+        this.loadHarness();
+        return true;
+      }
+      case 'harness.install.cancel':
+        this.clearInstall();
+        return true;
       case 'harness.skill.file.delete':
         this.harnessOps.removeSkillFile(this.harnessItem(msg.tool, 'skill', msg.path), msg.file);
         this.loadHarness();

@@ -1,4 +1,6 @@
+import * as os from 'node:os';
 import * as vscode from 'vscode';
+import { fetchSource, parseSource } from '../skillInstall';
 import type { HostToWebview, WebviewToHost } from '../../shared/messages';
 import type { ViewStateStore } from '../viewState';
 import type { MessageRouter } from './messageRouter';
@@ -57,6 +59,7 @@ export class WebviewBridge implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.router.clearInstall();
     this.subs.forEach((off) => off());
     this.disposables.forEach((d) => d.dispose());
   }
@@ -110,6 +113,11 @@ export class WebviewBridge implements vscode.Disposable {
         case 'harness.skill.file.open':
           await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(this.router.skillFilePath(msg.tool, msg.path, msg.file)), vscode.ViewColumn.Beside);
           return;
+        case 'harness.install.scan': {
+          const fetched = await fetchSource(parseSource(msg.source, os.homedir()));
+          this.router.setInstall(msg.source.trim(), fetched.dir, fetched.cleanup);
+          return;
+        }
         case 'harness.item.create':
           await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description)), vscode.ViewColumn.Beside);
           return;

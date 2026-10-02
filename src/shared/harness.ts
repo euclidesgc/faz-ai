@@ -93,6 +93,24 @@ export interface HarnessItem {
   detail?: string;
 }
 
+/** Uma skill encontrada numa pasta ou num repositório, antes de ser instalada. */
+export interface InstallableSkill {
+  /** pasta da skill, relativa à origem */
+  rel: string;
+  name: string;
+  description: string;
+  /** quantos arquivos de apoio a pasta tem, além do SKILL.md */
+  files: number;
+  /** o nome da pasta serve como nome de skill */
+  valid: boolean;
+}
+
+/** Skills encontradas na origem informada, à espera da escolha do que instalar. */
+export interface InstallPreview {
+  source: string;
+  skills: InstallableSkill[];
+}
+
 export interface ToolInventory {
   tool: AiTool;
   /** há sinal da ferramenta nesta máquina (pasta de configuração na home) */

@@ -143,6 +143,6 @@ export class BoardRepo {
       [boardId],
     ).map((r) => ({ id: str(r.id), cardId: str(r.card_id), filename: str(r.filename), storedName: str(r.stored_name), mime: str(r.mime), size: num(r.size), createdAt: num(r.created_at), artifact: bool(r.artifact) }));
 
-    return { board, workflows, columns, cardTypes, cards, fieldDefs, fieldValues, checklistItems, comments, attachments, currentUser, harness: EMPTY_HARNESS, pendingUpgrade: pendingUpgrade(db, boardId), aiRuns: [], aiRunUnsupported: null };
+    return { board, workflows, columns, cardTypes, cards, fieldDefs, fieldValues, checklistItems, comments, attachments, currentUser, harness: EMPTY_HARNESS, pendingUpgrade: pendingUpgrade(db, boardId), aiRuns: [], aiRunUnsupported: null, harnessInstall: null };
   }
 }

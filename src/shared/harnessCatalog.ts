@@ -272,3 +272,15 @@ export function permissionTargets(tool: AiTool): PermissionTarget[] {
 }
 
 export const PERMISSION_LIST_LABEL: Record<string, string> = { allow: 'permitir', ask: 'perguntar', deny: 'negar' };
+
+/**
+ * Como instalar plugins em cada ferramenta, pelos comandos que a documentação delas descreve.
+ * O board mostra os comandos; quem os roda é a pessoa, no terminal ou na sessão da ferramenta.
+ */
+export const PLUGIN_COMMANDS: Record<AiTool, { where: string; commands: string[] }> = {
+  claude: { where: 'no terminal', commands: ['claude plugin marketplace add <dono/repositorio>', 'claude plugin install <plugin>@<marketplace>', 'claude plugin list', 'claude plugin uninstall <plugin>@<marketplace>'] },
+  codex: { where: 'no terminal', commands: ['codex plugin marketplace add <dono/repositorio>', 'codex plugin list --available', 'codex plugin add <plugin>@<marketplace>', 'codex plugin remove <plugin>@<marketplace>'] },
+  copilot: { where: 'no terminal', commands: ['copilot plugin marketplace browse <marketplace>', 'copilot plugin install <plugin>@<marketplace>', 'copilot plugin list', 'copilot plugin uninstall <plugin>', 'gh skill search <termo>'] },
+  cursor: { where: 'no Cursor (Customize → Plugins) ou numa sessão do agente', commands: ['/plugin', 'agent plugin marketplace add <endereço git>'] },
+  kimi: { where: 'numa sessão do Kimi Code', commands: ['/plugins marketplace', '/plugins install <pasta, zip ou endereço do GitHub>', '/plugins list', '/plugins remove <id>'] },
+};

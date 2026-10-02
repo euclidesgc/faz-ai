@@ -139,6 +139,26 @@ describe('servidor MCP', () => {
   });
 });
 
+describe('instalar skills pelo board', () => {
+  it('mostra o que foi encontrado, instala as escolhidas e as oferece nos cards', async () => {
+    const src = path.join(dir, 'origem');
+    for (const name of ['commit', 'deploy']) {
+      fs.mkdirSync(path.join(src, name), { recursive: true });
+      fs.writeFileSync(path.join(src, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Skill ${name}\n---\n`);
+    }
+    let cleaned = false;
+    router.setInstall('origem', src, () => { cleaned = true; });
+    expect(router.snapshot().harnessInstall).toEqual({ source: 'origem', skills: [{ rel: 'commit', name: 'commit', description: 'Skill commit', files: 0, valid: true }, { rel: 'deploy', name: 'deploy', description: 'Skill deploy', files: 0, valid: true }] });
+    router.handle({ type: 'harness.install.apply', tool: 'claude', to: 'project', rels: ['commit'] });
+    expect(fs.existsSync(path.join(dir, '.claude/skills/commit/SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, '.claude/skills/deploy'))).toBe(false);
+    expect(router.snapshot().harnessInstall).toBeNull();
+    expect(cleaned).toBe(true);
+    expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toContain('commit');
+    expect(() => router.handle({ type: 'harness.install.apply', tool: 'claude', to: 'project', rels: ['deploy'] })).toThrow('Procure de novo');
+  });
+});
+
 describe('modelos e referências nas skills', () => {
   it('a skill de modelos nasce só quando indicada, e o card entrega os arquivos dela', async () => {
     router.handle({ type: 'harness.referenceSkill.create' });

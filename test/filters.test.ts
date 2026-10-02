@@ -48,6 +48,7 @@ const state: BoardState = {
   pendingUpgrade: [],
   aiRuns: [],
   aiRunUnsupported: null,
+  harnessInstall: null,
 };
 
 const run = (f: Partial<Filters>) => [...(applyFilters(state, { ...EMPTY_FILTERS, includeRelated: false, ...f }, NOW) ?? [])].sort();

@@ -1,5 +1,5 @@
 import type { ExecProfile } from './execution';
-import type { AiTool, Harness } from './harness';
+import type { AiTool, Harness, InstallPreview } from './harness';
 import type { ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
@@ -197,4 +197,6 @@ export interface BoardState {
   aiRuns: Id[];
   /** por que a ferramenta do projeto não pode ser executada pelo board; null quando pode */
   aiRunUnsupported: string | null;
+  /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */
+  harnessInstall: InstallPreview | null;
 }
