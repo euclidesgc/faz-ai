@@ -46,6 +46,8 @@ export class MessageRouter {
   readonly harnessStore: HarnessStore | null;
   private harness: Harness = EMPTY_HARNESS;
   private aiRuns: string[] = [];
+  private approved: string[] = [];
+  private approveListeners: ((cardId: string) => void)[] = [];
   boardId: string;
 
   constructor(private dbHandle: DbHandle, private opts: RouterOptions) {
@@ -262,6 +264,7 @@ export class MessageRouter {
     if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
     this.cards.setStatus(msg.cardId, msg.status, msg.status === 'blocked' ? note : '', author);
     if (note) this.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
+    if (msg.status === 'approved') this.approved.push(msg.cardId);
   }
 
   /** Como `card.create`, mas devolve o id do card criado. */
@@ -275,7 +278,14 @@ export class MessageRouter {
   private changed(): BoardState {
     this.dbHandle.scheduleSave();
     this.listeners.forEach((fn) => fn());
+    // avisa das aprovações só depois de o board estar gravado e os webviews atualizados
+    for (const cardId of this.approved.splice(0)) this.approveListeners.forEach((fn) => fn(cardId));
     return this.snapshot();
+  }
+
+  /** Avisa quando uma pessoa aprova um card (usado pelo merge automático). */
+  onDidApprove(fn: (cardId: string) => void): void {
+    this.approveListeners.push(fn);
   }
 
   private apply(msg: WebviewToHost, author: string, byAi: boolean): boolean {
@@ -341,6 +351,17 @@ export class MessageRouter {
       case 'card.workspace.prepare':
         this.prepareWorkspace(msg.cardId);
         return true;
+      case 'card.workspace.clear': {
+        const story = this.storyOf(msg.cardId);
+        this.cards.setWorkspace(story.id, story.branch, '');
+        return true;
+      }
+      case 'card.pr.set': {
+        const url = msg.url.trim();
+        if (url && !/^https?:\/\/\S+$/.test(url)) throw new Error('Informe o endereço (URL) do pull request.');
+        this.cards.setPullRequest(this.storyOf(msg.cardId).id, url);
+        return true;
+      }
       case 'comment.add':
         if (!msg.body.trim()) return true;
         this.comments.add(msg.cardId, author, msg.body.trim(), byAi ? 'ai' : 'human');

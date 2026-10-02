@@ -182,6 +182,7 @@ function workspaceOf(s: BoardState, c: Card) {
       workspace: {
         branch: story.branch,
         path: story.worktreePath,
+        ...(story.prUrl ? { pullRequest: story.prUrl } : {}),
         note:
           s.board.git.mode === 'worktree'
             ? `Altere o código só dentro de ${story.worktreePath} (worktree da história, já na branch ${story.branch}) e faça os commits lá. Não mexa na pasta principal do projeto.`

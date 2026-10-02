@@ -98,7 +98,7 @@ export class BoardRepo {
       parentId: r.parent_id == null ? null : str(r.parent_id), title: str(r.title), description: str(r.description),
       position: num(r.position), createdAt: num(r.created_at), updatedAt: num(r.updated_at),
       deletedAt: r.deleted_at == null ? null : num(r.deleted_at), archivedAt: r.archived_at == null ? null : num(r.archived_at),
-      status: isCardStatus(r.status) ? r.status : null, statusReason: str(r.status_reason), statusAt: r.status_at == null ? null : num(r.status_at), statusBy: str(r.status_by), branch: str(r.branch), worktreePath: str(r.worktree_path),
+      status: isCardStatus(r.status) ? r.status : null, statusReason: str(r.status_reason), statusAt: r.status_at == null ? null : num(r.status_at), statusBy: str(r.status_by), branch: str(r.branch), worktreePath: str(r.worktree_path), prUrl: str(r.pr_url),
     }));
 
     const fieldDefs: FieldDef[] = all(db, 'SELECT * FROM field_defs WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({

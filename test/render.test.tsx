@@ -149,7 +149,7 @@ describe('telas montam sem erro', () => {
 
   it('configurações', () => {
     expect(html(<Settings />)).toContain('Harness de IA');
-    for (const text of ['Worktree por história', 'Nome da branch', 'historia/12-login-com-google', 'Pasta das worktrees']) expect(html(<GitSettings />)).toContain(text);
+    for (const text of ['Worktree por história', 'Nome da branch', 'historia/12-login-com-google', 'Pasta das worktrees', 'Fazer o merge do PR ao aprovar a homologação', 'Squash']) expect(html(<GitSettings />)).toContain(text);
     const cols = html(<ColumnsSettings />);
     for (const text of ['PRD', 'Começa colapsada', 'Linha começa colapsada', 'Arquivados', 'IA atua', 'Exige aprovação', 'Fase', 'PRD.md', 'Discovery', 'Homologação']) expect(cols).toContain(text);
     const types = html(<TypesSettings />);

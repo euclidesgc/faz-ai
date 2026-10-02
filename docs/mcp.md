@@ -179,6 +179,10 @@ pasta em que o código deve ser alterado. O nome da branch e a pasta são defini
 não deve criar branches por conta própria. Nas execuções pelo board, a pasta das worktrees é
 passada à ferramenta como pasta de trabalho extra (`--add-dir`).
 
+`set_pull_request` registra na história o endereço do PR aberto pela IA; ele volta em
+`workspace.pullRequest`. A IA não faz o merge: com o merge automático ligado, é o board que roda
+`gh pr merge <url> --squash|--merge|--rebase` quando a pessoa aprova a homologação.
+
 ### Fases e documentos
 
 Cada coluna em que a IA atua é uma fase. `get_card` devolve em `phase` a instrução da fase, o nome

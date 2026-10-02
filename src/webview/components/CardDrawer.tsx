@@ -134,11 +134,12 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             {story.branch ? (
               <>
                 <span title="Branch da história">⎇ <code>{story.branch}</code></span>
-                {state.board.git.mode === 'worktree' && <button className="ghost small" title={story.worktreePath} onClick={() => send({ type: 'card.workspace.open', cardId })}>Abrir a pasta de trabalho</button>}
+                {state.board.git.mode === 'worktree' && story.worktreePath && <button className="ghost small" title={story.worktreePath} onClick={() => send({ type: 'card.workspace.open', cardId })}>Abrir a pasta de trabalho</button>}
               </>
             ) : (
               <button className="ghost small" title="Cria a branch da história e, no modo worktree, a pasta de trabalho dela" onClick={() => send({ type: 'card.workspace.prepare', cardId })}>Criar branch da história</button>
             )}
+            {story.prUrl && <a href={story.prUrl} title={story.prUrl}>Pull request ↗</a>}
           </div>
         )}
 
