@@ -30,9 +30,12 @@ os artefatos de cada fase e move os cards conforme avança.
   por sua vez, pergunta ao board o que está com ela.
 - **Dizer à IA como executar cada card.** Cada card pode indicar o modelo, o nível de esforço e as
   skills obrigatórias. O modelo pode ser sugerido por regras a partir do tamanho da tarefa.
-- **Cuidar do harness do projeto.** O arquivo de regras (`CLAUDE.md` ou `AGENTS.md`), as skills e
-  os agentes (subagentes) são criados e editados pelo próprio board; skills também podem ser
-  ligadas e desligadas.
+- **Decidir antes o que a IA usa.** Um perfil de execução define o agente, as skills, os servidores
+  MCP, as ferramentas e o modelo de cada fase ou card, em vez de a ferramenta descobrir sozinha
+  durante a conversa.
+- **Ver e configurar o harness inteiro.** Para cada ferramenta de IA instalada, o board mostra o
+  que ela carrega (instruções, skills, agentes, comandos, hooks, servidores MCP, plugins e
+  configurações), separado entre o projeto, a sua pasta de usuário e os plugins.
 
 ## Como usar
 
@@ -134,6 +137,74 @@ aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma hi
 Quais colunas exigem aprovação, e em quais a IA atua, se define em Configurações → Workflows e
 colunas. Você mesmo pode mover qualquer card sem aprovação.
 
+### Perfis de execução
+
+Um perfil (Configurações → **Perfis de execução**) diz o que a sessão de IA usa para trabalhar num
+card: agente, skills, servidores MCP, ferramentas disponíveis e negadas, modelo e esforço, e se a
+sessão é limpa (sem as personalizações da sua pasta de usuário e sem invocação automática de
+skills). O perfil vale por fase (Workflows e colunas → Fase), pode ser trocado em cada card, e um
+deles pode ser o padrão do board.
+
+Cada execução pelo board ("Chamar IA" e heartbeat) é uma sessão nova, só com o que está no card. O
+perfil vira parâmetros da linha de comando onde a ferramenta aceita; o resto segue no prompt, como
+instrução:
+
+| Ferramenta | Imposto por parâmetro | Só orientado |
+| --- | --- | --- |
+| Claude Code | agente, servidores MCP, ferramentas, modelo e esforço, sessão limpa | skills |
+| GitHub Copilot | agente, servidores MCP, ferramentas, modelo e esforço | skills, sessão limpa |
+| Kimi Code | agente, modelo | skills, servidores MCP, ferramentas, sessão limpa |
+| Codex | servidores MCP, modelo e esforço | agente, skills, ferramentas, sessão limpa |
+| Cursor | modelo | todo o resto |
+
+As skills vão sempre pelo caminho do arquivo. Numa conversa aberta por você, o perfil chega à IA
+pelo `get_card`, como orientação.
+
+## Harness de IA
+
+Em Configurações → **Harness de IA** fica tudo que as ferramentas de IA carregam. No topo, a
+ferramenta do projeto, o arquivo de regras, as skills e os agentes do projeto. Abaixo, em **Tudo que
+cada ferramenta carrega**, há uma aba por ferramenta com oito seções (instruções e regras, skills,
+agentes, comandos e prompts, hooks, servidores MCP, plugins, configurações e permissões), cada uma
+dividida em três escopos:
+
+- **Projeto**: arquivos desta pasta; valem só aqui.
+- **Global**: arquivos da sua pasta de usuário (`~/.claude`, `~/.codex`, `~/.copilot`…); valem em
+  todos os seus projetos. Toda alteração neles pede confirmação.
+- **Plugins**: vêm de pacotes instalados; não são alterados pelo board, mas podem ser copiados.
+
+O que dá para fazer:
+
+- **Abrir** qualquer item no editor, onde ele também é editado.
+- **Criar** um item no lugar e no formato que a ferramenta espera, **apagar**, e **copiar** skills,
+  agentes, comandos e regras do global ou de um plugin para o projeto (e do projeto para o global).
+- **Servidores MCP**: acrescentar e remover, no formato de cada arquivo.
+- **Hooks e permissões**: acrescentar e remover hooks e regras de permitir, perguntar e negar.
+- **Buscar e instalar skills** de uma pasta ou de um repositório git: o board lista as skills
+  encontradas e copia só as que você escolher. Nada do repositório é executado.
+
+### Skills sob demanda
+
+Cada skill tem um modo:
+
+- **Automática**: a IA vê a descrição em toda sessão e decide quando usar.
+- **Só quando indicada**: a IA não a invoca sozinha; vale quando um card a indica ou quando é
+  chamada pelo nome.
+- **Desligada** (só no projeto): a ferramenta não a enxerga, mas um card ainda pode indicá-la.
+
+O campo "Skills" do card oferece as skills do projeto, as globais e as de plugins, com o filtro
+Todas / Projeto / Globais. O card entrega à IA o caminho do arquivo de cada skill, então ela não
+precisa estar à vista da ferramenta para ser usada. Assim dá para ter muitas skills disponíveis sem
+ocupar o contexto de toda sessão. A economia de contexto é documentada no Claude Code e no Cursor;
+nas outras ferramentas, a documentação diz só que a IA deixa de invocar a skill sozinha.
+
+### Modelos e referências
+
+Modelos de classe e exemplos de código ficam dentro da pasta da skill (`references/`, `assets/`,
+`scripts/`). O botão **Arquivos** de cada skill lista, cria e apaga esses arquivos, e **Criar skill
+de modelos** cria no projeto uma skill própria para eles. O card que indica a skill recebe os
+caminhos dos arquivos de apoio.
+
 O editor precisa estar aberto na pasta do projeto para a IA alcançar o board. O registro manual, os
 formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](docs/mcp.md).
 
@@ -143,12 +214,12 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 
 | Seção | O que ajusta |
 | --- | --- |
-| Workflows e colunas | Nomes, ordem e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento); quais começam colapsadas |
+| Workflows e colunas | Nomes, ordem (arrastando a linha) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento); quais começam colapsadas |
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos | Campos personalizados (texto, seleção, data, modelo…) e onde aparecem |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
 | Perfis de execução | O que a sessão de IA usa em cada card: agente, skills, servidores MCP, ferramentas e modelo; por fase, com troca por card |
-| Harness de IA | Ferramenta do projeto, arquivo de regras, skills e agentes; execução pela conversa e heartbeat; tudo que cada ferramenta carrega, separado em projeto, global e plugins, com criar, apagar e copiar entre global e projeto, servidores MCP, hooks, permissões e instalação de skills de uma pasta ou repositório |
+| Harness de IA | Ferramenta do projeto, arquivo de regras, skills e agentes; execução pela conversa e heartbeat; tudo que cada ferramenta carrega, por escopo (ver [Harness de IA](#harness-de-ia)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
 | Aparência | Tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
