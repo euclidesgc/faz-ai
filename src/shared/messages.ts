@@ -15,6 +15,8 @@ export type WebviewToHost =
   /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */
   | { type: 'ai.run'; cardId: Id }
   | { type: 'ai.stop'; cardId: Id }
+  /** começa agora uma rodada do heartbeat: a IA trata tudo o que está pendente com ela */
+  | { type: 'ai.heartbeat.run' }
   | { type: 'card.create'; typeId: Id; columnId: Id; parentId: Id | null; title: string }
   | { type: 'card.update'; cardId: Id; patch: { title?: string; description?: string; typeId?: Id } }
   | { type: 'card.move'; cardId: Id; columnId: Id; position: number; /** ao cancelar uma história, cancela também as sub-tarefas em aberto */ cancelChildren?: boolean }

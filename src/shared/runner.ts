@@ -7,6 +7,10 @@ export interface RunnerConfig {
   permission: RunnerPermission;
   /** tempo máximo de uma execução, em minutos */
   timeoutMinutes: number;
+  /** rotina periódica: a extensão chama a IA sozinha quando há pendência com ela */
+  heartbeat: boolean;
+  /** intervalo entre as rodadas do heartbeat, em minutos */
+  heartbeatMinutes: number;
 }
 
 export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint: string }[] = [
@@ -16,7 +20,8 @@ export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint:
 ];
 
 export const TIMEOUT_RANGE = { min: 1, max: 240 };
-export const DEFAULT_RUNNER: RunnerConfig = { permission: 'board', timeoutMinutes: 30 };
+export const HEARTBEAT_RANGE = { min: 5, max: 1440 };
+export const DEFAULT_RUNNER: RunnerConfig = { permission: 'board', timeoutMinutes: 30, heartbeat: false, heartbeatMinutes: 60 };
 
 /** Lê a configuração salva, completando com os padrões o que faltar ou for inválido. */
 export function parseRunner(json: string | null | undefined): RunnerConfig {
@@ -28,7 +33,10 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
     /* inválido: usa os padrões */
   }
   const minutes = Math.round(Number(raw.timeoutMinutes));
+  const interval = Math.round(Number(raw.heartbeatMinutes));
   return {
+    heartbeat: raw.heartbeat === true,
+    heartbeatMinutes: Number.isFinite(interval) && interval > 0 ? Math.min(HEARTBEAT_RANGE.max, Math.max(HEARTBEAT_RANGE.min, interval)) : DEFAULT_RUNNER.heartbeatMinutes,
     permission: RUNNER_PERMISSIONS.some((p) => p.value === raw.permission) ? (raw.permission as RunnerPermission) : DEFAULT_RUNNER.permission,
     timeoutMinutes: Number.isFinite(minutes) && minutes > 0 ? Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, minutes)) : DEFAULT_RUNNER.timeoutMinutes,
   };

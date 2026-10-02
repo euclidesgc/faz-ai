@@ -174,6 +174,6 @@ describe('telas montam sem erro', () => {
     const look = html(<AppearanceSettings />);
     for (const text of ['Tema', 'Sistema (acompanha o VS Code)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia', 'Status dos cards', 'Aguardando resposta']) expect(look).toContain(text);
     const harness = html(<HarnessSettings />);
-    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)', 'Instalar skill do fluxo', 'Execução pela conversa', 'Só o board', 'Tempo limite por execução']) expect(harness).toContain(text);
+    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)', 'Instalar skill do fluxo', 'Execução pela conversa e heartbeat', 'Só o board', 'Tempo limite por execução', 'Heartbeat ligado', 'Rodar agora']) expect(harness).toContain(text);
   });
 });
