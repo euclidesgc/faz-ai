@@ -150,6 +150,6 @@ describe('telas montam sem erro', () => {
     const look = html(<AppearanceSettings />);
     for (const text of ['Tema', 'Sistema (acompanha o VS Code)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia']) expect(look).toContain(text);
     const harness = html(<HarnessSettings />);
-    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)']) expect(harness).toContain(text);
+    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)']) expect(harness).toContain(text);
   });
 });

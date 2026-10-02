@@ -44,6 +44,8 @@ export function createMcpServer(opts: McpOptions): McpServer {
     workspaceDir: opts.workspaceDir,
     author: () => {
       const client = server.server.getClientVersion();
+      // o VS Code se apresenta pelo nome do produto ("Visual Studio Code", "Visual Studio Code - Insiders"); quem fala por ele é o Copilot
+      if (client?.name.startsWith('Visual Studio Code')) return 'GitHub Copilot';
       return (client && (CLIENT_NAMES[client.name] ?? client.title ?? client.name)) || 'IA';
     },
   });

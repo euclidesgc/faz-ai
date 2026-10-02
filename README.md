@@ -14,7 +14,7 @@ os artefatos de cada fase e move os cards conforme avança.
   Implementação, Concluído e Cancelado. Cada história se desdobra em sub-tarefas, que têm um fluxo
   próprio (A fazer, Em andamento, Concluído).
 - **Trabalhar com a IA no mesmo quadro.** A extensão expõe o board por MCP. Claude Code, Codex,
-  Cursor, Kimi Code ou outro cliente MCP podem consultar e editar tudo o que a interface permite, e
+  Cursor, Kimi Code, GitHub Copilot ou outro cliente MCP podem consultar e editar tudo o que a interface permite, e
   as mudanças aparecem no board na hora.
 - **Dizer à IA como executar cada card.** Cada card pode indicar o modelo, o nível de esforço e as
   skills obrigatórias. O modelo pode ser sugerido por regras a partir do tamanho da tarefa.
@@ -39,7 +39,7 @@ daquela fase. Essas regras podem ser desligadas nas configurações.
 ## Usando com IA
 
 1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Codex,
-   Cursor ou Kimi Code).
+   Cursor, Kimi Code ou GitHub Copilot).
 2. Clique em **Conectar IA (MCP)**. O board registra o servidor no arquivo que a ferramenta lê.
 3. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
    board" ou "pegue a história #1 e escreva o PRD".
