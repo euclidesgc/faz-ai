@@ -322,6 +322,25 @@ To try the interface without the editor, `node dist/cli.js <folder> --data <test
 serves the board in the browser. The tests cover the extension's activation (with a fake editor in
 `test/fakes/vscode.ts`) and the page server (`test/webServer.test.ts`).
 
+### Setting up the development environment
+
+The repository has all the code, but a few items live outside git. On a fresh clone (another
+machine, for example), they must be set up again:
+
+| Item | What it is for | How to get it |
+|---|---|---|
+| Node.js 18+ and git | build, tests and the `faz-ai` command | regular install |
+| `.mcp.json` and `.claude/settings.local.json` | connect the AI to the board; hold machine paths | **Conectar IA (MCP)** in the board settings |
+| Board and attachments | live in the extension's storage, not in the repository | the folder's board starts empty on the other machine |
+| `.env.release` with `OVSX_PAT` | publishing to Open VSX | token at https://open-vsx.org/user-settings/tokens |
+| Azure CLI login | publishing to the VS Code Marketplace | `az login --allow-no-subscriptions`, with the account that owns the publisher |
+| Authenticated `gh` | creating the GitHub Release | `gh auth login` |
+| `.claude/skills/publicar-extensao/` | the publishing walkthrough for the AI | copy the folder from the original machine |
+
+The last three are only needed to publish. `npm run release -- <patch|minor|major|current>` runs
+the full release; `--dry-run` rehearses without publishing. The options are at the top of
+`scripts/release.mjs`.
+
 ## Version history
 
 What changed in each version is in [CHANGELOG_EN.md](CHANGELOG_EN.md).

@@ -305,6 +305,25 @@ Para testar a interface sem o editor, `node dist/cli.js <pasta> --data <pasta de
 serve o board no navegador. Os testes cobrem a ativação da extensão (com um editor de mentira em
 `test/fakes/vscode.ts`) e o servidor da página (`test/webServer.test.ts`).
 
+### Preparar o ambiente de desenvolvimento
+
+O repositório tem todo o código, mas alguns itens ficam fora do git. Num clone novo (outra máquina,
+por exemplo), eles precisam ser refeitos:
+
+| Item | Para que serve | Como obter |
+|---|---|---|
+| Node.js 18+ e git | build, testes e o comando `faz-ai` | instalação normal |
+| `.mcp.json` e `.claude/settings.local.json` | ligam a IA ao board; guardam caminhos da máquina | **Conectar IA (MCP)** nas configurações do board |
+| Board e anexos | ficam no armazenamento da extensão, não no repositório | o board da pasta começa vazio na outra máquina |
+| `.env.release` com `OVSX_PAT` | publicar no Open VSX | token em https://open-vsx.org/user-settings/tokens |
+| Login da Azure CLI | publicar no VS Code Marketplace | `az login --allow-no-subscriptions`, com a conta dona do publisher |
+| `gh` autenticado | criar a GitHub Release | `gh auth login` |
+| `.claude/skills/publicar-extensao/` | passo a passo da publicação para a IA | copiar a pasta da máquina original |
+
+Os três últimos só são necessários para publicar. `npm run release -- <patch|minor|major|current>`
+faz o release completo; `--dry-run` ensaia sem publicar. As opções estão no topo de
+`scripts/release.mjs`.
+
 ## Histórico de versões
 
 O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md).
