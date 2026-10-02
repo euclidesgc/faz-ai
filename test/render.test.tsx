@@ -125,6 +125,17 @@ describe('telas montam sem erro', () => {
     for (const text of ['Artefatos da história', 'spec.md', 'anexado à história', 'Nenhum anexo.']) expect(subAttachments).toContain(text);
     expect(html(<AttachmentsTab cardId={storyId} />)).toContain('artefato');
     useBoardStore.setState({ state: st });
+    // conversa: chamar a IA, IA em execução e imagem colada (referência a um anexo do card)
+    const image = st.attachments[0]!;
+    useBoardStore.setState({
+      attachmentsBaseUri: 'https://anexos',
+      state: { ...st, aiRuns: [storyId], comments: st.comments.map((c) => ({ ...c, body: `veja ![tela](attachment:${image.filename})` })) },
+    });
+    const talking = html(<CommentsTab cardId={storyId} />);
+    for (const text of ['Chamar IA', 'está trabalhando neste card', 'Parar', `src="https://anexos/${storyId}/${image.storedName}"`]) expect(talking).toContain(text);
+    useBoardStore.setState({ state: { ...st, aiRunUnsupported: 'Sem suporte' } });
+    expect(html(<CommentsTab cardId={storyId} />)).toContain('não está disponível');
+    useBoardStore.setState({ state: st, attachmentsBaseUri: '' });
     const own = html(<CommentsTab cardId={storyId} />);
     expect(own).toContain('Apagar');
     expect(own).toContain('Editar');
@@ -163,6 +174,6 @@ describe('telas montam sem erro', () => {
     const look = html(<AppearanceSettings />);
     for (const text of ['Tema', 'Sistema (acompanha o VS Code)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia', 'Status dos cards', 'Aguardando resposta']) expect(look).toContain(text);
     const harness = html(<HarnessSettings />);
-    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)', 'Instalar skill do fluxo']) expect(harness).toContain(text);
+    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi/skills', 'ao board (MCP)', 'Instalar skill do fluxo', 'Execução pela conversa', 'Só o board', 'Tempo limite por execução']) expect(harness).toContain(text);
   });
 });

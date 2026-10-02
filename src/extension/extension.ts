@@ -12,11 +12,14 @@ import { MessageRouter } from './panel/messageRouter';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
 import { ViewStateStore } from './viewState';
+import { AiRunner } from './runner';
+import { loginShellPath, spawnHeadless } from './spawn';
 import { cardRef } from '../shared/model';
 import { humanQueueStatuses, turnsPassedToHuman } from '../shared/pending';
 
 let handle: DbHandle | null = null;
 let stopMcp: (() => void) | null = null;
+let runner: AiRunner | null = null;
 
 function gitUserName(cwd: string): Promise<string> {
   return new Promise((resolve) => {
@@ -63,10 +66,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       };
       router.onDidChange(onBoardChange);
       onBoardChange();
+      const pathEnv = await loginShellPath();
+      runner = new AiRunner(router, {
+        cwd: f.uri.fsPath,
+        log: (line) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`),
+        spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
+      });
       void offerBoardUpgrade(context, router);
       return router;
     })();
     return routerPromise;
+  };
+
+  const output = vscode.window.createOutputChannel('Faz AI');
+  /** Chama ou interrompe a IA num card; erros (ferramenta sem suporte, card já em execução) aparecem como aviso. */
+  const aiCommand = (action: 'start' | 'stop') => async (cardId: string) => {
+    if (!(await getRouter()) || !runner) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
+    try {
+      runner[action](cardId);
+    } catch (e) {
+      vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
+    }
   };
 
   const tree = new BoardTreeProvider(getRouter);
@@ -95,6 +115,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard(cardId)),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
     vscode.commands.registerCommand('fazai.connectAI', () => connectAI(bridgePath, getRouter)),
+    output,
+    vscode.commands.registerCommand('fazai.ai.run', aiCommand('start')),
+    vscode.commands.registerCommand('fazai.ai.stop', aiCommand('stop')),
     vscode.commands.registerCommand('fazai.upgradeBoard', async () => {
       const router = await getRouter();
       if (!router) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
@@ -189,6 +212,8 @@ async function connectAI(bridgePath: string, getRouter: () => Promise<MessageRou
 }
 
 export async function deactivate(): Promise<void> {
+  runner?.dispose();
+  runner = null;
   stopMcp?.();
   stopMcp = null;
   await handle?.close();

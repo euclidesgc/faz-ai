@@ -26,6 +26,7 @@ export function createMcpServer(opts: McpOptions): McpServer {
         'Cards são identificados pelo número (#12). Comece por get_board para conhecer colunas, tipos e campos. ' +
         'Sinalize o progresso movendo os cards entre colunas e registre decisões e resultados em comentários ou anexos. ' +
         'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_question). ' +
+        'Uma imagem ou arquivo colado numa mensagem aparece como `attachment:<nome>`: o arquivo é o anexo de mesmo nome em `attachments` de get_card, e pode ser lido pelo `path`. ' +
         'Cada card tem um status de trabalho em `work`: "ready" e "approved" estão com você, "waiting_review", "waiting_answer" e "blocked" estão com a pessoa. ' +
         'Ao começar um card chame start_work. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
         'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +

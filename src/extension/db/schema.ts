@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -194,6 +194,10 @@ const MIGRATIONS: Record<number, string> = {
   14: `
     -- quem escreveu a mensagem na conversa: 'human' ou 'ai'; mensagens antigas ficam sem origem
     ALTER TABLE comments ADD COLUMN source TEXT;
+  `,
+  15: `
+    -- como a extensão executa a IA para um card (permissões, tempo limite)
+    ALTER TABLE boards ADD COLUMN runner_json TEXT NOT NULL DEFAULT '{}';
   `,
 };
 

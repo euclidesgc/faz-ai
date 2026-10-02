@@ -1,3 +1,4 @@
+import { DEFAULT_RUNNER } from '../src/shared/runner';
 import { describe, expect, it } from 'vitest';
 import type { BoardState, Card } from '../src/shared/model';
 import { DEFAULT_APPEARANCE } from '../src/shared/appearance';
@@ -14,7 +15,7 @@ const card = (id: string, over: Partial<Card> = {}): Card => ({
 });
 
 const state: BoardState = {
-  board: { id: 'b', workspaceKey: 'k', name: 'B', rules: DEFAULT_RULES, aiTool: 'claude', modelCatalog: [], modelRules: [], appearance: DEFAULT_APPEARANCE, templateVersion: 1 },
+  board: { id: 'b', workspaceKey: 'k', name: 'B', rules: DEFAULT_RULES, aiTool: 'claude', modelCatalog: [], modelRules: [], appearance: DEFAULT_APPEARANCE, templateVersion: 1, runner: DEFAULT_RUNNER },
   workflows: [{ id: 'wp', boardId: 'b', name: 'H', position: 0, kind: 'parent', collapsed: false, archiveCollapsed: true }, { id: 'wc', boardId: 'b', name: 'S', position: 1, kind: 'child', collapsed: false, archiveCollapsed: true }],
   columns: [
     { id: 'todo', workflowId: 'wp', name: 'Backlog', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '' },
@@ -44,6 +45,8 @@ const state: BoardState = {
   currentUser: 'a',
   harness: EMPTY_HARNESS,
   pendingUpgrade: [],
+  aiRuns: [],
+  aiRunUnsupported: null,
 };
 
 const run = (f: Partial<Filters>) => [...(applyFilters(state, { ...EMPTY_FILTERS, includeRelated: false, ...f }, NOW) ?? [])].sort();
