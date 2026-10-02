@@ -4,6 +4,16 @@
 
 # Faz AI Kanban
 
+> ⚠️ **O Faz AI está em fase alpha.**
+>
+> O projeto é novo e muda rápido: quase toda semana sai uma versão, e nem tudo foi testado em todas
+> as ferramentas de IA e sistemas operacionais. Erros e comportamentos inesperados podem acontecer,
+> e telas, comandos e o formato do board ainda podem mudar de uma versão para outra.
+>
+> Use à vontade, mas com esse cuidado em mente: revise o que a IA fizer antes de aprovar e não
+> dependa do board como único registro de algo importante. Se algo quebrar ou parecer estranho,
+> [conte numa issue](https://github.com/euclidesgc/faz-ai/issues): é assim que ele sai do alpha.
+
 > **Obrigado a quem está baixando e testando.**
 >
 > Publiquei a extensão no marketplace do Cursor e fui dormir. Quando acordei para instalá-la na
@@ -320,9 +330,11 @@ por exemplo), eles precisam ser refeitos:
 | `gh` autenticado | criar a GitHub Release | `gh auth login` |
 | `.claude/skills/publicar-extensao/` | passo a passo da publicação para a IA | copiar a pasta da máquina original |
 
-Os três últimos só são necessários para publicar. `npm run release -- <patch|minor|major|current>`
-faz o release completo; `--dry-run` ensaia sem publicar. As opções estão no topo de
-`scripts/release.mjs`.
+Os três últimos só são necessários para publicar. A `main` só aceita mudanças por pull request,
+então a versão nova do `package.json` entra pelo PR da própria mudança e, depois do merge,
+`npm run release -- current` publica essa versão (com `patch`, `minor` ou `major` o script tentaria
+enviar o commit da versão direto para a `main` e seria recusado). `--dry-run` ensaia sem publicar.
+As opções estão no topo de `scripts/release.mjs`.
 
 ## Histórico de versões
 

@@ -4,6 +4,16 @@
 
 # Faz AI Kanban
 
+> ⚠️ **Faz AI is in alpha.**
+>
+> The project is new and moves fast: a new version ships almost every week, and not everything has
+> been tested on every AI tool and operating system. Bugs and unexpected behavior can happen, and
+> screens, commands and the board format may still change from one version to the next.
+>
+> Use it freely, but with that in mind: review what the AI does before approving it, and do not rely
+> on the board as the only record of something important. If something breaks or looks odd,
+> [tell me in an issue](https://github.com/euclidesgc/faz-ai/issues): that is how it gets out of alpha.
+
 > **Thank you to everyone downloading and trying it out.**
 >
 > I published the extension to the Cursor marketplace and went to sleep. When I woke up to install
@@ -337,9 +347,11 @@ machine, for example), they must be set up again:
 | Authenticated `gh` | creating the GitHub Release | `gh auth login` |
 | `.claude/skills/publicar-extensao/` | the publishing walkthrough for the AI | copy the folder from the original machine |
 
-The last three are only needed to publish. `npm run release -- <patch|minor|major|current>` runs
-the full release; `--dry-run` rehearses without publishing. The options are at the top of
-`scripts/release.mjs`.
+The last three are only needed to publish. `main` only accepts changes through pull requests, so
+the new version in `package.json` goes in with the change's own PR and, after the merge,
+`npm run release -- current` publishes that version (with `patch`, `minor` or `major` the script
+would try to push the version commit straight to `main` and be refused). `--dry-run` rehearses
+without publishing. The options are at the top of `scripts/release.mjs`.
 
 ## Version history
 
