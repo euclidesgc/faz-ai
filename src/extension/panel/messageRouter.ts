@@ -9,6 +9,7 @@ import { AttachmentStore } from '../attachments';
 import { SKILLS_FIELD } from '../db/schema';
 import { pendingUpgrade, upgradeBoard } from '../db/boardTemplate';
 import { HarnessStore } from '../harness';
+import { FLOW_SKILL } from '../flowSkill';
 import { AttachmentRepo } from '../repositories/attachmentRepo';
 import { BoardRepo } from '../repositories/boardRepo';
 import { CardRepo } from '../repositories/cardRepo';
@@ -206,7 +207,7 @@ export class MessageRouter {
     if (msg.status === 'approved' && byAi) throw new Error('Só uma pessoa pode aprovar um card.');
     if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
     this.cards.setStatus(msg.cardId, msg.status, msg.status === 'blocked' ? note : '', author);
-    if (note) this.comments.add(msg.cardId, author, note);
+    if (note) this.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
   }
 
   /** Como `card.create`, mas devolve o id do card criado. */
@@ -281,7 +282,7 @@ export class MessageRouter {
         return true;
       case 'comment.add':
         if (!msg.body.trim()) return true;
-        this.comments.add(msg.cardId, author, msg.body.trim());
+        this.comments.add(msg.cardId, author, msg.body.trim(), byAi ? 'ai' : 'human');
         // a pessoa respondeu à pergunta da IA: a vez volta para a IA
         if (!byAi && this.cards.status(msg.cardId) === 'waiting_answer') this.cards.setStatus(msg.cardId, 'ready', '', author);
         return true;
@@ -368,6 +369,11 @@ export class MessageRouter {
         return this.harnessOp((h) => h.setSkillEnabled(msg.name, msg.enabled));
       case 'harness.skill.delete':
         return this.harnessOp((h) => h.deleteSkill(msg.name));
+      case 'harness.flowSkill.install':
+        // não sobrescreve: se a pessoa já ajustou a skill, a versão dela fica
+        return this.harnessOp((h) => {
+          if (!this.harness.skills.some((k) => k.name === FLOW_SKILL.name)) h.createSkill(FLOW_SKILL.name, FLOW_SKILL.description, FLOW_SKILL.body);
+        });
       case 'settings.board.update':
         this.boards.updateBoard(this.boardId, msg.patch);
         if (msg.patch.aiTool) this.useTool(this.boards.snapshot(this.boardId).board.aiTool);

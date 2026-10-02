@@ -8,8 +8,9 @@ import type { MessageRouter } from '../panel/messageRouter';
 import { ALL_AI_TOOLS, RULE_FILES, type AiTool } from '../../shared/harness';
 import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../../shared/models';
 import { newId } from '../db/ids';
+import { FLOW_SKILL } from '../flowSkill';
 import { ALL_CARD_STATUSES } from '../../shared/status';
-import { boardOverview, harnessOverview, modelsOverview, cardDetail, cardStatus, cardSummary, coerceFieldValue, findCard, findColumn, findField, findType, findWorkflow } from './format';
+import { boardOverview, pendingOverview, harnessOverview, modelsOverview, cardDetail, cardStatus, cardSummary, coerceFieldValue, findCard, findColumn, findField, findType, findWorkflow } from './format';
 
 export interface ToolContext {
   getRouter: () => Promise<MessageRouter>;
@@ -119,6 +120,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     'Detalhe completo de um card: descrição (markdown), campos, sub-tarefas, checklist, conversa e anexos. Em `phase` vem o que fazer na fase em que o card está e o modelo do documento que ela produz; numa sub-tarefa, `storyArtifacts` traz os documentos já anexados à história.',
     { card: cardArg },
     (a, router) => detail(router, findCard(router.snapshot(), a.card).id),
+    true,
+  );
+
+  tool(
+    'get_pending_work',
+    'O que está pendente com você no board: cards aprovados para avançar (`approved`), mensagens da pessoa sem resposta (`unanswered`) e cards prontos para trabalhar (`ready`). É o ponto de partida de uma sessão sem pedido específico (ex.: rotina periódica). `withPerson` mostra o que espera a pessoa.',
+    {},
+    (_a, router) => pendingOverview(router.snapshot()),
     true,
   );
 
@@ -712,6 +721,17 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     (a, router) => {
       router.handle({ type: 'harness.skill.create', name: a.name, description: a.description, content: a.content });
       return harness(router);
+    },
+  );
+
+  tool(
+    'install_flow_skill',
+    'Instala no projeto a skill "faz-ai-fluxo", que ensina a conduzir os cards pelo fluxo do board (fases, documentos, revisão, pendências). Não sobrescreve uma skill de mesmo nome que já exista.',
+    {},
+    (_a, router) => {
+      const had = router.snapshot().harness.skills.some((k) => k.name === FLOW_SKILL.name);
+      router.handle({ type: 'harness.flowSkill.install' });
+      return { installed: !had, note: had ? 'A skill já existia e foi mantida como está.' : 'Skill criada.', skill: router.snapshot().harness.skills.find((k) => k.name === FLOW_SKILL.name)?.path };
     },
   );
 

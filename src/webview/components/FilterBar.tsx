@@ -31,12 +31,13 @@ export function FilterBar() {
     chips.push({ key: 'date', label: `${name}: ${when}`, clear: () => setFilters({ dateField: null, datePreset: null }) });
   }
   if (filters.relation !== 'any') chips.push({ key: 'rel', label: RELATIONS[filters.relation]!, clear: () => setFilters({ relation: 'any' }) });
+  if (filters.owner !== 'any') chips.push({ key: 'owner', label: filters.owner === 'human' ? 'Com você' : 'Com a IA', clear: () => setFilters({ owner: 'any' }) });
   if (parent) chips.push({ key: 'parent', label: `Sub-tarefas de: ${parent.title}`, clear: () => selectParent(null) });
 
   return (
     <div className="filterbar">
       <div className="filterbar-main">
-        <input className="search" type="search" placeholder="Buscar em título, descrição, comentários e campos…" value={filters.text} onChange={(e) => setFilters({ text: e.target.value })} />
+        <input className="search" type="search" placeholder="Buscar em título, descrição, conversa e campos…" value={filters.text} onChange={(e) => setFilters({ text: e.target.value })} />
         <button onClick={() => send({ type: 'ui.showFilters' })} title="Abrir os filtros na barra lateral">Filtros{count > 0 && ` (${count})`}</button>
         {chips.map((c) => (
           <span key={c.key} className="filter-chip" onClick={c.clear} title="Remover este filtro">{c.label} ✕</span>

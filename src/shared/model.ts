@@ -107,6 +107,8 @@ export interface Comment {
   id: Id;
   cardId: Id;
   author: string;
+  /** quem escreveu: a pessoa ou a IA; null nas mensagens anteriores a essa marcação */
+  source: 'human' | 'ai' | null;
   body: string;
   createdAt: number;
   updatedAt: number;

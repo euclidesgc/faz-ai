@@ -1,4 +1,5 @@
 import type { BoardState, Card, FieldValue, Id } from './model';
+import { statusInfo, type StatusOwner } from './status';
 
 export type DatePreset = 'today' | '7d' | '30d' | 'custom';
 export type Relation = 'any' | 'withChildren' | 'withoutChildren' | 'pendingChildren';
@@ -16,12 +17,14 @@ export interface Filters {
   dateFrom: string;
   dateTo: string;
   relation: Relation;
+  /** com quem está a pendência do card */
+  owner: StatusOwner | 'any';
   /** mostrar também o pai e as sub-tarefas dos cards encontrados */
   includeRelated: boolean;
 }
 
 export const EMPTY_FILTERS: Filters = {
-  text: '', typeIds: [], fields: {}, dateField: null, datePreset: null, dateFrom: '', dateTo: '', relation: 'any', includeRelated: true,
+  text: '', typeIds: [], fields: {}, dateField: null, datePreset: null, dateFrom: '', dateTo: '', relation: 'any', owner: 'any', includeRelated: true,
 };
 
 /** Estado de visualização compartilhado entre o board e a barra lateral. */
@@ -48,7 +51,8 @@ export function activeFilterCount(f: Filters): number {
     (f.typeIds.length ? 1 : 0) +
     Object.values(f.fields).filter((v) => v.length).length +
     (dateRange(f, Date.now()) ? 1 : 0) +
-    (f.relation !== 'any' ? 1 : 0)
+    (f.relation !== 'any' ? 1 : 0) +
+    (f.owner !== 'any' ? 1 : 0)
   );
 }
 
@@ -89,7 +93,7 @@ export function applyFilters(state: BoardState, f: Filters, now: number = Date.n
   const range = dateRange(f, now);
   const words = norm(f.text).split(/\s+/).filter(Boolean);
   const fieldFilters = Object.entries(f.fields).filter(([, v]) => v.length);
-  if (!words.length && !f.typeIds.length && !fieldFilters.length && !range && f.relation === 'any') return null;
+  if (!words.length && !f.typeIds.length && !fieldFilters.length && !range && f.relation === 'any' && f.owner === 'any') return null;
 
   const cards = state.cards.filter((c) => c.deletedAt === null);
   const values = new Map<string, FieldValue>();
@@ -108,6 +112,7 @@ export function applyFilters(state: BoardState, f: Filters, now: number = Date.n
 
   const matches = (c: Card): boolean => {
     if (f.typeIds.length && !f.typeIds.includes(c.typeId)) return false;
+    if (f.owner !== 'any' && (!c.status || c.archivedAt !== null || statusInfo(c.status).owner !== f.owner)) return false;
 
     for (const [fieldId, accepted] of fieldFilters) {
       const v = values.get(`${c.id}:${fieldId}`) ?? null;

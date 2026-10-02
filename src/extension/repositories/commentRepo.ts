@@ -5,10 +5,10 @@ import { run } from '../db/query';
 export class CommentRepo {
   constructor(private db: Database) {}
 
-  add(cardId: string, author: string, body: string): string {
+  add(cardId: string, author: string, body: string, source: 'human' | 'ai'): string {
     const id = newId();
     const t = now();
-    run(this.db, 'INSERT INTO comments(id, card_id, author, body, created_at, updated_at) VALUES (?,?,?,?,?,?)', [id, cardId, author, body, t, t]);
+    run(this.db, 'INSERT INTO comments(id, card_id, author, body, created_at, updated_at, source) VALUES (?,?,?,?,?,?,?)', [id, cardId, author, body, t, t, source]);
     return id;
   }
 

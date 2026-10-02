@@ -81,7 +81,7 @@ describe('arquivo', () => {
 describe('comentários e anexos', () => {
   it('comentários entram no snapshot e somem com o card', () => {
     const comments = new CommentRepo(db);
-    const id = comments.add(story, 'Ana', 'primeiro');
+    const id = comments.add(story, 'Ana', 'primeiro', 'human');
     comments.update(id, 'editado');
     expect(boards.snapshot(boardId, 'Ana').comments[0]).toMatchObject({ author: 'Ana', body: 'editado' });
     expect(boards.snapshot(boardId, 'Ana').currentUser).toBe('Ana');

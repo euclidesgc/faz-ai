@@ -25,6 +25,9 @@ os artefatos de cada fase e move os cards conforme avança.
   você ou com a IA.
 - **Revisar antes de a IA avançar.** Nas colunas que exigem aprovação (Discovery, PRD, Spec, Plan
   e Homologação, por padrão), a IA termina o trabalho, pede a revisão e para. Ela só move o card depois que você aprova.
+- **Ver o que espera por você.** O filtro "Com você", o contador no ícone da barra lateral e um
+  aviso do editor mostram quando a IA pede revisão, faz uma pergunta ou trava num impedimento. A IA,
+  por sua vez, pergunta ao board o que está com ela.
 - **Dizer à IA como executar cada card.** Cada card pode indicar o modelo, o nível de esforço e as
   skills obrigatórias. O modelo pode ser sugerido por regras a partir do tamanho da tarefa.
 - **Cuidar do harness do projeto.** O arquivo de regras (`CLAUDE.md` ou `AGENTS.md`) e as skills
@@ -52,8 +55,11 @@ daquela fase. Essas regras podem ser desligadas nas configurações.
 1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Codex,
    Cursor, Kimi Code ou GitHub Copilot).
 2. Clique em **Conectar IA (MCP)**. O board registra o servidor no arquivo que a ferramenta lê.
-3. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
-   board" ou "pegue a história #1 e escreva o PRD".
+3. Em **Harness de IA**, clique em **Instalar skill do fluxo**: ela ensina a IA a conduzir os cards
+   pelas fases, gerar os documentos, pedir revisão e retomar pendências. É um arquivo do projeto e
+   pode ser editado.
+4. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
+   board", "pegue a história #1 e escreva o PRD" ou "veja o que está pendente no board e dê andamento".
 
 Fluxo sugerido: a IA lê a história e a instrução da fase, cria uma sub-tarefa para construir o
 documento da fase, anexa o documento à história e pede a revisão pela conversa do card. Você

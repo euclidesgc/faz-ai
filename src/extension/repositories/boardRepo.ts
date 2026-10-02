@@ -112,9 +112,9 @@ export class BoardRepo {
 
     const comments: Comment[] = all(
       db,
-      'SELECT cm.* FROM comments cm JOIN cards c ON c.id = cm.card_id WHERE c.board_id = ? ORDER BY cm.created_at',
+      'SELECT cm.* FROM comments cm JOIN cards c ON c.id = cm.card_id WHERE c.board_id = ? ORDER BY cm.created_at, cm.rowid',
       [boardId],
-    ).map((r) => ({ id: str(r.id), cardId: str(r.card_id), author: str(r.author), body: str(r.body), createdAt: num(r.created_at), updatedAt: num(r.updated_at) }));
+    ).map((r) => ({ id: str(r.id), cardId: str(r.card_id), author: str(r.author), source: r.source === 'human' || r.source === 'ai' ? r.source : null, body: str(r.body), createdAt: num(r.created_at), updatedAt: num(r.updated_at) }));
 
     const attachments: Attachment[] = all(
       db,
