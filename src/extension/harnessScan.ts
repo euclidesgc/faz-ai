@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool, HarnessItem, HarnessScope } from '../shared/harness';
 import { HARNESS_CATALOG, PERMISSION_LIST_LABEL, PLUGIN_ROOTS, type HarnessSource } from '../shared/harnessCatalog';
+import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { skillMode } from './skillMode';
 
 const HEAD_BYTES = 4096;
@@ -57,17 +58,11 @@ const obj = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 const short = (s: string, max = 160) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
 
-/** `description` de um arquivo markdown (frontmatter YAML, valor de uma linha) ou TOML. */
+/** `description` de um arquivo markdown (frontmatter YAML) ou TOML. */
 function descriptionOf(file: string): string {
   const text = head(file);
   if (file.endsWith('.toml')) return /^description\s*=\s*"((?:[^"\\]|\\.)*)"/m.exec(text)?.[1]?.replace(/\\(.)/g, '$1') ?? '';
-  const fm = /^---\r?\n([\s\S]*?)(\r?\n---|$)/.exec(text)?.[1] ?? '';
-  return (
-    /^description:\s*(.*)$/m
-      .exec(fm)?.[1]
-      ?.trim()
-      .replace(/^["']|["']$/g, '') ?? ''
-  );
+  return frontmatterValue(frontmatterOf(text), 'description') ?? '';
 }
 
 function walk(dir: string, ext: string, depth = 0): string[] {

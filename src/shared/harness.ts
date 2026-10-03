@@ -70,10 +70,25 @@ export const HARNESS_KINDS: { id: HarnessKind; label: string; hint: string }[] =
   { id: 'settings', label: 'Configurações e permissões', hint: 'Arquivos de configuração da ferramenta.' },
 ];
 
-export const HARNESS_SCOPES: { id: HarnessScope; label: string; hint: string }[] = [
-  { id: 'project', label: 'Projeto', hint: 'Arquivos desta pasta; valem só aqui.' },
-  { id: 'user', label: 'Global', hint: 'Arquivos da sua pasta de usuário; valem em todos os projetos.' },
-  { id: 'plugin', label: 'Plugins', hint: 'Vêm de plugins instalados ou da própria ferramenta; não são editáveis.' },
+export const HARNESS_SCOPES: { id: HarnessScope; label: string; hint: string; summary: string }[] = [
+  {
+    id: 'project',
+    label: 'Projeto',
+    hint: 'Arquivos desta pasta; valem só aqui.',
+    summary: 'Fazem parte deste projeto e vão no repositório.',
+  },
+  {
+    id: 'user',
+    label: 'Global',
+    hint: 'Arquivos da sua pasta de usuário; valem em todos os projetos.',
+    summary: 'Da sua máquina: valem em todos os seus projetos, mas não vão no repositório.',
+  },
+  {
+    id: 'plugin',
+    label: 'Plugins',
+    hint: 'Vêm de plugins instalados ou da própria ferramenta; não são editáveis.',
+    summary: 'Vêm de plugins e não podem ser alterados, só copiados.',
+  },
 ];
 
 /** Um item que a ferramenta carrega. Não leva o conteúdo: o arquivo é aberto no editor. */

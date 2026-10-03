@@ -13,11 +13,11 @@ import { Button, Callout } from '@radix-ui/themes';
 import { IconWarning } from '../../ui';
 import { SettingsCard } from '../SettingsCard';
 import { InstallSkills } from './InstallSkills';
-import { ItemRow } from './ItemRow';
 import { NewHook } from './NewHook';
 import { NewItem } from './NewItem';
 import { NewMcpServer } from './NewMcpServer';
 import { NewPermission } from './NewPermission';
+import { ScopeGroup } from './ScopeGroup';
 import { toolLabel } from './text';
 import type { ItemActions } from './useItemActions';
 
@@ -55,7 +55,6 @@ export function KindSection({
   onFilesOpen,
 }: Props) {
   const state = useBoardStore((s) => s.state)!;
-  const { copyable, twin, copy, setMode } = actions;
   const mcpFiles = mcpTargets(tool);
   const hookFiles = hookTargets(tool);
   const permissionFiles = permissionTargets(tool);
@@ -172,59 +171,21 @@ export function KindSection({
           {toolLabel(tool)}. As demais só são lidas quando indicadas.
         </p>
       )}
-      {ofKind.length === 0 && <p className="muted small">Nada encontrado para o {toolLabel(tool)}.</p>}
       {HARNESS_SCOPES.map((s) => {
         const group = ofKind.filter((i) => i.scope === s.id);
-        if (!group.length) return null;
-        const toProject = s.id === 'project' ? [] : group.filter((i) => copyable(i, 'project') && !twin(i, 'project'));
+        // o projeto aparece sempre: vazio, é a resposta de que nada daqui faz parte dele
         return (
-          <details key={s.id} open={s.id !== 'plugin' || group.length <= 12}>
-            <summary title={s.hint}>
-              {s.label} <span className="muted small">({group.length})</span>
-              {s.id !== 'plugin' && group.filter((i) => i.mode === 'auto').length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="1"
-                  title="A IA deixa de invocar essas skills sozinha; elas continuam valendo nos cards que as indicam"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setMode(
-                      group.filter((i) => i.mode === 'auto'),
-                      'manual',
-                    );
-                  }}
-                >
-                  Deixar todas só quando indicadas
-                </Button>
-              )}
-              {toProject.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="1"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    copy(toProject, 'project');
-                  }}
-                >
-                  Copiar todas para o projeto ({toProject.length})
-                </Button>
-              )}
-            </summary>
-            <table className="table">
-              <tbody>
-                {group.map((i) => (
-                  <ItemRow
-                    key={`${i.path}|${i.name}|${i.detail ?? ''}`}
-                    tool={tool}
-                    item={i}
-                    actions={actions}
-                    filesOpen={filesOpen === i.path}
-                    onToggleFiles={() => onFilesOpen(filesOpen === i.path ? null : i.path)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </details>
+          (group.length > 0 || s.id === 'project') && (
+            <ScopeGroup
+              key={s.id}
+              tool={tool}
+              scope={s.id}
+              items={group}
+              actions={actions}
+              filesOpen={filesOpen}
+              onFilesOpen={onFilesOpen}
+            />
+          )
         );
       })}
     </SettingsCard>

@@ -2,7 +2,7 @@ import type { AiTool, HarnessItem, SkillMode } from '../../../../shared/harness'
 import { copyTarget } from '../../../../shared/harnessCatalog';
 import { harness, type HarnessScope } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { GLOBAL_WARNING } from './text';
+import { GLOBAL_WARNING, withGlobalWarning } from './text';
 
 /** Ações sobre os itens já listados de uma ferramenta, usadas pela linha e pelos botões "todas" de cada escopo. */
 export function useItemActions(tool: AiTool, items: HarnessItem[]) {
@@ -47,7 +47,24 @@ export function useItemActions(tool: AiTool, items: HarnessItem[]) {
       });
     else run();
   };
-  return { copyable, twin, copy, setMode };
+  /** só o que é um arquivo ou pasta própria, fora de plugin, pode ser apagado daqui */
+  const deletable = (i: HarnessItem) => i.scope !== 'plugin' && i.layout !== 'entry' && i.kind !== 'settings';
+  const remove = (list: HarnessItem[]) => {
+    const global = list.some((i) => i.scope === 'user') ? 'user' : 'project';
+    ask({
+      title: list.length === 1 ? `Apagar "${list[0]!.name}"?` : `Apagar ${list.length} itens?`,
+      message: withGlobalWarning(
+        list.length === 1
+          ? `${list[0]!.layout === 'skills' ? 'A pasta da skill é removida, com todos os arquivos dela' : 'O arquivo é removido'}: ${list[0]!.location}`
+          : list.map((i) => `${i.name} (${i.location})`).join('\n'),
+        global,
+      ),
+      confirmLabel: 'Apagar',
+      danger: true,
+      onConfirm: () => list.forEach((i) => harness.deleteItem(tool, i.kind, i.path)),
+    });
+  };
+  return { copyable, twin, copy, setMode, deletable, remove };
 }
 
 export type ItemActions = ReturnType<typeof useItemActions>;
