@@ -7,6 +7,7 @@
   "command.upgradeBoard.title": "Faz AI: Update board to the current default",
   "command.heartbeat.runNow.title": "Faz AI: Run the heartbeat now (handle pending items with the AI)",
   "command.heartbeat.stop.title": "Faz AI: Stop the AI runs and autonomous mode",
+  "command.autopilot.pause.title": "Faz AI: Pause autonomous mode (YOLO)",
   "command.autopilot.resume.title": "Faz AI: Resume autonomous mode (YOLO)",
   "command.showLog.title": "Faz AI: Show the run log",
   "viewsContainer.fazai.title": "Faz AI",

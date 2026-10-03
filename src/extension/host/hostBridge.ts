@@ -13,6 +13,10 @@ export interface HostEnv {
   connectAI(): unknown;
   runAi(cardId: string): unknown;
   stopAi(cardId: string): unknown;
+  /** pausa o autopiloto das histórias em modo autônomo */
+  pauseAutopilot(): unknown;
+  /** retoma o autopiloto das histórias em modo autônomo */
+  resumeAutopilot(): unknown;
   /** começa uma rodada do heartbeat; o texto devolvido vira um aviso na interface */
   runHeartbeat(): unknown;
   /** abre uma pasta (a worktree de uma história) numa janela do editor ou no sistema */
@@ -97,6 +101,12 @@ export class HostBridge {
           return;
         case 'ai.stop':
           await this.env.stopAi(msg.cardId);
+          return;
+        case 'ai.autopilot.pause':
+          await this.env.pauseAutopilot();
+          return;
+        case 'ai.autopilot.resume':
+          await this.env.resumeAutopilot();
           return;
         case 'card.workspace.open': {
           const cards = this.router.snapshot().cards;

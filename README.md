@@ -272,7 +272,7 @@ aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma hi
 - Cards que estão com você (aguardando revisão ou resposta, bloqueados) não são tocados, a menos
   que você tenha deixado uma mensagem sem resposta na conversa.
 - **Rodar agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
-  uma rodada na hora, mesmo com o heartbeat desligado. **Faz AI: Parar as execuções da IA**
+  uma rodada na hora, mesmo com o heartbeat desligado. **Faz AI: Parar as execuções da IA e o modo autônomo**
   interrompe tudo.
 - A barra de status mostra os cards em execução e a hora da próxima rodada.
 - O **coração** no topo direito do board mostra o heartbeat: vermelho e batendo quando ele está
@@ -282,6 +282,41 @@ aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma hi
 
 Quais colunas exigem aprovação, e em quais a IA atua, se define em Configurações → Workflows e
 colunas. Você mesmo pode mover qualquer card sem aprovação.
+
+### Modo autônomo (YOLO)
+
+Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo (YOLO)**
+(o board pede uma confirmação, porque o modo abre mão de toda aprovação). A partir daí a IA toca a
+história sozinha, **sem pedir autorização nem confirmação para nada**:
+
+- Do **Backlog** até o fim: ela faz o Discovery, o PRD, a Spec e o Plan, cria as sub-tarefas,
+  implementa uma por uma e, na Homologação, abre o pull request. As colunas que exigem aprovação
+  deixam de segurar o card, e o pedido de revisão da IA vira aprovação na hora, com o resumo
+  registrado na conversa.
+- **Sem perguntas**: a IA não usa `ask_question`; diante de uma dúvida ela decide e registra a
+  decisão e o motivo na conversa. Só um impedimento real (acesso, ambiente, falha que ela não
+  resolve) bloqueia o card.
+- **Sem merge**: Concluído quer dizer pull request aberto. O merge continua sendo seu.
+- **Sem restrições**: nas execuções do modo, a IA roda com a permissão "Sem restrições" (altera
+  arquivos e roda comandos), porque precisa de git e do `gh`. Ligar o modo é aceitar isso para a história.
+- **Em fila e em pilha**: o **autopiloto** toca as histórias em modo autônomo uma de cada vez, na
+  ordem do número, e passa à próxima quando a atual conclui, sem esperar o intervalo do
+  heartbeat. A branch de cada história parte da branch da anterior e o pull request é aberto com
+  `--base` nela, formando uma pilha de PRs.
+- **Dividir um pedido grande**: a IA pode criar as histórias seguintes a partir de uma história em
+  modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo e entram na
+  fila. Ela nunca liga o modo numa história que você não ligou.
+- **Freios**: o autopiloto para quando a IA bloqueia o card ou quando uma execução falha (o card
+  fica Bloqueado, com o motivo) e bloqueia a história depois de 3 execuções seguidas que não
+  avançaram nada. Ao destravar o card, ele continua sozinho.
+
+O **botão "Autônomo"** no topo do board aparece enquanto houver história na fila: aceso quando o
+autopiloto está tocando, apagado quando está pausado; um clique pausa (e interrompe a IA) ou
+retoma. Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
+(YOLO)** e **Faz AI: Parar as execuções da IA e o modo autônomo**. Ao abrir o editor, o autopiloto
+não começa sozinho: ele liga quando você ativa o modo numa história ou retoma. O heartbeat não
+toca histórias em modo autônomo; elas são do autopiloto.
+
 
 ### Agentes
 

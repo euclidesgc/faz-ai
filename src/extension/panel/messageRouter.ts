@@ -34,6 +34,8 @@ const bridgeOnly = {
   'chat.stop': viaBridge,
   'chat.clear': viaBridge,
   'ui.showChat': viaBridge,
+  'ai.autopilot.pause': viaBridge,
+  'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
   'harness.item.open': viaBridge,
   'harness.item.create': viaBridge,

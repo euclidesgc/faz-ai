@@ -55,6 +55,7 @@ import {
   TriangleAlert,
   User,
   X,
+  Zap,
   type LucideIcon,
   type LucideProps,
 } from 'lucide-react';
@@ -89,6 +90,7 @@ export const IconDrag = icon(GripVertical, 'IconDrag');
 export const IconExternal = icon(ExternalLink, 'IconExternal');
 export const IconWarning = icon(TriangleAlert, 'IconWarning');
 export const IconHeart = icon(Heart, 'IconHeart');
+export const IconYolo = icon(Zap, 'IconYolo');
 export const IconPlus = icon(Plus, 'IconPlus');
 export const IconPanelClose = icon(PanelLeftClose, 'IconPanelClose');
 export const IconPanelOpen = icon(PanelLeftOpen, 'IconPanelOpen');

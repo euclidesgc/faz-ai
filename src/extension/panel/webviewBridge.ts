@@ -45,6 +45,8 @@ function vscodeEnv(webview: vscode.Webview, router: MessageRouter): HostEnv {
     openInBrowser: () => vscode.commands.executeCommand('fazai.openInBrowser'),
     runAi: (cardId) => vscode.commands.executeCommand('fazai.ai.run', cardId),
     stopAi: (cardId) => vscode.commands.executeCommand('fazai.ai.stop', cardId),
+    pauseAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.pause'),
+    resumeAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.resume'),
     runHeartbeat: () => vscode.commands.executeCommand('fazai.heartbeat.runNow'),
     openFolder: (dir) => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(dir), { forceNewWindow: true }),
     openFile: async (file) => void (await open(file)),

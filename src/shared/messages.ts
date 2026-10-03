@@ -20,6 +20,10 @@ export type WebviewToHost =
   /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */
   | { type: 'ai.run'; cardId: Id }
   | { type: 'ai.stop'; cardId: Id }
+  /** pausa o autopiloto das histórias em modo autônomo e interrompe a execução em andamento nelas */
+  | { type: 'ai.autopilot.pause' }
+  /** retoma o autopiloto das histórias em modo autônomo */
+  | { type: 'ai.autopilot.resume' }
   /** começa agora uma rodada do heartbeat: a IA trata tudo o que está pendente com ela */
   | { type: 'ai.heartbeat.run' }
   | { type: 'card.create'; typeId: Id; columnId: Id; parentId: Id | null; title: string }

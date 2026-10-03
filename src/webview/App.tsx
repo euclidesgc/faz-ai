@@ -10,6 +10,7 @@ import { CardDrawer } from './components/CardDrawer';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { Dialog } from './components/Dialog';
 import { FilterBar } from './components/FilterBar';
+import { AutopilotButton } from './components/AutopilotButton';
 import { HeartbeatButton } from './components/HeartbeatButton';
 import { ThemeToggle } from './components/ThemeToggle';
 import { TrashView } from './components/TrashView';
@@ -101,6 +102,7 @@ export function App() {
         >
           <IconChat /> {t('Chat')}
         </Button>
+        <AutopilotButton />
         <HeartbeatButton offline={offline} />
         <ThemeToggle />
       </header>

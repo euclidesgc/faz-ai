@@ -298,6 +298,41 @@ answers pending messages and works on ready cards, one story at a time.
 Which columns require approval, and in which ones the AI works, is set in Configurações → Workflows
 e colunas. You can always move any card yourself without approval.
 
+### Autonomous mode (YOLO)
+
+A **story** can be marked **YOLO**: in the card panel, turn on **Modo autônomo (YOLO)** (the board
+asks for confirmation, because the mode gives up every approval). From then on the AI drives the
+story by itself, **without asking for authorization or confirmation on anything**:
+
+- From **Backlog** to the end: it does Discovery, PRD, Spec and Plan, creates the sub-tasks,
+  implements them one by one and, at Homologação, opens the pull request. Columns that require
+  approval stop holding the card, and the AI's review request becomes an approval right away, with
+  its summary recorded in the conversation.
+- **No questions**: the AI does not use `ask_question`; faced with a doubt it decides and records
+  the decision and the reason in the conversation. Only a real impediment (access, environment, a
+  failure it cannot fix) blocks the card.
+- **No merge**: Concluído means an open pull request. Merging stays with you.
+- **No restrictions**: in the mode's runs the AI uses the "Sem restrições" permission (edits files
+  and runs commands), because it needs git and `gh`. Turning the mode on accepts this for the story.
+- **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in number
+  order, and moves on to the next when the current one finishes, without waiting for the heartbeat
+  interval. Each story's branch starts from the previous story's branch and its pull request is
+  opened with `--base` on it, forming a stack of PRs.
+- **Splitting a large request**: the AI can create the following stories from an autonomous story
+  (`create_card` with `autonomous_from`). They are born autonomous and join the queue. It never
+  turns the mode on for a story you did not turn on.
+- **Brakes**: the autopilot stops when the AI blocks the card or when a run fails (the card is
+  Bloqueado, with the reason), and blocks the story after 3 consecutive runs that advanced nothing.
+  Once you unblock the card it carries on by itself.
+
+The **"Autônomo" button** at the top of the board shows while there is a story in the queue: lit
+when the autopilot is driving, dimmed when paused; a click pauses (and interrupts the AI) or
+resumes. From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
+autônomo (YOLO)** and **Faz AI: Parar as execuções da IA e o modo autônomo**. When the editor
+opens the autopilot does not start by itself: it starts when you turn the mode on for a story or
+resume. The heartbeat does not drive autonomous stories; they belong to the autopilot.
+
+
 ### Agents
 
 ![Agent with intent, chosen skills and read-only tools](docs/images/agents_en.png)

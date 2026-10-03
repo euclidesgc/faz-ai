@@ -192,6 +192,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           },
           runAi: (cardId) => h.runner.start(cardId),
           stopAi: (cardId) => h.runner.stop(cardId),
+          pauseAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.pause'),
+          resumeAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.resume'),
           runHeartbeat: () => vscode.commands.executeCommand('fazai.heartbeat.runNow'),
           openFolder: (dir) => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(dir), { forceNewWindow: true }),
           openFile: (file) => vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file)),
@@ -241,6 +243,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       autopilot?.pause();
       heartbeat?.stop();
     }),
+    vscode.commands.registerCommand('fazai.autopilot.pause', () => autopilot?.pause()),
     vscode.commands.registerCommand('fazai.autopilot.resume', async () => {
       if (!(await getRouter()) || !autopilot) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
       autopilot.resume();

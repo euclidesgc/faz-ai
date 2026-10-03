@@ -7,6 +7,7 @@
   "command.upgradeBoard.title": "Faz AI: Atualizar board para o padrão atual",
   "command.heartbeat.runNow.title": "Faz AI: Rodar o heartbeat agora (tratar pendências com a IA)",
   "command.heartbeat.stop.title": "Faz AI: Parar as execuções da IA e o modo autônomo",
+  "command.autopilot.pause.title": "Faz AI: Pausar o modo autônomo (YOLO)",
   "command.autopilot.resume.title": "Faz AI: Retomar o modo autônomo (YOLO)",
   "command.showLog.title": "Faz AI: Mostrar o log das execuções",
   "viewsContainer.fazai.title": "Faz AI",

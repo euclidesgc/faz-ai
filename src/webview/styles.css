@@ -2433,3 +2433,19 @@ body.host-web .drawer {
 .chat-drawer .chat-head {
   padding-right: var(--sp-24);
 }
+/* modo autônomo (YOLO): selo no card, barra no painel e botão do autopiloto no topo */
+.yolo-mark {
+  color: var(--warn-border);
+}
+.yolo-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  cursor: pointer;
+}
+.autopilot.on {
+  color: var(--warn-border);
+}
+.autopilot.off {
+  color: var(--muted);
+}

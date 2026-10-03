@@ -279,4 +279,11 @@ export const board: Record<string, string> = {
   'Serão arquivados junto com o card: {along}.': 'These will be archived with the card: {along}.',
   'O card sai do board.': 'The card leaves the board.',
   'Nada é apagado, e desarquivar traz tudo de volta.': 'Nothing is deleted, and unarchiving brings everything back.',
+
+  'Modo autônomo: tocando {n} história(s) em fila.{detail} Clique para pausar e interromper a IA.':
+    'Autonomous mode: driving {n} queued story(ies).{detail} Click to pause and interrupt the AI.',
+  'Modo autônomo pausado.{detail} {n} história(s) esperando. Clique para retomar.':
+    'Autonomous mode paused.{detail} {n} story(ies) waiting. Click to resume.',
+  Autônomo: 'Autonomous',
+  'Autônomo pausado': 'Autonomous paused',
 };

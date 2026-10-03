@@ -17,6 +17,7 @@ import {
   IconPr,
   IconSubtasks,
   IconSuggest,
+  IconYolo,
 } from '../ui';
 
 // o clique num controle do rodapé não arrasta nem abre o card
@@ -69,6 +70,11 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
       {card.description && (
         <span title={t('Tem descrição')}>
           <IconDescription />
+        </span>
+      )}
+      {card.yolo && (
+        <span className="yolo-mark" title={t('Modo autônomo (YOLO): a IA toca esta história sozinha, sem aprovação')}>
+          <IconYolo />
         </span>
       )}
       {card.branch && (

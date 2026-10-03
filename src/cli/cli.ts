@@ -134,6 +134,8 @@ async function main(): Promise<void> {
       },
       runAi: (cardId) => runner.start(cardId),
       stopAi: (cardId) => runner.stop(cardId),
+      pauseAutopilot: () => host.autopilot.pause(),
+      resumeAutopilot: () => host.autopilot.resume(),
       runHeartbeat() {
         const n = heartbeat.runNow();
         return n ? `A IA vai tratar ${n} história(s) com pendência. O andamento aparece nos cards.` : 'Nada pendente com a IA.';
