@@ -17,6 +17,22 @@ function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author:
 }
 
 /**
+ * A IA divide o trabalho de uma história em modo autônomo em outras histórias: elas nascem em modo autônomo
+ * (a pessoa já abriu mão da aprovação para esse trabalho) e entram na fila depois da de origem.
+ * Não amplia a autonomia a partir de uma história que não está em modo autônomo.
+ */
+function inheritYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.inherit'>, author: string): void {
+  const cards = ctx.state().cards;
+  const from = cards.find((c) => c.id === msg.fromId);
+  const card = cards.find((c) => c.id === msg.cardId);
+  if (!from || !card) throw new Error('Card não encontrado');
+  if (from.parentId || !from.yolo) throw new Error(`#${from.number} não é uma história em modo autônomo.`);
+  if (card.parentId) throw new Error('O modo autônomo vale para a história, não para uma sub-tarefa.');
+  ctx.cards.setYolo(card.id, true);
+  ctx.comments.add(card.id, author, `Criada em modo autônomo a partir de #${from.number} ${from.title}.`, 'ai');
+}
+
+/**
  * Liga ou desliga o modo autônomo da história. É decisão da pessoa: a IA nunca amplia a própria autonomia.
  * Ao ligar, o que estava esperando uma pessoa é liberado para a IA seguir.
  */
@@ -91,6 +107,11 @@ export const cardHandlers = {
   },
   'card.yolo.set': (msg, ctx, { author, byAi }) => {
     setYolo(ctx, msg, author, byAi);
+    return true;
+  },
+  'card.yolo.inherit': (msg, ctx, { author, byAi }) => {
+    if (!byAi) throw new Error('Para ligar o modo autônomo numa história, use card.yolo.set.');
+    inheritYolo(ctx, msg, author);
     return true;
   },
   'card.execProfile.set': (msg, ctx) => {

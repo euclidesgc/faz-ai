@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 21;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -228,6 +228,10 @@ const MIGRATIONS: Record<number, string> = {
   20: `
     -- modo autônomo (YOLO) da história: a IA segue sem pedir aprovação nem confirmação
     ALTER TABLE cards ADD COLUMN yolo INTEGER NOT NULL DEFAULT 0;
+  `,
+  21: `
+    -- branch de onde a branch da história partiu, quando não é a principal (histórias empilhadas do modo autônomo)
+    ALTER TABLE cards ADD COLUMN base_branch TEXT NOT NULL DEFAULT '';
   `,
 };
 

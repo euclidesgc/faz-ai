@@ -248,6 +248,11 @@ export class CardRepo {
     run(this.db, 'UPDATE cards SET branch = ?, worktree_path = ? WHERE id = ?', [branch, worktreePath, cardId]);
   }
 
+  /** Guarda de qual branch a da história partiu (vazio = a principal). */
+  setBaseBranch(cardId: string, base: string): void {
+    run(this.db, 'UPDATE cards SET base_branch = ? WHERE id = ?', [base, cardId]);
+  }
+
   setExecProfile(cardId: string, profileId: string | null): void {
     run(this.db, 'UPDATE cards SET exec_profile = ? WHERE id = ?', [profileId || null, cardId]);
   }

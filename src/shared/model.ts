@@ -114,6 +114,8 @@ export interface Card {
   branch: string;
   /** pasta em que o código da história é alterado: a worktree, ou a pasta do projeto no modo "branch" */
   worktreePath: string;
+  /** branch de onde a da história partiu, quando não é a principal (histórias empilhadas); vazio = a principal */
+  baseBranch: string;
   /** endereço do pull request da história; vazio enquanto não foi aberto */
   prUrl: string;
   /** agente de execução escolhido para este card; null = o da coluna */

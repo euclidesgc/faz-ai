@@ -35,6 +35,8 @@ export interface PreparedWorkspace {
   branch: string;
   /** pasta em que o código da história deve ser alterado */
   path: string;
+  /** branch de onde a da história partiu, quando foi pedida uma que existe (história empilhada); vazio = a principal */
+  base: string;
 }
 
 /**
@@ -46,27 +48,31 @@ export function prepareWorkspace(input: {
   mode: Exclude<WorkspaceMode, 'off'>;
   branch: string;
   worktreePath: string;
+  /** branch de onde a da história parte (história empilhada); sem ela, ou se ela não existe aqui, a principal */
+  base?: string;
 }): PreparedWorkspace {
   const repo = tryGit(input.projectDir, ['rev-parse', '--show-toplevel']);
   if (!repo) throw new Error('A pasta do projeto não é um repositório git.');
   if (tryGit(repo, ['rev-parse', '--verify', '--quiet', 'HEAD']) === null)
     throw new Error('O repositório ainda não tem nenhum commit: faça o primeiro commit antes de criar branches de histórias.');
 
+  const stacked = input.base && branchExists(repo, input.base) ? input.base : '';
+  const start = stacked || baseBranch(repo);
   if (input.mode === 'branch') {
-    if (!branchExists(repo, input.branch)) git(repo, ['branch', input.branch, baseBranch(repo)]);
-    return { branch: input.branch, path: repo };
+    if (!branchExists(repo, input.branch)) git(repo, ['branch', input.branch, start]);
+    return { branch: input.branch, path: repo, base: stacked };
   }
 
   const dir = path.resolve(repo, input.worktreePath);
   const registered = git(repo, ['worktree', 'list', '--porcelain'])
     .split('\n')
     .some((l) => l === `worktree ${fs.existsSync(dir) ? fs.realpathSync(dir) : dir}`);
-  if (registered) return { branch: input.branch, path: dir };
+  if (registered) return { branch: input.branch, path: dir, base: '' };
   if (fs.existsSync(dir) && fs.readdirSync(dir).length) throw new Error(`A pasta ${dir} já existe e não é uma worktree deste repositório.`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   if (branchExists(repo, input.branch)) git(repo, ['worktree', 'add', dir, input.branch]);
-  else git(repo, ['worktree', 'add', '-b', input.branch, dir, baseBranch(repo)]);
-  return { branch: input.branch, path: dir };
+  else git(repo, ['worktree', 'add', '-b', input.branch, dir, start]);
+  return { branch: input.branch, path: dir, base: stacked };
 }
 
 /** Remove a worktree de uma história (a branch fica). Não faz nada se ela já não existe. */

@@ -103,6 +103,44 @@ describe('branch e worktree por história', () => {
     expect(card(2).branch).toBe('');
   });
 
+  it('histórias em modo autônomo se empilham: cada branch parte da anterior', async () => {
+    const yolo = (n: number) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled: true });
+    await call('create_card', { title: 'Base', column: 'Implementação' });
+    await call('create_card', { title: 'Segunda', column: 'Implementação' });
+    await call('create_card', { title: 'Terceira', column: 'Implementação' });
+    await call('create_card', { title: 'Fora da pilha', column: 'Implementação' });
+    yolo(1);
+    yolo(2);
+    yolo(3);
+
+    // a primeira parte da principal
+    const first = (await call('prepare_workspace', { card: 1 })).data;
+    expect(first.baseBranch).toBeUndefined();
+    const dir1 = first.path;
+    fs.writeFileSync(path.join(dir1, 'base.txt'), 'da primeira');
+    git(dir1, 'add', '.');
+    git(dir1, 'commit', '-q', '-m', 'primeira');
+
+    // a segunda parte da branch da primeira e enxerga o trabalho dela
+    const second = (await call('prepare_workspace', { card: 2 })).data;
+    expect(second.baseBranch).toBe(first.branch);
+    expect(second.stackNote).toContain(`--base ${first.branch}`);
+    expect(fs.readFileSync(path.join(second.path, 'base.txt'), 'utf8')).toBe('da primeira');
+    expect(card(2).baseBranch).toBe(first.branch);
+    git(second.path, 'config', 'user.email', 'teste@exemplo.com');
+    git(second.path, 'config', 'user.name', 'Teste');
+    git(second.path, 'commit', '-q', '--allow-empty', '-m', 'segunda');
+
+    // a terceira se apoia na segunda; chamar de novo mantém a base escolhida
+    expect((await call('prepare_workspace', { card: 3 })).data.baseBranch).toBe(second.branch);
+    expect((await call('prepare_workspace', { card: 2 })).data.baseBranch).toBe(first.branch);
+
+    // quem não está em modo autônomo parte da principal
+    const outside = (await call('prepare_workspace', { card: 4 })).data;
+    expect(outside.baseBranch).toBeUndefined();
+    expect(() => git(repo, 'merge-base', '--is-ancestor', 'main', outside.branch)).not.toThrow();
+  });
+
   it('modo branch cria a branch sem trocar a atual; desligado recusa', async () => {
     await call('create_card', { title: 'Corrigir crash', type: 'Bug', column: 'Implementação' });
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch', branchPattern: 'fix/{numero}-{titulo}' } } });

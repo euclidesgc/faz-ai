@@ -74,6 +74,7 @@ export const AUTONOMOUS_ADVICE = [
   'Diante de uma dúvida, decida pela opção mais razoável segundo o código, a documentação e a conversa, e registre a decisão e o motivo na conversa.',
   'Use block_card só se for impossível seguir (acesso, ambiente, falha que você não resolve), explicando o que é preciso para destravar.',
   'Na Implementação, execute todas as sub-tarefas até o fim. Na Homologação não há aprovação: envie a branch, abra o pull request, registre-o com set_pull_request e mova a história para a coluna de conclusão. Não faça o merge.',
+  'Se o pedido for grande demais para uma entrega só (partes independentes), divida-o no Discovery: mantenha nesta história a primeira entrega e crie as seguintes com create_card (autonomous_from = esta história), em ordem de dependência. Elas entram na fila e cada uma parte da branch da anterior, com o pull request empilhado (--base na branch anterior).',
 ].join('\n');
 
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */

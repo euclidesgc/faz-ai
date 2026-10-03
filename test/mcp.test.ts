@@ -1150,6 +1150,23 @@ describe('modo autônomo (YOLO)', () => {
     expect((await call('block_card', { card: 1, reason: 'Sem acesso' })).error).toBe(false);
   });
 
+  it('a IA divide o trabalho em outras histórias, que herdam o modo; sem o modo, ela não amplia a própria autonomia', async () => {
+    await call('create_card', { title: 'Grande', column: 'Discovery' });
+    const refused = await call('create_card', { title: 'Parte 2', autonomous_from: 1 });
+    expect(refused.error).toBe(true);
+    expect(refused.text).toContain('só uma pessoa liga');
+    expect(router.snapshot().cards).toHaveLength(1); // nada foi criado pela metade
+
+    setYolo(1, true);
+    const part = (await call('create_card', { title: 'Parte 2', autonomous_from: 1 })).data;
+    expect(part).toMatchObject({ column: 'Backlog', autonomous: true });
+    expect(card(2).yolo).toBe(true);
+    expect((await call('get_card', { card: 2 })).data.comments[0].body).toContain('a partir de #1');
+    expect((await call('create_card', { title: 'Passo', parent: 1, autonomous_from: 1 })).error).toBe(true);
+    // a mensagem só vale vinda da IA
+    expect(() => router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id })).toThrow('card.yolo.set');
+  });
+
   it('ligar libera o que esperava uma pessoa', async () => {
     await call('create_card', { title: 'Login', column: 'PRD' });
     await call('request_review', { card: 1, summary: 'PRD pronto' });
