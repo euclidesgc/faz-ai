@@ -35,7 +35,7 @@ produces the artifacts of each phase and moves the cards as it goes.
 The extension's interface is in Portuguese. This page keeps the names you will see on screen and
 gives the English meaning next to them.
 
-![Board with stories in the SDD phases and sub-tasks in the bottom row](docs/images/board.png)
+![Board with stories in the SDD phases and sub-tasks in the bottom workflow](docs/images/board.png)
 
 ## What it is for
 
@@ -294,7 +294,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 
 | Section | What it adjusts |
 | --- | --- |
-| Workflows e colunas | Names, order (drag the row) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template); which ones start collapsed |
+| Workflows e colunas | As many workflows as you want (independent cards or sub-tasks), with editable names; **Nova coluna** (new column) on each one; names, order (drag) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template). Opening and closing workflows and columns happens on the board itself and is remembered |
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
 | Campos | Custom fields (text, select, date, model…) and where they appear |
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |

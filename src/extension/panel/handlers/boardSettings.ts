@@ -1,3 +1,4 @@
+import { workflowDeleteBlocker } from '../../../shared/selectors';
 import { upgradeBoard } from '../../db/boardTemplate';
 import type { HandlerMap } from './context';
 import { initModels, useTool } from './models';
@@ -40,8 +41,18 @@ export const boardSettingsHandlers = {
     ctx.settings.deleteField(msg.fieldId);
     return true;
   },
+  'settings.workflow.create': (msg, ctx) => {
+    ctx.boards.createWorkflow(ctx.boardId, msg.name, msg.kind);
+    return true;
+  },
   'settings.workflow.update': (msg, ctx) => {
     ctx.boards.updateWorkflow(msg.workflowId, msg.patch);
+    return true;
+  },
+  'settings.workflow.delete': (msg, ctx) => {
+    const blocker = workflowDeleteBlocker(ctx.state(), msg.workflowId);
+    if (blocker) throw new Error(blocker);
+    ctx.boards.deleteWorkflow(msg.workflowId);
     return true;
   },
   'settings.rules.update': (msg, ctx) => {

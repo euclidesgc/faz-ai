@@ -234,7 +234,7 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
           <Button
             variant="ghost"
             disabled={!canAdd}
-            title={canAdd ? '' : 'Clique numa história, na linha de cima, para criar sub-tarefas dela'}
+            title={canAdd ? '' : 'Clique numa história para criar sub-tarefas dela'}
             onClick={() => setAdding(true)}
           >
             {workflow.kind === 'child' ? '+ Nova sub-tarefa' : '+ Novo card'}

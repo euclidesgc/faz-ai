@@ -32,7 +32,7 @@ Um board kanban dentro do editor (VS Code e Cursor), feito para conduzir Spec-Dr
 (SDD) junto com uma IA. Você organiza o trabalho em histórias e sub-tarefas; a IA lê o board, produz
 os artefatos de cada fase e move os cards conforme avança.
 
-![Board com histórias nas fases do SDD e sub-tarefas na linha de baixo](docs/images/board.png)
+![Board com histórias nas fases do SDD e sub-tarefas no workflow de baixo](docs/images/board.png)
 
 ## Para que serve
 
@@ -278,7 +278,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 
 | Seção | O que ajusta |
 | --- | --- |
-| Workflows e colunas | Nomes, ordem (arrastando a linha) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento); quais começam colapsadas |
+| Workflows e colunas | Quantos workflows quiser (cards independentes ou sub-tarefas), com nome editável; **Nova coluna** em cada um; nomes, ordem (arrastando) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento). Abrir e fechar workflows e colunas é feito no próprio board e fica lembrado |
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos | Campos personalizados (texto, seleção, data, modelo…) e onde aparecem |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |

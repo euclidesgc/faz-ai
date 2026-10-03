@@ -76,7 +76,6 @@ export type WebviewToHost =
         name?: string;
         category?: ColumnCategory;
         position?: number;
-        collapsed?: boolean;
         aiActive?: boolean;
         requiresApproval?: boolean;
         aiInstruction?: string;
@@ -107,7 +106,9 @@ export type WebviewToHost =
       patch: { name?: string; options?: string[]; appliesToTypes?: Id[] | null; display?: FieldDisplay };
     }
   | { type: 'settings.field.delete'; fieldId: Id }
-  | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string; collapsed?: boolean; archiveCollapsed?: boolean } }
+  | { type: 'settings.workflow.create'; name: string; kind: WorkflowKind }
+  | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string } }
+  | { type: 'settings.workflow.delete'; workflowId: Id }
   | {
       type: 'settings.board.update';
       patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance>; runner?: Partial<RunnerConfig>; git?: Partial<GitConfig> };

@@ -16,6 +16,7 @@ import {
   subtaskSlot,
   typesOf,
   valueOf,
+  workflowDeleteBlocker,
 } from '../src/shared/selectors';
 import { boardState, card, sub } from './fakes/board';
 
@@ -163,5 +164,20 @@ describe('isAiWorking', () => {
     expect(isAiWorking(boardState({ aiRuns: ['c1'] }), c)).toBe(true);
     expect(isAiWorking(boardState(), { ...c, status: 'running' })).toBe(true);
     expect(isAiWorking(boardState({ aiRuns: ['outro'] }), { ...c, status: 'waiting_review' })).toBe(false);
+  });
+});
+
+describe('workflowDeleteBlocker', () => {
+  it('libera um workflow vazio, sem tipos de card, quando há outro no board', () => {
+    expect(workflowDeleteBlocker(boardState(), 'wc')).toBeNull();
+  });
+
+  it('bloqueia o único workflow, o que tem cards (mesmo arquivados) e o que tem tipo de card', () => {
+    const s = boardState();
+    expect(workflowDeleteBlocker({ ...s, workflows: s.workflows.slice(0, 1) }, 'wp')).toBe('O board precisa de ao menos um workflow');
+    expect(workflowDeleteBlocker({ ...s, cards: [card('c1', { workflowId: 'wc', archivedAt: 1 })] }, 'wc')).toContain('1 card(s)');
+    const withType = { ...s, cardTypes: [{ id: 't', boardId: 'b', name: 'T', color: '#000', defaultWorkflowId: 'wc', defaults: {} }] };
+    expect(workflowDeleteBlocker(withType, 'wc')).toContain('1 tipo(s)');
+    expect(workflowDeleteBlocker(s, 'nao-existe')).toBe('Workflow não encontrado');
   });
 });

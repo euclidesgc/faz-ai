@@ -36,7 +36,6 @@ export function registerBoardTools(tool: DefineTool): void {
       name: z.string().min(1).optional(),
       category: categoryArg.optional(),
       position: z.number().int().min(0).optional(),
-      collapsed: z.boolean().optional().describe('A coluna começa colapsada ao abrir o board'),
       ai_active: z.boolean().optional().describe('A IA trabalha nos cards desta coluna: ao entrar nela o card fica "ready"'),
       requires_approval: z.boolean().optional().describe('A IA só avança o card depois que uma pessoa aprova'),
       ai_instruction: z.string().optional().describe('O que a IA faz quando um card entra nesta coluna (fase)'),
@@ -57,7 +56,6 @@ export function registerBoardTools(tool: DefineTool): void {
           name: a.name,
           category: a.category,
           position: a.position,
-          collapsed: a.collapsed,
           aiActive: a.ai_active,
           requiresApproval: a.requires_approval,
           aiInstruction: a.ai_instruction,
@@ -83,7 +81,7 @@ export function registerBoardTools(tool: DefineTool): void {
     },
   );
 
-  tool('rename_workflow', 'Renomeia um workflow (linha do board).', { workflow: workflowArg, name: z.string().min(1) }, (a, router) => {
+  tool('rename_workflow', 'Renomeia um workflow.', { workflow: workflowArg, name: z.string().min(1) }, (a, router) => {
     router.handle({
       type: 'settings.workflow.update',
       workflowId: findWorkflow(router.snapshot(), a.workflow).id,
@@ -93,15 +91,21 @@ export function registerBoardTools(tool: DefineTool): void {
   });
 
   tool(
-    'set_workflow_layout',
-    'Define como uma linha do board aparece ao abrir: a linha inteira colapsada ou não, e a coluna de arquivados dela colapsada ou não.',
-    { workflow: workflowArg, collapsed: z.boolean().optional(), archive_collapsed: z.boolean().optional() },
+    'create_workflow',
+    'Cria um workflow (linha do board) no fim do board, com as colunas A fazer, Em andamento e Concluído. `kind` "parent" recebe cards independentes (como histórias e bugs); "child" recebe sub-tarefas de uma história.',
+    { name: z.string().min(1), kind: z.enum(['parent', 'child']).default('parent') },
     (a, router) => {
-      router.handle({
-        type: 'settings.workflow.update',
-        workflowId: findWorkflow(router.snapshot(), a.workflow).id,
-        patch: { collapsed: a.collapsed, archiveCollapsed: a.archive_collapsed },
-      });
+      router.handle({ type: 'settings.workflow.create', name: a.name, kind: a.kind });
+      return overview(router);
+    },
+  );
+
+  tool(
+    'delete_workflow',
+    'Exclui um workflow e as colunas dele. Só é possível se ele não tiver cards (nem arquivados ou na lixeira), se nenhum tipo de card nascer nele e se não for o único workflow do board.',
+    { workflow: workflowArg },
+    (a, router) => {
+      router.handle({ type: 'settings.workflow.delete', workflowId: findWorkflow(router.snapshot(), a.workflow).id });
       return overview(router);
     },
   );

@@ -78,6 +78,16 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   detalhe" passou a se chamar **Oculto**.
 - Os formulários passam a usar os componentes do [Radix Themes](https://www.radix-ui.com/themes),
   da mesma família das cores do board. As outras telas migram aos poucos.
+- **Workflows e colunas refeitos**: você pode criar quantos workflows quiser com **Novo workflow**
+  (escolhendo se recebe cards independentes ou sub-tarefas; ele nasce com A fazer, Em andamento e
+  Concluído) e excluir os que estiverem vazios. O nome de cada workflow é editável, e **Nova
+  coluna** fica no topo de cada um, abrindo uma linha alinhada na tabela. Saíram os rótulos "linha
+  de cima" e "linha de baixo" e as opções "começa colapsada" do workflow, da coluna e dos
+  arquivados: o board guarda o estado em que você deixou cada workflow e coluna.
+- O assistente de IA (MCP) ganhou `create_workflow` e `delete_workflow`; `set_workflow_layout` e o
+  parâmetro `collapsed` de `update_column` foram removidos.
+- Os logs do navegador de teste (`.playwright-mcp`) entraram por engano em PRs anteriores e agora
+  são ignorados pelo git.
 
 ## 0.29.1
 
