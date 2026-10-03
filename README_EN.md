@@ -325,6 +325,9 @@ npm test
 npm run typecheck
 ```
 
+`npm test` also runs the linter and checks formatting; `npm run format` formats everything. To make
+`git blame` skip the formatting-only commit: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
+
 Press `F5` to open the Extension Development Host. The code is in `src/extension` (host and MCP
 server), `src/webview` (React interface), `src/shared` (model and protocol), `src/mcp-bridge`
 (the stdio bridge used by AI clients) and `src/cli` (the board outside the editor).
