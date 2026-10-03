@@ -62,7 +62,7 @@ export function App() {
       </div>
     );
   const trashCount = state.cards.filter((c) => c.deletedAt !== null).length;
-  const withYou = humanQueue(pendingWork(state)).length;
+  const withYou = humanQueue(state, pendingWork(state)).length;
   const running = state.aiRuns.length;
   const onlyMine = filters.owner === 'human';
 

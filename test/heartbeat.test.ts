@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { Heartbeat, heartbeatTargets } from '../src/extension/heartbeat';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { BUG_TYPE } from '../src/shared/priority';
 import type { CardStatus } from '../src/shared/status';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -36,6 +37,23 @@ const create = (title: string, column: string, parent?: number) => {
     typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
     columnId: s.columns.find((c) => c.workflowId === wf.id && c.name === column)!.id,
     parentId: parent ? card(parent).id : null,
+    title,
+  });
+};
+/** Cria o tipo que fura a fila (Bug) no workflow de histórias e devolve o id dele. */
+const createBugType = (): string => {
+  const wf = router.snapshot().workflows.find((w) => w.kind === 'parent')!;
+  router.handle({ type: 'settings.type.create', name: BUG_TYPE, color: '#e11d48', defaultWorkflowId: wf.id });
+  return router.snapshot().cardTypes.find((t) => t.name === BUG_TYPE)!.id;
+};
+/** Cria uma história com o tipo escolhido (ex.: Bug), na coluna dada. */
+const createTyped = (typeId: string, title: string, column: string) => {
+  const s = router.snapshot();
+  const wf = s.workflows.find((w) => w.kind === 'parent')!;
+  return router.createCard({
+    typeId,
+    columnId: s.columns.find((c) => c.workflowId === wf.id && c.name === column)!.id,
+    parentId: null,
     title,
   });
 };
@@ -88,12 +106,40 @@ describe('heartbeat', () => {
     setStatus(3, 'approved');
     setStatus(5, 'waiting_review');
     create('Sub de D', 'A fazer', 5); // #6: a história está com a pessoa
-    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([3, 1]);
+    // ordem de execução: de cima para baixo no board, não por categoria (PRD vem antes de Spec)
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1, 3]);
 
     // mensagem da pessoa sem resposta traz a história para a fila, mesmo aguardando revisão
     router.handle({ type: 'comment.add', cardId: card(5).id, body: 'Por quê?' });
     router.handle({ type: 'comment.add', cardId: card(2).id, body: 'Detalhe na sub-tarefa' });
-    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([3, 5, 1]); // aprovados, mensagens sem resposta, prontos
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1, 3, 5]); // PRD, Spec, Plan: de cima para baixo
+  });
+
+  it('bug fura a fila: entra na frente mesmo estando mais abaixo no board', () => {
+    const bugTypeId = createBugType();
+    create('A', 'PRD'); // #1 pronto, perto do topo
+    createTyped(bugTypeId, 'Bug', 'Plan'); // #2 pronto, mais abaixo
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([2, 1]);
+  });
+
+  it('o bug muda a ordem, mas não o conjunto de histórias pendentes', () => {
+    const bugTypeId = createBugType();
+    create('A', 'PRD'); // #1 pronto
+    create('B', 'Spec'); // #2: vai ser aprovado
+    createTyped(bugTypeId, 'Bug', 'Implementação'); // #3: mais abaixo que A e B
+    setStatus(2, 'approved');
+    const targets = heartbeatTargets(router.snapshot()).map((c) => c.number);
+    expect([...targets].sort((a, b) => a - b)).toEqual([1, 2, 3]); // mesmo conjunto de antes
+    expect(targets).toEqual([3, 1, 2]); // só a ordem muda: bug primeiro, depois de cima para baixo
+  });
+
+  it('bug "Pronto" vem antes de um card "Aprovado" que está mais abaixo no board', () => {
+    const bugTypeId = createBugType();
+    createTyped(bugTypeId, 'Bug', 'PRD'); // #1: pronto, perto do topo
+    create('Aprovada', 'Homologação'); // #2: aprovado, mas bem mais abaixo
+    setStatus(2, 'approved');
+    // antes, a categoria "approved" venceria mesmo mais abaixo; agora a posição no board decide
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1, 2]);
   });
 
   it('só roda quando o intervalo passa, e nunca sem pendência', () => {

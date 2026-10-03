@@ -63,7 +63,7 @@ export function autopilotStep(s: BoardState): AutopilotStep {
     const next = columnsOf(s, story.workflowId).find((c) => c.position > column.position && c.category !== 'cancelled');
     return next ? { kind: 'advance', story, column: next } : { kind: 'idle' };
   }
-  const queue = aiQueue(pendingWork(s));
+  const queue = aiQueue(s, pendingWork(s));
   if (queue.some((c) => c.id === story.id || c.parentId === story.id)) return { kind: 'run', story };
   // nada com a IA e a história continua aberta: o ciclo emperrou
   return { kind: 'paused', story, reason: `${cardRef(story)} não tem nada pendente com a IA, mas ainda não foi concluído.` };

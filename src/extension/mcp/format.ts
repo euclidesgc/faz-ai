@@ -374,14 +374,14 @@ export function pendingOverview(s: BoardState) {
     const m = s.comments.filter((x) => x.cardId === c.id).at(-1);
     return m ? { lastMessage: { author: m.author, at: iso(m.createdAt), body: m.body } } : {};
   };
-  const total = aiQueue(p).length;
+  const total = aiQueue(s, p).length;
   return {
     forYou: {
       approved: p.ai.approved.map((c) => cardSummary(s, c)),
       unanswered: p.ai.unanswered.map((c) => ({ ...cardSummary(s, c), ...lastHuman(c) })),
       ready: p.ai.ready.map((c) => cardSummary(s, c)),
     },
-    withPerson: humanQueue(p).map((c) => cardSummary(s, c)),
+    withPerson: humanQueue(s, p).map((c) => cardSummary(s, c)),
     next: total
       ? 'Trate nesta ordem: approved (mova para a próxima coluna e siga o trabalho), unanswered (responda na conversa do card), ready (trabalhe no card). Não mexa no que está em withPerson.'
       : 'Nada pendente com você. Encerre sem alterar o board.',
