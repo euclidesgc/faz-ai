@@ -7,6 +7,7 @@ import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
 import { Dialog } from './components/Dialog';
 import { FilterBar } from './components/FilterBar';
+import { HeartbeatButton } from './components/HeartbeatButton';
 import { ThemeToggle } from './components/ThemeToggle';
 import { TrashView } from './components/TrashView';
 import { Settings } from './components/settings/Settings';
@@ -87,6 +88,7 @@ export function App() {
             Abrir no navegador <IconExternal />
           </Button>
         )}
+        <HeartbeatButton offline={offline} />
         <ThemeToggle />
       </header>
       {offline && (

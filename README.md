@@ -195,6 +195,9 @@ aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma hi
   uma rodada na hora, mesmo com o heartbeat desligado. **Faz AI: Parar as execuções da IA**
   interrompe tudo.
 - A barra de status mostra os cards em execução e a hora da próxima rodada.
+- O **coração** no topo direito do board mostra o heartbeat: vermelho e batendo quando ele está
+  rodando; cinza e parado quando está desligado ou não consegue rodar (sem ligação com o Faz AI ou
+  sem a ferramenta). Clicar nele liga e desliga o heartbeat.
 - As execuções usam a mesma permissão e o mesmo tempo limite do botão "Chamar IA".
 
 Quais colunas exigem aprovação, e em quais a IA atua, se define em Configurações → Workflows e

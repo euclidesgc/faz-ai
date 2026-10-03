@@ -61,3 +61,17 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
         : DEFAULT_RUNNER.timeoutMinutes,
   };
 }
+
+/** Como o heartbeat está agora: batendo, desligado (por escolha) ou parado (ligado, mas sem como rodar). */
+export type HeartbeatState = { kind: 'beating' } | { kind: 'off' } | { kind: 'stopped'; reason: string };
+
+/**
+ * Estado do heartbeat para o coração do topo do board. "Parado" é quando ele está ligado mas não consegue rodar:
+ * a página perdeu a ligação com o Faz AI, ou a ferramenta do projeto não pode ser executada pelo board.
+ */
+export function heartbeatState(runner: RunnerConfig, ctx: { offline: boolean; unsupported: string | null }): HeartbeatState {
+  if (!runner.heartbeat) return { kind: 'off' };
+  if (ctx.offline) return { kind: 'stopped', reason: 'Sem ligação com o Faz AI.' };
+  if (ctx.unsupported) return { kind: 'stopped', reason: ctx.unsupported };
+  return { kind: 'beating' };
+}

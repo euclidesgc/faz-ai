@@ -20,6 +20,7 @@ import {
   GitPullRequest,
   GripVertical,
   Hand,
+  Heart,
   Heading,
   Italic,
   Link,
@@ -83,6 +84,7 @@ export const IconRun = icon(Play, 'IconRun');
 export const IconDrag = icon(GripVertical, 'IconDrag');
 export const IconExternal = icon(ExternalLink, 'IconExternal');
 export const IconWarning = icon(TriangleAlert, 'IconWarning');
+export const IconHeart = icon(Heart, 'IconHeart');
 export const IconPlus = icon(Plus, 'IconPlus');
 export const IconPanelClose = icon(PanelLeftClose, 'IconPanelClose');
 export const IconPanelOpen = icon(PanelLeftOpen, 'IconPanelOpen');
