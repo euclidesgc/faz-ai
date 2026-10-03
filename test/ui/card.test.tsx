@@ -194,6 +194,30 @@ describe('CardDrawer', () => {
     expect(lastSent('field.setValue')).toEqual({ type: 'field.setValue', cardId: board.storyId, fieldId: effort.id, value: 'Alto' });
   });
 
+  it('campo de texto: digitar rápido não perde letras e só grava ao sair do campo, uma vez', async () => {
+    board.router.handle({
+      type: 'settings.field.create',
+      name: 'Só no detalhe',
+      kind: 'text',
+      options: [],
+      appliesToTypes: null,
+      display: 'badge',
+    });
+    syncStore(board.router);
+    openStory();
+    const field = snap().fieldDefs.find((f) => f.name === 'Só no detalhe')!;
+    const input = screen.getByLabelText('Só no detalhe');
+    // o host não devolve nada no teste: com o campo controlado pelo board, cada tecla apagava a anterior
+    await userEvent.type(input, 'Que porra está acontecendo');
+    expect(input).toHaveValue('Que porra está acontecendo');
+    expect(sentOf('field.setValue')).toHaveLength(0);
+    await userEvent.tab();
+    expect(sentOf('field.setValue')).toEqual([
+      { type: 'field.setValue', cardId: board.storyId, fieldId: field.id, value: 'Que porra está acontecendo' },
+    ]);
+    board.router.handle({ type: 'settings.field.delete', fieldId: field.id });
+  });
+
   it('as abas mostram a conversa e os anexos, com a contagem no rótulo', async () => {
     patchState((s) => ({
       comments: [{ id: 'c1', cardId: board.storyId, author: 'Pessoa', body: 'oi', createdAt: 0, updatedAt: 0 } as never, ...s.comments],

@@ -69,6 +69,8 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   others, with the card preview (Enter adds, Esc cancels). Settings and the trash use the full width
   of the screen, and the settings side menu collapses into an icon-only strip (the choice is
   remembered).
+- Text, link and number fields on a card no longer drop letters when you type fast. The value is
+  saved when you leave the field, press Enter or close the card, instead of on every keystroke.
 
 ## 0.29.1
 
