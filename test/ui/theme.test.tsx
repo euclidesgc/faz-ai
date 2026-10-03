@@ -1,7 +1,8 @@
-import { lastSent, posted, seedBoard, syncStore, type SeededBoard } from './setup';
+import { choose, lastSent, posted, seedBoard, syncStore, type SeededBoard } from './setup';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Theme } from '@radix-ui/themes';
 import type { ThemeMode } from '../../src/shared/appearance';
 import { ThemeToggle } from '../../src/webview/components/ThemeToggle';
 import { AppearanceSettings } from '../../src/webview/components/settings/AppearanceSettings';
@@ -35,16 +36,54 @@ describe('ThemeToggle', () => {
 describe('AppearanceSettings', () => {
   it('trocar o tema no select envia só o campo alterado', async () => {
     withTheme('system');
-    render(<AppearanceSettings />);
-    await userEvent.selectOptions(screen.getByLabelText('Tema'), 'dark');
+    render(
+      <Theme>
+        <AppearanceSettings />
+      </Theme>,
+    );
+    await choose(screen.getByRole('combobox', { name: 'Tema' }), 'Escuro');
     expect(lastSent('settings.board.update').patch).toEqual({ appearance: { theme: 'dark' } });
   });
 
   it('trocar a fonte envia o patch da fonte', async () => {
     withTheme('system');
-    render(<AppearanceSettings />);
-    await userEvent.selectOptions(screen.getByLabelText('Fonte dos textos'), 'serif');
+    render(
+      <Theme>
+        <AppearanceSettings />
+      </Theme>,
+    );
+    await choose(screen.getByRole('combobox', { name: 'Fonte dos textos' }), 'Serifada');
     expect(lastSent('settings.board.update').patch).toEqual({ appearance: { font: 'serif' } });
+  });
+});
+
+describe('AppearanceSettings: tamanho da fonte e status', () => {
+  it('o controle deslizante muda o tamanho da fonte pelo teclado', async () => {
+    withTheme('system');
+    render(
+      <Theme>
+        <AppearanceSettings />
+      </Theme>,
+    );
+    const thumb = screen.getByRole('slider');
+    thumb.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    const { fontSize } = lastSent('settings.board.update').patch.appearance!;
+    expect(fontSize).toBeGreaterThan(0);
+  });
+
+  it('o nome de um status é uma caixa de texto e grava ao sair', async () => {
+    withTheme('system');
+    render(
+      <Theme>
+        <AppearanceSettings />
+      </Theme>,
+    );
+    const name = screen.getByLabelText('Nome do status running');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Rodando');
+    await userEvent.tab();
+    expect(lastSent('settings.board.update').patch.appearance!.statuses!.running!.label).toBe('Rodando');
   });
 });
 

@@ -5,7 +5,9 @@ import { settings } from '../../commands';
 import { ContrastHint } from './ColorPreview';
 import { StatusBadge } from '../StatusBar';
 import { renderMarkdown } from '../MarkdownEditor';
-import { Button, EnumSelect, FieldRow } from '../ui';
+import { Button, Card, Slider, TextField } from '@radix-ui/themes';
+import { FormField, SelectField } from '../ui';
+import { SectionHeader } from './SectionHeader';
 import { PageHeader } from './PageHeader';
 
 const SAMPLE = '## Exemplo de descrição\n\nTexto de um card com **negrito**, _itálico_ e `código`.\n\n- Primeiro item\n- Segundo item';
@@ -20,7 +22,7 @@ export function AppearanceSettings() {
       <PageHeader
         title="Aparência"
         actions={
-          <Button variant="ghost" size="small" disabled={!changed} onClick={() => set(DEFAULT_APPEARANCE)}>
+          <Button variant="soft" color="gray" disabled={!changed} onClick={() => set(DEFAULT_APPEARANCE)}>
             Restaurar padrões
           </Button>
         }
@@ -28,37 +30,51 @@ export function AppearanceSettings() {
         Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.
       </PageHeader>
 
-      <section className="settings-block">
-        <FieldRow label="Tema">
-          <EnumSelect options={THEMES} value={appearance.theme} onChange={(theme) => set({ theme })} />
-        </FieldRow>
-        <FieldRow label="Fonte dos textos">
-          <EnumSelect options={FONTS} value={appearance.font} onChange={(font) => set({ font })} />
-        </FieldRow>
-        <FieldRow label="Tamanho da fonte">
-          <div className="row">
-            <input
-              type="range"
+      <Card className="form-card" aria-label="Tema e fonte">
+        <div className="form-grid">
+          <FormField label="Tema">
+            {(id) => (
+              <SelectField id={id} aria-label="Tema" options={THEMES} value={appearance.theme} onChange={(theme) => set({ theme })} />
+            )}
+          </FormField>
+          <FormField label="Fonte dos textos">
+            {(id) => (
+              <SelectField
+                id={id}
+                aria-label="Fonte dos textos"
+                options={FONTS}
+                value={appearance.font}
+                onChange={(font) => set({ font })}
+              />
+            )}
+          </FormField>
+        </div>
+        <FormField label={`Tamanho da fonte: ${appearance.fontSize}px`}>
+          {(id) => (
+            <Slider
+              id={id}
+              aria-label="Tamanho da fonte"
+              className="font-size-slider"
               min={FONT_SIZE_RANGE.min}
               max={FONT_SIZE_RANGE.max}
               step={1}
-              value={appearance.fontSize}
-              onChange={(e) => set({ fontSize: Number(e.target.value) })}
+              value={[appearance.fontSize]}
+              onValueChange={([fontSize]) => set({ fontSize })}
             />
-            <span>{appearance.fontSize}px</span>
-          </div>
-        </FieldRow>
-      </section>
+          )}
+        </FormField>
+      </Card>
 
-      <h3 className="section-head">Prévia</h3>
+      <SectionHeader title="Prévia" />
       <div
         className="markdown"
         style={{ fontFamily: fontStack(appearance.font), fontSize: appearance.fontSize }}
         dangerouslySetInnerHTML={{ __html: renderMarkdown(SAMPLE) }}
       />
 
-      <h3 className="section-head">Status dos cards</h3>
-      <p className="muted">Os status são fixos, porque as regras do board dependem deles; o nome e a cor de cada um podem ser ajustados.</p>
+      <SectionHeader title="Status dos cards">
+        Os status são fixos, porque as regras do board dependem deles; o nome e a cor de cada um podem ser ajustados.
+      </SectionHeader>
       <table className="table">
         <thead>
           <tr>
@@ -78,16 +94,23 @@ export function AppearanceSettings() {
                   <StatusBadge status={s.id} />
                 </td>
                 <td>
-                  <input
+                  <TextField.Root
+                    aria-label={`Nome do status ${s.id}`}
                     key={style.label}
                     defaultValue={style.label}
                     onBlur={(e) =>
                       e.target.value.trim() && e.target.value.trim() !== style.label && patch({ label: e.target.value.trim() })
                     }
+                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                   />
                 </td>
                 <td>
-                  <input type="color" value={style.color} onChange={(e) => patch({ color: e.target.value })} />
+                  <input
+                    type="color"
+                    aria-label={`Cor do status ${s.id}`}
+                    value={style.color}
+                    onChange={(e) => patch({ color: e.target.value })}
+                  />
                   <ContrastHint color={style.color} onPick={(color) => patch({ color })} />
                 </td>
                 <td className="muted">

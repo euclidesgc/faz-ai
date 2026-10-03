@@ -120,6 +120,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   esforços), no lugar da linha solta no fim da tabela. A lista e a **Sugestão de modelo** usam os
   campos, seletores e interruptores do Radix Themes; **Montar nova regra** fica no topo da seção e
   o montador abre acima da lista de regras.
+- **Git e Aparência com o novo design**: os campos viram cartões de formulário com o rótulo acima
+  de cada caixa e a ajuda embaixo. Seletores, interruptor do merge automático, o aviso do merge
+  (agora um aviso do Radix) e o controle deslizante do tamanho da fonte são os do Radix Themes;
+  Restaurar padrões da Aparência é o botão do mesmo estilo das outras telas.
 
 ## 0.29.1
 
