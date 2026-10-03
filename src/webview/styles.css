@@ -354,14 +354,19 @@ button.active {
 .card-bar button.icon:hover:where(:not(:disabled)) {
   background: color-mix(in srgb, currentColor 18%, transparent);
 }
-/* LED da IA: na cor do texto da barra (preto ou branco pelo contraste), para aparecer sobre qualquer cor de tipo;
-   pulsa com um halo que se expande e some */
+/* LED da IA, sempre na barra do card: na cor do texto da barra (preto ou branco pelo contraste), para aparecer sobre
+   qualquer cor de tipo. Apagado = só o contorno; aceso = cheio e pulsando com um halo que se expande e some */
 .ai-led {
   flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, currentColor 50%, transparent);
+}
+.ai-led.on {
   background: currentColor;
+  box-shadow: none;
   animation: led-pulse 1.6s ease-in-out infinite;
 }
 @keyframes led-pulse {
@@ -376,7 +381,7 @@ button.active {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ai-led {
+  .ai-led.on {
     animation: none;
   }
 }

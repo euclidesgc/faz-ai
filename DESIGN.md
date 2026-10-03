@@ -71,7 +71,7 @@ olho.
 - A barra do card usa a cor do tipo via `badgeStyle()`. O que fica sobre ela (ID, botões, LED da
   IA) usa `currentColor`, para herdar o preto ou branco escolhido pelo contraste. Uma cor fixa
   (um LED verde, por exemplo) some sobre um tipo da mesma cor.
-- Animação contínua (o LED da IA) para com `prefers-reduced-motion`: o LED fica aceso, sem piscar.
+- Animação contínua (o LED da IA) para com `prefers-reduced-motion`: o LED aceso fica fixo, sem piscar. O LED está sempre no card: apagado é só o contorno, aceso é cheio; a diferença não depende de movimento nem de cor.
 - `tokens.css` tem uma declaração por linha, porque `test/tokens.test.ts` faz parse do arquivo.
 
 ## Ícones

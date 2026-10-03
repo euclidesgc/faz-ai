@@ -95,7 +95,7 @@ Below it come the title (in full in the tooltip when it doesn't fit), the status
 who the next step is waiting on (a robot for the AI, a person for you) and how long it has been
 like that, the fields, the AI model (e.g. "Sonnet 5.5 - baixo", with the effort in Portuguese) and,
 in the footer, the counters, the branch and the PR. Cards waiting on you get a border in the
-status color, and an LED blinks on the bar while the AI is working on the card.
+status color, and the LED on the bar blinks slowly while the AI is working on the card (on a story, also when it works on one of its sub-tasks); when it finishes, the LED stays there, turned off.
 
 ### The board in the browser, outside the editor
 

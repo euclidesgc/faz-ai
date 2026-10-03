@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldDef } from '../src/shared/model';
 import {
+  aiWorkingChildren,
   archivedIn,
   cardsIn,
   checklistOf,
@@ -179,5 +180,20 @@ describe('workflowDeleteBlocker', () => {
     const withType = { ...s, cardTypes: [{ id: 't', boardId: 'b', name: 'T', color: '#000', defaultWorkflowId: 'wc', defaults: {} }] };
     expect(workflowDeleteBlocker(withType, 'wc')).toContain('1 tipo(s)');
     expect(workflowDeleteBlocker(s, 'nao-existe')).toBe('Workflow não encontrado');
+  });
+});
+
+describe('aiWorkingChildren', () => {
+  it('conta só as sub-tarefas vivas que a IA está trabalhando', () => {
+    const story = card('s1');
+    const subs = [
+      card('a', { parentId: 's1' }),
+      card('b', { parentId: 's1', status: 'running' }),
+      card('c', { parentId: 's1', deletedAt: 1 }),
+    ];
+    const s = boardState({ cards: [story, ...subs], aiRuns: ['a', 'c'] });
+    expect(aiWorkingChildren(s, story)).toBe(2);
+    expect(aiWorkingChildren(boardState({ cards: [story, ...subs] }), story)).toBe(1);
+    expect(aiWorkingChildren(s, subs[0]!)).toBe(0);
   });
 });

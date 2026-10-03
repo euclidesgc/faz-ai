@@ -4,15 +4,16 @@ import { cards } from '../../commands';
 import { requestArchive, requestTrash } from '../../store/actions';
 import { Menu } from '../Menu';
 import { Button, IconOpen } from '../ui';
+import type { AiWork } from './AiLed';
 import { CardBar } from './CardBar';
 
 /** Barra do card, como a de uma janela, com os botões de abrir e de ações. No cartão arrastado (`overlay`) os botões somem. */
-export function TitleBar({ card, type, working, overlay }: { card: Card; type?: CardType; working: boolean; overlay: boolean }) {
+export function TitleBar({ card, type, work, overlay }: { card: Card; type?: CardType; work: AiWork; overlay: boolean }) {
   const openCard = useBoardStore((s) => s.openCard);
   const archived = card.archivedAt !== null;
 
   return (
-    <CardBar id={cardRef(card)} typeName={type?.name} color={type?.color} working={working}>
+    <CardBar id={cardRef(card)} typeName={type?.name} color={type?.color} work={work}>
       {!overlay && (
         <span className="card-actions">
           <Button

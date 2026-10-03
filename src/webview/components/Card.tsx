@@ -3,10 +3,11 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cardRef, type Card, type FieldDef } from '../../shared/model';
 import { statusInfo } from '../../shared/status';
-import { fieldsForType, isAiWorking, valueOf } from '../../shared/selectors';
+import { aiWorkingChildren, fieldsForType, isAiWorking, valueOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { FieldBadge, hasValue } from './FieldRenderer';
 import { IconParent } from './ui';
+import type { AiWork } from './cardView/AiLed';
 import { CardFooter } from './cardView/CardFooter';
 import { StatusLine } from './cardView/StatusLine';
 import { TitleBar } from './cardView/TitleBar';
@@ -34,6 +35,14 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const fields = fieldsForType(state, card.typeId).filter((f) => f.display !== 'hidden');
   const parent = card.parentId ? state.cards.find((c) => c.id === card.parentId) : undefined;
   const selected = isParent && selectedParentId === card.id;
+  const workingChildren = isParent ? aiWorkingChildren(state, card) : 0;
+  const work: AiWork = archived
+    ? null
+    : isAiWorking(state, card)
+      ? { mode: 'self' }
+      : workingChildren
+        ? { mode: 'children', count: workingChildren }
+        : null;
   const status = archived ? null : card.status;
   // pendência com a pessoa: a borda ganha a cor do status para achar de relance o que espera por ela
   const mine = status !== null && statusInfo(status).owner === 'human';
@@ -60,7 +69,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       tabIndex={overlay ? undefined : 0}
       title={overlay ? undefined : 'Dois cliques (ou Enter) abrem o card'}
     >
-      <TitleBar card={card} type={type} working={!archived && isAiWorking(state, card)} overlay={overlay} />
+      <TitleBar card={card} type={type} work={work} overlay={overlay} />
       <div className="card-body">
         <div className="card-title" title={card.title}>
           {card.title}
