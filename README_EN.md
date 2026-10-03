@@ -304,6 +304,10 @@ keep many skills available without filling the context of every session. The con
 documented for Claude Code and Cursor; for the other tools, the documentation only says the AI
 stops invoking the skill on its own.
 
+To avoid ticking skills card by card, set them on the type: in Configurações → **Tipos de card** →
+**Padrões por tipo** (defaults per type), the "Skills" field (and the model) come pre-filled on
+every new card of that type. Each card can still change them.
+
 ### Templates and references
 
 Class templates and code examples live inside the skill's folder (`references/`, `assets/`,

@@ -6,6 +6,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Skills automáticas por tipo de card.** Em Tipos de card → Padrões por tipo, o campo Skills usa
+  a janela de escolha (antes mostrava "Sem opções ainda" quando o projeto não tinha skills próprias)
+  e todo card novo do tipo nasce com as skills escolhidas. Há teste de ponta a ponta.
+
 - **Harness de IA em três abas.** A tela era uma rolagem longa com três assuntos misturados. Agora:
   **Ferramenta e execução** (a IA do projeto, execução pela conversa e heartbeat), **Do projeto**
   (regras, skills e agentes que fazem parte do repositório) e **Tudo que a ferramenta carrega** (o
