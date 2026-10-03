@@ -7,6 +7,14 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **The AI queue follows the board order, not the card number.** The heartbeat, the autopilot and
+  `get_pending_work` now take cards with bugs first and then top to bottom — what decides is the
+  card's position on the board. Category no longer weighs in either: a ready bug no longer sits
+  behind an approved card that is further down. `get_pending_work` gained an `order` field with the
+  whole queue in order; the `approved`, `unanswered` and `ready` groups still say what to do with
+  each card. The branch base for autonomous stories is still the previous story by number, so a
+  story that runs before a lower-numbered one opens its pull request outside the stack.
+
 - **Release without a direct push to `main`.** `npm run release` now creates the `release/vX.Y.Z`
   branch from an up-to-date main and sets the version and the CHANGELOGs on it ("Unreleased" becomes
   the version). After publishing to the stores, it pushes the branch, opens the PR and, once the
