@@ -1,11 +1,11 @@
 import { badgeStyle } from '../../shared/color';
 import { cardRef } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
+import { cards, trash } from '../commands';
 import { Button, DeleteButton } from './ui';
 
 export function TrashView() {
   const state = useBoardStore((s) => s.state)!;
-  const send = useBoardStore((s) => s.send);
   const ask = useBoardStore((s) => s.ask);
 
   const deleted = state.cards.filter((c) => c.deletedAt !== null);
@@ -27,7 +27,7 @@ export function TrashView() {
               message: `${deleted.length} card(s) serão apagados definitivamente, com comentários e anexos. Não dá para desfazer.`,
               confirmLabel: 'Esvaziar',
               danger: true,
-              onConfirm: () => send({ type: 'trash.empty' }),
+              onConfirm: () => trash.empty(),
             })
           }
         >
@@ -56,12 +56,12 @@ export function TrashView() {
                   <td>{column?.name}</td>
                   <td>{new Date(c.deletedAt!).toLocaleString()}</td>
                   <td className="row end">
-                    <Button onClick={() => send({ type: 'card.restore', cardId: c.id })}>Restaurar</Button>
+                    <Button onClick={() => cards.restore(c.id)}>Restaurar</Button>
                     <DeleteButton
                       variant="ghost"
                       question={`Apagar "${c.title}" definitivamente?`}
                       message="Comentários, anexos e sub-tarefas deste card também serão apagados. Não dá para desfazer."
-                      onConfirm={() => send({ type: 'card.deletePermanent', cardId: c.id })}
+                      onConfirm={() => cards.deletePermanent(c.id)}
                     >
                       Apagar de vez
                     </DeleteButton>

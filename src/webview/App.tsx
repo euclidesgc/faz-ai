@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppearance } from './appearance';
 import { humanQueue, pendingWork } from '../shared/pending';
 import { useBoardStore, useHostSync } from './store/boardStore';
+import { ui } from './commands';
 import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
 import { Dialog } from './components/Dialog';
@@ -15,7 +16,7 @@ import { isWeb, onConnectionChange } from './vscode';
 export function App() {
   useHostSync();
   useAppearance();
-  const { state, error, notice, view, setError, setNotice, setView, openCardId, filters, setFilters, send } = useBoardStore();
+  const { state, error, notice, view, setError, setNotice, setView, openCardId, filters, setFilters } = useBoardStore();
   const [offline, setOffline] = useState(false);
 
   // erros (ex.: regra de conclusão) e avisos somem sozinhos
@@ -62,7 +63,7 @@ export function App() {
             {withYou} com você
           </Button>
         )}
-        {!isWeb && <Button variant="ghost" title="Abre este board no navegador, fora do editor" onClick={() => send({ type: 'ui.openInBrowser' })}>Abrir no navegador ↗</Button>}
+        {!isWeb && <Button variant="ghost" title="Abre este board no navegador, fora do editor" onClick={() => ui.openInBrowser()}>Abrir no navegador ↗</Button>}
         <ThemeToggle />
       </header>
       {offline && <div className="banner warn offline">Sem ligação com o Faz AI: o que você fizer agora não é salvo. A página reconecta sozinha quando o editor (ou o comando <code>faz-ai</code>) voltar.</div>}

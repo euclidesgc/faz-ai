@@ -3,6 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Card, Column as ColumnModel, ColumnCategory, Workflow } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
+import { cards, settings } from '../commands';
 import { SortableCard } from './Card';
 import { Menu } from './Menu';
 import { Button } from './ui';
@@ -37,11 +38,10 @@ export function CollapsedColumn({ setNodeRef, isOver, name, count, className = '
   );
 }
 
-export function Column({ column, workflow, cards, total, index, siblings, collapsed, onToggle }: Props) {
+export function Column({ column, workflow, cards: visibleCards, total, index, siblings, collapsed, onToggle }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const state = useBoardStore((s) => s.state)!;
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
-  const send = useBoardStore((s) => s.send);
   const ask = useBoardStore((s) => s.ask);
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
@@ -54,13 +54,13 @@ export function Column({ column, workflow, cards, total, index, siblings, collap
   const submit = () => {
     const t = typeId || types[0]?.id;
     if (!title.trim() || !t) return;
-    send({ type: 'card.create', typeId: t, columnId: column.id, parentId: workflow.kind === 'child' ? selectedParentId : null, title: title.trim() });
+    cards.create({ typeId: t, columnId: column.id, parentId: workflow.kind === 'child' ? selectedParentId : null, title: title.trim() });
     setTitle('');
   };
 
   const rename = () => {
     const name = renaming?.trim();
-    if (name && name !== column.name) send({ type: 'settings.column.update', columnId: column.id, patch: { name } });
+    if (name && name !== column.name) settings.updateColumn(column.id, { name });
     setRenaming(null);
   };
 
@@ -74,11 +74,11 @@ export function Column({ column, workflow, cards, total, index, siblings, collap
       confirmLabel: 'Excluir coluna',
       danger: true,
       choices: n ? { label: 'Mover cards para', options: others.map((c) => ({ value: c.id, label: c.name })) } : undefined,
-      onConfirm: (dest) => send({ type: 'settings.column.delete', columnId: column.id, moveCardsTo: dest ?? others[0]!.id }),
+      onConfirm: (dest) => settings.deleteColumn(column.id, dest ?? others[0]!.id),
     });
   };
 
-  const count = cards.length === total ? String(total) : `${cards.length}/${total}`;
+  const count = visibleCards.length === total ? String(total) : `${visibleCards.length}/${total}`;
   if (collapsed) {
     const mark = column.category === 'done' ? '✓ ' : column.category === 'cancelled' ? '✕ ' : '';
     return <CollapsedColumn setNodeRef={setNodeRef} isOver={isOver} name={`${mark}${column.name}`} count={count} className={column.isTerminal ? 'terminal' : ''} onExpand={onToggle} />;
@@ -121,19 +121,19 @@ export function Column({ column, workflow, cards, total, index, siblings, collap
             ...CATEGORIES.map((c) => ({
               label: c.label,
               checked: column.category === c.value,
-              onClick: () => send({ type: 'settings.column.update', columnId: column.id, patch: { category: c.value } }),
+              onClick: () => settings.updateColumn(column.id, { category: c.value }),
             })),
             'sep' as const,
-            { label: '← Mover para a esquerda', disabled: index === 0, onClick: () => send({ type: 'settings.column.update', columnId: column.id, patch: { position: index - 1 } }) },
-            { label: '→ Mover para a direita', disabled: index === siblings.length - 1, onClick: () => send({ type: 'settings.column.update', columnId: column.id, patch: { position: index + 1 } }) },
+            { label: '← Mover para a esquerda', disabled: index === 0, onClick: () => settings.updateColumn(column.id, { position: index - 1 }) },
+            { label: '→ Mover para a direita', disabled: index === siblings.length - 1, onClick: () => settings.updateColumn(column.id, { position: index + 1 }) },
             'sep',
             { label: 'Excluir coluna', danger: true, disabled: siblings.length <= 1, onClick: remove },
           ]}
         />
       </header>
-      <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={visibleCards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div className="column-body">
-          {cards.map((card) => (
+          {visibleCards.map((card) => (
             <SortableCard key={card.id} card={card} />
           ))}
         </div>

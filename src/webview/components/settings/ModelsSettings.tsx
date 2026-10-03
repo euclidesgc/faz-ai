@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AI_TOOLS, type AiTool } from '../../../shared/harness';
 import { modelId, type ModelOption } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
+import { settings } from '../../commands';
 import { ModelRulesEditor } from './ModelRulesEditor';
 import { Button } from '../ui';
 
@@ -18,11 +19,10 @@ const SOURCES: Record<AiTool, string> = {
 
 export function ModelsSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const send = useBoardStore((s) => s.send);
   const { modelCatalog: catalog, aiTool } = state.board;
   const [draft, setDraft] = useState<Record<string, { model: string; label: string; efforts: string }>>({});
 
-  const setCatalog = (next: ModelOption[]) => send({ type: 'settings.models.set', catalog: next });
+  const setCatalog = (next: ModelOption[]) => settings.setModels(next);
   const patchModel = (id: string, patch: Partial<ModelOption>) => setCatalog(catalog.map((o) => (o.id === id ? { ...o, ...patch } : o)));
 
   // o projeto trabalha com uma ferramenta por vez: só os modelos dela aparecem
@@ -53,7 +53,7 @@ export function ModelsSettings() {
                 <h3 className="plain">{t.label}</h3>
                 <span className="muted small">{mine.length} modelo(s)</span>
                 <span className="spacer" />
-                <Button title={`Fonte: ${SOURCES[t.id]}`} onClick={() => send({ type: 'settings.models.detect', tool: t.id })}>Detectar modelos</Button>
+                <Button title={`Fonte: ${SOURCES[t.id]}`} onClick={() => settings.detectModels(t.id)}>Detectar modelos</Button>
               </div>
               <div className="muted small">Ao detectar: {SOURCES[t.id]}. Modelos que você acrescentou à mão são mantidos.</div>
               <table className="table">

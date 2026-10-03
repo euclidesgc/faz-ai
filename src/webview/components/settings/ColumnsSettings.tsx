@@ -6,6 +6,7 @@ import type { Column, ColumnCategory } from '../../../shared/model';
 import { PHASE_DEFAULTS } from '../../../shared/phaseDefaults';
 import { archiveKey } from '../../../shared/filters';
 import { columnsOf, useBoardStore } from '../../store/boardStore';
+import { settings } from '../../commands';
 import { MarkdownEditor } from '../MarkdownEditor';
 import { AddInput, Button, DeleteButton, EnumSelect } from '../ui';
 
@@ -17,10 +18,9 @@ const CATEGORIES: { value: ColumnCategory; label: string }[] = [
 
 /** A fase de uma coluna: o que a IA faz quando o card entra nela e o documento que a fase produz. */
 function PhaseEditor({ column }: { column: Column }) {
-  const send = useBoardStore((s) => s.send);
   const [template, setTemplate] = useState(column.artifactTemplate);
   const profiles = useBoardStore((s) => s.state)!.board.execProfiles;
-  const patch = (p: { aiInstruction?: string; artifactName?: string; artifactTemplate?: string; execProfile?: string | null }) => send({ type: 'settings.column.update', columnId: column.id, patch: p });
+  const patch = (p: { aiInstruction?: string; artifactName?: string; artifactTemplate?: string; execProfile?: string | null }) => settings.updateColumn(column.id, p);
   const preset = PHASE_DEFAULTS[column.name];
   const isDefault = preset && preset.instruction === column.aiInstruction && preset.artifactName === column.artifactName && preset.artifactTemplate === column.artifactTemplate;
 
@@ -85,13 +85,12 @@ const START = '__start';
 
 export function ColumnsSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const send = useBoardStore((s) => s.send);
   const resetCollapsed = useBoardStore((s) => s.resetCollapsed);
   const [phaseOpen, setPhaseOpen] = useState<string | null>(null);
   /** coluna depois da qual a nova entra, por workflow; sem escolha, vale o padrão */
   const [newAfter, setNewAfter] = useState<Record<string, string>>({});
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
-  const moveTo = (columnId: string, position: number) => send({ type: 'settings.column.update', columnId, patch: { position } });
+  const moveTo = (columnId: string, position: number) => settings.updateColumn(columnId, { position });
 
   return (
     <div>
@@ -105,7 +104,7 @@ export function ColumnsSettings() {
         const defaultAfter = (firstTerminal === -1 ? cols[cols.length - 1] : cols[firstTerminal - 1])?.id ?? START;
         const after = newAfter[wf.id] && (newAfter[wf.id] === START || cols.some((c) => c.id === newAfter[wf.id])) ? newAfter[wf.id]! : defaultAfter;
         const create = (name: string) => {
-          send({ type: 'settings.column.create', workflowId: wf.id, name, position: after === START ? 0 : cols.findIndex((c) => c.id === after) + 1 });
+          settings.createColumn(wf.id, name, after === START ? 0 : cols.findIndex((c) => c.id === after) + 1);
           setNewAfter({ ...newAfter, [wf.id]: '' });
         };
         // para a exclusão: quantos cards apontam para a coluna (inclusive arquivados e na lixeira) e para onde podem ir
@@ -118,11 +117,11 @@ export function ColumnsSettings() {
         return (
           <section key={wf.id} className="settings-block">
             <div className="row">
-              <input className="h3-input" defaultValue={wf.name} onBlur={(e) => e.target.value.trim() && e.target.value !== wf.name && send({ type: 'settings.workflow.update', workflowId: wf.id, patch: { name: e.target.value.trim() } })} />
+              <input className="h3-input" defaultValue={wf.name} onBlur={(e) => e.target.value.trim() && e.target.value !== wf.name && settings.updateWorkflow(wf.id, { name: e.target.value.trim() })} />
               <span className="muted">{wf.kind === 'parent' ? 'linha de cima' : 'linha de baixo'}</span>
               <span className="spacer" />
               <label className="switch" title="Como a linha aparece ao abrir o board; no board ela abre e fecha pelo cabeçalho">
-                <input type="checkbox" checked={wf.collapsed} onChange={(e) => { send({ type: 'settings.workflow.update', workflowId: wf.id, patch: { collapsed: e.target.checked } }); resetCollapsed(wf.id); }} />
+                <input type="checkbox" checked={wf.collapsed} onChange={(e) => { settings.updateWorkflow(wf.id, { collapsed: e.target.checked }); resetCollapsed(wf.id); }} />
                 Linha começa colapsada
               </label>
             </div>
@@ -134,18 +133,18 @@ export function ColumnsSettings() {
                 {cols.map((c, i) => (
                   <Fragment key={c.id}>
                   <SortableRow id={c.id} name={c.name} onStep={(d) => i + d >= 0 && i + d < cols.length && moveTo(c.id, i + d)}>
-                    <td><input defaultValue={c.name} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && send({ type: 'settings.column.update', columnId: c.id, patch: { name: e.target.value.trim() } })} /></td>
+                    <td><input defaultValue={c.name} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && settings.updateColumn(c.id, { name: e.target.value.trim() })} /></td>
                     <td>
-                      <EnumSelect options={CATEGORIES} value={c.category} onChange={(category) => send({ type: 'settings.column.update', columnId: c.id, patch: { category } })} />
+                      <EnumSelect options={CATEGORIES} value={c.category} onChange={(category) => settings.updateColumn(c.id, { category })} />
                     </td>
-                    <td><input type="checkbox" disabled={c.category !== 'open'} checked={c.aiActive} onChange={(e) => send({ type: 'settings.column.update', columnId: c.id, patch: { aiActive: e.target.checked } })} /></td>
-                    <td><input type="checkbox" disabled={c.category !== 'open'} checked={c.requiresApproval} onChange={(e) => send({ type: 'settings.column.update', columnId: c.id, patch: { requiresApproval: e.target.checked } })} /></td>
+                    <td><input type="checkbox" disabled={c.category !== 'open'} checked={c.aiActive} onChange={(e) => settings.updateColumn(c.id, { aiActive: e.target.checked })} /></td>
+                    <td><input type="checkbox" disabled={c.category !== 'open'} checked={c.requiresApproval} onChange={(e) => settings.updateColumn(c.id, { requiresApproval: e.target.checked })} /></td>
                     <td>
                       <Button variant="ghost" size="small" on={phaseOpen === c.id} disabled={c.category !== 'open'} title="Instrução para a IA e modelo do documento desta fase" onClick={() => setPhaseOpen(phaseOpen === c.id ? null : c.id)}>
                         {c.artifactName || (c.aiInstruction ? 'Instrução' : 'Definir')} ▾
                       </Button>
                     </td>
-                    <td><input type="checkbox" checked={c.collapsed} onChange={(e) => { send({ type: 'settings.column.update', columnId: c.id, patch: { collapsed: e.target.checked } }); resetCollapsed(c.id); }} /></td>
+                    <td><input type="checkbox" checked={c.collapsed} onChange={(e) => { settings.updateColumn(c.id, { collapsed: e.target.checked }); resetCollapsed(c.id); }} /></td>
                     <td>
                       <DeleteButton
                         disabled={cols.length <= 1}
@@ -153,7 +152,7 @@ export function ColumnsSettings() {
                         message={inColumn(c.id) ? `${inColumn(c.id)} card(s) serão movidos para a coluna escolhida.` : 'A coluna está vazia.'}
                         confirmLabel="Excluir coluna"
                         choices={inColumn(c.id) ? { label: 'Mover cards para', options: others(c.id).map((x) => ({ value: x.id, label: x.name })) } : undefined}
-                        onConfirm={(dest) => send({ type: 'settings.column.delete', columnId: c.id, moveCardsTo: dest ?? others(c.id)[0]!.id })}
+                        onConfirm={(dest) => settings.deleteColumn(c.id, dest ?? others(c.id)[0]!.id)}
                       />
                     </td>
                   </SortableRow>
@@ -168,7 +167,7 @@ export function ColumnsSettings() {
                   <td></td>
                   <td></td>
                   <td></td>
-                  <td><input type="checkbox" checked={wf.archiveCollapsed} onChange={(e) => { send({ type: 'settings.workflow.update', workflowId: wf.id, patch: { archiveCollapsed: e.target.checked } }); resetCollapsed(archiveKey(wf.id)); }} /></td>
+                  <td><input type="checkbox" checked={wf.archiveCollapsed} onChange={(e) => { settings.updateWorkflow(wf.id, { archiveCollapsed: e.target.checked }); resetCollapsed(archiveKey(wf.id)); }} /></td>
                   <td></td>
                 </tr>
               </tbody>

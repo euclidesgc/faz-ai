@@ -1,6 +1,7 @@
 import { activeFilterCount, dateRange } from '../../shared/filters';
 import { useState } from 'react';
 import { useBoardStore } from '../store/boardStore';
+import { ui } from '../commands';
 import { isWeb } from '../vscode';
 import { FilterPanel } from './FilterPanel';
 
@@ -12,7 +13,7 @@ export function FilterBar() {
   const state = useBoardStore((s) => s.state)!;
   const filters = useBoardStore((s) => s.filters);
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
-  const { setFilters, clearFilters, selectParent, send } = useBoardStore();
+  const { setFilters, clearFilters, selectParent } = useBoardStore();
 
   const [panelOpen, setPanelOpen] = useState(false);
 
@@ -43,7 +44,7 @@ export function FilterBar() {
     <div className="filterbar">
       <div className="filterbar-main">
         <input className="search" type="search" placeholder="Buscar em título, descrição, conversa e campos…" value={filters.text} onChange={(e) => setFilters({ text: e.target.value })} />
-        <button className={panelOpen ? 'active' : ''} aria-expanded={isWeb ? panelOpen : undefined} onClick={() => (isWeb ? setPanelOpen(!panelOpen) : send({ type: 'ui.showFilters' }))} title={isWeb ? 'Mostrar ou esconder os filtros' : 'Abrir os filtros na barra lateral'}>Filtros{count > 0 && ` (${count})`}</button>
+        <button className={panelOpen ? 'active' : ''} aria-expanded={isWeb ? panelOpen : undefined} onClick={() => (isWeb ? setPanelOpen(!panelOpen) : ui.showFilters())} title={isWeb ? 'Mostrar ou esconder os filtros' : 'Abrir os filtros na barra lateral'}>Filtros{count > 0 && ` (${count})`}</button>
         {chips.map((c) => (
           <span key={c.key} className="filter-chip" onClick={c.clear} title="Remover este filtro">{c.label} ✕</span>
         ))}

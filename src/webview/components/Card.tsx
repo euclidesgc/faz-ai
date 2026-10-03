@@ -4,6 +4,7 @@ import { badgeStyle } from '../../shared/color';
 import { cardRef, type Card } from '../../shared/model';
 import { modelFieldOf, modelLabel, suggestModel } from '../../shared/models';
 import { childrenOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
+import { cards } from '../commands';
 import { requestArchive, requestTrash } from '../store/actions';
 import { FieldBadge } from './FieldRenderer';
 import { Menu } from './Menu';
@@ -25,7 +26,6 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
   const selectParent = useBoardStore((s) => s.selectParent);
   const openCard = useBoardStore((s) => s.openCard);
-  const send = useBoardStore((s) => s.send);
 
   const type = state.cardTypes.find((t) => t.id === card.typeId);
   const workflow = state.workflows.find((w) => w.id === card.workflowId);
@@ -77,7 +77,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
               items={[
                 { label: 'Abrir detalhes', onClick: () => openCard(card.id) },
                 archived
-                  ? { label: 'Desarquivar', onClick: () => send({ type: 'card.unarchive', cardId: card.id }) }
+                  ? { label: 'Desarquivar', onClick: () => cards.unarchive(card.id) }
                   : { label: 'Arquivar', onClick: () => requestArchive(card.id) },
                 'sep',
                 { label: 'Mover para a lixeira', danger: true, onClick: () => requestTrash(card.id) },
@@ -107,7 +107,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              send({ type: 'field.setValue', cardId: card.id, fieldId: modelField!.id, value: offerSuggestion });
+              cards.setField(card.id, modelField!.id, offerSuggestion);
             }}
           >✦ {modelLabel(state.board.modelCatalog, offerSuggestion)}</button>
         )}

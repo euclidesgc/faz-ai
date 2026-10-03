@@ -3,6 +3,7 @@ import { aiToolInfo } from '../../../shared/harness';
 import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelLabel, modelValue, type ModelRule, type RuleCondition } from '../../../shared/models';
 import type { BoardState } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
+import { settings } from '../../commands';
 import { ModelEditor } from '../FieldRenderer';
 import { Button, EnumSelect, FieldRow } from '../ui';
 
@@ -92,12 +93,11 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
 /** Lista das regras em uso (a ordem importa) e o montador de regras. */
 export function ModelRulesEditor() {
   const state = useBoardStore((s) => s.state)!;
-  const send = useBoardStore((s) => s.send);
   const { modelRules: rules, modelCatalog: allModels, aiTool } = state.board;
   const catalog = allModels.filter((o) => o.tool === aiTool);
   const [editing, setEditing] = useState<ModelRule | null>(null);
 
-  const setRules = (next: ModelRule[]) => send({ type: 'settings.modelRules.set', rules: next });
+  const setRules = (next: ModelRule[]) => settings.setModelRules(next);
   const move = (i: number, delta: number) => {
     const next = [...rules];
     const [r] = next.splice(i, 1);
@@ -153,7 +153,7 @@ export function ModelRulesEditor() {
           <div className="row">
             <Button variant="primary" disabled={!catalog.length} onClick={startNew}>Montar nova regra</Button>
             <span className="spacer" />
-            <Button disabled={!hasEffort} title={`Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do ${tool.label}`} onClick={() => send({ type: 'settings.modelRules.suggest', tool: aiTool })}>
+            <Button disabled={!hasEffort} title={`Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do ${tool.label}`} onClick={() => settings.suggestModelRules(aiTool)}>
               Recriar as regras de "{EFFORT_FIELD}"
             </Button>
           </div>
