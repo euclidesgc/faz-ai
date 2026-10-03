@@ -206,8 +206,8 @@ describe('HarnessInventory', () => {
 
   it('ações da linha: abrir, copiar para o projeto e apagar com confirmação', async () => {
     renderScreen();
-    const row = screen.getByText('global-skill').closest('tr')!;
-    await userEvent.click(within(row).getByRole('button', { name: 'Abrir' }));
+    const row = screen.getByText('global-skill').closest('li')!;
+    await userEvent.click(within(row).getByRole('button', { name: '~/.claude/skills/global-skill/SKILL.md' }));
     expect(lastSent('harness.item.open')).toEqual({ type: 'harness.item.open', path: '/abs/~/.claude/skills/global-skill/SKILL.md' });
     await userEvent.click(within(row).getByRole('button', { name: 'Copiar para o projeto' }));
     expect(lastSent('harness.item.copy')).toEqual({
@@ -230,7 +230,7 @@ describe('HarnessInventory', () => {
 
   it('modo da skill global pede confirmação; arquivos de apoio abrem e são criados', async () => {
     renderScreen();
-    await choose(within(screen.getByText('global-skill').closest('tr')!).getByRole('combobox'), /Só quando indicada/);
+    await choose(within(screen.getByText('global-skill').closest('li')!).getByRole('combobox'), /Só quando indicada/);
     expect(useBoardStore.getState().dialog?.title).toBe('Alterar skills da pasta do usuário?');
     await userEvent.click(dialog().getByRole('button', { name: 'Alterar' }));
     expect(lastSent('harness.skill.setMode')).toEqual({
@@ -239,7 +239,7 @@ describe('HarnessInventory', () => {
       paths: ['/abs/~/.claude/skills/global-skill/SKILL.md'],
       mode: 'manual',
     });
-    const row = screen.getByText('revisar-spec').closest('tr')!;
+    const row = screen.getByText('revisar-spec').closest('li')!;
     await userEvent.click(within(row).getByRole('button', { name: 'Arquivos (1)' }));
     const files = document.querySelector<HTMLElement>('.skill-files')!;
     await userEvent.click(within(files).getByRole('button', { name: 'Abrir' }));
@@ -258,6 +258,48 @@ describe('HarnessInventory', () => {
       file: 'references/exemplo.ts',
       link: true,
     });
+  });
+
+  it('cada escopo diz de onde os itens vêm: o do projeto fica marcado como parte do repositório', () => {
+    renderScreen();
+    const skills = within(section('Skills'));
+    expect(
+      within(skills.getByRole('region', { name: 'Projeto' })).getByText('Fazem parte deste projeto e vão no repositório.'),
+    ).toBeInTheDocument();
+    expect(within(skills.getByRole('region', { name: 'Global' })).getByText(/não vão no repositório/)).toBeInTheDocument();
+    // a descrição é a dica do nome, e o caminho vem numa linha própria
+    const row = skills.getByText('revisar-spec').closest('li')!;
+    expect(within(row).getByText('Descrição de revisar-spec')).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: '.claude/skills/revisar-spec/SKILL.md' })).toBeInTheDocument();
+  });
+
+  it('marcar itens abre a barra de ações em massa; copiar do global para o projeto', async () => {
+    renderScreen();
+    const global = within(section('Skills')).getByRole('region', { name: 'Global' });
+    expect(within(global).queryByRole('toolbar')).toBeNull();
+    await userEvent.click(within(global).getByRole('checkbox', { name: 'Selecionar todos em Global' }));
+    const bar = within(within(global).getByRole('toolbar'));
+    expect(bar.getByText('1 marcados')).toBeInTheDocument();
+    await userEvent.click(bar.getByRole('button', { name: 'Copiar para o projeto (1)' }));
+    expect(lastSent('harness.item.copy')).toMatchObject({
+      to: 'project',
+      items: [{ kind: 'skill', path: '/abs/~/.claude/skills/global-skill/SKILL.md' }],
+    });
+    // a seleção some depois da ação
+    expect(within(global).queryByRole('toolbar')).toBeNull();
+  });
+
+  it('em massa: muda o modo e apaga o que foi marcado, com confirmação', async () => {
+    renderScreen();
+    const project = within(section('Skills')).getByRole('region', { name: 'Projeto' });
+    await userEvent.click(within(project).getByRole('checkbox', { name: 'Selecionar revisar-spec' }));
+    await userEvent.click(within(project).getByRole('button', { name: 'Deixar só quando indicadas' }));
+    expect(lastSent('harness.skill.setMode')).toMatchObject({ mode: 'manual', paths: ['/abs/.claude/skills/revisar-spec/SKILL.md'] });
+    await userEvent.click(within(project).getByRole('checkbox', { name: 'Selecionar revisar-spec' }));
+    await userEvent.click(within(project).getByRole('button', { name: 'Apagar (1)' }));
+    expect(useBoardStore.getState().dialog).toMatchObject({ title: 'Apagar "revisar-spec"?', danger: true });
+    await userEvent.click(dialog().getByRole('button', { name: 'Apagar' }));
+    expect(lastSent('harness.item.delete')).toMatchObject({ kind: 'skill', path: '/abs/.claude/skills/revisar-spec/SKILL.md' });
   });
 
   it('buscar e instalar: Enter procura as skills da origem', async () => {

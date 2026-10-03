@@ -7,6 +7,16 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 
 ## Unreleased
 
+- **AI harness: new list for skills, agents, hooks and MCP servers.** Each item shows its name, the
+  description as a hint (two lines, full text on hover) and the file path on its own line, in full;
+  clicking it opens the file in the editor. The table that broke the path and description across
+  several lines is gone. Each row has a checkbox, and the header one selects the group; with items
+  selected, a bar lets you make skills automatic or only-when-indicated, copy to the project or to
+  global, and delete. The **Projeto** group always comes first, highlighted, saying it is part of
+  the repository; **Global** and **Plugins** say they are not.
+- **Block descriptions in frontmatter**: skills and agents with `description: |` or `>` (multi-line)
+  showed an empty description or just the bar; the full description is now read.
+
 - **Theme button in the board's top bar**: the icon in the top-right corner cycles between
   **Sistema** (system), **Claro** (light) and **Escuro** (dark). It is the same preference as
   Configurações > Aparência, so the choice is saved and applies in the editor and in the browser.

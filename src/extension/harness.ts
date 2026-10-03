@@ -14,21 +14,17 @@ import {
   type SkillMode,
   type ToolInventory,
 } from '../shared/harness';
+import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { scanInventory } from './harnessScan';
 import { detectTools } from './models';
 import { setSkillMode, skillMode } from './skillMode';
 
 const MAX_BYTES = 512 * 1024;
 
-/** Lê `name` e `description` do frontmatter YAML de um SKILL.md (só valores de uma linha). */
+/** Lê `name`, `description` e `model` do frontmatter YAML de um SKILL.md ou arquivo de agente. */
 export function parseFrontmatter(content: string): { name?: string; description?: string; model?: string } {
-  const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
-  if (!m) return {};
-  const get = (key: string) => {
-    const line = new RegExp(`^${key}:\\s*(.*)$`, 'm').exec(m[1]!);
-    return line ? line[1]!.trim().replace(/^["']|["']$/g, '') : undefined;
-  };
-  return { name: get('name'), description: get('description'), model: get('model') };
+  const fm = frontmatterOf(content);
+  return { name: frontmatterValue(fm, 'name'), description: frontmatterValue(fm, 'description'), model: frontmatterValue(fm, 'model') };
 }
 
 export function skillTemplate(name: string, description: string, body: string): string {

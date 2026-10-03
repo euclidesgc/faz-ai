@@ -6,6 +6,17 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Harness de IA: lista nova de skills, agentes, hooks e servidores MCP.** Cada item tem o nome, a
+  descrição como dica (duas linhas, com o texto completo ao passar o mouse) e o caminho do arquivo
+  numa linha própria, por inteiro; clicar nele abre o arquivo no editor. Saiu a tabela que
+  quebrava o caminho e a descrição em várias linhas. Cada linha tem uma caixa de seleção, e a do
+  cabeçalho marca o grupo; com itens marcados, uma barra permite deixar as skills automáticas ou só
+  quando indicadas, copiar para o projeto ou para o global, e apagar. O grupo **Projeto** vem
+  sempre primeiro, em destaque, com a frase de que faz parte do repositório; **Global** e
+  **Plugins** dizem que não fazem.
+- **Descrição em bloco do frontmatter**: skills e agentes com `description: |` ou `>` (em várias
+  linhas) apareciam com a descrição vazia ou só com a barra; agora a descrição é lida inteira.
+
 - **Botão de tema no topo do board**: o ícone no canto superior direito alterna entre **Sistema**,
   **Claro** e **Escuro**. É a mesma preferência de Configurações > Aparência, então a escolha fica
   salva e vale no editor e no navegador.

@@ -247,7 +247,8 @@ carrega** (everything each tool loads), there is one tab per tool with eight sec
 and rules, skills, agents, commands and prompts, hooks, MCP servers, plugins, settings and
 permissions), each split into three scopes:
 
-- **Projeto** (project): files in this folder; they apply only here.
+- **Projeto** (project): files in this folder; they apply only here and go into the repository.
+  This group is always shown, highlighted, and says when the project has nothing of that kind.
 - **Global**: files in your user folder (`~/.claude`, `~/.codex`, `~/.copilot`…); they apply to all
   your projects. Every change to them asks for confirmation.
 - **Plugins**: they come from installed packages; the board does not change them, but they can be
@@ -255,7 +256,12 @@ permissions), each split into three scopes:
 
 What you can do:
 
-- **Open** any item in the editor, which is also where it is edited.
+- **Read the list effortlessly.** Each item shows its name, the description as a hint (capped at
+  two lines) and, on its own line, the full path of the file. Clicking the path opens the file in
+  the editor, which is also where it is edited.
+- **Act on many at once.** Each row has a checkbox, and the header one selects the whole group.
+  With items selected a bar appears: make skills automatic or only-when-indicated, copy to the
+  project or to global, and delete, always with confirmation.
 - **Create** an item in the place and format the tool expects, **delete** it, and **copy** skills,
   agents, commands and rules from global or from a plugin into the project (and from the project to
   global).

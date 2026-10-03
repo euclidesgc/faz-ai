@@ -234,14 +234,20 @@ cada ferramenta carrega**, há uma aba por ferramenta com oito seções (instru�
 agentes, comandos e prompts, hooks, servidores MCP, plugins, configurações e permissões), cada uma
 dividida em três escopos:
 
-- **Projeto**: arquivos desta pasta; valem só aqui.
+- **Projeto**: arquivos desta pasta; valem só aqui e vão no repositório. Esse grupo aparece sempre,
+  em destaque, e diz quando o projeto não tem nada daquele tipo.
 - **Global**: arquivos da sua pasta de usuário (`~/.claude`, `~/.codex`, `~/.copilot`…); valem em
   todos os seus projetos. Toda alteração neles pede confirmação.
 - **Plugins**: vêm de pacotes instalados; não são alterados pelo board, mas podem ser copiados.
 
 O que dá para fazer:
 
-- **Abrir** qualquer item no editor, onde ele também é editado.
+- **Ler a lista sem esforço.** Cada item mostra o nome, a descrição como dica (limitada a duas
+  linhas) e, numa linha própria, o caminho do arquivo por inteiro. Clicar no caminho abre o arquivo
+  no editor, onde ele também é editado.
+- **Agir em vários de uma vez.** Cada linha tem uma caixa de seleção, e a do cabeçalho marca o
+  grupo todo. Com itens marcados aparece uma barra: deixar as skills automáticas ou só quando
+  indicadas, copiar para o projeto ou para o global, e apagar, sempre com confirmação.
 - **Criar** um item no lugar e no formato que a ferramenta espera, **apagar**, e **copiar** skills,
   agentes, comandos e regras do global ou de um plugin para o projeto (e do projeto para o global).
 - **Servidores MCP**: acrescentar e remover, no formato de cada arquivo.
