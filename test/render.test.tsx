@@ -226,8 +226,7 @@ describe('telas montam sem erro', () => {
         onCancel={() => {}}
       />,
     );
-    for (const text of ['Tipo do card', 'OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs'])
-      expect(builder).toContain(text);
+    for (const text of ['OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
 
     const look = html(<AppearanceSettings />);
     for (const text of [
