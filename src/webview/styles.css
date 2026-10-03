@@ -644,7 +644,6 @@ button.chip.on:hover:where(:not(:disabled)) {
   flex-direction: column;
   gap: var(--sp-12);
   overflow-y: auto;
-  transition: width 0.15s ease;
 }
 /* menu recolhido: faixa só com ícones, como a barra de atividades do VS Code */
 .settings-side.collapsed {
@@ -674,11 +673,6 @@ button.chip.on:hover:where(:not(:disabled)) {
 }
 .settings-side.collapsed .glyph {
   font-size: var(--fs-lg);
-}
-@media (prefers-reduced-motion: reduce) {
-  .settings-side {
-    transition: none;
-  }
 }
 .settings-side .field-row {
   grid-template-columns: 1fr;
