@@ -32,6 +32,7 @@ const card = (id: string, over: Partial<Card> = {}): Card => ({
   statusBy: '',
   branch: '',
   worktreePath: '',
+  baseBranch: '',
   prUrl: '',
   execProfile: null,
   yolo: false,

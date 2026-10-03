@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Card } from '../../../shared/model';
 import { branchName, slug } from '../../../shared/git';
-import { isPullRequestUrl, storyOf } from '../../../shared/story';
+import { isPullRequestUrl, stackBaseOf, storyOf } from '../../../shared/story';
 import { prepareWorkspace } from '../../git';
 import type { BoardContext, HandlerMap } from './context';
 
@@ -51,8 +51,16 @@ function prepareStoryWorkspace(ctx: BoardContext, cardId: string): void {
     });
   const worktreePath =
     story.worktreePath || path.join(worktreeRoot(ctx) ?? projectDir, `${story.number}-${slug(story.title) || 'historia'}`);
-  const ws = prepareWorkspace({ projectDir, mode: git.mode, branch, worktreePath });
+  // história em modo autônomo parte da branch da anterior; a base escolhida na primeira vez vale daí em diante
+  const ws = prepareWorkspace({
+    projectDir,
+    mode: git.mode,
+    branch,
+    worktreePath,
+    base: story.branch ? story.baseBranch : (stackBaseOf(s, story)?.branch ?? ''),
+  });
   ctx.cards.setWorkspace(story.id, ws.branch, ws.path);
+  if (!story.branch) ctx.cards.setBaseBranch(story.id, ws.base);
 }
 
 /** Branch, worktree e pull request da história. */

@@ -11,3 +11,15 @@ export const isPullRequestUrl = (url: string): boolean => /^https?:\/\/\S+$/.tes
 
 /** A história do card está em modo autônomo (YOLO): a IA segue sem pedir aprovação nem confirmação. A sub-tarefa vale o que vale a história. */
 export const isYolo = (state: Pick<BoardState, 'cards'>, card: Card): boolean => storyOf(state, card)?.yolo === true;
+
+/**
+ * Em que a branch de uma história em modo autônomo se apoia: a da história YOLO anterior (a de número
+ * menor mais próxima que já tem branch), para os pull requests formarem uma pilha. Sem anterior, a branch principal.
+ * Conta também a anterior já concluída: o pull request dela continua aberto até uma pessoa fazer o merge.
+ */
+export function stackBaseOf(state: Pick<BoardState, 'cards'>, story: Card): Card | undefined {
+  if (!story.yolo || story.parentId) return undefined;
+  return state.cards
+    .filter((c) => c.yolo && !c.parentId && c.number < story.number && c.branch && c.deletedAt === null && c.archivedAt === null)
+    .sort((a, b) => b.number - a.number)[0];
+}

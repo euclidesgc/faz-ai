@@ -43,6 +43,8 @@ export type WebviewToHost =
   | { type: 'card.pr.set'; cardId: Id; url: string }
   /** liga ou desliga o modo autônomo (YOLO) da história do card */
   | { type: 'card.yolo.set'; cardId: Id; enabled: boolean }
+  /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */
+  | { type: 'card.yolo.inherit'; cardId: Id; fromId: Id }
   /** agente de execução do card; null volta ao da coluna */
   | { type: 'card.execProfile.set'; cardId: Id; profileId: Id | null }
   | { type: 'settings.execProfiles.set'; profiles: ExecProfile[] }

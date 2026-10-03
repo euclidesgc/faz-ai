@@ -236,6 +236,7 @@ export class BoardRepo {
       statusBy: str(r.status_by),
       branch: str(r.branch),
       worktreePath: str(r.worktree_path),
+      baseBranch: str(r.base_branch),
       prUrl: str(r.pr_url),
       execProfile: r.exec_profile == null ? null : str(r.exec_profile),
       yolo: num(r.yolo) === 1,

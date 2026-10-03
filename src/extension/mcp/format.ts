@@ -282,6 +282,12 @@ function workspaceOf(s: BoardState, c: Card) {
       workspace: {
         branch: story.branch,
         path: story.worktreePath,
+        ...(story.baseBranch
+          ? {
+              baseBranch: story.baseBranch,
+              stackNote: `Esta história está empilhada sobre ${story.baseBranch}: abra o pull request com --base ${story.baseBranch} (ex.: gh pr create --base ${story.baseBranch}) e diga na descrição de qual pull request ele depende.`,
+            }
+          : {}),
         ...(story.prUrl ? { pullRequest: story.prUrl } : {}),
         note:
           s.board.git.mode === 'worktree'

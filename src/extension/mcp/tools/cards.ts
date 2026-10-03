@@ -17,9 +17,18 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       type: z.string().optional().describe('Nome do tipo de card; por padrão, o primeiro tipo do workflow'),
       column: z.string().optional().describe('Nome da coluna; por padrão, a primeira do workflow'),
       fields: fieldsArg.optional(),
+      autonomous_from: cardArg
+        .optional()
+        .describe(
+          'Só em história: número de uma história em modo autônomo (YOLO) de que esta nasce. A nova também fica em modo autônomo e entra na fila depois dela, com o pull request empilhado. Use para dividir um pedido grande em entregas.',
+        ),
     },
     (a, router) => {
       const s = router.snapshot();
+      if (a.autonomous_from !== undefined && a.parent !== undefined)
+        throw new Error('autonomous_from vale para histórias; sub-tarefas herdam o modo da história.');
+      const origin = a.autonomous_from !== undefined ? live(findCard(s, a.autonomous_from)) : null;
+      if (origin && !origin.yolo) throw new Error(`#${origin.number} não está em modo autônomo; só uma pessoa liga o modo numa história.`);
       const parent = a.parent !== undefined ? live(findCard(s, a.parent)) : null;
       if (parent?.parentId) throw new Error(`#${parent.number} é uma sub-tarefa; o pai precisa ser uma história.`);
       const wf = s.workflows.find((w) => w.kind === (parent ? 'child' : 'parent'));
@@ -33,6 +42,7 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       const id = router.createCard({ typeId: type.id, columnId: column.id, parentId: parent?.id ?? null, title: a.title });
       if (a.description) router.handle({ type: 'card.update', cardId: id, patch: { description: a.description } });
       setFields(router, s, id, a.fields);
+      if (origin) router.handle({ type: 'card.yolo.inherit', cardId: id, fromId: origin.id }, aiOrigin(ctx));
       return detail(router, id);
     },
   );
