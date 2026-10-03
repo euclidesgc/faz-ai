@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useBoardStore } from '../store/boardStore';
+import { SelectField } from './ui';
 
 /** Diálogo de confirmação (window.confirm não funciona dentro de webviews do VSCode). */
 export function Dialog() {
@@ -35,13 +36,7 @@ export function Dialog() {
         {dialog.choices && (
           <label className="field-row">
             <span>{dialog.choices.label}</span>
-            <select value={choice} onChange={(e) => setChoice(e.target.value)}>
-              {dialog.choices.options.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <SelectField aria-label={dialog.choices.label} options={dialog.choices.options} value={choice} onChange={setChoice} />
           </label>
         )}
         <div className="row end wrap">

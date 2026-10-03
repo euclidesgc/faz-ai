@@ -4,7 +4,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { requestArchive, requestMove, requestTrash } from '../../store/actions';
 import { Menu } from '../Menu';
-import { Button, EnumSelect, IconChevronDown, IconClose } from '../ui';
+import { Button, IconChevronDown, IconClose, SelectField } from '../ui';
 
 /** Barra do topo do drawer: tipo, coluna, ações do card e fechar. */
 export function DrawerHeader({ card }: { card: Card }) {
@@ -18,8 +18,9 @@ export function DrawerHeader({ card }: { card: Card }) {
 
   return (
     <header className="drawer-header">
-      <EnumSelect options={types} value={card.typeId} onChange={(typeId) => cards.update(card.id, { typeId })} />
-      <EnumSelect
+      <SelectField aria-label="Tipo" options={types} value={card.typeId} onChange={(typeId) => cards.update(card.id, { typeId })} />
+      <SelectField
+        aria-label="Coluna"
         disabled={trashed || archived}
         options={columns}
         value={card.columnId}

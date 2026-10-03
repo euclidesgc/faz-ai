@@ -1,6 +1,7 @@
 import { useAppearance } from './appearance';
 import { activeFilterCount } from '../shared/filters';
 import { FilterPanel } from './components/FilterPanel';
+import { TextField } from '@radix-ui/themes';
 import { Button } from './components/ui';
 import { isLive } from '../shared/selectors';
 import { useBoardStore, useFilteredIds, useHostSync } from './store/boardStore';
@@ -22,9 +23,10 @@ export function FiltersApp() {
 
   return (
     <div className="filters-view">
-      <input
+      <TextField.Root
         className="search"
         type="search"
+        aria-label="Buscar"
         placeholder="Buscar palavras-chave…"
         value={filters.text}
         onChange={(e) => setFilters({ text: e.target.value })}

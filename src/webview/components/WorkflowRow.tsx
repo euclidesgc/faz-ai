@@ -19,6 +19,7 @@ import { cards, settings } from '../commands';
 import { requestArchive, requestMove } from '../store/actions';
 import { CollapsedColumn, Column } from './Column';
 import { CardView, SortableCard } from './Card';
+import { TextField } from '@radix-ui/themes';
 import { Button, IconChevronLeft } from './ui';
 
 const archiveId = archiveKey;
@@ -120,8 +121,9 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
               + Coluna
             </Button>
           ) : (
-            <input
+            <TextField.Root
               autoFocus
+              aria-label="Nome da coluna"
               placeholder="Nome da coluna"
               value={newColumn}
               onChange={(e) => setNewColumn(e.target.value)}

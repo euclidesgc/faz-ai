@@ -1,6 +1,6 @@
-import { lastSent, seedBoard, type SeededBoard } from './setup';
+import { choose, lastSent, renderThemed, seedBoard, type SeededBoard } from './setup';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FilterBar } from '../../src/webview/components/FilterBar';
 import { FilterPanel } from '../../src/webview/components/FilterPanel';
@@ -15,7 +15,7 @@ const filters = () => useBoardStore.getState().filters;
 
 describe('FilterPanel', () => {
   it('clicar num chip de tipo liga o filtro e compartilha com o host', async () => {
-    render(<FilterPanel />);
+    renderThemed(<FilterPanel />);
     const type = board.router.snapshot().cardTypes[0]!;
     await userEvent.click(screen.getByRole('button', { name: type.name }));
     expect(filters().typeIds).toEqual([type.id]);
@@ -23,7 +23,7 @@ describe('FilterPanel', () => {
   });
 
   it('clicar de novo no chip desliga o filtro', async () => {
-    render(<FilterPanel />);
+    renderThemed(<FilterPanel />);
     const type = board.router.snapshot().cardTypes[0]!;
     const chip = screen.getByRole('button', { name: type.name });
     await userEvent.click(chip);
@@ -33,7 +33,7 @@ describe('FilterPanel', () => {
   });
 
   it('chip de um campo de opções acumula valores do mesmo campo', async () => {
-    render(<FilterPanel />);
+    renderThemed(<FilterPanel />);
     const field = board.router.snapshot().fieldDefs.find((f) => f.kind === 'select' && f.options.length >= 2)!;
     const [a, b] = field.options as [string, string];
     await userEvent.click(screen.getByRole('button', { name: a }));
@@ -42,9 +42,8 @@ describe('FilterPanel', () => {
   });
 
   it('o select de pendência muda o dono filtrado', async () => {
-    render(<FilterPanel />);
-    // a opção "Com a IA" só existe no select de pendência
-    await userEvent.selectOptions(screen.getByRole('option', { name: 'Com a IA' }).closest('select')!, 'human');
+    renderThemed(<FilterPanel />);
+    await choose(screen.getByRole('combobox', { name: 'Com quem está' }), /Com você/);
     expect(filters().owner).toBe('human');
     expect(lastSent('view.set').patch.filters?.owner).toBe('human');
   });
@@ -52,13 +51,13 @@ describe('FilterPanel', () => {
 
 describe('FilterBar', () => {
   it('no editor, o botão Filtros pede ao host para mostrar a barra lateral', async () => {
-    render(<FilterBar />);
+    renderThemed(<FilterBar />);
     await userEvent.click(screen.getByRole('button', { name: 'Filtros' }));
     expect(lastSent('ui.showFilters')).toEqual({ type: 'ui.showFilters' });
   });
 
   it('digitar na busca atualiza o texto do filtro', async () => {
-    render(<FilterBar />);
+    renderThemed(<FilterBar />);
     await userEvent.type(screen.getByRole('searchbox'), 'login');
     expect(filters().text).toBe('login');
     expect(lastSent('view.set').patch.filters?.text).toBe('login');
@@ -67,7 +66,7 @@ describe('FilterBar', () => {
   it('clicar no chip de um filtro ativo remove só aquele filtro; Limpar zera tudo', async () => {
     const type = board.router.snapshot().cardTypes[0]!;
     useBoardStore.setState({ filters: { ...filters(), typeIds: [type.id], owner: 'ai' } });
-    render(<FilterBar />);
+    renderThemed(<FilterBar />);
     await userEvent.click(screen.getByText(`Tipo: ${type.name}`));
     expect(filters().typeIds).toEqual([]);
     expect(filters().owner).toBe('ai');

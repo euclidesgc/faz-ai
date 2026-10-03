@@ -7,7 +7,11 @@ import { columnOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { ai, cards } from '../commands';
 import { renderMarkdown } from './MarkdownEditor';
-import { Button, IconAi, IconHuman, IconRun } from './ui';
+import { TextArea } from '@radix-ui/themes';
+import { Button, IconAi, IconHuman, IconRun, SelectField } from './ui';
+
+/** O Select do Radix não aceita valor vazio: "sem status" usa este. */
+const NO_STATUS = '__none';
 
 /**
  * Selo do status de trabalho: ícone de com quem está a pendência (IA ou você) e o rótulo. O dono vai
@@ -104,31 +108,29 @@ export function StatusBar({ card }: { card: Card }) {
             Bloquear
           </Button>
         )}
-        <select
+        <SelectField
           className="status-select"
+          aria-label="Status"
           title="Mudar o status manualmente"
-          value={card.status ?? ''}
-          onChange={(e) => {
-            const next = (e.target.value || null) as CardStatus | null;
+          options={[
+            { value: NO_STATUS, label: 'Sem status' },
+            ...CARD_STATUSES.map((st) => ({ value: st.id, label: styles[st.id].label })),
+          ]}
+          value={card.status ?? NO_STATUS}
+          onChange={(value) => {
+            const next = value === NO_STATUS ? null : value;
             if (next === 'blocked')
               start({ status: 'blocked', title: 'O que está impedindo o trabalho?', confirm: 'Bloquear', required: true });
             else set(next);
           }}
-        >
-          <option value="">Sem status</option>
-          {CARD_STATUSES.map((s) => (
-            <option key={s.id} value={s.id}>
-              {styles[s.id].label}
-            </option>
-          ))}
-        </select>
+        />
       </div>
       {card.status === 'blocked' && card.statusReason && (
         <div className="banner warn status-reason markdown plain" dangerouslySetInnerHTML={{ __html: renderMarkdown(card.statusReason) }} />
       )}
       {pending && (
         <div className="status-note">
-          <textarea
+          <TextArea
             autoFocus
             rows={3}
             placeholder={`${pending.title} O texto vai para a conversa do card.`}

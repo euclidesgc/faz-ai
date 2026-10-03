@@ -1,7 +1,8 @@
-import { useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
+import { TextField } from '@radix-ui/themes';
 import { Button } from './Button';
 
-interface Props extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onKeyDown' | 'children'> {
+interface Props extends Omit<ComponentProps<typeof TextField.Root>, 'value' | 'onChange' | 'onKeyDown' | 'children'> {
   /** recebe o texto já sem espaços nas pontas; devolver `false` mantém o texto no campo */
   onAdd: (text: string) => void | boolean;
   /** rótulo do botão de adicionar; sem isso, só o Enter adiciona */
@@ -20,7 +21,7 @@ export function AddInput({ onAdd, buttonLabel, children, ...rest }: Props) {
   };
   return (
     <>
-      <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} {...rest} />
+      <TextField.Root value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} {...rest} />
       {children}
       {buttonLabel && (
         <Button variant="primary" disabled={!text.trim()} onClick={add}>

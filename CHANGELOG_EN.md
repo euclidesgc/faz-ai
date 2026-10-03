@@ -7,6 +7,11 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 
 ## Unreleased
 
+- **Open-card, board and filter controls in the same style.** Type, column, status, agent, filters
+  and the dialog choice are now Radix selects, as are the checklist and filter checkboxes and the
+  search, add-item and date fields. Only the title, the checklist item, the column name and the
+  markdown editor stay as editable text.
+
 - **Links between cards.** Any card can be linked to another one, in any workflow: **parent**,
   **child** or **related**, in the **Vínculos** section of the open card, with search by number or
   title. The card footer shows the link and the children's progress; repeated links and cycles are
