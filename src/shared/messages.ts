@@ -41,7 +41,7 @@ export type WebviewToHost =
   | { type: 'card.workspace.prepare'; cardId: Id }
   /** registra o pull request da história do card */
   | { type: 'card.pr.set'; cardId: Id; url: string }
-  /** perfil de execução do card; null volta ao da coluna */
+  /** agente de execução do card; null volta ao da coluna */
   | { type: 'card.execProfile.set'; cardId: Id; profileId: Id | null }
   | { type: 'settings.execProfiles.set'; profiles: ExecProfile[] }
   /** a pasta de trabalho da história foi removida (a branch continua registrada) */

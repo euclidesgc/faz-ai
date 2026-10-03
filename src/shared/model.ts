@@ -34,7 +34,7 @@ export interface Board {
   runner: RunnerConfig;
   /** branch e worktree das histórias */
   git: GitConfig;
-  /** perfis de execução: o que a sessão de IA recebe para trabalhar num card */
+  /** agentes de execução (guardados como perfis): o que a sessão de IA recebe para trabalhar num card */
   execProfiles: ExecProfile[];
 }
 
@@ -70,7 +70,7 @@ export interface Column {
   artifactName: string;
   /** modelo do documento, em markdown */
   artifactTemplate: string;
-  /** perfil de execução dos cards desta coluna; null = o padrão do board */
+  /** agente de execução dos cards desta coluna; null = o padrão do board */
   execProfile: Id | null;
 }
 
@@ -115,7 +115,7 @@ export interface Card {
   worktreePath: string;
   /** endereço do pull request da história; vazio enquanto não foi aberto */
   prUrl: string;
-  /** perfil de execução escolhido para este card; null = o da coluna */
+  /** agente de execução escolhido para este card; null = o da coluna */
   execProfile: Id | null;
 }
 

@@ -44,7 +44,7 @@ export function registerBoardTools(tool: DefineTool): void {
       exec_profile: z
         .string()
         .optional()
-        .describe('Nome do perfil de execução dos cards desta coluna (ver get_board); vazio volta ao padrão do board'),
+        .describe('Nome do agente de execução dos cards desta coluna (ver execProfiles em get_board); vazio volta ao padrão do board'),
     },
     (a, router) => {
       const s = router.snapshot();

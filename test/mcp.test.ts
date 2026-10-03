@@ -218,6 +218,7 @@ describe('perfis de execução', () => {
   const profile = (over: Record<string, unknown>) => ({
     id: 'p',
     name: 'Perfil',
+    purpose: '',
     agent: '',
     skills: [],
     mcpServers: null,

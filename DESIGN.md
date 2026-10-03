@@ -114,7 +114,7 @@ olho.
   - `SelectField` (seletor tipado), `SwitchField` (interruptor com rótulo) e `NumberField` /
     `TextField` de `components/ui` no lugar de `<select>`, `<input>` e `EnumSelect`;
   - o Select do Radix não aceita `value` vazio: use um item sentinela (`'__none'`).
-- Ainda nativos: o card aberto (tipo, coluna, status, perfil, checklist) e o board.
+- Ainda nativos: o card aberto (tipo, coluna, status, agente, checklist) e o board.
 
 ## Como adicionar uma cor
 

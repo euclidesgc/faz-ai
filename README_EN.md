@@ -61,9 +61,9 @@ gives the English meaning next to them.
   The AI, in turn, asks the board what is waiting for it.
 - **Tell the AI how to run each card.** Each card can name the model, the effort level and the
   required skills. The model can be suggested by rules based on the size of the task.
-- **Decide beforehand what the AI uses.** An execution profile sets the agent, skills, MCP servers,
-  tools and model for each phase or card, instead of letting the tool figure it out during the
-  conversation.
+- **Decide beforehand what the AI uses.** An agent sets the skills, MCP servers, tools and model for
+  each phase or card, instead of letting the tool figure it out during the conversation. Every run
+  started by the board goes through an agent.
 - **See and configure the whole harness.** For each AI tool installed, the board shows what it
   loads (instructions, skills, agents, commands, hooks, MCP servers, plugins and settings), split
   between the project, your user folder and plugins.
@@ -216,27 +216,40 @@ answers pending messages and works on ready cards, one story at a time.
 Which columns require approval, and in which ones the AI works, is set in Configurações → Workflows
 e colunas. You can always move any card yourself without approval.
 
-### Execution profiles
+### Agents
 
-A profile (Configurações → **Perfis de execução**) says what the AI session uses to work on a card:
-agent, skills, MCP servers, available and denied tools, model and effort, and whether the session
-is clean (without your user-folder customizations and without automatic skill invocation). A
-profile applies per phase (Workflows e colunas → Fase), can be changed on each card, and one of
-them can be the board default.
+An agent (Configurações → **Agentes**) says how the AI works on a card: which skills it reads, which
+MCP servers and tools (available and denied) it can use, which model and effort, and whether the
+session is clean (without your user-folder customizations and without automatic skill invocation).
+Every run started by the board goes through an agent: the one chosen on the card; otherwise the
+phase's (Workflows e colunas → Fase); otherwise the board default. The board always has at least
+one, the **Agente padrão** (default agent), which restricts nothing.
+
+To configure without knowing every skill or tool:
+
+- **O que este agente faz** (what this agent does): one sentence of intent. With it, the **Sugerir
+  pela intenção** (suggest from intent) button selects the skills (and MCP servers) whose name or
+  description match. The suggestion is word-based, local and does not call an AI; you confirm what
+  stays.
+- **Skills**: the same picker window as the card, with search, origin tabs and checkboxes.
+- **Tools**: ready-made sets (**Só leitura** read-only, **Editar código** edit code) and an editable
+  list.
+- **Tool subagent**: optional, an agent file of the tool itself (for example
+  `.claude/agents/reviewer.md`) to drive the session.
 
 Each run started by the board ("Chamar IA" and the heartbeat) is a new session, with only what is
-on the card. The profile becomes command-line parameters where the tool accepts them; the rest goes
+on the card. The agent becomes command-line parameters where the tool accepts them; the rest goes
 into the prompt, as instructions:
 
 | Tool | Enforced by parameter | Advised only |
 | --- | --- | --- |
-| Claude Code | agent, MCP servers, tools, model and effort, clean session | skills |
-| GitHub Copilot | agent, MCP servers, tools, model and effort | skills, clean session |
-| Kimi Code | agent, model | skills, MCP servers, tools, clean session |
-| Codex | MCP servers, model and effort | agent, skills, tools, clean session |
+| Claude Code | subagent, MCP servers, tools, model and effort, clean session | skills |
+| GitHub Copilot | subagent, MCP servers, tools, model and effort | skills, clean session |
+| Kimi Code | subagent, model | skills, MCP servers, tools, clean session |
+| Codex | MCP servers, model and effort | subagent, skills, tools, clean session |
 | Cursor | model | everything else |
 
-Skills are always passed by file path. In a conversation you open yourself, the profile reaches the
+Skills are always passed by file path. In a conversation you open yourself, the agent reaches the
 AI through `get_card`, as guidance.
 
 ## AI harness
@@ -309,7 +322,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
 | Campos | Custom fields (text, select, date, model…) and where they appear |
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
-| Perfis de execução | What the AI session uses on each card: agent, skills, MCP servers, tools and model; per phase, changeable per card |
+| Agentes | How the AI works on each card: skills, MCP servers, tools and model; there is always a default; per phase, changeable per card, with suggestions from intent |
 | Harness de IA | The project's tool, rules file, skills and agents; runs from the conversation and the heartbeat; everything each tool loads, by scope (see [AI harness](#ai-harness)) |
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |

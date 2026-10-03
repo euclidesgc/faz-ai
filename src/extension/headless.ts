@@ -18,7 +18,7 @@ export interface HeadlessInput {
   permission: RunnerPermission;
   /** pastas fora da pasta do projeto em que a IA também trabalha (as worktrees das histórias) */
   addDirs?: string[];
-  /** o que o perfil de execução do card pede: agente, servidores MCP, ferramentas, modelo, sessão limpa */
+  /** o que o agente do card pede: subagente, servidores MCP, ferramentas, modelo, sessão limpa */
   exec?: ExecInput;
   /** como iniciar o servidor MCP do board; quando a ferramenta aceita, vai na linha de comando e dispensa o registro no projeto */
   boardServer?: { command: string; args: string[] };
@@ -41,7 +41,7 @@ const MCP_CONFIG = 'mcp.json';
  * Cursor e Kimi não têm, no modo sem interface, um nível de permissão intermediário por linha de
  * comando: só rodam "sem restrições".
  *
- * Parâmetros do perfil de execução (`exec`), das referências de linha de comando de cada ferramenta:
+ * Parâmetros do agente de execução (`exec`), das referências de linha de comando de cada ferramenta:
  * - Claude Code: --agent, --model, --effort, --tools, --disallowedTools, --mcp-config com
  *   --strict-mcp-config, --setting-sources e --disable-slash-commands (code.claude.com/docs/en/cli-reference)
  * - Codex: --model e `-c` para model_reasoning_effort e mcp_servers.<id>.enabled
@@ -59,14 +59,14 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
       full: ['--permission-mode', 'bypassPermissions'],
     };
     const args = ['-p', ...modes[permission]];
-    // os servidores liberados no perfil também rodam sem pedir aprovação
+    // os servidores liberados no agente também rodam sem pedir aprovação
     if (exec?.mcpAllowed && permission !== 'full') args.push(...exec.mcpAllowed.map((n) => `mcp__${n}__*`));
     args.push(...addDirs.flatMap((d) => ['--add-dir', d]));
     if (exec?.model) args.push('--model', exec.model.name, ...(exec.model.effort ? ['--effort', exec.model.effort] : []));
     if (exec?.agent) args.push('--agent', exec.agent);
     if (exec?.tools.length) args.push('--tools', exec.tools.join(','));
     if (exec?.deniedTools.length) args.push('--disallowedTools', ...exec.deniedTools);
-    // sem perfil que restrinja os servidores, o do board vai junto dos já configurados: a execução não
+    // sem agente que restrinja os servidores, o do board vai junto dos já configurados: a execução não
     // depende de "Conectar ao board" nem da aprovação do .mcp.json, que o modo -p não tem como pedir
     const mcpConfig =
       exec?.mcpConfig ?? (boardServer ? JSON.stringify({ mcpServers: { [SERVER]: { type: 'stdio', ...boardServer } } }) : null);

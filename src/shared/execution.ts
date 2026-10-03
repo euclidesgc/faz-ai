@@ -4,15 +4,19 @@ import { parseModelValue } from './models';
 import { columnOf, valueOf } from './selectors';
 
 /**
- * Perfil de execução: o que uma sessão de IA recebe para trabalhar num card, definido antes, em vez
- * de descoberto pela ferramenta. Vale por fase (coluna) e pode ser trocado em cada card.
+ * Agente do board (guardado como "perfil de execução" no banco e nas mensagens): o que uma sessão de
+ * IA recebe para trabalhar num card, definido antes, em vez de descoberto pela ferramenta. Toda
+ * execução pelo board roda através de um agente: o do card, o da fase ou o padrão. Não confundir com
+ * `agent`, abaixo, que é o arquivo de subagente da própria ferramenta (ex.: `.claude/agents/x.md`).
  */
 export interface ExecProfile {
   id: string;
   name: string;
-  /** agente da ferramenta que conduz a sessão; vazio = o agente padrão */
+  /** o que o agente faz, em uma frase: base para sugerir skills e servidores MCP */
+  purpose: string;
+  /** subagente da ferramenta que conduz a sessão; vazio = o agente padrão dela */
   agent: string;
-  /** skills que toda execução com este perfil deve ler, além das indicadas no card */
+  /** skills que toda execução com este agente deve ler, além das indicadas no card */
   skills: string[];
   /** servidores MCP liberados além do servidor do board; null = todos os configurados */
   mcpServers: string[] | null;
@@ -24,14 +28,48 @@ export interface ExecProfile {
   model: string;
   /** sessão limpa: sem as personalizações da pasta do usuário e sem invocação automática de skills */
   clean: boolean;
-  /** perfil usado quando nem o card nem a coluna indicam um */
+  /** agente usado quando nem o card nem a coluna indicam um */
   isDefault: boolean;
 }
+
+/** O agente que existe quando o board ainda não tem nenhum: sem restrições, a sessão usa o que a ferramenta carregar. */
+export const defaultAgent = (): ExecProfile => ({
+  id: 'padrao',
+  name: 'Agente padrão',
+  purpose: '',
+  agent: '',
+  skills: [],
+  mcpServers: null,
+  tools: [],
+  deniedTools: [],
+  model: '',
+  clean: false,
+  isDefault: true,
+});
+
+/** Conjuntos de ferramentas prontos, nos nomes do Claude Code; nas demais ferramentas valem como orientação. */
+export const TOOL_PRESETS: { id: string; label: string; hint: string; tools: string[] }[] = [
+  { id: 'read', label: 'Só leitura', hint: 'Lê e busca arquivos; não edita nem roda comandos.', tools: ['Read', 'Grep', 'Glob'] },
+  {
+    id: 'code',
+    label: 'Editar código',
+    hint: 'Lê, edita arquivos e roda comandos no terminal.',
+    tools: ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'Bash'],
+  },
+];
 
 const strings = (v: unknown): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()))] : [];
 
+/** Os agentes salvos, descartando o inválido. Nunca devolve vazio: sem nenhum, vale o agente padrão. */
 export function parseProfiles(json: string | null | undefined): ExecProfile[] {
+  const list = readProfiles(json);
+  if (!list.length) return [defaultAgent()];
+  // sempre há um padrão: na falta, o primeiro
+  return list.some((p) => p.isDefault) ? list : list.map((p, i) => ({ ...p, isDefault: i === 0 }));
+}
+
+function readProfiles(json: string | null | undefined): ExecProfile[] {
   let raw: unknown;
   try {
     raw = JSON.parse(json ?? '');
@@ -46,7 +84,8 @@ export function parseProfiles(json: string | null | undefined): ExecProfile[] {
     seen.add(v.id);
     out.push({
       id: v.id,
-      name: typeof v.name === 'string' && v.name.trim() ? v.name.trim() : 'Perfil',
+      name: typeof v.name === 'string' && v.name.trim() ? v.name.trim() : 'Agente',
+      purpose: typeof v.purpose === 'string' ? v.purpose.trim() : '',
       agent: typeof v.agent === 'string' ? v.agent.trim() : '',
       skills: strings(v.skills),
       mcpServers: Array.isArray(v.mcpServers) ? strings(v.mcpServers) : null,
@@ -54,14 +93,14 @@ export function parseProfiles(json: string | null | undefined): ExecProfile[] {
       deniedTools: strings(v.deniedTools),
       model: typeof v.model === 'string' ? v.model : '',
       clean: v.clean === true,
-      // só um perfil é o padrão
+      // só um agente é o padrão
       isDefault: v.isDefault === true && !out.some((p) => p.isDefault),
     });
   }
   return out;
 }
 
-/** O perfil que vale para o card: o do card, o da coluna dele, o da coluna da história (numa sub-tarefa) ou o padrão do board. */
+/** O agente que vale para o card: o do card, o da coluna dele, o da coluna da história (numa sub-tarefa) ou o padrão do board. */
 export function profileOf(s: BoardState, c: Card): ExecProfile | undefined {
   const byId = (id: string | null | undefined) => (id ? s.board.execProfiles.find((p) => p.id === id) : undefined);
   const column = (card: Card) => columnOf(s, card)?.execProfile;
@@ -74,11 +113,11 @@ export function profileOf(s: BoardState, c: Card): ExecProfile | undefined {
   );
 }
 
-/** O que a execução de um card deve usar, já resolvido entre o card e o perfil. */
+/** O que a execução de um card deve usar, já resolvido entre o card e o agente. */
 export interface ExecManifest {
   profile: string | null;
   agent: string;
-  /** nomes das skills: as do perfil e as indicadas no campo Skills do card */
+  /** nomes das skills: as do agente e as indicadas no campo Skills do card */
   skills: string[];
   mcpServers: string[] | null;
   tools: string[];

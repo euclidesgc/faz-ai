@@ -287,10 +287,11 @@ describe('CardDrawer', () => {
     expect(screen.queryByRole('button', { name: 'Criar branch da história' })).toBeNull();
   });
 
-  it('perfil de execução: escolher envia o id; "Da fase" volta para null', async () => {
+  it('agente de execução: escolher envia o id; "Da fase" volta para null', async () => {
     const profile = {
       id: 'p1',
       name: 'Revisor',
+      purpose: '',
       agent: 'reviewer',
       skills: ['tdd'],
       mcpServers: [],
@@ -307,7 +308,7 @@ describe('CardDrawer', () => {
     expect(lastSent('card.execProfile.set')).toEqual({ type: 'card.execProfile.set', cardId: board.storyId, profileId: 'p1' });
     // o host devolveria o card com o perfil escolhido
     act(() => patchCard(board.storyId, { execProfile: 'p1' }));
-    expect(screen.getByText('agente reviewer · skills: tdd · MCP: board · sessão limpa')).toBeInTheDocument();
+    expect(screen.getByText('subagente reviewer · skills: tdd · MCP: board · sessão limpa')).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByDisplayValue('Revisor'), 'Da fase (nenhum)');
     expect(lastSent('card.execProfile.set').profileId).toBeNull();
   });
