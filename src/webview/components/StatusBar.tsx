@@ -5,6 +5,7 @@ import { CARD_STATUSES, OWNER_LABEL, statusInfo, type CardStatus } from '../../s
 import { aiToolInfo } from '../../shared/harness';
 import { useBoardStore } from '../store/boardStore';
 import { renderMarkdown } from './MarkdownEditor';
+import { Button } from './ui';
 
 /** Selo do status de trabalho, com quem está a pendência. */
 export function StatusBadge({ status, short = false }: { status: CardStatus; short?: boolean }) {
@@ -48,21 +49,25 @@ export function StatusBar({ card }: { card: Card }) {
         <span className="spacer" />
         {card.status === 'waiting_review' && (
           <>
-            <button className="primary" title="A IA move o card para a próxima coluna na próxima vez que trabalhar" onClick={() => set('approved')}>Aprovar</button>
-            <button onClick={() => start({ status: 'ready', title: 'O que precisa ser ajustado?', confirm: 'Pedir ajustes', required: true })}>Pedir ajustes</button>
+            <Button variant="primary" title="A IA move o card para a próxima coluna na próxima vez que trabalhar" onClick={() => set('approved')}>Aprovar</Button>
+            <Button onClick={() => start({ status: 'ready', title: 'O que precisa ser ajustado?', confirm: 'Pedir ajustes', required: true })}>Pedir ajustes</Button>
           </>
         )}
-        {card.status === 'blocked' && <button className="primary" onClick={() => set('ready')}>Desbloquear</button>}
+        {card.status === 'blocked' && <Button variant="primary" onClick={() => set('ready')}>Desbloquear</Button>}
         {running ? (
-          <button title={`Interrompe o ${toolLabel}; o status volta ao que era`} onClick={() => send({ type: 'ai.stop', cardId: card.id })}><span className="spinner" /> Parar a IA</button>
+          <Button title={`Interrompe o ${toolLabel}; o status volta ao que era`} onClick={() => send({ type: 'ai.stop', cardId: card.id })}><span className="spinner" /> Parar a IA</Button>
         ) : (
-          <button
+          <Button
             disabled={!!state.aiRunUnsupported}
             title={state.aiRunUnsupported ?? `Roda o ${toolLabel} em segundo plano para trabalhar neste card. A resposta chega na conversa.`}
             onClick={() => send({ type: 'ai.run', cardId: card.id })}
-          >▶ Chamar IA</button>
+          >▶ Chamar IA</Button>
         )}
-        {card.status !== 'blocked' && <button className="ghost small" onClick={() => start({ status: 'blocked', title: 'O que está impedindo o trabalho?', confirm: 'Bloquear', required: true })}>Bloquear</button>}
+        {card.status !== 'blocked' && (
+          <Button variant="ghost" size="small" onClick={() => start({ status: 'blocked', title: 'O que está impedindo o trabalho?', confirm: 'Bloquear', required: true })}>
+            Bloquear
+          </Button>
+        )}
         <select
           className="status-select"
           title="Mudar o status manualmente"
@@ -82,8 +87,8 @@ export function StatusBar({ card }: { card: Card }) {
         <div className="status-note">
           <textarea autoFocus rows={3} placeholder={`${pending.title} O texto vai para a conversa do card.`} value={note} onChange={(e) => setNote(e.target.value)} />
           <div className="row end">
-            <button onClick={() => setPending(null)}>Cancelar</button>
-            <button className="primary" disabled={pending.required && !note.trim()} onClick={confirm}>{pending.confirm}</button>
+            <Button onClick={() => setPending(null)}>Cancelar</Button>
+            <Button variant="primary" disabled={pending.required && !note.trim()} onClick={confirm}>{pending.confirm}</Button>
           </div>
         </div>
       )}

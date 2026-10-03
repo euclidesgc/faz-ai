@@ -10,6 +10,7 @@ import { FieldEditor, ModelEditor } from './FieldRenderer';
 import { Menu } from './Menu';
 import { MarkdownEditor, renderMarkdown } from './MarkdownEditor';
 import { StatusBar } from './StatusBar';
+import { AddInput, Button, FieldRow } from './ui';
 
 type Tab = 'details' | 'comments' | 'attachments';
 
@@ -25,8 +26,6 @@ export function CardDrawer({ cardId }: { cardId: string }) {
   const [title, setTitle] = useState(card?.title ?? '');
   const [desc, setDesc] = useState(card?.description ?? '');
   const [editingDesc, setEditingDesc] = useState(false);
-  const [newItem, setNewItem] = useState('');
-  const [newSub, setNewSub] = useState('');
 
   // a descrição só é ressincronizada ao trocar de card, para não sobrescrever o que está sendo digitado
   const latest = useRef({ desc, saved: card?.description ?? '', cardId });
@@ -81,10 +80,9 @@ export function CardDrawer({ cardId }: { cardId: string }) {
   const saveTitle = () => title.trim() && title !== card.title && send({ type: 'card.update', cardId, patch: { title: title.trim() } });
   const saveDesc = () => desc !== card.description && send({ type: 'card.update', cardId, patch: { description: desc } });
 
-  const addSub = () => {
-    if (!newSub.trim() || !childFirstCol || !subType) return;
-    send({ type: 'card.create', typeId: subType.id, columnId: childFirstCol.id, parentId: card.id, title: newSub.trim() });
-    setNewSub('');
+  const addSub = (title: string) => {
+    if (!childFirstCol || !subType) return false;
+    send({ type: 'card.create', typeId: subType.id, columnId: childFirstCol.id, parentId: card.id, title });
   };
 
   return (
@@ -99,7 +97,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             {columns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <span className="spacer" />
-          {trashed && <button className="primary" onClick={() => send({ type: 'card.restore', cardId })}>Restaurar</button>}
+          {trashed && <Button variant="primary" onClick={() => send({ type: 'card.restore', cardId })}>Restaurar</Button>}
           {/* arquivar e excluir ficam num menu, longe do botão de fechar, para não serem clicados por engano */}
           {!trashed && (
             <Menu
@@ -116,7 +114,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             </Menu>
           )}
           <span className="drawer-divider" />
-          <button className="icon drawer-close" title="Fechar (Esc)" aria-label="Fechar" onClick={() => openCard(null)}>✕</button>
+          <Button variant="icon" className="drawer-close" title="Fechar (Esc)" aria-label="Fechar" onClick={() => openCard(null)}>✕</Button>
         </header>
 
         {trashed && <div className="banner warn">Este card está na lixeira.</div>}
@@ -138,10 +136,16 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             {story.branch ? (
               <>
                 <span title="Branch da história">⎇ <code>{story.branch}</code></span>
-                {state.board.git.mode === 'worktree' && story.worktreePath && <button className="ghost small" title={story.worktreePath} onClick={() => send({ type: 'card.workspace.open', cardId })}>Abrir a pasta de trabalho</button>}
+                {state.board.git.mode === 'worktree' && story.worktreePath && (
+                  <Button variant="ghost" size="small" title={story.worktreePath} onClick={() => send({ type: 'card.workspace.open', cardId })}>
+                    Abrir a pasta de trabalho
+                  </Button>
+                )}
               </>
             ) : (
-              <button className="ghost small" title="Cria a branch da história e, no modo worktree, a pasta de trabalho dela" onClick={() => send({ type: 'card.workspace.prepare', cardId })}>Criar branch da história</button>
+              <Button variant="ghost" size="small" title="Cria a branch da história e, no modo worktree, a pasta de trabalho dela" onClick={() => send({ type: 'card.workspace.prepare', cardId })}>
+                Criar branch da história
+              </Button>
             )}
             {story.prUrl && <a href={story.prUrl} title={story.prUrl}>Pull request ↗</a>}
           </div>
@@ -163,9 +167,9 @@ export function CardDrawer({ cardId }: { cardId: string }) {
         )}
 
         <nav className="tabs">
-          <button className={tab === 'details' ? 'active' : ''} onClick={() => setTab('details')}>Detalhes</button>
-          <button className={tab === 'comments' ? 'active' : ''} onClick={() => setTab('comments')}>Conversa{commentCount > 0 && ` (${commentCount})`}</button>
-          <button className={tab === 'attachments' ? 'active' : ''} onClick={() => setTab('attachments')}>Anexos{attachmentCount > 0 && ` (${attachmentCount})`}</button>
+          <Button active={tab === 'details'} onClick={() => setTab('details')}>Detalhes</Button>
+          <Button active={tab === 'comments'} onClick={() => setTab('comments')}>Conversa{commentCount > 0 && ` (${commentCount})`}</Button>
+          <Button active={tab === 'attachments'} onClick={() => setTab('attachments')}>Anexos{attachmentCount > 0 && ` (${attachmentCount})`}</Button>
         </nav>
 
         {tab === 'comments' && <CommentsTab cardId={card.id} />}
@@ -182,23 +186,20 @@ export function CardDrawer({ cardId }: { cardId: string }) {
                     const set = (v: FieldValue) => send({ type: 'field.setValue', cardId, fieldId: f.id, value: v });
                     if (f.kind !== 'model') {
                       return (
-                        <label key={f.id} className="field-row">
-                          <span>{f.name}</span>
+                        <FieldRow key={f.id} label={f.name}>
                           <FieldEditor field={f} value={value} onChange={set} />
-                        </label>
+                        </FieldRow>
                       );
                     }
                     // modelo e esforço do modelo em linhas separadas, para não confundir com o esforço da atividade
                     return (
                       <div key={f.id} className="model-rows">
-                        <label className="field-row">
-                          <span>{f.name}</span>
+                        <FieldRow label={f.name}>
                           <ModelEditor part="model" value={value} onChange={set} />
-                        </label>
-                        <label className="field-row">
-                          <span>{MODEL_EFFORT_LABEL}</span>
+                        </FieldRow>
+                        <FieldRow label={MODEL_EFFORT_LABEL}>
                           <ModelEditor part="effort" value={value} onChange={set} />
-                        </label>
+                        </FieldRow>
                         {suggested && suggested !== value && (
                           <div className="field-row">
                             <span />
@@ -218,8 +219,8 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             <section className="drawer-section">
               <div className="section-head">
                 <h3>Descrição</h3>
-                {!editingDesc && <button className="ghost small" onClick={() => setEditingDesc(true)}>Editar</button>}
-                {editingDesc && <button className="ghost small" onClick={() => { saveDesc(); setEditingDesc(false); }}>Concluir</button>}
+                {!editingDesc && <Button variant="ghost" size="small" onClick={() => setEditingDesc(true)}>Editar</Button>}
+                {editingDesc && <Button variant="ghost" size="small" onClick={() => { saveDesc(); setEditingDesc(false); }}>Concluir</Button>}
               </div>
               {editingDesc ? (
                 <MarkdownEditor autoFocus minRows={12} value={desc} onChange={setDesc} onCommit={saveDesc} placeholder="Descreva o problema, o contexto e o critério de aceite. Markdown suportado." />
@@ -235,28 +236,18 @@ export function CardDrawer({ cardId }: { cardId: string }) {
                   <li key={item.id} className={item.done ? 'done' : ''}>
                     <input type="checkbox" checked={item.done} onChange={(e) => send({ type: 'checklist.update', itemId: item.id, patch: { done: e.target.checked } })} />
                     <input className="inline-edit" defaultValue={item.text} onBlur={(e) => e.target.value !== item.text && send({ type: 'checklist.update', itemId: item.id, patch: { text: e.target.value } })} />
-                    <button className="icon" onClick={() => send({ type: 'checklist.delete', itemId: item.id })}>✕</button>
+                    <Button variant="icon" onClick={() => send({ type: 'checklist.delete', itemId: item.id })}>✕</Button>
                   </li>
                 ))}
               </ul>
-              <input
-                placeholder="+ Novo item (Enter)"
-                value={newItem}
-                onChange={(e) => setNewItem(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newItem.trim()) {
-                    send({ type: 'checklist.add', cardId, text: newItem.trim() });
-                    setNewItem('');
-                  }
-                }}
-              />
+              <AddInput placeholder="+ Novo item (Enter)" onAdd={(text) => send({ type: 'checklist.add', cardId, text })} />
             </section>
 
             {workflow.kind === 'parent' && childWf && (
               <section className="drawer-section">
                 <div className="section-head">
                   <h3>Sub-tarefas <small>{children.length}</small></h3>
-                  <button className="ghost small" onClick={() => { selectParent(null); selectParent(card.id); openCard(null); }}>Ver no board</button>
+                  <Button variant="ghost" size="small" onClick={() => { selectParent(null); selectParent(card.id); openCard(null); }}>Ver no board</Button>
                 </div>
                 <ul className="children">
                   {children.map((c) => {
@@ -269,7 +260,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
                     );
                   })}
                 </ul>
-                <input placeholder="+ Nova sub-tarefa (Enter)" value={newSub} onChange={(e) => setNewSub(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addSub()} />
+                <AddInput placeholder="+ Nova sub-tarefa (Enter)" onAdd={addSub} />
               </section>
             )}
           </>

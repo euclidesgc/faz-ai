@@ -17,6 +17,7 @@ import { archivedIn, cardsIn, columnsOf, useBoardStore, useFilteredIds } from '.
 import { requestArchive, requestMove } from '../store/actions';
 import { CollapsedColumn, Column } from './Column';
 import { CardView, SortableCard } from './Card';
+import { Button } from './ui';
 
 const archiveId = archiveKey;
 
@@ -94,7 +95,7 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
         />
         <div className="column-add">
           {newColumn === null ? (
-            <button className="ghost" title="Nova coluna" onClick={() => setNewColumn('')}>+ Coluna</button>
+            <Button variant="ghost" title="Nova coluna" onClick={() => setNewColumn('')}>+ Coluna</Button>
           ) : (
             <input
               autoFocus
@@ -121,7 +122,7 @@ function ArchiveColumn({ workflowId, cards, collapsed, onToggle }: { workflowId:
   return (
     <div ref={setNodeRef} className={`column archive ${isOver ? 'over' : ''}`}>
       <header className="column-header">
-        <button className="icon collapse-toggle" title="Colapsar a coluna" onClick={() => onToggle(false)}>‹</button>
+        <Button variant="icon" className="collapse-toggle" title="Colapsar a coluna" onClick={() => onToggle(false)}>‹</Button>
         <span className="column-name">Arquivados</span>
         <span className="column-count">{cards.length}</span>
       </header>

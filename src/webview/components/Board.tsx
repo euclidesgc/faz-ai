@@ -1,5 +1,6 @@
 import { cardRef } from '../../shared/model';
 import { cardsIn, columnsOf, isLive, useBoardStore } from '../store/boardStore';
+import { Button } from './ui';
 import { WorkflowRow } from './WorkflowRow';
 
 export function Board() {
@@ -28,7 +29,7 @@ export function Board() {
           return (
             <section key={wf.id} className={`workflow workflow-${wf.kind} ${collapsed ? 'collapsed' : ''}`}>
               <header className="workflow-header" onClick={() => setCollapsed(wf.id, !collapsed)} title={collapsed ? 'Expandir a linha' : 'Colapsar a linha'}>
-                <button className="icon collapse-toggle" aria-expanded={!collapsed}>{collapsed ? '▸' : '▾'}</button>
+                <Button variant="icon" className="collapse-toggle" aria-expanded={!collapsed}>{collapsed ? '▸' : '▾'}</Button>
                 <h2>{wf.name}</h2>
                 <span className="column-count">{total} {total === 1 ? 'card' : 'cards'}</span>
                 {wf.kind === 'child' && !empty &&

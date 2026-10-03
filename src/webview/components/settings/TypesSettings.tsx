@@ -2,19 +2,17 @@ import { useState } from 'react';
 import { badgeStyle } from '../../../shared/color';
 import { fieldsForType, useBoardStore } from '../../store/boardStore';
 import { FieldEditor } from '../FieldRenderer';
+import { AddInput, DeleteButton, FieldRow } from '../ui';
 
 export function TypesSettings() {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
-  const ask = useBoardStore((s) => s.ask);
-  const [name, setName] = useState('');
   const [color, setColor] = useState('#4c8dff');
   const [wf, setWf] = useState(state.workflows[0]?.id ?? '');
 
-  const add = () => {
-    if (!name.trim() || !wf) return;
-    send({ type: 'settings.type.create', name: name.trim(), color, defaultWorkflowId: wf });
-    setName('');
+  const add = (name: string) => {
+    if (!wf) return false;
+    send({ type: 'settings.type.create', name, color, defaultWorkflowId: wf });
   };
 
   return (
@@ -36,7 +34,14 @@ export function TypesSettings() {
                   </select>
                 </td>
                 <td>{used}</td>
-                <td><button className="icon danger" disabled={used > 0} title={used ? 'Tipo em uso' : 'Apagar'} onClick={() => ask({ title: `Apagar o tipo "${t.name}"?`, confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'settings.type.delete', typeId: t.id }) })}>🗑</button></td>
+                <td>
+                  <DeleteButton
+                    disabled={used > 0}
+                    title={used ? 'Tipo em uso' : 'Apagar'}
+                    question={`Apagar o tipo "${t.name}"?`}
+                    onConfirm={() => send({ type: 'settings.type.delete', typeId: t.id })}
+                  />
+                </td>
               </tr>
             );
           })}
@@ -44,11 +49,11 @@ export function TypesSettings() {
       </table>
       <div className="row">
         <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
-        <input placeholder="Novo tipo" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
-        <select value={wf} onChange={(e) => setWf(e.target.value)}>
-          {state.workflows.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-        </select>
-        <button className="primary" disabled={!name.trim()} onClick={add}>Adicionar</button>
+        <AddInput placeholder="Novo tipo" onAdd={add} buttonLabel="Adicionar">
+          <select value={wf} onChange={(e) => setWf(e.target.value)}>
+            {state.workflows.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+          </select>
+        </AddInput>
       </div>
 
       <h2 className="section-head">Padrões por tipo</h2>
@@ -61,12 +66,11 @@ export function TypesSettings() {
               <div className="row"><span className="type-badge" style={badgeStyle(t.color)}>{t.name}</span></div>
               {fields.length === 0 && <span className="muted small">Nenhum campo se aplica a este tipo.</span>}
               {fields.map((f) => (
-                <label key={f.id} className="field-row">
-                  <span>{f.name}</span>
+                <FieldRow key={f.id} label={f.name}>
                   {f.kind === 'multiselect' && f.options.length === 0
                     ? <span className="muted small">Sem opções ainda.</span>
                     : <FieldEditor field={f} value={t.defaults[f.id] ?? null} onChange={(v) => send({ type: 'settings.type.update', typeId: t.id, patch: { defaults: { ...t.defaults, [f.id]: v } } })} />}
-                </label>
+                </FieldRow>
               ))}
             </section>
           );

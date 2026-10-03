@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, REFERENCE_SKILL, SKILL_FILE_PATTERN, SKILL_FOLDERS, SKILL_MODES, SKILL_NAME_PATTERN, type AiTool, type HarnessItem, type HarnessKind, type SkillMode } from '../../../shared/harness';
 import { HOOK_EVENTS, MCP_NAME_PATTERN, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS, copyTarget, createTargets, hookTargets, mcpTargets, permissionTargets, type CreateTarget, type HookTarget, type McpTarget, type PermissionTarget } from '../../../shared/harnessCatalog';
 import { useBoardStore } from '../../store/boardStore';
+import { DeleteButton } from '../ui';
 
 const GLOBAL_WARNING = 'O arquivo fica na sua pasta de usuário e vale para todos os seus projetos.';
 
@@ -212,7 +213,14 @@ function SkillFiles({ tool, skill, editable }: { tool: AiTool; skill: HarnessIte
           <code>{f}</code>
           <span className="spacer" />
           <button className="ghost small" onClick={() => send({ type: 'harness.skill.file.open', tool, path: skill.path, file: f })}>Abrir</button>
-          {editable && <button className="icon danger" title="Apagar o arquivo" onClick={() => ask({ title: `Apagar "${f}"?`, message: `O arquivo sai da skill "${skill.name}". Se o SKILL.md aponta para ele, ajuste o texto.`, confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'harness.skill.file.delete', tool, path: skill.path, file: f }) })}>🗑</button>}
+          {editable && (
+            <DeleteButton
+              title="Apagar o arquivo"
+              question={`Apagar "${f}"?`}
+              message={`O arquivo sai da skill "${skill.name}". Se o SKILL.md aponta para ele, ajuste o texto.`}
+              onConfirm={() => send({ type: 'harness.skill.file.delete', tool, path: skill.path, file: f })}
+            />
+          )}
         </div>
       ))}
       {editable && (
@@ -396,17 +404,31 @@ export function HarnessInventory() {
           {copyable(i, 'user') && !twin(i, 'user') && <button className="ghost small" title="Cria uma cópia na sua pasta de usuário, que vale em todos os projetos" onClick={() => copy([i], 'user')}>Copiar para o global</button>}
           {editable && i.kind !== 'settings' && <button className="icon danger" title="Apagar" onClick={() => remove(i)}>🗑</button>}
           {i.kind === 'hook' && i.scope !== 'plugin' && hookFiles.length > 0 && i.path.endsWith('.json') && (
-            <button className="icon danger" title="Remover o hook deste arquivo" onClick={() => ask({ title: `Remover o hook de "${i.name}"?`, message: `${i.detail ?? ''}\n\nA entrada sai de ${i.location}.`, confirmLabel: 'Remover', danger: true, onConfirm: () => send({ type: 'harness.hook.remove', tool, path: i.path, event: i.name, command: i.detail ?? '' }) })}>🗑</button>
+            <DeleteButton
+              title="Remover o hook deste arquivo"
+              question={`Remover o hook de "${i.name}"?`}
+              message={`${i.detail ?? ''}\n\nA entrada sai de ${i.location}.`}
+              confirmLabel="Remover"
+              onConfirm={() => send({ type: 'harness.hook.remove', tool, path: i.path, event: i.name, command: i.detail ?? '' })}
+            />
           )}
           {i.kind === 'settings' && i.layout === 'entry' && i.scope !== 'plugin' && (
-            <button className="icon danger" title="Remover a regra deste arquivo" onClick={() => ask({ title: 'Remover a regra de permissão?', message: `${i.description}: ${i.name}\n\nA regra sai de ${i.location}.`, confirmLabel: 'Remover', danger: true, onConfirm: () => send({ type: 'harness.permission.remove', tool, path: i.path, list: i.detail ?? '', rule: i.name }) })}>🗑</button>
+            <DeleteButton
+              title="Remover a regra deste arquivo"
+              question="Remover a regra de permissão?"
+              message={`${i.description}: ${i.name}\n\nA regra sai de ${i.location}.`}
+              confirmLabel="Remover"
+              onConfirm={() => send({ type: 'harness.permission.remove', tool, path: i.path, list: i.detail ?? '', rule: i.name })}
+            />
           )}
           {i.kind === 'mcp' && i.scope !== 'plugin' && mcpFiles.some((t) => t.label === i.location) && (
-            <button
-              className="icon danger"
+            <DeleteButton
               title="Remover o servidor deste arquivo"
-              onClick={() => ask({ title: `Remover o servidor "${i.name}"?`, message: `A entrada sai de ${i.location}.${i.scope === 'user' ? `\n\n${GLOBAL_WARNING}` : ''}`, confirmLabel: 'Remover', danger: true, onConfirm: () => send({ type: 'harness.mcp.remove', tool, path: i.path, name: i.name }) })}
-            >🗑</button>
+              question={`Remover o servidor "${i.name}"?`}
+              message={`A entrada sai de ${i.location}.${i.scope === 'user' ? `\n\n${GLOBAL_WARNING}` : ''}`}
+              confirmLabel="Remover"
+              onConfirm={() => send({ type: 'harness.mcp.remove', tool, path: i.path, name: i.name })}
+            />
           )}
         </td>
       </tr>

@@ -1,6 +1,7 @@
 import { badgeStyle } from '../../shared/color';
 import { cardRef } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
+import { Button, DeleteButton } from './ui';
 
 export function TrashView() {
   const state = useBoardStore((s) => s.state)!;
@@ -17,7 +18,8 @@ export function TrashView() {
       <div className="row">
         <h2>Lixeira</h2>
         <span className="spacer" />
-        <button
+        {/* botão sem classe de perigo de propósito: a confirmação é que é vermelha, não ele */}
+        <Button
           disabled={!deleted.length}
           onClick={() =>
             ask({
@@ -30,7 +32,7 @@ export function TrashView() {
           }
         >
           Esvaziar lixeira
-        </button>
+        </Button>
       </div>
       {roots.length === 0 ? (
         <p className="muted">A lixeira está vazia. Cards excluídos ficam aqui até você restaurar ou apagar de vez.</p>
@@ -54,21 +56,15 @@ export function TrashView() {
                   <td>{column?.name}</td>
                   <td>{new Date(c.deletedAt!).toLocaleString()}</td>
                   <td className="row end">
-                    <button onClick={() => send({ type: 'card.restore', cardId: c.id })}>Restaurar</button>
-                    <button
-                      className="ghost danger"
-                      onClick={() =>
-                        ask({
-                          title: `Apagar "${c.title}" definitivamente?`,
-                          message: 'Comentários, anexos e sub-tarefas deste card também serão apagados. Não dá para desfazer.',
-                          confirmLabel: 'Apagar',
-                          danger: true,
-                          onConfirm: () => send({ type: 'card.deletePermanent', cardId: c.id }),
-                        })
-                      }
+                    <Button onClick={() => send({ type: 'card.restore', cardId: c.id })}>Restaurar</Button>
+                    <DeleteButton
+                      variant="ghost"
+                      question={`Apagar "${c.title}" definitivamente?`}
+                      message="Comentários, anexos e sub-tarefas deste card também serão apagados. Não dá para desfazer."
+                      onConfirm={() => send({ type: 'card.deletePermanent', cardId: c.id })}
                     >
                       Apagar de vez
-                    </button>
+                    </DeleteButton>
                   </td>
                 </tr>
               );

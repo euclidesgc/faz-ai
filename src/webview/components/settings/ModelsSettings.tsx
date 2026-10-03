@@ -3,6 +3,7 @@ import { AI_TOOLS, type AiTool } from '../../../shared/harness';
 import { modelId, type ModelOption } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
 import { ModelRulesEditor } from './ModelRulesEditor';
+import { Button } from '../ui';
 
 const splitList = (s: string): string[] => s.split(',').map((x) => x.trim()).filter(Boolean);
 
@@ -52,7 +53,7 @@ export function ModelsSettings() {
                 <h3 className="plain">{t.label}</h3>
                 <span className="muted small">{mine.length} modelo(s)</span>
                 <span className="spacer" />
-                <button title={`Fonte: ${SOURCES[t.id]}`} onClick={() => send({ type: 'settings.models.detect', tool: t.id })}>Detectar modelos</button>
+                <Button title={`Fonte: ${SOURCES[t.id]}`} onClick={() => send({ type: 'settings.models.detect', tool: t.id })}>Detectar modelos</Button>
               </div>
               <div className="muted small">Ao detectar: {SOURCES[t.id]}. Modelos que você acrescentou à mão são mantidos.</div>
               <table className="table">
@@ -80,7 +81,8 @@ export function ModelsSettings() {
                           </select>
                         )}
                       </td>
-                      <td className="narrow"><button className="icon danger" title="Remover do catálogo" onClick={() => setCatalog(catalog.filter((x) => x.id !== o.id))}>🗑</button></td>
+                      {/* sem confirmação de propósito: a lista pode ser refeita com "Detectar modelos" */}
+                      <td className="narrow"><Button variant="icon" danger title="Remover do catálogo" onClick={() => setCatalog(catalog.filter((x) => x.id !== o.id))}>🗑</Button></td>
                     </tr>
                   ))}
                   <tr>
@@ -88,7 +90,7 @@ export function ModelsSettings() {
                     <td><input placeholder="identificador" value={d.model} onChange={(e) => setDraft({ ...draft, [t.id]: { ...d, model: e.target.value } })} /></td>
                     <td><input placeholder="low, medium, high" value={d.efforts} onChange={(e) => setDraft({ ...draft, [t.id]: { ...d, efforts: e.target.value } })} /></td>
                     <td></td>
-                    <td className="narrow"><button className="primary" disabled={!d.model.trim()} onClick={() => addModel(t.id)}>Adicionar</button></td>
+                    <td className="narrow"><Button variant="primary" disabled={!d.model.trim()} onClick={() => addModel(t.id)}>Adicionar</Button></td>
                   </tr>
                 </tbody>
               </table>

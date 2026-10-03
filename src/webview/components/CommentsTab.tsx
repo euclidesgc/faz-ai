@@ -9,6 +9,7 @@ import { MAX_ATTACHMENT_BYTES, toBase64 } from './AttachmentsTab';
 const ATTACHMENT_SCHEME = 'attachment:';
 const ATTACHMENT_LINK = /\]\(attachment:([^)\s]+)\)/g;
 import { MarkdownEditor, renderMarkdown } from './MarkdownEditor';
+import { Button, DeleteButton } from './ui';
 
 /** Conversa do card: é por aqui que a pessoa e a IA falam sobre o trabalho. */
 export function CommentsTab({ cardId }: { cardId: string }) {
@@ -69,7 +70,7 @@ export function CommentsTab({ cardId }: { cardId: string }) {
           <span className="spinner" />
           <span>{toolLabel} está trabalhando neste card… A resposta aparece aqui quando terminar.</span>
           <span className="spacer" />
-          <button className="ghost small" onClick={() => send({ type: 'ai.stop', cardId })}>Parar</button>
+          <Button variant="ghost" size="small" onClick={() => send({ type: 'ai.stop', cardId })}>Parar</Button>
         </div>
       )}
       <div className="comment-new">
@@ -80,13 +81,13 @@ export function CommentsTab({ cardId }: { cardId: string }) {
             <a onClick={() => openSettings('harness')}>Mudar</a>
           </span>
           <span className="spacer" />
-          <button disabled={!draft.trim()} onClick={submit}>Enviar</button>
-          <button
-            className="primary"
+          <Button disabled={!draft.trim()} onClick={submit}>Enviar</Button>
+          <Button
+            variant="primary"
             disabled={!canCall || running}
             title={state.aiRunUnsupported ?? `Roda o ${toolLabel} em segundo plano para ler a conversa e trabalhar neste card. A resposta chega aqui, sem acompanhamento ao vivo.`}
             onClick={callAi}
-          >{draft.trim() ? 'Enviar e chamar IA' : '▶ Chamar IA'}</button>
+          >{draft.trim() ? 'Enviar e chamar IA' : '▶ Chamar IA'}</Button>
         </div>
       </div>
     </section>
@@ -95,7 +96,6 @@ export function CommentsTab({ cardId }: { cardId: string }) {
 
 function CommentItem({ comment, mine, render }: { comment: Comment; mine: boolean; render: (body: string) => string }) {
   const send = useBoardStore((s) => s.send);
-  const ask = useBoardStore((s) => s.ask);
   const [editing, setEditing] = useState<string | null>(null);
 
   const save = () => {
@@ -113,13 +113,15 @@ function CommentItem({ comment, mine, render }: { comment: Comment; mine: boolea
         {/* editar só a própria mensagem; apagar vale para qualquer um, inclusive os escritos pela IA */}
         {editing === null && (
           <>
-            {mine && <button className="ghost small" onClick={() => setEditing(comment.body)}>Editar</button>}
-            <button
-              className="ghost small danger"
-              onClick={() => ask({ title: mine ? 'Apagar esta mensagem?' : `Apagar a mensagem de ${comment.author}?`, confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'comment.delete', commentId: comment.id }) })}
+            {mine && <Button variant="ghost" size="small" onClick={() => setEditing(comment.body)}>Editar</Button>}
+            <DeleteButton
+              variant="ghost"
+              size="small"
+              question={mine ? 'Apagar esta mensagem?' : `Apagar a mensagem de ${comment.author}?`}
+              onConfirm={() => send({ type: 'comment.delete', commentId: comment.id })}
             >
               Apagar
-            </button>
+            </DeleteButton>
           </>
         )}
       </header>
@@ -129,8 +131,8 @@ function CommentItem({ comment, mine, render }: { comment: Comment; mine: boolea
         <>
           <MarkdownEditor compact autoFocus minRows={3} value={editing} onChange={setEditing} onSubmit={save} />
           <div className="row end">
-            <button onClick={() => setEditing(null)}>Cancelar</button>
-            <button className="primary" onClick={save}>Salvar</button>
+            <Button onClick={() => setEditing(null)}>Cancelar</Button>
+            <Button variant="primary" onClick={save}>Salvar</Button>
           </div>
         </>
       )}

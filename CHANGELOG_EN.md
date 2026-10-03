@@ -19,12 +19,16 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 - Status and card type badges stay readable in any chosen color: the text turns black or white
   depending on the background color.
 - The primary button is indigo in both themes (it was green in dark).
+- Cards no longer have the colored stripe on the left: the type color lives in the type badge.
 - Scrollbars use the board's colors, and the columns' horizontal scrollbar now has breathing room
   below the cards.
 - The contrast of text, controls and keyboard focus is checked by an automated test in both
   themes. The color rules are in `DESIGN.md`.
 - Internal: lint (ESLint) and formatting (Prettier) set up, plus interaction tests (clicks and
   keyboard) for the board. Nothing changes for users.
+- Internal: the front end now uses UI primitives (button, typed select, chips, field row, delete
+  button with confirmation, add input, number field) instead of repeating the same HTML in every
+  screen. Nothing changes visually or for users.
 
 ## 0.29.1
 

@@ -7,6 +7,7 @@ import { childrenOf, fieldsForType, useBoardStore, valueOf } from '../store/boar
 import { requestArchive, requestTrash } from '../store/actions';
 import { FieldBadge } from './FieldRenderer';
 import { Menu } from './Menu';
+import { Button } from './ui';
 import { StatusBadge } from './StatusBar';
 
 export function SortableCard({ card }: { card: Card }) {
@@ -47,7 +48,6 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   return (
     <article
       className={`card ${selected ? 'selected' : ''} ${overlay ? 'overlay' : ''} ${archived ? 'archived' : ''}`}
-      style={{ borderLeftColor: type?.color ?? 'var(--accent)' }}
       onClick={(e) => {
         e.stopPropagation();
         if (isParent && !archived) selectParent(card.id);
@@ -71,7 +71,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         </span>
         {!overlay && (
           <span className="card-actions">
-            <button className="icon" title="Abrir o card" aria-label="Abrir o card" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); openCard(card.id); }}>⤢</button>
+            <Button variant="icon" title="Abrir o card" aria-label="Abrir o card" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); openCard(card.id); }}>⤢</Button>
             <Menu
               title="Ações do card"
               items={[

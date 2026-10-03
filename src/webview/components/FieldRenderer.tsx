@@ -3,6 +3,7 @@ import type { FieldDef, FieldValue } from '../../shared/model';
 import { AI_TOOLS } from '../../shared/harness';
 import { modelLabel, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
+import { Button, ChipsEditor } from './ui';
 
 /** Exibição compacta no card. */
 export function FieldBadge({ field, value }: { field: FieldDef; value: FieldValue }) {
@@ -69,18 +70,7 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
     case 'multiselect': {
       const current = Array.isArray(value) ? value : [];
       if (field.name.toLowerCase() === 'skills') return <SkillsPicker options={field.options} current={current} onChange={onChange} />;
-      return (
-        <div className="chips-editor">
-          {field.options.map((o) => {
-            const on = current.includes(o);
-            return (
-              <button key={o} className={`chip ${on ? 'on' : ''}`} onClick={() => onChange(on ? current.filter((x) => x !== o) : [...current, o])}>
-                {o}
-              </button>
-            );
-          })}
-        </div>
-      );
+      return <ChipsEditor options={field.options} values={current} onChange={onChange} />;
     }
   }
 }
@@ -154,27 +144,29 @@ function SkillsPicker({ options, current, onChange }: { options: string[]; curre
           {global.size > 0 && (
             <div className="segmented">
               {scopes.map((s) => (
-                <button key={s.id} className={scope === s.id ? 'on' : ''} onClick={() => setScope(s.id)}>{s.label} ({count(s.id)})</button>
+                <Button key={s.id} on={scope === s.id} onClick={() => setScope(s.id)}>{s.label} ({count(s.id)})</Button>
               ))}
             </div>
           )}
         </div>
       )}
-      <div className="chips-editor">
-        {shown.map((o) => {
-          const on = current.includes(o);
+      <ChipsEditor
+        options={shown.map((o) => {
           const g = global.get(o);
           const where = [inProject.has(o) ? 'projeto' : '', g ? (g.plugin ? `plugin ${g.plugin}` : 'global') : ''].filter(Boolean).join(' e ');
-          return (
-            <button key={o} className={`chip ${on ? 'on' : ''}`} title={`${where ? `Skill de: ${where}. ` : ''}${g && !inProject.has(o) ? g.description : ''}`.trim()} onClick={() => onChange(on ? current.filter((x) => x !== o) : [...current, o])}>
-              {o}{!inProject.has(o) && g && <small className="chip-scope">{g.plugin ? 'plugin' : 'global'}</small>}
-            </button>
-          );
+          return {
+            value: o,
+            title: `${where ? `Skill de: ${where}. ` : ''}${g && !inProject.has(o) ? g.description : ''}`.trim(),
+            label: <>{o}{!inProject.has(o) && g && <small className="chip-scope">{g.plugin ? 'plugin' : 'global'}</small>}</>,
+          };
         })}
+        values={current}
+        onChange={onChange}
+      >
         {open && shown.length === 0 && <span className="muted small">Nenhuma skill {q ? `com "${query.trim()}"` : scope === 'project' ? 'no projeto' : scope === 'global' ? 'global' : ''}.</span>}
         {!open && shown.length === 0 && <span className="muted small">Nenhuma skill obrigatória.</span>}
-        {all.length > 0 && <button className="ghost small" onClick={() => { setOpen(!open); setQuery(''); }}>{open ? 'Concluir' : `Escolher skills (${all.length})`}</button>}
-      </div>
+        {all.length > 0 && <Button variant="ghost" size="small" onClick={() => { setOpen(!open); setQuery(''); }}>{open ? 'Concluir' : `Escolher skills (${all.length})`}</Button>}
+      </ChipsEditor>
     </div>
   );
 }

@@ -1,10 +1,12 @@
-import { DEFAULT_GIT, MERGE_METHODS, WORKSPACE_MODES, branchName, type GitConfig, type MergeMethod, type WorkspaceMode } from '../../../shared/git';
+import { DEFAULT_GIT, MERGE_METHODS, WORKSPACE_MODES, branchName, type GitConfig } from '../../../shared/git';
 import { useBoardStore } from '../../store/boardStore';
+import { useBoardPatch } from '../../store/useBoardPatch';
+import { EnumSelect, FieldRow } from '../ui';
 
 export function GitSettings() {
   const git = useBoardStore((s) => s.state)!.board.git;
-  const send = useBoardStore((s) => s.send);
-  const set = (patch: Partial<GitConfig>) => send({ type: 'settings.board.update', patch: { git: patch } });
+  const patchBoard = useBoardPatch();
+  const set = (patch: Partial<GitConfig>) => patchBoard({ git: patch });
   const off = git.mode === 'off';
 
   return (
@@ -16,27 +18,22 @@ export function GitSettings() {
       </p>
 
       <section className="settings-block">
-        <label className="field-row">
-          <span>Onde a IA mexe no código</span>
-          <select value={git.mode} onChange={(e) => set({ mode: e.target.value as WorkspaceMode })}>
-            {WORKSPACE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-        </label>
+        <FieldRow label="Onde a IA mexe no código">
+          <EnumSelect options={WORKSPACE_MODES} value={git.mode} onChange={(mode) => set({ mode })} />
+        </FieldRow>
         <p className="muted small">{WORKSPACE_MODES.find((m) => m.value === git.mode)!.hint}</p>
 
-        <label className="field-row">
-          <span>Nome da branch</span>
+        <FieldRow label="Nome da branch">
           <input key={git.branchPattern} disabled={off} defaultValue={git.branchPattern} onBlur={(e) => e.target.value.trim() !== git.branchPattern && set({ branchPattern: e.target.value })} />
-        </label>
+        </FieldRow>
         <p className="muted small">
           Aceita <code>{'{tipo}'}</code>, <code>{'{numero}'}</code> (obrigatório) e <code>{'{titulo}'}</code>. Exemplo:{' '}
           <code>{branchName(git.branchPattern, { type: 'História', number: 12, title: 'Login com Google' })}</code>
         </p>
 
-        <label className="field-row">
-          <span>Pasta das worktrees</span>
+        <FieldRow label="Pasta das worktrees">
           <input key={git.worktreeDir} disabled={git.mode !== 'worktree'} defaultValue={git.worktreeDir} onBlur={(e) => e.target.value.trim() !== git.worktreeDir && set({ worktreeDir: e.target.value })} />
-        </label>
+        </FieldRow>
         <p className="muted small">
           Relativa à pasta do projeto; <code>{'{repo}'}</code> é o nome dela. O padrão (<code>{DEFAULT_GIT.worktreeDir}</code>) fica ao lado do projeto, fora do repositório.
           Cada worktree é uma cópia de trabalho: dependências (ex.: <code>node_modules</code>) precisam ser instaladas nela.
@@ -55,12 +52,9 @@ export function GitSettings() {
           Fazer o merge do PR ao aprovar a homologação
         </label>
         {git.autoMerge && <p className="banner warn small">O merge é feito no GitHub com a sua conta (comando <code>gh</code>) e não pode ser desfeito pelo board.</p>}
-        <label className="field-row">
-          <span>Tipo de merge</span>
-          <select disabled={!git.autoMerge} value={git.mergeMethod} onChange={(e) => set({ mergeMethod: e.target.value as MergeMethod })}>
-            {MERGE_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-        </label>
+        <FieldRow label="Tipo de merge">
+          <EnumSelect options={MERGE_METHODS} disabled={!git.autoMerge} value={git.mergeMethod} onChange={(mergeMethod) => set({ mergeMethod })} />
+        </FieldRow>
         <p className="muted small">Requer o GitHub CLI (<code>gh</code>) instalado e autenticado. No modo worktree, a pasta de trabalho da história é removida depois do merge; a branch fica.</p>
       </section>
     </div>
