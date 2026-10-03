@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openFile, type DbHandle } from '../db/database';
+import { Autopilot } from '../autopilot';
 import { Heartbeat } from '../heartbeat';
 import { registerClients } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
@@ -23,6 +24,8 @@ export interface BoardHostOptions {
   /** caminho estável do bridge.js, entregue à ferramenta de IA para ela falar com o board */
   bridgePath: string;
   log(line: string): void;
+  /** esta janela é a dona do board (serve o MCP), a única que roda o autopiloto; padrão: sempre */
+  ownsBoard?: () => boolean;
 }
 
 /** O board de uma pasta em funcionamento: banco, roteador, executor da IA e heartbeat. Não depende da API do VSCode. */
@@ -31,6 +34,8 @@ export interface BoardHost {
   runner: AiRunner;
   heartbeat: Heartbeat;
   chat: ChatSession;
+  /** toca sozinho as histórias em modo autônomo (YOLO) */
+  autopilot: Autopilot;
   /** registra o servidor MCP do board na ferramenta de IA do projeto e devolve o resumo do que foi feito */
   connectAI(): { message: string; toIgnore: string[] };
   addToGitignore(lines: string[]): void;
@@ -110,6 +115,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
     file: path.join(o.storageDir, 'chat', `${workspaceKey(o.folderPath)}.json`),
   });
+  const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
   const heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: o.log });
 
   const gitignore = path.join(o.folderPath, '.gitignore');
@@ -118,6 +124,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     runner,
     heartbeat,
     chat,
+    autopilot,
     connectAI() {
       const done = registerClients([router.snapshot().board.aiTool], { bridgePath: o.bridgePath, workspaceDir: o.folderPath, homeDir });
       // arquivos do projeto guardam caminhos desta máquina, então normalmente não devem ir para o repositório
@@ -136,6 +143,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       fs.writeFileSync(gitignore, `${current}${current && !current.endsWith('\n') ? '\n' : ''}${lines.join('\n')}\n`);
     },
     async dispose() {
+      autopilot.pause();
       heartbeat.stop();
       runner.dispose();
       chat.dispose();

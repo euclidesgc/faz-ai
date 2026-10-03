@@ -12,6 +12,7 @@ import { ChatViewProvider } from './sidebar/ChatViewProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
 import { ViewStateStore } from './viewState';
 import type { AiRunner } from './runner';
+import type { Autopilot } from './autopilot';
 import type { Heartbeat } from './heartbeat';
 import { revealInSystem } from './web/osOpen';
 import { preferredPort, startWebServer, type WebServer } from './web/webServer';
@@ -22,6 +23,7 @@ let host: BoardHost | null = null;
 let stopMcp: (() => void) | null = null;
 let runner: AiRunner | null = null;
 let heartbeat: Heartbeat | null = null;
+let autopilot: Autopilot | null = null;
 let heartbeatTimer: NodeJS.Timeout | undefined;
 let web: WebServer | null = null;
 /** outra janela do editor (ou o faz-ai do terminal) já serve o board desta pasta */
@@ -70,7 +72,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!f) return Promise.resolve(undefined);
     routerPromise ??= (async () => {
       const log = (line: string) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`);
-      host = await createBoardHost({ storageDir: storage, wasmDir, folderPath: f.uri.fsPath, folderName: f.name, bridgePath, log });
+      host = await createBoardHost({
+        storageDir: storage,
+        wasmDir,
+        folderPath: f.uri.fsPath,
+        folderName: f.name,
+        bridgePath,
+        log,
+        ownsBoard: () => !!stopMcp,
+      });
       const router = host.router;
       // o que já estava com a pessoa ao abrir não gera aviso; só o que a IA passar daqui em diante
       let withHuman = humanQueueStatuses(router.snapshot());
@@ -91,6 +101,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       onBoardChange();
       runner = host.runner;
       heartbeat = host.heartbeat;
+      autopilot = host.autopilot;
       heartbeat.onDidChange(updateStatusBar);
       router.onDidChange(updateStatusBar);
       // lembra, por pasta, se o heartbeat está ligado: só nesse caso o board é carregado ao abrir o editor
@@ -225,7 +236,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           : 'Faz AI: nada pendente com a IA.',
       );
     }),
-    vscode.commands.registerCommand('fazai.heartbeat.stop', () => heartbeat?.stop()),
+    // parar interrompe também o autopiloto: sem isso ele chamaria a IA de novo na hora
+    vscode.commands.registerCommand('fazai.heartbeat.stop', () => {
+      autopilot?.pause();
+      heartbeat?.stop();
+    }),
+    vscode.commands.registerCommand('fazai.autopilot.resume', async () => {
+      if (!(await getRouter()) || !autopilot) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
+      autopilot.resume();
+    }),
     vscode.commands.registerCommand('fazai.upgradeBoard', async () => {
       const router = await getRouter();
       if (!router) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
@@ -314,6 +333,7 @@ export async function deactivate(): Promise<void> {
   web?.close();
   web = null;
   heartbeat = null;
+  autopilot = null;
   runner = null;
   stopMcp?.();
   stopMcp = null;

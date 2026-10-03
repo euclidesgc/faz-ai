@@ -72,6 +72,7 @@ it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serv
     'fazai.ai.run',
     'fazai.ai.stop',
     'fazai.heartbeat.runNow',
+    'fazai.autopilot.resume',
     'fazai.upgradeBoard',
     'fazai.showLog',
   ])

@@ -130,6 +130,7 @@ const state: BoardState = {
   pendingUpgrade: [],
   chat: EMPTY_CHAT,
   aiRuns: [],
+  autopilot: { active: false, note: null },
   aiRunUnsupported: null,
   harnessInstall: null,
 };
