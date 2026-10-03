@@ -64,12 +64,13 @@ export type WebviewToHost =
   | { type: 'attachment.pick'; cardId: Id }
   /** `artifact`: é o documento de uma fase; vai para a história (mesmo enviado de uma sub-tarefa) e substitui o artefato de mesmo nome */
   | { type: 'attachment.addData'; cardId: Id; filename: string; base64: string; artifact?: boolean }
-  | { type: 'attachment.open'; attachmentId: Id }
   | { type: 'attachment.reveal'; attachmentId: Id }
   /** lê o conteúdo de um anexo de texto/JSON para exibir ou editar na modal */
   | { type: 'attachment.read'; requestId: string; attachmentId: Id }
   /** grava o conteúdo editado de volta no arquivo do anexo */
   | { type: 'attachment.write'; requestId: string; attachmentId: Id; content: string }
+  /** diálogo nativo de "salvar como" (só no editor; na web a modal faz o download direto) */
+  | { type: 'attachment.saveAs'; attachmentId: Id }
   | { type: 'attachment.delete'; attachmentId: Id }
   | { type: 'field.setValue'; cardId: Id; fieldId: Id; value: FieldValue }
   | { type: 'checklist.add'; cardId: Id; text: string }

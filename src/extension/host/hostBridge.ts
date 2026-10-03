@@ -151,14 +151,16 @@ export class HostBridge {
           if (files?.length) this.router.addAttachmentFiles(msg.cardId, files);
           return;
         }
-        case 'attachment.open':
         case 'attachment.reveal': {
           const a = this.router.getAttachment(msg.attachmentId);
           if (!a) throw new Error('Anexo não encontrado');
-          const file = this.router.store.pathOf(a);
-          if (msg.type === 'attachment.reveal') await this.env.revealFile(file);
-          else if (/^(text\/|application\/json)/.test(a.mime)) await this.env.openFile(file);
-          else await this.env.openExternal(file);
+          await this.env.revealFile(this.router.store.pathOf(a));
+          return;
+        }
+        case 'attachment.saveAs': {
+          const a = this.router.getAttachment(msg.attachmentId);
+          if (!a) throw new Error('Anexo não encontrado');
+          await this.env.saveFileAs?.(this.router.store.pathOf(a), a.filename);
           return;
         }
         case 'attachment.read': {

@@ -4,8 +4,9 @@ import { t, tn } from './i18n';
 import { rich } from './i18n/rich';
 import { humanQueue, pendingWork } from '../shared/pending';
 import { useBoardStore, useHostSync } from './store/boardStore';
-import { ui } from './commands';
+import { ui, attachments } from './commands';
 import { AttachmentModal } from './components/attachment/AttachmentModal';
+import type { Attachment } from '../shared/model';
 import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
 import { ChatPanel } from './components/chat/ChatPanel';
@@ -24,7 +25,21 @@ export function App() {
   useAppearance();
   const { state, error, notice, view, setError, setNotice, setView, openCardId, filters, setFilters, chatOpen, setChatOpen } =
     useBoardStore();
+  const attachmentsBaseUri = useBoardStore((s) => s.attachmentsBaseUri);
   const [offline, setOffline] = useState(false);
+
+  // "Salvar como…" diverge por ambiente: na web não há diálogo nativo, então a modal baixa o
+  // arquivo pela rota estática já servida; no editor, o host abre o showSaveDialog do VS Code.
+  const saveAttachmentAs = (a: Attachment) => {
+    if (isWeb) {
+      const link = document.createElement('a');
+      link.href = `${attachmentsBaseUri}/${a.cardId}/${encodeURIComponent(a.storedName)}`;
+      link.download = a.filename;
+      link.click();
+    } else {
+      attachments.saveAs(a.id);
+    }
+  };
 
   // erros (ex.: regra de conclusão) e avisos somem sozinhos
   useEffect(() => {
@@ -135,7 +150,7 @@ export function App() {
         </aside>
       )}
       {openCardId && <CardDrawer cardId={openCardId} />}
-      <AttachmentModal />
+      <AttachmentModal onSaveAs={saveAttachmentAs} />
       <Dialog />
       <div className="toasts" aria-live="polite">
         {error && (

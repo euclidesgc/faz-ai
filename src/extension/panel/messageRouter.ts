@@ -43,10 +43,10 @@ const bridgeOnly = {
   'harness.skill.file.open': viaBridge,
   'harness.install.scan': viaBridge,
   'attachment.pick': viaBridge,
-  'attachment.open': viaBridge,
   'attachment.reveal': viaBridge,
   'attachment.read': viaBridge,
   'attachment.write': viaBridge,
+  'attachment.saveAs': viaBridge,
 } satisfies Partial<HandlerMap>;
 
 /** Um handler por tipo de mensagem, agrupados por domínio em ./handlers. */
