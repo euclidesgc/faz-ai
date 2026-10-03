@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SKILL_NAME_PATTERN, type AiTool, type HarnessKind } from '../../../../shared/harness';
 import type { CreateTarget } from '../../../../shared/harnessCatalog';
+import { toItemName } from '../../../../shared/harnessProject';
 import { harness } from '../../../commands';
 import { FieldRow } from '../../ui';
 import { FormActions } from './FormActions';
@@ -36,11 +37,7 @@ export function NewItem({
       <TargetPicker label="Onde" targets={targets} value={source} onChange={setSource} />
       {named && (
         <FieldRow label="Nome">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-            placeholder="revisar-spec"
-          />
+          <input value={name} onChange={(e) => setName(toItemName(e.target.value))} placeholder="revisar-spec" />
         </FieldRow>
       )}
       {named && (

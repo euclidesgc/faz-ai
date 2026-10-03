@@ -42,6 +42,8 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   group. The list the AI sees (names, descriptions, parameters) does not change.
 - Internal: the host message router (690 lines) becomes a typed dispatcher with per-domain handlers
   in `src/extension/panel/handlers/`; the story rule lives in `src/shared/story.ts`.
+- Internal: the Settings > Harness screen (483 lines) becomes a composition of sections in
+  `settings/harness/`, with new interaction tests; non-React rules move to `src/shared`.
 
 ## 0.29.1
 

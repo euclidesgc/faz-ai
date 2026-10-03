@@ -1,6 +1,8 @@
+import { FLOW_SKILL_NAME } from '../shared/harnessProject';
+
 /** Skill que ensina a IA a conduzir os cards pelo fluxo do board. É instalada na pasta de skills da ferramenta em uso. */
 export const FLOW_SKILL = {
-  name: 'faz-ai-fluxo',
+  name: FLOW_SKILL_NAME,
   description:
     'Use sempre que for trabalhar em cards do board Faz AI: conduzir uma história pelas fases, construir o documento de uma fase, responder na conversa de um card, pedir revisão ou retomar o que está pendente.',
   body: `# Fluxo do board Faz AI

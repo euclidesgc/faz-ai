@@ -40,6 +40,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   um arquivo por grupo. A lista que a IA vê (nomes, descrições, parâmetros) não muda.
 - Interno: o roteador de mensagens do host (690 linhas) vira um despachante tipado com handlers
   por domínio em `src/extension/panel/handlers/`; a regra da história fica em `src/shared/story.ts`.
+- Interno: a tela Configurações > Harness (483 linhas) vira composição de seções em
+  `settings/harness/`, com testes de interação novos; regras sem React vão para `src/shared`.
 
 ## 0.29.1
 
