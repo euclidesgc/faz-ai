@@ -1959,7 +1959,8 @@ button:where(:not([class*='rt-'])) {
 }
 .field-card-body {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  /* 380px é a largura do seletor "No board" (4 opções): coluna mais estreita faz ele invadir a vizinha */
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: var(--sp-16);
   margin-top: var(--sp-16);
   padding-top: var(--sp-16);
@@ -1976,6 +1977,12 @@ button:where(:not([class*='rt-'])) {
 }
 .kind-select {
   width: 100%;
+}
+.field-card-body > * {
+  min-width: 0;
+}
+.display-picker .rt-SegmentedControlRoot {
+  max-width: 100%;
 }
 .display-picker,
 .applies-to {

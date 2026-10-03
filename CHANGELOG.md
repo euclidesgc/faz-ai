@@ -99,6 +99,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   rodando; cinza e parado quando ele está desligado ou não consegue rodar (sem ligação com o Faz
   AI ou sem a ferramenta do projeto, com o motivo no tooltip). Um clique no coração liga e desliga o
   heartbeat.
+- Em Configurações > Campos, o seletor "No board" (Selo, Selo vazado, Nome: valor, Oculto) não
+  invade mais a coluna das opções quando a janela é estreita: as colunas do cartão do campo passam
+  a quebrar de linha antes de ficarem menores que o seletor.
 
 ## 0.29.1
 
