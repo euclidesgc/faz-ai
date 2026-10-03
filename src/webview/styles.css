@@ -1346,7 +1346,7 @@ h3.plain {
   flex-direction: column;
   gap: var(--sp-4);
 }
-.rule-builder .condition select {
+.rule-builder .condition .rt-SelectTrigger {
   min-width: 0;
 }
 .joiner {
@@ -2273,4 +2273,14 @@ body.host-web .drawer {
   gap: var(--sp-12);
   border-top: 1px solid var(--border);
   padding-top: var(--sp-12);
+}
+
+/* campos lado a lado nos formulários de rascunho */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-12);
+}
+.form-grid > * {
+  min-width: 0;
 }

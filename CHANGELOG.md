@@ -115,6 +115,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   perfil é um cartão com o nome numa caixa de texto, o selo "padrão" e as ações à direita, e o
   editor usa os seletores, interruptores e campos do Radix Themes. O seletor de **modelo e
   esforço** (também usado no card aberto) passou a ser o do Radix.
+- **Modelos de IA com o novo design**: **Detectar modelos** e **Novo modelo** ficam no topo à
+  direita. O modelo novo abre um rascunho com os campos alinhados (nome, identificador e
+  esforços), no lugar da linha solta no fim da tabela. A lista e a **Sugestão de modelo** usam os
+  campos, seletores e interruptores do Radix Themes; **Montar nova regra** fica no topo da seção e
+  o montador abre acima da lista de regras.
 
 ## 0.29.1
 

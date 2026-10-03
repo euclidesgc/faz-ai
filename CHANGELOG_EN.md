@@ -112,6 +112,11 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   profile is a card with the name in a text box, the "padrão" badge and the actions on the right,
   and the editor uses the Radix Themes selectors, switches and fields. The **model and effort**
   selector (also used in the open card) is now the Radix one.
+- **AI models with the new design**: **Detectar modelos** and **Novo modelo** are at the top
+  right. A new model opens a draft with aligned fields (name, identifier and efforts), instead of
+  the loose row at the end of the table. The list and the **Sugestão de modelo** use the Radix
+  Themes fields, selectors and switches; **Montar nova regra** is at the top of the section and the
+  builder opens above the rule list.
 
 ## 0.29.1
 
