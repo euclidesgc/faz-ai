@@ -521,6 +521,24 @@ com o push concluído, faz o merge (squash). Por fim atualiza a main local, apag
 `npm run release -- finish` retoma de onde parou (na branch de release ou na main), sem publicar de
 novo. `--dry-run` ensaia sem publicar. As opções estão no topo de `scripts/release.mjs`.
 
+Entre empacotar e publicar, o release abre o `.vsix` e confere os quatro arquivos de vitrine
+(`README.md`, `README_EN.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`): o changelog precisa ter o título
+da versão que está saindo no topo, sem nenhum "Não lançado"/"Unreleased" sobrando em lugar nenhum, e
+o README precisa ter os blocos de aviso de fase alpha e de agradecimento. Falhando qualquer coisa, o
+release recusa antes de publicar em qualquer loja. O renomear de "Não lançado" para a versão
+acontece em todos os modos, inclusive no `--dry-run`; quando o release não chega a commitar (dry-run
+ou `--no-git`), os CHANGELOGs renomeados são restaurados ao original ao final. Sem nenhuma seção
+"Não lançado"/"Unreleased" para renomear, use `--allow-no-notes` — só é exigida quando faltar essa
+seção **e** a primeira seção do CHANGELOG não for a versão que está saindo.
+
+Dois cuidados:
+
+- se reescrever o texto de um bloco de aviso do README, atualize a tabela `SHOWCASE` em
+  `scripts/releaseCheck.mjs` com o novo texto; do contrário o release recusa publicar um README
+  correto, por desenho (falso positivo).
+- um Ctrl+C no meio do release pode deixar os CHANGELOGs com o título renomeado em disco; desfaça com
+  `git checkout CHANGELOG.md CHANGELOG_EN.md`.
+
 ## Histórico de versões
 
 O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md).

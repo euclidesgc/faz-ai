@@ -5,11 +5,14 @@
 //
 // A main só aceita mudanças por pull request, então o release nunca faz push nela:
 //   1. cria a branch release/vX.Y.Z a partir da main atualizada e, nela, ajusta a versão
-//      (package.json) e os CHANGELOGs ("Não lançado" vira a versão), faz o commit e empacota;
-//   2. publica nas lojas;
-//   3. envia a branch (push), abre o PR para a main e, com o push concluído, faz o merge (squash);
-//   4. atualiza a main local, apaga a branch de release (local e remota);
-//   5. cria a tag e a GitHub Release sobre o commit mergeado.
+//      (package.json) e os CHANGELOGs ("Não lançado" vira a versão, em todos os modos), faz o
+//      commit e empacota;
+//   2. confere o .vsix gerado (README.md, README_EN.md, CHANGELOG.md e CHANGELOG_EN.md), recusando
+//      antes de publicar se algum arquivo estiver errado;
+//   3. publica nas lojas;
+//   4. envia a branch (push), abre o PR para a main e, com o push concluído, faz o merge (squash);
+//   5. atualiza a main local, apaga a branch de release (local e remota);
+//   6. cria a tag e a GitHub Release sobre o commit mergeado.
 // Se algo parar depois da publicação nas lojas, `npm run release -- finish` retoma de onde parou
 // (na branch release/vX.Y.Z ou na main), sem publicar de novo.
 //
