@@ -9,6 +9,7 @@ import { FilterBar } from './components/FilterBar';
 import { ThemeToggle } from './components/ThemeToggle';
 import { TrashView } from './components/TrashView';
 import { Settings } from './components/settings/Settings';
+import { Button } from './components/ui';
 import { isWeb, onConnectionChange } from './vscode';
 
 export function App() {
@@ -42,15 +43,16 @@ export function App() {
       <header className="topbar">
         <h1 title={state.board.name}>{state.board.name}</h1>
         <nav>
-          <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
-          <button className={view === 'trash' ? 'active' : ''} onClick={() => setView('trash')}>Lixeira{trashCount > 0 && ` (${trashCount})`}</button>
-          <button className={view === 'settings' ? 'active' : ''} onClick={() => setView('settings')}>Configurações</button>
+          <Button active={view === 'board'} onClick={() => setView('board')}>Board</Button>
+          <Button active={view === 'trash'} onClick={() => setView('trash')}>Lixeira{trashCount > 0 && ` (${trashCount})`}</Button>
+          <Button active={view === 'settings'} onClick={() => setView('settings')}>Configurações</Button>
         </nav>
         <span className="spacer" />
         {running > 0 && <span className="topbar-info" title="Execuções da IA em andamento"><span className="spinner" /> IA trabalhando em {running} card{running > 1 ? 's' : ''}</span>}
         {withYou > 0 && (
-          <button
-            className={`topbar-pending ${onlyMine ? 'on' : ''}`}
+          <Button
+            className="topbar-pending"
+            on={onlyMine}
             title={onlyMine ? 'Mostrando só o que espera por você. Clique para ver tudo.' : 'Cards esperando revisão, resposta ou desbloqueio. Clique para ver só eles.'}
             onClick={() => {
               setView('board');
@@ -58,9 +60,9 @@ export function App() {
             }}
           >
             {withYou} com você
-          </button>
+          </Button>
         )}
-        {!isWeb && <button className="ghost" title="Abre este board no navegador, fora do editor" onClick={() => send({ type: 'ui.openInBrowser' })}>Abrir no navegador ↗</button>}
+        {!isWeb && <Button variant="ghost" title="Abre este board no navegador, fora do editor" onClick={() => send({ type: 'ui.openInBrowser' })}>Abrir no navegador ↗</Button>}
         <ThemeToggle />
       </header>
       {offline && <div className="banner warn offline">Sem ligação com o Faz AI: o que você fizer agora não é salvo. A página reconecta sozinha quando o editor (ou o comando <code>faz-ai</code>) voltar.</div>}
@@ -76,13 +78,13 @@ export function App() {
         {error && (
           <div className="toast error" role="alert">
             <span>{error}</span>
-            <button className="icon" aria-label="Fechar aviso" onClick={() => setError(null)}>✕</button>
+            <Button variant="icon" aria-label="Fechar aviso" onClick={() => setError(null)}>✕</Button>
           </div>
         )}
         {notice && (
           <div className="toast" role="status">
             <span>{notice}</span>
-            <button className="icon" aria-label="Fechar aviso" onClick={() => setNotice(null)}>✕</button>
+            <Button variant="icon" aria-label="Fechar aviso" onClick={() => setNotice(null)}>✕</Button>
           </div>
         )}
       </div>

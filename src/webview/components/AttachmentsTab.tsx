@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { cardRef } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
+import { Button, DeleteButton } from './ui';
 
 export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
@@ -19,7 +20,6 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
   const state = useBoardStore((s) => s.state)!;
   const baseUri = useBoardStore((s) => s.attachmentsBaseUri);
   const send = useBoardStore((s) => s.send);
-  const ask = useBoardStore((s) => s.ask);
   const setError = useBoardStore((s) => s.setError);
   const [over, setOver] = useState(false);
   const attachments = state.attachments.filter((a) => a.cardId === cardId);
@@ -75,7 +75,7 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); void addFiles(Array.from(e.dataTransfer.files)); }}
       >
-        <button className="primary" onClick={() => send({ type: 'attachment.pick', cardId })}>Escolher arquivos…</button>
+        <Button variant="primary" onClick={() => send({ type: 'attachment.pick', cardId })}>Escolher arquivos…</Button>
         <span className="muted">ou arraste arquivos para cá (segure Shift ao soltar), ou cole uma imagem. Até 20 MB cada.</span>
       </div>
 
@@ -92,14 +92,14 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
               <a onClick={() => send({ type: 'attachment.open', attachmentId: a.id })}>{a.filename}</a>{a.artifact && <span className="badge artifact-badge" title="Documento de uma fase">artefato</span>}
               <span className="muted small">{formatSize(a.size)} · {new Date(a.createdAt).toLocaleString()}</span>
             </div>
-            <button className="ghost small" onClick={() => send({ type: 'attachment.reveal', attachmentId: a.id })}>Mostrar na pasta</button>
-            <button
-              className="icon danger"
+            <Button variant="ghost" size="small" onClick={() => send({ type: 'attachment.reveal', attachmentId: a.id })}>Mostrar na pasta</Button>
+            <DeleteButton
               title="Remover anexo"
-              onClick={() => ask({ title: `Remover "${a.filename}"?`, message: 'O arquivo anexado será apagado.', confirmLabel: 'Remover', danger: true, onConfirm: () => send({ type: 'attachment.delete', attachmentId: a.id }) })}
-            >
-              🗑
-            </button>
+              question={`Remover "${a.filename}"?`}
+              message="O arquivo anexado será apagado."
+              confirmLabel="Remover"
+              onConfirm={() => send({ type: 'attachment.delete', attachmentId: a.id })}
+            />
           </li>
         ))}
       </ul>

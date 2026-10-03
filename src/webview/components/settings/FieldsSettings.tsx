@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FieldDef, FieldDisplay, FieldKind } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
+import { Button, Chip, ChipsEditor, DeleteButton, EnumSelect, FieldRow as Row } from '../ui';
 
 const KINDS: { value: FieldKind; label: string }[] = [
   { value: 'text', label: 'Texto' }, { value: 'number', label: 'Número' }, { value: 'date', label: 'Data' },
@@ -35,10 +36,10 @@ export function FieldsSettings() {
         <h3>Novo campo</h3>
         <div className="row wrap">
           <input placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} />
-          <select value={kind} onChange={(e) => setKind(e.target.value as FieldKind)}>{KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}</select>
-          <select value={display} onChange={(e) => setDisplay(e.target.value as FieldDisplay)}>{DISPLAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}</select>
+          <EnumSelect options={KINDS} value={kind} onChange={setKind} />
+          <EnumSelect options={DISPLAYS} value={display} onChange={setDisplay} />
           {hasOptions(kind) && <input placeholder="Opções separadas por vírgula" value={options} onChange={(e) => setOptions(e.target.value)} />}
-          <button className="primary" disabled={!name.trim()} onClick={add}>Adicionar</button>
+          <Button variant="primary" disabled={!name.trim()} onClick={add}>Adicionar</Button>
         </div>
       </section>
     </div>
@@ -48,41 +49,36 @@ export function FieldsSettings() {
 function FieldRow({ field }: { field: FieldDef }) {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
-  const ask = useBoardStore((s) => s.ask);
   const all = field.appliesToTypes === null;
-
-  const toggleType = (typeId: string) => {
-    const cur = field.appliesToTypes ?? state.cardTypes.map((t) => t.id);
-    const next = cur.includes(typeId) ? cur.filter((x) => x !== typeId) : [...cur, typeId];
-    send({ type: 'settings.field.update', fieldId: field.id, patch: { appliesToTypes: next.length === state.cardTypes.length ? null : next } });
-  };
+  const allIds = state.cardTypes.map((t) => t.id);
 
   return (
     <section className="settings-block">
       <div className="row wrap">
         <input className="h3-input" defaultValue={field.name} onBlur={(e) => e.target.value.trim() && e.target.value !== field.name && send({ type: 'settings.field.update', fieldId: field.id, patch: { name: e.target.value.trim() } })} />
         <span className="muted">{KINDS.find((k) => k.value === field.kind)?.label}</span>
-        <select value={field.display} onChange={(e) => send({ type: 'settings.field.update', fieldId: field.id, patch: { display: e.target.value as FieldDisplay } })}>
-          {DISPLAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-        </select>
+        <EnumSelect options={DISPLAYS} value={field.display} onChange={(display) => send({ type: 'settings.field.update', fieldId: field.id, patch: { display } })} />
         <span className="spacer" />
-        <button className="icon danger" onClick={() => ask({ title: `Apagar o campo "${field.name}"?`, message: 'Os valores deste campo em todos os cards serão apagados.', confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'settings.field.delete', fieldId: field.id }) })}>🗑</button>
+        <DeleteButton
+          question={`Apagar o campo "${field.name}"?`}
+          message="Os valores deste campo em todos os cards serão apagados."
+          onConfirm={() => send({ type: 'settings.field.delete', fieldId: field.id })}
+        />
       </div>
       {hasOptions(field.kind) && (
-        <label className="field-row">
-          <span>Opções</span>
+        <Row label="Opções">
           <input defaultValue={field.options.join(', ')} onBlur={(e) => send({ type: 'settings.field.update', fieldId: field.id, patch: { options: splitOpts(e.target.value) } })} />
-        </label>
+        </Row>
       )}
-      <div className="field-row">
-        <span>Aplica-se a</span>
-        <div className="chips-editor">
-          <button className={`chip ${all ? 'on' : ''}`} onClick={() => send({ type: 'settings.field.update', fieldId: field.id, patch: { appliesToTypes: all ? [] : null } })}>Todos</button>
-          {state.cardTypes.map((t) => (
-            <button key={t.id} className={`chip ${all || field.appliesToTypes?.includes(t.id) ? 'on' : ''}`} onClick={() => toggleType(t.id)}>{t.name}</button>
-          ))}
-        </div>
-      </div>
+      <Row as="div" label="Aplica-se a">
+        <ChipsEditor
+          options={state.cardTypes.map((t) => ({ value: t.id, label: t.name }))}
+          values={field.appliesToTypes ?? allIds}
+          // marcar todos os tipos equivale a "Todos" (null)
+          onChange={(next) => send({ type: 'settings.field.update', fieldId: field.id, patch: { appliesToTypes: next.length === allIds.length ? null : next } })}
+          before={<Chip on={all} onClick={() => send({ type: 'settings.field.update', fieldId: field.id, patch: { appliesToTypes: all ? [] : null } })}>Todos</Chip>}
+        />
+      </Row>
     </section>
   );
 }

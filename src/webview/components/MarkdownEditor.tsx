@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { marked } from 'marked';
+import { Button } from './ui';
 
 marked.setOptions({ gfm: true, breaks: true });
 
@@ -117,19 +118,19 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
   const toolbar = (
     <div className="md-toolbar">
       {TOOLS.map((t) => (
-        <button key={t.kind} className={`icon md-${t.kind}`} title={t.title} onMouseDown={(e) => e.preventDefault()} onClick={() => format(t.kind)}>{t.label}</button>
+        <Button key={t.kind} variant="icon" className={`md-${t.kind}`} title={t.title} onMouseDown={(e) => e.preventDefault()} onClick={() => format(t.kind)}>{t.label}</Button>
       ))}
       <span className="spacer" />
       {!expanded && (
         <>
-          <button className={`ghost small ${mode === 'write' ? 'on' : ''}`} onClick={() => setMode('write')}>Escrever</button>
-          <button className={`ghost small ${mode === 'preview' ? 'on' : ''}`} onClick={() => { setMode('preview'); onCommit?.(); }}>Visualizar</button>
+          <Button variant="ghost" size="small" on={mode === 'write'} onClick={() => setMode('write')}>Escrever</Button>
+          <Button variant="ghost" size="small" on={mode === 'preview'} onClick={() => { setMode('preview'); onCommit?.(); }}>Visualizar</Button>
         </>
       )}
       {!compact && (
-        <button className="ghost small" title={expanded ? 'Recolher (Esc)' : 'Expandir editor'} onMouseDown={(e) => e.preventDefault()} onClick={() => { if (expanded) onCommit?.(); setExpanded(!expanded); setMode('write'); }}>
+        <Button variant="ghost" size="small" title={expanded ? 'Recolher (Esc)' : 'Expandir editor'} onMouseDown={(e) => e.preventDefault()} onClick={() => { if (expanded) onCommit?.(); setExpanded(!expanded); setMode('write'); }}>
           {expanded ? '⤡ Recolher' : '⤢ Expandir'}
-        </button>
+        </Button>
       )}
     </div>
   );

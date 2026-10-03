@@ -25,6 +25,9 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   themes. The color rules are in `DESIGN.md`.
 - Internal: lint (ESLint) and formatting (Prettier) set up, plus interaction tests (clicks and
   keyboard) for the board. Nothing changes for users.
+- Internal: the front end now uses UI primitives (button, typed select, chips, field row, delete
+  button with confirmation, add input, number field) instead of repeating the same HTML in every
+  screen. Nothing changes visually or for users.
 
 ## 0.29.1
 

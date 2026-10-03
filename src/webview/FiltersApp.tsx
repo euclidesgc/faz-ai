@@ -1,6 +1,7 @@
 import { useAppearance } from './appearance';
 import { activeFilterCount } from '../shared/filters';
 import { FilterPanel } from './components/FilterPanel';
+import { Button } from './components/ui';
 import { useBoardStore, useFilteredIds, useHostSync } from './store/boardStore';
 
 /** Conteúdo da seção "Filtros" na barra lateral. */
@@ -24,7 +25,7 @@ export function FiltersApp() {
       <div className="row">
         <span className="muted small">{active ? `${shown} de ${total} cards` : `${total} cards`}</span>
         <span className="spacer" />
-        {active > 0 && <button className="ghost small" onClick={clearFilters}>Limpar ({active})</button>}
+        {active > 0 && <Button variant="ghost" size="small" onClick={clearFilters}>Limpar ({active})</Button>}
       </div>
       <FilterPanel />
     </div>

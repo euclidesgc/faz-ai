@@ -3,6 +3,7 @@ import { EXEC_ASPECTS, EXEC_ENFORCEMENT, type ExecAspect, type ExecProfile } fro
 import { aiToolInfo } from '../../../shared/harness';
 import { useBoardStore } from '../../store/boardStore';
 import { ModelEditor } from '../FieldRenderer';
+import { Button, ChipsEditor, DeleteButton } from '../ui';
 
 const newId = (): string => Math.random().toString(36).slice(2) + Date.now().toString(36);
 const list = (text: string): string[] => [...new Set(text.split(/[,\n]/).map((x) => x.trim()).filter(Boolean))];
@@ -11,7 +12,6 @@ const list = (text: string): string[] => [...new Set(text.split(/[,\n]/).map((x)
 export function ExecProfilesSettings() {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
-  const ask = useBoardStore((s) => s.ask);
   const [open, setOpen] = useState<string | null>(null);
   const profiles = state.board.execProfiles;
   const tool = aiToolInfo(state.board.aiTool);
@@ -33,8 +33,6 @@ export function ExecProfilesSettings() {
       {how[aspect] === 'enforced' ? 'imposto' : 'orientado'}
     </span>
   );
-  const toggle = (values: string[], v: string) => (values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
-
   return (
     <div>
       <h2>Perfis de execução</h2>
@@ -61,9 +59,18 @@ export function ExecProfilesSettings() {
               <input className="h3-input" key={p.name} defaultValue={p.name} onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== p.name && patch(p.id, { name: e.target.value.trim() })} />
               {p.isDefault && <span className="pill">padrão</span>}
               <span className="spacer" />
-              {!p.isDefault && <button className="ghost small" title="Usado quando nem o card nem a coluna indicam um perfil" onClick={() => patch(p.id, { isDefault: true })}>Tornar padrão</button>}
-              <button onClick={() => setOpen(open === p.id ? null : p.id)}>{open === p.id ? 'Fechar' : 'Editar'}</button>
-              <button className="icon danger" title="Apagar o perfil" onClick={() => ask({ title: `Apagar o perfil "${p.name}"?`, message: 'Colunas e cards que usam este perfil voltam ao padrão.', confirmLabel: 'Apagar', danger: true, onConfirm: () => save(profiles.filter((x) => x.id !== p.id)) })}>🗑</button>
+              {!p.isDefault && (
+                <Button variant="ghost" size="small" title="Usado quando nem o card nem a coluna indicam um perfil" onClick={() => patch(p.id, { isDefault: true })}>
+                  Tornar padrão
+                </Button>
+              )}
+              <Button onClick={() => setOpen(open === p.id ? null : p.id)}>{open === p.id ? 'Fechar' : 'Editar'}</Button>
+              <DeleteButton
+                title="Apagar o perfil"
+                question={`Apagar o perfil "${p.name}"?`}
+                message="Colunas e cards que usam este perfil voltam ao padrão."
+                onConfirm={() => save(profiles.filter((x) => x.id !== p.id))}
+              />
             </div>
             <div className="muted small">
               {[p.agent && `agente ${p.agent}`, p.skills.length && `${p.skills.length} skill(s)`, p.mcpServers && `MCP: board${p.mcpServers.length ? ` + ${p.mcpServers.join(', ')}` : ''}`, p.tools.length && `ferramentas: ${p.tools.join(', ')}`, p.clean && 'sessão limpa'].filter(Boolean).join(' · ') || 'Sem restrições: a sessão usa o que a ferramenta carregar.'}
@@ -79,10 +86,9 @@ export function ExecProfilesSettings() {
                 </label>
                 <div className="field-col">
                   <span>Skills do perfil {badge('skills')} <small className="muted">lidas em toda execução com este perfil, além das indicadas no card</small></span>
-                  <div className="chips-editor">
-                    {[...new Set([...skills, ...p.skills])].map((k) => <button key={k} className={`chip ${p.skills.includes(k) ? 'on' : ''}`} onClick={() => patch(p.id, { skills: toggle(p.skills, k) })}>{k}</button>)}
+                  <ChipsEditor options={[...new Set([...skills, ...p.skills])]} values={p.skills} onChange={(next) => patch(p.id, { skills: next })}>
                     {skills.length === 0 && p.skills.length === 0 && <span className="muted small">Nenhuma skill encontrada.</span>}
-                  </div>
+                  </ChipsEditor>
                 </div>
                 <div className="field-col">
                   <span>Servidores MCP {badge('mcp')}</span>
@@ -91,10 +97,9 @@ export function ExecProfilesSettings() {
                     Restringir: a sessão usa só o servidor do board e os marcados abaixo
                   </label>
                   {p.mcpServers !== null && (
-                    <div className="chips-editor">
-                      {[...new Set([...servers, ...p.mcpServers])].map((n) => <button key={n} className={`chip ${p.mcpServers!.includes(n) ? 'on' : ''}`} onClick={() => patch(p.id, { mcpServers: toggle(p.mcpServers!, n) })}>{n}</button>)}
+                    <ChipsEditor options={[...new Set([...servers, ...p.mcpServers])]} values={p.mcpServers} onChange={(next) => patch(p.id, { mcpServers: next })}>
                       {servers.length === 0 && <span className="muted small">Nenhum outro servidor configurado para o {tool.label}.</span>}
-                    </div>
+                    </ChipsEditor>
                   )}
                 </div>
                 <label className="field-col">
@@ -119,7 +124,7 @@ export function ExecProfilesSettings() {
         ))}
         {profiles.length === 0 && <p className="muted">Nenhum perfil ainda. Sem perfil, a execução usa tudo que a ferramenta carregar, e só o modelo do card é passado a ela.</p>}
       </div>
-      <div className="row"><button className="primary" onClick={add}>Novo perfil</button></div>
+      <div className="row"><Button variant="primary" onClick={add}>Novo perfil</Button></div>
     </div>
   );
 }

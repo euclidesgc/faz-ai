@@ -1,4 +1,4 @@
-import { useBoardStore } from '../../store/boardStore';
+import { useBoardStore, type SettingsTab } from '../../store/boardStore';
 import { ColumnsSettings } from './ColumnsSettings';
 import { TypesSettings } from './TypesSettings';
 import { FieldsSettings } from './FieldsSettings';
@@ -8,35 +8,43 @@ import { ModelsSettings } from './ModelsSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { ExecProfilesSettings } from './ExecProfilesSettings';
 import { GitSettings } from './GitSettings';
+import { useBoardPatch } from '../../store/useBoardPatch';
+import { Button, DeleteButton, FieldRow } from '../ui';
+
+const TABS: [SettingsTab, string][] = [
+  ['columns', 'Workflows e colunas'],
+  ['types', 'Tipos de card'],
+  ['fields', 'Campos'],
+  ['rules', 'Regras do board'],
+  ['harness', 'Harness de IA'],
+  ['profiles', 'Perfis de execução'],
+  ['models', 'Modelos de IA'],
+  ['git', 'Git'],
+  ['appearance', 'Aparência'],
+];
 
 export function Settings() {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
   const ask = useBoardStore((s) => s.ask);
+  const patchBoard = useBoardPatch();
   const tab = useBoardStore((s) => s.settingsTab);
   const setTab = useBoardStore((s) => s.openSettings);
 
   return (
     <div className="settings">
       <div className="settings-side">
-        <label className="field-row">
-          <span>Nome do board</span>
-          <input defaultValue={state.board.name} onBlur={(e) => e.target.value.trim() && e.target.value !== state.board.name && send({ type: 'settings.board.update', patch: { name: e.target.value.trim() } })} />
-        </label>
+        <FieldRow label="Nome do board">
+          <input defaultValue={state.board.name} onBlur={(e) => e.target.value.trim() && e.target.value !== state.board.name && patchBoard({ name: e.target.value.trim() })} />
+        </FieldRow>
         <nav className="tabs-vertical">
-          <button className={tab === 'columns' ? 'active' : ''} onClick={() => setTab('columns')}>Workflows e colunas</button>
-          <button className={tab === 'types' ? 'active' : ''} onClick={() => setTab('types')}>Tipos de card</button>
-          <button className={tab === 'fields' ? 'active' : ''} onClick={() => setTab('fields')}>Campos</button>
-          <button className={tab === 'rules' ? 'active' : ''} onClick={() => setTab('rules')}>Regras do board</button>
-          <button className={tab === 'harness' ? 'active' : ''} onClick={() => setTab('harness')}>Harness de IA</button>
-          <button className={tab === 'profiles' ? 'active' : ''} onClick={() => setTab('profiles')}>Perfis de execução</button>
-          <button className={tab === 'models' ? 'active' : ''} onClick={() => setTab('models')}>Modelos de IA</button>
-          <button className={tab === 'git' ? 'active' : ''} onClick={() => setTab('git')}>Git</button>
-          <button className={tab === 'appearance' ? 'active' : ''} onClick={() => setTab('appearance')}>Aparência</button>
+          {TABS.map(([id, label]) => (
+            <Button key={id} active={tab === id} onClick={() => setTab(id)}>{label}</Button>
+          ))}
         </nav>
         {state.pendingUpgrade.length > 0 && (
-          <button
-            className="primary"
+          <Button
+            variant="primary"
             title="Leva este board ao padrão atual da extensão, sem mover nenhum card"
             onClick={() =>
               ask({
@@ -46,22 +54,19 @@ export function Settings() {
                 onConfirm: () => send({ type: 'settings.board.upgrade' }),
               })
             }
-          >Atualizar board</button>
+          >Atualizar board</Button>
         )}
-        <button title="Registra o board como servidor MCP para o Claude Code e outros clientes de IA" onClick={() => send({ type: 'ui.connectAI' })}>Conectar IA (MCP)</button>
-        <button
-          className="ghost danger"
+        <Button title="Registra o board como servidor MCP para o Claude Code e outros clientes de IA" onClick={() => send({ type: 'ui.connectAI' })}>Conectar IA (MCP)</Button>
+        <DeleteButton
+          variant="ghost"
           title="Apaga todos os cards e configurações e recria o board com o padrão atual"
-          onClick={() =>
-            ask({
-              title: 'Recriar o board do zero?',
-              message: `Todos os ${state.cards.length} card(s), conversas, anexos e configurações deste board serão apagados, e o board volta ao padrão. Isso não pode ser desfeito. Regras e skills do projeto não são afetadas.`,
-              confirmLabel: 'Apagar tudo e recriar',
-              danger: true,
-              onConfirm: () => send({ type: 'settings.board.reset' }),
-            })
-          }
-        >Recriar board padrão</button>
+          question="Recriar o board do zero?"
+          message={`Todos os ${state.cards.length} card(s), conversas, anexos e configurações deste board serão apagados, e o board volta ao padrão. Isso não pode ser desfeito. Regras e skills do projeto não são afetadas.`}
+          confirmLabel="Apagar tudo e recriar"
+          onConfirm={() => send({ type: 'settings.board.reset' })}
+        >
+          Recriar board padrão
+        </DeleteButton>
       </div>
       <div className="settings-main">
         {tab === 'columns' && <ColumnsSettings />}

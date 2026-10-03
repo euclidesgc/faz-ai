@@ -7,6 +7,13 @@ import { PHASE_DEFAULTS } from '../../../shared/phaseDefaults';
 import { archiveKey } from '../../../shared/filters';
 import { columnsOf, useBoardStore } from '../../store/boardStore';
 import { MarkdownEditor } from '../MarkdownEditor';
+import { AddInput, Button, DeleteButton, EnumSelect } from '../ui';
+
+const CATEGORIES: { value: ColumnCategory; label: string }[] = [
+  { value: 'open', label: 'Trabalho em aberto' },
+  { value: 'done', label: 'Conclusão' },
+  { value: 'cancelled', label: 'Cancelamento' },
+];
 
 /** A fase de uma coluna: o que a IA faz quando o card entra nela e o documento que a fase produz. */
 function PhaseEditor({ column }: { column: Column }) {
@@ -42,7 +49,9 @@ function PhaseEditor({ column }: { column: Column }) {
       )}
       {preset && (
         <div className="row end">
-          <button className="ghost small" disabled={isDefault} onClick={() => patch({ aiInstruction: preset.instruction, artifactName: preset.artifactName, artifactTemplate: preset.artifactTemplate })}>Restaurar o padrão desta fase</button>
+          <Button variant="ghost" size="small" disabled={isDefault} onClick={() => patch({ aiInstruction: preset.instruction, artifactName: preset.artifactName, artifactTemplate: preset.artifactTemplate })}>
+            Restaurar o padrão desta fase
+          </Button>
         </div>
       )}
     </div>
@@ -77,9 +86,7 @@ const START = '__start';
 export function ColumnsSettings() {
   const state = useBoardStore((s) => s.state)!;
   const send = useBoardStore((s) => s.send);
-  const ask = useBoardStore((s) => s.ask);
   const resetCollapsed = useBoardStore((s) => s.resetCollapsed);
-  const [newName, setNewName] = useState<Record<string, string>>({});
   const [phaseOpen, setPhaseOpen] = useState<string | null>(null);
   /** coluna depois da qual a nova entra, por workflow; sem escolha, vale o padrão */
   const [newAfter, setNewAfter] = useState<Record<string, string>>({});
@@ -97,13 +104,13 @@ export function ColumnsSettings() {
         // padrão: antes da primeira coluna de conclusão, que é onde uma fase nova costuma entrar
         const defaultAfter = (firstTerminal === -1 ? cols[cols.length - 1] : cols[firstTerminal - 1])?.id ?? START;
         const after = newAfter[wf.id] && (newAfter[wf.id] === START || cols.some((c) => c.id === newAfter[wf.id])) ? newAfter[wf.id]! : defaultAfter;
-        const create = () => {
-          const name = newName[wf.id]?.trim();
-          if (!name) return;
+        const create = (name: string) => {
           send({ type: 'settings.column.create', workflowId: wf.id, name, position: after === START ? 0 : cols.findIndex((c) => c.id === after) + 1 });
-          setNewName({ ...newName, [wf.id]: '' });
           setNewAfter({ ...newAfter, [wf.id]: '' });
         };
+        // para a exclusão: quantos cards apontam para a coluna (inclusive arquivados e na lixeira) e para onde podem ir
+        const inColumn = (columnId: string) => state.cards.filter((k) => k.columnId === columnId).length;
+        const others = (columnId: string) => cols.filter((x) => x.id !== columnId);
         const onDragEnd = (e: DragEndEvent) => {
           const to = cols.findIndex((c) => c.id === e.over?.id);
           if (e.over && e.active.id !== e.over.id && to !== -1) moveTo(String(e.active.id), to);
@@ -129,37 +136,25 @@ export function ColumnsSettings() {
                   <SortableRow id={c.id} name={c.name} onStep={(d) => i + d >= 0 && i + d < cols.length && moveTo(c.id, i + d)}>
                     <td><input defaultValue={c.name} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && send({ type: 'settings.column.update', columnId: c.id, patch: { name: e.target.value.trim() } })} /></td>
                     <td>
-                      <select value={c.category} onChange={(e) => send({ type: 'settings.column.update', columnId: c.id, patch: { category: e.target.value as ColumnCategory } })}>
-                        <option value="open">Trabalho em aberto</option>
-                        <option value="done">Conclusão</option>
-                        <option value="cancelled">Cancelamento</option>
-                      </select>
+                      <EnumSelect options={CATEGORIES} value={c.category} onChange={(category) => send({ type: 'settings.column.update', columnId: c.id, patch: { category } })} />
                     </td>
                     <td><input type="checkbox" disabled={c.category !== 'open'} checked={c.aiActive} onChange={(e) => send({ type: 'settings.column.update', columnId: c.id, patch: { aiActive: e.target.checked } })} /></td>
                     <td><input type="checkbox" disabled={c.category !== 'open'} checked={c.requiresApproval} onChange={(e) => send({ type: 'settings.column.update', columnId: c.id, patch: { requiresApproval: e.target.checked } })} /></td>
                     <td>
-                      <button className={`ghost small ${phaseOpen === c.id ? 'on' : ''}`} disabled={c.category !== 'open'} title="Instrução para a IA e modelo do documento desta fase" onClick={() => setPhaseOpen(phaseOpen === c.id ? null : c.id)}>
+                      <Button variant="ghost" size="small" on={phaseOpen === c.id} disabled={c.category !== 'open'} title="Instrução para a IA e modelo do documento desta fase" onClick={() => setPhaseOpen(phaseOpen === c.id ? null : c.id)}>
                         {c.artifactName || (c.aiInstruction ? 'Instrução' : 'Definir')} ▾
-                      </button>
+                      </Button>
                     </td>
                     <td><input type="checkbox" checked={c.collapsed} onChange={(e) => { send({ type: 'settings.column.update', columnId: c.id, patch: { collapsed: e.target.checked } }); resetCollapsed(c.id); }} /></td>
                     <td>
-                      <button
-                        className="icon danger"
+                      <DeleteButton
                         disabled={cols.length <= 1}
-                        onClick={() => {
-                          const others = cols.filter((x) => x.id !== c.id);
-                          const n = state.cards.filter((k) => k.columnId === c.id).length;
-                          ask({
-                            title: `Excluir a coluna "${c.name}"?`,
-                            message: n ? `${n} card(s) serão movidos para a coluna escolhida.` : 'A coluna está vazia.',
-                            confirmLabel: 'Excluir coluna',
-                            danger: true,
-                            choices: n ? { label: 'Mover cards para', options: others.map((x) => ({ value: x.id, label: x.name })) } : undefined,
-                            onConfirm: (dest) => send({ type: 'settings.column.delete', columnId: c.id, moveCardsTo: dest ?? others[0]!.id }),
-                          });
-                        }}
-                      >🗑</button>
+                        question={`Excluir a coluna "${c.name}"?`}
+                        message={inColumn(c.id) ? `${inColumn(c.id)} card(s) serão movidos para a coluna escolhida.` : 'A coluna está vazia.'}
+                        confirmLabel="Excluir coluna"
+                        choices={inColumn(c.id) ? { label: 'Mover cards para', options: others(c.id).map((x) => ({ value: x.id, label: x.name })) } : undefined}
+                        onConfirm={(dest) => send({ type: 'settings.column.delete', columnId: c.id, moveCardsTo: dest ?? others(c.id)[0]!.id })}
+                      />
                     </td>
                   </SortableRow>
                   {phaseOpen === c.id && <tr><td colSpan={8}><PhaseEditor column={c} /></td></tr>}
@@ -180,12 +175,12 @@ export function ColumnsSettings() {
             </table>
             </DndContext>
             <div className="row">
-              <input placeholder="Nova coluna" value={newName[wf.id] ?? ''} onChange={(e) => setNewName({ ...newName, [wf.id]: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && create()} />
-              <select title="Onde a nova coluna entra" value={after} onChange={(e) => setNewAfter({ ...newAfter, [wf.id]: e.target.value })}>
-                <option value={START}>No início</option>
-                {cols.map((c) => <option key={c.id} value={c.id}>Depois de {c.name}</option>)}
-              </select>
-              <button className="primary" disabled={!newName[wf.id]?.trim()} onClick={create}>Adicionar</button>
+              <AddInput placeholder="Nova coluna" onAdd={create} buttonLabel="Adicionar">
+                <select title="Onde a nova coluna entra" value={after} onChange={(e) => setNewAfter({ ...newAfter, [wf.id]: e.target.value })}>
+                  <option value={START}>No início</option>
+                  {cols.map((c) => <option key={c.id} value={c.id}>Depois de {c.name}</option>)}
+                </select>
+              </AddInput>
             </div>
           </section>
         );

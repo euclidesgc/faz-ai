@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
 import { AI_TOOLS, RULE_FILES, SKILL_MODES, SKILL_NAME_PATTERN, aiToolInfo, type Agent, type AiTool, type RuleFile, type Skill, type SkillMode } from '../../../shared/harness';
-import { HEARTBEAT_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE, type RunnerPermission } from '../../../shared/runner';
+import { HEARTBEAT_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE } from '../../../shared/runner';
 import { useBoardStore } from '../../store/boardStore';
+import { useBoardPatch } from '../../store/useBoardPatch';
+import { Button, DeleteButton, EnumSelect, FieldRow, NumberField } from '../ui';
 import { HarnessInventory } from './HarnessInventory';
+
+// SKILL_MODES usa `id`; o seletor espera `value`
+const SKILL_MODE_OPTIONS = SKILL_MODES.map((m) => ({ value: m.id, label: m.label }));
 
 type Editing = { kind: 'rule'; name: string } | { kind: 'skill'; name: string } | { kind: 'agent'; name: string } | { kind: 'newSkill' } | { kind: 'newAgent' } | null;
 
@@ -21,8 +26,8 @@ function FileEditor({ saved, onSave, onClose }: { saved: string; onSave: (conten
     <div className="file-editor">
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={18} spellCheck={false} />
       <div className="row">
-        <button className="primary" disabled={!dirty} onClick={() => onSave(text)}>Salvar</button>
-        <button className="ghost" onClick={onClose}>{dirty ? 'Descartar' : 'Fechar'}</button>
+        <Button variant="primary" disabled={!dirty} onClick={() => onSave(text)}>Salvar</Button>
+        <Button variant="ghost" onClick={onClose}>{dirty ? 'Descartar' : 'Fechar'}</Button>
         {dirty && <span className="muted small">Alterações não salvas</span>}
       </div>
     </div>
@@ -37,10 +42,10 @@ export function HarnessSettings() {
   const send = useBoardStore((s) => s.send);
   const tool = aiToolInfo(state.board.aiTool);
   const agents = harness.rules.find((r) => r.name === 'AGENTS.md');
-  const chooseTool = (id: AiTool) => id !== tool.id && send({ type: 'settings.board.update', patch: { aiTool: id } });
+  const patchBoard = useBoardPatch();
+  const chooseTool = (id: AiTool) => id !== tool.id && patchBoard({ aiTool: id });
   // o arquivo de regras da ferramenta em uso; com o Claude Code, o AGENTS.md também aparece porque pode ser importado
   const rules = harness.rules.filter((r) => r.name === tool.rules || (tool.id === 'claude' && r.name === 'AGENTS.md' && r.exists));
-  const ask = useBoardStore((s) => s.ask);
   const [editing, setEditing] = useState<Editing>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -70,12 +75,13 @@ export function HarnessSettings() {
         <h3 className="plain">{a.name}</h3>
         {a.model && <span className="pill">{a.model}</span>}
         <span className="spacer" />
-        <button onClick={() => toggle('agent', a.name)}>{isEditing('agent', a.name) ? 'Fechar' : 'Editar'}</button>
-        <button
-          className="icon danger"
+        <Button onClick={() => toggle('agent', a.name)}>{isEditing('agent', a.name) ? 'Fechar' : 'Editar'}</Button>
+        <DeleteButton
           title="Apagar o agente"
-          onClick={() => ask({ title: `Apagar o agente "${a.name}"?`, message: 'O arquivo do agente é removido do projeto.', confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'harness.agent.delete', name: a.name }) })}
-        >🗑</button>
+          question={`Apagar o agente "${a.name}"?`}
+          message="O arquivo do agente é removido do projeto."
+          onConfirm={() => send({ type: 'harness.agent.delete', name: a.name })}
+        />
       </div>
       <div className="muted small">{a.description || 'Sem descrição no frontmatter.'}</div>
       <div className="muted small"><code>{a.path}</code></div>
@@ -101,15 +107,18 @@ export function HarnessSettings() {
           <span className="muted small">Lido por: {readBy}</span>
           <span className="spacer" />
           {r.name === 'CLAUDE.md' && !r.exists && agents?.exists && (
-            <button title="Cria um CLAUDE.md que só importa o AGENTS.md, para as regras ficarem num arquivo só" onClick={() => send({ type: 'harness.rule.write', name: 'CLAUDE.md', content: '@AGENTS.md\n' })}>Usar o AGENTS.md</button>
+            <Button title="Cria um CLAUDE.md que só importa o AGENTS.md, para as regras ficarem num arquivo só" onClick={() => send({ type: 'harness.rule.write', name: 'CLAUDE.md', content: '@AGENTS.md\n' })}>
+              Usar o AGENTS.md
+            </Button>
           )}
-          <button onClick={() => toggle('rule', r.name)}>{isEditing('rule', r.name) ? 'Fechar' : r.exists ? 'Editar' : 'Criar'}</button>
+          <Button onClick={() => toggle('rule', r.name)}>{isEditing('rule', r.name) ? 'Fechar' : r.exists ? 'Editar' : 'Criar'}</Button>
           {r.exists && (
-            <button
-              className="icon danger"
+            <DeleteButton
               title="Apagar o arquivo"
-              onClick={() => ask({ title: `Apagar ${r.name}?`, message: 'O arquivo é removido da pasta do projeto.', confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'harness.rule.delete', name: r.name }) })}
-            >🗑</button>
+              question={`Apagar ${r.name}?`}
+              message="O arquivo é removido da pasta do projeto."
+              onConfirm={() => send({ type: 'harness.rule.delete', name: r.name })}
+            />
           )}
         </div>
         {isEditing('rule', r.name) && <FileEditor saved={r.content} onSave={(content) => send({ type: 'harness.rule.write', name: r.name, content })} onClose={() => setEditing(null)} />}
@@ -135,16 +144,15 @@ export function HarnessSettings() {
         <span className={`pill ${k.enabled ? '' : 'off'}`}>{k.enabled ? 'Ligada' : 'Desligada'}</span>
         <span className="spacer" />
         {k.enabled && (
-          <select title={SKILL_MODES.find((m) => m.id === k.mode)!.hint} value={k.mode} onChange={(e) => setMode([k], e.target.value as SkillMode)}>
-            {SKILL_MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-          </select>
+          <EnumSelect options={SKILL_MODE_OPTIONS} title={SKILL_MODES.find((m) => m.id === k.mode)!.hint} value={k.mode} onChange={(mode) => setMode([k], mode)} />
         )}
-        <button onClick={() => toggle('skill', k.name)}>{isEditing('skill', k.name) ? 'Fechar' : 'Editar'}</button>
-        <button
-          className="icon danger"
+        <Button onClick={() => toggle('skill', k.name)}>{isEditing('skill', k.name) ? 'Fechar' : 'Editar'}</Button>
+        <DeleteButton
           title="Apagar a skill"
-          onClick={() => ask({ title: `Apagar a skill "${k.name}"?`, message: 'A pasta da skill é removida do projeto, com todos os arquivos dela.', confirmLabel: 'Apagar', danger: true, onConfirm: () => send({ type: 'harness.skill.delete', name: k.name }) })}
-        >🗑</button>
+          question={`Apagar a skill "${k.name}"?`}
+          message="A pasta da skill é removida do projeto, com todos os arquivos dela."
+          onConfirm={() => send({ type: 'harness.skill.delete', name: k.name })}
+        />
       </div>
       <div className="muted small">{k.description || 'Sem descrição no frontmatter.'}</div>
       <div className="muted small"><code>{k.path}</code></div>
@@ -180,7 +188,7 @@ export function HarnessSettings() {
         </tbody>
       </table>
       <div className="row">
-        <button className="primary" onClick={() => send({ type: 'ui.connectAI' })}>Conectar o {tool.label} ao board (MCP)</button>
+        <Button variant="primary" onClick={() => send({ type: 'ui.connectAI' })}>Conectar o {tool.label} ao board (MCP)</Button>
         <span className="muted small">Registra o servidor do board em {tool.mcp}.</span>
       </div>
 
@@ -193,37 +201,32 @@ export function HarnessSettings() {
         <p className="banner warn">{state.aiRunUnsupported}</p>
       ) : (
         <section className="settings-block runner-settings">
-          <label className="field-row">
-            <span>O que a IA pode fazer</span>
-            <select value={state.board.runner.permission} onChange={(e) => send({ type: 'settings.board.update', patch: { runner: { permission: e.target.value as RunnerPermission } } })}>
-              {RUNNER_PERMISSIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
-          </label>
+          <FieldRow label="O que a IA pode fazer">
+            <EnumSelect options={RUNNER_PERMISSIONS} value={state.board.runner.permission} onChange={(permission) => patchBoard({ runner: { permission } })} />
+          </FieldRow>
           <p className={`small ${state.board.runner.permission === 'full' ? 'banner warn' : 'muted'}`}>{RUNNER_PERMISSIONS.find((p) => p.value === state.board.runner.permission)!.hint}</p>
-          <label className="field-row">
-            <span>Tempo limite por execução</span>
+          <FieldRow label="Tempo limite por execução">
             <div className="row">
-              <input type="number" min={TIMEOUT_RANGE.min} max={TIMEOUT_RANGE.max} key={state.board.runner.timeoutMinutes} defaultValue={state.board.runner.timeoutMinutes} onBlur={(e) => Number(e.target.value) !== state.board.runner.timeoutMinutes && send({ type: 'settings.board.update', patch: { runner: { timeoutMinutes: Number(e.target.value) } } })} />
+              <NumberField min={TIMEOUT_RANGE.min} max={TIMEOUT_RANGE.max} value={state.board.runner.timeoutMinutes} onCommit={(timeoutMinutes) => patchBoard({ runner: { timeoutMinutes } })} />
               <span className="muted">minutos</span>
             </div>
-          </label>
+          </FieldRow>
           <h4>Heartbeat</h4>
           <p className="muted small">
             Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool.label} sozinho a cada intervalo: ele avança os cards aprovados,
             responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. Sem pendência, nada é executado.
           </p>
           <label className="switch">
-            <input type="checkbox" checked={state.board.runner.heartbeat} onChange={(e) => send({ type: 'settings.board.update', patch: { runner: { heartbeat: e.target.checked } } })} />
+            <input type="checkbox" checked={state.board.runner.heartbeat} onChange={(e) => patchBoard({ runner: { heartbeat: e.target.checked } })} />
             Heartbeat ligado
           </label>
-          <label className="field-row">
-            <span>Intervalo</span>
+          <FieldRow label="Intervalo">
             <div className="row">
-              <input type="number" min={HEARTBEAT_RANGE.min} max={HEARTBEAT_RANGE.max} key={state.board.runner.heartbeatMinutes} defaultValue={state.board.runner.heartbeatMinutes} onBlur={(e) => Number(e.target.value) !== state.board.runner.heartbeatMinutes && send({ type: 'settings.board.update', patch: { runner: { heartbeatMinutes: Number(e.target.value) } } })} />
+              <NumberField min={HEARTBEAT_RANGE.min} max={HEARTBEAT_RANGE.max} value={state.board.runner.heartbeatMinutes} onCommit={(heartbeatMinutes) => patchBoard({ runner: { heartbeatMinutes } })} />
               <span className="muted">minutos</span>
-              <button title="Começa uma rodada agora, mesmo com o heartbeat desligado" onClick={() => send({ type: 'ai.heartbeat.run' })}>Rodar agora</button>
+              <Button title="Começa uma rodada agora, mesmo com o heartbeat desligado" onClick={() => send({ type: 'ai.heartbeat.run' })}>Rodar agora</Button>
             </div>
-          </label>
+          </FieldRow>
         </section>
       )}
 
@@ -235,9 +238,11 @@ export function HarnessSettings() {
         <h3>Skills</h3>
         <span className="spacer" />
         {!harness.skills.some((k) => k.name === FLOW_SKILL_NAME) && (
-          <button title="Cria a skill que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências" onClick={() => send({ type: 'harness.flowSkill.install' })}>Instalar skill do fluxo</button>
+          <Button title="Cria a skill que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências" onClick={() => send({ type: 'harness.flowSkill.install' })}>
+            Instalar skill do fluxo
+          </Button>
         )}
-        <button className="primary" onClick={() => setEditing(editing?.kind === 'newSkill' ? null : { kind: 'newSkill' })}>Nova skill</button>
+        <Button variant="primary" onClick={() => setEditing(editing?.kind === 'newSkill' ? null : { kind: 'newSkill' })}>Nova skill</Button>
       </div>
       <p className="muted small">
         Skills do {tool.label} em <code>{tool.skills}</code>. Todas viram opções do campo "Skills" dos cards, e um card que indica uma skill
@@ -251,24 +256,24 @@ export function HarnessSettings() {
       {automatic.length > 1 && (
         <div className="row">
           <span className="muted small">{automatic.length} skills automáticas no projeto.</span>
-          <button className="ghost small" title="A IA deixa de invocar essas skills sozinha; elas continuam valendo nos cards que as indicam" onClick={() => setMode(automatic, 'manual')}>Deixar todas só quando indicadas</button>
+          <Button variant="ghost" size="small" title="A IA deixa de invocar essas skills sozinha; elas continuam valendo nos cards que as indicam" onClick={() => setMode(automatic, 'manual')}>
+            Deixar todas só quando indicadas
+          </Button>
         </div>
       )}
 
       {editing?.kind === 'newSkill' && (
         <section className="settings-block">
-          <label className="field-row">
-            <span>Nome</span>
+          <FieldRow label="Nome">
             <input value={name} onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} placeholder="revisar-spec" />
-          </label>
-          <label className="field-row">
-            <span>Descrição (quando usar)</span>
+          </FieldRow>
+          <FieldRow label="Descrição (quando usar)">
             <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Use ao revisar uma Spec antes de passar para o Plan" />
-          </label>
+          </FieldRow>
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10} placeholder="Instruções da skill, em markdown" spellCheck={false} />
           <div className="row">
-            <button className="primary" disabled={!nameOk || !description.trim()} onClick={createSkill}>Criar skill</button>
-            <button className="ghost" onClick={() => setEditing(null)}>Cancelar</button>
+            <Button variant="primary" disabled={!nameOk || !description.trim()} onClick={createSkill}>Criar skill</Button>
+            <Button variant="ghost" onClick={() => setEditing(null)}>Cancelar</Button>
             {name && !nameOk && <span className="muted small">Nome inválido ou já usado.</span>}
           </div>
         </section>
@@ -282,7 +287,7 @@ export function HarnessSettings() {
       <div className="row section-head">
         <h3>Agentes</h3>
         <span className="spacer" />
-        {tool.agents && <button className="primary" onClick={() => setEditing(editing?.kind === 'newAgent' ? null : { kind: 'newAgent' })}>Novo agente</button>}
+        {tool.agents && <Button variant="primary" onClick={() => setEditing(editing?.kind === 'newAgent' ? null : { kind: 'newAgent' })}>Novo agente</Button>}
       </div>
       {tool.agents ? (
         <>
@@ -292,24 +297,21 @@ export function HarnessSettings() {
           </p>
           {editing?.kind === 'newAgent' && (
             <section className="settings-block">
-              <label className="field-row">
-                <span>Nome</span>
+              <FieldRow label="Nome">
                 <input value={name} onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} placeholder="revisor-de-spec" />
-              </label>
-              <label className="field-row">
-                <span>Descrição (quando delegar)</span>
+              </FieldRow>
+              <FieldRow label="Descrição (quando delegar)">
                 <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Revisa uma Spec e aponta lacunas antes do Plan" />
-              </label>
+              </FieldRow>
               {tool.agents.modelField && (
-                <label className="field-row">
-                  <span>Modelo (opcional)</span>
+                <FieldRow label="Modelo (opcional)">
                   <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="vazio = o modelo da sessão" />
-                </label>
+                </FieldRow>
               )}
               <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10} placeholder="Instruções do agente" spellCheck={false} />
               <div className="row">
-                <button className="primary" disabled={!agentNameOk || !description.trim()} onClick={createAgent}>Criar agente</button>
-                <button className="ghost" onClick={clearForm}>Cancelar</button>
+                <Button variant="primary" disabled={!agentNameOk || !description.trim()} onClick={createAgent}>Criar agente</Button>
+                <Button variant="ghost" onClick={clearForm}>Cancelar</Button>
                 {name && !agentNameOk && <span className="muted small">Nome inválido ou já usado.</span>}
               </div>
             </section>

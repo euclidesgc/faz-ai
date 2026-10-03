@@ -4,6 +4,12 @@ import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelLabel, modelValue, typ
 import type { BoardState } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { ModelEditor } from '../FieldRenderer';
+import { Button, EnumSelect, FieldRow } from '../ui';
+
+const OPS: { value: RuleCondition['op']; label: string }[] = [
+  { value: 'is', label: 'é' },
+  { value: 'isNot', label: 'não é' },
+];
 
 const newId = (): string => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
@@ -28,15 +34,12 @@ function ConditionRow({ state, condition, onChange, onRemove }: { state: BoardSt
         {!source && <option value={condition.fieldId}>(campo apagado)</option>}
         {all.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
       </select>
-      <select value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as RuleCondition['op'] })}>
-        <option value="is">é</option>
-        <option value="isNot">não é</option>
-      </select>
+      <EnumSelect options={OPS} value={condition.op} onChange={(op) => onChange({ ...condition, op })} />
       <select value={condition.value} onChange={(e) => onChange({ ...condition, value: e.target.value })}>
         {source && !source.values.includes(condition.value) && <option value={condition.value}>{valueText(condition.value) || '—'}</option>}
         {source?.values.map((v) => <option key={v} value={v}>{valueText(v)}</option>)}
       </select>
-      <button className="icon" title="Remover a condição" onClick={onRemove}>✕</button>
+      <Button variant="icon" title="Remover a condição" onClick={onRemove}>✕</Button>
     </div>
   );
 }
@@ -52,10 +55,9 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
 
   return (
     <section className="settings-block rule-builder">
-      <label className="field-row">
-        <span>Nome da regra</span>
+      <FieldRow label="Nome da regra">
         <input value={rule.name} placeholder="Ex.: Backend pesado" onChange={(e) => setRule({ ...rule, name: e.target.value })} />
-      </label>
+      </FieldRow>
 
       <div className="muted small">Quando</div>
       {rule.groups.map((group, gi) => (
@@ -68,21 +70,20 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
                 <ConditionRow state={state} condition={c} onChange={(next) => setGroup(gi, group.map((x, i) => (i === ci ? next : x)))} onRemove={() => setGroup(gi, group.filter((_, i) => i !== ci))} />
               </div>
             ))}
-            <button className="ghost small" onClick={() => setGroup(gi, [...group, blank()])}>+ E (outra condição neste grupo)</button>
+            <Button variant="ghost" size="small" onClick={() => setGroup(gi, [...group, blank()])}>+ E (outra condição neste grupo)</Button>
           </div>
         </div>
       ))}
-      <div><button className="ghost small" onClick={() => setRule({ ...rule, groups: [...rule.groups, [blank()]] })}>+ OU (grupo alternativo)</button></div>
+      <div><Button variant="ghost" size="small" onClick={() => setRule({ ...rule, groups: [...rule.groups, [blank()]] })}>+ OU (grupo alternativo)</Button></div>
 
-      <label className="field-row">
-        <span>Sugerir</span>
+      <FieldRow label="Sugerir">
         <ModelEditor value={rule.model} onChange={(v) => setRule({ ...rule, model: typeof v === 'string' ? v : '' })} />
-      </label>
+      </FieldRow>
       <div className="muted small">{describeRule(state, rule)} → {modelLabel(state.board.modelCatalog, rule.model, true) || '(escolha um modelo)'}</div>
 
       <div className="row">
-        <button className="primary" disabled={!valid} onClick={() => onSave(rule)}>{state.board.modelRules.some((r) => r.id === rule.id) ? 'Salvar regra' : 'Adicionar à lista'}</button>
-        <button className="ghost" onClick={onCancel}>Cancelar</button>
+        <Button variant="primary" disabled={!valid} onClick={() => onSave(rule)}>{state.board.modelRules.some((r) => r.id === rule.id) ? 'Salvar regra' : 'Adicionar à lista'}</Button>
+        <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
       </div>
     </section>
   );
@@ -134,10 +135,11 @@ export function ModelRulesEditor() {
               <td>{describeRule(state, r)}</td>
               <td>{modelLabel(allModels, r.model, true)}</td>
               <td className="narrow">
-                <button className="icon" title="Subir (tem prioridade sobre as de baixo)" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
-                <button className="icon" title="Descer" disabled={i === rules.length - 1} onClick={() => move(i, 1)}>↓</button>
-                <button className="icon" title="Editar" onClick={() => setEditing(r)}>✎</button>
-                <button className="icon danger" title="Remover da lista" onClick={() => setRules(rules.filter((x) => x.id !== r.id))}>🗑</button>
+                <Button variant="icon" title="Subir (tem prioridade sobre as de baixo)" disabled={i === 0} onClick={() => move(i, -1)}>↑</Button>
+                <Button variant="icon" title="Descer" disabled={i === rules.length - 1} onClick={() => move(i, 1)}>↓</Button>
+                <Button variant="icon" title="Editar" onClick={() => setEditing(r)}>✎</Button>
+                {/* sem confirmação de propósito: a regra pode ser remontada em segundos */}
+                <Button variant="icon" danger title="Remover da lista" onClick={() => setRules(rules.filter((x) => x.id !== r.id))}>🗑</Button>
               </td>
             </tr>
           ))}
@@ -149,11 +151,11 @@ export function ModelRulesEditor() {
         ? <RuleBuilder key={editing.id} initial={editing} onSave={save} onCancel={() => setEditing(null)} />
         : (
           <div className="row">
-            <button className="primary" disabled={!catalog.length} onClick={startNew}>Montar nova regra</button>
+            <Button variant="primary" disabled={!catalog.length} onClick={startNew}>Montar nova regra</Button>
             <span className="spacer" />
-            <button disabled={!hasEffort} title={`Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do ${tool.label}`} onClick={() => send({ type: 'settings.modelRules.suggest', tool: aiTool })}>
+            <Button disabled={!hasEffort} title={`Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do ${tool.label}`} onClick={() => send({ type: 'settings.modelRules.suggest', tool: aiTool })}>
               Recriar as regras de "{EFFORT_FIELD}"
-            </button>
+            </Button>
           </div>
         )}
     </div>

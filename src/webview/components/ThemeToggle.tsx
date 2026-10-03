@@ -1,5 +1,7 @@
 import { THEMES, type ThemeMode } from '../../shared/appearance';
 import { useBoardStore } from '../store/boardStore';
+import { useBoardPatch } from '../store/useBoardPatch';
+import { Button } from './ui';
 
 /** Ordem em que o botão percorre os temas a cada clique. */
 export const THEME_CYCLE: ThemeMode[] = ['system', 'light', 'dark'];
@@ -15,18 +17,19 @@ export const nextTheme = (theme: ThemeMode): ThemeMode => THEME_CYCLE[(THEME_CYC
 /** Atalho no topo do board para trocar o tema; grava a mesma preferência de Configurações > Aparência. */
 export function ThemeToggle() {
   const theme = useBoardStore((s) => s.state?.board.appearance.theme) ?? 'system';
-  const send = useBoardStore((s) => s.send);
+  const patchBoard = useBoardPatch();
   const label = `Tema: ${THEMES.find((t) => t.value === theme)?.label.split(' (')[0]}. Clique para mudar para ${THEMES.find((t) => t.value === nextTheme(theme))?.label.split(' (')[0]}.`;
   return (
-    <button
-      className="icon theme-toggle"
+    <Button
+      variant="icon"
+      className="theme-toggle"
       title={label}
       aria-label={label}
-      onClick={() => send({ type: 'settings.board.update', patch: { appearance: { theme: nextTheme(theme) } } })}
+      onClick={() => patchBoard({ appearance: { theme: nextTheme(theme) } })}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         {ICONS[theme]}
       </svg>
-    </button>
+    </Button>
   );
 }

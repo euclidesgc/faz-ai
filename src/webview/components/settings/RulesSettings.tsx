@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type CompleteParentMode, type ConfirmMode } from '../../../shared/rules';
 import { columnsOf, useBoardStore } from '../../store/boardStore';
+import { Button, EnumSelect } from '../ui';
 
 const CONFIRM_OPTIONS: { value: ConfirmMode; label: string }[] = [
   { value: 'whenDependents', label: 'Avisar se levar sub-tarefas ou anexos' },
@@ -50,9 +51,7 @@ export function RulesSettings() {
   const changed = (Object.keys(DEFAULT_RULES) as (keyof BoardRules)[]).some((k) => rules[k] !== DEFAULT_RULES[k]);
 
   const confirmSelect = (key: 'confirmTrash' | 'confirmArchive') => (
-    <select value={rules[key]} onChange={(e) => set({ [key]: e.target.value as ConfirmMode })}>
-      {CONFIRM_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+    <EnumSelect options={CONFIRM_OPTIONS} value={rules[key]} onChange={(mode) => set({ [key]: mode })} />
   );
   const confirmThen = (mode: ConfirmMode, verb: string) =>
     mode === 'always' ? `sempre pedir confirmação antes de ${verb}.`
@@ -64,7 +63,7 @@ export function RulesSettings() {
       <div className="row">
         <h2>Regras</h2>
         <span className="spacer" />
-        <button className="ghost small" disabled={!changed} onClick={() => set(DEFAULT_RULES)}>Restaurar padrões</button>
+        <Button variant="ghost" size="small" disabled={!changed} onClick={() => set(DEFAULT_RULES)}>Restaurar padrões</Button>
       </div>
       <p className="muted">
         Regras deste board. O que conta como conclusão ou cancelamento vem de "Esta coluna representa", no menu ⋯ de cada coluna.
@@ -106,9 +105,7 @@ export function RulesSettings() {
           : 'mover só a história. As sub-tarefas ficam onde estão.'
         }
         control={
-          <select value={rules.onCancelParent} onChange={(e) => set({ onCancelParent: e.target.value as CancelChildrenMode })}>
-            {CANCEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          <EnumSelect options={CANCEL_OPTIONS} value={rules.onCancelParent} onChange={(onCancelParent) => set({ onCancelParent })} />
         }
       />
 
@@ -122,9 +119,7 @@ export function RulesSettings() {
           : 'deixar a história onde está.'
         }
         control={
-          <select value={rules.onAllChildrenDone} onChange={(e) => set({ onAllChildrenDone: e.target.value as CompleteParentMode })}>
-            {COMPLETE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          <EnumSelect options={COMPLETE_OPTIONS} value={rules.onAllChildrenDone} onChange={(onAllChildrenDone) => set({ onAllChildrenDone })} />
         }
       />
 

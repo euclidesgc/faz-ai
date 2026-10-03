@@ -5,6 +5,7 @@ import type { Card, Column as ColumnModel, ColumnCategory, Workflow } from '../.
 import { useBoardStore } from '../store/boardStore';
 import { SortableCard } from './Card';
 import { Menu } from './Menu';
+import { Button } from './ui';
 
 const CATEGORIES: { value: ColumnCategory; label: string; hint: string }[] = [
   { value: 'open', label: 'Trabalho em aberto', hint: '' },
@@ -29,7 +30,7 @@ interface Props {
 export function CollapsedColumn({ setNodeRef, isOver, name, count, className = '', onExpand }: { setNodeRef: (el: HTMLElement | null) => void; isOver: boolean; name: string; count: string; className?: string; onExpand: () => void }) {
   return (
     <div ref={setNodeRef} className={`column collapsed ${className} ${isOver ? 'over' : ''}`} onClick={onExpand} title={`Expandir "${name}"`}>
-      <button className="icon collapse-toggle" aria-expanded={false}>›</button>
+      <Button variant="icon" className="collapse-toggle" aria-expanded={false}>›</Button>
       <span className="column-count">{count}</span>
       <span className="column-name-vertical">{name}</span>
     </div>
@@ -86,7 +87,7 @@ export function Column({ column, workflow, cards, total, index, siblings, collap
   return (
     <div ref={setNodeRef} className={`column ${isOver ? 'over' : ''} ${column.isTerminal ? 'terminal' : ''}`}>
       <header className="column-header">
-        <button className="icon collapse-toggle" title="Colapsar a coluna" onClick={onToggle}>‹</button>
+        <Button variant="icon" className="collapse-toggle" title="Colapsar a coluna" onClick={onToggle}>‹</Button>
         {renaming !== null ? (
           <input
             autoFocus
@@ -158,14 +159,14 @@ export function Column({ column, workflow, cards, total, index, siblings, collap
               </select>
             )}
             <div className="row">
-              <button className="primary" onClick={submit}>Adicionar</button>
-              <button onClick={() => setAdding(false)}>Fechar</button>
+              <Button variant="primary" onClick={submit}>Adicionar</Button>
+              <Button onClick={() => setAdding(false)}>Fechar</Button>
             </div>
           </div>
         ) : (
-          <button className="ghost" disabled={!canAdd} title={canAdd ? '' : 'Clique numa história, na linha de cima, para criar sub-tarefas dela'} onClick={() => setAdding(true)}>
+          <Button variant="ghost" disabled={!canAdd} title={canAdd ? '' : 'Clique numa história, na linha de cima, para criar sub-tarefas dela'} onClick={() => setAdding(true)}>
             {workflow.kind === 'child' ? '+ Nova sub-tarefa' : '+ Novo card'}
-          </button>
+          </Button>
         )}
       </footer>
     </div>
