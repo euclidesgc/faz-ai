@@ -208,6 +208,9 @@ answers pending messages and works on ready cards, one story at a time.
   agora**, starts a round right away, even with the heartbeat off. **Faz AI: Parar as execuções da
   IA** stops everything.
 - The status bar shows the cards being run and the time of the next round.
+- The **heart** at the top right of the board shows the heartbeat: red and beating while it is
+  running; grey and still when it is off or cannot run (no connection to Faz AI, or no tool).
+  Clicking it turns the heartbeat on and off.
 - Runs use the same permission and time limit as the "Chamar IA" button.
 
 Which columns require approval, and in which ones the AI works, is set in Configurações → Workflows

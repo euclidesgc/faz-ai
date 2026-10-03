@@ -94,6 +94,9 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   while the AI works on the card, and a story also lights up when the AI works on one of its
   sub-tasks. When the AI finishes, the LED stays on the card, turned off (outline only). The type
   preview also shows the turned-off LED.
+- **Heartbeat heart** at the top right of the board: red and beating while the heartbeat is running;
+  grey and still when it is off or cannot run (no connection to Faz AI or no project tool, with the
+  reason in the tooltip). Clicking the heart turns the heartbeat on and off.
 
 ## 0.29.1
 

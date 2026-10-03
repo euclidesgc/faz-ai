@@ -95,6 +95,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   enquanto a IA trabalha no card, e a história também acende quando a IA trabalha numa sub-tarefa
   dela. Quando a IA termina, o LED continua no card, apagado (só o contorno). A prévia dos tipos
   também mostra o LED apagado.
+- **Coração do heartbeat** no topo direito do board: vermelho e batendo enquanto o heartbeat está
+  rodando; cinza e parado quando ele está desligado ou não consegue rodar (sem ligação com o Faz
+  AI ou sem a ferramenta do projeto, com o motivo no tooltip). Um clique no coração liga e desliga o
+  heartbeat.
 
 ## 0.29.1
 
