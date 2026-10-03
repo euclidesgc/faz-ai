@@ -66,6 +66,10 @@ export type WebviewToHost =
   | { type: 'attachment.addData'; cardId: Id; filename: string; base64: string; artifact?: boolean }
   | { type: 'attachment.open'; attachmentId: Id }
   | { type: 'attachment.reveal'; attachmentId: Id }
+  /** lê o conteúdo de um anexo de texto/JSON para exibir ou editar na modal */
+  | { type: 'attachment.read'; requestId: string; attachmentId: Id }
+  /** grava o conteúdo editado de volta no arquivo do anexo */
+  | { type: 'attachment.write'; requestId: string; attachmentId: Id; content: string }
   | { type: 'attachment.delete'; attachmentId: Id }
   | { type: 'field.setValue'; cardId: Id; fieldId: Id; value: FieldValue }
   | { type: 'checklist.add'; cardId: Id; text: string }
@@ -192,6 +196,10 @@ export type HostToWebview =
   | { type: 'viewState'; view: ViewState }
   | { type: 'error'; message: string }
   /** aviso informativo (algo deu certo ou precisa de atenção, sem ser erro) */
-  | { type: 'notice'; message: string };
+  | { type: 'notice'; message: string }
+  /** resposta a `attachment.read`, correlacionada por `requestId` */
+  | { type: 'attachment.readResult'; requestId: string; content?: string; error?: string }
+  /** resposta a `attachment.write`, correlacionada por `requestId` */
+  | { type: 'attachment.writeResult'; requestId: string; ok: boolean; error?: string };
 
 export type { WorkflowKind };
