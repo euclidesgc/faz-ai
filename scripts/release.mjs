@@ -31,8 +31,10 @@
 import { execSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { buffer as streamToBuffer } from 'node:stream/consumers';
 import { fileURLToPath } from 'node:url';
-import { SHOWCASE, firstSection, renameUnreleased } from './releaseCheck.mjs';
+import { open as openZip } from 'yauzl-promise';
+import { SHOWCASE, firstSection, packageProblems, renameUnreleased } from './releaseCheck.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -139,6 +141,34 @@ async function mergeVersionPullRequest(next, tag) {
   if (read(`git branch --list ${releaseBranch}`)) run(`git branch -D ${releaseBranch}`);
   if (read(`git ls-remote --heads origin ${releaseBranch}`)) run(`git push origin --delete ${releaseBranch}`);
   run('git fetch --prune origin');
+}
+
+// Confere os quatro arquivos de vitrine de dentro do .vsix antes de publicar. O `vsce` minuscula só
+// os dois arquivos que o manifesto aponta (README.md/CHANGELOG.md viram readme.md/changelog.md
+// dentro do pacote), enquanto os de inglês mantêm o nome original — por isso o casamento com o nome
+// do zip é sem distinção de maiúsculas. A decisão de "está certo?" fica inteira em packageProblems
+// (releaseCheck.mjs): aqui só se lê o disco e o zip.
+async function checkPackage(vsix, next) {
+  console.log(`\n▶ Conferindo o pacote: ${vsix}`);
+  const contents = {};
+  const zip = await openZip(join(root, vsix));
+  try {
+    for await (const entry of zip) {
+      const match = SHOWCASE.find((e) => `extension/${e.file}`.toLowerCase() === entry.filename.toLowerCase());
+      if (!match) continue;
+      contents[match.file] = (await streamToBuffer(await entry.openReadStream())).toString('utf8');
+    }
+  } finally {
+    await zip.close();
+  }
+  const problems = packageProblems(contents, next);
+  if (problems.length > 0) {
+    fail(
+      `O pacote ${vsix} não pode ser publicado:\n` +
+        problems.map((p) => `  - ${p}`).join('\n') +
+        '\n  Corrija os arquivos e rode o release de novo; nada foi publicado.',
+    );
+  }
 }
 
 // Tag e GitHub Release sobre a main já com a versão
@@ -255,6 +285,10 @@ try {
   }
   throw err;
 }
+
+// Confere o pacote antes de qualquer publicação, inclusive no --dry-run: o ensaio precisa ensaiar
+// a conferência. Uma recusa aqui chama fail(), que sai com código 1 sem publicar nada.
+await checkPackage(vsix, next);
 
 if (dryRun) {
   console.log(`\n✔ Dry-run concluído: ${vsix} gerado. Nada foi publicado.`);
