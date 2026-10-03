@@ -4,6 +4,14 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **Release sem push direto na `main`.** O `npm run release` agora publica nas lojas, abre o PR da
+  versão (`release/vX.Y.Z`, já com "Não lançado" renomeado nos CHANGELOGs), espera o merge e só então
+  cria a tag e a GitHub Release sobre o commit mergeado. Antes, o push direto era recusado pela
+  `main` protegida e deixava uma tag solta no remoto. O novo `npm run release -- finish` conclui a
+  tag e a GitHub Release depois do merge, sem publicar de novo.
+
 ## 0.30.0
 
 - **Modo autônomo (YOLO)**: uma história marcada como YOLO é tocada pela IA do Backlog ao pull

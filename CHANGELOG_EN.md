@@ -5,6 +5,15 @@
 What changed in each version of Faz AI Kanban, newest first. The extension's interface is in
 Portuguese, so names of screens and buttons appear as you see them on screen.
 
+## Unreleased
+
+- **Release without a direct push to `main`.** `npm run release` now publishes to the stores, opens
+  the version PR (`release/vX.Y.Z`, with "Unreleased" already renamed in the CHANGELOGs), waits for
+  the merge and only then creates the tag and the GitHub Release on the merged commit. Before, the
+  direct push was refused by the protected `main` and left a stray tag on the remote. The new
+  `npm run release -- finish` completes the tag and the GitHub Release after the merge, without
+  publishing again.
+
 ## 0.30.0
 
 - **Autonomous mode (YOLO)**: a story marked YOLO is driven by the AI from Backlog to the pull
