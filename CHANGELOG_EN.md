@@ -7,6 +7,12 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 
 ## Unreleased
 
+- **Card Skills field with a picker window.** Instead of a wall of chips (one per skill, hundreds
+  with plugins), the field shows what is selected and opens a window with search by name or
+  description, Todas / Marcadas / Projeto / Globais / Plugins tabs (all / selected / project /
+  global / plugins), a checkbox per skill and each one's origin. The same picker serves agents and
+  uses the description of their intent to suggest skills.
+
 - **AI harness: new list for skills, agents, hooks and MCP servers.** Each item shows its name, the
   description as a hint (two lines, full text on hover) and the file path on its own line, in full;
   clicking it opens the file in the editor. The table that broke the path and description across

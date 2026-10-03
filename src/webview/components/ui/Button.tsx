@@ -8,7 +8,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: 'small';
   /** compõe `danger` com outra variante (`icon danger`, `ghost small danger`) */
   danger?: boolean;
-  /** estado ligado de um botão de alternância (`ghost on`, `segmented on`) */
+  /** estado ligado de um botão de alternância (`ghost on`) */
   on?: boolean;
   /** aba ou item selecionado (`tabs`, `tabs-vertical`, `topbar nav`) */
   active?: boolean;

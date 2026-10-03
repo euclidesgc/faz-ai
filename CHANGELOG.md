@@ -6,6 +6,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Campo Skills do card com janela de escolha.** No lugar da parede de chips (uma para cada skill,
+  centenas com plugins), o campo mostra as marcadas e abre uma janela com busca por nome ou
+  descrição, abas Todas / Marcadas / Projeto / Globais / Plugins, caixa de seleção por skill e a
+  origem de cada uma. O mesmo seletor serve aos agentes e usa a descrição da intenção para sugerir
+  skills.
+
 - **Harness de IA: lista nova de skills, agentes, hooks e servidores MCP.** Cada item tem o nome, a
   descrição como dica (duas linhas, com o texto completo ao passar o mouse) e o caminho do arquivo
   numa linha própria, por inteiro; clicar nele abre o arquivo no editor. Saiu a tabela que

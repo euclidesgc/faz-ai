@@ -1,11 +1,11 @@
-import { useState } from 'react';
 import { Checkbox, Select, TextField as RxTextField } from '@radix-ui/themes';
 import type { FieldDef, FieldValue } from '../../shared/model';
 import { AI_TOOLS } from '../../shared/harness';
 import { effortLabel, modelDisplay, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
-import { Button, ChipsEditor, IconExternal, SelectField, TextField } from './ui';
+import { ChipsEditor, IconExternal, SelectField, TextField } from './ui';
 import { isSkillsField } from './settings/fields/fieldKinds';
+import { SkillPicker } from './skills/SkillPicker';
 
 /** O campo tem algo para mostrar no card (checkbox desmarcado e lista vazia não contam). */
 export const hasValue = (value: FieldValue): value is NonNullable<FieldValue> =>
@@ -94,7 +94,7 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
       return <ModelEditor value={value} onChange={onChange} />;
     case 'multiselect': {
       const current = Array.isArray(value) ? value : [];
-      if (isSkillsField(field.name)) return <SkillsPicker options={field.options} current={current} onChange={onChange} />;
+      if (isSkillsField(field.name)) return <SkillPicker value={current} onChange={onChange} />;
       return <ChipsEditor options={field.options} values={current} onChange={onChange} />;
     }
   }
@@ -174,98 +174,6 @@ export function ModelEditor({
     <div className="row model-editor">
       {modelSelect}
       {effortSelect}
-    </div>
-  );
-}
-
-type SkillScope = 'all' | 'project' | 'global';
-
-/** Campo "Skills": as do projeto e as globais (pasta do usuário e plugins) da ferramenta em uso, com filtro por origem. */
-function SkillsPicker({ options, current, onChange }: { options: string[]; current: string[]; onChange: (v: FieldValue) => void }) {
-  const state = useBoardStore((s) => s.state)!;
-  const [scope, setScope] = useState<SkillScope>('all');
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const items = (state.harness.inventory.find((t) => t.tool === state.board.aiTool)?.items ?? []).filter((i) => i.kind === 'skill');
-  const inProject = new Set([...state.harness.skills.map((k) => k.name), ...items.filter((i) => i.scope === 'project').map((i) => i.name)]);
-  const global = new Map(items.filter((i) => i.scope !== 'project').map((i) => [i.name, i]));
-  // um valor marcado continua visível mesmo que a skill tenha saído das opções
-  const all = [...options, ...current.filter((c) => !options.includes(c))];
-  const q = query.trim().toLowerCase();
-  // fechado, mostra só as skills marcadas: a lista inteira (dezenas, com plugins) empurrava o resto do card para baixo
-  const shown = open
-    ? all.filter(
-        (o) => (scope === 'all' || (scope === 'project' ? inProject.has(o) : global.has(o))) && (!q || o.toLowerCase().includes(q)),
-      )
-    : all.filter((o) => current.includes(o));
-  const count = (s: SkillScope) => all.filter((o) => (s === 'all' ? true : s === 'project' ? inProject.has(o) : global.has(o))).length;
-  const scopes: { id: SkillScope; label: string }[] = [
-    { id: 'all', label: 'Todas' },
-    { id: 'project', label: 'Projeto' },
-    { id: 'global', label: 'Globais' },
-  ];
-  return (
-    <div className="skills-picker">
-      {open && (
-        <div className="row wrap">
-          <input
-            autoFocus
-            type="search"
-            placeholder="Buscar skill…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setOpen(false))}
-          />
-          {global.size > 0 && (
-            <div className="segmented">
-              {scopes.map((s) => (
-                <Button key={s.id} on={scope === s.id} onClick={() => setScope(s.id)}>
-                  {s.label} ({count(s.id)})
-                </Button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-      <ChipsEditor
-        options={shown.map((o) => {
-          const g = global.get(o);
-          const where = [inProject.has(o) ? 'projeto' : '', g ? (g.plugin ? `plugin ${g.plugin}` : 'global') : '']
-            .filter(Boolean)
-            .join(' e ');
-          return {
-            value: o,
-            title: `${where ? `Skill de: ${where}. ` : ''}${g && !inProject.has(o) ? g.description : ''}`.trim(),
-            label: (
-              <>
-                {o}
-                {!inProject.has(o) && g && <small className="chip-scope">{g.plugin ? 'plugin' : 'global'}</small>}
-              </>
-            ),
-          };
-        })}
-        values={current}
-        onChange={onChange}
-      >
-        {open && shown.length === 0 && (
-          <span className="muted small">
-            Nenhuma skill {q ? `com "${query.trim()}"` : scope === 'project' ? 'no projeto' : scope === 'global' ? 'global' : ''}.
-          </span>
-        )}
-        {!open && shown.length === 0 && <span className="muted small">Nenhuma skill obrigatória.</span>}
-        {all.length > 0 && (
-          <Button
-            variant="ghost"
-            size="small"
-            onClick={() => {
-              setOpen(!open);
-              setQuery('');
-            }}
-          >
-            {open ? 'Concluir' : `Escolher skills (${all.length})`}
-          </Button>
-        )}
-      </ChipsEditor>
     </div>
   );
 }
