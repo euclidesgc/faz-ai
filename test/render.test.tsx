@@ -174,12 +174,12 @@ describe('telas montam sem erro', () => {
     expect(collapsed).toContain('aria-label="Harness de IA"');
     useBoardStore.setState({ settingsNavCollapsed: false });
     for (const text of [
-      'Worktree por história',
+      'Cada história ganha uma branch e uma pasta de trabalho própria',
       'Nome da branch',
       'historia/12-login-com-google',
       'Pasta das worktrees',
       'Fazer o merge do PR ao aprovar a homologação',
-      'Squash',
+      'Tipo de merge',
     ])
       expect(html(<GitSettings />)).toContain(text);
     const cols = html(<WorkflowsSettings />);
@@ -229,16 +229,7 @@ describe('telas montam sem erro', () => {
     for (const text of ['OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
 
     const look = html(<AppearanceSettings />);
-    for (const text of [
-      'Tema',
-      'Sistema (acompanha o editor ou o sistema)',
-      'Fonte dos textos',
-      'Sem serifa do sistema',
-      '14px',
-      'Prévia',
-      'Status dos cards',
-      'Aguardando resposta',
-    ])
+    for (const text of ['Tema', 'Fonte dos textos', 'Tamanho da fonte: 14px', 'Prévia', 'Status dos cards', 'Aguardando resposta'])
       expect(look).toContain(text);
     const toggle = html(<ThemeToggle />);
     for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);

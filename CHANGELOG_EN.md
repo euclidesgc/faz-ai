@@ -117,6 +117,10 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   the loose row at the end of the table. The list and the **Sugestão de modelo** use the Radix
   Themes fields, selectors and switches; **Montar nova regra** is at the top of the section and the
   builder opens above the rule list.
+- **Git and Appearance with the new design**: the fields become form cards with the label above
+  each box and the help below. Selectors, the auto-merge switch, the merge warning (now a Radix
+  callout) and the font-size slider are Radix Themes ones; Appearance's Restaurar padrões is the
+  same button style as the other screens.
 
 ## 0.29.1
 

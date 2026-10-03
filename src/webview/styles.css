@@ -2284,3 +2284,7 @@ body.host-web .drawer {
 .form-grid > * {
   min-width: 0;
 }
+
+.font-size-slider {
+  max-width: 320px;
+}
