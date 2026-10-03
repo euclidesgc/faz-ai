@@ -9,7 +9,9 @@ import {
 import { PLUGIN_COMMANDS, createTargets, hookTargets, mcpTargets, permissionTargets } from '../../../../shared/harnessCatalog';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { Button } from '../../ui';
+import { Button, Callout } from '@radix-ui/themes';
+import { IconWarning } from '../../ui';
+import { SettingsCard } from '../SettingsCard';
 import { InstallSkills } from './InstallSkills';
 import { ItemRow } from './ItemRow';
 import { NewHook } from './NewHook';
@@ -63,40 +65,44 @@ export function KindSection({
   /** skills cuja descrição a ferramenta carrega em toda sessão */
   const automatic = items.filter((i) => i.kind === 'skill' && i.mode === 'auto');
   return (
-    <section className="settings-block">
-      <div className="row">
-        <h3 className="plain">{k.label}</h3>
-        <span className="pill off">{ofKind.length}</span>
-        <span className="muted small">{k.hint}</span>
-        <span className="spacer" />
-        {k.id === 'skill' && (
-          <Button size="small" onClick={() => onInstalling(!installing)}>
-            Buscar e instalar
-          </Button>
-        )}
-        {k.id === 'settings' && permissionFiles.length > 0 && (
-          <Button
-            size="small"
-            onClick={() => {
-              onAddingRule(!addingRule);
-              onCreating(null);
-            }}
-          >
-            Nova regra de permissão
-          </Button>
-        )}
-        {(places.length > 0 || (k.id === 'mcp' && mcpFiles.length > 0) || (k.id === 'hook' && hookFiles.length > 0)) && (
-          <Button
-            size="small"
-            onClick={() => {
-              onCreating(creating === k.id ? null : k.id);
-              onAddingRule(false);
-            }}
-          >
-            {k.id === 'settings' ? 'Novo arquivo' : 'Novo'}
-          </Button>
-        )}
-      </div>
+    <SettingsCard
+      title={k.label}
+      badge={{ text: String(ofKind.length), on: false }}
+      hint={k.hint}
+      actions={
+        <>
+          {k.id === 'skill' && (
+            <Button variant="soft" color="gray" onClick={() => onInstalling(!installing)}>
+              Buscar e instalar
+            </Button>
+          )}
+          {k.id === 'settings' && permissionFiles.length > 0 && (
+            <Button
+              variant="soft"
+              color="gray"
+              onClick={() => {
+                onAddingRule(!addingRule);
+                onCreating(null);
+              }}
+            >
+              Nova regra de permissão
+            </Button>
+          )}
+          {(places.length > 0 || (k.id === 'mcp' && mcpFiles.length > 0) || (k.id === 'hook' && hookFiles.length > 0)) && (
+            <Button
+              variant="soft"
+              color="gray"
+              onClick={() => {
+                onCreating(creating === k.id ? null : k.id);
+                onAddingRule(false);
+              }}
+            >
+              {k.id === 'settings' ? 'Novo arquivo' : 'Novo'}
+            </Button>
+          )}
+        </>
+      }
+    >
       {k.id === 'skill' &&
         tool === state.board.aiTool &&
         !items.some((i) => i.kind === 'skill' && i.scope === 'project' && i.name === REFERENCE_SKILL.name) && (
@@ -105,7 +111,7 @@ export function KindSection({
               Modelos de classe e exemplos de código ficam bem numa skill própria, só quando indicada: os arquivos vão em{' '}
               <code>references/</code> e os cards que a indicam recebem os caminhos.
             </span>
-            <Button variant="ghost" size="small" onClick={() => harness.createReferenceSkill()}>
+            <Button variant="ghost" size="1" onClick={() => harness.createReferenceSkill()}>
               Criar skill de modelos
             </Button>
           </div>
@@ -126,9 +132,14 @@ export function KindSection({
         </div>
       )}
       {k.id === 'hook' && (
-        <p className="banner warn small">
-          Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.
-        </p>
+        <Callout.Root color="orange" size="1">
+          <Callout.Icon>
+            <IconWarning />
+          </Callout.Icon>
+          <Callout.Text>
+            Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.
+          </Callout.Text>
+        </Callout.Root>
       )}
       {creating === 'hook' && k.id === 'hook' && hookFiles.length > 0 && (
         <NewHook key={tool} tool={tool} targets={hookFiles} onClose={() => onCreating(null)} />
@@ -173,7 +184,7 @@ export function KindSection({
               {s.id !== 'plugin' && group.filter((i) => i.mode === 'auto').length > 1 && (
                 <Button
                   variant="ghost"
-                  size="small"
+                  size="1"
                   title="A IA deixa de invocar essas skills sozinha; elas continuam valendo nos cards que as indicam"
                   onClick={(e) => {
                     e.preventDefault();
@@ -189,7 +200,7 @@ export function KindSection({
               {toProject.length > 1 && (
                 <Button
                   variant="ghost"
-                  size="small"
+                  size="1"
                   onClick={(e) => {
                     e.preventDefault();
                     copy(toProject, 'project');
@@ -216,6 +227,6 @@ export function KindSection({
           </details>
         );
       })}
-    </section>
+    </SettingsCard>
   );
 }

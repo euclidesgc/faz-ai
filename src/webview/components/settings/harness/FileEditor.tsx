@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button } from '../../ui';
+import { Button, TextArea } from '@radix-ui/themes';
 
 /** Editor de texto simples com salvar/descartar; `saved` é o conteúdo que está no disco. */
 export function FileEditor({ saved, onSave, onClose }: { saved: string; onSave: (content: string) => void; onClose: () => void }) {
@@ -14,15 +14,15 @@ export function FileEditor({ saved, onSave, onClose }: { saved: string; onSave: 
   const dirty = text !== saved;
   return (
     <div className="file-editor">
-      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={18} spellCheck={false} />
-      <div className="row">
-        <Button variant="primary" disabled={!dirty} onClick={() => onSave(text)}>
-          Salvar
-        </Button>
-        <Button variant="ghost" onClick={onClose}>
+      <TextArea className="code-area" value={text} onChange={(e) => setText(e.target.value)} rows={18} spellCheck={false} />
+      <div className="form-actions">
+        {dirty && <span className="muted small">Alterações não salvas</span>}
+        <Button variant="soft" color="gray" onClick={onClose}>
           {dirty ? 'Descartar' : 'Fechar'}
         </Button>
-        {dirty && <span className="muted small">Alterações não salvas</span>}
+        <Button disabled={!dirty} onClick={() => onSave(text)}>
+          Salvar
+        </Button>
       </div>
     </div>
   );

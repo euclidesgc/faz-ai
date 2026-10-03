@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { AiTool } from '../../../../shared/harness';
 import { PERMISSION_LIST_LABEL, type PermissionTarget } from '../../../../shared/harnessCatalog';
 import { harness } from '../../../commands';
-import { EnumSelect, FieldRow } from '../../ui';
+import { Card, TextField } from '@radix-ui/themes';
+import { FormField, SelectField } from '../../ui';
 import { FormActions } from './FormActions';
 import { TargetPicker } from './TargetPicker';
 import { useTargetForm } from './useTargetForm';
@@ -20,24 +21,31 @@ export function NewPermission({ tool, targets, onClose }: { tool: AiTool; target
       confirmLabel: 'Acrescentar',
     });
   return (
-    <div className="harness-new">
+    <Card className="draft-card" aria-label="Regra de permissão nova">
       <TargetPicker label="Arquivo" targets={targets} value={source} onChange={setSource} />
-      <FieldRow label="Lista">
-        <EnumSelect
-          options={target.lists.map((l) => ({ value: l, label: `${PERMISSION_LIST_LABEL[l] ?? l} (${l})` }))}
-          value={list}
-          onChange={setList}
-        />
-      </FieldRow>
-      <FieldRow label="Regra">
-        <input
-          value={rule}
-          onChange={(e) => setRule(e.target.value)}
-          placeholder={tool === 'cursor' ? 'Ex.: Shell(git), Read(src/**)' : 'Ex.: Bash(npm run test *), Read(./.env)'}
-          spellCheck={false}
-        />
-      </FieldRow>
+      <FormField label="Lista">
+        {(id) => (
+          <SelectField
+            id={id}
+            aria-label="Lista"
+            options={target.lists.map((l) => ({ value: l, label: `${PERMISSION_LIST_LABEL[l] ?? l} (${l})` }))}
+            value={list}
+            onChange={setList}
+          />
+        )}
+      </FormField>
+      <FormField label="Regra">
+        {(id) => (
+          <TextField.Root
+            id={id}
+            value={rule}
+            onChange={(e) => setRule(e.target.value)}
+            placeholder={tool === 'cursor' ? 'Ex.: Shell(git), Read(src/**)' : 'Ex.: Bash(npm run test *), Read(./.env)'}
+            spellCheck={false}
+          />
+        )}
+      </FormField>
       <FormActions label="Acrescentar regra" disabled={!rule.trim()} onSubmit={add} onCancel={onClose} />
-    </div>
+    </Card>
   );
 }

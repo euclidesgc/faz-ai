@@ -269,7 +269,7 @@ describe('telas montam sem erro', () => {
       'ao board (MCP)',
       'Instalar skill do fluxo',
       'Execução pela conversa e heartbeat',
-      'Só o board',
+      'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',
       'Heartbeat ligado',
       'Rodar agora',

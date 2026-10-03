@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { AiTool } from '../../../../shared/harness';
 import { MCP_NAME_PATTERN, type McpServerInput, type McpTarget } from '../../../../shared/harnessCatalog';
 import { harness } from '../../../commands';
-import { EnumSelect, FieldRow, type EnumOption } from '../../ui';
+import { Card, TextArea, TextField } from '@radix-ui/themes';
+import { FormField, SelectField, type EnumOption } from '../../ui';
 import { FormActions } from './FormActions';
 import { TargetPicker } from './TargetPicker';
 import { useTargetForm } from './useTargetForm';
@@ -52,41 +53,55 @@ export function NewMcpServer({ tool, targets, onClose }: { tool: AiTool; targets
       { title: 'Acrescentar servidor na pasta do usuário?', message: target.label, confirmLabel: 'Acrescentar' },
     );
   return (
-    <div className="harness-new">
+    <Card className="draft-card" aria-label="Servidor MCP novo">
       <TargetPicker label="Arquivo" targets={targets} value={source} onChange={setSource} />
-      <FieldRow label="Nome">
-        <input value={name} onChange={(e) => setName(e.target.value.trim())} placeholder="github" />
-      </FieldRow>
-      <FieldRow label="Tipo">
-        <EnumSelect options={TRANSPORTS} value={transport} onChange={setTransport} />
-      </FieldRow>
+      <FormField label="Nome">
+        {(id) => <TextField.Root id={id} value={name} onChange={(e) => setName(e.target.value.trim())} placeholder="github" />}
+      </FormField>
+      <FormField label="Tipo">
+        {(id) => <SelectField id={id} aria-label="Tipo" options={TRANSPORTS} value={transport} onChange={setTransport} />}
+      </FormField>
       {transport === 'stdio' ? (
         <>
-          <FieldRow label="Comando">
-            <input value={command} onChange={(e) => setCommand(e.target.value)} placeholder="npx" />
-          </FieldRow>
-          <FieldRow label="Argumentos">
-            <textarea rows={2} value={args} onChange={(e) => setArgs(e.target.value)} placeholder="um por linha" spellCheck={false} />
-          </FieldRow>
+          <FormField label="Comando">
+            {(id) => <TextField.Root id={id} value={command} onChange={(e) => setCommand(e.target.value)} placeholder="npx" />}
+          </FormField>
+          <FormField label="Argumentos">
+            {(id) => (
+              <TextArea
+                id={id}
+                className="code-area"
+                rows={2}
+                value={args}
+                onChange={(e) => setArgs(e.target.value)}
+                placeholder="um por linha"
+                spellCheck={false}
+              />
+            )}
+          </FormField>
         </>
       ) : (
-        <FieldRow label="Endereço">
-          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://exemplo.dev/mcp" />
-        </FieldRow>
+        <FormField label="Endereço">
+          {(id) => <TextField.Root id={id} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://exemplo.dev/mcp" />}
+        </FormField>
       )}
-      <FieldRow label={transport === 'stdio' ? 'Variáveis de ambiente' : 'Cabeçalhos'}>
-        <textarea
-          rows={2}
-          value={extra}
-          onChange={(e) => setExtra(e.target.value)}
-          placeholder="CHAVE=valor, um por linha"
-          spellCheck={false}
-        />
-      </FieldRow>
-      <p className="muted small">
-        Variáveis e cabeçalhos são gravados no arquivo como estão. Se o arquivo vai para o repositório, não ponha segredos nele.
-      </p>
+      <FormField
+        label={transport === 'stdio' ? 'Variáveis de ambiente' : 'Cabeçalhos'}
+        hint="Gravados no arquivo como estão. Se o arquivo vai para o repositório, não ponha segredos nele."
+      >
+        {(id) => (
+          <TextArea
+            id={id}
+            className="code-area"
+            rows={2}
+            value={extra}
+            onChange={(e) => setExtra(e.target.value)}
+            placeholder="CHAVE=valor, um por linha"
+            spellCheck={false}
+          />
+        )}
+      </FormField>
       <FormActions label="Acrescentar servidor" disabled={!ok} onSubmit={add} onCancel={onClose} />
-    </div>
+    </Card>
   );
 }

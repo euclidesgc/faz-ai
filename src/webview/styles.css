@@ -1617,11 +1617,11 @@ tr.dragging .drag-handle {
 }
 
 /* Harness: inventário por ferramenta e escopo */
-.harness-inventory .tabs {
+.harness-tabs {
   flex-wrap: wrap;
   margin-bottom: var(--sp-12);
 }
-.harness-inventory .tabs .pill {
+.harness-tabs .rt-Badge {
   margin-left: var(--sp-6);
 }
 .harness-inventory details {
@@ -1635,7 +1635,7 @@ tr.dragging .drag-handle {
 .harness-inventory td:first-child {
   white-space: nowrap;
 }
-.harness-inventory td:first-child .pill {
+.harness-inventory td:first-child .rt-Badge {
   margin-left: var(--sp-6);
 }
 .harness-inventory td code {
@@ -2161,4 +2161,100 @@ body.host-web .drawer {
 .filterbar-panel .filter-group {
   max-height: 170px;
   overflow: auto;
+}
+
+/* seções e cartões das configurações (SectionHeader, SettingsCard) */
+.section-header {
+  margin: var(--sp-20) 0 var(--sp-8);
+}
+.section-header-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.section-header-row h3,
+.settings-card-head h4 {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--fg);
+  margin: 0;
+}
+.section-header-actions,
+.settings-card-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+}
+.section-desc {
+  margin-top: var(--sp-6);
+}
+.settings-card {
+  margin-bottom: var(--sp-8);
+}
+.settings-card.off {
+  opacity: 0.7;
+}
+.settings-card-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-6) var(--sp-8);
+}
+.settings-card > :not(.settings-card-head) {
+  margin-top: var(--sp-8);
+}
+
+/* formulários dos cartões das configurações */
+.draft-card,
+.form-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  margin-bottom: var(--sp-8);
+}
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+}
+.form-divider {
+  border-top: 1px solid var(--border);
+}
+.unit-field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.unit-field .rt-TextFieldRoot {
+  width: 120px;
+}
+.grow {
+  flex: 1 1 280px;
+}
+.code-area {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+.skill-files .rt-SelectTrigger {
+  min-width: 120px;
+}
+
+/* ações de uma linha do inventário */
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sp-4) var(--sp-8);
+}
+.harness-inventory td.actions {
+  min-width: 260px;
+}
+.harness-inventory td code {
+  min-width: 180px;
+  display: inline-block;
 }

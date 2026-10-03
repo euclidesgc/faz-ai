@@ -1,8 +1,8 @@
-import { FieldRow } from '../../ui';
+import { FormField, SelectField } from '../../ui';
 import type { HarnessTarget } from './useTargetForm';
 
 interface Props {
-  /** rótulo da linha: "Onde" ou "Arquivo" */
+  /** rótulo do campo: "Onde" ou "Arquivo" */
   label: string;
   targets: readonly HarnessTarget[];
   /** `source` do destino escolhido */
@@ -13,14 +13,16 @@ interface Props {
 /** Seletor de onde gravar: cada opção diz se o arquivo é do projeto ou global. */
 export function TargetPicker({ label, targets, value, onChange }: Props) {
   return (
-    <FieldRow label={label}>
-      <select value={value} onChange={(e) => onChange(Number(e.target.value))}>
-        {targets.map((t) => (
-          <option key={t.source} value={t.source}>
-            {t.scope === 'user' ? 'Global' : 'Projeto'}: {t.label}
-          </option>
-        ))}
-      </select>
-    </FieldRow>
+    <FormField label={label}>
+      {(id) => (
+        <SelectField
+          id={id}
+          aria-label={label}
+          options={targets.map((t) => ({ value: String(t.source), label: `${t.scope === 'user' ? 'Global' : 'Projeto'}: ${t.label}` }))}
+          value={String(value)}
+          onChange={(source) => onChange(Number(source))}
+        />
+      )}
+    </FormField>
   );
 }

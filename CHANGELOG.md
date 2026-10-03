@@ -106,6 +106,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   interruptor ou o seletor à direita e o "Quando / Então" embaixo. Os controles são os do Radix
   Themes, iguais aos de Campos e Workflows. É a primeira das telas de Configurações que ainda usavam
   os controles antigos.
+- **Harness de IA com o novo design**: regras, skills e agentes do projeto viram cartões com o
+  título, o selo de estado e as ações à direita; cada seção tem o botão principal no topo (Nova
+  skill, Novo agente, Conectar ao board, Rodar agora, Atualizar). Formulários de criação, seletores,
+  interruptores, caixas de marcar e as abas de ferramenta usam o Radix Themes, como Campos,
+  Workflows e Regras.
 
 ## 0.29.1
 

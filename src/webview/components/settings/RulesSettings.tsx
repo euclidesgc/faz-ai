@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
-import { Badge, Button, Card, Heading, Switch, Text } from '@radix-ui/themes';
+import { Badge, Button, Card, Heading } from '@radix-ui/themes';
 import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type CompleteParentMode, type ConfirmMode } from '../../../shared/rules';
 import { columnsOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
-import { SelectField } from '../ui';
+import { SelectField, SwitchField } from '../ui';
 import { PageHeader } from './PageHeader';
 
 const CONFIRM_OPTIONS: { value: ConfirmMode; label: string }[] = [
@@ -44,16 +44,6 @@ function Rule({ title, when, then, active, control }: { title: string; when: str
         <dd>{then}</dd>
       </dl>
     </Card>
-  );
-}
-
-/** Liga e desliga uma regra: o rótulo clica no interruptor. */
-function RuleSwitch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (on: boolean) => void }) {
-  return (
-    <Text as="label" size="2" className="switch-row">
-      <Switch checked={checked} onCheckedChange={onChange} />
-      {label}
-    </Text>
   );
 }
 
@@ -106,7 +96,7 @@ export function RulesSettings() {
             : 'permitir. As sub-tarefas ficam onde estão.'
         }
         control={
-          <RuleSwitch
+          <SwitchField
             label="Bloquear"
             checked={rules.blockDoneWithOpenChildren}
             onChange={(blockDoneWithOpenChildren) => set({ blockDoneWithOpenChildren })}
@@ -124,7 +114,7 @@ export function RulesSettings() {
             : 'permitir. As sub-tarefas ficam onde estão.'
         }
         control={
-          <RuleSwitch
+          <SwitchField
             label="Bloquear"
             checked={rules.blockPhaseAdvanceWithOpenChildren}
             onChange={(blockPhaseAdvanceWithOpenChildren) => set({ blockPhaseAdvanceWithOpenChildren })}
@@ -184,7 +174,7 @@ export function RulesSettings() {
             : 'não mexer no modelo. A sugestão só é aplicada pelo botão no card.'
         }
         control={
-          <RuleSwitch
+          <SwitchField
             label="Preencher"
             checked={rules.autoApplyModelSuggestion}
             onChange={(autoApplyModelSuggestion) => set({ autoApplyModelSuggestion })}

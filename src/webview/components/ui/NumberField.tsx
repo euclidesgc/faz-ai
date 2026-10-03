@@ -1,7 +1,8 @@
-import type { InputHTMLAttributes } from 'react';
+import { TextField } from '@radix-ui/themes';
+import type { ComponentProps } from 'react';
 
 interface Props extends Omit<
-  InputHTMLAttributes<HTMLInputElement>,
+  ComponentProps<typeof TextField.Root>,
   'value' | 'defaultValue' | 'onChange' | 'onBlur' | 'type' | 'min' | 'max'
 > {
   value: number;
@@ -23,7 +24,7 @@ export function NumberField({ value, min, max, onCommit, ...rest }: Props) {
     if (next !== value) onCommit(next);
   };
   return (
-    <input
+    <TextField.Root
       type="number"
       key={value}
       defaultValue={value}

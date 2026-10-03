@@ -2,7 +2,8 @@
 // o tsconfig.extension.json inclui test/**/*.ts sem a lib DOM, e um helper .ts com DOM quebraria o typecheck.
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -57,6 +58,12 @@ export function lastSent<T extends WebviewToHost['type']>(type: T): Extract<Webv
       `nenhuma mensagem "${type}" foi enviada; enviadas: ${posted.mock.calls.map(([m]) => m.type).join(', ') || '(nenhuma)'}`,
     );
   return last;
+}
+
+/** Escolhe uma opção num seletor do Radix Themes (o `<select>` nativo do jsdom não existe mais nessas telas). */
+export async function choose(trigger: HTMLElement, option: string | RegExp): Promise<void> {
+  await userEvent.click(trigger);
+  await userEvent.click(await screen.findByRole('option', { name: option }));
 }
 
 export interface SeededBoard {

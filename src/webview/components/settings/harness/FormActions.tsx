@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Button } from '../../ui';
+import { Button } from '@radix-ui/themes';
 
 interface Props {
   /** texto do botão principal */
@@ -14,12 +14,12 @@ interface Props {
 /** Rodapé dos formulários de criação: o botão principal e o Cancelar. */
 export function FormActions({ label, disabled, onSubmit, onCancel, children }: Props) {
   return (
-    <div className="row">
-      <Button variant="primary" disabled={disabled} onClick={onSubmit}>
-        {label}
-      </Button>
-      <Button variant="ghost" onClick={onCancel}>
+    <div className="form-actions">
+      <Button variant="soft" color="gray" onClick={onCancel}>
         Cancelar
+      </Button>
+      <Button disabled={disabled} onClick={onSubmit}>
+        {label}
       </Button>
       {children}
     </div>
