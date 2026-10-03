@@ -1,26 +1,15 @@
+import type { CSSProperties } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { badgeStyle } from '../../shared/color';
-import { cardRef, type Card } from '../../shared/model';
-import { modelFieldOf, modelLabel, suggestModel } from '../../shared/models';
-import { childrenOf, countDone, fieldsForType, valueOf } from '../../shared/selectors';
+import { cardRef, type Card, type FieldDef } from '../../shared/model';
+import { statusInfo } from '../../shared/status';
+import { fieldsForType, isAiWorking, valueOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
-import { cards } from '../commands';
-import { requestArchive, requestTrash } from '../store/actions';
-import { FieldBadge } from './FieldRenderer';
-import { Menu } from './Menu';
-import {
-  Button,
-  IconAttachment,
-  IconChecklist,
-  IconComments,
-  IconDescription,
-  IconOpen,
-  IconParent,
-  IconSubtasks,
-  IconSuggest,
-} from './ui';
-import { StatusBadge } from './StatusBar';
+import { FieldBadge, hasValue } from './FieldRenderer';
+import { IconParent } from './ui';
+import { CardFooter } from './cardView/CardFooter';
+import { StatusLine } from './cardView/StatusLine';
+import { TitleBar } from './cardView/TitleBar';
 
 export function SortableCard({ card }: { card: Card }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
@@ -32,6 +21,7 @@ export function SortableCard({ card }: { card: Card }) {
   );
 }
 
+/** Card do board: barra na cor do tipo, título, status, campos, modelo e rodapé. */
 export function CardView({ card, overlay = false }: { card: Card; overlay?: boolean }) {
   const state = useBoardStore((s) => s.state)!;
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
@@ -39,26 +29,21 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const openCard = useBoardStore((s) => s.openCard);
 
   const type = state.cardTypes.find((t) => t.id === card.typeId);
-  const workflow = state.workflows.find((w) => w.id === card.workflowId);
-  const isParent = workflow?.kind === 'parent';
+  const isParent = state.workflows.find((w) => w.id === card.workflowId)?.kind === 'parent';
   const archived = card.archivedAt !== null;
-  const children = isParent ? childrenOf(state, card.id) : [];
-  const doneChildren = countDone(state, children);
-  const checklist = state.checklistItems.filter((i) => i.cardId === card.id);
-  const checklistDone = checklist.filter((i) => i.done).length;
-  const comments = state.comments.filter((c) => c.cardId === card.id).length;
-  const attachments = state.attachments.filter((a) => a.cardId === card.id).length;
   const fields = fieldsForType(state, card.typeId).filter((f) => f.display !== 'hidden');
   const parent = card.parentId ? state.cards.find((c) => c.id === card.parentId) : undefined;
   const selected = isParent && selectedParentId === card.id;
-  // sugestão das regras, oferecida quando difere do modelo que está no card
-  const modelField = modelFieldOf(state, card);
-  const suggestion = modelField ? suggestModel(state, card) : null;
-  const offerSuggestion = modelField && suggestion && suggestion !== valueOf(state, card.id, modelField.id) ? suggestion : null;
+  const status = archived ? null : card.status;
+  // pendência com a pessoa: a borda ganha a cor do status para achar de relance o que espera por ela
+  const mine = status !== null && statusInfo(status).owner === 'human';
+  const style = mine ? ({ '--status-color': state.board.appearance.statuses[status].color } as CSSProperties) : undefined;
+  const classes = ['card', selected && 'selected', overlay && 'overlay', archived && 'archived', mine && 'mine'].filter(Boolean).join(' ');
 
   return (
     <article
-      className={`card ${selected ? 'selected' : ''} ${overlay ? 'overlay' : ''} ${archived ? 'archived' : ''}`}
+      className={classes}
+      style={style}
       onClick={(e) => {
         e.stopPropagation();
         if (isParent && !archived) selectParent(card.id);
@@ -75,101 +60,35 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       tabIndex={overlay ? undefined : 0}
       title={overlay ? undefined : 'Dois cliques (ou Enter) abrem o card'}
     >
-      <div className="card-top">
-        <span className="card-head">
-          <span className="card-id" title="ID do card">
-            {cardRef(card)}
-          </span>
-          <span className="type-badge" style={badgeStyle(type?.color)}>
-            {type?.name}
-          </span>
-        </span>
-        {!overlay && (
-          <span className="card-actions">
-            <Button
-              variant="icon"
-              title="Abrir o card"
-              aria-label="Abrir o card"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                openCard(card.id);
-              }}
-            >
-              <IconOpen />
-            </Button>
-            <Menu
-              title="Ações do card"
-              items={[
-                { label: 'Abrir detalhes', onClick: () => openCard(card.id) },
-                archived
-                  ? { label: 'Desarquivar', onClick: () => cards.unarchive(card.id) }
-                  : { label: 'Arquivar', onClick: () => requestArchive(card.id) },
-                'sep',
-                { label: 'Mover para a lixeira', danger: true, onClick: () => requestTrash(card.id) },
-              ]}
-            />
-          </span>
-        )}
-      </div>
-      <div className="card-title">{card.title}</div>
-      {parent && (
-        <div className="card-parent" title={parent.title}>
-          <IconParent /> {cardRef(parent)} {parent.title}
+      <TitleBar card={card} type={type} working={!archived && isAiWorking(state, card)} overlay={overlay} />
+      <div className="card-body">
+        <div className="card-title" title={card.title}>
+          {card.title}
         </div>
-      )}
-      {card.status && !archived && (
-        <div className="card-status">
-          <StatusBadge status={card.status} />
-        </div>
-      )}
-      {fields.length > 0 && (
-        <div className="card-fields">
-          {fields.map((f) => (
-            <FieldBadge key={f.id} field={f} value={valueOf(state, card.id, f.id)} />
-          ))}
-        </div>
-      )}
-      <div className="card-meta">
-        {children.length > 0 && (
-          <span title="Sub-tarefas concluídas">
-            <IconSubtasks /> {doneChildren}/{children.length}
-          </span>
+        {parent && (
+          <div className="card-parent" title={parent.title}>
+            <IconParent /> {cardRef(parent)} {parent.title}
+          </div>
         )}
-        {checklist.length > 0 && (
-          <span title="Checklist">
-            <IconChecklist /> {checklistDone}/{checklist.length}
-          </span>
-        )}
-        {comments > 0 && (
-          <span title="Mensagens na conversa">
-            <IconComments /> {comments}
-          </span>
-        )}
-        {attachments > 0 && (
-          <span title="Anexos">
-            <IconAttachment /> {attachments}
-          </span>
-        )}
-        {card.description && (
-          <span title="Tem descrição">
-            <IconDescription />
-          </span>
-        )}
-        {offerSuggestion && !overlay && (
-          <button
-            className="suggest-model"
-            title={`Modelo sugerido pelas regras: ${modelLabel(state.board.modelCatalog, offerSuggestion, true)}. Clique para usar.`}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              cards.setField(card.id, modelField!.id, offerSuggestion);
-            }}
-          >
-            <IconSuggest /> {modelLabel(state.board.modelCatalog, offerSuggestion)}
-          </button>
-        )}
+        {status && <StatusLine card={card} />}
+        <FieldLine className="card-fields" fields={fields.filter((f) => f.kind !== 'model')} cardId={card.id} />
+        <FieldLine className="card-model" fields={fields.filter((f) => f.kind === 'model')} cardId={card.id} />
+        <CardFooter card={card} isParent={isParent} overlay={overlay} />
       </div>
     </article>
+  );
+}
+
+/** Uma linha de selos de campo; some quando nenhum dos campos tem valor. */
+function FieldLine({ className, fields, cardId }: { className: string; fields: FieldDef[]; cardId: string }) {
+  const state = useBoardStore((s) => s.state)!;
+  const shown = fields.map((f) => ({ f, value: valueOf(state, cardId, f.id) })).filter(({ value }) => hasValue(value));
+  if (shown.length === 0) return null;
+  return (
+    <div className={className}>
+      {shown.map(({ f, value }) => (
+        <FieldBadge key={f.id} field={f} value={value} />
+      ))}
+    </div>
   );
 }

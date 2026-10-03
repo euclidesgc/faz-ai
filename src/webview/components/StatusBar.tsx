@@ -7,16 +7,22 @@ import { columnOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { ai, cards } from '../commands';
 import { renderMarkdown } from './MarkdownEditor';
-import { Button, IconRun } from './ui';
+import { Button, IconAi, IconHuman, IconRun } from './ui';
 
-/** Selo do status de trabalho, com quem está a pendência. */
-export function StatusBadge({ status, short = false }: { status: CardStatus; short?: boolean }) {
+/**
+ * Selo do status de trabalho: ícone de com quem está a pendência (IA ou você) e o rótulo. O dono vai
+ * também em texto para leitor de tela; `reason` (motivo do bloqueio) entra no tooltip.
+ */
+export function StatusBadge({ status, reason }: { status: CardStatus; reason?: string }) {
   const style = useBoardStore((s) => s.state)!.board.appearance.statuses[status];
   const info = statusInfo(status);
+  const Owner = info.owner === 'ai' ? IconAi : IconHuman;
+  const owner = `Pendência ${OWNER_LABEL[info.owner]}`;
   return (
-    <span className="status-badge" style={badgeStyle(style.color)} title={`${info.hint} — ${OWNER_LABEL[info.owner]}`}>
+    <span className="status-badge" style={badgeStyle(style.color)} title={[`${info.hint}. ${owner}.`, reason].filter(Boolean).join('\n')}>
+      <Owner />
+      <span className="sr-only">{owner}: </span>
       {style.label}
-      {!short && ` · ${OWNER_LABEL[info.owner]}`}
     </span>
   );
 }

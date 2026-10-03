@@ -102,7 +102,7 @@ describe('styles.css consome só tokens', () => {
 
   it('só referencia tokens definidos em tokens.css (ou os que o JS define)', () => {
     const defined = new Set(Object.keys({ ...themes.light, ...themes.dark }));
-    const fromJs = new Set(['--text-font', '--text-size', '--vscode-font-family', '--vscode-editor-font-family']);
+    const fromJs = new Set(['--text-font', '--text-size', '--status-color', '--vscode-font-family', '--vscode-editor-font-family']);
     const used = new Set([...stylesCss.matchAll(/var\((--[\w-]+)/g)].map((m) => m[1]!));
     const missing = [...used].filter((v) => !defined.has(v) && !fromJs.has(v));
     expect(missing).toEqual([]);

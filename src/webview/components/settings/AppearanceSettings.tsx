@@ -73,7 +73,7 @@ export function AppearanceSettings() {
             return (
               <tr key={s.id}>
                 <td>
-                  <StatusBadge status={s.id} short />
+                  <StatusBadge status={s.id} />
                 </td>
                 <td>
                   <input

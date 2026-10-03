@@ -83,11 +83,18 @@ daquela fase. Essas regras podem ser desligadas nas configurações.
 No topo do board, **N com você** mostra quantos cards esperam revisão, resposta ou desbloqueio (um
 clique filtra só eles), e um indicador aparece enquanto a IA trabalha em algum card.
 
+Cada card tem uma barra na cor do tipo, com o ID, o tipo e os botões de abrir e de ações. Abaixo
+vêm o título (inteiro no tooltip, se não couber), o status com um ícone de com quem está a
+pendência (robô para a IA, pessoa para você) e há quanto tempo ele está assim, os campos, o modelo
+de IA (ex.: "Sonnet 5.5 - baixo") e, no rodapé, os contadores, a branch e o PR. Cards com
+pendência sua ganham a borda na cor do status, e um LED pisca na barra enquanto a IA trabalha no
+card.
+
 ### Board no navegador, fora do editor
 
 O board não depende da janela do editor:
 
-- **Abrir no navegador ↗** (no topo do board, ou o comando **Faz AI: Abrir board no navegador**)
+- **Abrir no navegador** (no topo do board, ou o comando **Faz AI: Abrir board no navegador**)
   abre o mesmo board numa aba do navegador. O editor continua aberto e é ele que guarda o board;
   as duas telas ficam sincronizadas.
 - **Sem o editor**: rode `~/.faz-ai/bin/faz-ai` na pasta do projeto (ou `faz-ai <pasta>`). O

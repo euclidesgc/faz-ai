@@ -8,6 +8,9 @@ export const isLive = (c: Card): boolean => c.deletedAt === null && c.archivedAt
 /** Card arquivado que não está na lixeira. */
 export const isArchived = (c: Card): boolean => c.deletedAt === null && c.archivedAt !== null;
 
+/** A IA está trabalhando no card: uma execução disparada pela extensão ou uma sessão que marcou "Em execução". */
+export const isAiWorking = (state: BoardState, card: Card): boolean => card.status === 'running' || state.aiRuns.includes(card.id);
+
 /** Coluna em que o card está. */
 export const columnOf = (state: BoardState, card: Card): Column | undefined => state.columns.find((c) => c.id === card.columnId);
 

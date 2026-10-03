@@ -4,7 +4,7 @@ import {
   EFFORT_FIELD,
   TYPE_CONDITION,
   describeRule,
-  modelLabel,
+  modelDisplay,
   modelValue,
   type ModelRule,
   type RuleCondition,
@@ -136,7 +136,7 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
         <ModelEditor value={rule.model} onChange={(v) => setRule({ ...rule, model: typeof v === 'string' ? v : '' })} />
       </FieldRow>
       <div className="muted small">
-        {describeRule(state, rule)} → {modelLabel(state.board.modelCatalog, rule.model, true) || '(escolha um modelo)'}
+        {describeRule(state, rule)} → {modelDisplay(state.board.modelCatalog, rule.model, true) || '(escolha um modelo)'}
       </div>
 
       <div className="row">
@@ -215,7 +215,7 @@ export function ModelRulesEditor() {
               </td>
               <td>{r.name || <span className="muted">(sem nome)</span>}</td>
               <td>{describeRule(state, r)}</td>
-              <td>{modelLabel(allModels, r.model, true)}</td>
+              <td>{modelDisplay(allModels, r.model, true)}</td>
               <td className="narrow">
                 <Button variant="icon" title="Subir (tem prioridade sobre as de baixo)" disabled={i === 0} onClick={() => move(i, -1)}>
                   <IconArrowUp />
