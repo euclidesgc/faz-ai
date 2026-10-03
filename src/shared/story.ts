@@ -44,7 +44,7 @@ export const lastAiColumn = (state: BoardState, workflowId: Id): Column | undefi
 /**
  * A história (não a sub-tarefa) está entregue: modo autônomo, parada na última coluna em que a IA
  * atua, com pull request registrado e o status passado para a pessoa — exceto bloqueio, que é
- * impedimento (RF6), não entrega.
+ * impedimento, não entrega.
  */
 export function isDelivered(state: BoardState, card: Card): boolean {
   if (!card.yolo || card.parentId) return false;
