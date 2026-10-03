@@ -77,7 +77,7 @@ describe('HarnessInventory', () => {
 
   it('criar um agente no projeto envia sem pedir confirmação e fecha o formulário', async () => {
     renderScreen();
-    const agents = section('Agentes');
+    const agents = section('Subagentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
     // o destino começa no primeiro lugar possível, o do projeto
     expect(within(agents).getByRole('combobox', { name: 'Onde' })).toHaveTextContent('Projeto: .claude/agents/<nome>.md');
@@ -100,7 +100,7 @@ describe('HarnessInventory', () => {
 
   it('com destino global, pede confirmação e só envia depois de confirmar', async () => {
     renderScreen();
-    const agents = section('Agentes');
+    const agents = section('Subagentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
     await choose(within(agents).getByRole('combobox', { name: 'Onde' }), `Global: ${userAgents().label}`);
     await userEvent.type(within(agents).getByPlaceholderText('revisar-spec'), 'revisor-global');
@@ -119,7 +119,7 @@ describe('HarnessInventory', () => {
 
   it('cancelar a confirmação global não envia e mantém o formulário aberto', async () => {
     renderScreen();
-    const agents = section('Agentes');
+    const agents = section('Subagentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
     await choose(within(agents).getByRole('combobox', { name: 'Onde' }), `Global: ${userAgents().label}`);
     await userEvent.type(within(agents).getByPlaceholderText('revisar-spec'), 'x');
@@ -134,7 +134,7 @@ describe('HarnessInventory', () => {
   it('Cancelar fecha o formulário sem enviar nada', async () => {
     renderScreen();
     posted.mockClear();
-    const agents = section('Agentes');
+    const agents = section('Subagentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
     await userEvent.click(within(agents).getByRole('button', { name: 'Cancelar' }));
     expect(within(agents).queryByRole('button', { name: 'Criar e abrir no editor' })).toBeNull();

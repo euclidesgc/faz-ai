@@ -6,7 +6,7 @@ import { Theme } from '@radix-ui/themes';
 import { RUNNER_PERMISSIONS } from '../../src/shared/runner';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { HarnessSettings } from '../../src/webview/components/settings/HarnessSettings';
-import { useBoardStore } from '../../src/webview/store/boardStore';
+import { useBoardStore, type HarnessTab } from '../../src/webview/store/boardStore';
 import type { Agent, Harness, HarnessItem, Skill } from '../../src/shared/harness';
 import type { BoardState } from '../../src/shared/model';
 
@@ -64,20 +64,38 @@ beforeEach(async () => {
   posted.mockClear();
 });
 
-const renderScreen = () =>
-  render(
+const renderScreen = (tab: HarnessTab = 'project') => {
+  useBoardStore.setState({ harnessTab: tab });
+  return render(
     <Theme>
       <HarnessSettings />
       <Dialog />
     </Theme>,
   );
+};
 /** bloco de um item (regra, skill ou agente) pelo título dele */
 const block = (name: string) => within(screen.getByLabelText(name));
 const dialog = () => within(screen.getByRole('dialog'));
 
+describe('HarnessSettings: abas', () => {
+  it('três abas separam a ferramenta, o que é do projeto e tudo que a ferramenta carrega', async () => {
+    renderScreen('tool');
+    expect(screen.getByText('Ferramenta deste projeto')).toBeInTheDocument();
+    expect(screen.queryByText('Regras do projeto')).toBeNull();
+    await userEvent.click(screen.getByRole('tab', { name: /Do projeto/ }));
+    expect(screen.getByText('Regras do projeto')).toBeInTheDocument();
+    expect(screen.queryByText('Ferramenta deste projeto')).toBeNull();
+    // a aba escolhida fica lembrada
+    expect(useBoardStore.getState().harnessTab).toBe('project');
+    await userEvent.click(screen.getByRole('tab', { name: /Tudo que a ferramenta carrega/ }));
+    expect(screen.getByText('Tudo que cada ferramenta carrega')).toBeInTheDocument();
+    expect(useBoardStore.getState().harnessTab).toBe('all');
+  });
+});
+
 describe('HarnessSettings: ferramenta e execução', () => {
   it('escolher outra ferramenta grava no board; a atual não envia nada', async () => {
-    renderScreen();
+    renderScreen('tool');
     const radios = screen.getAllByRole('radio');
     await userEvent.click(radios[0]!);
     expect(sentOf('settings.board.update')).toHaveLength(0);
@@ -86,13 +104,13 @@ describe('HarnessSettings: ferramenta e execução', () => {
   });
 
   it('conectar ao board pede ao host para registrar o MCP', async () => {
-    renderScreen();
+    renderScreen('tool');
     await userEvent.click(screen.getByRole('button', { name: 'Conectar o Claude Code ao board (MCP)' }));
     expect(lastSent('ui.connectAI')).toEqual({ type: 'ui.connectAI' });
   });
 
   it('permissão, tempo limite, heartbeat e Rodar agora', async () => {
-    renderScreen();
+    renderScreen('tool');
     const runner = document.querySelector<HTMLElement>('.runner-settings')!;
     await choose(
       within(runner).getByRole('combobox', { name: 'O que a IA pode fazer' }),
@@ -117,7 +135,7 @@ describe('HarnessSettings: ferramenta e execução', () => {
 
   it('sem suporte à execução, mostra o aviso no lugar dos campos', () => {
     setState(() => ({ aiRunUnsupported: 'Esta ferramenta não roda pelo board.' }));
-    renderScreen();
+    renderScreen('tool');
     expect(screen.getByText('Esta ferramenta não roda pelo board.')).toBeInTheDocument();
     expect(document.querySelector('.runner-settings')).toBeNull();
   });
@@ -253,17 +271,17 @@ describe('HarnessSettings: skills', () => {
 describe('HarnessSettings: agentes', () => {
   it('novo agente com modelo; Cancelar limpa o formulário', async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'Novo agente' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Novo subagente' }));
     await userEvent.type(screen.getByPlaceholderText('revisor-de-spec'), 'rascunho');
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Novo agente' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Novo subagente' }));
     expect(screen.getByPlaceholderText('revisor-de-spec')).toHaveValue('');
 
     await userEvent.type(screen.getByPlaceholderText('revisor-de-spec'), 'Revisor Novo');
     await userEvent.type(screen.getByPlaceholderText('Revisa uma Spec e aponta lacunas antes do Plan'), ' Revisa ');
     await userEvent.type(screen.getByPlaceholderText('vazio = o modelo da sessão'), '  ');
-    await userEvent.type(screen.getByPlaceholderText('Instruções do agente'), 'Passos');
-    await userEvent.click(screen.getByRole('button', { name: 'Criar agente' }));
+    await userEvent.type(screen.getByPlaceholderText('Instruções do subagente'), 'Passos');
+    await userEvent.click(screen.getByRole('button', { name: 'Criar subagente' }));
     expect(lastSent('harness.agent.create')).toEqual({
       type: 'harness.agent.create',
       name: 'revisor-novo',
@@ -271,15 +289,15 @@ describe('HarnessSettings: agentes', () => {
       content: 'Passos',
       model: undefined,
     });
-    expect(screen.queryByRole('button', { name: 'Criar agente' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Criar subagente' })).toBeNull();
   });
 
   it('nome de agente já usado não pode ser criado', async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'Novo agente' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Novo subagente' }));
     await userEvent.type(screen.getByPlaceholderText('revisor-de-spec'), 'revisor');
     await userEvent.type(screen.getByPlaceholderText('Revisa uma Spec e aponta lacunas antes do Plan'), 'x');
-    expect(screen.getByRole('button', { name: 'Criar agente' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Criar subagente' })).toBeDisabled();
   });
 
   it('editar e apagar um agente', async () => {
@@ -290,7 +308,7 @@ describe('HarnessSettings: agentes', () => {
     await userEvent.type(a.getByDisplayValue('instruções'), '.');
     await userEvent.click(a.getByRole('button', { name: 'Salvar' }));
     expect(lastSent('harness.agent.write')).toEqual({ type: 'harness.agent.write', name: 'revisor', content: 'instruções.' });
-    await userEvent.click(a.getByTitle('Apagar o agente'));
+    await userEvent.click(a.getByTitle('Apagar o subagente'));
     await userEvent.click(dialog().getByRole('button', { name: 'Apagar' }));
     expect(lastSent('harness.agent.delete')).toEqual({ type: 'harness.agent.delete', name: 'revisor' });
   });
@@ -298,8 +316,8 @@ describe('HarnessSettings: agentes', () => {
   it('ferramenta sem modelo por agente esconde o campo; sem agentes mostra a pasta vazia', async () => {
     setState((s) => ({ board: { ...s.board, aiTool: 'kimi' }, harness: { ...s.harness, agents: [] } }));
     renderScreen();
-    expect(screen.getByText(/Nenhum agente em/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Novo agente' }));
+    expect(screen.getByText(/Nenhum subagente em/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Novo subagente' }));
     expect(screen.queryByPlaceholderText('vazio = o modelo da sessão')).toBeNull();
   });
 });

@@ -10,7 +10,7 @@ import { DraftForm } from './DraftForm';
 import { FileEditor } from './FileEditor';
 import type { ProjectEditing } from './useProjectEditing';
 
-/** Os agentes (subagentes) do projeto, quando a ferramenta em uso os define em arquivos. */
+/** Os subagentes do projeto, quando a ferramenta em uso os define em arquivos. */
 export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectEditing }) {
   const agents = useBoardStore((s) => s.state!.harness.agents);
   const { draft } = edit;
@@ -35,9 +35,9 @@ export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
             {edit.isEditing('agent', a.name) ? 'Fechar' : 'Editar'}
           </Button>
           <DeleteButton
-            title="Apagar o agente"
-            question={`Apagar o agente "${a.name}"?`}
-            message="O arquivo do agente é removido do projeto."
+            title="Apagar o subagente"
+            question={`Apagar o subagente "${a.name}"?`}
+            message="O arquivo do subagente é removido do projeto."
             onConfirm={() => harness.deleteAgent(a.name)}
           />
         </>
@@ -56,40 +56,40 @@ export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
   return (
     <>
       <SectionHeader
-        title="Agentes"
+        title="Subagentes"
         actions={
           tool.agents && (
             <Button onClick={() => edit.toggleNew('newAgent')}>
-              <IconPlus /> Novo agente
+              <IconPlus /> Novo subagente
             </Button>
           )
         }
       >
         {tool.agents ? (
           <>
-            Agentes (subagentes) do {tool.label}: cada arquivo em <code>{tool.agents.dir}</code> define um ajudante com instruções próprias,
-            e a ferramenta delega trabalho a ele pela descrição.
+            Subagentes do {tool.label}: cada arquivo em <code>{tool.agents.dir}</code> define um ajudante com instruções próprias, e a
+            ferramenta delega trabalho a ele pela descrição.
             {tool.agents.modelField
-              ? ' Um agente pode fixar o modelo que usa, o que serve para executar um card com o modelo indicado nele.'
+              ? ' Um subagente pode fixar o modelo que usa, o que serve para executar um card com o modelo indicado nele.'
               : ''}
           </>
         ) : (
-          `O ${tool.label} não define agentes em arquivos do projeto.`
+          `O ${tool.label} não define subagentes em arquivos do projeto.`
         )}
       </SectionHeader>
       {tool.agents && (
         <>
           {edit.editing?.kind === 'newAgent' && (
             <DraftForm
-              title="Agente novo"
+              title="Subagente novo"
               draft={draft}
               onChange={edit.patchDraft}
               nameOk={isFreeName(draft.name, agents)}
               namePlaceholder="revisor-de-spec"
               descriptionLabel="Descrição (quando delegar)"
               descriptionPlaceholder="Revisa uma Spec e aponta lacunas antes do Plan"
-              bodyPlaceholder="Instruções do agente"
-              submitLabel="Criar agente"
+              bodyPlaceholder="Instruções do subagente"
+              submitLabel="Criar subagente"
               onSubmit={createAgent}
               onCancel={edit.clearForm}
             >
@@ -110,7 +110,7 @@ export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
           {agents.map(agentRow)}
           {agents.length === 0 && (
             <p className="muted">
-              Nenhum agente em <code>{tool.agents.dir}</code> ainda.
+              Nenhum subagente em <code>{tool.agents.dir}</code> ainda.
             </p>
           )}
         </>

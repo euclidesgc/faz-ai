@@ -65,7 +65,7 @@ gives the English meaning next to them.
   each phase or card, instead of letting the tool figure it out during the conversation. Every run
   started by the board goes through an agent.
 - **See and configure the whole harness.** For each AI tool installed, the board shows what it
-  loads (instructions, skills, agents, commands, hooks, MCP servers, plugins and settings), split
+  loads (instructions, skills, subagents, commands, hooks, MCP servers, plugins and settings), split
   between the project, your user folder and plugins.
 
 ## How to use it
@@ -254,10 +254,12 @@ AI through `get_card`, as guidance.
 
 ## AI harness
 
-Configurações → **Harness de IA** holds everything the AI tools load. At the top: the project's
-tool, the rules file, and the project's skills and agents. Below, under **Tudo que cada ferramenta
-carrega** (everything each tool loads), there is one tab per tool with eight sections (instructions
-and rules, skills, agents, commands and prompts, hooks, MCP servers, plugins, settings and
+Configurações → **Harness de IA** holds everything the AI tools load, in three tabs: **Ferramenta e
+execução** (tool and run: the project's AI and how the board calls it), **Do projeto** (from the
+project: the rules file, skills and agents that are part of the repository, editable there) and
+**Tudo que a ferramenta carrega** (everything the tool loads). In the last one, under **Tudo que
+cada ferramenta carrega** (everything each tool loads), there is one tab per tool with eight sections (instructions
+and rules, skills, subagents, commands and prompts, hooks, MCP servers, plugins, settings and
 permissions), each split into three scopes:
 
 - **Projeto** (project): files in this folder; they apply only here and go into the repository.
@@ -276,7 +278,7 @@ What you can do:
   With items selected a bar appears: make skills automatic or only-when-indicated, copy to the
   project or to global, and delete, always with confirmation.
 - **Create** an item in the place and format the tool expects, **delete** it, and **copy** skills,
-  agents, commands and rules from global or from a plugin into the project (and from the project to
+  subagents, commands and rules from global or from a plugin into the project (and from the project to
   global).
 - **MCP servers**: add and remove them, in each file's format.
 - **Hooks and permissions**: add and remove hooks and allow, ask and deny rules.

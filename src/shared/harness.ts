@@ -62,7 +62,7 @@ export const HARNESS_KINDS: { id: HarnessKind; label: string; hint: string }[] =
     hint: 'Texto carregado em toda sessão, ou quando a IA mexe em arquivos de um caminho.',
   },
   { id: 'skill', label: 'Skills', hint: 'Instruções que a IA carrega quando precisa, ou quando o card indica.' },
-  { id: 'agent', label: 'Agentes', hint: 'Ajudantes com instruções próprias, para os quais a ferramenta delega trabalho.' },
+  { id: 'agent', label: 'Subagentes', hint: 'Ajudantes com instruções próprias, para os quais a ferramenta delega trabalho.' },
   { id: 'command', label: 'Comandos e prompts', hint: 'Prompts prontos, chamados pelo nome.' },
   { id: 'hook', label: 'Hooks', hint: 'Comandos que a ferramenta roda sozinha em certos eventos.' },
   { id: 'mcp', label: 'Servidores MCP', hint: 'Servidores que dão ferramentas extras à IA.' },

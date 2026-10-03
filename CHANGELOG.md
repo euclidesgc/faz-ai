@@ -6,6 +6,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Harness de IA em três abas.** A tela era uma rolagem longa com três assuntos misturados. Agora:
+  **Ferramenta e execução** (a IA do projeto, execução pela conversa e heartbeat), **Do projeto**
+  (regras, skills e agentes que fazem parte do repositório) e **Tudo que a ferramenta carrega** (o
+  inventário, com global e plugins). A aba escolhida fica lembrada. Os arquivos de agente da própria
+  ferramenta aparecem como **Subagentes** nesta tela, para não se confundir com **Agentes**.
+
 - **Perfis de execução viram Agentes.** A tela, o menu e o card passam a dizer **Agente**: é ele que
   define como a IA trabalha (skills, servidores MCP, ferramentas, modelo e esforço). Toda execução
   pelo board roda através de um agente, o do card, o da fase ou o padrão, e o board sempre tem ao

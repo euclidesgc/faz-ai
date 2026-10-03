@@ -7,6 +7,12 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 
 ## Unreleased
 
+- **AI harness in three tabs.** The screen was a long scroll mixing three subjects. Now:
+  **Ferramenta e execução** (the project's AI, runs from the conversation and heartbeat),
+  **Do projeto** (rules, skills and agents that are part of the repository) and **Tudo que a
+  ferramenta carrega** (the inventory, with global and plugins). The chosen tab is remembered. The tool's own agent files appear as **Subagentes** (subagents)
+  on this screen, so they are not confused with **Agentes**.
+
 - **Execution profiles become Agents.** The screen, the menu and the card now say **Agente**: it
   defines how the AI works (skills, MCP servers, tools, model and effort). Every run started by the
   board goes through an agent, the card's, the phase's or the default, and the board always has at

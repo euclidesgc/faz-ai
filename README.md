@@ -60,7 +60,7 @@ os artefatos de cada fase e move os cards conforme avança.
   modelo de cada fase ou card, em vez de a ferramenta descobrir sozinha durante a conversa. Toda
   execução pelo board roda através de um agente.
 - **Ver e configurar o harness inteiro.** Para cada ferramenta de IA instalada, o board mostra o
-  que ela carrega (instruções, skills, agentes, comandos, hooks, servidores MCP, plugins e
+  que ela carrega (instruções, skills, subagentes, comandos, hooks, servidores MCP, plugins e
   configurações), separado entre o projeto, a sua pasta de usuário e os plugins.
 
 ## Como usar
@@ -239,10 +239,11 @@ pelo `get_card`, como orientação.
 
 ## Harness de IA
 
-Em Configurações → **Harness de IA** fica tudo que as ferramentas de IA carregam. No topo, a
-ferramenta do projeto, o arquivo de regras, as skills e os agentes do projeto. Abaixo, em **Tudo que
-cada ferramenta carrega**, há uma aba por ferramenta com oito seções (instruções e regras, skills,
-agentes, comandos e prompts, hooks, servidores MCP, plugins, configurações e permissões), cada uma
+Em Configurações → **Harness de IA** fica tudo que as ferramentas de IA carregam, em três abas:
+**Ferramenta e execução** (a IA do projeto e como o board a chama), **Do projeto** (o arquivo de
+regras, as skills e os agentes que fazem parte do repositório, editáveis ali) e **Tudo que a
+ferramenta carrega**. Nesta última, em **Tudo que cada ferramenta carrega**, há uma aba por ferramenta com oito seções (instruções e regras, skills,
+subagentes, comandos e prompts, hooks, servidores MCP, plugins, configurações e permissões), cada uma
 dividida em três escopos:
 
 - **Projeto**: arquivos desta pasta; valem só aqui e vão no repositório. Esse grupo aparece sempre,
@@ -260,7 +261,7 @@ O que dá para fazer:
   grupo todo. Com itens marcados aparece uma barra: deixar as skills automáticas ou só quando
   indicadas, copiar para o projeto ou para o global, e apagar, sempre com confirmação.
 - **Criar** um item no lugar e no formato que a ferramenta espera, **apagar**, e **copiar** skills,
-  agentes, comandos e regras do global ou de um plugin para o projeto (e do projeto para o global).
+  subagentes, comandos e regras do global ou de um plugin para o projeto (e do projeto para o global).
 - **Servidores MCP**: acrescentar e remover, no formato de cada arquivo.
 - **Hooks e permissões**: acrescentar e remover hooks e regras de permitir, perguntar e negar.
 - **Buscar e instalar skills** de uma pasta ou de um repositório git: o board lista as skills
