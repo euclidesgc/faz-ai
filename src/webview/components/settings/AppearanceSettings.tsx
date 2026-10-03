@@ -2,6 +2,7 @@ import { DEFAULT_APPEARANCE, FONTS, FONT_SIZE_RANGE, THEMES, fontStack, type App
 import { CARD_STATUSES, OWNER_LABEL } from '../../../shared/status';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
+import { ContrastHint } from './ColorPreview';
 import { StatusBadge } from '../StatusBar';
 import { renderMarkdown } from '../MarkdownEditor';
 import { Button, EnumSelect, FieldRow } from '../ui';
@@ -86,6 +87,7 @@ export function AppearanceSettings() {
                 </td>
                 <td>
                   <input type="color" value={style.color} onChange={(e) => patch({ color: e.target.value })} />
+                  <ContrastHint color={style.color} onPick={(color) => patch({ color })} />
                 </td>
                 <td className="muted">
                   {OWNER_LABEL[s.owner]} — {s.hint.toLowerCase()}

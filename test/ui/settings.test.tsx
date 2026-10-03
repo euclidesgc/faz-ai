@@ -20,6 +20,32 @@ beforeAll(async () => {
 });
 
 describe('TypesSettings', () => {
+  it('cada tipo tem a prévia do card com a cor e o nome; cor boa não mostra aviso', () => {
+    render(<TypesSettings />);
+    const t = useBoardStore.getState().state!.cardTypes[0]!;
+    const preview = screen.getByLabelText(`Prévia do card do tipo ${t.name}`);
+    expect(preview.querySelector('.card-bar')).toHaveTextContent(t.name);
+    expect(preview.querySelector('.card-bar')).toHaveStyle({ background: t.color });
+    expect(screen.queryByText('Texto difícil de ler nesta cor.')).toBeNull();
+  });
+
+  it('cor com pouco contraste mostra o aviso e as sugestões; um clique aplica a cor sugerida', async () => {
+    const t = useBoardStore.getState().state!.cardTypes[0]!;
+    board.router.handle({ type: 'settings.type.update', typeId: t.id, patch: { color: '#00aaaa' } });
+    syncStore(board.router);
+    render(<TypesSettings />);
+    expect(screen.getByText('Texto difícil de ler nesta cor.')).toBeInTheDocument();
+    await userEvent.click(screen.getByTitle('Usar #009191'));
+    expect(lastSent('settings.type.update')).toMatchObject({ typeId: t.id, patch: { color: '#009191' } });
+    board.router.handle({ type: 'settings.type.update', typeId: t.id, patch: { color: t.color } });
+    syncStore(board.router);
+  });
+
+  it('a cor do tipo novo também tem prévia', () => {
+    render(<TypesSettings />);
+    expect(screen.getByLabelText('Prévia do card do tipo Novo tipo')).toBeInTheDocument();
+  });
+
   it('digitar o nome e apertar Enter cria o tipo com o workflow escolhido', async () => {
     render(<TypesSettings />);
     const wf = useBoardStore.getState().state!.workflows[0]!;

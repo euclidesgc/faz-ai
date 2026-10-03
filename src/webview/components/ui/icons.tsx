@@ -33,6 +33,7 @@ import {
   Quote,
   Sparkles,
   Trash2,
+  TriangleAlert,
   User,
   X,
   type LucideIcon,
@@ -67,6 +68,7 @@ export const IconCheck = icon(Check, 'IconCheck');
 export const IconRun = icon(Play, 'IconRun');
 export const IconDrag = icon(GripVertical, 'IconDrag');
 export const IconExternal = icon(ExternalLink, 'IconExternal');
+export const IconWarning = icon(TriangleAlert, 'IconWarning');
 
 // direção
 export const IconChevronDown = icon(ChevronDown, 'IconChevronDown');

@@ -58,6 +58,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   você.
 - Um LED pisca devagar na barra do card enquanto a IA trabalha nele (fica aceso, sem piscar, com
   movimento reduzido no sistema).
+- **Texto legível na cor do tipo e do status**: a cor do texto (preto ou branco) passa a ser
+  escolhida pelo contraste percebido, e não mais pela fórmula antiga, que punha texto preto sobre o
+  azul da História e o vermelho do Bug. Em Configurações > Tipos de card, cada tipo mostra a prévia
+  do card enquanto você escolhe a cor; se a cor deixar o texto difícil de ler, aparece um aviso com
+  a mesma cor mais escura e mais clara para aplicar com um clique. O aviso também vale para as
+  cores dos status em Aparência.
 
 ## 0.29.1
 

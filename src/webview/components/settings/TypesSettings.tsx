@@ -5,6 +5,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { FieldEditor } from '../FieldRenderer';
 import { AddInput, DeleteButton, FieldRow } from '../ui';
+import { CardPreview, ContrastHint } from './ColorPreview';
 
 export function TypesSettings() {
   const state = useBoardStore((s) => s.state)!;
@@ -24,6 +25,7 @@ export function TypesSettings() {
         <thead>
           <tr>
             <th>Cor</th>
+            <th>Prévia</th>
             <th>Nome</th>
             <th>Workflow</th>
             <th>Em uso</th>
@@ -37,6 +39,12 @@ export function TypesSettings() {
               <tr key={t.id}>
                 <td>
                   <input type="color" value={t.color} onChange={(e) => settings.updateType(t.id, { color: e.target.value })} />
+                </td>
+                <td>
+                  <div className="preview-cell">
+                    <CardPreview typeName={t.name} color={t.color} />
+                    <ContrastHint color={t.color} onPick={(c) => settings.updateType(t.id, { color: c })} />
+                  </div>
                 </td>
                 <td>
                   <input
@@ -75,6 +83,7 @@ export function TypesSettings() {
       </table>
       <div className="row">
         <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+        <CardPreview typeName="Novo tipo" color={color} />
         <AddInput placeholder="Novo tipo" onAdd={add} buttonLabel="Adicionar">
           <select value={wf} onChange={(e) => setWf(e.target.value)}>
             {state.workflows.map((w) => (
@@ -85,6 +94,7 @@ export function TypesSettings() {
           </select>
         </AddInput>
       </div>
+      <ContrastHint color={color} onPick={setColor} />
 
       <h2 className="section-head">Padrões por tipo</h2>
       <p className="muted">

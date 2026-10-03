@@ -59,6 +59,11 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 - Cards waiting on you get a border in the status color, so you can spot them at a glance.
 - An LED blinks slowly on the card bar while the AI is working on it (steady, without blinking, when
   the system asks for reduced motion).
+- **Readable text on type and status colors**: the text color (black or white) is now chosen by
+  perceived contrast instead of the old formula, which put black text on the blue of História and
+  the red of Bug. In Configurações > Tipos de card, each type shows a preview of the card while you
+  pick its color; if the color makes the text hard to read, a warning offers the same color darker
+  and lighter, applied with one click. The warning also applies to the status colors in Aparência.
 
 ## 0.29.1
 

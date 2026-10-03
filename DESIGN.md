@@ -64,7 +64,10 @@ olho.
   `--vscode-editor-font-family`, que são fonte, não cor.
 - Hover nunca por `filter: brightness`. Use o token `*-hover` ou `--hover`.
 - Cor escolhida pelo usuário (status e tipo de card) passa sempre por `badgeStyle()` de
-  `src/shared/color.ts`, que escolhe texto preto ou branco pela luminância WCAG do fundo.
+  `src/shared/color.ts`, que escolhe texto preto ou branco pelo contraste percebido APCA (Lc). A
+  razão WCAG 2 não serve aqui: ela escolhe preto sobre azul e vermelho médios, que fica difícil de
+  ler em letra pequena. Abaixo de Lc 60 (`MIN_BADGE_LC`) as telas de configuração avisam e
+  sugerem a mesma cor mais escura ou mais clara (`readableVariants()`).
 - A barra do card usa a cor do tipo via `badgeStyle()`. O que fica sobre ela (ID, botões, LED da
   IA) usa `currentColor`, para herdar o preto ou branco escolhido pelo contraste. Uma cor fixa
   (um LED verde, por exemplo) some sobre um tipo da mesma cor.
