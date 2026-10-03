@@ -28,6 +28,25 @@
 >
 > Euclides G Catunda
 
+> **Enjoying it? Help Faz AI grow.**
+>
+> A new project gets better with feedback from the people using it. If it has already saved you
+> time, these one-minute gestures make a real difference:
+>
+> - ⭐ **Star the [GitHub repository](https://github.com/euclidesgc/faz-ai)**: it is the thing that
+>   helps other people find the project the most.
+> - 💬 **Rate the extension** in the store where you installed it, with stars and, if you can, a
+>   couple of lines on what you thought: [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=euclidesgc.faz-ai&ssr=false#review-details)
+>   or [Open VSX](https://open-vsx.org/extension/euclidesgc/faz-ai/reviews) (Cursor's store).
+> - 🐞 **Found a bug?** [Open an issue](https://github.com/euclidesgc/faz-ai/issues/new?template=bug.yml)
+>   saying what you did, what you expected and what happened. The extension version and the editor
+>   you use help a lot.
+> - 💡 **Have an idea or a suggestion?** [Tell me in an issue](https://github.com/euclidesgc/faz-ai/issues/new?template=sugestao.yml):
+>   missing flows, confusing screens and integrations you would like to see.
+>
+> Before opening one, take a look at the [existing issues](https://github.com/euclidesgc/faz-ai/issues):
+> sometimes the idea is already there, and a 👍 on it helps decide what comes next.
+
 A kanban board inside your editor (VS Code and Cursor), built to run Spec-Driven Development (SDD)
 together with an AI. You organize the work into stories and sub-tasks; the AI reads the board,
 produces the artifacts of each phase and moves the cards as it goes.
