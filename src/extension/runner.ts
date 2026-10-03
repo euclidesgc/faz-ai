@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { cardRef } from '../shared/model';
 import { aiToolInfo } from '../shared/harness';
 import { isLive } from '../shared/selectors';
+import { isYolo } from '../shared/story';
 import type { RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
@@ -66,8 +67,22 @@ function materialize(command: HeadlessCommand): { command: HeadlessCommand; clea
   return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
+/** O que a IA recebe a mais quando a história está em modo autônomo (YOLO): sem aprovação, sem perguntas, até o pull request. */
+export const AUTONOMOUS_ADVICE = [
+  'MODO AUTÔNOMO (YOLO): esta história foi liberada para rodar sozinha. Ninguém aprova, responde nem acompanha esta sessão.',
+  'Não chame request_review nem ask_question (a pergunta é recusada). Ao terminar a fase, registre na conversa o que foi feito e as decisões que tomou (add_comment) e mova o card para a próxima coluna.',
+  'Diante de uma dúvida, decida pela opção mais razoável segundo o código, a documentação e a conversa, e registre a decisão e o motivo na conversa.',
+  'Use block_card só se for impossível seguir (acesso, ambiente, falha que você não resolve), explicando o que é preciso para destravar.',
+  'Na Implementação, execute todas as sub-tarefas até o fim. Na Homologação não há aprovação: envie a branch, abra o pull request, registre-o com set_pull_request e mova a história para a coluna de conclusão. Não faça o merge.',
+].join('\n');
+
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
-export const cardPrompt = (ref: string, skills: { name: string; path?: string }[] = [], advice: string[] = []): string =>
+export const cardPrompt = (
+  ref: string,
+  skills: { name: string; path?: string }[] = [],
+  advice: string[] = [],
+  autonomous = false,
+): string =>
   [
     `Trabalhe no card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai".`,
     // as skills do card vão pelo caminho: valem mesmo desligadas ou fora da invocação automática
@@ -82,6 +97,7 @@ export const cardPrompt = (ref: string, skills: { name: string; path?: string }[
     'Se a skill "faz-ai-fluxo" existir no projeto, siga-a.',
     `Leia o card com get_card (descrição, conversa, anexos e a fase em \`phase\`). Se a última mensagem da conversa for da pessoa, responda a ela pela conversa do card.`,
     'Faça o trabalho da fase em que o card está e termine passando a vez: request_review quando houver algo para revisar, ask_question quando precisar de uma resposta, block_card se houver um impedimento, ou mova o card se a fase não exigir aprovação.',
+    ...(autonomous ? [AUTONOMOUS_ADVICE] : []),
     ...advice,
     'Trabalhe só neste card e nas sub-tarefas dele. Não pergunte nada fora da conversa do card: ninguém está acompanhando esta sessão.',
   ].join('\n');
@@ -115,10 +131,18 @@ export class AiRunner {
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
     const tool = aiToolInfo(state.board.aiTool);
     const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '');
-    const permissionAdvice = PERMISSION_ADVICE[state.board.runner.permission];
+    // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo
+    const autonomous = isYolo(state, card);
+    const permission = autonomous ? 'full' : state.board.runner.permission;
+    const permissionAdvice = PERMISSION_ADVICE[permission];
     const built = headlessCommand(state.board.aiTool, {
-      prompt: cardPrompt(cardRef(card), requiredSkills(state, card), [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])]),
-      permission: state.board.runner.permission,
+      prompt: cardPrompt(
+        cardRef(card),
+        requiredSkills(state, card),
+        [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+        autonomous,
+      ),
+      permission,
       addDirs: this.router.aiWorkDirs(),
       exec: plan.input,
       boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined,
@@ -128,6 +152,7 @@ export class AiRunner {
 
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const messagesBefore = this.aiMessages(cardId);
+    if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
     if (plan.manifest.profile || plan.manifest.model) log(plan.summary.join(' | '));
     log(`Chamando ${tool.label}: ${command.command} ${command.args.map((a) => (a.length > 80 ? `${a.slice(0, 80)}…` : a)).join(' ')}`);
     const tail: string[] = [];
@@ -220,6 +245,8 @@ export class AiRunner {
       );
     if (error) return this.block(cardId, `Não foi possível executar o ${toolLabel}: ${error.message}`);
     if (code !== 0) return this.block(cardId, `O ${toolLabel} terminou com erro (código ${code}).${output}`);
+    // em modo autônomo não há pessoa para esperar: o card volta para a IA seguir (o autopiloto limita as voltas sem progresso)
+    if (replied && isYolo(this.router.snapshot(), card)) return this.setStatus(cardId, 'ready', toolLabel);
     // respondeu na conversa e encerrou: a vez é da pessoa
     if (replied) return this.setStatus(cardId, 'waiting_answer', toolLabel);
     this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);

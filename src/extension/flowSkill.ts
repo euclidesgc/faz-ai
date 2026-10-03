@@ -63,6 +63,18 @@ Envie a branch da história, abra o pull request (se ainda não existir) e regis
 \`set_pull_request\`. Resuma na conversa o que foi feito e como testar, e chame \`request_review\`.
 Não faça o merge: ele depende da aprovação da pessoa e pode ser feito pelo próprio board.
 
+## Modo autônomo (YOLO)
+
+Quando o card (ou a história dele) mostra \`autonomous: true\`, a pessoa liberou a história para
+rodar sozinha: ninguém aprova nem responde. Então:
+
+- não chame \`request_review\` nem \`ask_question\` (a pergunta é recusada): ao terminar a fase,
+  registre na conversa o que fez e mova o card para a próxima coluna;
+- decida as dúvidas pela opção mais razoável e registre a decisão e o motivo na conversa;
+- \`block_card\` só para impedimento real (acesso, ambiente, falha que você não resolve);
+- na Implementação, execute todas as sub-tarefas até o fim; na Homologação, abra o pull request,
+  registre-o com \`set_pull_request\` e mova a história para a coluna de conclusão. Nunca faça o merge.
+
 ## Quando parar
 
 - Faltou uma informação ou decisão: \`ask_question\` no card, e pare de trabalhar nele.

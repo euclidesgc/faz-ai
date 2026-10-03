@@ -200,6 +200,54 @@ describe('executor da IA', () => {
     expect(card().status).toBe('waiting_answer');
   });
 
+  describe('modo autônomo (YOLO)', () => {
+    const yolo = () => router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+
+    it('roda sem restrições, mesmo com a permissão do board mais baixa, e leva as regras do modo no prompt', () => {
+      yolo();
+      runner.start(storyId);
+      expect(procs[0]!.command).toEqual(
+        headlessCommand('claude', {
+          prompt: cardPrompt('#1', [], [], true),
+          permission: 'full',
+          addDirs: [`${dir}.worktrees`],
+        }),
+      );
+      expect(procs[0]!.command.args).toContain('bypassPermissions');
+      expect(procs[0]!.command.stdin).toContain('MODO AUTÔNOMO');
+      expect(procs[0]!.command.stdin).toContain('Não faça o merge');
+      expect(log.join('\n')).toContain('Modo autônomo (YOLO)');
+    });
+
+    it('sem o modo, o prompt e a permissão seguem o board', () => {
+      runner.start(storyId);
+      expect(procs[0]!.command.stdin).not.toContain('MODO AUTÔNOMO');
+      expect(procs[0]!.command.args).not.toContain('bypassPermissions');
+    });
+
+    it('a sub-tarefa roda no modo da história', () => {
+      yolo();
+      const s = router.snapshot();
+      const wf = s.workflows.find((w) => w.kind === 'child')!;
+      const subId = router.createCard({
+        typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+        columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+        parentId: storyId,
+        title: 'Passo',
+      });
+      runner.start(subId);
+      expect(procs[0]!.command.stdin).toContain('MODO AUTÔNOMO');
+    });
+
+    it('se a IA só respondeu na conversa, o card volta para ela em vez de esperar uma pessoa', () => {
+      yolo();
+      runner.start(storyId);
+      ai({ type: 'comment.add', cardId: storyId, body: 'Decidi usar Google.' });
+      procs[0]!.exit(0);
+      expect(card().status).toBe('ready');
+    });
+  });
+
   it('falha, saída sem resposta e tempo limite bloqueiam o card com o motivo na conversa', () => {
     runner.start(storyId);
     procs[0]!.exit(2);
