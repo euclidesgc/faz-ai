@@ -5,7 +5,8 @@ import type { ColumnCategory, Workflow } from '../../../../shared/model';
 import { columnsOf } from '../../../../shared/selectors';
 import { useBoardStore } from '../../../store/boardStore';
 import { settings } from '../../../commands';
-import { DeleteButton, EnumSelect, IconChevronDown, Button } from '../../ui';
+import { Button, Checkbox, TextField } from '@radix-ui/themes';
+import { DeleteButton, IconChevronDown, SelectField } from '../../ui';
 import { NewColumnRow } from './NewColumnRow';
 import { PhaseEditor } from './PhaseEditor';
 import { SortableRow } from './SortableRow';
@@ -53,44 +54,47 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
               <Fragment key={c.id}>
                 <SortableRow id={c.id} name={c.name} onStep={(d) => i + d >= 0 && i + d < cols.length && moveTo(c.id, i + d)}>
                   <td>
-                    <input
+                    <TextField.Root
                       aria-label={`Nome da coluna ${c.name}`}
+                      key={c.name}
                       defaultValue={c.name}
                       onBlur={(e) =>
-                        e.target.value.trim() && e.target.value !== c.name && settings.updateColumn(c.id, { name: e.target.value.trim() })
+                        e.target.value.trim() &&
+                        e.target.value.trim() !== c.name &&
+                        settings.updateColumn(c.id, { name: e.target.value.trim() })
                       }
+                      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                     />
                   </td>
                   <td>
-                    <EnumSelect
+                    <SelectField
+                      aria-label={`O que ${c.name} representa`}
                       options={CATEGORIES}
                       value={c.category}
                       onChange={(category) => settings.updateColumn(c.id, { category })}
                     />
                   </td>
                   <td>
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       aria-label={`A IA atua em ${c.name}`}
                       disabled={c.category !== 'open'}
                       checked={c.aiActive}
-                      onChange={(e) => settings.updateColumn(c.id, { aiActive: e.target.checked })}
+                      onCheckedChange={(on) => settings.updateColumn(c.id, { aiActive: on === true })}
                     />
                   </td>
                   <td>
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       aria-label={`${c.name} exige aprovação`}
                       disabled={c.category !== 'open'}
                       checked={c.requiresApproval}
-                      onChange={(e) => settings.updateColumn(c.id, { requiresApproval: e.target.checked })}
+                      onCheckedChange={(on) => settings.updateColumn(c.id, { requiresApproval: on === true })}
                     />
                   </td>
                   <td>
                     <Button
-                      variant="ghost"
-                      size="small"
-                      on={phaseOpen === c.id}
+                      variant={phaseOpen === c.id ? 'soft' : 'ghost'}
+                      size="1"
+                      aria-pressed={phaseOpen === c.id}
                       disabled={c.category !== 'open'}
                       title="Instrução para a IA e modelo do documento desta fase"
                       onClick={() => setPhaseOpen(phaseOpen === c.id ? null : c.id)}

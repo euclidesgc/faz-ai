@@ -1,3 +1,4 @@
+import { TextField } from '@radix-ui/themes';
 import { useBoardStore, type SettingsTab } from '../../store/boardStore';
 import { settings, ui } from '../../commands';
 import { WorkflowsSettings } from './workflows/WorkflowsSettings';
@@ -12,7 +13,7 @@ import { GitSettings } from './GitSettings';
 import {
   Button,
   DeleteButton,
-  FieldRow,
+  FormField,
   IconAppearance,
   IconBranch,
   IconColumns,
@@ -76,14 +77,21 @@ export function Settings() {
           {collapsed ? <IconPanelOpen /> : <IconPanelClose />}
         </Button>
         {!collapsed && (
-          <FieldRow label="Nome do board">
-            <input
-              defaultValue={state.board.name}
-              onBlur={(e) =>
-                e.target.value.trim() && e.target.value !== state.board.name && settings.updateBoard({ name: e.target.value.trim() })
-              }
-            />
-          </FieldRow>
+          <FormField label="Nome do board">
+            {(id) => (
+              <TextField.Root
+                id={id}
+                key={state.board.name}
+                defaultValue={state.board.name}
+                onBlur={(e) =>
+                  e.target.value.trim() &&
+                  e.target.value.trim() !== state.board.name &&
+                  settings.updateBoard({ name: e.target.value.trim() })
+                }
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+              />
+            )}
+          </FormField>
         )}
         <nav className="tabs-vertical" aria-label="Seções das configurações">
           {TABS.map(([id, label, Glyph]) => (

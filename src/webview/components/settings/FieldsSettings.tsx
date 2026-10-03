@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useBoardStore } from '../../store/boardStore';
-import { Button, IconPlus } from '../ui';
+import { Button } from '@radix-ui/themes';
+import { IconPlus } from '../ui';
 import { PageHeader } from './PageHeader';
 import { FieldCard, NewFieldCard } from './fields/FieldCard';
 
@@ -13,7 +14,7 @@ export function FieldsSettings() {
       <PageHeader
         title="Campos personalizados"
         actions={
-          <Button variant="primary" disabled={adding} onClick={() => setAdding(true)}>
+          <Button disabled={adding} onClick={() => setAdding(true)}>
             <IconPlus /> Novo campo
           </Button>
         }

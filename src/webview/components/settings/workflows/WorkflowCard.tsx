@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Badge, Card, TextField } from '@radix-ui/themes';
+import { Badge, Button, Card, TextField } from '@radix-ui/themes';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Workflow } from '../../../../shared/model';
 import { workflowDeleteBlocker } from '../../../../shared/selectors';
 import { useBoardStore } from '../../../store/boardStore';
 import { settings } from '../../../commands';
-import { Button, DeleteButton, IconPlus } from '../../ui';
+import { DeleteButton, IconPlus } from '../../ui';
 import { ColumnsTable } from './ColumnsTable';
 import { DragHandle } from './DragHandle';
 import { kindLabel } from './kinds';
@@ -38,7 +38,7 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
             {kindLabel(workflow.kind)}
           </Badge>
           <span className="spacer" />
-          <Button variant="primary" disabled={adding} onClick={() => setAdding(true)}>
+          <Button disabled={adding} onClick={() => setAdding(true)}>
             <IconPlus /> Nova coluna
           </Button>
           <DeleteButton

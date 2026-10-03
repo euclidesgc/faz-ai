@@ -1,4 +1,4 @@
-import { lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -207,7 +207,7 @@ describe('CardDrawer', () => {
   it('mudar um campo envia field.setValue', async () => {
     openStory();
     const effort = snap().fieldDefs.find((f) => f.name === 'Esforço da atividade')!;
-    await userEvent.selectOptions(screen.getByLabelText('Esforço da atividade'), 'Alto');
+    await choose(screen.getByRole('combobox', { name: 'Esforço da atividade' }), 'Alto');
     expect(lastSent('field.setValue')).toEqual({ type: 'field.setValue', cardId: board.storyId, fieldId: effort.id, value: 'Alto' });
   });
 

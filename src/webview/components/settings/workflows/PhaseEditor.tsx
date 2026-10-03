@@ -4,7 +4,11 @@ import { PHASE_DEFAULTS } from '../../../../shared/phaseDefaults';
 import { useBoardStore } from '../../../store/boardStore';
 import { settings } from '../../../commands';
 import { MarkdownEditor } from '../../MarkdownEditor';
-import { Button } from '../../ui';
+import { Button, TextArea, TextField } from '@radix-ui/themes';
+import { FormField, SelectField } from '../../ui';
+
+/** O Select do Radix não aceita `value` vazio: "padrão do board" usa este valor. */
+const DEFAULT_PROFILE = '__default';
 
 /** A fase de uma coluna: o que a IA faz quando o card entra nela e o documento que a fase produz. */
 export function PhaseEditor({ column }: { column: Column }) {
@@ -21,67 +25,69 @@ export function PhaseEditor({ column }: { column: Column }) {
 
   return (
     <div className="phase-editor">
-      <label className="field-col">
-        <span>
-          Instrução para a IA <small className="muted">o que ela faz quando um card entra em "{column.name}"</small>
-        </span>
-        <textarea
-          key={column.aiInstruction}
-          rows={5}
-          defaultValue={column.aiInstruction}
-          placeholder="Ex.: escreva o documento de requisitos a partir da conversa do card…"
-          onBlur={(e) => e.target.value !== column.aiInstruction && patch({ aiInstruction: e.target.value })}
-        />
-      </label>
-      <label className="field-col">
-        <span>
-          Documento da fase <small className="muted">nome do arquivo anexado à história; vazio se a fase não gera documento</small>
-        </span>
-        <input
-          key={column.artifactName}
-          defaultValue={column.artifactName}
-          placeholder="Ex.: PRD.md"
-          onBlur={(e) => e.target.value.trim() !== column.artifactName && patch({ artifactName: e.target.value.trim() })}
-        />
-      </label>
-      <div className="field-col">
-        <span>
-          Modelo do documento <small className="muted">a IA preenche este modelo ao gerar o documento</small>
-        </span>
-        <MarkdownEditor
-          key={column.artifactTemplate}
-          minRows={8}
-          value={template}
-          onChange={setTemplate}
-          onCommit={() => template !== column.artifactTemplate && patch({ artifactTemplate: template })}
-          placeholder="Markdown com as seções do documento."
-        />
-      </div>
+      <FormField label="Instrução para a IA" hint={`O que ela faz quando um card entra em "${column.name}".`}>
+        {(id) => (
+          <TextArea
+            id={id}
+            key={column.aiInstruction}
+            rows={5}
+            defaultValue={column.aiInstruction}
+            placeholder="Ex.: escreva o documento de requisitos a partir da conversa do card…"
+            onBlur={(e) => e.target.value !== column.aiInstruction && patch({ aiInstruction: e.target.value })}
+          />
+        )}
+      </FormField>
+      <FormField label="Documento da fase" hint="Nome do arquivo anexado à história; vazio se a fase não gera documento.">
+        {(id) => (
+          <TextField.Root
+            id={id}
+            key={column.artifactName}
+            defaultValue={column.artifactName}
+            placeholder="Ex.: PRD.md"
+            onBlur={(e) => e.target.value.trim() !== column.artifactName && patch({ artifactName: e.target.value.trim() })}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          />
+        )}
+      </FormField>
+      <FormField label="Modelo do documento" hint="A IA preenche este modelo ao gerar o documento.">
+        {() => (
+          <MarkdownEditor
+            key={column.artifactTemplate}
+            minRows={8}
+            value={template}
+            onChange={setTemplate}
+            onCommit={() => template !== column.artifactTemplate && patch({ artifactTemplate: template })}
+            placeholder="Markdown com as seções do documento."
+          />
+        )}
+      </FormField>
       {profiles.length > 0 && (
-        <label className="field-col">
-          <span>
-            Perfil de execução{' '}
-            <small className="muted">
-              agente, skills, servidores MCP, ferramentas e modelo dos cards desta fase; cada card pode trocar
-            </small>
-          </span>
-          <select value={column.execProfile ?? ''} onChange={(e) => patch({ execProfile: e.target.value || null })}>
-            <option value="">
-              Padrão do board{profiles.find((p) => p.isDefault) ? ` (${profiles.find((p) => p.isDefault)!.name})` : ' (nenhum)'}
-            </option>
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FormField
+          label="Perfil de execução"
+          hint="Agente, skills, servidores MCP, ferramentas e modelo dos cards desta fase; cada card pode trocar."
+        >
+          {(id) => (
+            <SelectField
+              id={id}
+              aria-label="Perfil de execução"
+              options={[
+                {
+                  value: DEFAULT_PROFILE,
+                  label: `Padrão do board${profiles.find((p) => p.isDefault) ? ` (${profiles.find((p) => p.isDefault)!.name})` : ' (nenhum)'}`,
+                },
+                ...profiles.map((p) => ({ value: p.id, label: p.name })),
+              ]}
+              value={column.execProfile ?? DEFAULT_PROFILE}
+              onChange={(id) => patch({ execProfile: id === DEFAULT_PROFILE ? null : id })}
+            />
+          )}
+        </FormField>
       )}
       {preset && (
-        <div className="row end">
+        <div className="form-actions">
           <Button
-            variant="ghost"
-            size="small"
+            variant="soft"
+            color="gray"
             disabled={isDefault}
             onClick={() =>
               patch({ aiInstruction: preset.instruction, artifactName: preset.artifactName, artifactTemplate: preset.artifactTemplate })

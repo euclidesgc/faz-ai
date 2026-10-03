@@ -4,7 +4,9 @@ import { fieldsForType } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { FieldEditor } from '../FieldRenderer';
-import { Button, DeleteButton, FieldRow, IconPlus } from '../ui';
+import { Button, Card, TextField } from '@radix-ui/themes';
+import { DeleteButton, FormField, IconPlus, SelectField } from '../ui';
+import { SectionHeader } from './SectionHeader';
 import { CardPreview, ContrastHint } from './ColorPreview';
 import { PageHeader } from './PageHeader';
 
@@ -17,7 +19,7 @@ export function TypesSettings() {
       <PageHeader
         title="Tipos de card"
         actions={
-          <Button variant="primary" disabled={adding} onClick={() => setAdding(true)}>
+          <Button disabled={adding} onClick={() => setAdding(true)}>
             <IconPlus /> Novo tipo
           </Button>
         }
@@ -47,11 +49,16 @@ export function TypesSettings() {
                   <TypePreview name={t.name} color={t.color} onPick={(c) => settings.updateType(t.id, { color: c })} />
                 </td>
                 <td>
-                  <input
+                  <TextField.Root
+                    aria-label={`Nome do tipo ${t.name}`}
+                    key={t.name}
                     defaultValue={t.name}
                     onBlur={(e) =>
-                      e.target.value.trim() && e.target.value !== t.name && settings.updateType(t.id, { name: e.target.value.trim() })
+                      e.target.value.trim() &&
+                      e.target.value.trim() !== t.name &&
+                      settings.updateType(t.id, { name: e.target.value.trim() })
                     }
+                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                   />
                 </td>
                 <td>
@@ -77,16 +84,15 @@ export function TypesSettings() {
         </tbody>
       </table>
 
-      <h2 className="section-head">Padrões por tipo</h2>
-      <p className="muted">
+      <SectionHeader title="Padrões por tipo">
         Valores preenchidos automaticamente em cada card novo do tipo — por exemplo, o modelo e as skills que devem executar aquele tipo de
         trabalho. Cards já criados não mudam.
-      </p>
+      </SectionHeader>
       <div className="stack">
         {state.cardTypes.map((t) => {
           const fields = fieldsForType(state, t.id);
           return (
-            <section key={t.id} className="settings-block">
+            <Card key={t.id} className="draft-card" aria-label={`Padrões do tipo ${t.name}`}>
               <div className="row">
                 <span className="type-badge" style={badgeStyle(t.color)}>
                   {t.name}
@@ -94,19 +100,21 @@ export function TypesSettings() {
               </div>
               {fields.length === 0 && <span className="muted small">Nenhum campo se aplica a este tipo.</span>}
               {fields.map((f) => (
-                <FieldRow key={f.id} label={f.name}>
-                  {f.kind === 'multiselect' && f.options.length === 0 ? (
-                    <span className="muted small">Sem opções ainda.</span>
-                  ) : (
-                    <FieldEditor
-                      field={f}
-                      value={t.defaults[f.id] ?? null}
-                      onChange={(v) => settings.updateType(t.id, { defaults: { ...t.defaults, [f.id]: v } })}
-                    />
-                  )}
-                </FieldRow>
+                <FormField key={f.id} label={f.name}>
+                  {() =>
+                    f.kind === 'multiselect' && f.options.length === 0 ? (
+                      <span className="muted small">Sem opções ainda.</span>
+                    ) : (
+                      <FieldEditor
+                        field={f}
+                        value={t.defaults[f.id] ?? null}
+                        onChange={(v) => settings.updateType(t.id, { defaults: { ...t.defaults, [f.id]: v } })}
+                      />
+                    )
+                  }
+                </FormField>
               ))}
-            </section>
+            </Card>
           );
         })}
       </div>
@@ -127,13 +135,13 @@ function TypePreview({ name, color, onPick }: { name: string; color: string; onP
 function WorkflowSelect({ value, disabled, onChange }: { value: string; disabled?: boolean; onChange: (id: string) => void }) {
   const workflows = useBoardStore((s) => s.state!.workflows);
   return (
-    <select value={value} disabled={disabled} aria-label="Workflow" onChange={(e) => onChange(e.target.value)}>
-      {workflows.map((w) => (
-        <option key={w.id} value={w.id}>
-          {w.name}
-        </option>
-      ))}
-    </select>
+    <SelectField
+      aria-label="Workflow"
+      disabled={disabled}
+      options={workflows.map((w) => ({ value: w.id, label: w.name }))}
+      value={value}
+      onChange={onChange}
+    />
   );
 }
 
@@ -160,8 +168,9 @@ function NewTypeRow({ onDone }: { onDone: () => void }) {
         <TypePreview name={name.trim() || 'Novo tipo'} color={color} onPick={setColor} />
       </td>
       <td>
-        <input
+        <TextField.Root
           autoFocus
+          aria-label="Nome do tipo novo"
           placeholder="Nome do tipo"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -176,12 +185,14 @@ function NewTypeRow({ onDone }: { onDone: () => void }) {
       </td>
       <td />
       <td className="narrow">
-        <Button variant="primary" disabled={!ready} onClick={add}>
-          Adicionar
-        </Button>
-        <Button variant="ghost" onClick={onDone}>
-          Cancelar
-        </Button>
+        <div className="row-actions">
+          <Button variant="soft" color="gray" onClick={onDone}>
+            Cancelar
+          </Button>
+          <Button disabled={!ready} onClick={add}>
+            Adicionar
+          </Button>
+        </div>
       </td>
     </tr>
   );

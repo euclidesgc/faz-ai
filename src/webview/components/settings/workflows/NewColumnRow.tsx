@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { Column } from '../../../../shared/model';
 import { settings } from '../../../commands';
-import { Button } from '../../ui';
+import { Button, TextField } from '@radix-ui/themes';
+import { SelectField } from '../../ui';
 
 const START = '__start';
 
@@ -37,7 +38,7 @@ export function NewColumnRow({
     <tr className="draft-row">
       <td colSpan={colSpan}>
         <div className="row wrap">
-          <input
+          <TextField.Root
             autoFocus
             aria-label="Nome da coluna"
             placeholder="Nome da coluna"
@@ -48,19 +49,17 @@ export function NewColumnRow({
               if (e.key === 'Escape') onDone();
             }}
           />
-          <select aria-label="Onde a coluna entra" value={after} onChange={(e) => setAfter(e.target.value)}>
-            <option value={START}>No início</option>
-            {cols.map((c) => (
-              <option key={c.id} value={c.id}>
-                Depois de {c.name}
-              </option>
-            ))}
-          </select>
-          <Button variant="primary" disabled={!ready} onClick={add}>
-            Adicionar
-          </Button>
-          <Button variant="ghost" onClick={onDone}>
+          <SelectField
+            aria-label="Onde a coluna entra"
+            options={[{ value: START, label: 'No início' }, ...cols.map((c) => ({ value: c.id, label: `Depois de ${c.name}` }))]}
+            value={after}
+            onChange={setAfter}
+          />
+          <Button variant="soft" color="gray" onClick={onDone}>
             Cancelar
+          </Button>
+          <Button disabled={!ready} onClick={add}>
+            Adicionar
           </Button>
         </div>
       </td>

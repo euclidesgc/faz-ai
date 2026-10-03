@@ -755,25 +755,6 @@ button.chip.on:hover:where(:not(:disabled)) {
 .draft-row td {
   background: var(--hover);
 }
-.settings-block {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--sp-12);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-8);
-}
-.h3-input {
-  font-weight: 600;
-  font-size: var(--fs-md);
-  background: transparent;
-  border-color: transparent;
-}
-.h3-input:hover,
-.h3-input:focus {
-  border-color: var(--input-border);
-  background: var(--input-bg);
-}
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -1264,25 +1245,6 @@ button.ghost.on {
 .rule .when dd {
   margin: 0;
 }
-.switch {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-6);
-  cursor: pointer;
-}
-.pill {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  padding: 1px var(--sp-8);
-  border-radius: var(--radius-pill);
-  background: var(--badge-bg);
-  color: var(--badge-fg);
-}
-.pill.off {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-}
 
 /* harness e padrões por tipo */
 .stack {
@@ -1290,20 +1252,12 @@ button.ghost.on {
   flex-direction: column;
   gap: var(--sp-8);
 }
-h3.plain {
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: var(--fs-md);
-  color: var(--fg);
-  margin: 0;
-}
 .file-editor {
   display: flex;
   flex-direction: column;
   gap: var(--sp-6);
 }
-.file-editor textarea,
-.settings-block > textarea {
+.file-editor textarea {
   width: 100%;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
@@ -1547,15 +1501,6 @@ code {
   gap: var(--sp-8);
   padding: var(--sp-8) var(--sp-4) var(--sp-12);
 }
-.field-col {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
-}
-.field-col textarea,
-.field-col input {
-  width: 100%;
-}
 .story-artifacts {
   margin-bottom: var(--sp-12);
 }
@@ -1689,15 +1634,6 @@ tr.dragging .drag-handle {
 .harness-inventory summary button {
   margin-left: var(--sp-8);
   font-weight: normal;
-}
-.harness-new {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--sp-8);
-  margin: var(--sp-6) 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-6);
 }
 .skill-files {
   display: flex;
