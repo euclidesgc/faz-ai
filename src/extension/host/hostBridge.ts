@@ -30,6 +30,8 @@ export interface HostEnv {
   revealFile(file: string): unknown;
   /** deixa a pessoa escolher arquivos do disco; undefined quando ela desiste */
   pickFiles(): Promise<string[] | undefined>;
+  /** abre o diálogo nativo de "salvar como" e copia o arquivo do anexo para o destino escolhido; undefined quando a pessoa desiste ou o ambiente não suporta (web) */
+  saveFileAs?(sourcePath: string, suggestedName: string): Promise<void>;
   /** abre o board no navegador (só faz sentido dentro do editor) */
   openInBrowser?(): unknown;
   /** mostra o chat na barra lateral (só faz sentido dentro do editor) */
