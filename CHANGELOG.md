@@ -36,6 +36,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   em aberto, o que vai junto ao cancelar ou concluir) ficam num só lugar, em `src/shared`, com
   testes. Nada muda para quem usa.
 - O botão "⋯" dos menus avisa aos leitores de tela se o menu está aberto.
+- Interno: as ferramentas MCP saem de um arquivo de 1147 linhas para `src/extension/mcp/tools/`,
+  um arquivo por grupo. A lista que a IA vê (nomes, descrições, parâmetros) não muda.
 
 ## 0.29.1
 

@@ -38,6 +38,8 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   subtasks, what goes along when cancelling or completing) now live in one place, `src/shared`, with
   tests. Nothing changes for users.
 - The "⋯" menu button tells screen readers whether the menu is open.
+- Internal: the MCP tools move from a 1147-line file to `src/extension/mcp/tools/`, one file per
+  group. The list the AI sees (names, descriptions, parameters) does not change.
 
 ## 0.29.1
 
