@@ -299,12 +299,46 @@ button.active {
   padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-8);
   background: var(--badge-bg);
   color: var(--badge-fg);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 .card-bar .card-id {
   color: inherit;
+  font-size: inherit;
+}
+/* prévia do card em Configurações > Tipos: sem arrastar nem hover */
+.card.card-preview {
+  width: 200px;
+  cursor: default;
+  box-shadow: none;
+}
+.card-preview .card-bar {
+  min-height: 28px;
+}
+.preview-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.contrast-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-6);
+  margin-top: var(--sp-4);
   font-size: var(--fs-xs);
+  color: var(--fg);
+}
+.contrast-hint > .glyph {
+  color: var(--warn-border);
+}
+.contrast-swatch {
+  min-height: 0;
+  padding: 0 var(--sp-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: 600;
 }
 .card-type {
   flex: 1;
