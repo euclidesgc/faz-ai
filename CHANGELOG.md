@@ -18,7 +18,7 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - Os selos de status e de tipo de card ficam legíveis em qualquer cor escolhida: o texto vira preto
   ou branco conforme a cor de fundo.
 - O botão principal é azul índigo nos dois temas (no escuro era verde).
-- Os cards perderam a faixa colorida à esquerda: a cor do tipo fica no selo do tipo.
+- Os cards perderam a faixa colorida à esquerda: a cor do tipo fica na barra do card.
 - As barras de rolagem usam as cores do board, e a barra horizontal das colunas ganhou um espaço de
   respiro abaixo dos cards.
 - O contraste de textos, controles e foco do teclado é verificado por teste automático nos dois
@@ -49,6 +49,15 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - **Ícones novos**: emojis e símbolos soltos (✕ ⋯ ▾ ↗ 🗑 💬 📎) deram lugar a um conjunto único de
   ícones de traço ([Lucide](https://lucide.dev)) em todo o board: card, colunas, painel do card,
   editor de descrição, filtros e configurações.
+- **Card novo no board**: uma barra na cor do tipo, como a de uma janela, com o ID, o tipo e os
+  botões de abrir e de ações. O título fica numa linha (inteiro no tooltip), o status mostra com
+  quem está a pendência por um ícone (robô para a IA, pessoa para você) e há quanto tempo está
+  assim, e bloqueado mostra o motivo no tooltip. O modelo de IA ganha uma linha própria, com o
+  esforço em português ("Sonnet 5.5 - baixo"), e o rodapé mostra a branch e o link do PR.
+- Cards com pendência sua ganham a borda na cor do status, para achar de relance o que espera por
+  você.
+- Um LED pisca devagar na barra do card enquanto a IA trabalha nele (fica aceso, sem piscar, com
+  movimento reduzido no sistema).
 
 ## 0.29.1
 

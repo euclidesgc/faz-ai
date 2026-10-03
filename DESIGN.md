@@ -65,6 +65,10 @@ olho.
 - Hover nunca por `filter: brightness`. Use o token `*-hover` ou `--hover`.
 - Cor escolhida pelo usuário (status e tipo de card) passa sempre por `badgeStyle()` de
   `src/shared/color.ts`, que escolhe texto preto ou branco pela luminância WCAG do fundo.
+- A barra do card usa a cor do tipo via `badgeStyle()`. O que fica sobre ela (ID, botões, LED da
+  IA) usa `currentColor`, para herdar o preto ou branco escolhido pelo contraste. Uma cor fixa
+  (um LED verde, por exemplo) some sobre um tipo da mesma cor.
+- Animação contínua (o LED da IA) para com `prefers-reduced-motion`: o LED fica aceso, sem piscar.
 - `tokens.css` tem uma declaração por linha, porque `test/tokens.test.ts` faz parse do arquivo.
 
 ## Ícones

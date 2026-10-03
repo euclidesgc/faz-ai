@@ -19,7 +19,7 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 - Status and card type badges stay readable in any chosen color: the text turns black or white
   depending on the background color.
 - The primary button is indigo in both themes (it was green in dark).
-- Cards no longer have the colored stripe on the left: the type color lives in the type badge.
+- Cards no longer have the colored stripe on the left: the type color lives in the card bar.
 - Scrollbars use the board's colors, and the columns' horizontal scrollbar now has breathing room
   below the cards.
 - The contrast of text, controls and keyboard focus is checked by an automated test in both
@@ -51,6 +51,14 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 - **New icons**: emojis and loose symbols (✕ ⋯ ▾ ↗ 🗑 💬 📎) were replaced by a single set of line
   icons ([Lucide](https://lucide.dev)) across the whole board: cards, columns, card panel,
   description editor, filters and settings.
+- **New board card**: a bar in the type's color, like a window's title bar, with the ID, the type
+  and the open and actions buttons. The title stays on one line (in full in the tooltip), the status
+  shows who the next step is waiting on with an icon (a robot for the AI, a person for you) and for
+  how long, and a blocked card shows the reason in the tooltip. The AI model gets its own line, with
+  the effort in Portuguese ("Sonnet 5.5 - baixo"), and the footer shows the branch and the PR link.
+- Cards waiting on you get a border in the status color, so you can spot them at a glance.
+- An LED blinks slowly on the card bar while the AI is working on it (steady, without blinking, when
+  the system asks for reduced motion).
 
 ## 0.29.1
 

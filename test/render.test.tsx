@@ -94,7 +94,7 @@ describe('telas montam sem erro', () => {
     expect(board).toContain('Implementação');
     expect(board).toContain('#1');
     expect(board).toContain('revisar-spec');
-    expect(board).toContain('Opus 5.5 · high');
+    expect(board).toContain('Opus 5.5 - alto');
     expect(board).toContain('suggest-model');
     // a coluna de arquivados está sempre no board, colapsada por padrão; as demais abertas
     expect(board.match(/column collapsed archive/g)).toHaveLength(2);

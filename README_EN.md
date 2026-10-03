@@ -90,11 +90,18 @@ At the top of the board, **N com você** (N with you) shows how many cards are w
 review, answer or unblocking (one click filters to them), and an indicator appears while the AI is
 working on a card.
 
+Each card has a bar in its type's color, with the ID, the type and the open and actions buttons.
+Below it come the title (in full in the tooltip when it doesn't fit), the status with an icon for
+who the next step is waiting on (a robot for the AI, a person for you) and how long it has been
+like that, the fields, the AI model (e.g. "Sonnet 5.5 - baixo", with the effort in Portuguese) and,
+in the footer, the counters, the branch and the PR. Cards waiting on you get a border in the
+status color, and an LED blinks on the bar while the AI is working on the card.
+
 ### The board in the browser, outside the editor
 
 The board does not depend on the editor window:
 
-- **Abrir no navegador ↗** (open in browser, at the top of the board, or the command **Faz AI:
+- **Abrir no navegador** (open in browser, at the top of the board, or the command **Faz AI:
   Abrir board no navegador**) opens the same board in a browser tab. The editor stays open and
   keeps the board; both screens stay in sync.
 - **Without the editor**: run `~/.faz-ai/bin/faz-ai` in the project folder (or `faz-ai <folder>`).

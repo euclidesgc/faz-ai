@@ -70,14 +70,35 @@ export const modelValue = (id: string, effort: string | null): string => (effort
 
 const toolLabel = (tool: AiTool): string => AI_TOOLS.find((t) => t.id === tool)?.label ?? tool;
 
-/** Texto para exibir um valor de modelo, ex.: "Opus 5.5 · high". */
-export function modelLabel(catalog: ModelOption[], value: FieldValue | undefined, withTool = false): string {
+function formatModel(catalog: ModelOption[], value: FieldValue | undefined, withTool: boolean, effort: (e: string) => string): string {
   const v = parseModelValue(value);
   if (!v) return '';
   const o = catalog.find((x) => x.id === v.id);
   const name = o ? (withTool ? `${toolLabel(o.tool)} · ${o.label}` : o.label) : v.id;
-  return v.effort ? `${name} · ${v.effort}` : name;
+  return v.effort ? `${name}${effort(v.effort)}` : name;
 }
+
+/** Texto de um valor de modelo para a IA e o MCP, ex.: "Opus 5.5 · high" (o `resolveModelInput` lê de volta). */
+export const modelLabel = (catalog: ModelOption[], value: FieldValue | undefined, withTool = false): string =>
+  formatModel(catalog, value, withTool, (e) => ` · ${e}`);
+
+/** Nível de esforço como as ferramentas escrevem, em português para a interface. */
+export const EFFORT_LABELS: Record<string, string> = {
+  low: 'baixo',
+  light: 'leve',
+  medium: 'médio',
+  high: 'alto',
+  xhigh: 'muito alto',
+  max: 'máximo',
+  ultra: 'ultra',
+};
+
+/** Rótulo do esforço na interface; um nível desconhecido aparece como a ferramenta escreve. */
+export const effortLabel = (effort: string): string => EFFORT_LABELS[effort.toLowerCase()] ?? effort;
+
+/** Texto de um valor de modelo na interface, ex.: "Haiku 4.5 - baixo". */
+export const modelDisplay = (catalog: ModelOption[], value: FieldValue | undefined, withTool = false): string =>
+  formatModel(catalog, value, withTool, (e) => ` - ${effortLabel(e)}`);
 
 /**
  * Interpreta um modelo escrito por uma pessoa ou IA: o valor exato (`claude:opus@high`), ou o

@@ -1,5 +1,5 @@
 import type { Card, FieldValue } from '../../../shared/model';
-import { MODEL_EFFORT_LABEL, modelLabel, suggestModel } from '../../../shared/models';
+import { MODEL_EFFORT_LABEL, modelDisplay, suggestModel } from '../../../shared/models';
 import { fieldsForType, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
@@ -40,7 +40,7 @@ export function FieldsSection({ card }: { card: Card }) {
                 <div className="field-row">
                   <span />
                   <span className="muted small suggestion">
-                    Sugerido pelas regras: {modelLabel(state.board.modelCatalog, suggested, true)}{' '}
+                    Sugerido pelas regras: {modelDisplay(state.board.modelCatalog, suggested, true)}{' '}
                     <a
                       onClick={(e) => {
                         e.preventDefault();

@@ -1,22 +1,26 @@
 import { useState } from 'react';
 import type { FieldDef, FieldValue } from '../../shared/model';
 import { AI_TOOLS } from '../../shared/harness';
-import { modelLabel, modelValue, parseModelValue } from '../../shared/models';
+import { effortLabel, modelDisplay, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
 import { Button, ChipsEditor, IconExternal } from './ui';
+
+/** O campo tem algo para mostrar no card (checkbox desmarcado e lista vazia não contam). */
+export const hasValue = (value: FieldValue): value is NonNullable<FieldValue> =>
+  !(value === null || value === '' || value === false || (Array.isArray(value) && value.length === 0));
 
 /** Exibição compacta no card. */
 export function FieldBadge({ field, value }: { field: FieldDef; value: FieldValue }) {
   const catalog = useBoardStore((s) => s.state?.board.modelCatalog ?? []);
-  if (value === null || value === '' || value === false || (Array.isArray(value) && value.length === 0)) return null;
+  if (!hasValue(value)) return null;
   if (field.kind === 'model') {
     return (
       <span
         className={field.display === 'chip' ? 'chip' : field.display === 'inline' ? 'inline-field' : 'badge'}
-        title={`${field.name}: ${modelLabel(catalog, value, true)}`}
+        title={`${field.name}: ${modelDisplay(catalog, value, true)}`}
       >
         {field.display === 'inline' && <em>{field.name}: </em>}
-        {modelLabel(catalog, value)}
+        {modelDisplay(catalog, value)}
       </span>
     );
   }
@@ -141,7 +145,7 @@ export function ModelEditor({
       >
         {option.efforts.map((e) => (
           <option key={e} value={e}>
-            {e}
+            {effortLabel(e)}
           </option>
         ))}
       </select>
