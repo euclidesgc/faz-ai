@@ -254,9 +254,11 @@ AI through `get_card`, as guidance.
 
 ## AI harness
 
-Configurações → **Harness de IA** holds everything the AI tools load. At the top: the project's
-tool, the rules file, and the project's skills and agents. Below, under **Tudo que cada ferramenta
-carrega** (everything each tool loads), there is one tab per tool with eight sections (instructions
+Configurações → **Harness de IA** holds everything the AI tools load, in three tabs: **Ferramenta e
+execução** (tool and run: the project's AI and how the board calls it), **Do projeto** (from the
+project: the rules file, skills and agents that are part of the repository, editable there) and
+**Tudo que a ferramenta carrega** (everything the tool loads). In the last one, under **Tudo que
+cada ferramenta carrega** (everything each tool loads), there is one tab per tool with eight sections (instructions
 and rules, skills, agents, commands and prompts, hooks, MCP servers, plugins, settings and
 permissions), each split into three scopes:
 

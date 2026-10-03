@@ -237,7 +237,13 @@ describe('telas montam sem erro', () => {
     const profiles = html(<AgentsSettings />);
     for (const text of ['Agentes', 'aceita por parâmetro', 'imposto', 'orientado', 'Novo agente', 'Agente padrão'])
       expect(profiles).toContain(text);
-    const harness = html(<HarnessSettings />);
+    // cada aba do Harness é montada por vez: juntamos o texto das três
+    const harness = (['tool', 'project', 'all'] as const)
+      .map((harnessTab) => {
+        useBoardStore.setState({ harnessTab });
+        return html(<HarnessSettings />);
+      })
+      .join('\n');
     for (const text of [
       'Ferramenta deste projeto',
       'type="radio"',
@@ -263,8 +269,8 @@ describe('telas montam sem erro', () => {
       'Tempo limite por execução',
       'Heartbeat ligado',
       'Rodar agora',
-      'Agentes',
-      'Novo agente',
+      'Subagentes',
+      'Novo subagente',
       'revisor-de-spec',
       '.claude/agents/revisor-de-spec.md',
     ])

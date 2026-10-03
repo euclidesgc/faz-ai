@@ -239,9 +239,10 @@ pelo `get_card`, como orientação.
 
 ## Harness de IA
 
-Em Configurações → **Harness de IA** fica tudo que as ferramentas de IA carregam. No topo, a
-ferramenta do projeto, o arquivo de regras, as skills e os agentes do projeto. Abaixo, em **Tudo que
-cada ferramenta carrega**, há uma aba por ferramenta com oito seções (instruções e regras, skills,
+Em Configurações → **Harness de IA** fica tudo que as ferramentas de IA carregam, em três abas:
+**Ferramenta e execução** (a IA do projeto e como o board a chama), **Do projeto** (o arquivo de
+regras, as skills e os agentes que fazem parte do repositório, editáveis ali) e **Tudo que a
+ferramenta carrega**. Nesta última, em **Tudo que cada ferramenta carrega**, há uma aba por ferramenta com oito seções (instruções e regras, skills,
 agentes, comandos e prompts, hooks, servidores MCP, plugins, configurações e permissões), cada uma
 dividida em três escopos:
 

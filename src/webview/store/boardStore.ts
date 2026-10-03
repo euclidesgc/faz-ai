@@ -6,6 +6,8 @@ import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../..
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 
 export type View = 'board' | 'trash' | 'settings';
+/** Abas da tela de Harness de IA: a ferramenta e a execução, o que é do projeto, e tudo que a ferramenta carrega. */
+export type HarnessTab = 'tool' | 'project' | 'all';
 export type SettingsTab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'agents' | 'git' | 'appearance';
 
 export interface DialogSpec {
@@ -25,6 +27,7 @@ export interface DialogSpec {
 interface UiState {
   view: View;
   settingsTab: SettingsTab;
+  harnessTab: HarnessTab;
   /** menu lateral das configurações recolhido numa faixa de ícones */
   settingsNavCollapsed: boolean;
   openCardId: Id | null;
@@ -73,6 +76,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     dialog: null,
     view: persisted?.view ?? 'board',
     settingsTab: persisted?.settingsTab ?? 'columns',
+    harnessTab: persisted?.harnessTab ?? 'tool',
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     filters: EMPTY_FILTERS,
@@ -120,7 +124,13 @@ export const useBoardStore = create<BoardStore>((set, get) => {
 });
 
 function persist(s: BoardStore): void {
-  const ui: UiState = { view: s.view, settingsTab: s.settingsTab, settingsNavCollapsed: s.settingsNavCollapsed, openCardId: s.openCardId };
+  const ui: UiState = {
+    view: s.view,
+    settingsTab: s.settingsTab,
+    harnessTab: s.harnessTab,
+    settingsNavCollapsed: s.settingsNavCollapsed,
+    openCardId: s.openCardId,
+  };
   setUiState(ui);
 }
 
