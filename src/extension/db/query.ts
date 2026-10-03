@@ -37,3 +37,5 @@ export function transaction<T>(db: Database, fn: () => T): T {
 export const str = (v: SqlValue | undefined): string => (v == null ? '' : String(v));
 export const num = (v: SqlValue | undefined): number => Number(v ?? 0);
 export const bool = (v: SqlValue | undefined): boolean => Number(v ?? 0) === 1;
+/** Como `str`, mas preserva `NULL` em vez de virar `''` — para colunas onde a distinção importa (RF-15). */
+export const strOrNull = (v: SqlValue | undefined): string | null => (v == null ? null : String(v));
