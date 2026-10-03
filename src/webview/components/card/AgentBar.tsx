@@ -2,6 +2,10 @@ import { manifestOf, profileOf } from '../../../shared/execution';
 import type { Card } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
+import { SelectField } from '../ui';
+
+/** O Select do Radix não aceita valor vazio: "o agente da fase" usa este. */
+const FROM_PHASE = '__phase';
 
 /** Agente de execução do card e o resumo do que a sessão de IA vai usar com ele. */
 export function AgentBar({ card }: { card: Card }) {
@@ -18,14 +22,15 @@ export function AgentBar({ card }: { card: Card }) {
       title="O que a sessão de IA usa para trabalhar neste card: skills, servidores MCP, ferramentas e modelo"
     >
       <span>Agente</span>
-      <select value={card.execProfile ?? ''} onChange={(e) => cards.setExecProfile(card.id, e.target.value || null)}>
-        <option value="">Da fase{inherited ? ` (${inherited.name})` : ' (nenhum)'}</option>
-        {profiles.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      <SelectField
+        aria-label="Agente"
+        options={[
+          { value: FROM_PHASE, label: `Da fase${inherited ? ` (${inherited.name})` : ' (nenhum)'}` },
+          ...profiles.map((p) => ({ value: p.id, label: p.name })),
+        ]}
+        value={card.execProfile ?? FROM_PHASE}
+        onChange={(id) => cards.setExecProfile(card.id, id === FROM_PHASE ? null : id)}
+      />
       {manifest.profile && (
         <span className="muted small">
           {[

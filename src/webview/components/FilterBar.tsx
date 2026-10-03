@@ -4,6 +4,7 @@ import { useBoardStore } from '../store/boardStore';
 import { ui } from '../commands';
 import { isWeb } from '../vscode';
 import { FilterPanel } from './FilterPanel';
+import { TextField } from '@radix-ui/themes';
 import { IconClose } from './ui';
 
 const PRESETS: Record<string, string> = { today: 'hoje', '7d': 'últimos 7 dias', '30d': 'últimos 30 dias', custom: 'período' };
@@ -67,9 +68,10 @@ export function FilterBar() {
   return (
     <div className="filterbar">
       <div className="filterbar-main">
-        <input
+        <TextField.Root
           className="search"
           type="search"
+          aria-label="Buscar"
           placeholder="Buscar em título, descrição, conversa e campos…"
           value={filters.text}
           onChange={(e) => setFilters({ text: e.target.value })}

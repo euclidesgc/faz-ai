@@ -1,6 +1,7 @@
 import { checklistOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { checklist } from '../../commands';
+import { Checkbox } from '@radix-ui/themes';
 import { AddInput, Button, IconClose } from '../ui';
 
 /** Checklist do card: marcar, renomear, excluir e adicionar itens. */
@@ -21,7 +22,11 @@ export function ChecklistSection({ cardId }: { cardId: string }) {
       <ul className="checklist">
         {items.map((item) => (
           <li key={item.id} className={item.done ? 'done' : ''}>
-            <input type="checkbox" checked={item.done} onChange={(e) => checklist.update(item.id, { done: e.target.checked })} />
+            <Checkbox
+              aria-label={`Concluir "${item.text}"`}
+              checked={item.done}
+              onCheckedChange={(v) => checklist.update(item.id, { done: v === true })}
+            />
             <input
               className="inline-edit"
               defaultValue={item.text}

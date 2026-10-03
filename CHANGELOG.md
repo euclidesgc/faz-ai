@@ -6,6 +6,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Controles do card aberto, do board e dos filtros no mesmo padrão.** Tipo, coluna, status, agente,
+  filtros e escolha do diálogo agora são os seletores do Radix, assim como as caixas de seleção da
+  checklist e dos filtros e os campos de busca, de adicionar item e de data. Ficaram como texto
+  editável só o título, o item da checklist, o nome da coluna e o editor de markdown.
+
 - **Vínculos entre cards.** Qualquer card pode ser vinculado a outro, de qualquer workflow: **pai**,
   **filho** ou **relativo**, na seção **Vínculos** do card aberto, com busca por número ou título. O
   rodapé do card mostra o vínculo e o progresso dos filhos; vínculo repetido e ciclo são recusados.

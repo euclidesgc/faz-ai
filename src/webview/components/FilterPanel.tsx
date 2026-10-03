@@ -1,7 +1,10 @@
 import type { DatePreset, Filters, Relation } from '../../shared/filters';
 import { useBoardStore } from '../store/boardStore';
-import { ChipsEditor, EnumSelect } from './ui';
+import { Checkbox, TextField } from '@radix-ui/themes';
+import { ChipsEditor, SelectField } from './ui';
 
+/** O Select do Radix não aceita valor vazio: "qualquer data" usa este. */
+const ANY_DATE = '__any';
 const OWNERS: { value: Filters['owner']; label: string }[] = [
   { value: 'any', label: 'Qualquer' },
   { value: 'human', label: 'Com você (revisar, responder, desbloquear)' },
@@ -33,7 +36,7 @@ export function FilterPanel() {
     <div className="filter-panel">
       <div className="filter-group">
         <h3>Pendência</h3>
-        <EnumSelect options={OWNERS} value={filters.owner} onChange={(owner) => setFilters({ owner })} />
+        <SelectField aria-label="Com quem está" options={OWNERS} value={filters.owner} onChange={(owner) => setFilters({ owner })} />
       </div>
 
       <div className="filter-group">
@@ -65,38 +68,54 @@ export function FilterPanel() {
 
       <div className="filter-group">
         <h3>Data</h3>
-        <select
-          value={filters.dateField ?? ''}
-          onChange={(e) =>
-            setFilters({ dateField: e.target.value || null, datePreset: e.target.value ? (filters.datePreset ?? '7d') : null })
+        <SelectField
+          aria-label="Campo de data"
+          options={[
+            { value: ANY_DATE, label: 'Qualquer data' },
+            { value: 'createdAt', label: 'Criado em' },
+            { value: 'updatedAt', label: 'Atualizado em' },
+            ...dateFields.map((f) => ({ value: f.id, label: f.name })),
+          ]}
+          value={filters.dateField ?? ANY_DATE}
+          onChange={(field) =>
+            setFilters({
+              dateField: field === ANY_DATE ? null : field,
+              datePreset: field === ANY_DATE ? null : (filters.datePreset ?? '7d'),
+            })
           }
-        >
-          <option value="">Qualquer data</option>
-          <option value="createdAt">Criado em</option>
-          <option value="updatedAt">Atualizado em</option>
-          {dateFields.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
+        />
         {filters.dateField && (
-          <EnumSelect options={PRESETS} value={filters.datePreset ?? '7d'} onChange={(datePreset) => setFilters({ datePreset })} />
+          <SelectField
+            aria-label="Período"
+            options={PRESETS}
+            value={filters.datePreset ?? '7d'}
+            onChange={(datePreset) => setFilters({ datePreset })}
+          />
         )}
         {filters.dateField && filters.datePreset === 'custom' && (
           <div className="row wrap">
-            <input type="date" value={filters.dateFrom} onChange={(e) => setFilters({ dateFrom: e.target.value })} />
+            <TextField.Root
+              type="date"
+              aria-label="De"
+              value={filters.dateFrom}
+              onChange={(e) => setFilters({ dateFrom: e.target.value })}
+            />
             <span className="muted">até</span>
-            <input type="date" value={filters.dateTo} onChange={(e) => setFilters({ dateTo: e.target.value })} />
+            <TextField.Root type="date" aria-label="Até" value={filters.dateTo} onChange={(e) => setFilters({ dateTo: e.target.value })} />
           </div>
         )}
       </div>
 
       <div className="filter-group">
         <h3>Relacionamentos</h3>
-        <EnumSelect options={RELATIONS} value={filters.relation} onChange={(relation) => setFilters({ relation })} />
+        <SelectField
+          aria-label="Relacionamento"
+          options={RELATIONS}
+          value={filters.relation}
+          onChange={(relation) => setFilters({ relation })}
+        />
         <label className="row">
-          <input type="checkbox" checked={filters.includeRelated} onChange={(e) => setFilters({ includeRelated: e.target.checked })} />
+          <Checkbox checked={filters.includeRelated} onCheckedChange={(v) => setFilters({ includeRelated: v === true })} />
           Incluir pai e sub-tarefas dos resultados
         </label>
       </div>

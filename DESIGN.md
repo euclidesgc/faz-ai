@@ -114,7 +114,7 @@ olho.
   - `SelectField` (seletor tipado), `SwitchField` (interruptor com rótulo) e `NumberField` /
     `TextField` de `components/ui` no lugar de `<select>`, `<input>` e `EnumSelect`;
   - o Select do Radix não aceita `value` vazio: use um item sentinela (`'__none'`).
-- Ainda nativos: o card aberto (tipo, coluna, status, agente, checklist) e o board.
+- Seletores (`SelectField`), caixas de seleção, campos de busca e de adicionar, e a nota de status são do Radix em toda a interface, no board, no card aberto e nos filtros. Seguem nativos, de propósito, só os campos que têm de parecer texto (título do card, item da checklist, renomear coluna e workflow, o editor de markdown) e o seletor de cor (`<input type="color">`).
 
 ## Como adicionar uma cor
 

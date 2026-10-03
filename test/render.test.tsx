@@ -112,7 +112,7 @@ describe('telas montam sem erro', () => {
     expect(custom).not.toContain('A fazer'); // linha de baixo fechada não mostra as colunas
     useBoardStore.setState({ collapsed: {} }); // a história tem modelo manual diferente da sugestão
     expect(html(<FilterBar />)).toContain('Filtros');
-    expect(html(<FiltersApp />)).toContain('Com você (revisar, responder, desbloquear)');
+    expect(html(<FiltersApp />)).toContain('aria-label="Com quem está"');
     expect(html(<TrashView />)).toContain('Lixo');
     const drawer = html(<CardDrawer cardId={storyId} />);
     expect(drawer).toContain('História');

@@ -2,7 +2,9 @@
 // o tsconfig.extension.json inclui test/**/*.ts sem a lib DOM, e um helper .ts com DOM quebraria o typecheck.
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
-import { cleanup, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { Theme } from '@radix-ui/themes';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -59,6 +61,9 @@ export function lastSent<T extends WebviewToHost['type']>(type: T): Extract<Webv
     );
   return last;
 }
+
+/** Renderiza dentro do tema do Radix, que os seletores e campos do design system exigem. */
+export const renderThemed = (ui: ReactElement) => render(<Theme>{ui}</Theme>);
 
 /** Escolhe uma opção num seletor do Radix Themes (o `<select>` nativo do jsdom não existe mais nessas telas). */
 export async function choose(trigger: HTMLElement, option: string | RegExp): Promise<void> {

@@ -6,7 +6,8 @@ import { useBoardStore } from '../store/boardStore';
 import { cards, settings } from '../commands';
 import { SortableCard } from './Card';
 import { Menu } from './Menu';
-import { Button, IconApproval, IconCheck, IconChevronLeft, IconChevronRight, IconClose } from './ui';
+import { TextField } from '@radix-ui/themes';
+import { Button, IconApproval, IconCheck, IconChevronLeft, IconChevronRight, IconClose, SelectField } from './ui';
 
 const CATEGORIES: { value: ColumnCategory; label: string; hint: string }[] = [
   { value: 'open', label: 'Trabalho em aberto', hint: '' },
@@ -204,8 +205,9 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
       <footer className="column-footer">
         {adding ? (
           <div className="add-form">
-            <input
+            <TextField.Root
               autoFocus
+              aria-label="Título do card"
               placeholder="Título (Enter adiciona)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -215,13 +217,12 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
               }}
             />
             {types.length > 1 && (
-              <select value={typeId || types[0]?.id} onChange={(e) => setTypeId(e.target.value)}>
-                {types.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+              <SelectField
+                aria-label="Tipo do card"
+                options={types.map((t) => ({ value: t.id, label: t.name }))}
+                value={typeId || types[0]!.id}
+                onChange={setTypeId}
+              />
             )}
             <div className="row">
               <Button variant="primary" onClick={submit}>

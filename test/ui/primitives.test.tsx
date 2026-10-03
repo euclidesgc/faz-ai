@@ -1,11 +1,11 @@
-import { seedBoard } from './setup';
+import { choose, renderThemed, seedBoard } from './setup';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { Menu } from '../../src/webview/components/Menu';
-import { AddInput, Button, ChipsEditor, DeleteButton, EnumSelect, NumberField, TextField } from '../../src/webview/components/ui';
+import { AddInput, Button, ChipsEditor, DeleteButton, NumberField, SelectField, TextField } from '../../src/webview/components/ui';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 beforeAll(async () => {
@@ -61,12 +61,13 @@ describe('Menu', () => {
   });
 });
 
-describe('EnumSelect', () => {
-  it('chama onChange com o valor escolhido', async () => {
+describe('SelectField', () => {
+  it('chama onChange com o valor escolhido, já tipado', async () => {
     type Mode = 'a' | 'b';
     const onChange = vi.fn<(v: Mode) => void>();
-    render(
-      <EnumSelect<Mode>
+    renderThemed(
+      <SelectField<Mode>
+        aria-label="Modo"
         options={[
           { value: 'a', label: 'A' },
           { value: 'b', label: 'B' },
@@ -75,7 +76,7 @@ describe('EnumSelect', () => {
         onChange={onChange}
       />,
     );
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'b');
+    await choose(screen.getByRole('combobox', { name: 'Modo' }), 'B');
     expect(onChange).toHaveBeenCalledWith('b');
   });
 });

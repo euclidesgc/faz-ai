@@ -112,14 +112,14 @@ describe('CardDrawer', () => {
   it('trocar o tipo envia card.update com typeId', async () => {
     openStory();
     const bug = snap().cardTypes.find((t) => t.name === 'Bug')!;
-    await userEvent.selectOptions(screen.getByDisplayValue('História'), 'Bug');
+    await choose(screen.getByRole('combobox', { name: 'Tipo' }), 'Bug');
     expect(lastSent('card.update')).toEqual({ type: 'card.update', cardId: board.storyId, patch: { typeId: bug.id } });
   });
 
   it('trocar a coluna move o card para o fim da coluna nova', async () => {
     openStory();
     const discovery = snap().columns.find((c) => c.name === 'Discovery')!;
-    await userEvent.selectOptions(screen.getByDisplayValue('Backlog'), 'Discovery');
+    await choose(screen.getByRole('combobox', { name: 'Coluna' }), 'Discovery');
     expect(lastSent('card.move')).toEqual({ type: 'card.move', cardId: board.storyId, columnId: discovery.id, position: 0 });
   });
 
@@ -303,13 +303,12 @@ describe('CardDrawer', () => {
     };
     patchState((s) => ({ board: { ...s.board, execProfiles: [profile] } }));
     openStory();
-    const select = screen.getByDisplayValue('Da fase (nenhum)');
-    await userEvent.selectOptions(select, 'Revisor');
+    await choose(screen.getByRole('combobox', { name: 'Agente' }), 'Revisor');
     expect(lastSent('card.execProfile.set')).toEqual({ type: 'card.execProfile.set', cardId: board.storyId, profileId: 'p1' });
     // o host devolveria o card com o perfil escolhido
     act(() => patchCard(board.storyId, { execProfile: 'p1' }));
     expect(screen.getByText('subagente reviewer · skills: tdd · MCP: board · sessão limpa')).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByDisplayValue('Revisor'), 'Da fase (nenhum)');
+    await choose(screen.getByRole('combobox', { name: 'Agente' }), /Da fase/);
     expect(lastSent('card.execProfile.set').profileId).toBeNull();
   });
 
@@ -333,7 +332,7 @@ describe('CardDrawer', () => {
     patchCard(board.subId, { archivedAt: 1 });
     openCardDrawer(board.subId);
     expect(screen.getByText('Este card está arquivado.')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('A fazer')).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Coluna' })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
     await userEvent.click(screen.getByRole('button', { name: 'Desarquivar' }));
     expect(lastSent('card.unarchive')).toEqual({ type: 'card.unarchive', cardId: board.subId });
