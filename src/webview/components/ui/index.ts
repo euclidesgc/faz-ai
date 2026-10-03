@@ -6,4 +6,5 @@ export { DeleteButton } from './DeleteButton';
 export { AddInput } from './AddInput';
 export { NumberField } from './NumberField';
 export { TextField } from './TextField';
+export { FormField } from './FormField';
 export * from './icons';

@@ -31,7 +31,7 @@ h3 {
   letter-spacing: 0.04em;
   color: var(--muted);
 }
-a {
+a:where(:not([class*='rt-'])) {
   color: var(--link);
   cursor: pointer;
 }
@@ -50,9 +50,10 @@ a {
   flex-wrap: wrap;
 }
 
-input,
-select,
-textarea {
+/* regras de elemento valem só para os nossos controles: os do Radix Themes (classes rt-*) têm o próprio estilo */
+input:where(:not([class*='rt-'])),
+select:where(:not([class*='rt-'])),
+textarea:where(:not([class*='rt-'])) {
   background: var(--input-bg);
   color: var(--input-fg);
   border: 1px solid var(--input-border);
@@ -61,26 +62,26 @@ textarea {
   font: inherit;
   min-width: 0;
 }
-input[type='checkbox'] {
+input[type='checkbox']:where(:not([class*='rt-'])) {
   width: auto;
 }
-input[type='color'] {
+input[type='color']:where(:not([class*='rt-'])) {
   padding: 0;
   width: 28px;
   height: 24px;
 }
-textarea {
+textarea:where(:not([class*='rt-'])) {
   width: 100%;
   resize: vertical;
 }
-input:focus,
-select:focus,
-textarea:focus {
+input:where(:not([class*='rt-'])):focus,
+select:where(:not([class*='rt-'])):focus,
+textarea:where(:not([class*='rt-'])):focus {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
 
-button {
+button:where(:not([class*='rt-'])) {
   background: var(--btn2-bg);
   color: var(--btn2-fg);
   border: none;
@@ -90,14 +91,14 @@ button {
   cursor: pointer;
 }
 /* hover sem brilho: cada fundo tem seu tom de hover; variantes transparentes definem o próprio abaixo */
-button:hover:where(:not(:disabled)) {
+button:where(:not([class*='rt-'])):hover:where(:not(:disabled)) {
   background: var(--btn2-bg-hover);
 }
 button.primary:hover:where(:not(:disabled)),
 button.active:hover:where(:not(:disabled)) {
   background: var(--btn-bg-hover);
 }
-button:disabled {
+button:where(:not([class*='rt-'])):disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -1815,9 +1816,9 @@ button.topbar-pending.on:hover:where(:not(:disabled)) {
 
 /* ---- revisão de usabilidade (0.29) ---- */
 /* controles: mesma altura, foco visível pelo teclado */
-button,
-select,
-input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']) {
+button:where(:not([class*='rt-'])),
+select:where(:not([class*='rt-'])),
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):where(:not([class*='rt-'])) {
   min-height: 26px;
 }
 button.small,
@@ -1830,20 +1831,106 @@ button.icon,
 .tabs button {
   min-height: 0;
 }
-button {
+button:where(:not([class*='rt-'])) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--sp-6);
   white-space: nowrap;
 }
+/* Radix Themes: o tema envolve o app todo; tipografia e cor continuam as do board, e os componentes dele usam a nossa fonte */
+.app-theme.radix-themes {
+  --default-font-family: var(--font-ui);
+  --code-font-family: var(--font-mono);
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  height: 100%;
+}
+/* formulários (FormField): rótulo acima, ajuda abaixo */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.form-field-hint {
+  margin: 0;
+  max-width: 70ch;
+}
+/* Campos personalizados: um card por campo */
+.field-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+.field-card-head {
+  display: grid;
+  grid-template-columns: minmax(200px, 320px) 1fr auto;
+  gap: var(--sp-16);
+  align-items: start;
+}
+.field-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-4);
+}
+.field-card-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--sp-16);
+  margin-top: var(--sp-16);
+  padding-top: var(--sp-16);
+  border-top: 1px solid var(--border);
+}
+.field-card.draft .field-card-head {
+  grid-template-columns: minmax(200px, 320px) minmax(200px, 320px);
+}
+.field-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-8);
+  margin-top: var(--sp-16);
+}
+.kind-select {
+  width: 100%;
+}
+.display-picker,
+.applies-to {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-8);
+}
+.field-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+}
+.options-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-6);
+}
+.option-chip {
+  gap: var(--sp-2);
+}
+.switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+}
 /* ícones Lucide (components/ui/icons.tsx): seguem o tamanho e a cor do texto em volta */
 .glyph {
   flex: none;
   vertical-align: -0.125em;
 }
-button:focus-visible,
-a:focus-visible,
+button:where(:not([class*='rt-'])):focus-visible,
+a:where(:not([class*='rt-'])):focus-visible,
 .card:focus-visible,
 .filter-chip:focus-visible {
   outline: var(--focus-ring);

@@ -9,11 +9,15 @@ const DARK_QUERY = '(prefers-color-scheme: dark)';
 /** Grava em `data-theme` o claro ou escuro que vale agora neste documento. */
 export function applyTheme(mode: ThemeMode): void {
   const { body } = document;
-  body.dataset.theme = resolveTheme(mode, {
+  const theme = resolveTheme(mode, {
     isWeb,
     bodyClasses: Array.from(body.classList),
     prefersDark: window.matchMedia(DARK_QUERY).matches,
   });
+  body.dataset.theme = theme;
+  // os componentes do Radix Themes leem o claro/escuro pela classe `light`/`dark` de um ancestral
+  body.classList.toggle('dark', theme === 'dark');
+  body.classList.toggle('light', theme === 'light');
 }
 
 /** Aplica o tema e a tipografia do board ao documento deste webview. */

@@ -4,6 +4,7 @@ import { AI_TOOLS } from '../../shared/harness';
 import { effortLabel, modelDisplay, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
 import { Button, ChipsEditor, IconExternal, TextField } from './ui';
+import { isSkillsField } from './settings/fields/fieldKinds';
 
 /** O campo tem algo para mostrar no card (checkbox desmarcado e lista vazia não contam). */
 export const hasValue = (value: FieldValue): value is NonNullable<FieldValue> =>
@@ -91,7 +92,7 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
       return <ModelEditor value={value} onChange={onChange} />;
     case 'multiselect': {
       const current = Array.isArray(value) ? value : [];
-      if (field.name.toLowerCase() === 'skills') return <SkillsPicker options={field.options} current={current} onChange={onChange} />;
+      if (isSkillsField(field.name)) return <SkillsPicker options={field.options} current={current} onChange={onChange} />;
       return <ChipsEditor options={field.options} values={current} onChange={onChange} />;
     }
   }

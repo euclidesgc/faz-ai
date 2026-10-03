@@ -34,6 +34,15 @@ Object.defineProperty(window, 'matchMedia', {
   }),
 });
 Element.prototype.scrollIntoView = () => {};
+// o que o Radix Themes usa e o jsdom não tem (Select mede o conteúdo e captura o ponteiro)
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+Element.prototype.hasPointerCapture ??= () => false;
+Element.prototype.releasePointerCapture ??= () => {};
+Element.prototype.setPointerCapture ??= () => {};
 
 /** Mensagens de um tipo, na ordem em que foram enviadas. */
 export const sentOf = <T extends WebviewToHost['type']>(type: T): Extract<WebviewToHost, { type: T }>[] =>
