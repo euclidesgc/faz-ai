@@ -1,3 +1,4 @@
+import { EMPTY_CHAT } from '../src/shared/chat';
 import { DEFAULT_RUNNER } from '../src/shared/runner';
 import { DEFAULT_GIT } from '../src/shared/git';
 import { describe, expect, it } from 'vitest';
@@ -126,6 +127,7 @@ const state: BoardState = {
   currentUser: 'a',
   harness: EMPTY_HARNESS,
   pendingUpgrade: [],
+  chat: EMPTY_CHAT,
   aiRuns: [],
   aiRunUnsupported: null,
   harnessInstall: null,

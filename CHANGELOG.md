@@ -6,6 +6,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Chat com a IA no board.** Uma conversa para criar, mover e vincular cards e consultar o board em
+  linguagem natural: na barra lateral do editor (seção **Chat com a IA**, abaixo de Board e Filtros)
+  e, no navegador, no botão **Chat** do topo. Dá para escolher o **modelo e o esforço** das próximas
+  mensagens; a IA age pelas ferramentas do board e responde em markdown. Há **Parar** e **Limpar**,
+  e o histórico fica guardado por projeto. Usa o mesmo limite de execução do restante (por padrão,
+  só o board).
+
 - **Controles do card aberto, do board e dos filtros no mesmo padrão.** Tipo, coluna, status, agente,
   filtros e escolha do diálogo agora são os seletores do Radix, assim como as caixas de seleção da
   checklist e dos filtros e os campos de busca, de adicionar item e de data. Ficaram como texto

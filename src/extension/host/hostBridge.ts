@@ -26,6 +26,8 @@ export interface HostEnv {
   pickFiles(): Promise<string[] | undefined>;
   /** abre o board no navegador (só faz sentido dentro do editor) */
   openInBrowser?(): unknown;
+  /** mostra o chat na barra lateral (só faz sentido dentro do editor) */
+  showChat?(): unknown;
 }
 
 /**
@@ -79,6 +81,14 @@ export class HostBridge {
           if (typeof notice === 'string') this.post({ type: 'notice', message: notice });
           return;
         }
+        case 'ui.showChat':
+          await this.env.showChat?.();
+          return;
+        case 'chat.send':
+        case 'chat.stop':
+        case 'chat.clear':
+          this.router.chatCommand(msg);
+          return;
         case 'ui.openInBrowser':
           await this.env.openInBrowser?.();
           return;

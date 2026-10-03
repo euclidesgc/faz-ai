@@ -8,6 +8,7 @@ import { socketPath, workspaceKey } from './mcp/socketPath';
 import { BoardPanel } from './panel/BoardPanel';
 import type { MessageRouter } from './panel/messageRouter';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
+import { ChatViewProvider } from './sidebar/ChatViewProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
 import { ViewStateStore } from './viewState';
 import type { AiRunner } from './runner';
@@ -196,6 +197,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     treeView,
     vscode.window.registerWebviewViewProvider('fazai.filters', new FiltersViewProvider(context, getRouter, viewState), {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
+    vscode.window.registerWebviewViewProvider('fazai.chat', new ChatViewProvider(context, getRouter, viewState), {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     // clicar no ícone da barra lateral já abre o board

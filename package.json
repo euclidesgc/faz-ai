@@ -107,6 +107,12 @@
           "name": "Filtros",
           "type": "webview",
           "icon": "media/kanban.svg"
+        },
+        {
+          "id": "fazai.chat",
+          "name": "Chat com a IA",
+          "type": "webview",
+          "icon": "media/kanban.svg"
         }
       ]
     },

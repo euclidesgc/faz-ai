@@ -169,6 +169,12 @@ export type WebviewToHost =
   | { type: 'harness.agent.create'; name: string; description: string; content: string; model?: string }
   | { type: 'harness.agent.write'; name: string; content: string }
   | { type: 'harness.agent.delete'; name: string }
+  /** chat com a IA do projeto: envia uma mensagem (com o modelo escolhido, ou null para o padrão), interrompe ou limpa a conversa */
+  | { type: 'chat.send'; text: string; model: string | null }
+  | { type: 'chat.stop' }
+  | { type: 'chat.clear' }
+  /** mostra o chat na barra lateral do editor */
+  | { type: 'ui.showChat' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
   | { type: 'harness.flowSkill.install' };
 

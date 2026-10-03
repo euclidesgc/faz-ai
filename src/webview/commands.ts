@@ -28,6 +28,13 @@ export const ui = {
   showFilters: () => post({ type: 'ui.showFilters' }),
   connectAI: () => post({ type: 'ui.connectAI' }),
   openInBrowser: () => post({ type: 'ui.openInBrowser' }),
+  showChat: () => post({ type: 'ui.showChat' }),
+};
+
+export const chat = {
+  send: (text: string, model: string | null) => post({ type: 'chat.send', text, model }),
+  stop: () => post({ type: 'chat.stop' }),
+  clear: () => post({ type: 'chat.clear' }),
 };
 
 export const ai = {

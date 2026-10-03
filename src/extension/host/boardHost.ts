@@ -8,6 +8,7 @@ import { registerClients } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger } from '../merge';
 import { MessageRouter } from '../panel/messageRouter';
+import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { loginShellPath, spawnHeadless } from '../spawn';
 
@@ -29,6 +30,7 @@ export interface BoardHost {
   router: MessageRouter;
   runner: AiRunner;
   heartbeat: Heartbeat;
+  chat: ChatSession;
   /** registra o servidor MCP do board na ferramenta de IA do projeto e devolve o resumo do que foi feito */
   connectAI(): { message: string; toIgnore: string[] };
   addToGitignore(lines: string[]): void;
@@ -100,6 +102,14 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         );
       }),
   });
+  const chat = new ChatSession(router, {
+    cwd: o.folderPath,
+    homeDir,
+    bridgePath: o.bridgePath,
+    log: o.log,
+    spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
+    file: path.join(o.storageDir, 'chat', `${workspaceKey(o.folderPath)}.json`),
+  });
   const heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: o.log });
 
   const gitignore = path.join(o.folderPath, '.gitignore');
@@ -107,6 +117,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     router,
     runner,
     heartbeat,
+    chat,
     connectAI() {
       const done = registerClients([router.snapshot().board.aiTool], { bridgePath: o.bridgePath, workspaceDir: o.folderPath, homeDir });
       // arquivos do projeto guardam caminhos desta máquina, então normalmente não devem ir para o repositório
@@ -127,6 +138,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     async dispose() {
       heartbeat.stop();
       runner.dispose();
+      chat.dispose();
       await handle.close();
     },
   };

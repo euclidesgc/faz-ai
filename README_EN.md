@@ -154,6 +154,20 @@ You answer on the card itself:
   goes back to the AI.
 - **Bloquear** (block) records a blocker, with the reason.
 
+### Chat with the AI
+
+To give the board orders in natural language, use the **Chat**: in the editor's sidebar, the **Chat
+com a IA** section (below Board and Filtros); in the browser, the **Chat** button in the top bar,
+which opens a panel on the right. Write, for example, "create a Login with Google story and three
+sub-tasks" or "what is waiting for me?". The project's AI answers and acts through the board tools:
+it creates, moves and links cards, and queries what is on it. Below the field you pick the **model
+and effort** for the next messages (the choice is remembered). Enter sends, Shift+Enter adds a line,
+**Parar** (stop) interrupts and **Limpar** (clear) erases the conversation. The history is kept per
+project.
+
+The chat uses the same background run as the cards, so the limit under Configurações → Harness de
+IA → "O que a IA pode fazer" applies (by default, the board only), and so does the time limit there.
+
 ### Calling the AI from the conversation
 
 In any card's conversation, **Chamar IA** (call AI) runs the project's tool in the background to

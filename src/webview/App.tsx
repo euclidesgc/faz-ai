@@ -5,19 +5,21 @@ import { useBoardStore, useHostSync } from './store/boardStore';
 import { ui } from './commands';
 import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
+import { ChatPanel } from './components/chat/ChatPanel';
 import { Dialog } from './components/Dialog';
 import { FilterBar } from './components/FilterBar';
 import { HeartbeatButton } from './components/HeartbeatButton';
 import { ThemeToggle } from './components/ThemeToggle';
 import { TrashView } from './components/TrashView';
 import { Settings } from './components/settings/Settings';
-import { Button, IconClose, IconExternal } from './components/ui';
+import { Button, IconChat, IconClose, IconExternal } from './components/ui';
 import { isWeb, onConnectionChange } from './vscode';
 
 export function App() {
   useHostSync();
   useAppearance();
-  const { state, error, notice, view, setError, setNotice, setView, openCardId, filters, setFilters } = useBoardStore();
+  const { state, error, notice, view, setError, setNotice, setView, openCardId, filters, setFilters, chatOpen, setChatOpen } =
+    useBoardStore();
   const [offline, setOffline] = useState(false);
 
   // erros (ex.: regra de conclusão) e avisos somem sozinhos
@@ -88,6 +90,14 @@ export function App() {
             Abrir no navegador <IconExternal />
           </Button>
         )}
+        <Button
+          variant="ghost"
+          on={isWeb && chatOpen}
+          title={isWeb ? 'Conversar com a IA sobre o board' : 'Abre o chat com a IA na barra lateral'}
+          onClick={() => (isWeb ? setChatOpen(!chatOpen) : ui.showChat())}
+        >
+          <IconChat /> Chat
+        </Button>
         <HeartbeatButton offline={offline} />
         <ThemeToggle />
       </header>
@@ -103,6 +113,20 @@ export function App() {
         {view === 'trash' && <TrashView />}
         {view === 'settings' && <Settings />}
       </main>
+      {isWeb && chatOpen && (
+        <aside className="chat-drawer">
+          <Button
+            variant="icon"
+            className="drawer-close"
+            title="Fechar o chat"
+            aria-label="Fechar o chat"
+            onClick={() => setChatOpen(false)}
+          >
+            <IconClose />
+          </Button>
+          <ChatPanel />
+        </aside>
+      )}
       {openCardId && <CardDrawer cardId={openCardId} />}
       <Dialog />
       <div className="toasts" aria-live="polite">
