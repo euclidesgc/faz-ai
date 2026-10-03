@@ -3,6 +3,7 @@ import type { FieldDef } from '../src/shared/model';
 import {
   archivedIn,
   cardsIn,
+  checklistOf,
   childrenOf,
   columnOf,
   columnsOf,
@@ -11,6 +12,8 @@ import {
   isArchived,
   isLive,
   openChildren,
+  subtaskSlot,
+  typesOf,
   valueOf,
 } from '../src/shared/selectors';
 import { boardState, card, sub } from './fakes/board';
@@ -124,5 +127,30 @@ describe('campos', () => {
     expect(valueOf(s, 'h', 'prazo')).toBe('2026-10-05');
     expect(valueOf(s, 'h', 'urgente')).toBe(false);
     expect(valueOf(s, 'h', 'fase')).toBeNull();
+  });
+});
+
+describe('typesOf / checklistOf / subtaskSlot', () => {
+  const type = (id: string, defaultWorkflowId: string) => ({ id, boardId: 'b', name: id, color: '#000', defaultWorkflowId, defaults: {} });
+  const item = (id: string, cardId: string, position: number) => ({ id, cardId, text: id, done: false, position });
+
+  it('typesOf traz só os tipos que nascem no workflow', () => {
+    const s = boardState({ cardTypes: [type('story', 'wp'), type('sub', 'wc'), type('bug', 'wp')] });
+    expect(ids(typesOf(s, 'wp'))).toEqual(['story', 'bug']);
+  });
+
+  it('checklistOf traz os itens do card em ordem', () => {
+    const s = boardState({ checklistItems: [item('b', 'c1', 1), item('x', 'c2', 0), item('a', 'c1', 0)] });
+    expect(ids(checklistOf(s, 'c1'))).toEqual(['a', 'b']);
+  });
+
+  it('subtaskSlot aponta a primeira coluna e o tipo do workflow de baixo', () => {
+    expect(subtaskSlot(boardState({ cardTypes: [type('story', 'wp'), type('sub', 'wc')] }))).toEqual({ typeId: 'sub', columnId: 'todo' });
+  });
+
+  it('subtaskSlot é undefined sem tipo de sub-tarefa ou sem workflow de baixo', () => {
+    expect(subtaskSlot(boardState({ cardTypes: [type('story', 'wp')] }))).toBeUndefined();
+    const s = boardState({ cardTypes: [type('sub', 'wc')] });
+    expect(subtaskSlot({ ...s, workflows: s.workflows.filter((w) => w.kind === 'parent') })).toBeUndefined();
   });
 });
