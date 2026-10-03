@@ -4,6 +4,14 @@ import { App } from './App';
 import { applyTheme } from './appearance';
 import { FiltersApp } from './FiltersApp';
 import { isWeb } from './vscode';
+import { Theme } from '@radix-ui/themes';
+// Radix Themes antes dos nossos estilos: só os tokens base, as escalas que os componentes usam (os
+// valores são os mesmos de tokens.css) e os componentes; sem utilities.css
+import '@radix-ui/themes/tokens/base.css';
+import '@radix-ui/themes/tokens/colors/indigo.css';
+import '@radix-ui/themes/tokens/colors/slate.css';
+import '@radix-ui/themes/tokens/colors/red.css';
+import '@radix-ui/themes/components.css';
 import './tokens.css';
 import './styles.css';
 
@@ -25,4 +33,11 @@ if (isWeb) {
 // a tela "Carregando…" já nasce com tema; a preferência salva chega depois, com o board
 applyTheme('system');
 
-createRoot(root).render(<React.StrictMode>{isFilters ? <FiltersApp /> : <App />}</React.StrictMode>);
+createRoot(root).render(
+  <React.StrictMode>
+    {/* claro/escuro vem da classe do body (applyTheme); sem fundo próprio, o fundo é o do board */}
+    <Theme className="app-theme" accentColor="indigo" grayColor="slate" radius="medium" scaling="95%" hasBackground={false}>
+      {isFilters ? <FiltersApp /> : <App />}
+    </Theme>
+  </React.StrictMode>,
+);

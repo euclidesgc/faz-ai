@@ -71,6 +71,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   escolha fica lembrada).
 - Campos de texto, link e número do card não perdem mais letras quando você digita rápido. O
   valor é gravado ao sair do campo, com Enter ou ao fechar o card, em vez de a cada tecla.
+- **Tela de Campos refeita**: cada campo vira um cartão com o nome numa caixa de texto, o tipo com
+  a explicação do que ele guarda, como ele aparece no board (com a prévia ao vivo), as opções como
+  selos (Enter inclui, X tira) e os tipos de card em que ele existe. **Novo campo**, no topo, abre o
+  rascunho com a escolha do tipo; campos de seleção pedem ao menos uma opção. A exibição "Só no
+  detalhe" passou a se chamar **Oculto**.
+- Os formulários passam a usar os componentes do [Radix Themes](https://www.radix-ui.com/themes),
+  da mesma família das cores do board. As outras telas migram aos poucos.
 
 ## 0.29.1
 

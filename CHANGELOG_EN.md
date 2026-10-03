@@ -71,6 +71,13 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   remembered).
 - Text, link and number fields on a card no longer drop letters when you type fast. The value is
   saved when you leave the field, press Enter or close the card, instead of on every keystroke.
+- **Fields screen redone**: each field becomes a card with its name in a text box, the type with an
+  explanation of what it stores, how it shows on the board (with a live preview), the options as
+  chips (Enter adds, X removes) and the card types it exists in. **Novo campo** (new field), at the
+  top, opens the draft with the type choice; selection fields require at least one option. The
+  "Só no detalhe" display is now called **Oculto** (hidden).
+- Forms now use [Radix Themes](https://www.radix-ui.com/themes) components, from the same family as
+  the board's colors. The other screens migrate gradually.
 
 ## 0.29.1
 

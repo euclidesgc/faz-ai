@@ -88,6 +88,25 @@ olho.
 - Para um ícone novo: escolha no site do Lucide, importe em `icons.tsx` e exporte com um nome que
   diga o que ele significa no board, não o desenho.
 
+## Componentes (Radix Themes)
+
+- Formulários e painéis novos usam [Radix Themes](https://www.radix-ui.com/themes): `TextField`,
+  `Select`, `SegmentedControl`, `Switch`, `CheckboxGroup`, `Card`, `Badge`, `Button`. É da mesma
+  família da paleta (Radix Colors), então os valores de cor são os mesmos de `tokens.css`.
+- O tema envolve o app em `main.tsx` (`accentColor="indigo"`, `grayColor="slate"`, sem fundo
+  próprio). O claro/escuro vem da classe `light`/`dark` que `applyTheme` põe no `body`, junto do
+  `data-theme`.
+- Entram só `tokens/base.css`, as escalas `indigo`, `slate` e `red` e `components.css`; sem
+  `utilities.css`. Por isso não use as props de espaçamento e layout dos componentes (`m`, `p`,
+  `gap`, `Flex`, `Box`, `Grid`): o layout fica em `styles.css`.
+- As regras de elemento de `styles.css` (`button`, `input`, `select`, `textarea`, `a`) têm
+  `:where(:not([class*='rt-']))`: valem só para os nossos controles e não mexem nos do Radix. Regra
+  nova de elemento segue o mesmo padrão.
+- Campo de formulário: `FormField` (`components/ui/FormField.tsx`), com o rótulo acima, o controle e
+  uma linha de ajuda abaixo. O rótulo aponta para o controle pelo `id`.
+- As telas antigas migram aos poucos: ao refazer uma tela, troque os controles escritos à mão pelos
+  do Radix.
+
 ## Como adicionar uma cor
 
 1. Escolha o passo na escala Radix (1-2 fundos, 3-5 fundos de componente, 6-8 bordas, 9-10

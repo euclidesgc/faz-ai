@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import type { ThemeMode } from '../../src/shared/appearance';
 import { ThemeToggle } from '../../src/webview/components/ThemeToggle';
 import { AppearanceSettings } from '../../src/webview/components/settings/AppearanceSettings';
+import { applyTheme } from '../../src/webview/appearance';
 
 let board: SeededBoard;
 beforeAll(async () => {
@@ -44,5 +45,17 @@ describe('AppearanceSettings', () => {
     render(<AppearanceSettings />);
     await userEvent.selectOptions(screen.getByLabelText('Fonte dos textos'), 'serif');
     expect(lastSent('settings.board.update').patch).toEqual({ appearance: { font: 'serif' } });
+  });
+});
+
+describe('applyTheme', () => {
+  it('marca data-theme e a classe light/dark que os componentes do Radix Themes leem', () => {
+    applyTheme('dark');
+    expect(document.body.dataset.theme).toBe('dark');
+    expect(document.body).toHaveClass('dark');
+    expect(document.body).not.toHaveClass('light');
+    applyTheme('light');
+    expect(document.body).toHaveClass('light');
+    expect(document.body).not.toHaveClass('dark');
   });
 });
