@@ -8,7 +8,7 @@ import { RulesSettings } from './RulesSettings';
 import { HarnessSettings } from './HarnessSettings';
 import { ModelsSettings } from './ModelsSettings';
 import { AppearanceSettings } from './AppearanceSettings';
-import { ExecProfilesSettings } from './ExecProfilesSettings';
+import { AgentsSettings } from './AgentsSettings';
 import { GitSettings } from './GitSettings';
 import {
   Button,
@@ -23,7 +23,7 @@ import {
   IconModels,
   IconPanelClose,
   IconPanelOpen,
-  IconProfiles,
+  IconAgents,
   IconReset,
   IconRules,
   IconTypes,
@@ -37,7 +37,7 @@ const TABS: [SettingsTab, string, Icon][] = [
   ['fields', 'Campos', IconFields],
   ['rules', 'Regras do board', IconRules],
   ['harness', 'Harness de IA', IconHarness],
-  ['profiles', 'Perfis de execução', IconProfiles],
+  ['agents', 'Agentes', IconAgents],
   ['models', 'Modelos de IA', IconModels],
   ['git', 'Git', IconBranch],
   ['appearance', 'Aparência', IconAppearance],
@@ -139,7 +139,7 @@ export function Settings() {
         {tab === 'appearance' && <AppearanceSettings />}
         {tab === 'harness' && <HarnessSettings />}
         {tab === 'git' && <GitSettings />}
-        {tab === 'profiles' && <ExecProfilesSettings />}
+        {tab === 'agents' && <AgentsSettings />}
       </div>
     </div>
   );

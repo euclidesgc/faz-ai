@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ExecInput } from '../src/extension/execution';
 import { headlessCommand, tmpArg, type HeadlessCommand } from '../src/extension/headless';
-import { EXEC_ENFORCEMENT, parseProfiles } from '../src/shared/execution';
+import { EXEC_ENFORCEMENT, defaultAgent, parseProfiles } from '../src/shared/execution';
 import { ALL_AI_TOOLS } from '../src/shared/harness';
 
 const exec: ExecInput = {
@@ -94,6 +94,7 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
       {
         id: 'a',
         name: 'Plan',
+        purpose: '',
         agent: '',
         skills: ['x'],
         mcpServers: [],
@@ -105,7 +106,8 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
       },
       {
         id: 'b',
-        name: 'Perfil',
+        name: 'Agente',
+        purpose: '',
         agent: '',
         skills: [],
         mcpServers: null,
@@ -116,6 +118,10 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
         isDefault: false,
       },
     ]);
-    expect(parseProfiles('isto não é json')).toEqual([]);
+    // sem nada (ou com lixo), vale o agente padrão: toda execução passa por um agente
+    expect(parseProfiles('isto não é json')).toEqual([defaultAgent()]);
+    expect(parseProfiles('[]')).toEqual([defaultAgent()]);
+    // sem nenhum marcado como padrão, o primeiro assume
+    expect(parseProfiles(JSON.stringify([{ id: 'x' }, { id: 'y' }])).map((p) => p.isDefault)).toEqual([true, false]);
   });
 });

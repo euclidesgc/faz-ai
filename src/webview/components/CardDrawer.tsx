@@ -7,7 +7,7 @@ import { ChecklistSection } from './card/ChecklistSection';
 import { CommentsTab } from './card/CommentsTab';
 import { DescriptionSection } from './card/DescriptionSection';
 import { DrawerHeader } from './card/DrawerHeader';
-import { ExecProfileBar } from './card/ExecProfileBar';
+import { AgentBar } from './card/AgentBar';
 import { FieldsSection } from './card/FieldsSection';
 import { SubtasksSection } from './card/SubtasksSection';
 import { useDescriptionDraft } from './card/useDescriptionDraft';
@@ -49,7 +49,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
         <CardHeading card={card} />
         {live && <StatusBar card={card} />}
         <WorkspaceBar card={card} />
-        <ExecProfileBar card={card} />
+        <AgentBar card={card} />
 
         <CardTabs cardId={card.id} tab={tab} onChange={setTab} />
 

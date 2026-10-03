@@ -3,7 +3,7 @@ import { upgradeBoard } from '../../db/boardTemplate';
 import type { HandlerMap } from './context';
 import { initModels, useTool } from './models';
 
-/** Configurações do board: colunas, tipos, campos, workflows, regras, perfis de execução e o próprio board. */
+/** Configurações do board: colunas, tipos, campos, workflows, regras, agentes de execução e o próprio board. */
 export const boardSettingsHandlers = {
   'settings.column.create': (msg, ctx) => {
     ctx.settings.createColumn(msg.workflowId, msg.name, msg.position);

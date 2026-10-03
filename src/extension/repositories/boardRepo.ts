@@ -106,7 +106,7 @@ export class BoardRepo {
       run(this.db, 'UPDATE boards SET ai_tools_json = ? WHERE id = ?', [JSON.stringify(patch.aiTool), boardId]);
   }
 
-  /** Grava os perfis de execução e solta as colunas e os cards que apontavam para um perfil removido. */
+  /** Grava os agentes (perfis de execução) e solta as colunas e os cards que apontavam para um removido. */
   setExecProfiles(boardId: string, profiles: ExecProfile[]): void {
     const clean = parseProfiles(JSON.stringify(profiles));
     run(this.db, 'UPDATE boards SET exec_profiles_json = ? WHERE id = ?', [JSON.stringify(clean), boardId]);

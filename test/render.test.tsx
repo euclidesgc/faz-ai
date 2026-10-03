@@ -17,7 +17,7 @@ import { ThemeToggle, nextTheme } from '../src/webview/components/ThemeToggle';
 import { TrashView } from '../src/webview/components/TrashView';
 import { WorkflowsSettings } from '../src/webview/components/settings/workflows/WorkflowsSettings';
 import { FieldsSettings } from '../src/webview/components/settings/FieldsSettings';
-import { ExecProfilesSettings } from '../src/webview/components/settings/ExecProfilesSettings';
+import { AgentsSettings } from '../src/webview/components/settings/AgentsSettings';
 import { HarnessSettings } from '../src/webview/components/settings/HarnessSettings';
 import { RuleBuilder } from '../src/webview/components/settings/ModelRulesEditor';
 import { AppearanceSettings } from '../src/webview/components/settings/AppearanceSettings';
@@ -234,8 +234,8 @@ describe('telas montam sem erro', () => {
     const toggle = html(<ThemeToggle />);
     for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
-    const profiles = html(<ExecProfilesSettings />);
-    for (const text of ['Perfis de execução', 'na execução pelo board', 'imposto', 'orientado', 'Novo perfil', 'Nenhum perfil ainda'])
+    const profiles = html(<AgentsSettings />);
+    for (const text of ['Agentes', 'aceita por parâmetro', 'imposto', 'orientado', 'Novo agente', 'Agente padrão'])
       expect(profiles).toContain(text);
     const harness = html(<HarnessSettings />);
     for (const text of [

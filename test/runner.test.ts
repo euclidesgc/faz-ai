@@ -34,7 +34,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     workspaceDir: project,
     homeDir: home,
   });
-  const base = { agent: '', skills: [], tools: [], deniedTools: [], model: '', clean: false, isDefault: true };
+  const base = { purpose: '', agent: '', skills: [], tools: [], deniedTools: [], model: '', clean: false, isDefault: true };
   router.handle({
     type: 'settings.execProfiles.set',
     profiles: [{ ...base, id: 'p', name: 'Restrito', mcpServers: ['github'], deniedTools: ['WebFetch'] }],

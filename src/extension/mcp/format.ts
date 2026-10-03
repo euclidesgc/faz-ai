@@ -174,7 +174,7 @@ export function modelsOverview(s: BoardState) {
   };
 }
 
-/** O que a sessão deve usar neste card, segundo o perfil de execução; vazio quando não há perfil. */
+/** O que a sessão deve usar neste card, segundo o agente do card (o do card, o da fase ou o padrão do board). */
 function executionOf(s: BoardState, c: Card) {
   const m = manifestOf(s, c);
   if (!m.profile) return {};
@@ -189,7 +189,7 @@ function executionOf(s: BoardState, c: Card) {
       ...(m.deniedTools.length ? { deniedTools: m.deniedTools } : {}),
       ...(m.clean ? { clean: true } : {}),
       enforcedByBoardRun: EXEC_ASPECTS.filter((a) => how[a.id] === 'enforced').map((a) => a.id),
-      note: 'Perfil de execução do card. Numa sessão aberta pela pessoa nada disto é imposto: siga como instrução (use só o agente, os servidores MCP e as ferramentas listados; com `clean`, só as skills de requiredSkills). Na execução pelo board, os itens de `enforcedByBoardRun` são impostos por parâmetro.',
+      note: 'Agente de execução do card (`profile` é o nome dele; `agent` é o subagente da ferramenta, se houver). Numa sessão aberta pela pessoa nada disto é imposto: siga como instrução (use só o subagente, os servidores MCP e as ferramentas listados; com `clean`, só as skills de requiredSkills). Na execução pelo board, os itens de `enforcedByBoardRun` são impostos por parâmetro.',
     },
   };
 }
@@ -205,7 +205,7 @@ function supportFiles(skillMd: string, files: string[]) {
 
 /** Skills marcadas no campo "Skills" do card: obrigatórias na execução. */
 export function requiredSkills(s: BoardState, c: Card) {
-  // as skills do card somam às do perfil de execução
+  // as skills do card somam às do agente
   return manifestOf(s, c).skills.map((name) => {
     const skill = s.harness.skills.find((k) => k.name === name);
     if (skill) {

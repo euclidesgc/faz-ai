@@ -7,7 +7,7 @@ import type { BoardState, Card } from '../shared/model';
 /** Nome do servidor MCP do board, como registrado em cada ferramenta. */
 export const BOARD_SERVER = 'faz-ai';
 
-/** O que o perfil pede e a linha de comando da ferramenta consegue impor. */
+/** O que o agente pede e a linha de comando da ferramenta consegue impor. */
 export interface ExecInput {
   agent: string;
   /** servidores MCP liberados além do do board; null = sem restrição */
@@ -55,7 +55,7 @@ function claudeServers(projectDir: string, homeDir: string): Record<string, unkn
   };
 }
 
-/** Traduz o perfil do card no que a execução pelo board impõe e no que só orienta. */
+/** Traduz o agente do card no que a execução pelo board impõe e no que só orienta. */
 export function executionPlan(s: BoardState, c: Card, projectDir: string, homeDir: string): ExecPlan {
   const tool: AiTool = s.board.aiTool;
   const manifest = manifestOf(s, c);
@@ -70,10 +70,10 @@ export function executionPlan(s: BoardState, c: Card, projectDir: string, homeDi
     const defs = claudeServers(projectDir, homeDir);
     if (!defs[BOARD_SERVER])
       throw new Error(
-        'O perfil de execução restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Use "Conectar ao board (MCP)" em Configurações → Harness de IA.',
+        'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Use "Conectar ao board (MCP)" em Configurações → Harness de IA.',
       );
     const missing = allowed.filter((n) => !defs[n]);
-    if (missing.length) throw new Error(`Servidores MCP do perfil não encontrados na configuração do Claude Code: ${missing.join(', ')}.`);
+    if (missing.length) throw new Error(`Servidores MCP do agente não encontrados na configuração do Claude Code: ${missing.join(', ')}.`);
     mcpConfig = JSON.stringify({ mcpServers: Object.fromEntries([BOARD_SERVER, ...allowed].map((n) => [n, defs[n]])) });
   }
 
@@ -92,8 +92,8 @@ export function executionPlan(s: BoardState, c: Card, projectDir: string, homeDi
 
   const mark = (aspect: keyof typeof how) => (how[aspect] === 'enforced' ? 'imposto' : 'orientado');
   const summary = [
-    `Perfil: ${manifest.profile ?? 'nenhum'}`,
-    ...(manifest.agent ? [`Agente: ${manifest.agent} (${mark('agent')})`] : []),
+    `Agente do board: ${manifest.profile ?? 'nenhum'}`,
+    ...(manifest.agent ? [`Subagente da ferramenta: ${manifest.agent} (${mark('agent')})`] : []),
     ...(manifest.skills.length ? [`Skills: ${manifest.skills.join(', ')} (pelo caminho do arquivo)`] : []),
     ...(allowed ? [`Servidores MCP: ${[BOARD_SERVER, ...allowed].join(', ')} (${mark('mcp')})`] : []),
     ...(manifest.tools.length ? [`Ferramentas: ${manifest.tools.join(', ')} (${mark('tools')})`] : []),

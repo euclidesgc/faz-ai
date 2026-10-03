@@ -7,6 +7,17 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 
 ## Unreleased
 
+- **Execution profiles become Agents.** The screen, the menu and the card now say **Agente**: it
+  defines how the AI works (skills, MCP servers, tools, model and effort). Every run started by the
+  board goes through an agent, the card's, the phase's or the default, and the board always has at
+  least one (**Agente padrão**, no restrictions); the last one cannot be deleted. The tool's own
+  agent file is now called **Subagente** (subagent, optional).
+- **Agents configured by intent.** Each agent has the field **O que este agente faz** (what this
+  agent does); with it, **Sugerir pela intenção** selects matching skills and MCP servers
+  (word-based search, no AI call). An agent's skills use the picker window with search, and tools
+  have ready-made sets: **Só leitura** (read-only) and **Editar código** (edit code). The table of
+  what Claude Code accepts by parameter moved into a collapsed section.
+
 - **Card Skills field with a picker window.** Instead of a wall of chips (one per skill, hundreds
   with plugins), the field shows what is selected and opens a window with search by name or
   description, Todas / Marcadas / Projeto / Globais / Plugins tabs (all / selected / project /

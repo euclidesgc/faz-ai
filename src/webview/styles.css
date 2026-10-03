@@ -2286,3 +2286,22 @@ body.host-web .drawer {
 .skill-footer .muted {
   margin-right: auto;
 }
+
+/* agentes */
+.agents-help {
+  margin: var(--sp-8) 0;
+}
+.agents-help summary {
+  cursor: pointer;
+  color: var(--link);
+  font-size: var(--fs-sm);
+}
+.agent-purpose {
+  font-size: var(--fs-md);
+}
+.agent-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+  margin-bottom: var(--sp-4);
+}

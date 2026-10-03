@@ -62,14 +62,11 @@ export function PhaseEditor({ column }: { column: Column }) {
         )}
       </FormField>
       {profiles.length > 0 && (
-        <FormField
-          label="Perfil de execução"
-          hint="Agente, skills, servidores MCP, ferramentas e modelo dos cards desta fase; cada card pode trocar."
-        >
+        <FormField label="Agente" hint="Skills, servidores MCP, ferramentas e modelo dos cards desta fase; cada card pode trocar.">
           {(id) => (
             <SelectField
               id={id}
-              aria-label="Perfil de execução"
+              aria-label="Agente"
               options={[
                 {
                   value: DEFAULT_PROFILE,

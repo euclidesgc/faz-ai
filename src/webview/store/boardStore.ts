@@ -6,7 +6,7 @@ import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../..
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 
 export type View = 'board' | 'trash' | 'settings';
-export type SettingsTab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'profiles' | 'git' | 'appearance';
+export type SettingsTab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'agents' | 'git' | 'appearance';
 
 export interface DialogSpec {
   title: string;

@@ -5,7 +5,7 @@ import { cardArg } from './args';
 import { aiOrigin, detail, findProfile, live } from './helpers';
 import type { DefineTool, ToolContext } from './registry';
 
-/** Execução pela IA: status de trabalho, workspace (branch/pasta), perfil de execução e pull request. */
+/** Execução pela IA: status de trabalho, workspace (branch/pasta), agente de execução e pull request. */
 export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
   const setStatus = (
     router: MessageRouter,
@@ -87,8 +87,8 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'set_card_profile',
-    'Escolhe o perfil de execução de um card (agente, skills, servidores MCP, ferramentas e modelo que a sessão deve usar); os perfis estão em get_board. Sem `profile`, o card volta a usar o perfil da coluna.',
-    { card: cardArg, profile: z.string().optional().describe('Nome do perfil; omita para voltar ao da coluna') },
+    'Escolhe o agente de execução de um card (skills, servidores MCP, ferramentas e modelo que a sessão deve usar); os agentes estão em execProfiles, em get_board. Sem `profile`, o card volta a usar o agente da coluna.',
+    { card: cardArg, profile: z.string().optional().describe('Nome do agente; omita para voltar ao da coluna') },
     (a, router) => {
       const card = live(findCard(router.snapshot(), a.card));
       router.handle(

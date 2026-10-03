@@ -18,7 +18,7 @@ export function createCard(ctx: BoardContext, input: { typeId: string; columnId:
   return id;
 }
 
-/** Ciclo de vida do card: criar, editar, mover, arquivar, lixeira, campos, status e perfil de execução. */
+/** Ciclo de vida do card: criar, editar, mover, arquivar, lixeira, campos, status e agente de execução. */
 export const cardHandlers = {
   'card.create': (msg, ctx) => {
     createCard(ctx, msg);

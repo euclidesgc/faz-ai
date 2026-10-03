@@ -6,6 +6,17 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Perfis de execução viram Agentes.** A tela, o menu e o card passam a dizer **Agente**: é ele que
+  define como a IA trabalha (skills, servidores MCP, ferramentas, modelo e esforço). Toda execução
+  pelo board roda através de um agente, o do card, o da fase ou o padrão, e o board sempre tem ao
+  menos um (**Agente padrão**, sem restrições); o último não pode ser apagado. O arquivo de agente
+  da própria ferramenta agora se chama **Subagente** (opcional).
+- **Agentes configuráveis por intenção.** Cada agente tem o campo **O que este agente faz**; com
+  ele, **Sugerir pela intenção** marca skills e servidores MCP que combinam (busca por palavras,
+  sem chamar IA). As skills do agente usam a janela de escolha com busca, e as ferramentas têm
+  conjuntos prontos: **Só leitura** e **Editar código**. A tabela do que o Claude Code aceita por
+  parâmetro foi para uma seção recolhida.
+
 - **Campo Skills do card com janela de escolha.** No lugar da parede de chips (uma para cada skill,
   centenas com plugins), o campo mostra as marcadas e abre uma janela com busca por nome ou
   descrição, abas Todas / Marcadas / Projeto / Globais / Plugins, caixa de seleção por skill e a

@@ -44,7 +44,7 @@ import {
   RotateCcw,
   Scale,
   Shapes,
-  SlidersHorizontal,
+  UserCog,
   Sparkles,
   TextCursorInput,
   Trash2,
@@ -129,7 +129,7 @@ export const IconTypes = icon(Shapes, 'IconTypes');
 export const IconFields = icon(TextCursorInput, 'IconFields');
 export const IconRules = icon(Scale, 'IconRules');
 export const IconHarness = icon(BrainCircuit, 'IconHarness');
-export const IconProfiles = icon(SlidersHorizontal, 'IconProfiles');
+export const IconAgents = icon(UserCog, 'IconAgents');
 export const IconModels = icon(Cpu, 'IconModels');
 export const IconAppearance = icon(Palette, 'IconAppearance');
 export const IconConnect = icon(Plug, 'IconConnect');
