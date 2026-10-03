@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { badgeStyle } from '../../../shared/color';
-import { fieldsForType, useBoardStore } from '../../store/boardStore';
+import { fieldsForType } from '../../../shared/selectors';
+import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { FieldEditor } from '../FieldRenderer';
 import { AddInput, DeleteButton, FieldRow } from '../ui';

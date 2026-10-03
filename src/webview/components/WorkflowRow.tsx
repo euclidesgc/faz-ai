@@ -13,7 +13,8 @@ import {
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { archiveKey } from '../../shared/filters';
 import type { Card as CardModel, Workflow } from '../../shared/model';
-import { archivedIn, cardsIn, columnsOf, useBoardStore, useFilteredIds } from '../store/boardStore';
+import { archivedIn, cardsIn, columnsOf } from '../../shared/selectors';
+import { useBoardStore, useFilteredIds } from '../store/boardStore';
 import { cards, settings } from '../commands';
 import { requestArchive, requestMove } from '../store/actions';
 import { CollapsedColumn, Column } from './Column';

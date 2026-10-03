@@ -10,6 +10,7 @@ import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../.
 import { newId } from '../db/ids';
 import { FLOW_SKILL } from '../flowSkill';
 import { ALL_CARD_STATUSES } from '../../shared/status';
+import { childrenOf, columnsOf } from '../../shared/selectors';
 import {
   boardOverview,
   pendingOverview,
@@ -198,9 +199,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       if (!wf) throw new Error('Workflow não encontrado.');
       const type = a.type ? findType(s, a.type) : s.cardTypes.find((t) => t.defaultWorkflowId === wf.id);
       if (!type) throw new Error(`Nenhum tipo de card definido para o workflow "${wf.name}".`);
-      const column = a.column
-        ? findColumn(s, a.column, wf.id)
-        : s.columns.filter((c) => c.workflowId === wf.id).sort((x, y) => x.position - y.position)[0];
+      const column = a.column ? findColumn(s, a.column, wf.id) : columnsOf(s, wf.id)[0];
       if (!column) throw new Error(`O workflow "${wf.name}" não tem colunas.`);
       // valida os campos antes de criar, para não deixar um card pela metade
       for (const [name, value] of Object.entries(a.fields ?? {})) coerceFieldValue(findField(s, name), value, s.board.modelCatalog);
@@ -399,7 +398,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     (a, router) => {
       const s = router.snapshot();
       const card = findCard(s, a.card);
-      const kids = s.cards.filter((k) => k.parentId === card.id && k.deletedAt === null).length;
+      const kids = childrenOf(s, card.id).length;
       router.handle({ type: 'card.trash', cardId: card.id });
       return `#${card.number} movido para a lixeira${kids ? `, com ${kids} sub-tarefa(s)` : ''}.`;
     },

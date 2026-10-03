@@ -1,4 +1,5 @@
 import { cardRef, type Card } from '../shared/model';
+import { columnsOf, openChildren } from '../shared/selectors';
 import { removeWorktree } from './git';
 import type { MessageRouter } from './panel/messageRouter';
 
@@ -32,7 +33,7 @@ export class AutoMerger {
   private target(card: Card) {
     const s = this.router.snapshot();
     if (!s.board.git.autoMerge || card.parentId || !card.prUrl || this.merging.has(card.id)) return null;
-    const columns = s.columns.filter((c) => c.workflowId === card.workflowId).sort((a, b) => a.position - b.position);
+    const columns = columnsOf(s, card.workflowId);
     const next = columns[columns.findIndex((c) => c.id === card.columnId) + 1];
     return next?.category === 'done' ? next : null;
   }
@@ -46,13 +47,7 @@ export class AutoMerger {
     const block = (reason: string) =>
       this.router.handle({ type: 'card.status.set', cardId, status: 'blocked', note: reason }, { author: AUTHOR, source: 'ai' });
 
-    const openKids = state.cards.filter(
-      (k) =>
-        k.parentId === cardId &&
-        k.deletedAt === null &&
-        k.archivedAt === null &&
-        state.columns.find((c) => c.id === k.columnId)?.category === 'open',
-    ).length;
+    const openKids = openChildren(state, cardId).length;
     if (openKids && state.board.rules.blockDoneWithOpenChildren)
       return void block(`O merge de ${card.prUrl} não foi feito: ${openKids} sub-tarefa(s) da história ainda em aberto.`);
 

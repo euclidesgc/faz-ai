@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { create } from 'zustand';
-import type { BoardState, Card, Column, FieldDef, Id } from '../../shared/model';
+import type { BoardState, Id } from '../../shared/model';
+import { isLive } from '../../shared/selectors';
 import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../../shared/filters';
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 
@@ -133,30 +134,6 @@ export function useHostSync(): void {
     return off;
   }, []);
 }
-
-// ---- seletores utilitários ----
-export const isLive = (c: Card): boolean => c.deletedAt === null && c.archivedAt === null;
-
-export const columnsOf = (state: BoardState, workflowId: Id): Column[] =>
-  state.columns.filter((c) => c.workflowId === workflowId).sort((a, b) => a.position - b.position);
-
-/** Cards ativos da coluna (fora da lixeira e do arquivo), em ordem. */
-export const cardsIn = (state: BoardState, columnId: Id): Card[] =>
-  state.cards.filter((c) => c.columnId === columnId && isLive(c)).sort((a, b) => a.position - b.position);
-
-export const archivedIn = (state: BoardState, workflowId: Id): Card[] =>
-  state.cards
-    .filter((c) => c.workflowId === workflowId && c.archivedAt !== null && c.deletedAt === null)
-    .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
-
-export const childrenOf = (state: BoardState, parentId: Id): Card[] =>
-  state.cards.filter((c) => c.parentId === parentId && c.deletedAt === null);
-
-export const fieldsForType = (state: BoardState, typeId: Id): FieldDef[] =>
-  state.fieldDefs.filter((f) => f.appliesToTypes === null || f.appliesToTypes.includes(typeId)).sort((a, b) => a.position - b.position);
-
-export const valueOf = (state: BoardState, cardId: Id, fieldId: Id) =>
-  state.fieldValues.find((v) => v.cardId === cardId && v.fieldId === fieldId)?.value ?? null;
 
 /** Ids que passam nos filtros, ou null quando não há filtro ativo. */
 export function useFilteredIds(): Set<Id> | null {

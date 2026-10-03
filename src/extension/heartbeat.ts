@@ -1,5 +1,6 @@
 import { cardRef, type BoardState, type Card } from '../shared/model';
 import { aiQueue, pendingWork } from '../shared/pending';
+import { isLive } from '../shared/selectors';
 import { statusInfo } from '../shared/status';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
@@ -28,7 +29,7 @@ export function heartbeatTargets(s: BoardState): Card[] {
   const out: Card[] = [];
   for (const card of aiQueue(p)) {
     const story = card.parentId ? byId.get(card.parentId) : card;
-    if (!story || story.deletedAt !== null || story.archivedAt !== null || out.includes(story)) continue;
+    if (!story || !isLive(story) || out.includes(story)) continue;
     const withHuman = !!story.status && statusInfo(story.status).owner === 'human';
     if (story.status === 'running' || (withHuman && !unanswered.has(story.id))) continue;
     out.push(story);

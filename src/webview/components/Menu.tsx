@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { Button } from './ui';
 
 export type MenuItem =
   { label: string; onClick(): void; danger?: boolean; disabled?: boolean; checked?: boolean } | { header: string } | 'sep';
@@ -34,10 +35,13 @@ export function Menu({ items, title = 'Mais ações', children = '⋯' }: { item
 
   return (
     <>
-      <button
+      <Button
         ref={btn}
-        className="icon menu-trigger"
+        variant="icon"
+        className="menu-trigger"
         title={title}
+        aria-haspopup="menu"
+        aria-expanded={pos !== null}
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
@@ -47,7 +51,7 @@ export function Menu({ items, title = 'Mais ações', children = '⋯' }: { item
         }}
       >
         {children}
-      </button>
+      </Button>
       {pos &&
         createPortal(
           <div className="menu" style={{ top: pos.top, left: pos.left }} onMouseDown={(e) => e.stopPropagation()}>
@@ -59,9 +63,9 @@ export function Menu({ items, title = 'Mais ações', children = '⋯' }: { item
                   {it.header}
                 </span>
               ) : (
-                <button
+                <Button
                   key={i}
-                  className={it.danger ? 'danger' : ''}
+                  danger={it.danger}
                   disabled={it.disabled}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -71,7 +75,7 @@ export function Menu({ items, title = 'Mais ações', children = '⋯' }: { item
                 >
                   <span className="menu-check">{it.checked ? '✓' : ''}</span>
                   {it.label}
-                </button>
+                </Button>
               ),
             )}
           </div>,

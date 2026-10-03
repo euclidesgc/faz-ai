@@ -2,6 +2,7 @@ import { useAppearance } from './appearance';
 import { activeFilterCount } from '../shared/filters';
 import { FilterPanel } from './components/FilterPanel';
 import { Button } from './components/ui';
+import { isLive } from '../shared/selectors';
 import { useBoardStore, useFilteredIds, useHostSync } from './store/boardStore';
 
 /** Conteúdo da seção "Filtros" na barra lateral. */
@@ -16,7 +17,7 @@ export function FiltersApp() {
 
   if (!state) return <div className="loading">Carregando…</div>;
   const active = activeFilterCount(filters) + (selectedParentId ? 1 : 0);
-  const total = state.cards.filter((c) => c.deletedAt === null && c.archivedAt === null).length;
+  const total = state.cards.filter(isLive).length;
   const shown = matched ? state.cards.filter((c) => matched.has(c.id) && c.archivedAt === null).length : total;
 
   return (
