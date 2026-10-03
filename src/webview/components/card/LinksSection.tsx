@@ -6,7 +6,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { links } from '../../commands';
 import { Button as RxButton, IconButton, TextField } from '@radix-ui/themes';
 import { IconTrash, SelectField } from '../ui';
-import { t } from '../../i18n';
+import { t, dt } from '../../i18n';
 
 type Relation = 'parent' | 'child' | 'related';
 const RELATIONS: { value: Relation; label: string }[] = [
@@ -45,7 +45,7 @@ export function LinksSection({ card }: { card: Card }) {
       <a onClick={() => openCard(c.id)}>
         <span className="card-id">{cardRef(c)}</span> {c.title}
       </a>
-      <span className="muted">{columnOf(state, c)?.name}</span>
+      <span className="muted">{dt(columnOf(state, c)?.name ?? '')}</span>
       <IconButton
         variant="ghost"
         color="red"
@@ -108,7 +108,8 @@ export function LinksSection({ card }: { card: Card }) {
                   setQuery('');
                 }}
               >
-                <span className="card-id">{cardRef(c)}</span> {c.title} <span className="muted">· {columnOf(state, c)?.name}</span>
+                <span className="card-id">{cardRef(c)}</span> {c.title}{' '}
+                <span className="muted">· {dt(columnOf(state, c)?.name ?? '')}</span>
               </RxButton>
             </li>
           ))}

@@ -5,7 +5,7 @@ import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelValue, type ModelRule,
 import type { BoardState } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
-import { t } from '../../i18n';
+import { t, dt } from '../../i18n';
 import { ModelEditor } from '../FieldRenderer';
 import { Button, Card, IconButton, Switch, TextField } from '@radix-ui/themes';
 import { FormField, IconArrowDown, IconArrowUp, IconClose, IconEdit, IconPlus, IconTrash, SelectField } from '../ui';
@@ -31,7 +31,7 @@ function sources(state: BoardState): { id: string; name: string; values: string[
   ];
 }
 
-const valueText = (v: string): string => (v === 'true' ? t('Sim') : v === 'false' ? t('Não') : v);
+const valueText = (v: string): string => (v === 'true' ? t('Sim') : v === 'false' ? t('Não') : dt(v));
 
 function ConditionRow({
   state,
@@ -53,7 +53,7 @@ function ConditionRow({
         aria-label={t('Campo da condição')}
         options={[
           ...(source ? [] : [{ value: condition.fieldId, label: t('(campo apagado)') }]),
-          ...all.map((s) => ({ value: s.id, label: s.name })),
+          ...all.map((s) => ({ value: s.id, label: dt(s.name) })),
         ]}
         value={condition.fieldId}
         onChange={(fieldId) => onChange({ ...condition, fieldId, value: all.find((s) => s.id === fieldId)?.values[0] ?? '' })}

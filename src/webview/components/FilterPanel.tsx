@@ -1,6 +1,6 @@
 import type { DatePreset, Filters, Relation } from '../../shared/filters';
 import { useBoardStore } from '../store/boardStore';
-import { t } from '../i18n';
+import { t, dt } from '../i18n';
 import { Checkbox, TextField } from '@radix-ui/themes';
 import { ChipsEditor, optionChip, SelectField } from './ui';
 
@@ -48,7 +48,7 @@ export function FilterPanel() {
       <div className="filter-group">
         <h3>{t('Tipo')}</h3>
         <ChipsEditor
-          options={state.cardTypes.map((ct) => ({ value: ct.id, label: ct.name }))}
+          options={state.cardTypes.map((ct) => ({ value: ct.id, label: dt(ct.name) }))}
           values={filters.typeIds}
           onChange={(typeIds) => setFilters({ typeIds })}
         />
@@ -56,7 +56,7 @@ export function FilterPanel() {
 
       {optionFields.map((f) => (
         <div key={f.id} className="filter-group">
-          <h3>{f.name}</h3>
+          <h3>{dt(f.name)}</h3>
           <ChipsEditor
             options={
               f.kind === 'checkbox'
@@ -80,7 +80,7 @@ export function FilterPanel() {
             { value: ANY_DATE, label: t('Qualquer data') },
             { value: 'createdAt', label: t('Criado em') },
             { value: 'updatedAt', label: t('Atualizado em') },
-            ...dateFields.map((f) => ({ value: f.id, label: f.name })),
+            ...dateFields.map((f) => ({ value: f.id, label: dt(f.name) })),
           ]}
           value={filters.dateField ?? ANY_DATE}
           onChange={(field) =>

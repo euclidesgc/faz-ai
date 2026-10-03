@@ -6,7 +6,7 @@ import { settings } from '../../../commands';
 import { MarkdownEditor } from '../../MarkdownEditor';
 import { Button, TextArea, TextField } from '@radix-ui/themes';
 import { FormField, SelectField } from '../../ui';
-import { t } from '../../../i18n';
+import { t, dt } from '../../../i18n';
 
 /** O Select do Radix não aceita `value` vazio: "padrão do board" usa este valor. */
 const DEFAULT_PROFILE = '__default';
@@ -77,7 +77,7 @@ export function PhaseEditor({ column }: { column: Column }) {
                   value: DEFAULT_PROFILE,
                   label: defaultProfile ? t('Padrão do board ({name})', { name: defaultProfile.name }) : t('Padrão do board (nenhum)'),
                 },
-                ...profiles.map((p) => ({ value: p.id, label: p.name })),
+                ...profiles.map((p) => ({ value: p.id, label: dt(p.name) })),
               ]}
               value={column.execProfile ?? DEFAULT_PROFILE}
               onChange={(id) => patch({ execProfile: id === DEFAULT_PROFILE ? null : id })}

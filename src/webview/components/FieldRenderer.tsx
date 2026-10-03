@@ -7,7 +7,7 @@ import { useBoardStore } from '../store/boardStore';
 import { ChipsEditor, IconExternal, OptionLabel, optionChip, SelectField, TextField } from './ui';
 import { isSkillsField } from './settings/fields/fieldKinds';
 import { SkillPicker } from './skills/SkillPicker';
-import { getLocale, t } from '../i18n';
+import { dt, getLocale, t } from '../i18n';
 
 /** O campo tem algo para mostrar no card (checkbox desmarcado e lista vazia não contam). */
 export const hasValue = (value: FieldValue): value is NonNullable<FieldValue> =>
@@ -21,9 +21,9 @@ export function FieldBadge({ field, value }: { field: FieldDef; value: FieldValu
     return (
       <span
         className={field.display === 'chip' ? 'chip' : field.display === 'inline' ? 'inline-field' : 'badge'}
-        title={`${field.name}: ${modelDisplay(catalog, value, true)}`}
+        title={`${dt(field.name)}: ${modelDisplay(catalog, value, true)}`}
       >
-        {field.display === 'inline' && <em>{field.name}: </em>}
+        {field.display === 'inline' && <em>{dt(field.name)}: </em>}
         {modelDisplay(catalog, value)}
       </span>
     );
@@ -33,8 +33,8 @@ export function FieldBadge({ field, value }: { field: FieldDef; value: FieldValu
   return (
     <>
       {items.map((v, i) => (
-        <span key={i} className={cls} title={field.name}>
-          {field.display === 'inline' && <em>{field.name}: </em>}
+        <span key={i} className={cls} title={dt(field.name)}>
+          {field.display === 'inline' && <em>{dt(field.name)}: </em>}
           {field.kind === 'select' || field.kind === 'multiselect' ? <OptionLabel text={format(field, v)} /> : format(field, v)}
         </span>
       ))}
@@ -43,7 +43,7 @@ export function FieldBadge({ field, value }: { field: FieldDef; value: FieldValu
 }
 
 function format(field: FieldDef, v: string | number | boolean): string {
-  if (field.kind === 'checkbox') return v ? field.name : '';
+  if (field.kind === 'checkbox') return v ? dt(field.name) : '';
   if (field.kind === 'date' && typeof v === 'string') {
     const d = new Date(v);
     return isNaN(d.getTime()) ? v : d.toLocaleDateString(getLocale() === 'en' ? 'en-US' : undefined);
@@ -82,11 +82,11 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
     case 'date':
       return <RxTextField.Root type="date" value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value || null)} />;
     case 'checkbox':
-      return <Checkbox aria-label={field.name} checked={!!value} onCheckedChange={(on) => onChange(on === true)} />;
+      return <Checkbox aria-label={dt(field.name)} checked={!!value} onCheckedChange={(on) => onChange(on === true)} />;
     case 'select':
       return (
         <SelectField
-          aria-label={field.name}
+          aria-label={dt(field.name)}
           options={[{ value: NO_VALUE, label: '—' }, ...field.options.map((o) => ({ value: o, label: <OptionLabel text={o} /> }))]}
           value={(value as string) || NO_VALUE}
           onChange={(v) => onChange(v === NO_VALUE ? null : v)}

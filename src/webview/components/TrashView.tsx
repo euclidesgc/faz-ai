@@ -2,7 +2,7 @@ import { badgeStyle } from '../../shared/color';
 import { cardRef } from '../../shared/model';
 import { columnOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
-import { formatDateTime, t } from '../i18n';
+import { formatDateTime, t, dt } from '../i18n';
 import { cards, trash } from '../commands';
 import { Button, DeleteButton, IconParent } from './ui';
 
@@ -70,10 +70,10 @@ export function TrashView() {
                   </td>
                   <td>
                     <span className="type-badge" style={badgeStyle(type?.color)}>
-                      {type?.name}
+                      {type && dt(type.name)}
                     </span>
                   </td>
-                  <td>{column?.name}</td>
+                  <td>{column && dt(column.name)}</td>
                   <td>{formatDateTime(c.deletedAt!)}</td>
                   <td className="row end">
                     <Button onClick={() => cards.restore(c.id)}>{t('Restaurar')}</Button>

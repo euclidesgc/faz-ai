@@ -1,3 +1,4 @@
+import { dt } from '../../i18n';
 import { techColor, techIcon } from '../../techLogos';
 import type { ChipOption } from './ChipsEditor';
 
@@ -17,7 +18,7 @@ export function OptionLabel({ text }: { text: string }) {
   return (
     <>
       <TechLogo name={text} />
-      {text}
+      {dt(text)}
     </>
   );
 }

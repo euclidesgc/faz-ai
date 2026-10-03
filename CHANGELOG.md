@@ -11,6 +11,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   cria a tag e a GitHub Release sobre o commit mergeado. Antes, o push direto era recusado pela
   `main` protegida e deixava uma tag solta no remoto. O novo `npm run release -- finish` conclui a
   tag e a GitHub Release depois do merge, sem publicar de novo.
+- **Board padrão em inglês.** Com a interface em inglês, os nomes do board que a extensão cria (os
+  workflows Histórias e Sub-tarefas, colunas como Implementação, Homologação e Concluído, os tipos de
+  card, os campos Fase e Esforço da atividade, suas opções e o Agente padrão) aparecem traduzidos, no
+  board, no card, nos filtros, na lixeira e nas listas das configurações. Muda só a exibição: o nome
+  guardado continua o mesmo, então nada quebra ao trocar de idioma, e o que você criou ou renomeou
+  nunca é traduzido. As caixas de nome das configurações continuam mostrando o nome guardado.
 - **Logo da tecnologia nos campos de seleção.** Opções de campos de seleção e de múltipla seleção
   que nomeiam uma tecnologia (Flutter, Dart, React, TypeScript, Python, Rust, Docker, GitHub e cerca
   de 80 outras, também por apelido: "node", "ts", "k8s") ganham o logo, na cor da marca, no card,

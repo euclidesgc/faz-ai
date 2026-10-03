@@ -127,8 +127,13 @@ olho.
 - `test/i18n.test.ts` barra texto sem tradução, `{parâmetros}` ou tags diferentes entre os idiomas e a
   mesma frase traduzida de dois jeitos. Mensagens de erro e aviso do host chegam em português e
   passam por `t()` no toast: o dicionário casa as que têm `{parâmetro}` como molde.
-- Não se traduz o que é dado: títulos e descrições, nomes de colunas, tipos e campos do board (o padrão
-  é criado em português), nomes de status editados, textos que a IA lê (instruções das fases, MCP).
+- Não se traduz o que é dado: títulos e descrições, nomes de status editados, textos que a IA lê
+  (instruções das fases, MCP). Os nomes do **board padrão** (workflows, colunas, tipos, campos, opções,
+  agente padrão) são guardados em português, que é o que o resto do sistema reconhece (fases, upgrade do
+  board), e só a **exibição** é traduzida por `dt(nome)` (`src/webview/i18n/en/defaults.ts`). Use `dt`
+  onde um desses nomes aparece como texto; nunca grave o resultado de `dt` nem o use em caixas de
+  edição. Nome criado ou renomeado pela pessoa passa sem tradução. `test/ui/defaultNames.test.tsx`
+  barra um nome padrão novo sem tradução.
 - Datas usam `formatDateTime`; o nome do esforço do modelo, `modelDisplay` de `src/webview/modelText.ts`.
 
 ## Como adicionar uma cor

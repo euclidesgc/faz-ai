@@ -1,6 +1,6 @@
 import { cardRef, type Card, type CardType } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
-import { t } from '../../i18n';
+import { t, dt } from '../../i18n';
 import { cards } from '../../commands';
 import { requestArchive, requestTrash } from '../../store/actions';
 import { Menu } from '../Menu';
@@ -14,7 +14,7 @@ export function TitleBar({ card, type, work, overlay }: { card: Card; type?: Car
   const archived = card.archivedAt !== null;
 
   return (
-    <CardBar id={cardRef(card)} typeName={type?.name} color={type?.color} work={work}>
+    <CardBar id={cardRef(card)} typeName={type && dt(type.name)} color={type?.color} work={work}>
       {!overlay && (
         <span className="card-actions">
           <Button

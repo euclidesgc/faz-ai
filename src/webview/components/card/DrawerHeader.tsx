@@ -5,7 +5,7 @@ import { cards } from '../../commands';
 import { requestArchive, requestMove, requestTrash } from '../../store/actions';
 import { Menu } from '../Menu';
 import { Button, IconChevronDown, IconClose, SelectField } from '../ui';
-import { t } from '../../i18n';
+import { t, dt } from '../../i18n';
 
 /** Barra do topo do drawer: tipo, coluna, ações do card e fechar. */
 export function DrawerHeader({ card }: { card: Card }) {
@@ -14,8 +14,8 @@ export function DrawerHeader({ card }: { card: Card }) {
   const close = () => openCard(null);
   const trashed = card.deletedAt !== null;
   const archived = card.archivedAt !== null;
-  const types = typesOf(state, card.workflowId).map((ty) => ({ value: ty.id, label: ty.name }));
-  const columns = columnsOf(state, card.workflowId).map((c) => ({ value: c.id, label: c.name }));
+  const types = typesOf(state, card.workflowId).map((ty) => ({ value: ty.id, label: dt(ty.name) }));
+  const columns = columnsOf(state, card.workflowId).map((c) => ({ value: c.id, label: dt(c.name) }));
 
   return (
     <header className="drawer-header">

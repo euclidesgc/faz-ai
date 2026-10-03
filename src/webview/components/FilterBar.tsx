@@ -1,7 +1,7 @@
 import { activeFilterCount, dateRange } from '../../shared/filters';
 import { useState } from 'react';
 import { useBoardStore } from '../store/boardStore';
-import { t } from '../i18n';
+import { t, dt } from '../i18n';
 import { ui } from '../commands';
 import { isWeb } from '../vscode';
 import { FilterPanel } from './FilterPanel';
@@ -33,7 +33,7 @@ export function FilterBar() {
     if (type)
       chips.push({
         key: `t${id}`,
-        label: t('Tipo: {name}', { name: type.name }),
+        label: t('Tipo: {name}', { name: dt(type.name) }),
         clear: () => setFilters({ typeIds: filters.typeIds.filter((x) => x !== id) }),
       });
   }
@@ -43,7 +43,7 @@ export function FilterBar() {
     const shown = f.kind === 'checkbox' ? values.map((v) => (v === 'true' ? t('Sim') : t('Não'))) : values;
     chips.push({
       key: `f${fieldId}`,
-      label: `${f.name}: ${shown.join(', ')}`,
+      label: `${dt(f.name)}: ${shown.map(dt).join(', ')}`,
       clear: () => setFilters({ fields: { ...filters.fields, [fieldId]: [] } }),
     });
   }
@@ -53,7 +53,7 @@ export function FilterBar() {
         ? t('Criado')
         : filters.dateField === 'updatedAt'
           ? t('Atualizado')
-          : (state.fieldDefs.find((f) => f.id === filters.dateField)?.name ?? t('Data'));
+          : dt(state.fieldDefs.find((f) => f.id === filters.dateField)?.name ?? t('Data'));
     const when =
       filters.datePreset === 'custom'
         ? [filters.dateFrom && t('de {date}', { date: filters.dateFrom }), filters.dateTo && t('até {date}', { date: filters.dateTo })]
