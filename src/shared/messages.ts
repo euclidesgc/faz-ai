@@ -41,6 +41,8 @@ export type WebviewToHost =
   | { type: 'card.workspace.prepare'; cardId: Id }
   /** registra o pull request da história do card */
   | { type: 'card.pr.set'; cardId: Id; url: string }
+  /** liga ou desliga o modo autônomo (YOLO) da história do card */
+  | { type: 'card.yolo.set'; cardId: Id; enabled: boolean }
   /** agente de execução do card; null volta ao da coluna */
   | { type: 'card.execProfile.set'; cardId: Id; profileId: Id | null }
   | { type: 'settings.execProfiles.set'; profiles: ExecProfile[] }

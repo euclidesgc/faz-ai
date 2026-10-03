@@ -1093,3 +1093,69 @@ describe('vínculos entre cards', () => {
     expect((await call('get_card', { card: a.id })).data.links.parents).toMatchObject([{ id: b.id }]);
   });
 });
+
+describe('modo autônomo (YOLO)', () => {
+  const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
+  const column = (name: string) => router.snapshot().columns.find((c) => c.name === name)!;
+  const setYolo = (n: number, enabled: boolean) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled });
+
+  it('só uma pessoa liga, e só na história', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD' });
+    await call('create_card', { title: 'Tela', parent: 1 });
+    expect(card(1).yolo).toBe(false);
+    expect(() => router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true }, { source: 'ai' })).toThrow('Só uma pessoa');
+    expect(() => setYolo(2, true)).toThrow('não para uma sub-tarefa');
+
+    setYolo(1, true);
+    expect(card(1).yolo).toBe(true);
+    expect(card(2).yolo).toBe(false); // a flag fica na história; a sub-tarefa herda
+    expect((await call('get_card', { card: 2 })).data.autonomous).toBe(true);
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('Modo autônomo ligado');
+    setYolo(1, false);
+    expect(card(1).yolo).toBe(false);
+  });
+
+  it('a IA avança uma coluna que exige aprovação sem esperar por ela', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD' });
+    expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(true); // sem YOLO, trava
+    setYolo(1, true);
+    expect((await call('move_card', { card: 1, column: 'Spec' })).data.card).toMatchObject({ column: 'Spec', work: { status: 'ready' } });
+    // as outras regras do board continuam valendo
+    await call('create_card', { title: 'Passo', parent: 1, fields: { Fase: 'Spec' } });
+    expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(true);
+  });
+
+  it('request_review vira aprovação na hora, com o resumo na conversa, e não dispara o merge automático', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD' });
+    setYolo(1, true);
+    const approvals: string[] = [];
+    router.onDidApprove((id) => approvals.push(id));
+
+    const res = (await call('request_review', { card: 1, summary: 'PRD pronto' })).data;
+    expect(res.card.work).toMatchObject({ status: 'approved' });
+    expect(res.next).toContain('Modo autônomo');
+    expect(card(1).status).toBe('approved');
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toBe('PRD pronto');
+    expect(approvals).toEqual([]);
+  });
+
+  it('ask_question é recusada: a IA decide sozinha', async () => {
+    await call('create_card', { title: 'Login', column: 'Discovery' });
+    setYolo(1, true);
+    const asked = await call('ask_question', { card: 1, question: 'Qual provedor?' });
+    expect(asked.error).toBe(true);
+    expect(asked.text).toContain('Decida por conta própria');
+    expect(card(1).status).toBe('ready');
+    // impedimento de verdade continua possível
+    expect((await call('block_card', { card: 1, reason: 'Sem acesso' })).error).toBe(false);
+  });
+
+  it('ligar libera o que esperava uma pessoa', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD' });
+    await call('request_review', { card: 1, summary: 'PRD pronto' });
+    expect(card(1).status).toBe('waiting_review');
+    setYolo(1, true);
+    expect(card(1).status).toBe('approved');
+    expect(column('PRD').requiresApproval).toBe(true); // a coluna não muda: só o card deixa de depender dela
+  });
+});

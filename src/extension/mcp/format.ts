@@ -13,7 +13,7 @@ import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
 import { childProgress, linkedCards } from '../../shared/links';
 import { childrenOf, columnOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
-import { storyOf } from '../../shared/story';
+import { isYolo, storyOf } from '../../shared/story';
 import {
   cardRef,
   type BoardState,
@@ -153,6 +153,7 @@ export function cardSummary(s: BoardState, c: Card) {
     column: columnOf(s, c)?.name,
     status: cardStatus(s, c),
     ...(workStatus(s, c) ? { work: workStatus(s, c) } : {}),
+    ...(isYolo(s, c) ? { autonomous: true } : {}),
     ...(parent ? { parent: `${cardRef(parent)} ${parent.title}` } : {}),
     ...(Object.keys(fieldsOf(s, c)).length ? { fields: fieldsOf(s, c) } : {}),
     ...(kids.length ? { subtasks: `${kids.filter((k) => cardStatus(s, k) !== 'open').length}/${kids.length} fora de aberto` } : {}),
@@ -262,8 +263,14 @@ function phaseOf(s: BoardState, c: Card) {
           artifactNote: `Construa o documento numa sub-tarefa da história com Fase = "${col.name}" e grave-o com add_attachment (artifact: true, filename: "${col.artifactName}"): ele fica anexado à história e substitui a versão anterior.`,
         }
       : {}),
-    requiresApproval: col.requiresApproval,
-    ...(col.requiresApproval ? { reviewNote: `Ao terminar, chame request_review na história ${cardRef(story)} e pare.` } : {}),
+    requiresApproval: col.requiresApproval && !story.yolo,
+    ...(story.yolo
+      ? {
+          autonomousNote: `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Decida as dúvidas por conta própria e registre a decisão na conversa.`,
+        }
+      : col.requiresApproval
+        ? { reviewNote: `Ao terminar, chame request_review na história ${cardRef(story)} e pare.` }
+        : {}),
   };
 }
 

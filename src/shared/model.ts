@@ -118,6 +118,8 @@ export interface Card {
   prUrl: string;
   /** agente de execução escolhido para este card; null = o da coluna */
   execProfile: Id | null;
+  /** modo autônomo (YOLO), só em histórias: a IA toca o card sem pedir aprovação nem confirmação */
+  yolo: boolean;
 }
 
 /** ID do card como aparece na interface. */

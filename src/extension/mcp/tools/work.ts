@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isYolo } from '../../../shared/story';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { cardSummary, findCard } from '../format';
 import { cardArg } from './args';
@@ -43,28 +44,37 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
     'request_review',
     'Entrega o trabalho da fase para revisão de uma pessoa (status "waiting_review") e registra o resumo na conversa do card. Depois de chamar, PARE: só uma pessoa aprova. Se ela pedir ajustes, o card volta para "ready" com o pedido na conversa; quando aprovar, o status vira "approved" e você move o card.',
     { card: cardArg, summary: z.string().min(1).describe('O que foi feito e o que a pessoa deve revisar (markdown)') },
-    (a, router) =>
-      setStatus(
+    (a, router) => {
+      const yolo = isYolo(router.snapshot(), live(findCard(router.snapshot(), a.card)));
+      return setStatus(
         router,
         a.card,
         'waiting_review',
         a.summary,
-        'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.',
-      ),
+        yolo
+          ? 'Modo autônomo (YOLO): o card foi aprovado automaticamente. Mova-o para a próxima coluna e siga o trabalho.'
+          : 'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.',
+      );
+    },
   );
 
   tool(
     'ask_question',
     'Faz uma pergunta à pessoa na conversa do card e passa a vez para ela (status "waiting_answer"). Use quando faltar uma informação ou decisão. Depois de chamar, pare de trabalhar neste card até a resposta chegar.',
     { card: cardArg, question: z.string().min(1).describe('A pergunta (markdown)') },
-    (a, router) =>
-      setStatus(
+    (a, router) => {
+      if (isYolo(router.snapshot(), live(findCard(router.snapshot(), a.card))))
+        throw new Error(
+          'Modo autônomo (YOLO): ninguém vai responder. Decida por conta própria, registre a decisão e o motivo na conversa do card com add_comment e siga o trabalho. Use block_card só se for impossível continuar.',
+        );
+      return setStatus(
         router,
         a.card,
         'waiting_answer',
         a.question,
         'Pare aqui. Quando a pessoa responder na conversa, o card volta para "ready".',
-      ),
+      );
+    },
   );
 
   tool(
