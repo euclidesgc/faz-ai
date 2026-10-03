@@ -37,7 +37,7 @@ export function HarnessSettings() {
   const send = useBoardStore((s) => s.send);
   const tool = aiToolInfo(state.board.aiTool);
   const agents = harness.rules.find((r) => r.name === 'AGENTS.md');
-  const useTool = (id: AiTool) => id !== tool.id && send({ type: 'settings.board.update', patch: { aiTool: id } });
+  const chooseTool = (id: AiTool) => id !== tool.id && send({ type: 'settings.board.update', patch: { aiTool: id } });
   // o arquivo de regras da ferramenta em uso; com o Claude Code, o AGENTS.md também aparece porque pode ser importado
   const rules = harness.rules.filter((r) => r.name === tool.rules || (tool.id === 'claude' && r.name === 'AGENTS.md' && r.exists));
   const ask = useBoardStore((s) => s.ask);
@@ -170,7 +170,7 @@ export function HarnessSettings() {
         <tbody>
           {AI_TOOLS.map((t) => (
             <tr key={t.id} className={t.id === tool.id ? '' : 'off'}>
-              <td><input type="radio" name="ai-tool" checked={t.id === tool.id} onChange={() => useTool(t.id)} /></td>
+              <td><input type="radio" name="ai-tool" checked={t.id === tool.id} onChange={() => chooseTool(t.id)} /></td>
               <td>{t.label}</td>
               <td><code>{t.rules}</code></td>
               <td><code>{t.skills}</code></td>
