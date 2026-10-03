@@ -2329,3 +2329,107 @@ body.host-web .drawer {
 .children li .rt-IconButton {
   margin-left: var(--sp-6);
 }
+
+/* chat com a IA */
+.chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: var(--sp-8);
+}
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+.chat-head h3 {
+  margin: 0;
+  font-size: var(--fs-h);
+}
+.chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-4);
+}
+.chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-6);
+}
+.chat-msg {
+  max-width: 92%;
+  padding: var(--sp-6) var(--sp-8);
+  border-radius: var(--radius-lg);
+  word-break: break-word;
+}
+.chat-msg p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.chat-msg.user {
+  align-self: flex-end;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+}
+.chat-msg.assistant {
+  align-self: flex-start;
+  background: var(--col-bg);
+}
+.chat-msg.error {
+  align-self: stretch;
+  max-width: none;
+  background: var(--error-bg);
+  color: var(--error);
+  white-space: pre-wrap;
+}
+.chat-msg.typing {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  color: var(--muted);
+}
+.chat-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+.chat-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--sp-6);
+}
+.chat-view {
+  height: 100vh;
+  padding: var(--sp-8);
+  box-sizing: border-box;
+}
+.chat-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 100vw);
+  z-index: 20;
+  padding: var(--sp-12);
+  box-sizing: border-box;
+  background: var(--card-bg);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-3);
+}
+.chat-drawer .drawer-close {
+  position: absolute;
+  top: var(--sp-8);
+  right: var(--sp-8);
+}
+.chat-drawer .chat-head {
+  padding-right: var(--sp-24);
+}

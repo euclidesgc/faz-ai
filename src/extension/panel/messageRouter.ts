@@ -2,6 +2,7 @@ import type { DbHandle } from '../db/database';
 import type { Attachment, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
 import type { AiTool } from '../../shared/harness';
+import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import type { AttachmentStore } from '../attachments';
 import type { HarnessStore } from '../harness';
 import { headlessUnsupported } from '../headless';
@@ -15,6 +16,9 @@ import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 
 export type { RouterOptions };
 
+/** As mensagens do webview que o chat executa. */
+export type ChatMessageIn = Extract<WebviewToHost, { type: 'chat.send' | 'chat.stop' | 'chat.clear' }>;
+
 /** Tratadas pela ponte do webview (dependem do VSCode): aqui não mudam o board. */
 const viaBridge = () => false;
 const bridgeOnly = {
@@ -26,6 +30,10 @@ const bridgeOnly = {
   'ai.run': viaBridge,
   'ai.stop': viaBridge,
   'ai.heartbeat.run': viaBridge,
+  'chat.send': viaBridge,
+  'chat.stop': viaBridge,
+  'chat.clear': viaBridge,
+  'ui.showChat': viaBridge,
   'card.workspace.open': viaBridge,
   'harness.item.open': viaBridge,
   'harness.item.create': viaBridge,
@@ -54,6 +62,8 @@ export class MessageRouter {
   private listeners = new Set<() => void>();
   private approveListeners: ((cardId: string) => void)[] = [];
   private aiRuns: string[] = [];
+  private chat: ChatState = EMPTY_CHAT;
+  private chatHandler: ((msg: ChatMessageIn) => void) | null = null;
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
 
@@ -87,6 +97,7 @@ export class MessageRouter {
       ...s,
       harness: current,
       aiRuns: this.aiRuns,
+      chat: this.chat,
       aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission),
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
     };
@@ -114,6 +125,23 @@ export class MessageRouter {
   setAiRuns(cardIds: string[]): void {
     this.aiRuns = cardIds;
     this.notify();
+  }
+
+  /** O chat com a IA (informado pela sessão de chat): as mensagens e se a IA está respondendo. */
+  setChat(chat: ChatState): void {
+    this.chat = chat;
+    this.notify();
+  }
+
+  /** Quem executa as mensagens `chat.*`: a sessão de chat do host. */
+  setChatHandler(fn: (msg: ChatMessageIn) => void): void {
+    this.chatHandler = fn;
+  }
+
+  /** Encaminha uma mensagem do chat à sessão; sem ela (board sem execução da IA), avisa. */
+  chatCommand(msg: ChatMessageIn): void {
+    if (!this.chatHandler) throw new Error('O chat não está disponível neste board.');
+    this.chatHandler(msg);
   }
 
   /**

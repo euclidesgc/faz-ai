@@ -143,6 +143,19 @@ responde no próprio card:
   para a IA.
 - **Bloquear** registra um impedimento, com o motivo.
 
+### Chat com a IA
+
+Para dar ordens ao board em linguagem natural, use o **Chat**: na barra lateral do editor, a seção
+**Chat com a IA** (abaixo de Board e Filtros); no navegador, o botão **Chat** do topo, que abre um
+painel à direita. Escreva, por exemplo, "crie uma história Login com Google e três sub-tarefas" ou
+"o que está esperando por mim?". A IA do projeto responde e age pelas ferramentas do board: cria,
+move e vincula cards, e consulta o que há nele. Abaixo do campo você escolhe o **modelo e o esforço**
+das próximas mensagens (a escolha fica lembrada). Enter envia, Shift+Enter quebra a linha, **Parar**
+interrompe e **Limpar** apaga a conversa. O histórico fica guardado por projeto.
+
+O chat usa a mesma execução em segundo plano dos cards, então vale o limite de Configurações →
+Harness de IA → "O que a IA pode fazer" (por padrão, só o board) e o tempo limite de lá.
+
 ### Chamar a IA pela conversa
 
 Na conversa de qualquer card, **Chamar IA** roda a ferramenta do projeto em segundo plano para ler

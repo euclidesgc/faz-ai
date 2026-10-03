@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { applyTheme } from './appearance';
+import { ChatApp } from './ChatApp';
 import { FiltersApp } from './FiltersApp';
 import { isWeb } from './vscode';
 import { Theme } from '@radix-ui/themes';
@@ -16,8 +17,8 @@ import './tokens.css';
 import './styles.css';
 
 const root = document.getElementById('root')!;
-const isFilters = root.dataset.view === 'filters';
-if (isFilters) document.body.classList.add('sidebar-view');
+const view = root.dataset.view;
+if (view === 'filters' || view === 'chat') document.body.classList.add('sidebar-view');
 
 if (isWeb) {
   document.body.classList.add('host-web');
@@ -37,7 +38,7 @@ createRoot(root).render(
   <React.StrictMode>
     {/* claro/escuro vem da classe do body (applyTheme); sem fundo próprio, o fundo é o do board */}
     <Theme className="app-theme" accentColor="indigo" grayColor="slate" radius="medium" scaling="95%" hasBackground={false}>
-      {isFilters ? <FiltersApp /> : <App />}
+      {view === 'filters' ? <FiltersApp /> : view === 'chat' ? <ChatApp /> : <App />}
     </Theme>
   </React.StrictMode>,
 );

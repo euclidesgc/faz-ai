@@ -1,3 +1,4 @@
+import { EMPTY_CHAT } from '../../src/shared/chat';
 import type { BoardState, Card, Column, ColumnCategory } from '../../src/shared/model';
 import { DEFAULT_APPEARANCE } from '../../src/shared/appearance';
 import { DEFAULT_GIT } from '../../src/shared/git';
@@ -93,6 +94,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     currentUser: 'a',
     harness: EMPTY_HARNESS,
     pendingUpgrade: [],
+    chat: EMPTY_CHAT,
     aiRuns: [],
     aiRunUnsupported: null,
     harnessInstall: null,

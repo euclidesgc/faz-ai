@@ -31,10 +31,16 @@ interface UiState {
   /** menu lateral das configurações recolhido numa faixa de ícones */
   settingsNavCollapsed: boolean;
   openCardId: Id | null;
+  /** modelo e esforço escolhidos no chat (valor do campo Modelo); null = o padrão da ferramenta */
+  chatModel: string | null;
 }
 
 interface BoardStore extends UiState, ViewState {
   state: BoardState | null;
+  /** o chat está aberto no painel lateral do board (no navegador; no editor ele fica na barra lateral) */
+  chatOpen: boolean;
+  setChatOpen(open: boolean): void;
+  setChatModel(model: string | null): void;
   attachmentsBaseUri: string;
   error: string | null;
   /** aviso informativo vindo do host */
@@ -79,6 +85,13 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     harnessTab: persisted?.harnessTab ?? 'tool',
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
+    chatModel: persisted?.chatModel ?? null,
+    chatOpen: false,
+    setChatOpen: (chatOpen) => set({ chatOpen }),
+    setChatModel(chatModel) {
+      set({ chatModel });
+      persist(get());
+    },
     filters: EMPTY_FILTERS,
     selectedParentId: null,
     collapsed: {},
@@ -130,6 +143,7 @@ function persist(s: BoardStore): void {
     harnessTab: s.harnessTab,
     settingsNavCollapsed: s.settingsNavCollapsed,
     openCardId: s.openCardId,
+    chatModel: s.chatModel,
   };
   setUiState(ui);
 }

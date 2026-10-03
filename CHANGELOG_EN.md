@@ -7,6 +7,13 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 
 ## Unreleased
 
+- **Chat with the AI on the board.** A conversation to create, move and link cards and query the
+  board in natural language: in the editor's sidebar (the **Chat com a IA** section, below Board and
+  Filtros) and, in the browser, the **Chat** button in the top bar. You can pick the **model and
+  effort** for the next messages; the AI acts through the board tools and answers in markdown. There
+  are **Parar** (stop) and **Limpar** (clear), and the history is kept per project. It uses the same
+  run limit as everything else (by default, the board only).
+
 - **Open-card, board and filter controls in the same style.** Type, column, status, agent, filters
   and the dialog choice are now Radix selects, as are the checklist and filter checkboxes and the
   search, add-item and date fields. Only the title, the checklist item, the column name and the

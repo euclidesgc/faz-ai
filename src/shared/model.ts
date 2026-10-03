@@ -1,4 +1,5 @@
 import type { ExecProfile } from './execution';
+import type { ChatState } from './chat';
 import type { AiTool, Harness, InstallPreview } from './harness';
 import type { ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
@@ -209,6 +210,8 @@ export interface BoardState {
   harness: Harness;
   /** mudanças que a atualização para o board padrão atual faria; vazio quando não há o que atualizar */
   pendingUpgrade: string[];
+  /** chat com a IA do projeto */
+  chat: ChatState;
   /** cards em que a extensão está executando a IA agora */
   aiRuns: Id[];
   /** por que a ferramenta do projeto não pode ser executada pelo board; null quando pode */

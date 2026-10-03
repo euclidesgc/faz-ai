@@ -1,3 +1,4 @@
+import { EMPTY_CHAT } from '../../shared/chat';
 import type { Database } from 'sql.js';
 import type {
   Attachment,
@@ -312,6 +313,7 @@ export class BoardRepo {
       currentUser,
       harness: EMPTY_HARNESS,
       pendingUpgrade: pendingUpgrade(db, boardId),
+      chat: EMPTY_CHAT,
       aiRuns: [],
       aiRunUnsupported: null,
       harnessInstall: null,

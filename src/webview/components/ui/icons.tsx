@@ -32,6 +32,9 @@ import {
   ListTree,
   Maximize2,
   MessageSquare,
+  MessagesSquare,
+  SendHorizontal,
+  Square,
   Minimize2,
   Palette,
   PanelLeftClose,
@@ -103,6 +106,9 @@ export const IconSubtasks = icon(ListTree, 'IconSubtasks');
 export const IconCardLink = icon(Link2, 'IconCardLink');
 export const IconChecklist = icon(ListChecks, 'IconChecklist');
 export const IconComments = icon(MessageSquare, 'IconComments');
+export const IconChat = icon(MessagesSquare, 'IconChat');
+export const IconSend = icon(SendHorizontal, 'IconSend');
+export const IconStop = icon(Square, 'IconStop');
 export const IconAttachment = icon(Paperclip, 'IconAttachment');
 export const IconDescription = icon(AlignLeft, 'IconDescription');
 export const IconSuggest = icon(Sparkles, 'IconSuggest');

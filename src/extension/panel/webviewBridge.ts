@@ -4,7 +4,7 @@ import { HostBridge, type HostEnv } from '../host/hostBridge';
 import type { ViewStateStore } from '../viewState';
 import type { MessageRouter } from './messageRouter';
 
-export type WebviewKind = 'board' | 'filters';
+export type WebviewKind = 'board' | 'filters' | 'chat';
 
 export function webviewOptions(context: vscode.ExtensionContext, router: MessageRouter): vscode.WebviewOptions {
   return {
@@ -40,6 +40,7 @@ function vscodeEnv(webview: vscode.Webview, router: MessageRouter): HostEnv {
   return {
     attachmentsBaseUri: () => webview.asWebviewUri(vscode.Uri.file(router.store.baseDir)).toString(),
     showFilters: () => vscode.commands.executeCommand('fazai.filters.focus'),
+    showChat: () => vscode.commands.executeCommand('fazai.chat.focus'),
     connectAI: () => vscode.commands.executeCommand('fazai.connectAI'),
     openInBrowser: () => vscode.commands.executeCommand('fazai.openInBrowser'),
     runAi: (cardId) => vscode.commands.executeCommand('fazai.ai.run', cardId),
