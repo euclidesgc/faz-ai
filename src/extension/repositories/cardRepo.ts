@@ -181,8 +181,9 @@ export class CardRepo {
             );
         }
       }
-      // regra: a IA só avança um card de uma coluna que exige aprovação depois que uma pessoa aprova; voltar ou cancelar é livre
-      if (byAi && fromCol !== columnId && str(col.category) !== 'cancelled') {
+      // regra: a IA só avança um card de uma coluna que exige aprovação depois que uma pessoa aprova; voltar ou cancelar é livre.
+      // Em modo autônomo (YOLO) a aprovação não é exigida: a pessoa abriu mão dela ao ligar o modo na história
+      if (byAi && !this.isYolo(cardId) && fromCol !== columnId && str(col.category) !== 'cancelled') {
         const from = one(db, 'SELECT name, position, requires_approval FROM columns WHERE id = ?', [fromCol]);
         if (from && num(from.requires_approval) === 1 && num(col.position) > num(from.position) && str(card.status) !== 'approved')
           throw new Error(
@@ -249,6 +250,21 @@ export class CardRepo {
 
   setExecProfile(cardId: string, profileId: string | null): void {
     run(this.db, 'UPDATE cards SET exec_profile = ? WHERE id = ?', [profileId || null, cardId]);
+  }
+
+  /** Liga ou desliga o modo autônomo da história. */
+  setYolo(storyId: string, enabled: boolean): void {
+    run(this.db, 'UPDATE cards SET yolo = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, now(), storyId]);
+  }
+
+  /** O card (ou a história dele, no caso de uma sub-tarefa) está em modo autônomo. */
+  isYolo(cardId: string): boolean {
+    const row = one(
+      this.db,
+      'SELECT COALESCE(p.yolo, c.yolo) AS yolo FROM cards c LEFT JOIN cards p ON p.id = c.parent_id WHERE c.id = ?',
+      [cardId],
+    );
+    return num(row?.yolo) === 1;
   }
 
   setPullRequest(cardId: string, url: string): void {

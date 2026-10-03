@@ -31,6 +31,7 @@ export const card = (id: string, over: Partial<Card> = {}): Card => ({
   worktreePath: '',
   prUrl: '',
   execProfile: null,
+  yolo: false,
   ...over,
 });
 
