@@ -20,7 +20,6 @@ export function useDescriptionDraft(card: Card | undefined, cardId: string): Des
   const [editing, setEditing] = useState(false);
 
   const latest = useRef({ desc, saved: card?.description ?? '', cardId });
-  latest.current = { desc, saved: card?.description ?? '', cardId };
 
   useEffect(() => {
     setDesc(card?.description ?? '');
@@ -32,6 +31,12 @@ export function useDescriptionDraft(card: Card | undefined, cardId: string): Des
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card?.id]);
+
+  // atualizado num efeito (e não no render) e declarado depois do de cima: ao trocar de card, a limpeza
+  // de cima roda antes deste e ainda vê o rascunho e o id do card anterior
+  useEffect(() => {
+    latest.current = { desc, saved: card?.description ?? '', cardId };
+  });
 
   const save = () => {
     if (card && desc !== card.description) cards.update(cardId, { description: desc });

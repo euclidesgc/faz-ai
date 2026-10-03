@@ -168,6 +168,15 @@ describe('CardDrawer', () => {
     expect(lastSent('card.update')).toEqual({ type: 'card.update', cardId: board.storyId, patch: { description: 'Pendente' } });
   });
 
+  it('trocar de card com a descrição em edição salva o rascunho no card de antes', async () => {
+    const { rerender } = openCardDrawer(board.storyId);
+    await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await userEvent.type(screen.getByPlaceholderText(/Descreva o problema/), 'Da história');
+    posted.mockClear();
+    rerender(<CardDrawer cardId={board.subId} />);
+    expect(sentOf('card.update')).toEqual([{ type: 'card.update', cardId: board.storyId, patch: { description: 'Da história' } }]);
+  });
+
   it('trocar de card volta para a aba Detalhes e mostra o card novo', async () => {
     const { rerender } = openCardDrawer(board.storyId);
     await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
