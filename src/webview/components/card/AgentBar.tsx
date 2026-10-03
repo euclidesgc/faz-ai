@@ -3,7 +3,7 @@ import type { Card } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { SelectField } from '../ui';
-import { t } from '../../i18n';
+import { t, dt } from '../../i18n';
 
 /** O Select do Radix não aceita valor vazio: "o agente da fase" usa este. */
 const FROM_PHASE = '__phase';
@@ -28,9 +28,9 @@ export function AgentBar({ card }: { card: Card }) {
         options={[
           {
             value: FROM_PHASE,
-            label: inherited ? t('Da fase ({name})', { name: inherited.name }) : t('Da fase (nenhum)'),
+            label: inherited ? t('Da fase ({name})', { name: dt(inherited.name) }) : t('Da fase (nenhum)'),
           },
-          ...profiles.map((p) => ({ value: p.id, label: p.name })),
+          ...profiles.map((p) => ({ value: p.id, label: dt(p.name) })),
         ]}
         value={card.execProfile ?? FROM_PHASE}
         onChange={(id) => cards.setExecProfile(card.id, id === FROM_PHASE ? null : id)}

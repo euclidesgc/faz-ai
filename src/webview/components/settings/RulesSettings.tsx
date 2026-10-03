@@ -3,7 +3,7 @@ import { Badge, Button, Card, Heading } from '@radix-ui/themes';
 import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type CompleteParentMode, type ConfirmMode } from '../../../shared/rules';
 import { columnsOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
-import { t } from '../../i18n';
+import { t, dt } from '../../i18n';
 import { settings } from '../../commands';
 import { SelectField, SwitchField } from '../ui';
 import { PageHeader } from './PageHeader';
@@ -58,7 +58,7 @@ export function RulesSettings() {
     const list = parentWf
       ? columnsOf(state, parentWf.id)
           .filter((c) => c.category === category)
-          .map((c) => `"${c.name}"`)
+          .map((c) => `"${dt(c.name)}"`)
       : [];
     return list.length ? list.join(', ') : t('nenhuma coluna definida ainda');
   };

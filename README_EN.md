@@ -51,8 +51,11 @@ A kanban board inside your editor (VS Code and Cursor), built to run Spec-Driven
 together with an AI. You organize the work into stories and sub-tasks; the AI reads the board,
 produces the artifacts of each phase and moves the cards as it goes.
 
-The extension's interface is in Portuguese. This page keeps the names you will see on screen and
-gives the English meaning next to them.
+The extension speaks English and Portuguese (**Settings → Appearance → Language**, automatic by
+default). This page keeps the Portuguese names you see in a Portuguese interface and gives the
+English meaning next to them; in English, the default board's names (workflows, columns, card types,
+fields and the default agent) are shown translated, and names you create or rename stay as you
+wrote them.
 
 ![Board with stories in the SDD phases and sub-tasks in the bottom workflow](docs/images/board_en.png)
 

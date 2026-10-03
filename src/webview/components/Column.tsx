@@ -3,7 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Card, Column as ColumnModel, ColumnCategory, Workflow } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
-import { t } from '../i18n';
+import { t, dt } from '../i18n';
 import { cards, settings } from '../commands';
 import { SortableCard } from './Card';
 import { Menu } from './Menu';
@@ -112,11 +112,11 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
     // conta todos os cards que apontam para a coluna, inclusive arquivados e na lixeira
     const n = state.cards.filter((c) => c.columnId === column.id).length;
     ask({
-      title: t('Excluir a coluna "{name}"?', { name: column.name }),
+      title: t('Excluir a coluna "{name}"?', { name: dt(column.name) }),
       message: n ? t('{n} card(s) desta coluna serão movidos para a coluna escolhida.', { n }) : t('A coluna está vazia.'),
       confirmLabel: t('Excluir coluna'),
       danger: true,
-      choices: n ? { label: t('Mover cards para'), options: others.map((c) => ({ value: c.id, label: c.name })) } : undefined,
+      choices: n ? { label: t('Mover cards para'), options: others.map((c) => ({ value: c.id, label: dt(c.name) })) } : undefined,
       onConfirm: (dest) => settings.deleteColumn(column.id, dest ?? others[0]!.id),
     });
   };
@@ -158,7 +158,7 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
         ) : (
           <span className="column-name" title={t('Duplo clique para renomear')} onDoubleClick={() => setRenaming(column.name)}>
             <TerminalMark category={column.category} />
-            {column.name}
+            {dt(column.name)}
             {column.requiresApproval && (
               <span className="approval-mark" title={t('Exige aprovação: a IA só avança o card desta coluna depois que você aprova')}>
                 {' '}
@@ -220,7 +220,7 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
             {types.length > 1 && (
               <SelectField
                 aria-label={t('Tipo do card')}
-                options={types.map((ct) => ({ value: ct.id, label: ct.name }))}
+                options={types.map((ct) => ({ value: ct.id, label: dt(ct.name) }))}
                 value={typeId || types[0]!.id}
                 onChange={setTypeId}
               />

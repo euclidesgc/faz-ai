@@ -2,7 +2,7 @@ import { cardRef } from '../../shared/model';
 
 import { cardsIn, columnsOf, isLive } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
-import { t, tn } from '../i18n';
+import { t, tn, dt } from '../i18n';
 import { rich } from '../i18n/rich';
 import { Button, IconChevronDown, IconChevronRight, IconClose } from './ui';
 import { WorkflowRow } from './WorkflowRow';
@@ -41,7 +41,7 @@ export function Board() {
                 <Button variant="icon" className="collapse-toggle" aria-expanded={!collapsed}>
                   {collapsed ? <IconChevronRight /> : <IconChevronDown />}
                 </Button>
-                <h2>{wf.name}</h2>
+                <h2>{dt(wf.name)}</h2>
                 <span className="column-count">{tn(total, '{n} card', '{n} cards')}</span>
                 {wf.kind === 'child' &&
                   !empty &&

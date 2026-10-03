@@ -3,7 +3,7 @@ import { badgeStyle } from '../../../shared/color';
 import { fieldsForType } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
-import { t } from '../../i18n';
+import { t, dt } from '../../i18n';
 import { FieldEditor } from '../FieldRenderer';
 import { Button, Card, TextField } from '@radix-ui/themes';
 import { DeleteButton, FormField, IconPlus, SelectField } from '../ui';
@@ -95,15 +95,15 @@ export function TypesSettings() {
         {state.cardTypes.map((ct) => {
           const fields = fieldsForType(state, ct.id);
           return (
-            <Card key={ct.id} className="draft-card" aria-label={t('Padrões do tipo {name}', { name: ct.name })}>
+            <Card key={ct.id} className="draft-card" aria-label={t('Padrões do tipo {name}', { name: dt(ct.name) })}>
               <div className="row">
                 <span className="type-badge" style={badgeStyle(ct.color)}>
-                  {ct.name}
+                  {dt(ct.name)}
                 </span>
               </div>
               {fields.length === 0 && <span className="muted small">{t('Nenhum campo se aplica a este tipo.')}</span>}
               {fields.map((f) => (
-                <FormField key={f.id} label={f.name}>
+                <FormField key={f.id} label={dt(f.name)}>
                   {() =>
                     f.kind === 'multiselect' && f.options.length === 0 && !isSkillsField(f.name) ? (
                       <span className="muted small">{t('Sem opções ainda.')}</span>
@@ -141,7 +141,7 @@ function WorkflowSelect({ value, disabled, onChange }: { value: string; disabled
     <SelectField
       aria-label={t('Workflow')}
       disabled={disabled}
-      options={workflows.map((w) => ({ value: w.id, label: w.name }))}
+      options={workflows.map((w) => ({ value: w.id, label: dt(w.name) }))}
       value={value}
       onChange={onChange}
     />

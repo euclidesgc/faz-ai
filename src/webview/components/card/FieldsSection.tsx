@@ -6,7 +6,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { FieldEditor, ModelEditor } from '../FieldRenderer';
 import { FieldRow } from '../ui';
-import { t } from '../../i18n';
+import { t, dt } from '../../i18n';
 
 /** Campos personalizados que se aplicam ao tipo do card. */
 export function FieldsSection({ card }: { card: Card }) {
@@ -24,7 +24,7 @@ export function FieldsSection({ card }: { card: Card }) {
           const set = (v: FieldValue) => cards.setField(card.id, f.id, v);
           if (f.kind !== 'model') {
             return (
-              <FieldRow key={f.id} label={f.name}>
+              <FieldRow key={f.id} label={dt(f.name)}>
                 <FieldEditor field={f} value={value} onChange={set} />
               </FieldRow>
             );
@@ -32,7 +32,7 @@ export function FieldsSection({ card }: { card: Card }) {
           // modelo e esforço do modelo em linhas separadas, para não confundir com o esforço da atividade
           return (
             <div key={f.id} className="model-rows">
-              <FieldRow label={f.name}>
+              <FieldRow label={dt(f.name)}>
                 <ModelEditor part="model" value={value} onChange={set} />
               </FieldRow>
               <FieldRow label={t(MODEL_EFFORT_LABEL)}>

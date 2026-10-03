@@ -3,7 +3,7 @@ import { childrenOf, columnOf, subtaskSlot } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { AddInput, Button } from '../ui';
-import { t } from '../../i18n';
+import { t, dt } from '../../i18n';
 
 /** Sub-tarefas da história: lista com a coluna de cada uma, atalho para o board e criação rápida. */
 export function SubtasksSection({ story }: { story: Card }) {
@@ -45,7 +45,7 @@ export function SubtasksSection({ story }: { story: Card }) {
               <a onClick={() => openCard(c.id)}>
                 <span className="card-id">{cardRef(c)}</span> {c.title}
               </a>
-              <span className="muted">{c.archivedAt ? t('Arquivada') : col?.name}</span>
+              <span className="muted">{c.archivedAt ? t('Arquivada') : col && dt(col.name)}</span>
             </li>
           );
         })}

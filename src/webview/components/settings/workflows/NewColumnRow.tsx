@@ -3,7 +3,7 @@ import type { Column } from '../../../../shared/model';
 import { settings } from '../../../commands';
 import { Button, TextField } from '@radix-ui/themes';
 import { SelectField } from '../../ui';
-import { t } from '../../../i18n';
+import { dt, t } from '../../../i18n';
 
 const START = '__start';
 
@@ -54,7 +54,7 @@ export function NewColumnRow({
             aria-label={t('Onde a coluna entra')}
             options={[
               { value: START, label: t('No início') },
-              ...cols.map((c) => ({ value: c.id, label: t('Depois de {name}', { name: c.name }) })),
+              ...cols.map((c) => ({ value: c.id, label: t('Depois de {name}', { name: dt(c.name) }) })),
             ]}
             value={after}
             onChange={setAfter}

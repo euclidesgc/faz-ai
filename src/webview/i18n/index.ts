@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { Locale } from '../../shared/language';
-import { EN } from './en';
+import { DEFAULT_NAMES_EN, EN } from './en';
 
 // Internacionalização. O texto em português é a chave: `t('Novo card')`. Em português, a chave volta como está;
 // em inglês, vem de ./en. O que falta no dicionário aparece em português (e o teste de i18n barra a omissão).
@@ -76,6 +76,14 @@ export function translation(key: string): string | undefined {
 /** Traduz um texto da interface. O texto em português é a chave; `{nome}` é preenchido por `params`. */
 export function t(key: string, params?: Params): string {
   return fill(translation(key) ?? key, params);
+}
+
+/**
+ * Nome de um item que o board cria sozinho (coluna, tipo, campo, opção, agente padrão) no idioma da interface. O nome
+ * guardado continua em português, que é o que o resto do sistema reconhece; o que a pessoa criou ou renomeou fica como está.
+ */
+export function dt(name: string): string {
+  return current === 'en' ? (DEFAULT_NAMES_EN[name] ?? name) : name;
 }
 
 /** Singular ou plural conforme `n`; os dois textos são chaves e recebem `{n}`. */

@@ -2,8 +2,8 @@
 
 # Changelog
 
-What changed in each version of Faz AI Kanban, newest first. The extension's interface is in
-Portuguese, so names of screens and buttons appear as you see them on screen.
+What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
+English; names of screens and buttons appear here as they are in the Portuguese interface.
 
 ## Unreleased
 
@@ -13,6 +13,13 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   direct push was refused by the protected `main` and left a stray tag on the remote. The new
   `npm run release -- finish` completes the tag and the GitHub Release after the merge, without
   publishing again.
+- **Default board in English.** With the interface in English, the names of the board the extension
+  creates (the Stories and Sub-tasks workflows, columns such as Implementation, Acceptance and Done,
+  card types, the Phase and Task effort fields, their options and the Default agent) are shown
+  translated, on the board, on the card, in the filters, in the trash and in the settings lists.
+  Only the display changes: the stored names stay as they are, so nothing breaks when you switch the
+  language, and names you create or rename are never translated. The name boxes in the settings
+  keep showing the stored name.
 - **Technology logos in select fields.** Options of select and multi-select fields that name a
   technology (Flutter, Dart, React, TypeScript, Python, Rust, Docker, GitHub and about 80 others,
   also by nickname: "node", "ts", "k8s") get their logo, in the brand color, on the card, in the
