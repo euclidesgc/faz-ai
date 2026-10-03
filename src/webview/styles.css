@@ -1873,6 +1873,11 @@ button:where(:not([class*='rt-'])) {
   gap: var(--sp-8);
   margin-bottom: var(--sp-12);
 }
+.field-list > .dragging {
+  position: relative;
+  z-index: 1;
+  opacity: 0.9;
+}
 .workflow-name {
   width: 280px;
   max-width: 100%;

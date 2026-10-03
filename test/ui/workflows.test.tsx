@@ -112,6 +112,26 @@ describe('WorkflowsSettings', () => {
     expect(lastSent('settings.column.create').position).toBe(firstDone);
   });
 
+  it('a alça do workflow move uma posição com ↓ e ↑; no primeiro e no último o passo para fora não envia nada', async () => {
+    show();
+    const [first, second] = state().workflows;
+    const handle = (name: string) => within(cardOf(name)).getByTitle(new RegExp(`Arraste para mudar a posição de "${name}"`));
+    handle(first!.name).focus();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(lastSent('settings.workflow.update')).toEqual({
+      type: 'settings.workflow.update',
+      workflowId: first!.id,
+      patch: { position: 1 },
+    });
+    posted.mockClear();
+    handle(first!.name).focus();
+    await userEvent.keyboard('{ArrowUp}');
+    expect(sentOf('settings.workflow.update')).toHaveLength(0);
+    handle(second!.name).focus();
+    await userEvent.keyboard('{ArrowUp}');
+    expect(lastSent('settings.workflow.update').patch).toEqual({ position: 0 });
+  });
+
   it('a tabela não tem mais coluna "Começa colapsada" e o menu de colunas não envia collapsed', async () => {
     show();
     const stories = cardOf('Histórias');

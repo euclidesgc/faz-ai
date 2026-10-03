@@ -294,7 +294,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 
 | Section | What it adjusts |
 | --- | --- |
-| Workflows e colunas | As many workflows as you want (independent cards or sub-tasks), with editable names; **Nova coluna** (new column) on each one; names, order (drag) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template). Opening and closing workflows and columns happens on the board itself and is remembered |
+| Workflows e colunas | As many workflows as you want (independent cards or sub-tasks), with editable names and a position you change by dragging; **Nova coluna** (new column) on each one; names, order (drag) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template). Opening and closing workflows and columns happens on the board itself and is remembered |
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
 | Campos | Custom fields (text, select, date, model…) and where they appear |
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |

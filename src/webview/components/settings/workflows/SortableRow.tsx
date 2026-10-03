@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { IconDrag } from '../../ui';
+import { DragHandle } from './DragHandle';
 
 /** Linha da tabela que pode ser arrastada pela alça; com a alça em foco, ↑ e ↓ movem uma posição. */
 export function SortableRow({
@@ -19,19 +19,7 @@ export function SortableRow({
   return (
     <tr ref={setNodeRef} className={isDragging ? 'dragging' : ''} style={{ transform: CSS.Translate.toString(transform), transition }}>
       <td className="drag-cell">
-        <button
-          className="icon drag-handle"
-          title={`Arraste para mudar a posição de "${name}" (ou use ↑ e ↓)`}
-          {...attributes}
-          {...listeners}
-          onKeyDown={(e) => {
-            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-            e.preventDefault();
-            onStep(e.key === 'ArrowUp' ? -1 : 1);
-          }}
-        >
-          <IconDrag />
-        </button>
+        <DragHandle name={name} onStep={onStep} drag={{ ...attributes, ...listeners }} />
       </td>
       {children}
     </tr>

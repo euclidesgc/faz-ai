@@ -132,8 +132,19 @@ export class BoardRepo {
     return id;
   }
 
-  updateWorkflow(workflowId: string, patch: { name?: string }): void {
-    if (patch.name !== undefined) run(this.db, 'UPDATE workflows SET name = ? WHERE id = ?', [patch.name, workflowId]);
+  updateWorkflow(workflowId: string, patch: { name?: string; position?: number }): void {
+    const db = this.db;
+    transaction(db, () => {
+      if (patch.name !== undefined) run(db, 'UPDATE workflows SET name = ? WHERE id = ?', [patch.name, workflowId]);
+      if (patch.position === undefined) return;
+      const board = one(db, 'SELECT board_id FROM workflows WHERE id = ?', [workflowId]);
+      if (!board) throw new Error('Workflow não encontrado');
+      // renumera o board inteiro: as posições gravadas podem ter buracos
+      const ids = all(db, 'SELECT id FROM workflows WHERE board_id = ? ORDER BY position', [str(board.board_id)]).map((r) => str(r.id));
+      ids.splice(ids.indexOf(workflowId), 1);
+      ids.splice(Math.max(0, Math.min(patch.position, ids.length)), 0, workflowId);
+      ids.forEach((id, i) => run(db, 'UPDATE workflows SET position = ? WHERE id = ?', [i, id]));
+    });
   }
 
   /** Apaga o workflow e as colunas dele. A regra de quando isso é permitido está em `workflowDeleteBlocker` (src/shared/selectors.ts). */

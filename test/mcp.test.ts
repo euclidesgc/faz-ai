@@ -591,6 +591,20 @@ describe('workflows', () => {
     expect(b.workflows.map((w: any) => w.name)).not.toContain('Atendimento');
   });
 
+  it('muda a posição de um workflow e renumera os outros', async () => {
+    await call('create_workflow', { name: 'Último', kind: 'parent' });
+    const order = () => router.snapshot().workflows.map((w) => w.name);
+    const before = order();
+    expect(before[before.length - 1]).toBe('Último');
+    await call('move_workflow', { workflow: 'Último', position: 0 });
+    expect(order()).toEqual(['Último', ...before.slice(0, -1)]);
+    expect(router.snapshot().workflows.map((w) => w.position)).toEqual(before.map((_, i) => i));
+    // posição além do fim vai para o fim
+    await call('move_workflow', { workflow: 'Último', position: 99 });
+    expect(order()).toEqual(before);
+    await call('delete_workflow', { workflow: 'Último' });
+  });
+
   it('recusa excluir um workflow em que nascem tipos de card, e exclui depois que eles saem', async () => {
     const story = router.snapshot().workflows.find((w) => w.kind === 'parent')!;
     expect((await call('delete_workflow', { workflow: story.name })).error).toBe(true);
