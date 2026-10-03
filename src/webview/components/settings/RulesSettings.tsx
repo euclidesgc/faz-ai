@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
+import { Badge, Button, Card, Heading, Switch, Text } from '@radix-ui/themes';
 import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type CompleteParentMode, type ConfirmMode } from '../../../shared/rules';
 import { columnsOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
-import { Button, EnumSelect } from '../ui';
+import { SelectField } from '../ui';
 import { PageHeader } from './PageHeader';
 
 const CONFIRM_OPTIONS: { value: ConfirmMode; label: string }[] = [
@@ -26,21 +27,33 @@ const COMPLETE_OPTIONS: { value: CompleteParentMode; label: string }[] = [
 
 function Rule({ title, when, then, active, control }: { title: string; when: string; then: string; active: boolean; control: ReactNode }) {
   return (
-    <section className={`settings-block rule ${active ? '' : 'off'}`}>
-      <div className="row">
-        <h3>{title}</h3>
-        <span className={`pill ${active ? '' : 'off'}`}>{active ? 'Ativa' : 'Desligada'}</span>
+    <Card className={`rule ${active ? '' : 'off'}`} aria-label={title}>
+      <div className="rule-head">
+        <Heading as="h3" size="3">
+          {title}
+        </Heading>
+        <Badge color={active ? 'indigo' : 'gray'} variant={active ? 'soft' : 'outline'}>
+          {active ? 'Ativa' : 'Desligada'}
+        </Badge>
+        <div className="rule-control">{control}</div>
       </div>
-      {control}
-      <div className="when">
-        <span>
-          <b>Quando</b> {when}
-        </span>
-        <span>
-          <b>Então</b> {then}
-        </span>
-      </div>
-    </section>
+      <dl className="when">
+        <dt>Quando</dt>
+        <dd>{when}</dd>
+        <dt>Então</dt>
+        <dd>{then}</dd>
+      </dl>
+    </Card>
+  );
+}
+
+/** Liga e desliga uma regra: o rótulo clica no interruptor. */
+function RuleSwitch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <Text as="label" size="2" className="switch-row">
+      <Switch checked={checked} onCheckedChange={onChange} />
+      {label}
+    </Text>
   );
 }
 
@@ -60,8 +73,8 @@ export function RulesSettings() {
   };
   const changed = (Object.keys(DEFAULT_RULES) as (keyof BoardRules)[]).some((k) => rules[k] !== DEFAULT_RULES[k]);
 
-  const confirmSelect = (key: 'confirmTrash' | 'confirmArchive') => (
-    <EnumSelect options={CONFIRM_OPTIONS} value={rules[key]} onChange={(mode) => set({ [key]: mode })} />
+  const confirmSelect = (key: 'confirmTrash' | 'confirmArchive', label: string) => (
+    <SelectField aria-label={label} options={CONFIRM_OPTIONS} value={rules[key]} onChange={(mode) => set({ [key]: mode })} />
   );
   const confirmThen = (mode: ConfirmMode, verb: string) =>
     mode === 'always'
@@ -71,11 +84,11 @@ export function RulesSettings() {
         : `avisar e pedir confirmação se o card levar sub-tarefas ou anexos junto; cards simples seguem direto.`;
 
   return (
-    <div>
+    <div className="rule-list">
       <PageHeader
         title="Regras"
         actions={
-          <Button variant="ghost" size="small" disabled={!changed} onClick={() => set(DEFAULT_RULES)}>
+          <Button variant="soft" color="gray" disabled={!changed} onClick={() => set(DEFAULT_RULES)}>
             Restaurar padrões
           </Button>
         }
@@ -93,14 +106,11 @@ export function RulesSettings() {
             : 'permitir. As sub-tarefas ficam onde estão.'
         }
         control={
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={rules.blockDoneWithOpenChildren}
-              onChange={(e) => set({ blockDoneWithOpenChildren: e.target.checked })}
-            />
-            Bloquear
-          </label>
+          <RuleSwitch
+            label="Bloquear"
+            checked={rules.blockDoneWithOpenChildren}
+            onChange={(blockDoneWithOpenChildren) => set({ blockDoneWithOpenChildren })}
+          />
         }
       />
 
@@ -114,14 +124,11 @@ export function RulesSettings() {
             : 'permitir. As sub-tarefas ficam onde estão.'
         }
         control={
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={rules.blockPhaseAdvanceWithOpenChildren}
-              onChange={(e) => set({ blockPhaseAdvanceWithOpenChildren: e.target.checked })}
-            />
-            Bloquear
-          </label>
+          <RuleSwitch
+            label="Bloquear"
+            checked={rules.blockPhaseAdvanceWithOpenChildren}
+            onChange={(blockPhaseAdvanceWithOpenChildren) => set({ blockPhaseAdvanceWithOpenChildren })}
+          />
         }
       />
 
@@ -137,7 +144,12 @@ export function RulesSettings() {
               : 'mover só a história. As sub-tarefas ficam onde estão.'
         }
         control={
-          <EnumSelect options={CANCEL_OPTIONS} value={rules.onCancelParent} onChange={(onCancelParent) => set({ onCancelParent })} />
+          <SelectField
+            aria-label="Ao cancelar uma história"
+            options={CANCEL_OPTIONS}
+            value={rules.onCancelParent}
+            onChange={(onCancelParent) => set({ onCancelParent })}
+          />
         }
       />
 
@@ -153,7 +165,8 @@ export function RulesSettings() {
               : 'deixar a história onde está.'
         }
         control={
-          <EnumSelect
+          <SelectField
+            aria-label="Ao concluir a última sub-tarefa"
             options={COMPLETE_OPTIONS}
             value={rules.onAllChildrenDone}
             onChange={(onAllChildrenDone) => set({ onAllChildrenDone })}
@@ -171,14 +184,11 @@ export function RulesSettings() {
             : 'não mexer no modelo. A sugestão só é aplicada pelo botão no card.'
         }
         control={
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={rules.autoApplyModelSuggestion}
-              onChange={(e) => set({ autoApplyModelSuggestion: e.target.checked })}
-            />
-            Preencher
-          </label>
+          <RuleSwitch
+            label="Preencher"
+            checked={rules.autoApplyModelSuggestion}
+            onChange={(autoApplyModelSuggestion) => set({ autoApplyModelSuggestion })}
+          />
         }
       />
 
@@ -187,7 +197,7 @@ export function RulesSettings() {
         active={rules.confirmTrash !== 'never'}
         when="um card é movido para a lixeira"
         then={confirmThen(rules.confirmTrash, 'excluir')}
-        control={confirmSelect('confirmTrash')}
+        control={confirmSelect('confirmTrash', 'Ao excluir um card')}
       />
 
       <Rule
@@ -195,7 +205,7 @@ export function RulesSettings() {
         active={rules.confirmArchive !== 'never'}
         when="um card é arquivado"
         then={confirmThen(rules.confirmArchive, 'arquivar')}
-        control={confirmSelect('confirmArchive')}
+        control={confirmSelect('confirmArchive', 'Ao arquivar um card')}
       />
     </div>
   );

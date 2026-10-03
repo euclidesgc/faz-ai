@@ -100,6 +100,10 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 - In Configurações > Campos, the "No board" selector (Selo, Selo vazado, Nome: valor, Oculto) no
   longer overlaps the options column when the window is narrow: the field card's columns now wrap
   before they get narrower than the selector.
+- **Board rules with the new design**: each rule becomes a card with the Ativa/Desligada badge, the
+  switch or selector on the right and the "Quando / Então" below. The controls are Radix Themes,
+  the same as Campos and Workflows. It is the first of the Configurações screens that still used the
+  old controls.
 
 ## 0.29.1
 
