@@ -1,4 +1,5 @@
 import { DEFAULT_APPEARANCE, FONTS, FONT_SIZE_RANGE, THEMES, fontStack, type Appearance } from '../../../shared/appearance';
+import type { Language } from '../../../shared/language';
 import { CARD_STATUSES, OWNER_LABEL } from '../../../shared/status';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
@@ -9,6 +10,12 @@ import { Button, Card, Slider, TextField } from '@radix-ui/themes';
 import { FormField, SelectField } from '../ui';
 import { SectionHeader } from './SectionHeader';
 import { PageHeader } from './PageHeader';
+
+const LANGUAGE_OPTIONS: { value: Language; label: string }[] = [
+  { value: 'auto', label: 'Automático (idioma do editor ou do navegador) / Automatic' },
+  { value: 'pt-BR', label: 'Português (Brasil)' },
+  { value: 'en', label: 'English' },
+];
 
 const SAMPLE = '## Exemplo de descrição\n\nTexto de um card com **negrito**, _itálico_ e `código`.\n\n- Primeiro item\n- Segundo item';
 
@@ -32,6 +39,17 @@ export function AppearanceSettings() {
 
       <Card className="form-card" aria-label="Tema e fonte">
         <div className="form-grid">
+          <FormField label="Idioma" hint="O idioma da interface do board.">
+            {(id) => (
+              <SelectField
+                id={id}
+                aria-label="Idioma"
+                options={LANGUAGE_OPTIONS}
+                value={appearance.language}
+                onChange={(language) => set({ language })}
+              />
+            )}
+          </FormField>
           <FormField label="Tema">
             {(id) => (
               <SelectField id={id} aria-label="Tema" options={THEMES} value={appearance.theme} onChange={(theme) => set({ theme })} />
