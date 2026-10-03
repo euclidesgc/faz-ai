@@ -82,6 +82,10 @@
         "title": "%command.heartbeat.stop.title%"
       },
       {
+        "command": "fazai.autopilot.resume",
+        "title": "%command.autopilot.resume.title%"
+      },
+      {
         "command": "fazai.showLog",
         "title": "%command.showLog.title%"
       }

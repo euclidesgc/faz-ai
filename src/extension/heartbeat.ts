@@ -29,7 +29,8 @@ export function heartbeatTargets(s: BoardState): Card[] {
   const out: Card[] = [];
   for (const card of aiQueue(p)) {
     const story = card.parentId ? byId.get(card.parentId) : card;
-    if (!story || !isLive(story) || out.includes(story)) continue;
+    // as histórias em modo autônomo são do autopiloto, que não espera o intervalo
+    if (!story || !isLive(story) || story.yolo || out.includes(story)) continue;
     const withHuman = !!story.status && statusInfo(story.status).owner === 'human';
     if (story.status === 'running' || (withHuman && !unanswered.has(story.id))) continue;
     out.push(story);

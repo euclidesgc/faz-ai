@@ -97,6 +97,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     pendingUpgrade: [],
     chat: EMPTY_CHAT,
     aiRuns: [],
+    autopilot: { active: false, note: null },
     aiRunUnsupported: null,
     harnessInstall: null,
     ...over,

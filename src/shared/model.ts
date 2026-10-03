@@ -192,6 +192,14 @@ export interface CardLink {
   kind: LinkKind;
 }
 
+/** Estado do autopiloto, que toca sozinho as histórias em modo autônomo, uma de cada vez. */
+export interface Autopilot {
+  /** está tocando as histórias; desligado depois de pausar, ou ao abrir o editor, até alguém ligar o modo numa história ou retomar */
+  active: boolean;
+  /** por que está parado esperando uma pessoa (impedimento numa história); null quando segue normalmente */
+  note: string | null;
+}
+
 /** Snapshot completo enviado ao webview após cada mutação. */
 export interface BoardState {
   board: Board;
@@ -216,6 +224,8 @@ export interface BoardState {
   chat: ChatState;
   /** cards em que a extensão está executando a IA agora */
   aiRuns: Id[];
+  /** autopiloto das histórias em modo autônomo (YOLO) */
+  autopilot: Autopilot;
   /** por que a ferramenta do projeto não pode ser executada pelo board; null quando pode */
   aiRunUnsupported: string | null;
   /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */

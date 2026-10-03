@@ -1,5 +1,5 @@
 import type { DbHandle } from '../db/database';
-import type { Attachment, BoardState } from '../../shared/model';
+import type { Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
 import type { AiTool } from '../../shared/harness';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
@@ -64,6 +64,7 @@ export class MessageRouter {
   private aiRuns: string[] = [];
   private chat: ChatState = EMPTY_CHAT;
   private chatHandler: ((msg: ChatMessageIn) => void) | null = null;
+  private autopilot: Autopilot = { active: false, note: null };
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
 
@@ -98,6 +99,7 @@ export class MessageRouter {
       harness: current,
       aiRuns: this.aiRuns,
       chat: this.chat,
+      autopilot: this.autopilot,
       aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission),
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
     };
@@ -142,6 +144,13 @@ export class MessageRouter {
   chatCommand(msg: ChatMessageIn): void {
     if (!this.chatHandler) throw new Error('O chat não está disponível neste board.');
     this.chatHandler(msg);
+  }
+
+  /** Estado do autopiloto (informado por ele). */
+  setAutopilot(state: Autopilot): void {
+    if (state.active === this.autopilot.active && state.note === this.autopilot.note) return;
+    this.autopilot = state;
+    this.notify();
   }
 
   /**
