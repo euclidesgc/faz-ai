@@ -485,7 +485,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   tool(
     'set_appearance',
-    'Ajusta a aparência do board: tema (system acompanha o VS Code, light, dark) e a fonte e o tamanho dos textos longos (descrição e comentários).',
+    'Ajusta a aparência do board: tema (system acompanha o claro/escuro do VS Code (ou do sistema, no navegador), light, dark) e a fonte e o tamanho dos textos longos (descrição e comentários).',
     {
       theme: z.enum(['system', 'light', 'dark']).optional(),
       font: z.enum(['sans', 'ui', 'serif', 'mono', 'editor']).optional().describe('sans = sem serifa do sistema; ui = fonte da interface do VS Code; editor = fonte do editor do VS Code'),

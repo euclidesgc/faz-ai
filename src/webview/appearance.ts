@@ -1,7 +1,20 @@
 import { useEffect } from 'react';
-import { fontStack } from '../shared/appearance';
+import { fontStack, type ThemeMode } from '../shared/appearance';
 import { useBoardStore } from './store/boardStore';
+import { resolveTheme } from './theme';
 import { isWeb } from './vscode';
+
+const DARK_QUERY = '(prefers-color-scheme: dark)';
+
+/** Grava em `data-theme` o claro ou escuro que vale agora neste documento. */
+export function applyTheme(mode: ThemeMode): void {
+  const { body } = document;
+  body.dataset.theme = resolveTheme(mode, {
+    isWeb,
+    bodyClasses: Array.from(body.classList),
+    prefersDark: window.matchMedia(DARK_QUERY).matches,
+  });
+}
 
 /** Aplica o tema e a tipografia do board ao documento deste webview. */
 export function useAppearance(): void {
@@ -11,13 +24,18 @@ export function useAppearance(): void {
     const { body } = document;
     body.style.setProperty('--text-font', fontStack(appearance.font));
     body.style.setProperty('--text-size', `${appearance.fontSize}px`);
-    if (appearance.theme !== 'system') return void (body.dataset.theme = appearance.theme);
-    // no editor, "sistema" são as cores do próprio VS Code; no navegador, o claro ou escuro do sistema operacional
-    if (!isWeb) return void delete body.dataset.theme;
-    const dark = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = () => (body.dataset.theme = dark.matches ? 'dark' : 'light');
-    apply();
-    dark.addEventListener('change', apply);
-    return () => dark.removeEventListener('change', apply);
+    const { theme } = appearance;
+    applyTheme(theme);
+    if (theme !== 'system') return;
+    const apply = () => applyTheme(theme);
+    if (isWeb) {
+      const dark = window.matchMedia(DARK_QUERY);
+      dark.addEventListener('change', apply);
+      return () => dark.removeEventListener('change', apply);
+    }
+    // no editor, o VS Code troca as classes `vscode-*` do body quando o tema muda
+    const observer = new MutationObserver(apply);
+    observer.observe(body, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
   }, [appearance]);
 }

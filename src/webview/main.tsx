@@ -1,8 +1,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { applyTheme } from './appearance';
 import { FiltersApp } from './FiltersApp';
 import { isWeb } from './vscode';
+import './tokens.css';
 import './styles.css';
 
 const root = document.getElementById('root')!;
@@ -19,5 +21,8 @@ if (isWeb) {
     window.open(link.href, '_blank', 'noopener');
   });
 }
+
+// a tela "Carregando…" já nasce com tema; a preferência salva chega depois, com o board
+applyTheme('system');
 
 createRoot(root).render(<React.StrictMode>{isFilters ? <FiltersApp /> : <App />}</React.StrictMode>);

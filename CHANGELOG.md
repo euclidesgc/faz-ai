@@ -9,6 +9,19 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - **Botão de tema no topo do board**: o ícone no canto superior direito alterna entre **Sistema**,
   **Claro** e **Escuro**. É a mesma preferência de Configurações > Aparência, então a escolha fica
   salva e vale no editor e no navegador.
+- **Cores próprias do board**: o board passa a usar a mesma paleta no editor e no navegador, em
+  claro e escuro, em vez de herdar as cores do tema do VS Code. Com **Sistema**, ele acompanha só
+  se o editor está em tema claro ou escuro. Temas de alto contraste usam o claro ou o escuro do
+  board com bordas reforçadas.
+- O painel de **Filtros** da barra lateral usa o fundo do tema do board. Antes, com o VS Code
+  escuro e o board claro, os filtros ficavam quase invisíveis.
+- Os selos de status e de tipo de card ficam legíveis em qualquer cor escolhida: o texto vira preto
+  ou branco conforme a cor de fundo.
+- O botão principal é azul índigo nos dois temas (no escuro era verde).
+- As barras de rolagem usam as cores do board, e a barra horizontal das colunas ganhou um espaço de
+  respiro abaixo dos cards.
+- O contraste de textos, controles e foco do teclado é verificado por teste automático nos dois
+  temas. As regras de cor estão em `DESIGN.md`.
 
 ## 0.29.1
 
