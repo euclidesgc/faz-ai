@@ -38,6 +38,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - O botão "⋯" dos menus avisa aos leitores de tela se o menu está aberto.
 - Interno: as ferramentas MCP saem de um arquivo de 1147 linhas para `src/extension/mcp/tools/`,
   um arquivo por grupo. A lista que a IA vê (nomes, descrições, parâmetros) não muda.
+- Interno: o roteador de mensagens do host (690 linhas) vira um despachante tipado com handlers
+  por domínio em `src/extension/panel/handlers/`; a regra da história fica em `src/shared/story.ts`.
 
 ## 0.29.1
 

@@ -40,6 +40,8 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 - The "⋯" menu button tells screen readers whether the menu is open.
 - Internal: the MCP tools move from a 1147-line file to `src/extension/mcp/tools/`, one file per
   group. The list the AI sees (names, descriptions, parameters) does not change.
+- Internal: the host message router (690 lines) becomes a typed dispatcher with per-domain handlers
+  in `src/extension/panel/handlers/`; the story rule lives in `src/shared/story.ts`.
 
 ## 0.29.1
 

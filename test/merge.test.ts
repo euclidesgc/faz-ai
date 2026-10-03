@@ -89,7 +89,7 @@ describe('pull request e merge na homologação', () => {
     router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true, mergeMethod: 'rebase' } } });
     await call('set_pull_request', { card: 1, url: PR });
     router.handle({ type: 'card.workspace.clear', cardId: card(1).id });
-    (router as any).cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
+    (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
     await approve(1);
     expect(calls).toEqual([['pr', 'merge', PR, '--rebase']]);
     expect(columnOf(1)).toBe('Concluído');
