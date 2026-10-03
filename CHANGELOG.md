@@ -69,6 +69,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   outras, com a prévia do card (Enter adiciona, Esc cancela). As configurações e a Lixeira ocupam
   toda a largura da tela, e o menu lateral das configurações recolhe numa faixa só com ícones (a
   escolha fica lembrada).
+- Campos de texto, link e número do card não perdem mais letras quando você digita rápido. O
+  valor é gravado ao sair do campo, com Enter ou ao fechar o card, em vez de a cada tecla.
 
 ## 0.29.1
 

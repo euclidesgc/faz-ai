@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { Menu } from '../../src/webview/components/Menu';
-import { AddInput, Button, ChipsEditor, DeleteButton, EnumSelect, NumberField } from '../../src/webview/components/ui';
+import { AddInput, Button, ChipsEditor, DeleteButton, EnumSelect, NumberField, TextField } from '../../src/webview/components/ui';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 beforeAll(async () => {
@@ -163,6 +163,48 @@ describe('NumberField', () => {
     await userEvent.type(input, '999');
     await userEvent.tab();
     expect(onCommit).toHaveBeenCalledWith(60);
+  });
+});
+
+describe('TextField', () => {
+  it('não grava a cada tecla; grava ao sair do campo, só se mudou', async () => {
+    const onCommit = vi.fn();
+    render(<TextField value="a" onCommit={onCommit} />);
+    const input = screen.getByRole('textbox');
+    await userEvent.click(input);
+    await userEvent.tab();
+    expect(onCommit).not.toHaveBeenCalled();
+    await userEvent.type(input, 'bcd');
+    expect(onCommit).not.toHaveBeenCalled();
+    await userEvent.tab();
+    expect(onCommit).toHaveBeenCalledOnce();
+    expect(onCommit).toHaveBeenCalledWith('abcd');
+  });
+
+  it('Enter grava sem sair do campo', async () => {
+    const onCommit = vi.fn();
+    render(<TextField value="" onCommit={onCommit} />);
+    await userEvent.type(screen.getByRole('textbox'), 'x{Enter}');
+    expect(onCommit).toHaveBeenCalledWith('x');
+  });
+
+  it('grava o rascunho quando o campo some (card fechado no meio da edição)', async () => {
+    const onCommit = vi.fn();
+    const { unmount } = render(<TextField value="" onCommit={onCommit} />);
+    await userEvent.type(screen.getByRole('textbox'), 'meio');
+    unmount();
+    expect(onCommit).toHaveBeenCalledOnce();
+    expect(onCommit).toHaveBeenCalledWith('meio');
+  });
+
+  it('valor novo de fora entra quando o campo não está em foco, mas não atropela quem digita', async () => {
+    const { rerender } = render(<TextField value="a" onCommit={() => {}} />);
+    const input = screen.getByRole('textbox');
+    rerender(<TextField value="b" onCommit={() => {}} />);
+    expect(input).toHaveValue('b');
+    await userEvent.type(input, 'X');
+    rerender(<TextField value="c" onCommit={() => {}} />);
+    expect(input).toHaveValue('bX');
   });
 });
 

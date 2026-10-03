@@ -3,7 +3,7 @@ import type { FieldDef, FieldValue } from '../../shared/model';
 import { AI_TOOLS } from '../../shared/harness';
 import { effortLabel, modelDisplay, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
-import { Button, ChipsEditor, IconExternal } from './ui';
+import { Button, ChipsEditor, IconExternal, TextField } from './ui';
 
 /** O campo tem algo para mostrar no card (checkbox desmarcado e lista vazia não contam). */
 export const hasValue = (value: FieldValue): value is NonNullable<FieldValue> =>
@@ -50,12 +50,13 @@ function format(field: FieldDef, v: string | number | boolean): string {
 /** Editor do valor no drawer. */
 export function FieldEditor({ field, value, onChange }: { field: FieldDef; value: FieldValue; onChange: (v: FieldValue) => void }) {
   switch (field.kind) {
+    // texto, link e número gravam ao terminar a edição (TextField): gravar a cada tecla perdia letras
     case 'text':
-      return <input value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} />;
+      return <TextField value={(value as string) ?? ''} onCommit={(v) => onChange(v || null)} />;
     case 'url':
       return (
         <div className="row">
-          <input value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} placeholder="https://" />
+          <TextField value={(value as string) ?? ''} onCommit={(v) => onChange(v.trim() || null)} placeholder="https://" />
           {value && (
             <a href={String(value)} target="_blank" rel="noreferrer" title="Abrir o link" aria-label="Abrir o link">
               <IconExternal />
@@ -65,10 +66,10 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
       );
     case 'number':
       return (
-        <input
+        <TextField
           type="number"
           value={value === null ? '' : String(value)}
-          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+          onCommit={(v) => onChange(v.trim() === '' || !Number.isFinite(Number(v)) ? null : Number(v))}
         />
       );
     case 'date':
