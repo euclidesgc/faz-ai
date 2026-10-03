@@ -5,7 +5,7 @@
 What changed in each version of Faz AI Kanban, newest first. The extension's interface is in
 Portuguese, so names of screens and buttons appear as you see them on screen.
 
-## Unreleased
+## 0.30.0
 
 - **Autonomous mode (YOLO)**: a story marked YOLO is driven by the AI from Backlog to the pull
   request, without asking for authorization or confirmation. Columns that require approval do not
