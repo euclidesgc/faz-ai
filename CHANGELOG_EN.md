@@ -7,6 +7,16 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 
 ## Unreleased
 
+- **Autonomous mode (YOLO)**: a story marked YOLO is driven by the AI from Backlog to the pull
+  request, without asking for authorization or confirmation. Columns that require approval do not
+  hold the card, the review request becomes an approval right away, and the AI settles doubts by
+  itself, recording them in the conversation. It runs with the "Sem restrições" permission and
+  does not merge. An **autopilot** drives stories in a queue, one at a time, and stacks the pull
+  requests: each story's branch starts from the previous one. The AI can split a large request
+  into several stories (`create_card` with `autonomous_from`). It stops when the card is blocked,
+  when a run fails and after 3 consecutive runs with no progress. Switch in the card panel (with
+  confirmation), badge on the card, an **Autônomo** button in the board's top bar and commands to
+  pause and resume.
 - **Interface in Portuguese and English.** In Configurações → Aparência (Settings → Appearance), the
   **Idioma** (language) can be **Automático** (follows the editor's or the browser's language:
   English for any `en`, Portuguese for the rest), **Português (Brasil)** or **English**. The whole

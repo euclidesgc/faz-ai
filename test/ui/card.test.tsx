@@ -1,6 +1,6 @@
 import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Board } from '../../src/webview/components/Board';
@@ -83,7 +83,8 @@ describe('CardDrawer', () => {
   it('marcar um item do checklist envia checklist.update com done', async () => {
     openStory();
     const item = board.router.snapshot().checklistItems.find((i) => i.cardId === board.storyId)!;
-    await userEvent.click(screen.getByRole('checkbox'));
+    // o painel também tem o interruptor do modo autônomo: o item é o checkbox da lista do checklist
+    await userEvent.click(within(screen.getByRole('heading', { name: /Checklist/ }).closest('section')!).getByRole('checkbox'));
     expect(lastSent('checklist.update')).toEqual({ type: 'checklist.update', itemId: item.id, patch: { done: true } });
   });
 

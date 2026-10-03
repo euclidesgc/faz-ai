@@ -13,6 +13,7 @@ import { FieldsSection } from './card/FieldsSection';
 import { SubtasksSection } from './card/SubtasksSection';
 import { useDescriptionDraft } from './card/useDescriptionDraft';
 import { WorkspaceBar } from './card/WorkspaceBar';
+import { YoloBar } from './card/YoloBar';
 import { StatusBar } from './StatusBar';
 import { formatDateTime, t } from '../i18n';
 
@@ -51,6 +52,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
         <CardHeading card={card} />
         {live && <StatusBar card={card} />}
         <WorkspaceBar card={card} />
+        <YoloBar card={card} />
         <AgentBar card={card} />
 
         <CardTabs cardId={card.id} tab={tab} onChange={setTab} />

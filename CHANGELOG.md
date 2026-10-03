@@ -6,6 +6,15 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Modo autônomo (YOLO)**: uma história marcada como YOLO é tocada pela IA do Backlog ao pull
+  request, sem pedir autorização nem confirmação. As colunas que exigem aprovação não seguram o
+  card, o pedido de revisão vira aprovação na hora e a IA decide as dúvidas sozinha, registrando
+  na conversa. Roda com a permissão "Sem restrições" e não faz o merge. Um **autopiloto** toca as
+  histórias em fila, uma de cada vez, e empilha os pull requests: a branch de cada história parte
+  da anterior. A IA pode dividir um pedido grande em várias histórias (`create_card` com
+  `autonomous_from`). Para quando o card é bloqueado, quando uma execução falha e depois de 3
+  execuções seguidas sem avanço. Interruptor no painel do card (com confirmação), selo no cartão,
+  botão **Autônomo** no topo do board e comandos para pausar e retomar.
 - **Interface em português e em inglês.** Em Configurações → Aparência, o **Idioma** pode ser
   **Automático** (segue o idioma do editor ou do navegador: inglês para qualquer `en`, português
   para o resto), **Português (Brasil)** ou **English**. A interface inteira troca na hora: board,

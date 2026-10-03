@@ -2,6 +2,7 @@ import { cardRef, type BoardState, type Card, type Column } from '../shared/mode
 import { aiQueue, pendingWork } from '../shared/pending';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { statusInfo } from '../shared/status';
+import { yoloStories } from '../shared/story';
 import type { MessageRouter } from './panel/messageRouter';
 
 const AUTHOR = 'Faz AI';
@@ -38,10 +39,6 @@ export type AutopilotStep =
   /** a fila parou numa história que depende de uma pessoa (impedimento) */
   | { kind: 'paused'; story: Card; reason: string };
 
-/** Histórias em modo autônomo ainda em aberto, na ordem em que foram criadas. */
-export const yoloStories = (s: BoardState): Card[] =>
-  s.cards.filter((c) => c.yolo && !c.parentId && isLive(c) && columnOf(s, c)?.category === 'open').sort((a, b) => a.number - b.number);
-
 /**
  * Próximo passo. As histórias vão em fila, uma de cada vez e na ordem do número: a branch de cada uma
  * parte da anterior, então a seguinte só começa quando a atual sai de aberto. Uma história com
@@ -59,7 +56,7 @@ export function autopilotStep(s: BoardState): AutopilotStep {
       story,
       reason: story.statusReason
         ? `${cardRef(story)} está bloqueado: ${story.statusReason}`
-        : `${cardRef(story)} está esperando uma pessoa (${statusInfo(story.status).label.toLowerCase()}).`,
+        : `${cardRef(story)} está esperando uma pessoa.`,
     };
 
   if (!column.aiActive) {

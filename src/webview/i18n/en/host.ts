@@ -219,4 +219,8 @@ export const host: Record<string, string> = {
   'Skill não encontrada na origem: {rel}': 'Skill not found in the source: {rel}',
   '"{name}" não é um nome de skill válido (letras minúsculas, números e hífens).':
     '"{name}" is not a valid skill name (lowercase letters, numbers and hyphens).',
+
+  '{ref} está bloqueado: {reason}': '{ref} is blocked: {reason}',
+  '{ref} está esperando uma pessoa.': '{ref} is waiting for a person.',
+  '{ref} não tem nada pendente com a IA, mas ainda não foi concluído.': '{ref} has nothing pending with the AI, but is not finished yet.',
 };

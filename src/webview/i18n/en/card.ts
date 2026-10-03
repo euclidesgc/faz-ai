@@ -196,4 +196,19 @@ export const card: Record<string, string> = {
   'Mostrando {shown} de {total}: refine a busca para ver as outras.': 'Showing {shown} of {total}: refine the search to see the rest.',
   '{n} marcadas': '{n} selected',
   Limpar: 'Clear',
+
+  'A IA trabalha nesta sub-tarefa sem pedir aprovação, como na história':
+    'The AI works on this sub-task without asking for approval, as in the story',
+  'Modo autônomo, da história {ref}': 'Autonomous mode, from story {ref}',
+  'A IA toca esta história sozinha, do Backlog até o pull request: cria os documentos de cada fase, o plano e as sub-tarefas, implementa uma por uma e abre o PR. Nada é pedido a você: não há aprovação, pergunta nem confirmação. A IA roda com a permissão "Sem restrições" (altera arquivos e roda comandos) e não faz o merge. As próximas histórias em modo autônomo entram na fila e viram uma pilha de pull requests. Pare a qualquer hora pelo botão do topo do board.':
+    'The AI drives this story by itself, from Backlog to the pull request: it writes the document of each phase, the plan and the sub-tasks, implements them one by one and opens the PR. Nothing is asked of you: there is no approval, question or confirmation. The AI runs with the "Sem restrições" (no restrictions) permission (it edits files and runs commands) and does not merge. The next autonomous stories join the queue and become a stack of pull requests. Stop at any time with the button at the top of the board.',
+  'Ligar o modo autônomo em {ref}?': 'Turn on autonomous mode for {ref}?',
+  'Ligar o modo autônomo': 'Turn on autonomous mode',
+  'Modo autônomo (YOLO)': 'Autonomous mode (YOLO)',
+  'O autopiloto está tocando a fila.': 'The autopilot is driving the queue.',
+  'O autopiloto está pausado.': 'The autopilot is paused.',
+  Pausar: 'Pause',
+  Retomar: 'Resume',
+  'Modo autônomo (YOLO): a IA toca esta história sozinha, sem aprovação':
+    'Autonomous mode (YOLO): the AI drives this story by itself, without approval',
 };
