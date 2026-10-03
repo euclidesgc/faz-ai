@@ -101,6 +101,20 @@ export function registerBoardTools(tool: DefineTool): void {
   );
 
   tool(
+    'move_workflow',
+    'Muda a posição de um workflow no board (0 = o primeiro, em cima). Os outros se reordenam.',
+    { workflow: workflowArg, position: z.number().int().min(0) },
+    (a, router) => {
+      router.handle({
+        type: 'settings.workflow.update',
+        workflowId: findWorkflow(router.snapshot(), a.workflow).id,
+        patch: { position: a.position },
+      });
+      return overview(router);
+    },
+  );
+
+  tool(
     'delete_workflow',
     'Exclui um workflow e as colunas dele. Só é possível se ele não tiver cards (nem arquivados ou na lixeira), se nenhum tipo de card nascer nele e se não for o único workflow do board.',
     { workflow: workflowArg },

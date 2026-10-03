@@ -107,7 +107,7 @@ export type WebviewToHost =
     }
   | { type: 'settings.field.delete'; fieldId: Id }
   | { type: 'settings.workflow.create'; name: string; kind: WorkflowKind }
-  | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string } }
+  | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string; position?: number } }
   | { type: 'settings.workflow.delete'; workflowId: Id }
   | {
       type: 'settings.board.update';

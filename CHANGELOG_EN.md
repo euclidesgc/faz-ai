@@ -88,6 +88,8 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   the `collapsed` parameter of `update_column` were removed.
 - The test browser's logs (`.playwright-mcp`) were committed by mistake in earlier PRs and are now
   ignored by git.
+- **Workflow order**: each workflow has a handle you drag to change its position on the board (with
+  the handle focused, ↑ and ↓ move one position). The AI assistant (MCP) gained `move_workflow`.
 
 ## 0.29.1
 

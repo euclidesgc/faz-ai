@@ -88,6 +88,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   parâmetro `collapsed` de `update_column` foram removidos.
 - Os logs do navegador de teste (`.playwright-mcp`) entraram por engano em PRs anteriores e agora
   são ignorados pelo git.
+- **Ordem dos workflows**: cada workflow tem uma alça para arrastar e mudar a posição dele no
+  board (com a alça em foco, ↑ e ↓ movem uma posição). O assistente de IA (MCP) ganhou
+  `move_workflow`.
 
 ## 0.29.1
 
