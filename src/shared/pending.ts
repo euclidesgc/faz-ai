@@ -1,4 +1,5 @@
 import type { BoardState, Card, Id } from './model';
+import { isLive } from './selectors';
 import { statusInfo, type CardStatus } from './status';
 
 /** O que está esperando por alguém no board: a fila da IA e a fila da pessoa. */
@@ -22,7 +23,7 @@ const byNumber = (a: Card, b: Card): number => a.number - b.number;
 
 export function pendingWork(s: BoardState): PendingWork {
   const open = new Set(s.columns.filter((c) => c.category === 'open').map((c) => c.id));
-  const cards = s.cards.filter((c) => c.deletedAt === null && c.archivedAt === null && open.has(c.columnId)).sort(byNumber);
+  const cards = s.cards.filter((c) => isLive(c) && open.has(c.columnId)).sort(byNumber);
   const byId = new Map(s.cards.map((c) => [c.id, c]));
   const withStatus = (status: CardStatus) => cards.filter((c) => c.status === status);
   const withHuman = (c: Card | undefined): boolean => !!c?.status && statusInfo(c.status).owner === 'human';

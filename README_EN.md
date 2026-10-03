@@ -329,8 +329,9 @@ npm run typecheck
 `git blame` skip the formatting-only commit: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
 Press `F5` to open the Extension Development Host. The code is in `src/extension` (host and MCP
-server), `src/webview` (React interface), `src/shared` (model and protocol), `src/mcp-bridge`
-(the stdio bridge used by AI clients) and `src/cli` (the board outside the editor).
+server), `src/webview` (React interface), `src/shared` (model, protocol and the board rules used by
+both host and interface), `src/mcp-bridge` (the stdio bridge used by AI clients) and `src/cli` (the
+board outside the editor).
 
 To try the interface without the editor, `node dist/cli.js <folder> --data <test data folder>`
 serves the board in the browser. The tests cover the extension's activation (with a fake editor in

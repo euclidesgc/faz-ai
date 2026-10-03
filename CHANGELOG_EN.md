@@ -34,6 +34,10 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   for users.
 - Internal: all code follows Prettier, checked by `npm test`, and `npm run typecheck` now covers
   the interface tests.
+- Internal: board rules that the host and the front end repeated (active card, a card's column, open
+  subtasks, what goes along when cancelling or completing) now live in one place, `src/shared`, with
+  tests. Nothing changes for users.
+- The "⋯" menu button tells screen readers whether the menu is open.
 
 ## 0.29.1
 

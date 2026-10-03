@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { manifestOf, profileOf } from '../../shared/execution';
 import { cardRef, type FieldValue } from '../../shared/model';
 import { MODEL_EFFORT_LABEL, modelLabel, suggestModel } from '../../shared/models';
-import { cardsIn, childrenOf, columnsOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
+import { cardsIn, childrenOf, columnOf, columnsOf, fieldsForType, valueOf } from '../../shared/selectors';
+import { useBoardStore } from '../store/boardStore';
 import { cards, checklist } from '../commands';
 import { requestArchive, requestMove, requestTrash } from '../store/actions';
 import { AttachmentsTab } from './AttachmentsTab';
@@ -372,7 +373,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
                 </div>
                 <ul className="children">
                   {children.map((c) => {
-                    const col = state.columns.find((x) => x.id === c.columnId);
+                    const col = columnOf(state, c);
                     return (
                       <li key={c.id} className={col?.isTerminal ? 'done' : ''}>
                         <a onClick={() => openCard(c.id)}>

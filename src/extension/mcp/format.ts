@@ -10,6 +10,7 @@ import {
   type ModelOption,
 } from '../../shared/models';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
+import { childrenOf, columnOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
 import {
   cardRef,
@@ -98,7 +99,7 @@ const iso = (t: number): string => new Date(t).toISOString();
 export function cardStatus(s: BoardState, c: Card): string {
   if (c.deletedAt !== null) return 'trashed';
   if (c.archivedAt !== null) return 'archived';
-  return s.columns.find((col) => col.id === c.columnId)?.category ?? 'open';
+  return columnOf(s, c)?.category ?? 'open';
 }
 
 function fieldsOf(s: BoardState, c: Card): Record<string, FieldValue> {
@@ -122,19 +123,17 @@ export function workStatus(s: BoardState, c: Card) {
   };
 }
 
-const activeChildren = (s: BoardState, c: Card): Card[] => s.cards.filter((k) => k.parentId === c.id && k.deletedAt === null);
-
 /** Linha de listagem: o suficiente para decidir qual card abrir. */
 export function cardSummary(s: BoardState, c: Card) {
   const parent = c.parentId ? s.cards.find((p) => p.id === c.parentId) : undefined;
-  const kids = activeChildren(s, c);
+  const kids = childrenOf(s, c.id);
   const checklist = s.checklistItems.filter((i) => i.cardId === c.id);
   return {
     id: cardRef(c),
     title: c.title,
     type: s.cardTypes.find((t) => t.id === c.typeId)?.name,
     workflow: s.workflows.find((w) => w.id === c.workflowId)?.name,
-    column: s.columns.find((col) => col.id === c.columnId)?.name,
+    column: columnOf(s, c)?.name,
     status: cardStatus(s, c),
     ...(workStatus(s, c) ? { work: workStatus(s, c) } : {}),
     ...(parent ? { parent: `${cardRef(parent)} ${parent.title}` } : {}),
@@ -232,7 +231,7 @@ export function requiredSkills(s: BoardState, c: Card) {
  */
 function phaseOf(s: BoardState, c: Card) {
   const story = c.parentId ? (s.cards.find((p) => p.id === c.parentId) ?? c) : c;
-  const col = s.columns.find((x) => x.id === story.columnId);
+  const col = columnOf(s, story);
   if (!col || !col.aiActive || (!col.aiInstruction && !col.artifactName)) return undefined;
   return {
     name: col.name,
@@ -274,7 +273,7 @@ function workspaceOf(s: BoardState, c: Card) {
 
 export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardState['attachments'][number]) => string) {
   const skills = requiredSkills(s, c);
-  const phase = c.deletedAt === null && c.archivedAt === null ? phaseOf(s, c) : undefined;
+  const phase = isLive(c) ? phaseOf(s, c) : undefined;
   const attachment = (a: BoardState['attachments'][number]) => ({
     attachmentId: a.id,
     filename: a.filename,
@@ -284,7 +283,7 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...(a.artifact ? { artifact: true } : {}),
   });
   const field = modelFieldOf(s, c);
-  const chosen = field ? s.fieldValues.find((v) => v.cardId === c.id && v.fieldId === field.id)?.value : undefined;
+  const chosen = field ? valueOf(s, c.id, field.id) : undefined;
   const suggested = suggestModel(s, c);
   return {
     ...cardSummary(s, c),
@@ -303,12 +302,12 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     description: c.description,
     createdAt: iso(c.createdAt),
     updatedAt: iso(c.updatedAt),
-    subtaskList: activeChildren(s, c)
+    subtaskList: childrenOf(s, c.id)
       .sort((a, b) => a.number - b.number)
       .map((k) => ({
         id: cardRef(k),
         title: k.title,
-        column: s.columns.find((col) => col.id === k.columnId)?.name,
+        column: columnOf(s, k)?.name,
         status: cardStatus(s, k),
         fields: fieldsOf(s, k),
       })),
@@ -346,7 +345,7 @@ export function pendingOverview(s: BoardState) {
 const profileName = (s: BoardState, id: string | null) => (id ? s.board.execProfiles.find((p) => p.id === id)?.name : undefined);
 
 export function boardOverview(s: BoardState) {
-  const active = s.cards.filter((c) => c.deletedAt === null && c.archivedAt === null);
+  const active = s.cards.filter(isLive);
   return {
     board: s.board.name,
     workflows: s.workflows.map((w) => ({
@@ -404,7 +403,7 @@ export function boardOverview(s: BoardState) {
     rules: s.board.rules,
     appearance: s.board.appearance,
     harness: harnessOverview(s),
-    archivedCards: s.cards.filter((c) => c.deletedAt === null && c.archivedAt !== null).length,
+    archivedCards: s.cards.filter(isArchived).length,
     trashedCards: s.cards.filter((c) => c.deletedAt !== null).length,
   };
 }

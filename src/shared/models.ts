@@ -1,6 +1,7 @@
 import { norm } from './filters';
 import { AI_TOOLS, type AiTool } from './harness';
 import type { BoardState, Card, FieldDef, FieldValue, Id } from './model';
+import { valueOf } from './selectors';
 
 /** Um modelo de LLM disponível em uma ferramenta, com os níveis de esforço que ele aceita. */
 export interface ModelOption {
@@ -114,7 +115,7 @@ function conditionHolds(state: BoardState, card: Card, c: RuleCondition): boolea
   let values: string[];
   if (c.fieldId === TYPE_CONDITION) values = [state.cardTypes.find((t) => t.id === card.typeId)?.name ?? ''];
   else {
-    const v = state.fieldValues.find((x) => x.cardId === card.id && x.fieldId === c.fieldId)?.value;
+    const v = valueOf(state, card.id, c.fieldId);
     // checkbox desmarcado não tem valor salvo: conta como "false"
     values =
       v === undefined || v === null

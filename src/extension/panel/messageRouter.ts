@@ -16,6 +16,7 @@ import {
   type InstallableSkill,
 } from '../../shared/harness';
 import { copyTarget } from '../../shared/harnessCatalog';
+import { valueOf } from '../../shared/selectors';
 import { findSkills, installSkills } from '../skillInstall';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelRule } from '../../shared/models';
 import { newId } from '../db/ids';
@@ -209,7 +210,7 @@ export class MessageRouter {
     const card = s.cards.find((c) => c.id === cardId);
     const field = card && modelFieldOf(s, card);
     if (!card || !field || !s.board.rules.autoApplyModelSuggestion) return;
-    const current = s.fieldValues.find((v) => v.cardId === cardId && v.fieldId === field.id)?.value ?? null;
+    const current = valueOf(s, cardId, field.id);
     const next = suggestModel(s, card);
     if ((current === null || current === previous) && next !== current) this.cards.setFieldValue(cardId, field.id, next);
   }

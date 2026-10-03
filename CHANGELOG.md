@@ -32,6 +32,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   ações ao host por comandos com nome (`src/webview/commands.ts`). Nada muda para quem usa.
 - Interno: o código todo segue o Prettier, conferido pelo `npm test`, e o `npm run typecheck`
   passa a cobrir os testes da interface.
+- Interno: as regras do board que o host e o front repetiam (card ativo, coluna do card, sub-tarefas
+  em aberto, o que vai junto ao cancelar ou concluir) ficam num só lugar, em `src/shared`, com
+  testes. Nada muda para quem usa.
+- O botão "⋯" dos menus avisa aos leitores de tela se o menu está aberto.
 
 ## 0.29.1
 

@@ -3,7 +3,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { badgeStyle } from '../../shared/color';
 import { cardRef, type Card } from '../../shared/model';
 import { modelFieldOf, modelLabel, suggestModel } from '../../shared/models';
-import { childrenOf, fieldsForType, useBoardStore, valueOf } from '../store/boardStore';
+import { childrenOf, countDone, fieldsForType, valueOf } from '../../shared/selectors';
+import { useBoardStore } from '../store/boardStore';
 import { cards } from '../commands';
 import { requestArchive, requestTrash } from '../store/actions';
 import { FieldBadge } from './FieldRenderer';
@@ -32,7 +33,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const isParent = workflow?.kind === 'parent';
   const archived = card.archivedAt !== null;
   const children = isParent ? childrenOf(state, card.id) : [];
-  const doneChildren = children.filter((c) => state.columns.find((col) => col.id === c.columnId)?.isTerminal).length;
+  const doneChildren = countDone(state, children);
   const checklist = state.checklistItems.filter((i) => i.cardId === card.id);
   const checklistDone = checklist.filter((i) => i.done).length;
   const comments = state.comments.filter((c) => c.cardId === card.id).length;

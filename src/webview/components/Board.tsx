@@ -1,5 +1,6 @@
 import { cardRef } from '../../shared/model';
-import { cardsIn, columnsOf, isLive, useBoardStore } from '../store/boardStore';
+import { cardsIn, columnsOf, isLive } from '../../shared/selectors';
+import { useBoardStore } from '../store/boardStore';
 import { Button } from './ui';
 import { WorkflowRow } from './WorkflowRow';
 

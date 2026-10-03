@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Comment } from '../../shared/model';
 import { aiToolInfo } from '../../shared/harness';
 import { RUNNER_PERMISSIONS } from '../../shared/runner';
+import { isLive } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { ai, attachments, comments } from '../commands';
 import { MAX_ATTACHMENT_BYTES, toBase64 } from './AttachmentsTab';
@@ -24,7 +25,7 @@ export function CommentsTab({ cardId }: { cardId: string }) {
   const running = state.aiRuns.includes(cardId);
   const toolLabel = aiToolInfo(state.board.aiTool).label;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === state.board.runner.permission)!;
-  const canCall = !!card && card.deletedAt === null && card.archivedAt === null && !state.aiRunUnsupported;
+  const canCall = !!card && isLive(card) && !state.aiRunUnsupported;
 
   const submit = () => {
     if (!draft.trim()) return;

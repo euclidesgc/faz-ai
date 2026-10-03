@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { cardRef } from '../shared/model';
 import { aiToolInfo } from '../shared/harness';
+import { isLive } from '../shared/selectors';
 import type { RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
@@ -110,7 +111,7 @@ export class AiRunner {
   start(cardId: string): void {
     const state = this.router.snapshot();
     const card = state.cards.find((c) => c.id === cardId);
-    if (!card || card.deletedAt !== null || card.archivedAt !== null) throw new Error('Card não encontrado.');
+    if (!card || !isLive(card)) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
     const tool = aiToolInfo(state.board.aiTool);
     const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '');

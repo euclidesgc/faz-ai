@@ -1,5 +1,6 @@
 import { badgeStyle } from '../../shared/color';
 import { cardRef } from '../../shared/model';
+import { columnOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { cards, trash } from '../commands';
 import { Button, DeleteButton } from './ui';
@@ -51,7 +52,7 @@ export function TrashView() {
             {roots.map((c) => {
               const kids = deleted.filter((k) => k.parentId === c.id).length;
               const type = state.cardTypes.find((t) => t.id === c.typeId);
-              const column = state.columns.find((col) => col.id === c.columnId);
+              const column = columnOf(state, c);
               const parent = c.parentId ? state.cards.find((p) => p.id === c.parentId) : undefined;
               return (
                 <tr key={c.id}>

@@ -312,8 +312,9 @@ O `npm test` também roda o lint e confere a formatação; `npm run format` form
 `git blame` pular o commit que só formatou o código: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
 Pressione `F5` para abrir o Extension Development Host. O código fica em `src/extension` (host e
-servidor MCP), `src/webview` (interface em React), `src/shared` (modelo e protocolo),
-`src/mcp-bridge` (ponte stdio usada pelos clientes de IA) e `src/cli` (o board fora do editor).
+servidor MCP), `src/webview` (interface em React), `src/shared` (modelo, protocolo e as regras do
+board usadas pelo host e pela interface), `src/mcp-bridge` (ponte stdio usada pelos clientes de IA)
+e `src/cli` (o board fora do editor).
 
 Para testar a interface sem o editor, `node dist/cli.js <pasta> --data <pasta de dados de teste>`
 serve o board no navegador. Os testes cobrem a ativação da extensão (com um editor de mentira em

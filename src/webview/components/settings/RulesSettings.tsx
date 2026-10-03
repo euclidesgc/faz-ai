@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type CompleteParentMode, type ConfirmMode } from '../../../shared/rules';
-import { columnsOf, useBoardStore } from '../../store/boardStore';
+import { columnsOf } from '../../../shared/selectors';
+import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { Button, EnumSelect } from '../ui';
 

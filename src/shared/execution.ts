@@ -1,6 +1,7 @@
 import type { AiTool } from './harness';
 import type { BoardState, Card } from './model';
 import { parseModelValue } from './models';
+import { columnOf, valueOf } from './selectors';
 
 /**
  * Perfil de execução: o que uma sessão de IA recebe para trabalhar num card, definido antes, em vez
@@ -63,7 +64,7 @@ export function parseProfiles(json: string | null | undefined): ExecProfile[] {
 /** O perfil que vale para o card: o do card, o da coluna dele, o da coluna da história (numa sub-tarefa) ou o padrão do board. */
 export function profileOf(s: BoardState, c: Card): ExecProfile | undefined {
   const byId = (id: string | null | undefined) => (id ? s.board.execProfiles.find((p) => p.id === id) : undefined);
-  const column = (card: Card) => s.columns.find((x) => x.id === card.columnId)?.execProfile;
+  const column = (card: Card) => columnOf(s, card)?.execProfile;
   const story = c.parentId ? s.cards.find((p) => p.id === c.parentId) : undefined;
   return (
     byId(c.execProfile) ??
@@ -91,7 +92,7 @@ export function manifestOf(s: BoardState, c: Card): ExecManifest {
   const profile = profileOf(s, c);
   const fieldValue = (match: (f: BoardState['fieldDefs'][number]) => boolean) => {
     const field = s.fieldDefs.find(match);
-    return field ? s.fieldValues.find((v) => v.cardId === c.id && v.fieldId === field.id)?.value : undefined;
+    return field ? valueOf(s, c.id, field.id) : undefined;
   };
   const cardSkills = fieldValue((f) => f.kind === 'multiselect' && f.name.toLowerCase() === 'skills');
   const chosen = parseModelValue(fieldValue((f) => f.kind === 'model') ?? null) ?? parseModelValue(profile?.model || null);

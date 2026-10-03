@@ -3,6 +3,7 @@ import { badgeStyle } from '../../shared/color';
 import type { Card } from '../../shared/model';
 import { CARD_STATUSES, OWNER_LABEL, statusInfo, type CardStatus } from '../../shared/status';
 import { aiToolInfo } from '../../shared/harness';
+import { columnOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { ai, cards } from '../commands';
 import { renderMarkdown } from './MarkdownEditor';
@@ -27,7 +28,7 @@ export function StatusBar({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const [pending, setPending] = useState<Pending | null>(null);
   const [note, setNote] = useState('');
-  const column = state.columns.find((c) => c.id === card.columnId);
+  const column = columnOf(state, card);
   const styles = state.board.appearance.statuses;
   const running = state.aiRuns.includes(card.id);
   const toolLabel = aiToolInfo(state.board.aiTool).label;
