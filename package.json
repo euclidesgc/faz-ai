@@ -41,7 +41,8 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onView:fazai.chat"
   ],
   "contributes": {
     "commands": [
