@@ -4,6 +4,7 @@ export { SelectField, type EnumOption } from './SelectField';
 export { SwitchField } from './SwitchField';
 export { Chip, ChipsEditor, type ChipOption } from './ChipsEditor';
 export { DeleteButton } from './DeleteButton';
+export { OptionLabel, TechLogo, optionChip } from './OptionLabel';
 export { AddInput } from './AddInput';
 export { NumberField } from './NumberField';
 export { TextField } from './TextField';

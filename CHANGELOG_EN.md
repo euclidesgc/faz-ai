@@ -13,6 +13,10 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   direct push was refused by the protected `main` and left a stray tag on the remote. The new
   `npm run release -- finish` completes the tag and the GitHub Release after the merge, without
   publishing again.
+- **Technology logos in select fields.** Options of select and multi-select fields that name a
+  technology (Flutter, Dart, React, TypeScript, Python, Rust, Docker, GitHub and about 80 others,
+  also by nickname: "node", "ts", "k8s") get their logo, in the brand color, on the card, in the
+  card's selector and in the filters. Options that are not technologies stay as before.
 
 ## 0.30.0
 

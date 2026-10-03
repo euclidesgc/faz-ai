@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Select } from '@radix-ui/themes';
 
 export interface EnumOption<T extends string> {
@@ -5,8 +6,14 @@ export interface EnumOption<T extends string> {
   label: string;
 }
 
+/** Uma opção do seletor: o rótulo pode levar um logo ou outro elemento, não só texto. */
+export interface SelectOption<T extends string> {
+  value: T;
+  label: ReactNode;
+}
+
 interface Props<T extends string> {
-  options: readonly EnumOption<T>[];
+  options: readonly SelectOption<T>[];
   value: T;
   onChange: (value: T) => void;
   id?: string;
