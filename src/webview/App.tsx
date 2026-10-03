@@ -6,6 +6,7 @@ import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
 import { Dialog } from './components/Dialog';
 import { FilterBar } from './components/FilterBar';
+import { ThemeToggle } from './components/ThemeToggle';
 import { TrashView } from './components/TrashView';
 import { Settings } from './components/settings/Settings';
 import { isWeb, onConnectionChange } from './vscode';
@@ -60,6 +61,7 @@ export function App() {
           </button>
         )}
         {!isWeb && <button className="ghost" title="Abre este board no navegador, fora do editor" onClick={() => send({ type: 'ui.openInBrowser' })}>Abrir no navegador ↗</button>}
+        <ThemeToggle />
       </header>
       {offline && <div className="banner warn offline">Sem ligação com o Faz AI: o que você fizer agora não é salvo. A página reconecta sozinha quando o editor (ou o comando <code>faz-ai</code>) voltar.</div>}
       {view === 'board' && <FilterBar />}
