@@ -6,6 +6,7 @@ import { settings } from '../../commands';
 import { FieldEditor } from '../FieldRenderer';
 import { Button, Card, TextField } from '@radix-ui/themes';
 import { DeleteButton, FormField, IconPlus, SelectField } from '../ui';
+import { isSkillsField } from './fields/fieldKinds';
 import { SectionHeader } from './SectionHeader';
 import { CardPreview, ContrastHint } from './ColorPreview';
 import { PageHeader } from './PageHeader';
@@ -85,8 +86,9 @@ export function TypesSettings() {
       </table>
 
       <SectionHeader title="Padrões por tipo">
-        Valores preenchidos automaticamente em cada card novo do tipo — por exemplo, o modelo e as skills que devem executar aquele tipo de
-        trabalho. Cards já criados não mudam.
+        Valores preenchidos automaticamente em cada card novo do tipo — por exemplo, o modelo e as skills que a IA deve ler ao executar
+        aquele tipo de trabalho. Escolha as skills aqui e todo card novo do tipo já nasce com elas; cada card ainda pode mudar. Cards já
+        criados não mudam.
       </SectionHeader>
       <div className="stack">
         {state.cardTypes.map((t) => {
@@ -102,7 +104,7 @@ export function TypesSettings() {
               {fields.map((f) => (
                 <FormField key={f.id} label={f.name}>
                   {() =>
-                    f.kind === 'multiselect' && f.options.length === 0 ? (
+                    f.kind === 'multiselect' && f.options.length === 0 && !isSkillsField(f.name) ? (
                       <span className="muted small">Sem opções ainda.</span>
                     ) : (
                       <FieldEditor
