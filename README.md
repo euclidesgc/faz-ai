@@ -127,6 +127,8 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 5. Cards podem ser arquivados (coluna "Arquivados" no fim de cada linha) ou enviados para a
    **Lixeira**, de onde podem ser restaurados.
 
+![Card aberto: status, aprovação, campos, descrição e checklist](docs/images/card.png)
+
 Por padrão, uma história não é concluída nem avança de fase enquanto tiver sub-tarefas em aberto
 daquela fase. Essas regras podem ser desligadas nas configurações.
 
@@ -194,6 +196,8 @@ responde no próprio card:
 - **Bloquear** registra um impedimento, com o motivo.
 
 ### Chat com a IA
+
+![Chat com a IA: pergunta e resposta usando o board](docs/images/chat.png)
 
 Para dar ordens ao board em linguagem natural, use o **Chat**: na barra lateral do editor, a seção
 **Chat com a IA** (abaixo de Board e Filtros); no navegador, o botão **Chat** do topo, que abre um
@@ -281,6 +285,8 @@ colunas. Você mesmo pode mover qualquer card sem aprovação.
 
 ### Agentes
 
+![Agente com intenção, skills escolhidas e ferramentas só de leitura](docs/images/agents.png)
+
 Um agente (Configurações → **Agentes**) diz como a IA trabalha num card: que skills ela lê, a que
 servidores MCP e ferramentas (disponíveis e negadas) tem acesso, que modelo e esforço usa e se a
 sessão é limpa (sem as personalizações da sua pasta de usuário e sem invocação automática de
@@ -314,6 +320,8 @@ As skills vão sempre pelo caminho do arquivo. Numa conversa aberta por você, o
 pelo `get_card`, como orientação.
 
 ## Harness de IA
+
+![Lista de skills do projeto e globais, com seleção e ações em massa](docs/images/harness.png)
 
 Em Configurações → **Harness de IA** fica tudo que as ferramentas de IA carregam, em três abas:
 **Ferramenta e execução** (a IA do projeto e como o board a chama), **Do projeto** (o arquivo de
