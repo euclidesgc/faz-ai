@@ -7,6 +7,10 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 
 ## Unreleased
 
+- **Automatic skills per card type.** In Tipos de card → Padrões por tipo, the Skills field uses
+  the picker window (before it showed "Sem opções ainda" when the project had no skills of its
+  own) and every new card of the type is born with the chosen skills. Covered end to end by a test.
+
 - **AI harness in three tabs.** The screen was a long scroll mixing three subjects. Now:
   **Ferramenta e execução** (the project's AI, runs from the conversation and heartbeat),
   **Do projeto** (rules, skills and agents that are part of the repository) and **Tudo que a

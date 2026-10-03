@@ -1,8 +1,8 @@
 import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { Theme } from '@radix-ui/themes';
 import userEvent from '@testing-library/user-event';
+import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { Settings } from '../../src/webview/components/settings/Settings';
 import { TypesSettings } from '../../src/webview/components/settings/TypesSettings';
@@ -169,6 +169,56 @@ describe('TypesSettings', () => {
       .state!.cardTypes.find((t) => t.defaultWorkflowId === board.router.snapshot().workflows[0]!.id && t.name !== 'Sem uso')!;
     const row = screen.getByDisplayValue(story.name).closest('tr')!;
     expect(within(row).getByTitle('Tipo em uso')).toBeDisabled();
+  });
+});
+
+describe('TypesSettings: skills por tipo', () => {
+  it('as skills escolhidas no tipo já nascem em todo card novo dele', async () => {
+    const s0 = useBoardStore.getState().state!;
+    useBoardStore.setState({
+      state: {
+        ...s0,
+        board: { ...s0.board, aiTool: 'claude' },
+        harness: {
+          ...s0.harness,
+          skills: [
+            {
+              name: 'revisar-spec',
+              description: 'Revisa a spec',
+              enabled: true,
+              mode: 'auto',
+              path: '.claude/skills/revisar-spec/SKILL.md',
+              content: '',
+            },
+          ],
+        },
+      },
+    });
+    const t = useBoardStore.getState().state!.cardTypes.find((x) => x.name !== 'Sem uso')!;
+    render(
+      <Theme>
+        <TypesSettings />
+      </Theme>,
+    );
+    const defaults = within(screen.getByLabelText(`Padrões do tipo ${t.name}`));
+    await userEvent.click(defaults.getByRole('button', { name: /Escolher skills/ }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('checkbox', { name: 'revisar-spec' }));
+    const sent = lastSent('settings.type.update');
+    const field = useBoardStore.getState().state!.fieldDefs.find((f) => f.name === 'Skills')!;
+    expect(sent).toMatchObject({ typeId: t.id, patch: { defaults: { [field.id]: ['revisar-spec'] } } });
+
+    // no host, o card novo do tipo nasce com a skill
+    board.router.handle(sent);
+    const snap = board.router.snapshot();
+    const cardId = board.router.createCard({
+      typeId: t.id,
+      columnId: snap.columns.find((c) => c.workflowId === t.defaultWorkflowId)!.id,
+      parentId: null,
+      title: 'Novo',
+    });
+    expect(board.router.snapshot().fieldValues.filter((v) => v.cardId === cardId && v.fieldId === field.id)[0]?.value).toEqual([
+      'revisar-spec',
+    ]);
   });
 });
 

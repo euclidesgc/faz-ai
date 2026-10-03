@@ -283,6 +283,10 @@ precisa estar à vista da ferramenta para ser usada. Assim dá para ter muitas s
 ocupar o contexto de toda sessão. A economia de contexto é documentada no Claude Code e no Cursor;
 nas outras ferramentas, a documentação diz só que a IA deixa de invocar a skill sozinha.
 
+Para não marcar skills card a card, escolha-as no tipo: em Configurações → **Tipos de card** →
+**Padrões por tipo**, as skills do campo "Skills" (e o modelo) ficam preenchidas em todo card novo
+daquele tipo. Cada card ainda pode mudá-las.
+
 ### Modelos e referências
 
 Modelos de classe e exemplos de código ficam dentro da pasta da skill (`references/`, `assets/`,
