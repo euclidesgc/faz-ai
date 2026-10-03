@@ -2,7 +2,9 @@ import { seedBoard } from './setup';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createRef } from 'react';
 import { Dialog } from '../../src/webview/components/Dialog';
+import { Menu } from '../../src/webview/components/Menu';
 import { AddInput, Button, ChipsEditor, DeleteButton, EnumSelect, NumberField } from '../../src/webview/components/ui';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
@@ -33,6 +35,29 @@ describe('Button', () => {
   it('o botão padrão (secondary) sai sem atributo class', () => {
     render(<Button>a</Button>);
     expect(screen.getByRole('button')).not.toHaveAttribute('class');
+  });
+
+  it('repassa o ref ao <button>', () => {
+    const ref = createRef<HTMLButtonElement>();
+    render(<Button ref={ref}>a</Button>);
+    expect(ref.current).toBe(screen.getByRole('button'));
+  });
+});
+
+describe('Menu', () => {
+  it('abre a lista abaixo do botão, marca aria-expanded e executa o item escolhido', async () => {
+    const onClick = vi.fn();
+    render(<Menu items={[{ label: 'Arquivar', onClick }, 'sep', { label: 'Excluir', danger: true, onClick: () => {} }]} />);
+    const trigger = screen.getByRole('button', { name: '⋯' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Excluir' })).toHaveClass('danger');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Arquivar' }));
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 });
 
