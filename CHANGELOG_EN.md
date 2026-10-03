@@ -44,6 +44,8 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   in `src/extension/panel/handlers/`; the story rule lives in `src/shared/story.ts`.
 - Internal: the Settings > Harness screen (483 lines) becomes a composition of sections in
   `settings/harness/`, with new interaction tests; non-React rules move to `src/shared`.
+- Internal: the card panel (399 lines) becomes a composition of parts in `components/card/`, with
+  21 new interaction tests; types, checklist and the subtask slot join `src/shared/selectors.ts`.
 
 ## 0.29.1
 

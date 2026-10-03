@@ -1,17 +1,17 @@
 import { useState } from 'react';
-import type { Comment } from '../../shared/model';
-import { aiToolInfo } from '../../shared/harness';
-import { RUNNER_PERMISSIONS } from '../../shared/runner';
-import { isLive } from '../../shared/selectors';
-import { useBoardStore } from '../store/boardStore';
-import { ai, attachments, comments } from '../commands';
+import type { Comment } from '../../../shared/model';
+import { aiToolInfo } from '../../../shared/harness';
+import { RUNNER_PERMISSIONS } from '../../../shared/runner';
+import { isLive } from '../../../shared/selectors';
+import { useBoardStore } from '../../store/boardStore';
+import { ai, attachments, comments } from '../../commands';
 import { MAX_ATTACHMENT_BYTES, toBase64 } from './AttachmentsTab';
 
 /** Referência a um anexo do card dentro de uma mensagem: `attachment:<nome do arquivo>`. */
 const ATTACHMENT_SCHEME = 'attachment:';
 const ATTACHMENT_LINK = /\]\(attachment:([^)\s]+)\)/g;
-import { MarkdownEditor, renderMarkdown } from './MarkdownEditor';
-import { Button, DeleteButton } from './ui';
+import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
+import { Button, DeleteButton } from '../ui';
 
 /** Conversa do card: é por aqui que a pessoa e a IA falam sobre o trabalho. */
 export function CommentsTab({ cardId }: { cardId: string }) {

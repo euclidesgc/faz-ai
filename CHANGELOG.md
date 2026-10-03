@@ -42,6 +42,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   por domínio em `src/extension/panel/handlers/`; a regra da história fica em `src/shared/story.ts`.
 - Interno: a tela Configurações > Harness (483 linhas) vira composição de seções em
   `settings/harness/`, com testes de interação novos; regras sem React vão para `src/shared`.
+- Interno: o painel do card (399 linhas) vira composição de partes em `components/card/`, com 21
+  testes de interação novos; tipos, checklist e vaga da sub-tarefa entram em `src/shared/selectors.ts`.
 
 ## 0.29.1
 

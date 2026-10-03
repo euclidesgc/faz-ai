@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { cardRef } from '../../shared/model';
-import { useBoardStore } from '../store/boardStore';
-import { attachments } from '../commands';
-import { Button, DeleteButton } from './ui';
+import { cardRef } from '../../../shared/model';
+import { useBoardStore } from '../../store/boardStore';
+import { attachments } from '../../commands';
+import { Button, DeleteButton } from '../ui';
 
 export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
