@@ -45,6 +45,8 @@ const bridgeOnly = {
   'attachment.pick': viaBridge,
   'attachment.open': viaBridge,
   'attachment.reveal': viaBridge,
+  'attachment.read': viaBridge,
+  'attachment.write': viaBridge,
 } satisfies Partial<HandlerMap>;
 
 /** Um handler por tipo de mensagem, agrupados por domínio em ./handlers. */
