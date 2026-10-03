@@ -1,6 +1,6 @@
 import { useBoardStore, type SettingsTab } from '../../store/boardStore';
 import { settings, ui } from '../../commands';
-import { ColumnsSettings } from './ColumnsSettings';
+import { WorkflowsSettings } from './workflows/WorkflowsSettings';
 import { TypesSettings } from './TypesSettings';
 import { FieldsSettings } from './FieldsSettings';
 import { RulesSettings } from './RulesSettings';
@@ -123,7 +123,7 @@ export function Settings() {
         </div>
       </div>
       <div className="settings-main">
-        {tab === 'columns' && <ColumnsSettings />}
+        {tab === 'columns' && <WorkflowsSettings />}
         {tab === 'types' && <TypesSettings />}
         {tab === 'fields' && <FieldsSettings />}
         {tab === 'rules' && <RulesSettings />}

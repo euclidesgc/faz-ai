@@ -78,6 +78,16 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   "Só no detalhe" display is now called **Oculto** (hidden).
 - Forms now use [Radix Themes](https://www.radix-ui.com/themes) components, from the same family as
   the board's colors. The other screens migrate gradually.
+- **Workflows and columns redone**: you can create as many workflows as you want with **Novo
+  workflow** (choosing whether it takes independent cards or sub-tasks; it starts with A fazer, Em
+  andamento and Concluído) and delete empty ones. Each workflow's name is editable, and **Nova
+  coluna** sits at the top of each one, opening an aligned row in the table. The "linha de cima" and
+  "linha de baixo" labels and the "starts collapsed" options for the workflow, column and archive
+  are gone: the board remembers the state in which you left each workflow and column.
+- The AI assistant (MCP) gained `create_workflow` and `delete_workflow`; `set_workflow_layout` and
+  the `collapsed` parameter of `update_column` were removed.
+- The test browser's logs (`.playwright-mcp`) were committed by mistake in earlier PRs and are now
+  ignored by git.
 
 ## 0.29.1
 

@@ -7,3 +7,6 @@ releases/
 .claude/skills/publicar-extensao/
 .mcp.json
 .claude/settings.local.json
+
+# logs do navegador de teste (Playwright MCP)
+.playwright-mcp/

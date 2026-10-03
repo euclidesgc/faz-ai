@@ -11,11 +11,13 @@ import type {
   FieldDef,
   FieldValueRow,
   Workflow,
+  WorkflowKind,
 } from '../../shared/model';
-import { all, bool, num, one, run, str } from '../db/query';
+import { all, bool, num, one, run, str, transaction } from '../db/query';
+import { newId } from '../db/ids';
 import { parseRules, type BoardRules } from '../../shared/rules';
 import { seedBoard } from '../db/seed';
-import { pendingUpgrade } from '../db/boardTemplate';
+import { BOARD_TEMPLATE, insertColumn, pendingUpgrade } from '../db/boardTemplate';
 import { isCardStatus } from '../../shared/status';
 import { parseRunner, type RunnerConfig } from '../../shared/runner';
 import { parseProfiles, type ExecProfile } from '../../shared/execution';
@@ -118,12 +120,28 @@ export class BoardRepo {
     run(this.db, `UPDATE cards SET exec_profile = NULL WHERE exec_profile IS NOT NULL ${keep} AND board_id = ?`, [...ids, boardId]);
   }
 
-  updateWorkflow(workflowId: string, patch: { name?: string; collapsed?: boolean; archiveCollapsed?: boolean }): void {
+  /** Cria um workflow no fim do board, com as colunas padrão do papel (para sub-tarefas: A fazer, Em andamento e Concluído). */
+  createWorkflow(boardId: string, name: string, kind: WorkflowKind): string {
+    const db = this.db;
+    const id = newId();
+    transaction(db, () => {
+      const position = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM workflows WHERE board_id = ?', [boardId])?.p);
+      run(db, 'INSERT INTO workflows(id, board_id, name, position, kind) VALUES (?,?,?,?,?)', [id, boardId, name, position, kind]);
+      BOARD_TEMPLATE.child.forEach((c, i) => insertColumn(db, id, c, i));
+    });
+    return id;
+  }
+
+  updateWorkflow(workflowId: string, patch: { name?: string }): void {
     if (patch.name !== undefined) run(this.db, 'UPDATE workflows SET name = ? WHERE id = ?', [patch.name, workflowId]);
-    if (patch.collapsed !== undefined)
-      run(this.db, 'UPDATE workflows SET collapsed = ? WHERE id = ?', [patch.collapsed ? 1 : 0, workflowId]);
-    if (patch.archiveCollapsed !== undefined)
-      run(this.db, 'UPDATE workflows SET archive_collapsed = ? WHERE id = ?', [patch.archiveCollapsed ? 1 : 0, workflowId]);
+  }
+
+  /** Apaga o workflow e as colunas dele. A regra de quando isso é permitido está em `workflowDeleteBlocker` (src/shared/selectors.ts). */
+  deleteWorkflow(workflowId: string): void {
+    transaction(this.db, () => {
+      run(this.db, 'DELETE FROM columns WHERE workflow_id = ?', [workflowId]);
+      run(this.db, 'DELETE FROM workflows WHERE id = ?', [workflowId]);
+    });
   }
 
   snapshot(boardId: string, currentUser = ''): BoardState {

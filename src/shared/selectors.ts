@@ -60,3 +60,17 @@ export function subtaskSlot(state: BoardState): { typeId: Id; columnId: Id } | u
   const type = typesOf(state, childWf.id)[0];
   return column && type ? { typeId: type.id, columnId: column.id } : undefined;
 }
+
+/**
+ * Por que o workflow não pode ser apagado, ou null se pode: ele é o único do board, ainda tem cards
+ * (inclusive arquivados e na lixeira) ou algum tipo de card nasce nele.
+ */
+export function workflowDeleteBlocker(state: BoardState, workflowId: Id): string | null {
+  if (!state.workflows.some((w) => w.id === workflowId)) return 'Workflow não encontrado';
+  if (state.workflows.length <= 1) return 'O board precisa de ao menos um workflow';
+  const cards = state.cards.filter((c) => c.workflowId === workflowId).length;
+  if (cards > 0) return `O workflow tem ${cards} card(s), inclusive arquivados e na lixeira`;
+  const types = state.cardTypes.filter((t) => t.defaultWorkflowId === workflowId).length;
+  if (types > 0) return `${types} tipo(s) de card nascem neste workflow`;
+  return null;
+}

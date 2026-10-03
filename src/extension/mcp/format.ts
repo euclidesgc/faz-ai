@@ -362,10 +362,7 @@ export function boardOverview(s: BoardState) {
           ...(c.requiresApproval ? { requiresApproval: true } : {}),
           ...(c.artifactName ? { artifact: c.artifactName } : {}),
           ...(profileName(s, c.execProfile) ? { execProfile: profileName(s, c.execProfile) } : {}),
-          ...(c.collapsed ? { collapsed: true } : {}),
         })),
-      ...(w.collapsed ? { collapsed: true } : {}),
-      archivedColumnCollapsed: w.archiveCollapsed,
     })),
     ...(s.board.execProfiles.length
       ? {

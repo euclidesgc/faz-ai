@@ -22,7 +22,7 @@ export function TypesSettings() {
           </Button>
         }
       >
-        Cada tipo pertence a um workflow (linha). Tipos da linha de baixo são sempre sub-tarefas de uma história.
+        Cada tipo pertence a um workflow. Tipos de um workflow de sub-tarefas são sempre sub-tarefas de uma história.
       </PageHeader>
       <table className="table types-table">
         <thead>

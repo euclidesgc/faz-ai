@@ -18,8 +18,8 @@ export function Board() {
       {empty && (
         <div className="board-hint">
           <strong>Este board ainda não tem cards.</strong> Crie uma história em <em>+ Novo card</em>, na primeira coluna. Um clique na
-          história mostra as sub-tarefas dela na linha de baixo; dois cliques abrem o card, onde ficam a descrição, a conversa com a IA e o
-          botão <em>Chamar IA</em>.
+          história mostra as sub-tarefas dela no workflow de sub-tarefas; dois cliques abrem o card, onde ficam a descrição, a conversa com
+          a IA e o botão <em>Chamar IA</em>.
         </div>
       )}
       {state.workflows
@@ -33,7 +33,7 @@ export function Board() {
               <header
                 className="workflow-header"
                 onClick={() => setCollapsed(wf.id, !collapsed)}
-                title={collapsed ? 'Expandir a linha' : 'Colapsar a linha'}
+                title={collapsed ? 'Expandir o workflow' : 'Colapsar o workflow'}
               >
                 <Button variant="icon" className="collapse-toggle" aria-expanded={!collapsed}>
                   {collapsed ? <IconChevronRight /> : <IconChevronDown />}

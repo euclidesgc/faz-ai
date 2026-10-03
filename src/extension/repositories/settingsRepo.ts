@@ -30,7 +30,6 @@ export class SettingsRepo {
       name?: string;
       category?: ColumnCategory;
       position?: number;
-      collapsed?: boolean;
       aiActive?: boolean;
       requiresApproval?: boolean;
       aiInstruction?: string;
@@ -42,7 +41,6 @@ export class SettingsRepo {
     const db = this.db;
     transaction(db, () => {
       if (patch.name !== undefined) run(db, 'UPDATE columns SET name = ? WHERE id = ?', [patch.name, columnId]);
-      if (patch.collapsed !== undefined) run(db, 'UPDATE columns SET collapsed = ? WHERE id = ?', [patch.collapsed ? 1 : 0, columnId]);
       if (patch.aiInstruction !== undefined) run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [patch.aiInstruction, columnId]);
       if (patch.artifactName !== undefined)
         run(db, 'UPDATE columns SET artifact_name = ? WHERE id = ?', [patch.artifactName.trim(), columnId]);

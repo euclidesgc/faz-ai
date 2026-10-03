@@ -14,7 +14,7 @@ import { CardDrawer } from '../src/webview/components/CardDrawer';
 import { FilterBar } from '../src/webview/components/FilterBar';
 import { ThemeToggle, nextTheme } from '../src/webview/components/ThemeToggle';
 import { TrashView } from '../src/webview/components/TrashView';
-import { ColumnsSettings } from '../src/webview/components/settings/ColumnsSettings';
+import { WorkflowsSettings } from '../src/webview/components/settings/workflows/WorkflowsSettings';
 import { FieldsSettings } from '../src/webview/components/settings/FieldsSettings';
 import { ExecProfilesSettings } from '../src/webview/components/settings/ExecProfilesSettings';
 import { HarnessSettings } from '../src/webview/components/settings/HarnessSettings';
@@ -180,20 +180,11 @@ describe('telas montam sem erro', () => {
       'Squash',
     ])
       expect(html(<GitSettings />)).toContain(text);
-    const cols = html(<ColumnsSettings />);
-    for (const text of [
-      'PRD',
-      'Começa colapsada',
-      'Linha começa colapsada',
-      'Arquivados',
-      'IA atua',
-      'Exige aprovação',
-      'Fase',
-      'PRD.md',
-      'Discovery',
-      'Homologação',
-    ])
+    const cols = html(<WorkflowsSettings />);
+    for (const text of ['PRD', 'Novo workflow', 'Nova coluna', 'IA atua', 'Exige aprovação', 'Fase', 'PRD.md', 'Discovery', 'Homologação'])
       expect(cols).toContain(text);
+    // a opção de começar colapsada saiu: vale o estado em que a pessoa deixou o board
+    for (const text of ['Começa colapsada', 'começa colapsada', 'linha de cima', 'linha de baixo']) expect(cols).not.toContain(text);
     const types = html(<TypesSettings />);
     expect(types).toContain('Padrões por tipo');
     expect(types).toContain('Modelo');

@@ -741,6 +741,12 @@ button.chip.on:hover:where(:not(:disabled)) {
 .settings-main .field-row input:not([type='checkbox']):not([type='radio']):not([type='color']) {
   max-width: 520px;
 }
+/* a regra `.table td input` estica o campo; na linha de rascunho o nome divide a linha com o resto */
+.table .draft-row td input:not([type]) {
+  width: auto;
+  flex: 1 1 260px;
+  max-width: 360px;
+}
 .draft-row td {
   background: var(--hover);
 }
@@ -1859,6 +1865,29 @@ button:where(:not([class*='rt-'])) {
 .form-field-hint {
   margin: 0;
   max-width: 70ch;
+}
+/* Workflows e colunas: um card por workflow */
+.workflow-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  margin-bottom: var(--sp-12);
+}
+.workflow-name {
+  width: 280px;
+  max-width: 100%;
+}
+.workflow-draft-fields {
+  display: grid;
+  grid-template-columns: minmax(200px, 320px) auto;
+  gap: var(--sp-16);
+  align-items: start;
+}
+.workflow-draft-fields .rt-SegmentedControlRoot {
+  width: fit-content;
+}
+.workflow-draft-note {
+  margin: var(--sp-12) 0 0;
 }
 /* Campos personalizados: um card por campo */
 .field-list {

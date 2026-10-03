@@ -574,19 +574,43 @@ describe('regras de modelo com E e OU', () => {
   });
 });
 
-describe('linhas e colunas colapsadas por padrão', () => {
-  it('guarda o padrão de cada coluna, da linha e da coluna de arquivados', async () => {
-    let b = (await call('get_board')).data;
-    expect(b.workflows[0].archivedColumnCollapsed).toBe(true); // arquivados começa colapsada
-    expect(b.workflows[0].collapsed).toBeUndefined();
-    expect(b.workflows[0].columns.every((c: any) => c.collapsed === undefined)).toBe(true);
-    await call('update_column', { column: 'Cancelado', collapsed: true });
-    b = (await call('set_workflow_layout', { workflow: 'child', collapsed: true, archive_collapsed: false })).data;
-    expect(b.workflows[0].columns.find((c: any) => c.name === 'Cancelado').collapsed).toBe(true);
-    expect(b.workflows[1]).toMatchObject({ collapsed: true, archivedColumnCollapsed: false });
-    const s = router.snapshot();
-    expect(s.columns.find((c) => c.name === 'Cancelado')!.collapsed).toBe(true);
-    expect(s.workflows.find((w) => w.kind === 'child')).toMatchObject({ collapsed: true, archiveCollapsed: false });
+describe('workflows', () => {
+  it('cria um workflow com as colunas padrão, renomeia e exclui quando vazio', async () => {
+    let b = (await call('create_workflow', { name: 'Suporte', kind: 'parent' })).data;
+    const created = b.workflows.find((w: any) => w.name === 'Suporte');
+    expect(created.columns.map((c: any) => c.name)).toEqual(['A fazer', 'Em andamento', 'Concluído']);
+    expect(created.columns.map((c: any) => c.category)).toEqual(['open', 'open', 'done']);
+    expect(router.snapshot().workflows.find((w) => w.name === 'Suporte')).toMatchObject({ kind: 'parent' });
+    // não dá para escolher um papel que não existe
+    expect((await call('create_workflow', { name: 'X', kind: 'irmão' })).error).toBe(true);
+
+    b = (await call('rename_workflow', { workflow: 'Suporte', name: 'Atendimento' })).data;
+    expect(b.workflows.map((w: any) => w.name)).toContain('Atendimento');
+
+    b = (await call('delete_workflow', { workflow: 'Atendimento' })).data;
+    expect(b.workflows.map((w: any) => w.name)).not.toContain('Atendimento');
+  });
+
+  it('recusa excluir um workflow em que nascem tipos de card, e exclui depois que eles saem', async () => {
+    const story = router.snapshot().workflows.find((w) => w.kind === 'parent')!;
+    expect((await call('delete_workflow', { workflow: story.name })).error).toBe(true);
+
+    await call('create_workflow', { name: 'Sozinho', kind: 'child' });
+    const lone = router.snapshot().workflows.find((w) => w.name === 'Sozinho')!;
+    expect(lone.position).toBe(router.snapshot().workflows.length - 1);
+    router.handle({ type: 'settings.type.create', name: 'Preso', color: '#123456', defaultWorkflowId: lone.id });
+    const blocked = await call('delete_workflow', { workflow: 'Sozinho' });
+    expect(blocked.error).toBe(true);
+    expect(blocked.text).toContain('tipo(s) de card nascem neste workflow');
+
+    router.handle({ type: 'settings.type.delete', typeId: router.snapshot().cardTypes.find((t) => t.name === 'Preso')!.id });
+    expect((await call('delete_workflow', { workflow: 'Sozinho' })).error).toBe(false);
+    expect(router.snapshot().workflows.some((w) => w.name === 'Sozinho')).toBe(false);
+  });
+
+  it('não expõe mais "começa colapsada" na coluna, na linha nem nos arquivados', async () => {
+    const b = (await call('get_board')).data;
+    expect(JSON.stringify(b)).not.toContain('ollapsed');
   });
 });
 

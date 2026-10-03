@@ -5,7 +5,7 @@ import type { CardStatus } from '../shared/status';
 import type { ExecProfile } from '../shared/execution';
 import type { ModelOption, ModelRule } from '../shared/models';
 import type { BoardRules } from '../shared/rules';
-import type { FieldValue, Id } from '../shared/model';
+import type { FieldValue, Id, WorkflowKind } from '../shared/model';
 import { postToHost } from './vscode';
 
 /** Patch de cada mensagem `*.update`, tirado do protocolo para não repetir a forma aqui. */
@@ -84,8 +84,10 @@ export const settings = {
   updateBoard: (patch: BoardPatch) => post({ type: 'settings.board.update', patch }),
   resetBoard: () => post({ type: 'settings.board.reset' }),
   upgradeBoard: () => post({ type: 'settings.board.upgrade' }),
+  createWorkflow: (name: string, kind: WorkflowKind) => post({ type: 'settings.workflow.create', name, kind }),
   updateWorkflow: (workflowId: Id, patch: PatchOf<'settings.workflow.update'>) =>
     post({ type: 'settings.workflow.update', workflowId, patch }),
+  deleteWorkflow: (workflowId: Id) => post({ type: 'settings.workflow.delete', workflowId }),
   createColumn: (workflowId: Id, name: string, position?: number) =>
     post({ type: 'settings.column.create', workflowId, name, ...(position !== undefined ? { position } : {}) }),
   updateColumn: (columnId: Id, patch: ColumnPatch) => post({ type: 'settings.column.update', columnId, patch }),
