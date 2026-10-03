@@ -124,6 +124,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   de cada caixa e a ajuda embaixo. Seletores, interruptor do merge automático, o aviso do merge
   (agora um aviso do Radix) e o controle deslizante do tamanho da fonte são os do Radix Themes;
   Restaurar padrões da Aparência é o botão do mesmo estilo das outras telas.
+- **Sobras do novo design nas Configurações**: a tabela de colunas (nome, "Representa", "IA atua" e
+  "Exige aprovação"), a linha de coluna nova, o editor da Fase, a tabela de Tipos de card, o nome do
+  board no menu lateral e os padrões por tipo passam a usar os campos, seletores e caixas de marcar
+  do Radix Themes. Os campos personalizados (texto, número, data, seleção e caixa) também usam o
+  Radix, inclusive no card aberto. O botão "Novo workflow", "Nova coluna", "Novo tipo" e "Novo
+  campo" têm o mesmo estilo em todas as telas.
 
 ## 0.29.1
 

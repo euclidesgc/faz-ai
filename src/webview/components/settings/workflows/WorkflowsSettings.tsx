@@ -3,7 +3,8 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type D
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useBoardStore } from '../../../store/boardStore';
 import { settings } from '../../../commands';
-import { Button, IconPlus } from '../../ui';
+import { Button } from '@radix-ui/themes';
+import { IconPlus } from '../../ui';
 import { PageHeader } from '../PageHeader';
 import { NewWorkflowCard } from './NewWorkflowCard';
 import { WorkflowCard } from './WorkflowCard';
@@ -23,7 +24,7 @@ export function WorkflowsSettings() {
       <PageHeader
         title="Workflows e colunas"
         actions={
-          <Button variant="primary" disabled={adding} onClick={() => setAdding(true)}>
+          <Button disabled={adding} onClick={() => setAdding(true)}>
             <IconPlus /> Novo workflow
           </Button>
         }

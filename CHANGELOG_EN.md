@@ -121,6 +121,12 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   each box and the help below. Selectors, the auto-merge switch, the merge warning (now a Radix
   callout) and the font-size slider are Radix Themes ones; Appearance's Restaurar padrões is the
   same button style as the other screens.
+- **Leftovers of the new design in Configurações**: the columns table (name, "Representa", "IA
+  atua" and "Exige aprovação"), the new-column row, the Fase editor, the card types table, the board
+  name in the side menu and the per-type defaults now use the Radix Themes fields, selectors and
+  checkboxes. Custom fields (text, number, date, select and checkbox) also use Radix, including in
+  the open card. The "Novo workflow", "Nova coluna", "Novo tipo" and "Novo campo" buttons look the
+  same on every screen.
 
 ## 0.29.1
 

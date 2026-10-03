@@ -1,4 +1,4 @@
-import { lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -87,7 +87,7 @@ describe('WorkflowsSettings', () => {
     const name = within(stories).getByLabelText('Nome da coluna');
     expect(name).toHaveFocus();
     await userEvent.type(name, 'Revisão');
-    await userEvent.selectOptions(within(stories).getByLabelText('Onde a coluna entra'), cols[1]!.id);
+    await choose(within(stories).getByRole('combobox', { name: 'Onde a coluna entra' }), `Depois de ${cols[1]!.name}`);
     await userEvent.type(name, '{Enter}');
     expect(lastSent('settings.column.create')).toEqual({
       type: 'settings.column.create',
@@ -106,7 +106,9 @@ describe('WorkflowsSettings', () => {
       .sort((a, b) => a.position - b.position);
     const firstDone = cols.findIndex((c) => c.category !== 'open');
     await userEvent.click(within(stories).getByRole('button', { name: 'Nova coluna' }));
-    expect(within(stories).getByLabelText('Onde a coluna entra')).toHaveValue(cols[firstDone - 1]!.id);
+    expect(within(stories).getByRole('combobox', { name: 'Onde a coluna entra' })).toHaveTextContent(
+      `Depois de ${cols[firstDone - 1]!.name}`,
+    );
     await userEvent.type(within(stories).getByLabelText('Nome da coluna'), 'x');
     await userEvent.click(within(stories).getByRole('button', { name: 'Adicionar' }));
     expect(lastSent('settings.column.create').position).toBe(firstDone);

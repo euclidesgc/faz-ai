@@ -104,8 +104,15 @@ olho.
   nova de elemento segue o mesmo padrão.
 - Campo de formulário: `FormField` (`components/ui/FormField.tsx`), com o rótulo acima, o controle e
   uma linha de ajuda abaixo. O rótulo aponta para o controle pelo `id`.
-- As telas antigas migram aos poucos: ao refazer uma tela, troque os controles escritos à mão pelos
-  do Radix.
+- Todas as telas de Configurações já usam o Radix. O padrão de cada aba é o mesmo:
+  - `PageHeader` (título, descrição e o botão principal no topo à direita) e, dentro da aba,
+    `SectionHeader` para cada seção;
+  - `SettingsCard` para um item (arquivo de regras, skill, agente) e `Card` com `FormField` para
+    formulários e rascunhos (`.draft-card`, `.form-card`, `.form-actions`);
+  - `SelectField` (seletor tipado), `SwitchField` (interruptor com rótulo) e `NumberField` /
+    `TextField` de `components/ui` no lugar de `<select>`, `<input>` e `EnumSelect`;
+  - o Select do Radix não aceita `value` vazio: use um item sentinela (`'__none'`).
+- Ainda nativos: o card aberto (tipo, coluna, status, perfil, checklist) e o board.
 
 ## Como adicionar uma cor
 

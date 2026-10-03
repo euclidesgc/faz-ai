@@ -1,4 +1,4 @@
-import { lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { Theme } from '@radix-ui/themes';
@@ -82,7 +82,7 @@ describe('TypesSettings', () => {
     );
     const wf = useBoardStore.getState().state!.workflows[1]!;
     const name = await openDraft();
-    await userEvent.selectOptions(within(name.closest('tr')!).getByLabelText('Workflow'), wf.id);
+    await choose(within(name.closest('tr')!).getByRole('combobox', { name: 'Workflow' }), wf.name);
     await userEvent.type(name, 'Bug{Enter}');
     expect(lastSent('settings.type.create')).toMatchObject({ name: 'Bug', defaultWorkflowId: wf.id });
     expect(screen.queryByPlaceholderText('Nome do tipo')).toBeNull();

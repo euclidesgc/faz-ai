@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Select } from '@radix-ui/themes';
+import { Checkbox, Select, TextField as RxTextField } from '@radix-ui/themes';
 import type { FieldDef, FieldValue } from '../../shared/model';
 import { AI_TOOLS } from '../../shared/harness';
 import { effortLabel, modelDisplay, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
-import { Button, ChipsEditor, IconExternal, TextField } from './ui';
+import { Button, ChipsEditor, IconExternal, SelectField, TextField } from './ui';
 import { isSkillsField } from './settings/fields/fieldKinds';
 
 /** O campo tem algo para mostrar no card (checkbox desmarcado e lista vazia não contam). */
@@ -49,6 +49,9 @@ function format(field: FieldDef, v: string | number | boolean): string {
   return String(v);
 }
 
+/** Valor do item "sem valor" de um seletor: o Select do Radix não aceita `value` vazio. */
+const NO_VALUE = '__none';
+
 /** Editor do valor no drawer. */
 export function FieldEditor({ field, value, onChange }: { field: FieldDef; value: FieldValue; onChange: (v: FieldValue) => void }) {
   switch (field.kind) {
@@ -75,19 +78,17 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
         />
       );
     case 'date':
-      return <input type="date" value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value || null)} />;
+      return <RxTextField.Root type="date" value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value || null)} />;
     case 'checkbox':
-      return <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />;
+      return <Checkbox aria-label={field.name} checked={!!value} onCheckedChange={(on) => onChange(on === true)} />;
     case 'select':
       return (
-        <select value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value || null)}>
-          <option value="">—</option>
-          {field.options.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
+        <SelectField
+          aria-label={field.name}
+          options={[{ value: NO_VALUE, label: '—' }, ...field.options.map((o) => ({ value: o, label: o }))]}
+          value={(value as string) || NO_VALUE}
+          onChange={(v) => onChange(v === NO_VALUE ? null : v)}
+        />
       );
     case 'model':
       return <ModelEditor value={value} onChange={onChange} />;

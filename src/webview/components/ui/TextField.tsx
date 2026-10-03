@@ -1,6 +1,7 @@
-import { useEffect, useRef, type InputHTMLAttributes } from 'react';
+import { useEffect, useRef, type ComponentProps } from 'react';
+import { TextField as RxTextField } from '@radix-ui/themes';
 
-interface Props extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'defaultValue' | 'onChange' | 'onBlur'> {
+interface Props extends Omit<ComponentProps<typeof RxTextField.Root>, 'value' | 'defaultValue' | 'onChange' | 'onBlur'> {
   value: string;
   /** chamado ao sair do campo, com Enter ou quando o campo some (card fechado), só se o texto mudou */
   onCommit: (value: string) => void;
@@ -40,7 +41,7 @@ export function TextField({ value, onCommit, onKeyDown, ...rest }: Props) {
   useEffect(() => () => commit(), []);
 
   return (
-    <input
+    <RxTextField.Root
       ref={input}
       defaultValue={value}
       onChange={(e) => (draft.current = e.target.value)}
