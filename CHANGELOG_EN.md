@@ -7,6 +7,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Autonomous mode (YOLO) now stops at Homologação, with the pull request open, instead of going
+  on to Concluído.** The AI goes from Backlog to the last column it works in (Homologação, on the
+  default board), opens the pull request, records it with `set_pull_request` and stops there: the
+  story waits for your review, with the "waiting review" status, and Concluído means merged again.
+  The autopilot no longer gets stuck on this delivered story and moves straight on to the next one
+  in the queue, without waiting for the review. YOLO stories already completed with an open pull
+  request before this change stay as they are, with no migration.
 - **The AI queue follows the board order, not the card number.** The heartbeat, the autopilot and
   `get_pending_work` now take cards with bugs first and then top to bottom — what decides is the
   card's position on the board. Category no longer weighs in either: a ready bug no longer sits

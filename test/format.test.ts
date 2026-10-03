@@ -22,7 +22,7 @@ async function setup() {
     ['Modelo', 'model'],
     ['Skills', 'multiselect'],
   ] as const) {
-    router.handle({ type: 'settings.field.create', name, kind, options: ['x'], appliesToTypes: null, display: 'card' });
+    router.handle({ type: 'settings.field.create', name, kind, options: ['x'], appliesToTypes: null, display: 'chip' });
   }
   const columnId = router.snapshot().columns[0]!.id;
   const cardId = router.createCard({ typeId, columnId, parentId: null, title: 'card' });

@@ -6,6 +6,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **O modo autônomo (YOLO) para na Homologação, com o pull request aberto, em vez de ir até
+  Concluído.** A IA vai do Backlog até a última coluna em que ela atua (Homologação, no board
+  padrão), abre o pull request, registra com `set_pull_request` e para ali: a história fica
+  aguardando a sua revisão, com o status "aguardando revisão", e Concluído volta a significar
+  mergeado. O autopiloto deixa de travar nessa história entregue e segue direto para a próxima da
+  fila, sem esperar a revisão. Histórias YOLO já concluídas com o pull request aberto antes dessa
+  mudança ficam como estão, sem migração.
 - **A fila da IA segue a ordem do board, não o número do card.** O heartbeat, o autopiloto e o
   `get_pending_work` passam a pegar os cards com os bugs na frente e, depois, de cima para baixo —
   o que decide é a posição do card no board. A categoria também deixou de pesar: um bug pronto não

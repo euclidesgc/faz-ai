@@ -310,19 +310,22 @@ Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Mod
 (o board pede uma confirmação, porque o modo abre mão de toda aprovação). A partir daí a IA toca a
 história sozinha, **sem pedir autorização nem confirmação para nada**:
 
-- Do **Backlog** até o fim: ela faz o Discovery, o PRD, a Spec e o Plan, cria as sub-tarefas,
-  implementa uma por uma e, na Homologação, abre o pull request. As colunas que exigem aprovação
-  deixam de segurar o card, e o pedido de revisão da IA vira aprovação na hora, com o resumo
-  registrado na conversa.
+- Do **Backlog** até a última coluna em que a IA atua (Homologação, no board padrão): ela faz o
+  Discovery, o PRD, a Spec e o Plan, cria as sub-tarefas, implementa uma por uma e, nessa última
+  coluna, abre o pull request, registra com `set_pull_request` e para ali — a história fica
+  aguardando a sua revisão. As colunas que exigem aprovação deixam de segurar o card, e o pedido de
+  revisão da IA vira aprovação na hora, com o resumo registrado na conversa.
 - **Sem perguntas**: a IA não usa `ask_question`; diante de uma dúvida ela decide e registra a
   decisão e o motivo na conversa. Só um impedimento real (acesso, ambiente, falha que ela não
   resolve) bloqueia o card.
-- **Sem merge**: Concluído quer dizer pull request aberto. O merge continua sendo seu.
+- **Sem merge**: a IA para na última coluna em que atua, com o pull request aberto; o merge e o
+  avanço até Concluído continuam sendo seus. Concluído quer dizer mergeado.
 - **Sem restrições**: nas execuções do modo, a IA roda com a permissão "Sem restrições" (altera
   arquivos e roda comandos), porque precisa de git e do `gh`. Ligar o modo é aceitar isso para a história.
 - **Em fila e em pilha**: o **autopiloto** toca as histórias em modo autônomo uma de cada vez, na
-  ordem do board — bugs na frente, depois de cima para baixo —, e passa à próxima quando a atual
-  conclui, sem esperar o intervalo do heartbeat. A branch de cada história parte da branch da
+  ordem do board — bugs na frente, depois de cima para baixo —, e segue para a próxima história da
+  fila assim que a atual é entregue (parada na última coluna da IA, com o pull request registrado),
+  sem esperar a sua revisão nem o intervalo do heartbeat. A branch de cada história parte da branch da
   história de número anterior que já tem branch, e o pull request é aberto com `--base` nela,
   formando uma pilha de PRs; quando a ordem do board faz uma história rodar antes de outra de
   número menor, a branch dela parte da principal e o pull request sai solto, fora da pilha.
