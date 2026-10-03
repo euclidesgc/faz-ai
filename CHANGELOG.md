@@ -91,6 +91,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - **Ordem dos workflows**: cada workflow tem uma alça para arrastar e mudar a posição dele no
   board (com a alça em foco, ↑ e ↓ movem uma posição). O assistente de IA (MCP) ganhou
   `move_workflow`.
+- **LED da IA sempre no card**: o LED na barra do card agora existe o tempo todo. Pisca devagar
+  enquanto a IA trabalha no card, e a história também acende quando a IA trabalha numa sub-tarefa
+  dela. Quando a IA termina, o LED continua no card, apagado (só o contorno). A prévia dos tipos
+  também mostra o LED apagado.
 
 ## 0.29.1
 

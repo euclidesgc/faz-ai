@@ -70,28 +70,51 @@ describe('CardView', () => {
     expect(container.querySelector('.status-badge')!.getAttribute('title')).toContain('Falta a chave da API');
   });
 
-  it('o LED aparece só enquanto a IA trabalha (execução da extensão ou status "Em execução")', () => {
-    const led = () => screen.queryByRole('img', { name: 'IA trabalhando neste card' });
-    const first = show(board.subId);
-    expect(led()).toBeNull();
-    first.unmount();
+  /** O LED do card renderizado: sempre existe; `on` diz se está aceso. */
+  const ledOf = (container: HTMLElement) => {
+    const led = container.querySelector('.ai-led')!;
+    return { on: led.classList.contains('on'), label: led.getAttribute('aria-label') };
+  };
+
+  it('o LED está sempre no card: apagado quando a IA não trabalha, aceso quando trabalha (extensão ou "Em execução")', () => {
+    const idle = show(board.subId);
+    expect(ledOf(idle.container)).toEqual({ on: false, label: 'IA parada neste card' });
+    idle.unmount();
 
     patchState(() => ({ aiRuns: [board.subId] }));
-    const second = show(board.subId);
-    expect(led()).not.toBeNull();
-    second.unmount();
+    const running = show(board.subId);
+    expect(ledOf(running.container)).toEqual({ on: true, label: 'IA trabalhando neste card' });
+    running.unmount();
 
     patchState(() => ({ aiRuns: [] }));
     patchCard(board.subId, { status: 'running', statusAt: Date.now() });
-    show(board.subId);
-    expect(led()).not.toBeNull();
+    const byStatus = show(board.subId);
+    expect(ledOf(byStatus.container).on).toBe(true);
+    byStatus.unmount();
+
+    // terminou: o LED continua no card, só apagado
+    patchCard(board.subId, { status: 'waiting_review', statusAt: Date.now() });
+    expect(ledOf(show(board.subId).container)).toEqual({ on: false, label: 'IA parada neste card' });
   });
 
-  it('card arquivado não mostra status nem LED', () => {
+  it('a história acende o LED quando a IA trabalha numa sub-tarefa dela, e diz quantas', () => {
+    const story = show(board.storyId);
+    expect(ledOf(story.container).on).toBe(false);
+    story.unmount();
+    patchState(() => ({ aiRuns: [board.subId] }));
+    const lit = show(board.storyId);
+    expect(ledOf(lit.container)).toEqual({ on: true, label: 'IA trabalhando em 1 sub-tarefa deste card' });
+    lit.unmount();
+    // e quando é nela mesma, vale a mensagem do próprio card
+    patchState(() => ({ aiRuns: [board.storyId, board.subId] }));
+    expect(ledOf(show(board.storyId).container).label).toBe('IA trabalhando neste card');
+  });
+
+  it('card arquivado não mostra status e o LED fica apagado', () => {
     patchCard(board.subId, { status: 'running', statusAt: Date.now(), archivedAt: Date.now() });
     const { container } = show(board.subId);
     expect(container.querySelector('.status-badge')).toBeNull();
-    expect(screen.queryByRole('img', { name: 'IA trabalhando neste card' })).toBeNull();
+    expect(ledOf(container).on).toBe(false);
   });
 
   it('o modelo aparece numa linha própria, com o esforço em português depois do nome', () => {

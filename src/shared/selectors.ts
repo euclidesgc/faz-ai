@@ -11,6 +11,10 @@ export const isArchived = (c: Card): boolean => c.deletedAt === null && c.archiv
 /** A IA está trabalhando no card: uma execução disparada pela extensão ou uma sessão que marcou "Em execução". */
 export const isAiWorking = (state: BoardState, card: Card): boolean => card.status === 'running' || state.aiRuns.includes(card.id);
 
+/** Quantas sub-tarefas vivas do card a IA está trabalhando: a história acende o LED enquanto qualquer uma delas roda. */
+export const aiWorkingChildren = (state: BoardState, card: Card): number =>
+  childrenOf(state, card.id).filter((c) => isAiWorking(state, c)).length;
+
 /** Coluna em que o card está. */
 export const columnOf = (state: BoardState, card: Card): Column | undefined => state.columns.find((c) => c.id === card.columnId);
 

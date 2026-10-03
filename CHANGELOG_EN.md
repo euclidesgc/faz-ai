@@ -90,6 +90,10 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   ignored by git.
 - **Workflow order**: each workflow has a handle you drag to change its position on the board (with
   the handle focused, ↑ and ↓ move one position). The AI assistant (MCP) gained `move_workflow`.
+- **AI LED always on the card**: the LED on the card bar now exists all the time. It blinks slowly
+  while the AI works on the card, and a story also lights up when the AI works on one of its
+  sub-tasks. When the AI finishes, the LED stays on the card, turned off (outline only). The type
+  preview also shows the turned-off LED.
 
 ## 0.29.1
 
