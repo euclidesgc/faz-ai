@@ -280,8 +280,10 @@ Each skill has a mode:
   card names it or when it is called by name.
 - **Desligada** (off, project only): the tool does not see it, but a card can still name it.
 
-The card's "Skills" field offers the project's skills, the global ones and the ones from plugins,
-with a Todas / Projeto / Globais (all / project / global) filter. The card hands the AI the file
+The card's "Skills" field shows a summary of what is selected and opens a window to choose: search
+by name or description, **Todas / Marcadas / Projeto / Globais / Plugins** tabs (all / selected /
+project / global / plugins) and one checkbox per skill, with its origin in view. It works with
+hundreds of skills. The card hands the AI the file
 path of each skill, so a skill does not need to be visible to the tool to be used. That lets you
 keep many skills available without filling the context of every session. The context saving is
 documented for Claude Code and Cursor; for the other tools, the documentation only says the AI

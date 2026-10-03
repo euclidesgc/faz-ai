@@ -264,8 +264,9 @@ Cada skill tem um modo:
   chamada pelo nome.
 - **Desligada** (só no projeto): a ferramenta não a enxerga, mas um card ainda pode indicá-la.
 
-O campo "Skills" do card oferece as skills do projeto, as globais e as de plugins, com o filtro
-Todas / Projeto / Globais. O card entrega à IA o caminho do arquivo de cada skill, então ela não
+O campo "Skills" do card mostra um resumo do que está marcado e abre uma janela para escolher: busca
+por nome ou descrição, abas **Todas / Marcadas / Projeto / Globais / Plugins** e uma caixa de seleção
+por skill, com a origem à vista. Funciona com centenas de skills. O card entrega à IA o caminho do arquivo de cada skill, então ela não
 precisa estar à vista da ferramenta para ser usada. Assim dá para ter muitas skills disponíveis sem
 ocupar o contexto de toda sessão. A economia de contexto é documentada no Claude Code e no Cursor;
 nas outras ferramentas, a documentação diz só que a IA deixa de invocar a skill sozinha.

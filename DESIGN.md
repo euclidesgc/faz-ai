@@ -102,6 +102,8 @@ olho.
 - As regras de elemento de `styles.css` (`button`, `input`, `select`, `textarea`, `a`) têm
   `:where(:not([class*='rt-']))`: valem só para os nossos controles e não mexem nos do Radix. Regra
   nova de elemento segue o mesmo padrão.
+- As props responsivas de tamanho (`maxWidth`, `width`) vêm do `utilities.css`, que não entra: limite
+  a largura de um `Dialog.Content` pelo CSS (ver `.skill-dialog`).
 - Campo de formulário: `FormField` (`components/ui/FormField.tsx`), com o rótulo acima, o controle e
   uma linha de ajuda abaixo. O rótulo aponta para o controle pelo `id`.
 - Todas as telas de Configurações já usam o Radix. O padrão de cada aba é o mesmo:
