@@ -656,6 +656,8 @@ describe('aparência', () => {
 describe('status do card e checkpoint de revisão', () => {
   const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
   const human = (n: number, status: any, note?: string) => router.handle({ type: 'card.status.set', cardId: card(n).id, status, note });
+  const pending = async () => (await call('get_pending_work')).data;
+  const ids = (list: any[]) => list.map((c) => c.id);
 
   it('a IA pede revisão e só avança depois da aprovação de uma pessoa', async () => {
     const story = (await call('create_card', { title: 'Login' })).data;
@@ -752,8 +754,6 @@ describe('status do card e checkpoint de revisão', () => {
 
   it('fila de pendências: o que está com a IA e o que está com a pessoa', async () => {
     const { humanQueueStatuses, turnsPassedToHuman } = await import('../src/shared/pending');
-    const pending = async () => (await call('get_pending_work')).data;
-    const ids = (list: any[]) => list.map((c) => c.id);
     expect((await pending()).next).toContain('Nada pendente');
 
     await call('create_card', { title: 'A', column: 'PRD' }); // #1
@@ -790,12 +790,27 @@ describe('status do card e checkpoint de revisão', () => {
     p = await pending();
     expect(ids(p.forYou.approved)).toEqual(['#1']);
     expect(ids(p.forYou.ready)).toEqual(['#4', '#2']);
-    expect(p.next).toContain('approved');
+    // next não cita mais os nomes dos grupos (approved/unanswered/ready), manda seguir `order`
+    expect(p.next).toContain('order');
     const quiet = humanQueueStatuses(router.snapshot());
     human(2, 'blocked', 'Sem acesso');
     expect(turnsPassedToHuman(quiet, router.snapshot())).toEqual([]);
     expect(ids((await pending()).withPerson)).toEqual(['#2']);
     expect((await call('list_cards', { work_status: 'blocked' })).data.total).toBe(1);
+  });
+
+  it('order traz a fila inteira em ordem, com o bug na frente mesmo vindo de outro grupo', async () => {
+    // o bug está pronto e mais abaixo no board; a história está aprovada e mais acima
+    await call('create_card', { title: 'Falha', type: 'Bug', column: 'Plan' }); // #1, pronto
+    await call('create_card', { title: 'Login', column: 'PRD' }); // #2, vai ser aprovado
+    human(2, 'approved');
+
+    const p = await pending();
+    expect(ids(p.forYou.ready)).toEqual(['#1']);
+    expect(ids(p.forYou.approved)).toEqual(['#2']);
+    // o bug vence as duas coisas que o venciam antes: a categoria "approved" e a coluna mais à esquerda
+    expect(p.order).toEqual(['#1', '#2']);
+    expect(p.next).toContain('order');
   });
 
   it('cria, edita e apaga agentes na pasta da ferramenta em uso', async () => {
