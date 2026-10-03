@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { AiTool } from '../../../../shared/harness';
 import { harness, type HarnessScope } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { Button, EnumSelect, type EnumOption } from '../../ui';
+import { Badge, Button, Card, Checkbox, TextField } from '@radix-ui/themes';
+import { SelectField, type EnumOption } from '../../ui';
 import { withGlobalWarning } from './text';
 
 const DESTINATIONS: EnumOption<HarnessScope>[] = [
@@ -40,9 +41,10 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
       },
     });
   return (
-    <div className="harness-new">
+    <Card className="draft-card" aria-label="Instalar skills">
       <div className="row">
-        <input
+        <TextField.Root
+          className="grow"
           value={source}
           onChange={(e) => setSource(e.target.value)}
           placeholder="dono/repositorio, endereço git (https ou ssh) ou o caminho de uma pasta"
@@ -63,7 +65,7 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
               {preview.skills.length} skill(s) em {preview.source}
             </b>
             <span className="spacer" />
-            <EnumSelect options={DESTINATIONS} value={to} onChange={setTo} />
+            <SelectField aria-label="Onde instalar" options={DESTINATIONS} value={to} onChange={setTo} />
           </div>
           <table className="table">
             <tbody>
@@ -72,16 +74,20 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
                 return (
                   <tr key={k.rel} className={blocked ? 'off' : ''}>
                     <td>
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        aria-label={`Instalar ${k.name}`}
                         disabled={!!blocked}
                         checked={picked.includes(k.rel)}
-                        onChange={(e) => setChosen(e.target.checked ? [...picked, k.rel] : picked.filter((r) => r !== k.rel))}
+                        onCheckedChange={(on) => setChosen(on === true ? [...picked, k.rel] : picked.filter((r) => r !== k.rel))}
                       />
                     </td>
                     <td>
                       {k.name}
-                      {blocked && <span className="pill off">{blocked}</span>}
+                      {blocked && (
+                        <Badge color="gray" variant="outline">
+                          {blocked}
+                        </Badge>
+                      )}
                     </td>
                     <td className="muted small">{k.description || '—'}</td>
                     <td className="muted small">
@@ -94,17 +100,15 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
             </tbody>
           </table>
           {preview.skills.length === 0 && <p className="muted small">Nenhuma pasta com SKILL.md nessa origem.</p>}
-          <div className="row">
-            <Button variant="primary" disabled={picked.length === 0} onClick={apply}>
-              Instalar {picked.length || ''} selecionada(s)
-            </Button>
+          <div className="form-actions">
             {installable.length > 1 && (
-              <Button variant="ghost" size="small" onClick={() => setChosen(installable.map((k) => k.rel))}>
+              <Button variant="ghost" size="1" onClick={() => setChosen(installable.map((k) => k.rel))}>
                 Selecionar todas
               </Button>
             )}
             <Button
-              variant="ghost"
+              variant="soft"
+              color="gray"
               onClick={() => {
                 harness.cancelInstall();
                 setChosen([]);
@@ -112,9 +116,12 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
             >
               Fechar
             </Button>
+            <Button disabled={picked.length === 0} onClick={apply}>
+              Instalar {picked.length || ''} selecionada(s)
+            </Button>
           </div>
         </>
       )}
-    </div>
+    </Card>
   );
 }

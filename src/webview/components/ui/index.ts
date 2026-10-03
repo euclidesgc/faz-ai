@@ -2,6 +2,7 @@ export { Button, type ButtonProps, type ButtonVariant } from './Button';
 export { FieldRow } from './FieldRow';
 export { EnumSelect, type EnumOption } from './EnumSelect';
 export { SelectField } from './SelectField';
+export { SwitchField } from './SwitchField';
 export { Chip, ChipsEditor, type ChipOption } from './ChipsEditor';
 export { DeleteButton } from './DeleteButton';
 export { AddInput } from './AddInput';

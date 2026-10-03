@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { AiTool } from '../../../../shared/harness';
 import { HOOK_EVENTS, type HookTarget } from '../../../../shared/harnessCatalog';
 import { harness } from '../../../commands';
-import { EnumSelect, FieldRow } from '../../ui';
+import { Card, TextField } from '@radix-ui/themes';
+import { FormField, SelectField } from '../../ui';
 import { FormActions } from './FormActions';
 import { TargetPicker } from './TargetPicker';
 import { toolLabel } from './text';
@@ -24,23 +25,55 @@ export function NewHook({ tool, targets, onClose }: { tool: AiTool; targets: Hoo
       confirmLabel: 'Acrescentar hook',
     });
   return (
-    <div className="harness-new">
+    <Card className="draft-card" aria-label="Hook novo">
       <TargetPicker label="Arquivo" targets={targets} value={source} onChange={setSource} />
-      <FieldRow label="Evento">
-        <EnumSelect options={HOOK_EVENTS[tool].map((e) => ({ value: e, label: e }))} value={event} onChange={setEvent} />
-      </FieldRow>
+      <FormField label="Evento">
+        {(id) => (
+          <SelectField
+            id={id}
+            aria-label="Evento"
+            options={HOOK_EVENTS[tool].map((e) => ({ value: e, label: e }))}
+            value={event}
+            onChange={setEvent}
+          />
+        )}
+      </FormField>
       {target.format !== 'copilot' && (
-        <FieldRow label="Filtro (opcional)">
-          <input value={matcher} onChange={(e) => setMatcher(e.target.value)} placeholder="Ex.: Bash, ou Edit|Write; vazio = sempre" />
-        </FieldRow>
+        <FormField label="Filtro (opcional)">
+          {(id) => (
+            <TextField.Root
+              id={id}
+              value={matcher}
+              onChange={(e) => setMatcher(e.target.value)}
+              placeholder="Ex.: Bash, ou Edit|Write; vazio = sempre"
+            />
+          )}
+        </FormField>
       )}
-      <FieldRow label="Comando">
-        <input value={command} onChange={(e) => setCommand(e.target.value)} placeholder="./scripts/verificar.sh" spellCheck={false} />
-      </FieldRow>
-      <FieldRow label="Tempo limite (s)">
-        <input type="number" min={0} value={timeout} onChange={(e) => setTimeout_(e.target.value)} placeholder="padrão da ferramenta" />
-      </FieldRow>
+      <FormField label="Comando">
+        {(id) => (
+          <TextField.Root
+            id={id}
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
+            placeholder="./scripts/verificar.sh"
+            spellCheck={false}
+          />
+        )}
+      </FormField>
+      <FormField label="Tempo limite (s)">
+        {(id) => (
+          <TextField.Root
+            id={id}
+            type="number"
+            min={0}
+            value={timeout}
+            onChange={(e) => setTimeout_(e.target.value)}
+            placeholder="padrão da ferramenta"
+          />
+        )}
+      </FormField>
       <FormActions label="Acrescentar hook" disabled={!event || !command.trim()} onSubmit={add} onCancel={onClose} />
-    </div>
+    </Card>
   );
 }

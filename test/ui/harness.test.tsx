@@ -1,7 +1,8 @@
-import { lastSent, posted, seedBoard, sentOf } from './setup';
+import { choose, lastSent, posted, seedBoard, sentOf } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { HarnessInventory } from '../../src/webview/components/settings/HarnessInventory';
 import { useBoardStore } from '../../src/webview/store/boardStore';
@@ -59,12 +60,12 @@ beforeEach(async () => {
 
 const renderScreen = () =>
   render(
-    <>
+    <Theme>
       <HarnessInventory />
       <Dialog />
-    </>,
+    </Theme>,
   );
-const section = (label: string) => screen.getByRole('heading', { name: label }).closest('section')!;
+const section = (label: string) => screen.getByLabelText(label);
 const dialog = () => within(screen.getByRole('dialog'));
 const userAgents = () => createTargets('claude').find((t) => t.kind === 'agent' && t.scope === 'user')!;
 
@@ -79,8 +80,7 @@ describe('HarnessInventory', () => {
     const agents = section('Agentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
     // o destino começa no primeiro lugar possível, o do projeto
-    const where = within(agents).getByDisplayValue('Projeto: .claude/agents/<nome>.md');
-    expect(where).toBeInTheDocument();
+    expect(within(agents).getByRole('combobox', { name: 'Onde' })).toHaveTextContent('Projeto: .claude/agents/<nome>.md');
     const create = within(agents).getByRole('button', { name: 'Criar e abrir no editor' });
     expect(create).toBeDisabled();
     await userEvent.type(within(agents).getByPlaceholderText('revisar-spec'), 'Meu Agente');
@@ -102,8 +102,7 @@ describe('HarnessInventory', () => {
     renderScreen();
     const agents = section('Agentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
-    // o valor da opção é o índice da fonte (o texto tem `<nome>`, que o selectOptions não acha)
-    await userEvent.selectOptions(within(agents).getByDisplayValue('Projeto: .claude/agents/<nome>.md'), String(userAgents().source));
+    await choose(within(agents).getByRole('combobox', { name: 'Onde' }), `Global: ${userAgents().label}`);
     await userEvent.type(within(agents).getByPlaceholderText('revisar-spec'), 'revisor-global');
     await userEvent.type(within(agents).getByPlaceholderText('Quando a IA deve usar'), 'Revisa');
     await userEvent.click(within(agents).getByRole('button', { name: 'Criar e abrir no editor' }));
@@ -122,8 +121,7 @@ describe('HarnessInventory', () => {
     renderScreen();
     const agents = section('Agentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
-    // o valor da opção é o índice da fonte (o texto tem `<nome>`, que o selectOptions não acha)
-    await userEvent.selectOptions(within(agents).getByDisplayValue('Projeto: .claude/agents/<nome>.md'), String(userAgents().source));
+    await choose(within(agents).getByRole('combobox', { name: 'Onde' }), `Global: ${userAgents().label}`);
     await userEvent.type(within(agents).getByPlaceholderText('revisar-spec'), 'x');
     await userEvent.type(within(agents).getByPlaceholderText('Quando a IA deve usar'), 'y');
     await userEvent.click(within(agents).getByRole('button', { name: 'Criar e abrir no editor' }));
@@ -188,11 +186,8 @@ describe('HarnessInventory', () => {
     const settings = section('Configurações e permissões');
     await userEvent.click(within(settings).getByRole('button', { name: 'Nova regra de permissão' }));
     const user = permissionTargets('claude').find((t) => t.scope === 'user')!;
-    await userEvent.selectOptions(
-      within(settings).getByDisplayValue(`Projeto: ${permissionTargets('claude')[0]!.label}`),
-      `Global: ${user.label}`,
-    );
-    await userEvent.selectOptions(within(settings).getByDisplayValue('permitir (allow)'), 'deny');
+    await choose(within(settings).getByRole('combobox', { name: 'Arquivo' }), `Global: ${user.label}`);
+    await choose(within(settings).getByRole('combobox', { name: 'Lista' }), /negar \(deny\)/);
     await userEvent.type(within(settings).getByPlaceholderText('Ex.: Bash(npm run test *), Read(./.env)'), 'Read(./.env)');
     await userEvent.click(within(settings).getByRole('button', { name: 'Acrescentar regra' }));
     expect(useBoardStore.getState().dialog).toMatchObject({
@@ -235,7 +230,7 @@ describe('HarnessInventory', () => {
 
   it('modo da skill global pede confirmação; arquivos de apoio abrem e são criados', async () => {
     renderScreen();
-    await userEvent.selectOptions(screen.getByText('global-skill').closest('tr')!.querySelector('select')!, 'manual');
+    await choose(within(screen.getByText('global-skill').closest('tr')!).getByRole('combobox'), /Só quando indicada/);
     expect(useBoardStore.getState().dialog?.title).toBe('Alterar skills da pasta do usuário?');
     await userEvent.click(dialog().getByRole('button', { name: 'Alterar' }));
     expect(lastSent('harness.skill.setMode')).toEqual({

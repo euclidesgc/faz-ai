@@ -1,8 +1,11 @@
+import { Button, TextField } from '@radix-ui/themes';
 import type { Agent } from '../../../../shared/harness';
 import { isFreeName, type AiToolInfo } from '../../../../shared/harnessProject';
 import { useBoardStore } from '../../../store/boardStore';
 import { harness } from '../../../commands';
-import { Button, DeleteButton, FieldRow } from '../../ui';
+import { DeleteButton, FormField, IconPlus } from '../../ui';
+import { SectionHeader } from '../SectionHeader';
+import { SettingsCard } from '../SettingsCard';
 import { DraftForm } from './DraftForm';
 import { FileEditor } from './FileEditor';
 import type { ProjectEditing } from './useProjectEditing';
@@ -22,19 +25,24 @@ export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
   };
 
   const agentRow = (a: Agent) => (
-    <section key={a.name} className="settings-block">
-      <div className="row">
-        <h3 className="plain">{a.name}</h3>
-        {a.model && <span className="pill">{a.model}</span>}
-        <span className="spacer" />
-        <Button onClick={() => edit.toggle('agent', a.name)}>{edit.isEditing('agent', a.name) ? 'Fechar' : 'Editar'}</Button>
-        <DeleteButton
-          title="Apagar o agente"
-          question={`Apagar o agente "${a.name}"?`}
-          message="O arquivo do agente é removido do projeto."
-          onConfirm={() => harness.deleteAgent(a.name)}
-        />
-      </div>
+    <SettingsCard
+      key={a.name}
+      title={a.name}
+      badge={a.model ? { text: a.model } : undefined}
+      actions={
+        <>
+          <Button variant="soft" color="gray" onClick={() => edit.toggle('agent', a.name)}>
+            {edit.isEditing('agent', a.name) ? 'Fechar' : 'Editar'}
+          </Button>
+          <DeleteButton
+            title="Apagar o agente"
+            question={`Apagar o agente "${a.name}"?`}
+            message="O arquivo do agente é removido do projeto."
+            onConfirm={() => harness.deleteAgent(a.name)}
+          />
+        </>
+      }
+    >
       <div className="muted small">{a.description || 'Sem descrição no frontmatter.'}</div>
       <div className="muted small">
         <code>{a.path}</code>
@@ -42,31 +50,38 @@ export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
       {edit.isEditing('agent', a.name) && (
         <FileEditor saved={a.content} onSave={(content) => harness.writeAgent(a.name, content)} onClose={edit.close} />
       )}
-    </section>
+    </SettingsCard>
   );
 
   return (
     <>
-      <div className="row section-head">
-        <h3>Agentes</h3>
-        <span className="spacer" />
-        {tool.agents && (
-          <Button variant="primary" onClick={() => edit.toggleNew('newAgent')}>
-            Novo agente
-          </Button>
-        )}
-      </div>
-      {tool.agents ? (
-        <>
-          <p className="muted small">
+      <SectionHeader
+        title="Agentes"
+        actions={
+          tool.agents && (
+            <Button onClick={() => edit.toggleNew('newAgent')}>
+              <IconPlus /> Novo agente
+            </Button>
+          )
+        }
+      >
+        {tool.agents ? (
+          <>
             Agentes (subagentes) do {tool.label}: cada arquivo em <code>{tool.agents.dir}</code> define um ajudante com instruções próprias,
             e a ferramenta delega trabalho a ele pela descrição.
             {tool.agents.modelField
               ? ' Um agente pode fixar o modelo que usa, o que serve para executar um card com o modelo indicado nele.'
               : ''}
-          </p>
+          </>
+        ) : (
+          `O ${tool.label} não define agentes em arquivos do projeto.`
+        )}
+      </SectionHeader>
+      {tool.agents && (
+        <>
           {edit.editing?.kind === 'newAgent' && (
             <DraftForm
+              title="Agente novo"
               draft={draft}
               onChange={edit.patchDraft}
               nameOk={isFreeName(draft.name, agents)}
@@ -79,27 +94,26 @@ export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
               onCancel={edit.clearForm}
             >
               {tool.agents.modelField && (
-                <FieldRow label="Modelo (opcional)">
-                  <input
-                    value={draft.model}
-                    onChange={(e) => edit.patchDraft({ model: e.target.value })}
-                    placeholder="vazio = o modelo da sessão"
-                  />
-                </FieldRow>
+                <FormField label="Modelo (opcional)">
+                  {(id) => (
+                    <TextField.Root
+                      id={id}
+                      value={draft.model}
+                      onChange={(e) => edit.patchDraft({ model: e.target.value })}
+                      placeholder="vazio = o modelo da sessão"
+                    />
+                  )}
+                </FormField>
               )}
             </DraftForm>
           )}
-          <div className="stack">
-            {agents.map(agentRow)}
-            {agents.length === 0 && (
-              <p className="muted">
-                Nenhum agente em <code>{tool.agents.dir}</code> ainda.
-              </p>
-            )}
-          </div>
+          {agents.map(agentRow)}
+          {agents.length === 0 && (
+            <p className="muted">
+              Nenhum agente em <code>{tool.agents.dir}</code> ainda.
+            </p>
+          )}
         </>
-      ) : (
-        <p className="muted small">O {tool.label} não define agentes em arquivos do projeto.</p>
       )}
     </>
   );

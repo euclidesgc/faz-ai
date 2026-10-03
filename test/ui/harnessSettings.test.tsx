@@ -1,7 +1,9 @@
-import { lastSent, posted, seedBoard, sentOf } from './setup';
+import { choose, lastSent, posted, seedBoard, sentOf } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Theme } from '@radix-ui/themes';
+import { RUNNER_PERMISSIONS } from '../../src/shared/runner';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { HarnessSettings } from '../../src/webview/components/settings/HarnessSettings';
 import { useBoardStore } from '../../src/webview/store/boardStore';
@@ -64,13 +66,13 @@ beforeEach(async () => {
 
 const renderScreen = () =>
   render(
-    <>
+    <Theme>
       <HarnessSettings />
       <Dialog />
-    </>,
+    </Theme>,
   );
 /** bloco de um item (regra, skill ou agente) pelo título dele */
-const block = (name: string) => within(screen.getByRole('heading', { name, level: 3 }).closest('section')!);
+const block = (name: string) => within(screen.getByLabelText(name));
 const dialog = () => within(screen.getByRole('dialog'));
 
 describe('HarnessSettings: ferramenta e execução', () => {
@@ -92,7 +94,10 @@ describe('HarnessSettings: ferramenta e execução', () => {
   it('permissão, tempo limite, heartbeat e Rodar agora', async () => {
     renderScreen();
     const runner = document.querySelector<HTMLElement>('.runner-settings')!;
-    await userEvent.selectOptions(within(runner).getAllByRole('combobox')[0]!, 'full');
+    await choose(
+      within(runner).getByRole('combobox', { name: 'O que a IA pode fazer' }),
+      RUNNER_PERMISSIONS.find((p) => p.value === 'full')!.label,
+    );
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { permission: 'full' } });
     const [timeout, interval] = within(runner).getAllByRole('spinbutton');
     await userEvent.clear(timeout!);
@@ -101,12 +106,12 @@ describe('HarnessSettings: ferramenta e execução', () => {
     await userEvent.clear(interval!);
     await userEvent.type(interval!, '45{Enter}');
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { heartbeatMinutes: 45 } });
-    const heartbeat = within(runner).getByRole('checkbox', { name: 'Heartbeat ligado' });
+    const heartbeat = within(runner).getByRole('switch', { name: 'Heartbeat ligado' });
     await userEvent.click(heartbeat);
     expect(lastSent('settings.board.update').patch).toEqual({
       runner: { heartbeat: !useBoardStore.getState().state!.board.runner.heartbeat },
     });
-    await userEvent.click(within(runner).getByRole('button', { name: 'Rodar agora' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rodar agora' }));
     expect(lastSent('ai.heartbeat.run')).toEqual({ type: 'ai.heartbeat.run' });
   });
 
@@ -166,11 +171,11 @@ describe('HarnessSettings: skills', () => {
     const off = block('desligada');
     expect(off.getByText('Desligada')).toBeInTheDocument();
     expect(off.queryByRole('combobox')).toBeNull();
-    await userEvent.click(off.getByRole('checkbox'));
+    await userEvent.click(off.getByRole('switch'));
     expect(lastSent('harness.skill.setEnabled')).toEqual({ type: 'harness.skill.setEnabled', name: 'desligada', enabled: true });
 
     const k = block('revisar-spec');
-    await userEvent.selectOptions(k.getByRole('combobox'), 'manual');
+    await choose(k.getByRole('combobox'), 'Só quando indicada');
     expect(lastSent('harness.skill.setMode')).toEqual({
       type: 'harness.skill.setMode',
       tool: 'claude',
@@ -197,7 +202,7 @@ describe('HarnessSettings: skills', () => {
   it('com várias automáticas, deixa todas só quando indicadas de uma vez', async () => {
     renderScreen();
     // o inventário no fim da página tem um botão de mesmo nome
-    const bulk = within(screen.getByText('2 skills automáticas no projeto.').closest<HTMLElement>('.row')!);
+    const bulk = within(screen.getByText('2 skills automáticas no projeto.').closest<HTMLElement>('p')!);
     await userEvent.click(bulk.getByRole('button', { name: 'Deixar todas só quando indicadas' }));
     expect(lastSent('harness.skill.setMode')).toEqual({
       type: 'harness.skill.setMode',

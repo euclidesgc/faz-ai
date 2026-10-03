@@ -3,7 +3,8 @@ import { SKILL_NAME_PATTERN, type AiTool, type HarnessKind } from '../../../../s
 import type { CreateTarget } from '../../../../shared/harnessCatalog';
 import { toItemName } from '../../../../shared/harnessProject';
 import { harness } from '../../../commands';
-import { FieldRow } from '../../ui';
+import { Card, TextField } from '@radix-ui/themes';
+import { FormField } from '../../ui';
 import { FormActions } from './FormActions';
 import { TargetPicker } from './TargetPicker';
 import { useTargetForm } from './useTargetForm';
@@ -33,19 +34,26 @@ export function NewItem({
       confirmLabel: 'Criar',
     });
   return (
-    <div className="harness-new">
+    <Card className="draft-card" aria-label="Item novo">
       <TargetPicker label="Onde" targets={targets} value={source} onChange={setSource} />
       {named && (
-        <FieldRow label="Nome">
-          <input value={name} onChange={(e) => setName(toItemName(e.target.value))} placeholder="revisar-spec" />
-        </FieldRow>
+        <FormField label="Nome">
+          {(id) => <TextField.Root id={id} value={name} onChange={(e) => setName(toItemName(e.target.value))} placeholder="revisar-spec" />}
+        </FormField>
       )}
       {named && (
-        <FieldRow label={`Descrição${needsDescription ? '' : ' (opcional)'}`}>
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Quando a IA deve usar" />
-        </FieldRow>
+        <FormField label={`Descrição${needsDescription ? '' : ' (opcional)'}`}>
+          {(id) => (
+            <TextField.Root
+              id={id}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Quando a IA deve usar"
+            />
+          )}
+        </FormField>
       )}
       <FormActions label="Criar e abrir no editor" disabled={!ok} onSubmit={create} onCancel={onClose} />
-    </div>
+    </Card>
   );
 }

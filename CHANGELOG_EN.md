@@ -104,6 +104,10 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   switch or selector on the right and the "Quando / Então" below. The controls are Radix Themes,
   the same as Campos and Workflows. It is the first of the Configurações screens that still used the
   old controls.
+- **AI harness with the new design**: the project's rules, skills and agents become cards with the
+  title, the state badge and the actions on the right; each section has its main button at the top
+  (Nova skill, Novo agente, Conectar ao board, Rodar agora, Atualizar). Creation forms, selectors,
+  switches, checkboxes and the tool tabs use Radix Themes, like Campos, Workflows and Regras.
 
 ## 0.29.1
 
