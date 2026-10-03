@@ -29,10 +29,22 @@ export interface WebServer {
 }
 
 const MIME: Record<string, string> = {
-  '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.svg': 'image/svg+xml',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
-  '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8',
-  '.woff2': 'font/woff2', '.map': 'application/json',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.pdf': 'application/pdf',
+  '.json': 'application/json; charset=utf-8',
+  '.md': 'text/plain; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.csv': 'text/plain; charset=utf-8',
+  '.woff2': 'font/woff2',
+  '.map': 'application/json',
 };
 const COOKIE = 'fazai_session';
 /** anexos chegam em base64 dentro da mensagem: 20 MB de arquivo viram ~27 MB de texto */
@@ -90,7 +102,11 @@ export async function startWebServer(o: WebServerOptions): Promise<WebServer> {
   const sendFile = (res: http.ServerResponse, file: string, cache = false) => {
     fs.readFile(file, (err, data) => {
       if (err) return void res.writeHead(404).end('Não encontrado');
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream', 'Cache-Control': cache ? 'private, max-age=3600' : 'no-cache', 'X-Content-Type-Options': 'nosniff' });
+      res.writeHead(200, {
+        'Content-Type': MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream',
+        'Cache-Control': cache ? 'private, max-age=3600' : 'no-cache',
+        'X-Content-Type-Options': 'nosniff',
+      });
       res.end(data);
     });
   };
@@ -114,13 +130,17 @@ export async function startWebServer(o: WebServerOptions): Promise<WebServer> {
   const serve = (req: http.IncomingMessage, res: http.ServerResponse): void => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
     // só atende quem chega pelo endereço local: barra páginas de fora que apontem um domínio para 127.0.0.1
-    if (!new Set([`127.0.0.1:${port}`, `localhost:${port}`]).has(req.headers.host ?? '')) return void res.writeHead(403).end('Endereço não permitido');
+    if (!new Set([`127.0.0.1:${port}`, `localhost:${port}`]).has(req.headers.host ?? ''))
+      return void res.writeHead(403).end('Endereço não permitido');
 
     const given = url.searchParams.get('t');
     if (given !== null) {
       if (!sameSecret(given, token)) return void res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' }).end(DENIED);
       url.searchParams.delete('t');
-      res.writeHead(302, { 'Set-Cookie': `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`, Location: url.pathname + url.search });
+      res.writeHead(302, {
+        'Set-Cookie': `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`,
+        Location: url.pathname + url.search,
+      });
       return void res.end();
     }
     const cookie = /(?:^|;\s*)fazai_session=([a-f0-9]+)/.exec(req.headers.cookie ?? '')?.[1] ?? '';
@@ -158,7 +178,12 @@ export async function startWebServer(o: WebServerOptions): Promise<WebServer> {
 
     if (url.pathname === '/events') {
       if (!/^[\w-]{8,64}$/.test(id)) return void res.writeHead(400).end();
-      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      });
       res.socket?.setNoDelay(true);
       res.write('retry: 2000\n\n');
       const previous = clients.get(id);
@@ -180,7 +205,8 @@ export async function startWebServer(o: WebServerOptions): Promise<WebServer> {
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-cache',
-        'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; frame-ancestors 'none'",
+        'Content-Security-Policy':
+          "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; frame-ancestors 'none'",
         'Referrer-Policy': 'no-referrer',
       });
       return void res.end(page(o.router.snapshot().board.name));

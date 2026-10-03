@@ -31,7 +31,12 @@ Uso: faz-ai [pasta] [opções]
 /** Pasta de dados: a da extensão no editor, quando existe (o board é o mesmo), ou ~/.faz-ai/data. */
 function defaultDataDir(): string {
   const home = os.homedir();
-  const appData = process.platform === 'darwin' ? path.join(home, 'Library', 'Application Support') : process.platform === 'win32' ? process.env.APPDATA ?? path.join(home, 'AppData', 'Roaming') : process.env.XDG_CONFIG_HOME ?? path.join(home, '.config');
+  const appData =
+    process.platform === 'darwin'
+      ? path.join(home, 'Library', 'Application Support')
+      : process.platform === 'win32'
+        ? (process.env.APPDATA ?? path.join(home, 'AppData', 'Roaming'))
+        : (process.env.XDG_CONFIG_HOME ?? path.join(home, '.config'));
   for (const editor of ['Code', 'Code - Insiders', 'Cursor', 'Windsurf', 'VSCodium']) {
     const dir = path.join(appData, editor, 'User', 'globalStorage', 'euclidesgc.faz-ai');
     if (fs.existsSync(dir)) return dir;
@@ -89,7 +94,9 @@ async function main(): Promise<void> {
   // o editor já serve o board desta pasta: dois processos gravando o mesmo banco perderiam dados
   const address = socketPath(folderPath);
   if (await socketAlive(address)) {
-    throw new Error(`O board de "${folderPath}" já está aberto em outro lugar (uma janela do editor ou outro faz-ai).\nNo editor, use o comando "Faz AI: Abrir board no navegador" para ver este mesmo board no navegador.`);
+    throw new Error(
+      `O board de "${folderPath}" já está aberto em outro lugar (uma janela do editor ou outro faz-ai).\nNo editor, use o comando "Faz AI: Abrir board no navegador" para ver este mesmo board no navegador.`,
+    );
   }
 
   const distDir = __dirname;
@@ -98,7 +105,14 @@ async function main(): Promise<void> {
   fs.mkdirSync(path.dirname(bridgePath), { recursive: true });
   fs.copyFileSync(path.join(distDir, 'mcp-bridge.js'), bridgePath);
 
-  const host = await createBoardHost({ storageDir: dataDir, wasmDir: distDir, folderPath, folderName: path.basename(folderPath), bridgePath, log });
+  const host = await createBoardHost({
+    storageDir: dataDir,
+    wasmDir: distDir,
+    folderPath,
+    folderName: path.basename(folderPath),
+    bridgePath,
+    log,
+  });
   const { router, runner, heartbeat } = host;
   const stopMcp = await startMcpServer(address, { getRouter: async () => router, workspaceDir: folderPath, version: FAZAI_VERSION });
   const key = workspaceKey(folderPath);
@@ -114,7 +128,9 @@ async function main(): Promise<void> {
     env: {
       connectAI() {
         const { message, toIgnore } = host.connectAI();
-        return toIgnore.length ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.` : message;
+        return toIgnore.length
+          ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.`
+          : message;
       },
       runAi: (cardId) => runner.start(cardId),
       stopAi: (cardId) => runner.stop(cardId),
@@ -147,7 +163,9 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());
 
-  process.stdout.write(`\nFaz AI ${FAZAI_VERSION}\nBoard:  ${router.snapshot().board.name} (${folderPath})\nAbra:   ${web.url}\n\nA IA do projeto alcança o board por este processo: deixe-o rodando. Ctrl+C encerra.\n\n`);
+  process.stdout.write(
+    `\nFaz AI ${FAZAI_VERSION}\nBoard:  ${router.snapshot().board.name} (${folderPath})\nAbra:   ${web.url}\n\nA IA do projeto alcança o board por este processo: deixe-o rodando. Ctrl+C encerra.\n\n`,
+  );
   if (!noOpen) openWithSystem(web.url);
 }
 

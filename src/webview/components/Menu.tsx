@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-export type MenuItem = { label: string; onClick(): void; danger?: boolean; disabled?: boolean; checked?: boolean } | { header: string } | 'sep';
+export type MenuItem =
+  { label: string; onClick(): void; danger?: boolean; disabled?: boolean; checked?: boolean } | { header: string } | 'sep';
 
 /** Botão que abre um menu flutuante. Renderizado em portal para não ser cortado nem afetado por transforms. */
 export function Menu({ items, title = 'Mais ações', children = '⋯' }: { items: MenuItem[]; title?: string; children?: ReactNode }) {
@@ -54,7 +55,9 @@ export function Menu({ items, title = 'Mais ações', children = '⋯' }: { item
               it === 'sep' ? (
                 <hr key={i} />
               ) : 'header' in it ? (
-                <span key={i} className="menu-header">{it.header}</span>
+                <span key={i} className="menu-header">
+                  {it.header}
+                </span>
               ) : (
                 <button
                   key={i}

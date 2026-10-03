@@ -35,7 +35,9 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
   const columns = useMemo(() => columnsOf(state, workflow.id), [state, workflow.id]);
 
   const visible = (cards: CardModel[]): CardModel[] =>
-    cards.filter((c) => (!filtered || filtered.has(c.id)) && (workflow.kind !== 'child' || !selectedParentId || c.parentId === selectedParentId));
+    cards.filter(
+      (c) => (!filtered || filtered.has(c.id)) && (workflow.kind !== 'child' || !selectedParentId || c.parentId === selectedParentId),
+    );
 
   const onDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
 
@@ -80,12 +82,30 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
   const activeCard = activeId ? state.cards.find((c) => c.id === activeId) : undefined;
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragCancel={() => setActiveId(null)}
+    >
       <div className="columns">
         {columns.map((col, i) => {
           const all = cardsIn(state, col.id);
           const collapsed = overrides[col.id] ?? col.collapsed;
-          return <Column key={col.id} column={col} workflow={workflow} cards={visible(all)} total={all.length} index={i} siblings={columns} collapsed={collapsed} onToggle={() => setCollapsed(col.id, !collapsed)} />;
+          return (
+            <Column
+              key={col.id}
+              column={col}
+              workflow={workflow}
+              cards={visible(all)}
+              total={all.length}
+              index={i}
+              siblings={columns}
+              collapsed={collapsed}
+              onToggle={() => setCollapsed(col.id, !collapsed)}
+            />
+          );
         })}
         <ArchiveColumn
           workflowId={workflow.id}
@@ -95,7 +115,9 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
         />
         <div className="column-add">
           {newColumn === null ? (
-            <Button variant="ghost" title="Nova coluna" onClick={() => setNewColumn('')}>+ Coluna</Button>
+            <Button variant="ghost" title="Nova coluna" onClick={() => setNewColumn('')}>
+              + Coluna
+            </Button>
           ) : (
             <input
               autoFocus
@@ -116,19 +138,43 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
   );
 }
 
-function ArchiveColumn({ workflowId, cards, collapsed, onToggle }: { workflowId: string; cards: CardModel[]; collapsed: boolean; onToggle: (collapsed: boolean) => void }) {
+function ArchiveColumn({
+  workflowId,
+  cards,
+  collapsed,
+  onToggle,
+}: {
+  workflowId: string;
+  cards: CardModel[];
+  collapsed: boolean;
+  onToggle: (collapsed: boolean) => void;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: archiveId(workflowId) });
-  if (collapsed) return <CollapsedColumn setNodeRef={setNodeRef} isOver={isOver} name="Arquivados" count={String(cards.length)} className="archive" onExpand={() => onToggle(true)} />;
+  if (collapsed)
+    return (
+      <CollapsedColumn
+        setNodeRef={setNodeRef}
+        isOver={isOver}
+        name="Arquivados"
+        count={String(cards.length)}
+        className="archive"
+        onExpand={() => onToggle(true)}
+      />
+    );
   return (
     <div ref={setNodeRef} className={`column archive ${isOver ? 'over' : ''}`}>
       <header className="column-header">
-        <Button variant="icon" className="collapse-toggle" title="Colapsar a coluna" onClick={() => onToggle(false)}>‹</Button>
+        <Button variant="icon" className="collapse-toggle" title="Colapsar a coluna" onClick={() => onToggle(false)}>
+          ‹
+        </Button>
         <span className="column-name">Arquivados</span>
         <span className="column-count">{cards.length}</span>
       </header>
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div className="column-body">
-          {cards.map((card) => <SortableCard key={card.id} card={card} />)}
+          {cards.map((card) => (
+            <SortableCard key={card.id} card={card} />
+          ))}
           {cards.length === 0 && <p className="muted empty">Arraste um card para cá para arquivar.</p>}
         </div>
       </SortableContext>

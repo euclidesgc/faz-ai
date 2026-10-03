@@ -24,7 +24,16 @@ export interface Filters {
 }
 
 export const EMPTY_FILTERS: Filters = {
-  text: '', typeIds: [], fields: {}, dateField: null, datePreset: null, dateFrom: '', dateTo: '', relation: 'any', owner: 'any', includeRelated: true,
+  text: '',
+  typeIds: [],
+  fields: {},
+  dateField: null,
+  datePreset: null,
+  dateFrom: '',
+  dateTo: '',
+  relation: 'any',
+  owner: 'any',
+  includeRelated: true,
 };
 
 /** Estado de visualização compartilhado entre o board e a barra lateral. */

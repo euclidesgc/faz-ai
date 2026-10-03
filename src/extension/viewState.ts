@@ -17,7 +17,11 @@ export class ViewStateStore {
 
   constructor(private memento: Memento) {
     const saved = memento.get<Partial<ViewState>>(KEY);
-    this.state = { filters: { ...EMPTY_FILTERS, ...saved?.filters }, selectedParentId: saved?.selectedParentId ?? null, collapsed: { ...EMPTY_VIEW_STATE.collapsed, ...saved?.collapsed } };
+    this.state = {
+      filters: { ...EMPTY_FILTERS, ...saved?.filters },
+      selectedParentId: saved?.selectedParentId ?? null,
+      collapsed: { ...EMPTY_VIEW_STATE.collapsed, ...saved?.collapsed },
+    };
   }
 
   get(): ViewState {

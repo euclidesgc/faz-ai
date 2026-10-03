@@ -1,6 +1,19 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ALL_AI_TOOLS, RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type Agent, type AgentSpec, type AiTool, type Harness, type RuleFile, type Skill, type SkillMode, type ToolInventory } from '../shared/harness';
+import {
+  ALL_AI_TOOLS,
+  RULE_FILES,
+  SKILL_NAME_PATTERN,
+  aiToolInfo,
+  type Agent,
+  type AgentSpec,
+  type AiTool,
+  type Harness,
+  type RuleFile,
+  type Skill,
+  type SkillMode,
+  type ToolInventory,
+} from '../shared/harness';
 import { scanInventory } from './harnessScan';
 import { detectTools } from './models';
 import { setSkillMode, skillMode } from './skillMode';
@@ -28,8 +41,12 @@ export function agentTemplate(spec: AgentSpec, name: string, description: string
   const withModel = spec.modelField && model.trim() ? model.trim() : '';
   if (spec.format === 'toml') {
     // strings JSON são strings básicas válidas em TOML
-    const lines = [`name = ${JSON.stringify(name)}`, `description = ${JSON.stringify(oneLine)}`, ...(withModel ? [`${spec.modelField} = ${JSON.stringify(withModel)}`] : [])];
-    return `${lines.join('\n')}\ndeveloper_instructions = """\n${body.trim().replace(/"""/g, '\'\'\'')}\n"""\n`;
+    const lines = [
+      `name = ${JSON.stringify(name)}`,
+      `description = ${JSON.stringify(oneLine)}`,
+      ...(withModel ? [`${spec.modelField} = ${JSON.stringify(withModel)}`] : []),
+    ];
+    return `${lines.join('\n')}\ndeveloper_instructions = """\n${body.trim().replace(/"""/g, "'''")}\n"""\n`;
   }
   const lines = [`name: ${name}`, `description: ${oneLine}`, ...(withModel ? [`${spec.modelField}: ${withModel}`] : [])];
   return `---\n${lines.join('\n')}\n---\n\n${body.trim()}\n`;
@@ -51,7 +68,11 @@ function agentMeta(spec: AgentSpec, content: string): { description: string; mod
  * Não depende da API do VSCode.
  */
 export class HarnessStore {
-  constructor(readonly workspaceDir: string, private tool: AiTool, private homeDir = '') {}
+  constructor(
+    readonly workspaceDir: string,
+    private tool: AiTool,
+    private homeDir = '',
+  ) {}
 
   setTool(tool: AiTool): void {
     this.tool = tool;
@@ -69,14 +90,20 @@ export class HarnessStore {
       const exists = fs.existsSync(file) && fs.statSync(file).isFile();
       return { name, exists, content: exists ? this.read(file) : '' };
     });
-    const skills = [...this.skillsIn(this.dirs.enabled, true), ...this.skillsIn(this.dirs.disabled, false)].sort((a, b) => a.name.localeCompare(b.name));
+    const skills = [...this.skillsIn(this.dirs.enabled, true), ...this.skillsIn(this.dirs.disabled, false)].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
     return { rules, skills, agents: this.agents(), inventory: this.inventory() };
   }
 
   /** O que cada ferramenta carrega, no projeto, na pasta do usuário e em plugins. */
   private inventory(): ToolInventory[] {
     const installed = detectTools(this.homeDir);
-    return ALL_AI_TOOLS.map((tool) => ({ tool, installed: installed.includes(tool), items: scanInventory(tool, this.workspaceDir, this.homeDir) }));
+    return ALL_AI_TOOLS.map((tool) => ({
+      tool,
+      installed: installed.includes(tool),
+      items: scanInventory(tool, this.workspaceDir, this.homeDir),
+    }));
   }
 
   /** Onde a ferramenta em uso guarda os agentes do projeto; lança erro se ela não tem agentes em arquivo. */
@@ -92,7 +119,9 @@ export class HarnessStore {
     if (!spec || !base || !fs.existsSync(base)) return [];
     return fs
       .readdirSync(base)
-      .filter((f) => f.endsWith(spec.ext) && SKILL_NAME_PATTERN.test(f.slice(0, -spec.ext.length)) && fs.statSync(path.join(base, f)).isFile())
+      .filter(
+        (f) => f.endsWith(spec.ext) && SKILL_NAME_PATTERN.test(f.slice(0, -spec.ext.length)) && fs.statSync(path.join(base, f)).isFile(),
+      )
       .map((f) => {
         const rel = `${spec.dir}/${f}`;
         const content = this.read(path.join(this.workspaceDir, rel));
@@ -102,7 +131,8 @@ export class HarnessStore {
   }
 
   private agentFile(name: string): string {
-    if (!SKILL_NAME_PATTERN.test(name)) throw new Error('Nome de agente inválido: use letras minúsculas, números e hífens (ex.: "revisor-de-spec").');
+    if (!SKILL_NAME_PATTERN.test(name))
+      throw new Error('Nome de agente inválido: use letras minúsculas, números e hífens (ex.: "revisor-de-spec").');
     return path.join(this.workspaceDir, this.agentSpec.dir, `${name}${this.agentSpec.ext}`);
   }
 
@@ -116,7 +146,8 @@ export class HarnessStore {
     const file = this.agentFile(name);
     if (fs.existsSync(file)) throw new Error(`Já existe um agente "${name}".`);
     if (!description.trim()) throw new Error('O agente precisa de uma descrição: é por ela que a IA decide quando delegar a ele.');
-    if (model.trim() && !this.agentSpec.modelField) throw new Error(`O ${aiToolInfo(this.tool).label} não permite fixar o modelo de um agente.`);
+    if (model.trim() && !this.agentSpec.modelField)
+      throw new Error(`O ${aiToolInfo(this.tool).label} não permite fixar o modelo de um agente.`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, agentTemplate(this.agentSpec, name, description, body, model));
   }
@@ -186,11 +217,13 @@ export class HarnessStore {
   }
 
   private checkName(name: string): void {
-    if (!SKILL_NAME_PATTERN.test(name)) throw new Error('Nome de skill inválido: use letras minúsculas, números e hífens (ex.: "revisar-spec").');
+    if (!SKILL_NAME_PATTERN.test(name))
+      throw new Error('Nome de skill inválido: use letras minúsculas, números e hífens (ex.: "revisar-spec").');
   }
 
   private rulePath(name: string): string {
-    if (!RULE_FILES.some((r) => r.name === name)) throw new Error(`Arquivo de regras desconhecido: "${name}". Aceitos: ${RULE_FILES.map((r) => r.name).join(', ')}.`);
+    if (!RULE_FILES.some((r) => r.name === name))
+      throw new Error(`Arquivo de regras desconhecido: "${name}". Aceitos: ${RULE_FILES.map((r) => r.name).join(', ')}.`);
     return path.join(this.workspaceDir, name);
   }
 
@@ -207,7 +240,14 @@ export class HarnessStore {
       .map((n) => {
         const rel = `${relDir}/${n}/SKILL.md`;
         const content = this.read(path.join(this.workspaceDir, rel));
-        return { name: n, description: parseFrontmatter(content).description ?? '', enabled, mode: skillMode(path.join(this.workspaceDir, rel)), path: rel, content };
+        return {
+          name: n,
+          description: parseFrontmatter(content).description ?? '',
+          enabled,
+          mode: skillMode(path.join(this.workspaceDir, rel)),
+          path: rel,
+          content,
+        };
       });
   }
 }

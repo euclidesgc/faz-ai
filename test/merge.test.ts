@@ -22,7 +22,11 @@ const call = async (name: string, args: Record<string, unknown> = {}) => {
   const res = await client.callTool({ name, arguments: args });
   const text = (res.content as { text: string }[])[0]!.text;
   let data: any = text;
-  try { data = JSON.parse(text); } catch { /* texto simples */ }
+  try {
+    data = JSON.parse(text);
+  } catch {
+    /* texto simples */
+  }
   return { error: res.isError === true, text, data };
 };
 const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
@@ -35,7 +39,12 @@ const approve = async (n: number) => {
 
 beforeEach(async () => {
   const db = await openInMemory(WASM_DIR);
-  router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, { workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(os.tmpdir(), 'fazai-merge') });
+  router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+    workspaceKey: 'ws',
+    folderName: 'Projeto',
+    author: 'Pessoa',
+    attachmentsDir: path.join(os.tmpdir(), 'fazai-merge'),
+  });
   const server = createMcpServer({ getRouter: async () => router, workspaceDir: os.tmpdir(), version: 'test' });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(a);
@@ -44,7 +53,17 @@ beforeEach(async () => {
   calls = [];
   removed = [];
   ghResult = async () => '';
-  merger = new AutoMerger(router, { cwd: '/projeto', log: () => {}, gh: (args) => { calls.push(args); return ghResult(); }, removeWorktree: (_dir, p) => { removed.push(p); } });
+  merger = new AutoMerger(router, {
+    cwd: '/projeto',
+    log: () => {},
+    gh: (args) => {
+      calls.push(args);
+      return ghResult();
+    },
+    removeWorktree: (_dir, p) => {
+      removed.push(p);
+    },
+  });
   await call('create_card', { title: 'Login', column: 'Homologação' });
 });
 
@@ -82,7 +101,9 @@ describe('pull request e merge na homologação', () => {
   it('merge que falha bloqueia o card, que continua na homologação', async () => {
     router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true } } });
     await call('set_pull_request', { card: 1, url: PR });
-    ghResult = async () => { throw new Error('Pull request is not mergeable: the merge commit cannot be cleanly created.'); };
+    ghResult = async () => {
+      throw new Error('Pull request is not mergeable: the merge commit cannot be cleanly created.');
+    };
     await approve(1);
     expect(calls).toEqual([['pr', 'merge', PR, '--squash']]);
     expect(columnOf(1)).toBe('Homologação');

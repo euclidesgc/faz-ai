@@ -32,7 +32,12 @@ beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-mcp-'));
   const db = await openInMemory(WASM_DIR);
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
-    workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(dir, 'attachments'), workspaceDir: dir, homeDir: path.join(dir, 'home-do-usuario'),
+    workspaceKey: 'ws',
+    folderName: 'Projeto',
+    author: 'Pessoa',
+    attachmentsDir: path.join(dir, 'attachments'),
+    workspaceDir: dir,
+    homeDir: path.join(dir, 'home-do-usuario'),
   });
   changes = 0;
   router.onDidChange(() => changes++);
@@ -48,7 +53,18 @@ afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 describe('servidor MCP', () => {
   it('expõe as ferramentas e descreve o board', async () => {
     const names = (await client.listTools()).tools.map((t) => t.name);
-    expect(names).toEqual(expect.arrayContaining(['get_board', 'list_cards', 'get_card', 'create_card', 'move_card', 'add_comment', 'add_attachment', 'update_rules']));
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'get_board',
+        'list_cards',
+        'get_card',
+        'create_card',
+        'move_card',
+        'add_comment',
+        'add_attachment',
+        'update_rules',
+      ]),
+    );
     const board = (await call('get_board')).data;
     expect(board.workflows.map((w: any) => w.columns.map((c: any) => c.name))).toEqual([
       ['Backlog', 'Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação', 'Concluído', 'Cancelado'],
@@ -91,7 +107,10 @@ describe('servidor MCP', () => {
 
   it('assina comentários com o cliente e cuida de checklist e lixeira', async () => {
     await call('create_card', { title: 'História' });
-    expect((await call('add_comment', { card: 1, body: 'Plano pronto' })).data).toMatchObject({ author: 'Claude Code', body: 'Plano pronto' });
+    expect((await call('add_comment', { card: 1, body: 'Plano pronto' })).data).toMatchObject({
+      author: 'Claude Code',
+      body: 'Plano pronto',
+    });
     const items = (await call('add_checklist_item', { card: 1, text: 'testes' })).data;
     const done = (await call('update_checklist_item', { item_id: items[0].itemId, done: true })).data;
     expect(done[0]).toMatchObject({ text: 'testes', done: true });
@@ -147,15 +166,25 @@ describe('instalar skills pelo board', () => {
       fs.writeFileSync(path.join(src, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Skill ${name}\n---\n`);
     }
     let cleaned = false;
-    router.setInstall('origem', src, () => { cleaned = true; });
-    expect(router.snapshot().harnessInstall).toEqual({ source: 'origem', skills: [{ rel: 'commit', name: 'commit', description: 'Skill commit', files: 0, valid: true }, { rel: 'deploy', name: 'deploy', description: 'Skill deploy', files: 0, valid: true }] });
+    router.setInstall('origem', src, () => {
+      cleaned = true;
+    });
+    expect(router.snapshot().harnessInstall).toEqual({
+      source: 'origem',
+      skills: [
+        { rel: 'commit', name: 'commit', description: 'Skill commit', files: 0, valid: true },
+        { rel: 'deploy', name: 'deploy', description: 'Skill deploy', files: 0, valid: true },
+      ],
+    });
     router.handle({ type: 'harness.install.apply', tool: 'claude', to: 'project', rels: ['commit'] });
     expect(fs.existsSync(path.join(dir, '.claude/skills/commit/SKILL.md'))).toBe(true);
     expect(fs.existsSync(path.join(dir, '.claude/skills/deploy'))).toBe(false);
     expect(router.snapshot().harnessInstall).toBeNull();
     expect(cleaned).toBe(true);
     expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toContain('commit');
-    expect(() => router.handle({ type: 'harness.install.apply', tool: 'claude', to: 'project', rels: ['deploy'] })).toThrow('Procure de novo');
+    expect(() => router.handle({ type: 'harness.install.apply', tool: 'claude', to: 'project', rels: ['deploy'] })).toThrow(
+      'Procure de novo',
+    );
   });
 });
 
@@ -166,27 +195,60 @@ describe('modelos e referências nas skills', () => {
     expect(skill).toMatchObject({ enabled: true, mode: 'manual' });
     expect(fs.existsSync(path.join(dir, '.claude/skills/modelos-do-projeto/references'))).toBe(true);
 
-    const written = (await call('write_skill_file', { skill: 'modelos-do-projeto', file: 'references/repositorio.ts', content: 'export class Repo {}' })).data;
+    const written = (
+      await call('write_skill_file', { skill: 'modelos-do-projeto', file: 'references/repositorio.ts', content: 'export class Repo {}' })
+    ).data;
     expect(written.files).toEqual(['references/repositorio.ts']);
     expect((await call('write_skill_file', { skill: 'modelos-do-projeto', file: '../fora.ts', content: 'x' })).error).toBe(true);
     expect((await call('write_skill_file', { skill: 'nao-existe', file: 'references/a.ts', content: 'x' })).error).toBe(true);
 
     const card = (await call('create_card', { title: 'História', fields: { Skills: ['modelos-do-projeto'] } })).data;
-    expect(card.requiredSkills).toEqual([{ name: 'modelos-do-projeto', scope: 'project', path: '.claude/skills/modelos-do-projeto/SKILL.md', files: ['.claude/skills/modelos-do-projeto/references/repositorio.ts'] }]);
+    expect(card.requiredSkills).toEqual([
+      {
+        name: 'modelos-do-projeto',
+        scope: 'project',
+        path: '.claude/skills/modelos-do-projeto/SKILL.md',
+        files: ['.claude/skills/modelos-do-projeto/references/repositorio.ts'],
+      },
+    ]);
   });
 });
 
 describe('perfis de execução', () => {
-  const profile = (over: Record<string, unknown>) => ({ id: 'p', name: 'Perfil', agent: '', skills: [], mcpServers: null, tools: [], deniedTools: [], model: '', clean: false, isDefault: false, ...over });
+  const profile = (over: Record<string, unknown>) => ({
+    id: 'p',
+    name: 'Perfil',
+    agent: '',
+    skills: [],
+    mcpServers: null,
+    tools: [],
+    deniedTools: [],
+    model: '',
+    clean: false,
+    isDefault: false,
+    ...over,
+  });
 
   it('resolve o perfil do card, da coluna e o padrão, e entrega em get_card', async () => {
     await call('create_skill', { name: 'planejar', description: 'Planeja', content: 'Passos' });
     await call('create_skill', { name: 'testar', description: 'Testa', content: 'Passos' });
     await call('create_agent', { name: 'planejador', description: 'Planeja', content: 'Instruções' });
-    router.handle({ type: 'settings.execProfiles.set', profiles: [
-      profile({ id: 'geral', name: 'Geral', isDefault: true, skills: ['testar'] }),
-      profile({ id: 'plan', name: 'Planejamento', agent: 'planejador', skills: ['planejar'], mcpServers: ['github'], deniedTools: ['WebFetch'], model: 'claude:opus@high', clean: true }),
-    ] });
+    router.handle({
+      type: 'settings.execProfiles.set',
+      profiles: [
+        profile({ id: 'geral', name: 'Geral', isDefault: true, skills: ['testar'] }),
+        profile({
+          id: 'plan',
+          name: 'Planejamento',
+          agent: 'planejador',
+          skills: ['planejar'],
+          mcpServers: ['github'],
+          deniedTools: ['WebFetch'],
+          model: 'claude:opus@high',
+          clean: true,
+        }),
+      ],
+    });
     await call('create_card', { title: 'História', fields: { Skills: ['testar'] } });
     // sem escolha no card nem na coluna: vale o padrão do board, e as skills do card somam às do perfil sem repetir
     let card = (await call('get_card', { card: 1 })).data;
@@ -199,7 +261,13 @@ describe('perfis de execução', () => {
     expect(board.execProfiles.map((p: any) => p.name)).toEqual(['Geral', 'Planejamento']);
     expect(board.workflows[0].columns[0].execProfile).toBe('Planejamento');
     card = (await call('get_card', { card: 1 })).data;
-    expect(card.execution).toMatchObject({ profile: 'Planejamento', agent: { name: 'planejador', path: path.join(dir, '.claude/agents/planejador.md') }, mcpServers: ['faz-ai', 'github'], deniedTools: ['WebFetch'], clean: true });
+    expect(card.execution).toMatchObject({
+      profile: 'Planejamento',
+      agent: { name: 'planejador', path: path.join(dir, '.claude/agents/planejador.md') },
+      mcpServers: ['faz-ai', 'github'],
+      deniedTools: ['WebFetch'],
+      clean: true,
+    });
     expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model', 'clean']);
     expect(card.requiredSkills.map((k: any) => k.name)).toEqual(['planejar', 'testar']);
     await call('create_card', { title: 'Sub', type: 'Sub-tarefa', parent: 1 });
@@ -237,20 +305,44 @@ describe('harness e padrões pelo MCP', () => {
     const card = (await call('create_card', { title: 'História', fields: { Skills: ['commit', 'critica', 'revisar-spec'] } })).data;
     expect(card.requiredSkills).toEqual([
       { name: 'commit', scope: 'user', path: path.join(home, '.claude/skills/commit/SKILL.md') },
-      { name: 'critica', scope: 'plugin', path: path.join(home, '.claude/plugins/cache/loja/design/skills/critica/SKILL.md'), plugin: 'design' },
+      {
+        name: 'critica',
+        scope: 'plugin',
+        path: path.join(home, '.claude/plugins/cache/loja/design/skills/critica/SKILL.md'),
+        plugin: 'design',
+      },
       { name: 'revisar-spec', scope: 'project', path: '.claude/skills/revisar-spec/SKILL.md' },
     ]);
     // copiar a skill global para o projeto: ela passa a existir nos dois escopos e o card usa a do projeto
-    const global = router.snapshot().harness.inventory.find((t) => t.tool === 'claude')!.items.find((i) => i.name === 'commit')!;
+    const global = router
+      .snapshot()
+      .harness.inventory.find((t) => t.tool === 'claude')!
+      .items.find((i) => i.name === 'commit')!;
     router.handle({ type: 'harness.item.copy', tool: 'claude', items: [{ kind: 'skill', path: global.path }], to: 'project' });
-    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({ name: 'commit', scope: 'project', path: '.claude/skills/commit/SKILL.md' });
-    expect(() => router.handle({ type: 'harness.item.delete', tool: 'claude', kind: 'skill', path: '/etc/passwd' })).toThrow('não encontrado');
+    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({
+      name: 'commit',
+      scope: 'project',
+      path: '.claude/skills/commit/SKILL.md',
+    });
+    expect(() => router.handle({ type: 'harness.item.delete', tool: 'claude', kind: 'skill', path: '/etc/passwd' })).toThrow(
+      'não encontrado',
+    );
     const inventory = (await call('get_harness')).data.inventory;
-    expect(inventory.find((i: any) => i.name === 'commit' && i.scope === 'user')).toEqual({ kind: 'skill', scope: 'user', name: 'commit', mode: 'auto', description: 'Escreve o commit', path: '~/.claude/skills/commit/SKILL.md' });
+    expect(inventory.find((i: any) => i.name === 'commit' && i.scope === 'user')).toEqual({
+      kind: 'skill',
+      scope: 'user',
+      name: 'commit',
+      mode: 'auto',
+      description: 'Escreve o commit',
+      path: '~/.claude/skills/commit/SKILL.md',
+    });
   });
 
   it('gerencia regras e skills do projeto e sincroniza o campo Skills', async () => {
-    expect((await call('get_harness')).data.ruleFiles.map((r: any) => [r.name, r.exists])).toEqual([['CLAUDE.md', false], ['AGENTS.md', false]]);
+    expect((await call('get_harness')).data.ruleFiles.map((r: any) => [r.name, r.exists])).toEqual([
+      ['CLAUDE.md', false],
+      ['AGENTS.md', false],
+    ]);
     await call('write_rule_file', { file: 'AGENTS.md', content: '# Regras\n' });
     expect(fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8')).toBe('# Regras\n');
     expect((await call('read_rule_file', { file: 'AGENTS.md' })).text).toBe('# Regras\n');
@@ -258,7 +350,15 @@ describe('harness e padrões pelo MCP', () => {
 
     expect((await call('create_skill', { name: 'Nome Ruim', description: 'd', content: 'c' })).error).toBe(true);
     const h = (await call('create_skill', { name: 'revisar-spec', description: 'Use ao revisar uma spec', content: 'Passos…' })).data;
-    expect(h.skills).toEqual([{ name: 'revisar-spec', enabled: true, mode: 'auto', description: 'Use ao revisar uma spec', path: '.claude/skills/revisar-spec/SKILL.md' }]);
+    expect(h.skills).toEqual([
+      {
+        name: 'revisar-spec',
+        enabled: true,
+        mode: 'auto',
+        description: 'Use ao revisar uma spec',
+        path: '.claude/skills/revisar-spec/SKILL.md',
+      },
+    ]);
     expect((await call('get_skill', { skill: 'revisar-spec' })).text).toContain('name: revisar-spec');
     const skillsField = () => router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
     expect(skillsField().options).toEqual(['revisar-spec']);
@@ -273,7 +373,11 @@ describe('harness e padrões pelo MCP', () => {
     expect(fs.existsSync(path.join(dir, '.claude', 'skills-disabled', 'revisar-spec', 'SKILL.md'))).toBe(true);
     // desligada, a skill continua podendo ser indicada: o card entrega o caminho do arquivo
     expect(skillsField().options).toEqual(['revisar-spec']);
-    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({ name: 'revisar-spec', scope: 'project', path: '.claude/skills-disabled/revisar-spec/SKILL.md' });
+    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({
+      name: 'revisar-spec',
+      scope: 'project',
+      path: '.claude/skills-disabled/revisar-spec/SKILL.md',
+    });
     await call('set_skill_enabled', { skill: 'revisar-spec', enabled: true });
     await call('delete_skill', { skill: 'revisar-spec' });
     expect((await call('get_harness')).data.skills).toEqual([]);
@@ -285,8 +389,13 @@ describe('harness e padrões pelo MCP', () => {
   });
 
   it('aplica os padrões do tipo aos cards novos e recria o board', async () => {
-    const board = (await call('update_card_type', { type: 'Sub-tarefa', default_fields: { Modelo: 'claude sonnet 5.5 high', Fase: 'Implementação' } })).data;
-    expect(board.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toEqual({ Modelo: 'claude:sonnet@high', Fase: 'Implementação' });
+    const board = (
+      await call('update_card_type', { type: 'Sub-tarefa', default_fields: { Modelo: 'claude sonnet 5.5 high', Fase: 'Implementação' } })
+    ).data;
+    expect(board.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toEqual({
+      Modelo: 'claude:sonnet@high',
+      Fase: 'Implementação',
+    });
     await call('create_card', { title: 'História' });
     const sub = (await call('create_card', { title: 'Tarefa', parent: 1, fields: { Fase: 'Spec' } })).data;
     expect(sub.fields).toEqual({ Modelo: 'Claude Code · Sonnet 5.5 · high', Fase: 'Spec' }); // o valor informado vence o padrão
@@ -302,13 +411,22 @@ describe('harness e padrões pelo MCP', () => {
 describe('modelos de IA', () => {
   it('monta o catálogo por ferramenta e interpreta modelo + esforço', async () => {
     const m = (await call('get_models')).data;
-    expect(m.catalog.find((o: any) => o.value === 'claude:opus')).toMatchObject({ tool: 'claude', model: 'opus', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' });
+    expect(m.catalog.find((o: any) => o.value === 'claude:opus')).toMatchObject({
+      tool: 'claude',
+      model: 'opus',
+      efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+      defaultEffort: 'medium',
+    });
     expect(new Set(m.catalog.map((o: any) => o.tool))).toEqual(new Set(['claude'])); // só a ferramenta em uso
 
     await call('create_card', { title: 'História' });
-    const set = async (modelo: string) => (await call('update_card', { card: 1, fields: { Modelo: modelo } }));
+    const set = async (modelo: string) => await call('update_card', { card: 1, fields: { Modelo: modelo } });
     expect((await set('Fable 5.1 low')).data.model).toMatchObject({ tool: 'claude', model: 'fable', effort: 'low' });
-    expect((await set('claude:opus@high')).data.model).toMatchObject({ model: 'opus', effort: 'high', label: 'Claude Code · Opus 5.5 · high' });
+    expect((await set('claude:opus@high')).data.model).toMatchObject({
+      model: 'opus',
+      effort: 'high',
+      label: 'Claude Code · Opus 5.5 · high',
+    });
     expect((await set('opus')).data.model.effort).toBe('medium'); // sem esforço informado, vale o padrão do modelo
     expect((await set('Kimi Code K3 max')).text).toContain('não está no catálogo'); // modelo de outra ferramenta
 
@@ -326,7 +444,11 @@ describe('modelos de IA', () => {
   it('sugere o modelo pelo esforço da tarefa sem trocar uma escolha manual', async () => {
     // regras iniciais: Esforço Baixo/Médio/Alto → modelo leve/intermediário/forte da primeira ferramenta
     const rules = (await call('get_models')).data.rules;
-    expect(rules.map((r: any) => [r.when, r.value])).toEqual([['Esforço da atividade = Baixo', 'claude:haiku'], ['Esforço da atividade = Médio', 'claude:sonnet@medium'], ['Esforço da atividade = Alto', 'claude:opus@high']]);
+    expect(rules.map((r: any) => [r.when, r.value])).toEqual([
+      ['Esforço da atividade = Baixo', 'claude:haiku'],
+      ['Esforço da atividade = Médio', 'claude:sonnet@medium'],
+      ['Esforço da atividade = Alto', 'claude:opus@high'],
+    ]);
 
     const card = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
     expect(card.model.value).toBe('claude:haiku');
@@ -339,10 +461,21 @@ describe('modelos de IA', () => {
     expect(manual.suggestedModel.value).toBe('claude:sonnet@medium');
 
     // regras por tag e por ferramenta
-    await call('set_model_rules', { rules: [{ when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku' }, { when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'Opus 5.5 max' }] });
-    expect((await call('create_card', { title: 'Doc', fields: { Tags: ['docs'], Esforço: 'Alto' } })).data.model.value).toBe('claude:haiku');
+    await call('set_model_rules', {
+      rules: [
+        { when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku' },
+        { when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'Opus 5.5 max' },
+      ],
+    });
+    expect((await call('create_card', { title: 'Doc', fields: { Tags: ['docs'], Esforço: 'Alto' } })).data.model.value).toBe(
+      'claude:haiku',
+    );
     const kimi = (await call('suggest_model_rules', { tool: 'kimi' })).data.rules;
-    expect(kimi.filter((r: any) => r.when.startsWith('Esforço')).map((r: any) => r.value)).toEqual(['kimi:kimi-code/k3@low', 'kimi:kimi-code/k3@high', 'kimi:kimi-code/k3@max']);
+    expect(kimi.filter((r: any) => r.when.startsWith('Esforço')).map((r: any) => r.value)).toEqual([
+      'kimi:kimi-code/k3@low',
+      'kimi:kimi-code/k3@high',
+      'kimi:kimi-code/k3@max',
+    ]);
     expect(kimi[0].when).toBe('Tags = docs'); // regras de outros campos são preservadas
   });
 
@@ -375,31 +508,55 @@ effort = "high"
     fs.writeFileSync(path.join(home, '.kimi-code', 'config.toml'), toml);
     const found = modelsFor('kimi', home);
     expect(found.map((o) => o.label)).toEqual(['K3', 'K2.7 Highspeed']);
-    expect(effortTiers('kimi', found).map(([, v]) => v)).toEqual(['kimi:kimi-code/k3@low', 'kimi:kimi-code/k3@high', 'kimi:kimi-code/k3@max']);
+    expect(effortTiers('kimi', found).map(([, v]) => v)).toEqual([
+      'kimi:kimi-code/k3@low',
+      'kimi:kimi-code/k3@high',
+      'kimi:kimi-code/k3@max',
+    ]);
     expect(modelsFor('kimi', path.join(dir, 'vazio')).length).toBeGreaterThan(0); // sem config local, lista embutida
   });
 });
 
 describe('regras de modelo com E e OU', () => {
-  const modelOf = async (fields: Record<string, unknown>, type?: string) => (await call('create_card', { title: 'x', type, fields })).data.model?.value;
+  const modelOf = async (fields: Record<string, unknown>, type?: string) =>
+    (await call('create_card', { title: 'x', type, fields })).data.model?.value;
 
   it('avalia grupos E/OU, negação, tipo do card, ordem e regras desligadas', async () => {
     const res = await call('set_model_rules', {
       rules: [
-        { name: 'Backend pesado', when: [[{ field: 'Esforço', value: 'Alto' }, { field: 'Tags', value: 'backend' }], [{ field: 'Tipo', value: 'Bug' }, { field: 'Esforço', value: 'Baixo', not: true }]], model: 'fable max' },
+        {
+          name: 'Backend pesado',
+          when: [
+            [
+              { field: 'Esforço', value: 'Alto' },
+              { field: 'Tags', value: 'backend' },
+            ],
+            [
+              { field: 'Tipo', value: 'Bug' },
+              { field: 'Esforço', value: 'Baixo', not: true },
+            ],
+          ],
+          model: 'fable max',
+        },
         { name: 'Desligada', when: [[{ field: 'Tags', value: 'docs' }]], model: 'opus low', enabled: false },
         { name: 'Docs', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku' },
         { name: 'Alto', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus high' },
       ],
     });
-    expect(res.data.rules[0]).toMatchObject({ name: 'Backend pesado', when: 'Esforço da atividade = Alto E Tags = backend OU Tipo = Bug E Esforço da atividade ≠ Baixo', enabled: true });
+    expect(res.data.rules[0]).toMatchObject({
+      name: 'Backend pesado',
+      when: 'Esforço da atividade = Alto E Tags = backend OU Tipo = Bug E Esforço da atividade ≠ Baixo',
+      enabled: true,
+    });
 
     expect(await modelOf({ Esforço: 'Alto', Tags: ['backend', 'frontend'] })).toBe('claude:fable@max'); // E: as duas condições
     expect(await modelOf({ Esforço: 'Alto', Tags: ['frontend'] })).toBe('claude:opus@high'); // só uma: cai na regra seguinte
     expect(await modelOf({ Esforço: 'Médio' }, 'Bug')).toBe('claude:fable@max'); // OU: segundo grupo, com negação
     expect(await modelOf({ Esforço: 'Baixo' }, 'Bug')).toBeUndefined(); // a negação falha e nenhuma outra casa
     expect(await modelOf({ Tags: ['docs'] })).toBe('claude:haiku'); // a regra desligada é pulada
-    expect((await call('set_model_rules', { rules: [{ when: [[{ field: 'Inexistente', value: 'x' }]], model: 'haiku' }] })).error).toBe(true);
+    expect((await call('set_model_rules', { rules: [{ when: [[{ field: 'Inexistente', value: 'x' }]], model: 'haiku' }] })).error).toBe(
+      true,
+    );
   });
 
   it('com o preenchimento automático desligado, só sugere', async () => {
@@ -411,9 +568,9 @@ describe('regras de modelo com E e OU', () => {
 
   it('converte regras salvas no formato antigo', async () => {
     const { parseModelRules } = await import('../src/shared/models');
-    expect(parseModelRules(JSON.stringify([{ id: 'a', fieldId: 'f1', value: 'Alto', model: 'claude:opus@high' }, { nada: true }]))).toEqual([
-      { id: 'a', name: '', enabled: true, groups: [[{ fieldId: 'f1', op: 'is', value: 'Alto' }]], model: 'claude:opus@high' },
-    ]);
+    expect(parseModelRules(JSON.stringify([{ id: 'a', fieldId: 'f1', value: 'Alto', model: 'claude:opus@high' }, { nada: true }]))).toEqual(
+      [{ id: 'a', name: '', enabled: true, groups: [[{ fieldId: 'f1', op: 'is', value: 'Alto' }]], model: 'claude:opus@high' }],
+    );
   });
 });
 
@@ -436,7 +593,11 @@ describe('linhas e colunas colapsadas por padrão', () => {
 describe('aparência', () => {
   it('guarda tema, fonte e tamanho, recusando valores fora do permitido', async () => {
     expect((await call('get_board')).data.appearance).toMatchObject({ theme: 'system', font: 'sans', fontSize: 14 });
-    expect((await call('set_appearance', { theme: 'dark', font_size: 16 })).data).toMatchObject({ theme: 'dark', font: 'sans', fontSize: 16 });
+    expect((await call('set_appearance', { theme: 'dark', font_size: 16 })).data).toMatchObject({
+      theme: 'dark',
+      font: 'sans',
+      fontSize: 16,
+    });
     expect((await call('set_appearance', { font: 'serif' })).data).toMatchObject({ theme: 'dark', font: 'serif', fontSize: 16 });
     expect((await call('set_appearance', { font_size: 40 })).error).toBe(true);
     router.handle({ type: 'settings.board.update', patch: { appearance: { fontSize: 99, theme: 'neon' as never } } });
@@ -444,7 +605,10 @@ describe('aparência', () => {
 
     // rótulo e cor dos status: o que for inválido volta ao padrão
     const statuses = router.snapshot().board.appearance.statuses;
-    router.handle({ type: 'settings.board.update', patch: { appearance: { statuses: { ...statuses, ready: { label: 'Na fila', color: 'vermelho' } } } } });
+    router.handle({
+      type: 'settings.board.update',
+      patch: { appearance: { statuses: { ...statuses, ready: { label: 'Na fila', color: 'vermelho' } } } },
+    });
     expect(router.snapshot().board.appearance.statuses.ready).toEqual({ label: 'Na fila', color: '#4c8dff' });
     expect(router.snapshot().board.appearance.statuses.blocked.label).toBe('Bloqueado');
   });
@@ -457,7 +621,10 @@ describe('status do card e checkpoint de revisão', () => {
   it('a IA pede revisão e só avança depois da aprovação de uma pessoa', async () => {
     const story = (await call('create_card', { title: 'Login' })).data;
     expect(story.work).toBeUndefined(); // Backlog: a IA não atua
-    expect((await call('get_board')).data.workflows[0].columns.find((c: any) => c.name === 'PRD')).toMatchObject({ aiActive: true, requiresApproval: true });
+    expect((await call('get_board')).data.workflows[0].columns.find((c: any) => c.name === 'PRD')).toMatchObject({
+      aiActive: true,
+      requiresApproval: true,
+    });
 
     // sair do Backlog não exige aprovação; ao entrar numa coluna em que a IA atua o card fica pronto
     expect((await call('move_card', { card: 1, column: 'PRD' })).data.card.work).toEqual({ status: 'ready', label: 'Pronto', with: 'ai' });
@@ -476,12 +643,17 @@ describe('status do card e checkpoint de revisão', () => {
     // pedir ajustes: volta para a IA, com o pedido na conversa
     human(1, 'ready', 'Faltou o critério de aceite');
     expect((await call('get_card', { card: 1 })).data).toMatchObject({ work: { status: 'ready', with: 'ai' } });
-    expect((await call('get_card', { card: 1 })).data.comments.at(-1)).toMatchObject({ author: 'Pessoa', body: 'Faltou o critério de aceite' });
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1)).toMatchObject({
+      author: 'Pessoa',
+      body: 'Faltou o critério de aceite',
+    });
     expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(true);
 
     // a IA não aprova; a pessoa sim
     await call('request_review', { card: 1, summary: 'Ajustado' });
-    expect(() => router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'approved' }, { source: 'ai' })).toThrow('Só uma pessoa');
+    expect(() => router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'approved' }, { source: 'ai' })).toThrow(
+      'Só uma pessoa',
+    );
     human(1, 'approved');
     expect(card(1)).toMatchObject({ status: 'approved', statusBy: 'Pessoa' });
     const moved = (await call('move_card', { card: 1, column: 'Spec' })).data.card;
@@ -489,7 +661,12 @@ describe('status do card e checkpoint de revisão', () => {
 
     // voltar e cancelar são livres; a pessoa move sem aprovação
     expect((await call('move_card', { card: 1, column: 'PRD' })).error).toBe(false);
-    router.handle({ type: 'card.move', cardId: card(1).id, columnId: router.snapshot().columns.find((c) => c.name === 'Plan')!.id, position: 0 });
+    router.handle({
+      type: 'card.move',
+      cardId: card(1).id,
+      columnId: router.snapshot().columns.find((c) => c.name === 'Plan')!.id,
+      position: 0,
+    });
     expect(card(1).status).toBe('ready');
     expect((await call('move_card', { card: 1, column: 'Cancelado' })).data.card.work).toBeUndefined();
   });
@@ -520,8 +697,16 @@ describe('status do card e checkpoint de revisão', () => {
     expect(subAfter.storyArtifacts.map((a: any) => a.attachmentId)).toEqual([second.attachmentId]);
 
     // a fase é configurável por coluna
-    await call('update_column', { column: 'PRD', ai_instruction: 'Escreva um one-pager', artifact_name: 'ONEPAGER.md', artifact_template: '# One-pager' });
-    expect((await call('get_card', { card: 1 })).data.phase).toMatchObject({ instruction: 'Escreva um one-pager', artifact: { filename: 'ONEPAGER.md', template: '# One-pager' } });
+    await call('update_column', {
+      column: 'PRD',
+      ai_instruction: 'Escreva um one-pager',
+      artifact_name: 'ONEPAGER.md',
+      artifact_template: '# One-pager',
+    });
+    expect((await call('get_card', { card: 1 })).data.phase).toMatchObject({
+      instruction: 'Escreva um one-pager',
+      artifact: { filename: 'ONEPAGER.md', template: '# One-pager' },
+    });
     await call('create_card', { title: 'No backlog' });
     expect((await call('get_card', { card: 3 })).data.phase).toBeUndefined();
   });
@@ -574,16 +759,34 @@ describe('status do card e checkpoint de revisão', () => {
 
   it('cria, edita e apaga agentes na pasta da ferramenta em uso', async () => {
     expect((await call('get_harness')).data.agents).toEqual([]);
-    const h = (await call('create_agent', { name: 'revisor-de-spec', description: 'Revisa uma Spec antes do Plan', content: 'Leia a spec e aponte lacunas.', model: 'opus' })).data;
-    expect(h.agents).toEqual([{ name: 'revisor-de-spec', description: 'Revisa uma Spec antes do Plan', model: 'opus', path: '.claude/agents/revisor-de-spec.md' }]);
+    const h = (
+      await call('create_agent', {
+        name: 'revisor-de-spec',
+        description: 'Revisa uma Spec antes do Plan',
+        content: 'Leia a spec e aponte lacunas.',
+        model: 'opus',
+      })
+    ).data;
+    expect(h.agents).toEqual([
+      { name: 'revisor-de-spec', description: 'Revisa uma Spec antes do Plan', model: 'opus', path: '.claude/agents/revisor-de-spec.md' },
+    ]);
     const file = path.join(dir, '.claude/agents/revisor-de-spec.md');
-    expect(fs.readFileSync(file, 'utf8')).toBe('---\nname: revisor-de-spec\ndescription: Revisa uma Spec antes do Plan\nmodel: opus\n---\n\nLeia a spec e aponte lacunas.\n');
+    expect(fs.readFileSync(file, 'utf8')).toBe(
+      '---\nname: revisor-de-spec\ndescription: Revisa uma Spec antes do Plan\nmodel: opus\n---\n\nLeia a spec e aponte lacunas.\n',
+    );
     expect((await call('get_agent', { agent: 'revisor-de-spec' })).text).toContain('aponte lacunas');
     expect((await call('create_agent', { name: 'revisor-de-spec', description: 'd', content: 'c' })).text).toContain('Já existe');
     expect((await call('create_agent', { name: 'Nome Inválido', description: 'd', content: 'c' })).error).toBe(true);
 
-    await call('update_agent', { agent: 'revisor-de-spec', content: '---\nname: revisor-de-spec\ndescription: Nova descrição\n---\nNovo corpo' });
-    expect((await call('get_harness')).data.agents[0]).toEqual({ name: 'revisor-de-spec', description: 'Nova descrição', path: '.claude/agents/revisor-de-spec.md' });
+    await call('update_agent', {
+      agent: 'revisor-de-spec',
+      content: '---\nname: revisor-de-spec\ndescription: Nova descrição\n---\nNovo corpo',
+    });
+    expect((await call('get_harness')).data.agents[0]).toEqual({
+      name: 'revisor-de-spec',
+      description: 'Nova descrição',
+      path: '.claude/agents/revisor-de-spec.md',
+    });
 
     // agente criado por fora aparece; cada ferramenta tem a sua pasta e extensão
     fs.writeFileSync(path.join(dir, '.claude/agents/planejador.md'), '---\nname: planejador\ndescription: Quebra a spec em passos\n---\nx');
@@ -595,11 +798,24 @@ describe('status do card e checkpoint de revisão', () => {
     expect(fs.existsSync(path.join(dir, '.github/agents/do-copilot.agent.md'))).toBe(true);
     // Codex guarda agentes em TOML; o Kimi não tem modelo por agente
     await call('set_ai_tool', { tool: 'codex' });
-    const codex = (await call('create_agent', { name: 'explorador', description: 'Explora o código "antes" de mudar', content: 'Só leia.', model: 'gpt-6-luna' })).data;
-    expect(codex.agents).toEqual([{ name: 'explorador', description: 'Explora o código "antes" de mudar', model: 'gpt-6-luna', path: '.codex/agents/explorador.toml' }]);
-    expect(fs.readFileSync(path.join(dir, '.codex/agents/explorador.toml'), 'utf8')).toBe('name = "explorador"\ndescription = "Explora o código \\"antes\\" de mudar"\nmodel = "gpt-6-luna"\ndeveloper_instructions = """\nSó leia.\n"""\n');
+    const codex = (
+      await call('create_agent', {
+        name: 'explorador',
+        description: 'Explora o código "antes" de mudar',
+        content: 'Só leia.',
+        model: 'gpt-6-luna',
+      })
+    ).data;
+    expect(codex.agents).toEqual([
+      { name: 'explorador', description: 'Explora o código "antes" de mudar', model: 'gpt-6-luna', path: '.codex/agents/explorador.toml' },
+    ]);
+    expect(fs.readFileSync(path.join(dir, '.codex/agents/explorador.toml'), 'utf8')).toBe(
+      'name = "explorador"\ndescription = "Explora o código \\"antes\\" de mudar"\nmodel = "gpt-6-luna"\ndeveloper_instructions = """\nSó leia.\n"""\n',
+    );
     await call('set_ai_tool', { tool: 'kimi' });
-    expect((await call('create_agent', { name: 'revisor', description: 'd', content: 'c', model: 'k3' })).text).toContain('não permite fixar o modelo');
+    expect((await call('create_agent', { name: 'revisor', description: 'd', content: 'c', model: 'k3' })).text).toContain(
+      'não permite fixar o modelo',
+    );
     await call('create_agent', { name: 'revisor', description: 'd', content: 'c' });
     expect(fs.existsSync(path.join(dir, '.kimi-code/agents/revisor.md'))).toBe(true);
     await call('set_ai_tool', { tool: 'cursor' });
@@ -624,13 +840,20 @@ describe('status do card e checkpoint de revisão', () => {
 
   it('pergunta, bloqueio e colunas configuráveis', async () => {
     await call('create_card', { title: 'Login', column: 'Implementação' });
-    expect((await call('ask_question', { card: 1, question: 'Qual provedor de login?' })).data.card.work).toMatchObject({ status: 'waiting_answer', with: 'human' });
+    expect((await call('ask_question', { card: 1, question: 'Qual provedor de login?' })).data.card.work).toMatchObject({
+      status: 'waiting_answer',
+      with: 'human',
+    });
     await call('add_comment', { card: 1, body: 'Enquanto isso, li o código.' });
     expect(card(1).status).toBe('waiting_answer'); // mensagem da IA não devolve a vez
     router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Google' });
     expect(card(1).status).toBe('ready');
 
-    expect((await call('block_card', { card: 1, reason: 'Sem acesso ao ambiente' })).data.card.work).toMatchObject({ status: 'blocked', with: 'human', reason: 'Sem acesso ao ambiente' });
+    expect((await call('block_card', { card: 1, reason: 'Sem acesso ao ambiente' })).data.card.work).toMatchObject({
+      status: 'blocked',
+      with: 'human',
+      reason: 'Sem acesso ao ambiente',
+    });
     expect(() => human(1, 'blocked')).toThrow('motivo');
     human(1, 'ready');
     expect(card(1)).toMatchObject({ status: 'ready', statusReason: '' });
@@ -645,7 +868,6 @@ describe('status do card e checkpoint de revisão', () => {
     await call('create_card', { title: 'H2' });
     expect((await call('create_card', { title: 'Tarefa', parent: 2 })).data.work).toMatchObject({ status: 'ready' });
   });
-
 });
 
 describe('ferramentas de IA', () => {
@@ -669,7 +891,11 @@ describe('ferramentas de IA', () => {
     expect(fs.existsSync(path.join(dir, '.agents/skills-disabled/do-codex/SKILL.md'))).toBe(true);
     expect((await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false })).error).toBe(true); // skill de outra ferramenta
 
-    for (const [tool, base] of [['cursor', '.cursor/skills'], ['kimi', '.kimi-code/skills'], ['copilot', '.github/skills']] as const) {
+    for (const [tool, base] of [
+      ['cursor', '.cursor/skills'],
+      ['kimi', '.kimi-code/skills'],
+      ['copilot', '.github/skills'],
+    ] as const) {
       await call('set_ai_tool', { tool });
       await call('create_skill', { name: `do-${tool}`, description: 'd', content: 'c' });
       expect(fs.existsSync(path.join(dir, base, `do-${tool}`, 'SKILL.md'))).toBe(true);
@@ -686,7 +912,10 @@ describe('ferramentas de IA', () => {
     fs.mkdirSync(path.join(home, '.kimi-code'), { recursive: true });
     fs.writeFileSync(path.join(home, '.kimi-code', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
     fs.mkdirSync(path.join(dir, '.codex'));
-    fs.writeFileSync(path.join(dir, '.codex', 'config.toml'), 'model = "x"\n\n[mcp_servers.faz-ai]\ncommand = "velho"\nargs = ["a"]\n\n[mcp_servers.outro]\ncommand = "y"\n');
+    fs.writeFileSync(
+      path.join(dir, '.codex', 'config.toml'),
+      'model = "x"\n\n[mcp_servers.faz-ai]\ncommand = "velho"\nargs = ["a"]\n\n[mcp_servers.outro]\ncommand = "y"\n',
+    );
     const bridge = '/b/com espaço/bridge.js';
     const done = registerClients(['claude', 'codex', 'cursor', 'kimi'], { bridgePath: bridge, workspaceDir: dir, homeDir: home });
     expect(done.map((d) => d.projectFile)).toEqual(['.mcp.json', '.codex/config.toml', '.cursor/mcp.json', null]);
@@ -712,14 +941,21 @@ describe('ferramentas de IA', () => {
     const copilot = registerClients(['copilot'], { bridgePath: bridge, workspaceDir: dir, homeDir: home });
     expect(copilot.map((d) => d.projectFile)).toEqual(['.vscode/mcp.json', '.mcp.json']);
     const vscode = JSON.parse(fs.readFileSync(path.join(dir, '.vscode', 'mcp.json'), 'utf8'));
-    expect(vscode).toEqual({ servers: { outro: { command: 'x' }, 'faz-ai': { type: 'stdio', command: 'node', args: [bridge, dir] } }, inputs: [] });
+    expect(vscode).toEqual({
+      servers: { outro: { command: 'x' }, 'faz-ai': { type: 'stdio', command: 'node', args: [bridge, dir] } },
+      inputs: [],
+    });
     expect(json(path.join(dir, '.mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir], tools: ['*'] });
   });
 
   it('sugere modelos do Copilot e o detecta pela CLI ou pela extensão do VS Code', async () => {
     const { detectTools, modelsFor, effortTiers } = await import('../src/extension/models');
     const home = path.join(dir, 'home-copilot');
-    expect(effortTiers('copilot', modelsFor('copilot', home)).map(([, v]) => v)).toEqual(['copilot:gpt-5.6-luna@low', 'copilot:gpt-5.6-terra@medium', 'copilot:gpt-5.6-sol@high']);
+    expect(effortTiers('copilot', modelsFor('copilot', home)).map(([, v]) => v)).toEqual([
+      'copilot:gpt-5.6-luna@low',
+      'copilot:gpt-5.6-terra@medium',
+      'copilot:gpt-5.6-sol@high',
+    ]);
     fs.mkdirSync(path.join(home, '.vscode', 'extensions', 'ms-python.python-1.0.0'), { recursive: true });
     expect(detectTools(home)).toEqual([]);
     fs.mkdirSync(path.join(home, '.vscode', 'extensions', 'github.copilot-chat-0.40.0'));
@@ -766,7 +1002,12 @@ describe('ponte stdio', () => {
       throw new Error(`sem resposta para ${id}`);
     };
     try {
-      send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'teste', version: '1' } } });
+      send({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'teste', version: '1' } },
+      });
       expect((await reply(1)).result.serverInfo.name).toBe('faz-ai');
       send({ jsonrpc: '2.0', method: 'notifications/initialized' });
       send({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'create_card', arguments: { title: 'Pela ponte' } } });

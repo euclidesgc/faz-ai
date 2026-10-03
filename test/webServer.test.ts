@@ -20,7 +20,11 @@ let calls: string[];
 let cookie: string;
 
 /** Requisição crua: o fetch do Node não deixa trocar o cabeçalho Host. */
-function request(method: string, target: string, opts: { headers?: Record<string, string>; body?: string } = {}): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }> {
+function request(
+  method: string,
+  target: string,
+  opts: { headers?: Record<string, string>; body?: string } = {},
+): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }> {
   return new Promise((resolve, reject) => {
     const req = http.request({ host: '127.0.0.1', port: web.port, path: target, method, headers: opts.headers }, (res) => {
       let body = '';
@@ -34,7 +38,9 @@ function request(method: string, target: string, opts: { headers?: Record<string
 }
 
 /** Abre o canal de eventos e devolve as mensagens recebidas e como fechá-lo. */
-function events(id: string): Promise<{ messages: HostToWebview[]; next(type: HostToWebview['type']): Promise<HostToWebview>; close(): void }> {
+function events(
+  id: string,
+): Promise<{ messages: HostToWebview[]; next(type: HostToWebview['type']): Promise<HostToWebview>; close(): void }> {
   return new Promise((resolve, reject) => {
     const messages: HostToWebview[] = [];
     const waiting: { type: string; done(m: HostToWebview): void }[] = [];
@@ -60,7 +66,8 @@ function events(id: string): Promise<{ messages: HostToWebview[]; next(type: Hos
   });
 }
 
-const post = (id: string, msg: WebviewToHost, headers: Record<string, string> = {}) => request('POST', `/message?c=${id}`, { headers: { cookie, 'content-type': 'application/json', ...headers }, body: JSON.stringify(msg) });
+const post = (id: string, msg: WebviewToHost, headers: Record<string, string> = {}) =>
+  request('POST', `/message?c=${id}`, { headers: { cookie, 'content-type': 'application/json', ...headers }, body: JSON.stringify(msg) });
 
 beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-web-'));
@@ -68,13 +75,18 @@ beforeEach(async () => {
   fs.writeFileSync(path.join(dir, 'webview', 'main.js'), 'console.log("board")');
   fs.writeFileSync(path.join(dir, 'segredo.txt'), 'fora da pasta da interface');
   const db = await openInMemory(WASM_DIR);
-  router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, { workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(dir, 'attachments') });
+  router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+    workspaceKey: 'ws',
+    folderName: 'Projeto',
+    author: 'Pessoa',
+    attachmentsDir: path.join(dir, 'attachments'),
+  });
   calls = [];
   const memory = new Map<string, unknown>();
   web = await startWebServer({
     webviewDir: path.join(dir, 'webview'),
     router,
-    viewState: new ViewStateStore({ get: <T,>(k: string) => memory.get(k) as T | undefined, update: (k, v) => memory.set(k, v) }),
+    viewState: new ViewStateStore({ get: <T>(k: string) => memory.get(k) as T | undefined, update: (k, v) => memory.set(k, v) }),
     tokenFile: path.join(dir, 'token'),
     env: {
       connectAI: () => 'Servidor registrado.',
@@ -127,7 +139,13 @@ it('a página recebe o board, cria um card e vê a mudança chegar', async () =>
   const s = initial.state;
   const wf = s.workflows.find((w) => w.kind === 'parent')!;
   const changed = page.next('boardState');
-  await post('cliente-um-1234', { type: 'card.create', typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id, columnId: s.columns.find((c) => c.workflowId === wf.id)!.id, parentId: null, title: 'Pelo navegador' });
+  await post('cliente-um-1234', {
+    type: 'card.create',
+    typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+    columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+    parentId: null,
+    title: 'Pelo navegador',
+  });
   const after = (await changed) as Extract<HostToWebview, { type: 'boardState' }>;
   const card = after.state.cards.find((c) => c.title === 'Pelo navegador')!;
   expect(card).toBeTruthy();
@@ -146,9 +164,16 @@ it('a página recebe o board, cria um card e vê a mudança chegar', async () =>
 
   // anexo enviado como dados é servido de volta só para cards deste board
   const withFile = page.next('boardState');
-  await post('cliente-um-1234', { type: 'attachment.addData', cardId: card.id, filename: 'nota.txt', base64: Buffer.from('olá').toString('base64') });
+  await post('cliente-um-1234', {
+    type: 'attachment.addData',
+    cardId: card.id,
+    filename: 'nota.txt',
+    base64: Buffer.from('olá').toString('base64'),
+  });
   const attachment = ((await withFile) as Extract<HostToWebview, { type: 'boardState' }>).state.attachments[0]!;
-  expect((await request('GET', `/attachments/${attachment.cardId}/${encodeURIComponent(attachment.storedName)}`, { headers: { cookie } })).body).toBe('olá');
+  expect(
+    (await request('GET', `/attachments/${attachment.cardId}/${encodeURIComponent(attachment.storedName)}`, { headers: { cookie } })).body,
+  ).toBe('olá');
   expect((await request('GET', `/attachments/${attachment.cardId}/outro.txt`, { headers: { cookie } })).status).toBe(404);
   page.close();
 });

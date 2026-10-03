@@ -6,15 +6,33 @@ import { newId } from './db/ids';
 export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
 const MIME: Record<string, string> = {
-  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
-  pdf: 'application/pdf', md: 'text/markdown', txt: 'text/plain', json: 'application/json', csv: 'text/csv',
-  html: 'text/html', zip: 'application/zip', mp4: 'video/mp4', mov: 'video/quicktime',
-  doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  pdf: 'application/pdf',
+  md: 'text/markdown',
+  txt: 'text/plain',
+  json: 'application/json',
+  csv: 'text/csv',
+  html: 'text/html',
+  zip: 'application/zip',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
 const mimeOf = (filename: string): string => MIME[path.extname(filename).slice(1).toLowerCase()] ?? 'application/octet-stream';
-const safeName = (filename: string): string => path.basename(filename).replace(/[^\w.\-() ]+/g, '_').slice(0, 120) || 'arquivo';
+const safeName = (filename: string): string =>
+  path
+    .basename(filename)
+    .replace(/[^\w.\-() ]+/g, '_')
+    .slice(0, 120) || 'arquivo';
 
 /** Arquivos de anexos em disco: <baseDir>/<cardId>/<id>-<nome>. */
 export class AttachmentStore {

@@ -66,12 +66,27 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
     >
       <div className="card-top">
         <span className="card-head">
-          <span className="card-id" title="ID do card">{cardRef(card)}</span>
-          <span className="type-badge" style={badgeStyle(type?.color)}>{type?.name}</span>
+          <span className="card-id" title="ID do card">
+            {cardRef(card)}
+          </span>
+          <span className="type-badge" style={badgeStyle(type?.color)}>
+            {type?.name}
+          </span>
         </span>
         {!overlay && (
           <span className="card-actions">
-            <Button variant="icon" title="Abrir o card" aria-label="Abrir o card" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); openCard(card.id); }}>⤢</Button>
+            <Button
+              variant="icon"
+              title="Abrir o card"
+              aria-label="Abrir o card"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                openCard(card.id);
+              }}
+            >
+              ⤢
+            </Button>
             <Menu
               title="Ações do card"
               items={[
@@ -87,16 +102,34 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         )}
       </div>
       <div className="card-title">{card.title}</div>
-      {parent && <div className="card-parent" title={parent.title}>↳ {cardRef(parent)} {parent.title}</div>}
-      {card.status && !archived && <div className="card-status"><StatusBadge status={card.status} /></div>}
+      {parent && (
+        <div className="card-parent" title={parent.title}>
+          ↳ {cardRef(parent)} {parent.title}
+        </div>
+      )}
+      {card.status && !archived && (
+        <div className="card-status">
+          <StatusBadge status={card.status} />
+        </div>
+      )}
       {fields.length > 0 && (
         <div className="card-fields">
-          {fields.map((f) => <FieldBadge key={f.id} field={f} value={valueOf(state, card.id, f.id)} />)}
+          {fields.map((f) => (
+            <FieldBadge key={f.id} field={f} value={valueOf(state, card.id, f.id)} />
+          ))}
         </div>
       )}
       <div className="card-meta">
-        {children.length > 0 && <span title="Sub-tarefas concluídas">⑂ {doneChildren}/{children.length}</span>}
-        {checklist.length > 0 && <span title="Checklist">☑ {checklistDone}/{checklist.length}</span>}
+        {children.length > 0 && (
+          <span title="Sub-tarefas concluídas">
+            ⑂ {doneChildren}/{children.length}
+          </span>
+        )}
+        {checklist.length > 0 && (
+          <span title="Checklist">
+            ☑ {checklistDone}/{checklist.length}
+          </span>
+        )}
         {comments > 0 && <span title="Mensagens na conversa">💬 {comments}</span>}
         {attachments > 0 && <span title="Anexos">📎 {attachments}</span>}
         {card.description && <span title="Tem descrição">≡</span>}
@@ -109,7 +142,9 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
               e.stopPropagation();
               cards.setField(card.id, modelField!.id, offerSuggestion);
             }}
-          >✦ {modelLabel(state.board.modelCatalog, offerSuggestion)}</button>
+          >
+            ✦ {modelLabel(state.board.modelCatalog, offerSuggestion)}
+          </button>
         )}
       </div>
     </article>

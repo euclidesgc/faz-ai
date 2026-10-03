@@ -50,7 +50,19 @@ export function insertColumn(db: Database, workflowId: string, c: TemplateColumn
     db,
     `INSERT INTO columns(id, workflow_id, name, position, is_terminal, category, ai_active, requires_approval, ai_instruction, artifact_name, artifact_template)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [newId(), workflowId, c.name, position, c.category === 'open' ? 0 : 1, c.category, c.aiActive ? 1 : 0, c.requiresApproval ? 1 : 0, phase?.instruction ?? '', phase?.artifactName ?? '', phase?.artifactTemplate ?? ''],
+    [
+      newId(),
+      workflowId,
+      c.name,
+      position,
+      c.category === 'open' ? 0 : 1,
+      c.category,
+      c.aiActive ? 1 : 0,
+      c.requiresApproval ? 1 : 0,
+      phase?.instruction ?? '',
+      phase?.artifactName ?? '',
+      phase?.artifactTemplate ?? '',
+    ],
   );
 }
 
@@ -73,7 +85,8 @@ function steps(db: Database, boardId: string): Step[] {
         if (!col || bool(col.ai_active) || bool(col.requires_approval)) continue;
         out.push({
           description: `Coluna "${str(col.name)}": a IA atua${t.requiresApproval ? ' e só avança o card com a sua aprovação' : ''}.`,
-          apply: () => run(db, 'UPDATE columns SET ai_active = 1, requires_approval = ? WHERE id = ?', [t.requiresApproval ? 1 : 0, str(col.id)]),
+          apply: () =>
+            run(db, 'UPDATE columns SET ai_active = 1, requires_approval = ? WHERE id = ?', [t.requiresApproval ? 1 : 0, str(col.id)]),
         });
       }
     }
@@ -81,7 +94,9 @@ function steps(db: Database, boardId: string): Step[] {
   if (version < 2) {
     const parent = one(db, "SELECT id FROM workflows WHERE board_id = ? AND kind = 'parent' ORDER BY position LIMIT 1", [boardId]);
     const wf = parent ? str(parent.id) : null;
-    const cols = wf ? all(db, 'SELECT id, name, ai_instruction, artifact_name, artifact_template FROM columns WHERE workflow_id = ?', [wf]) : [];
+    const cols = wf
+      ? all(db, 'SELECT id, name, ai_instruction, artifact_name, artifact_template FROM columns WHERE workflow_id = ?', [wf])
+      : [];
     const named = (name: string) => cols.find((c) => norm(str(c.name)) === norm(name));
     const template = (name: string) => BOARD_TEMPLATE.parent.find((c) => c.name === name)!;
     if (wf && !named('Discovery')) {
@@ -110,10 +125,18 @@ function steps(db: Database, boardId: string): Step[] {
       if (!phase || str(col.ai_instruction) || str(col.artifact_name) || str(col.artifact_template)) continue;
       out.push({
         description: `Coluna "${str(col.name)}": instrução para a IA${phase.artifactName ? ` e modelo do documento ${phase.artifactName}` : ''}.`,
-        apply: () => run(db, 'UPDATE columns SET ai_instruction = ?, artifact_name = ?, artifact_template = ? WHERE id = ?', [phase.instruction, phase.artifactName, phase.artifactTemplate, str(col.id)]),
+        apply: () =>
+          run(db, 'UPDATE columns SET ai_instruction = ?, artifact_name = ?, artifact_template = ? WHERE id = ?', [
+            phase.instruction,
+            phase.artifactName,
+            phase.artifactTemplate,
+            str(col.id),
+          ]),
       });
     }
-    const fase = one(db, "SELECT id, options_json FROM field_defs WHERE board_id = ? AND lower(name) = 'fase' AND kind = 'select'", [boardId]);
+    const fase = one(db, "SELECT id, options_json FROM field_defs WHERE board_id = ? AND lower(name) = 'fase' AND kind = 'select'", [
+      boardId,
+    ]);
     if (fase) {
       const options = JSON.parse(str(fase.options_json) || '[]') as string[];
       const has = (name: string) => options.some((o) => norm(o) === norm(name));
@@ -128,20 +151,30 @@ function steps(db: Database, boardId: string): Step[] {
   }
   if (version < 3) {
     // quem já estava na versão 2 tem a instrução antiga; nas anteriores o passo acima já grava a nova
-    const cols = all(db, 'SELECT c.id, c.name FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? AND c.ai_instruction = ?', [boardId, IMPLEMENTATION_INSTRUCTION_V2]);
+    const cols = all(
+      db,
+      'SELECT c.id, c.name FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? AND c.ai_instruction = ?',
+      [boardId, IMPLEMENTATION_INSTRUCTION_V2],
+    );
     for (const col of cols) {
       out.push({
         description: `Coluna "${str(col.name)}": a instrução passa a pedir a branch e a pasta de trabalho da história antes de alterar código.`,
-        apply: () => run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [PHASE_DEFAULTS['Implementação']!.instruction, str(col.id)]),
+        apply: () =>
+          run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [PHASE_DEFAULTS['Implementação']!.instruction, str(col.id)]),
       });
     }
   }
   if (version < 4) {
-    const cols = all(db, 'SELECT c.id, c.name FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? AND c.ai_instruction = ?', [boardId, HOMOLOGATION_INSTRUCTION_V2]);
+    const cols = all(
+      db,
+      'SELECT c.id, c.name FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? AND c.ai_instruction = ?',
+      [boardId, HOMOLOGATION_INSTRUCTION_V2],
+    );
     for (const col of cols) {
       out.push({
         description: `Coluna "${str(col.name)}": a instrução passa a pedir o pull request da história antes da revisão.`,
-        apply: () => run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [PHASE_DEFAULTS['Homologação']!.instruction, str(col.id)]),
+        apply: () =>
+          run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [PHASE_DEFAULTS['Homologação']!.instruction, str(col.id)]),
       });
     }
   }

@@ -30,7 +30,8 @@ function sendWeb(msg: WebviewToHost): void {
   void fetch(`/message?c=${clientId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msg) })
     .then((res) => {
       if (res.status === 413) deliver({ type: 'error', message: 'O arquivo é grande demais para enviar (limite de 20 MB).' });
-      else if (res.status === 401) deliver({ type: 'error', message: 'O acesso a este board expirou. Abra o board de novo pelo editor ou pelo terminal.' });
+      else if (res.status === 401)
+        deliver({ type: 'error', message: 'O acesso a este board expirou. Abra o board de novo pelo editor ou pelo terminal.' });
     })
     .catch(() => setConnected(false));
 }
@@ -67,7 +68,8 @@ function pickFilesInBrowser(cardId: string): void {
         continue;
       }
       const reader = new FileReader();
-      reader.onload = () => postToHost({ type: 'attachment.addData', cardId, filename: file.name, base64: String(reader.result).split(',')[1] ?? '' });
+      reader.onload = () =>
+        postToHost({ type: 'attachment.addData', cardId, filename: file.name, base64: String(reader.result).split(',')[1] ?? '' });
       reader.readAsDataURL(file);
     }
   };

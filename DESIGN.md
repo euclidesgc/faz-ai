@@ -19,31 +19,31 @@ olho.
 
 ## Tokens semânticos
 
-| Token | Quando usar |
-|---|---|
-| `--bg` | fundo da página |
-| `--col-bg` | fundo das colunas e de áreas rebaixadas |
-| `--card-bg` | cards, menus, modais, painéis flutuantes |
-| `--hover` | fundo de item sob o mouse ou selecionado em lista |
-| `--code-bg` | fundo de código e nomes de arquivo |
-| `--badge-bg` / `--badge-fg` | selos neutros (contadores, rótulos fixos) |
-| `--overlay` | véu atrás de modais |
-| `--fg` | texto principal |
-| `--muted` | texto secundário, metadados, placeholders |
-| `--link` | links |
-| `--border` | bordas decorativas (separadores, contorno de cards) |
-| `--border-strong` | contorno de controles e barras de rolagem; precisa de contraste 3:1 |
-| `--input-bg` / `--input-fg` / `--input-border` | campos de texto, selects, textareas |
-| `--accent` | anel de foco, item selecionado, checkbox e radio (`accent-color`) |
-| `--btn-bg` / `--btn-fg` / `--btn-bg-hover` | botão primário (indigo nos dois temas) |
-| `--btn2-bg` / `--btn2-fg` / `--btn2-bg-hover` | botão secundário |
-| `--error` / `--error-bg` | texto e fundo de mensagem de erro |
-| `--danger-bg` / `--danger-fg` | botão destrutivo (excluir, descartar) |
-| `--warn-bg` / `--warn-border` | caixa de aviso |
-| `--warn-solid` / `--warn-solid-fg` | selo de aviso preenchido |
-| `--success` | texto de confirmação |
-| `--shadow-color`, `--shadow-1/2/3` | sombra de cards, menus e modais, do mais leve ao mais alto |
-| `--focus-ring` | `outline` de foco pelo teclado (`2px solid var(--accent)`) |
+| Token                                          | Quando usar                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------- |
+| `--bg`                                         | fundo da página                                                     |
+| `--col-bg`                                     | fundo das colunas e de áreas rebaixadas                             |
+| `--card-bg`                                    | cards, menus, modais, painéis flutuantes                            |
+| `--hover`                                      | fundo de item sob o mouse ou selecionado em lista                   |
+| `--code-bg`                                    | fundo de código e nomes de arquivo                                  |
+| `--badge-bg` / `--badge-fg`                    | selos neutros (contadores, rótulos fixos)                           |
+| `--overlay`                                    | véu atrás de modais                                                 |
+| `--fg`                                         | texto principal                                                     |
+| `--muted`                                      | texto secundário, metadados, placeholders                           |
+| `--link`                                       | links                                                               |
+| `--border`                                     | bordas decorativas (separadores, contorno de cards)                 |
+| `--border-strong`                              | contorno de controles e barras de rolagem; precisa de contraste 3:1 |
+| `--input-bg` / `--input-fg` / `--input-border` | campos de texto, selects, textareas                                 |
+| `--accent`                                     | anel de foco, item selecionado, checkbox e radio (`accent-color`)   |
+| `--btn-bg` / `--btn-fg` / `--btn-bg-hover`     | botão primário (indigo nos dois temas)                              |
+| `--btn2-bg` / `--btn2-fg` / `--btn2-bg-hover`  | botão secundário                                                    |
+| `--error` / `--error-bg`                       | texto e fundo de mensagem de erro                                   |
+| `--danger-bg` / `--danger-fg`                  | botão destrutivo (excluir, descartar)                               |
+| `--warn-bg` / `--warn-border`                  | caixa de aviso                                                      |
+| `--warn-solid` / `--warn-solid-fg`             | selo de aviso preenchido                                            |
+| `--success`                                    | texto de confirmação                                                |
+| `--shadow-color`, `--shadow-1/2/3`             | sombra de cards, menus e modais, do mais leve ao mais alto          |
+| `--focus-ring`                                 | `outline` de foco pelo teclado (`2px solid var(--accent)`)          |
 
 ## Escalas
 

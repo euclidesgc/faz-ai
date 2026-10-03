@@ -36,10 +36,12 @@ function bundledCandidates(command: string, homeDir: string): string[] {
       continue;
     }
     for (const e of entries) {
-      if (command === 'claude' && e.startsWith('anthropic.claude-code-')) out.push(path.join(dir, e, 'resources', 'native-binary', isWindows ? 'claude.exe' : 'claude'));
+      if (command === 'claude' && e.startsWith('anthropic.claude-code-'))
+        out.push(path.join(dir, e, 'resources', 'native-binary', isWindows ? 'claude.exe' : 'claude'));
       if (command === 'codex' && e.startsWith('openai.chatgpt-')) {
         try {
-          for (const platform of fs.readdirSync(path.join(dir, e, 'bin'))) out.push(path.join(dir, e, 'bin', platform, isWindows ? 'codex.exe' : 'codex'));
+          for (const platform of fs.readdirSync(path.join(dir, e, 'bin')))
+            out.push(path.join(dir, e, 'bin', platform, isWindows ? 'codex.exe' : 'codex'));
         } catch {
           /* extensão sem binário embutido */
         }
@@ -51,7 +53,14 @@ function bundledCandidates(command: string, homeDir: string): string[] {
 
 /** Onde os instaladores das ferramentas costumam deixar a CLI quando a pasta não está no PATH do editor. */
 function commonDirs(command: string, homeDir: string): string[] {
-  const dirs = [path.join(homeDir, '.local', 'bin'), path.join(homeDir, 'bin'), path.join(homeDir, '.npm-global', 'bin'), path.join(homeDir, '.bun', 'bin'), '/opt/homebrew/bin', '/usr/local/bin'];
+  const dirs = [
+    path.join(homeDir, '.local', 'bin'),
+    path.join(homeDir, 'bin'),
+    path.join(homeDir, '.npm-global', 'bin'),
+    path.join(homeDir, '.bun', 'bin'),
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+  ];
   if (command === 'claude') dirs.unshift(path.join(homeDir, '.claude', 'local'));
   if (isWindows && process.env.APPDATA) dirs.push(path.join(process.env.APPDATA, 'npm'));
   return dirs;

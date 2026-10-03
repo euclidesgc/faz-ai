@@ -37,10 +37,17 @@ function installLauncher(extensionPath: string, storage: string): void {
     const cli = path.join(extensionPath, 'dist', 'cli.js');
     fs.mkdirSync(bin, { recursive: true });
     if (process.platform === 'win32') {
-      fs.writeFileSync(path.join(bin, 'faz-ai.cmd'), `@echo off\r\nif not defined FAZAI_DATA set "FAZAI_DATA=${storage}"\r\nnode "${cli}" %*\r\n`);
+      fs.writeFileSync(
+        path.join(bin, 'faz-ai.cmd'),
+        `@echo off\r\nif not defined FAZAI_DATA set "FAZAI_DATA=${storage}"\r\nnode "${cli}" %*\r\n`,
+      );
     } else {
       const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
-      fs.writeFileSync(path.join(bin, 'faz-ai'), `#!/bin/sh\n# Gerado pela extensão Faz AI: abre o board de uma pasta no navegador, sem o editor.\nFAZAI_DATA="\${FAZAI_DATA:-${storage.replace(/(["$`\\])/g, '\\$1')}}" exec node ${quote(cli)} "$@"\n`, { mode: 0o755 });
+      fs.writeFileSync(
+        path.join(bin, 'faz-ai'),
+        `#!/bin/sh\n# Gerado pela extensão Faz AI: abre o board de uma pasta no navegador, sem o editor.\nFAZAI_DATA="\${FAZAI_DATA:-${storage.replace(/(["$`\\])/g, '\\$1')}}" exec node ${quote(cli)} "$@"\n`,
+        { mode: 0o755 },
+      );
     }
   } catch (e) {
     console.warn(`Faz AI: atalho de terminal não instalado: ${e instanceof Error ? e.message : String(e)}`);
@@ -74,7 +81,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         treeView.badge = withHuman.size ? { value: withHuman.size, tooltip: `${withHuman.size} card(s) esperando por você` } : undefined;
         for (const card of passed) {
           const label = state.board.appearance.statuses[card.status!].label;
-          void vscode.window.showInformationMessage(`${cardRef(card)} ${card.title}: ${label}`, 'Abrir card').then((choice) => choice && openBoard(card.id));
+          void vscode.window
+            .showInformationMessage(`${cardRef(card)} ${card.title}: ${label}`, 'Abrir card')
+            .then((choice) => choice && openBoard(card.id));
         }
       };
       router.onDidChange(onBoardChange);
@@ -117,7 +126,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const running = s.cards.filter((c) => s.aiRuns.includes(c.id)).map(cardRef);
       const next = heartbeat?.nextRoundAt;
       if (!running.length && !next) return statusBar.hide();
-      statusBar.text = running.length ? `$(sync~spin) Faz AI: ${running.join(', ')}${heartbeat!.queued ? ` +${heartbeat!.queued}` : ''}` : '$(pulse) Faz AI';
+      statusBar.text = running.length
+        ? `$(sync~spin) Faz AI: ${running.join(', ')}${heartbeat!.queued ? ` +${heartbeat!.queued}` : ''}`
+        : '$(pulse) Faz AI';
       statusBar.tooltip = [
         running.length ? `A IA está trabalhando em ${running.join(', ')}.` : 'Nenhuma execução em andamento.',
         next ? `Heartbeat ligado: próxima rodada às ${new Date(next).toLocaleTimeString()}.` : 'Heartbeat desligado.',
@@ -140,7 +151,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     BoardPanel.show(context, router, viewState, f.name, cardId);
     if (servedElsewhere) {
       servedElsewhere = false; // avisa uma vez
-      void vscode.window.showWarningMessage('O board desta pasta já está aberto em outro lugar (outra janela do editor ou o comando faz-ai no terminal). Use só um deles por vez: o que for alterado aqui pode ser sobrescrito pelo outro.');
+      void vscode.window.showWarningMessage(
+        'O board desta pasta já está aberto em outro lugar (outra janela do editor ou o comando faz-ai no terminal). Use só um deles por vez: o que for alterado aqui pode ser sobrescrito pelo outro.',
+      );
     }
   };
 
@@ -161,7 +174,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         env: {
           connectAI() {
             const { message, toIgnore } = h.connectAI();
-            return toIgnore.length ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.` : message;
+            return toIgnore.length
+              ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.`
+              : message;
           },
           runAi: (cardId) => h.runner.start(cardId),
           stopAi: (cardId) => h.runner.stop(cardId),
@@ -200,7 +215,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.heartbeat.runNow', async () => {
       if (!(await getRouter()) || !heartbeat) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
       const n = heartbeat.runNow();
-      vscode.window.showInformationMessage(n ? `Faz AI: a IA vai tratar ${n} história(s) com pendência. O andamento aparece nos cards e em Saída → Faz AI.` : 'Faz AI: nada pendente com a IA.');
+      vscode.window.showInformationMessage(
+        n
+          ? `Faz AI: a IA vai tratar ${n} história(s) com pendência. O andamento aparece nos cards e em Saída → Faz AI.`
+          : 'Faz AI: nada pendente com a IA.',
+      );
     }),
     vscode.commands.registerCommand('fazai.heartbeat.stop', () => heartbeat?.stop()),
     vscode.commands.registerCommand('fazai.upgradeBoard', async () => {
@@ -214,7 +233,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // regras e skills editadas por fora (editor, IA, git) aparecem no board
   const wf = folder();
   if (wf) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(wf, '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.codex/**,.cursor/**,.kimi/**,.kimi-code/**,.github/{skills*,agents,instructions,prompts,hooks,copilot}/**,.github/copilot-instructions.md,.github/mcp.json}'));
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(
+        wf,
+        '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.codex/**,.cursor/**,.kimi/**,.kimi-code/**,.github/{skills*,agents,instructions,prompts,hooks,copilot}/**,.github/copilot-instructions.md,.github/mcp.json}',
+      ),
+    );
     let timer: NodeJS.Timeout | undefined;
     const refresh = () => {
       clearTimeout(timer);

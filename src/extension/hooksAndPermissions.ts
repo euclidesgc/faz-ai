@@ -27,7 +27,10 @@ function write(file: string, config: Json): void {
 
 /** Hooks e regras de permissão nos arquivos JSON das ferramentas. Só mexe na entrada pedida; o resto do arquivo fica como estava. Não depende da API do VSCode. */
 export class HooksAndPermissions {
-  constructor(private projectDir: string, private homeDir: string) {}
+  constructor(
+    private projectDir: string,
+    private homeDir: string,
+  ) {}
 
   private base(scope: 'project' | 'user'): string {
     const dir = scope === 'project' ? this.projectDir : this.homeDir;
@@ -38,7 +41,14 @@ export class HooksAndPermissions {
   /** A fonte do catálogo que corresponde ao arquivo de um item listado. */
   private sourceOf(tool: AiTool, item: HarnessItem, match: (src: HarnessSource) => boolean): HarnessSource {
     if (item.scope === 'plugin') throw new Error('Itens de plugin não podem ser alterados pelo board.');
-    const src = HARNESS_CATALOG[tool].find((x) => match(x) && x.scope === item.scope && (x.layout === 'hook-files' ? item.path.startsWith(path.join(this.base(x.scope), x.path) + path.sep) : path.join(this.base(x.scope), x.path) === item.path));
+    const src = HARNESS_CATALOG[tool].find(
+      (x) =>
+        match(x) &&
+        x.scope === item.scope &&
+        (x.layout === 'hook-files'
+          ? item.path.startsWith(path.join(this.base(x.scope), x.path) + path.sep)
+          : path.join(this.base(x.scope), x.path) === item.path),
+    );
     if (!src) throw new Error('Este item fica num arquivo que o board não edita. Abra o arquivo e edite-o à mão.');
     return src;
   }
@@ -61,7 +71,9 @@ export class HooksAndPermissions {
     if (target.format === 'nested') {
       const handler = { type: 'command', command, ...(timeout ? { timeout } : {}) };
       // entra no grupo que já tem o mesmo filtro, se houver
-      const at = list.findIndex((g) => (typeof obj(g).matcher === 'string' ? obj(g).matcher : '') === matcher && Array.isArray(obj(g).hooks));
+      const at = list.findIndex(
+        (g) => (typeof obj(g).matcher === 'string' ? obj(g).matcher : '') === matcher && Array.isArray(obj(g).hooks),
+      );
       if (at >= 0) list[at] = { ...obj(list[at]), hooks: [...(obj(list[at]).hooks as unknown[]), handler] };
       else list.push({ ...(matcher ? { matcher } : {}), hooks: [handler] });
     } else if (target.format === 'flat') {
@@ -102,7 +114,8 @@ export class HooksAndPermissions {
   /** Acrescenta uma regra a uma das listas de permissão (allow, ask, deny) do arquivo indicado. */
   addPermission(tool: AiTool, index: number, list: string, rule: string): string {
     const src = HARNESS_CATALOG[tool][index];
-    if (!src || src.layout !== 'json-permissions' || !src.lists.includes(list)) throw new Error('Este arquivo de permissões não é editado pelo board.');
+    if (!src || src.layout !== 'json-permissions' || !src.lists.includes(list))
+      throw new Error('Este arquivo de permissões não é editado pelo board.');
     const text = rule.trim();
     if (!text) throw new Error('Informe a regra.');
     const file = path.join(this.base(src.scope), src.path);

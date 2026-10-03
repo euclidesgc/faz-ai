@@ -23,7 +23,15 @@ const bridge = { ...options, entryPoints: ['src/mcp-bridge/bridge.ts'], outfile:
 
 // board fora do editor: `node dist/cli.js [pasta]` serve o board no navegador
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
-const cli = { ...options, entryPoints: ['src/cli/cli.ts'], outfile: 'dist/cli.js', external: [], sourcemap: false, define: { FAZAI_VERSION: JSON.stringify(version) }, banner: { js: '#!/usr/bin/env node' } };
+const cli = {
+  ...options,
+  entryPoints: ['src/cli/cli.ts'],
+  outfile: 'dist/cli.js',
+  external: [],
+  sourcemap: false,
+  define: { FAZAI_VERSION: JSON.stringify(version) },
+  banner: { js: '#!/usr/bin/env node' },
+};
 
 if (watch) {
   for (const o of [options, bridge, cli]) await (await context(o)).watch();

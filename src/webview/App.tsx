@@ -33,7 +33,12 @@ export function App() {
 
   useEffect(() => onConnectionChange((online) => setOffline(!online)), []);
 
-  if (!state) return <div className="loading">{offline ? 'Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.' : 'Carregando board…'}</div>;
+  if (!state)
+    return (
+      <div className="loading">
+        {offline ? 'Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.' : 'Carregando board…'}
+      </div>
+    );
   const trashCount = state.cards.filter((c) => c.deletedAt !== null).length;
   const withYou = humanQueue(pendingWork(state)).length;
   const running = state.aiRuns.length;
@@ -44,17 +49,31 @@ export function App() {
       <header className="topbar">
         <h1 title={state.board.name}>{state.board.name}</h1>
         <nav>
-          <Button active={view === 'board'} onClick={() => setView('board')}>Board</Button>
-          <Button active={view === 'trash'} onClick={() => setView('trash')}>Lixeira{trashCount > 0 && ` (${trashCount})`}</Button>
-          <Button active={view === 'settings'} onClick={() => setView('settings')}>Configurações</Button>
+          <Button active={view === 'board'} onClick={() => setView('board')}>
+            Board
+          </Button>
+          <Button active={view === 'trash'} onClick={() => setView('trash')}>
+            Lixeira{trashCount > 0 && ` (${trashCount})`}
+          </Button>
+          <Button active={view === 'settings'} onClick={() => setView('settings')}>
+            Configurações
+          </Button>
         </nav>
         <span className="spacer" />
-        {running > 0 && <span className="topbar-info" title="Execuções da IA em andamento"><span className="spinner" /> IA trabalhando em {running} card{running > 1 ? 's' : ''}</span>}
+        {running > 0 && (
+          <span className="topbar-info" title="Execuções da IA em andamento">
+            <span className="spinner" /> IA trabalhando em {running} card{running > 1 ? 's' : ''}
+          </span>
+        )}
         {withYou > 0 && (
           <Button
             className="topbar-pending"
             on={onlyMine}
-            title={onlyMine ? 'Mostrando só o que espera por você. Clique para ver tudo.' : 'Cards esperando revisão, resposta ou desbloqueio. Clique para ver só eles.'}
+            title={
+              onlyMine
+                ? 'Mostrando só o que espera por você. Clique para ver tudo.'
+                : 'Cards esperando revisão, resposta ou desbloqueio. Clique para ver só eles.'
+            }
             onClick={() => {
               setView('board');
               setFilters({ owner: onlyMine ? 'any' : 'human' });
@@ -63,10 +82,19 @@ export function App() {
             {withYou} com você
           </Button>
         )}
-        {!isWeb && <Button variant="ghost" title="Abre este board no navegador, fora do editor" onClick={() => ui.openInBrowser()}>Abrir no navegador ↗</Button>}
+        {!isWeb && (
+          <Button variant="ghost" title="Abre este board no navegador, fora do editor" onClick={() => ui.openInBrowser()}>
+            Abrir no navegador ↗
+          </Button>
+        )}
         <ThemeToggle />
       </header>
-      {offline && <div className="banner warn offline">Sem ligação com o Faz AI: o que você fizer agora não é salvo. A página reconecta sozinha quando o editor (ou o comando <code>faz-ai</code>) voltar.</div>}
+      {offline && (
+        <div className="banner warn offline">
+          Sem ligação com o Faz AI: o que você fizer agora não é salvo. A página reconecta sozinha quando o editor (ou o comando{' '}
+          <code>faz-ai</code>) voltar.
+        </div>
+      )}
       {view === 'board' && <FilterBar />}
       <main className="content">
         {view === 'board' && <Board />}
@@ -79,13 +107,17 @@ export function App() {
         {error && (
           <div className="toast error" role="alert">
             <span>{error}</span>
-            <Button variant="icon" aria-label="Fechar aviso" onClick={() => setError(null)}>✕</Button>
+            <Button variant="icon" aria-label="Fechar aviso" onClick={() => setError(null)}>
+              ✕
+            </Button>
           </div>
         )}
         {notice && (
           <div className="toast" role="status">
             <span>{notice}</span>
-            <Button variant="icon" aria-label="Fechar aviso" onClick={() => setNotice(null)}>✕</Button>
+            <Button variant="icon" aria-label="Fechar aviso" onClick={() => setNotice(null)}>
+              ✕
+            </Button>
           </div>
         )}
       </div>

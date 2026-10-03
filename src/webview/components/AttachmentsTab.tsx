@@ -6,7 +6,8 @@ import { Button, DeleteButton } from './ui';
 
 export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
-const formatSize = (n: number): string => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+const formatSize = (n: number): string =>
+  n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
 
 export function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -55,13 +56,22 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
     <section className="drawer-section">
       {parent && storyArtifacts.length > 0 && (
         <div className="story-artifacts">
-          <h3>Artefatos da história <small>{cardRef(parent)} {parent.title}</small></h3>
+          <h3>
+            Artefatos da história{' '}
+            <small>
+              {cardRef(parent)} {parent.title}
+            </small>
+          </h3>
           <ul className="attachments">
             {storyArtifacts.map((a) => (
               <li key={a.id}>
-                <span className="thumb file" onClick={() => attachments.open(a.id)}>{(a.filename.split('.').pop() ?? '').slice(0, 4).toUpperCase() || '?'}</span>
+                <span className="thumb file" onClick={() => attachments.open(a.id)}>
+                  {(a.filename.split('.').pop() ?? '').slice(0, 4).toUpperCase() || '?'}
+                </span>
                 <div className="att-info">
-                  <a title="Abre o documento anexado à história" onClick={() => attachments.open(a.id)}>{a.filename}</a>
+                  <a title="Abre o documento anexado à história" onClick={() => attachments.open(a.id)}>
+                    {a.filename}
+                  </a>
                   <span className="muted small">anexado à história · {new Date(a.createdAt).toLocaleString()}</span>
                 </div>
               </li>
@@ -71,11 +81,20 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
       )}
       <div
         className={`dropzone ${over ? 'over' : ''}`}
-        onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
         onDragLeave={() => setOver(false)}
-        onDrop={(e) => { e.preventDefault(); setOver(false); void addFiles(Array.from(e.dataTransfer.files)); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          void addFiles(Array.from(e.dataTransfer.files));
+        }}
       >
-        <Button variant="primary" onClick={() => attachments.pick(cardId)}>Escolher arquivos…</Button>
+        <Button variant="primary" onClick={() => attachments.pick(cardId)}>
+          Escolher arquivos…
+        </Button>
         <span className="muted">ou arraste arquivos para cá (segure Shift ao soltar), ou cole uma imagem. Até 20 MB cada.</span>
       </div>
 
@@ -84,15 +103,31 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
         {cardAttachments.map((a) => (
           <li key={a.id}>
             {a.mime.startsWith('image/') && baseUri ? (
-              <img className="thumb" src={`${baseUri}/${a.cardId}/${encodeURIComponent(a.storedName)}`} alt="" onClick={() => attachments.open(a.id)} />
+              <img
+                className="thumb"
+                src={`${baseUri}/${a.cardId}/${encodeURIComponent(a.storedName)}`}
+                alt=""
+                onClick={() => attachments.open(a.id)}
+              />
             ) : (
-              <span className="thumb file" onClick={() => attachments.open(a.id)}>{(a.filename.split('.').pop() ?? '').slice(0, 4).toUpperCase() || '?'}</span>
+              <span className="thumb file" onClick={() => attachments.open(a.id)}>
+                {(a.filename.split('.').pop() ?? '').slice(0, 4).toUpperCase() || '?'}
+              </span>
             )}
             <div className="att-info">
-              <a onClick={() => attachments.open(a.id)}>{a.filename}</a>{a.artifact && <span className="badge artifact-badge" title="Documento de uma fase">artefato</span>}
-              <span className="muted small">{formatSize(a.size)} · {new Date(a.createdAt).toLocaleString()}</span>
+              <a onClick={() => attachments.open(a.id)}>{a.filename}</a>
+              {a.artifact && (
+                <span className="badge artifact-badge" title="Documento de uma fase">
+                  artefato
+                </span>
+              )}
+              <span className="muted small">
+                {formatSize(a.size)} · {new Date(a.createdAt).toLocaleString()}
+              </span>
             </div>
-            <Button variant="ghost" size="small" onClick={() => attachments.reveal(a.id)}>Mostrar na pasta</Button>
+            <Button variant="ghost" size="small" onClick={() => attachments.reveal(a.id)}>
+              Mostrar na pasta
+            </Button>
             <DeleteButton
               title="Remover anexo"
               question={`Remover "${a.filename}"?`}

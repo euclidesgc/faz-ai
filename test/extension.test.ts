@@ -31,7 +31,8 @@ beforeEach(() => {
   project = path.join(root, 'projeto');
   storage = path.join(root, 'dados');
   extensionDir = path.join(root, 'ext');
-  for (const d of [home, project, storage, path.join(extensionDir, 'dist', 'webview'), path.join(extensionDir, 'media')]) fs.mkdirSync(d, { recursive: true });
+  for (const d of [home, project, storage, path.join(extensionDir, 'dist', 'webview'), path.join(extensionDir, 'media')])
+    fs.mkdirSync(d, { recursive: true });
   fs.copyFileSync(path.resolve(__dirname, '../node_modules/sql.js/dist/sql-wasm.wasm'), path.join(extensionDir, 'dist', 'sql-wasm.wasm'));
   fs.writeFileSync(path.join(extensionDir, 'dist', 'mcp-bridge.js'), '// ponte');
   fs.writeFileSync(path.join(extensionDir, 'dist', 'cli.js'), '// cli');
@@ -64,7 +65,17 @@ it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serv
   };
   await activate(context as never);
 
-  for (const id of ['fazai.openBoard', 'fazai.openInBrowser', 'fazai.connectAI', 'fazai.ai.run', 'fazai.ai.stop', 'fazai.heartbeat.runNow', 'fazai.upgradeBoard', 'fazai.showLog']) expect(fake.commands.has(id), id).toBe(true);
+  for (const id of [
+    'fazai.openBoard',
+    'fazai.openInBrowser',
+    'fazai.connectAI',
+    'fazai.ai.run',
+    'fazai.ai.stop',
+    'fazai.heartbeat.runNow',
+    'fazai.upgradeBoard',
+    'fazai.showLog',
+  ])
+    expect(fake.commands.has(id), id).toBe(true);
   // o atalho de terminal aponta para esta versão e para os mesmos dados
   const launcher = fs.readFileSync(path.join(home, '.faz-ai', 'bin', 'faz-ai'), 'utf8');
   expect(launcher).toContain(path.join(extensionDir, 'dist', 'cli.js'));
@@ -77,12 +88,25 @@ it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serv
   expect(webview.html).toContain('data-host="vscode"');
   webview.receive({ type: 'ready' });
   await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'boardState'), 'board enviado ao painel');
-  const state = (webview.posted.find((m) => (m as { type: string }).type === 'boardState') as { state: import('../src/shared/model').BoardState }).state;
+  const state = (
+    webview.posted.find((m) => (m as { type: string }).type === 'boardState') as { state: import('../src/shared/model').BoardState }
+  ).state;
   expect(state.board.name).toBe('projeto');
 
   const wf = state.workflows.find((w) => w.kind === 'parent')!;
-  webview.receive({ type: 'card.create', typeId: state.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id, columnId: state.columns.find((c) => c.workflowId === wf.id)!.id, parentId: null, title: 'Card pelo editor' });
-  const titles = () => (webview.posted.filter((m) => (m as { type: string }).type === 'boardState').at(-1) as { state: import('../src/shared/model').BoardState }).state.cards.map((c) => c.title);
+  webview.receive({
+    type: 'card.create',
+    typeId: state.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+    columnId: state.columns.find((c) => c.workflowId === wf.id)!.id,
+    parentId: null,
+    title: 'Card pelo editor',
+  });
+  const titles = () =>
+    (
+      webview.posted.filter((m) => (m as { type: string }).type === 'boardState').at(-1) as {
+        state: import('../src/shared/model').BoardState;
+      }
+    ).state.cards.map((c) => c.title);
   await wait(() => titles().includes('Card pelo editor'), 'card criado');
 
   // o mesmo board, no navegador: o endereço aberto entrega a página a quem tem o segredo
@@ -90,7 +114,9 @@ it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serv
   await wait(() => fake.opened.length > 0, 'navegador aberto');
   const url = new URL(fake.opened[0]!);
   expect(url.hostname).toBe('127.0.0.1');
-  const status = await new Promise<number>((resolve, reject) => http.get(url, (res) => (res.resume(), resolve(res.statusCode ?? 0))).on('error', reject));
+  const status = await new Promise<number>((resolve, reject) =>
+    http.get(url, (res) => (res.resume(), resolve(res.statusCode ?? 0))).on('error', reject),
+  );
   expect(status).toBe(302);
   expect(fake.messages.filter((m) => m.kind === 'error')).toEqual([]);
 

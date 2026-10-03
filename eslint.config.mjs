@@ -20,9 +20,13 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', ignoreRestSiblings: true },
       ],
-      // `any` explícito só aparece nos testes do MCP/merge, em fronteiras sem tipo; aviso para não travar o PR
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
     },
+  },
+  {
+    // os testes leem o JSON devolvido pelas ferramentas MCP, que não tem tipo; tipar cada resposta só somaria casts
+    files: ['test/**/*.{ts,tsx}'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
   },
   {
     files: ['src/webview/**/*.{ts,tsx}', 'test/**/*.tsx'],

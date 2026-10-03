@@ -308,6 +308,9 @@ npm test
 npm run typecheck
 ```
 
+O `npm test` também roda o lint e confere a formatação; `npm run format` formata tudo. Para o
+`git blame` pular o commit que só formatou o código: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
+
 Pressione `F5` para abrir o Extension Development Host. O código fica em `src/extension` (host e
 servidor MCP), `src/webview` (interface em React), `src/shared` (modelo e protocolo),
 `src/mcp-bridge` (ponte stdio usada pelos clientes de IA) e `src/cli` (o board fora do editor).

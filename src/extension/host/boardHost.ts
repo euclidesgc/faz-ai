@@ -83,8 +83,20 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     log: o.log,
     gh: (args, cwd) =>
       new Promise((resolve, reject) => {
-        execFile('gh', args, { cwd, timeout: 120_000, env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) } }, (err, stdout, stderr) =>
-          err ? reject(new Error((err as NodeJS.ErrnoException).code === 'ENOENT' ? 'o comando "gh" (GitHub CLI) não foi encontrado.' : stderr.trim() || err.message)) : resolve(stdout),
+        execFile(
+          'gh',
+          args,
+          { cwd, timeout: 120_000, env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) } },
+          (err, stdout, stderr) =>
+            err
+              ? reject(
+                  new Error(
+                    (err as NodeJS.ErrnoException).code === 'ENOENT'
+                      ? 'o comando "gh" (GitHub CLI) não foi encontrado.'
+                      : stderr.trim() || err.message,
+                  ),
+                )
+              : resolve(stdout),
         );
       }),
   });
@@ -98,7 +110,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     connectAI() {
       const done = registerClients([router.snapshot().board.aiTool], { bridgePath: o.bridgePath, workspaceDir: o.folderPath, homeDir });
       // arquivos do projeto guardam caminhos desta máquina, então normalmente não devem ir para o repositório
-      const ignored = fs.existsSync(gitignore) ? fs.readFileSync(gitignore, 'utf8').split(/\r?\n/).map((l) => l.trim()) : [];
+      const ignored = fs.existsSync(gitignore)
+        ? fs
+            .readFileSync(gitignore, 'utf8')
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+        : [];
       const toIgnore = [...new Set(done.flatMap((d) => (d.projectFile && !ignored.includes(d.projectFile) ? [d.projectFile] : [])))];
       const files = done.map((d) => d.projectFile ?? d.file.replace(homeDir, '~')).join(', ');
       return { message: `Servidor "faz-ai" registrado em: ${files}. ${[...new Set(done.map((d) => d.next))].join(' ')}`, toIgnore };

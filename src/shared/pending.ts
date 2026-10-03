@@ -36,7 +36,9 @@ export function pendingWork(s: BoardState): PendingWork {
       // sub-tarefa de uma história que está com a pessoa espera a decisão dela
       ready: withStatus('ready').filter((c) => !c.parentId || !withHuman(byId.get(c.parentId))),
       // card bloqueado fica parado até a pessoa desbloquear, mesmo que o motivo esteja na conversa
-      unanswered: cards.filter((c) => lastSource.get(c.id) === 'human' && !['ready', 'approved', 'running', 'blocked'].includes(c.status ?? '')),
+      unanswered: cards.filter(
+        (c) => lastSource.get(c.id) === 'human' && !['ready', 'approved', 'running', 'blocked'].includes(c.status ?? ''),
+      ),
     },
     human: {
       waitingReview: withStatus('waiting_review'),
@@ -47,7 +49,8 @@ export function pendingWork(s: BoardState): PendingWork {
 }
 
 /** Cards cuja pendência está com a pessoa. */
-export const humanQueue = (p: PendingWork): Card[] => [...p.human.waitingReview, ...p.human.waitingAnswer, ...p.human.blocked].sort(byNumber);
+export const humanQueue = (p: PendingWork): Card[] =>
+  [...p.human.waitingReview, ...p.human.waitingAnswer, ...p.human.blocked].sort(byNumber);
 /** Cards cuja pendência está com a IA; vazio quando não há nada para ela fazer. */
 export const aiQueue = (p: PendingWork): Card[] => [...new Set([...p.ai.approved, ...p.ai.unanswered, ...p.ai.ready])];
 

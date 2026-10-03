@@ -45,7 +45,10 @@ export class Heartbeat {
   private lastRoundAt: number;
   private listeners = new Set<() => void>();
 
-  constructor(private runner: HeartbeatRunner, private deps: HeartbeatDeps) {
+  constructor(
+    private runner: HeartbeatRunner,
+    private deps: HeartbeatDeps,
+  ) {
     // a primeira rodada acontece um intervalo depois de o editor abrir, não na abertura
     this.lastRoundAt = deps.now();
     runner.onDidFinish(() => this.pump());
@@ -92,7 +95,11 @@ export class Heartbeat {
     this.lastRoundAt = this.deps.now();
     const targets = heartbeatTargets(this.deps.snapshot());
     this.queue = targets.map((c) => c.id);
-    this.deps.log(targets.length ? `Heartbeat: ${targets.length} história(s) com pendência: ${targets.map(cardRef).join(', ')}.` : 'Heartbeat: nada pendente com a IA.');
+    this.deps.log(
+      targets.length
+        ? `Heartbeat: ${targets.length} história(s) com pendência: ${targets.map(cardRef).join(', ')}.`
+        : 'Heartbeat: nada pendente com a IA.',
+    );
     this.pump();
     return targets.length;
   }

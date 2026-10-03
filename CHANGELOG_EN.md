@@ -29,6 +29,11 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 - Internal: the front end now uses UI primitives (button, typed select, chips, field row, delete
   button with confirmation, add input, number field) instead of repeating the same HTML in every
   screen. Nothing changes visually or for users.
+- Internal: the Settings > Harness screen was split into one file per section, and the front end
+  asks the host for actions through named commands (`src/webview/commands.ts`). Nothing changes
+  for users.
+- Internal: all code follows Prettier, checked by `npm test`, and `npm run typecheck` now covers
+  the interface tests.
 
 ## 0.29.1
 

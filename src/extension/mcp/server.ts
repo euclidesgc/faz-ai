@@ -14,7 +14,12 @@ export interface McpOptions {
   version: string;
 }
 
-const CLIENT_NAMES: Record<string, string> = { 'claude-code': 'Claude Code', 'claude-ai': 'Claude', cursor: 'Cursor', 'cursor-vscode': 'Cursor' };
+const CLIENT_NAMES: Record<string, string> = {
+  'claude-code': 'Claude Code',
+  'claude-ai': 'Claude',
+  cursor: 'Cursor',
+  'cursor-vscode': 'Cursor',
+};
 
 /** Cria um servidor MCP (uma sessão) com as ferramentas do board. */
 export function createMcpServer(opts: McpOptions): McpServer {

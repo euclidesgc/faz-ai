@@ -14,10 +14,12 @@ describe('color', () => {
   it('garante contraste ≥ 4.5 em toda a grade de cores', () => {
     const steps = [0x00, 0x33, 0x66, 0x99, 0xcc, 0xff];
     const hex = (n: number) => n.toString(16).padStart(2, '0');
-    for (const r of steps) for (const g of steps) for (const b of steps) {
-      const color = `#${hex(r)}${hex(g)}${hex(b)}`;
-      expect(contrastRatio(color, readableOn(color)), color).toBeGreaterThanOrEqual(4.5);
-    }
+    for (const r of steps)
+      for (const g of steps)
+        for (const b of steps) {
+          const color = `#${hex(r)}${hex(g)}${hex(b)}`;
+          expect(contrastRatio(color, readableOn(color)), color).toBeGreaterThanOrEqual(4.5);
+        }
   });
 
   it('preto e branco têm contraste 21', () => {

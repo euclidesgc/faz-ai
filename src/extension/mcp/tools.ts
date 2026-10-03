@@ -10,7 +10,21 @@ import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../.
 import { newId } from '../db/ids';
 import { FLOW_SKILL } from '../flowSkill';
 import { ALL_CARD_STATUSES } from '../../shared/status';
-import { boardOverview, pendingOverview, harnessOverview, modelsOverview, cardDetail, cardStatus, cardSummary, coerceFieldValue, findCard, findColumn, findField, findType, findWorkflow } from './format';
+import {
+  boardOverview,
+  pendingOverview,
+  harnessOverview,
+  modelsOverview,
+  cardDetail,
+  cardStatus,
+  cardSummary,
+  coerceFieldValue,
+  findCard,
+  findColumn,
+  findField,
+  findType,
+  findWorkflow,
+} from './format';
 
 export interface ToolContext {
   getRouter: () => Promise<MessageRouter>;
@@ -27,7 +41,9 @@ const cardArg = z.union([z.string(), z.number()]).describe('Número do card, ex.
 const fieldsArg = z
   .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()]))
   .describe('Valores de campos personalizados por nome do campo, ex.: {"Fase": "Spec"}. null limpa o campo.');
-const categoryArg = z.enum(['open', 'done', 'cancelled']).describe('O que a coluna representa: trabalho em aberto, conclusão ou cancelamento');
+const categoryArg = z
+  .enum(['open', 'done', 'cancelled'])
+  .describe('O que a coluna representa: trabalho em aberto, conclusão ou cancelamento');
 
 export function registerTools(server: McpServer, ctx: ToolContext): void {
   /** Registra uma ferramenta; o retorno vira JSON e exceções viram erro legível para o modelo. */
@@ -50,7 +66,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   const detail = (router: MessageRouter, cardId: string) => {
     const s = router.snapshot();
-    return cardDetail(s, s.cards.find((c) => c.id === cardId)!, (a) => router.store.pathOf(a));
+    return cardDetail(
+      s,
+      s.cards.find((c) => c.id === cardId)!,
+      (a) => router.store.pathOf(a),
+    );
   };
   const setFields = (router: MessageRouter, s: BoardState, cardId: string, fields: Record<string, unknown> | undefined): void => {
     // valida tudo antes de gravar qualquer coisa
@@ -86,7 +106,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       type: z.string().optional().describe('Nome do tipo de card'),
       parent: cardArg.optional().describe('Só as sub-tarefas desta história'),
       status: z.enum(['open', 'done', 'cancelled']).optional().describe('Categoria da coluna em que o card está'),
-      work_status: z.enum(ALL_CARD_STATUSES as [string, ...string[]]).optional().describe('Status de trabalho do card (campo `work.status`)'),
+      work_status: z
+        .enum(ALL_CARD_STATUSES as [string, ...string[]])
+        .optional()
+        .describe('Status de trabalho do card (campo `work.status`)'),
       text: z.string().optional().describe('Palavras-chave buscadas em título, descrição, comentários e campos'),
       fields: z.record(z.string(), z.array(z.string())).optional().describe('Campo → valores aceitos, ex.: {"Fase": ["PRD", "Spec"]}'),
       include_archived: z.boolean().optional(),
@@ -100,7 +123,13 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       const parentId = a.parent !== undefined ? findCard(s, a.parent).id : null;
       const fields: Record<string, string[]> = {};
       for (const [name, values] of Object.entries(a.fields ?? {})) fields[findField(s, name).id] = values;
-      const matched = applyFilters(s, { ...EMPTY_FILTERS, text: a.text ?? '', typeIds: typeId ? [typeId] : [], fields, includeRelated: false });
+      const matched = applyFilters(s, {
+        ...EMPTY_FILTERS,
+        text: a.text ?? '',
+        typeIds: typeId ? [typeId] : [],
+        fields,
+        includeRelated: false,
+      });
       const cards = s.cards
         .filter((c) => (a.include_trashed || c.deletedAt === null) && (a.include_archived || c.archivedAt === null || c.deletedAt !== null))
         .filter((c) => !wf || c.workflowId === wf.id)
@@ -139,8 +168,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       const att = router.getAttachment(a.attachment_id);
       if (!att) throw new Error('Anexo não encontrado.');
       const file = router.store.pathOf(att);
-      if (!/^(text\/|application\/json)/.test(att.mime)) return { filename: att.filename, mime: att.mime, path: file, note: 'Anexo não textual: abra pelo caminho.' };
-      if (att.size > MAX_READ_BYTES) return { filename: att.filename, path: file, note: 'Anexo grande demais para devolver aqui: leia pelo caminho.' };
+      if (!/^(text\/|application\/json)/.test(att.mime))
+        return { filename: att.filename, mime: att.mime, path: file, note: 'Anexo não textual: abra pelo caminho.' };
+      if (att.size > MAX_READ_BYTES)
+        return { filename: att.filename, path: file, note: 'Anexo grande demais para devolver aqui: leia pelo caminho.' };
       return fs.readFileSync(file, 'utf8');
     },
     true,
@@ -167,7 +198,9 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       if (!wf) throw new Error('Workflow não encontrado.');
       const type = a.type ? findType(s, a.type) : s.cardTypes.find((t) => t.defaultWorkflowId === wf.id);
       if (!type) throw new Error(`Nenhum tipo de card definido para o workflow "${wf.name}".`);
-      const column = a.column ? findColumn(s, a.column, wf.id) : s.columns.filter((c) => c.workflowId === wf.id).sort((x, y) => x.position - y.position)[0];
+      const column = a.column
+        ? findColumn(s, a.column, wf.id)
+        : s.columns.filter((c) => c.workflowId === wf.id).sort((x, y) => x.position - y.position)[0];
       if (!column) throw new Error(`O workflow "${wf.name}" não tem colunas.`);
       // valida os campos antes de criar, para não deixar um card pela metade
       for (const [name, value] of Object.entries(a.fields ?? {})) coerceFieldValue(findField(s, name), value, s.board.modelCatalog);
@@ -208,21 +241,35 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       card: cardArg,
       column: z.string().describe('Nome da coluna de destino'),
       position: z.number().int().min(0).optional().describe('Posição na coluna (0 = topo); por padrão, no fim'),
-      cancel_subtasks: z.boolean().optional().describe('Ao mover uma história para uma coluna de cancelamento, cancela também as sub-tarefas em aberto'),
+      cancel_subtasks: z
+        .boolean()
+        .optional()
+        .describe('Ao mover uma história para uma coluna de cancelamento, cancela também as sub-tarefas em aberto'),
     },
     (a, router) => {
       const s = router.snapshot();
       const card = live(findCard(s, a.card));
       const column = findColumn(s, a.column, card.workflowId);
-      if (card.archivedAt !== null) router.handle({ type: 'card.unarchive', cardId: card.id, columnId: column.id, position: a.position ?? END }, ai());
-      else router.handle({ type: 'card.move', cardId: card.id, columnId: column.id, position: a.position ?? END, cancelChildren: a.cancel_subtasks }, ai());
+      if (card.archivedAt !== null)
+        router.handle({ type: 'card.unarchive', cardId: card.id, columnId: column.id, position: a.position ?? END }, ai());
+      else
+        router.handle(
+          { type: 'card.move', cardId: card.id, columnId: column.id, position: a.position ?? END, cancelChildren: a.cancel_subtasks },
+          ai(),
+        );
       const after = router.snapshot();
-      const result: Record<string, unknown> = { card: cardSummary(after, after.cards.find((c) => c.id === card.id)!) };
+      const result: Record<string, unknown> = {
+        card: cardSummary(
+          after,
+          after.cards.find((c) => c.id === card.id)!,
+        ),
+      };
       // equivalente ao aviso que a interface dá quando a última sub-tarefa em aberto termina
       const parent = card.parentId ? after.cards.find((c) => c.id === card.parentId) : undefined;
       if (parent && column.category !== 'open' && cardStatus(after, parent) === 'open') {
         const open = after.cards.filter((k) => k.parentId === parent.id && cardStatus(after, k) === 'open').length;
-        if (open === 0) result.hint = `Todas as sub-tarefas de #${parent.number} "${parent.title}" saíram de aberto; considere mover a história para uma coluna de conclusão.`;
+        if (open === 0)
+          result.hint = `Todas as sub-tarefas de #${parent.number} "${parent.title}" saíram de aberto; considere mover a história para uma coluna de conclusão.`;
       }
       return result;
     },
@@ -230,28 +277,64 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   // ---------- status de trabalho ----------
 
-  const setStatus = (router: MessageRouter, ref: string | number, status: 'running' | 'waiting_review' | 'waiting_answer' | 'blocked', note: string | undefined, next: string) => {
+  const setStatus = (
+    router: MessageRouter,
+    ref: string | number,
+    status: 'running' | 'waiting_review' | 'waiting_answer' | 'blocked',
+    note: string | undefined,
+    next: string,
+  ) => {
     const card = live(findCard(router.snapshot(), ref));
     const after = router.handle({ type: 'card.status.set', cardId: card.id, status, note }, ai());
-    return { card: cardSummary(after, after.cards.find((c) => c.id === card.id)!), next };
+    return {
+      card: cardSummary(
+        after,
+        after.cards.find((c) => c.id === card.id)!,
+      ),
+      next,
+    };
   };
 
-  tool('start_work', 'Marca que você começou a trabalhar no card (status "running"). Chame antes de executar o trabalho de um card.', { card: cardArg }, (a, router) =>
-    setStatus(router, a.card, 'running', undefined, 'Ao terminar, peça a revisão com request_review, pergunte com ask_question ou mova o card.'),
+  tool(
+    'start_work',
+    'Marca que você começou a trabalhar no card (status "running"). Chame antes de executar o trabalho de um card.',
+    { card: cardArg },
+    (a, router) =>
+      setStatus(
+        router,
+        a.card,
+        'running',
+        undefined,
+        'Ao terminar, peça a revisão com request_review, pergunte com ask_question ou mova o card.',
+      ),
   );
 
   tool(
     'request_review',
     'Entrega o trabalho da fase para revisão de uma pessoa (status "waiting_review") e registra o resumo na conversa do card. Depois de chamar, PARE: só uma pessoa aprova. Se ela pedir ajustes, o card volta para "ready" com o pedido na conversa; quando aprovar, o status vira "approved" e você move o card.',
     { card: cardArg, summary: z.string().min(1).describe('O que foi feito e o que a pessoa deve revisar (markdown)') },
-    (a, router) => setStatus(router, a.card, 'waiting_review', a.summary, 'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.'),
+    (a, router) =>
+      setStatus(
+        router,
+        a.card,
+        'waiting_review',
+        a.summary,
+        'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.',
+      ),
   );
 
   tool(
     'ask_question',
     'Faz uma pergunta à pessoa na conversa do card e passa a vez para ela (status "waiting_answer"). Use quando faltar uma informação ou decisão. Depois de chamar, pare de trabalhar neste card até a resposta chegar.',
     { card: cardArg, question: z.string().min(1).describe('A pergunta (markdown)') },
-    (a, router) => setStatus(router, a.card, 'waiting_answer', a.question, 'Pare aqui. Quando a pessoa responder na conversa, o card volta para "ready".'),
+    (a, router) =>
+      setStatus(
+        router,
+        a.card,
+        'waiting_answer',
+        a.question,
+        'Pare aqui. Quando a pessoa responder na conversa, o card volta para "ready".',
+      ),
   );
 
   tool(
@@ -278,7 +361,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     { card: cardArg, profile: z.string().optional().describe('Nome do perfil; omita para voltar ao da coluna') },
     (a, router) => {
       const card = live(findCard(router.snapshot(), a.card));
-      router.handle({ type: 'card.execProfile.set', cardId: card.id, profileId: a.profile ? findProfile(router.snapshot(), a.profile).id : null }, ai());
+      router.handle(
+        { type: 'card.execProfile.set', cardId: card.id, profileId: a.profile ? findProfile(router.snapshot(), a.profile).id : null },
+        ai(),
+      );
       return detail(router, card.id);
     },
   );
@@ -338,11 +424,16 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
   );
 
-  tool('empty_trash', 'Apaga DE VEZ todos os cards que estão na lixeira, com seus anexos. Não pode ser desfeito: confirme com a pessoa antes.', {}, (_a, router) => {
-    const n = router.snapshot().cards.filter((c) => c.deletedAt !== null).length;
-    router.handle({ type: 'trash.empty' });
-    return `Lixeira esvaziada: ${n} card(s) apagado(s) definitivamente.`;
-  });
+  tool(
+    'empty_trash',
+    'Apaga DE VEZ todos os cards que estão na lixeira, com seus anexos. Não pode ser desfeito: confirme com a pessoa antes.',
+    {},
+    (_a, router) => {
+      const n = router.snapshot().cards.filter((c) => c.deletedAt !== null).length;
+      router.handle({ type: 'trash.empty' });
+      return `Lixeira esvaziada: ${n} card(s) apagado(s) definitivamente.`;
+    },
+  );
 
   // ---------- checklist, comentários, anexos ----------
 
@@ -406,14 +497,20 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
     (a, router) => {
       const card = findCard(router.snapshot(), a.card);
-      const target = a.artifact ? card.parentId ?? card.id : card.id;
+      const target = a.artifact ? (card.parentId ?? card.id) : card.id;
       const before = new Set(router.snapshot().attachments.map((x) => x.id));
       if (a.path) {
         const file = path.resolve(ctx.workspaceDir, a.path);
         if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`Arquivo não encontrado: ${file}`);
         router.addAttachmentFiles(card.id, [file], a.artifact);
       } else if (a.filename && a.content !== undefined) {
-        router.handle({ type: 'attachment.addData', cardId: card.id, filename: a.filename, base64: Buffer.from(a.content, 'utf8').toString('base64'), artifact: a.artifact });
+        router.handle({
+          type: 'attachment.addData',
+          cardId: card.id,
+          filename: a.filename,
+          base64: Buffer.from(a.content, 'utf8').toString('base64'),
+          artifact: a.artifact,
+        });
       } else {
         throw new Error('Informe `path`, ou `filename` e `content`.');
       }
@@ -432,25 +529,70 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 
   const overview = (router: MessageRouter) => boardOverview(router.snapshot());
   const workflowArg = z.string().describe('Nome do workflow, ou "parent" (histórias) / "child" (sub-tarefas)');
-  const columnWorkflowArg = workflowArg.optional().describe('Workflow da coluna; necessário quando há colunas de mesmo nome nos dois workflows');
+  const columnWorkflowArg = workflowArg
+    .optional()
+    .describe('Workflow da coluna; necessário quando há colunas de mesmo nome nos dois workflows');
 
-  tool('create_column', 'Cria uma coluna em um workflow. Sem `position`, ela entra antes da primeira coluna de conclusão ou cancelamento.', { workflow: workflowArg, name: z.string().min(1), category: categoryArg.optional(), position: z.number().int().min(0).optional().describe('Índice da coluna na linha (0 = primeira)') }, (a, router) => {
-    const s = router.snapshot();
-    const wf = findWorkflow(s, a.workflow);
-    const before = new Set(s.columns.map((c) => c.id));
-    const created = router.handle({ type: 'settings.column.create', workflowId: wf.id, name: a.name, position: a.position }).columns.find((c) => !before.has(c.id));
-    if (created && a.category) router.handle({ type: 'settings.column.update', columnId: created.id, patch: { category: a.category } });
-    return overview(router);
-  });
+  tool(
+    'create_column',
+    'Cria uma coluna em um workflow. Sem `position`, ela entra antes da primeira coluna de conclusão ou cancelamento.',
+    {
+      workflow: workflowArg,
+      name: z.string().min(1),
+      category: categoryArg.optional(),
+      position: z.number().int().min(0).optional().describe('Índice da coluna na linha (0 = primeira)'),
+    },
+    (a, router) => {
+      const s = router.snapshot();
+      const wf = findWorkflow(s, a.workflow);
+      const before = new Set(s.columns.map((c) => c.id));
+      const created = router
+        .handle({ type: 'settings.column.create', workflowId: wf.id, name: a.name, position: a.position })
+        .columns.find((c) => !before.has(c.id));
+      if (created && a.category) router.handle({ type: 'settings.column.update', columnId: created.id, patch: { category: a.category } });
+      return overview(router);
+    },
+  );
 
   tool(
     'update_column',
     'Altera uma coluna: nome, o que ela representa (categoria), posição no workflow, se a IA atua nela, se ela exige aprovação de uma pessoa para o card avançar, e a fase (instrução para a IA e modelo do documento que a fase produz).',
-    { column: z.string(), workflow: columnWorkflowArg, name: z.string().min(1).optional(), category: categoryArg.optional(), position: z.number().int().min(0).optional(), collapsed: z.boolean().optional().describe('A coluna começa colapsada ao abrir o board'), ai_active: z.boolean().optional().describe('A IA trabalha nos cards desta coluna: ao entrar nela o card fica "ready"'), requires_approval: z.boolean().optional().describe('A IA só avança o card depois que uma pessoa aprova'), ai_instruction: z.string().optional().describe('O que a IA faz quando um card entra nesta coluna (fase)'), artifact_name: z.string().optional().describe('Nome do arquivo do documento que a fase produz, ex.: "PRD.md"; vazio se não produz'), artifact_template: z.string().optional().describe('Modelo do documento, em markdown'), exec_profile: z.string().optional().describe('Nome do perfil de execução dos cards desta coluna (ver get_board); vazio volta ao padrão do board') },
+    {
+      column: z.string(),
+      workflow: columnWorkflowArg,
+      name: z.string().min(1).optional(),
+      category: categoryArg.optional(),
+      position: z.number().int().min(0).optional(),
+      collapsed: z.boolean().optional().describe('A coluna começa colapsada ao abrir o board'),
+      ai_active: z.boolean().optional().describe('A IA trabalha nos cards desta coluna: ao entrar nela o card fica "ready"'),
+      requires_approval: z.boolean().optional().describe('A IA só avança o card depois que uma pessoa aprova'),
+      ai_instruction: z.string().optional().describe('O que a IA faz quando um card entra nesta coluna (fase)'),
+      artifact_name: z.string().optional().describe('Nome do arquivo do documento que a fase produz, ex.: "PRD.md"; vazio se não produz'),
+      artifact_template: z.string().optional().describe('Modelo do documento, em markdown'),
+      exec_profile: z
+        .string()
+        .optional()
+        .describe('Nome do perfil de execução dos cards desta coluna (ver get_board); vazio volta ao padrão do board'),
+    },
     (a, router) => {
       const s = router.snapshot();
       const col = findColumn(s, a.column, a.workflow ? findWorkflow(s, a.workflow).id : undefined);
-      router.handle({ type: 'settings.column.update', columnId: col.id, patch: { name: a.name, category: a.category, position: a.position, collapsed: a.collapsed, aiActive: a.ai_active, requiresApproval: a.requires_approval, aiInstruction: a.ai_instruction, artifactName: a.artifact_name, artifactTemplate: a.artifact_template, execProfile: a.exec_profile === undefined ? undefined : a.exec_profile ? findProfile(router.snapshot(), a.exec_profile).id : null } });
+      router.handle({
+        type: 'settings.column.update',
+        columnId: col.id,
+        patch: {
+          name: a.name,
+          category: a.category,
+          position: a.position,
+          collapsed: a.collapsed,
+          aiActive: a.ai_active,
+          requiresApproval: a.requires_approval,
+          aiInstruction: a.ai_instruction,
+          artifactName: a.artifact_name,
+          artifactTemplate: a.artifact_template,
+          execProfile: a.exec_profile === undefined ? undefined : a.exec_profile ? findProfile(router.snapshot(), a.exec_profile).id : null,
+        },
+      });
       return overview(router);
     },
   );
@@ -469,7 +611,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   );
 
   tool('rename_workflow', 'Renomeia um workflow (linha do board).', { workflow: workflowArg, name: z.string().min(1) }, (a, router) => {
-    router.handle({ type: 'settings.workflow.update', workflowId: findWorkflow(router.snapshot(), a.workflow).id, patch: { name: a.name } });
+    router.handle({
+      type: 'settings.workflow.update',
+      workflowId: findWorkflow(router.snapshot(), a.workflow).id,
+      patch: { name: a.name },
+    });
     return overview(router);
   });
 
@@ -478,7 +624,11 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     'Define como uma linha do board aparece ao abrir: a linha inteira colapsada ou não, e a coluna de arquivados dela colapsada ou não.',
     { workflow: workflowArg, collapsed: z.boolean().optional(), archive_collapsed: z.boolean().optional() },
     (a, router) => {
-      router.handle({ type: 'settings.workflow.update', workflowId: findWorkflow(router.snapshot(), a.workflow).id, patch: { collapsed: a.collapsed, archiveCollapsed: a.archive_collapsed } });
+      router.handle({
+        type: 'settings.workflow.update',
+        workflowId: findWorkflow(router.snapshot(), a.workflow).id,
+        patch: { collapsed: a.collapsed, archiveCollapsed: a.archive_collapsed },
+      });
       return overview(router);
     },
   );
@@ -488,11 +638,16 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     'Ajusta a aparência do board: tema (system acompanha o claro/escuro do VS Code (ou do sistema, no navegador), light, dark) e a fonte e o tamanho dos textos longos (descrição e comentários).',
     {
       theme: z.enum(['system', 'light', 'dark']).optional(),
-      font: z.enum(['sans', 'ui', 'serif', 'mono', 'editor']).optional().describe('sans = sem serifa do sistema; ui = fonte da interface do VS Code; editor = fonte do editor do VS Code'),
+      font: z
+        .enum(['sans', 'ui', 'serif', 'mono', 'editor'])
+        .optional()
+        .describe('sans = sem serifa do sistema; ui = fonte da interface do VS Code; editor = fonte do editor do VS Code'),
       font_size: z.number().int().min(11).max(22).optional().describe('Tamanho em px'),
     },
     (a, router) => {
-      const patch = Object.fromEntries(Object.entries({ theme: a.theme, font: a.font, fontSize: a.font_size }).filter(([, v]) => v !== undefined));
+      const patch = Object.fromEntries(
+        Object.entries({ theme: a.theme, font: a.font, fontSize: a.font_size }).filter(([, v]) => v !== undefined),
+      );
       return router.handle({ type: 'settings.board.update', patch: { appearance: patch } }).board.appearance;
     },
   );
@@ -502,12 +657,25 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     return overview(router);
   });
 
-  const colorArg = z.string().regex(/^#[0-9a-fA-F]{6}$/).describe('Cor em hexadecimal, ex.: "#3b82f6"');
+  const colorArg = z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .describe('Cor em hexadecimal, ex.: "#3b82f6"');
 
-  tool('create_card_type', 'Cria um tipo de card.', { name: z.string().min(1), workflow: workflowArg, color: colorArg.optional() }, (a, router) => {
-    router.handle({ type: 'settings.type.create', name: a.name, color: a.color ?? '#6b7280', defaultWorkflowId: findWorkflow(router.snapshot(), a.workflow).id });
-    return overview(router);
-  });
+  tool(
+    'create_card_type',
+    'Cria um tipo de card.',
+    { name: z.string().min(1), workflow: workflowArg, color: colorArg.optional() },
+    (a, router) => {
+      router.handle({
+        type: 'settings.type.create',
+        name: a.name,
+        color: a.color ?? '#6b7280',
+        defaultWorkflowId: findWorkflow(router.snapshot(), a.workflow).id,
+      });
+      return overview(router);
+    },
+  );
 
   tool(
     'update_card_type',
@@ -516,12 +684,21 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       type: z.string(),
       name: z.string().min(1).optional(),
       color: colorArg.optional(),
-      default_fields: fieldsArg.optional().describe('Padrões por nome do campo, ex.: {"Modelo": "claude:sonnet@medium", "Skills": ["revisar-spec"]}. Substitui todos os padrões do tipo; {} limpa.'),
+      default_fields: fieldsArg
+        .optional()
+        .describe(
+          'Padrões por nome do campo, ex.: {"Modelo": "claude:sonnet@medium", "Skills": ["revisar-spec"]}. Substitui todos os padrões do tipo; {} limpa.',
+        ),
     },
     (a, router) => {
       const s = router.snapshot();
       const defaults = a.default_fields
-        ? Object.fromEntries(Object.entries(a.default_fields).map(([name, value]) => { const f = findField(s, name); return [f.id, coerceFieldValue(f, value, s.board.modelCatalog)]; }))
+        ? Object.fromEntries(
+            Object.entries(a.default_fields).map(([name, value]) => {
+              const f = findField(s, name);
+              return [f.id, coerceFieldValue(f, value, s.board.modelCatalog)];
+            }),
+          )
         : undefined;
       router.handle({ type: 'settings.type.update', typeId: findType(s, a.type).id, patch: { name: a.name, color: a.color, defaults } });
       return overview(router);
@@ -536,15 +713,29 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   const kindArg = z.enum(['text', 'number', 'date', 'select', 'multiselect', 'checkbox', 'url']);
   const displayArg = z.enum(['badge', 'chip', 'inline', 'hidden']).describe('Como o campo aparece no card');
   const appliesArg = z.array(z.string()).nullable().describe('Nomes dos tipos de card em que o campo aparece; null = todos');
-  const typeIds = (s: BoardState, names: string[] | null | undefined) => (names === undefined ? undefined : names === null ? null : names.map((n) => findType(s, n).id));
+  const typeIds = (s: BoardState, names: string[] | null | undefined) =>
+    names === undefined ? undefined : names === null ? null : names.map((n) => findType(s, n).id);
 
   tool(
     'create_field',
     'Cria um campo personalizado para os cards.',
-    { name: z.string().min(1), kind: kindArg, options: z.array(z.string()).optional().describe('Opções, para select e multiselect'), applies_to_types: appliesArg.optional(), display: displayArg.optional() },
+    {
+      name: z.string().min(1),
+      kind: kindArg,
+      options: z.array(z.string()).optional().describe('Opções, para select e multiselect'),
+      applies_to_types: appliesArg.optional(),
+      display: displayArg.optional(),
+    },
     (a, router) => {
       const s = router.snapshot();
-      router.handle({ type: 'settings.field.create', name: a.name, kind: a.kind, options: a.options ?? [], appliesToTypes: typeIds(s, a.applies_to_types) ?? null, display: a.display ?? 'inline' });
+      router.handle({
+        type: 'settings.field.create',
+        name: a.name,
+        kind: a.kind,
+        options: a.options ?? [],
+        appliesToTypes: typeIds(s, a.applies_to_types) ?? null,
+        display: a.display ?? 'inline',
+      });
       return overview(router);
     },
   );
@@ -552,10 +743,20 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
   tool(
     'update_field',
     'Altera nome, opções, tipos de card ou exibição de um campo personalizado.',
-    { field: z.string(), name: z.string().min(1).optional(), options: z.array(z.string()).optional(), applies_to_types: appliesArg.optional(), display: displayArg.optional() },
+    {
+      field: z.string(),
+      name: z.string().min(1).optional(),
+      options: z.array(z.string()).optional(),
+      applies_to_types: appliesArg.optional(),
+      display: displayArg.optional(),
+    },
     (a, router) => {
       const s = router.snapshot();
-      router.handle({ type: 'settings.field.update', fieldId: findField(s, a.field).id, patch: { name: a.name, options: a.options, appliesToTypes: typeIds(s, a.applies_to_types), display: a.display } });
+      router.handle({
+        type: 'settings.field.update',
+        fieldId: findField(s, a.field).id,
+        patch: { name: a.name, options: a.options, appliesToTypes: typeIds(s, a.applies_to_types), display: a.display },
+      });
       return overview(router);
     },
   );
@@ -570,12 +771,18 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     'Altera as regras do board. Só o que for informado é alterado.',
     {
       blockDoneWithOpenChildren: z.boolean().optional().describe('História não entra em coluna de conclusão com sub-tarefas em aberto'),
-      blockPhaseAdvanceWithOpenChildren: z.boolean().optional().describe('História não avança de coluna enquanto houver sub-tarefas em aberto cuja Fase é a coluna atual'),
+      blockPhaseAdvanceWithOpenChildren: z
+        .boolean()
+        .optional()
+        .describe('História não avança de coluna enquanto houver sub-tarefas em aberto cuja Fase é a coluna atual'),
       onCancelParent: z.enum(['ask', 'cascade', 'keep']).optional().describe('Sub-tarefas em aberto quando a história é cancelada'),
       onAllChildrenDone: z.enum(['ask', 'auto', 'off']).optional().describe('História quando a última sub-tarefa em aberto é concluída'),
       confirmTrash: z.enum(['whenDependents', 'always', 'never']).optional(),
       confirmArchive: z.enum(['whenDependents', 'always', 'never']).optional(),
-      autoApplyModelSuggestion: z.boolean().optional().describe('Preencher o campo de modelo com a sugestão enquanto ele não foi escolhido à mão'),
+      autoApplyModelSuggestion: z
+        .boolean()
+        .optional()
+        .describe('Preencher o campo de modelo com a sugestão enquanto ele não foi escolhido à mão'),
     },
     (a, router) => {
       const patch = Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined));
@@ -623,7 +830,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       tool: toolArg,
       model: z.string().min(1).describe('Identificador usado pela ferramenta para escolher o modelo, ex.: "opus", "k3", "gpt-6.1-sol"'),
       label: z.string().optional().describe('Nome para exibição; por padrão, o identificador'),
-      efforts: z.array(z.string()).optional().describe('Níveis de esforço/raciocínio aceitos, do menor para o maior; vazio se o modelo não tem esse ajuste'),
+      efforts: z
+        .array(z.string())
+        .optional()
+        .describe('Níveis de esforço/raciocínio aceitos, do menor para o maior; vazio se o modelo não tem esse ajuste'),
       default_effort: z.string().optional(),
     },
     (a, router) => {
@@ -631,7 +841,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       const id = modelId(a.tool as AiTool, a.model);
       const efforts = a.efforts ?? [];
       if (a.default_effort && !efforts.includes(a.default_effort)) throw new Error('default_effort precisa ser um dos efforts.');
-      const entry = { id, tool: a.tool as AiTool, model: a.model, label: a.label ?? a.model, efforts, defaultEffort: a.default_effort ?? null };
+      const entry = {
+        id,
+        tool: a.tool as AiTool,
+        model: a.model,
+        label: a.label ?? a.model,
+        efforts,
+        defaultEffort: a.default_effort ?? null,
+      };
       const at = catalog.findIndex((o) => o.id === id);
       if (at >= 0) catalog[at] = entry;
       else catalog.push(entry);
@@ -640,12 +857,17 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
   );
 
-  tool('delete_model', 'Remove um modelo do catálogo.', { model: z.string().describe('`value` do modelo no catálogo, ex.: "claude:opus"') }, (a, router) => {
-    const catalog = router.snapshot().board.modelCatalog;
-    if (!catalog.some((o) => o.id === a.model)) throw new Error(`Modelo "${a.model}" não está no catálogo.`);
-    router.handle({ type: 'settings.models.set', catalog: catalog.filter((o) => o.id !== a.model) });
-    return models(router);
-  });
+  tool(
+    'delete_model',
+    'Remove um modelo do catálogo.',
+    { model: z.string().describe('`value` do modelo no catálogo, ex.: "claude:opus"') },
+    (a, router) => {
+      const catalog = router.snapshot().board.modelCatalog;
+      if (!catalog.some((o) => o.id === a.model)) throw new Error(`Modelo "${a.model}" não está no catálogo.`);
+      router.handle({ type: 'settings.models.set', catalog: catalog.filter((o) => o.id !== a.model) });
+      return models(router);
+    },
+  );
 
   tool(
     'set_model_rules',
@@ -656,13 +878,15 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           name: z.string().optional(),
           when: z
             .array(
-              z.array(
-                z.object({
-                  field: z.string().describe('Nome do campo (ex.: "Esforço", "Tags") ou "Tipo" para o tipo do card'),
-                  value: z.string().describe('Valor comparado, ex.: "Alto", "backend", "Bug"'),
-                  not: z.boolean().optional().describe('true = a condição vale quando o campo NÃO tem esse valor'),
-                }),
-              ).min(1),
+              z
+                .array(
+                  z.object({
+                    field: z.string().describe('Nome do campo (ex.: "Esforço", "Tags") ou "Tipo" para o tipo do card'),
+                    value: z.string().describe('Valor comparado, ex.: "Alto", "backend", "Bug"'),
+                    not: z.boolean().optional().describe('true = a condição vale quando o campo NÃO tem esse valor'),
+                  }),
+                )
+                .min(1),
             )
             .min(1)
             .describe('Ex.: [[{Esforço=Alto},{Tags=backend}], [{Tipo=Bug}]] significa (Esforço=Alto E Tags=backend) OU Tipo=Bug'),
@@ -673,12 +897,15 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
     (a, router) => {
       const s = router.snapshot();
-      const fieldId = (name: string) => (['tipo', 'type', TYPE_CONDITION].includes(name.trim().toLowerCase()) ? TYPE_CONDITION : findField(s, name).id);
+      const fieldId = (name: string) =>
+        ['tipo', 'type', TYPE_CONDITION].includes(name.trim().toLowerCase()) ? TYPE_CONDITION : findField(s, name).id;
       const rules: ModelRule[] = a.rules.map((r) => ({
         id: newId(),
         name: r.name ?? '',
         enabled: r.enabled !== false,
-        groups: r.when.map((g) => g.map((c) => ({ fieldId: fieldId(c.field), op: c.not ? ('isNot' as const) : ('is' as const), value: c.value }))),
+        groups: r.when.map((g) =>
+          g.map((c) => ({ fieldId: fieldId(c.field), op: c.not ? ('isNot' as const) : ('is' as const), value: c.value })),
+        ),
         model: resolveModelInput(s.board.modelCatalog, r.model),
       }));
       router.handle({ type: 'settings.modelRules.set', rules });
@@ -725,23 +952,40 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
   );
 
-  tool('read_rule_file', 'Lê um arquivo de regras do projeto.', { file: ruleArg }, (a, router) => {
-    const r = router.snapshot().harness.rules.find((x) => x.name === a.file);
-    if (!r?.exists) throw new Error(`${a.file} não existe neste projeto.`);
-    return r.content;
-  }, true);
+  tool(
+    'read_rule_file',
+    'Lê um arquivo de regras do projeto.',
+    { file: ruleArg },
+    (a, router) => {
+      const r = router.snapshot().harness.rules.find((x) => x.name === a.file);
+      if (!r?.exists) throw new Error(`${a.file} não existe neste projeto.`);
+      return r.content;
+    },
+    true,
+  );
 
-  tool('write_rule_file', 'Cria ou substitui por inteiro um arquivo de regras do projeto.', { file: ruleArg, content: z.string() }, (a, router) => {
-    router.handle({ type: 'harness.rule.write', name: a.file, content: a.content });
-    return harness(router);
-  });
+  tool(
+    'write_rule_file',
+    'Cria ou substitui por inteiro um arquivo de regras do projeto.',
+    { file: ruleArg, content: z.string() },
+    (a, router) => {
+      router.handle({ type: 'harness.rule.write', name: a.file, content: a.content });
+      return harness(router);
+    },
+  );
 
   tool('delete_rule_file', 'Apaga um arquivo de regras do projeto. Não pode ser desfeito pelo board.', { file: ruleArg }, (a, router) => {
     router.handle({ type: 'harness.rule.delete', name: a.file });
     return harness(router);
   });
 
-  tool('get_skill', 'Lê o SKILL.md completo de uma skill do projeto.', { skill: skillArg }, (a, router) => skill(router, a.skill).content, true);
+  tool(
+    'get_skill',
+    'Lê o SKILL.md completo de uma skill do projeto.',
+    { skill: skillArg },
+    (a, router) => skill(router, a.skill).content,
+    true,
+  );
 
   tool(
     'create_skill',
@@ -764,15 +1008,24 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     (_a, router) => {
       const had = router.snapshot().harness.skills.some((k) => k.name === FLOW_SKILL.name);
       router.handle({ type: 'harness.flowSkill.install' });
-      return { installed: !had, note: had ? 'A skill já existia e foi mantida como está.' : 'Skill criada.', skill: router.snapshot().harness.skills.find((k) => k.name === FLOW_SKILL.name)?.path };
+      return {
+        installed: !had,
+        note: had ? 'A skill já existia e foi mantida como está.' : 'Skill criada.',
+        skill: router.snapshot().harness.skills.find((k) => k.name === FLOW_SKILL.name)?.path,
+      };
     },
   );
 
-  tool('update_skill', 'Substitui o SKILL.md inteiro de uma skill, incluindo o frontmatter (name, description).', { skill: skillArg, content: z.string().min(1) }, (a, router) => {
-    skill(router, a.skill);
-    router.handle({ type: 'harness.skill.write', name: a.skill, content: a.content });
-    return harness(router);
-  });
+  tool(
+    'update_skill',
+    'Substitui o SKILL.md inteiro de uma skill, incluindo o frontmatter (name, description).',
+    { skill: skillArg, content: z.string().min(1) },
+    (a, router) => {
+      skill(router, a.skill);
+      router.handle({ type: 'harness.skill.write', name: a.skill, content: a.content });
+      return harness(router);
+    },
+  );
 
   tool(
     'set_skill_enabled',
@@ -785,32 +1038,55 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
   );
 
-  tool('delete_skill', 'Apaga uma skill do projeto, com todos os arquivos da pasta. Não pode ser desfeito pelo board.', { skill: skillArg }, (a, router) => {
-    skill(router, a.skill);
-    router.handle({ type: 'harness.skill.delete', name: a.skill });
-    return harness(router);
-  });
+  tool(
+    'delete_skill',
+    'Apaga uma skill do projeto, com todos os arquivos da pasta. Não pode ser desfeito pelo board.',
+    { skill: skillArg },
+    (a, router) => {
+      skill(router, a.skill);
+      router.handle({ type: 'harness.skill.delete', name: a.skill });
+      return harness(router);
+    },
+  );
 
   // ---------- harness: agentes do projeto ----------
 
   const agentArg = z.string().describe('Nome do agente (nome do arquivo, sem a extensão), ex.: "revisor-de-spec"');
   const agent = (router: MessageRouter, name: string) => {
     const found = router.snapshot().harness.agents.find((x) => x.name === name);
-    if (!found) throw new Error(`Agente "${name}" não encontrado. Existentes: ${router.snapshot().harness.agents.map((x) => `"${x.name}"`).join(', ') || 'nenhum'}.`);
+    if (!found)
+      throw new Error(
+        `Agente "${name}" não encontrado. Existentes: ${
+          router
+            .snapshot()
+            .harness.agents.map((x) => `"${x.name}"`)
+            .join(', ') || 'nenhum'
+        }.`,
+      );
     return found;
   };
 
   tool(
     'write_skill_file',
     'Grava um arquivo de apoio numa skill do projeto: um modelo de classe ou exemplo de código em `references/`, um modelo de arquivo em `assets/` ou um script em `scripts/`. Substitui o arquivo se ele já existir. Para a IA ler o arquivo quando usar a skill, o SKILL.md precisa apontar para ele (use update_skill).',
-    { skill: z.string().describe('Nome da skill do projeto'), file: z.string().describe('Caminho dentro da pasta da skill, ex.: "references/modelo-de-repositorio.ts"'), content: z.string() },
+    {
+      skill: z.string().describe('Nome da skill do projeto'),
+      file: z.string().describe('Caminho dentro da pasta da skill, ex.: "references/modelo-de-repositorio.ts"'),
+      content: z.string(),
+    },
     (a, router) => {
       router.writeSkillFile(a.skill, a.file, a.content);
       return harnessOverview(router.snapshot()).inventory.find((i) => i.kind === 'skill' && i.scope === 'project' && i.name === a.skill);
     },
   );
 
-  tool('get_agent', 'Lê o arquivo completo de um agente (subagente) do projeto, listado em get_harness.', { agent: agentArg }, (a, router) => agent(router, a.agent).content, true);
+  tool(
+    'get_agent',
+    'Lê o arquivo completo de um agente (subagente) do projeto, listado em get_harness.',
+    { agent: agentArg },
+    (a, router) => agent(router, a.agent).content,
+    true,
+  );
 
   tool(
     'create_agent',
@@ -819,7 +1095,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       name: z.string().describe('Letras minúsculas, números e hífens'),
       description: z.string().min(1).describe('Quando delegar a este agente; é por ela que a IA decide usá-lo'),
       content: z.string().describe('Instruções do agente em markdown (sem o frontmatter)'),
-      model: z.string().optional().describe('Modelo fixado no agente, no formato que a ferramenta aceita no frontmatter; sem ele o agente usa o modelo da sessão'),
+      model: z
+        .string()
+        .optional()
+        .describe('Modelo fixado no agente, no formato que a ferramenta aceita no frontmatter; sem ele o agente usa o modelo da sessão'),
     },
     (a, router) => {
       router.handle({ type: 'harness.agent.create', name: a.name, description: a.description, content: a.content, model: a.model });
@@ -827,11 +1106,16 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     },
   );
 
-  tool('update_agent', 'Substitui o arquivo inteiro de um agente, incluindo o frontmatter.', { agent: agentArg, content: z.string().min(1) }, (a, router) => {
-    agent(router, a.agent);
-    router.handle({ type: 'harness.agent.write', name: a.agent, content: a.content });
-    return harness(router);
-  });
+  tool(
+    'update_agent',
+    'Substitui o arquivo inteiro de um agente, incluindo o frontmatter.',
+    { agent: agentArg, content: z.string().min(1) },
+    (a, router) => {
+      agent(router, a.agent);
+      router.handle({ type: 'harness.agent.write', name: a.agent, content: a.content });
+      return harness(router);
+    },
+  );
 
   tool('delete_agent', 'Apaga um agente do projeto. Não pode ser desfeito pelo board.', { agent: agentArg }, (a, router) => {
     agent(router, a.agent);
@@ -843,7 +1127,10 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
 /** Ids das colunas com esse nome (pode haver uma em cada workflow). */
 function findProfile(s: BoardState, name: string) {
   const profile = s.board.execProfiles.find((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
-  if (!profile) throw new Error(`Perfil de execução "${name}" não encontrado. Perfis: ${s.board.execProfiles.map((p) => p.name).join(', ') || 'nenhum'}.`);
+  if (!profile)
+    throw new Error(
+      `Perfil de execução "${name}" não encontrado. Perfis: ${s.board.execProfiles.map((p) => p.name).join(', ') || 'nenhum'}.`,
+    );
   return profile;
 }
 

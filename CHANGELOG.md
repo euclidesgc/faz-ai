@@ -28,6 +28,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - Interno: o front passa a usar primitivas de interface (botão, seletor tipado, chips, linha de
   campo, botão de apagar com confirmação, campo de adicionar, campo numérico) em vez de repetir o
   mesmo HTML em cada tela. Nada muda na aparência nem para quem usa.
+- Interno: a tela Configurações > Harness foi quebrada em arquivos por seção, e o front pede as
+  ações ao host por comandos com nome (`src/webview/commands.ts`). Nada muda para quem usa.
+- Interno: o código todo segue o Prettier, conferido pelo `npm test`, e o `npm run typecheck`
+  passa a cobrir os testes da interface.
 
 ## 0.29.1
 

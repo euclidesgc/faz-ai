@@ -23,7 +23,11 @@ const call = async (name: string, args: Record<string, unknown> = {}) => {
   const res = await client.callTool({ name, arguments: args });
   const text = (res.content as { text: string }[])[0]!.text;
   let data: any = text;
-  try { data = JSON.parse(text); } catch { /* texto simples */ }
+  try {
+    data = JSON.parse(text);
+  } catch {
+    /* texto simples */
+  }
   return { error: res.isError === true, text, data };
 };
 const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
@@ -42,7 +46,11 @@ beforeEach(async () => {
 
   const db = await openInMemory(WASM_DIR);
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
-    workspaceKey: 'ws', folderName: 'projeto', author: 'Pessoa', attachmentsDir: path.join(base, 'attachments'), workspaceDir: repo,
+    workspaceKey: 'ws',
+    folderName: 'projeto',
+    author: 'Pessoa',
+    attachmentsDir: path.join(base, 'attachments'),
+    workspaceDir: repo,
   });
   const server = createMcpServer({ getRouter: async () => router, workspaceDir: repo, version: 'test' });
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -56,11 +64,16 @@ afterEach(() => fs.rmSync(base, { recursive: true, force: true }));
 describe('nome da branch', () => {
   it('monta o nome a partir do tipo, número e título', () => {
     expect(slug('Login com Google: 2ª tentativa!')).toBe('login-com-google-2-tentativa');
-    expect(branchName('{tipo}/{numero}-{titulo}', { type: 'Débito técnico', number: 7, title: 'Atualizar SDK' })).toBe('debito-tecnico/7-atualizar-sdk');
+    expect(branchName('{tipo}/{numero}-{titulo}', { type: 'Débito técnico', number: 7, title: 'Atualizar SDK' })).toBe(
+      'debito-tecnico/7-atualizar-sdk',
+    );
     expect(branchName('feat/{numero}', { type: 'História', number: 3, title: 'x' })).toBe('feat/3');
     expect(branchName('{numero}-{titulo}', { type: 'Bug', number: 9, title: '???' })).toBe('9-sem-titulo');
     // sem o número o padrão é recusado
-    expect(parseGit(JSON.stringify({ branchPattern: '{titulo}', mode: 'nada' }))).toMatchObject({ branchPattern: '{tipo}/{numero}-{titulo}', mode: 'worktree' });
+    expect(parseGit(JSON.stringify({ branchPattern: '{titulo}', mode: 'nada' }))).toMatchObject({
+      branchPattern: '{tipo}/{numero}-{titulo}',
+      mode: 'worktree',
+    });
   });
 });
 
@@ -117,8 +130,12 @@ describe('branch e worktree por história', () => {
     const root = path.join(base, 'projeto.worktrees');
     expect(router.aiWorkDirs()).toEqual([root]);
     expect(fs.existsSync(root)).toBe(true);
-    expect(headlessCommand('claude', { prompt: 'P', permission: 'edits', addDirs: [root] })).toMatchObject({ args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', '--add-dir', root] });
-    expect(headlessCommand('copilot', { prompt: 'P', permission: 'board', addDirs: [root] })).toMatchObject({ args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', `--add-dir=${root}`, '--no-ask-user'] });
+    expect(headlessCommand('claude', { prompt: 'P', permission: 'edits', addDirs: [root] })).toMatchObject({
+      args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', '--add-dir', root],
+    });
+    expect(headlessCommand('copilot', { prompt: 'P', permission: 'board', addDirs: [root] })).toMatchObject({
+      args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', `--add-dir=${root}`, '--no-ask-user'],
+    });
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
     expect(router.aiWorkDirs()).toEqual([]);
   });

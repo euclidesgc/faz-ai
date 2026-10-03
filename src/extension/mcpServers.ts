@@ -33,7 +33,10 @@ function readForWrite(file: string): Record<string, unknown> {
 }
 
 const tomlKey = (name: string) => (/^[\w-]+$/.test(name) ? name : JSON.stringify(name));
-const tomlTable = (pairs: Record<string, string>) => Object.entries(pairs).map(([k, v]) => `${tomlKey(k)} = ${JSON.stringify(v)}`).join('\n');
+const tomlTable = (pairs: Record<string, string>) =>
+  Object.entries(pairs)
+    .map(([k, v]) => `${tomlKey(k)} = ${JSON.stringify(v)}`)
+    .join('\n');
 
 /** Linhas de um TOML sem a tabela do servidor e as subtabelas dela (env, http_headers…). */
 function withoutTomlServer(toml: string, table: string, name: string): { text: string; removed: boolean } {
@@ -55,7 +58,10 @@ function withoutTomlServer(toml: string, table: string, name: string): { text: s
 
 /** Acrescenta e remove servidores MCP nos arquivos de configuração das ferramentas. Não depende da API do VSCode. */
 export class McpServers {
-  constructor(private projectDir: string, private homeDir: string) {}
+  constructor(
+    private projectDir: string,
+    private homeDir: string,
+  ) {}
 
   private file(src: HarnessSource): string {
     const base = src.scope === 'project' ? this.projectDir : this.homeDir;
@@ -65,7 +71,8 @@ export class McpServers {
 
   private source(tool: AiTool, index: number): HarnessSource {
     const src = HARNESS_CATALOG[tool][index];
-    if (!src || src.kind !== 'mcp' || (src.layout !== 'json-keys' && src.layout !== 'toml-tables')) throw new Error('Este arquivo de servidores MCP não é editado pelo board.');
+    if (!src || src.kind !== 'mcp' || (src.layout !== 'json-keys' && src.layout !== 'toml-tables'))
+      throw new Error('Este arquivo de servidores MCP não é editado pelo board.');
     return src;
   }
 
@@ -91,8 +98,17 @@ export class McpServers {
       // strings JSON são strings básicas válidas em TOML
       const block =
         s.transport === 'stdio'
-          ? [`[${head}]`, `command = ${JSON.stringify(s.command)}`, ...(s.args.length ? [`args = [${s.args.map((a) => JSON.stringify(a)).join(', ')}]`] : []), ...(Object.keys(s.env).length ? ['', `[${head}.env]`, tomlTable(s.env)] : [])]
-          : [`[${head}]`, `url = ${JSON.stringify(s.url)}`, ...(Object.keys(s.headers).length ? ['', `[${head}.http_headers]`, tomlTable(s.headers)] : [])];
+          ? [
+              `[${head}]`,
+              `command = ${JSON.stringify(s.command)}`,
+              ...(s.args.length ? [`args = [${s.args.map((a) => JSON.stringify(a)).join(', ')}]`] : []),
+              ...(Object.keys(s.env).length ? ['', `[${head}.env]`, tomlTable(s.env)] : []),
+            ]
+          : [
+              `[${head}]`,
+              `url = ${JSON.stringify(s.url)}`,
+              ...(Object.keys(s.headers).length ? ['', `[${head}.http_headers]`, tomlTable(s.headers)] : []),
+            ];
       const rest = toml.replace(/\n+$/, '');
       fs.writeFileSync(file, `${rest}${rest ? '\n\n' : ''}${block.join('\n')}\n`);
     }
@@ -102,8 +118,15 @@ export class McpServers {
   /** Remove o servidor do arquivo em que a varredura o encontrou. */
   remove(tool: AiTool, item: HarnessItem): void {
     if (item.kind !== 'mcp' || item.scope === 'plugin') throw new Error('Servidores de plugin não podem ser removidos pelo board.');
-    const src = HARNESS_CATALOG[tool].find((x) => x.kind === 'mcp' && (x.layout === 'json-keys' || x.layout === 'toml-tables') && x.scope === item.scope && this.file(x) === item.path);
-    if (!src) throw new Error('Este servidor fica num arquivo que o board não edita. Abra o arquivo, ou use a linha de comando da ferramenta.');
+    const src = HARNESS_CATALOG[tool].find(
+      (x) =>
+        x.kind === 'mcp' &&
+        (x.layout === 'json-keys' || x.layout === 'toml-tables') &&
+        x.scope === item.scope &&
+        this.file(x) === item.path,
+    );
+    if (!src)
+      throw new Error('Este servidor fica num arquivo que o board não edita. Abra o arquivo, ou use a linha de comando da ferramenta.');
     if (src.layout === 'json-keys') {
       const config = readForWrite(item.path);
       const section = { ...(config[src.key] as Record<string, unknown> | undefined) };

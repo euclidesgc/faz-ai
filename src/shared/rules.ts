@@ -41,13 +41,17 @@ export function parseRules(json: string | null | undefined): BoardRules {
   const pick = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(v as T) ? (v as T) : fallback);
   const confirm = ['whenDependents', 'always', 'never'] as const;
   return {
-    blockDoneWithOpenChildren: typeof raw.blockDoneWithOpenChildren === 'boolean' ? raw.blockDoneWithOpenChildren : DEFAULT_RULES.blockDoneWithOpenChildren,
+    blockDoneWithOpenChildren:
+      typeof raw.blockDoneWithOpenChildren === 'boolean' ? raw.blockDoneWithOpenChildren : DEFAULT_RULES.blockDoneWithOpenChildren,
     blockPhaseAdvanceWithOpenChildren:
-      typeof raw.blockPhaseAdvanceWithOpenChildren === 'boolean' ? raw.blockPhaseAdvanceWithOpenChildren : DEFAULT_RULES.blockPhaseAdvanceWithOpenChildren,
+      typeof raw.blockPhaseAdvanceWithOpenChildren === 'boolean'
+        ? raw.blockPhaseAdvanceWithOpenChildren
+        : DEFAULT_RULES.blockPhaseAdvanceWithOpenChildren,
     onCancelParent: pick(raw.onCancelParent, ['ask', 'cascade', 'keep'] as const, DEFAULT_RULES.onCancelParent),
     onAllChildrenDone: pick(raw.onAllChildrenDone, ['ask', 'auto', 'off'] as const, DEFAULT_RULES.onAllChildrenDone),
     confirmTrash: pick(raw.confirmTrash, confirm, DEFAULT_RULES.confirmTrash),
     confirmArchive: pick(raw.confirmArchive, confirm, DEFAULT_RULES.confirmArchive),
-    autoApplyModelSuggestion: typeof raw.autoApplyModelSuggestion === 'boolean' ? raw.autoApplyModelSuggestion : DEFAULT_RULES.autoApplyModelSuggestion,
+    autoApplyModelSuggestion:
+      typeof raw.autoApplyModelSuggestion === 'boolean' ? raw.autoApplyModelSuggestion : DEFAULT_RULES.autoApplyModelSuggestion,
   };
 }

@@ -29,7 +29,9 @@ describe('resolveTheme', () => {
   });
 
   it('no editor, as duas classes de alto contraste juntas são o tema claro', () => {
-    expect(resolveTheme('system', env({ bodyClasses: ['vscode-high-contrast', 'vscode-high-contrast-light'], prefersDark: true }))).toBe('light');
+    expect(resolveTheme('system', env({ bodyClasses: ['vscode-high-contrast', 'vscode-high-contrast-light'], prefersDark: true }))).toBe(
+      'light',
+    );
   });
 
   it('no editor sem classe do VS Code, cai no sistema operacional', () => {
