@@ -102,6 +102,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - Em Configurações > Campos, o seletor "No board" (Selo, Selo vazado, Nome: valor, Oculto) não
   invade mais a coluna das opções quando a janela é estreita: as colunas do cartão do campo passam
   a quebrar de linha antes de ficarem menores que o seletor.
+- **Regras do board com o novo design**: cada regra vira um cartão com o selo Ativa/Desligada, o
+  interruptor ou o seletor à direita e o "Quando / Então" embaixo. Os controles são os do Radix
+  Themes, iguais aos de Campos e Workflows. É a primeira das telas de Configurações que ainda usavam
+  os controles antigos.
 
 ## 0.29.1
 

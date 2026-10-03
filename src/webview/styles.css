@@ -1217,39 +1217,52 @@ button.ghost.on {
 }
 
 /* regras (Configurações → Regras) */
-.rule {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--sp-6) var(--sp-16);
-  align-items: center;
-}
-.rule.off {
-  opacity: 0.65;
-}
-.rule h3 {
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: var(--fs-md);
-  color: var(--fg);
-}
-.rule .when {
-  grid-column: 1 / -1;
+.rule-list {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: var(--sp-12);
+}
+.rule-list > .page-header {
+  margin-bottom: 0;
+}
+.rule.off {
+  opacity: 0.7;
+}
+.rule-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-8) var(--sp-12);
+}
+/* o h3 global das configurações é um rótulo em caixa alta; o título da regra é uma frase */
+.rule-head h3 {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--fg);
+}
+.rule-control {
+  margin-left: auto;
+}
+.rule-control .rt-SelectTrigger {
+  min-width: 230px;
+}
+.rule .when {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-4) var(--sp-12);
+  margin: var(--sp-12) 0 0;
   font-size: var(--fs-sm);
 }
-.rule .when b {
-  display: inline-block;
-  min-width: 54px;
+.rule .when dt {
   font-weight: 600;
   font-size: var(--fs-micro);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
+  padding-top: 2px;
 }
-.rule select {
-  min-width: 230px;
+.rule .when dd {
+  margin: 0;
 }
 .switch {
   display: inline-flex;

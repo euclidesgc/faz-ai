@@ -12,6 +12,7 @@ import { Board } from '../src/webview/components/Board';
 import { CommentsTab } from '../src/webview/components/card/CommentsTab';
 import { CardDrawer } from '../src/webview/components/CardDrawer';
 import { FilterBar } from '../src/webview/components/FilterBar';
+import { Theme } from '@radix-ui/themes';
 import { ThemeToggle, nextTheme } from '../src/webview/components/ThemeToggle';
 import { TrashView } from '../src/webview/components/TrashView';
 import { WorkflowsSettings } from '../src/webview/components/settings/workflows/WorkflowsSettings';
@@ -86,7 +87,8 @@ beforeAll(async () => {
   useBoardStore.setState({ state: router.snapshot() });
 });
 
-const html = (el: ReactElement) => renderToString(el);
+// as telas com controles do Radix precisam do `Theme`, como no main.tsx
+const html = (el: ReactElement) => renderToString(<Theme>{el}</Theme>);
 
 describe('telas montam sem erro', () => {
   it('board, filtros, lixeira e detalhe do card', () => {
