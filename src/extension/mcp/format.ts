@@ -12,6 +12,7 @@ import {
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
 import { childrenOf, columnOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
+import { storyOf } from '../../shared/story';
 import {
   cardRef,
   type BoardState,
@@ -230,7 +231,7 @@ export function requiredSkills(s: BoardState, c: Card) {
  * sub-tarefa, é a fase da história, porque o artefato é construído na sub-tarefa mas pertence à história.
  */
 function phaseOf(s: BoardState, c: Card) {
-  const story = c.parentId ? (s.cards.find((p) => p.id === c.parentId) ?? c) : c;
+  const story = storyOf(s, c) ?? c;
   const col = columnOf(s, story);
   if (!col || !col.aiActive || (!col.aiInstruction && !col.artifactName)) return undefined;
   return {
@@ -249,7 +250,7 @@ function phaseOf(s: BoardState, c: Card) {
 
 /** Onde o código da história deve ser alterado (sub-tarefas usam a branch e a pasta da história). */
 function workspaceOf(s: BoardState, c: Card) {
-  const story = c.parentId ? (s.cards.find((p) => p.id === c.parentId) ?? c) : c;
+  const story = storyOf(s, c) ?? c;
   if (story.branch) {
     return {
       workspace: {
