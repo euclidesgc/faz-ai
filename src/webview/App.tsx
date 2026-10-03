@@ -5,6 +5,7 @@ import { rich } from './i18n/rich';
 import { humanQueue, pendingWork } from '../shared/pending';
 import { useBoardStore, useHostSync } from './store/boardStore';
 import { ui } from './commands';
+import { AttachmentModal } from './components/attachment/AttachmentModal';
 import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
 import { ChatPanel } from './components/chat/ChatPanel';
@@ -134,6 +135,7 @@ export function App() {
         </aside>
       )}
       {openCardId && <CardDrawer cardId={openCardId} />}
+      <AttachmentModal />
       <Dialog />
       <div className="toasts" aria-live="polite">
         {error && (

@@ -117,5 +117,13 @@ afterEach(() => {
   cleanup();
   posted.mockClear();
   // estado de tela volta ao padrão para um teste não vazar no outro
-  useBoardStore.setState({ dialog: null, openCardId: null, filters: EMPTY_FILTERS, selectedParentId: null, collapsed: {}, view: 'board' });
+  useBoardStore.setState({
+    dialog: null,
+    attachmentModal: null,
+    openCardId: null,
+    filters: EMPTY_FILTERS,
+    selectedParentId: null,
+    collapsed: {},
+    view: 'board',
+  });
 });
