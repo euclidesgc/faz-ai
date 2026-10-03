@@ -505,11 +505,13 @@ por exemplo), eles precisam ser refeitos:
 | `gh` autenticado | criar a GitHub Release | `gh auth login` |
 | `.claude/skills/publicar-extensao/` | passo a passo da publicação para a IA | copiar a pasta da máquina original |
 
-Os três últimos só são necessários para publicar. A `main` só aceita mudanças por pull request,
-então a versão nova do `package.json` entra pelo PR da própria mudança e, depois do merge,
-`npm run release -- current` publica essa versão (com `patch`, `minor` ou `major` o script tentaria
-enviar o commit da versão direto para a `main` e seria recusado). `--dry-run` ensaia sem publicar.
-As opções estão no topo de `scripts/release.mjs`.
+Os três últimos só são necessários para publicar. A `main` só aceita mudanças por pull request, e o
+script já cuida disso: `npm run release -- <patch|minor|major>` roda a main limpa, testa, empacota,
+publica nas duas lojas e abre o PR `release/vX.Y.Z` com a versão nova (e os CHANGELOGs com "Não
+lançado" renomeado para a versão). Você mergeia o PR e o script, que espera até 30 minutos, cria a
+tag e a GitHub Release com o `.vsix`. Se o merge demorar mais, `npm run release -- finish` conclui
+depois, sem publicar de novo. `--dry-run` ensaia sem publicar. As opções estão no topo de
+`scripts/release.mjs`.
 
 ## Histórico de versões
 

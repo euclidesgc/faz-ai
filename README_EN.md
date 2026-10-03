@@ -529,11 +529,13 @@ machine, for example), they must be set up again:
 | Authenticated `gh` | creating the GitHub Release | `gh auth login` |
 | `.claude/skills/publicar-extensao/` | the publishing walkthrough for the AI | copy the folder from the original machine |
 
-The last three are only needed to publish. `main` only accepts changes through pull requests, so
-the new version in `package.json` goes in with the change's own PR and, after the merge,
-`npm run release -- current` publishes that version (with `patch`, `minor` or `major` the script
-would try to push the version commit straight to `main` and be refused). `--dry-run` rehearses
-without publishing. The options are at the top of `scripts/release.mjs`.
+The last three are only needed to publish. `main` only accepts changes through pull requests, and
+the script already deals with that: `npm run release -- <patch|minor|major>` runs on a clean main,
+tests, packages, publishes to both stores and opens the `release/vX.Y.Z` PR with the new version
+(and the CHANGELOGs with "Unreleased" renamed to the version). You merge the PR and the script,
+which waits up to 30 minutes, creates the tag and the GitHub Release with the `.vsix`. If the merge
+takes longer, `npm run release -- finish` completes it later, without publishing again. `--dry-run`
+rehearses without publishing. The options are at the top of `scripts/release.mjs`.
 
 ## Version history
 
