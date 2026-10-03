@@ -18,6 +18,7 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - Os selos de status e de tipo de card ficam legíveis em qualquer cor escolhida: o texto vira preto
   ou branco conforme a cor de fundo.
 - O botão principal é azul índigo nos dois temas (no escuro era verde).
+- Os cards perderam a faixa colorida à esquerda: a cor do tipo fica no selo do tipo.
 - As barras de rolagem usam as cores do board, e a barra horizontal das colunas ganhou um espaço de
   respiro abaixo dos cards.
 - O contraste de textos, controles e foco do teclado é verificado por teste automático nos dois

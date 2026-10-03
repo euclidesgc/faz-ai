@@ -48,7 +48,6 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   return (
     <article
       className={`card ${selected ? 'selected' : ''} ${overlay ? 'overlay' : ''} ${archived ? 'archived' : ''}`}
-      style={{ borderLeftColor: type?.color ?? 'var(--accent)' }}
       onClick={(e) => {
         e.stopPropagation();
         if (isParent && !archived) selectParent(card.id);
