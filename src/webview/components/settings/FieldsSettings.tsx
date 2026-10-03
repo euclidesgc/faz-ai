@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useBoardStore } from '../../store/boardStore';
+import { t } from '../../i18n';
 import { Button } from '@radix-ui/themes';
 import { IconPlus } from '../ui';
 import { PageHeader } from './PageHeader';
@@ -12,15 +13,16 @@ export function FieldsSettings() {
   return (
     <div>
       <PageHeader
-        title="Campos personalizados"
+        title={t('Campos personalizados')}
         actions={
           <Button disabled={adding} onClick={() => setAdding(true)}>
-            <IconPlus /> Novo campo
+            <IconPlus /> {t('Novo campo')}
           </Button>
         }
       >
-        Campos guardam informações extras do card, como prazo, pontos ou tags. Todos aparecem no card aberto; em "No board" você escolhe se
-        e como cada um aparece também no card do board.
+        {t(
+          'Campos guardam informações extras do card, como prazo, pontos ou tags. Todos aparecem no card aberto; em "No board" você escolhe se e como cada um aparece também no card do board.',
+        )}
       </PageHeader>
       <div className="field-list">
         {adding && <NewFieldCard onDone={() => setAdding(false)} />}

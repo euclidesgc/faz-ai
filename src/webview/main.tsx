@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { Fragment } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { applyTheme } from './appearance';
 import { ChatApp } from './ChatApp';
+import { useLocale } from './i18n';
 import { FiltersApp } from './FiltersApp';
 import { isWeb } from './vscode';
 import { Theme } from '@radix-ui/themes';
@@ -34,11 +35,17 @@ if (isWeb) {
 // a tela "Carregando…" já nasce com tema; a preferência salva chega depois, com o board
 applyTheme('system');
 
+/** Ao trocar o idioma a interface inteira é montada de novo: assim nenhum texto fica no idioma antigo. */
+function Shell() {
+  const locale = useLocale();
+  return <Fragment key={locale}>{view === 'filters' ? <FiltersApp /> : view === 'chat' ? <ChatApp /> : <App />}</Fragment>;
+}
+
 createRoot(root).render(
   <React.StrictMode>
     {/* claro/escuro vem da classe do body (applyTheme); sem fundo próprio, o fundo é o do board */}
     <Theme className="app-theme" accentColor="indigo" grayColor="slate" radius="medium" scaling="95%" hasBackground={false}>
-      {view === 'filters' ? <FiltersApp /> : view === 'chat' ? <ChatApp /> : <App />}
+      <Shell />
     </Theme>
   </React.StrictMode>,
 );

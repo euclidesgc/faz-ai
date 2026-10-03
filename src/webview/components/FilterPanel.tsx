@@ -1,5 +1,6 @@
 import type { DatePreset, Filters, Relation } from '../../shared/filters';
 import { useBoardStore } from '../store/boardStore';
+import { t } from '../i18n';
 import { Checkbox, TextField } from '@radix-ui/themes';
 import { ChipsEditor, SelectField } from './ui';
 
@@ -35,14 +36,19 @@ export function FilterPanel() {
   return (
     <div className="filter-panel">
       <div className="filter-group">
-        <h3>Pendência</h3>
-        <SelectField aria-label="Com quem está" options={OWNERS} value={filters.owner} onChange={(owner) => setFilters({ owner })} />
+        <h3>{t('Pendência')}</h3>
+        <SelectField
+          aria-label={t('Com quem está')}
+          options={OWNERS.map((o) => ({ ...o, label: t(o.label) }))}
+          value={filters.owner}
+          onChange={(owner) => setFilters({ owner })}
+        />
       </div>
 
       <div className="filter-group">
-        <h3>Tipo</h3>
+        <h3>{t('Tipo')}</h3>
         <ChipsEditor
-          options={state.cardTypes.map((t) => ({ value: t.id, label: t.name }))}
+          options={state.cardTypes.map((ct) => ({ value: ct.id, label: ct.name }))}
           values={filters.typeIds}
           onChange={(typeIds) => setFilters({ typeIds })}
         />
@@ -55,8 +61,8 @@ export function FilterPanel() {
             options={
               f.kind === 'checkbox'
                 ? [
-                    { value: 'true', label: 'Sim' },
-                    { value: 'false', label: 'Não' },
+                    { value: 'true', label: t('Sim') },
+                    { value: 'false', label: t('Não') },
                   ]
                 : f.options
             }
@@ -67,13 +73,13 @@ export function FilterPanel() {
       ))}
 
       <div className="filter-group">
-        <h3>Data</h3>
+        <h3>{t('Data')}</h3>
         <SelectField
-          aria-label="Campo de data"
+          aria-label={t('Campo de data')}
           options={[
-            { value: ANY_DATE, label: 'Qualquer data' },
-            { value: 'createdAt', label: 'Criado em' },
-            { value: 'updatedAt', label: 'Atualizado em' },
+            { value: ANY_DATE, label: t('Qualquer data') },
+            { value: 'createdAt', label: t('Criado em') },
+            { value: 'updatedAt', label: t('Atualizado em') },
             ...dateFields.map((f) => ({ value: f.id, label: f.name })),
           ]}
           value={filters.dateField ?? ANY_DATE}
@@ -86,8 +92,8 @@ export function FilterPanel() {
         />
         {filters.dateField && (
           <SelectField
-            aria-label="Período"
-            options={PRESETS}
+            aria-label={t('Período')}
+            options={PRESETS.map((p) => ({ ...p, label: t(p.label) }))}
             value={filters.datePreset ?? '7d'}
             onChange={(datePreset) => setFilters({ datePreset })}
           />
@@ -96,27 +102,32 @@ export function FilterPanel() {
           <div className="row wrap">
             <TextField.Root
               type="date"
-              aria-label="De"
+              aria-label={t('De')}
               value={filters.dateFrom}
               onChange={(e) => setFilters({ dateFrom: e.target.value })}
             />
-            <span className="muted">até</span>
-            <TextField.Root type="date" aria-label="Até" value={filters.dateTo} onChange={(e) => setFilters({ dateTo: e.target.value })} />
+            <span className="muted">{t('até')}</span>
+            <TextField.Root
+              type="date"
+              aria-label={t('Até')}
+              value={filters.dateTo}
+              onChange={(e) => setFilters({ dateTo: e.target.value })}
+            />
           </div>
         )}
       </div>
 
       <div className="filter-group">
-        <h3>Relacionamentos</h3>
+        <h3>{t('Relacionamentos')}</h3>
         <SelectField
-          aria-label="Relacionamento"
-          options={RELATIONS}
+          aria-label={t('Relacionamento')}
+          options={RELATIONS.map((r) => ({ ...r, label: t(r.label) }))}
           value={filters.relation}
           onChange={(relation) => setFilters({ relation })}
         />
         <label className="row">
           <Checkbox checked={filters.includeRelated} onCheckedChange={(v) => setFilters({ includeRelated: v === true })} />
-          Incluir pai e sub-tarefas dos resultados
+          {t('Incluir pai e sub-tarefas dos resultados')}
         </label>
       </div>
     </div>

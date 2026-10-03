@@ -37,6 +37,57 @@ gives the English meaning next to them.
 
 ![Board with stories in the SDD phases and sub-tasks in the bottom workflow](docs/images/board.png)
 
+## Getting started
+
+In five minutes you have a task moving on the board, with the AI working on it.
+
+1. **Install and open.** Install **Faz AI Kanban** in VS Code or Cursor (from the tool's own
+   marketplace), open your project's folder and click the **Faz AI** icon in the sidebar. Each
+   folder has its own board, already set up with the workflow phases.
+2. **Connect the AI to the board.** In **Configurações → Harness de IA** (Settings → AI harness),
+   pick the project's tool (Claude Code, Codex, Cursor, Kimi Code or GitHub Copilot) and click
+   **Conectar IA (MCP)** (connect AI). In the **Do projeto** (project) tab, click **Instalar skill
+   do fluxo** (install the flow skill): it teaches the AI to drive the phases.
+3. **Create the task.** In the **Backlog** column, click **+ Novo card** (new card), type the title
+   (for example, "Login with Google") and press Enter. Double-click opens the card: describe what
+   you want, in Markdown, and optionally pick the AI model and the skills it must read.
+4. **Let the AI start.** Drag the card to **Discovery** and click **Chamar IA** (call AI) on the
+   card. The AI reads the card through the board, analyzes the problem and talks with you in the
+   **Conversa** (conversation) tab. When it finishes, the status changes to **Aguardando
+   revisão** (waiting for review): it is your turn.
+5. **Review and move on.** Read the phase document, answer, or click **Aprovar** (approve) or
+   **Pedir ajustes** (ask for changes). On approval the story moves on to **PRD**, **Spec**,
+   **Plan** and **Implementação** (implementation), always with the AI producing and you approving.
+   The implementation sub-tasks are born in the lower workflow and the AI completes them one by one.
+
+For day to day: the **N com você** (N with you) counter at the top shows what is waiting for you,
+the **Chat** lets you ask the AI, in natural language, to create and move cards, and the
+**heartbeat** can call the AI by itself when something is pending with it.
+
+### Why this saves context
+
+The AI spends context on whatever it loads in every session. The board exists so it loads only what
+is needed, at the right time:
+
+- **Each card is a new, short session.** Instead of one long conversation that accumulates
+  everything, the AI opens the card through the board (`get_card`), does that piece of work and
+  stops. The history stays on the card, not in the context window.
+- **Skills only when indicated.** An automatic skill puts its description in every session; marked
+  **Só quando indicada** (only when indicated), it only enters the cards that ask for it. Under
+  **Harness de IA → Tudo que a ferramenta carrega**, the board shows how many skills are automatic
+  and how many characters of description they put into every session.
+- **Agents that restrict.** An agent can allow only some MCP servers and tools, and the **clean
+  session** drops your user-folder customizations: fewer tool definitions loaded for nothing (what
+  Claude Code and Cursor enforce by parameter is in the [Agents](#agents) table).
+- **Documents as attachments.** PRD, Spec and Plan stay attached to the story; the AI reads them
+  when the card needs it, instead of getting them pasted into every message.
+- **The right model for each task.** Suggestion rules and the model per card or per agent avoid
+  using the most expensive model where a lighter one is enough.
+
+The context saving of on-demand skills is documented for Claude Code and Cursor; for the other
+tools, the documentation only says the AI stops invoking the skill on its own. The board does not
+promise a percentage: it shows, in the inventory, what is being loaded.
+
 ## What it is for
 
 - **Plan in phases.** The story columns are the phases of the flow: Backlog, Discovery, PRD, Spec,
@@ -136,7 +187,7 @@ navegador**; the terminal `faz-ai` warns and does not start.
    Cursor, Kimi Code or GitHub Copilot).
 2. Click **Conectar IA (MCP)** (connect AI). The board registers the server in the file the tool
    reads.
-3. In **Harness de IA**, click **Instalar skill do fluxo** (install the flow skill): it teaches the
+3. In **Harness de IA**, in the **Do projeto** tab, click **Instalar skill do fluxo** (install the flow skill): it teaches the
    AI to take cards through the phases, write the documents, ask for review and pick up pending
    work. It is a file in your project and can be edited.
 4. Open a new session of the tool in the project folder and ask, for example, "list the cards on
@@ -359,7 +410,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Harness de IA | The project's tool, rules file, skills and agents; runs from the conversation and the heartbeat; everything each tool loads, by scope (see [AI harness](#ai-harness)) |
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
-| Aparência | Theme (system, light, dark), font and size of long texts; name and color of the statuses |
+| Aparência | **Language** (automatic, Português (Brasil) or English), theme (system, light, dark), font and size of long texts; name and color of the statuses |
 
 About models: **Detectar modelos** (detect models) reads the tool's list (for Kimi Code, from the
 local configuration; for the others, a built-in list you can edit). Suggestion rules combine

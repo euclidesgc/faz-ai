@@ -116,6 +116,21 @@ olho.
   - o Select do Radix não aceita `value` vazio: use um item sentinela (`'__none'`).
 - Seletores (`SelectField`), caixas de seleção, campos de busca e de adicionar, e a nota de status são do Radix em toda a interface, no board, no card aberto e nos filtros. Seguem nativos, de propósito, só os campos que têm de parecer texto (título do card, item da checklist, renomear coluna e workflow, o editor de markdown) e o seletor de cor (`<input type="color">`).
 
+## Textos e idiomas
+
+- A interface fala português (Brasil) e inglês. O **texto em português é a chave**: `t('Novo card')`.
+  Em português a chave volta como está; em inglês vem do dicionário `src/webview/i18n/en/<área>.ts`.
+  Parâmetros usam `{nome}` (`t('Apagar o tipo "{name}"?', { name })`), plurais usam `tn(n, um, vários)` e
+  texto com negrito ou código usa `rich('Use <b>isto</b> em <code>{pasta}</code>', { pasta })`.
+- Nunca chame `t()` no nível do módulo: o idioma muda com a tela aberta, e a interface é montada de
+  novo ao trocar. Constantes de módulo guardam o português e são traduzidas onde são usadas.
+- `test/i18n.test.ts` barra texto sem tradução, `{parâmetros}` ou tags diferentes entre os idiomas e a
+  mesma frase traduzida de dois jeitos. Mensagens de erro e aviso do host chegam em português e
+  passam por `t()` no toast: o dicionário casa as que têm `{parâmetro}` como molde.
+- Não se traduz o que é dado: títulos e descrições, nomes de colunas, tipos e campos do board (o padrão
+  é criado em português), nomes de status editados, textos que a IA lê (instruções das fases, MCP).
+- Datas usam `formatDateTime`; o nome do esforço do modelo, `modelDisplay` de `src/webview/modelText.ts`.
+
 ## Como adicionar uma cor
 
 1. Escolha o passo na escala Radix (1-2 fundos, 3-5 fundos de componente, 6-8 bordas, 9-10

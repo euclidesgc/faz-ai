@@ -1,5 +1,6 @@
 import { FormField, SelectField } from '../../ui';
 import type { HarnessTarget } from './useTargetForm';
+import { t } from '../../../i18n';
 
 interface Props {
   /** rótulo do campo: "Onde" ou "Arquivo" */
@@ -18,7 +19,10 @@ export function TargetPicker({ label, targets, value, onChange }: Props) {
         <SelectField
           id={id}
           aria-label={label}
-          options={targets.map((t) => ({ value: String(t.source), label: `${t.scope === 'user' ? 'Global' : 'Projeto'}: ${t.label}` }))}
+          options={targets.map((x) => ({
+            value: String(x.source),
+            label: `${x.scope === 'user' ? t('Global') : t('Projeto')}: ${x.label.replace('<nome>', t('<nome>'))}`,
+          }))}
           value={String(value)}
           onChange={(source) => onChange(Number(source))}
         />

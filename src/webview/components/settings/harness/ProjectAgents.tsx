@@ -9,6 +9,8 @@ import { SettingsCard } from '../SettingsCard';
 import { DraftForm } from './DraftForm';
 import { FileEditor } from './FileEditor';
 import type { ProjectEditing } from './useProjectEditing';
+import { t } from '../../../i18n';
+import { rich } from '../../../i18n/rich';
 
 /** Os subagentes do projeto, quando a ferramenta em uso os define em arquivos. */
 export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectEditing }) {
@@ -32,18 +34,18 @@ export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
       actions={
         <>
           <Button variant="soft" color="gray" onClick={() => edit.toggle('agent', a.name)}>
-            {edit.isEditing('agent', a.name) ? 'Fechar' : 'Editar'}
+            {edit.isEditing('agent', a.name) ? t('Fechar') : t('Editar')}
           </Button>
           <DeleteButton
-            title="Apagar o subagente"
-            question={`Apagar o subagente "${a.name}"?`}
-            message="O arquivo do subagente é removido do projeto."
+            title={t('Apagar o subagente')}
+            question={t('Apagar o subagente "{name}"?', { name: a.name })}
+            message={t('O arquivo do subagente é removido do projeto.')}
             onConfirm={() => harness.deleteAgent(a.name)}
           />
         </>
       }
     >
-      <div className="muted small">{a.description || 'Sem descrição no frontmatter.'}</div>
+      <div className="muted small">{a.description || t('Sem descrição no frontmatter.')}</div>
       <div className="muted small">
         <code>{a.path}</code>
       </div>
@@ -56,51 +58,53 @@ export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
   return (
     <>
       <SectionHeader
-        title="Subagentes"
+        title={t('Subagentes')}
         actions={
           tool.agents && (
             <Button onClick={() => edit.toggleNew('newAgent')}>
-              <IconPlus /> Novo subagente
+              <IconPlus /> {t('Novo subagente')}
             </Button>
           )
         }
       >
         {tool.agents ? (
           <>
-            Subagentes do {tool.label}: cada arquivo em <code>{tool.agents.dir}</code> define um ajudante com instruções próprias, e a
-            ferramenta delega trabalho a ele pela descrição.
+            {rich(
+              'Subagentes do {tool}: cada arquivo em <code>{dir}</code> define um ajudante com instruções próprias, e a ferramenta delega trabalho a ele pela descrição.',
+              { tool: tool.label, dir: tool.agents.dir },
+            )}
             {tool.agents.modelField
-              ? ' Um subagente pode fixar o modelo que usa, o que serve para executar um card com o modelo indicado nele.'
+              ? ` ${t('Um subagente pode fixar o modelo que usa, o que serve para executar um card com o modelo indicado nele.')}`
               : ''}
           </>
         ) : (
-          `O ${tool.label} não define subagentes em arquivos do projeto.`
+          t('O {tool} não define subagentes em arquivos do projeto.', { tool: tool.label })
         )}
       </SectionHeader>
       {tool.agents && (
         <>
           {edit.editing?.kind === 'newAgent' && (
             <DraftForm
-              title="Subagente novo"
+              title={t('Subagente novo')}
               draft={draft}
               onChange={edit.patchDraft}
               nameOk={isFreeName(draft.name, agents)}
               namePlaceholder="revisor-de-spec"
-              descriptionLabel="Descrição (quando delegar)"
-              descriptionPlaceholder="Revisa uma Spec e aponta lacunas antes do Plan"
-              bodyPlaceholder="Instruções do subagente"
-              submitLabel="Criar subagente"
+              descriptionLabel={t('Descrição (quando delegar)')}
+              descriptionPlaceholder={t('Revisa uma Spec e aponta lacunas antes do Plan')}
+              bodyPlaceholder={t('Instruções do subagente')}
+              submitLabel={t('Criar subagente')}
               onSubmit={createAgent}
               onCancel={edit.clearForm}
             >
               {tool.agents.modelField && (
-                <FormField label="Modelo (opcional)">
+                <FormField label={t('Modelo (opcional)')}>
                   {(id) => (
                     <TextField.Root
                       id={id}
                       value={draft.model}
                       onChange={(e) => edit.patchDraft({ model: e.target.value })}
-                      placeholder="vazio = o modelo da sessão"
+                      placeholder={t('vazio = o modelo da sessão')}
                     />
                   )}
                 </FormField>
@@ -109,9 +113,7 @@ export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
           )}
           {agents.map(agentRow)}
           {agents.length === 0 && (
-            <p className="muted">
-              Nenhum subagente em <code>{tool.agents.dir}</code> ainda.
-            </p>
+            <p className="muted">{rich('Nenhum subagente em <code>{dir}</code> ainda.', { dir: tool.agents.dir })}</p>
           )}
         </>
       )}

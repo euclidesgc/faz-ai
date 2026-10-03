@@ -8,6 +8,7 @@ import { FormActions } from './FormActions';
 import { TargetPicker } from './TargetPicker';
 import { toolLabel } from './text';
 import { useTargetForm } from './useTargetForm';
+import { t } from '../../../i18n';
 
 /** Formulário de um hook novo: em que arquivo, em que evento, com que filtro e que comando roda. */
 export function NewHook({ tool, targets, onClose }: { tool: AiTool; targets: HookTarget[]; onClose: () => void }) {
@@ -20,18 +21,23 @@ export function NewHook({ tool, targets, onClose }: { tool: AiTool; targets: Hoo
   const add = () =>
     submit(() => harness.addHook(tool, source, { event, matcher, command, timeout: Number(timeout) || 0 }), {
       always: true,
-      title: 'Acrescentar este hook?',
-      message: `O ${toolLabel(tool)} vai rodar este comando sozinho, no seu computador, a cada "${event}":\n\n${command}\n\nArquivo: ${target.label}`,
-      confirmLabel: 'Acrescentar hook',
+      title: t('Acrescentar este hook?'),
+      message: t('O {tool} vai rodar este comando sozinho, no seu computador, a cada "{event}":\n\n{command}\n\nArquivo: {file}', {
+        tool: toolLabel(tool),
+        event,
+        command,
+        file: target.label,
+      }),
+      confirmLabel: t('Acrescentar hook'),
     });
   return (
-    <Card className="draft-card" aria-label="Hook novo">
-      <TargetPicker label="Arquivo" targets={targets} value={source} onChange={setSource} />
-      <FormField label="Evento">
+    <Card className="draft-card" aria-label={t('Hook novo')}>
+      <TargetPicker label={t('Arquivo')} targets={targets} value={source} onChange={setSource} />
+      <FormField label={t('Evento')}>
         {(id) => (
           <SelectField
             id={id}
-            aria-label="Evento"
+            aria-label={t('Evento')}
             options={HOOK_EVENTS[tool].map((e) => ({ value: e, label: e }))}
             value={event}
             onChange={setEvent}
@@ -39,18 +45,18 @@ export function NewHook({ tool, targets, onClose }: { tool: AiTool; targets: Hoo
         )}
       </FormField>
       {target.format !== 'copilot' && (
-        <FormField label="Filtro (opcional)">
+        <FormField label={t('Filtro (opcional)')}>
           {(id) => (
             <TextField.Root
               id={id}
               value={matcher}
               onChange={(e) => setMatcher(e.target.value)}
-              placeholder="Ex.: Bash, ou Edit|Write; vazio = sempre"
+              placeholder={t('Ex.: Bash, ou Edit|Write; vazio = sempre')}
             />
           )}
         </FormField>
       )}
-      <FormField label="Comando">
+      <FormField label={t('Comando')}>
         {(id) => (
           <TextField.Root
             id={id}
@@ -61,7 +67,7 @@ export function NewHook({ tool, targets, onClose }: { tool: AiTool; targets: Hoo
           />
         )}
       </FormField>
-      <FormField label="Tempo limite (s)">
+      <FormField label={t('Tempo limite (s)')}>
         {(id) => (
           <TextField.Root
             id={id}
@@ -69,11 +75,11 @@ export function NewHook({ tool, targets, onClose }: { tool: AiTool; targets: Hoo
             min={0}
             value={timeout}
             onChange={(e) => setTimeout_(e.target.value)}
-            placeholder="padrão da ferramenta"
+            placeholder={t('padrão da ferramenta')}
           />
         )}
       </FormField>
-      <FormActions label="Acrescentar hook" disabled={!event || !command.trim()} onSubmit={add} onCancel={onClose} />
+      <FormActions label={t('Acrescentar hook')} disabled={!event || !command.trim()} onSubmit={add} onCancel={onClose} />
     </Card>
   );
 }

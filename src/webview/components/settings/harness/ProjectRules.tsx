@@ -8,6 +8,7 @@ import { SectionHeader } from '../SectionHeader';
 import { SettingsCard } from '../SettingsCard';
 import { FileEditor } from './FileEditor';
 import type { ProjectEditing } from './useProjectEditing';
+import { t } from '../../../i18n';
 
 /** Os arquivos de regras do projeto que a ferramenta em uso lê, com criar, editar e apagar. */
 export function ProjectRules({ tool, edit }: { tool: AiToolInfo; edit: ProjectEditing }) {
@@ -16,28 +17,28 @@ export function ProjectRules({ tool, edit }: { tool: AiToolInfo; edit: ProjectEd
     <SettingsCard
       key={r.name}
       title={r.name}
-      badge={{ text: r.exists ? 'Existe' : 'Não existe', on: r.exists }}
-      hint={`Lido por: ${ruleReadBy(r.name)}`}
+      badge={{ text: r.exists ? t('Existe') : t('Não existe'), on: r.exists }}
+      hint={t('Lido por: {readBy}', { readBy: t(ruleReadBy(r.name) ?? '') })}
       actions={
         <>
           {canImportAgentsMd(r, rules) && (
             <Button
               variant="soft"
               color="gray"
-              title="Cria um CLAUDE.md que só importa o AGENTS.md, para as regras ficarem num arquivo só"
+              title={t('Cria um CLAUDE.md que só importa o AGENTS.md, para as regras ficarem num arquivo só')}
               onClick={() => harness.writeRule('CLAUDE.md', '@AGENTS.md\n')}
             >
-              Usar o AGENTS.md
+              {t('Usar o AGENTS.md')}
             </Button>
           )}
           <Button variant="soft" color="gray" onClick={() => edit.toggle('rule', r.name)}>
-            {edit.isEditing('rule', r.name) ? 'Fechar' : r.exists ? 'Editar' : 'Criar'}
+            {edit.isEditing('rule', r.name) ? t('Fechar') : r.exists ? t('Editar') : t('Criar')}
           </Button>
           {r.exists && (
             <DeleteButton
-              title="Apagar o arquivo"
-              question={`Apagar ${r.name}?`}
-              message="O arquivo é removido da pasta do projeto."
+              title={t('Apagar o arquivo')}
+              question={t('Apagar {name}?', { name: r.name })}
+              message={t('O arquivo é removido da pasta do projeto.')}
               onConfirm={() => harness.deleteRule(r.name)}
             />
           )}
@@ -51,8 +52,8 @@ export function ProjectRules({ tool, edit }: { tool: AiToolInfo; edit: ProjectEd
   );
   return (
     <>
-      <SectionHeader title="Regras do projeto">
-        Instruções carregadas em toda sessão de IA. Quanto mais curtas, menos contexto consomem.
+      <SectionHeader title={t('Regras do projeto')}>
+        {t('Instruções carregadas em toda sessão de IA. Quanto mais curtas, menos contexto consomem.')}
       </SectionHeader>
       {visibleRules(rules, tool).map(ruleRow)}
     </>

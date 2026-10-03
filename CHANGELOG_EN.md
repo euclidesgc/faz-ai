@@ -7,6 +7,14 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 
 ## Unreleased
 
+- **Interface in Portuguese and English.** In Configurações → Aparência (Settings → Appearance), the
+  **Idioma** (language) can be **Automático** (follows the editor's or the browser's language:
+  English for any `en`, Portuguese for the rest), **Português (Brasil)** or **English**. The whole
+  interface switches on the spot: board, card, filters, chat, settings and the board's error and
+  notice messages. The names of commands and sections in the editor (command palette and sidebar)
+  also follow the editor's language. What you write (titles, descriptions, names) and what is read
+  by the AI (phase instructions, MCP tools) is not translated.
+
 - **Chat with the AI on the board.** A conversation to create, move and link cards and query the
   board in natural language: in the editor's sidebar (the **Chat com a IA** section, below Board and
   Filtros) and, in the browser, the **Chat** button in the top bar. You can pick the **model and

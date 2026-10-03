@@ -7,9 +7,11 @@ import { FormField, SelectField, type EnumOption } from '../../ui';
 import { FormActions } from './FormActions';
 import { TargetPicker } from './TargetPicker';
 import { useTargetForm } from './useTargetForm';
+import { t } from '../../../i18n';
 
 type Transport = McpServerInput['transport'];
 
+// os rótulos ficam em português e são traduzidos onde a lista é usada
 const TRANSPORTS: EnumOption<Transport>[] = [
   { value: 'stdio', label: 'Comando local (stdio)' },
   { value: 'http', label: 'Endereço (HTTP)' },
@@ -50,23 +52,31 @@ export function NewMcpServer({ tool, targets, onClose }: { tool: AiTool; targets
           url,
           headers: transport === 'http' ? pairs(extra) : {},
         }),
-      { title: 'Acrescentar servidor na pasta do usuário?', message: target.label, confirmLabel: 'Acrescentar' },
+      { title: t('Acrescentar servidor na pasta do usuário?'), message: target.label, confirmLabel: t('Acrescentar') },
     );
   return (
-    <Card className="draft-card" aria-label="Servidor MCP novo">
-      <TargetPicker label="Arquivo" targets={targets} value={source} onChange={setSource} />
-      <FormField label="Nome">
+    <Card className="draft-card" aria-label={t('Servidor MCP novo')}>
+      <TargetPicker label={t('Arquivo')} targets={targets} value={source} onChange={setSource} />
+      <FormField label={t('Nome')}>
         {(id) => <TextField.Root id={id} value={name} onChange={(e) => setName(e.target.value.trim())} placeholder="github" />}
       </FormField>
-      <FormField label="Tipo">
-        {(id) => <SelectField id={id} aria-label="Tipo" options={TRANSPORTS} value={transport} onChange={setTransport} />}
+      <FormField label={t('Tipo')}>
+        {(id) => (
+          <SelectField
+            id={id}
+            aria-label={t('Tipo')}
+            options={TRANSPORTS.map((o) => ({ ...o, label: t(o.label) }))}
+            value={transport}
+            onChange={setTransport}
+          />
+        )}
       </FormField>
       {transport === 'stdio' ? (
         <>
-          <FormField label="Comando">
+          <FormField label={t('Comando')}>
             {(id) => <TextField.Root id={id} value={command} onChange={(e) => setCommand(e.target.value)} placeholder="npx" />}
           </FormField>
-          <FormField label="Argumentos">
+          <FormField label={t('Argumentos')}>
             {(id) => (
               <TextArea
                 id={id}
@@ -74,20 +84,20 @@ export function NewMcpServer({ tool, targets, onClose }: { tool: AiTool; targets
                 rows={2}
                 value={args}
                 onChange={(e) => setArgs(e.target.value)}
-                placeholder="um por linha"
+                placeholder={t('um por linha')}
                 spellCheck={false}
               />
             )}
           </FormField>
         </>
       ) : (
-        <FormField label="Endereço">
+        <FormField label={t('Endereço')}>
           {(id) => <TextField.Root id={id} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://exemplo.dev/mcp" />}
         </FormField>
       )}
       <FormField
-        label={transport === 'stdio' ? 'Variáveis de ambiente' : 'Cabeçalhos'}
-        hint="Gravados no arquivo como estão. Se o arquivo vai para o repositório, não ponha segredos nele."
+        label={transport === 'stdio' ? t('Variáveis de ambiente') : t('Cabeçalhos')}
+        hint={t('Gravados no arquivo como estão. Se o arquivo vai para o repositório, não ponha segredos nele.')}
       >
         {(id) => (
           <TextArea
@@ -96,12 +106,12 @@ export function NewMcpServer({ tool, targets, onClose }: { tool: AiTool; targets
             rows={2}
             value={extra}
             onChange={(e) => setExtra(e.target.value)}
-            placeholder="CHAVE=valor, um por linha"
+            placeholder={t('CHAVE=valor, um por linha')}
             spellCheck={false}
           />
         )}
       </FormField>
-      <FormActions label="Acrescentar servidor" disabled={!ok} onSubmit={add} onCancel={onClose} />
+      <FormActions label={t('Acrescentar servidor')} disabled={!ok} onSubmit={add} onCancel={onClose} />
     </Card>
   );
 }

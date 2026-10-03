@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { HARNESS_KINDS, type AiTool, type HarnessKind } from '../../../shared/harness';
 import { harness } from '../../commands';
 import { useBoardStore } from '../../store/boardStore';
+import { t } from '../../i18n';
+import { rich } from '../../i18n/rich';
 import { Badge, Button, Tabs } from '@radix-ui/themes';
 import { SectionHeader } from './SectionHeader';
 import { KindSection } from './harness/KindSection';
@@ -20,23 +22,23 @@ export function HarnessInventory() {
   useEffect(() => harness.refresh(), []);
 
   const inventory = state.harness.inventory;
-  const items = inventory.find((t) => t.tool === tool)?.items ?? [];
-  const missing = inventory.filter((t) => !t.installed && t.items.length === 0).map((t) => toolLabel(t.tool));
+  const items = inventory.find((x) => x.tool === tool)?.items ?? [];
+  const missing = inventory.filter((x) => !x.installed && x.items.length === 0).map((x) => toolLabel(x.tool));
   const actions = useItemActions(tool, items);
 
   return (
     <div className="harness-inventory">
       <SectionHeader
-        title="Tudo que cada ferramenta carrega"
+        title={t('Tudo que cada ferramenta carrega')}
         actions={
-          <Button variant="soft" color="gray" title="Relê as pastas do projeto e do usuário" onClick={() => harness.refresh()}>
-            Atualizar
+          <Button variant="soft" color="gray" title={t('Relê as pastas do projeto e do usuário')} onClick={() => harness.refresh()}>
+            {t('Atualizar')}
           </Button>
         }
       >
-        O que cada ferramenta de IA lê neste projeto e na sua pasta de usuário, separado por escopo. <b>Projeto</b> vale só aqui;{' '}
-        <b>Global</b> vale em todos os seus projetos; <b>Plugins</b> vem de pacotes instalados e não pode ser alterado, mas pode ser
-        copiado. "Abrir" mostra o arquivo no editor, onde ele também é editado.
+        {rich(
+          'O que cada ferramenta de IA lê neste projeto e na sua pasta de usuário, separado por escopo. <b>Projeto</b> vale só aqui; <b>Global</b> vale em todos os seus projetos; <b>Plugins</b> vem de pacotes instalados e não pode ser alterado, mas pode ser copiado. "Abrir" mostra o arquivo no editor, onde ele também é editado.',
+        )}
       </SectionHeader>
       <Tabs.Root
         value={tool}
@@ -46,24 +48,26 @@ export function HarnessInventory() {
         }}
       >
         <Tabs.List className="harness-tabs">
-          {inventory.map((t) => (
-            <Tabs.Trigger key={t.tool} value={t.tool}>
-              {toolLabel(t.tool)}
-              {t.tool === state.board.aiTool && (
+          {inventory.map((x) => (
+            <Tabs.Trigger key={x.tool} value={x.tool}>
+              {toolLabel(x.tool)}
+              {x.tool === state.board.aiTool && (
                 <Badge color="indigo" variant="soft">
-                  deste projeto
+                  {t('deste projeto')}
                 </Badge>
               )}
-              {!t.installed && (
+              {!x.installed && (
                 <Badge color="gray" variant="outline">
-                  não encontrada
+                  {t('não encontrada')}
                 </Badge>
               )}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
       </Tabs.Root>
-      {missing.length > 0 && <p className="muted small">Sem sinal de instalação nesta máquina: {missing.join(', ')}.</p>}
+      {missing.length > 0 && (
+        <p className="muted small">{t('Sem sinal de instalação nesta máquina: {tools}.', { tools: missing.join(', ') })}</p>
+      )}
       {HARNESS_KINDS.map((k) => (
         <KindSection
           key={k.id}

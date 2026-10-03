@@ -1,5 +1,6 @@
 import { heartbeatState } from '../../shared/runner';
 import { useBoardStore } from '../store/boardStore';
+import { t } from '../i18n';
 import { settings } from '../commands';
 import { Button, IconHeart } from './ui';
 
@@ -11,13 +12,13 @@ export function HeartbeatButton({ offline }: { offline: boolean }) {
   const state = useBoardStore((s) => s.state)!;
   const { runner } = state.board;
   const beat = heartbeatState(runner, { offline, unsupported: state.aiRunUnsupported });
-  const every = `a cada ${runner.heartbeatMinutes} min`;
+  const every = t('a cada {n} min', { n: runner.heartbeatMinutes });
   const label =
     beat.kind === 'beating'
-      ? `Heartbeat ligado: o board chama a IA ${every} quando há pendência com ela. Clique para desligar.`
+      ? t('Heartbeat ligado: o board chama a IA {every} quando há pendência com ela. Clique para desligar.', { every })
       : beat.kind === 'off'
-        ? `Heartbeat desligado. Clique para ligar: o board passa a chamar a IA ${every} quando há pendência com ela.`
-        : `Heartbeat parado: ${beat.reason}`;
+        ? t('Heartbeat desligado. Clique para ligar: o board passa a chamar a IA {every} quando há pendência com ela.', { every })
+        : t('Heartbeat parado: {reason}', { reason: t(beat.reason) });
 
   return (
     <Button

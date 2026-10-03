@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Badge, Button, Card, Select, Text, TextField } from '@radix-ui/themes';
 import type { FieldDef, FieldDisplay, FieldKind, Id } from '../../../../shared/model';
 import { settings } from '../../../commands';
+import { t } from '../../../i18n';
 import { DeleteButton, FormField } from '../../ui';
 import { AppliesTo, DisplayPicker, OptionsEditor } from './FieldParts';
 import { FIELD_KINDS, hasOptions, isSkillsField, kindInfo } from './fieldKinds';
@@ -11,9 +12,9 @@ export function FieldCard({ field }: { field: FieldDef }) {
   const info = kindInfo(field.kind);
   const update = (patch: Parameters<typeof settings.updateField>[1]) => settings.updateField(field.id, patch);
   return (
-    <Card className="field-card" aria-label={`Campo ${field.name}`}>
+    <Card className="field-card" aria-label={t('Campo {name}', { name: field.name })}>
       <div className="field-card-head">
-        <FormField label="Nome">
+        <FormField label={t('Nome')}>
           {(id) => (
             <TextField.Root
               id={id}
@@ -29,19 +30,19 @@ export function FieldCard({ field }: { field: FieldDef }) {
         </FormField>
         <div className="field-kind">
           <Text size="1" weight="medium">
-            Tipo
+            {t('Tipo')}
           </Text>
           <Badge size="2" color="indigo" variant="soft">
-            {info.label}
+            {t(info.label)}
           </Badge>
           <Text size="1" color="gray">
-            {info.hint}
+            {t(info.hint)}
           </Text>
         </div>
         <DeleteButton
-          title="Apagar o campo"
-          question={`Apagar o campo "${field.name}"?`}
-          message="Os valores deste campo em todos os cards serão apagados."
+          title={t('Apagar o campo')}
+          question={t('Apagar o campo "{name}"?', { name: field.name })}
+          message={t('Os valores deste campo em todos os cards serão apagados.')}
           onConfirm={() => settings.deleteField(field.id)}
         />
       </div>
@@ -49,8 +50,11 @@ export function FieldCard({ field }: { field: FieldDef }) {
         <DisplayPicker field={field} onChange={(display) => update({ display })} />
         {hasOptions(field.kind) &&
           (isSkillsField(field.name) ? (
-            <FormField label="Opções" hint="As opções acompanham as skills do projeto e as instaladas (Configurações > Harness de IA).">
-              {() => <Text size="2">{field.options.length} skills disponíveis</Text>}
+            <FormField
+              label={t('Opções')}
+              hint={t('As opções acompanham as skills do projeto e as instaladas (Configurações > Harness de IA).')}
+            >
+              {() => <Text size="2">{t('{count} skills disponíveis', { count: field.options.length })}</Text>}
             </FormField>
           ) : (
             <OptionsEditor options={field.options} onChange={(options) => update({ options })} />
@@ -77,14 +81,14 @@ export function NewFieldCard({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <Card className="field-card draft" aria-label="Campo novo">
+    <Card className="field-card draft" aria-label={t('Campo novo')}>
       <div className="field-card-head">
-        <FormField label="Nome">
+        <FormField label={t('Nome')}>
           {(id) => (
             <TextField.Root
               id={id}
               autoFocus
-              placeholder="Ex.: Prazo, Pontos, Cliente"
+              placeholder={t('Ex.: Prazo, Pontos, Cliente')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
@@ -94,14 +98,14 @@ export function NewFieldCard({ onDone }: { onDone: () => void }) {
             />
           )}
         </FormField>
-        <FormField label="Tipo" hint={`${kindInfo(kind).hint} O tipo não muda depois de criado.`}>
+        <FormField label={t('Tipo')} hint={`${t(kindInfo(kind).hint)} ${t('O tipo não muda depois de criado.')}`}>
           {(id) => (
             <Select.Root value={kind} onValueChange={(v) => setKind(v as FieldKind)}>
               <Select.Trigger id={id} className="kind-select" />
               <Select.Content position="popper">
                 {FIELD_KINDS.map((k) => (
                   <Select.Item key={k.value} value={k.value}>
-                    {k.label}
+                    {t(k.label)}
                   </Select.Item>
                 ))}
               </Select.Content>
@@ -116,10 +120,10 @@ export function NewFieldCard({ onDone }: { onDone: () => void }) {
       </div>
       <div className="field-card-actions">
         <Button variant="soft" color="gray" onClick={onDone}>
-          Cancelar
+          {t('Cancelar')}
         </Button>
         <Button disabled={!ready} onClick={create}>
-          Criar campo
+          {t('Criar campo')}
         </Button>
       </div>
     </Card>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useBoardStore } from '../store/boardStore';
+import { t } from '../i18n';
 import { SelectField } from './ui';
 
 /** Diálogo de confirmação (window.confirm não funciona dentro de webviews do VSCode). */
@@ -40,7 +41,7 @@ export function Dialog() {
           </label>
         )}
         <div className="row end wrap">
-          <button onClick={() => ask(null)}>{dialog.cancelLabel ?? 'Cancelar'}</button>
+          <button onClick={() => ask(null)}>{dialog.cancelLabel ?? t('Cancelar')}</button>
           {dialog.secondary && (
             <button
               onClick={() => {
@@ -52,7 +53,7 @@ export function Dialog() {
             </button>
           )}
           <button autoFocus className={dialog.danger ? 'primary danger-bg' : 'primary'} onClick={confirm}>
-            {dialog.confirmLabel ?? 'Confirmar'}
+            {dialog.confirmLabel ?? t('Confirmar')}
           </button>
         </div>
       </div>

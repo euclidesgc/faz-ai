@@ -6,6 +6,7 @@ import { settings } from '../../../commands';
 import { MarkdownEditor } from '../../MarkdownEditor';
 import { Button, TextArea, TextField } from '@radix-ui/themes';
 import { FormField, SelectField } from '../../ui';
+import { t } from '../../../i18n';
 
 /** O Select do Radix não aceita `value` vazio: "padrão do board" usa este valor. */
 const DEFAULT_PROFILE = '__default';
@@ -16,6 +17,7 @@ export function PhaseEditor({ column }: { column: Column }) {
   const profiles = useBoardStore((s) => s.state)!.board.execProfiles;
   const patch = (p: { aiInstruction?: string; artifactName?: string; artifactTemplate?: string; execProfile?: string | null }) =>
     settings.updateColumn(column.id, p);
+  const defaultProfile = profiles.find((p) => p.isDefault);
   const preset = PHASE_DEFAULTS[column.name];
   const isDefault =
     preset &&
@@ -25,31 +27,31 @@ export function PhaseEditor({ column }: { column: Column }) {
 
   return (
     <div className="phase-editor">
-      <FormField label="Instrução para a IA" hint={`O que ela faz quando um card entra em "${column.name}".`}>
+      <FormField label={t('Instrução para a IA')} hint={t('O que ela faz quando um card entra em "{name}".', { name: column.name })}>
         {(id) => (
           <TextArea
             id={id}
             key={column.aiInstruction}
             rows={5}
             defaultValue={column.aiInstruction}
-            placeholder="Ex.: escreva o documento de requisitos a partir da conversa do card…"
+            placeholder={t('Ex.: escreva o documento de requisitos a partir da conversa do card…')}
             onBlur={(e) => e.target.value !== column.aiInstruction && patch({ aiInstruction: e.target.value })}
           />
         )}
       </FormField>
-      <FormField label="Documento da fase" hint="Nome do arquivo anexado à história; vazio se a fase não gera documento.">
+      <FormField label={t('Documento da fase')} hint={t('Nome do arquivo anexado à história; vazio se a fase não gera documento.')}>
         {(id) => (
           <TextField.Root
             id={id}
             key={column.artifactName}
             defaultValue={column.artifactName}
-            placeholder="Ex.: PRD.md"
+            placeholder={t('Ex.: PRD.md')}
             onBlur={(e) => e.target.value.trim() !== column.artifactName && patch({ artifactName: e.target.value.trim() })}
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
           />
         )}
       </FormField>
-      <FormField label="Modelo do documento" hint="A IA preenche este modelo ao gerar o documento.">
+      <FormField label={t('Modelo do documento')} hint={t('A IA preenche este modelo ao gerar o documento.')}>
         {() => (
           <MarkdownEditor
             key={column.artifactTemplate}
@@ -57,20 +59,23 @@ export function PhaseEditor({ column }: { column: Column }) {
             value={template}
             onChange={setTemplate}
             onCommit={() => template !== column.artifactTemplate && patch({ artifactTemplate: template })}
-            placeholder="Markdown com as seções do documento."
+            placeholder={t('Markdown com as seções do documento.')}
           />
         )}
       </FormField>
       {profiles.length > 0 && (
-        <FormField label="Agente" hint="Skills, servidores MCP, ferramentas e modelo dos cards desta fase; cada card pode trocar.">
+        <FormField
+          label={t('Agente')}
+          hint={t('Skills, servidores MCP, ferramentas e modelo dos cards desta fase; cada card pode trocar.')}
+        >
           {(id) => (
             <SelectField
               id={id}
-              aria-label="Agente"
+              aria-label={t('Agente')}
               options={[
                 {
                   value: DEFAULT_PROFILE,
-                  label: `Padrão do board${profiles.find((p) => p.isDefault) ? ` (${profiles.find((p) => p.isDefault)!.name})` : ' (nenhum)'}`,
+                  label: defaultProfile ? t('Padrão do board ({name})', { name: defaultProfile.name }) : t('Padrão do board (nenhum)'),
                 },
                 ...profiles.map((p) => ({ value: p.id, label: p.name })),
               ]}
@@ -90,7 +95,7 @@ export function PhaseEditor({ column }: { column: Column }) {
               patch({ aiInstruction: preset.instruction, artifactName: preset.artifactName, artifactTemplate: preset.artifactTemplate })
             }
           >
-            Restaurar o padrão desta fase
+            {t('Restaurar o padrão desta fase')}
           </Button>
         </div>
       )}

@@ -10,6 +10,7 @@ import { DeleteButton, IconPlus } from '../../ui';
 import { ColumnsTable } from './ColumnsTable';
 import { DragHandle } from './DragHandle';
 import { kindLabel } from './kinds';
+import { t } from '../../../i18n';
 
 /** Um workflow: o nome (editável), o papel, o botão Nova coluna e a tabela de colunas. */
 export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep: (delta: number) => void }) {
@@ -20,13 +21,13 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
 
   return (
     <div ref={setNodeRef} className={isDragging ? 'dragging' : ''} style={{ transform: CSS.Translate.toString(transform), transition }}>
-      <Card className="workflow-card" aria-label={`Workflow ${workflow.name}`}>
+      <Card className="workflow-card" aria-label={t('Workflow {name}', { name: workflow.name })}>
         <div className="workflow-card-head">
           <DragHandle name={workflow.name} onStep={onStep} drag={{ ...attributes, ...listeners }} />
           <TextField.Root
             key={workflow.name}
             className="workflow-name"
-            aria-label="Nome do workflow"
+            aria-label={t('Nome do workflow')}
             defaultValue={workflow.name}
             onBlur={(e) => {
               const name = e.target.value.trim();
@@ -35,18 +36,18 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
           />
           <Badge size="2" color="indigo" variant="soft">
-            {kindLabel(workflow.kind)}
+            {t(kindLabel(workflow.kind))}
           </Badge>
           <span className="spacer" />
           <Button disabled={adding} onClick={() => setAdding(true)}>
-            <IconPlus /> Nova coluna
+            <IconPlus /> {t('Nova coluna')}
           </Button>
           <DeleteButton
             disabled={blocker !== null}
-            title={blocker ?? 'Excluir o workflow'}
-            question={`Excluir o workflow "${workflow.name}"?`}
-            message="As colunas dele serão apagadas. Ele não tem cards."
-            confirmLabel="Excluir workflow"
+            title={blocker ? t(blocker) : t('Excluir o workflow')}
+            question={t('Excluir o workflow "{name}"?', { name: workflow.name })}
+            message={t('As colunas dele serão apagadas. Ele não tem cards.')}
+            confirmLabel={t('Excluir workflow')}
             onConfirm={() => settings.deleteWorkflow(workflow.id)}
           />
         </div>

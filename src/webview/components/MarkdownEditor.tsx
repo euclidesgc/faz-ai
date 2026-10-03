@@ -15,6 +15,7 @@ import {
   IconTaskList,
   type Icon,
 } from './ui';
+import { t } from '../i18n';
 
 marked.setOptions({ gfm: true, breaks: true });
 
@@ -38,7 +39,7 @@ const TOOLS: { kind: Format; Icon: Icon; title: string }[] = [
 export function applyFormat(value: string, start: number, end: number, kind: Format): { value: string; start: number; end: number } {
   const sel = value.slice(start, end);
   const wrap = (before: string, after: string, placeholder: string) => {
-    const text = sel || placeholder;
+    const text = sel || t(placeholder);
     return {
       value: value.slice(0, start) + before + text + after + value.slice(end),
       start: start + before.length,
@@ -156,23 +157,23 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
 
   const toolbar = (
     <div className="md-toolbar">
-      {TOOLS.map((t) => (
+      {TOOLS.map((tool) => (
         <Button
-          key={t.kind}
+          key={tool.kind}
           variant="icon"
-          className={`md-${t.kind}`}
-          title={t.title}
+          className={`md-${tool.kind}`}
+          title={t(tool.title)}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => format(t.kind)}
+          onClick={() => format(tool.kind)}
         >
-          <t.Icon />
+          <tool.Icon />
         </Button>
       ))}
       <span className="spacer" />
       {!expanded && (
         <>
           <Button variant="ghost" size="small" on={mode === 'write'} onClick={() => setMode('write')}>
-            Escrever
+            {t('Escrever')}
           </Button>
           <Button
             variant="ghost"
@@ -183,7 +184,7 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
               onCommit?.();
             }}
           >
-            Visualizar
+            {t('Visualizar')}
           </Button>
         </>
       )}
@@ -191,7 +192,7 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
         <Button
           variant="ghost"
           size="small"
-          title={expanded ? 'Recolher (Esc)' : 'Expandir editor'}
+          title={expanded ? t('Recolher (Esc)') : t('Expandir editor')}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             if (expanded) onCommit?.();
@@ -201,11 +202,11 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
         >
           {expanded ? (
             <>
-              <IconCollapse /> Recolher
+              <IconCollapse /> {t('Recolher')}
             </>
           ) : (
             <>
-              <IconOpen /> Expandir
+              <IconOpen /> {t('Expandir')}
             </>
           )}
         </Button>
@@ -219,7 +220,7 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
       autoFocus={autoFocus || expanded}
       rows={minRows}
       value={value}
-      placeholder={placeholder ?? 'Markdown suportado'}
+      placeholder={placeholder ?? t('Markdown suportado')}
       onChange={(e) => onChange(e.target.value)}
       onBlur={() => onCommit?.()}
       onKeyDown={onKeyDown}
@@ -237,7 +238,7 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
   const preview = (
     <div
       className="markdown"
-      dangerouslySetInnerHTML={{ __html: value.trim() ? renderMarkdown(value) : '<p class="muted">Nada para visualizar.</p>' }}
+      dangerouslySetInnerHTML={{ __html: value.trim() ? renderMarkdown(value) : `<p class="muted">${t('Nada para visualizar.')}</p>` }}
     />
   );
 

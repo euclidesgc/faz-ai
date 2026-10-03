@@ -1,3 +1,4 @@
+import { LANGUAGES, type Language } from './language';
 import { DEFAULT_STATUS_STYLES, parseStatusStyles, type StatusStyles } from './status';
 
 /** Aparência do board: tema, tipografia dos textos longos (descrição, conversa) e os status dos cards. */
@@ -6,6 +7,8 @@ export type ThemeMode = 'system' | 'light' | 'dark';
 export type TextFont = 'sans' | 'ui' | 'serif' | 'mono' | 'editor';
 
 export interface Appearance {
+  /** idioma da interface; `auto` segue o do editor ou do navegador */
+  language: Language;
   /** 'system' acompanha só o claro ou escuro do VS Code (no navegador, o do sistema operacional); as cores são sempre as do board */
   theme: ThemeMode;
   /** fonte dos campos de texto longo */
@@ -16,7 +19,13 @@ export interface Appearance {
   statuses: StatusStyles;
 }
 
-export const DEFAULT_APPEARANCE: Appearance = { theme: 'system', font: 'sans', fontSize: 14, statuses: DEFAULT_STATUS_STYLES };
+export const DEFAULT_APPEARANCE: Appearance = {
+  language: 'auto',
+  theme: 'system',
+  font: 'sans',
+  fontSize: 14,
+  statuses: DEFAULT_STATUS_STYLES,
+};
 export const FONT_SIZE_RANGE = { min: 11, max: 22 };
 
 export const THEMES: { value: ThemeMode; label: string }[] = [
@@ -50,6 +59,7 @@ export function parseAppearance(json: string | null | undefined): Appearance {
   }
   const size = Math.round(Number(raw.fontSize));
   return {
+    language: LANGUAGES.includes(raw.language as Language) ? (raw.language as Language) : DEFAULT_APPEARANCE.language,
     theme: THEMES.some((t) => t.value === raw.theme) ? (raw.theme as ThemeMode) : DEFAULT_APPEARANCE.theme,
     font: FONTS.some((f) => f.value === raw.font) ? (raw.font as TextFont) : DEFAULT_APPEARANCE.font,
     fontSize:

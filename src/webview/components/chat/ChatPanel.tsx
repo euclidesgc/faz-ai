@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { aiToolInfo } from '../../../shared/harness';
 import { useBoardStore } from '../../store/boardStore';
+import { t } from '../../i18n';
 import { chat } from '../../commands';
 import { ModelEditor } from '../FieldRenderer';
 import { renderMarkdown } from '../MarkdownEditor';
@@ -40,23 +41,24 @@ export function ChatPanel() {
   };
 
   return (
-    <section className="chat" aria-label="Chat com a IA">
+    <section className="chat" aria-label={t('Chat com a IA')}>
       <header className="chat-head">
-        <h3>Chat com {tool.label}</h3>
+        <h3>{t('Chat com {tool}', { tool: tool.label })}</h3>
         <Button variant="ghost" size="1" disabled={messages.length === 0 && !busy} onClick={chat.clear}>
-          Limpar
+          {t('Limpar')}
         </Button>
       </header>
       <div className="chat-log" ref={log} role="log" aria-live="polite">
         {messages.length === 0 && !busy && (
           <div className="chat-empty">
             <p className="muted small">
-              Peça à IA para criar, mover e vincular cards ou para resumir o board. Ela age pelas ferramentas do board; escolha o modelo
-              abaixo.
+              {t(
+                'Peça à IA para criar, mover e vincular cards ou para resumir o board. Ela age pelas ferramentas do board; escolha o modelo abaixo.',
+              )}
             </p>
             {EXAMPLES.map((e) => (
-              <Button key={e} variant="soft" color="gray" size="1" onClick={() => setText(e)}>
-                {e}
+              <Button key={e} variant="soft" color="gray" size="1" onClick={() => setText(t(e))}>
+                {t(e)}
               </Button>
             ))}
           </div>
@@ -72,14 +74,14 @@ export function ChatPanel() {
         ))}
         {busy && (
           <div className="chat-msg assistant typing" role="status">
-            <span className="spinner" /> {tool.label} está respondendo…
+            <span className="spinner" /> {t('{tool} está respondendo…', { tool: tool.label })}
           </div>
         )}
       </div>
       <div className="chat-composer">
         <TextArea
-          aria-label="Mensagem para a IA"
-          placeholder="Escreva para a IA… (Enter envia, Shift+Enter quebra a linha)"
+          aria-label={t('Mensagem para a IA')}
+          placeholder={t('Escreva para a IA… (Enter envia, Shift+Enter quebra a linha)')}
           rows={2}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -94,11 +96,11 @@ export function ChatPanel() {
           <ModelEditor value={model} onChange={(v) => setModel(typeof v === 'string' ? v : null)} />
           {busy ? (
             <Button color="red" variant="soft" onClick={chat.stop}>
-              <IconStop /> Parar
+              <IconStop /> {t('Parar')}
             </Button>
           ) : (
             <Button disabled={!text.trim()} onClick={send}>
-              <IconSend /> Enviar
+              <IconSend /> {t('Enviar')}
             </Button>
           )}
         </div>

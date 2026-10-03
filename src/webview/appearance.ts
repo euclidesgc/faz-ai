@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { fontStack, type ThemeMode } from '../shared/appearance';
+import { resolveLocale } from '../shared/language';
+import { setLocale } from './i18n';
 import { useBoardStore } from './store/boardStore';
 import { resolveTheme } from './theme';
 import { isWeb } from './vscode';
@@ -25,6 +27,9 @@ export function useAppearance(): void {
   const appearance = useBoardStore((s) => s.state?.board.appearance);
   useEffect(() => {
     if (!appearance) return;
+    const locale = resolveLocale(appearance.language, navigator.language);
+    setLocale(locale);
+    document.documentElement.lang = locale === 'en' ? 'en' : 'pt-BR';
     const { body } = document;
     body.style.setProperty('--text-font', fontStack(appearance.font));
     body.style.setProperty('--text-size', `${appearance.fontSize}px`);

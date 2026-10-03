@@ -15,6 +15,7 @@ import { archiveKey } from '../../shared/filters';
 import type { Card as CardModel, Workflow } from '../../shared/model';
 import { archivedIn, cardsIn, columnsOf } from '../../shared/selectors';
 import { useBoardStore, useFilteredIds } from '../store/boardStore';
+import { t } from '../i18n';
 import { cards, settings } from '../commands';
 import { requestArchive, requestMove } from '../store/actions';
 import { CollapsedColumn, Column } from './Column';
@@ -117,14 +118,14 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
         />
         <div className="column-add">
           {newColumn === null ? (
-            <Button variant="ghost" title="Nova coluna" onClick={() => setNewColumn('')}>
-              + Coluna
+            <Button variant="ghost" title={t('Nova coluna')} onClick={() => setNewColumn('')}>
+              {t('+ Coluna')}
             </Button>
           ) : (
             <TextField.Root
               autoFocus
-              aria-label="Nome da coluna"
-              placeholder="Nome da coluna"
+              aria-label={t('Nome da coluna')}
+              placeholder={t('Nome da coluna')}
               value={newColumn}
               onChange={(e) => setNewColumn(e.target.value)}
               onBlur={addColumn}
@@ -158,7 +159,7 @@ function ArchiveColumn({
       <CollapsedColumn
         setNodeRef={setNodeRef}
         isOver={isOver}
-        name="Arquivados"
+        name={t('Arquivados')}
         count={String(cards.length)}
         className="archive"
         onExpand={() => onToggle(true)}
@@ -167,10 +168,10 @@ function ArchiveColumn({
   return (
     <div ref={setNodeRef} className={`column archive ${isOver ? 'over' : ''}`}>
       <header className="column-header">
-        <Button variant="icon" className="collapse-toggle" title="Colapsar a coluna" onClick={() => onToggle(false)}>
+        <Button variant="icon" className="collapse-toggle" title={t('Colapsar a coluna')} onClick={() => onToggle(false)}>
           <IconChevronLeft />
         </Button>
-        <span className="column-name">Arquivados</span>
+        <span className="column-name">{t('Arquivados')}</span>
         <span className="column-count">{cards.length}</span>
       </header>
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
@@ -178,7 +179,7 @@ function ArchiveColumn({
           {cards.map((card) => (
             <SortableCard key={card.id} card={card} />
           ))}
-          {cards.length === 0 && <p className="muted empty">Arraste um card para cá para arquivar.</p>}
+          {cards.length === 0 && <p className="muted empty">{t('Arraste um card para cá para arquivar.')}</p>}
         </div>
       </SortableContext>
     </div>

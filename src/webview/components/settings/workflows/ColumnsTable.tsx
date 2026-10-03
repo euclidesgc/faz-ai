@@ -10,6 +10,7 @@ import { DeleteButton, IconChevronDown, SelectField } from '../../ui';
 import { NewColumnRow } from './NewColumnRow';
 import { PhaseEditor } from './PhaseEditor';
 import { SortableRow } from './SortableRow';
+import { t } from '../../../i18n';
 
 const CATEGORIES: { value: ColumnCategory; label: string }[] = [
   { value: 'open', label: 'Trabalho em aberto' },
@@ -21,6 +22,7 @@ const COLUMNS = 7;
 
 /** Colunas de um workflow: nome, o que representa, IA, aprovação e fase; arrastar pela alça muda a ordem. */
 export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workflow; adding: boolean; onAddDone: () => void }) {
+  const categories = CATEGORIES.map((o) => ({ ...o, label: t(o.label) }));
   const state = useBoardStore((s) => s.state)!;
   const [phaseOpen, setPhaseOpen] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -40,11 +42,11 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
         <thead>
           <tr>
             <th></th>
-            <th>Coluna</th>
-            <th>Representa</th>
-            <th>IA atua</th>
-            <th>Exige aprovação</th>
-            <th>Fase</th>
+            <th>{t('Coluna')}</th>
+            <th>{t('Representa')}</th>
+            <th>{t('IA atua')}</th>
+            <th>{t('Exige aprovação')}</th>
+            <th>{t('Fase')}</th>
             <th></th>
           </tr>
         </thead>
@@ -55,7 +57,7 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
                 <SortableRow id={c.id} name={c.name} onStep={(d) => i + d >= 0 && i + d < cols.length && moveTo(c.id, i + d)}>
                   <td>
                     <TextField.Root
-                      aria-label={`Nome da coluna ${c.name}`}
+                      aria-label={t('Nome da coluna {name}', { name: c.name })}
                       key={c.name}
                       defaultValue={c.name}
                       onBlur={(e) =>
@@ -68,15 +70,15 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
                   </td>
                   <td>
                     <SelectField
-                      aria-label={`O que ${c.name} representa`}
-                      options={CATEGORIES}
+                      aria-label={t('O que {name} representa', { name: c.name })}
+                      options={categories}
                       value={c.category}
                       onChange={(category) => settings.updateColumn(c.id, { category })}
                     />
                   </td>
                   <td>
                     <Checkbox
-                      aria-label={`A IA atua em ${c.name}`}
+                      aria-label={t('A IA atua em {name}', { name: c.name })}
                       disabled={c.category !== 'open'}
                       checked={c.aiActive}
                       onCheckedChange={(on) => settings.updateColumn(c.id, { aiActive: on === true })}
@@ -84,7 +86,7 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
                   </td>
                   <td>
                     <Checkbox
-                      aria-label={`${c.name} exige aprovação`}
+                      aria-label={t('{name} exige aprovação', { name: c.name })}
                       disabled={c.category !== 'open'}
                       checked={c.requiresApproval}
                       onCheckedChange={(on) => settings.updateColumn(c.id, { requiresApproval: on === true })}
@@ -96,22 +98,26 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
                       size="1"
                       aria-pressed={phaseOpen === c.id}
                       disabled={c.category !== 'open'}
-                      title="Instrução para a IA e modelo do documento desta fase"
+                      title={t('Instrução para a IA e modelo do documento desta fase')}
                       onClick={() => setPhaseOpen(phaseOpen === c.id ? null : c.id)}
                     >
-                      {c.artifactName || (c.aiInstruction ? 'Instrução' : 'Definir')} <IconChevronDown />
+                      {c.artifactName || (c.aiInstruction ? t('Instrução') : t('Definir'))} <IconChevronDown />
                     </Button>
                   </td>
                   <td>
                     <DeleteButton
                       disabled={cols.length <= 1}
-                      title={cols.length <= 1 ? 'Um workflow precisa de ao menos uma coluna' : 'Excluir a coluna'}
-                      question={`Excluir a coluna "${c.name}"?`}
-                      message={inColumn(c.id) ? `${inColumn(c.id)} card(s) serão movidos para a coluna escolhida.` : 'A coluna está vazia.'}
-                      confirmLabel="Excluir coluna"
+                      title={cols.length <= 1 ? t('Um workflow precisa de ao menos uma coluna') : t('Excluir a coluna')}
+                      question={t('Excluir a coluna "{name}"?', { name: c.name })}
+                      message={
+                        inColumn(c.id)
+                          ? t('{n} card(s) serão movidos para a coluna escolhida.', { n: inColumn(c.id) })
+                          : t('A coluna está vazia.')
+                      }
+                      confirmLabel={t('Excluir coluna')}
                       choices={
                         inColumn(c.id)
-                          ? { label: 'Mover cards para', options: others(c.id).map((x) => ({ value: x.id, label: x.name })) }
+                          ? { label: t('Mover cards para'), options: others(c.id).map((x) => ({ value: x.id, label: x.name })) }
                           : undefined
                       }
                       onConfirm={(dest) => settings.deleteColumn(c.id, dest ?? others(c.id)[0]!.id)}

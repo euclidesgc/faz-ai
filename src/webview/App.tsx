@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAppearance } from './appearance';
+import { t, tn } from './i18n';
+import { rich } from './i18n/rich';
 import { humanQueue, pendingWork } from '../shared/pending';
 import { useBoardStore, useHostSync } from './store/boardStore';
 import { ui } from './commands';
@@ -25,13 +27,13 @@ export function App() {
   // erros (ex.: regra de conclusão) e avisos somem sozinhos
   useEffect(() => {
     if (!error) return;
-    const t = setTimeout(() => setError(null), 12000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setError(null), 12000);
+    return () => clearTimeout(timer);
   }, [error, setError]);
   useEffect(() => {
     if (!notice) return;
-    const t = setTimeout(() => setNotice(null), 12000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setNotice(null), 12000);
+    return () => clearTimeout(timer);
   }, [notice, setNotice]);
 
   useEffect(() => onConnectionChange((online) => setOffline(!online)), []);
@@ -39,7 +41,7 @@ export function App() {
   if (!state)
     return (
       <div className="loading">
-        {offline ? 'Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.' : 'Carregando board…'}
+        {offline ? t('Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.') : t('Carregando board…')}
       </div>
     );
   const trashCount = state.cards.filter((c) => c.deletedAt !== null).length;
@@ -53,19 +55,20 @@ export function App() {
         <h1 title={state.board.name}>{state.board.name}</h1>
         <nav>
           <Button active={view === 'board'} onClick={() => setView('board')}>
-            Board
+            {t('Board')}
           </Button>
           <Button active={view === 'trash'} onClick={() => setView('trash')}>
-            Lixeira{trashCount > 0 && ` (${trashCount})`}
+            {t('Lixeira')}
+            {trashCount > 0 && ` (${trashCount})`}
           </Button>
           <Button active={view === 'settings'} onClick={() => setView('settings')}>
-            Configurações
+            {t('Configurações')}
           </Button>
         </nav>
         <span className="spacer" />
         {running > 0 && (
-          <span className="topbar-info" title="Execuções da IA em andamento">
-            <span className="spinner" /> IA trabalhando em {running} card{running > 1 ? 's' : ''}
+          <span className="topbar-info" title={t('Execuções da IA em andamento')}>
+            <span className="spinner" /> {tn(running, 'IA trabalhando em {n} card', 'IA trabalhando em {n} cards')}
           </span>
         )}
         {withYou > 0 && (
@@ -74,37 +77,38 @@ export function App() {
             on={onlyMine}
             title={
               onlyMine
-                ? 'Mostrando só o que espera por você. Clique para ver tudo.'
-                : 'Cards esperando revisão, resposta ou desbloqueio. Clique para ver só eles.'
+                ? t('Mostrando só o que espera por você. Clique para ver tudo.')
+                : t('Cards esperando revisão, resposta ou desbloqueio. Clique para ver só eles.')
             }
             onClick={() => {
               setView('board');
               setFilters({ owner: onlyMine ? 'any' : 'human' });
             }}
           >
-            {withYou} com você
+            {t('{n} com você', { n: withYou })}
           </Button>
         )}
         {!isWeb && (
-          <Button variant="ghost" title="Abre este board no navegador, fora do editor" onClick={() => ui.openInBrowser()}>
-            Abrir no navegador <IconExternal />
+          <Button variant="ghost" title={t('Abre este board no navegador, fora do editor')} onClick={() => ui.openInBrowser()}>
+            {t('Abrir no navegador')} <IconExternal />
           </Button>
         )}
         <Button
           variant="ghost"
           on={isWeb && chatOpen}
-          title={isWeb ? 'Conversar com a IA sobre o board' : 'Abre o chat com a IA na barra lateral'}
+          title={isWeb ? t('Conversar com a IA sobre o board') : t('Abre o chat com a IA na barra lateral')}
           onClick={() => (isWeb ? setChatOpen(!chatOpen) : ui.showChat())}
         >
-          <IconChat /> Chat
+          <IconChat /> {t('Chat')}
         </Button>
         <HeartbeatButton offline={offline} />
         <ThemeToggle />
       </header>
       {offline && (
         <div className="banner warn offline">
-          Sem ligação com o Faz AI: o que você fizer agora não é salvo. A página reconecta sozinha quando o editor (ou o comando{' '}
-          <code>faz-ai</code>) voltar.
+          {rich(
+            'Sem ligação com o Faz AI: o que você fizer agora não é salvo. A página reconecta sozinha quando o editor (ou o comando <code>faz-ai</code>) voltar.',
+          )}
         </div>
       )}
       {view === 'board' && <FilterBar />}
@@ -118,8 +122,8 @@ export function App() {
           <Button
             variant="icon"
             className="drawer-close"
-            title="Fechar o chat"
-            aria-label="Fechar o chat"
+            title={t('Fechar o chat')}
+            aria-label={t('Fechar o chat')}
             onClick={() => setChatOpen(false)}
           >
             <IconClose />
@@ -132,16 +136,16 @@ export function App() {
       <div className="toasts" aria-live="polite">
         {error && (
           <div className="toast error" role="alert">
-            <span>{error}</span>
-            <Button variant="icon" aria-label="Fechar aviso" onClick={() => setError(null)}>
+            <span>{t(error)}</span>
+            <Button variant="icon" aria-label={t('Fechar aviso')} onClick={() => setError(null)}>
               <IconClose />
             </Button>
           </div>
         )}
         {notice && (
           <div className="toast" role="status">
-            <span>{notice}</span>
-            <Button variant="icon" aria-label="Fechar aviso" onClick={() => setNotice(null)}>
+            <span>{t(notice)}</span>
+            <Button variant="icon" aria-label={t('Fechar aviso')} onClick={() => setNotice(null)}>
               <IconClose />
             </Button>
           </div>

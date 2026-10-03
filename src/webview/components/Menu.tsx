@@ -1,20 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { t } from '../i18n';
 import { Button, IconCheck, IconMore } from './ui';
 
 export type MenuItem =
   { label: string; onClick(): void; danger?: boolean; disabled?: boolean; checked?: boolean } | { header: string } | 'sep';
 
 /** Botão que abre um menu flutuante. Renderizado em portal para não ser cortado nem afetado por transforms. */
-export function Menu({
-  items,
-  title = 'Mais ações',
-  children = <IconMore />,
-}: {
-  items: MenuItem[];
-  title?: string;
-  children?: ReactNode;
-}) {
+export function Menu({ items, title, children = <IconMore /> }: { items: MenuItem[]; title?: string; children?: ReactNode }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
 
@@ -47,7 +40,7 @@ export function Menu({
         ref={btn}
         variant="icon"
         className="menu-trigger"
-        title={title}
+        title={title ?? t('Mais ações')}
         aria-haspopup="menu"
         aria-expanded={pos !== null}
         onPointerDown={(e) => e.stopPropagation()}

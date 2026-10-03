@@ -3,6 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Card, Column as ColumnModel, ColumnCategory, Workflow } from '../../shared/model';
 import { useBoardStore } from '../store/boardStore';
+import { t } from '../i18n';
 import { cards, settings } from '../commands';
 import { SortableCard } from './Card';
 import { Menu } from './Menu';
@@ -36,7 +37,7 @@ interface Props {
 function TerminalMark({ category }: { category: ColumnCategory }) {
   if (category === 'open') return null;
   return (
-    <span className={`terminal-mark ${category}`} title={CATEGORIES.find((c) => c.value === category)!.hint}>
+    <span className={`terminal-mark ${category}`} title={t(CATEGORIES.find((c) => c.value === category)!.hint)}>
       {category === 'done' ? <IconCheck /> : <IconClose />}{' '}
     </span>
   );
@@ -66,7 +67,7 @@ export function CollapsedColumn({
       ref={setNodeRef}
       className={`column collapsed ${className} ${isOver ? 'over' : ''}`}
       onClick={onExpand}
-      title={`Expandir "${name}"`}
+      title={t('Expandir "{name}"', { name })}
     >
       <Button variant="icon" className="collapse-toggle" aria-expanded={false}>
         <IconChevronRight />
@@ -90,13 +91,13 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
   const [typeId, setTypeId] = useState<string>('');
   const [renaming, setRenaming] = useState<string | null>(null);
 
-  const types = state.cardTypes.filter((t) => t.defaultWorkflowId === workflow.id);
+  const types = state.cardTypes.filter((ct) => ct.defaultWorkflowId === workflow.id);
   const canAdd = workflow.kind === 'parent' || !!selectedParentId;
 
   const submit = () => {
-    const t = typeId || types[0]?.id;
-    if (!title.trim() || !t) return;
-    cards.create({ typeId: t, columnId: column.id, parentId: workflow.kind === 'child' ? selectedParentId : null, title: title.trim() });
+    const type = typeId || types[0]?.id;
+    if (!title.trim() || !type) return;
+    cards.create({ typeId: type, columnId: column.id, parentId: workflow.kind === 'child' ? selectedParentId : null, title: title.trim() });
     setTitle('');
   };
 
@@ -111,11 +112,11 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
     // conta todos os cards que apontam para a coluna, inclusive arquivados e na lixeira
     const n = state.cards.filter((c) => c.columnId === column.id).length;
     ask({
-      title: `Excluir a coluna "${column.name}"?`,
-      message: n ? `${n} card(s) desta coluna serão movidos para a coluna escolhida.` : 'A coluna está vazia.',
-      confirmLabel: 'Excluir coluna',
+      title: t('Excluir a coluna "{name}"?', { name: column.name }),
+      message: n ? t('{n} card(s) desta coluna serão movidos para a coluna escolhida.', { n }) : t('A coluna está vazia.'),
+      confirmLabel: t('Excluir coluna'),
       danger: true,
-      choices: n ? { label: 'Mover cards para', options: others.map((c) => ({ value: c.id, label: c.name })) } : undefined,
+      choices: n ? { label: t('Mover cards para'), options: others.map((c) => ({ value: c.id, label: c.name })) } : undefined,
       onConfirm: (dest) => settings.deleteColumn(column.id, dest ?? others[0]!.id),
     });
   };
@@ -138,7 +139,7 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
   return (
     <div ref={setNodeRef} className={`column ${isOver ? 'over' : ''} ${column.isTerminal ? 'terminal' : ''}`}>
       <header className="column-header">
-        <Button variant="icon" className="collapse-toggle" title="Colapsar a coluna" onClick={onToggle}>
+        <Button variant="icon" className="collapse-toggle" title={t('Colapsar a coluna')} onClick={onToggle}>
           <IconChevronLeft />
         </Button>
         {renaming !== null ? (
@@ -155,11 +156,11 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
             }}
           />
         ) : (
-          <span className="column-name" title="Duplo clique para renomear" onDoubleClick={() => setRenaming(column.name)}>
+          <span className="column-name" title={t('Duplo clique para renomear')} onDoubleClick={() => setRenaming(column.name)}>
             <TerminalMark category={column.category} />
             {column.name}
             {column.requiresApproval && (
-              <span className="approval-mark" title="Exige aprovação: a IA só avança o card desta coluna depois que você aprova">
+              <span className="approval-mark" title={t('Exige aprovação: a IA só avança o card desta coluna depois que você aprova')}>
                 {' '}
                 <IconApproval />
               </span>
@@ -168,30 +169,30 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
         )}
         <span className="column-count">{count}</span>
         <Menu
-          title="Ações da coluna"
+          title={t('Ações da coluna')}
           items={[
-            { label: 'Renomear', onClick: () => setRenaming(column.name) },
-            { label: 'Colapsar', onClick: onToggle },
+            { label: t('Renomear'), onClick: () => setRenaming(column.name) },
+            { label: t('Colapsar'), onClick: onToggle },
             'sep',
-            { header: 'Esta coluna representa' },
+            { header: t('Esta coluna representa') },
             ...CATEGORIES.map((c) => ({
-              label: c.label,
+              label: t(c.label),
               checked: column.category === c.value,
               onClick: () => settings.updateColumn(column.id, { category: c.value }),
             })),
             'sep' as const,
             {
-              label: 'Mover para a esquerda',
+              label: t('Mover para a esquerda'),
               disabled: index === 0,
               onClick: () => settings.updateColumn(column.id, { position: index - 1 }),
             },
             {
-              label: 'Mover para a direita',
+              label: t('Mover para a direita'),
               disabled: index === siblings.length - 1,
               onClick: () => settings.updateColumn(column.id, { position: index + 1 }),
             },
             'sep',
-            { label: 'Excluir coluna', danger: true, disabled: siblings.length <= 1, onClick: remove },
+            { label: t('Excluir coluna'), danger: true, disabled: siblings.length <= 1, onClick: remove },
           ]}
         />
       </header>
@@ -207,8 +208,8 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
           <div className="add-form">
             <TextField.Root
               autoFocus
-              aria-label="Título do card"
-              placeholder="Título (Enter adiciona)"
+              aria-label={t('Título do card')}
+              placeholder={t('Título (Enter adiciona)')}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -218,27 +219,27 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
             />
             {types.length > 1 && (
               <SelectField
-                aria-label="Tipo do card"
-                options={types.map((t) => ({ value: t.id, label: t.name }))}
+                aria-label={t('Tipo do card')}
+                options={types.map((ct) => ({ value: ct.id, label: ct.name }))}
                 value={typeId || types[0]!.id}
                 onChange={setTypeId}
               />
             )}
             <div className="row">
               <Button variant="primary" onClick={submit}>
-                Adicionar
+                {t('Adicionar')}
               </Button>
-              <Button onClick={() => setAdding(false)}>Fechar</Button>
+              <Button onClick={() => setAdding(false)}>{t('Fechar')}</Button>
             </div>
           </div>
         ) : (
           <Button
             variant="ghost"
             disabled={!canAdd}
-            title={canAdd ? '' : 'Clique numa história para criar sub-tarefas dela'}
+            title={canAdd ? '' : t('Clique numa história para criar sub-tarefas dela')}
             onClick={() => setAdding(true)}
           >
-            {workflow.kind === 'child' ? '+ Nova sub-tarefa' : '+ Novo card'}
+            {workflow.kind === 'child' ? t('+ Nova sub-tarefa') : t('+ Novo card')}
           </Button>
         )}
       </footer>

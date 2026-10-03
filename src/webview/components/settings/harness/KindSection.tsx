@@ -20,6 +20,8 @@ import { NewPermission } from './NewPermission';
 import { ScopeGroup } from './ScopeGroup';
 import { toolLabel } from './text';
 import type { ItemActions } from './useItemActions';
+import { getLocale, t } from '../../../i18n';
+import { rich } from '../../../i18n/rich';
 
 interface Props {
   kind: (typeof HARNESS_KINDS)[number];
@@ -65,14 +67,14 @@ export function KindSection({
   const automatic = items.filter((i) => i.kind === 'skill' && i.mode === 'auto');
   return (
     <SettingsCard
-      title={k.label}
+      title={t(k.label)}
       badge={{ text: String(ofKind.length), on: false }}
-      hint={k.hint}
+      hint={t(k.hint)}
       actions={
         <>
           {k.id === 'skill' && (
             <Button variant="soft" color="gray" onClick={() => onInstalling(!installing)}>
-              Buscar e instalar
+              {t('Buscar e instalar')}
             </Button>
           )}
           {k.id === 'settings' && permissionFiles.length > 0 && (
@@ -84,7 +86,7 @@ export function KindSection({
                 onCreating(null);
               }}
             >
-              Nova regra de permissão
+              {t('Nova regra de permissão')}
             </Button>
           )}
           {(places.length > 0 || (k.id === 'mcp' && mcpFiles.length > 0) || (k.id === 'hook' && hookFiles.length > 0)) && (
@@ -96,7 +98,7 @@ export function KindSection({
                 onAddingRule(false);
               }}
             >
-              {k.id === 'settings' ? 'Novo arquivo' : 'Novo'}
+              {k.id === 'settings' ? t('Novo arquivo') : t('Novo')}
             </Button>
           )}
         </>
@@ -107,27 +109,29 @@ export function KindSection({
         !items.some((i) => i.kind === 'skill' && i.scope === 'project' && i.name === REFERENCE_SKILL.name) && (
           <div className="row">
             <span className="muted small">
-              Modelos de classe e exemplos de código ficam bem numa skill própria, só quando indicada: os arquivos vão em{' '}
-              <code>references/</code> e os cards que a indicam recebem os caminhos.
+              {rich(
+                'Modelos de classe e exemplos de código ficam bem numa skill própria, só quando indicada: os arquivos vão em <code>references/</code> e os cards que a indicam recebem os caminhos.',
+              )}
             </span>
             <Button variant="ghost" size="1" onClick={() => harness.createReferenceSkill()}>
-              Criar skill de modelos
+              {t('Criar skill de modelos')}
             </Button>
           </div>
         )}
       {k.id === 'skill' && (installing || state.harnessInstall) && <InstallSkills key={tool} tool={tool} />}
       {k.id === 'plugin' && (
         <div className="muted small">
-          Plugins são instalados e removidos pela própria ferramenta, {PLUGIN_COMMANDS[tool].where}:
+          {t('Plugins são instalados e removidos pela própria ferramenta, {where}:', { where: t(PLUGIN_COMMANDS[tool].where) })}
           <ul>
             {PLUGIN_COMMANDS[tool].commands.map((c) => (
               <li key={c}>
-                <code>{c}</code>
+                <code>{t(c)}</code>
               </li>
             ))}
           </ul>
-          Para aproveitar só uma skill de um plugin ou de um repositório, use "Buscar e instalar" na seção Skills, ou "Copiar para o
-          projeto" na skill do plugin.
+          {t(
+            'Para aproveitar só uma skill de um plugin ou de um repositório, use "Buscar e instalar" na seção Skills, ou "Copiar para o projeto" na skill do plugin.',
+          )}
         </div>
       )}
       {k.id === 'hook' && (
@@ -136,7 +140,7 @@ export function KindSection({
             <IconWarning />
           </Callout.Icon>
           <Callout.Text>
-            Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.
+            {t('Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.')}
           </Callout.Text>
         </Callout.Root>
       )}
@@ -145,8 +149,9 @@ export function KindSection({
       )}
       {k.id === 'hook' && tool === 'kimi' && (
         <p className="muted small">
-          Os hooks do Kimi Code ficam no <code>~/.kimi-code/config.toml</code> (<code>[[hooks]]</code>): aparecem aqui e são editados no
-          arquivo.
+          {rich(
+            'Os hooks do Kimi Code ficam no <code>~/.kimi-code/config.toml</code> (<code>[[hooks]]</code>): aparecem aqui e são editados no arquivo.',
+          )}
         </p>
       )}
       {k.id === 'settings' && addingRule && permissionFiles.length > 0 && (
@@ -157,8 +162,9 @@ export function KindSection({
       )}
       {k.id === 'mcp' && tool === 'claude' && (
         <p className="muted small">
-          Os servidores do <code>~/.claude.json</code> aparecem aqui, mas são alterados pelo Claude Code:{' '}
-          <code>claude mcp add --scope user …</code> e <code>claude mcp remove …</code>.
+          {rich(
+            'Os servidores do <code>~/.claude.json</code> aparecem aqui, mas são alterados pelo Claude Code: <code>claude mcp add --scope user …</code> e <code>claude mcp remove …</code>.',
+          )}
         </p>
       )}
       {creating === k.id && k.id !== 'hook' && k.id !== 'mcp' && places.length > 0 && (
@@ -166,9 +172,14 @@ export function KindSection({
       )}
       {k.id === 'skill' && automatic.length > 0 && (
         <p className="muted small">
-          {automatic.length} skills automáticas: as descrições delas,{' '}
-          {automatic.reduce((n, i) => n + i.description.length, 0).toLocaleString('pt-BR')} caracteres ao todo, entram em toda sessão do{' '}
-          {toolLabel(tool)}. As demais só são lidas quando indicadas.
+          {t(
+            '{n} skills automáticas: as descrições delas, {chars} caracteres ao todo, entram em toda sessão do {tool}. As demais só são lidas quando indicadas.',
+            {
+              n: automatic.length,
+              chars: automatic.reduce((n, i) => n + i.description.length, 0).toLocaleString(getLocale() === 'en' ? 'en-US' : 'pt-BR'),
+              tool: toolLabel(tool),
+            },
+          )}
         </p>
       )}
       {HARNESS_SCOPES.map((s) => {

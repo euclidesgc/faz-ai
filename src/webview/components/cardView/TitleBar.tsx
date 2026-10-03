@@ -1,5 +1,6 @@
 import { cardRef, type Card, type CardType } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
+import { t } from '../../i18n';
 import { cards } from '../../commands';
 import { requestArchive, requestTrash } from '../../store/actions';
 import { Menu } from '../Menu';
@@ -18,8 +19,8 @@ export function TitleBar({ card, type, work, overlay }: { card: Card; type?: Car
         <span className="card-actions">
           <Button
             variant="icon"
-            title="Abrir o card"
-            aria-label="Abrir o card"
+            title={t('Abrir o card')}
+            aria-label={t('Abrir o card')}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
@@ -29,14 +30,14 @@ export function TitleBar({ card, type, work, overlay }: { card: Card; type?: Car
             <IconOpen />
           </Button>
           <Menu
-            title="Ações do card"
+            title={t('Ações do card')}
             items={[
-              { label: 'Abrir detalhes', onClick: () => openCard(card.id) },
+              { label: t('Abrir detalhes'), onClick: () => openCard(card.id) },
               archived
-                ? { label: 'Desarquivar', onClick: () => cards.unarchive(card.id) }
-                : { label: 'Arquivar', onClick: () => requestArchive(card.id) },
+                ? { label: t('Desarquivar'), onClick: () => cards.unarchive(card.id) }
+                : { label: t('Arquivar'), onClick: () => requestArchive(card.id) },
               'sep',
-              { label: 'Mover para a lixeira', danger: true, onClick: () => requestTrash(card.id) },
+              { label: t('Mover para a lixeira'), danger: true, onClick: () => requestTrash(card.id) },
             ]}
           />
         </span>

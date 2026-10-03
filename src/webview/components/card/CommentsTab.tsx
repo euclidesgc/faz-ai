@@ -6,6 +6,7 @@ import { isLive } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { ai, attachments, comments } from '../../commands';
 import { MAX_ATTACHMENT_BYTES, toBase64 } from './AttachmentsTab';
+import { formatDateTime, t } from '../../i18n';
 
 /** Referência a um anexo do card dentro de uma mensagem: `attachment:<nome do arquivo>`. */
 const ATTACHMENT_SCHEME = 'attachment:';
@@ -44,7 +45,7 @@ export function CommentsTab({ cardId }: { cardId: string }) {
     files
       .map((file, i) => {
         if (file.size > MAX_ATTACHMENT_BYTES) {
-          setError(`"${file.name}" tem mais de 20 MB e não foi anexado.`);
+          setError(t('"{name}" tem mais de 20 MB e não foi anexado.', { name: file.name }));
           return '';
         }
         const ext = (file.name.split('.').pop() || file.type.split('/').pop() || 'png').replace(/[^a-z0-9]/gi, '').toLowerCase();
@@ -66,17 +67,19 @@ export function CommentsTab({ cardId }: { cardId: string }) {
 
   return (
     <section className="drawer-section comments">
-      {cardComments.length === 0 && <p className="muted">Nenhuma mensagem ainda. A conversa com a IA sobre este card acontece aqui.</p>}
+      {cardComments.length === 0 && (
+        <p className="muted">{t('Nenhuma mensagem ainda. A conversa com a IA sobre este card acontece aqui.')}</p>
+      )}
       {cardComments.map((c) => (
         <CommentItem key={c.id} comment={c} mine={c.author === state.currentUser} render={resolve} />
       ))}
       {running && (
         <div className="banner ai-running">
           <span className="spinner" />
-          <span>{toolLabel} está trabalhando neste card… A resposta aparece aqui quando terminar.</span>
+          <span>{t('{tool} está trabalhando neste card… A resposta aparece aqui quando terminar.', { tool: toolLabel })}</span>
           <span className="spacer" />
           <Button variant="ghost" size="small" onClick={() => ai.stop(cardId)}>
-            Parar
+            {t('Parar')}
           </Button>
         </div>
       )}
@@ -88,33 +91,38 @@ export function CommentsTab({ cardId }: { cardId: string }) {
           onChange={setDraft}
           onSubmit={submit}
           onPasteFiles={pasteFiles}
-          placeholder="Escreva uma mensagem… (Cmd+Enter envia; cole imagens direto aqui)"
+          placeholder={t('Escreva uma mensagem… (Cmd+Enter envia; cole imagens direto aqui)')}
         />
         <div className="row wrap">
-          <span className="muted small ai-permission" title={state.aiRunUnsupported ?? permission.hint}>
+          <span className="muted small ai-permission" title={state.aiRunUnsupported ?? t(permission.hint)}>
             {state.aiRunUnsupported
-              ? `Chamar a IA daqui não está disponível para o ${toolLabel}.`
-              : `Permissão do ${toolLabel} ao ser chamado: ${permission.label}.`}{' '}
-            <a onClick={() => openSettings('harness')}>Mudar</a>
+              ? t('Chamar a IA daqui não está disponível para o {tool}.', { tool: toolLabel })
+              : t('Permissão do {tool} ao ser chamado: {permission}.', { tool: toolLabel, permission: t(permission.label) })}{' '}
+            <a onClick={() => openSettings('harness')}>{t('Mudar')}</a>
           </span>
           <span className="spacer" />
           <Button disabled={!draft.trim()} onClick={submit}>
-            Enviar
+            {t('Enviar')}
           </Button>
           <Button
             variant="primary"
             disabled={!canCall || running}
             title={
               state.aiRunUnsupported ??
-              `Roda o ${toolLabel} em segundo plano para ler a conversa e trabalhar neste card. A resposta chega aqui, sem acompanhamento ao vivo.`
+              t(
+                'Roda o {tool} em segundo plano para ler a conversa e trabalhar neste card. A resposta chega aqui, sem acompanhamento ao vivo.',
+                {
+                  tool: toolLabel,
+                },
+              )
             }
             onClick={callAi}
           >
             {draft.trim() ? (
-              'Enviar e chamar IA'
+              t('Enviar e chamar IA')
             ) : (
               <>
-                <IconRun /> Chamar IA
+                <IconRun /> {t('Chamar IA')}
               </>
             )}
           </Button>
@@ -138,8 +146,8 @@ function CommentItem({ comment, mine, render }: { comment: Comment; mine: boolea
         <span className="avatar">{comment.author.slice(0, 1).toUpperCase()}</span>
         <strong>{comment.author}</strong>
         <span className="muted small">
-          {new Date(comment.createdAt).toLocaleString()}
-          {comment.updatedAt > comment.createdAt && ' · editado'}
+          {formatDateTime(comment.createdAt)}
+          {comment.updatedAt > comment.createdAt && ` · ${t('editado')}`}
         </span>
         <span className="spacer" />
         {/* editar só a própria mensagem; apagar vale para qualquer um, inclusive os escritos pela IA */}
@@ -147,16 +155,16 @@ function CommentItem({ comment, mine, render }: { comment: Comment; mine: boolea
           <>
             {mine && (
               <Button variant="ghost" size="small" onClick={() => setEditing(comment.body)}>
-                Editar
+                {t('Editar')}
               </Button>
             )}
             <DeleteButton
               variant="ghost"
               size="small"
-              question={mine ? 'Apagar esta mensagem?' : `Apagar a mensagem de ${comment.author}?`}
+              question={mine ? t('Apagar esta mensagem?') : t('Apagar a mensagem de {author}?', { author: comment.author })}
               onConfirm={() => comments.delete(comment.id)}
             >
-              Apagar
+              {t('Apagar')}
             </DeleteButton>
           </>
         )}
@@ -167,9 +175,9 @@ function CommentItem({ comment, mine, render }: { comment: Comment; mine: boolea
         <>
           <MarkdownEditor compact autoFocus minRows={3} value={editing} onChange={setEditing} onSubmit={save} />
           <div className="row end">
-            <Button onClick={() => setEditing(null)}>Cancelar</Button>
+            <Button onClick={() => setEditing(null)}>{t('Cancelar')}</Button>
             <Button variant="primary" onClick={save}>
-              Salvar
+              {t('Salvar')}
             </Button>
           </div>
         </>

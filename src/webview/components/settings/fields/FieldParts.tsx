@@ -3,6 +3,7 @@ import { Badge, CheckboxGroup, IconButton, SegmentedControl, Switch, Text, TextF
 import type { FieldDef, FieldDisplay, Id } from '../../../../shared/model';
 import { modelValue } from '../../../../shared/models';
 import { useBoardStore } from '../../../store/boardStore';
+import { t } from '../../../i18n';
 import { FieldBadge } from '../../FieldRenderer';
 import { FormField, IconClose } from '../../ui';
 import { FIELD_DISPLAYS, kindInfo } from './fieldKinds';
@@ -20,25 +21,25 @@ export function DisplayPicker({
   const model = catalog[0];
   const sample =
     field.kind === 'model' ? (model ? modelValue(model.id, model.defaultEffort) : null) : kindInfo(field.kind).sample(field.options);
-  const preview = { ...field, id: 'preview', boardId: '', appliesToTypes: null, position: 0, name: field.name || 'Campo' } as FieldDef;
+  const preview = { ...field, id: 'preview', boardId: '', appliesToTypes: null, position: 0, name: field.name || t('Campo') } as FieldDef;
   return (
-    <FormField label="No board" hint={info.hint}>
+    <FormField label={t('No board')} hint={t(info.hint)}>
       {(id) => (
         <div className="display-picker">
           <SegmentedControl.Root id={id} size="1" value={field.display} onValueChange={(v) => onChange(v as FieldDisplay)}>
             {FIELD_DISPLAYS.map((d) => (
               <SegmentedControl.Item key={d.value} value={d.value}>
-                {d.label}
+                {t(d.label)}
               </SegmentedControl.Item>
             ))}
           </SegmentedControl.Root>
-          <div className="field-preview" aria-label="Prévia no card">
+          <div className="field-preview" aria-label={t('Prévia no card')}>
             <Text size="1" color="gray">
-              Prévia:
+              {t('Prévia:')}
             </Text>
             {field.display === 'hidden' ? (
               <Text size="1" color="gray">
-                (não aparece)
+                {t('(não aparece)')}
               </Text>
             ) : (
               <FieldBadge field={preview} value={sample} />
@@ -59,7 +60,7 @@ export function OptionsEditor({ options, onChange }: { options: string[]; onChan
     setDraft('');
   };
   return (
-    <FormField label="Opções" hint="Digite uma opção e aperte Enter. As opções aparecem na ordem da lista.">
+    <FormField label={t('Opções')} hint={t('Digite uma opção e aperte Enter. As opções aparecem na ordem da lista.')}>
       {(id) => (
         <div className="options-editor">
           {options.map((o) => (
@@ -69,7 +70,7 @@ export function OptionsEditor({ options, onChange }: { options: string[]; onChan
                 size="1"
                 variant="ghost"
                 color="gray"
-                aria-label={`Tirar a opção ${o}`}
+                aria-label={t('Tirar a opção {option}', { option: o })}
                 onClick={() => onChange(options.filter((x) => x !== o))}
               >
                 <IconClose />
@@ -79,7 +80,7 @@ export function OptionsEditor({ options, onChange }: { options: string[]; onChan
           <TextField.Root
             id={id}
             size="1"
-            placeholder="Nova opção"
+            placeholder={t('Nova opção')}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -99,20 +100,20 @@ export function AppliesTo({ value, onChange }: { value: Id[] | null; onChange: (
   const all = value === null;
   return (
     <FormField
-      label="Tipos de card"
-      hint={all ? 'O campo existe em todos os tipos, inclusive nos que forem criados depois.' : 'Só os tipos marcados têm o campo.'}
+      label={t('Tipos de card')}
+      hint={all ? t('O campo existe em todos os tipos, inclusive nos que forem criados depois.') : t('Só os tipos marcados têm o campo.')}
     >
       {(id) => (
         <div className="applies-to">
           <Text as="label" size="2" className="switch-row">
-            <Switch id={id} size="1" checked={all} onCheckedChange={(on) => onChange(on ? null : types.map((t) => t.id))} />
-            Todos os tipos
+            <Switch id={id} size="1" checked={all} onCheckedChange={(on) => onChange(on ? null : types.map((ty) => ty.id))} />
+            {t('Todos os tipos')}
           </Text>
           {!all && (
             <CheckboxGroup.Root size="1" value={value} onValueChange={(next) => onChange(next.length === types.length ? null : next)}>
-              {types.map((t) => (
-                <CheckboxGroup.Item key={t.id} value={t.id}>
-                  {t.name}
+              {types.map((ty) => (
+                <CheckboxGroup.Item key={ty.id} value={ty.id}>
+                  {ty.name}
                 </CheckboxGroup.Item>
               ))}
             </CheckboxGroup.Root>

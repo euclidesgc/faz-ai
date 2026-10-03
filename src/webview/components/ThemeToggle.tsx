@@ -1,5 +1,6 @@
 import { THEMES, type ThemeMode } from '../../shared/appearance';
 import { useBoardStore } from '../store/boardStore';
+import { t } from '../i18n';
 import { settings } from '../commands';
 import { Button } from './ui';
 
@@ -19,7 +20,8 @@ export const nextTheme = (theme: ThemeMode): ThemeMode => THEME_CYCLE[(THEME_CYC
 /** Atalho no topo do board para trocar o tema; grava a mesma preferência de Configurações > Aparência. */
 export function ThemeToggle() {
   const theme = useBoardStore((s) => s.state?.board.appearance.theme) ?? 'system';
-  const label = `Tema: ${THEMES.find((t) => t.value === theme)?.label.split(' (')[0]}. Clique para mudar para ${THEMES.find((t) => t.value === nextTheme(theme))?.label.split(' (')[0]}.`;
+  const name = (mode: ThemeMode) => t(THEMES.find((th) => th.value === mode)!.label.split(' (')[0]!);
+  const label = t('Tema: {current}. Clique para mudar para {next}.', { current: name(theme), next: name(nextTheme(theme)) });
   return (
     <Button
       variant="icon"

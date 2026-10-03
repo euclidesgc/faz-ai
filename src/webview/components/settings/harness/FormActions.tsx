@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Button } from '@radix-ui/themes';
+import { t } from '../../../i18n';
 
 interface Props {
   /** texto do botão principal */
@@ -16,7 +17,7 @@ export function FormActions({ label, disabled, onSubmit, onCancel, children }: P
   return (
     <div className="form-actions">
       <Button variant="soft" color="gray" onClick={onCancel}>
-        Cancelar
+        {t('Cancelar')}
       </Button>
       <Button disabled={disabled} onClick={onSubmit}>
         {label}

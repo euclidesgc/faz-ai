@@ -1,7 +1,9 @@
 import { DEFAULT_APPEARANCE, FONTS, FONT_SIZE_RANGE, THEMES, fontStack, type Appearance } from '../../../shared/appearance';
+import type { Language } from '../../../shared/language';
 import { CARD_STATUSES, OWNER_LABEL } from '../../../shared/status';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
+import { t } from '../../i18n';
 import { ContrastHint } from './ColorPreview';
 import { StatusBadge } from '../StatusBar';
 import { renderMarkdown } from '../MarkdownEditor';
@@ -9,6 +11,12 @@ import { Button, Card, Slider, TextField } from '@radix-ui/themes';
 import { FormField, SelectField } from '../ui';
 import { SectionHeader } from './SectionHeader';
 import { PageHeader } from './PageHeader';
+
+const LANGUAGE_OPTIONS: { value: Language; label: string }[] = [
+  { value: 'auto', label: 'Automático (idioma do editor ou do navegador) / Automatic' },
+  { value: 'pt-BR', label: 'Português (Brasil)' },
+  { value: 'en', label: 'English' },
+];
 
 const SAMPLE = '## Exemplo de descrição\n\nTexto de um card com **negrito**, _itálico_ e `código`.\n\n- Primeiro item\n- Segundo item';
 
@@ -20,40 +28,57 @@ export function AppearanceSettings() {
   return (
     <div>
       <PageHeader
-        title="Aparência"
+        title={t('Aparência')}
         actions={
           <Button variant="soft" color="gray" disabled={!changed} onClick={() => set(DEFAULT_APPEARANCE)}>
-            Restaurar padrões
+            {t('Restaurar padrões')}
           </Button>
         }
       >
-        Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.
+        {t('Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.')}
       </PageHeader>
 
-      <Card className="form-card" aria-label="Tema e fonte">
+      <Card className="form-card" aria-label={t('Tema e fonte')}>
         <div className="form-grid">
-          <FormField label="Tema">
-            {(id) => (
-              <SelectField id={id} aria-label="Tema" options={THEMES} value={appearance.theme} onChange={(theme) => set({ theme })} />
-            )}
-          </FormField>
-          <FormField label="Fonte dos textos">
+          <FormField label={t('Idioma')} hint={t('O idioma da interface do board.')}>
             {(id) => (
               <SelectField
                 id={id}
-                aria-label="Fonte dos textos"
-                options={FONTS}
+                aria-label={t('Idioma')}
+                options={LANGUAGE_OPTIONS}
+                value={appearance.language}
+                onChange={(language) => set({ language })}
+              />
+            )}
+          </FormField>
+          <FormField label={t('Tema')}>
+            {(id) => (
+              <SelectField
+                id={id}
+                aria-label={t('Tema')}
+                options={THEMES.map((o) => ({ ...o, label: t(o.label) }))}
+                value={appearance.theme}
+                onChange={(theme) => set({ theme })}
+              />
+            )}
+          </FormField>
+          <FormField label={t('Fonte dos textos')}>
+            {(id) => (
+              <SelectField
+                id={id}
+                aria-label={t('Fonte dos textos')}
+                options={FONTS.map((o) => ({ value: o.value, label: t(o.label) }))}
                 value={appearance.font}
                 onChange={(font) => set({ font })}
               />
             )}
           </FormField>
         </div>
-        <FormField label={`Tamanho da fonte: ${appearance.fontSize}px`}>
+        <FormField label={t('Tamanho da fonte: {size}px', { size: appearance.fontSize })}>
           {(id) => (
             <Slider
               id={id}
-              aria-label="Tamanho da fonte"
+              aria-label={t('Tamanho da fonte')}
               className="font-size-slider"
               min={FONT_SIZE_RANGE.min}
               max={FONT_SIZE_RANGE.max}
@@ -65,23 +90,23 @@ export function AppearanceSettings() {
         </FormField>
       </Card>
 
-      <SectionHeader title="Prévia" />
+      <SectionHeader title={t('Prévia')} />
       <div
         className="markdown"
         style={{ fontFamily: fontStack(appearance.font), fontSize: appearance.fontSize }}
-        dangerouslySetInnerHTML={{ __html: renderMarkdown(SAMPLE) }}
+        dangerouslySetInnerHTML={{ __html: renderMarkdown(t(SAMPLE)) }}
       />
 
-      <SectionHeader title="Status dos cards">
-        Os status são fixos, porque as regras do board dependem deles; o nome e a cor de cada um podem ser ajustados.
+      <SectionHeader title={t('Status dos cards')}>
+        {t('Os status são fixos, porque as regras do board dependem deles; o nome e a cor de cada um podem ser ajustados.')}
       </SectionHeader>
       <table className="table">
         <thead>
           <tr>
-            <th>Status</th>
-            <th>Nome</th>
-            <th>Cor</th>
-            <th>Com quem fica</th>
+            <th>{t('Status')}</th>
+            <th>{t('Nome')}</th>
+            <th>{t('Cor')}</th>
+            <th>{t('Com quem fica')}</th>
           </tr>
         </thead>
         <tbody>
@@ -95,7 +120,7 @@ export function AppearanceSettings() {
                 </td>
                 <td>
                   <TextField.Root
-                    aria-label={`Nome do status ${s.id}`}
+                    aria-label={t('Nome do status {id}', { id: s.id })}
                     key={style.label}
                     defaultValue={style.label}
                     onBlur={(e) =>
@@ -107,14 +132,14 @@ export function AppearanceSettings() {
                 <td>
                   <input
                     type="color"
-                    aria-label={`Cor do status ${s.id}`}
+                    aria-label={t('Cor do status {id}', { id: s.id })}
                     value={style.color}
                     onChange={(e) => patch({ color: e.target.value })}
                   />
                   <ContrastHint color={style.color} onPick={(color) => patch({ color })} />
                 </td>
                 <td className="muted">
-                  {OWNER_LABEL[s.owner]} — {s.hint.toLowerCase()}
+                  {t(OWNER_LABEL[s.owner])} — {t(s.hint).toLowerCase()}
                 </td>
               </tr>
             );

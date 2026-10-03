@@ -3,6 +3,7 @@ import type { Column } from '../../../../shared/model';
 import { settings } from '../../../commands';
 import { Button, TextField } from '@radix-ui/themes';
 import { SelectField } from '../../ui';
+import { t } from '../../../i18n';
 
 const START = '__start';
 
@@ -40,8 +41,8 @@ export function NewColumnRow({
         <div className="row wrap">
           <TextField.Root
             autoFocus
-            aria-label="Nome da coluna"
-            placeholder="Nome da coluna"
+            aria-label={t('Nome da coluna')}
+            placeholder={t('Nome da coluna')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
@@ -50,16 +51,19 @@ export function NewColumnRow({
             }}
           />
           <SelectField
-            aria-label="Onde a coluna entra"
-            options={[{ value: START, label: 'No início' }, ...cols.map((c) => ({ value: c.id, label: `Depois de ${c.name}` }))]}
+            aria-label={t('Onde a coluna entra')}
+            options={[
+              { value: START, label: t('No início') },
+              ...cols.map((c) => ({ value: c.id, label: t('Depois de {name}', { name: c.name }) })),
+            ]}
             value={after}
             onChange={setAfter}
           />
           <Button variant="soft" color="gray" onClick={onDone}>
-            Cancelar
+            {t('Cancelar')}
           </Button>
           <Button disabled={!ready} onClick={add}>
-            Adicionar
+            {t('Adicionar')}
           </Button>
         </div>
       </td>

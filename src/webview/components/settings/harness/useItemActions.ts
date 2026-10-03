@@ -3,6 +3,7 @@ import { copyTarget } from '../../../../shared/harnessCatalog';
 import { harness, type HarnessScope } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { GLOBAL_WARNING, withGlobalWarning } from './text';
+import { t } from '../../../i18n';
 
 /** Ações sobre os itens já listados de uma ferramenta, usadas pela linha e pelos botões "todas" de cada escopo. */
 export function useItemActions(tool: AiTool, items: HarnessItem[]) {
@@ -19,14 +20,19 @@ export function useItemActions(tool: AiTool, items: HarnessItem[]) {
         list.map((i) => ({ kind: i.kind, path: i.path })),
         to,
       );
-    const what = list.length === 1 ? `"${list[0]!.name}"` : `${list.length} itens`;
+    const what = list.length === 1 ? `"${list[0]!.name}"` : t('{n} itens', { n: list.length });
     if (to === 'user')
-      ask({ title: `Copiar ${what} para a pasta do usuário?`, message: GLOBAL_WARNING, confirmLabel: 'Copiar', onConfirm: run });
+      ask({
+        title: t('Copiar {what} para a pasta do usuário?', { what }),
+        message: t(GLOBAL_WARNING),
+        confirmLabel: t('Copiar'),
+        onConfirm: run,
+      });
     else if (list.length > 1)
       ask({
-        title: `Copiar ${what} para o projeto?`,
-        message: 'Cada item vira uma cópia independente na pasta do projeto.',
-        confirmLabel: 'Copiar',
+        title: t('Copiar {what} para o projeto?', { what }),
+        message: t('Cada item vira uma cópia independente na pasta do projeto.'),
+        confirmLabel: t('Copiar'),
         onConfirm: run,
       });
     else run();
@@ -40,9 +46,9 @@ export function useItemActions(tool: AiTool, items: HarnessItem[]) {
       );
     if (list.some((i) => i.scope === 'user'))
       ask({
-        title: 'Alterar skills da pasta do usuário?',
-        message: `A mudança é gravada no arquivo da skill. ${GLOBAL_WARNING}`,
-        confirmLabel: 'Alterar',
+        title: t('Alterar skills da pasta do usuário?'),
+        message: t('A mudança é gravada no arquivo da skill. {warning}', { warning: t(GLOBAL_WARNING) }),
+        confirmLabel: t('Alterar'),
         onConfirm: run,
       });
     else run();
@@ -52,14 +58,16 @@ export function useItemActions(tool: AiTool, items: HarnessItem[]) {
   const remove = (list: HarnessItem[]) => {
     const global = list.some((i) => i.scope === 'user') ? 'user' : 'project';
     ask({
-      title: list.length === 1 ? `Apagar "${list[0]!.name}"?` : `Apagar ${list.length} itens?`,
+      title: list.length === 1 ? t('Apagar "{name}"?', { name: list[0]!.name }) : t('Apagar {n} itens?', { n: list.length }),
       message: withGlobalWarning(
         list.length === 1
-          ? `${list[0]!.layout === 'skills' ? 'A pasta da skill é removida, com todos os arquivos dela' : 'O arquivo é removido'}: ${list[0]!.location}`
+          ? list[0]!.layout === 'skills'
+            ? t('A pasta da skill é removida, com todos os arquivos dela: {location}', { location: list[0]!.location })
+            : t('O arquivo é removido: {location}', { location: list[0]!.location })
           : list.map((i) => `${i.name} (${i.location})`).join('\n'),
         global,
       ),
-      confirmLabel: 'Apagar',
+      confirmLabel: t('Apagar'),
       danger: true,
       onConfirm: () => list.forEach((i) => harness.deleteItem(tool, i.kind, i.path)),
     });

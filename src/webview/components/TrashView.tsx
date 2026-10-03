@@ -2,6 +2,7 @@ import { badgeStyle } from '../../shared/color';
 import { cardRef } from '../../shared/model';
 import { columnOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
+import { formatDateTime, t } from '../i18n';
 import { cards, trash } from '../commands';
 import { Button, DeleteButton, IconParent } from './ui';
 
@@ -17,48 +18,50 @@ export function TrashView() {
   return (
     <div className="trash">
       <div className="row">
-        <h2>Lixeira</h2>
+        <h2>{t('Lixeira')}</h2>
         <span className="spacer" />
         {/* botão sem classe de perigo de propósito: a confirmação é que é vermelha, não ele */}
         <Button
           disabled={!deleted.length}
           onClick={() =>
             ask({
-              title: 'Esvaziar a lixeira?',
-              message: `${deleted.length} card(s) serão apagados definitivamente, com comentários e anexos. Não dá para desfazer.`,
-              confirmLabel: 'Esvaziar',
+              title: t('Esvaziar a lixeira?'),
+              message: t('{n} card(s) serão apagados definitivamente, com comentários e anexos. Não dá para desfazer.', {
+                n: deleted.length,
+              }),
+              confirmLabel: t('Esvaziar'),
               danger: true,
               onConfirm: () => trash.empty(),
             })
           }
         >
-          Esvaziar lixeira
+          {t('Esvaziar lixeira')}
         </Button>
       </div>
       {roots.length === 0 ? (
-        <p className="muted">A lixeira está vazia. Cards excluídos ficam aqui até você restaurar ou apagar de vez.</p>
+        <p className="muted">{t('A lixeira está vazia. Cards excluídos ficam aqui até você restaurar ou apagar de vez.')}</p>
       ) : (
         <table className="table">
           <thead>
             <tr>
-              <th>Card</th>
-              <th>Tipo</th>
-              <th>Estava em</th>
-              <th>Excluído em</th>
+              <th>{t('Card')}</th>
+              <th>{t('Tipo')}</th>
+              <th>{t('Estava em')}</th>
+              <th>{t('Excluído em')}</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {roots.map((c) => {
               const kids = deleted.filter((k) => k.parentId === c.id).length;
-              const type = state.cardTypes.find((t) => t.id === c.typeId);
+              const type = state.cardTypes.find((ct) => ct.id === c.typeId);
               const column = columnOf(state, c);
               const parent = c.parentId ? state.cards.find((p) => p.id === c.parentId) : undefined;
               return (
                 <tr key={c.id}>
                   <td>
                     <span className="card-id">{cardRef(c)}</span> <strong>{c.title}</strong>
-                    {kids > 0 && <span className="muted"> + {kids} sub-tarefa(s)</span>}
+                    {kids > 0 && <span className="muted"> + {t('{n} sub-tarefa(s)', { n: kids })}</span>}
                     {parent && (
                       <div className="muted small">
                         <IconParent /> {cardRef(parent)} {parent.title}
@@ -71,16 +74,16 @@ export function TrashView() {
                     </span>
                   </td>
                   <td>{column?.name}</td>
-                  <td>{new Date(c.deletedAt!).toLocaleString()}</td>
+                  <td>{formatDateTime(c.deletedAt!)}</td>
                   <td className="row end">
-                    <Button onClick={() => cards.restore(c.id)}>Restaurar</Button>
+                    <Button onClick={() => cards.restore(c.id)}>{t('Restaurar')}</Button>
                     <DeleteButton
                       variant="ghost"
-                      question={`Apagar "${c.title}" definitivamente?`}
-                      message="Comentários, anexos e sub-tarefas deste card também serão apagados. Não dá para desfazer."
+                      question={t('Apagar "{title}" definitivamente?', { title: c.title })}
+                      message={t('Comentários, anexos e sub-tarefas deste card também serão apagados. Não dá para desfazer.')}
                       onConfirm={() => cards.deletePermanent(c.id)}
                     >
-                      Apagar de vez
+                      {t('Apagar de vez')}
                     </DeleteButton>
                   </td>
                 </tr>

@@ -1,6 +1,9 @@
 import { cardRef } from '../../shared/model';
+
 import { cardsIn, columnsOf, isLive } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
+import { t, tn } from '../i18n';
+import { rich } from '../i18n/rich';
 import { Button, IconChevronDown, IconChevronRight, IconClose } from './ui';
 import { WorkflowRow } from './WorkflowRow';
 
@@ -17,9 +20,9 @@ export function Board() {
     <div className="board">
       {empty && (
         <div className="board-hint">
-          <strong>Este board ainda não tem cards.</strong> Crie uma história em <em>+ Novo card</em>, na primeira coluna. Um clique na
-          história mostra as sub-tarefas dela no workflow de sub-tarefas; dois cliques abrem o card, onde ficam a descrição, a conversa com
-          a IA e o botão <em>Chamar IA</em>.
+          {rich(
+            '<b>Este board ainda não tem cards.</b> Crie uma história em <i>+ Novo card</i>, na primeira coluna. Um clique na história mostra as sub-tarefas dela no workflow de sub-tarefas; dois cliques abrem o card, onde ficam a descrição, a conversa com a IA e o botão <i>Chamar IA</i>.',
+          )}
         </div>
       )}
       {state.workflows
@@ -33,30 +36,28 @@ export function Board() {
               <header
                 className="workflow-header"
                 onClick={() => setCollapsed(wf.id, !collapsed)}
-                title={collapsed ? 'Expandir o workflow' : 'Colapsar o workflow'}
+                title={collapsed ? t('Expandir o workflow') : t('Colapsar o workflow')}
               >
                 <Button variant="icon" className="collapse-toggle" aria-expanded={!collapsed}>
                   {collapsed ? <IconChevronRight /> : <IconChevronDown />}
                 </Button>
                 <h2>{wf.name}</h2>
-                <span className="column-count">
-                  {total} {total === 1 ? 'card' : 'cards'}
-                </span>
+                <span className="column-count">{tn(total, '{n} card', '{n} cards')}</span>
                 {wf.kind === 'child' &&
                   !empty &&
                   (selected ? (
                     <span
                       className="filter-chip"
-                      title="Mostrar as sub-tarefas de todas as histórias"
+                      title={t('Mostrar as sub-tarefas de todas as histórias')}
                       onClick={(e) => {
                         e.stopPropagation();
                         selectParent(null);
                       }}
                     >
-                      de {cardRef(selected)} {selected.title} <IconClose />
+                      {t('de {ref} {title}', { ref: cardRef(selected), title: selected.title })} <IconClose />
                     </span>
                   ) : (
-                    <span className="muted small">de todas as histórias · clique numa história para ver e criar as dela</span>
+                    <span className="muted small">{t('de todas as histórias · clique numa história para ver e criar as dela')}</span>
                   ))}
               </header>
               {!collapsed && <WorkflowRow workflow={wf} />}

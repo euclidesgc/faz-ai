@@ -5,6 +5,7 @@ import { Badge, Button, Checkbox } from '@radix-ui/themes';
 import { ItemRow } from './ItemRow';
 import { toolLabel } from './text';
 import type { ItemActions } from './useItemActions';
+import { t } from '../../../i18n';
 
 /** Chave estável de uma linha: o mesmo arquivo pode trazer várias entradas (hooks, regras de permissão). */
 const keyOf = (i: HarnessItem) => `${i.path}|${i.name}|${i.detail ?? ''}`;
@@ -45,48 +46,48 @@ export function ScopeGroup({ tool, scope, items, actions, filesOpen, onFilesOpen
   const allOn = items.length > 0 && picked.length === items.length;
 
   return (
-    <section className={`scope-group scope-${scope}`} aria-label={info.label}>
+    <section className={`scope-group scope-${scope}`} aria-label={t(info.label)}>
       <header className="scope-head">
         <Checkbox
           disabled={items.length === 0}
-          aria-label={`Selecionar todos em ${info.label}`}
+          aria-label={t('Selecionar todos em {scope}', { scope: t(info.label) })}
           checked={allOn ? true : picked.length > 0 ? 'indeterminate' : false}
           onCheckedChange={(v) => set(items, v === true)}
         />
         <Badge color={scope === 'project' ? 'indigo' : 'gray'} variant={scope === 'project' ? 'solid' : 'soft'} size="2">
-          {info.label}
+          {t(info.label)}
         </Badge>
         <span className="muted small">{items.length}</span>
-        <span className="muted small scope-summary">{info.summary}</span>
+        <span className="muted small scope-summary">{t(info.summary)}</span>
       </header>
       {picked.length > 0 && (
-        <div className="bulk-bar" role="toolbar" aria-label="Ações nos itens marcados">
-          <b>{picked.length} marcados</b>
+        <div className="bulk-bar" role="toolbar" aria-label={t('Ações nos itens marcados')}>
+          <b>{t('{n} marcados', { n: picked.length })}</b>
           {modeable.length > 0 && (
             <>
               <Button
                 variant="soft"
                 color="gray"
                 size="1"
-                title="A IA vê a descrição em toda sessão e decide quando usar"
+                title={t('A IA vê a descrição em toda sessão e decide quando usar')}
                 onClick={() => {
                   setMode(modeable, 'auto');
                   done();
                 }}
               >
-                Deixar automáticas
+                {t('Deixar automáticas')}
               </Button>
               <Button
                 variant="soft"
                 color="gray"
                 size="1"
-                title="A IA deixa de invocar sozinha; elas continuam valendo nos cards que as indicam"
+                title={t('A IA deixa de invocar sozinha; elas continuam valendo nos cards que as indicam')}
                 onClick={() => {
                   setMode(modeable, 'manual');
                   done();
                 }}
               >
-                Deixar só quando indicadas
+                {t('Deixar só quando indicadas')}
               </Button>
             </>
           )}
@@ -100,7 +101,7 @@ export function ScopeGroup({ tool, scope, items, actions, filesOpen, onFilesOpen
                 done();
               }}
             >
-              Copiar para o projeto ({toProject.length})
+              {t('Copiar para o projeto ({n})', { n: toProject.length })}
             </Button>
           )}
           {toUser.length > 0 && (
@@ -113,7 +114,7 @@ export function ScopeGroup({ tool, scope, items, actions, filesOpen, onFilesOpen
                 done();
               }}
             >
-              Copiar para o global ({toUser.length})
+              {t('Copiar para o global ({n})', { n: toUser.length })}
             </Button>
           )}
           {removable.length > 0 && (
@@ -126,15 +127,15 @@ export function ScopeGroup({ tool, scope, items, actions, filesOpen, onFilesOpen
                 done();
               }}
             >
-              Apagar ({removable.length})
+              {t('Apagar ({n})', { n: removable.length })}
             </Button>
           )}
           <Button variant="ghost" size="1" onClick={done}>
-            Limpar seleção
+            {t('Limpar seleção')}
           </Button>
         </div>
       )}
-      {items.length === 0 && <p className="muted small scope-empty">Nada neste projeto para o {toolLabel(tool)}.</p>}
+      {items.length === 0 && <p className="muted small scope-empty">{t('Nada neste projeto para o {tool}.', { tool: toolLabel(tool) })}</p>}
       <ul className="item-list">
         {items.map((i) => (
           <ItemRow

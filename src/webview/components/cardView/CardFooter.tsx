@@ -1,9 +1,11 @@
 import type { SyntheticEvent } from 'react';
+import { modelDisplay } from '../../modelText';
 import type { Card } from '../../../shared/model';
-import { modelDisplay, modelFieldOf, suggestModel } from '../../../shared/models';
+import { modelFieldOf, suggestModel } from '../../../shared/models';
 import { childProgress, linkedCards } from '../../../shared/links';
 import { checklistOf, childrenOf, countDone, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
+import { t } from '../../i18n';
 import { cards } from '../../commands';
 import {
   IconAttachment,
@@ -40,37 +42,37 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
   return (
     <div className="card-meta">
       {children.length > 0 && (
-        <span title="Sub-tarefas concluídas">
+        <span title={t('Sub-tarefas concluídas')}>
           <IconSubtasks /> {countDone(state, children)}/{children.length}
         </span>
       )}
       {linkCount > 0 && (
-        <span title={progress.total ? 'Filhos vinculados encerrados' : 'Cards vinculados'}>
+        <span title={progress.total ? t('Filhos vinculados encerrados') : t('Cards vinculados')}>
           <IconCardLink /> {progress.total ? `${progress.done}/${progress.total}` : linkCount}
         </span>
       )}
       {checklist.length > 0 && (
-        <span title="Checklist">
+        <span title={t('Checklist')}>
           <IconChecklist /> {checklistDone}/{checklist.length}
         </span>
       )}
       {comments > 0 && (
-        <span title="Mensagens na conversa">
+        <span title={t('Mensagens na conversa')}>
           <IconComments /> {comments}
         </span>
       )}
       {attachments > 0 && (
-        <span title="Anexos">
+        <span title={t('Anexos')}>
           <IconAttachment /> {attachments}
         </span>
       )}
       {card.description && (
-        <span title="Tem descrição">
+        <span title={t('Tem descrição')}>
           <IconDescription />
         </span>
       )}
       {card.branch && (
-        <span title={`Branch: ${card.branch}`}>
+        <span title={t('Branch: {name}', { name: card.branch })}>
           <IconBranch />
         </span>
       )}
@@ -78,8 +80,8 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
         <a
           className="card-pr"
           href={card.prUrl}
-          title={`Pull request: ${card.prUrl}`}
-          aria-label="Pull request"
+          title={t('Pull request: {url}', { url: card.prUrl })}
+          aria-label={t('Pull request')}
           onPointerDown={keep}
           onClick={keep}
           onDoubleClick={keep}
@@ -90,7 +92,7 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
       {offer && !overlay && (
         <button
           className="suggest-model"
-          title={`Modelo sugerido pelas regras: ${modelDisplay(catalog, offer, true)}. Clique para usar.`}
+          title={t('Modelo sugerido pelas regras: {model}. Clique para usar.', { model: modelDisplay(catalog, offer, true) })}
           onPointerDown={keep}
           onClick={(e) => {
             e.stopPropagation();
