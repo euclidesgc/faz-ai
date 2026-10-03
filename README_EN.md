@@ -35,7 +35,7 @@ produces the artifacts of each phase and moves the cards as it goes.
 The extension's interface is in Portuguese. This page keeps the names you will see on screen and
 gives the English meaning next to them.
 
-![Board with stories in the SDD phases and sub-tasks in the bottom workflow](docs/images/board.png)
+![Board with stories in the SDD phases and sub-tasks in the bottom workflow](docs/images/board_en.png)
 
 ## Getting started
 
@@ -134,6 +134,8 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 5. Cards can be archived (the "Arquivados" column at the end of each row) or sent to the **Lixeira**
    (trash), from where they can be restored.
 
+![Open card: status, approval, fields, description and checklist](docs/images/card_en.png)
+
 By default, a story is not completed and does not advance a phase while it has open sub-tasks of
 that phase. These rules can be turned off in the settings.
 
@@ -206,6 +208,8 @@ You answer on the card itself:
 - **Bloquear** (block) records a blocker, with the reason.
 
 ### Chat with the AI
+
+![AI chat: question and answer using the board](docs/images/chat_en.png)
 
 To give the board orders in natural language, use the **Chat**: in the editor's sidebar, the **Chat
 com a IA** section (below Board and Filtros); in the browser, the **Chat** button in the top bar,
@@ -296,6 +300,8 @@ e colunas. You can always move any card yourself without approval.
 
 ### Agents
 
+![Agent with intent, chosen skills and read-only tools](docs/images/agents_en.png)
+
 An agent (Configurações → **Agentes**) says how the AI works on a card: which skills it reads, which
 MCP servers and tools (available and denied) it can use, which model and effort, and whether the
 session is clean (without your user-folder customizations and without automatic skill invocation).
@@ -331,6 +337,8 @@ Skills are always passed by file path. In a conversation you open yourself, the 
 AI through `get_card`, as guidance.
 
 ## AI harness
+
+![List of project and global skills, with selection and bulk actions](docs/images/harness_en.png)
 
 Configurações → **Harness de IA** holds everything the AI tools load, in three tabs: **Ferramenta e
 execução** (tool and run: the project's AI and how the board calls it), **Do projeto** (from the
@@ -398,7 +406,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 
 ## Settings
 
-![Settings: model catalog and suggestion rules](docs/images/settings.png)
+![Settings: model catalog and suggestion rules](docs/images/settings_en.png)
 
 | Section | What it adjusts |
 | --- | --- |

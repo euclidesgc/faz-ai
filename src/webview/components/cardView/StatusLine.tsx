@@ -13,7 +13,7 @@ export function StatusLine({ card }: { card: Card }) {
       <StatusBadge status={card.status} reason={card.status === 'blocked' ? card.statusReason : undefined} />
       {card.statusAt !== null && (
         <span className="card-status-age" title={t('Desde {date}', { date: formatDateTime(card.statusAt) })}>
-          {timeAgo(card.statusAt, now)}
+          {t(timeAgo(card.statusAt, now))}
         </span>
       )}
     </div>
