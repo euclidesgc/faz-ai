@@ -5,6 +5,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { ModelEditor } from '../FieldRenderer';
 import { Button, ChipsEditor, DeleteButton } from '../ui';
+import { PageHeader } from './PageHeader';
 
 const newId = (): string => Math.random().toString(36).slice(2) + Date.now().toString(36);
 const list = (text: string): string[] => [
@@ -64,12 +65,11 @@ export function ExecProfilesSettings() {
   );
   return (
     <div>
-      <h2>Perfis de execução</h2>
-      <p className="muted">
+      <PageHeader title="Perfis de execução">
         Um perfil diz o que a sessão de IA usa para trabalhar num card: agente, skills, servidores MCP, ferramentas e modelo. Assim isso é
         decidido antes, em vez de a ferramenta descobrir sozinha durante a conversa. O perfil vale por fase (em Workflows e colunas → Fase)
         e pode ser trocado em cada card; sem nenhum dos dois, vale o perfil padrão.
-      </p>
+      </PageHeader>
       <p className="muted small">
         Cada execução pelo board ("Chamar IA" e heartbeat) é uma sessão nova, só com o que está no card. <b>Imposto</b> é o que o{' '}
         {tool.label} recebe por parâmetro nessa execução; <b>orientado</b> segue como instrução no prompt. Numa conversa aberta por você,

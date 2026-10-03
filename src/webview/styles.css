@@ -636,12 +636,43 @@ button.chip.on:hover:where(:not(:disabled)) {
   height: 100%;
 }
 .settings-side {
+  flex: none;
   width: 220px;
   border-right: 1px solid var(--border);
-  padding: var(--sp-12);
+  padding: var(--sp-8) var(--sp-12) var(--sp-12);
   display: flex;
   flex-direction: column;
   gap: var(--sp-12);
+  overflow-y: auto;
+}
+/* menu recolhido: faixa só com ícones, como a barra de atividades do VS Code */
+.settings-side.collapsed {
+  width: 48px;
+  padding: var(--sp-8) var(--sp-4);
+  align-items: center;
+}
+.settings-side .nav-toggle {
+  align-self: flex-end;
+  color: var(--muted);
+}
+.settings-side.collapsed .nav-toggle {
+  align-self: center;
+}
+.settings-side-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+.settings-side-actions button {
+  justify-content: flex-start;
+}
+.settings-side.collapsed .tabs-vertical button,
+.settings-side.collapsed .settings-side-actions button {
+  justify-content: center;
+  padding: var(--sp-6);
+}
+.settings-side.collapsed .glyph {
+  font-size: var(--fs-lg);
 }
 .settings-side .field-row {
   grid-template-columns: 1fr;
@@ -665,12 +696,52 @@ button.chip.on:hover:where(:not(:disabled)) {
 }
 .settings-main {
   flex: 1;
+  min-width: 0;
   padding: var(--sp-12) var(--sp-20);
   overflow: auto;
   display: flex;
   flex-direction: column;
   gap: var(--sp-12);
-  max-width: 900px;
+}
+/* topo de cada aba: título e ação principal na mesma linha, descrição abaixo */
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  margin-bottom: var(--sp-8);
+}
+.page-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  min-height: 30px;
+}
+.page-header-actions {
+  display: flex;
+  gap: var(--sp-6);
+}
+/* tabelas e blocos ocupam a largura toda; só o texto corrido tem limite, para não virar uma linha só */
+.page-desc {
+  max-width: 100ch;
+  margin: 0;
+}
+.types-table td {
+  vertical-align: middle;
+}
+/* só o nome estica; cor, prévia, workflow, uso e ações ficam do tamanho do conteúdo */
+.types-table td:not(:nth-child(3)),
+.types-table th:not(:nth-child(3)) {
+  width: 1%;
+  white-space: nowrap;
+}
+/* campos de formulário não atravessam a tela larga: a largura total é para tabelas e blocos */
+.settings-main .field-row select,
+.settings-main .field-row input:not([type='checkbox']):not([type='radio']):not([type='color']) {
+  max-width: 520px;
+}
+.draft-row td {
+  background: var(--hover);
 }
 .settings-block {
   border: 1px solid var(--border);
@@ -1096,7 +1167,6 @@ button.ghost.on {
   display: flex;
   flex-direction: column;
   gap: var(--sp-12);
-  max-width: 1000px;
 }
 .trash td {
   vertical-align: middle;

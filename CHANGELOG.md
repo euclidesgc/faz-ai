@@ -64,6 +64,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   do card enquanto você escolhe a cor; se a cor deixar o texto difícil de ler, aparece um aviso com
   a mesma cor mais escura e mais clara para aplicar com um clique. O aviso também vale para as
   cores dos status em Aparência.
+- **Configurações mais organizadas**: cada seção tem o título e a ação principal na mesma linha.
+  Em **Tipos de card**, o botão **Novo tipo** no topo abre uma linha na tabela, alinhada com as
+  outras, com a prévia do card (Enter adiciona, Esc cancela). As configurações e a Lixeira ocupam
+  toda a largura da tela, e o menu lateral das configurações recolhe numa faixa só com ícones (a
+  escolha fica lembrada).
 
 ## 0.29.1
 

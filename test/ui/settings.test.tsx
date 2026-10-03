@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Dialog } from '../../src/webview/components/Dialog';
+import { Settings } from '../../src/webview/components/settings/Settings';
 import { TypesSettings } from '../../src/webview/components/settings/TypesSettings';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
@@ -41,30 +42,58 @@ describe('TypesSettings', () => {
     syncStore(board.router);
   });
 
-  it('a cor do tipo novo também tem prévia', () => {
+  /** Abre a linha do tipo novo pelo botão do topo e devolve o campo de nome. */
+  async function openDraft() {
+    await userEvent.click(screen.getByRole('button', { name: 'Novo tipo' }));
+    return screen.getByPlaceholderText('Nome do tipo');
+  }
+
+  it('o botão Novo tipo abre uma linha na tabela, com foco no nome, e fica desligado enquanto ela está aberta', async () => {
     render(<TypesSettings />);
+    expect(screen.queryByPlaceholderText('Nome do tipo')).toBeNull();
+    const name = await openDraft();
+    expect(name).toHaveFocus();
+    expect(name.closest('tr')).toHaveClass('draft-row');
+    expect(screen.getByRole('button', { name: 'Novo tipo' })).toBeDisabled();
+    // a prévia acompanha o nome digitado
     expect(screen.getByLabelText('Prévia do card do tipo Novo tipo')).toBeInTheDocument();
+    await userEvent.type(name, 'Spike');
+    expect(screen.getByLabelText('Prévia do card do tipo Spike')).toBeInTheDocument();
   });
 
-  it('digitar o nome e apertar Enter cria o tipo com o workflow escolhido', async () => {
+  it('Enter cria o tipo com o workflow escolhido e fecha a linha', async () => {
     render(<TypesSettings />);
-    const wf = useBoardStore.getState().state!.workflows[0]!;
-    await userEvent.type(screen.getByPlaceholderText('Novo tipo'), 'Bug{Enter}');
+    const wf = useBoardStore.getState().state!.workflows[1]!;
+    const name = await openDraft();
+    await userEvent.selectOptions(within(name.closest('tr')!).getByLabelText('Workflow'), wf.id);
+    await userEvent.type(name, 'Bug{Enter}');
     expect(lastSent('settings.type.create')).toMatchObject({ name: 'Bug', defaultWorkflowId: wf.id });
-    // o campo é limpo depois de adicionar
-    expect(screen.getByPlaceholderText('Novo tipo')).toHaveValue('');
+    expect(screen.queryByPlaceholderText('Nome do tipo')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Novo tipo' })).toBeEnabled();
   });
 
-  it('o botão Adicionar faz o mesmo que o Enter', async () => {
+  it('o botão Adicionar faz o mesmo que o Enter e fica desligado sem nome', async () => {
     render(<TypesSettings />);
-    await userEvent.type(screen.getByPlaceholderText('Novo tipo'), 'Melhoria');
+    const name = await openDraft();
+    expect(screen.getByRole('button', { name: 'Adicionar' })).toBeDisabled();
+    await userEvent.type(name, 'Melhoria');
     await userEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
     expect(lastSent('settings.type.create').name).toBe('Melhoria');
   });
 
   it('Enter com o nome vazio não envia nada', async () => {
     render(<TypesSettings />);
-    await userEvent.type(screen.getByPlaceholderText('Novo tipo'), '   {Enter}');
+    await userEvent.type(await openDraft(), '   {Enter}');
+    expect(sentOf('settings.type.create')).toHaveLength(0);
+  });
+
+  it('Esc e Cancelar fecham a linha sem criar', async () => {
+    render(<TypesSettings />);
+    await userEvent.type(await openDraft(), 'Rascunho{Escape}');
+    expect(screen.queryByPlaceholderText('Nome do tipo')).toBeNull();
+    await openDraft();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByPlaceholderText('Nome do tipo')).toBeNull();
     expect(sentOf('settings.type.create')).toHaveLength(0);
   });
 
@@ -107,5 +136,25 @@ describe('TypesSettings', () => {
       .state!.cardTypes.find((t) => t.defaultWorkflowId === board.router.snapshot().workflows[0]!.id && t.name !== 'Sem uso')!;
     const row = screen.getByDisplayValue(story.name).closest('tr')!;
     expect(within(row).getByTitle('Tipo em uso')).toBeDisabled();
+  });
+});
+
+describe('Settings: menu lateral', () => {
+  it('recolhe numa faixa de ícones: rótulos somem, as seções seguem acessíveis pelo nome e o estado fica lembrado', async () => {
+    useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
+    render(<Settings />);
+    expect(screen.getByLabelText('Nome do board')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Recolher o menu' }));
+    expect(useBoardStore.getState().settingsNavCollapsed).toBe(true);
+    expect(screen.queryByLabelText('Nome do board')).toBeNull();
+    const nav = screen.getByRole('navigation', { name: 'Seções das configurações' });
+    expect(nav).not.toHaveTextContent('Tipos de card');
+    await userEvent.click(within(nav).getByRole('button', { name: 'Tipos de card' }));
+    expect(useBoardStore.getState().settingsTab).toBe('types');
+    expect(screen.getByRole('button', { name: 'Conectar IA (MCP)' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Expandir o menu' }));
+    expect(nav).toHaveTextContent('Tipos de card');
+    useBoardStore.setState({ settingsNavCollapsed: false });
   });
 });

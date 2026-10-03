@@ -4,12 +4,16 @@ import {
   ArrowUp,
   Bold,
   Bot,
+  BrainCircuit,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleArrowUp,
   Code,
+  Columns3,
   CornerDownRight,
+  Cpu,
   Ellipsis,
   ExternalLink,
   GitBranch,
@@ -27,11 +31,21 @@ import {
   Maximize2,
   MessageSquare,
   Minimize2,
+  Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
   Paperclip,
   Pencil,
   Play,
+  Plug,
+  Plus,
   Quote,
+  RotateCcw,
+  Scale,
+  Shapes,
+  SlidersHorizontal,
   Sparkles,
+  TextCursorInput,
   Trash2,
   TriangleAlert,
   User,
@@ -69,6 +83,9 @@ export const IconRun = icon(Play, 'IconRun');
 export const IconDrag = icon(GripVertical, 'IconDrag');
 export const IconExternal = icon(ExternalLink, 'IconExternal');
 export const IconWarning = icon(TriangleAlert, 'IconWarning');
+export const IconPlus = icon(Plus, 'IconPlus');
+export const IconPanelClose = icon(PanelLeftClose, 'IconPanelClose');
+export const IconPanelOpen = icon(PanelLeftOpen, 'IconPanelOpen');
 
 // direção
 export const IconChevronDown = icon(ChevronDown, 'IconChevronDown');
@@ -103,3 +120,16 @@ export const IconTaskList = icon(ListTodo, 'IconTaskList');
 export const IconQuote = icon(Quote, 'IconQuote');
 export const IconCode = icon(Code, 'IconCode');
 export const IconLink = icon(Link, 'IconLink');
+
+// configurações: abas do menu lateral e ações do board
+export const IconColumns = icon(Columns3, 'IconColumns');
+export const IconTypes = icon(Shapes, 'IconTypes');
+export const IconFields = icon(TextCursorInput, 'IconFields');
+export const IconRules = icon(Scale, 'IconRules');
+export const IconHarness = icon(BrainCircuit, 'IconHarness');
+export const IconProfiles = icon(SlidersHorizontal, 'IconProfiles');
+export const IconModels = icon(Cpu, 'IconModels');
+export const IconAppearance = icon(Palette, 'IconAppearance');
+export const IconConnect = icon(Plug, 'IconConnect');
+export const IconUpgrade = icon(CircleArrowUp, 'IconUpgrade');
+export const IconReset = icon(RotateCcw, 'IconReset');

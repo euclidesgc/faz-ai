@@ -4,24 +4,27 @@ import { fieldsForType } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { FieldEditor } from '../FieldRenderer';
-import { AddInput, DeleteButton, FieldRow } from '../ui';
+import { Button, DeleteButton, FieldRow, IconPlus } from '../ui';
 import { CardPreview, ContrastHint } from './ColorPreview';
+import { PageHeader } from './PageHeader';
 
 export function TypesSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const [color, setColor] = useState('#4c8dff');
-  const [wf, setWf] = useState(state.workflows[0]?.id ?? '');
-
-  const add = (name: string) => {
-    if (!wf) return false;
-    settings.createType(name, color, wf);
-  };
+  const [adding, setAdding] = useState(false);
 
   return (
     <div>
-      <h2>Tipos de card</h2>
-      <p className="muted">Cada tipo pertence a um workflow (linha). Tipos da linha de baixo são sempre sub-tarefas de uma história.</p>
-      <table className="table">
+      <PageHeader
+        title="Tipos de card"
+        actions={
+          <Button variant="primary" disabled={adding} onClick={() => setAdding(true)}>
+            <IconPlus /> Novo tipo
+          </Button>
+        }
+      >
+        Cada tipo pertence a um workflow (linha). Tipos da linha de baixo são sempre sub-tarefas de uma história.
+      </PageHeader>
+      <table className="table types-table">
         <thead>
           <tr>
             <th>Cor</th>
@@ -41,10 +44,7 @@ export function TypesSettings() {
                   <input type="color" value={t.color} onChange={(e) => settings.updateType(t.id, { color: e.target.value })} />
                 </td>
                 <td>
-                  <div className="preview-cell">
-                    <CardPreview typeName={t.name} color={t.color} />
-                    <ContrastHint color={t.color} onPick={(c) => settings.updateType(t.id, { color: c })} />
-                  </div>
+                  <TypePreview name={t.name} color={t.color} onPick={(c) => settings.updateType(t.id, { color: c })} />
                 </td>
                 <td>
                   <input
@@ -55,20 +55,14 @@ export function TypesSettings() {
                   />
                 </td>
                 <td>
-                  <select
+                  <WorkflowSelect
                     value={t.defaultWorkflowId}
                     disabled={used > 0}
-                    onChange={(e) => settings.updateType(t.id, { defaultWorkflowId: e.target.value })}
-                  >
-                    {state.workflows.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(id) => settings.updateType(t.id, { defaultWorkflowId: id })}
+                  />
                 </td>
                 <td>{used}</td>
-                <td>
+                <td className="narrow">
                   <DeleteButton
                     disabled={used > 0}
                     title={used ? 'Tipo em uso' : 'Apagar'}
@@ -79,22 +73,9 @@ export function TypesSettings() {
               </tr>
             );
           })}
+          {adding && <NewTypeRow onDone={() => setAdding(false)} />}
         </tbody>
       </table>
-      <div className="row">
-        <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
-        <CardPreview typeName="Novo tipo" color={color} />
-        <AddInput placeholder="Novo tipo" onAdd={add} buttonLabel="Adicionar">
-          <select value={wf} onChange={(e) => setWf(e.target.value)}>
-            {state.workflows.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
-        </AddInput>
-      </div>
-      <ContrastHint color={color} onPick={setColor} />
 
       <h2 className="section-head">Padrões por tipo</h2>
       <p className="muted">
@@ -130,5 +111,78 @@ export function TypesSettings() {
         })}
       </div>
     </div>
+  );
+}
+
+/** Prévia do card na cor do tipo, com o aviso de contraste e as sugestões de cor. */
+function TypePreview({ name, color, onPick }: { name: string; color: string; onPick: (color: string) => void }) {
+  return (
+    <div className="preview-cell">
+      <CardPreview typeName={name} color={color} />
+      <ContrastHint color={color} onPick={onPick} />
+    </div>
+  );
+}
+
+function WorkflowSelect({ value, disabled, onChange }: { value: string; disabled?: boolean; onChange: (id: string) => void }) {
+  const workflows = useBoardStore((s) => s.state!.workflows);
+  return (
+    <select value={value} disabled={disabled} aria-label="Workflow" onChange={(e) => onChange(e.target.value)}>
+      {workflows.map((w) => (
+        <option key={w.id} value={w.id}>
+          {w.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** Linha de rascunho do tipo novo, com as mesmas colunas dos tipos existentes. Enter adiciona, Esc cancela. */
+function NewTypeRow({ onDone }: { onDone: () => void }) {
+  const firstWorkflow = useBoardStore((s) => s.state!.workflows[0]?.id ?? '');
+  const [name, setName] = useState('');
+  const [color, setColor] = useState('#4c8dff');
+  const [wf, setWf] = useState(firstWorkflow);
+  const ready = name.trim() !== '' && wf !== '';
+
+  const add = () => {
+    if (!ready) return;
+    settings.createType(name.trim(), color, wf);
+    onDone();
+  };
+
+  return (
+    <tr className="draft-row">
+      <td>
+        <input type="color" value={color} aria-label="Cor do tipo novo" onChange={(e) => setColor(e.target.value)} />
+      </td>
+      <td>
+        <TypePreview name={name.trim() || 'Novo tipo'} color={color} onPick={setColor} />
+      </td>
+      <td>
+        <input
+          autoFocus
+          placeholder="Nome do tipo"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') add();
+            if (e.key === 'Escape') onDone();
+          }}
+        />
+      </td>
+      <td>
+        <WorkflowSelect value={wf} onChange={setWf} />
+      </td>
+      <td />
+      <td className="narrow">
+        <Button variant="primary" disabled={!ready} onClick={add}>
+          Adicionar
+        </Button>
+        <Button variant="ghost" onClick={onDone}>
+          Cancelar
+        </Button>
+      </td>
+    </tr>
   );
 }
