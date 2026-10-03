@@ -1,5 +1,6 @@
 import type { Card, Column, Id } from '../../shared/model';
 import { childrenToCancel, dependents, parentToComplete } from '../../shared/cascade';
+import { linkedParentsToComplete } from '../../shared/links';
 import { cards } from '../commands';
 import { useBoardStore } from './boardStore';
 
@@ -44,21 +45,26 @@ export function requestMove(cardId: Id, columnId: Id, position: number): void {
 }
 
 /**
- * Chamado depois de mover uma sub-tarefa: se era a última em aberto indo para a conclusão, pergunta
- * (ou move direto, conforme a regra) se a história vai para a coluna de conclusão.
+ * Chamado depois de mover um card: se era o último filho em aberto (sub-tarefa ou filho vinculado)
+ * indo para a conclusão, pergunta (ou move direto, conforme a regra) se o pai vai também.
  */
 function offerToCompleteParent(child: Card, target: Column): void {
   const { state, ask } = useBoardStore.getState();
-  const next = parentToComplete(state!, child, target);
-  if (!next) return;
-  const { parent, column, position } = next;
-  const complete = () => cards.move(parent.id, column.id, position);
+  const structural = parentToComplete(state!, child, target);
+  const candidates = [...(structural ? [structural] : []), ...linkedParentsToComplete(state!, child, target)];
+  if (!candidates.length) return;
+  const complete = () => candidates.forEach(({ parent, column, position }) => cards.move(parent.id, column.id, position));
   if (state!.board.rules.onAllChildrenDone === 'auto') return complete();
+  const [{ parent, column }] = candidates as [(typeof candidates)[number]];
+  const names = candidates.map((c) => `"${c.parent.title}"`).join(', ');
   ask({
-    title: 'Todas as sub-tarefas foram concluídas',
-    message: `"${parent.title}" não tem mais sub-tarefas em aberto. Quer mover a história para "${column.name}" também?`,
+    title: structural ? 'Todas as sub-tarefas foram concluídas' : 'Todos os filhos vinculados foram concluídos',
+    message:
+      candidates.length === 1
+        ? `"${parent.title}" não tem mais ${structural ? 'sub-tarefas' : 'filhos'} em aberto. Quer mover ${structural ? 'a história' : 'o card'} para "${column.name}" também?`
+        : `Não restam filhos em aberto em ${names}. Quer mover esses cards para a coluna de conclusão também?`,
     cancelLabel: 'Agora não',
-    confirmLabel: `Mover para "${column.name}"`,
+    confirmLabel: candidates.length === 1 ? `Mover para "${column.name}"` : `Mover ${candidates.length} cards`,
     onConfirm: complete,
   });
 }

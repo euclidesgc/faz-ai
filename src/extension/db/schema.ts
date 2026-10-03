@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -214,6 +214,16 @@ const MIGRATIONS: Record<number, string> = {
     ALTER TABLE boards ADD COLUMN exec_profiles_json TEXT NOT NULL DEFAULT '[]';
     ALTER TABLE columns ADD COLUMN exec_profile TEXT;
     ALTER TABLE cards ADD COLUMN exec_profile TEXT;
+  `,
+  19: `
+    -- vínculos entre cards: pai/filho (de é pai de para) e relativo
+    CREATE TABLE IF NOT EXISTS card_links (
+      id TEXT PRIMARY KEY,
+      from_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      to_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      UNIQUE (from_id, to_id)
+    );
   `,
 };
 

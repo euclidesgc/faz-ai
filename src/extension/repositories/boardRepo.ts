@@ -5,6 +5,7 @@ import type {
   BoardState,
   Card,
   CardType,
+  CardLink,
   ChecklistItem,
   Column,
   Comment,
@@ -261,6 +262,12 @@ export class BoardRepo {
       [boardId],
     ).map((r) => ({ id: str(r.id), cardId: str(r.card_id), text: str(r.text), done: bool(r.done), position: num(r.position) }));
 
+    const links: CardLink[] = all(
+      db,
+      'SELECT l.* FROM card_links l JOIN cards c ON c.id = l.from_id WHERE c.board_id = ? ORDER BY l.rowid',
+      [boardId],
+    ).map((r) => ({ id: str(r.id), fromId: str(r.from_id), toId: str(r.to_id), kind: r.kind === 'related' ? 'related' : 'child' }));
+
     const comments: Comment[] = all(
       db,
       'SELECT cm.* FROM comments cm JOIN cards c ON c.id = cm.card_id WHERE c.board_id = ? ORDER BY cm.created_at, cm.rowid',
@@ -299,6 +306,7 @@ export class BoardRepo {
       fieldDefs,
       fieldValues,
       checklistItems,
+      links,
       comments,
       attachments,
       currentUser,

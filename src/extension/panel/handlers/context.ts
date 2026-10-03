@@ -8,6 +8,7 @@ import { AttachmentRepo } from '../../repositories/attachmentRepo';
 import { BoardRepo } from '../../repositories/boardRepo';
 import { CardRepo } from '../../repositories/cardRepo';
 import { ChecklistRepo } from '../../repositories/checklistRepo';
+import { LinkRepo } from '../../repositories/linkRepo';
 import { CommentRepo } from '../../repositories/commentRepo';
 import { SettingsRepo } from '../../repositories/settingsRepo';
 import { BoardHarness } from './harness';
@@ -28,6 +29,7 @@ export class BoardContext {
   readonly boards: BoardRepo;
   readonly cards: CardRepo;
   readonly checklist: ChecklistRepo;
+  readonly links: LinkRepo;
   readonly settings: SettingsRepo;
   readonly comments: CommentRepo;
   readonly attachments: AttachmentRepo;
@@ -46,6 +48,7 @@ export class BoardContext {
     this.boards = new BoardRepo(db);
     this.cards = new CardRepo(db);
     this.checklist = new ChecklistRepo(db);
+    this.links = new LinkRepo(db);
     this.settings = new SettingsRepo(db);
     this.comments = new CommentRepo(db);
     this.attachments = new AttachmentRepo(db);

@@ -5,7 +5,7 @@ import type { CardStatus } from '../shared/status';
 import type { ExecProfile } from '../shared/execution';
 import type { ModelOption, ModelRule } from '../shared/models';
 import type { BoardRules } from '../shared/rules';
-import type { FieldValue, Id, WorkflowKind } from '../shared/model';
+import type { FieldValue, Id, LinkKind, WorkflowKind } from '../shared/model';
 import { postToHost } from './vscode';
 
 /** Patch de cada mensagem `*.update`, tirado do protocolo para não repetir a forma aqui. */
@@ -70,6 +70,11 @@ export const checklist = {
   add: (cardId: Id, text: string) => post({ type: 'checklist.add', cardId, text }),
   update: (itemId: Id, patch: PatchOf<'checklist.update'>) => post({ type: 'checklist.update', itemId, patch }),
   delete: (itemId: Id) => post({ type: 'checklist.delete', itemId }),
+};
+
+export const links = {
+  add: (fromId: Id, toId: Id, kind: LinkKind) => post({ type: 'link.add', fromId, toId, kind }),
+  remove: (linkId: Id) => post({ type: 'link.remove', linkId }),
 };
 
 export const attachments = {

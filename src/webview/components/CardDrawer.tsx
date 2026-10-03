@@ -8,6 +8,7 @@ import { CommentsTab } from './card/CommentsTab';
 import { DescriptionSection } from './card/DescriptionSection';
 import { DrawerHeader } from './card/DrawerHeader';
 import { AgentBar } from './card/AgentBar';
+import { LinksSection } from './card/LinksSection';
 import { FieldsSection } from './card/FieldsSection';
 import { SubtasksSection } from './card/SubtasksSection';
 import { useDescriptionDraft } from './card/useDescriptionDraft';
@@ -62,6 +63,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             <DescriptionSection draft={draft} />
             <ChecklistSection cardId={card.id} />
             {isStory && <SubtasksSection story={card} />}
+            <LinksSection card={card} />
           </>
         )}
 

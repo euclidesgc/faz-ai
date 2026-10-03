@@ -175,6 +175,20 @@ export interface ChecklistItem {
   position: number;
 }
 
+/**
+ * Como dois cards se relacionam. `child`: o card `fromId` é o pai de `toId` (o pai só termina quando os
+ * filhos terminam). `related`: sem hierarquia, só referência (`fromId` e `toId` valem nos dois sentidos).
+ */
+export type LinkKind = 'child' | 'related';
+
+/** Vínculo entre dois cards, em qualquer workflow. Complementa as sub-tarefas (`parentId`), que seguem como estão. */
+export interface CardLink {
+  id: Id;
+  fromId: Id;
+  toId: Id;
+  kind: LinkKind;
+}
+
 /** Snapshot completo enviado ao webview após cada mutação. */
 export interface BoardState {
   board: Board;
@@ -185,6 +199,8 @@ export interface BoardState {
   fieldDefs: FieldDef[];
   fieldValues: FieldValueRow[];
   checklistItems: ChecklistItem[];
+  /** vínculos entre cards (pai/filho e relativo) */
+  links: CardLink[];
   comments: Comment[];
   attachments: Attachment[];
   /** autor usado em novos comentários */

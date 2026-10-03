@@ -120,6 +120,7 @@ const state: BoardState = {
     { cardId: 'solo', fieldId: 'prazo', value: '2026-10-05' },
   ],
   checklistItems: [],
+  links: [],
   comments: [{ id: 'c1', cardId: 'solo', author: 'a', source: 'human', body: 'ver com a Júlia', createdAt: NOW, updatedAt: NOW }],
   attachments: [],
   currentUser: 'a',

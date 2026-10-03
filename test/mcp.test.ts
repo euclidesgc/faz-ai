@@ -1059,3 +1059,37 @@ describe('ponte stdio', () => {
     }
   }, 15000);
 });
+
+describe('vínculos entre cards', () => {
+  it('link_cards vincula pai, filho e relativo; get_card mostra, e unlink_cards remove', async () => {
+    const pai = (await call('create_card', { title: 'Pai' })).data;
+    const filho = (await call('create_card', { title: 'Filho' })).data;
+    const outro = (await call('create_card', { title: 'Outro' })).data;
+    const ok = await call('link_cards', { card: pai.id, other: filho.id, relation: 'child' });
+    expect(ok.error).toBe(false);
+    expect(ok.data.children).toMatchObject([{ id: filho.id, title: 'Filho' }]);
+    expect(ok.data.childrenProgress).toBe('0/1 encerrados');
+    await call('link_cards', { card: pai.id, other: outro.id, relation: 'related' });
+
+    // visto do filho, o card de origem aparece como pai
+    expect((await call('get_card', { card: filho.id })).data.links.parents).toMatchObject([{ id: pai.id }]);
+    expect((await call('get_card', { card: outro.id })).data.links.related).toMatchObject([{ id: pai.id }]);
+    expect(router.snapshot().links).toHaveLength(2);
+
+    // não repete e não fecha ciclo
+    expect((await call('link_cards', { card: filho.id, other: pai.id, relation: 'child' })).error).toBe(true);
+    expect((await call('link_cards', { card: pai.id, other: pai.id, relation: 'related' })).error).toBe(true);
+
+    expect((await call('unlink_cards', { card: filho.id, other: pai.id })).error).toBe(false);
+    expect(router.snapshot().links).toHaveLength(1);
+    expect((await call('unlink_cards', { card: filho.id, other: pai.id })).error).toBe(true);
+  });
+
+  it('`parent` faz de other o pai do card', async () => {
+    const a = (await call('create_card', { title: 'A' })).data;
+    const b = (await call('create_card', { title: 'B' })).data;
+    await call('link_cards', { card: a.id, other: b.id, relation: 'parent' });
+    expect(router.snapshot().links[0]).toMatchObject({ kind: 'child' });
+    expect((await call('get_card', { card: a.id })).data.links.parents).toMatchObject([{ id: b.id }]);
+  });
+});

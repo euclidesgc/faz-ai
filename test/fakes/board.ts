@@ -87,6 +87,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     fieldDefs: [],
     fieldValues: [],
     checklistItems: [],
+    links: [],
     comments: [],
     attachments: [],
     currentUser: 'a',

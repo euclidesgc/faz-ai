@@ -89,6 +89,19 @@ pendência (robô para a IA, pessoa para você) e há quanto tempo ele está ass
 de IA (ex.: "Sonnet 5.5 - baixo") e, no rodapé, os contadores, a branch e o PR. Cards com
 pendência sua ganham a borda na cor do status, e o LED da barra pisca devagar enquanto a IA trabalha no card (na história, também quando ela trabalha numa sub-tarefa); quando ela termina, o LED continua lá, apagado.
 
+### Vínculos entre cards
+
+Além das sub-tarefas, qualquer card pode ser vinculado a outro, de qualquer workflow, em **Vínculos**
+no card aberto (como em Kanbanize ou Businessmap): **pai**, **filho** ou **relativo**. Busque o
+outro card pelo número ou título e escolha o tipo do vínculo. O rodapé do card no board mostra o
+vínculo e, se há filhos, quantos já estão encerrados. O vínculo repetido e o que fecharia um ciclo
+(o pai já ser filho do card) são recusados.
+
+Um pai vinculado segue a regra de Configurações → Regras: quando o último filho em aberto entra numa
+coluna de conclusão, o board pergunta (ou move sozinho, conforme a regra) se o pai também vai para a
+conclusão. A IA usa as ferramentas `link_cards` e `unlink_cards`, e o `get_card` devolve os
+vínculos.
+
 ### Board no navegador, fora do editor
 
 O board não depende da janela do editor:
