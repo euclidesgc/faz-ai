@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useBoardStore, type DialogSpec } from '../../store/boardStore';
 import { Button, type ButtonProps } from './Button';
+import { IconTrash } from './icons';
 
 interface Props extends Omit<ButtonProps, 'onClick' | 'danger' | 'children'> {
   /** título do diálogo de confirmação (ex.: `Apagar o tipo "Bug"?`) */
@@ -16,7 +17,7 @@ interface Props extends Omit<ButtonProps, 'onClick' | 'danger' | 'children'> {
 
 /**
  * Botão de exclusão com a confirmação do board: abre o Dialog (`danger`) e só chama `onConfirm`
- * se a pessoa confirmar. Por padrão é o ícone 🗑 (`icon danger`); `variant`/`size` trocam o visual.
+ * se a pessoa confirmar. Por padrão é o ícone da lixeira (`icon danger`); `variant`/`size` trocam o visual.
  */
 export function DeleteButton({
   question,
@@ -25,7 +26,7 @@ export function DeleteButton({
   choices,
   onConfirm,
   variant = 'icon',
-  children = '🗑',
+  children = <IconTrash />,
   ...rest
 }: Props) {
   const ask = useBoardStore((s) => s.ask);

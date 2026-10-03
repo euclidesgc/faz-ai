@@ -114,14 +114,14 @@ describe('CardDrawer', () => {
     expect(lastSent('card.move')).toEqual({ type: 'card.move', cardId: board.storyId, columnId: discovery.id, position: 0 });
   });
 
-  it('editar o texto de um item do checklist envia o texto novo; ✕ exclui o item', async () => {
+  it('editar o texto de um item do checklist envia o texto novo; o X exclui o item', async () => {
     openStory();
     const item = snap().checklistItems.find((i) => i.cardId === board.storyId)!;
     const input = screen.getByDisplayValue('item');
     await userEvent.type(input, ' revisto');
     await userEvent.tab();
     expect(lastSent('checklist.update')).toEqual({ type: 'checklist.update', itemId: item.id, patch: { text: 'item revisto' } });
-    await userEvent.click(screen.getByRole('button', { name: '✕' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remover o item' }));
     expect(lastSent('checklist.delete')).toEqual({ type: 'checklist.delete', itemId: item.id });
   });
 
@@ -235,7 +235,7 @@ describe('CardDrawer', () => {
     patchCard(board.storyId, { branch: 'feat/login', worktreePath: '/tmp/wt', prUrl: 'https://example.com/pr/1' });
     openCardDrawer(board.subId);
     expect(screen.getByText('feat/login')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Pull request ↗' })).toHaveAttribute('href', 'https://example.com/pr/1');
+    expect(screen.getByRole('link', { name: 'Pull request' })).toHaveAttribute('href', 'https://example.com/pr/1');
     await userEvent.click(screen.getByRole('button', { name: 'Abrir a pasta de trabalho' }));
     expect(lastSent('card.workspace.open')).toEqual({ type: 'card.workspace.open', cardId: board.subId });
   });
@@ -273,7 +273,7 @@ describe('CardDrawer', () => {
 
   it('Ações: arquivar uma sub-tarefa sem dependentes envia card.archive e fecha', async () => {
     openCardDrawer(board.subId);
-    await userEvent.click(screen.getByRole('button', { name: 'Ações ▾' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
     await userEvent.click(screen.getByRole('button', { name: 'Arquivar' }));
     expect(lastSent('card.archive')).toEqual({ type: 'card.archive', cardId: board.subId });
     expect(useBoardStore.getState().openCardId).toBeNull();
@@ -281,7 +281,7 @@ describe('CardDrawer', () => {
 
   it('Ações: mover a história para a lixeira pergunta antes (ela tem sub-tarefa)', async () => {
     openStory();
-    await userEvent.click(screen.getByRole('button', { name: 'Ações ▾' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
     await userEvent.click(screen.getByRole('button', { name: 'Mover para a lixeira' }));
     expect(useBoardStore.getState().dialog).not.toBeNull();
     expect(sentOf('card.trash')).toHaveLength(0);
@@ -292,7 +292,7 @@ describe('CardDrawer', () => {
     openCardDrawer(board.subId);
     expect(screen.getByText('Este card está arquivado.')).toBeInTheDocument();
     expect(screen.getByDisplayValue('A fazer')).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: 'Ações ▾' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
     await userEvent.click(screen.getByRole('button', { name: 'Desarquivar' }));
     expect(lastSent('card.unarchive')).toEqual({ type: 'card.unarchive', cardId: board.subId });
   });
@@ -301,7 +301,7 @@ describe('CardDrawer', () => {
     patchCard(board.subId, { deletedAt: 1 });
     openCardDrawer(board.subId);
     expect(screen.getByText('Este card está na lixeira.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Ações ▾' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ações' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Criar branch da história' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Restaurar' }));
     expect(lastSent('card.restore')).toEqual({ type: 'card.restore', cardId: board.subId });

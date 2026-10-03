@@ -1,6 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { marked } from 'marked';
-import { Button } from './ui';
+import {
+  Button,
+  IconBold,
+  IconCode,
+  IconCollapse,
+  IconHeading,
+  IconItalic,
+  IconLink,
+  IconList,
+  IconListOrdered,
+  IconOpen,
+  IconQuote,
+  IconTaskList,
+  type Icon,
+} from './ui';
 
 marked.setOptions({ gfm: true, breaks: true });
 
@@ -8,16 +22,16 @@ export const renderMarkdown = (src: string): string => marked.parse(src) as stri
 
 type Format = 'bold' | 'italic' | 'heading' | 'ul' | 'ol' | 'task' | 'code' | 'quote' | 'link';
 
-const TOOLS: { kind: Format; label: string; title: string }[] = [
-  { kind: 'bold', label: 'B', title: 'Negrito (Cmd+B)' },
-  { kind: 'italic', label: 'I', title: 'Itálico (Cmd+I)' },
-  { kind: 'heading', label: 'H', title: 'Título' },
-  { kind: 'ul', label: '•', title: 'Lista' },
-  { kind: 'ol', label: '1.', title: 'Lista numerada' },
-  { kind: 'task', label: '☑', title: 'Lista de tarefas' },
-  { kind: 'quote', label: '❝', title: 'Citação' },
-  { kind: 'code', label: '</>', title: 'Código' },
-  { kind: 'link', label: '🔗', title: 'Link (Cmd+K)' },
+const TOOLS: { kind: Format; Icon: Icon; title: string }[] = [
+  { kind: 'bold', Icon: IconBold, title: 'Negrito (Cmd+B)' },
+  { kind: 'italic', Icon: IconItalic, title: 'Itálico (Cmd+I)' },
+  { kind: 'heading', Icon: IconHeading, title: 'Título' },
+  { kind: 'ul', Icon: IconList, title: 'Lista' },
+  { kind: 'ol', Icon: IconListOrdered, title: 'Lista numerada' },
+  { kind: 'task', Icon: IconTaskList, title: 'Lista de tarefas' },
+  { kind: 'quote', Icon: IconQuote, title: 'Citação' },
+  { kind: 'code', Icon: IconCode, title: 'Código' },
+  { kind: 'link', Icon: IconLink, title: 'Link (Cmd+K)' },
 ];
 
 /** Aplica a formatação sobre a seleção e devolve o novo texto e a nova seleção. */
@@ -151,7 +165,7 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => format(t.kind)}
         >
-          {t.label}
+          <t.Icon />
         </Button>
       ))}
       <span className="spacer" />
@@ -185,7 +199,15 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
             setMode('write');
           }}
         >
-          {expanded ? '⤡ Recolher' : '⤢ Expandir'}
+          {expanded ? (
+            <>
+              <IconCollapse /> Recolher
+            </>
+          ) : (
+            <>
+              <IconOpen /> Expandir
+            </>
+          )}
         </Button>
       )}
     </div>

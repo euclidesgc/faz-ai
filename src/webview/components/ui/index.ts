@@ -5,3 +5,4 @@ export { Chip, ChipsEditor, type ChipOption } from './ChipsEditor';
 export { DeleteButton } from './DeleteButton';
 export { AddInput } from './AddInput';
 export { NumberField } from './NumberField';
+export * from './icons';

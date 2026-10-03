@@ -9,7 +9,17 @@ import { cards } from '../commands';
 import { requestArchive, requestTrash } from '../store/actions';
 import { FieldBadge } from './FieldRenderer';
 import { Menu } from './Menu';
-import { Button } from './ui';
+import {
+  Button,
+  IconAttachment,
+  IconChecklist,
+  IconComments,
+  IconDescription,
+  IconOpen,
+  IconParent,
+  IconSubtasks,
+  IconSuggest,
+} from './ui';
 import { StatusBadge } from './StatusBar';
 
 export function SortableCard({ card }: { card: Card }) {
@@ -86,7 +96,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
                 openCard(card.id);
               }}
             >
-              ⤢
+              <IconOpen />
             </Button>
             <Menu
               title="Ações do card"
@@ -105,7 +115,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       <div className="card-title">{card.title}</div>
       {parent && (
         <div className="card-parent" title={parent.title}>
-          ↳ {cardRef(parent)} {parent.title}
+          <IconParent /> {cardRef(parent)} {parent.title}
         </div>
       )}
       {card.status && !archived && (
@@ -123,17 +133,29 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       <div className="card-meta">
         {children.length > 0 && (
           <span title="Sub-tarefas concluídas">
-            ⑂ {doneChildren}/{children.length}
+            <IconSubtasks /> {doneChildren}/{children.length}
           </span>
         )}
         {checklist.length > 0 && (
           <span title="Checklist">
-            ☑ {checklistDone}/{checklist.length}
+            <IconChecklist /> {checklistDone}/{checklist.length}
           </span>
         )}
-        {comments > 0 && <span title="Mensagens na conversa">💬 {comments}</span>}
-        {attachments > 0 && <span title="Anexos">📎 {attachments}</span>}
-        {card.description && <span title="Tem descrição">≡</span>}
+        {comments > 0 && (
+          <span title="Mensagens na conversa">
+            <IconComments /> {comments}
+          </span>
+        )}
+        {attachments > 0 && (
+          <span title="Anexos">
+            <IconAttachment /> {attachments}
+          </span>
+        )}
+        {card.description && (
+          <span title="Tem descrição">
+            <IconDescription />
+          </span>
+        )}
         {offerSuggestion && !overlay && (
           <button
             className="suggest-model"
@@ -144,7 +166,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
               cards.setField(card.id, modelField!.id, offerSuggestion);
             }}
           >
-            ✦ {modelLabel(state.board.modelCatalog, offerSuggestion)}
+            <IconSuggest /> {modelLabel(state.board.modelCatalog, offerSuggestion)}
           </button>
         )}
       </div>

@@ -79,7 +79,7 @@ export function RulesSettings() {
         </Button>
       </div>
       <p className="muted">
-        Regras deste board. O que conta como conclusão ou cancelamento vem de "Esta coluna representa", no menu ⋯ de cada coluna.
+        Regras deste board. O que conta como conclusão ou cancelamento vem de "Esta coluna representa", no menu de ações de cada coluna.
       </p>
 
       <Rule

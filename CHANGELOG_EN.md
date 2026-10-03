@@ -48,6 +48,9 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   21 new interaction tests; types, checklist and the subtask slot join `src/shared/selectors.ts`.
 - Fixed: switching cards while editing the description saved the draft to the card opened next (for
   example, the subtask); it now goes to the card it was written on.
+- **New icons**: emojis and loose symbols (✕ ⋯ ▾ ↗ 🗑 💬 📎) were replaced by a single set of line
+  icons ([Lucide](https://lucide.dev)) across the whole board: cards, columns, card panel,
+  description editor, filters and settings.
 
 ## 0.29.1
 

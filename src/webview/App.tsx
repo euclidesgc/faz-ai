@@ -10,7 +10,7 @@ import { FilterBar } from './components/FilterBar';
 import { ThemeToggle } from './components/ThemeToggle';
 import { TrashView } from './components/TrashView';
 import { Settings } from './components/settings/Settings';
-import { Button } from './components/ui';
+import { Button, IconClose, IconExternal } from './components/ui';
 import { isWeb, onConnectionChange } from './vscode';
 
 export function App() {
@@ -84,7 +84,7 @@ export function App() {
         )}
         {!isWeb && (
           <Button variant="ghost" title="Abre este board no navegador, fora do editor" onClick={() => ui.openInBrowser()}>
-            Abrir no navegador ↗
+            Abrir no navegador <IconExternal />
           </Button>
         )}
         <ThemeToggle />
@@ -108,7 +108,7 @@ export function App() {
           <div className="toast error" role="alert">
             <span>{error}</span>
             <Button variant="icon" aria-label="Fechar aviso" onClick={() => setError(null)}>
-              ✕
+              <IconClose />
             </Button>
           </div>
         )}
@@ -116,7 +116,7 @@ export function App() {
           <div className="toast" role="status">
             <span>{notice}</span>
             <Button variant="icon" aria-label="Fechar aviso" onClick={() => setNotice(null)}>
-              ✕
+              <IconClose />
             </Button>
           </div>
         )}

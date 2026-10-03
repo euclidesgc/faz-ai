@@ -19,7 +19,7 @@ import { cards, settings } from '../commands';
 import { requestArchive, requestMove } from '../store/actions';
 import { CollapsedColumn, Column } from './Column';
 import { CardView, SortableCard } from './Card';
-import { Button } from './ui';
+import { Button, IconChevronLeft } from './ui';
 
 const archiveId = archiveKey;
 
@@ -166,7 +166,7 @@ function ArchiveColumn({
     <div ref={setNodeRef} className={`column archive ${isOver ? 'over' : ''}`}>
       <header className="column-header">
         <Button variant="icon" className="collapse-toggle" title="Colapsar a coluna" onClick={() => onToggle(false)}>
-          ‹
+          <IconChevronLeft />
         </Button>
         <span className="column-name">Arquivados</span>
         <span className="column-count">{cards.length}</span>

@@ -1,7 +1,7 @@
 import { cardRef } from '../../shared/model';
 import { cardsIn, columnsOf, isLive } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
-import { Button } from './ui';
+import { Button, IconChevronDown, IconChevronRight, IconClose } from './ui';
 import { WorkflowRow } from './WorkflowRow';
 
 export function Board() {
@@ -36,7 +36,7 @@ export function Board() {
                 title={collapsed ? 'Expandir a linha' : 'Colapsar a linha'}
               >
                 <Button variant="icon" className="collapse-toggle" aria-expanded={!collapsed}>
-                  {collapsed ? '▸' : '▾'}
+                  {collapsed ? <IconChevronRight /> : <IconChevronDown />}
                 </Button>
                 <h2>{wf.name}</h2>
                 <span className="column-count">
@@ -53,7 +53,7 @@ export function Board() {
                         selectParent(null);
                       }}
                     >
-                      de {cardRef(selected)} {selected.title} ✕
+                      de {cardRef(selected)} {selected.title} <IconClose />
                     </span>
                   ) : (
                     <span className="muted small">de todas as histórias · clique numa história para ver e criar as dela</span>

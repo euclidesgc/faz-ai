@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Card, Column as ColumnModel, ColumnCategory, Workflow } from '../../shared/model';
@@ -6,7 +6,7 @@ import { useBoardStore } from '../store/boardStore';
 import { cards, settings } from '../commands';
 import { SortableCard } from './Card';
 import { Menu } from './Menu';
-import { Button } from './ui';
+import { Button, IconApproval, IconCheck, IconChevronLeft, IconChevronRight, IconClose } from './ui';
 
 const CATEGORIES: { value: ColumnCategory; label: string; hint: string }[] = [
   { value: 'open', label: 'Trabalho em aberto', hint: '' },
@@ -31,11 +31,22 @@ interface Props {
   onToggle: () => void;
 }
 
+/** Marca de coluna concluída ou cancelada; nada nas abertas. */
+function TerminalMark({ category }: { category: ColumnCategory }) {
+  if (category === 'open') return null;
+  return (
+    <span className={`terminal-mark ${category}`} title={CATEGORIES.find((c) => c.value === category)!.hint}>
+      {category === 'done' ? <IconCheck /> : <IconClose />}{' '}
+    </span>
+  );
+}
+
 /** Coluna fechada: uma faixa estreita com o nome na vertical, que ainda aceita cards arrastados. */
 export function CollapsedColumn({
   setNodeRef,
   isOver,
   name,
+  mark,
   count,
   className = '',
   onExpand,
@@ -43,6 +54,8 @@ export function CollapsedColumn({
   setNodeRef: (el: HTMLElement | null) => void;
   isOver: boolean;
   name: string;
+  /** marca antes do nome (concluída/cancelada) */
+  mark?: ReactNode;
   count: string;
   className?: string;
   onExpand: () => void;
@@ -55,10 +68,13 @@ export function CollapsedColumn({
       title={`Expandir "${name}"`}
     >
       <Button variant="icon" className="collapse-toggle" aria-expanded={false}>
-        ›
+        <IconChevronRight />
       </Button>
       <span className="column-count">{count}</span>
-      <span className="column-name-vertical">{name}</span>
+      <span className="column-name-vertical">
+        {mark}
+        {name}
+      </span>
     </div>
   );
 }
@@ -105,12 +121,12 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
 
   const count = visibleCards.length === total ? String(total) : `${visibleCards.length}/${total}`;
   if (collapsed) {
-    const mark = column.category === 'done' ? '✓ ' : column.category === 'cancelled' ? '✕ ' : '';
     return (
       <CollapsedColumn
         setNodeRef={setNodeRef}
         isOver={isOver}
-        name={`${mark}${column.name}`}
+        name={column.name}
+        mark={<TerminalMark category={column.category} />}
         count={count}
         className={column.isTerminal ? 'terminal' : ''}
         onExpand={onToggle}
@@ -122,7 +138,7 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
     <div ref={setNodeRef} className={`column ${isOver ? 'over' : ''} ${column.isTerminal ? 'terminal' : ''}`}>
       <header className="column-header">
         <Button variant="icon" className="collapse-toggle" title="Colapsar a coluna" onClick={onToggle}>
-          ‹
+          <IconChevronLeft />
         </Button>
         {renaming !== null ? (
           <input
@@ -139,16 +155,12 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
           />
         ) : (
           <span className="column-name" title="Duplo clique para renomear" onDoubleClick={() => setRenaming(column.name)}>
-            {column.category !== 'open' && (
-              <span className={`terminal-mark ${column.category}`} title={CATEGORIES.find((c) => c.value === column.category)!.hint}>
-                {column.category === 'done' ? '✓ ' : '✕ '}
-              </span>
-            )}
+            <TerminalMark category={column.category} />
             {column.name}
             {column.requiresApproval && (
               <span className="approval-mark" title="Exige aprovação: a IA só avança o card desta coluna depois que você aprova">
                 {' '}
-                ✋
+                <IconApproval />
               </span>
             )}
           </span>
@@ -168,12 +180,12 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
             })),
             'sep' as const,
             {
-              label: '← Mover para a esquerda',
+              label: 'Mover para a esquerda',
               disabled: index === 0,
               onClick: () => settings.updateColumn(column.id, { position: index - 1 }),
             },
             {
-              label: '→ Mover para a direita',
+              label: 'Mover para a direita',
               disabled: index === siblings.length - 1,
               onClick: () => settings.updateColumn(column.id, { position: index + 1 }),
             },

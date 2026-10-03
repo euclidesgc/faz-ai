@@ -46,6 +46,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   testes de interação novos; tipos, checklist e vaga da sub-tarefa entram em `src/shared/selectors.ts`.
 - Corrigido: trocar de card com a descrição em edição salvava o rascunho no card aberto em seguida
   (por exemplo, na sub-tarefa); agora ele vai para o card em que foi escrito.
+- **Ícones novos**: emojis e símbolos soltos (✕ ⋯ ▾ ↗ 🗑 💬 📎) deram lugar a um conjunto único de
+  ícones de traço ([Lucide](https://lucide.dev)) em todo o board: card, colunas, painel do card,
+  editor de descrição, filtros e configurações.
 
 ## 0.29.1
 

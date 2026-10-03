@@ -2,7 +2,7 @@ import type { Card } from '../../../shared/model';
 import { storyOf } from '../../../shared/story';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
-import { Button } from '../ui';
+import { Button, IconBranch, IconExternal, IconPr } from '../ui';
 
 /** Branch, pasta de trabalho e PR do card. São da história: a sub-tarefa mostra as do pai. */
 export function WorkspaceBar({ card }: { card: Card }) {
@@ -16,7 +16,7 @@ export function WorkspaceBar({ card }: { card: Card }) {
       {story.branch ? (
         <>
           <span title="Branch da história">
-            ⎇ <code>{story.branch}</code>
+            <IconBranch /> <code>{story.branch}</code>
           </span>
           {mode === 'worktree' && story.worktreePath && (
             <Button variant="ghost" size="small" title={story.worktreePath} onClick={() => cards.openWorkspace(card.id)}>
@@ -36,7 +36,7 @@ export function WorkspaceBar({ card }: { card: Card }) {
       )}
       {story.prUrl && (
         <a href={story.prUrl} title={story.prUrl}>
-          Pull request ↗
+          <IconPr /> Pull request <IconExternal />
         </a>
       )}
     </div>

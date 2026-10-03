@@ -9,7 +9,7 @@ import { columnsOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { MarkdownEditor } from '../MarkdownEditor';
-import { AddInput, Button, DeleteButton, EnumSelect } from '../ui';
+import { AddInput, Button, DeleteButton, EnumSelect, IconChevronDown, IconDrag } from '../ui';
 
 const CATEGORIES: { value: ColumnCategory; label: string }[] = [
   { value: 'open', label: 'Trabalho em aberto' },
@@ -123,7 +123,7 @@ function SortableRow({ id, name, onStep, children }: { id: string; name: string;
             onStep(e.key === 'ArrowUp' ? -1 : 1);
           }}
         >
-          ⠿
+          <IconDrag />
         </button>
       </td>
       {children}
@@ -149,7 +149,7 @@ export function ColumnsSettings() {
         A linha de cima recebe histórias, bugs, retrabalho e débitos. A linha de baixo recebe as sub-tarefas de cada história. Uma história
         só pode entrar numa coluna de conclusão quando não tem sub-tarefas em aberto. "Começa colapsada" é o padrão ao abrir o board; lá,
         cada linha e coluna abre e fecha com um clique, e essa escolha fica lembrada. Para mudar a ordem das colunas, arraste a linha pela
-        alça ⠿.
+        alça à esquerda de cada linha.
       </p>
       <p className="muted">
         "IA atua" marca as colunas em que a IA trabalha: ao entrar nelas o card fica Pronto. "Exige aprovação" é o ponto de revisão: a IA
@@ -259,7 +259,7 @@ export function ColumnsSettings() {
                               title="Instrução para a IA e modelo do documento desta fase"
                               onClick={() => setPhaseOpen(phaseOpen === c.id ? null : c.id)}
                             >
-                              {c.artifactName || (c.aiInstruction ? 'Instrução' : 'Definir')} ▾
+                              {c.artifactName || (c.aiInstruction ? 'Instrução' : 'Definir')} <IconChevronDown />
                             </Button>
                           </td>
                           <td>

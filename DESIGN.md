@@ -67,6 +67,20 @@ olho.
   `src/shared/color.ts`, que escolhe texto preto ou branco pela luminância WCAG do fundo.
 - `tokens.css` tem uma declaração por linha, porque `test/tokens.test.ts` faz parse do arquivo.
 
+## Ícones
+
+- A interface usa [Lucide](https://lucide.dev), sempre por `src/webview/components/ui/icons.tsx`.
+  Esse arquivo é um mapa semântico (`IconOpen`, `IconTrash`, `IconAi`...) e é o único que importa
+  de `lucide-react`; trocar um ícone ali troca em todo o board.
+- O ícone tem `1em` e `currentColor`: segue o tamanho e a cor do texto em volta. Para mudar o
+  tamanho, mude o `font-size` do elemento pai.
+- O ícone é decorativo (`aria-hidden`). Botão só com ícone precisa de `title` ou `aria-label`, que
+  vira o nome acessível.
+- Nada de emoji ou símbolo solto (✕ ⋯ ▾ ↗ 🗑...) como ícone. Setas em frases (→ ↑ ↓) são texto e
+  podem ficar. `test/icons.test.ts` verifica as duas regras.
+- Para um ícone novo: escolha no site do Lucide, importe em `icons.tsx` e exporte com um nome que
+  diga o que ele significa no board, não o desenho.
+
 ## Como adicionar uma cor
 
 1. Escolha o passo na escala Radix (1-2 fundos, 3-5 fundos de componente, 6-8 bordas, 9-10
@@ -101,3 +115,6 @@ desabilitados não precisam atingir 4.5:1.
 
 Paleta de [Radix Colors](https://github.com/radix-ui/colors), licença MIT. Os valores hex foram
 copiados para `tokens.css`; não há dependência de pacote.
+
+Ícones de [Lucide](https://lucide.dev), licença ISC. Entram no pacote só os ícones importados em
+`icons.tsx`.

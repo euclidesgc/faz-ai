@@ -4,6 +4,7 @@ import { useBoardStore } from '../store/boardStore';
 import { ui } from '../commands';
 import { isWeb } from '../vscode';
 import { FilterPanel } from './FilterPanel';
+import { IconClose } from './ui';
 
 const PRESETS: Record<string, string> = { today: 'hoje', '7d': 'últimos 7 dias', '30d': 'últimos 30 dias', custom: 'período' };
 const RELATIONS: Record<string, string> = {
@@ -83,7 +84,7 @@ export function FilterBar() {
         </button>
         {chips.map((c) => (
           <span key={c.key} className="filter-chip" onClick={c.clear} title="Remover este filtro">
-            {c.label} ✕
+            {c.label} <IconClose />
           </span>
         ))}
         {(count > 0 || parent) && (

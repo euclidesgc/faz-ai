@@ -859,16 +859,6 @@ button.ghost.on {
   min-width: 26px;
   color: var(--fg);
 }
-.md-bold {
-  font-weight: 700;
-}
-.md-italic {
-  font-style: italic;
-}
-.md-code {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-}
 .md-editor textarea {
   border: none;
   border-radius: 0;
@@ -1666,6 +1656,11 @@ button {
   justify-content: center;
   gap: var(--sp-6);
   white-space: nowrap;
+}
+/* ícones Lucide (components/ui/icons.tsx): seguem o tamanho e a cor do texto em volta */
+.glyph {
+  flex: none;
+  vertical-align: -0.125em;
 }
 button:focus-visible,
 a:focus-visible,

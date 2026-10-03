@@ -13,7 +13,7 @@ import type { BoardState } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { ModelEditor } from '../FieldRenderer';
-import { Button, EnumSelect, FieldRow } from '../ui';
+import { Button, EnumSelect, FieldRow, IconArrowDown, IconArrowUp, IconClose, IconEdit, IconTrash } from '../ui';
 
 const OPS: { value: RuleCondition['op']; label: string }[] = [
   { value: 'is', label: 'é' },
@@ -72,7 +72,7 @@ function ConditionRow({
         ))}
       </select>
       <Button variant="icon" title="Remover a condição" onClick={onRemove}>
-        ✕
+        <IconClose />
       </Button>
     </div>
   );
@@ -218,17 +218,17 @@ export function ModelRulesEditor() {
               <td>{modelLabel(allModels, r.model, true)}</td>
               <td className="narrow">
                 <Button variant="icon" title="Subir (tem prioridade sobre as de baixo)" disabled={i === 0} onClick={() => move(i, -1)}>
-                  ↑
+                  <IconArrowUp />
                 </Button>
                 <Button variant="icon" title="Descer" disabled={i === rules.length - 1} onClick={() => move(i, 1)}>
-                  ↓
+                  <IconArrowDown />
                 </Button>
                 <Button variant="icon" title="Editar" onClick={() => setEditing(r)}>
-                  ✎
+                  <IconEdit />
                 </Button>
                 {/* sem confirmação de propósito: a regra pode ser remontada em segundos */}
                 <Button variant="icon" danger title="Remover da lista" onClick={() => setRules(rules.filter((x) => x.id !== r.id))}>
-                  🗑
+                  <IconTrash />
                 </Button>
               </td>
             </tr>

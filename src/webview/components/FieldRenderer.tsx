@@ -3,7 +3,7 @@ import type { FieldDef, FieldValue } from '../../shared/model';
 import { AI_TOOLS } from '../../shared/harness';
 import { modelLabel, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
-import { Button, ChipsEditor } from './ui';
+import { Button, ChipsEditor, IconExternal } from './ui';
 
 /** Exibição compacta no card. */
 export function FieldBadge({ field, value }: { field: FieldDef; value: FieldValue }) {
@@ -53,8 +53,8 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
         <div className="row">
           <input value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} placeholder="https://" />
           {value && (
-            <a href={String(value)} target="_blank" rel="noreferrer">
-              ↗
+            <a href={String(value)} target="_blank" rel="noreferrer" title="Abrir o link" aria-label="Abrir o link">
+              <IconExternal />
             </a>
           )}
         </div>

@@ -68,7 +68,7 @@ describe('FilterBar', () => {
     const type = board.router.snapshot().cardTypes[0]!;
     useBoardStore.setState({ filters: { ...filters(), typeIds: [type.id], owner: 'ai' } });
     render(<FilterBar />);
-    await userEvent.click(screen.getByText(`Tipo: ${type.name} ✕`));
+    await userEvent.click(screen.getByText(`Tipo: ${type.name}`));
     expect(filters().typeIds).toEqual([]);
     expect(filters().owner).toBe('ai');
     await userEvent.click(screen.getByRole('button', { name: 'Limpar' }));

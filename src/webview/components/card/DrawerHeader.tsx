@@ -4,7 +4,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { requestArchive, requestMove, requestTrash } from '../../store/actions';
 import { Menu } from '../Menu';
-import { Button, EnumSelect } from '../ui';
+import { Button, EnumSelect, IconChevronDown, IconClose } from '../ui';
 
 /** Barra do topo do drawer: tipo, coluna, ações do card e fechar. */
 export function DrawerHeader({ card }: { card: Card }) {
@@ -43,12 +43,12 @@ export function DrawerHeader({ card }: { card: Card }) {
             { label: 'Mover para a lixeira', danger: true, onClick: () => requestTrash(card.id, close) },
           ]}
         >
-          Ações ▾
+          Ações <IconChevronDown />
         </Menu>
       )}
       <span className="drawer-divider" />
       <Button variant="icon" className="drawer-close" title="Fechar (Esc)" aria-label="Fechar" onClick={close}>
-        ✕
+        <IconClose />
       </Button>
     </header>
   );
