@@ -97,6 +97,9 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 - **Heartbeat heart** at the top right of the board: red and beating while the heartbeat is running;
   grey and still when it is off or cannot run (no connection to Faz AI or no project tool, with the
   reason in the tooltip). Clicking the heart turns the heartbeat on and off.
+- In Configurações > Campos, the "No board" selector (Selo, Selo vazado, Nome: valor, Oculto) no
+  longer overlaps the options column when the window is narrow: the field card's columns now wrap
+  before they get narrower than the selector.
 
 ## 0.29.1
 

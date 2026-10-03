@@ -108,3 +108,11 @@ describe('styles.css consome só tokens', () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe('styles.css: layout dos campos', () => {
+  it('a coluna do cartão de campo é larga o bastante para o seletor "No board" (senão ele invade a vizinha)', () => {
+    const min = /\.field-card-body\s*\{[^}]*minmax\((\d+)px/.exec(stylesCss)?.[1];
+    // o seletor tem 4 opções e ~350px de largura; a medida foi conferida no navegador em larguras de 700 a 1900px
+    expect(Number(min)).toBeGreaterThanOrEqual(370);
+  });
+});
