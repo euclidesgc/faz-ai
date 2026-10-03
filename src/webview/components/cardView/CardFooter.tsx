@@ -1,10 +1,21 @@
 import type { SyntheticEvent } from 'react';
 import type { Card } from '../../../shared/model';
 import { modelDisplay, modelFieldOf, suggestModel } from '../../../shared/models';
+import { childProgress, linkedCards } from '../../../shared/links';
 import { checklistOf, childrenOf, countDone, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
-import { IconAttachment, IconBranch, IconChecklist, IconComments, IconDescription, IconPr, IconSubtasks, IconSuggest } from '../ui';
+import {
+  IconAttachment,
+  IconBranch,
+  IconCardLink,
+  IconChecklist,
+  IconComments,
+  IconDescription,
+  IconPr,
+  IconSubtasks,
+  IconSuggest,
+} from '../ui';
 
 // o clique num controle do rodapé não arrasta nem abre o card
 const keep = (e: SyntheticEvent) => e.stopPropagation();
@@ -13,6 +24,9 @@ const keep = (e: SyntheticEvent) => e.stopPropagation();
 export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: boolean; overlay: boolean }) {
   const state = useBoardStore((s) => s.state)!;
   const children = isParent ? childrenOf(state, card.id) : [];
+  const linked = linkedCards(state, card.id);
+  const linkCount = linked.parents.length + linked.children.length + linked.related.length;
+  const progress = childProgress(state, card.id);
   const checklist = checklistOf(state, card.id);
   const checklistDone = checklist.filter((i) => i.done).length;
   const comments = state.comments.filter((c) => c.cardId === card.id).length;
@@ -28,6 +42,11 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
       {children.length > 0 && (
         <span title="Sub-tarefas concluídas">
           <IconSubtasks /> {countDone(state, children)}/{children.length}
+        </span>
+      )}
+      {linkCount > 0 && (
+        <span title={progress.total ? 'Filhos vinculados encerrados' : 'Cards vinculados'}>
+          <IconCardLink /> {progress.total ? `${progress.done}/${progress.total}` : linkCount}
         </span>
       )}
       {checklist.length > 0 && (

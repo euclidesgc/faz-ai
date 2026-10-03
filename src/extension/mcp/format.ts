@@ -10,6 +10,7 @@ import {
   type ModelOption,
 } from '../../shared/models';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
+import { childProgress, linkedCards } from '../../shared/links';
 import { childrenOf, columnOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
 import { storyOf } from '../../shared/story';
@@ -124,6 +125,21 @@ export function workStatus(s: BoardState, c: Card) {
   };
 }
 
+/** Cards vinculados (pai, filhos e relativos), com o progresso dos filhos; vazio quando o card não tem vínculos. */
+function linksOf(s: BoardState, c: Card) {
+  const l = linkedCards(s, c.id);
+  const line = (k: Card) => ({ id: cardRef(k), title: k.title, column: columnOf(s, k)?.name, status: cardStatus(s, k) });
+  if (!l.parents.length && !l.children.length && !l.related.length) return {};
+  const p = childProgress(s, c.id);
+  return {
+    links: {
+      ...(l.parents.length ? { parents: l.parents.map(line) } : {}),
+      ...(l.children.length ? { children: l.children.map(line), childrenProgress: `${p.done}/${p.total} encerrados` } : {}),
+      ...(l.related.length ? { related: l.related.map(line) } : {}),
+    },
+  };
+}
+
 /** Linha de listagem: o suficiente para decidir qual card abrir. */
 export function cardSummary(s: BoardState, c: Card) {
   const parent = c.parentId ? s.cards.find((p) => p.id === c.parentId) : undefined;
@@ -141,6 +157,9 @@ export function cardSummary(s: BoardState, c: Card) {
     ...(Object.keys(fieldsOf(s, c)).length ? { fields: fieldsOf(s, c) } : {}),
     ...(kids.length ? { subtasks: `${kids.filter((k) => cardStatus(s, k) !== 'open').length}/${kids.length} fora de aberto` } : {}),
     ...(checklist.length ? { checklist: `${checklist.filter((i) => i.done).length}/${checklist.length}` } : {}),
+    ...(linkedCards(s, c.id).children.length
+      ? { linkedChildren: `${childProgress(s, c.id).done}/${childProgress(s, c.id).total} encerrados` }
+      : {}),
   };
 }
 
@@ -313,6 +332,7 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
         fields: fieldsOf(s, k),
       })),
     checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })),
+    ...linksOf(s, c),
     comments: s.comments
       .filter((m) => m.cardId === c.id)
       .map((m) => ({ commentId: m.id, author: m.author, ...(m.source ? { from: m.source } : {}), at: iso(m.createdAt), body: m.body })),

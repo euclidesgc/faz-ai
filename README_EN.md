@@ -97,6 +97,19 @@ like that, the fields, the AI model (e.g. "Sonnet 5.5 - baixo", with the effort 
 in the footer, the counters, the branch and the PR. Cards waiting on you get a border in the
 status color, and the LED on the bar blinks slowly while the AI is working on the card (on a story, also when it works on one of its sub-tasks); when it finishes, the LED stays there, turned off.
 
+### Links between cards
+
+Besides sub-tasks, any card can be linked to another one, in any workflow, under **Vínculos**
+(links) in the open card (as in Kanbanize or Businessmap): **parent**, **child** or **related**.
+Search the other card by number or title and pick the kind of link. The card footer on the board
+shows the link and, when there are children, how many are already closed. A repeated link and one
+that would close a cycle (the parent already being a child of the card) are refused.
+
+A linked parent follows the rule in Configurações → Regras: when the last open child enters a
+completion column, the board asks (or moves on its own, depending on the rule) whether the parent
+should also go to completion. The AI uses the `link_cards` and `unlink_cards` tools, and `get_card`
+returns the links.
+
 ### The board in the browser, outside the editor
 
 The board does not depend on the editor window:

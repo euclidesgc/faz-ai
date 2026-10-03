@@ -6,6 +6,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Vínculos entre cards.** Qualquer card pode ser vinculado a outro, de qualquer workflow: **pai**,
+  **filho** ou **relativo**, na seção **Vínculos** do card aberto, com busca por número ou título. O
+  rodapé do card mostra o vínculo e o progresso dos filhos; vínculo repetido e ciclo são recusados.
+  Quando o último filho em aberto entra numa coluna de conclusão, vale a regra "ao concluir todos os
+  filhos" (perguntar, mover sozinho ou nada) também para o pai vinculado. A IA ganha `link_cards` e
+  `unlink_cards`, e o `get_card` devolve os vínculos. As sub-tarefas seguem como estão.
+
 - **Skills automáticas por tipo de card.** Em Tipos de card → Padrões por tipo, o campo Skills usa
   a janela de escolha (antes mostrava "Sem opções ainda" quando o projeto não tinha skills próprias)
   e todo card novo do tipo nasce com as skills escolhidas. Há teste de ponta a ponta.

@@ -28,6 +28,7 @@ import {
   ListChecks,
   ListOrdered,
   ListTodo,
+  Link2,
   ListTree,
   Maximize2,
   MessageSquare,
@@ -99,6 +100,7 @@ export const IconArrowDown = icon(ArrowDown, 'IconArrowDown');
 // conteúdo do card
 export const IconParent = icon(CornerDownRight, 'IconParent');
 export const IconSubtasks = icon(ListTree, 'IconSubtasks');
+export const IconCardLink = icon(Link2, 'IconCardLink');
 export const IconChecklist = icon(ListChecks, 'IconChecklist');
 export const IconComments = icon(MessageSquare, 'IconComments');
 export const IconAttachment = icon(Paperclip, 'IconAttachment');

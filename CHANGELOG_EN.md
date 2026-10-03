@@ -7,6 +7,13 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
 
 ## Unreleased
 
+- **Links between cards.** Any card can be linked to another one, in any workflow: **parent**,
+  **child** or **related**, in the **Vínculos** section of the open card, with search by number or
+  title. The card footer shows the link and the children's progress; repeated links and cycles are
+  refused. When the last open child enters a completion column, the "when all children are done"
+  rule (ask, move on its own, or nothing) also applies to the linked parent. The AI gets
+  `link_cards` and `unlink_cards`, and `get_card` returns the links. Sub-tasks stay as they are.
+
 - **Automatic skills per card type.** In Tipos de card → Padrões por tipo, the Skills field uses
   the picker window (before it showed "Sem opções ainda" when the project had no skills of its
   own) and every new card of the type is born with the chosen skills. Covered end to end by a test.

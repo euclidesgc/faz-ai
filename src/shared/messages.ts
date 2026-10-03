@@ -8,7 +8,7 @@ import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
 import type { RunnerConfig } from './runner';
 import type { GitConfig } from './git';
-import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, WorkflowKind } from './model';
+import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
 
 export type WebviewToHost =
   | { type: 'ready' }
@@ -63,6 +63,9 @@ export type WebviewToHost =
   | { type: 'checklist.add'; cardId: Id; text: string }
   | { type: 'checklist.update'; itemId: Id; patch: { text?: string; done?: boolean } }
   | { type: 'checklist.delete'; itemId: Id }
+  /** vincula dois cards: `child` faz de `fromId` o pai de `toId`; `related` só os relaciona */
+  | { type: 'link.add'; fromId: Id; toId: Id; kind: LinkKind }
+  | { type: 'link.remove'; linkId: Id }
   | {
       type: 'settings.column.create';
       workflowId: Id;

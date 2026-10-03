@@ -1,13 +1,37 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';
+import { linkBetween } from '../../../shared/links';
 import { findCard } from '../format';
 import { cardArg } from './args';
 import { aiOrigin, detail } from './helpers';
 import type { DefineTool, ToolContext } from './registry';
 
-/** Conteúdo do card: checklist, comentários (conversa) e anexos. */
+/** Conteúdo do card: checklist, comentários (conversa), anexos e vínculos com outros cards. */
 export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): void {
+  tool(
+    'link_cards',
+    'Vincula dois cards, de qualquer workflow. `relation` diz o que `other` é para `card`: "parent" (o pai dele), "child" (um filho dele) ou "related" (só relacionado). O pai só deve ser concluído quando todos os filhos vinculados estiverem encerrados. Recusa vínculo duplicado e ciclo.',
+    { card: cardArg, other: cardArg, relation: z.enum(['parent', 'child', 'related']) },
+    (a, router) => {
+      const s = router.snapshot();
+      const card = findCard(s, a.card);
+      const other = findCard(s, a.other);
+      const [fromId, toId] = a.relation === 'parent' ? [other.id, card.id] : [card.id, other.id];
+      router.handle({ type: 'link.add', fromId, toId, kind: a.relation === 'related' ? 'related' : 'child' }, aiOrigin(ctx));
+      return detail(router, card.id).links;
+    },
+  );
+
+  tool('unlink_cards', 'Remove o vínculo entre dois cards, seja qual for o tipo dele.', { card: cardArg, other: cardArg }, (a, router) => {
+    const s = router.snapshot();
+    const card = findCard(s, a.card);
+    const link = linkBetween(s, card.id, findCard(s, a.other).id);
+    if (!link) throw new Error('Estes cards não estão vinculados.');
+    router.handle({ type: 'link.remove', linkId: link.id }, aiOrigin(ctx));
+    return detail(router, card.id).links ?? {};
+  });
+
   tool('add_checklist_item', 'Adiciona um item ao checklist (TODO) do card.', { card: cardArg, text: z.string().min(1) }, (a, router) => {
     const card = findCard(router.snapshot(), a.card);
     router.handle({ type: 'checklist.add', cardId: card.id, text: a.text });

@@ -1,3 +1,4 @@
+import { linkProblem } from '../../../shared/links';
 import type { Attachment } from '../../../shared/model';
 import type { BoardContext, HandlerMap } from './context';
 
@@ -35,6 +36,16 @@ export const cardContentHandlers = {
   },
   'checklist.delete': (msg, ctx) => {
     ctx.checklist.delete(msg.itemId);
+    return true;
+  },
+  'link.add': (msg, ctx) => {
+    const problem = linkProblem(ctx.state(), msg.fromId, msg.toId, msg.kind);
+    if (problem) throw new Error(problem);
+    ctx.links.add(msg.fromId, msg.toId, msg.kind);
+    return true;
+  },
+  'link.remove': (msg, ctx) => {
+    ctx.links.remove(msg.linkId);
     return true;
   },
   'comment.add': (msg, ctx, { author, byAi }) => {
