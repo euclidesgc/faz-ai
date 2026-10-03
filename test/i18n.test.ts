@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { EN } from '../src/webview/i18n/en';
+import { board } from '../src/webview/i18n/en/board';
+import { card } from '../src/webview/i18n/en/card';
+import { harness } from '../src/webview/i18n/en/harness';
+import { host } from '../src/webview/i18n/en/host';
+import { settings } from '../src/webview/i18n/en/settings';
+import { shared } from '../src/webview/i18n/en/shared';
+import { workflows } from '../src/webview/i18n/en/workflows';
 import { fill, setLocale, t, tn } from '../src/webview/i18n';
 
 const ROOT = path.resolve(__dirname, '../src/webview');
@@ -48,6 +55,17 @@ describe('i18n: dicionário', () => {
   it('a tradução usa os mesmos {parâmetros} e as mesmas tags do texto em português', () => {
     const wrong = Object.entries(EN).filter(([pt, en]) => names(pt).join() !== names(en).join() || tags(pt).join() !== tags(en).join());
     expect(wrong.map(([pt]) => pt)).toEqual([]);
+  });
+
+  it('o mesmo texto em duas áreas tem a mesma tradução', () => {
+    const seen = new Map<string, string>();
+    const clashes: string[] = [];
+    for (const area of [shared, host, board, card, settings, workflows, harness])
+      for (const [pt, en] of Object.entries(area)) {
+        if (seen.has(pt) && seen.get(pt) !== en) clashes.push(`${pt} => "${seen.get(pt)}" / "${en}"`);
+        seen.set(pt, en);
+      }
+    expect(clashes).toEqual([]);
   });
 
   it('nenhuma tradução ficou vazia nem igual ao português com acento (esquecida)', () => {
