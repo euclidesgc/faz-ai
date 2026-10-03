@@ -190,7 +190,12 @@ export class HostBridge {
             await fs.writeFile(file, msg.content, 'utf8');
             this.post({ type: 'attachment.writeResult', requestId: msg.requestId, ok: true });
           } catch (e) {
-            this.post({ type: 'attachment.writeResult', requestId: msg.requestId, ok: false, error: e instanceof Error ? e.message : String(e) });
+            this.post({
+              type: 'attachment.writeResult',
+              requestId: msg.requestId,
+              ok: false,
+              error: e instanceof Error ? e.message : String(e),
+            });
           }
           return;
         }
