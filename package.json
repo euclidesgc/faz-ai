@@ -153,7 +153,7 @@
     "build:web": "vite build",
     "watch:ext": "node esbuild.mjs --watch",
     "watch:web": "vite build --watch",
-    "typecheck": "tsc -p tsconfig.extension.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
+    "typecheck": "tsc -p tsconfig.extension.json --noEmit && tsc -p tsconfig.webview.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "npm run build:ext && npm run lint && vitest run",
     "package": "vsce package",
     "vscode:prepublish": "npm run build",

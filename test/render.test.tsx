@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ReactElement } from 'react';
 import { renderToString } from 'react-dom/server';
+import type { StateCreator } from 'zustand';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AttachmentsTab } from '../src/webview/components/AttachmentsTab';
@@ -30,11 +31,11 @@ import { useBoardStore } from '../src/webview/store/boardStore';
 // na renderização de servidor o zustand lê o estado inicial da store; aqui as telas precisam do estado atual
 vi.mock('zustand', async (original) => {
   const z = await original<typeof import('zustand')>();
-  const create = (init: Parameters<typeof z.createStore>[0]) => {
-    const api = z.createStore(init) as ReturnType<typeof z.createStore> & { getServerState?: () => unknown };
-    api.getServerState = api.getState;
-    return z.create(api as never);
-  };
+  const create = <T,>(init: StateCreator<T>) =>
+    z.create<T>((set, get, api) => {
+      Object.assign(api, { getServerState: api.getState });
+      return init(set, get, api);
+    });
   return { ...z, create };
 });
 
