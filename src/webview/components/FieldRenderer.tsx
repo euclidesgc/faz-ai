@@ -4,7 +4,7 @@ import type { FieldDef, FieldValue } from '../../shared/model';
 import { AI_TOOLS } from '../../shared/harness';
 import { effortLabel, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
-import { ChipsEditor, IconExternal, SelectField, TextField } from './ui';
+import { ChipsEditor, IconExternal, OptionLabel, optionChip, SelectField, TextField } from './ui';
 import { isSkillsField } from './settings/fields/fieldKinds';
 import { SkillPicker } from './skills/SkillPicker';
 import { getLocale, t } from '../i18n';
@@ -35,7 +35,7 @@ export function FieldBadge({ field, value }: { field: FieldDef; value: FieldValu
       {items.map((v, i) => (
         <span key={i} className={cls} title={field.name}>
           {field.display === 'inline' && <em>{field.name}: </em>}
-          {format(field, v)}
+          {field.kind === 'select' || field.kind === 'multiselect' ? <OptionLabel text={format(field, v)} /> : format(field, v)}
         </span>
       ))}
     </>
@@ -87,7 +87,7 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
       return (
         <SelectField
           aria-label={field.name}
-          options={[{ value: NO_VALUE, label: '—' }, ...field.options.map((o) => ({ value: o, label: o }))]}
+          options={[{ value: NO_VALUE, label: '—' }, ...field.options.map((o) => ({ value: o, label: <OptionLabel text={o} /> }))]}
           value={(value as string) || NO_VALUE}
           onChange={(v) => onChange(v === NO_VALUE ? null : v)}
         />
@@ -97,7 +97,7 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
     case 'multiselect': {
       const current = Array.isArray(value) ? value : [];
       if (isSkillsField(field.name)) return <SkillPicker value={current} onChange={onChange} />;
-      return <ChipsEditor options={field.options} values={current} onChange={onChange} />;
+      return <ChipsEditor options={field.options.map(optionChip)} values={current} onChange={onChange} />;
     }
   }
 }

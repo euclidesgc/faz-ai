@@ -2,7 +2,7 @@ import type { DatePreset, Filters, Relation } from '../../shared/filters';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { Checkbox, TextField } from '@radix-ui/themes';
-import { ChipsEditor, SelectField } from './ui';
+import { ChipsEditor, optionChip, SelectField } from './ui';
 
 /** O Select do Radix não aceita valor vazio: "qualquer data" usa este. */
 const ANY_DATE = '__any';
@@ -64,7 +64,7 @@ export function FilterPanel() {
                     { value: 'true', label: t('Sim') },
                     { value: 'false', label: t('Não') },
                   ]
-                : f.options
+                : f.options.map(optionChip)
             }
             values={filters.fields[f.id] ?? []}
             onChange={(next) => setFilters({ fields: { ...filters.fields, [f.id]: next } })}

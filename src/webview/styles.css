@@ -2449,3 +2449,17 @@ body.host-web .drawer {
 .autopilot.off {
   color: var(--muted);
 }
+
+/* logo da tecnologia à frente de uma opção de campo de seleção */
+.tech-logo {
+  width: 1em;
+  height: 1em;
+  margin-right: 0.35em;
+  vertical-align: -0.125em;
+  flex: none;
+}
+
+/* no chip marcado (fundo colorido) a cor da marca some: o logo usa a cor do texto */
+.chip.on .tech-logo {
+  fill: currentColor;
+}
