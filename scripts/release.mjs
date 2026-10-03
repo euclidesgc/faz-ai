@@ -20,6 +20,7 @@
 //   --no-git           não faz commit, PR, merge, tag nem GitHub Release
 //   --allow-dirty      permite rodar com alterações não commitadas
 //   --allow-branch     permite rodar fora da branch main
+//   --allow-no-notes   permite publicar sem a seção "Não lançado" no CHANGELOG
 //
 // Tokens (variáveis de ambiente ou arquivo .env.release na raiz, fora do git):
 //   VSCE_PAT  (opcional) PAT global do Azure DevOps com escopo Marketplace > Manage.
@@ -31,6 +32,7 @@ import { execSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SHOWCASE, firstSection, renameUnreleased } from './releaseCheck.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -71,19 +73,23 @@ function version() {
   return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 }
 
-// "Não lançado" / "Unreleased" nos CHANGELOGs passa a ser a versão que está saindo
-function renameUnreleased(next) {
-  for (const [file, heading] of [
-    ['CHANGELOG.md', 'Não lançado'],
-    ['CHANGELOG_EN.md', 'Unreleased'],
-  ]) {
-    const path = join(root, file);
+// "Não lançado" / "Unreleased" nos CHANGELOGs passa a ser a versão que está saindo, sempre (até em
+// --dry-run e --no-git), para que o .vsix nunca saia com o título errado no topo do changelog. Quando
+// o release vai commitar, o arquivo renomeado entra no commit da versão (`commit: true`); quando não
+// vai, o texto original é guardado e devolvido ao disco no `process.on('exit')` do chamador — mesmo
+// em falha, já que `fail()` chama `process.exit(1)` e não passa por `finally`.
+function prepareChangelogs(next, commit) {
+  for (const entry of SHOWCASE.filter((e) => e.kind === 'changelog')) {
+    const path = join(root, entry.file);
     if (!existsSync(path)) continue;
-    const text = readFileSync(path, 'utf8');
-    const renamed = text.replace(`## ${heading}\n`, `## ${next}\n`);
-    if (renamed !== text) {
-      writeFileSync(path, renamed);
-      run(`git add ${file}`);
+    const original = readFileSync(path, 'utf8');
+    const { text, renamed } = renameUnreleased(original, entry.unreleased, next);
+    if (!renamed) continue;
+    writeFileSync(path, text);
+    if (commit) {
+      run(`git add ${entry.file}`);
+    } else {
+      process.on('exit', () => writeFileSync(path, original));
     }
   }
 }
@@ -202,6 +208,25 @@ if (viaPullRequest && branch === 'main') {
     fail('A main local tem commits que não estão na origin/main. Eles iriam no PR da versão.');
 }
 
+// Sem "Não lançado" para renomear e sem já estar na versão que está saindo, não há notas para
+// publicar. Vem antes de criar a branch e de mexer no package.json: uma recusa aqui não deixa nada
+// para desfazer. Quando não há "Não lançado" mas a primeira seção já é a versão (caso do `current`,
+// que republica sem renomear nada), segue sem precisar da opção.
+if (!flags.has('--allow-no-notes')) {
+  const entry = SHOWCASE.find((e) => e.file === 'CHANGELOG.md');
+  const changelogPath = join(root, entry.file);
+  if (existsSync(changelogPath)) {
+    const text = readFileSync(changelogPath, 'utf8');
+    const first = firstSection(text);
+    if (!text.includes(`## ${entry.unreleased}`) && first !== next) {
+      fail(
+        `${entry.file} não tem a seção "## ${entry.unreleased}", e a primeira seção é "${first}", não "${next}".\n` +
+          '  Escreva o que mudou em "## Não lançado" ou rode de novo com --allow-no-notes para publicar sem notas.',
+      );
+    }
+  }
+}
+
 // Validação (a versão não influencia os testes, então roda antes de mexer em qualquer branch)
 run('npm run typecheck');
 run('npm test');
@@ -210,11 +235,10 @@ run('npm test');
 const releaseBranch = `release/${tag}`;
 if (viaPullRequest) run(`git switch -c ${releaseBranch}`);
 if (bump !== 'current') run(`npm version ${next} --no-git-tag-version`, { stdio: 'pipe' });
-if (viaPullRequest) {
-  run('git add package.json package-lock.json');
-  renameUnreleased(next);
-  run(`git commit -m "Release ${tag}"`);
-}
+
+if (viaPullRequest) run('git add package.json package-lock.json');
+prepareChangelogs(next, viaPullRequest);
+if (viaPullRequest) run(`git commit -m "Release ${tag}"`);
 
 // Empacotamento (vsce roda "vscode:prepublish", que faz o build). Os pacotes ficam em releases/
 // (fora do git): um por versão e uma cópia da última. Se falhar, nada saiu da máquina: a branch
