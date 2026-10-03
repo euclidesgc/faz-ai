@@ -1,0 +1,37 @@
+name: Reportar um bug / Report a bug
+description: Algo quebrou ou se comportou de um jeito inesperado / Something broke or behaved unexpectedly
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: O que aconteceu? / What happened?
+      description: O que você fez, o que esperava e o que aconteceu. Prints ajudam. / What you did, what you expected and what happened. Screenshots help.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versão da extensão / Extension version
+      placeholder: '0.29.1'
+  - type: dropdown
+    id: editor
+    attributes:
+      label: Editor / Editor
+      options: [VS Code, Cursor, Navegador (CLI) / Browser (CLI), Outro / Other]
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Ferramenta de IA do projeto / Project AI tool
+      options: [Claude Code, Codex, Cursor, Kimi Code, GitHub Copilot, Nenhuma / None]
+  - type: input
+    id: os
+    attributes:
+      label: Sistema operacional / Operating system
+      placeholder: Linux, macOS, Windows
+  - type: textarea
+    id: log
+    attributes:
+      label: Log (opcional) / Log (optional)
+      description: 'Saída do comando "Faz AI: Mostrar o log das execuções" / Output of the "Faz AI: Show the run log" command'
+      render: text

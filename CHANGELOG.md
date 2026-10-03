@@ -15,6 +15,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   `autonomous_from`). Para quando o card é bloqueado, quando uma execução falha e depois de 3
   execuções seguidas sem avanço. Interruptor no painel do card (com confirmação), selo no cartão,
   botão **Autônomo** no topo do board e comandos para pausar e retomar.
+- **Pedido de avaliação e canais de retorno no README.** O começo do README (em português e em
+  inglês) ganhou um convite para dar uma estrela no repositório, avaliar a extensão no VS Code
+  Marketplace e no Open VSX (a loja do Cursor), reportar bugs e sugerir melhorias pelas issues do
+  repositório. As issues agora têm dois formulários prontos, **Reportar um bug** (com versão,
+  editor, ferramenta de IA e sistema) e **Sugerir uma melhoria**.
 - **Interface em português e em inglês.** Em Configurações → Aparência, o **Idioma** pode ser
   **Automático** (segue o idioma do editor ou do navegador: inglês para qualquer `en`, português
   para o resto), **Português (Brasil)** ou **English**. A interface inteira troca na hora: board,

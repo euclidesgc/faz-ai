@@ -1,0 +1,16 @@
+name: Sugerir uma melhoria / Suggest an improvement
+description: Uma ideia, um fluxo que falta ou uma tela confusa / An idea, a missing flow or a confusing screen
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qual problema você quer resolver? / What problem do you want to solve?
+      description: Conte a situação em que sentiu falta disso. / Describe the situation where you missed it.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Como você imagina a solução? / How do you imagine the solution?
+      description: Opcional. Rascunhos e exemplos de outras ferramentas são bem-vindos. / Optional. Sketches and examples from other tools are welcome.

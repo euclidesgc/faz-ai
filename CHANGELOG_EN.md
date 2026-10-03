@@ -17,6 +17,11 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   when a run fails and after 3 consecutive runs with no progress. Switch in the card panel (with
   confirmation), badge on the card, an **Autônomo** button in the board's top bar and commands to
   pause and resume.
+- **Rating request and feedback channels in the README.** The top of the README (in Portuguese and
+  English) now invites people to star the repository, rate the extension on the VS Code Marketplace
+  and Open VSX (Cursor's store), report bugs and suggest improvements through the repository's
+  issues. Issues now have two ready-made forms, **Report a bug** (with version, editor, AI tool and
+  system) and **Suggest an improvement**.
 - **Interface in Portuguese and English.** In Configurações → Aparência (Settings → Appearance), the
   **Idioma** (language) can be **Automático** (follows the editor's or the browser's language:
   English for any `en`, Portuguese for the rest), **Português (Brasil)** or **English**. The whole

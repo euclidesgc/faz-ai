@@ -28,6 +28,25 @@
 >
 > Euclides G Catunda
 
+> **Gostou? Ajude o Faz AI a crescer.**
+>
+> Um projeto novo melhora com o retorno de quem usa. Se ele já te poupou tempo, estes gestos de um
+> minuto fazem muita diferença:
+>
+> - ⭐ **Dê uma estrela** no [repositório do GitHub](https://github.com/euclidesgc/faz-ai): é o que
+>   mais ajuda outras pessoas a encontrarem o projeto.
+> - 💬 **Avalie a extensão** na loja onde você a instalou, com estrelas e, se puder, duas linhas
+>   sobre o que achou: [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=euclidesgc.faz-ai&ssr=false#review-details)
+>   ou [Open VSX](https://open-vsx.org/extension/euclidesgc/faz-ai/reviews) (a loja do Cursor).
+> - 🐞 **Encontrou um bug?** [Abra uma issue](https://github.com/euclidesgc/faz-ai/issues/new?template=bug.yml)
+>   dizendo o que você fez, o que esperava e o que aconteceu. A versão da extensão e o editor que
+>   você usa ajudam bastante.
+> - 💡 **Tem uma ideia ou sugestão?** [Conte numa issue](https://github.com/euclidesgc/faz-ai/issues/new?template=sugestao.yml):
+>   fluxos que faltam, telas confusas e integrações que você gostaria de ver.
+>
+> Antes de abrir, vale uma olhada nas [issues já abertas](https://github.com/euclidesgc/faz-ai/issues):
+> às vezes a ideia já existe, e um 👍 nela ajuda a decidir a ordem do que vem a seguir.
+
 Um board kanban dentro do editor (VS Code e Cursor), feito para conduzir Spec-Driven Development
 (SDD) junto com uma IA. Você organiza o trabalho em histórias e sub-tarefas; a IA lê o board, produz
 os artefatos de cada fase e move os cards conforme avança.
