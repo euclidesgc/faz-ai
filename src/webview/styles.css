@@ -1311,9 +1311,6 @@ h3.plain {
 }
 
 /* modelos de IA */
-.model-editor select {
-  min-width: 0;
-}
 .field-row .suggestion {
   grid-column: 2;
 }
@@ -1420,8 +1417,9 @@ h3.plain {
   display: grid;
   gap: var(--sp-6);
 }
-.model-editor select {
+.model-editor .rt-SelectTrigger {
   flex: 1;
+  min-width: 0;
 }
 .field-row select,
 .field-row input:not([type='checkbox']):not([type='range']):not([type='color']) {
@@ -2257,4 +2255,22 @@ body.host-web .drawer {
 .harness-inventory td code {
   min-width: 180px;
   display: inline-block;
+}
+
+/* perfis de execução */
+.profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  margin-top: var(--sp-12);
+}
+.profile-name {
+  min-width: 220px;
+}
+.profile-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-12);
 }

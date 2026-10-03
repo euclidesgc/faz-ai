@@ -111,6 +111,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   skill, Novo agente, Conectar ao board, Rodar agora, Atualizar). Formulários de criação, seletores,
   interruptores, caixas de marcar e as abas de ferramenta usam o Radix Themes, como Campos,
   Workflows e Regras.
+- **Perfis de execução com o novo design**: o botão **Novo perfil** fica no topo à direita; cada
+  perfil é um cartão com o nome numa caixa de texto, o selo "padrão" e as ações à direita, e o
+  editor usa os seletores, interruptores e campos do Radix Themes. O seletor de **modelo e
+  esforço** (também usado no card aberto) passou a ser o do Radix.
 
 ## 0.29.1
 
