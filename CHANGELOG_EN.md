@@ -46,6 +46,8 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   `settings/harness/`, with new interaction tests; non-React rules move to `src/shared`.
 - Internal: the card panel (399 lines) becomes a composition of parts in `components/card/`, with
   21 new interaction tests; types, checklist and the subtask slot join `src/shared/selectors.ts`.
+- Fixed: switching cards while editing the description saved the draft to the card opened next (for
+  example, the subtask); it now goes to the card it was written on.
 
 ## 0.29.1
 

@@ -44,6 +44,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   `settings/harness/`, com testes de interação novos; regras sem React vão para `src/shared`.
 - Interno: o painel do card (399 linhas) vira composição de partes em `components/card/`, com 21
   testes de interação novos; tipos, checklist e vaga da sub-tarefa entram em `src/shared/selectors.ts`.
+- Corrigido: trocar de card com a descrição em edição salvava o rascunho no card aberto em seguida
+  (por exemplo, na sub-tarefa); agora ele vai para o card em que foi escrito.
 
 ## 0.29.1
 
