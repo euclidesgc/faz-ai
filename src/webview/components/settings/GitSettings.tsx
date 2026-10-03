@@ -2,6 +2,7 @@ import { DEFAULT_GIT, MERGE_METHODS, WORKSPACE_MODES, branchName, type GitConfig
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { EnumSelect, FieldRow } from '../ui';
+import { PageHeader } from './PageHeader';
 
 export function GitSettings() {
   const git = useBoardStore((s) => s.state)!.board.git;
@@ -10,12 +11,11 @@ export function GitSettings() {
 
   return (
     <div>
-      <h2>Git</h2>
-      <p className="muted">
+      <PageHeader title="Git">
         Cada história trabalha numa branch própria, criada pelo board com um nome previsível. As sub-tarefas fazem commits na branch da
         história. A branch é criada quando a IA chama <code>prepare_workspace</code> (a fase de Implementação padrão pede isso) ou pelo
         botão no card.
-      </p>
+      </PageHeader>
 
       <section className="settings-block">
         <FieldRow label="Onde a IA mexe no código">

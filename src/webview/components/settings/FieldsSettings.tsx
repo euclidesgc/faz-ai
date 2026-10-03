@@ -3,6 +3,7 @@ import type { FieldDef, FieldDisplay, FieldKind } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { Button, Chip, ChipsEditor, DeleteButton, EnumSelect, FieldRow as Row } from '../ui';
+import { PageHeader } from './PageHeader';
 
 const KINDS: { value: FieldKind; label: string }[] = [
   { value: 'text', label: 'Texto' },
@@ -38,8 +39,9 @@ export function FieldsSettings() {
 
   return (
     <div>
-      <h2>Campos personalizados</h2>
-      <p className="muted">Campos aparecem no detalhe do card e, conforme a exibição escolhida, também na face do card no board.</p>
+      <PageHeader title="Campos personalizados">
+        Campos aparecem no detalhe do card e, conforme a exibição escolhida, também na face do card no board.
+      </PageHeader>
       {state.fieldDefs.map((f) => (
         <FieldRow key={f.id} field={f} />
       ))}

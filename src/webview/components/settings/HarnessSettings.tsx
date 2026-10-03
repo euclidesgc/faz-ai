@@ -7,6 +7,7 @@ import { ProjectSkills } from './harness/ProjectSkills';
 import { ProjectTool } from './harness/ProjectTool';
 import { RunnerSettings } from './harness/RunnerSettings';
 import { useProjectEditing } from './harness/useProjectEditing';
+import { PageHeader } from './PageHeader';
 
 /** Tela do harness de IA: a ferramenta do projeto, a execução pelo board, regras, skills e agentes do projeto e o inventário completo. */
 export function HarnessSettings() {
@@ -15,11 +16,10 @@ export function HarnessSettings() {
   const edit = useProjectEditing();
   return (
     <div>
-      <h2>Harness de IA</h2>
-      <p className="muted">
+      <PageHeader title="Harness de IA">
         Regras, skills e agentes que a ferramenta deste projeto lê na pasta do projeto, editáveis aqui. No fim da página está tudo que cada
         ferramenta carrega, incluindo o que vem da sua pasta de usuário e de plugins.
-      </p>
+      </PageHeader>
       <ProjectTool tool={tool} />
       <RunnerSettings tool={tool} />
       <ProjectRules tool={tool} edit={edit} />

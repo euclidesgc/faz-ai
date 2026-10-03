@@ -5,6 +5,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { ModelRulesEditor } from './ModelRulesEditor';
 import { Button, IconTrash } from '../ui';
+import { PageHeader } from './PageHeader';
 
 const splitList = (s: string): string[] =>
   s
@@ -52,11 +53,10 @@ export function ModelsSettings() {
 
   return (
     <div>
-      <h2>Modelos de IA</h2>
-      <p className="muted">
+      <PageHeader title="Modelos de IA">
         Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos
         cards. A ferramenta é escolhida em Harness de IA.
-      </p>
+      </PageHeader>
 
       <div className="stack">
         {tools.map((t) => {

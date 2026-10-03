@@ -10,6 +10,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { MarkdownEditor } from '../MarkdownEditor';
 import { AddInput, Button, DeleteButton, EnumSelect, IconChevronDown, IconDrag } from '../ui';
+import { PageHeader } from './PageHeader';
 
 const CATEGORIES: { value: ColumnCategory; label: string }[] = [
   { value: 'open', label: 'Trabalho em aberto' },
@@ -144,13 +145,12 @@ export function ColumnsSettings() {
 
   return (
     <div>
-      <h2>Workflows e colunas</h2>
-      <p className="muted">
+      <PageHeader title="Workflows e colunas">
         A linha de cima recebe histórias, bugs, retrabalho e débitos. A linha de baixo recebe as sub-tarefas de cada história. Uma história
         só pode entrar numa coluna de conclusão quando não tem sub-tarefas em aberto. "Começa colapsada" é o padrão ao abrir o board; lá,
         cada linha e coluna abre e fecha com um clique, e essa escolha fica lembrada. Para mudar a ordem das colunas, arraste a linha pela
         alça à esquerda de cada linha.
-      </p>
+      </PageHeader>
       <p className="muted">
         "IA atua" marca as colunas em que a IA trabalha: ao entrar nelas o card fica Pronto. "Exige aprovação" é o ponto de revisão: a IA
         termina, pede a revisão e só avança o card depois que você aprova. Em "Fase" ficam a instrução da IA para a coluna e o modelo do

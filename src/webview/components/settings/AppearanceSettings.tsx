@@ -6,6 +6,7 @@ import { ContrastHint } from './ColorPreview';
 import { StatusBadge } from '../StatusBar';
 import { renderMarkdown } from '../MarkdownEditor';
 import { Button, EnumSelect, FieldRow } from '../ui';
+import { PageHeader } from './PageHeader';
 
 const SAMPLE = '## Exemplo de descrição\n\nTexto de um card com **negrito**, _itálico_ e `código`.\n\n- Primeiro item\n- Segundo item';
 
@@ -16,16 +17,16 @@ export function AppearanceSettings() {
 
   return (
     <div>
-      <div className="row">
-        <h2>Aparência</h2>
-        <span className="spacer" />
-        <Button variant="ghost" size="small" disabled={!changed} onClick={() => set(DEFAULT_APPEARANCE)}>
-          Restaurar padrões
-        </Button>
-      </div>
-      <p className="muted">
+      <PageHeader
+        title="Aparência"
+        actions={
+          <Button variant="ghost" size="small" disabled={!changed} onClick={() => set(DEFAULT_APPEARANCE)}>
+            Restaurar padrões
+          </Button>
+        }
+      >
         Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.
-      </p>
+      </PageHeader>
 
       <section className="settings-block">
         <FieldRow label="Tema">

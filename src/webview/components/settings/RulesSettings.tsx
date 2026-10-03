@@ -4,6 +4,7 @@ import { columnsOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { Button, EnumSelect } from '../ui';
+import { PageHeader } from './PageHeader';
 
 const CONFIRM_OPTIONS: { value: ConfirmMode; label: string }[] = [
   { value: 'whenDependents', label: 'Avisar se levar sub-tarefas ou anexos' },
@@ -71,16 +72,16 @@ export function RulesSettings() {
 
   return (
     <div>
-      <div className="row">
-        <h2>Regras</h2>
-        <span className="spacer" />
-        <Button variant="ghost" size="small" disabled={!changed} onClick={() => set(DEFAULT_RULES)}>
-          Restaurar padrões
-        </Button>
-      </div>
-      <p className="muted">
+      <PageHeader
+        title="Regras"
+        actions={
+          <Button variant="ghost" size="small" disabled={!changed} onClick={() => set(DEFAULT_RULES)}>
+            Restaurar padrões
+          </Button>
+        }
+      >
         Regras deste board. O que conta como conclusão ou cancelamento vem de "Esta coluna representa", no menu de ações de cada coluna.
-      </p>
+      </PageHeader>
 
       <Rule
         title="Concluir história com sub-tarefas em aberto"

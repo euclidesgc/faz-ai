@@ -25,6 +25,8 @@ export interface DialogSpec {
 interface UiState {
   view: View;
   settingsTab: SettingsTab;
+  /** menu lateral das configurações recolhido numa faixa de ícones */
+  settingsNavCollapsed: boolean;
   openCardId: Id | null;
 }
 
@@ -42,6 +44,7 @@ interface BoardStore extends UiState, ViewState {
   setView(view: View): void;
   /** abre as configurações numa seção (fecha o card aberto) */
   openSettings(tab: SettingsTab): void;
+  setSettingsNavCollapsed(collapsed: boolean): void;
   selectParent(id: Id | null): void;
   openCard(id: Id | null): void;
   setFilters(patch: Partial<Filters>): void;
@@ -70,6 +73,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     dialog: null,
     view: persisted?.view ?? 'board',
     settingsTab: persisted?.settingsTab ?? 'columns',
+    settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     filters: EMPTY_FILTERS,
     selectedParentId: null,
@@ -95,6 +99,10 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       set({ view: 'settings', settingsTab, openCardId: null });
       persist(get());
     },
+    setSettingsNavCollapsed(settingsNavCollapsed) {
+      set({ settingsNavCollapsed });
+      persist(get());
+    },
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
     openCard(id) {
       set({ openCardId: id });
@@ -112,7 +120,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
 });
 
 function persist(s: BoardStore): void {
-  const ui: UiState = { view: s.view, settingsTab: s.settingsTab, openCardId: s.openCardId };
+  const ui: UiState = { view: s.view, settingsTab: s.settingsTab, settingsNavCollapsed: s.settingsNavCollapsed, openCardId: s.openCardId };
   setUiState(ui);
 }
 

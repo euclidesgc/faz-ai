@@ -64,6 +64,11 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   the red of Bug. In Configurações > Tipos de card, each type shows a preview of the card while you
   pick its color; if the color makes the text hard to read, a warning offers the same color darker
   and lighter, applied with one click. The warning also applies to the status colors in Aparência.
+- **Tidier settings**: each section has its title and main action on the same line. In **Tipos de
+  card**, the **Novo tipo** (new type) button at the top opens a row in the table, aligned with the
+  others, with the card preview (Enter adds, Esc cancels). Settings and the trash use the full width
+  of the screen, and the settings side menu collapses into an icon-only strip (the choice is
+  remembered).
 
 ## 0.29.1
 

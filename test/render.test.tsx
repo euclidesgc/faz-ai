@@ -165,6 +165,12 @@ describe('telas montam sem erro', () => {
 
   it('configurações', () => {
     expect(html(<Settings />)).toContain('Harness de IA');
+    // menu recolhido: só ícones, com o nome da seção no aria-label
+    useBoardStore.setState({ settingsNavCollapsed: true });
+    const collapsed = html(<Settings />);
+    expect(collapsed).toContain('settings-side collapsed');
+    expect(collapsed).toContain('aria-label="Harness de IA"');
+    useBoardStore.setState({ settingsNavCollapsed: false });
     for (const text of [
       'Worktree por história',
       'Nome da branch',
