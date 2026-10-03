@@ -533,12 +533,14 @@ machine, for example), they must be set up again:
 | `.claude/skills/publicar-extensao/` | the publishing walkthrough for the AI | copy the folder from the original machine |
 
 The last three are only needed to publish. `main` only accepts changes through pull requests, and
-the script already deals with that: `npm run release -- <patch|minor|major>` runs on a clean main,
-tests, packages, publishes to both stores and opens the `release/vX.Y.Z` PR with the new version
-(and the CHANGELOGs with "Unreleased" renamed to the version). You merge the PR and the script,
-which waits up to 30 minutes, creates the tag and the GitHub Release with the `.vsix`. If the merge
-takes longer, `npm run release -- finish` completes it later, without publishing again. `--dry-run`
-rehearses without publishing. The options are at the top of `scripts/release.mjs`.
+the script already deals with that: `npm run release -- <patch|minor|major>` starts from an
+up-to-date, clean main, runs the tests, creates the `release/vX.Y.Z` branch and, on it, sets the
+version and the CHANGELOGs ("Unreleased" becomes the version), commits and packages. It publishes to
+both stores, pushes the branch, opens the PR to main and, once the push is done, merges it (squash).
+Then it updates the local main, deletes the release branch (local and remote) and creates the tag
+and the GitHub Release with the `.vsix`. If anything stops after publishing,
+`npm run release -- finish` picks up where it left off (on the release branch or on main), without
+publishing again. `--dry-run` rehearses without publishing. The options are at the top of `scripts/release.mjs`.
 
 ## Version history
 

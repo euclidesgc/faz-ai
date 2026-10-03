@@ -7,11 +7,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
-- **Release without a direct push to `main`.** `npm run release` now publishes to the stores, opens
-  the version PR (`release/vX.Y.Z`, with "Unreleased" already renamed in the CHANGELOGs), waits for
-  the merge and only then creates the tag and the GitHub Release on the merged commit. Before, the
-  direct push was refused by the protected `main` and left a stray tag on the remote. The new
-  `npm run release -- finish` completes the tag and the GitHub Release after the merge, without
+- **Release without a direct push to `main`.** `npm run release` now creates the `release/vX.Y.Z`
+  branch from an up-to-date main and sets the version and the CHANGELOGs on it ("Unreleased" becomes
+  the version). After publishing to the stores, it pushes the branch, opens the PR and, once the
+  push is done, merges it by itself (squash), updates the local main, deletes the release branch
+  (local and remote) and creates the tag and the GitHub Release on the merged commit. Before, the
+  direct push was refused by the protected `main` and left a stray tag on the remote. If anything
+  stops after publishing, `npm run release -- finish` picks up where it left off, without
   publishing again.
 - **Default board in English.** With the interface in English, the names of the board the extension
   creates (the Stories and Sub-tasks workflows, columns such as Implementation, Acceptance and Done,
