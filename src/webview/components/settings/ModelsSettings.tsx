@@ -3,6 +3,7 @@ import { AI_TOOLS, type AiTool } from '../../../shared/harness';
 import { modelId, type ModelOption } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
+import { t } from '../../i18n';
 import { Button, Card, IconButton, TextField } from '@radix-ui/themes';
 import { FormField, IconPlus, IconTrash, SelectField } from '../ui';
 import { ModelRulesEditor } from './ModelRulesEditor';
@@ -53,35 +54,35 @@ function NewModelCard({
     if (e.key === 'Escape') onDone();
   };
   return (
-    <Card className="draft-card" aria-label="Modelo novo">
+    <Card className="draft-card" aria-label={t('Modelo novo')}>
       <div className="form-grid">
-        <FormField label="Nome">
+        <FormField label={t('Nome')}>
           {(id) => (
             <TextField.Root
               id={id}
               autoFocus
               value={draft.label}
-              placeholder="Ex.: Sonnet 5.5"
+              placeholder={t('Ex.: Sonnet 5.5')}
               onChange={(e) => set({ label: e.target.value })}
               onKeyDown={enter}
             />
           )}
         </FormField>
         <FormField
-          label="Identificador na ferramenta"
-          hint={draft.model.trim() && !ready ? 'Já existe um modelo com este identificador.' : undefined}
+          label={t('Identificador na ferramenta')}
+          hint={draft.model.trim() && !ready ? t('Já existe um modelo com este identificador.') : undefined}
         >
           {(id) => (
             <TextField.Root
               id={id}
               value={draft.model}
-              placeholder="identificador"
+              placeholder={t('identificador')}
               onChange={(e) => set({ model: e.target.value })}
               onKeyDown={enter}
             />
           )}
         </FormField>
-        <FormField label="Esforços aceitos" hint="Separados por vírgula; o primeiro é o padrão.">
+        <FormField label={t('Esforços aceitos')} hint={t('Separados por vírgula; o primeiro é o padrão.')}>
           {(id) => (
             <TextField.Root
               id={id}
@@ -95,10 +96,10 @@ function NewModelCard({
       </div>
       <div className="form-actions">
         <Button variant="soft" color="gray" onClick={onDone}>
-          Cancelar
+          {t('Cancelar')}
         </Button>
         <Button disabled={!ready} onClick={add}>
-          Adicionar
+          {t('Adicionar')}
         </Button>
       </div>
     </Card>
@@ -114,41 +115,48 @@ export function ModelsSettings() {
   const patchModel = (id: string, patch: Partial<ModelOption>) => setCatalog(catalog.map((o) => (o.id === id ? { ...o, ...patch } : o)));
 
   // o projeto trabalha com uma ferramenta por vez: só os modelos dela aparecem
-  const tools = AI_TOOLS.filter((t) => t.id === aiTool);
+  const tools = AI_TOOLS.filter((tl) => tl.id === aiTool);
 
   return (
     <div>
       <PageHeader
-        title="Modelos de IA"
+        title={t('Modelos de IA')}
         actions={
           <>
-            {tools.map((t) => (
-              <Button key={t.id} variant="soft" color="gray" title={`Fonte: ${SOURCES[t.id]}`} onClick={() => settings.detectModels(t.id)}>
-                Detectar modelos
+            {tools.map((tl) => (
+              <Button
+                key={tl.id}
+                variant="soft"
+                color="gray"
+                title={t('Fonte: {source}', { source: t(SOURCES[tl.id]) })}
+                onClick={() => settings.detectModels(tl.id)}
+              >
+                {t('Detectar modelos')}
               </Button>
             ))}
             <Button disabled={adding} onClick={() => setAdding(true)}>
-              <IconPlus /> Novo modelo
+              <IconPlus /> {t('Novo modelo')}
             </Button>
           </>
         }
       >
-        Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos
-        cards. A ferramenta é escolhida em Harness de IA.
+        {t(
+          'Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness de IA.',
+        )}
       </PageHeader>
 
-      {tools.map((t) => {
-        const mine = catalog.filter((o) => o.tool === t.id);
+      {tools.map((tl) => {
+        const mine = catalog.filter((o) => o.tool === tl.id);
         return (
           <SettingsCard
-            key={t.id}
-            title={t.label}
-            badge={{ text: `${mine.length} modelo(s)`, on: false }}
-            hint={`Ao detectar: ${SOURCES[t.id]}. Modelos que você acrescentou à mão são mantidos.`}
+            key={tl.id}
+            title={tl.label}
+            badge={{ text: t('{count} modelo(s)', { count: mine.length }), on: false }}
+            hint={t('Ao detectar: {source}. Modelos que você acrescentou à mão são mantidos.', { source: t(SOURCES[tl.id]) })}
           >
             {adding && (
               <NewModelCard
-                tool={t.id}
+                tool={tl.id}
                 taken={(id) => catalog.some((o) => o.id === id)}
                 onAdd={(m) => setCatalog([...catalog, m])}
                 onDone={() => setAdding(false)}
@@ -157,10 +165,10 @@ export function ModelsSettings() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Nome</th>
-                  <th>Identificador na ferramenta</th>
-                  <th>Esforços aceitos (separados por vírgula)</th>
-                  <th>Esforço padrão</th>
+                  <th>{t('Nome')}</th>
+                  <th>{t('Identificador na ferramenta')}</th>
+                  <th>{t('Esforços aceitos (separados por vírgula)')}</th>
+                  <th>{t('Esforço padrão')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -169,7 +177,7 @@ export function ModelsSettings() {
                   <tr key={o.id}>
                     <td>
                       <TextField.Root
-                        aria-label={`Nome de ${o.model}`}
+                        aria-label={t('Nome de {model}', { model: o.model })}
                         key={o.label}
                         defaultValue={o.label}
                         onBlur={(e) =>
@@ -183,10 +191,10 @@ export function ModelsSettings() {
                     </td>
                     <td>
                       <TextField.Root
-                        aria-label={`Esforços de ${o.model}`}
+                        aria-label={t('Esforços de {model}', { model: o.model })}
                         key={o.efforts.join()}
                         defaultValue={o.efforts.join(', ')}
-                        placeholder="sem ajuste de esforço"
+                        placeholder={t('sem ajuste de esforço')}
                         onBlur={(e) => {
                           const efforts = splitList(e.target.value);
                           if (efforts.join() !== o.efforts.join())
@@ -201,7 +209,7 @@ export function ModelsSettings() {
                     <td className="narrow">
                       {o.efforts.length > 0 && (
                         <SelectField
-                          aria-label={`Esforço padrão de ${o.model}`}
+                          aria-label={t('Esforço padrão de {model}', { model: o.model })}
                           options={o.efforts.map((e) => ({ value: e, label: e }))}
                           value={o.defaultEffort && o.efforts.includes(o.defaultEffort) ? o.defaultEffort : o.efforts[0]!}
                           onChange={(defaultEffort) => patchModel(o.id, { defaultEffort })}
@@ -213,8 +221,8 @@ export function ModelsSettings() {
                       <IconButton
                         variant="ghost"
                         color="red"
-                        title="Remover do catálogo"
-                        aria-label={`Remover ${o.model} do catálogo`}
+                        title={t('Remover do catálogo')}
+                        aria-label={t('Remover {model} do catálogo', { model: o.model })}
                         onClick={() => setCatalog(catalog.filter((x) => x.id !== o.id))}
                       >
                         <IconTrash />
@@ -225,7 +233,7 @@ export function ModelsSettings() {
                 {mine.length === 0 && (
                   <tr>
                     <td colSpan={5} className="muted">
-                      Nenhum modelo. Use "Detectar modelos" ou "Novo modelo".
+                      {t('Nenhum modelo. Use "Detectar modelos" ou "Novo modelo".')}
                     </td>
                   </tr>
                 )}

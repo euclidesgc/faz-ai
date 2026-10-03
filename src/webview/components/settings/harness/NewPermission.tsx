@@ -7,6 +7,7 @@ import { FormField, SelectField } from '../../ui';
 import { FormActions } from './FormActions';
 import { TargetPicker } from './TargetPicker';
 import { useTargetForm } from './useTargetForm';
+import { t } from '../../../i18n';
 
 /** Formulário de uma regra de permissão: o arquivo, a lista (permitir, perguntar, negar) e a regra. */
 export function NewPermission({ tool, targets, onClose }: { tool: AiTool; targets: PermissionTarget[]; onClose: () => void }) {
@@ -16,36 +17,36 @@ export function NewPermission({ tool, targets, onClose }: { tool: AiTool; target
   // cada arquivo tem suas listas: se a escolhida não existe no novo destino, vai a primeira dele
   const add = () =>
     submit(() => harness.addPermission(tool, source, target.lists.includes(list) ? list : target.lists[0]!, rule), {
-      title: 'Acrescentar regra na pasta do usuário?',
+      title: t('Acrescentar regra na pasta do usuário?'),
       message: target.label,
-      confirmLabel: 'Acrescentar',
+      confirmLabel: t('Acrescentar'),
     });
   return (
-    <Card className="draft-card" aria-label="Regra de permissão nova">
-      <TargetPicker label="Arquivo" targets={targets} value={source} onChange={setSource} />
-      <FormField label="Lista">
+    <Card className="draft-card" aria-label={t('Regra de permissão nova')}>
+      <TargetPicker label={t('Arquivo')} targets={targets} value={source} onChange={setSource} />
+      <FormField label={t('Lista')}>
         {(id) => (
           <SelectField
             id={id}
-            aria-label="Lista"
-            options={target.lists.map((l) => ({ value: l, label: `${PERMISSION_LIST_LABEL[l] ?? l} (${l})` }))}
+            aria-label={t('Lista')}
+            options={target.lists.map((l) => ({ value: l, label: `${t(PERMISSION_LIST_LABEL[l] ?? l)} (${l})` }))}
             value={list}
             onChange={setList}
           />
         )}
       </FormField>
-      <FormField label="Regra">
+      <FormField label={t('Regra')}>
         {(id) => (
           <TextField.Root
             id={id}
             value={rule}
             onChange={(e) => setRule(e.target.value)}
-            placeholder={tool === 'cursor' ? 'Ex.: Shell(git), Read(src/**)' : 'Ex.: Bash(npm run test *), Read(./.env)'}
+            placeholder={tool === 'cursor' ? t('Ex.: Shell(git), Read(src/**)') : t('Ex.: Bash(npm run test *), Read(./.env)')}
             spellCheck={false}
           />
         )}
       </FormField>
-      <FormActions label="Acrescentar regra" disabled={!rule.trim()} onSubmit={add} onCancel={onClose} />
+      <FormActions label={t('Acrescentar regra')} disabled={!rule.trim()} onSubmit={add} onCancel={onClose} />
     </Card>
   );
 }

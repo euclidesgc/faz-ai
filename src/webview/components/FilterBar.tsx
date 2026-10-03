@@ -1,6 +1,7 @@
 import { activeFilterCount, dateRange } from '../../shared/filters';
 import { useState } from 'react';
 import { useBoardStore } from '../store/boardStore';
+import { t } from '../i18n';
 import { ui } from '../commands';
 import { isWeb } from '../vscode';
 import { FilterPanel } from './FilterPanel';
@@ -28,18 +29,18 @@ export function FilterBar() {
 
   const chips: { key: string; label: string; clear(): void }[] = [];
   for (const id of filters.typeIds) {
-    const t = state.cardTypes.find((x) => x.id === id);
-    if (t)
+    const type = state.cardTypes.find((x) => x.id === id);
+    if (type)
       chips.push({
         key: `t${id}`,
-        label: `Tipo: ${t.name}`,
+        label: t('Tipo: {name}', { name: type.name }),
         clear: () => setFilters({ typeIds: filters.typeIds.filter((x) => x !== id) }),
       });
   }
   for (const [fieldId, values] of Object.entries(filters.fields)) {
     const f = state.fieldDefs.find((x) => x.id === fieldId);
     if (!f || !values.length) continue;
-    const shown = f.kind === 'checkbox' ? values.map((v) => (v === 'true' ? 'Sim' : 'Não')) : values;
+    const shown = f.kind === 'checkbox' ? values.map((v) => (v === 'true' ? t('Sim') : t('Não'))) : values;
     chips.push({
       key: `f${fieldId}`,
       label: `${f.name}: ${shown.join(', ')}`,
@@ -49,21 +50,27 @@ export function FilterBar() {
   if (dateRange(filters, Date.now())) {
     const name =
       filters.dateField === 'createdAt'
-        ? 'Criado'
+        ? t('Criado')
         : filters.dateField === 'updatedAt'
-          ? 'Atualizado'
-          : (state.fieldDefs.find((f) => f.id === filters.dateField)?.name ?? 'Data');
+          ? t('Atualizado')
+          : (state.fieldDefs.find((f) => f.id === filters.dateField)?.name ?? t('Data'));
     const when =
       filters.datePreset === 'custom'
-        ? [filters.dateFrom && `de ${filters.dateFrom}`, filters.dateTo && `até ${filters.dateTo}`].filter(Boolean).join(' ')
-        : PRESETS[filters.datePreset!];
+        ? [filters.dateFrom && t('de {date}', { date: filters.dateFrom }), filters.dateTo && t('até {date}', { date: filters.dateTo })]
+            .filter(Boolean)
+            .join(' ')
+        : t(PRESETS[filters.datePreset!]!);
     chips.push({ key: 'date', label: `${name}: ${when}`, clear: () => setFilters({ dateField: null, datePreset: null }) });
   }
   if (filters.relation !== 'any')
-    chips.push({ key: 'rel', label: RELATIONS[filters.relation]!, clear: () => setFilters({ relation: 'any' }) });
+    chips.push({ key: 'rel', label: t(RELATIONS[filters.relation]!), clear: () => setFilters({ relation: 'any' }) });
   if (filters.owner !== 'any')
-    chips.push({ key: 'owner', label: filters.owner === 'human' ? 'Com você' : 'Com a IA', clear: () => setFilters({ owner: 'any' }) });
-  if (parent) chips.push({ key: 'parent', label: `Sub-tarefas de: ${parent.title}`, clear: () => selectParent(null) });
+    chips.push({
+      key: 'owner',
+      label: filters.owner === 'human' ? t('Com você') : t('Com a IA'),
+      clear: () => setFilters({ owner: 'any' }),
+    });
+  if (parent) chips.push({ key: 'parent', label: t('Sub-tarefas de: {title}', { title: parent.title }), clear: () => selectParent(null) });
 
   return (
     <div className="filterbar">
@@ -71,8 +78,8 @@ export function FilterBar() {
         <TextField.Root
           className="search"
           type="search"
-          aria-label="Buscar"
-          placeholder="Buscar em título, descrição, conversa e campos…"
+          aria-label={t('Buscar')}
+          placeholder={t('Buscar em título, descrição, conversa e campos…')}
           value={filters.text}
           onChange={(e) => setFilters({ text: e.target.value })}
         />
@@ -80,18 +87,19 @@ export function FilterBar() {
           className={panelOpen ? 'active' : ''}
           aria-expanded={isWeb ? panelOpen : undefined}
           onClick={() => (isWeb ? setPanelOpen(!panelOpen) : ui.showFilters())}
-          title={isWeb ? 'Mostrar ou esconder os filtros' : 'Abrir os filtros na barra lateral'}
+          title={isWeb ? t('Mostrar ou esconder os filtros') : t('Abrir os filtros na barra lateral')}
         >
-          Filtros{count > 0 && ` (${count})`}
+          {t('Filtros')}
+          {count > 0 && ` (${count})`}
         </button>
         {chips.map((c) => (
-          <span key={c.key} className="filter-chip" onClick={c.clear} title="Remover este filtro">
+          <span key={c.key} className="filter-chip" onClick={c.clear} title={t('Remover este filtro')}>
             {c.label} <IconClose />
           </span>
         ))}
         {(count > 0 || parent) && (
           <button className="ghost" onClick={clearFilters}>
-            Limpar
+            {t('Limpar')}
           </button>
         )}
       </div>

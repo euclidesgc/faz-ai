@@ -6,6 +6,14 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Interface em português e em inglês.** Em Configurações → Aparência, o **Idioma** pode ser
+  **Automático** (segue o idioma do editor ou do navegador: inglês para qualquer `en`, português
+  para o resto), **Português (Brasil)** ou **English**. A interface inteira troca na hora: board,
+  card, filtros, chat, configurações e as mensagens de erro e aviso do board. Os nomes de comandos e
+  seções do editor (paleta de comandos e barra lateral) também seguem o idioma do editor. O que você
+  escreve (títulos, descrições, nomes) e o que é lido pela IA (instruções das fases, ferramentas MCP)
+  não é traduzido.
+
 - **Chat com a IA no board.** Uma conversa para criar, mover e vincular cards e consultar o board em
   linguagem natural: na barra lateral do editor (seção **Chat com a IA**, abaixo de Board e Filtros)
   e, no navegador, no botão **Chat** do topo. Dá para escolher o **modelo e o esforço** das próximas

@@ -1,22 +1,23 @@
 import type { FieldDisplay, FieldKind, FieldValue } from '../../../../shared/model';
+import { t } from '../../../i18n';
 
 /** Cada tipo de campo com o nome na tela, o que ele guarda e um valor de exemplo para a prévia. */
 export const FIELD_KINDS: { value: FieldKind; label: string; hint: string; sample: (options: string[]) => FieldValue }[] = [
-  { value: 'text', label: 'Texto', hint: 'Uma linha de texto livre.', sample: () => 'Texto de exemplo' },
+  { value: 'text', label: 'Texto', hint: 'Uma linha de texto livre.', sample: () => t('Texto de exemplo') },
   { value: 'number', label: 'Número', hint: 'Um número, como pontos ou horas.', sample: () => 3 },
   { value: 'date', label: 'Data', hint: 'Uma data, como um prazo.', sample: () => new Date().toISOString().slice(0, 10) },
-  { value: 'url', label: 'Link', hint: 'Um endereço, com um botão para abrir.', sample: () => 'https://exemplo.com' },
+  { value: 'url', label: 'Link', hint: 'Um endereço, com um botão para abrir.', sample: () => t('https://exemplo.com') },
   {
     value: 'select',
     label: 'Seleção',
     hint: 'Uma opção de uma lista que você define.',
-    sample: (o) => o[0] ?? 'Opção',
+    sample: (o) => o[0] ?? t('Opção'),
   },
   {
     value: 'multiselect',
     label: 'Múltipla seleção',
     hint: 'Várias opções de uma lista que você define, como tags.',
-    sample: (o) => (o.length ? o.slice(0, 2) : ['Opção 1', 'Opção 2']),
+    sample: (o) => (o.length ? o.slice(0, 2) : [t('Opção 1'), t('Opção 2')]),
   },
   {
     value: 'checkbox',

@@ -5,6 +5,7 @@ import { CARD_STATUSES, OWNER_LABEL, statusInfo, type CardStatus } from '../../s
 import { aiToolInfo } from '../../shared/harness';
 import { columnOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
+import { t } from '../i18n';
 import { ai, cards } from '../commands';
 import { renderMarkdown } from './MarkdownEditor';
 import { TextArea } from '@radix-ui/themes';
@@ -21,12 +22,16 @@ export function StatusBadge({ status, reason }: { status: CardStatus; reason?: s
   const style = useBoardStore((s) => s.state)!.board.appearance.statuses[status];
   const info = statusInfo(status);
   const Owner = info.owner === 'ai' ? IconAi : IconHuman;
-  const owner = `Pendência ${OWNER_LABEL[info.owner]}`;
+  const owner = t('Pendência {owner}', { owner: t(OWNER_LABEL[info.owner]) });
   return (
-    <span className="status-badge" style={badgeStyle(style.color)} title={[`${info.hint}. ${owner}.`, reason].filter(Boolean).join('\n')}>
+    <span
+      className="status-badge"
+      style={badgeStyle(style.color)}
+      title={[`${t(info.hint)}. ${owner}.`, reason].filter(Boolean).join('\n')}
+    >
       <Owner />
       <span className="sr-only">{owner}: </span>
-      {style.label}
+      {t(style.label)}
     </span>
   );
 }
@@ -60,67 +65,73 @@ export function StatusBar({ card }: { card: Card }) {
         {card.status ? (
           <StatusBadge status={card.status} />
         ) : (
-          <span className="muted small">{column?.aiActive ? 'Sem status' : 'A IA não atua nesta coluna'}</span>
+          <span className="muted small">{column?.aiActive ? t('Sem status') : t('A IA não atua nesta coluna')}</span>
         )}
         <span className="spacer" />
         {card.status === 'waiting_review' && (
           <>
             <Button
               variant="primary"
-              title="A IA move o card para a próxima coluna na próxima vez que trabalhar"
+              title={t('A IA move o card para a próxima coluna na próxima vez que trabalhar')}
               onClick={() => set('approved')}
             >
-              Aprovar
+              {t('Aprovar')}
             </Button>
             <Button
-              onClick={() => start({ status: 'ready', title: 'O que precisa ser ajustado?', confirm: 'Pedir ajustes', required: true })}
+              onClick={() =>
+                start({ status: 'ready', title: t('O que precisa ser ajustado?'), confirm: t('Pedir ajustes'), required: true })
+              }
             >
-              Pedir ajustes
+              {t('Pedir ajustes')}
             </Button>
           </>
         )}
         {card.status === 'blocked' && (
           <Button variant="primary" onClick={() => set('ready')}>
-            Desbloquear
+            {t('Desbloquear')}
           </Button>
         )}
         {running ? (
-          <Button title={`Interrompe o ${toolLabel}; o status volta ao que era`} onClick={() => ai.stop(card.id)}>
-            <span className="spinner" /> Parar a IA
+          <Button title={t('Interrompe o {tool}; o status volta ao que era', { tool: toolLabel })} onClick={() => ai.stop(card.id)}>
+            <span className="spinner" /> {t('Parar a IA')}
           </Button>
         ) : (
           <Button
             disabled={!!state.aiRunUnsupported}
             title={
-              state.aiRunUnsupported ?? `Roda o ${toolLabel} em segundo plano para trabalhar neste card. A resposta chega na conversa.`
+              state.aiRunUnsupported
+                ? t(state.aiRunUnsupported)
+                : t('Roda o {tool} em segundo plano para trabalhar neste card. A resposta chega na conversa.', { tool: toolLabel })
             }
             onClick={() => ai.run(card.id)}
           >
-            <IconRun /> Chamar IA
+            <IconRun /> {t('Chamar IA')}
           </Button>
         )}
         {card.status !== 'blocked' && (
           <Button
             variant="ghost"
             size="small"
-            onClick={() => start({ status: 'blocked', title: 'O que está impedindo o trabalho?', confirm: 'Bloquear', required: true })}
+            onClick={() =>
+              start({ status: 'blocked', title: t('O que está impedindo o trabalho?'), confirm: t('Bloquear'), required: true })
+            }
           >
-            Bloquear
+            {t('Bloquear')}
           </Button>
         )}
         <SelectField
           className="status-select"
-          aria-label="Status"
-          title="Mudar o status manualmente"
+          aria-label={t('Status')}
+          title={t('Mudar o status manualmente')}
           options={[
-            { value: NO_STATUS, label: 'Sem status' },
-            ...CARD_STATUSES.map((st) => ({ value: st.id, label: styles[st.id].label })),
+            { value: NO_STATUS, label: t('Sem status') },
+            ...CARD_STATUSES.map((st) => ({ value: st.id, label: t(styles[st.id].label) })),
           ]}
           value={card.status ?? NO_STATUS}
           onChange={(value) => {
             const next = value === NO_STATUS ? null : value;
             if (next === 'blocked')
-              start({ status: 'blocked', title: 'O que está impedindo o trabalho?', confirm: 'Bloquear', required: true });
+              start({ status: 'blocked', title: t('O que está impedindo o trabalho?'), confirm: t('Bloquear'), required: true });
             else set(next);
           }}
         />
@@ -133,12 +144,12 @@ export function StatusBar({ card }: { card: Card }) {
           <TextArea
             autoFocus
             rows={3}
-            placeholder={`${pending.title} O texto vai para a conversa do card.`}
+            placeholder={`${pending.title} ${t('O texto vai para a conversa do card.')}`}
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
           <div className="row end">
-            <Button onClick={() => setPending(null)}>Cancelar</Button>
+            <Button onClick={() => setPending(null)}>{t('Cancelar')}</Button>
             <Button variant="primary" disabled={pending.required && !note.trim()} onClick={confirm}>
               {pending.confirm}
             </Button>

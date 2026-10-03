@@ -1,5 +1,6 @@
 import { TextField } from '@radix-ui/themes';
 import { useBoardStore, type SettingsTab } from '../../store/boardStore';
+import { t } from '../../i18n';
 import { settings, ui } from '../../commands';
 import { WorkflowsSettings } from './workflows/WorkflowsSettings';
 import { TypesSettings } from './TypesSettings';
@@ -69,15 +70,15 @@ export function Settings() {
         <Button
           variant="icon"
           className="nav-toggle"
-          title={collapsed ? 'Expandir o menu' : 'Recolher o menu'}
-          aria-label={collapsed ? 'Expandir o menu' : 'Recolher o menu'}
+          title={collapsed ? t('Expandir o menu') : t('Recolher o menu')}
+          aria-label={collapsed ? t('Expandir o menu') : t('Recolher o menu')}
           aria-expanded={!collapsed}
           onClick={() => setCollapsed(!collapsed)}
         >
           {collapsed ? <IconPanelOpen /> : <IconPanelClose />}
         </Button>
         {!collapsed && (
-          <FormField label="Nome do board">
+          <FormField label={t('Nome do board')}>
             {(id) => (
               <TextField.Root
                 id={id}
@@ -93,9 +94,9 @@ export function Settings() {
             )}
           </FormField>
         )}
-        <nav className="tabs-vertical" aria-label="Seções das configurações">
+        <nav className="tabs-vertical" aria-label={t('Seções das configurações')}>
           {TABS.map(([id, label, Glyph]) => (
-            <Button key={id} active={tab === id} onClick={() => setTab(id)} {...navProps(collapsed, label, Glyph)} />
+            <Button key={id} active={tab === id} onClick={() => setTab(id)} {...navProps(collapsed, t(label), Glyph)} />
           ))}
         </nav>
         <div className="settings-side-actions">
@@ -104,29 +105,34 @@ export function Settings() {
               variant="primary"
               onClick={() =>
                 ask({
-                  title: 'Atualizar o board para o padrão atual?',
-                  message: `Nenhum card sai do lugar e o que você personalizou é mantido. O que muda: ${state.pendingUpgrade.join(' ')}`,
-                  confirmLabel: 'Atualizar board',
+                  title: t('Atualizar o board para o padrão atual?'),
+                  message: t('Nenhum card sai do lugar e o que você personalizou é mantido. O que muda: {changes}', {
+                    changes: state.pendingUpgrade.map((c) => t(c)).join(' '),
+                  }),
+                  confirmLabel: t('Atualizar board'),
                   onConfirm: () => settings.upgradeBoard(),
                 })
               }
-              {...navProps(collapsed, 'Atualizar board', IconUpgrade)}
-              title="Leva este board ao padrão atual da extensão, sem mover nenhum card"
+              {...navProps(collapsed, t('Atualizar board'), IconUpgrade)}
+              title={t('Leva este board ao padrão atual da extensão, sem mover nenhum card')}
             />
           )}
           <Button
             onClick={() => ui.connectAI()}
-            {...navProps(collapsed, 'Conectar IA (MCP)', IconConnect)}
-            title="Registra o board como servidor MCP para o Claude Code e outros clientes de IA"
+            {...navProps(collapsed, t('Conectar IA (MCP)'), IconConnect)}
+            title={t('Registra o board como servidor MCP para o Claude Code e outros clientes de IA')}
           />
           <DeleteButton
             variant="ghost"
-            question="Recriar o board do zero?"
-            message={`Todos os ${state.cards.length} card(s), conversas, anexos e configurações deste board serão apagados, e o board volta ao padrão. Isso não pode ser desfeito. Regras e skills do projeto não são afetadas.`}
-            confirmLabel="Apagar tudo e recriar"
+            question={t('Recriar o board do zero?')}
+            message={t(
+              'Todos os {count} card(s), conversas, anexos e configurações deste board serão apagados, e o board volta ao padrão. Isso não pode ser desfeito. Regras e skills do projeto não são afetadas.',
+              { count: state.cards.length },
+            )}
+            confirmLabel={t('Apagar tudo e recriar')}
             onConfirm={() => settings.resetBoard()}
-            {...navProps(collapsed, 'Recriar board padrão', IconReset)}
-            title="Apaga todos os cards e configurações e recria o board com o padrão atual"
+            {...navProps(collapsed, t('Recriar board padrão'), IconReset)}
+            title={t('Apaga todos os cards e configurações e recria o board com o padrão atual')}
           />
         </div>
       </div>

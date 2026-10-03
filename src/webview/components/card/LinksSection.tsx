@@ -6,6 +6,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { links } from '../../commands';
 import { Button as RxButton, IconButton, TextField } from '@radix-ui/themes';
 import { IconTrash, SelectField } from '../ui';
+import { t } from '../../i18n';
 
 type Relation = 'parent' | 'child' | 'related';
 const RELATIONS: { value: Relation; label: string }[] = [
@@ -49,8 +50,8 @@ export function LinksSection({ card }: { card: Card }) {
         variant="ghost"
         color="red"
         size="1"
-        title="Remover o vínculo"
-        aria-label={`Remover o vínculo com ${cardRef(c)}`}
+        title={t('Remover o vínculo')}
+        aria-label={t('Remover o vínculo com {card}', { card: cardRef(c) })}
         onClick={() => remove(c.id)}
       >
         <IconTrash />
@@ -68,29 +69,35 @@ export function LinksSection({ card }: { card: Card }) {
     );
 
   return (
-    <section className="drawer-section" aria-label="Vínculos">
+    <section className="drawer-section" aria-label={t('Vínculos')}>
       <div className="section-head">
         <h3>
-          Vínculos <small>{total}</small>
+          {t('Vínculos')} <small>{total}</small>
         </h3>
       </div>
-      {total === 0 && <p className="muted small">Este card não está vinculado a nenhum outro.</p>}
-      {group('Pai', linked.parents)}
-      {group('Filhos', linked.children, `${progress.done}/${progress.total} encerrados`)}
-      {group('Relativos', linked.related)}
+      {total === 0 && <p className="muted small">{t('Este card não está vinculado a nenhum outro.')}</p>}
+      {group(t('Pai'), linked.parents)}
+      {group(t('Filhos'), linked.children, t('{done}/{total} encerrados', { done: progress.done, total: progress.total }))}
+      {group(t('Relativos'), linked.related)}
       <div className="link-add">
-        <SelectField<Relation> size="1" aria-label="Tipo de vínculo" options={RELATIONS} value={relation} onChange={setRelation} />
+        <SelectField<Relation>
+          size="1"
+          aria-label={t('Tipo de vínculo')}
+          options={RELATIONS.map((r) => ({ ...r, label: t(r.label) }))}
+          value={relation}
+          onChange={setRelation}
+        />
         <TextField.Root
           className="grow"
-          aria-label="Buscar card para vincular"
-          placeholder="Buscar card por número ou título…"
+          aria-label={t('Buscar card para vincular')}
+          placeholder={t('Buscar card por número ou título…')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
-      {q && found.length === 0 && <p className="muted small">Nenhum card disponível com "{query.trim()}".</p>}
+      {q && found.length === 0 && <p className="muted small">{t('Nenhum card disponível com "{query}".', { query: query.trim() })}</p>}
       {found.length > 0 && (
-        <ul className="link-results" aria-label="Cards encontrados">
+        <ul className="link-results" aria-label={t('Cards encontrados')}>
           {found.map((c) => (
             <li key={c.id}>
               <RxButton

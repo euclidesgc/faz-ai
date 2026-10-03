@@ -3,6 +3,7 @@ import type { Card } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { SelectField } from '../ui';
+import { t } from '../../i18n';
 
 /** O Select do Radix não aceita valor vazio: "o agente da fase" usa este. */
 const FROM_PHASE = '__phase';
@@ -19,13 +20,16 @@ export function AgentBar({ card }: { card: Card }) {
   return (
     <div
       className="drawer-workspace"
-      title="O que a sessão de IA usa para trabalhar neste card: skills, servidores MCP, ferramentas e modelo"
+      title={t('O que a sessão de IA usa para trabalhar neste card: skills, servidores MCP, ferramentas e modelo')}
     >
-      <span>Agente</span>
+      <span>{t('Agente')}</span>
       <SelectField
-        aria-label="Agente"
+        aria-label={t('Agente')}
         options={[
-          { value: FROM_PHASE, label: `Da fase${inherited ? ` (${inherited.name})` : ' (nenhum)'}` },
+          {
+            value: FROM_PHASE,
+            label: inherited ? t('Da fase ({name})', { name: inherited.name }) : t('Da fase (nenhum)'),
+          },
           ...profiles.map((p) => ({ value: p.id, label: p.name })),
         ]}
         value={card.execProfile ?? FROM_PHASE}
@@ -34,11 +38,15 @@ export function AgentBar({ card }: { card: Card }) {
       {manifest.profile && (
         <span className="muted small">
           {[
-            manifest.agent && `subagente ${manifest.agent}`,
-            manifest.skills.length && `skills: ${manifest.skills.join(', ')}`,
-            manifest.mcpServers && `MCP: board${manifest.mcpServers.length ? ` + ${manifest.mcpServers.join(', ')}` : ''}`,
-            manifest.model && `modelo ${manifest.model.name}${manifest.model.effort ? ` · ${manifest.model.effort}` : ''}`,
-            manifest.clean && 'sessão limpa',
+            manifest.agent && t('subagente {name}', { name: manifest.agent }),
+            manifest.skills.length && t('skills: {list}', { list: manifest.skills.join(', ') }),
+            manifest.mcpServers &&
+              (manifest.mcpServers.length ? t('MCP: board + {list}', { list: manifest.mcpServers.join(', ') }) : t('MCP: board')),
+            manifest.model &&
+              (manifest.model.effort
+                ? t('modelo {name} · {effort}', { name: manifest.model.name, effort: manifest.model.effort })
+                : t('modelo {name}', { name: manifest.model.name })),
+            manifest.clean && t('sessão limpa'),
           ]
             .filter(Boolean)
             .join(' · ')}

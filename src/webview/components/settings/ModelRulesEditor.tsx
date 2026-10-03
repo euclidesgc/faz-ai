@@ -1,17 +1,11 @@
 import { useState } from 'react';
+import { modelDisplay } from '../../modelText';
 import { aiToolInfo } from '../../../shared/harness';
-import {
-  EFFORT_FIELD,
-  TYPE_CONDITION,
-  describeRule,
-  modelDisplay,
-  modelValue,
-  type ModelRule,
-  type RuleCondition,
-} from '../../../shared/models';
+import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelValue, type ModelRule, type RuleCondition } from '../../../shared/models';
 import type { BoardState } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
+import { t } from '../../i18n';
 import { ModelEditor } from '../FieldRenderer';
 import { Button, Card, IconButton, Switch, TextField } from '@radix-ui/themes';
 import { FormField, IconArrowDown, IconArrowUp, IconClose, IconEdit, IconPlus, IconTrash, SelectField } from '../ui';
@@ -30,14 +24,14 @@ const newId = (): string => Math.random().toString(36).slice(2) + Date.now().toS
 /** O que pode ser usado numa condição: o tipo do card e os campos de opções fixas. */
 function sources(state: BoardState): { id: string; name: string; values: string[] }[] {
   return [
-    { id: TYPE_CONDITION, name: 'Tipo do card', values: state.cardTypes.map((t) => t.name) },
+    { id: TYPE_CONDITION, name: t('Tipo do card'), values: state.cardTypes.map((ct) => ct.name) },
     ...state.fieldDefs
       .filter((f) => f.kind === 'select' || f.kind === 'multiselect' || f.kind === 'checkbox')
       .map((f) => ({ id: f.id, name: f.name, values: f.kind === 'checkbox' ? ['true', 'false'] : f.options })),
   ];
 }
 
-const valueText = (v: string): string => (v === 'true' ? 'Sim' : v === 'false' ? 'Não' : v);
+const valueText = (v: string): string => (v === 'true' ? t('Sim') : v === 'false' ? t('Não') : v);
 
 function ConditionRow({
   state,
@@ -56,17 +50,22 @@ function ConditionRow({
   return (
     <div className="row condition">
       <SelectField
-        aria-label="Campo da condição"
+        aria-label={t('Campo da condição')}
         options={[
-          ...(source ? [] : [{ value: condition.fieldId, label: '(campo apagado)' }]),
+          ...(source ? [] : [{ value: condition.fieldId, label: t('(campo apagado)') }]),
           ...all.map((s) => ({ value: s.id, label: s.name })),
         ]}
         value={condition.fieldId}
         onChange={(fieldId) => onChange({ ...condition, fieldId, value: all.find((s) => s.id === fieldId)?.values[0] ?? '' })}
       />
-      <SelectField aria-label="Operador" options={OPS} value={condition.op} onChange={(op) => onChange({ ...condition, op })} />
       <SelectField
-        aria-label="Valor da condição"
+        aria-label={t('Operador')}
+        options={OPS.map((o) => ({ ...o, label: t(o.label) }))}
+        value={condition.op}
+        onChange={(op) => onChange({ ...condition, op })}
+      />
+      <SelectField
+        aria-label={t('Valor da condição')}
         options={[
           ...(unknown ? [{ value: condition.value || EMPTY, label: valueText(condition.value) || '—' }] : []),
           ...(source?.values.map((v) => ({ value: v, label: valueText(v) })) ?? []),
@@ -74,7 +73,7 @@ function ConditionRow({
         value={condition.value || EMPTY}
         onChange={(value) => onChange({ ...condition, value: value === EMPTY ? '' : value })}
       />
-      <IconButton variant="ghost" color="gray" title="Remover a condição" aria-label="Remover a condição" onClick={onRemove}>
+      <IconButton variant="ghost" color="gray" title={t('Remover a condição')} aria-label={t('Remover a condição')} onClick={onRemove}>
         <IconClose />
       </IconButton>
     </div>
@@ -92,27 +91,27 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
   const valid = rule.groups.length > 0 && rule.groups.every((g) => g.length > 0 && g.every((c) => c.value !== '')) && rule.model !== '';
 
   return (
-    <Card className="draft-card rule-builder" aria-label="Regra de sugestão">
-      <FormField label="Nome da regra">
+    <Card className="draft-card rule-builder" aria-label={t('Regra de sugestão')}>
+      <FormField label={t('Nome da regra')}>
         {(id) => (
           <TextField.Root
             id={id}
             autoFocus
             value={rule.name}
-            placeholder="Ex.: Backend pesado"
+            placeholder={t('Ex.: Backend pesado')}
             onChange={(e) => setRule({ ...rule, name: e.target.value })}
           />
         )}
       </FormField>
 
-      <div className="muted small">Quando</div>
+      <div className="muted small">{t('Quando')}</div>
       {rule.groups.map((group, gi) => (
         <div key={gi}>
-          {gi > 0 && <div className="joiner or">OU</div>}
+          {gi > 0 && <div className="joiner or">{t('OU')}</div>}
           <div className="condition-group">
             {group.map((c, ci) => (
               <div key={ci}>
-                {ci > 0 && <div className="joiner">E</div>}
+                {ci > 0 && <div className="joiner">{t('E')}</div>}
                 <ConditionRow
                   state={state}
                   condition={c}
@@ -132,30 +131,30 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
               </div>
             ))}
             <Button variant="ghost" size="1" onClick={() => setGroup(gi, [...group, blank()])}>
-              + E (outra condição neste grupo)
+              {t('+ E (outra condição neste grupo)')}
             </Button>
           </div>
         </div>
       ))}
       <div>
         <Button variant="ghost" size="1" onClick={() => setRule({ ...rule, groups: [...rule.groups, [blank()]] })}>
-          + OU (grupo alternativo)
+          {t('+ OU (grupo alternativo)')}
         </Button>
       </div>
 
       <FormField
-        label="Sugerir"
-        hint={`${describeRule(state, rule)} → ${modelDisplay(state.board.modelCatalog, rule.model, true) || '(escolha um modelo)'}`}
+        label={t('Sugerir')}
+        hint={`${describeRule(state, rule)} → ${modelDisplay(state.board.modelCatalog, rule.model, true) || t('(escolha um modelo)')}`}
       >
         {() => <ModelEditor value={rule.model} onChange={(v) => setRule({ ...rule, model: typeof v === 'string' ? v : '' })} />}
       </FormField>
 
       <div className="form-actions">
         <Button variant="soft" color="gray" onClick={onCancel}>
-          Cancelar
+          {t('Cancelar')}
         </Button>
         <Button disabled={!valid} onClick={() => onSave(rule)}>
-          {state.board.modelRules.some((r) => r.id === rule.id) ? 'Salvar regra' : 'Adicionar à lista'}
+          {state.board.modelRules.some((r) => r.id === rule.id) ? t('Salvar regra') : t('Adicionar à lista')}
         </Button>
       </div>
     </Card>
@@ -198,26 +197,27 @@ export function ModelRulesEditor() {
   return (
     <div>
       <SectionHeader
-        title="Sugestão de modelo"
+        title={t('Sugestão de modelo')}
         actions={
           <>
             <Button
               variant="soft"
               color="gray"
               disabled={!hasEffort}
-              title={`Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do ${tool.label}`}
+              title={t('Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do {tool}', { tool: tool.label })}
               onClick={() => settings.suggestModelRules(aiTool)}
             >
-              Recriar as regras de "{EFFORT_FIELD}"
+              {t('Recriar as regras de "{field}"', { field: EFFORT_FIELD })}
             </Button>
             <Button disabled={!catalog.length || editing !== null} onClick={startNew}>
-              <IconPlus /> Montar nova regra
+              <IconPlus /> {t('Montar nova regra')}
             </Button>
           </>
         }
       >
-        Regras que sugerem um modelo a partir dos atributos do card. As regras são avaliadas de cima para baixo e a primeira ligada que casa
-        vence. O resultado é sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.
+        {t(
+          'Regras que sugerem um modelo a partir dos atributos do card. As regras são avaliadas de cima para baixo e a primeira ligada que casa vence. O resultado é sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.',
+        )}
       </SectionHeader>
 
       {editing && <RuleBuilder key={editing.id} initial={editing} onSave={save} onCancel={() => setEditing(null)} />}
@@ -226,9 +226,9 @@ export function ModelRulesEditor() {
         <thead>
           <tr>
             <th></th>
-            <th>Regra</th>
-            <th>Quando</th>
-            <th>Sugere</th>
+            <th>{t('Regra')}</th>
+            <th>{t('Quando')}</th>
+            <th>{t('Sugere')}</th>
             <th></th>
           </tr>
         </thead>
@@ -238,21 +238,21 @@ export function ModelRulesEditor() {
               <td className="narrow">
                 <Switch
                   size="1"
-                  title={r.enabled ? 'Regra em uso' : 'Regra desligada'}
-                  aria-label={`Regra ${r.name || i + 1} em uso`}
+                  title={r.enabled ? t('Regra em uso') : t('Regra desligada')}
+                  aria-label={t('Regra {name} em uso', { name: r.name || i + 1 })}
                   checked={r.enabled}
                   onCheckedChange={(enabled) => setRules(rules.map((x) => (x.id === r.id ? { ...x, enabled } : x)))}
                 />
               </td>
-              <td>{r.name || <span className="muted">(sem nome)</span>}</td>
+              <td>{r.name || <span className="muted">{t('(sem nome)')}</span>}</td>
               <td>{describeRule(state, r)}</td>
               <td>{modelDisplay(allModels, r.model, true)}</td>
               <td className="narrow">
                 <IconButton
                   variant="ghost"
                   color="gray"
-                  title="Subir (tem prioridade sobre as de baixo)"
-                  aria-label="Subir"
+                  title={t('Subir (tem prioridade sobre as de baixo)')}
+                  aria-label={t('Subir')}
                   disabled={i === 0}
                   onClick={() => move(i, -1)}
                 >
@@ -261,22 +261,22 @@ export function ModelRulesEditor() {
                 <IconButton
                   variant="ghost"
                   color="gray"
-                  title="Descer"
-                  aria-label="Descer"
+                  title={t('Descer')}
+                  aria-label={t('Descer')}
                   disabled={i === rules.length - 1}
                   onClick={() => move(i, 1)}
                 >
                   <IconArrowDown />
                 </IconButton>
-                <IconButton variant="ghost" color="gray" title="Editar" aria-label="Editar" onClick={() => setEditing(r)}>
+                <IconButton variant="ghost" color="gray" title={t('Editar')} aria-label={t('Editar')} onClick={() => setEditing(r)}>
                   <IconEdit />
                 </IconButton>
                 {/* sem confirmação de propósito: a regra pode ser remontada em segundos */}
                 <IconButton
                   variant="ghost"
                   color="red"
-                  title="Remover da lista"
-                  aria-label="Remover da lista"
+                  title={t('Remover da lista')}
+                  aria-label={t('Remover da lista')}
                   onClick={() => setRules(rules.filter((x) => x.id !== r.id))}
                 >
                   <IconTrash />
@@ -287,7 +287,7 @@ export function ModelRulesEditor() {
           {rules.length === 0 && (
             <tr>
               <td colSpan={5} className="muted">
-                Nenhuma regra na lista: o board não sugere modelo.
+                {t('Nenhuma regra na lista: o board não sugere modelo.')}
               </td>
             </tr>
           )}

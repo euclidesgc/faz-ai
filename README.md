@@ -34,6 +34,56 @@ os artefatos de cada fase e move os cards conforme avança.
 
 ![Board com histórias nas fases do SDD e sub-tarefas no workflow de baixo](docs/images/board.png)
 
+## Primeiros passos
+
+Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nela.
+
+1. **Instale e abra.** Instale **Faz AI Kanban** no VS Code ou no Cursor (pelo marketplace da
+   própria ferramenta), abra a pasta do seu projeto e clique no ícone **Faz AI** na barra lateral.
+   Cada pasta tem o seu board, já com as fases do fluxo.
+2. **Conecte a IA ao board.** Em **Configurações → Harness de IA**, escolha a ferramenta do projeto
+   (Claude Code, Codex, Cursor, Kimi Code ou GitHub Copilot) e clique em **Conectar IA (MCP)**. Na
+   aba **Do projeto**, clique em **Instalar skill do fluxo**: ela ensina a IA a conduzir as fases.
+3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
+   exemplo, "Login com Google") e dê Enter. Duplo clique abre o card: descreva o que você quer, em
+   Markdown, e, se quiser, escolha o modelo da IA e as skills que ela deve ler.
+4. **Deixe a IA começar.** Arraste o card para **Discovery** e clique em **Chamar IA** no card. A IA
+   lê o card pelo board, analisa o problema e conversa com você na aba **Conversa**. Quando termina,
+   o status muda para **Aguardando revisão**: é a sua vez.
+5. **Revise e siga.** Leia o documento da fase, responda ou clique em **Aprovar** (ou **Pedir
+   ajustes**). Com a aprovação, a história avança para **PRD**, **Spec**, **Plan** e
+   **Implementação**, sempre com a IA produzindo e você aprovando. As sub-tarefas da implementação
+   nascem no workflow de baixo e a IA as conclui uma a uma.
+
+Para o dia a dia: o contador **N com você** no topo mostra o que espera por você, o **Chat** deixa
+você pedir à IA, em linguagem natural, para criar e mover cards, e o **heartbeat** pode chamar a IA
+sozinho quando há pendência com ela.
+
+### Por que isso poupa contexto
+
+A IA gasta contexto com o que carrega em toda sessão. O board existe para ela carregar só o
+necessário, na hora certa:
+
+- **Cada card é uma sessão nova e curta.** Em vez de uma conversa longa que acumula tudo, a IA abre o
+  card pelo board (`get_card`), faz aquele trabalho e para. O histórico fica no card, e não na janela
+  de contexto.
+- **Skills só quando indicadas.** Uma skill automática põe a descrição dela em toda sessão; marcada
+  como **Só quando indicada**, ela só entra nos cards que a pedem. Em **Harness de IA → Tudo que a
+  ferramenta carrega**, o board mostra quantas skills são automáticas e quantos caracteres de
+  descrição elas colocam em toda sessão.
+- **Agentes que restringem.** Um agente pode liberar só alguns servidores MCP e ferramentas, e a
+  **sessão limpa** dispensa as personalizações da sua pasta de usuário: menos definições de
+  ferramentas carregadas sem necessidade (o que o Claude Code e o Cursor impõem por parâmetro está na
+  tabela de [Agentes](#agentes)).
+- **Documentos como anexos.** PRD, Spec e Plan ficam anexados à história; a IA os lê quando o card
+  precisa, em vez de recebê-los colados em cada mensagem.
+- **Modelo certo para cada tarefa.** Regras de sugestão e o modelo por card ou por agente evitam usar
+  o modelo mais caro onde o mais leve basta.
+
+A economia de contexto de skills sob demanda é documentada no Claude Code e no Cursor; nas outras
+ferramentas, a documentação diz só que a IA deixa de invocar a skill sozinha. O board não promete
+um percentual: ele mostra, no inventário, o que está sendo carregado.
+
 ## Para que serve
 
 - **Planejar em fases.** As colunas das histórias são as fases do fluxo: Backlog, Discovery, PRD,
@@ -127,7 +177,7 @@ o `faz-ai` do terminal avisa e não inicia.
 1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Codex,
    Cursor, Kimi Code ou GitHub Copilot).
 2. Clique em **Conectar IA (MCP)**. O board registra o servidor no arquivo que a ferramenta lê.
-3. Em **Harness de IA**, clique em **Instalar skill do fluxo**: ela ensina a IA a conduzir os cards
+3. Em **Harness de IA**, na aba **Do projeto**, clique em **Instalar skill do fluxo**: ela ensina a IA a conduzir os cards
    pelas fases, gerar os documentos, pedir revisão e retomar pendências. É um arquivo do projeto e
    pode ser editado.
 4. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
@@ -337,7 +387,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Harness de IA | Ferramenta do projeto, arquivo de regras, skills e agentes; execução pela conversa e heartbeat; tudo que cada ferramenta carrega, por escopo (ver [Harness de IA](#harness-de-ia)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
-| Aparência | Tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
+| Aparência | **Idioma** (automático, Português (Brasil) ou English), tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
 
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração
 local; nas outras, uma lista embutida que pode ser editada). As regras de sugestão combinam

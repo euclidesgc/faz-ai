@@ -1,11 +1,13 @@
 import { Checkbox, Select, TextField as RxTextField } from '@radix-ui/themes';
+import { modelDisplay } from '../modelText';
 import type { FieldDef, FieldValue } from '../../shared/model';
 import { AI_TOOLS } from '../../shared/harness';
-import { effortLabel, modelDisplay, modelValue, parseModelValue } from '../../shared/models';
+import { effortLabel, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
 import { ChipsEditor, IconExternal, SelectField, TextField } from './ui';
 import { isSkillsField } from './settings/fields/fieldKinds';
 import { SkillPicker } from './skills/SkillPicker';
+import { getLocale, t } from '../i18n';
 
 /** O campo tem algo para mostrar no card (checkbox desmarcado e lista vazia não contam). */
 export const hasValue = (value: FieldValue): value is NonNullable<FieldValue> =>
@@ -44,7 +46,7 @@ function format(field: FieldDef, v: string | number | boolean): string {
   if (field.kind === 'checkbox') return v ? field.name : '';
   if (field.kind === 'date' && typeof v === 'string') {
     const d = new Date(v);
-    return isNaN(d.getTime()) ? v : d.toLocaleDateString();
+    return isNaN(d.getTime()) ? v : d.toLocaleDateString(getLocale() === 'en' ? 'en-US' : undefined);
   }
   return String(v);
 }
@@ -63,7 +65,7 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
         <div className="row">
           <TextField value={(value as string) ?? ''} onCommit={(v) => onChange(v.trim() || null)} placeholder="https://" />
           {value && (
-            <a href={String(value)} target="_blank" rel="noreferrer" title="Abrir o link" aria-label="Abrir o link">
+            <a href={String(value)} target="_blank" rel="noreferrer" title={t('Abrir o link')} aria-label={t('Abrir o link')}>
               <IconExternal />
             </a>
           )}
@@ -130,15 +132,15 @@ export function ModelEditor({
         onChange(o ? modelValue(o.id, o.defaultEffort) : null);
       }}
     >
-      <Select.Trigger aria-label="Modelo" />
+      <Select.Trigger aria-label={t('Modelo')} />
       <Select.Content position="popper">
         <Select.Item value={NO_MODEL}>—</Select.Item>
-        {current && !option && <Select.Item value={current.id}>{current.id} (fora do catálogo)</Select.Item>}
-        {AI_TOOLS.filter((t) => catalog.some((o) => o.tool === t.id)).map((t) => (
-          <Select.Group key={t.id}>
-            <Select.Label>{t.label}</Select.Label>
+        {current && !option && <Select.Item value={current.id}>{t('{id} (fora do catálogo)', { id: current.id })}</Select.Item>}
+        {AI_TOOLS.filter((tl) => catalog.some((o) => o.tool === tl.id)).map((tl) => (
+          <Select.Group key={tl.id}>
+            <Select.Label>{tl.label}</Select.Label>
             {catalog
-              .filter((o) => o.tool === t.id)
+              .filter((o) => o.tool === tl.id)
               .map((o) => (
                 <Select.Item key={o.id} value={o.id}>
                   {o.label}
@@ -152,11 +154,11 @@ export function ModelEditor({
   const effortSelect =
     option && option.efforts.length > 0 ? (
       <Select.Root value={current?.effort ?? option.efforts[0]!} onValueChange={(effort) => onChange(modelValue(option.id, effort))}>
-        <Select.Trigger aria-label="Esforço do modelo" title="Esforço do modelo" />
+        <Select.Trigger aria-label={t('Esforço do modelo')} title={t('Esforço do modelo')} />
         <Select.Content position="popper">
           {option.efforts.map((e) => (
             <Select.Item key={e} value={e}>
-              {effortLabel(e)}
+              {t(effortLabel(e))}
             </Select.Item>
           ))}
         </Select.Content>
@@ -167,7 +169,7 @@ export function ModelEditor({
   if (part === 'effort')
     return (
       effortSelect ?? (
-        <span className="muted small">{option ? 'Este modelo não tem ajuste de esforço.' : 'Escolha um modelo primeiro.'}</span>
+        <span className="muted small">{option ? t('Este modelo não tem ajuste de esforço.') : t('Escolha um modelo primeiro.')}</span>
       )
     );
   return (

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { suggestSkills, skillCatalog, type CatalogSkill } from '../../../shared/skillCatalog';
 import { useBoardStore } from '../../store/boardStore';
 import { Badge, Button, Checkbox, Dialog, SegmentedControl, TextField } from '@radix-ui/themes';
+import { t } from '../../i18n';
 
 type Tab = 'all' | 'picked' | 'project' | 'user' | 'plugin' | 'suggested';
 
@@ -25,7 +26,7 @@ interface Props {
  * Escolha de skills para muitas opções: um resumo do que está marcado e uma janela com busca, abas
  * por origem e caixas de seleção. Substitui a parede de chips, que não escala com centenas de skills.
  */
-export function SkillPicker({ value, onChange, intent = '', title = 'Escolher skills' }: Props) {
+export function SkillPicker({ value, onChange, intent = '', title }: Props) {
   const state = useBoardStore((s) => s.state)!;
   const catalog = useMemo(() => skillCatalog(state), [state]);
   const [open, setOpen] = useState(false);
@@ -37,7 +38,7 @@ export function SkillPicker({ value, onChange, intent = '', title = 'Escolher sk
     ...catalog,
     ...value
       .filter((v) => !catalog.some((c) => c.name === v))
-      .map((name) => ({ name, description: 'Não encontrada no disco.', scope: 'user' as const })),
+      .map((name) => ({ name, description: t('Não encontrada no disco.'), scope: 'user' as const })),
   ];
   const suggested = useMemo(() => suggestSkills(intent, catalog), [intent, catalog]);
   const q = query.trim().toLowerCase();
@@ -50,7 +51,7 @@ export function SkillPicker({ value, onChange, intent = '', title = 'Escolher sk
           ? suggested.some((x) => x.name === k.name)
           : k.scope === tab;
   const rows = all.filter((k) => inTab(k) && (!q || k.name.toLowerCase().includes(q) || k.description.toLowerCase().includes(q)));
-  const count = (t: Tab) => (t === 'all' ? all.length : t === 'picked' ? value.length : all.filter((k) => k.scope === t).length);
+  const count = (tb: Tab) => (tb === 'all' ? all.length : tb === 'picked' ? value.length : all.filter((k) => k.scope === tb).length);
   const toggle = (name: string, on: boolean) => onChange(on ? [...value, name] : value.filter((v) => v !== name));
   const tabs: { id: Tab; label: string }[] = [
     { id: 'all', label: 'Todas' },
@@ -60,8 +61,8 @@ export function SkillPicker({ value, onChange, intent = '', title = 'Escolher sk
     { id: 'plugin', label: 'Plugins' },
     ...(suggested.length > 0 ? [{ id: 'suggested' as Tab, label: 'Sugeridas' }] : []),
   ];
-  const show = (t: Tab) => {
-    setTab(t);
+  const show = (tb: Tab) => {
+    setTab(tb);
     setQuery('');
     setOpen(true);
   };
@@ -69,7 +70,7 @@ export function SkillPicker({ value, onChange, intent = '', title = 'Escolher sk
   return (
     <div className="skill-picker">
       <div className="skill-summary">
-        {value.length === 0 && <span className="muted small">Nenhuma skill.</span>}
+        {value.length === 0 && <span className="muted small">{t('Nenhuma skill.')}</span>}
         {value.slice(0, SUMMARY).map((v) => (
           <Badge key={v} color="indigo" variant="soft">
             {v}
@@ -83,46 +84,46 @@ export function SkillPicker({ value, onChange, intent = '', title = 'Escolher sk
       </div>
       <div className="skill-actions">
         <Button variant="soft" color="gray" size="1" onClick={() => show('all')}>
-          Escolher skills ({all.length})
+          {t('Escolher skills ({n})', { n: all.length })}
         </Button>
         {suggested.length > 0 && (
           <Button
             variant="ghost"
             size="1"
-            title="Skills cujo nome ou descrição combinam com a intenção descrita"
+            title={t('Skills cujo nome ou descrição combinam com a intenção descrita')}
             onClick={() => show('suggested')}
           >
-            Sugerir pela intenção ({suggested.length})
+            {t('Sugerir pela intenção ({n})', { n: suggested.length })}
           </Button>
         )}
       </div>
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Content className="skill-dialog">
-          <Dialog.Title>{title}</Dialog.Title>
+          <Dialog.Title>{title ?? t('Escolher skills')}</Dialog.Title>
           <Dialog.Description size="2" color="gray">
-            A IA lê o arquivo de cada skill marcada ao executar. Busque pelo nome ou pela descrição.
+            {t('A IA lê o arquivo de cada skill marcada ao executar. Busque pelo nome ou pela descrição.')}
           </Dialog.Description>
           <TextField.Root
             autoFocus
             type="search"
-            aria-label="Buscar skill"
-            placeholder="Buscar por nome ou descrição…"
+            aria-label={t('Buscar skill')}
+            placeholder={t('Buscar por nome ou descrição…')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <SegmentedControl.Root size="1" value={tab} onValueChange={(t) => setTab(t as Tab)} aria-label="Origem das skills">
-            {tabs.map((t) => (
-              <SegmentedControl.Item key={t.id} value={t.id}>
-                {t.label} {t.id === 'suggested' ? suggested.length : count(t.id)}
+          <SegmentedControl.Root size="1" value={tab} onValueChange={(v) => setTab(v as Tab)} aria-label={t('Origem das skills')}>
+            {tabs.map((tb) => (
+              <SegmentedControl.Item key={tb.id} value={tb.id}>
+                {t(tb.label)} {tb.id === 'suggested' ? suggested.length : count(tb.id)}
               </SegmentedControl.Item>
             ))}
           </SegmentedControl.Root>
           {tab === 'suggested' && rows.length > 1 && (
             <Button variant="soft" size="1" onClick={() => onChange([...new Set([...value, ...rows.map((k) => k.name)])])}>
-              Marcar as {rows.length} sugeridas
+              {t('Marcar as {n} sugeridas', { n: rows.length })}
             </Button>
           )}
-          <ul className="skill-options" aria-label="Skills">
+          <ul className="skill-options" aria-label={t('Skills')}>
             {rows.slice(0, PAGE).map((k) => (
               <li key={k.name}>
                 <label className="skill-option">
@@ -131,7 +132,7 @@ export function SkillPicker({ value, onChange, intent = '', title = 'Escolher sk
                     <span className="item-title">
                       <span className="item-name">{k.name}</span>
                       <Badge color={k.scope === 'project' ? 'indigo' : 'gray'} variant={k.scope === 'project' ? 'solid' : 'outline'}>
-                        {k.plugin ?? SCOPE_LABEL[k.scope]}
+                        {k.plugin ?? t(SCOPE_LABEL[k.scope])}
                       </Badge>
                     </span>
                     {k.description && <span className="item-hint">{k.description}</span>}
@@ -139,21 +140,25 @@ export function SkillPicker({ value, onChange, intent = '', title = 'Escolher sk
                 </label>
               </li>
             ))}
-            {rows.length === 0 && <li className="muted small">Nenhuma skill {q ? `com "${query.trim()}"` : 'nesta aba'}.</li>}
+            {rows.length === 0 && (
+              <li className="muted small">
+                {q ? t('Nenhuma skill com "{query}".', { query: query.trim() }) : t('Nenhuma skill nesta aba.')}
+              </li>
+            )}
           </ul>
           {rows.length > PAGE && (
             <p className="muted small">
-              Mostrando {PAGE} de {rows.length}: refine a busca para ver as outras.
+              {t('Mostrando {shown} de {total}: refine a busca para ver as outras.', { shown: PAGE, total: rows.length })}
             </p>
           )}
           <div className="skill-footer">
-            <span className="muted small">{value.length} marcadas</span>
+            <span className="muted small">{t('{n} marcadas', { n: value.length })}</span>
             {value.length > 0 && (
               <Button variant="ghost" size="1" onClick={() => onChange([])}>
-                Limpar
+                {t('Limpar')}
               </Button>
             )}
-            <Button onClick={() => setOpen(false)}>Concluir</Button>
+            <Button onClick={() => setOpen(false)}>{t('Concluir')}</Button>
           </div>
         </Dialog.Content>
       </Dialog.Root>

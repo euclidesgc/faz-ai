@@ -4,6 +4,7 @@ import { toItemName } from '../../../../shared/harnessProject';
 import { FormField } from '../../ui';
 import { FormActions } from './FormActions';
 import type { Draft } from './useProjectEditing';
+import { t } from '../../../i18n';
 
 interface Props {
   title: string;
@@ -39,7 +40,7 @@ export function DraftForm({
 }: Props) {
   return (
     <Card className="draft-card" aria-label={title}>
-      <FormField label="Nome" hint={draft.name && !nameOk ? 'Nome inválido ou já usado.' : undefined}>
+      <FormField label={t('Nome')} hint={draft.name && !nameOk ? t('Nome inválido ou já usado.') : undefined}>
         {(id) => (
           <TextField.Root
             id={id}
@@ -62,7 +63,7 @@ export function DraftForm({
         )}
       </FormField>
       {children}
-      <FormField label="Instruções">
+      <FormField label={t('Instruções')}>
         {(id) => (
           <TextArea
             id={id}

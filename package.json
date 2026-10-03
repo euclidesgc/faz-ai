@@ -47,50 +47,50 @@
     "commands": [
       {
         "command": "fazai.openBoard",
-        "title": "Faz AI: Abrir Board",
+        "title": "%command.openBoard.title%",
         "icon": "$(project)"
       },
       {
         "command": "fazai.openInBrowser",
-        "title": "Faz AI: Abrir board no navegador",
+        "title": "%command.openInBrowser.title%",
         "icon": "$(globe)"
       },
       {
         "command": "fazai.refreshSidebar",
-        "title": "Faz AI: Atualizar",
+        "title": "%command.refreshSidebar.title%",
         "icon": "$(refresh)"
       },
       {
         "command": "fazai.openCard",
-        "title": "Faz AI: Abrir Card"
+        "title": "%command.openCard.title%"
       },
       {
         "command": "fazai.connectAI",
-        "title": "Faz AI: Conectar IA (MCP)",
+        "title": "%command.connectAI.title%",
         "icon": "$(plug)"
       },
       {
         "command": "fazai.upgradeBoard",
-        "title": "Faz AI: Atualizar board para o padrão atual"
+        "title": "%command.upgradeBoard.title%"
       },
       {
         "command": "fazai.heartbeat.runNow",
-        "title": "Faz AI: Rodar o heartbeat agora (tratar pendências com a IA)"
+        "title": "%command.heartbeat.runNow.title%"
       },
       {
         "command": "fazai.heartbeat.stop",
-        "title": "Faz AI: Parar as execuções da IA"
+        "title": "%command.heartbeat.stop.title%"
       },
       {
         "command": "fazai.showLog",
-        "title": "Faz AI: Mostrar o log das execuções"
+        "title": "%command.showLog.title%"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "fazai",
-          "title": "Faz AI",
+          "title": "%viewsContainer.fazai.title%",
           "icon": "media/kanban.svg"
         }
       ]
@@ -99,18 +99,18 @@
       "fazai": [
         {
           "id": "fazai.sidebar",
-          "name": "Board",
+          "name": "%view.sidebar.name%",
           "icon": "media/kanban.svg"
         },
         {
           "id": "fazai.filters",
-          "name": "Filtros",
+          "name": "%view.filters.name%",
           "type": "webview",
           "icon": "media/kanban.svg"
         },
         {
           "id": "fazai.chat",
-          "name": "Chat com a IA",
+          "name": "%view.chat.name%",
           "type": "webview",
           "icon": "media/kanban.svg"
         }
@@ -119,7 +119,7 @@
     "viewsWelcome": [
       {
         "view": "fazai.sidebar",
-        "contents": "Abra uma pasta para usar o board.\n[Abrir pasta](command:vscode.openFolder)",
+        "contents": "%viewsWelcome.sidebar.contents%",
         "when": "workbenchState == empty"
       }
     ],

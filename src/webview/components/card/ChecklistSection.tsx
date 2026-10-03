@@ -3,6 +3,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { checklist } from '../../commands';
 import { Checkbox } from '@radix-ui/themes';
 import { AddInput, Button, IconClose } from '../ui';
+import { t } from '../../i18n';
 
 /** Checklist do card: marcar, renomear, excluir e adicionar itens. */
 export function ChecklistSection({ cardId }: { cardId: string }) {
@@ -12,7 +13,7 @@ export function ChecklistSection({ cardId }: { cardId: string }) {
   return (
     <section className="drawer-section">
       <h3>
-        Checklist{' '}
+        {t('Checklist')}{' '}
         {items.length > 0 && (
           <small>
             {items.filter((i) => i.done).length}/{items.length}
@@ -23,7 +24,7 @@ export function ChecklistSection({ cardId }: { cardId: string }) {
         {items.map((item) => (
           <li key={item.id} className={item.done ? 'done' : ''}>
             <Checkbox
-              aria-label={`Concluir "${item.text}"`}
+              aria-label={t('Concluir "{text}"', { text: item.text })}
               checked={item.done}
               onCheckedChange={(v) => checklist.update(item.id, { done: v === true })}
             />
@@ -32,13 +33,13 @@ export function ChecklistSection({ cardId }: { cardId: string }) {
               defaultValue={item.text}
               onBlur={(e) => e.target.value !== item.text && checklist.update(item.id, { text: e.target.value })}
             />
-            <Button variant="icon" title="Remover o item" aria-label="Remover o item" onClick={() => checklist.delete(item.id)}>
+            <Button variant="icon" title={t('Remover o item')} aria-label={t('Remover o item')} onClick={() => checklist.delete(item.id)}>
               <IconClose />
             </Button>
           </li>
         ))}
       </ul>
-      <AddInput placeholder="+ Novo item (Enter)" onAdd={(text) => checklist.add(cardId, text)} />
+      <AddInput placeholder={t('+ Novo item (Enter)')} onAdd={(text) => checklist.add(cardId, text)} />
     </section>
   );
 }

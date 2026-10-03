@@ -5,6 +5,7 @@ import { useBoardStore } from '../../../store/boardStore';
 import { Button, TextField } from '@radix-ui/themes';
 import { DeleteButton, SelectField, SwitchField } from '../../ui';
 import { GLOBAL_WARNING } from './text';
+import { t } from '../../../i18n';
 
 const FOLDERS = SKILL_FOLDERS.map((x) => ({ value: x.id, label: `${x.label}/` }));
 
@@ -23,24 +24,29 @@ export function SkillFiles({ tool, skill, editable }: { tool: AiTool; skill: Har
       setName('');
     };
     if (skill.scope === 'user')
-      ask({ title: 'Criar arquivo numa skill da pasta do usuário?', message: GLOBAL_WARNING, confirmLabel: 'Criar', onConfirm: run });
+      ask({
+        title: t('Criar arquivo numa skill da pasta do usuário?'),
+        message: t(GLOBAL_WARNING),
+        confirmLabel: t('Criar'),
+        onConfirm: run,
+      });
     else run();
   };
   return (
     <div className="skill-files">
-      {files.length === 0 && <span className="muted small">Sem arquivos de apoio.</span>}
+      {files.length === 0 && <span className="muted small">{t('Sem arquivos de apoio.')}</span>}
       {files.map((f) => (
         <div key={f} className="row">
           <code>{f}</code>
           <span className="spacer" />
           <Button variant="ghost" size="1" onClick={() => harness.openSkillFile(tool, skill.path, f)}>
-            Abrir
+            {t('Abrir')}
           </Button>
           {editable && (
             <DeleteButton
-              title="Apagar o arquivo"
-              question={`Apagar "${f}"?`}
-              message={`O arquivo sai da skill "${skill.name}". Se o SKILL.md aponta para ele, ajuste o texto.`}
+              title={t('Apagar o arquivo')}
+              question={t('Apagar "{file}"?', { file: f })}
+              message={t('O arquivo sai da skill "{name}". Se o SKILL.md aponta para ele, ajuste o texto.', { name: skill.name })}
               onConfirm={() => harness.deleteSkillFile(tool, skill.path, f)}
             />
           )}
@@ -48,22 +54,22 @@ export function SkillFiles({ tool, skill, editable }: { tool: AiTool; skill: Har
       ))}
       {editable && (
         <div className="row">
-          <SelectField aria-label="Pasta do arquivo" options={FOLDERS} value={folder} onChange={setFolder} />
+          <SelectField aria-label={t('Pasta do arquivo')} options={FOLDERS} value={folder} onChange={setFolder} />
           <TextField.Root
-            aria-label="Nome do arquivo"
+            aria-label={t('Nome do arquivo')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="modelo-de-repositorio.ts"
             spellCheck={false}
           />
           <SwitchField
-            label="Citar no SKILL.md"
-            title="As ferramentas só leem um arquivo de apoio quando o SKILL.md aponta para ele"
+            label={t('Citar no SKILL.md')}
+            title={t('As ferramentas só leem um arquivo de apoio quando o SKILL.md aponta para ele')}
             checked={link}
             onChange={setLink}
           />
           <Button variant="soft" color="gray" disabled={!ok} onClick={create}>
-            Novo arquivo
+            {t('Novo arquivo')}
           </Button>
         </div>
       )}

@@ -1,12 +1,14 @@
+import { t, tn } from '../../i18n';
+
 /** O que a IA está fazendo por um card: nada (`null`), trabalhando nele, ou em sub-tarefas dele. */
 export type AiWork = { mode: 'self' } | { mode: 'children'; count: number } | null;
 
 const label = (work: AiWork): string =>
   !work
-    ? 'IA parada neste card'
+    ? t('IA parada neste card')
     : work.mode === 'self'
-      ? 'IA trabalhando neste card'
-      : `IA trabalhando em ${work.count} sub-tarefa${work.count > 1 ? 's' : ''} deste card`;
+      ? t('IA trabalhando neste card')
+      : tn(work.count, 'IA trabalhando em {n} sub-tarefa deste card', 'IA trabalhando em {n} sub-tarefas deste card');
 
 /**
  * LED da IA, sempre presente na barra do card: aceso e piscando devagar enquanto ela trabalha (no card ou

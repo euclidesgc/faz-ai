@@ -5,6 +5,7 @@ import { cardRef, type Card, type FieldDef } from '../../shared/model';
 import { statusInfo } from '../../shared/status';
 import { aiWorkingChildren, fieldsForType, isAiWorking, valueOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
+import { t } from '../i18n';
 import { FieldBadge, hasValue } from './FieldRenderer';
 import { IconParent } from './ui';
 import type { AiWork } from './cardView/AiLed';
@@ -67,7 +68,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         openCard(card.id);
       }}
       tabIndex={overlay ? undefined : 0}
-      title={overlay ? undefined : 'Dois cliques (ou Enter) abrem o card'}
+      title={overlay ? undefined : t('Dois cliques (ou Enter) abrem o card')}
     >
       <TitleBar card={card} type={type} work={work} overlay={overlay} />
       <div className="card-body">

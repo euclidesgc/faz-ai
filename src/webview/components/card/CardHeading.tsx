@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { cardRef, type Card } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
+import { t } from '../../i18n';
 
 /** Avisos de lixeira/arquivo, link para a história, id e título editável do card. */
 export function CardHeading({ card }: { card: Card }) {
@@ -20,19 +21,19 @@ export function CardHeading({ card }: { card: Card }) {
 
   return (
     <>
-      {trashed && <div className="banner warn">Este card está na lixeira.</div>}
-      {!trashed && archived && <div className="banner warn">Este card está arquivado.</div>}
+      {trashed && <div className="banner warn">{t('Este card está na lixeira.')}</div>}
+      {!trashed && archived && <div className="banner warn">{t('Este card está arquivado.')}</div>}
 
       {parent && (
         <div className="drawer-parent">
-          Sub-tarefa de{' '}
+          {t('Sub-tarefa de')}{' '}
           <a onClick={() => openCard(parent.id)}>
             {cardRef(parent)} {parent.title}
           </a>
         </div>
       )}
 
-      <div className="drawer-id" title="ID do card">
+      <div className="drawer-id" title={t('ID do card')}>
         {cardRef(card)}
       </div>
       <input

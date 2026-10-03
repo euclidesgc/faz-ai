@@ -1,10 +1,12 @@
 import type { Card, FieldValue } from '../../../shared/model';
-import { MODEL_EFFORT_LABEL, modelDisplay, suggestModel } from '../../../shared/models';
+import { modelDisplay } from '../../modelText';
+import { MODEL_EFFORT_LABEL, suggestModel } from '../../../shared/models';
 import { fieldsForType, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { FieldEditor, ModelEditor } from '../FieldRenderer';
 import { FieldRow } from '../ui';
+import { t } from '../../i18n';
 
 /** Campos personalizados que se aplicam ao tipo do card. */
 export function FieldsSection({ card }: { card: Card }) {
@@ -15,7 +17,7 @@ export function FieldsSection({ card }: { card: Card }) {
 
   return (
     <section className="drawer-section">
-      <h3>Campos</h3>
+      <h3>{t('Campos')}</h3>
       <div className="fields-grid">
         {fields.map((f) => {
           const value = valueOf(state, card.id, f.id);
@@ -33,21 +35,21 @@ export function FieldsSection({ card }: { card: Card }) {
               <FieldRow label={f.name}>
                 <ModelEditor part="model" value={value} onChange={set} />
               </FieldRow>
-              <FieldRow label={MODEL_EFFORT_LABEL}>
+              <FieldRow label={t(MODEL_EFFORT_LABEL)}>
                 <ModelEditor part="effort" value={value} onChange={set} />
               </FieldRow>
               {suggested && suggested !== value && (
                 <div className="field-row">
                   <span />
                   <span className="muted small suggestion">
-                    Sugerido pelas regras: {modelDisplay(state.board.modelCatalog, suggested, true)}{' '}
+                    {t('Sugerido pelas regras: {model}', { model: modelDisplay(state.board.modelCatalog, suggested, true) })}{' '}
                     <a
                       onClick={(e) => {
                         e.preventDefault();
                         set(suggested);
                       }}
                     >
-                      Usar
+                      {t('Usar')}
                     </a>
                   </span>
                 </div>

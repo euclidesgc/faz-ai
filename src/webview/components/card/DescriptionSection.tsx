@@ -1,6 +1,7 @@
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
 import { Button } from '../ui';
 import type { DescriptionDraft } from './useDescriptionDraft';
+import { t } from '../../i18n';
 
 /** Descrição em Markdown: lida renderizada, editada no editor ao clicar. */
 export function DescriptionSection({ draft }: { draft: DescriptionDraft }) {
@@ -9,10 +10,10 @@ export function DescriptionSection({ draft }: { draft: DescriptionDraft }) {
   return (
     <section className="drawer-section">
       <div className="section-head">
-        <h3>Descrição</h3>
+        <h3>{t('Descrição')}</h3>
         {!editing && (
           <Button variant="ghost" size="small" onClick={() => setEditing(true)}>
-            Editar
+            {t('Editar')}
           </Button>
         )}
         {editing && (
@@ -24,7 +25,7 @@ export function DescriptionSection({ draft }: { draft: DescriptionDraft }) {
               setEditing(false);
             }}
           >
-            Concluir
+            {t('Concluir')}
           </Button>
         )}
       </div>
@@ -35,14 +36,14 @@ export function DescriptionSection({ draft }: { draft: DescriptionDraft }) {
           value={desc}
           onChange={setDesc}
           onCommit={save}
-          placeholder="Descreva o problema, o contexto e o critério de aceite. Markdown suportado."
+          placeholder={t('Descreva o problema, o contexto e o critério de aceite. Markdown suportado.')}
         />
       ) : (
         <div
           className="markdown clickable"
           onClick={(e) => (e.target as HTMLElement).tagName !== 'A' && setEditing(true)}
           dangerouslySetInnerHTML={{
-            __html: desc.trim() ? renderMarkdown(desc) : '<p class="muted">Clique para adicionar uma descrição…</p>',
+            __html: desc.trim() ? renderMarkdown(desc) : `<p class="muted">${t('Clique para adicionar uma descrição…')}</p>`,
           }}
         />
       )}

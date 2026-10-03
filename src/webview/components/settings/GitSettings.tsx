@@ -1,6 +1,8 @@
 import { DEFAULT_GIT, MERGE_METHODS, WORKSPACE_MODES, branchName, type GitConfig } from '../../../shared/git';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
+import { t } from '../../i18n';
+import { rich } from '../../i18n/rich';
 import { Callout, Card, TextField } from '@radix-ui/themes';
 import { FormField, IconWarning, SelectField, SwitchField } from '../ui';
 import { SectionHeader } from './SectionHeader';
@@ -14,18 +16,18 @@ export function GitSettings() {
   return (
     <div>
       <PageHeader title="Git">
-        Cada história trabalha numa branch própria, criada pelo board com um nome previsível. As sub-tarefas fazem commits na branch da
-        história. A branch é criada quando a IA chama <code>prepare_workspace</code> (a fase de Implementação padrão pede isso) ou pelo
-        botão no card.
+        {rich(
+          'Cada história trabalha numa branch própria, criada pelo board com um nome previsível. As sub-tarefas fazem commits na branch da história. A branch é criada quando a IA chama <code>prepare_workspace</code> (a fase de Implementação padrão pede isso) ou pelo botão no card.',
+        )}
       </PageHeader>
 
       <Card className="form-card" aria-label="Branch e worktree">
-        <FormField label="Onde a IA mexe no código" hint={WORKSPACE_MODES.find((m) => m.value === git.mode)!.hint}>
+        <FormField label={t('Onde a IA mexe no código')} hint={t(WORKSPACE_MODES.find((m) => m.value === git.mode)!.hint)}>
           {(id) => (
             <SelectField
               id={id}
-              aria-label="Onde a IA mexe no código"
-              options={WORKSPACE_MODES}
+              aria-label={t('Onde a IA mexe no código')}
+              options={WORKSPACE_MODES.map((m) => ({ value: m.value, label: t(m.label) }))}
               value={git.mode}
               onChange={(mode) => set({ mode })}
             />
@@ -33,13 +35,13 @@ export function GitSettings() {
         </FormField>
 
         <FormField
-          label="Nome da branch"
-          hint={
-            <>
-              Aceita <code>{'{tipo}'}</code>, <code>{'{numero}'}</code> (obrigatório) e <code>{'{titulo}'}</code>. Exemplo:{' '}
-              <code>{branchName(git.branchPattern, { type: 'História', number: 12, title: 'Login com Google' })}</code>
-            </>
-          }
+          label={t('Nome da branch')}
+          hint={rich(
+            'Aceita <code>{tipo}</code>, <code>{numero}</code> (obrigatório) e <code>{titulo}</code>. Exemplo: <code>{exemplo}</code>',
+            {
+              exemplo: branchName(git.branchPattern, { type: t('História'), number: 12, title: t('Login com Google') }),
+            },
+          )}
         >
           {(id) => (
             <TextField.Root
@@ -54,14 +56,11 @@ export function GitSettings() {
         </FormField>
 
         <FormField
-          label="Pasta das worktrees"
-          hint={
-            <>
-              Relativa à pasta do projeto; <code>{'{repo}'}</code> é o nome dela. O padrão (<code>{DEFAULT_GIT.worktreeDir}</code>) fica ao
-              lado do projeto, fora do repositório. Cada worktree é uma cópia de trabalho: dependências (ex.: <code>node_modules</code>)
-              precisam ser instaladas nela.
-            </>
-          }
+          label={t('Pasta das worktrees')}
+          hint={rich(
+            'Relativa à pasta do projeto; <code>{repo}</code> é o nome dela. O padrão (<code>{padrao}</code>) fica ao lado do projeto, fora do repositório. Cada worktree é uma cópia de trabalho: dependências (ex.: <code>node_modules</code>) precisam ser instaladas nela.',
+            { padrao: DEFAULT_GIT.worktreeDir },
+          )}
         >
           {(id) => (
             <TextField.Root
@@ -76,14 +75,14 @@ export function GitSettings() {
         </FormField>
       </Card>
 
-      <SectionHeader title="Pull request e merge">
-        Na Homologação a IA abre o pull request da história e o registra no card. Com o merge automático ligado, quando você aprova uma
-        história que está na última coluna antes da conclusão, o board faz o merge do PR e só então conclui o card. Se o merge falhar
-        (conflito, checks obrigatórios, sem acesso), o card fica Bloqueado com o erro.
+      <SectionHeader title={t('Pull request e merge')}>
+        {t(
+          'Na Homologação a IA abre o pull request da história e o registra no card. Com o merge automático ligado, quando você aprova uma história que está na última coluna antes da conclusão, o board faz o merge do PR e só então conclui o card. Se o merge falhar (conflito, checks obrigatórios, sem acesso), o card fica Bloqueado com o erro.',
+        )}
       </SectionHeader>
-      <Card className="form-card" aria-label="Pull request e merge">
+      <Card className="form-card" aria-label={t('Pull request e merge')}>
         <SwitchField
-          label="Fazer o merge do PR ao aprovar a homologação"
+          label={t('Fazer o merge do PR ao aprovar a homologação')}
           checked={git.autoMerge}
           onChange={(autoMerge) => set({ autoMerge })}
         />
@@ -93,24 +92,21 @@ export function GitSettings() {
               <IconWarning />
             </Callout.Icon>
             <Callout.Text>
-              O merge é feito no GitHub com a sua conta (comando <code>gh</code>) e não pode ser desfeito pelo board.
+              {rich('O merge é feito no GitHub com a sua conta (comando <code>gh</code>) e não pode ser desfeito pelo board.')}
             </Callout.Text>
           </Callout.Root>
         )}
         <FormField
-          label="Tipo de merge"
-          hint={
-            <>
-              Requer o GitHub CLI (<code>gh</code>) instalado e autenticado. No modo worktree, a pasta de trabalho da história é removida
-              depois do merge; a branch fica.
-            </>
-          }
+          label={t('Tipo de merge')}
+          hint={rich(
+            'Requer o GitHub CLI (<code>gh</code>) instalado e autenticado. No modo worktree, a pasta de trabalho da história é removida depois do merge; a branch fica.',
+          )}
         >
           {(id) => (
             <SelectField
               id={id}
-              aria-label="Tipo de merge"
-              options={MERGE_METHODS}
+              aria-label={t('Tipo de merge')}
+              options={MERGE_METHODS.map((m) => ({ ...m, label: t(m.label) }))}
               disabled={!git.autoMerge}
               value={git.mergeMethod}
               onChange={(mergeMethod) => set({ mergeMethod })}

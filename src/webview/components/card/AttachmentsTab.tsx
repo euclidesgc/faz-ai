@@ -3,6 +3,7 @@ import { cardRef } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { attachments } from '../../commands';
 import { Button, DeleteButton } from '../ui';
+import { formatDateTime, t } from '../../i18n';
 
 export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
@@ -31,7 +32,7 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
   const addFiles = async (files: File[]) => {
     for (const file of files) {
       if (file.size > MAX_ATTACHMENT_BYTES) {
-        setError(`"${file.name}" tem mais de 20 MB e não foi anexado.`);
+        setError(t('"{name}" tem mais de 20 MB e não foi anexado.', { name: file.name }));
         continue;
       }
       attachments.addData({ cardId, filename: file.name || `colado-${Date.now()}.png`, base64: await toBase64(file) });
@@ -57,7 +58,7 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
       {parent && storyArtifacts.length > 0 && (
         <div className="story-artifacts">
           <h3>
-            Artefatos da história{' '}
+            {t('Artefatos da história')}{' '}
             <small>
               {cardRef(parent)} {parent.title}
             </small>
@@ -69,10 +70,12 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
                   {(a.filename.split('.').pop() ?? '').slice(0, 4).toUpperCase() || '?'}
                 </span>
                 <div className="att-info">
-                  <a title="Abre o documento anexado à história" onClick={() => attachments.open(a.id)}>
+                  <a title={t('Abre o documento anexado à história')} onClick={() => attachments.open(a.id)}>
                     {a.filename}
                   </a>
-                  <span className="muted small">anexado à história · {new Date(a.createdAt).toLocaleString()}</span>
+                  <span className="muted small">
+                    {t('anexado à história')} · {formatDateTime(a.createdAt)}
+                  </span>
                 </div>
               </li>
             ))}
@@ -93,12 +96,12 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
         }}
       >
         <Button variant="primary" onClick={() => attachments.pick(cardId)}>
-          Escolher arquivos…
+          {t('Escolher arquivos…')}
         </Button>
-        <span className="muted">ou arraste arquivos para cá (segure Shift ao soltar), ou cole uma imagem. Até 20 MB cada.</span>
+        <span className="muted">{t('ou arraste arquivos para cá (segure Shift ao soltar), ou cole uma imagem. Até 20 MB cada.')}</span>
       </div>
 
-      {cardAttachments.length === 0 && <p className="muted">Nenhum anexo.</p>}
+      {cardAttachments.length === 0 && <p className="muted">{t('Nenhum anexo.')}</p>}
       <ul className="attachments">
         {cardAttachments.map((a) => (
           <li key={a.id}>
@@ -117,22 +120,22 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
             <div className="att-info">
               <a onClick={() => attachments.open(a.id)}>{a.filename}</a>
               {a.artifact && (
-                <span className="badge artifact-badge" title="Documento de uma fase">
-                  artefato
+                <span className="badge artifact-badge" title={t('Documento de uma fase')}>
+                  {t('artefato')}
                 </span>
               )}
               <span className="muted small">
-                {formatSize(a.size)} · {new Date(a.createdAt).toLocaleString()}
+                {formatSize(a.size)} · {formatDateTime(a.createdAt)}
               </span>
             </div>
             <Button variant="ghost" size="small" onClick={() => attachments.reveal(a.id)}>
-              Mostrar na pasta
+              {t('Mostrar na pasta')}
             </Button>
             <DeleteButton
-              title="Remover anexo"
-              question={`Remover "${a.filename}"?`}
-              message="O arquivo anexado será apagado."
-              confirmLabel="Remover"
+              title={t('Remover anexo')}
+              question={t('Remover "{name}"?', { name: a.filename })}
+              message={t('O arquivo anexado será apagado.')}
+              confirmLabel={t('Remover')}
               onConfirm={() => attachments.delete(a.id)}
             />
           </li>

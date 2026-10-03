@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useBoardStore, type DialogSpec } from '../../store/boardStore';
 import { Button, type ButtonProps } from './Button';
 import { IconTrash } from './icons';
+import { t } from '../../i18n';
 
 interface Props extends Omit<ButtonProps, 'onClick' | 'danger' | 'children'> {
   /** título do diálogo de confirmação (ex.: `Apagar o tipo "Bug"?`) */
@@ -22,7 +23,7 @@ interface Props extends Omit<ButtonProps, 'onClick' | 'danger' | 'children'> {
 export function DeleteButton({
   question,
   message,
-  confirmLabel = 'Apagar',
+  confirmLabel,
   choices,
   onConfirm,
   variant = 'icon',
@@ -34,7 +35,7 @@ export function DeleteButton({
     <Button
       variant={variant}
       danger
-      onClick={() => ask({ title: question, message, confirmLabel, danger: true, choices, onConfirm })}
+      onClick={() => ask({ title: question, message, confirmLabel: confirmLabel ?? t('Apagar'), danger: true, choices, onConfirm })}
       {...rest}
     >
       {children}

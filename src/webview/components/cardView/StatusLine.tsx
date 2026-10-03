@@ -1,5 +1,6 @@
 import type { Card } from '../../../shared/model';
 import { timeAgo } from '../../../shared/time';
+import { formatDateTime, t } from '../../i18n';
 import { useNow } from '../../useNow';
 import { StatusBadge } from '../StatusBar';
 
@@ -11,7 +12,7 @@ export function StatusLine({ card }: { card: Card }) {
     <div className="card-status">
       <StatusBadge status={card.status} reason={card.status === 'blocked' ? card.statusReason : undefined} />
       {card.statusAt !== null && (
-        <span className="card-status-age" title={`Desde ${new Date(card.statusAt).toLocaleString()}`}>
+        <span className="card-status-age" title={t('Desde {date}', { date: formatDateTime(card.statusAt) })}>
           {timeAgo(card.statusAt, now)}
         </span>
       )}

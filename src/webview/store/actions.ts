@@ -2,17 +2,16 @@ import type { Card, Column, Id } from '../../shared/model';
 import { childrenToCancel, dependents, parentToComplete } from '../../shared/cascade';
 import { linkedParentsToComplete } from '../../shared/links';
 import { cards } from '../commands';
+import { t, tn } from '../i18n';
 import { useBoardStore } from './boardStore';
-
-const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
 /** Frase "Junto vão: 3 sub-tarefas e 2 anexos." ou '' se não houver nada. */
 function alongWith(children: number, attachments: number): string {
   const parts = [
-    children ? plural(children, 'sub-tarefa', 'sub-tarefas') : '',
-    attachments ? plural(attachments, 'anexo', 'anexos') : '',
+    children ? tn(children, '{n} sub-tarefa', '{n} sub-tarefas') : '',
+    attachments ? tn(attachments, '{n} anexo', '{n} anexos') : '',
   ].filter(Boolean);
-  return parts.join(' e ');
+  return parts.length === 2 ? t('{a} e {b}', { a: parts[0]!, b: parts[1]! }) : (parts[0] ?? '');
 }
 
 /**
@@ -30,11 +29,13 @@ export function requestMove(cardId: Id, columnId: Id, position: number): void {
   if (open.length && state!.board.rules.onCancelParent === 'cascade') return cards.move(cardId, columnId, position, true);
   if (open.length) {
     ask({
-      title: `Cancelar "${card.title}"?`,
-      message: `Esta história tem ${plural(open.length, 'sub-tarefa em aberto', 'sub-tarefas em aberto')}. Quer cancelar as sub-tarefas também? Elas vão para a coluna de cancelamento das sub-tarefas.`,
-      cancelLabel: 'Voltar',
-      secondary: { label: 'Cancelar só a história', onClick: () => cards.move(cardId, columnId, position) },
-      confirmLabel: `Cancelar história e ${plural(open.length, 'sub-tarefa', 'sub-tarefas')}`,
+      title: t('Cancelar "{title}"?', { title: card.title }),
+      message: t('Esta história tem {open}. Quer cancelar as sub-tarefas também? Elas vão para a coluna de cancelamento das sub-tarefas.', {
+        open: tn(open.length, '{n} sub-tarefa em aberto', '{n} sub-tarefas em aberto'),
+      }),
+      cancelLabel: t('Voltar'),
+      secondary: { label: t('Cancelar só a história'), onClick: () => cards.move(cardId, columnId, position) },
+      confirmLabel: t('Cancelar história e {tasks}', { tasks: tn(open.length, '{n} sub-tarefa', '{n} sub-tarefas') }),
       danger: true,
       onConfirm: () => cards.move(cardId, columnId, position, true),
     });
@@ -58,13 +59,22 @@ function offerToCompleteParent(child: Card, target: Column): void {
   const [{ parent, column }] = candidates as [(typeof candidates)[number]];
   const names = candidates.map((c) => `"${c.parent.title}"`).join(', ');
   ask({
-    title: structural ? 'Todas as sub-tarefas foram concluídas' : 'Todos os filhos vinculados foram concluídos',
+    title: structural ? t('Todas as sub-tarefas foram concluídas') : t('Todos os filhos vinculados foram concluídos'),
     message:
       candidates.length === 1
-        ? `"${parent.title}" não tem mais ${structural ? 'sub-tarefas' : 'filhos'} em aberto. Quer mover ${structural ? 'a história' : 'o card'} para "${column.name}" também?`
-        : `Não restam filhos em aberto em ${names}. Quer mover esses cards para a coluna de conclusão também?`,
-    cancelLabel: 'Agora não',
-    confirmLabel: candidates.length === 1 ? `Mover para "${column.name}"` : `Mover ${candidates.length} cards`,
+        ? structural
+          ? t('"{parent}" não tem mais sub-tarefas em aberto. Quer mover a história para "{column}" também?', {
+              parent: parent.title,
+              column: column.name,
+            })
+          : t('"{parent}" não tem mais filhos em aberto. Quer mover o card para "{column}" também?', {
+              parent: parent.title,
+              column: column.name,
+            })
+        : t('Não restam filhos em aberto em {names}. Quer mover esses cards para a coluna de conclusão também?', { names }),
+    cancelLabel: t('Agora não'),
+    confirmLabel:
+      candidates.length === 1 ? t('Mover para "{column}"', { column: column.name }) : t('Mover {n} cards', { n: candidates.length }),
     onConfirm: complete,
   });
 }
@@ -73,18 +83,25 @@ function offerToCompleteParent(child: Card, target: Column): void {
 const REMOVALS = {
   trash: {
     rule: 'confirmTrash',
-    verb: 'Excluir',
+    title: (name: string) => t('Excluir "{title}"?', { title: name }),
+    confirm: () => t('Excluir'),
+    confirmWithChildren: (tasks: string) => t('Excluir história e {tasks}', { tasks }),
     message: (along: string) =>
-      (along ? `Vão para a lixeira junto com o card: ${along}. ` : 'O card vai para a lixeira. ') + 'Dá para restaurar pela aba Lixeira.',
+      (along ? t('Vão para a lixeira junto com o card: {along}.', { along }) : t('O card vai para a lixeira.')) +
+      ' ' +
+      t('Dá para restaurar pela aba Lixeira.'),
     danger: true,
     command: cards.trash,
   },
   archive: {
     rule: 'confirmArchive',
-    verb: 'Arquivar',
+    title: (name: string) => t('Arquivar "{title}"?', { title: name }),
+    confirm: () => t('Arquivar'),
+    confirmWithChildren: (tasks: string) => t('Arquivar história e {tasks}', { tasks }),
     message: (along: string) =>
-      (along ? `Serão arquivados junto com o card: ${along}. ` : 'O card sai do board. ') +
-      'Nada é apagado, e desarquivar traz tudo de volta.',
+      (along ? t('Serão arquivados junto com o card: {along}.', { along }) : t('O card sai do board.')) +
+      ' ' +
+      t('Nada é apagado, e desarquivar traz tudo de volta.'),
     danger: false,
     command: cards.archive,
   },
@@ -105,10 +122,10 @@ function requestRemoval(kind: keyof typeof REMOVALS, cardId: Id, after?: () => v
   const mode = state!.board.rules[cfg.rule];
   if (mode === 'never' || (mode === 'whenDependents' && !along)) return go();
   ask({
-    title: `${cfg.verb} "${card.title}"?`,
+    title: cfg.title(card.title),
     message: cfg.message(along),
-    cancelLabel: 'Voltar',
-    confirmLabel: children.length ? `${cfg.verb} história e ${plural(children.length, 'sub-tarefa', 'sub-tarefas')}` : cfg.verb,
+    cancelLabel: t('Voltar'),
+    confirmLabel: children.length ? cfg.confirmWithChildren(tn(children.length, '{n} sub-tarefa', '{n} sub-tarefas')) : cfg.confirm(),
     danger: cfg.danger,
     onConfirm: go,
   });

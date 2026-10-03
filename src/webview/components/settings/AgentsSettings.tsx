@@ -9,6 +9,8 @@ import { SkillPicker } from '../skills/SkillPicker';
 import { Badge, Button, Card, TextArea, TextField } from '@radix-ui/themes';
 import { ChipsEditor, DeleteButton, FormField, IconPlus, SelectField, SwitchField } from '../ui';
 import { PageHeader } from './PageHeader';
+import { t } from '../../i18n';
+import { rich } from '../../i18n/rich';
 
 /** O Select do Radix não aceita `value` vazio: "sem subagente" usa este valor. */
 const NO_AGENT = '__none';
@@ -48,7 +50,7 @@ export function AgentsSettings() {
       ...profiles,
       {
         id,
-        name: `Agente ${profiles.length + 1}`,
+        name: t('Agente {n}', { n: profiles.length + 1 }),
         purpose: '',
         agent: '',
         skills: [],
@@ -68,52 +70,52 @@ export function AgentsSettings() {
       variant={how[aspect] === 'enforced' ? 'soft' : 'outline'}
       title={
         how[aspect] === 'enforced'
-          ? `Na execução pelo board, o ${tool.label} recebe isto por parâmetro: a sessão não tem como usar outra coisa.`
-          : `O ${tool.label} não aceita isto por parâmetro: segue no prompt, como instrução.`
+          ? t('Na execução pelo board, o {tool} recebe isto por parâmetro: a sessão não tem como usar outra coisa.', { tool: tool.label })
+          : t('O {tool} não aceita isto por parâmetro: segue no prompt, como instrução.', { tool: tool.label })
       }
     >
-      {how[aspect] === 'enforced' ? 'imposto' : 'orientado'}
+      {how[aspect] === 'enforced' ? t('imposto') : t('orientado')}
     </Badge>
   );
   /** o resumo de uma linha do que o agente restringe; sem nada, ele não restringe */
   const summary = (p: ExecProfile): string =>
     [
-      p.agent && `subagente ${p.agent}`,
-      p.skills.length && `${p.skills.length} skill(s)`,
-      p.mcpServers && `MCP: board${p.mcpServers.length ? ` + ${p.mcpServers.join(', ')}` : ''}`,
-      p.tools.length && `ferramentas: ${p.tools.join(', ')}`,
-      p.clean && 'sessão limpa',
+      p.agent && t('subagente {name}', { name: p.agent }),
+      p.skills.length && t('{n} skill(s)', { n: p.skills.length }),
+      p.mcpServers && (p.mcpServers.length ? t('MCP: board + {list}', { list: p.mcpServers.join(', ') }) : t('MCP: board')),
+      p.tools.length && t('ferramentas: {list}', { list: p.tools.join(', ') }),
+      p.clean && t('sessão limpa'),
     ]
       .filter(Boolean)
-      .join(' · ') || 'Sem restrições: a sessão usa o que a ferramenta carregar.';
+      .join(' · ') || t('Sem restrições: a sessão usa o que a ferramenta carregar.');
 
   return (
     <div>
       <PageHeader
-        title="Agentes"
+        title={t('Agentes')}
         actions={
           <Button onClick={add}>
-            <IconPlus /> Novo agente
+            <IconPlus /> {t('Novo agente')}
           </Button>
         }
       >
-        Um agente diz como a IA trabalha num card: que skills ela lê, a que servidores MCP e ferramentas ela tem acesso e que modelo usa.
-        Toda execução pelo board ("Chamar IA" e heartbeat) roda através de um agente: o escolhido no card; senão, o da fase (Workflows e
-        colunas → Fase); senão, o padrão. Assim isso é decidido antes, em vez de a ferramenta descobrir sozinha durante a conversa.
+        {t(
+          'Um agente diz como a IA trabalha num card: que skills ela lê, a que servidores MCP e ferramentas ela tem acesso e que modelo usa. Toda execução pelo board ("Chamar IA" e heartbeat) roda através de um agente: o escolhido no card; senão, o da fase (Workflows e colunas → Fase); senão, o padrão. Assim isso é decidido antes, em vez de a ferramenta descobrir sozinha durante a conversa.',
+        )}
       </PageHeader>
       <details className="agents-help">
-        <summary>O que o {tool.label} aceita por parâmetro</summary>
+        <summary>{t('O que o {tool} aceita por parâmetro', { tool: tool.label })}</summary>
         <p className="muted small">
-          Cada execução pelo board é uma sessão nova, só com o que está no card. <b>Imposto</b> é o que o {tool.label} recebe por parâmetro;{' '}
-          <b>orientado</b> segue como instrução no prompt. Numa conversa aberta por você, tudo é orientação: a IA lê o agente em{' '}
-          <code>get_card</code>. As skills vão sempre pelo caminho do arquivo, no prompt: valem mesmo desligadas ou fora da invocação
-          automática.
+          {rich(
+            'Cada execução pelo board é uma sessão nova, só com o que está no card. <b>Imposto</b> é o que o {tool} recebe por parâmetro; <b>orientado</b> segue como instrução no prompt. Numa conversa aberta por você, tudo é orientação: a IA lê o agente em <code>get_card</code>. As skills vão sempre pelo caminho do arquivo, no prompt: valem mesmo desligadas ou fora da invocação automática.',
+            { tool: tool.label },
+          )}
         </p>
         <table className="table">
           <thead>
             <tr>
               {EXEC_ASPECTS.map((a) => (
-                <th key={a.id}>{a.label}</th>
+                <th key={a.id}>{t(a.label)}</th>
               ))}
             </tr>
           </thead>
@@ -135,11 +137,11 @@ export function AgentsSettings() {
             5,
           ).map((s) => s.name);
           return (
-            <Card key={p.id} className="settings-card" aria-label={`Agente ${p.name}`}>
+            <Card key={p.id} className="settings-card" aria-label={t('Agente {name}', { name: p.name })}>
               <div className="settings-card-head">
                 <TextField.Root
                   className="profile-name"
-                  aria-label="Nome do agente"
+                  aria-label={t('Nome do agente')}
                   key={p.name}
                   defaultValue={p.name}
                   onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== p.name && patch(p.id, { name: e.target.value.trim() })}
@@ -147,7 +149,7 @@ export function AgentsSettings() {
                 />
                 {p.isDefault && (
                   <Badge color="indigo" variant="soft">
-                    padrão
+                    {t('padrão')}
                   </Badge>
                 )}
                 <div className="settings-card-actions">
@@ -155,20 +157,20 @@ export function AgentsSettings() {
                     <Button
                       variant="ghost"
                       size="1"
-                      title="Usado quando nem o card nem a coluna indicam um agente"
+                      title={t('Usado quando nem o card nem a coluna indicam um agente')}
                       onClick={() => patch(p.id, { isDefault: true })}
                     >
-                      Tornar padrão
+                      {t('Tornar padrão')}
                     </Button>
                   )}
                   <Button variant="soft" color="gray" onClick={() => setOpen(open === p.id ? null : p.id)}>
-                    {open === p.id ? 'Fechar' : 'Editar'}
+                    {open === p.id ? t('Fechar') : t('Editar')}
                   </Button>
                   <DeleteButton
-                    title={profiles.length === 1 ? 'Precisa haver ao menos um agente' : 'Apagar o agente'}
+                    title={profiles.length === 1 ? t('Precisa haver ao menos um agente') : t('Apagar o agente')}
                     disabled={profiles.length === 1}
-                    question={`Apagar o agente "${p.name}"?`}
-                    message="Colunas e cards que usam este agente voltam ao padrão."
+                    question={t('Apagar o agente "{name}"?', { name: p.name })}
+                    message={t('Colunas e cards que usam este agente voltam ao padrão.')}
                     onConfirm={() =>
                       save(
                         profiles
@@ -185,8 +187,8 @@ export function AgentsSettings() {
               {open === p.id && (
                 <div className="profile-editor">
                   <FormField
-                    label="O que este agente faz"
-                    hint="Uma frase, como na descrição de um agente. É a base para sugerir skills e servidores MCP."
+                    label={t('O que este agente faz')}
+                    hint={t('Uma frase, como na descrição de um agente. É a base para sugerir skills e servidores MCP.')}
                   >
                     {(id) => (
                       <TextArea
@@ -194,29 +196,41 @@ export function AgentsSettings() {
                         rows={2}
                         key={p.purpose}
                         defaultValue={p.purpose}
-                        placeholder="Ex.: revisa a Spec e aponta lacunas antes do Plan"
+                        placeholder={t('Ex.: revisa a Spec e aponta lacunas antes do Plan')}
                         onBlur={(e) => e.target.value.trim() !== p.purpose && patch(p.id, { purpose: e.target.value.trim() })}
                       />
                     )}
                   </FormField>
                   <FormField
-                    label={<>Skills {badge('skills')}</>}
-                    hint="Lidas em toda execução com este agente, além das indicadas no card. Com a intenção preenchida, o botão Sugerir pela intenção marca as que combinam."
+                    label={
+                      <>
+                        {t('Skills')} {badge('skills')}
+                      </>
+                    }
+                    hint={t(
+                      'Lidas em toda execução com este agente, além das indicadas no card. Com a intenção preenchida, o botão Sugerir pela intenção marca as que combinam.',
+                    )}
                   >
                     {() => (
                       <SkillPicker
                         value={p.skills}
                         onChange={(next) => patch(p.id, { skills: next })}
                         intent={p.purpose}
-                        title={`Skills de ${p.name}`}
+                        title={t('Skills de {name}', { name: p.name })}
                       />
                     )}
                   </FormField>
-                  <FormField label={<>Servidores MCP {badge('mcp')}</>}>
+                  <FormField
+                    label={
+                      <>
+                        {t('Servidores MCP')} {badge('mcp')}
+                      </>
+                    }
+                  >
                     {() => (
                       <>
                         <SwitchField
-                          label="Restringir: a sessão usa só o servidor do board e os marcados abaixo"
+                          label={t('Restringir: a sessão usa só o servidor do board e os marcados abaixo')}
                           checked={p.mcpServers !== null}
                           onChange={(on) => patch(p.id, { mcpServers: on ? [] : null })}
                         />
@@ -227,16 +241,18 @@ export function AgentsSettings() {
                             onChange={(next) => patch(p.id, { mcpServers: next })}
                           >
                             {serverNames.length === 0 && (
-                              <span className="muted small">Nenhum outro servidor configurado para o {tool.label}.</span>
+                              <span className="muted small">
+                                {t('Nenhum outro servidor configurado para o {tool}.', { tool: tool.label })}
+                              </span>
                             )}
                             {suggestedServers.length > 0 && (
                               <Button
                                 variant="ghost"
                                 size="1"
-                                title="Servidores cujo nome ou descrição combinam com a intenção"
+                                title={t('Servidores cujo nome ou descrição combinam com a intenção')}
                                 onClick={() => patch(p.id, { mcpServers: [...new Set([...(p.mcpServers ?? []), ...suggestedServers])] })}
                               >
-                                Sugerir pela intenção ({suggestedServers.length})
+                                {t('Sugerir pela intenção ({n})', { n: suggestedServers.length })}
                               </Button>
                             )}
                           </ChipsEditor>
@@ -245,69 +261,93 @@ export function AgentsSettings() {
                     )}
                   </FormField>
                   <FormField
-                    label={<>Ferramentas disponíveis {badge('tools')}</>}
-                    hint="Nomes separados por vírgula, como a ferramenta os chama; vazio = as que o nível de permissão da execução libera."
+                    label={
+                      <>
+                        {t('Ferramentas disponíveis')} {badge('tools')}
+                      </>
+                    }
+                    hint={t(
+                      'Nomes separados por vírgula, como a ferramenta os chama; vazio = as que o nível de permissão da execução libera.',
+                    )}
                   >
                     {(id) => (
                       <>
                         <div className="agent-presets">
-                          {TOOL_PRESETS.map((t) => (
+                          {TOOL_PRESETS.map((preset) => (
                             <Button
-                              key={t.id}
+                              key={preset.id}
                               variant="soft"
                               color="gray"
                               size="1"
-                              title={t.hint}
-                              onClick={() => patch(p.id, { tools: t.tools })}
+                              title={t(preset.hint)}
+                              onClick={() => patch(p.id, { tools: preset.tools })}
                             >
-                              {t.label}
+                              {t(preset.label)}
                             </Button>
                           ))}
                           <Button
                             variant="ghost"
                             size="1"
-                            title="Sem lista: vale o que o nível de permissão libera"
+                            title={t('Sem lista: vale o que o nível de permissão libera')}
                             onClick={() => patch(p.id, { tools: [] })}
                           >
-                            Liberar o padrão
+                            {t('Liberar o padrão')}
                           </Button>
                         </div>
                         <TextField.Root
                           id={id}
                           key={p.tools.join()}
                           defaultValue={p.tools.join(', ')}
-                          placeholder="Ex.: Read, Grep, Glob, Edit"
+                          placeholder={t('Ex.: Read, Grep, Glob, Edit')}
                           onBlur={(e) => patch(p.id, { tools: list(e.target.value) })}
                         />
                       </>
                     )}
                   </FormField>
-                  <FormField label={<>Ferramentas negadas {badge('tools')}</>}>
+                  <FormField
+                    label={
+                      <>
+                        {t('Ferramentas negadas')} {badge('tools')}
+                      </>
+                    }
+                  >
                     {(id) => (
                       <TextField.Root
                         id={id}
                         key={p.deniedTools.join()}
                         defaultValue={p.deniedTools.join(', ')}
-                        placeholder="Ex.: WebFetch, Bash(git push *)"
+                        placeholder={t('Ex.: WebFetch, Bash(git push *)')}
                         onBlur={(e) => patch(p.id, { deniedTools: list(e.target.value) })}
                       />
                     )}
                   </FormField>
-                  <FormField label={<>Modelo e esforço {badge('model')}</>} hint="O modelo indicado no card tem preferência.">
+                  <FormField
+                    label={
+                      <>
+                        {t('Modelo e esforço')} {badge('model')}
+                      </>
+                    }
+                    hint={t('O modelo indicado no card tem preferência.')}
+                  >
                     {() => <ModelEditor value={p.model || null} onChange={(v) => patch(p.id, { model: typeof v === 'string' ? v : '' })} />}
                   </FormField>
                   <FormField
                     label={
                       <>
-                        Subagente do {tool.label} {badge('agent')}
+                        {t('Subagente do {tool}', { tool: tool.label })} {badge('agent')}
                       </>
                     }
-                    hint={`Opcional: um arquivo de agente do ${tool.label} (em Harness de IA → Agentes) que conduz a sessão; vazio = o agente padrão da ferramenta.`}
+                    hint={t(
+                      'Opcional: um arquivo de agente do {tool} (em Harness de IA → Agentes) que conduz a sessão; vazio = o agente padrão da ferramenta.',
+                      {
+                        tool: tool.label,
+                      },
+                    )}
                   >
                     {(id) => (
                       <SelectField
                         id={id}
-                        aria-label="Subagente"
+                        aria-label={t('Subagente')}
                         options={[
                           { value: NO_AGENT, label: '—' },
                           ...[...new Set([...subagents, ...(p.agent ? [p.agent] : [])])].map((a) => ({ value: a, label: a })),
@@ -318,11 +358,12 @@ export function AgentsSettings() {
                     )}
                   </FormField>
                   <SwitchField
-                    label={
-                      <>
-                        Sessão limpa {badge('clean')}: sem as personalizações da sua pasta de usuário e sem invocação automática de skills
-                      </>
-                    }
+                    label={rich(
+                      'Sessão limpa {badge}: sem as personalizações da sua pasta de usuário e sem invocação automática de skills',
+                      {
+                        badge: badge('clean'),
+                      },
+                    )}
                     checked={p.clean}
                     onChange={(clean) => patch(p.id, { clean })}
                   />

@@ -97,8 +97,13 @@ export const EFFORT_LABELS: Record<string, string> = {
 export const effortLabel = (effort: string): string => EFFORT_LABELS[effort.toLowerCase()] ?? effort;
 
 /** Texto de um valor de modelo na interface, ex.: "Haiku 4.5 - baixo". */
-export const modelDisplay = (catalog: ModelOption[], value: FieldValue | undefined, withTool = false): string =>
-  formatModel(catalog, value, withTool, (e) => ` - ${effortLabel(e)}`);
+export const modelDisplay = (
+  catalog: ModelOption[],
+  value: FieldValue | undefined,
+  withTool = false,
+  /** traduz o nome do esforço (a interface em inglês passa `t`) */
+  translate: (text: string) => string = (s) => s,
+): string => formatModel(catalog, value, withTool, (e) => ` - ${translate(effortLabel(e))}`);
 
 /**
  * Interpreta um modelo escrito por uma pessoa ou IA: o valor exato (`claude:opus@high`), ou o

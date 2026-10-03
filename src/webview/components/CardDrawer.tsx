@@ -14,6 +14,7 @@ import { SubtasksSection } from './card/SubtasksSection';
 import { useDescriptionDraft } from './card/useDescriptionDraft';
 import { WorkspaceBar } from './card/WorkspaceBar';
 import { StatusBar } from './StatusBar';
+import { formatDateTime, t } from '../i18n';
 
 /** Painel lateral de um card: compõe as partes de components/card/. */
 export function CardDrawer({ cardId }: { cardId: string }) {
@@ -68,7 +69,10 @@ export function CardDrawer({ cardId }: { cardId: string }) {
         )}
 
         <footer className="drawer-footer muted">
-          Criado {new Date(card.createdAt).toLocaleString()} · Atualizado {new Date(card.updatedAt).toLocaleString()}
+          {t('Criado {created} · Atualizado {updated}', {
+            created: formatDateTime(card.createdAt),
+            updated: formatDateTime(card.updatedAt),
+          })}
         </footer>
       </aside>
     </>

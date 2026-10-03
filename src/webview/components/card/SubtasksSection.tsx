@@ -3,6 +3,7 @@ import { childrenOf, columnOf, subtaskSlot } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { AddInput, Button } from '../ui';
+import { t } from '../../i18n';
 
 /** Sub-tarefas da história: lista com a coluna de cada uma, atalho para o board e criação rápida. */
 export function SubtasksSection({ story }: { story: Card }) {
@@ -22,7 +23,7 @@ export function SubtasksSection({ story }: { story: Card }) {
     <section className="drawer-section">
       <div className="section-head">
         <h3>
-          Sub-tarefas <small>{children.length}</small>
+          {t('Sub-tarefas')} <small>{children.length}</small>
         </h3>
         <Button
           variant="ghost"
@@ -33,7 +34,7 @@ export function SubtasksSection({ story }: { story: Card }) {
             openCard(null);
           }}
         >
-          Ver no board
+          {t('Ver no board')}
         </Button>
       </div>
       <ul className="children">
@@ -44,12 +45,12 @@ export function SubtasksSection({ story }: { story: Card }) {
               <a onClick={() => openCard(c.id)}>
                 <span className="card-id">{cardRef(c)}</span> {c.title}
               </a>
-              <span className="muted">{c.archivedAt ? 'Arquivada' : col?.name}</span>
+              <span className="muted">{c.archivedAt ? t('Arquivada') : col?.name}</span>
             </li>
           );
         })}
       </ul>
-      <AddInput placeholder="+ Nova sub-tarefa (Enter)" onAdd={addSub} />
+      <AddInput placeholder={t('+ Nova sub-tarefa (Enter)')} onAdd={addSub} />
     </section>
   );
 }

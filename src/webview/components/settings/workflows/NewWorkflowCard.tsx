@@ -4,6 +4,7 @@ import type { WorkflowKind } from '../../../../shared/model';
 import { settings } from '../../../commands';
 import { FormField } from '../../ui';
 import { WORKFLOW_KINDS } from './kinds';
+import { t } from '../../../i18n';
 
 /** Rascunho do workflow novo: nome e papel (que não muda depois). Ele nasce com A fazer, Em andamento e Concluído. */
 export function NewWorkflowCard({ onDone }: { onDone: () => void }) {
@@ -19,14 +20,14 @@ export function NewWorkflowCard({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <Card className="workflow-card draft" aria-label="Workflow novo">
+    <Card className="workflow-card draft" aria-label={t('Workflow novo')}>
       <div className="workflow-draft-fields">
-        <FormField label="Nome">
+        <FormField label={t('Nome')}>
           {(id) => (
             <TextField.Root
               id={id}
               autoFocus
-              placeholder="Ex.: Suporte, Bugs, Pesquisa"
+              placeholder={t('Ex.: Suporte, Bugs, Pesquisa')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
@@ -36,12 +37,12 @@ export function NewWorkflowCard({ onDone }: { onDone: () => void }) {
             />
           )}
         </FormField>
-        <FormField label="Papel" hint={`${hint} O papel não muda depois de criado.`}>
+        <FormField label={t('Papel')} hint={t('{hint} O papel não muda depois de criado.', { hint: t(hint) })}>
           {(id) => (
             <SegmentedControl.Root id={id} size="1" value={kind} onValueChange={(v) => setKind(v as WorkflowKind)}>
               {WORKFLOW_KINDS.map((k) => (
                 <SegmentedControl.Item key={k.value} value={k.value}>
-                  {k.label}
+                  {t(k.label)}
                 </SegmentedControl.Item>
               ))}
             </SegmentedControl.Root>
@@ -49,14 +50,14 @@ export function NewWorkflowCard({ onDone }: { onDone: () => void }) {
         </FormField>
       </div>
       <Text as="p" size="1" color="gray" className="workflow-draft-note">
-        Começa com as colunas A fazer, Em andamento e Concluído; depois você muda como quiser.
+        {t('Começa com as colunas A fazer, Em andamento e Concluído; depois você muda como quiser.')}
       </Text>
       <div className="field-card-actions">
         <RxButton variant="soft" color="gray" onClick={onDone}>
-          Cancelar
+          {t('Cancelar')}
         </RxButton>
         <RxButton disabled={!ready} onClick={create}>
-          Criar workflow
+          {t('Criar workflow')}
         </RxButton>
       </div>
     </Card>
