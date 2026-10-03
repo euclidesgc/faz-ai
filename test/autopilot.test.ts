@@ -41,6 +41,17 @@ const move = (n: number, column: string) =>
   });
 const status = (n: number, s: CardStatus | null, note?: string) => ai({ type: 'card.status.set', cardId: card(n).id, status: s, note });
 const yolo = (n: number, enabled = true) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled });
+/** Cria uma história com um tipo escolhido pelo nome (ex.: Bug), na coluna dada. */
+const createTyped = (typeName: string, title: string, column: string) => {
+  const s = router.snapshot();
+  const wf = s.workflows.find((w) => w.kind === 'parent')!;
+  return router.createCard({
+    typeId: s.cardTypes.find((t) => t.name === typeName && t.defaultWorkflowId === wf.id)!.id,
+    columnId: s.columns.find((c) => c.workflowId === wf.id && c.name === column)!.id,
+    parentId: null,
+    title,
+  });
+};
 const create = (title: string, column: string, parent?: number) => {
   const s = router.snapshot();
   const wf = s.workflows.find((w) => w.kind === (parent ? 'child' : 'parent'))!;
@@ -98,12 +109,31 @@ describe('autopilotStep', () => {
     owns = false; // só olha o passo; quem decide não age
   });
 
-  it('trata uma história de cada vez, na ordem do número', () => {
+  it('trata uma história de cada vez, a de cima do board primeiro', () => {
     create('A', 'Backlog'); // #1
     create('B', 'PRD'); // #2
     yolo(2);
     yolo(1);
     expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 1 }, column: { name: 'Discovery' } });
+  });
+
+  it('mover a história de baixo para o topo da coluna dá a vez a ela, mesmo com número maior', () => {
+    create('A', 'PRD'); // #1, linha de cima
+    create('B', 'PRD'); // #2, logo abaixo
+    yolo(1);
+    yolo(2);
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 1 } });
+
+    move(2, 'PRD'); // a B vai para o topo da mesma coluna
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 2 } });
+  });
+
+  it('o bug fura a fila, mesmo estando mais abaixo no board', () => {
+    create('A', 'PRD'); // #1, perto do topo
+    createTyped('Bug', 'Bug', 'Implementação'); // #2, bem mais abaixo
+    yolo(1);
+    yolo(2);
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 2 } });
   });
 
   it('história que a IA ainda não pode tocar é avançada; sem nada em modo autônomo, não há o que fazer', () => {
@@ -114,8 +144,8 @@ describe('autopilotStep', () => {
   });
 
   it('o card bloqueado segura a fila, e a sub-tarefa vai junto da história', () => {
-    create('A', 'Implementação'); // #1
-    create('B', 'PRD'); // #2
+    create('A', 'PRD'); // #1, acima da B no board
+    create('B', 'Implementação'); // #2
     create('Passo', 'A fazer', 1); // #3
     yolo(1);
     yolo(2);
@@ -156,11 +186,12 @@ describe('autopiloto', () => {
       move(1, 'PRD'); // sem aprovação, porque a história é YOLO
     });
     expect(columnName(1)).toBe('PRD');
-    expect(runner.started).toEqual([card(1).id, card(1).id]); // a mesma história segue; a B espera
+    // a A saiu do Backlog e a B subiu para a linha de cima: pela ordem do board a vez é dela
+    expect(runner.started).toEqual([card(1).id, card(2).id]);
 
-    runner.finish(() => move(1, 'Concluído'));
-    expect(runner.started.at(-1)).toBe(card(2).id);
-    expect(columnName(2)).toBe('Discovery');
+    runner.finish(() => move(2, 'Concluído'));
+    expect(runner.started).toEqual([card(1).id, card(2).id, card(1).id]); // sem a B na fila, a A retoma
+    expect(columnName(1)).toBe('PRD');
   });
 
   it('acaba a fila e se desliga; uma nova história em modo autônomo o liga de novo', () => {

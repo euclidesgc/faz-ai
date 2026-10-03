@@ -1,5 +1,6 @@
 import type { BoardState, Card } from './model';
 import { columnOf, isLive } from './selectors';
+import { byExecutionOrder } from './priority';
 
 // Regras da história: o card principal, que guarda a branch, a worktree e o pull request das sub-tarefas.
 
@@ -25,8 +26,6 @@ export function stackBaseOf(state: Pick<BoardState, 'cards'>, story: Card): Card
     .sort((a, b) => b.number - a.number)[0];
 }
 
-/** Histórias em modo autônomo ainda em aberto, na ordem em que foram criadas. */
+/** Histórias em modo autônomo ainda em aberto, na ordem de execução da fila: bug primeiro, depois de cima para baixo no board. */
 export const yoloStories = (state: BoardState): Card[] =>
-  state.cards
-    .filter((c) => c.yolo && !c.parentId && isLive(c) && columnOf(state, c)?.category === 'open')
-    .sort((a, b) => a.number - b.number);
+  state.cards.filter((c) => c.yolo && !c.parentId && isLive(c) && columnOf(state, c)?.category === 'open').sort(byExecutionOrder(state));
