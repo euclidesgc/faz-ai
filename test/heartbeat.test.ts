@@ -14,34 +14,60 @@ let heartbeat: Heartbeat;
 let now: number;
 let log: string[];
 /** executor simulado: registra o que foi iniciado; `finish` encerra a execução em andamento */
-let runner: { running: string[]; started: string[]; fail: boolean; start(id: string): void; stop(id: string): void; onDidFinish(fn: (id: string) => void): void; finish(status?: CardStatus): void };
+let runner: {
+  running: string[];
+  started: string[];
+  fail: boolean;
+  start(id: string): void;
+  stop(id: string): void;
+  onDidFinish(fn: (id: string) => void): void;
+  finish(status?: CardStatus): void;
+};
 
 const number = (id: string) => router.snapshot().cards.find((c) => c.id === id)!.number;
 const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
-const setStatus = (n: number, status: CardStatus | null, note?: string) => router.handle({ type: 'card.status.set', cardId: card(n).id, status, note });
+const setStatus = (n: number, status: CardStatus | null, note?: string) =>
+  router.handle({ type: 'card.status.set', cardId: card(n).id, status, note });
 const create = (title: string, column: string, parent?: number) => {
   const s = router.snapshot();
   const kind = parent ? 'child' : 'parent';
   const wf = s.workflows.find((w) => w.kind === kind)!;
-  return router.createCard({ typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id, columnId: s.columns.find((c) => c.workflowId === wf.id && c.name === column)!.id, parentId: parent ? card(parent).id : null, title });
+  return router.createCard({
+    typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+    columnId: s.columns.find((c) => c.workflowId === wf.id && c.name === column)!.id,
+    parentId: parent ? card(parent).id : null,
+    title,
+  });
 };
 
 beforeEach(async () => {
   const db = await openInMemory(WASM_DIR);
-  router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, { workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(os.tmpdir(), 'fazai-hb') });
+  router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+    workspaceKey: 'ws',
+    folderName: 'Projeto',
+    author: 'Pessoa',
+    attachmentsDir: path.join(os.tmpdir(), 'fazai-hb'),
+  });
   now = 1_000_000;
   log = [];
   let listener: (id: string) => void = () => {};
   runner = {
-    running: [], started: [], fail: false,
+    running: [],
+    started: [],
+    fail: false,
     start(id) {
       if (this.fail) throw new Error('ferramenta indisponível');
       this.running.push(id);
       this.started.push(id);
       router.handle({ type: 'card.status.set', cardId: id, status: 'running' }, { source: 'ai' });
     },
-    stop(id) { this.running = this.running.filter((x) => x !== id); listener(id); },
-    onDidFinish(fn) { listener = fn; },
+    stop(id) {
+      this.running = this.running.filter((x) => x !== id);
+      listener(id);
+    },
+    onDidFinish(fn) {
+      listener = fn;
+    },
     finish(status = 'waiting_review') {
       const id = this.running.shift()!;
       router.handle({ type: 'card.status.set', cardId: id, status, note: status === 'blocked' ? 'erro' : undefined }, { source: 'ai' });

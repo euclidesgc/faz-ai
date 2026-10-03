@@ -3,7 +3,9 @@
    Hex literal só pode existir neste arquivo; styles.css consome apenas var(--token).
    Formato fixo (uma declaração por linha) porque test/tokens.test.ts faz parse deste arquivo. */
 
-html { color-scheme: light dark; }
+html {
+  color-scheme: light dark;
+}
 
 body {
   /* espaçamento */
@@ -27,8 +29,9 @@ body {
   --focus-ring: 2px solid var(--accent);
   /* Tipografia. Duas famílias: a da interface para tudo, e a monoespaçada só para código e nomes de arquivo.
      A mono não usa a fonte do editor do VS Code: quando ela não está disponível no webview, o navegador cai numa serifada. */
-  --font-ui: var(--vscode-font-family, system-ui), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-ui:
+    var(--vscode-font-family, system-ui), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
   /* Escala: micro = rótulos em maiúsculas; xs = selos e metadados; sm = rótulos e texto de apoio; md = texto base;
      h = títulos de seção; lg = título da tela; xl = título do card aberto */
   --fs-micro: 10px;
@@ -44,12 +47,12 @@ body {
   --danger-bg: #ce2c31;
   --danger-fg: #ffffff;
   --warn-solid-fg: #1c2024;
-  --overlay: rgba(0,0,0,.4);
+  --overlay: rgba(0, 0, 0, 0.4);
   scrollbar-color: var(--border-strong) transparent;
   accent-color: var(--accent);
 }
 
-body[data-theme=light] {
+body[data-theme='light'] {
   color-scheme: light;
   /* primitivos (Radix, tema claro) */
   --slate-1: #fcfcfd;
@@ -97,10 +100,10 @@ body[data-theme=light] {
   --badge-bg: var(--slate-4);
   --badge-fg: var(--slate-12);
   --code-bg: var(--slate-3);
-  --shadow-color: rgba(28,32,36,.18);
+  --shadow-color: rgba(28, 32, 36, 0.18);
 }
 
-body[data-theme=dark] {
+body[data-theme='dark'] {
   color-scheme: dark;
   /* primitivos (Radix, tema escuro) */
   --slate-1: #111113;
@@ -148,11 +151,16 @@ body[data-theme=dark] {
   --badge-bg: var(--slate-5);
   --badge-fg: var(--slate-12);
   --code-bg: var(--slate-4);
-  --shadow-color: rgba(0,0,0,.5);
+  --shadow-color: rgba(0, 0, 0, 0.5);
 }
 
 /* instante antes de o JS definir data-theme: não pinta nada por cima do host */
-body:not([data-theme]) { background: transparent; }
+body:not([data-theme]) {
+  background: transparent;
+}
 
 /* alto contraste do VS Code: bordas decorativas passam a usar a forte */
-body.vscode-high-contrast, body.vscode-high-contrast-light { --border: var(--border-strong); }
+body.vscode-high-contrast,
+body.vscode-high-contrast-light {
+  --border: var(--border-strong);
+}

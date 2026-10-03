@@ -19,7 +19,8 @@ const write = (base: string, rel: string, content: string) => {
   fs.writeFileSync(file, content);
 };
 const skill = (description: string) => `---\nname: x\ndescription: ${description}\n---\n\nCorpo\n`;
-const names = (items: ReturnType<typeof scanInventory>, kind: string, scope: string) => items.filter((i) => i.kind === kind && i.scope === scope).map((i) => i.name);
+const names = (items: ReturnType<typeof scanInventory>, kind: string, scope: string) =>
+  items.filter((i) => i.kind === kind && i.scope === scope).map((i) => i.name);
 
 beforeEach(() => {
   root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-scan-')));
@@ -37,14 +38,33 @@ describe('varredura do harness por ferramenta e escopo', () => {
     write(project, '.claude/skills/revisar/SKILL.md', skill('Do projeto'));
     write(project, '.claude/agents/revisor.md', '---\nname: revisor\ndescription: Revisa\n---\n');
     write(project, '.claude/commands/deploy.md', 'Faça o deploy');
-    write(project, '.claude/settings.json', JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: './check.sh' }] }] } }));
-    write(project, '.mcp.json', JSON.stringify({ mcpServers: { 'faz-ai': { command: 'node', args: ['bridge.js', '--token=segredo'], env: { CHAVE: 'segredo' } } } }));
+    write(
+      project,
+      '.claude/settings.json',
+      JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: './check.sh' }] }] } }),
+    );
+    write(
+      project,
+      '.mcp.json',
+      JSON.stringify({ mcpServers: { 'faz-ai': { command: 'node', args: ['bridge.js', '--token=segredo'], env: { CHAVE: 'segredo' } } } }),
+    );
     write(home, '.claude/CLAUDE.md', '# Global');
     write(home, '.claude/skills/commit/SKILL.md', skill('Global'));
-    write(home, '.claude.json', JSON.stringify({ mcpServers: { remoto: { type: 'http', url: 'https://exemplo.dev/mcp?key=segredo' } }, projects: { [project]: { mcpServers: { local: { command: 'npx' } } } } }));
+    write(
+      home,
+      '.claude.json',
+      JSON.stringify({
+        mcpServers: { remoto: { type: 'http', url: 'https://exemplo.dev/mcp?key=segredo' } },
+        projects: { [project]: { mcpServers: { local: { command: 'npx' } } } },
+      }),
+    );
     // plugin com duas gerações lado a lado: vale a mais recente
     for (const dir of ['design', 'design~g3']) {
-      write(home, `.claude/plugins/synced/abc/${dir}/.claude-plugin/plugin.json`, JSON.stringify({ name: 'design', description: 'Plugin de design' }));
+      write(
+        home,
+        `.claude/plugins/synced/abc/${dir}/.claude-plugin/plugin.json`,
+        JSON.stringify({ name: 'design', description: 'Plugin de design' }),
+      );
       write(home, `.claude/plugins/synced/abc/${dir}/skills/critica/SKILL.md`, skill(dir));
     }
     write(home, '.claude/plugins/.trash/velho/.claude-plugin/plugin.json', JSON.stringify({ name: 'lixo' }));
@@ -56,11 +76,24 @@ describe('varredura do harness por ferramenta e escopo', () => {
     expect(names(items, 'skill', 'user')).toEqual(['commit']);
     expect(names(items, 'agent', 'project')).toEqual(['revisor']);
     expect(names(items, 'command', 'project')).toEqual(['deploy']);
-    expect(items.find((i) => i.kind === 'hook')).toMatchObject({ name: 'PreToolUse', description: 'Bash → ./check.sh', detail: './check.sh', location: '.claude/settings.json' });
+    expect(items.find((i) => i.kind === 'hook')).toMatchObject({
+      name: 'PreToolUse',
+      description: 'Bash → ./check.sh',
+      detail: './check.sh',
+      location: '.claude/settings.json',
+    });
     expect(names(items, 'mcp', 'user')).toEqual(['remoto', 'local']);
     expect(names(items, 'plugin', 'plugin')).toEqual(['design']);
-    expect(items.find((i) => i.kind === 'skill' && i.scope === 'plugin')).toMatchObject({ name: 'critica', description: 'design~g3', plugin: 'design' });
-    expect(items.find((i) => i.name === 'commit')).toMatchObject({ description: 'Global', location: '~/.claude/skills/commit/SKILL.md', path: path.join(home, '.claude/skills/commit/SKILL.md') });
+    expect(items.find((i) => i.kind === 'skill' && i.scope === 'plugin')).toMatchObject({
+      name: 'critica',
+      description: 'design~g3',
+      plugin: 'design',
+    });
+    expect(items.find((i) => i.name === 'commit')).toMatchObject({
+      description: 'Global',
+      location: '~/.claude/skills/commit/SKILL.md',
+      path: path.join(home, '.claude/skills/commit/SKILL.md'),
+    });
     // nada que possa ser segredo vai para a lista
     expect(JSON.stringify(items)).not.toContain('segredo');
     expect(items.find((i) => i.name === 'remoto')?.description).toBe('https://exemplo.dev/mcp');
@@ -72,13 +105,20 @@ describe('varredura do harness por ferramenta e escopo', () => {
     write(project, '.codex/agents/revisor.toml', 'name = "revisor"\ndescription = "Revisa a spec"\ndeveloper_instructions = """\nx\n"""\n');
     write(home, '.agents/skills/global/SKILL.md', skill('Global'));
     write(home, '.codex/skills/.system/imagegen/SKILL.md', skill('Embutida'));
-    write(home, '.codex/config.toml', 'model = "gpt"\n\n[mcp_servers.faz-ai]\ncommand = "node"\nargs = ["x"]\n\n[mcp_servers.faz-ai.env]\nTOKEN = "segredo"\n\n[mcp_servers."com.ponto"]\nurl = "https://exemplo.dev/mcp"\n');
+    write(
+      home,
+      '.codex/config.toml',
+      'model = "gpt"\n\n[mcp_servers.faz-ai]\ncommand = "node"\nargs = ["x"]\n\n[mcp_servers.faz-ai.env]\nTOKEN = "segredo"\n\n[mcp_servers."com.ponto"]\nurl = "https://exemplo.dev/mcp"\n',
+    );
     const items = scanInventory('codex', project, home);
     expect(names(items, 'skill', 'project')).toEqual(['testar']);
     expect(names(items, 'skill', 'user')).toEqual(['global']);
     expect(items.find((i) => i.name === 'imagegen')).toMatchObject({ scope: 'plugin', plugin: 'Codex (embutidas)' });
     expect(items.find((i) => i.kind === 'agent')).toMatchObject({ name: 'revisor', description: 'Revisa a spec' });
-    expect(items.filter((i) => i.kind === 'mcp').map((i) => [i.name, i.description])).toEqual([['faz-ai', 'node'], ['com.ponto', 'https://exemplo.dev/mcp']]);
+    expect(items.filter((i) => i.kind === 'mcp').map((i) => [i.name, i.description])).toEqual([
+      ['faz-ai', 'node'],
+      ['com.ponto', 'https://exemplo.dev/mcp'],
+    ]);
     expect(JSON.stringify(items)).not.toContain('segredo');
   });
 
@@ -107,7 +147,11 @@ describe('varredura do harness por ferramenta e escopo', () => {
     write(project, '.github/instructions/api.instructions.md', '---\napplyTo: "src/**"\ndescription: API\n---\n');
     write(project, '.github/agents/revisor.agent.md', '---\ndescription: Revisa\n---\n');
     write(project, '.github/prompts/pr.prompt.md', '---\ndescription: Abre PR\n---\n');
-    write(project, '.github/hooks/seguranca.json', JSON.stringify({ version: 1, hooks: { preToolUse: [{ type: 'command', bash: './scan.sh' }] } }));
+    write(
+      project,
+      '.github/hooks/seguranca.json',
+      JSON.stringify({ version: 1, hooks: { preToolUse: [{ type: 'command', bash: './scan.sh' }] } }),
+    );
     write(project, '.vscode/mcp.json', '{\n  // servidor do board\n  "servers": { "faz-ai": { "command": "node" } }\n}');
     write(home, '.copilot/skills/global/SKILL.md', skill('Global'));
     const copilot = scanInventory('copilot', project, home);
@@ -127,24 +171,39 @@ describe('varredura do harness por ferramenta e escopo', () => {
 });
 
 describe('criar, copiar e apagar itens do harness', () => {
-  const find = (tool: 'claude' | 'codex' | 'copilot' | 'cursor', kind: string, name: string, scope: string) => scanInventory(tool, project, home).find((i) => i.kind === kind && i.name === name && i.scope === scope)!;
-  const target = (tool: 'claude' | 'codex' | 'copilot' | 'cursor', label: string) => createTargets(tool).find((t) => t.label === label)!.source;
+  const find = (tool: 'claude' | 'codex' | 'copilot' | 'cursor', kind: string, name: string, scope: string) =>
+    scanInventory(tool, project, home).find((i) => i.kind === kind && i.name === name && i.scope === scope)!;
+  const target = (tool: 'claude' | 'codex' | 'copilot' | 'cursor', label: string) =>
+    createTargets(tool).find((t) => t.label === label)!.source;
 
   it('cria no projeto e na pasta do usuário, no formato de cada ferramenta', () => {
     const ops = new HarnessOps(project, home);
     const skillFile = ops.create('claude', target('claude', '~/.claude/skills/<nome>/SKILL.md'), 'commit', 'Escreve o commit');
     expect(skillFile).toBe(path.join(home, '.claude/skills/commit/SKILL.md'));
     expect(fs.readFileSync(skillFile, 'utf8')).toContain('description: Escreve o commit');
-    expect(fs.readFileSync(ops.create('codex', target('codex', '.codex/agents/<nome>.toml'), 'revisor', 'Revisa'), 'utf8')).toContain('developer_instructions = """');
-    expect(ops.create('copilot', target('copilot', '.github/agents/<nome>.agent.md'), 'revisor', 'Revisa')).toBe(path.join(project, '.github/agents/revisor.agent.md'));
-    expect(fs.readFileSync(ops.create('cursor', target('cursor', '.cursor/rules/<nome>.mdc'), 'estilo', 'Estilo'), 'utf8')).toBe('---\ndescription: Estilo\nalwaysApply: false\n---\n\n');
+    expect(fs.readFileSync(ops.create('codex', target('codex', '.codex/agents/<nome>.toml'), 'revisor', 'Revisa'), 'utf8')).toContain(
+      'developer_instructions = """',
+    );
+    expect(ops.create('copilot', target('copilot', '.github/agents/<nome>.agent.md'), 'revisor', 'Revisa')).toBe(
+      path.join(project, '.github/agents/revisor.agent.md'),
+    );
+    expect(fs.readFileSync(ops.create('cursor', target('cursor', '.cursor/rules/<nome>.mdc'), 'estilo', 'Estilo'), 'utf8')).toBe(
+      '---\ndescription: Estilo\nalwaysApply: false\n---\n\n',
+    );
     expect(ops.create('claude', target('claude', '~/.claude/CLAUDE.md'), '', '')).toBe(path.join(home, '.claude/CLAUDE.md'));
     // não sobrescreve, não aceita nome fora do padrão e exige descrição em skill e agente
     expect(() => ops.create('claude', target('claude', '~/.claude/skills/<nome>/SKILL.md'), 'commit', 'x')).toThrow('Já existe');
     expect(() => ops.create('claude', target('claude', '.claude/skills/<nome>/SKILL.md'), '../fora', 'x')).toThrow('Nome inválido');
     expect(() => ops.create('claude', target('claude', '.claude/agents/<nome>.md'), 'sem-descricao', ' ')).toThrow('descrição');
     // entradas de arquivo de configuração não são lugares de criação
-    expect(() => ops.create('claude', HARNESS_CATALOG.claude.findIndex((s) => s.layout === 'json-keys'), 'x', 'x')).toThrow();
+    expect(() =>
+      ops.create(
+        'claude',
+        HARNESS_CATALOG.claude.findIndex((s) => s.layout === 'json-keys'),
+        'x',
+        'x',
+      ),
+    ).toThrow();
   });
 
   it('copia do global e de plugin para o projeto, com a pasta inteira da skill', () => {
@@ -190,7 +249,9 @@ describe('modo de invocação das skills', () => {
     const md = path.join(project, '.claude/skills/deploy/SKILL.md');
     expect(skillMode(md)).toBe('auto');
     setSkillMode('claude', md, 'manual');
-    expect(fs.readFileSync(md, 'utf8')).toBe('---\nname: deploy\ndescription: Faz o deploy\ndisable-model-invocation: true\n---\n\nPassos\n');
+    expect(fs.readFileSync(md, 'utf8')).toBe(
+      '---\nname: deploy\ndescription: Faz o deploy\ndisable-model-invocation: true\n---\n\nPassos\n',
+    );
     expect(skillMode(md)).toBe('manual');
     setSkillMode('claude', md, 'manual'); // repetir não duplica a chave
     expect(fs.readFileSync(md, 'utf8').match(/disable-model-invocation/g)).toHaveLength(1);
@@ -207,7 +268,9 @@ describe('modo de invocação das skills', () => {
     // SKILL.md sem frontmatter ganha um
     write(project, '.claude/skills/solta/SKILL.md', 'Só o corpo');
     setSkillMode('claude', path.join(project, '.claude/skills/solta/SKILL.md'), 'manual');
-    expect(fs.readFileSync(path.join(project, '.claude/skills/solta/SKILL.md'), 'utf8')).toBe('---\ndisable-model-invocation: true\n---\n\nSó o corpo');
+    expect(fs.readFileSync(path.join(project, '.claude/skills/solta/SKILL.md'), 'utf8')).toBe(
+      '---\ndisable-model-invocation: true\n---\n\nSó o corpo',
+    );
   });
 
   it('Codex: grava a política em agents/openai.yaml sem mexer no SKILL.md', () => {
@@ -228,9 +291,26 @@ describe('modo de invocação das skills', () => {
 });
 
 describe('servidores MCP nos arquivos de cada ferramenta', () => {
-  const stdio = { name: 'github', transport: 'stdio' as const, command: 'npx', args: ['-y', 'gh-mcp'], env: { TOKEN: 'abc' }, url: '', headers: {} };
-  const http = { name: 'docs', transport: 'http' as const, command: '', args: [], env: {}, url: 'https://exemplo.dev/mcp', headers: { Authorization: 'Bearer x' } };
-  const at = (tool: 'claude' | 'codex' | 'cursor' | 'kimi' | 'copilot', label: string) => mcpTargets(tool).find((t) => t.label === label)!.source;
+  const stdio = {
+    name: 'github',
+    transport: 'stdio' as const,
+    command: 'npx',
+    args: ['-y', 'gh-mcp'],
+    env: { TOKEN: 'abc' },
+    url: '',
+    headers: {},
+  };
+  const http = {
+    name: 'docs',
+    transport: 'http' as const,
+    command: '',
+    args: [],
+    env: {},
+    url: 'https://exemplo.dev/mcp',
+    headers: { Authorization: 'Bearer x' },
+  };
+  const at = (tool: 'claude' | 'codex' | 'cursor' | 'kimi' | 'copilot', label: string) =>
+    mcpTargets(tool).find((t) => t.label === label)!.source;
   const json = (base: string, rel: string) => JSON.parse(fs.readFileSync(path.join(base, rel), 'utf8'));
 
   it('grava no formato de cada arquivo, preservando o que já estava lá', () => {
@@ -238,13 +318,24 @@ describe('servidores MCP nos arquivos de cada ferramenta', () => {
     write(project, '.mcp.json', JSON.stringify({ outraChave: 1, mcpServers: { 'faz-ai': { command: 'node' } } }));
     mcp.add('claude', at('claude', '.mcp.json'), stdio);
     mcp.add('claude', at('claude', '.mcp.json'), http);
-    expect(json(project, '.mcp.json')).toEqual({ outraChave: 1, mcpServers: { 'faz-ai': { command: 'node' }, github: { type: 'stdio', command: 'npx', args: ['-y', 'gh-mcp'], env: { TOKEN: 'abc' } }, docs: { type: 'http', url: 'https://exemplo.dev/mcp', headers: { Authorization: 'Bearer x' } } } });
+    expect(json(project, '.mcp.json')).toEqual({
+      outraChave: 1,
+      mcpServers: {
+        'faz-ai': { command: 'node' },
+        github: { type: 'stdio', command: 'npx', args: ['-y', 'gh-mcp'], env: { TOKEN: 'abc' } },
+        docs: { type: 'http', url: 'https://exemplo.dev/mcp', headers: { Authorization: 'Bearer x' } },
+      },
+    });
     mcp.add('cursor', at('cursor', '~/.cursor/mcp.json'), stdio);
-    expect(json(home, '.cursor/mcp.json')).toEqual({ mcpServers: { github: { command: 'npx', args: ['-y', 'gh-mcp'], env: { TOKEN: 'abc' } } } });
+    expect(json(home, '.cursor/mcp.json')).toEqual({
+      mcpServers: { github: { command: 'npx', args: ['-y', 'gh-mcp'], env: { TOKEN: 'abc' } } },
+    });
     mcp.add('kimi', at('kimi', '.kimi-code/mcp.json'), stdio);
     expect(json(project, '.kimi-code/mcp.json').mcpServers.github.transport).toBe('stdio');
     mcp.add('copilot', at('copilot', '.vscode/mcp.json'), http);
-    expect(json(project, '.vscode/mcp.json')).toEqual({ servers: { docs: { type: 'http', url: 'https://exemplo.dev/mcp', headers: { Authorization: 'Bearer x' } } } });
+    expect(json(project, '.vscode/mcp.json')).toEqual({
+      servers: { docs: { type: 'http', url: 'https://exemplo.dev/mcp', headers: { Authorization: 'Bearer x' } } },
+    });
     mcp.add('copilot', at('copilot', '~/.copilot/mcp-config.json'), stdio);
     expect(json(home, '.copilot/mcp-config.json').mcpServers.github.tools).toEqual(['*']);
     // o ~/.claude.json não é um alvo de escrita
@@ -270,11 +361,16 @@ describe('servidores MCP nos arquivos de cada ferramenta', () => {
     mcp.add('codex', at('codex', '~/.codex/config.toml'), { ...http, name: 'com.ponto' });
     const toml = () => fs.readFileSync(path.join(home, '.codex/config.toml'), 'utf8');
     expect(toml()).toContain('[mcp_servers.github]\ncommand = "npx"\nargs = ["-y", "gh-mcp"]\n\n[mcp_servers.github.env]\nTOKEN = "abc"');
-    expect(toml()).toContain('[mcp_servers."com.ponto"]\nurl = "https://exemplo.dev/mcp"\n\n[mcp_servers."com.ponto".http_headers]\nAuthorization = "Bearer x"');
+    expect(toml()).toContain(
+      '[mcp_servers."com.ponto"]\nurl = "https://exemplo.dev/mcp"\n\n[mcp_servers."com.ponto".http_headers]\nAuthorization = "Bearer x"',
+    );
     expect(() => mcp.add('codex', at('codex', '~/.codex/config.toml'), stdio)).toThrow('Já existe');
     const items = () => scanInventory('codex', project, home).filter((i) => i.kind === 'mcp');
     expect(items().map((i) => i.name)).toEqual(['faz-ai', 'github', 'com.ponto']);
-    mcp.remove('codex', items().find((i) => i.name === 'github')!);
+    mcp.remove(
+      'codex',
+      items().find((i) => i.name === 'github')!,
+    );
     expect(items().map((i) => i.name)).toEqual(['faz-ai', 'com.ponto']);
     expect(toml()).not.toContain('TOKEN');
     expect(toml()).toContain('[features]\nhooks = true');
@@ -297,12 +393,18 @@ describe('servidores MCP nos arquivos de cada ferramenta', () => {
 
 describe('hooks e permissões nos arquivos de cada ferramenta', () => {
   const json = (base: string, rel: string) => JSON.parse(fs.readFileSync(path.join(base, rel), 'utf8'));
-  const hookAt = (tool: 'claude' | 'codex' | 'cursor' | 'copilot' | 'kimi', label: string) => hookTargets(tool).find((t) => t.label === label)!.source;
-  const hooksOf = (tool: 'claude' | 'codex' | 'cursor' | 'copilot' | 'kimi') => scanInventory(tool, project, home).filter((i) => i.kind === 'hook');
+  const hookAt = (tool: 'claude' | 'codex' | 'cursor' | 'copilot' | 'kimi', label: string) =>
+    hookTargets(tool).find((t) => t.label === label)!.source;
+  const hooksOf = (tool: 'claude' | 'codex' | 'cursor' | 'copilot' | 'kimi') =>
+    scanInventory(tool, project, home).filter((i) => i.kind === 'hook');
 
   it('Claude Code e Codex: agrupa por filtro e preserva o resto do arquivo', () => {
     const ops = new HooksAndPermissions(project, home);
-    write(project, '.claude/settings.json', JSON.stringify({ model: 'opus', hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: './a.sh' }] }] } }));
+    write(
+      project,
+      '.claude/settings.json',
+      JSON.stringify({ model: 'opus', hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: './a.sh' }] }] } }),
+    );
     const src = hookAt('claude', '.claude/settings.json');
     ops.addHook('claude', src, { event: 'PreToolUse', matcher: 'Bash', command: './b.sh', timeout: 10 });
     ops.addHook('claude', src, { event: 'PreToolUse', matcher: 'Edit|Write', command: './c.sh', timeout: 0 });
@@ -311,29 +413,66 @@ describe('hooks e permissões nos arquivos de cada ferramenta', () => {
       model: 'opus',
       hooks: {
         PreToolUse: [
-          { matcher: 'Bash', hooks: [{ type: 'command', command: './a.sh' }, { type: 'command', command: './b.sh', timeout: 10 }] },
+          {
+            matcher: 'Bash',
+            hooks: [
+              { type: 'command', command: './a.sh' },
+              { type: 'command', command: './b.sh', timeout: 10 },
+            ],
+          },
           { matcher: 'Edit|Write', hooks: [{ type: 'command', command: './c.sh' }] },
         ],
         Stop: [{ hooks: [{ type: 'command', command: './fim.sh' }] }],
       },
     });
-    expect(hooksOf('claude').map((i) => [i.name, i.description])).toEqual([['PreToolUse', 'Bash → ./a.sh'], ['PreToolUse', 'Bash → ./b.sh'], ['PreToolUse', 'Edit|Write → ./c.sh'], ['Stop', './fim.sh']]);
+    expect(hooksOf('claude').map((i) => [i.name, i.description])).toEqual([
+      ['PreToolUse', 'Bash → ./a.sh'],
+      ['PreToolUse', 'Bash → ./b.sh'],
+      ['PreToolUse', 'Edit|Write → ./c.sh'],
+      ['Stop', './fim.sh'],
+    ]);
     // remover tira só o comando pedido; grupo e evento vazios somem
-    ops.removeHook('claude', hooksOf('claude').find((i) => i.detail === './a.sh')!);
-    ops.removeHook('claude', hooksOf('claude').find((i) => i.detail === './fim.sh')!);
-    expect(json(project, '.claude/settings.json').hooks).toEqual({ PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: './b.sh', timeout: 10 }] }, { matcher: 'Edit|Write', hooks: [{ type: 'command', command: './c.sh' }] }] });
+    ops.removeHook(
+      'claude',
+      hooksOf('claude').find((i) => i.detail === './a.sh')!,
+    );
+    ops.removeHook(
+      'claude',
+      hooksOf('claude').find((i) => i.detail === './fim.sh')!,
+    );
+    expect(json(project, '.claude/settings.json').hooks).toEqual({
+      PreToolUse: [
+        { matcher: 'Bash', hooks: [{ type: 'command', command: './b.sh', timeout: 10 }] },
+        { matcher: 'Edit|Write', hooks: [{ type: 'command', command: './c.sh' }] },
+      ],
+    });
     expect(json(project, '.claude/settings.json').model).toBe('opus');
 
-    ops.addHook('codex', hookAt('codex', '~/.codex/hooks.json'), { event: 'SessionStart', matcher: 'startup', command: 'python3 a.py', timeout: 0 });
-    expect(json(home, '.codex/hooks.json')).toEqual({ hooks: { SessionStart: [{ matcher: 'startup', hooks: [{ type: 'command', command: 'python3 a.py' }] }] } });
+    ops.addHook('codex', hookAt('codex', '~/.codex/hooks.json'), {
+      event: 'SessionStart',
+      matcher: 'startup',
+      command: 'python3 a.py',
+      timeout: 0,
+    });
+    expect(json(home, '.codex/hooks.json')).toEqual({
+      hooks: { SessionStart: [{ matcher: 'startup', hooks: [{ type: 'command', command: 'python3 a.py' }] }] },
+    });
   });
 
   it('Cursor e Copilot: entradas diretas, com a versão do arquivo', () => {
     const ops = new HooksAndPermissions(project, home);
     ops.addHook('cursor', hookAt('cursor', '.cursor/hooks.json'), { event: 'afterFileEdit', matcher: '', command: './fmt.sh', timeout: 5 });
     expect(json(project, '.cursor/hooks.json')).toEqual({ version: 1, hooks: { afterFileEdit: [{ command: './fmt.sh', timeout: 5 }] } });
-    ops.addHook('copilot', hookAt('copilot', '.github/hooks/faz-ai.json'), { event: 'preToolUse', matcher: 'ignorado', command: './scan.sh', timeout: 30 });
-    expect(json(project, '.github/hooks/faz-ai.json')).toEqual({ version: 1, hooks: { preToolUse: [{ type: 'command', bash: './scan.sh', timeoutSec: 30 }] } });
+    ops.addHook('copilot', hookAt('copilot', '.github/hooks/faz-ai.json'), {
+      event: 'preToolUse',
+      matcher: 'ignorado',
+      command: './scan.sh',
+      timeout: 30,
+    });
+    expect(json(project, '.github/hooks/faz-ai.json')).toEqual({
+      version: 1,
+      hooks: { preToolUse: [{ type: 'command', bash: './scan.sh', timeoutSec: 30 }] },
+    });
     ops.removeHook('copilot', hooksOf('copilot')[0]!);
     expect(json(project, '.github/hooks/faz-ai.json')).toEqual({ version: 1, hooks: {} });
     expect(hookTargets('kimi')).toEqual([]);
@@ -342,26 +481,50 @@ describe('hooks e permissões nos arquivos de cada ferramenta', () => {
   it('recusa hook de plugin, arquivo com comentários e dados incompletos', () => {
     const ops = new HooksAndPermissions(project, home);
     write(home, '.claude/plugins/loja/p/.claude-plugin/plugin.json', '{"name":"p"}');
-    write(home, '.claude/plugins/loja/p/hooks/hooks.json', JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: './x.sh' }] }] } }));
+    write(
+      home,
+      '.claude/plugins/loja/p/hooks/hooks.json',
+      JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: './x.sh' }] }] } }),
+    );
     expect(() => ops.removeHook('claude', hooksOf('claude')[0]!)).toThrow('plugin');
     write(project, '.claude/settings.json', '{\n  // comentário\n  "hooks": {}\n}');
-    expect(() => ops.addHook('claude', hookAt('claude', '.claude/settings.json'), { event: 'Stop', matcher: '', command: './x.sh', timeout: 0 })).toThrow('edite-o à mão');
-    expect(() => ops.addHook('claude', hookAt('claude', '~/.claude/settings.json'), { event: 'Stop', matcher: '', command: ' ', timeout: 0 })).toThrow('comando');
-    expect(() => ops.addHook('claude', hookAt('claude', '~/.claude/settings.json'), { event: 'com espaço', matcher: '', command: 'x', timeout: 0 })).toThrow('evento');
+    expect(() =>
+      ops.addHook('claude', hookAt('claude', '.claude/settings.json'), { event: 'Stop', matcher: '', command: './x.sh', timeout: 0 }),
+    ).toThrow('edite-o à mão');
+    expect(() =>
+      ops.addHook('claude', hookAt('claude', '~/.claude/settings.json'), { event: 'Stop', matcher: '', command: ' ', timeout: 0 }),
+    ).toThrow('comando');
+    expect(() =>
+      ops.addHook('claude', hookAt('claude', '~/.claude/settings.json'), { event: 'com espaço', matcher: '', command: 'x', timeout: 0 }),
+    ).toThrow('evento');
   });
 
   it('regras de permissão: lista, acrescenta e remove por lista', () => {
     const ops = new HooksAndPermissions(project, home);
-    write(project, '.claude/settings.json', JSON.stringify({ permissions: { allow: ['Bash(npm test)'], defaultMode: 'acceptEdits' }, hooks: {} }));
+    write(
+      project,
+      '.claude/settings.json',
+      JSON.stringify({ permissions: { allow: ['Bash(npm test)'], defaultMode: 'acceptEdits' }, hooks: {} }),
+    );
     const src = permissionTargets('claude').find((t) => t.label === '.claude/settings.json')!.source;
     ops.addPermission('claude', src, 'deny', 'Read(./.env)');
     ops.addPermission('claude', src, 'allow', 'Bash(git status)');
     expect(() => ops.addPermission('claude', src, 'allow', 'Bash(git status)')).toThrow('já está');
     expect(() => ops.addPermission('claude', src, 'inventada', 'x')).toThrow();
     const rules = () => scanInventory('claude', project, home).filter((i) => i.kind === 'settings' && i.layout === 'entry');
-    expect(rules().map((i) => [i.name, i.description, i.detail])).toEqual([['Bash(npm test)', 'permitir', 'allow'], ['Bash(git status)', 'permitir', 'allow'], ['Read(./.env)', 'negar', 'deny']]);
-    ops.removePermission('claude', rules().find((i) => i.name === 'Bash(npm test)')!);
-    expect(json(project, '.claude/settings.json')).toEqual({ permissions: { allow: ['Bash(git status)'], defaultMode: 'acceptEdits', deny: ['Read(./.env)'] }, hooks: {} });
+    expect(rules().map((i) => [i.name, i.description, i.detail])).toEqual([
+      ['Bash(npm test)', 'permitir', 'allow'],
+      ['Bash(git status)', 'permitir', 'allow'],
+      ['Read(./.env)', 'negar', 'deny'],
+    ]);
+    ops.removePermission(
+      'claude',
+      rules().find((i) => i.name === 'Bash(npm test)')!,
+    );
+    expect(json(project, '.claude/settings.json')).toEqual({
+      permissions: { allow: ['Bash(git status)'], defaultMode: 'acceptEdits', deny: ['Read(./.env)'] },
+      hooks: {},
+    });
     ops.addPermission('cursor', permissionTargets('cursor').find((t) => t.scope === 'user')!.source, 'deny', 'Shell(rm)');
     expect(json(home, '.cursor/cli-config.json')).toEqual({ permissions: { deny: ['Shell(rm)'] } });
   });
@@ -382,7 +545,8 @@ describe('arquivos de apoio das skills', () => {
     expect(md.endsWith('- [assets/arquivo.tpl](assets/arquivo.tpl)\n')).toBe(true);
     expect(md).not.toContain('checar.sh');
     expect(() => ops.addSkillFile(item(), 'assets/arquivo.tpl', '', false)).toThrow('Já existe');
-    for (const bad of ['../fora.md', '/etc/passwd', 'SKILL.md', 'a/../../b', 'com espaço.md', 'a/b/c/d/e.md']) expect(() => ops.addSkillFile(item(), bad, '', false)).toThrow('inválido');
+    for (const bad of ['../fora.md', '/etc/passwd', 'SKILL.md', 'a/../../b', 'com espaço.md', 'a/b/c/d/e.md'])
+      expect(() => ops.addSkillFile(item(), bad, '', false)).toThrow('inválido');
     ops.writeSkillFile(item(), 'references/modelo.ts', 'novo');
     expect(fs.readFileSync(path.join(project, '.claude/skills/api/references/modelo.ts'), 'utf8')).toBe('novo');
     ops.removeSkillFile(item(), 'scripts/checar.sh');
@@ -391,6 +555,13 @@ describe('arquivos de apoio das skills', () => {
     // skill de plugin: só leitura
     write(home, '.claude/plugins/loja/p/.claude-plugin/plugin.json', '{"name":"p"}');
     write(home, '.claude/plugins/loja/p/skills/de-plugin/SKILL.md', skill('x'));
-    expect(() => ops.addSkillFile(scanInventory('claude', project, home).find((i) => i.name === 'de-plugin')!, 'references/a.md', '', false)).toThrow('plugin');
+    expect(() =>
+      ops.addSkillFile(
+        scanInventory('claude', project, home).find((i) => i.name === 'de-plugin')!,
+        'references/a.md',
+        '',
+        false,
+      ),
+    ).toThrow('plugin');
   });
 });

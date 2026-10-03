@@ -35,7 +35,17 @@ describe('seed', () => {
   it('cria board com dois workflows, colunas, tipos e campos padrão', () => {
     const s = snap();
     expect(s.workflows).toHaveLength(2);
-    expect(colsOf(parentWf().id).map((c) => c.name)).toEqual(['Backlog', 'Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação', 'Concluído', 'Cancelado']);
+    expect(colsOf(parentWf().id).map((c) => c.name)).toEqual([
+      'Backlog',
+      'Discovery',
+      'PRD',
+      'Spec',
+      'Plan',
+      'Implementação',
+      'Homologação',
+      'Concluído',
+      'Cancelado',
+    ]);
     expect(colsOf(childWf().id).map((c) => c.name)).toEqual(['A fazer', 'Em andamento', 'Concluído']);
     expect(s.cardTypes.map((t) => t.name)).toContain('Sub-tarefa');
     expect(s.fieldDefs.map((f) => f.name)).toEqual(['Fase', 'Tags', 'Esforço da atividade', 'Modelo', 'Skills']);
@@ -73,7 +83,10 @@ describe('cards', () => {
     cards.move(a, doing!.id, 0);
     cards.move(c, backlog!.id, 0);
     const s = snap();
-    const inBacklog = s.cards.filter((x) => x.columnId === backlog!.id).sort((x, y) => x.position - y.position).map((x) => x.id);
+    const inBacklog = s.cards
+      .filter((x) => x.columnId === backlog!.id)
+      .sort((x, y) => x.position - y.position)
+      .map((x) => x.id);
     expect(inBacklog).toEqual([c, b]);
     expect(s.cards.find((x) => x.id === a)?.columnId).toBe(doing!.id);
     expect(() => cards.move(a, colsOf(childWf().id)[0]!.id, 0)).toThrow();
@@ -82,7 +95,12 @@ describe('cards', () => {
   it('apagar pai apaga filhos, valores de campo e checklist (cascade)', () => {
     const backlog = colsOf(parentWf().id)[0]!;
     const story = cards.create(boardId, { typeId: typeNamed('História').id, columnId: backlog.id, parentId: null, title: 'a' });
-    const sub = cards.create(boardId, { typeId: typeNamed('Sub-tarefa').id, columnId: colsOf(childWf().id)[0]!.id, parentId: story, title: 'b' });
+    const sub = cards.create(boardId, {
+      typeId: typeNamed('Sub-tarefa').id,
+      columnId: colsOf(childWf().id)[0]!.id,
+      parentId: story,
+      title: 'b',
+    });
     const fase = snap().fieldDefs.find((f) => f.name === 'Fase')!;
     cards.setFieldValue(sub, fase.id, 'PRD');
     checklist.add(story, 'passo 1');
@@ -110,7 +128,18 @@ describe('settings', () => {
     const wf = parentWf().id;
     const review = settings.createColumn(wf, 'Review');
     settings.updateColumn(review, { position: 2 });
-    expect(colsOf(wf).map((c) => c.name)).toEqual(['Backlog', 'Discovery', 'Review', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação', 'Concluído', 'Cancelado']);
+    expect(colsOf(wf).map((c) => c.name)).toEqual([
+      'Backlog',
+      'Discovery',
+      'Review',
+      'PRD',
+      'Spec',
+      'Plan',
+      'Implementação',
+      'Homologação',
+      'Concluído',
+      'Cancelado',
+    ]);
     const card = cards.create(boardId, { typeId: typeNamed('História').id, columnId: review, parentId: null, title: 'a' });
     const done = colsOf(wf).find((c) => c.name === 'Concluído')!;
     settings.deleteColumn(review, done.id);
@@ -123,7 +152,20 @@ describe('settings', () => {
     settings.createColumn(wf, 'QA');
     settings.createColumn(wf, 'Triagem', 1);
     settings.createColumn(wf, 'Fim', 99);
-    expect(colsOf(wf).map((c) => c.name)).toEqual(['Backlog', 'Triagem', 'Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação', 'QA', 'Concluído', 'Cancelado', 'Fim']);
+    expect(colsOf(wf).map((c) => c.name)).toEqual([
+      'Backlog',
+      'Triagem',
+      'Discovery',
+      'PRD',
+      'Spec',
+      'Plan',
+      'Implementação',
+      'Homologação',
+      'QA',
+      'Concluído',
+      'Cancelado',
+      'Fim',
+    ]);
     expect(colsOf(wf).map((c) => c.position)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   });
 
@@ -134,7 +176,13 @@ describe('settings', () => {
   });
 
   it('cria e atualiza campo custom', () => {
-    const id = settings.createField(boardId, { name: 'Prioridade', kind: 'select', options: ['Alta', 'Baixa'], appliesToTypes: null, display: 'badge' });
+    const id = settings.createField(boardId, {
+      name: 'Prioridade',
+      kind: 'select',
+      options: ['Alta', 'Baixa'],
+      appliesToTypes: null,
+      display: 'badge',
+    });
     settings.updateField(id, { options: ['Alta', 'Média', 'Baixa'], appliesToTypes: [typeNamed('Bug').id] });
     const f = snap().fieldDefs.find((x) => x.id === id)!;
     expect(f.options).toHaveLength(3);
@@ -144,7 +192,8 @@ describe('settings', () => {
 
 describe('número do card', () => {
   it('é sequencial por board e não é reutilizado depois de apagar', () => {
-    const mk = (title: string) => cards.create(boardId, { typeId: typeNamed('História').id, columnId: colsOf(parentWf().id)[0]!.id, parentId: null, title });
+    const mk = (title: string) =>
+      cards.create(boardId, { typeId: typeNamed('História').id, columnId: colsOf(parentWf().id)[0]!.id, parentId: null, title });
     const numberOf = (id: string) => snap().cards.find((c) => c.id === id)?.number;
     const a = mk('a');
     const b = mk('b');
@@ -155,7 +204,12 @@ describe('número do card', () => {
     const other = boards.getOrCreate('ws-2', 'Outro').id;
     const s = boards.snapshot(other);
     const wf = s.workflows.find((w) => w.kind === 'parent')!;
-    const id = cards.create(other, { typeId: s.cardTypes.find((t) => t.name === 'História')!.id, columnId: s.columns.find((c) => c.workflowId === wf.id)!.id, parentId: null, title: 'x' });
+    const id = cards.create(other, {
+      typeId: s.cardTypes.find((t) => t.name === 'História')!.id,
+      columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+      parentId: null,
+      title: 'x',
+    });
     expect(boards.snapshot(other).cards.find((c) => c.id === id)?.number).toBe(1);
   });
 });

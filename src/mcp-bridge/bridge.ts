@@ -54,7 +54,8 @@ function offline(): void {
   const answer = (line: string) => {
     try {
       const msg = JSON.parse(line) as { id?: unknown };
-      if (msg.id !== undefined) process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: OFFLINE } }) + '\n');
+      if (msg.id !== undefined)
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: OFFLINE } }) + '\n');
     } catch {
       /* linha inválida: ignora */
     }

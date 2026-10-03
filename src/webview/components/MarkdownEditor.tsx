@@ -25,25 +25,42 @@ export function applyFormat(value: string, start: number, end: number, kind: For
   const sel = value.slice(start, end);
   const wrap = (before: string, after: string, placeholder: string) => {
     const text = sel || placeholder;
-    return { value: value.slice(0, start) + before + text + after + value.slice(end), start: start + before.length, end: start + before.length + text.length };
+    return {
+      value: value.slice(0, start) + before + text + after + value.slice(end),
+      start: start + before.length,
+      end: start + before.length + text.length,
+    };
   };
   const prefixLines = (prefix: (i: number) => string) => {
     const lineStart = value.lastIndexOf('\n', start - 1) + 1;
     const lineEndIdx = value.indexOf('\n', end);
     const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
-    const block = value.slice(lineStart, lineEnd).split('\n').map((l, i) => prefix(i) + l).join('\n');
+    const block = value
+      .slice(lineStart, lineEnd)
+      .split('\n')
+      .map((l, i) => prefix(i) + l)
+      .join('\n');
     return { value: value.slice(0, lineStart) + block + value.slice(lineEnd), start: lineStart, end: lineStart + block.length };
   };
   switch (kind) {
-    case 'bold': return wrap('**', '**', 'texto');
-    case 'italic': return wrap('_', '_', 'texto');
-    case 'code': return sel.includes('\n') ? wrap('```\n', '\n```', 'código') : wrap('`', '`', 'código');
-    case 'link': return wrap('[', '](https://)', 'texto');
-    case 'heading': return prefixLines(() => '## ');
-    case 'ul': return prefixLines(() => '- ');
-    case 'ol': return prefixLines((i) => `${i + 1}. `);
-    case 'task': return prefixLines(() => '- [ ] ');
-    case 'quote': return prefixLines(() => '> ');
+    case 'bold':
+      return wrap('**', '**', 'texto');
+    case 'italic':
+      return wrap('_', '_', 'texto');
+    case 'code':
+      return sel.includes('\n') ? wrap('```\n', '\n```', 'código') : wrap('`', '`', 'código');
+    case 'link':
+      return wrap('[', '](https://)', 'texto');
+    case 'heading':
+      return prefixLines(() => '## ');
+    case 'ul':
+      return prefixLines(() => '- ');
+    case 'ol':
+      return prefixLines((i) => `${i + 1}. `);
+    case 'task':
+      return prefixLines(() => '- [ ] ');
+    case 'quote':
+      return prefixLines(() => '> ');
   }
 }
 
@@ -102,11 +119,19 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const mod = e.metaKey || e.ctrlKey;
-    if (mod && e.key === 'Enter' && onSubmit) { e.preventDefault(); onSubmit(); }
-    else if (mod && e.key.toLowerCase() === 'b') { e.preventDefault(); format('bold'); }
-    else if (mod && e.key.toLowerCase() === 'i') { e.preventDefault(); format('italic'); }
-    else if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); format('link'); }
-    else if (e.key === 'Tab' && !e.shiftKey) {
+    if (mod && e.key === 'Enter' && onSubmit) {
+      e.preventDefault();
+      onSubmit();
+    } else if (mod && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      format('bold');
+    } else if (mod && e.key.toLowerCase() === 'i') {
+      e.preventDefault();
+      format('italic');
+    } else if (mod && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      format('link');
+    } else if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
       const el = e.currentTarget;
       const s = el.selectionStart;
@@ -118,17 +143,48 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
   const toolbar = (
     <div className="md-toolbar">
       {TOOLS.map((t) => (
-        <Button key={t.kind} variant="icon" className={`md-${t.kind}`} title={t.title} onMouseDown={(e) => e.preventDefault()} onClick={() => format(t.kind)}>{t.label}</Button>
+        <Button
+          key={t.kind}
+          variant="icon"
+          className={`md-${t.kind}`}
+          title={t.title}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => format(t.kind)}
+        >
+          {t.label}
+        </Button>
       ))}
       <span className="spacer" />
       {!expanded && (
         <>
-          <Button variant="ghost" size="small" on={mode === 'write'} onClick={() => setMode('write')}>Escrever</Button>
-          <Button variant="ghost" size="small" on={mode === 'preview'} onClick={() => { setMode('preview'); onCommit?.(); }}>Visualizar</Button>
+          <Button variant="ghost" size="small" on={mode === 'write'} onClick={() => setMode('write')}>
+            Escrever
+          </Button>
+          <Button
+            variant="ghost"
+            size="small"
+            on={mode === 'preview'}
+            onClick={() => {
+              setMode('preview');
+              onCommit?.();
+            }}
+          >
+            Visualizar
+          </Button>
         </>
       )}
       {!compact && (
-        <Button variant="ghost" size="small" title={expanded ? 'Recolher (Esc)' : 'Expandir editor'} onMouseDown={(e) => e.preventDefault()} onClick={() => { if (expanded) onCommit?.(); setExpanded(!expanded); setMode('write'); }}>
+        <Button
+          variant="ghost"
+          size="small"
+          title={expanded ? 'Recolher (Esc)' : 'Expandir editor'}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            if (expanded) onCommit?.();
+            setExpanded(!expanded);
+            setMode('write');
+          }}
+        >
           {expanded ? '⤡ Recolher' : '⤢ Expandir'}
         </Button>
       )}
@@ -156,7 +212,12 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
     />
   );
 
-  const preview = <div className="markdown" dangerouslySetInnerHTML={{ __html: value.trim() ? renderMarkdown(value) : '<p class="muted">Nada para visualizar.</p>' }} />;
+  const preview = (
+    <div
+      className="markdown"
+      dangerouslySetInnerHTML={{ __html: value.trim() ? renderMarkdown(value) : '<p class="muted">Nada para visualizar.</p>' }}
+    />
+  );
 
   if (expanded) {
     return (

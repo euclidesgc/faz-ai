@@ -11,7 +11,10 @@ export function FieldBadge({ field, value }: { field: FieldDef; value: FieldValu
   if (value === null || value === '' || value === false || (Array.isArray(value) && value.length === 0)) return null;
   if (field.kind === 'model') {
     return (
-      <span className={field.display === 'chip' ? 'chip' : field.display === 'inline' ? 'inline-field' : 'badge'} title={`${field.name}: ${modelLabel(catalog, value, true)}`}>
+      <span
+        className={field.display === 'chip' ? 'chip' : field.display === 'inline' ? 'inline-field' : 'badge'}
+        title={`${field.name}: ${modelLabel(catalog, value, true)}`}
+      >
         {field.display === 'inline' && <em>{field.name}: </em>}
         {modelLabel(catalog, value)}
       </span>
@@ -49,11 +52,21 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
       return (
         <div className="row">
           <input value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} placeholder="https://" />
-          {value && <a href={String(value)} target="_blank" rel="noreferrer">↗</a>}
+          {value && (
+            <a href={String(value)} target="_blank" rel="noreferrer">
+              ↗
+            </a>
+          )}
         </div>
       );
     case 'number':
-      return <input type="number" value={value === null ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))} />;
+      return (
+        <input
+          type="number"
+          value={value === null ? '' : String(value)}
+          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        />
+      );
     case 'date':
       return <input type="date" value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value || null)} />;
     case 'checkbox':
@@ -62,7 +75,11 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
       return (
         <select value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value || null)}>
           <option value="">—</option>
-          {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
+          {field.options.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
         </select>
       );
     case 'model':
@@ -77,7 +94,15 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
 
 /** Modelo + nível de esforço, escolhidos no catálogo do board. */
 /** `part` mostra só o seletor de modelo ou só o de esforço, para telas que os colocam em linhas separadas. */
-export function ModelEditor({ value, onChange, part = 'both' }: { value: FieldValue; onChange: (v: FieldValue) => void; part?: 'both' | 'model' | 'effort' }) {
+export function ModelEditor({
+  value,
+  onChange,
+  part = 'both',
+}: {
+  value: FieldValue;
+  onChange: (v: FieldValue) => void;
+  part?: 'both' | 'model' | 'effort';
+}) {
   const all = useBoardStore((s) => s.state?.board.modelCatalog ?? []);
   const tool = useBoardStore((s) => s.state?.board.aiTool);
   const current = parseModelValue(value);
@@ -96,20 +121,39 @@ export function ModelEditor({ value, onChange, part = 'both' }: { value: FieldVa
       {current && !option && <option value={current.id}>{current.id} (fora do catálogo)</option>}
       {AI_TOOLS.filter((t) => catalog.some((o) => o.tool === t.id)).map((t) => (
         <optgroup key={t.id} label={t.label}>
-          {catalog.filter((o) => o.tool === t.id).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+          {catalog
+            .filter((o) => o.tool === t.id)
+            .map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
         </optgroup>
       ))}
     </select>
   );
   const effortSelect =
     option && option.efforts.length > 0 ? (
-      <select title="Esforço do modelo" value={current?.effort ?? ''} onChange={(e) => onChange(modelValue(option.id, e.target.value || null))}>
-        {option.efforts.map((e) => <option key={e} value={e}>{e}</option>)}
+      <select
+        title="Esforço do modelo"
+        value={current?.effort ?? ''}
+        onChange={(e) => onChange(modelValue(option.id, e.target.value || null))}
+      >
+        {option.efforts.map((e) => (
+          <option key={e} value={e}>
+            {e}
+          </option>
+        ))}
       </select>
     ) : null;
 
   if (part === 'model') return modelSelect;
-  if (part === 'effort') return effortSelect ?? <span className="muted small">{option ? 'Este modelo não tem ajuste de esforço.' : 'Escolha um modelo primeiro.'}</span>;
+  if (part === 'effort')
+    return (
+      effortSelect ?? (
+        <span className="muted small">{option ? 'Este modelo não tem ajuste de esforço.' : 'Escolha um modelo primeiro.'}</span>
+      )
+    );
   return (
     <div className="row model-editor">
       {modelSelect}
@@ -133,18 +177,35 @@ function SkillsPicker({ options, current, onChange }: { options: string[]; curre
   const all = [...options, ...current.filter((c) => !options.includes(c))];
   const q = query.trim().toLowerCase();
   // fechado, mostra só as skills marcadas: a lista inteira (dezenas, com plugins) empurrava o resto do card para baixo
-  const shown = open ? all.filter((o) => (scope === 'all' || (scope === 'project' ? inProject.has(o) : global.has(o))) && (!q || o.toLowerCase().includes(q))) : all.filter((o) => current.includes(o));
+  const shown = open
+    ? all.filter(
+        (o) => (scope === 'all' || (scope === 'project' ? inProject.has(o) : global.has(o))) && (!q || o.toLowerCase().includes(q)),
+      )
+    : all.filter((o) => current.includes(o));
   const count = (s: SkillScope) => all.filter((o) => (s === 'all' ? true : s === 'project' ? inProject.has(o) : global.has(o))).length;
-  const scopes: { id: SkillScope; label: string }[] = [{ id: 'all', label: 'Todas' }, { id: 'project', label: 'Projeto' }, { id: 'global', label: 'Globais' }];
+  const scopes: { id: SkillScope; label: string }[] = [
+    { id: 'all', label: 'Todas' },
+    { id: 'project', label: 'Projeto' },
+    { id: 'global', label: 'Globais' },
+  ];
   return (
     <div className="skills-picker">
       {open && (
         <div className="row wrap">
-          <input autoFocus type="search" placeholder="Buscar skill…" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setOpen(false))} />
+          <input
+            autoFocus
+            type="search"
+            placeholder="Buscar skill…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setOpen(false))}
+          />
           {global.size > 0 && (
             <div className="segmented">
               {scopes.map((s) => (
-                <Button key={s.id} on={scope === s.id} onClick={() => setScope(s.id)}>{s.label} ({count(s.id)})</Button>
+                <Button key={s.id} on={scope === s.id} onClick={() => setScope(s.id)}>
+                  {s.label} ({count(s.id)})
+                </Button>
               ))}
             </div>
           )}
@@ -153,19 +214,41 @@ function SkillsPicker({ options, current, onChange }: { options: string[]; curre
       <ChipsEditor
         options={shown.map((o) => {
           const g = global.get(o);
-          const where = [inProject.has(o) ? 'projeto' : '', g ? (g.plugin ? `plugin ${g.plugin}` : 'global') : ''].filter(Boolean).join(' e ');
+          const where = [inProject.has(o) ? 'projeto' : '', g ? (g.plugin ? `plugin ${g.plugin}` : 'global') : '']
+            .filter(Boolean)
+            .join(' e ');
           return {
             value: o,
             title: `${where ? `Skill de: ${where}. ` : ''}${g && !inProject.has(o) ? g.description : ''}`.trim(),
-            label: <>{o}{!inProject.has(o) && g && <small className="chip-scope">{g.plugin ? 'plugin' : 'global'}</small>}</>,
+            label: (
+              <>
+                {o}
+                {!inProject.has(o) && g && <small className="chip-scope">{g.plugin ? 'plugin' : 'global'}</small>}
+              </>
+            ),
           };
         })}
         values={current}
         onChange={onChange}
       >
-        {open && shown.length === 0 && <span className="muted small">Nenhuma skill {q ? `com "${query.trim()}"` : scope === 'project' ? 'no projeto' : scope === 'global' ? 'global' : ''}.</span>}
+        {open && shown.length === 0 && (
+          <span className="muted small">
+            Nenhuma skill {q ? `com "${query.trim()}"` : scope === 'project' ? 'no projeto' : scope === 'global' ? 'global' : ''}.
+          </span>
+        )}
         {!open && shown.length === 0 && <span className="muted small">Nenhuma skill obrigatória.</span>}
-        {all.length > 0 && <Button variant="ghost" size="small" onClick={() => { setOpen(!open); setQuery(''); }}>{open ? 'Concluir' : `Escolher skills (${all.length})`}</Button>}
+        {all.length > 0 && (
+          <Button
+            variant="ghost"
+            size="small"
+            onClick={() => {
+              setOpen(!open);
+              setQuery('');
+            }}
+          >
+            {open ? 'Concluir' : `Escolher skills (${all.length})`}
+          </Button>
+        )}
       </ChipsEditor>
     </div>
   );

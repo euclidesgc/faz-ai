@@ -14,7 +14,8 @@ export function StatusBadge({ status, short = false }: { status: CardStatus; sho
   const info = statusInfo(status);
   return (
     <span className="status-badge" style={badgeStyle(style.color)} title={`${info.hint} — ${OWNER_LABEL[info.owner]}`}>
-      {style.label}{!short && ` · ${OWNER_LABEL[info.owner]}`}
+      {style.label}
+      {!short && ` · ${OWNER_LABEL[info.owner]}`}
     </span>
   );
 }
@@ -45,26 +46,54 @@ export function StatusBar({ card }: { card: Card }) {
   return (
     <section className="status-bar">
       <div className="row">
-        {card.status ? <StatusBadge status={card.status} /> : <span className="muted small">{column?.aiActive ? 'Sem status' : 'A IA não atua nesta coluna'}</span>}
+        {card.status ? (
+          <StatusBadge status={card.status} />
+        ) : (
+          <span className="muted small">{column?.aiActive ? 'Sem status' : 'A IA não atua nesta coluna'}</span>
+        )}
         <span className="spacer" />
         {card.status === 'waiting_review' && (
           <>
-            <Button variant="primary" title="A IA move o card para a próxima coluna na próxima vez que trabalhar" onClick={() => set('approved')}>Aprovar</Button>
-            <Button onClick={() => start({ status: 'ready', title: 'O que precisa ser ajustado?', confirm: 'Pedir ajustes', required: true })}>Pedir ajustes</Button>
+            <Button
+              variant="primary"
+              title="A IA move o card para a próxima coluna na próxima vez que trabalhar"
+              onClick={() => set('approved')}
+            >
+              Aprovar
+            </Button>
+            <Button
+              onClick={() => start({ status: 'ready', title: 'O que precisa ser ajustado?', confirm: 'Pedir ajustes', required: true })}
+            >
+              Pedir ajustes
+            </Button>
           </>
         )}
-        {card.status === 'blocked' && <Button variant="primary" onClick={() => set('ready')}>Desbloquear</Button>}
+        {card.status === 'blocked' && (
+          <Button variant="primary" onClick={() => set('ready')}>
+            Desbloquear
+          </Button>
+        )}
         {running ? (
-          <Button title={`Interrompe o ${toolLabel}; o status volta ao que era`} onClick={() => ai.stop(card.id)}><span className="spinner" /> Parar a IA</Button>
+          <Button title={`Interrompe o ${toolLabel}; o status volta ao que era`} onClick={() => ai.stop(card.id)}>
+            <span className="spinner" /> Parar a IA
+          </Button>
         ) : (
           <Button
             disabled={!!state.aiRunUnsupported}
-            title={state.aiRunUnsupported ?? `Roda o ${toolLabel} em segundo plano para trabalhar neste card. A resposta chega na conversa.`}
+            title={
+              state.aiRunUnsupported ?? `Roda o ${toolLabel} em segundo plano para trabalhar neste card. A resposta chega na conversa.`
+            }
             onClick={() => ai.run(card.id)}
-          >▶ Chamar IA</Button>
+          >
+            ▶ Chamar IA
+          </Button>
         )}
         {card.status !== 'blocked' && (
-          <Button variant="ghost" size="small" onClick={() => start({ status: 'blocked', title: 'O que está impedindo o trabalho?', confirm: 'Bloquear', required: true })}>
+          <Button
+            variant="ghost"
+            size="small"
+            onClick={() => start({ status: 'blocked', title: 'O que está impedindo o trabalho?', confirm: 'Bloquear', required: true })}
+          >
             Bloquear
           </Button>
         )}
@@ -74,21 +103,36 @@ export function StatusBar({ card }: { card: Card }) {
           value={card.status ?? ''}
           onChange={(e) => {
             const next = (e.target.value || null) as CardStatus | null;
-            if (next === 'blocked') start({ status: 'blocked', title: 'O que está impedindo o trabalho?', confirm: 'Bloquear', required: true });
+            if (next === 'blocked')
+              start({ status: 'blocked', title: 'O que está impedindo o trabalho?', confirm: 'Bloquear', required: true });
             else set(next);
           }}
         >
           <option value="">Sem status</option>
-          {CARD_STATUSES.map((s) => <option key={s.id} value={s.id}>{styles[s.id].label}</option>)}
+          {CARD_STATUSES.map((s) => (
+            <option key={s.id} value={s.id}>
+              {styles[s.id].label}
+            </option>
+          ))}
         </select>
       </div>
-      {card.status === 'blocked' && card.statusReason && <div className="banner warn status-reason markdown plain" dangerouslySetInnerHTML={{ __html: renderMarkdown(card.statusReason) }} />}
+      {card.status === 'blocked' && card.statusReason && (
+        <div className="banner warn status-reason markdown plain" dangerouslySetInnerHTML={{ __html: renderMarkdown(card.statusReason) }} />
+      )}
       {pending && (
         <div className="status-note">
-          <textarea autoFocus rows={3} placeholder={`${pending.title} O texto vai para a conversa do card.`} value={note} onChange={(e) => setNote(e.target.value)} />
+          <textarea
+            autoFocus
+            rows={3}
+            placeholder={`${pending.title} O texto vai para a conversa do card.`}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
           <div className="row end">
             <Button onClick={() => setPending(null)}>Cancelar</Button>
-            <Button variant="primary" disabled={pending.required && !note.trim()} onClick={confirm}>{pending.confirm}</Button>
+            <Button variant="primary" disabled={pending.required && !note.trim()} onClick={confirm}>
+              {pending.confirm}
+            </Button>
           </div>
         </div>
       )}

@@ -21,11 +21,21 @@ export function FiltersApp() {
 
   return (
     <div className="filters-view">
-      <input className="search" type="search" placeholder="Buscar palavras-chave…" value={filters.text} onChange={(e) => setFilters({ text: e.target.value })} />
+      <input
+        className="search"
+        type="search"
+        placeholder="Buscar palavras-chave…"
+        value={filters.text}
+        onChange={(e) => setFilters({ text: e.target.value })}
+      />
       <div className="row">
         <span className="muted small">{active ? `${shown} de ${total} cards` : `${total} cards`}</span>
         <span className="spacer" />
-        {active > 0 && <Button variant="ghost" size="small" onClick={clearFilters}>Limpar ({active})</Button>}
+        {active > 0 && (
+          <Button variant="ghost" size="small" onClick={clearFilters}>
+            Limpar ({active})
+          </Button>
+        )}
       </div>
       <FilterPanel />
     </div>

@@ -20,7 +20,10 @@ const col = (name: string, kind: 'parent' | 'child' = 'parent') => {
   const s = snap();
   return s.columns.find((c) => c.name === name && s.workflows.find((w) => w.id === c.workflowId)!.kind === kind)!;
 };
-const places = () => snap().cards.map((c) => [c.title, c.columnId, c.position, c.status]).sort();
+const places = () =>
+  snap()
+    .cards.map((c) => [c.title, c.columnId, c.position, c.status])
+    .sort();
 
 /** Deixa o board como os criados antes do status de card: sem Discovery e Homologação, colunas sem papel da IA nem fase, e versão 0. */
 beforeEach(async () => {
@@ -41,10 +44,22 @@ describe('atualização do board para o padrão atual', () => {
     expect(s.board.templateVersion).toBe(BOARD_TEMPLATE_VERSION);
     expect(s.pendingUpgrade).toEqual([]);
     expect(s.columns.filter((c) => c.requiresApproval).map((c) => c.name)).toEqual(['Discovery', 'PRD', 'Spec', 'Plan', 'Homologação']);
-    expect(s.columns.filter((c) => c.aiActive).map((c) => c.name).sort()).toEqual(['A fazer', 'Discovery', 'Em andamento', 'Homologação', 'Implementação', 'PRD', 'Plan', 'Spec']);
+    expect(
+      s.columns
+        .filter((c) => c.aiActive)
+        .map((c) => c.name)
+        .sort(),
+    ).toEqual(['A fazer', 'Discovery', 'Em andamento', 'Homologação', 'Implementação', 'PRD', 'Plan', 'Spec']);
     expect(s.columns.find((c) => c.name === 'PRD')).toMatchObject({ artifactName: 'PRD.md' });
     expect(s.columns.find((c) => c.name === 'Discovery')!.aiInstruction).toContain('ask_question');
-    expect(s.fieldDefs.find((f) => f.name === 'Fase')!.options).toEqual(['Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação']);
+    expect(s.fieldDefs.find((f) => f.name === 'Fase')!.options).toEqual([
+      'Discovery',
+      'PRD',
+      'Spec',
+      'Plan',
+      'Implementação',
+      'Homologação',
+    ]);
   });
 
   it('completa as colunas sem mover cards nem mexer no que foi personalizado', () => {
@@ -91,12 +106,30 @@ describe('atualização do board para o padrão atual', () => {
     // colunas novas entram no lugar certo, já configuradas; as demais só são renumeradas
     const s2 = snap();
     const parentWf = s2.workflows.find((w) => w.kind === 'parent')!.id;
-    expect(s2.columns.filter((c) => c.workflowId === parentWf).map((c) => c.name)).toEqual(['Backlog', 'Discovery', 'Requisitos', 'Spec', 'Plan', 'Implementação', 'Homologação', 'Concluído', 'Cancelado', 'Revisão de segurança']);
+    expect(s2.columns.filter((c) => c.workflowId === parentWf).map((c) => c.name)).toEqual([
+      'Backlog',
+      'Discovery',
+      'Requisitos',
+      'Spec',
+      'Plan',
+      'Implementação',
+      'Homologação',
+      'Concluído',
+      'Cancelado',
+      'Revisão de segurança',
+    ]);
     expect(col('Discovery')).toMatchObject({ aiActive: true, requiresApproval: true, artifactName: 'DISCOVERY.md' });
     expect(col('Homologação')).toMatchObject({ aiActive: true, requiresApproval: true, artifactName: '' });
     expect(col('Requisitos')).toMatchObject({ aiInstruction: '', artifactName: '' });
     expect(col('Plan').artifactTemplate).toContain('# Plano');
-    expect(s2.fieldDefs.find((f) => f.name === 'Fase')!.options).toEqual(['Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação']);
+    expect(s2.fieldDefs.find((f) => f.name === 'Fase')!.options).toEqual([
+      'Discovery',
+      'PRD',
+      'Spec',
+      'Plan',
+      'Implementação',
+      'Homologação',
+    ]);
 
     // rodar de novo não muda nada
     expect(pendingUpgrade(db, boardId)).toEqual([]);
@@ -108,7 +141,12 @@ describe('atualização do board para o padrão atual', () => {
   it('pelo roteador: o board antigo avisa o que muda e é atualizado por mensagem, com cópia de segurança', () => {
     let backups = 0;
     const handle = { db, scheduleSave: () => {}, backup: () => backups++, close: async () => {} };
-    const router = new MessageRouter(handle as never, { workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(os.tmpdir(), 'fazai-upgrade') });
+    const router = new MessageRouter(handle as never, {
+      workspaceKey: 'ws',
+      folderName: 'Projeto',
+      author: 'Pessoa',
+      attachmentsDir: path.join(os.tmpdir(), 'fazai-upgrade'),
+    });
     expect(router.snapshot().board.templateVersion).toBe(0);
     expect(router.snapshot().pendingUpgrade.length).toBeGreaterThan(0);
     const after = router.handle({ type: 'settings.board.upgrade' });

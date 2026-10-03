@@ -21,7 +21,9 @@ export function parseSource(text: string, homeDir = ''): InstallSource {
   }
   if (/^[\w.-]+\/[\w.-]+$/.test(source)) return { kind: 'git', url: `https://github.com/${source.replace(/\.git$/, '')}.git` };
   if (/^(https:\/\/|ssh:\/\/|git@)[\w.@:/~-]+$/.test(source)) return { kind: 'git', url: source };
-  throw new Error('Origem não reconhecida. Use o caminho completo de uma pasta, "dono/repositorio" do GitHub ou um endereço https ou ssh de um repositório git.');
+  throw new Error(
+    'Origem não reconhecida. Use o caminho completo de uma pasta, "dono/repositorio" do GitHub ou um endereço https ou ssh de um repositório git.',
+  );
 }
 
 export type GitRunner = (args: string[]) => Promise<void>;
@@ -29,7 +31,9 @@ export type GitRunner = (args: string[]) => Promise<void>;
 /** `git clone` sem rodar nada do repositório: sem hooks, sem submódulos, só o último commit. */
 export const runGit: GitRunner = (args) =>
   new Promise((resolve, reject) => {
-    execFile('git', args, { timeout: 120_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }, (error, _out, stderr) => (error ? reject(new Error(stderr.trim() || error.message)) : resolve()));
+    execFile('git', args, { timeout: 120_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }, (error, _out, stderr) =>
+      error ? reject(new Error(stderr.trim() || error.message)) : resolve(),
+    );
   });
 
 /** Deixa a origem disponível numa pasta: a própria, se for local, ou um clone temporário. `cleanup` apaga o clone. */
@@ -38,7 +42,17 @@ export async function fetchSource(source: InstallSource, git: GitRunner = runGit
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-skills-'));
   const cleanup = () => fs.rmSync(dir, { recursive: true, force: true });
   try {
-    await git(['-c', 'core.hooksPath=/dev/null', 'clone', '--depth', '1', '--no-recurse-submodules', '--', source.url, path.join(dir, 'repo')]);
+    await git([
+      '-c',
+      'core.hooksPath=/dev/null',
+      'clone',
+      '--depth',
+      '1',
+      '--no-recurse-submodules',
+      '--',
+      source.url,
+      path.join(dir, 'repo'),
+    ]);
   } catch (e) {
     cleanup();
     throw new Error(`Não foi possível clonar ${source.url}: ${e instanceof Error ? e.message : String(e)}`);
@@ -46,11 +60,17 @@ export async function fetchSource(source: InstallSource, git: GitRunner = runGit
   return { dir: path.join(dir, 'repo'), cleanup };
 }
 
-const frontmatterValue = (text: string, key: string) => new RegExp(`^${key}:\\s*(.*)$`, 'm').exec(/^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? '')?.[1]?.trim().replace(/^["']|["']$/g, '') ?? '';
+const frontmatterValue = (text: string, key: string) =>
+  new RegExp(`^${key}:\\s*(.*)$`, 'm')
+    .exec(/^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? '')?.[1]
+    ?.trim()
+    .replace(/^["']|["']$/g, '') ?? '';
 
 function countFiles(dir: string, depth = 0): number {
   if (depth > MAX_DEPTH) return 0;
-  return fs.readdirSync(dir, { withFileTypes: true }).reduce((n, e) => n + (e.isDirectory() ? countFiles(path.join(dir, e.name), depth + 1) : e.isFile() ? 1 : 0), 0);
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .reduce((n, e) => n + (e.isDirectory() ? countFiles(path.join(dir, e.name), depth + 1) : e.isFile() ? 1 : 0), 0);
 }
 
 /** Pastas com SKILL.md dentro da origem (sem entrar em .git, node_modules ou pastas ocultas). */
@@ -61,7 +81,13 @@ export function findSkills(root: string): InstallableSkill[] {
     const md = path.join(dir, 'SKILL.md');
     if (fs.existsSync(md) && fs.statSync(md).isFile()) {
       const name = path.basename(dir);
-      out.push({ rel: path.relative(root, dir).split(path.sep).join('/') || '.', name, description: frontmatterValue(fs.readFileSync(md, 'utf8').slice(0, 8192), 'description'), files: countFiles(dir) - 1, valid: SKILL_NAME_PATTERN.test(name) });
+      out.push({
+        rel: path.relative(root, dir).split(path.sep).join('/') || '.',
+        name,
+        description: frontmatterValue(fs.readFileSync(md, 'utf8').slice(0, 8192), 'description'),
+        files: countFiles(dir) - 1,
+        valid: SKILL_NAME_PATTERN.test(name),
+      });
       return; // uma skill não contém outra
     }
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -88,7 +114,10 @@ export function installSkills(root: string, rels: string[], destRoot: string): s
   fs.mkdirSync(destRoot, { recursive: true });
   return chosen.map((k) => {
     const dest = path.join(destRoot, k.name);
-    fs.cpSync(k.rel === '.' ? root : path.join(root, ...k.rel.split('/')), dest, { recursive: true, filter: (src) => !fs.lstatSync(src).isSymbolicLink() && path.basename(src) !== '.git' });
+    fs.cpSync(k.rel === '.' ? root : path.join(root, ...k.rel.split('/')), dest, {
+      recursive: true,
+      filter: (src) => !fs.lstatSync(src).isSymbolicLink() && path.basename(src) !== '.git',
+    });
     return path.join(dest, 'SKILL.md');
   });
 }

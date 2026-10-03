@@ -70,7 +70,14 @@ export const cardPrompt = (ref: string, skills: { name: string; path?: string }[
   [
     `Trabalhe no card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai".`,
     // as skills do card vão pelo caminho: valem mesmo desligadas ou fora da invocação automática
-    ...(skills.some((k) => k.path) ? [`Antes de começar, leia estas skills, obrigatórias para este card: ${skills.filter((k) => k.path).map((k) => `${k.name} (${k.path})`).join('; ')}.`] : []),
+    ...(skills.some((k) => k.path)
+      ? [
+          `Antes de começar, leia estas skills, obrigatórias para este card: ${skills
+            .filter((k) => k.path)
+            .map((k) => `${k.name} (${k.path})`)
+            .join('; ')}.`,
+        ]
+      : []),
     'Se a skill "faz-ai-fluxo" existir no projeto, siga-a.',
     `Leia o card com get_card (descrição, conversa, anexos e a fase em \`phase\`). Se a última mensagem da conversa for da pessoa, responda a ela pela conversa do card.`,
     'Faça o trabalho da fase em que o card está e termine passando a vez: request_review quando houver algo para revisar, ask_question quando precisar de uma resposta, block_card se houver um impedimento, ou mova o card se a fase não exigir aprovação.',
@@ -86,7 +93,10 @@ export class AiRunner {
   private runs = new Map<string, Run>();
   private finishListeners: ((cardId: string) => void)[] = [];
 
-  constructor(private router: MessageRouter, private deps: RunnerDeps) {}
+  constructor(
+    private router: MessageRouter,
+    private deps: RunnerDeps,
+  ) {}
 
   isRunning(cardId: string): boolean {
     return this.runs.has(cardId);
@@ -105,7 +115,13 @@ export class AiRunner {
     const tool = aiToolInfo(state.board.aiTool);
     const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '');
     const permissionAdvice = PERMISSION_ADVICE[state.board.runner.permission];
-    const built = headlessCommand(state.board.aiTool, { prompt: cardPrompt(cardRef(card), requiredSkills(state, card), [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])]), permission: state.board.runner.permission, addDirs: this.router.aiWorkDirs(), exec: plan.input, boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined });
+    const built = headlessCommand(state.board.aiTool, {
+      prompt: cardPrompt(cardRef(card), requiredSkills(state, card), [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])]),
+      permission: state.board.runner.permission,
+      addDirs: this.router.aiWorkDirs(),
+      exec: plan.input,
+      boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined,
+    });
     if ('unsupported' in built) throw new Error(built.unsupported);
     const { command, cleanup } = materialize(built);
 
@@ -117,11 +133,14 @@ export class AiRunner {
     let proc: RunningProcess;
     try {
       proc = this.deps.spawn(command, this.deps.cwd, (text) =>
-        text.split(/\r?\n/).filter(Boolean).forEach((line) => {
-          log(line);
-          tail.push(line.length > 300 ? `${line.slice(0, 300)}…` : line);
-          if (tail.length > TAIL_LINES) tail.shift();
-        }),
+        text
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .forEach((line) => {
+            log(line);
+            tail.push(line.length > 300 ? `${line.slice(0, 300)}…` : line);
+            if (tail.length > TAIL_LINES) tail.shift();
+          }),
       );
     } catch (e) {
       cleanup();
@@ -146,7 +165,15 @@ export class AiRunner {
       clearTimeout(run.timer);
       cleanup();
       this.runs.delete(cardId);
-      log(error ? `Falhou: ${error.message}` : run.stopped ? 'Interrompida.' : run.timedOut ? 'Encerrada por tempo limite.' : `Terminou (código ${code}).`);
+      log(
+        error
+          ? `Falhou: ${error.message}`
+          : run.stopped
+            ? 'Interrompida.'
+            : run.timedOut
+              ? 'Encerrada por tempo limite.'
+              : `Terminou (código ${code}).`,
+      );
       this.settle(cardId, run, code, error, this.aiMessages(cardId) > messagesBefore, tool.label);
       this.publish();
       this.finishListeners.forEach((fn) => fn(cardId));
@@ -176,10 +203,20 @@ export class AiRunner {
     // a IA (ou a pessoa) já mudou o status durante a execução: é ele que vale
     if (!card || card.status !== 'running') return;
     // restaurar não passa pelas regras da IA (o status anterior pode ser "Aprovado")
-    if (run.stopped) return void this.router.handle({ type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous }, { author: RUNNER_AUTHOR });
+    if (run.stopped)
+      return void this.router.handle(
+        { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
+        { author: RUNNER_AUTHOR },
+      );
     // o fim do que a ferramenta escreveu vai junto: a pessoa entende a falha sem sair do card
-    const output = run.tail.length ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${run.tail.join('\n').replace(/```/g, "'''")}\n\`\`\`` : '';
-    if (run.timedOut) return this.block(cardId, `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness de IA.${output}`);
+    const output = run.tail.length
+      ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${run.tail.join('\n').replace(/```/g, "'''")}\n\`\`\``
+      : '';
+    if (run.timedOut)
+      return this.block(
+        cardId,
+        `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness de IA.${output}`,
+      );
     if (error) return this.block(cardId, `Não foi possível executar o ${toolLabel}: ${error.message}`);
     if (code !== 0) return this.block(cardId, `O ${toolLabel} terminou com erro (código ${code}).${output}`);
     // respondeu na conversa e encerrou: a vez é da pessoa

@@ -82,7 +82,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       if (selectedParentId && !state.cards.some((c) => c.id === selectedParentId && isLive(c))) setShared({ selectedParentId: null });
       persist(get());
     },
-    setViewState: (view) => set({ filters: { ...EMPTY_FILTERS, ...view.filters }, selectedParentId: view.selectedParentId, collapsed: view.collapsed ?? {} }),
+    setViewState: (view) =>
+      set({ filters: { ...EMPTY_FILTERS, ...view.filters }, selectedParentId: view.selectedParentId, collapsed: view.collapsed ?? {} }),
     setError: (error) => set({ error }),
     setNotice: (notice) => set({ notice }),
     setView(view) {
@@ -144,9 +145,12 @@ export const cardsIn = (state: BoardState, columnId: Id): Card[] =>
   state.cards.filter((c) => c.columnId === columnId && isLive(c)).sort((a, b) => a.position - b.position);
 
 export const archivedIn = (state: BoardState, workflowId: Id): Card[] =>
-  state.cards.filter((c) => c.workflowId === workflowId && c.archivedAt !== null && c.deletedAt === null).sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
+  state.cards
+    .filter((c) => c.workflowId === workflowId && c.archivedAt !== null && c.deletedAt === null)
+    .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
 
-export const childrenOf = (state: BoardState, parentId: Id): Card[] => state.cards.filter((c) => c.parentId === parentId && c.deletedAt === null);
+export const childrenOf = (state: BoardState, parentId: Id): Card[] =>
+  state.cards.filter((c) => c.parentId === parentId && c.deletedAt === null);
 
 export const fieldsForType = (state: BoardState, typeId: Id): FieldDef[] =>
   state.fieldDefs.filter((f) => f.appliesToTypes === null || f.appliesToTypes.includes(typeId)).sort((a, b) => a.position - b.position);

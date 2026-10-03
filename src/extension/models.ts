@@ -51,14 +51,41 @@ const BUILTIN: Record<AiTool, Seed[]> = {
 
 /** Modelo sugerido por nível de esforço da tarefa (Baixo, Médio, Alto), como [modelo, esforço]. */
 const TIERS: Record<AiTool, [string, string | null][]> = {
-  claude: [['haiku', null], ['sonnet', 'medium'], ['opus', 'high']],
-  codex: [['gpt-6-luna', 'light'], ['gpt-6.1-sol', 'medium'], ['gpt-6-astra', 'high']],
-  cursor: [['auto', null], ['composer-2.5', null], ['composer-2.5', null]],
-  kimi: [['kimi-code/k3', 'low'], ['kimi-code/k3', 'high'], ['kimi-code/k3', 'max']],
-  copilot: [['gpt-5.6-luna', 'low'], ['gpt-5.6-terra', 'medium'], ['gpt-5.6-sol', 'high']],
+  claude: [
+    ['haiku', null],
+    ['sonnet', 'medium'],
+    ['opus', 'high'],
+  ],
+  codex: [
+    ['gpt-6-luna', 'light'],
+    ['gpt-6.1-sol', 'medium'],
+    ['gpt-6-astra', 'high'],
+  ],
+  cursor: [
+    ['auto', null],
+    ['composer-2.5', null],
+    ['composer-2.5', null],
+  ],
+  kimi: [
+    ['kimi-code/k3', 'low'],
+    ['kimi-code/k3', 'high'],
+    ['kimi-code/k3', 'max'],
+  ],
+  copilot: [
+    ['gpt-5.6-luna', 'low'],
+    ['gpt-5.6-terra', 'medium'],
+    ['gpt-5.6-sol', 'high'],
+  ],
 };
 
-const option = (tool: AiTool, [model, label, efforts, defaultEffort]: Seed): ModelOption => ({ id: modelId(tool, model), tool, model, label, efforts, defaultEffort });
+const option = (tool: AiTool, [model, label, efforts, defaultEffort]: Seed): ModelOption => ({
+  id: modelId(tool, model),
+  tool,
+  model,
+  label,
+  efforts,
+  defaultEffort,
+});
 
 /** Lê as tabelas `[models."nome"]` do config.toml do Kimi, com display_name, support_efforts e default_effort. */
 export function parseKimiModels(toml: string): ModelOption[] {
@@ -112,8 +139,16 @@ export function modelsFor(tool: AiTool, homeDir: string): ModelOption[] {
 /** Ferramentas com sinal de instalação nesta máquina (pasta de configuração na home). */
 export function detectTools(homeDir: string): AiTool[] {
   if (!homeDir) return [];
-  const dirs: Record<AiTool, string[]> = { claude: ['.claude'], codex: ['.codex'], cursor: ['.cursor'], kimi: ['.kimi-code', '.kimi'], copilot: ['.copilot'] };
-  return (Object.keys(dirs) as AiTool[]).filter((t) => dirs[t].some((d) => fs.existsSync(path.join(homeDir, d))) || (t === 'copilot' && hasCopilotExtension(homeDir)));
+  const dirs: Record<AiTool, string[]> = {
+    claude: ['.claude'],
+    codex: ['.codex'],
+    cursor: ['.cursor'],
+    kimi: ['.kimi-code', '.kimi'],
+    copilot: ['.copilot'],
+  };
+  return (Object.keys(dirs) as AiTool[]).filter(
+    (t) => dirs[t].some((d) => fs.existsSync(path.join(homeDir, d))) || (t === 'copilot' && hasCopilotExtension(homeDir)),
+  );
 }
 
 /** O Copilot no VS Code é uma extensão; a pasta ~/.copilot só existe para quem usa a Copilot CLI. */
@@ -140,7 +175,9 @@ export function effortTiers(tool: AiTool, catalog: ModelOption[]): [string, stri
     if (o) return [level, modelValue(o.id, effort && o.efforts.includes(effort) ? effort : o.defaultEffort)];
     // o modelo embutido não existe no catálogo real: usa o primeiro modelo, variando o esforço quando houver
     const first = mine[0]!;
-    const e = first.efforts.length ? first.efforts[Math.min(first.efforts.length - 1, Math.round((i * (first.efforts.length - 1)) / 2))]! : null;
+    const e = first.efforts.length
+      ? first.efforts[Math.min(first.efforts.length - 1, Math.round((i * (first.efforts.length - 1)) / 2))]!
+      : null;
     return [level, modelValue(first.id, e)];
   });
 }

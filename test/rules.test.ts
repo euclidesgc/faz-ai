@@ -68,7 +68,12 @@ describe('categoria de coluna', () => {
       INSERT INTO columns VALUES ('a','w','Backlog',0,0), ('b','w','Concluído',1,1), ('c','w','Cancelado',2,1), ('d','w','Entregue',3,1);`);
     migrate(old);
     const rows = old.exec('SELECT id, category FROM columns ORDER BY id')[0]!.values;
-    expect(rows).toEqual([['a', 'open'], ['b', 'done'], ['c', 'cancelled'], ['d', 'done']]);
+    expect(rows).toEqual([
+      ['a', 'open'],
+      ['b', 'done'],
+      ['c', 'cancelled'],
+      ['d', 'done'],
+    ]);
   });
 });
 
@@ -146,7 +151,10 @@ describe('cancelar história levando as sub-tarefas', () => {
 describe('regras configuráveis', () => {
   it('board novo e banco antigo usam os padrões; valores inválidos são ignorados', () => {
     expect(snap().board.rules).toEqual(DEFAULT_RULES);
-    expect(parseRules('{"onCancelParent":"xyz","confirmTrash":"never","blockDoneWithOpenChildren":"sim"}')).toEqual({ ...DEFAULT_RULES, confirmTrash: 'never' });
+    expect(parseRules('{"onCancelParent":"xyz","confirmTrash":"never","blockDoneWithOpenChildren":"sim"}')).toEqual({
+      ...DEFAULT_RULES,
+      confirmTrash: 'never',
+    });
     expect(parseRules('não é json')).toEqual(DEFAULT_RULES);
     expect(DEFAULT_RULES.onAllChildrenDone).toBe('ask');
     expect(parseRules('{"onAllChildrenDone":"auto"}').onAllChildrenDone).toBe('auto');
@@ -171,7 +179,12 @@ describe('regras configuráveis', () => {
 describe('regra: história só avança de fase sem sub-tarefas da fase em aberto', () => {
   const setFase = (cardId: string, fase: string) => cards.setFieldValue(cardId, snap().fieldDefs.find((f) => f.name === 'Fase')!.id, fase);
   const mk = (title: string, parentId: string | null) =>
-    cards.create(boardId, { typeId: snap().cardTypes.find((t) => t.name === (parentId ? 'Sub-tarefa' : 'História'))!.id, columnId: col(parentId ? 'child' : 'parent', parentId ? 'A fazer' : 'PRD').id, parentId, title });
+    cards.create(boardId, {
+      typeId: snap().cardTypes.find((t) => t.name === (parentId ? 'Sub-tarefa' : 'História'))!.id,
+      columnId: col(parentId ? 'child' : 'parent', parentId ? 'A fazer' : 'PRD').id,
+      parentId,
+      title,
+    });
 
   it('bloqueia avançar, mas deixa voltar, cancelar e avançar com sub-tarefas de outra fase', () => {
     const story = mk('h', null);

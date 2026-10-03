@@ -67,7 +67,12 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
       case 'claude': {
         const file = path.join(o.workspaceDir, '.mcp.json');
         mergeJson(file, { type: 'stdio', command: 'node', args });
-        out.push({ tool, file, projectFile: '.mcp.json', next: 'Claude Code: abra uma sessão nova na pasta e aprove o servidor (/mcp mostra o estado).' });
+        out.push({
+          tool,
+          file,
+          projectFile: '.mcp.json',
+          next: 'Claude Code: abra uma sessão nova na pasta e aprove o servidor (/mcp mostra o estado).',
+        });
         break;
       }
       case 'cursor': {
@@ -80,7 +85,12 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
         const file = path.join(o.workspaceDir, '.codex', 'config.toml');
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, upsertTomlServer(fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '', 'node', args));
-        out.push({ tool, file, projectFile: '.codex/config.toml', next: 'Codex: o projeto precisa estar marcado como confiável; abra uma sessão nova (codex mcp list confere).' });
+        out.push({
+          tool,
+          file,
+          projectFile: '.codex/config.toml',
+          next: 'Codex: o projeto precisa estar marcado como confiável; abra uma sessão nova (codex mcp list confere).',
+        });
         break;
       }
       case 'kimi': {
@@ -97,10 +107,20 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
         // o VS Code lê .vscode/mcp.json (chave `servers`); a Copilot CLI não lê esse arquivo, e sim o .mcp.json
         const vscodeFile = path.join(o.workspaceDir, '.vscode', 'mcp.json');
         mergeJson(vscodeFile, { type: 'stdio', command: 'node', args }, 'servers');
-        out.push({ tool, file: vscodeFile, projectFile: '.vscode/mcp.json', next: 'GitHub Copilot no VS Code: confirme a confiança e inicie o servidor (MCP: List Servers).' });
+        out.push({
+          tool,
+          file: vscodeFile,
+          projectFile: '.vscode/mcp.json',
+          next: 'GitHub Copilot no VS Code: confirme a confiança e inicie o servidor (MCP: List Servers).',
+        });
         const cliFile = path.join(o.workspaceDir, '.mcp.json');
         mergeJson(cliFile, { type: 'stdio', command: 'node', args, tools: ['*'] });
-        out.push({ tool, file: cliFile, projectFile: '.mcp.json', next: 'Copilot CLI: abra uma sessão nova na pasta e confirme a confiança nela.' });
+        out.push({
+          tool,
+          file: cliFile,
+          projectFile: '.mcp.json',
+          next: 'Copilot CLI: abra uma sessão nova na pasta e confirme a confiança nela.',
+        });
         break;
       }
     }

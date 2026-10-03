@@ -14,7 +14,8 @@ const exec: ExecInput = {
   model: { name: 'opus', effort: 'high' },
   clean: true,
 };
-const args = (tool: (typeof ALL_AI_TOOLS)[number], permission: 'board' | 'full' = 'full') => (headlessCommand(tool, { prompt: 'P', permission, exec }) as HeadlessCommand).args;
+const args = (tool: (typeof ALL_AI_TOOLS)[number], permission: 'board' | 'full' = 'full') =>
+  (headlessCommand(tool, { prompt: 'P', permission, exec }) as HeadlessCommand).args;
 const has = (list: string[], ...seq: string[]) => list.some((_, i) => seq.every((s, j) => list[i + j] === s));
 
 describe('perfil de execução na linha de comando de cada ferramenta', () => {
@@ -41,7 +42,16 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
     expect(codex.at(-1)).toBe('-');
 
     const copilot = args('copilot');
-    for (const flag of ['--agent=planejador', '--model=opus', '--effort=high', '--available-tools=Read,Edit', '--excluded-tools=WebFetch', '--disable-mcp-server=slack', '--no-custom-instructions']) expect(copilot).toContain(flag);
+    for (const flag of [
+      '--agent=planejador',
+      '--model=opus',
+      '--effort=high',
+      '--available-tools=Read,Edit',
+      '--excluded-tools=WebFetch',
+      '--disable-mcp-server=slack',
+      '--no-custom-instructions',
+    ])
+      expect(copilot).toContain(flag);
 
     expect(has(args('cursor'), '--model', 'opus')).toBe(true);
     expect(args('cursor')).not.toContain('--agent');
@@ -49,20 +59,62 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
   });
 
   it('sem perfil, o comando é o mesmo de antes', () => {
-    for (const tool of ALL_AI_TOOLS) expect(headlessCommand(tool, { prompt: 'P', permission: 'full' })).toEqual(headlessCommand(tool, { prompt: 'P', permission: 'full', exec: undefined }));
-    expect((headlessCommand('claude', { prompt: 'P', permission: 'full' }) as HeadlessCommand).args).toEqual(['-p', '--permission-mode', 'bypassPermissions']);
+    for (const tool of ALL_AI_TOOLS)
+      expect(headlessCommand(tool, { prompt: 'P', permission: 'full' })).toEqual(
+        headlessCommand(tool, { prompt: 'P', permission: 'full', exec: undefined }),
+      );
+    expect((headlessCommand('claude', { prompt: 'P', permission: 'full' }) as HeadlessCommand).args).toEqual([
+      '-p',
+      '--permission-mode',
+      'bypassPermissions',
+    ]);
   });
 
   it('a tabela do que é imposto cobre todas as ferramentas, e as skills vão sempre como orientação', () => {
     for (const tool of ALL_AI_TOOLS) expect(EXEC_ENFORCEMENT[tool].skills).toBe('advised');
-    expect(EXEC_ENFORCEMENT.claude).toMatchObject({ agent: 'enforced', mcp: 'enforced', tools: 'enforced', model: 'enforced', clean: 'enforced' });
+    expect(EXEC_ENFORCEMENT.claude).toMatchObject({
+      agent: 'enforced',
+      mcp: 'enforced',
+      tools: 'enforced',
+      model: 'enforced',
+      clean: 'enforced',
+    });
   });
 
   it('lê os perfis salvos, descartando o que for inválido e mantendo um só padrão', () => {
-    const parsed = parseProfiles(JSON.stringify([{ id: 'a', name: ' Plan ', skills: ['x', 'x', 3], mcpServers: [], isDefault: true }, { id: 'a', name: 'duplicado' }, { name: 'sem id' }, { id: 'b', isDefault: true, mcpServers: 'tudo' }]));
+    const parsed = parseProfiles(
+      JSON.stringify([
+        { id: 'a', name: ' Plan ', skills: ['x', 'x', 3], mcpServers: [], isDefault: true },
+        { id: 'a', name: 'duplicado' },
+        { name: 'sem id' },
+        { id: 'b', isDefault: true, mcpServers: 'tudo' },
+      ]),
+    );
     expect(parsed).toEqual([
-      { id: 'a', name: 'Plan', agent: '', skills: ['x'], mcpServers: [], tools: [], deniedTools: [], model: '', clean: false, isDefault: true },
-      { id: 'b', name: 'Perfil', agent: '', skills: [], mcpServers: null, tools: [], deniedTools: [], model: '', clean: false, isDefault: false },
+      {
+        id: 'a',
+        name: 'Plan',
+        agent: '',
+        skills: ['x'],
+        mcpServers: [],
+        tools: [],
+        deniedTools: [],
+        model: '',
+        clean: false,
+        isDefault: true,
+      },
+      {
+        id: 'b',
+        name: 'Perfil',
+        agent: '',
+        skills: [],
+        mcpServers: null,
+        tools: [],
+        deniedTools: [],
+        model: '',
+        clean: false,
+        isDefault: false,
+      },
     ]);
     expect(parseProfiles('isto não é json')).toEqual([]);
   });

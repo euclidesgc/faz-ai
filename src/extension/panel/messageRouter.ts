@@ -5,7 +5,16 @@ import type { Attachment, BoardState, Card, FieldDef } from '../../shared/model'
 import { branchName, slug } from '../../shared/git';
 import { prepareWorkspace } from '../git';
 import type { WebviewToHost } from '../../shared/messages';
-import { EMPTY_HARNESS, REFERENCE_SKILL, aiToolInfo, type AiTool, type Harness, type HarnessItem, type HarnessKind, type InstallableSkill } from '../../shared/harness';
+import {
+  EMPTY_HARNESS,
+  REFERENCE_SKILL,
+  aiToolInfo,
+  type AiTool,
+  type Harness,
+  type HarnessItem,
+  type HarnessKind,
+  type InstallableSkill,
+} from '../../shared/harness';
 import { copyTarget } from '../../shared/harnessCatalog';
 import { findSkills, installSkills } from '../skillInstall';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelRule } from '../../shared/models';
@@ -57,7 +66,10 @@ export class MessageRouter {
   private approveListeners: ((cardId: string) => void)[] = [];
   boardId: string;
 
-  constructor(private dbHandle: DbHandle, private opts: RouterOptions) {
+  constructor(
+    private dbHandle: DbHandle,
+    private opts: RouterOptions,
+  ) {
     const db = dbHandle.db;
     this.boards = new BoardRepo(db);
     this.cards = new CardRepo(db);
@@ -83,7 +95,13 @@ export class MessageRouter {
 
   snapshot(): BoardState {
     const s = this.boards.snapshot(this.boardId, this.opts.author);
-    return { ...s, harness: this.harness, aiRuns: this.aiRuns, aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission), harnessInstall: this.install ? { source: this.install.source, skills: this.install.skills } : null };
+    return {
+      ...s,
+      harness: this.harness,
+      aiRuns: this.aiRuns,
+      aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission),
+      harnessInstall: this.install ? { source: this.install.source, skills: this.install.skills } : null,
+    };
   }
 
   /** Cards em que a extensão está executando a IA (informado pelo executor). */
@@ -107,10 +125,14 @@ export class MessageRouter {
     if (!this.harnessStore) return;
     this.harness = this.harnessStore.scan();
     const tool = this.boards.snapshot(this.boardId).board.aiTool;
-    const outside = (this.harness.inventory.find((t) => t.tool === tool)?.items ?? []).filter((i) => i.kind === 'skill' && i.scope !== 'project').map((i) => i.name);
+    const outside = (this.harness.inventory.find((t) => t.tool === tool)?.items ?? [])
+      .filter((i) => i.kind === 'skill' && i.scope !== 'project')
+      .map((i) => i.name);
     const project = this.harness.skills.map((s) => s.name);
     const names = [...project, ...[...new Set(outside)].filter((n) => !project.includes(n)).sort()];
-    const field = this.boards.snapshot(this.boardId).fieldDefs.find((f) => f.name.toLowerCase() === SKILLS_FIELD.toLowerCase() && f.kind === 'multiselect');
+    const field = this.boards
+      .snapshot(this.boardId)
+      .fieldDefs.find((f) => f.name.toLowerCase() === SKILLS_FIELD.toLowerCase() && f.kind === 'multiselect');
     if (field && JSON.stringify(field.options) !== JSON.stringify(names)) this.settings.updateField(field.id, { options: names });
   }
 
@@ -126,7 +148,7 @@ export class MessageRouter {
     const { board } = this.boards.snapshot(this.boardId);
     if (board.modelCatalog.length) return;
     const installed = detectTools(this.home);
-    const tool = installed.includes(board.aiTool) ? board.aiTool : installed[0] ?? board.aiTool;
+    const tool = installed.includes(board.aiTool) ? board.aiTool : (installed[0] ?? board.aiTool);
     if (tool !== board.aiTool) this.boards.updateBoard(this.boardId, { aiTool: tool });
     this.useTool(tool);
   }
@@ -159,11 +181,16 @@ export class MessageRouter {
     }
     const field = s.fieldDefs.find((f) => f.name.toLowerCase() === EFFORT_FIELD.toLowerCase());
     if (!field) throw new Error(`O board não tem o campo "${EFFORT_FIELD}".`);
-    const tiers = effortTiers(tool, s.board.modelCatalog).map(
-      ([value, model]): ModelRule => ({ id: newId(), name: `${EFFORT_FIELD} ${value.toLowerCase()}`, enabled: true, groups: [[{ fieldId: field.id, op: 'is', value }]], model }),
-    );
+    const tiers = effortTiers(tool, s.board.modelCatalog).map(([value, model]): ModelRule => ({
+      id: newId(),
+      name: `${EFFORT_FIELD} ${value.toLowerCase()}`,
+      enabled: true,
+      groups: [[{ fieldId: field.id, op: 'is', value }]],
+      model,
+    }));
     // sai o que era só "Esforço = X"; regras montadas pela pessoa ficam, e na frente (a primeira que casa vence)
-    const onlyEffort = (r: ModelRule) => r.groups.length === 1 && r.groups[0]!.length === 1 && r.groups[0]![0]!.fieldId === field.id && r.groups[0]![0]!.op === 'is';
+    const onlyEffort = (r: ModelRule) =>
+      r.groups.length === 1 && r.groups[0]!.length === 1 && r.groups[0]![0]!.fieldId === field.id && r.groups[0]![0]!.op === 'is';
     this.boards.setModelRules(this.boardId, [...s.board.modelRules.filter((r) => !onlyEffort(r)), ...tiers]);
   }
 
@@ -204,7 +231,9 @@ export class MessageRouter {
 
   /** Entrada de um arquivo de configuração (hook ou regra de permissão) listada pela varredura. */
   private harnessEntry(tool: AiTool, kind: HarnessKind, file: string, name: string, detail: string): HarnessItem {
-    const item = this.harness.inventory.find((t) => t.tool === tool)?.items.find((i) => i.kind === kind && i.layout === 'entry' && i.path === file && i.name === name && (i.detail ?? '') === detail);
+    const item = this.harness.inventory
+      .find((t) => t.tool === tool)
+      ?.items.find((i) => i.kind === kind && i.layout === 'entry' && i.path === file && i.name === name && (i.detail ?? '') === detail);
     if (!item) throw new Error('Item não encontrado no harness. Atualize a lista e tente de novo.');
     return item;
   }
@@ -232,7 +261,9 @@ export class MessageRouter {
   /** Grava um arquivo de apoio numa skill do projeto (usado pela IA). */
   writeSkillFile(name: string, rel: string, content: string): string {
     const tool = this.boards.snapshot(this.boardId).board.aiTool;
-    const item = this.harness.inventory.find((t) => t.tool === tool)?.items.find((i) => i.kind === 'skill' && i.scope === 'project' && i.name === name);
+    const item = this.harness.inventory
+      .find((t) => t.tool === tool)
+      ?.items.find((i) => i.kind === 'skill' && i.scope === 'project' && i.name === name);
     if (!item) throw new Error(`Skill "${name}" não encontrada no projeto.`);
     const file = this.harnessOps.writeSkillFile(item, rel, content);
     this.loadHarness();
@@ -279,7 +310,7 @@ export class MessageRouter {
   private addAttachment(cardId: string, artifact: boolean, importTo: (cardId: string) => Omit<Attachment, 'createdAt' | 'artifact'>): void {
     const card = this.boards.snapshot(this.boardId).cards.find((c) => c.id === cardId);
     if (!card) throw new Error('Card não encontrado');
-    const rec = importTo(artifact ? card.parentId ?? card.id : card.id);
+    const rec = importTo(artifact ? (card.parentId ?? card.id) : card.id);
     if (artifact) {
       for (const old of this.attachments.artifactsNamed(rec.cardId, rec.filename)) {
         this.attachments.delete(old.id);
@@ -332,8 +363,15 @@ export class MessageRouter {
     if (!this.opts.workspaceDir) throw new Error('Nenhuma pasta de projeto aberta.');
     const story = this.storyOf(cardId);
     // a branch já registrada vale mesmo que o título ou o padrão tenham mudado depois
-    const branch = story.branch || branchName(git.branchPattern, { type: s.cardTypes.find((t) => t.id === story.typeId)?.name ?? '', number: story.number, title: story.title });
-    const worktreePath = story.worktreePath || path.join(this.worktreeRoot ?? this.opts.workspaceDir, `${story.number}-${slug(story.title) || 'historia'}`);
+    const branch =
+      story.branch ||
+      branchName(git.branchPattern, {
+        type: s.cardTypes.find((t) => t.id === story.typeId)?.name ?? '',
+        number: story.number,
+        title: story.title,
+      });
+    const worktreePath =
+      story.worktreePath || path.join(this.worktreeRoot ?? this.opts.workspaceDir, `${story.number}-${slug(story.title) || 'historia'}`);
     const ws = prepareWorkspace({ projectDir: this.opts.workspaceDir, mode: git.mode, branch, worktreePath });
     this.cards.setWorkspace(story.id, ws.branch, ws.path);
   }
@@ -556,7 +594,15 @@ export class MessageRouter {
         return this.harnessOp((h) => {
           h.createSkill(REFERENCE_SKILL.name, REFERENCE_SKILL.description, REFERENCE_SKILL.body);
           h.setSkillMode(REFERENCE_SKILL.name, 'manual');
-          fs.mkdirSync(path.join(h.workspaceDir, aiToolInfo(this.boards.snapshot(this.boardId).board.aiTool).skills, REFERENCE_SKILL.name, 'references'), { recursive: true });
+          fs.mkdirSync(
+            path.join(
+              h.workspaceDir,
+              aiToolInfo(this.boards.snapshot(this.boardId).board.aiTool).skills,
+              REFERENCE_SKILL.name,
+              'references',
+            ),
+            { recursive: true },
+          );
         });
       case 'harness.hook.add':
         this.hooksAndPermissions.addHook(msg.tool, msg.source, msg.hook);
@@ -579,7 +625,9 @@ export class MessageRouter {
         this.loadHarness();
         return true;
       case 'harness.mcp.remove': {
-        const item = this.harness.inventory.find((t) => t.tool === msg.tool)?.items.find((i) => i.kind === 'mcp' && i.path === msg.path && i.name === msg.name);
+        const item = this.harness.inventory
+          .find((t) => t.tool === msg.tool)
+          ?.items.find((i) => i.kind === 'mcp' && i.path === msg.path && i.name === msg.name);
         if (!item) throw new Error('Servidor não encontrado no harness. Atualize a lista e tente de novo.');
         new McpServers(this.opts.workspaceDir ?? '', this.home).remove(msg.tool, item);
         this.loadHarness();
@@ -629,7 +677,8 @@ export class MessageRouter {
       case 'harness.flowSkill.install':
         // não sobrescreve: se a pessoa já ajustou a skill, a versão dela fica
         return this.harnessOp((h) => {
-          if (!this.harness.skills.some((k) => k.name === FLOW_SKILL.name)) h.createSkill(FLOW_SKILL.name, FLOW_SKILL.description, FLOW_SKILL.body);
+          if (!this.harness.skills.some((k) => k.name === FLOW_SKILL.name))
+            h.createSkill(FLOW_SKILL.name, FLOW_SKILL.description, FLOW_SKILL.body);
         });
       case 'settings.board.update':
         this.boards.updateBoard(this.boardId, msg.patch);

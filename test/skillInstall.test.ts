@@ -23,7 +23,16 @@ describe('instalar skills de uma pasta ou repositório', () => {
     expect(parseSource('anthropics/skills')).toEqual({ kind: 'git', url: 'https://github.com/anthropics/skills.git' });
     expect(parseSource(' https://gitlab.com/time/skills.git ')).toEqual({ kind: 'git', url: 'https://gitlab.com/time/skills.git' });
     expect(parseSource('git@github.com:time/skills.git')).toEqual({ kind: 'git', url: 'git@github.com:time/skills.git' });
-    for (const bad of ['', '--upload-pack=x', 'ext::sh -c x', 'file:///etc', 'http://inseguro.dev/x.git', path.join(root, 'nao-existe'), 'https://x.dev/a b']) expect(() => parseSource(bad)).toThrow();
+    for (const bad of [
+      '',
+      '--upload-pack=x',
+      'ext::sh -c x',
+      'file:///etc',
+      'http://inseguro.dev/x.git',
+      path.join(root, 'nao-existe'),
+      'https://x.dev/a b',
+    ])
+      expect(() => parseSource(bad)).toThrow();
   });
 
   it('encontra as skills, e copia só as escolhidas, sem links simbólicos e sem substituir', () => {

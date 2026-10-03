@@ -27,7 +27,8 @@ export interface ExecProfile {
   isDefault: boolean;
 }
 
-const strings = (v: unknown): string[] => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()))] : []);
+const strings = (v: unknown): string[] =>
+  Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()))] : [];
 
 export function parseProfiles(json: string | null | undefined): ExecProfile[] {
   let raw: unknown;
@@ -64,7 +65,12 @@ export function profileOf(s: BoardState, c: Card): ExecProfile | undefined {
   const byId = (id: string | null | undefined) => (id ? s.board.execProfiles.find((p) => p.id === id) : undefined);
   const column = (card: Card) => s.columns.find((x) => x.id === card.columnId)?.execProfile;
   const story = c.parentId ? s.cards.find((p) => p.id === c.parentId) : undefined;
-  return byId(c.execProfile) ?? byId(column(c)) ?? (story ? byId(story.execProfile) ?? byId(column(story)) : undefined) ?? s.board.execProfiles.find((p) => p.isDefault);
+  return (
+    byId(c.execProfile) ??
+    byId(column(c)) ??
+    (story ? (byId(story.execProfile) ?? byId(column(story))) : undefined) ??
+    s.board.execProfiles.find((p) => p.isDefault)
+  );
 }
 
 /** O que a execução de um card deve usar, já resolvido entre o card e o perfil. */
@@ -97,7 +103,9 @@ export function manifestOf(s: BoardState, c: Card): ExecManifest {
     mcpServers: profile?.mcpServers ?? null,
     tools: profile?.tools ?? [],
     deniedTools: profile?.deniedTools ?? [],
-    model: option ? { name: option.model, effort: chosen!.effort && option.efforts.includes(chosen!.effort) ? chosen!.effort : null } : null,
+    model: option
+      ? { name: option.model, effort: chosen!.effort && option.efforts.includes(chosen!.effort) ? chosen!.effort : null }
+      : null,
     clean: profile?.clean ?? false,
   };
 }

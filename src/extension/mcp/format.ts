@@ -1,9 +1,26 @@
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, manifestOf } from '../../shared/execution';
 import { norm } from '../../shared/filters';
-import { describeRule, modelFieldOf, modelLabel, parseModelValue, resolveModelInput, suggestModel, type ModelOption } from '../../shared/models';
+import {
+  describeRule,
+  modelFieldOf,
+  modelLabel,
+  parseModelValue,
+  resolveModelInput,
+  suggestModel,
+  type ModelOption,
+} from '../../shared/models';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
 import { statusInfo } from '../../shared/status';
-import { cardRef, type BoardState, type Card, type CardType, type Column, type FieldDef, type FieldValue, type Workflow } from '../../shared/model';
+import {
+  cardRef,
+  type BoardState,
+  type Card,
+  type CardType,
+  type Column,
+  type FieldDef,
+  type FieldValue,
+  type Workflow,
+} from '../../shared/model';
 
 /** Converte o snapshot em respostas enxutas para o modelo: nomes e números no lugar de UUIDs. */
 
@@ -138,8 +155,21 @@ export function describeModel(s: BoardState, value: FieldValue) {
 /** Catálogo de modelos e regras de sugestão do board. */
 export function modelsOverview(s: BoardState) {
   return {
-    catalog: s.board.modelCatalog.map((o) => ({ value: o.id, tool: o.tool, model: o.model, label: o.label, efforts: o.efforts, defaultEffort: o.defaultEffort })),
-    rules: s.board.modelRules.map((r) => ({ ...(r.name ? { name: r.name } : {}), when: describeRule(s, r), suggest: modelLabel(s.board.modelCatalog, r.model, true), value: r.model, enabled: r.enabled })),
+    catalog: s.board.modelCatalog.map((o) => ({
+      value: o.id,
+      tool: o.tool,
+      model: o.model,
+      label: o.label,
+      efforts: o.efforts,
+      defaultEffort: o.defaultEffort,
+    })),
+    rules: s.board.modelRules.map((r) => ({
+      ...(r.name ? { name: r.name } : {}),
+      when: describeRule(s, r),
+      suggest: modelLabel(s.board.modelCatalog, r.model, true),
+      value: r.model,
+      enabled: r.enabled,
+    })),
     note: 'Num card, o campo de modelo aceita `<value>@<esforço>` (ex.: "claude:opus@high") ou o nome do modelo seguido do esforço.',
   };
 }
@@ -184,7 +214,15 @@ export function requiredSkills(s: BoardState, c: Card) {
     }
     // fora do projeto: skill global ou de plugin da ferramenta em uso, com o caminho absoluto
     const outside = toolItems(s).find((i) => i.kind === 'skill' && i.scope !== 'project' && i.name === name);
-    return outside ? { name, scope: outside.scope, path: outside.path, ...(outside.plugin ? { plugin: outside.plugin } : {}), ...supportFiles(outside.path, outside.files ?? []) } : { name, note: 'skill não encontrada' };
+    return outside
+      ? {
+          name,
+          scope: outside.scope,
+          path: outside.path,
+          ...(outside.plugin ? { plugin: outside.plugin } : {}),
+          ...supportFiles(outside.path, outside.files ?? []),
+        }
+      : { name, note: 'skill não encontrada' };
   });
 }
 
@@ -193,7 +231,7 @@ export function requiredSkills(s: BoardState, c: Card) {
  * sub-tarefa, é a fase da história, porque o artefato é construído na sub-tarefa mas pertence à história.
  */
 function phaseOf(s: BoardState, c: Card) {
-  const story = c.parentId ? s.cards.find((p) => p.id === c.parentId) ?? c : c;
+  const story = c.parentId ? (s.cards.find((p) => p.id === c.parentId) ?? c) : c;
   const col = s.columns.find((x) => x.id === story.columnId);
   if (!col || !col.aiActive || (!col.aiInstruction && !col.artifactName)) return undefined;
   return {
@@ -212,7 +250,7 @@ function phaseOf(s: BoardState, c: Card) {
 
 /** Onde o código da história deve ser alterado (sub-tarefas usam a branch e a pasta da história). */
 function workspaceOf(s: BoardState, c: Card) {
-  const story = c.parentId ? s.cards.find((p) => p.id === c.parentId) ?? c : c;
+  const story = c.parentId ? (s.cards.find((p) => p.id === c.parentId) ?? c) : c;
   if (story.branch) {
     return {
       workspace: {
@@ -226,13 +264,25 @@ function workspaceOf(s: BoardState, c: Card) {
       },
     };
   }
-  return s.board.git.mode === 'off' ? {} : { workspaceNote: 'Esta história ainda não tem branch. Antes de alterar código do projeto, chame prepare_workspace: o board cria a branch e a pasta de trabalho.' };
+  return s.board.git.mode === 'off'
+    ? {}
+    : {
+        workspaceNote:
+          'Esta história ainda não tem branch. Antes de alterar código do projeto, chame prepare_workspace: o board cria a branch e a pasta de trabalho.',
+      };
 }
 
 export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardState['attachments'][number]) => string) {
   const skills = requiredSkills(s, c);
   const phase = c.deletedAt === null && c.archivedAt === null ? phaseOf(s, c) : undefined;
-  const attachment = (a: BoardState['attachments'][number]) => ({ attachmentId: a.id, filename: a.filename, mime: a.mime, size: a.size, path: attachmentPath(a), ...(a.artifact ? { artifact: true } : {}) });
+  const attachment = (a: BoardState['attachments'][number]) => ({
+    attachmentId: a.id,
+    filename: a.filename,
+    mime: a.mime,
+    size: a.size,
+    path: attachmentPath(a),
+    ...(a.artifact ? { artifact: true } : {}),
+  });
   const field = modelFieldOf(s, c);
   const chosen = field ? s.fieldValues.find((v) => v.cardId === c.id && v.fieldId === field.id)?.value : undefined;
   const suggested = suggestModel(s, c);
@@ -240,7 +290,13 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...cardSummary(s, c),
     ...(chosen ? { model: { ...describeModel(s, chosen), note: 'Modelo e esforço que devem executar este card.' } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
-    ...(skills.length ? { requiredSkills: skills, requiredSkillsNote: 'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em `files` estão os arquivos de apoio de cada skill (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.' } : {}),
+    ...(skills.length
+      ? {
+          requiredSkills: skills,
+          requiredSkillsNote:
+            'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em `files` estão os arquivos de apoio de cada skill (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.',
+        }
+      : {}),
     ...(phase ? { phase } : {}),
     ...executionOf(s, c),
     ...workspaceOf(s, c),
@@ -249,9 +305,17 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     updatedAt: iso(c.updatedAt),
     subtaskList: activeChildren(s, c)
       .sort((a, b) => a.number - b.number)
-      .map((k) => ({ id: cardRef(k), title: k.title, column: s.columns.find((col) => col.id === k.columnId)?.name, status: cardStatus(s, k), fields: fieldsOf(s, k) })),
+      .map((k) => ({
+        id: cardRef(k),
+        title: k.title,
+        column: s.columns.find((col) => col.id === k.columnId)?.name,
+        status: cardStatus(s, k),
+        fields: fieldsOf(s, k),
+      })),
     checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })),
-    comments: s.comments.filter((m) => m.cardId === c.id).map((m) => ({ commentId: m.id, author: m.author, ...(m.source ? { from: m.source } : {}), at: iso(m.createdAt), body: m.body })),
+    comments: s.comments
+      .filter((m) => m.cardId === c.id)
+      .map((m) => ({ commentId: m.id, author: m.author, ...(m.source ? { from: m.source } : {}), at: iso(m.createdAt), body: m.body })),
     attachments: s.attachments.filter((a) => a.cardId === c.id).map(attachment),
     // os artefatos das fases ficam na história; a sub-tarefa os enxerga por aqui
     ...(c.parentId ? { storyArtifacts: s.attachments.filter((a) => a.cardId === c.parentId && a.artifact).map(attachment) } : {}),
@@ -290,11 +354,32 @@ export function boardOverview(s: BoardState) {
       kind: w.kind === 'parent' ? 'parent (histórias)' : 'child (sub-tarefas, sempre ligadas a uma história)',
       columns: s.columns
         .filter((c) => c.workflowId === w.id)
-        .map((c) => ({ name: c.name, category: c.category, cards: active.filter((k) => k.columnId === c.id).length, ...(c.aiActive ? { aiActive: true } : {}), ...(c.requiresApproval ? { requiresApproval: true } : {}), ...(c.artifactName ? { artifact: c.artifactName } : {}), ...(profileName(s, c.execProfile) ? { execProfile: profileName(s, c.execProfile) } : {}), ...(c.collapsed ? { collapsed: true } : {}) })),
+        .map((c) => ({
+          name: c.name,
+          category: c.category,
+          cards: active.filter((k) => k.columnId === c.id).length,
+          ...(c.aiActive ? { aiActive: true } : {}),
+          ...(c.requiresApproval ? { requiresApproval: true } : {}),
+          ...(c.artifactName ? { artifact: c.artifactName } : {}),
+          ...(profileName(s, c.execProfile) ? { execProfile: profileName(s, c.execProfile) } : {}),
+          ...(c.collapsed ? { collapsed: true } : {}),
+        })),
       ...(w.collapsed ? { collapsed: true } : {}),
       archivedColumnCollapsed: w.archiveCollapsed,
     })),
-    ...(s.board.execProfiles.length ? { execProfiles: s.board.execProfiles.map((p) => ({ name: p.name, ...(p.isDefault ? { default: true } : {}), ...(p.agent ? { agent: p.agent } : {}), ...(p.skills.length ? { skills: p.skills } : {}), ...(p.mcpServers ? { mcpServers: p.mcpServers } : {}), ...(p.model ? { model: p.model } : {}), ...(p.clean ? { clean: true } : {}) })) } : {}),
+    ...(s.board.execProfiles.length
+      ? {
+          execProfiles: s.board.execProfiles.map((p) => ({
+            name: p.name,
+            ...(p.isDefault ? { default: true } : {}),
+            ...(p.agent ? { agent: p.agent } : {}),
+            ...(p.skills.length ? { skills: p.skills } : {}),
+            ...(p.mcpServers ? { mcpServers: p.mcpServers } : {}),
+            ...(p.model ? { model: p.model } : {}),
+            ...(p.clean ? { clean: true } : {}),
+          })),
+        }
+      : {}),
     cardTypes: s.cardTypes.map((t) => {
       const defaults = Object.fromEntries(
         Object.entries(t.defaults).flatMap(([id, v]) => {
@@ -302,7 +387,12 @@ export function boardOverview(s: BoardState) {
           return f ? [[f.name, v]] : [];
         }),
       );
-      return { name: t.name, color: t.color, workflow: s.workflows.find((w) => w.id === t.defaultWorkflowId)?.name, ...(Object.keys(defaults).length ? { defaultFields: defaults } : {}) };
+      return {
+        name: t.name,
+        color: t.color,
+        workflow: s.workflows.find((w) => w.id === t.defaultWorkflowId)?.name,
+        ...(Object.keys(defaults).length ? { defaultFields: defaults } : {}),
+      };
     }),
     fields: s.fieldDefs.map((f) => ({
       name: f.name,
@@ -325,8 +415,22 @@ export function harnessOverview(s: BoardState) {
     aiTool: s.board.aiTool,
     ruleFiles: s.harness.rules.map((r) => ({ name: r.name, exists: r.exists, ...(r.exists ? { bytes: r.content.length } : {}) })),
     skills: s.harness.skills.map((k) => ({ name: k.name, enabled: k.enabled, mode: k.mode, description: k.description, path: k.path })),
-    agents: s.harness.agents.map((a) => ({ name: a.name, description: a.description, ...(a.model ? { model: a.model } : {}), path: a.path })),
+    agents: s.harness.agents.map((a) => ({
+      name: a.name,
+      description: a.description,
+      ...(a.model ? { model: a.model } : {}),
+      path: a.path,
+    })),
     // tudo que a ferramenta em uso carrega, com o escopo: project, user (global) ou plugin
-    inventory: toolItems(s).map((i) => ({ kind: i.kind, scope: i.scope, name: i.name, ...(i.mode ? { mode: i.mode } : {}), ...(i.files?.length ? { files: i.files } : {}), ...(i.description ? { description: i.description } : {}), path: i.location, ...(i.plugin ? { plugin: i.plugin } : {}) })),
+    inventory: toolItems(s).map((i) => ({
+      kind: i.kind,
+      scope: i.scope,
+      name: i.name,
+      ...(i.mode ? { mode: i.mode } : {}),
+      ...(i.files?.length ? { files: i.files } : {}),
+      ...(i.description ? { description: i.description } : {}),
+      path: i.location,
+      ...(i.plugin ? { plugin: i.plugin } : {}),
+    })),
   };
 }

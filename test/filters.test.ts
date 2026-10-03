@@ -11,17 +11,96 @@ const NOW = new Date(2026, 9, 1, 12).getTime();
 const DAY = 86400000;
 
 const card = (id: string, over: Partial<Card> = {}): Card => ({
-  id, number: 0, boardId: 'b', workflowId: 'wp', columnId: 'todo', typeId: 'story', parentId: null, title: id, description: '',
-  position: 0, createdAt: NOW, updatedAt: NOW, deletedAt: null, archivedAt: null, status: null, statusReason: '', statusAt: null, statusBy: '', branch: '', worktreePath: '', prUrl: '', execProfile: null, ...over,
+  id,
+  number: 0,
+  boardId: 'b',
+  workflowId: 'wp',
+  columnId: 'todo',
+  typeId: 'story',
+  parentId: null,
+  title: id,
+  description: '',
+  position: 0,
+  createdAt: NOW,
+  updatedAt: NOW,
+  deletedAt: null,
+  archivedAt: null,
+  status: null,
+  statusReason: '',
+  statusAt: null,
+  statusBy: '',
+  branch: '',
+  worktreePath: '',
+  prUrl: '',
+  execProfile: null,
+  ...over,
 });
 
 const state: BoardState = {
-  board: { id: 'b', workspaceKey: 'k', name: 'B', rules: DEFAULT_RULES, aiTool: 'claude', modelCatalog: [], modelRules: [], appearance: DEFAULT_APPEARANCE, templateVersion: 1, runner: DEFAULT_RUNNER, git: DEFAULT_GIT, execProfiles: [] },
-  workflows: [{ id: 'wp', boardId: 'b', name: 'H', position: 0, kind: 'parent', collapsed: false, archiveCollapsed: true }, { id: 'wc', boardId: 'b', name: 'S', position: 1, kind: 'child', collapsed: false, archiveCollapsed: true }],
+  board: {
+    id: 'b',
+    workspaceKey: 'k',
+    name: 'B',
+    rules: DEFAULT_RULES,
+    aiTool: 'claude',
+    modelCatalog: [],
+    modelRules: [],
+    appearance: DEFAULT_APPEARANCE,
+    templateVersion: 1,
+    runner: DEFAULT_RUNNER,
+    git: DEFAULT_GIT,
+    execProfiles: [],
+  },
+  workflows: [
+    { id: 'wp', boardId: 'b', name: 'H', position: 0, kind: 'parent', collapsed: false, archiveCollapsed: true },
+    { id: 'wc', boardId: 'b', name: 'S', position: 1, kind: 'child', collapsed: false, archiveCollapsed: true },
+  ],
   columns: [
-    { id: 'todo', workflowId: 'wp', name: 'Backlog', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '', execProfile: null },
-    { id: 'c-todo', workflowId: 'wc', name: 'A fazer', position: 0, category: 'open', isTerminal: false, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '', execProfile: null },
-    { id: 'c-done', workflowId: 'wc', name: 'Concluído', position: 1, category: 'done', isTerminal: true, collapsed: false, aiActive: false, requiresApproval: false, aiInstruction: '', artifactName: '', artifactTemplate: '', execProfile: null },
+    {
+      id: 'todo',
+      workflowId: 'wp',
+      name: 'Backlog',
+      position: 0,
+      category: 'open',
+      isTerminal: false,
+      collapsed: false,
+      aiActive: false,
+      requiresApproval: false,
+      aiInstruction: '',
+      artifactName: '',
+      artifactTemplate: '',
+      execProfile: null,
+    },
+    {
+      id: 'c-todo',
+      workflowId: 'wc',
+      name: 'A fazer',
+      position: 0,
+      category: 'open',
+      isTerminal: false,
+      collapsed: false,
+      aiActive: false,
+      requiresApproval: false,
+      aiInstruction: '',
+      artifactName: '',
+      artifactTemplate: '',
+      execProfile: null,
+    },
+    {
+      id: 'c-done',
+      workflowId: 'wc',
+      name: 'Concluído',
+      position: 1,
+      category: 'done',
+      isTerminal: true,
+      collapsed: false,
+      aiActive: false,
+      requiresApproval: false,
+      aiInstruction: '',
+      artifactName: '',
+      artifactTemplate: '',
+      execProfile: null,
+    },
   ],
   cardTypes: [],
   cards: [
@@ -90,7 +169,8 @@ describe('applyFilters', () => {
 
   it('pendência: com a pessoa ou com a IA', () => {
     const cards = state.cards.map((c, i) => ({ ...c, status: (['waiting_review', 'ready', 'blocked'] as const)[i] ?? null }));
-    const owned = (owner: Filters['owner']) => [...(applyFilters({ ...state, cards }, { ...EMPTY_FILTERS, includeRelated: false, owner }, NOW) ?? [])].sort();
+    const owned = (owner: Filters['owner']) =>
+      [...(applyFilters({ ...state, cards }, { ...EMPTY_FILTERS, includeRelated: false, owner }, NOW) ?? [])].sort();
     const idOf = (status: string) => cards.filter((c) => c.status === status && c.deletedAt === null).map((c) => c.id);
     expect(owned('human')).toEqual([...idOf('waiting_review'), ...idOf('blocked')].sort());
     expect(owned('ai')).toEqual(idOf('ready'));

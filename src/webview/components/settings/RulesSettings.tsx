@@ -31,8 +31,12 @@ function Rule({ title, when, then, active, control }: { title: string; when: str
       </div>
       {control}
       <div className="when">
-        <span><b>Quando</b> {when}</span>
-        <span><b>Então</b> {then}</span>
+        <span>
+          <b>Quando</b> {when}
+        </span>
+        <span>
+          <b>Então</b> {then}
+        </span>
       </div>
     </section>
   );
@@ -45,7 +49,11 @@ export function RulesSettings() {
 
   const parentWf = state.workflows.find((w) => w.kind === 'parent');
   const names = (category: 'done' | 'cancelled') => {
-    const list = parentWf ? columnsOf(state, parentWf.id).filter((c) => c.category === category).map((c) => `"${c.name}"`) : [];
+    const list = parentWf
+      ? columnsOf(state, parentWf.id)
+          .filter((c) => c.category === category)
+          .map((c) => `"${c.name}"`)
+      : [];
     return list.length ? list.join(', ') : 'nenhuma coluna definida ainda';
   };
   const changed = (Object.keys(DEFAULT_RULES) as (keyof BoardRules)[]).some((k) => rules[k] !== DEFAULT_RULES[k]);
@@ -54,16 +62,20 @@ export function RulesSettings() {
     <EnumSelect options={CONFIRM_OPTIONS} value={rules[key]} onChange={(mode) => set({ [key]: mode })} />
   );
   const confirmThen = (mode: ConfirmMode, verb: string) =>
-    mode === 'always' ? `sempre pedir confirmação antes de ${verb}.`
-    : mode === 'never' ? `${verb} direto, sem perguntar. As sub-tarefas e os anexos vão junto do mesmo jeito.`
-    : `avisar e pedir confirmação se o card levar sub-tarefas ou anexos junto; cards simples seguem direto.`;
+    mode === 'always'
+      ? `sempre pedir confirmação antes de ${verb}.`
+      : mode === 'never'
+        ? `${verb} direto, sem perguntar. As sub-tarefas e os anexos vão junto do mesmo jeito.`
+        : `avisar e pedir confirmação se o card levar sub-tarefas ou anexos junto; cards simples seguem direto.`;
 
   return (
     <div>
       <div className="row">
         <h2>Regras</h2>
         <span className="spacer" />
-        <Button variant="ghost" size="small" disabled={!changed} onClick={() => set(DEFAULT_RULES)}>Restaurar padrões</Button>
+        <Button variant="ghost" size="small" disabled={!changed} onClick={() => set(DEFAULT_RULES)}>
+          Restaurar padrões
+        </Button>
       </div>
       <p className="muted">
         Regras deste board. O que conta como conclusão ou cancelamento vem de "Esta coluna representa", no menu ⋯ de cada coluna.
@@ -73,10 +85,18 @@ export function RulesSettings() {
         title="Concluir história com sub-tarefas em aberto"
         active={rules.blockDoneWithOpenChildren}
         when={`uma história é movida para uma coluna de conclusão (${names('done')}) e ainda tem sub-tarefas em aberto`}
-        then={rules.blockDoneWithOpenChildren ? 'bloquear o movimento e avisar quantas sub-tarefas faltam.' : 'permitir. As sub-tarefas ficam onde estão.'}
+        then={
+          rules.blockDoneWithOpenChildren
+            ? 'bloquear o movimento e avisar quantas sub-tarefas faltam.'
+            : 'permitir. As sub-tarefas ficam onde estão.'
+        }
         control={
           <label className="switch">
-            <input type="checkbox" checked={rules.blockDoneWithOpenChildren} onChange={(e) => set({ blockDoneWithOpenChildren: e.target.checked })} />
+            <input
+              type="checkbox"
+              checked={rules.blockDoneWithOpenChildren}
+              onChange={(e) => set({ blockDoneWithOpenChildren: e.target.checked })}
+            />
             Bloquear
           </label>
         }
@@ -86,10 +106,18 @@ export function RulesSettings() {
         title="Avançar de fase com sub-tarefas da fase em aberto"
         active={rules.blockPhaseAdvanceWithOpenChildren}
         when={'uma história é movida para uma coluna mais adiante e ainda tem sub-tarefas em aberto cujo campo "Fase" é a coluna atual'}
-        then={rules.blockPhaseAdvanceWithOpenChildren ? 'bloquear o movimento e avisar quantas sub-tarefas da fase faltam. Voltar de coluna e cancelar continuam livres.' : 'permitir. As sub-tarefas ficam onde estão.'}
+        then={
+          rules.blockPhaseAdvanceWithOpenChildren
+            ? 'bloquear o movimento e avisar quantas sub-tarefas da fase faltam. Voltar de coluna e cancelar continuam livres.'
+            : 'permitir. As sub-tarefas ficam onde estão.'
+        }
         control={
           <label className="switch">
-            <input type="checkbox" checked={rules.blockPhaseAdvanceWithOpenChildren} onChange={(e) => set({ blockPhaseAdvanceWithOpenChildren: e.target.checked })} />
+            <input
+              type="checkbox"
+              checked={rules.blockPhaseAdvanceWithOpenChildren}
+              onChange={(e) => set({ blockPhaseAdvanceWithOpenChildren: e.target.checked })}
+            />
             Bloquear
           </label>
         }
@@ -100,9 +128,11 @@ export function RulesSettings() {
         active={rules.onCancelParent !== 'keep'}
         when={`uma história é movida para uma coluna de cancelamento (${names('cancelled')}) e ainda tem sub-tarefas em aberto`}
         then={
-          rules.onCancelParent === 'ask' ? 'perguntar se as sub-tarefas devem ser canceladas também.'
-          : rules.onCancelParent === 'cascade' ? 'cancelar as sub-tarefas em aberto junto, sem perguntar.'
-          : 'mover só a história. As sub-tarefas ficam onde estão.'
+          rules.onCancelParent === 'ask'
+            ? 'perguntar se as sub-tarefas devem ser canceladas também.'
+            : rules.onCancelParent === 'cascade'
+              ? 'cancelar as sub-tarefas em aberto junto, sem perguntar.'
+              : 'mover só a história. As sub-tarefas ficam onde estão.'
         }
         control={
           <EnumSelect options={CANCEL_OPTIONS} value={rules.onCancelParent} onChange={(onCancelParent) => set({ onCancelParent })} />
@@ -114,12 +144,18 @@ export function RulesSettings() {
         active={rules.onAllChildrenDone !== 'off'}
         when="uma sub-tarefa é concluída e a história não tem mais nenhuma sub-tarefa em aberto"
         then={
-          rules.onAllChildrenDone === 'ask' ? `perguntar se a história deve ir para a coluna de conclusão (${names('done')}).`
-          : rules.onAllChildrenDone === 'auto' ? `mover a história para a coluna de conclusão (${names('done')}), sem perguntar.`
-          : 'deixar a história onde está.'
+          rules.onAllChildrenDone === 'ask'
+            ? `perguntar se a história deve ir para a coluna de conclusão (${names('done')}).`
+            : rules.onAllChildrenDone === 'auto'
+              ? `mover a história para a coluna de conclusão (${names('done')}), sem perguntar.`
+              : 'deixar a história onde está.'
         }
         control={
-          <EnumSelect options={COMPLETE_OPTIONS} value={rules.onAllChildrenDone} onChange={(onAllChildrenDone) => set({ onAllChildrenDone })} />
+          <EnumSelect
+            options={COMPLETE_OPTIONS}
+            value={rules.onAllChildrenDone}
+            onChange={(onAllChildrenDone) => set({ onAllChildrenDone })}
+          />
         }
       />
 
@@ -127,10 +163,18 @@ export function RulesSettings() {
         title="Preencher o modelo sugerido"
         active={rules.autoApplyModelSuggestion}
         when="um card é criado ou um atributo dele muda, e o campo de modelo está vazio ou ainda tem a sugestão anterior"
-        then={rules.autoApplyModelSuggestion ? 'preencher o modelo com a sugestão das regras. Um modelo escolhido à mão nunca é trocado.' : 'não mexer no modelo. A sugestão só é aplicada pelo botão no card.'}
+        then={
+          rules.autoApplyModelSuggestion
+            ? 'preencher o modelo com a sugestão das regras. Um modelo escolhido à mão nunca é trocado.'
+            : 'não mexer no modelo. A sugestão só é aplicada pelo botão no card.'
+        }
         control={
           <label className="switch">
-            <input type="checkbox" checked={rules.autoApplyModelSuggestion} onChange={(e) => set({ autoApplyModelSuggestion: e.target.checked })} />
+            <input
+              type="checkbox"
+              checked={rules.autoApplyModelSuggestion}
+              onChange={(e) => set({ autoApplyModelSuggestion: e.target.checked })}
+            />
             Preencher
           </label>
         }

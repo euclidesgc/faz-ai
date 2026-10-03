@@ -10,7 +10,12 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
   const boardId = newId();
   db.exec('BEGIN;');
   try {
-    db.run('INSERT INTO boards(id, workspace_key, name, template_version) VALUES (?,?,?,?)', [boardId, workspaceKey, name, BOARD_TEMPLATE_VERSION]);
+    db.run('INSERT INTO boards(id, workspace_key, name, template_version) VALUES (?,?,?,?)', [
+      boardId,
+      workspaceKey,
+      name,
+      BOARD_TEMPLATE_VERSION,
+    ]);
 
     const parentWf = newId();
     const childWf = newId();

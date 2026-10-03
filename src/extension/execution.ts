@@ -31,7 +31,8 @@ export interface ExecPlan {
   summary: string[];
 }
 
-const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+const obj = (v: unknown): Record<string, unknown> =>
+  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 
 function readJson(file: string): Record<string, unknown> {
   try {
@@ -47,7 +48,11 @@ function readJson(file: string): Record<string, unknown> {
  */
 function claudeServers(projectDir: string, homeDir: string): Record<string, unknown> {
   const user = homeDir ? readJson(path.join(homeDir, '.claude.json')) : {};
-  return { ...obj(user.mcpServers), ...obj(readJson(path.join(projectDir, '.mcp.json')).mcpServers), ...obj(obj(obj(user.projects)[projectDir]).mcpServers) };
+  return {
+    ...obj(user.mcpServers),
+    ...obj(readJson(path.join(projectDir, '.mcp.json')).mcpServers),
+    ...obj(obj(obj(user.projects)[projectDir]).mcpServers),
+  };
 }
 
 /** Traduz o perfil do card no que a execução pelo board impõe e no que só orienta. */
@@ -63,7 +68,10 @@ export function executionPlan(s: BoardState, c: Card, projectDir: string, homeDi
   let mcpConfig: string | null = null;
   if (allowed && tool === 'claude') {
     const defs = claudeServers(projectDir, homeDir);
-    if (!defs[BOARD_SERVER]) throw new Error('O perfil de execução restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Use "Conectar ao board (MCP)" em Configurações → Harness de IA.');
+    if (!defs[BOARD_SERVER])
+      throw new Error(
+        'O perfil de execução restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Use "Conectar ao board (MCP)" em Configurações → Harness de IA.',
+      );
     const missing = allowed.filter((n) => !defs[n]);
     if (missing.length) throw new Error(`Servidores MCP do perfil não encontrados na configuração do Claude Code: ${missing.join(', ')}.`);
     mcpConfig = JSON.stringify({ mcpServers: Object.fromEntries([BOARD_SERVER, ...allowed].map((n) => [n, defs[n]])) });
@@ -71,13 +79,16 @@ export function executionPlan(s: BoardState, c: Card, projectDir: string, homeDi
 
   const advice: string[] = [];
   const agentFile = manifest.agent ? items.find((i) => i.kind === 'agent' && i.name === manifest.agent)?.path : undefined;
-  if (manifest.agent && how.agent === 'advised') advice.push(`Atue como o agente "${manifest.agent}"${agentFile ? `: leia e siga as instruções de ${agentFile}` : ''}.`);
-  if (allowed && how.mcp === 'advised') advice.push(`De servidores MCP, use só o do board${allowed.length ? ` e: ${allowed.join(', ')}` : ''}.`);
+  if (manifest.agent && how.agent === 'advised')
+    advice.push(`Atue como o agente "${manifest.agent}"${agentFile ? `: leia e siga as instruções de ${agentFile}` : ''}.`);
+  if (allowed && how.mcp === 'advised')
+    advice.push(`De servidores MCP, use só o do board${allowed.length ? ` e: ${allowed.join(', ')}` : ''}.`);
   if (how.tools === 'advised') {
     if (manifest.tools.length) advice.push(`Use só estas ferramentas: ${manifest.tools.join(', ')}.`);
     if (manifest.deniedTools.length) advice.push(`Não use estas ferramentas: ${manifest.deniedTools.join(', ')}.`);
   }
-  if (manifest.clean && how.clean === 'advised') advice.push('Use só as skills e instruções indicadas neste card e nas regras do projeto; ignore as demais.');
+  if (manifest.clean && how.clean === 'advised')
+    advice.push('Use só as skills e instruções indicadas neste card e nas regras do projeto; ignore as demais.');
 
   const mark = (aspect: keyof typeof how) => (how[aspect] === 'enforced' ? 'imposto' : 'orientado');
   const summary = [
@@ -87,8 +98,24 @@ export function executionPlan(s: BoardState, c: Card, projectDir: string, homeDi
     ...(allowed ? [`Servidores MCP: ${[BOARD_SERVER, ...allowed].join(', ')} (${mark('mcp')})`] : []),
     ...(manifest.tools.length ? [`Ferramentas: ${manifest.tools.join(', ')} (${mark('tools')})`] : []),
     ...(manifest.deniedTools.length ? [`Ferramentas negadas: ${manifest.deniedTools.join(', ')} (${mark('tools')})`] : []),
-    ...(manifest.model ? [`Modelo: ${manifest.model.name}${manifest.model.effort ? ` · ${manifest.model.effort}` : ''} (${mark('model')})`] : []),
+    ...(manifest.model
+      ? [`Modelo: ${manifest.model.name}${manifest.model.effort ? ` · ${manifest.model.effort}` : ''} (${mark('model')})`]
+      : []),
     ...(manifest.clean ? [`Sessão limpa (${mark('clean')})`] : []),
   ];
-  return { manifest, input: { agent: manifest.agent, mcpAllowed: allowed, mcpBlocked: blocked, mcpConfig, tools: manifest.tools, deniedTools: manifest.deniedTools, model: manifest.model, clean: manifest.clean }, advice, summary };
+  return {
+    manifest,
+    input: {
+      agent: manifest.agent,
+      mcpAllowed: allowed,
+      mcpBlocked: blocked,
+      mcpConfig,
+      tools: manifest.tools,
+      deniedTools: manifest.deniedTools,
+      model: manifest.model,
+      clean: manifest.clean,
+    },
+    advice,
+    summary,
+  };
 }

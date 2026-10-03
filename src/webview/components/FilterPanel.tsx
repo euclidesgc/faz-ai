@@ -49,7 +49,14 @@ export function FilterPanel() {
         <div key={f.id} className="filter-group">
           <h3>{f.name}</h3>
           <ChipsEditor
-            options={f.kind === 'checkbox' ? [{ value: 'true', label: 'Sim' }, { value: 'false', label: 'Não' }] : f.options}
+            options={
+              f.kind === 'checkbox'
+                ? [
+                    { value: 'true', label: 'Sim' },
+                    { value: 'false', label: 'Não' },
+                  ]
+                : f.options
+            }
             values={filters.fields[f.id] ?? []}
             onChange={(next) => setFilters({ fields: { ...filters.fields, [f.id]: next } })}
           />
@@ -58,13 +65,24 @@ export function FilterPanel() {
 
       <div className="filter-group">
         <h3>Data</h3>
-        <select value={filters.dateField ?? ''} onChange={(e) => setFilters({ dateField: e.target.value || null, datePreset: e.target.value ? filters.datePreset ?? '7d' : null })}>
+        <select
+          value={filters.dateField ?? ''}
+          onChange={(e) =>
+            setFilters({ dateField: e.target.value || null, datePreset: e.target.value ? (filters.datePreset ?? '7d') : null })
+          }
+        >
           <option value="">Qualquer data</option>
           <option value="createdAt">Criado em</option>
           <option value="updatedAt">Atualizado em</option>
-          {dateFields.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          {dateFields.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
         </select>
-        {filters.dateField && <EnumSelect options={PRESETS} value={filters.datePreset ?? '7d'} onChange={(datePreset) => setFilters({ datePreset })} />}
+        {filters.dateField && (
+          <EnumSelect options={PRESETS} value={filters.datePreset ?? '7d'} onChange={(datePreset) => setFilters({ datePreset })} />
+        )}
         {filters.dateField && filters.datePreset === 'custom' && (
           <div className="row wrap">
             <input type="date" value={filters.dateFrom} onChange={(e) => setFilters({ dateFrom: e.target.value })} />
@@ -82,7 +100,6 @@ export function FilterPanel() {
           Incluir pai e sub-tarefas dos resultados
         </label>
       </div>
-
     </div>
   );
 }

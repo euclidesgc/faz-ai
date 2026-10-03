@@ -26,7 +26,11 @@ export const THEMES: { value: ThemeMode; label: string }[] = [
 ];
 
 export const FONTS: { value: TextFont; label: string; stack: string }[] = [
-  { value: 'sans', label: 'Sem serifa do sistema', stack: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif' },
+  {
+    value: 'sans',
+    label: 'Sem serifa do sistema',
+    stack: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif',
+  },
   { value: 'ui', label: 'Fonte da interface do VS Code', stack: 'var(--vscode-font-family), system-ui, sans-serif' },
   { value: 'serif', label: 'Serifada', stack: 'Georgia, "Iowan Old Style", "Times New Roman", serif' },
   { value: 'mono', label: 'Monoespaçada', stack: 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace' },
@@ -48,7 +52,8 @@ export function parseAppearance(json: string | null | undefined): Appearance {
   return {
     theme: THEMES.some((t) => t.value === raw.theme) ? (raw.theme as ThemeMode) : DEFAULT_APPEARANCE.theme,
     font: FONTS.some((f) => f.value === raw.font) ? (raw.font as TextFont) : DEFAULT_APPEARANCE.font,
-    fontSize: Number.isFinite(size) && size > 0 ? Math.min(FONT_SIZE_RANGE.max, Math.max(FONT_SIZE_RANGE.min, size)) : DEFAULT_APPEARANCE.fontSize,
+    fontSize:
+      Number.isFinite(size) && size > 0 ? Math.min(FONT_SIZE_RANGE.max, Math.max(FONT_SIZE_RANGE.min, size)) : DEFAULT_APPEARANCE.fontSize,
     statuses: parseStatusStyles(raw.statuses),
   };
 }

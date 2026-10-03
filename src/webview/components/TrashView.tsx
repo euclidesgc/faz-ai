@@ -38,7 +38,15 @@ export function TrashView() {
         <p className="muted">A lixeira está vazia. Cards excluídos ficam aqui até você restaurar ou apagar de vez.</p>
       ) : (
         <table className="table">
-          <thead><tr><th>Card</th><th>Tipo</th><th>Estava em</th><th>Excluído em</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>Card</th>
+              <th>Tipo</th>
+              <th>Estava em</th>
+              <th>Excluído em</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
             {roots.map((c) => {
               const kids = deleted.filter((k) => k.parentId === c.id).length;
@@ -50,9 +58,17 @@ export function TrashView() {
                   <td>
                     <span className="card-id">{cardRef(c)}</span> <strong>{c.title}</strong>
                     {kids > 0 && <span className="muted"> + {kids} sub-tarefa(s)</span>}
-                    {parent && <div className="muted small">↳ {cardRef(parent)} {parent.title}</div>}
+                    {parent && (
+                      <div className="muted small">
+                        ↳ {cardRef(parent)} {parent.title}
+                      </div>
+                    )}
                   </td>
-                  <td><span className="type-badge" style={badgeStyle(type?.color)}>{type?.name}</span></td>
+                  <td>
+                    <span className="type-badge" style={badgeStyle(type?.color)}>
+                      {type?.name}
+                    </span>
+                  </td>
                   <td>{column?.name}</td>
                   <td>{new Date(c.deletedAt!).toLocaleString()}</td>
                   <td className="row end">

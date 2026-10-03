@@ -91,13 +91,29 @@ export function CardDrawer({ cardId }: { cardId: string }) {
       <aside className="drawer">
         <header className="drawer-header">
           <select value={card.typeId} onChange={(e) => cards.update(cardId, { typeId: e.target.value })}>
-            {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {types.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
           </select>
-          <select disabled={trashed || archived} value={card.columnId} onChange={(e) => requestMove(cardId, e.target.value, cardsIn(state, e.target.value).length)}>
-            {columns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          <select
+            disabled={trashed || archived}
+            value={card.columnId}
+            onChange={(e) => requestMove(cardId, e.target.value, cardsIn(state, e.target.value).length)}
+          >
+            {columns.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
           </select>
           <span className="spacer" />
-          {trashed && <Button variant="primary" onClick={() => cards.restore(cardId)}>Restaurar</Button>}
+          {trashed && (
+            <Button variant="primary" onClick={() => cards.restore(cardId)}>
+              Restaurar
+            </Button>
+          )}
           {/* arquivar e excluir ficam num menu, longe do botão de fechar, para não serem clicados por engano */}
           {!trashed && (
             <Menu
@@ -114,7 +130,9 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             </Menu>
           )}
           <span className="drawer-divider" />
-          <Button variant="icon" className="drawer-close" title="Fechar (Esc)" aria-label="Fechar" onClick={() => openCard(null)}>✕</Button>
+          <Button variant="icon" className="drawer-close" title="Fechar (Esc)" aria-label="Fechar" onClick={() => openCard(null)}>
+            ✕
+          </Button>
         </header>
 
         {trashed && <div className="banner warn">Este card está na lixeira.</div>}
@@ -122,12 +140,23 @@ export function CardDrawer({ cardId }: { cardId: string }) {
 
         {parent && (
           <div className="drawer-parent">
-            Sub-tarefa de <a onClick={() => openCard(parent.id)}>{cardRef(parent)} {parent.title}</a>
+            Sub-tarefa de{' '}
+            <a onClick={() => openCard(parent.id)}>
+              {cardRef(parent)} {parent.title}
+            </a>
           </div>
         )}
 
-        <div className="drawer-id" title="ID do card">{cardRef(card)}</div>
-        <input className="drawer-title" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveTitle} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+        <div className="drawer-id" title="ID do card">
+          {cardRef(card)}
+        </div>
+        <input
+          className="drawer-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={saveTitle}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+        />
 
         {!trashed && !archived && <StatusBar card={card} />}
 
@@ -135,7 +164,9 @@ export function CardDrawer({ cardId }: { cardId: string }) {
           <div className="drawer-workspace">
             {story.branch ? (
               <>
-                <span title="Branch da história">⎇ <code>{story.branch}</code></span>
+                <span title="Branch da história">
+                  ⎇ <code>{story.branch}</code>
+                </span>
                 {state.board.git.mode === 'worktree' && story.worktreePath && (
                   <Button variant="ghost" size="small" title={story.worktreePath} onClick={() => cards.openWorkspace(cardId)}>
                     Abrir a pasta de trabalho
@@ -143,33 +174,63 @@ export function CardDrawer({ cardId }: { cardId: string }) {
                 )}
               </>
             ) : (
-              <Button variant="ghost" size="small" title="Cria a branch da história e, no modo worktree, a pasta de trabalho dela" onClick={() => cards.prepareWorkspace(cardId)}>
+              <Button
+                variant="ghost"
+                size="small"
+                title="Cria a branch da história e, no modo worktree, a pasta de trabalho dela"
+                onClick={() => cards.prepareWorkspace(cardId)}
+              >
                 Criar branch da história
               </Button>
             )}
-            {story.prUrl && <a href={story.prUrl} title={story.prUrl}>Pull request ↗</a>}
+            {story.prUrl && (
+              <a href={story.prUrl} title={story.prUrl}>
+                Pull request ↗
+              </a>
+            )}
           </div>
         )}
 
         {!trashed && state.board.execProfiles.length > 0 && (
-          <div className="drawer-workspace" title="O que a sessão de IA usa para trabalhar neste card: agente, skills, servidores MCP, ferramentas e modelo">
+          <div
+            className="drawer-workspace"
+            title="O que a sessão de IA usa para trabalhar neste card: agente, skills, servidores MCP, ferramentas e modelo"
+          >
             <span>Perfil de execução</span>
             <select value={card.execProfile ?? ''} onChange={(e) => cards.setExecProfile(cardId, e.target.value || null)}>
               <option value="">Da fase{inherited ? ` (${inherited.name})` : ' (nenhum)'}</option>
-              {state.board.execProfiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {state.board.execProfiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
             </select>
             {manifest.profile && (
               <span className="muted small">
-                {[manifest.agent && `agente ${manifest.agent}`, manifest.skills.length && `skills: ${manifest.skills.join(', ')}`, manifest.mcpServers && `MCP: board${manifest.mcpServers.length ? ` + ${manifest.mcpServers.join(', ')}` : ''}`, manifest.model && `modelo ${manifest.model.name}${manifest.model.effort ? ` · ${manifest.model.effort}` : ''}`, manifest.clean && 'sessão limpa'].filter(Boolean).join(' · ')}
+                {[
+                  manifest.agent && `agente ${manifest.agent}`,
+                  manifest.skills.length && `skills: ${manifest.skills.join(', ')}`,
+                  manifest.mcpServers && `MCP: board${manifest.mcpServers.length ? ` + ${manifest.mcpServers.join(', ')}` : ''}`,
+                  manifest.model && `modelo ${manifest.model.name}${manifest.model.effort ? ` · ${manifest.model.effort}` : ''}`,
+                  manifest.clean && 'sessão limpa',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </span>
             )}
           </div>
         )}
 
         <nav className="tabs">
-          <Button active={tab === 'details'} onClick={() => setTab('details')}>Detalhes</Button>
-          <Button active={tab === 'comments'} onClick={() => setTab('comments')}>Conversa{commentCount > 0 && ` (${commentCount})`}</Button>
-          <Button active={tab === 'attachments'} onClick={() => setTab('attachments')}>Anexos{attachmentCount > 0 && ` (${attachmentCount})`}</Button>
+          <Button active={tab === 'details'} onClick={() => setTab('details')}>
+            Detalhes
+          </Button>
+          <Button active={tab === 'comments'} onClick={() => setTab('comments')}>
+            Conversa{commentCount > 0 && ` (${commentCount})`}
+          </Button>
+          <Button active={tab === 'attachments'} onClick={() => setTab('attachments')}>
+            Anexos{attachmentCount > 0 && ` (${attachmentCount})`}
+          </Button>
         </nav>
 
         {tab === 'comments' && <CommentsTab cardId={card.id} />}
@@ -205,7 +266,14 @@ export function CardDrawer({ cardId }: { cardId: string }) {
                             <span />
                             <span className="muted small suggestion">
                               Sugerido pelas regras: {modelLabel(state.board.modelCatalog, suggested, true)}{' '}
-                              <a onClick={(e) => { e.preventDefault(); set(suggested); }}>Usar</a>
+                              <a
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  set(suggested);
+                                }}
+                              >
+                                Usar
+                              </a>
                             </span>
                           </div>
                         )}
@@ -219,24 +287,65 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             <section className="drawer-section">
               <div className="section-head">
                 <h3>Descrição</h3>
-                {!editingDesc && <Button variant="ghost" size="small" onClick={() => setEditingDesc(true)}>Editar</Button>}
-                {editingDesc && <Button variant="ghost" size="small" onClick={() => { saveDesc(); setEditingDesc(false); }}>Concluir</Button>}
+                {!editingDesc && (
+                  <Button variant="ghost" size="small" onClick={() => setEditingDesc(true)}>
+                    Editar
+                  </Button>
+                )}
+                {editingDesc && (
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    onClick={() => {
+                      saveDesc();
+                      setEditingDesc(false);
+                    }}
+                  >
+                    Concluir
+                  </Button>
+                )}
               </div>
               {editingDesc ? (
-                <MarkdownEditor autoFocus minRows={12} value={desc} onChange={setDesc} onCommit={saveDesc} placeholder="Descreva o problema, o contexto e o critério de aceite. Markdown suportado." />
+                <MarkdownEditor
+                  autoFocus
+                  minRows={12}
+                  value={desc}
+                  onChange={setDesc}
+                  onCommit={saveDesc}
+                  placeholder="Descreva o problema, o contexto e o critério de aceite. Markdown suportado."
+                />
               ) : (
-                <div className="markdown clickable" onClick={(e) => (e.target as HTMLElement).tagName !== 'A' && setEditingDesc(true)} dangerouslySetInnerHTML={{ __html: desc.trim() ? renderMarkdown(desc) : '<p class="muted">Clique para adicionar uma descrição…</p>' }} />
+                <div
+                  className="markdown clickable"
+                  onClick={(e) => (e.target as HTMLElement).tagName !== 'A' && setEditingDesc(true)}
+                  dangerouslySetInnerHTML={{
+                    __html: desc.trim() ? renderMarkdown(desc) : '<p class="muted">Clique para adicionar uma descrição…</p>',
+                  }}
+                />
               )}
             </section>
 
             <section className="drawer-section">
-              <h3>Checklist {checklistItems.length > 0 && <small>{checklistItems.filter((i) => i.done).length}/{checklistItems.length}</small>}</h3>
+              <h3>
+                Checklist{' '}
+                {checklistItems.length > 0 && (
+                  <small>
+                    {checklistItems.filter((i) => i.done).length}/{checklistItems.length}
+                  </small>
+                )}
+              </h3>
               <ul className="checklist">
                 {checklistItems.map((item) => (
                   <li key={item.id} className={item.done ? 'done' : ''}>
                     <input type="checkbox" checked={item.done} onChange={(e) => checklist.update(item.id, { done: e.target.checked })} />
-                    <input className="inline-edit" defaultValue={item.text} onBlur={(e) => e.target.value !== item.text && checklist.update(item.id, { text: e.target.value })} />
-                    <Button variant="icon" onClick={() => checklist.delete(item.id)}>✕</Button>
+                    <input
+                      className="inline-edit"
+                      defaultValue={item.text}
+                      onBlur={(e) => e.target.value !== item.text && checklist.update(item.id, { text: e.target.value })}
+                    />
+                    <Button variant="icon" onClick={() => checklist.delete(item.id)}>
+                      ✕
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -246,15 +355,29 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             {workflow.kind === 'parent' && childWf && (
               <section className="drawer-section">
                 <div className="section-head">
-                  <h3>Sub-tarefas <small>{children.length}</small></h3>
-                  <Button variant="ghost" size="small" onClick={() => { selectParent(null); selectParent(card.id); openCard(null); }}>Ver no board</Button>
+                  <h3>
+                    Sub-tarefas <small>{children.length}</small>
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    onClick={() => {
+                      selectParent(null);
+                      selectParent(card.id);
+                      openCard(null);
+                    }}
+                  >
+                    Ver no board
+                  </Button>
                 </div>
                 <ul className="children">
                   {children.map((c) => {
                     const col = state.columns.find((x) => x.id === c.columnId);
                     return (
                       <li key={c.id} className={col?.isTerminal ? 'done' : ''}>
-                        <a onClick={() => openCard(c.id)}><span className="card-id">{cardRef(c)}</span> {c.title}</a>
+                        <a onClick={() => openCard(c.id)}>
+                          <span className="card-id">{cardRef(c)}</span> {c.title}
+                        </a>
                         <span className="muted">{c.archivedAt ? 'Arquivada' : col?.name}</span>
                       </li>
                     );

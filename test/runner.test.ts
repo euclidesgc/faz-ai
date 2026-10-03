@@ -19,17 +19,34 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   const home = path.join(root, 'h');
   fs.mkdirSync(project);
   fs.mkdirSync(home);
-  fs.writeFileSync(path.join(project, '.mcp.json'), JSON.stringify({ mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } }, slack: { command: 'slack' } } }));
+  fs.writeFileSync(
+    path.join(project, '.mcp.json'),
+    JSON.stringify({
+      mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } }, slack: { command: 'slack' } },
+    }),
+  );
   const db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
-  const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, { workspaceKey: 'ws', folderName: 'P', author: 'Pessoa', attachmentsDir: path.join(root, 'a'), workspaceDir: project, homeDir: home });
+  const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+    workspaceKey: 'ws',
+    folderName: 'P',
+    author: 'Pessoa',
+    attachmentsDir: path.join(root, 'a'),
+    workspaceDir: project,
+    homeDir: home,
+  });
   const base = { agent: '', skills: [], tools: [], deniedTools: [], model: '', clean: false, isDefault: true };
-  router.handle({ type: 'settings.execProfiles.set', profiles: [{ ...base, id: 'p', name: 'Restrito', mcpServers: ['github'], deniedTools: ['WebFetch'] }] });
+  router.handle({
+    type: 'settings.execProfiles.set',
+    profiles: [{ ...base, id: 'p', name: 'Restrito', mcpServers: ['github'], deniedTools: ['WebFetch'] }],
+  });
   const s0 = router.snapshot();
   const cardId = router.createCard({ typeId: s0.cardTypes[0]!.id, columnId: s0.columns[0]!.id, parentId: null, title: 'x' });
   const card = () => router.snapshot().cards.find((c) => c.id === cardId)!;
 
   const plan = executionPlan(router.snapshot(), card(), project, home);
-  expect(JSON.parse(plan.input.mcpConfig!)).toEqual({ mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } } });
+  expect(JSON.parse(plan.input.mcpConfig!)).toEqual({
+    mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } },
+  });
   expect(plan.input.mcpBlocked).toEqual(['slack']);
   expect(plan.advice).toEqual([]); // no Claude Code tudo isso vai por parâmetro
   expect(plan.summary.join(' | ')).toContain('Servidores MCP: faz-ai, github (imposto)');
@@ -45,7 +62,12 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     spawn: (command) => {
       const file = command.args[command.args.indexOf('--mcp-config') + 1]!;
       seen = { file, mode: fs.statSync(file).mode & 0o777, content: fs.readFileSync(file, 'utf8') };
-      return { kill: () => {}, onExit: (fn) => { exit = (code) => fn(code); } };
+      return {
+        kill: () => {},
+        onExit: (fn) => {
+          exit = (code) => fn(code);
+        },
+      };
     },
   });
   runner.start(cardId);
@@ -56,7 +78,10 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
 
   // noutra ferramenta, o que não vai por parâmetro vira instrução no prompt
   router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
-  expect(executionPlan(router.snapshot(), card(), project, home).advice).toEqual(['De servidores MCP, use só o do board e: github.', 'Não use estas ferramentas: WebFetch.']);
+  expect(executionPlan(router.snapshot(), card(), project, home).advice).toEqual([
+    'De servidores MCP, use só o do board e: github.',
+    'Não use estas ferramentas: WebFetch.',
+  ]);
 
   // sem o servidor do board registrado, a execução restrita não começa
   router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude' } });
@@ -68,7 +93,9 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
 
 it('o prompt da execução leva as skills do card pelo caminho', () => {
   expect(cardPrompt('#1')).not.toContain('skills, obrigatórias');
-  expect(cardPrompt('#1', [{ name: 'commit', path: '/home/.claude/skills/commit/SKILL.md' }, { name: 'sumida' }])).toContain('leia estas skills, obrigatórias para este card: commit (/home/.claude/skills/commit/SKILL.md).');
+  expect(cardPrompt('#1', [{ name: 'commit', path: '/home/.claude/skills/commit/SKILL.md' }, { name: 'sumida' }])).toContain(
+    'leia estas skills, obrigatórias para este card: commit (/home/.claude/skills/commit/SKILL.md).',
+  );
 });
 import type { HeadlessCommand } from '../src/extension/headless';
 
@@ -83,7 +110,11 @@ let procs: { command: HeadlessCommand; cwd: string; killed: boolean; exit(code: 
 let storyId: string;
 
 const card = () => router.snapshot().cards.find((c) => c.id === storyId)!;
-const lastMessage = () => router.snapshot().comments.filter((c) => c.cardId === storyId).at(-1);
+const lastMessage = () =>
+  router
+    .snapshot()
+    .comments.filter((c) => c.cardId === storyId)
+    .at(-1);
 /** o que a IA faria pelo MCP durante a execução */
 const ai = (msg: Parameters<MessageRouter['handle']>[0]) => router.handle(msg, { author: 'Claude Code', source: 'ai' });
 
@@ -91,11 +122,20 @@ beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-runner-'));
   const db = await openInMemory(WASM_DIR);
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
-    workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(dir, 'attachments'), workspaceDir: dir,
+    workspaceKey: 'ws',
+    folderName: 'Projeto',
+    author: 'Pessoa',
+    attachmentsDir: path.join(dir, 'attachments'),
+    workspaceDir: dir,
   });
   const s = router.snapshot();
   const wf = s.workflows.find((w) => w.kind === 'parent')!;
-  storyId = router.createCard({ typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id, columnId: s.columns.find((c) => c.name === 'Discovery')!.id, parentId: null, title: 'Login' });
+  storyId = router.createCard({
+    typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+    columnId: s.columns.find((c) => c.name === 'Discovery')!.id,
+    parentId: null,
+    title: 'Login',
+  });
   log = [];
   procs = [];
   runner = new AiRunner(router, {
@@ -104,12 +144,20 @@ beforeEach(async () => {
     spawn: (command, cwd, out) => {
       let listener: (code: number | null, error?: Error) => void = () => {};
       const proc = {
-        command, cwd, killed: false,
+        command,
+        cwd,
+        killed: false,
         exit: (code: number | null, error?: Error) => listener(code, error),
       };
       procs.push(proc);
       out('saída da ferramenta\n');
-      return { onExit: (fn) => (listener = fn), kill: () => { proc.killed = true; proc.exit(null); } };
+      return {
+        onExit: (fn) => (listener = fn),
+        kill: () => {
+          proc.killed = true;
+          proc.exit(null);
+        },
+      };
     },
   });
 });
@@ -125,7 +173,13 @@ describe('executor da IA', () => {
     runner.start(storyId);
     expect(procs).toHaveLength(1);
     expect(procs[0]!.cwd).toBe(dir);
-    expect(procs[0]!.command).toEqual(headlessCommand('claude', { prompt: cardPrompt('#1', [], [PERMISSION_ADVICE.board!]), permission: 'board', addDirs: [`${dir}.worktrees`] }));
+    expect(procs[0]!.command).toEqual(
+      headlessCommand('claude', {
+        prompt: cardPrompt('#1', [], [PERMISSION_ADVICE.board!]),
+        permission: 'board',
+        addDirs: [`${dir}.worktrees`],
+      }),
+    );
     expect(card()).toMatchObject({ status: 'running', statusBy: 'Claude Code' });
     expect(router.snapshot().aiRuns).toEqual([storyId]);
     expect(log.join('\n')).toContain('[#1] saída da ferramenta');
@@ -197,12 +251,33 @@ describe('executor da IA', () => {
   });
 
   it('monta o comando de cada ferramenta conforme a permissão', () => {
-    const cmd = (tool: Parameters<typeof headlessCommand>[0], permission: 'board' | 'edits' | 'full') => headlessCommand(tool, { prompt: 'P', permission });
-    expect(cmd('claude', 'board')).toEqual({ command: 'claude', args: ['-p', '--permission-mode', 'dontAsk', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep'], stdin: 'P' });
+    const cmd = (tool: Parameters<typeof headlessCommand>[0], permission: 'board' | 'edits' | 'full') =>
+      headlessCommand(tool, { prompt: 'P', permission });
+    expect(cmd('claude', 'board')).toEqual({
+      command: 'claude',
+      args: ['-p', '--permission-mode', 'dontAsk', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep'],
+      stdin: 'P',
+    });
     expect(cmd('claude', 'edits')).toMatchObject({ args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*'] });
     expect(cmd('claude', 'full')).toMatchObject({ args: ['-p', '--permission-mode', 'bypassPermissions'] });
-    expect(cmd('codex', 'edits')).toEqual({ command: 'codex', args: ['exec', '--sandbox', 'workspace-write', '--skip-git-repo-check', '-c', 'mcp_servers.faz-ai.default_tools_approval_mode="approve"', '-'], stdin: 'P' });
-    expect(cmd('copilot', 'board')).toEqual({ command: 'copilot', args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', '--no-ask-user'], env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' } });
+    expect(cmd('codex', 'edits')).toEqual({
+      command: 'codex',
+      args: [
+        'exec',
+        '--sandbox',
+        'workspace-write',
+        '--skip-git-repo-check',
+        '-c',
+        'mcp_servers.faz-ai.default_tools_approval_mode="approve"',
+        '-',
+      ],
+      stdin: 'P',
+    });
+    expect(cmd('copilot', 'board')).toEqual({
+      command: 'copilot',
+      args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', '--no-ask-user'],
+      env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' },
+    });
     expect(cmd('cursor', 'full')).toEqual({ command: 'agent', args: ['-p', '--force', '--approve-mcps', '--trust', 'P'] });
     expect(headlessUnsupported('claude', 'board')).toBeNull();
     expect(headlessUnsupported('cursor', 'board')).toContain('Cursor');

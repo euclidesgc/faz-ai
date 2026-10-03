@@ -7,7 +7,13 @@ export class BoardPanel {
   private static current: BoardPanel | undefined;
 
   /** Abre (ou revela) o board. Se `cardId` vier, abre o detalhe daquele card. */
-  static show(context: vscode.ExtensionContext, router: MessageRouter, viewState: ViewStateStore, folderName: string, cardId?: string): void {
+  static show(
+    context: vscode.ExtensionContext,
+    router: MessageRouter,
+    viewState: ViewStateStore,
+    folderName: string,
+    cardId?: string,
+  ): void {
     if (BoardPanel.current) {
       BoardPanel.current.panel.reveal(vscode.ViewColumn.One);
       if (cardId) BoardPanel.current.bridge.post({ type: 'ui.openCard', cardId });

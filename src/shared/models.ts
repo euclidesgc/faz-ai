@@ -44,7 +44,9 @@ export function parseModelRules(json: string | null | undefined): ModelRule[] {
     if (!r || typeof r.id !== 'string' || typeof r.model !== 'string') return [];
     const groups = Array.isArray(r.groups)
       ? r.groups.map((g) => (Array.isArray(g) ? g.filter((c) => c && typeof c.fieldId === 'string') : [])).filter((g) => g.length)
-      : r.fieldId ? [[{ fieldId: r.fieldId, op: 'is' as const, value: r.value ?? '' }]] : [];
+      : r.fieldId
+        ? [[{ fieldId: r.fieldId, op: 'is' as const, value: r.value ?? '' }]]
+        : [];
     return [{ id: r.id, name: r.name ?? '', enabled: r.enabled !== false, groups, model: r.model }];
   });
 }
@@ -98,7 +100,9 @@ export function resolveModelInput(catalog: ModelOption[], text: string): string 
       if (words.every((w, i) => clean[i] === w) && clean.length - words.length <= 1) return pick(o, clean[words.length] ?? null);
     }
   }
-  throw new Error(`Modelo "${text}" não está no catálogo. Disponíveis: ${catalog.map((o) => `${o.label} (${o.id})`).join(', ') || 'nenhum'}.`);
+  throw new Error(
+    `Modelo "${text}" não está no catálogo. Disponíveis: ${catalog.map((o) => `${o.label} (${o.id})`).join(', ') || 'nenhum'}.`,
+  );
 }
 
 /** Primeiro campo do tipo modelo que se aplica ao card. */
@@ -112,7 +116,14 @@ function conditionHolds(state: BoardState, card: Card, c: RuleCondition): boolea
   else {
     const v = state.fieldValues.find((x) => x.cardId === card.id && x.fieldId === c.fieldId)?.value;
     // checkbox desmarcado não tem valor salvo: conta como "false"
-    values = v === undefined || v === null ? (state.fieldDefs.find((f) => f.id === c.fieldId)?.kind === 'checkbox' ? ['false'] : []) : Array.isArray(v) ? v : [String(v)];
+    values =
+      v === undefined || v === null
+        ? state.fieldDefs.find((f) => f.id === c.fieldId)?.kind === 'checkbox'
+          ? ['false']
+          : []
+        : Array.isArray(v)
+          ? v
+          : [String(v)];
   }
   const has = values.some((x) => norm(x) === norm(c.value));
   return c.op === 'is' ? has : !has;
@@ -128,8 +139,11 @@ export function suggestModel(state: BoardState, card: Card): string | null {
 
 /** Texto de uma regra, ex.: `Esforço = Alto E Tags = backend OU Tipo = Bug`. */
 export function describeRule(state: BoardState, rule: ModelRule): string {
-  const name = (c: RuleCondition) => (c.fieldId === TYPE_CONDITION ? 'Tipo' : state.fieldDefs.find((f) => f.id === c.fieldId)?.name ?? '(campo apagado)');
-  return rule.groups.map((g) => g.map((c) => `${name(c)} ${c.op === 'is' ? '=' : '≠'} ${c.value}`).join(' E ')).join(' OU ') || '(sem condições)';
+  const name = (c: RuleCondition) =>
+    c.fieldId === TYPE_CONDITION ? 'Tipo' : (state.fieldDefs.find((f) => f.id === c.fieldId)?.name ?? '(campo apagado)');
+  return (
+    rule.groups.map((g) => g.map((c) => `${name(c)} ${c.op === 'is' ? '=' : '≠'} ${c.value}`).join(' E ')).join(' OU ') || '(sem condições)'
+  );
 }
 
 export function parseJsonArray<T>(json: string | null | undefined): T[] {

@@ -11,7 +11,13 @@ import type { AiTool, HarnessKind } from './harness';
  *
  * A varredura e a tela são genéricas sobre esta tabela: mudar um caminho é mudar um dado aqui.
  */
-export type HarnessSource = { kind: HarnessKind; scope: 'project' | 'user'; path: string; /** rótulo de origem para itens que vêm com a ferramenta */ builtin?: string; /** extensão dos arquivos novos, quando difere da que é listada */ createExt?: string } & (
+export type HarnessSource = {
+  kind: HarnessKind;
+  scope: 'project' | 'user';
+  path: string;
+  /** rótulo de origem para itens que vêm com a ferramenta */ builtin?: string;
+  /** extensão dos arquivos novos, quando difere da que é listada */ createExt?: string;
+} & (
   | { layout: 'file' }
   /** todos os arquivos da pasta (e subpastas) com a extensão */
   | { layout: 'files'; ext: string }
@@ -36,7 +42,13 @@ const both = (kind: HarnessKind, layout: 'skills', paths: [project: string[], us
   ...paths[0].map((path): Src => ({ kind, scope: 'project', layout, path })),
   ...paths[1].map((path): Src => ({ kind, scope: 'user', layout, path })),
 ];
-const files = (kind: HarnessKind, scope: 'project' | 'user', path: string, ext: string): Src => ({ kind, scope, layout: 'files', path, ext });
+const files = (kind: HarnessKind, scope: 'project' | 'user', path: string, ext: string): Src => ({
+  kind,
+  scope,
+  layout: 'files',
+  path,
+  ext,
+});
 const file = (kind: HarnessKind, scope: 'project' | 'user', path: string): Src => ({ kind, scope, layout: 'file', path });
 
 export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
@@ -60,7 +72,13 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
     file('settings', 'project', '.claude/settings.json'),
     file('settings', 'project', '.claude/settings.local.json'),
     { kind: 'settings', scope: 'project', layout: 'json-permissions', path: '.claude/settings.json', lists: ['allow', 'ask', 'deny'] },
-    { kind: 'settings', scope: 'project', layout: 'json-permissions', path: '.claude/settings.local.json', lists: ['allow', 'ask', 'deny'] },
+    {
+      kind: 'settings',
+      scope: 'project',
+      layout: 'json-permissions',
+      path: '.claude/settings.local.json',
+      lists: ['allow', 'ask', 'deny'],
+    },
     { kind: 'settings', scope: 'user', layout: 'json-permissions', path: '.claude/settings.json', lists: ['allow', 'ask', 'deny'] },
     files('settings', 'project', '.claude/output-styles', '.md'),
     file('settings', 'user', '.claude/settings.json'),
@@ -88,7 +106,10 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
   cursor: [
     file('instructions', 'project', 'AGENTS.md'),
     files('instructions', 'project', '.cursor/rules', '.mdc'),
-    ...both('skill', 'skills', [['.cursor/skills', '.agents/skills', '.claude/skills', '.codex/skills'], ['.cursor/skills', '.agents/skills', '.claude/skills', '.codex/skills']]),
+    ...both('skill', 'skills', [
+      ['.cursor/skills', '.agents/skills', '.claude/skills', '.codex/skills'],
+      ['.cursor/skills', '.agents/skills', '.claude/skills', '.codex/skills'],
+    ]),
     files('agent', 'project', '.cursor/agents', '.md'),
     files('agent', 'project', '.claude/agents', '.md'),
     files('agent', 'user', '.cursor/agents', '.md'),
@@ -110,7 +131,10 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
     file('instructions', 'user', '.agents/AGENTS.md'),
     file('instructions', 'user', '.kimi-code/SYSTEM.md'),
     // .kimi/skills é a pasta da Kimi CLI antiga; o Kimi Code atual lê .kimi-code/skills e .agents/skills
-    ...both('skill', 'skills', [['.kimi-code/skills', '.agents/skills', '.kimi/skills'], ['.kimi-code/skills', '.agents/skills']]),
+    ...both('skill', 'skills', [
+      ['.kimi-code/skills', '.agents/skills', '.kimi/skills'],
+      ['.kimi-code/skills', '.agents/skills'],
+    ]),
     files('agent', 'project', '.kimi-code/agents', '.md'),
     files('agent', 'project', '.agents/agents', '.md'),
     files('agent', 'user', '.kimi-code/agents', '.md'),
@@ -127,7 +151,10 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
     files('instructions', 'project', '.github/instructions', '.instructions.md'),
     file('instructions', 'user', '.copilot/copilot-instructions.md'),
     files('instructions', 'user', '.copilot/instructions', '.instructions.md'),
-    ...both('skill', 'skills', [['.github/skills', '.claude/skills', '.agents/skills'], ['.copilot/skills', '.agents/skills']]),
+    ...both('skill', 'skills', [
+      ['.github/skills', '.claude/skills', '.agents/skills'],
+      ['.copilot/skills', '.agents/skills'],
+    ]),
     { ...files('agent', 'project', '.github/agents', '.md'), createExt: '.agent.md' },
     { ...files('agent', 'user', '.copilot/agents', '.md'), createExt: '.agent.md' },
     files('command', 'project', '.github/prompts', '.prompt.md'),
@@ -151,7 +178,12 @@ export const PLUGIN_ROOTS: Record<AiTool, { path: string; manifests: string[] }[
   codex: [{ path: '.codex/plugins/cache', manifests: ['plugin.json', '.codex-plugin/plugin.json'] }],
   cursor: [{ path: '.cursor/plugins/local', manifests: ['.cursor-plugin/plugin.json', 'plugin.json'] }],
   kimi: [{ path: '.kimi-code/plugins/managed', manifests: ['kimi.plugin.json', '.kimi-plugin/plugin.json'] }],
-  copilot: [{ path: '.copilot/installed-plugins', manifests: ['plugin.json', '.plugin/plugin.json', '.claude-plugin/plugin.json', '.github/plugin/plugin.json'] }],
+  copilot: [
+    {
+      path: '.copilot/installed-plugins',
+      manifests: ['plugin.json', '.plugin/plugin.json', '.claude-plugin/plugin.json', '.github/plugin/plugin.json'],
+    },
+  ],
 };
 
 /** Um lugar onde o board pode criar um item novo: arquivo fixo que ainda não existe, arquivo de uma pasta ou pasta de skill. */
@@ -169,13 +201,19 @@ export function createTargets(tool: AiTool): CreateTarget[] {
   return HARNESS_CATALOG[tool].flatMap((src, source): CreateTarget[] => {
     if (src.builtin || (src.layout !== 'file' && src.layout !== 'files' && src.layout !== 'skills')) return [];
     const base = `${src.scope === 'user' ? '~/' : ''}${src.path}`;
-    const label = src.layout === 'file' ? base : src.layout === 'skills' ? `${base}/<nome>/SKILL.md` : `${base}/<nome>${src.createExt ?? src.ext}`;
+    const label =
+      src.layout === 'file' ? base : src.layout === 'skills' ? `${base}/<nome>/SKILL.md` : `${base}/<nome>${src.createExt ?? src.ext}`;
     return [{ source, kind: src.kind, scope: src.scope, layout: src.layout, label }];
   });
 }
 
 /** Pasta para onde vai a cópia de um item: a primeira pasta do catálogo para o tipo e o escopo de destino. */
-export function copyTarget(tool: AiTool, kind: HarnessKind, layout: 'files' | 'skills', scope: 'project' | 'user'): HarnessSource | undefined {
+export function copyTarget(
+  tool: AiTool,
+  kind: HarnessKind,
+  layout: 'files' | 'skills',
+  scope: 'project' | 'user',
+): HarnessSource | undefined {
   return HARNESS_CATALOG[tool].find((s) => !s.builtin && s.kind === kind && s.scope === scope && s.layout === layout);
 }
 
@@ -194,7 +232,9 @@ export interface McpTarget {
  */
 export function mcpTargets(tool: AiTool): McpTarget[] {
   return HARNESS_CATALOG[tool].flatMap((src, source): McpTarget[] =>
-    src.kind === 'mcp' && (src.layout === 'json-keys' || src.layout === 'toml-tables') ? [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}` }] : [],
+    src.kind === 'mcp' && (src.layout === 'json-keys' || src.layout === 'toml-tables')
+      ? [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}` }]
+      : [],
   );
 }
 
@@ -219,7 +259,13 @@ export const MCP_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
  */
 export type HookFormat = 'nested' | 'flat' | 'copilot';
 
-const HOOK_FORMAT: Record<AiTool, HookFormat | null> = { claude: 'nested', codex: 'nested', cursor: 'flat', copilot: 'copilot', kimi: null };
+const HOOK_FORMAT: Record<AiTool, HookFormat | null> = {
+  claude: 'nested',
+  codex: 'nested',
+  cursor: 'flat',
+  copilot: 'copilot',
+  kimi: null,
+};
 
 /** Arquivo que o board grava dentro de uma pasta de hooks (Copilot). */
 export const HOOK_FILE = 'faz-ai.json';
@@ -244,10 +290,67 @@ export function hookTargets(tool: AiTool): HookTarget[] {
 
 /** Eventos de hook de cada ferramenta, conforme as páginas de hooks delas. */
 export const HOOK_EVENTS: Record<AiTool, string[]> = {
-  claude: ['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'UserPromptSubmit', 'PermissionRequest', 'Notification', 'SessionStart', 'SessionEnd', 'Stop', 'SubagentStart', 'SubagentStop', 'PreCompact', 'PostCompact', 'InstructionsLoaded', 'ConfigChange', 'FileChanged'],
-  codex: ['PreToolUse', 'PostToolUse', 'PermissionRequest', 'UserPromptSubmit', 'SessionStart', 'SessionEnd', 'Stop', 'Interrupt', 'SubagentStart', 'SubagentStop', 'PreCompact', 'PostCompact'],
-  cursor: ['preToolUse', 'postToolUse', 'postToolUseFailure', 'beforeShellExecution', 'afterShellExecution', 'beforeMCPExecution', 'afterMCPExecution', 'beforeReadFile', 'afterFileEdit', 'beforeSubmitPrompt', 'sessionStart', 'sessionEnd', 'subagentStart', 'subagentStop', 'preCompact', 'stop', 'afterAgentResponse'],
-  copilot: ['preToolUse', 'postToolUse', 'postToolUseFailure', 'userPromptSubmitted', 'sessionStart', 'agentStop', 'subagentStart', 'errorOccurred'],
+  claude: [
+    'PreToolUse',
+    'PostToolUse',
+    'PostToolUseFailure',
+    'UserPromptSubmit',
+    'PermissionRequest',
+    'Notification',
+    'SessionStart',
+    'SessionEnd',
+    'Stop',
+    'SubagentStart',
+    'SubagentStop',
+    'PreCompact',
+    'PostCompact',
+    'InstructionsLoaded',
+    'ConfigChange',
+    'FileChanged',
+  ],
+  codex: [
+    'PreToolUse',
+    'PostToolUse',
+    'PermissionRequest',
+    'UserPromptSubmit',
+    'SessionStart',
+    'SessionEnd',
+    'Stop',
+    'Interrupt',
+    'SubagentStart',
+    'SubagentStop',
+    'PreCompact',
+    'PostCompact',
+  ],
+  cursor: [
+    'preToolUse',
+    'postToolUse',
+    'postToolUseFailure',
+    'beforeShellExecution',
+    'afterShellExecution',
+    'beforeMCPExecution',
+    'afterMCPExecution',
+    'beforeReadFile',
+    'afterFileEdit',
+    'beforeSubmitPrompt',
+    'sessionStart',
+    'sessionEnd',
+    'subagentStart',
+    'subagentStop',
+    'preCompact',
+    'stop',
+    'afterAgentResponse',
+  ],
+  copilot: [
+    'preToolUse',
+    'postToolUse',
+    'postToolUseFailure',
+    'userPromptSubmitted',
+    'sessionStart',
+    'agentStop',
+    'subagentStart',
+    'errorOccurred',
+  ],
   kimi: [],
 };
 
@@ -268,7 +371,11 @@ export interface PermissionTarget {
 }
 
 export function permissionTargets(tool: AiTool): PermissionTarget[] {
-  return HARNESS_CATALOG[tool].flatMap((src, source): PermissionTarget[] => (src.layout === 'json-permissions' ? [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}`, lists: src.lists }] : []));
+  return HARNESS_CATALOG[tool].flatMap((src, source): PermissionTarget[] =>
+    src.layout === 'json-permissions'
+      ? [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}`, lists: src.lists }]
+      : [],
+  );
 }
 
 export const PERMISSION_LIST_LABEL: Record<string, string> = { allow: 'permitir', ask: 'perguntar', deny: 'negar' };
@@ -278,9 +385,40 @@ export const PERMISSION_LIST_LABEL: Record<string, string> = { allow: 'permitir'
  * O board mostra os comandos; quem os roda é a pessoa, no terminal ou na sessão da ferramenta.
  */
 export const PLUGIN_COMMANDS: Record<AiTool, { where: string; commands: string[] }> = {
-  claude: { where: 'no terminal', commands: ['claude plugin marketplace add <dono/repositorio>', 'claude plugin install <plugin>@<marketplace>', 'claude plugin list', 'claude plugin uninstall <plugin>@<marketplace>'] },
-  codex: { where: 'no terminal', commands: ['codex plugin marketplace add <dono/repositorio>', 'codex plugin list --available', 'codex plugin add <plugin>@<marketplace>', 'codex plugin remove <plugin>@<marketplace>'] },
-  copilot: { where: 'no terminal', commands: ['copilot plugin marketplace browse <marketplace>', 'copilot plugin install <plugin>@<marketplace>', 'copilot plugin list', 'copilot plugin uninstall <plugin>', 'gh skill search <termo>'] },
-  cursor: { where: 'no Cursor (Customize → Plugins) ou numa sessão do agente', commands: ['/plugin', 'agent plugin marketplace add <endereço git>'] },
-  kimi: { where: 'numa sessão do Kimi Code', commands: ['/plugins marketplace', '/plugins install <pasta, zip ou endereço do GitHub>', '/plugins list', '/plugins remove <id>'] },
+  claude: {
+    where: 'no terminal',
+    commands: [
+      'claude plugin marketplace add <dono/repositorio>',
+      'claude plugin install <plugin>@<marketplace>',
+      'claude plugin list',
+      'claude plugin uninstall <plugin>@<marketplace>',
+    ],
+  },
+  codex: {
+    where: 'no terminal',
+    commands: [
+      'codex plugin marketplace add <dono/repositorio>',
+      'codex plugin list --available',
+      'codex plugin add <plugin>@<marketplace>',
+      'codex plugin remove <plugin>@<marketplace>',
+    ],
+  },
+  copilot: {
+    where: 'no terminal',
+    commands: [
+      'copilot plugin marketplace browse <marketplace>',
+      'copilot plugin install <plugin>@<marketplace>',
+      'copilot plugin list',
+      'copilot plugin uninstall <plugin>',
+      'gh skill search <termo>',
+    ],
+  },
+  cursor: {
+    where: 'no Cursor (Customize → Plugins) ou numa sessão do agente',
+    commands: ['/plugin', 'agent plugin marketplace add <endereço git>'],
+  },
+  kimi: {
+    where: 'numa sessão do Kimi Code',
+    commands: ['/plugins marketplace', '/plugins install <pasta, zip ou endereço do GitHub>', '/plugins list', '/plugins remove <id>'],
+  },
 };

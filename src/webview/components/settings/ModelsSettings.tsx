@@ -6,7 +6,11 @@ import { settings } from '../../commands';
 import { ModelRulesEditor } from './ModelRulesEditor';
 import { Button } from '../ui';
 
-const splitList = (s: string): string[] => s.split(',').map((x) => x.trim()).filter(Boolean);
+const splitList = (s: string): string[] =>
+  s
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
 
 /** De onde vem a lista de modelos de cada ferramenta ao clicar em "Detectar". */
 const SOURCES: Record<AiTool, string> = {
@@ -32,7 +36,17 @@ export function ModelsSettings() {
     const d = draft[tool];
     if (!d?.model.trim() || catalog.some((o) => o.id === modelId(tool, d.model.trim()))) return;
     const efforts = splitList(d.efforts);
-    setCatalog([...catalog, { id: modelId(tool, d.model.trim()), tool, model: d.model.trim(), label: d.label.trim() || d.model.trim(), efforts, defaultEffort: efforts[0] ?? null }]);
+    setCatalog([
+      ...catalog,
+      {
+        id: modelId(tool, d.model.trim()),
+        tool,
+        model: d.model.trim(),
+        label: d.label.trim() || d.model.trim(),
+        efforts,
+        defaultEffort: efforts[0] ?? null,
+      },
+    ]);
     setDraft({ ...draft, [tool]: { model: '', label: '', efforts: '' } });
   };
 
@@ -40,7 +54,8 @@ export function ModelsSettings() {
     <div>
       <h2>Modelos de IA</h2>
       <p className="muted">
-        Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness de IA.
+        Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos
+        cards. A ferramenta é escolhida em Harness de IA.
       </p>
 
       <div className="stack">
@@ -53,16 +68,35 @@ export function ModelsSettings() {
                 <h3 className="plain">{t.label}</h3>
                 <span className="muted small">{mine.length} modelo(s)</span>
                 <span className="spacer" />
-                <Button title={`Fonte: ${SOURCES[t.id]}`} onClick={() => settings.detectModels(t.id)}>Detectar modelos</Button>
+                <Button title={`Fonte: ${SOURCES[t.id]}`} onClick={() => settings.detectModels(t.id)}>
+                  Detectar modelos
+                </Button>
               </div>
               <div className="muted small">Ao detectar: {SOURCES[t.id]}. Modelos que você acrescentou à mão são mantidos.</div>
               <table className="table">
-                <thead><tr><th>Nome</th><th>Identificador na ferramenta</th><th>Esforços aceitos (separados por vírgula)</th><th>Esforço padrão</th><th></th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Identificador na ferramenta</th>
+                    <th>Esforços aceitos (separados por vírgula)</th>
+                    <th>Esforço padrão</th>
+                    <th></th>
+                  </tr>
+                </thead>
                 <tbody>
                   {mine.map((o) => (
                     <tr key={o.id}>
-                      <td><input defaultValue={o.label} onBlur={(e) => e.target.value.trim() && e.target.value !== o.label && patchModel(o.id, { label: e.target.value.trim() })} /></td>
-                      <td><code>{o.model}</code></td>
+                      <td>
+                        <input
+                          defaultValue={o.label}
+                          onBlur={(e) =>
+                            e.target.value.trim() && e.target.value !== o.label && patchModel(o.id, { label: e.target.value.trim() })
+                          }
+                        />
+                      </td>
+                      <td>
+                        <code>{o.model}</code>
+                      </td>
                       <td>
                         <input
                           key={o.efforts.join()}
@@ -70,27 +104,70 @@ export function ModelsSettings() {
                           placeholder="sem ajuste de esforço"
                           onBlur={(e) => {
                             const efforts = splitList(e.target.value);
-                            if (efforts.join() !== o.efforts.join()) patchModel(o.id, { efforts, defaultEffort: o.defaultEffort && efforts.includes(o.defaultEffort) ? o.defaultEffort : efforts[0] ?? null });
+                            if (efforts.join() !== o.efforts.join())
+                              patchModel(o.id, {
+                                efforts,
+                                defaultEffort:
+                                  o.defaultEffort && efforts.includes(o.defaultEffort) ? o.defaultEffort : (efforts[0] ?? null),
+                              });
                           }}
                         />
                       </td>
                       <td className="narrow">
                         {o.efforts.length > 0 && (
-                          <select value={o.defaultEffort ?? ''} onChange={(e) => patchModel(o.id, { defaultEffort: e.target.value || null })}>
-                            {o.efforts.map((e) => <option key={e} value={e}>{e}</option>)}
+                          <select
+                            value={o.defaultEffort ?? ''}
+                            onChange={(e) => patchModel(o.id, { defaultEffort: e.target.value || null })}
+                          >
+                            {o.efforts.map((e) => (
+                              <option key={e} value={e}>
+                                {e}
+                              </option>
+                            ))}
                           </select>
                         )}
                       </td>
                       {/* sem confirmação de propósito: a lista pode ser refeita com "Detectar modelos" */}
-                      <td className="narrow"><Button variant="icon" danger title="Remover do catálogo" onClick={() => setCatalog(catalog.filter((x) => x.id !== o.id))}>🗑</Button></td>
+                      <td className="narrow">
+                        <Button
+                          variant="icon"
+                          danger
+                          title="Remover do catálogo"
+                          onClick={() => setCatalog(catalog.filter((x) => x.id !== o.id))}
+                        >
+                          🗑
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                   <tr>
-                    <td><input placeholder="Nome" value={d.label} onChange={(e) => setDraft({ ...draft, [t.id]: { ...d, label: e.target.value } })} /></td>
-                    <td><input placeholder="identificador" value={d.model} onChange={(e) => setDraft({ ...draft, [t.id]: { ...d, model: e.target.value } })} /></td>
-                    <td><input placeholder="low, medium, high" value={d.efforts} onChange={(e) => setDraft({ ...draft, [t.id]: { ...d, efforts: e.target.value } })} /></td>
+                    <td>
+                      <input
+                        placeholder="Nome"
+                        value={d.label}
+                        onChange={(e) => setDraft({ ...draft, [t.id]: { ...d, label: e.target.value } })}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        placeholder="identificador"
+                        value={d.model}
+                        onChange={(e) => setDraft({ ...draft, [t.id]: { ...d, model: e.target.value } })}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        placeholder="low, medium, high"
+                        value={d.efforts}
+                        onChange={(e) => setDraft({ ...draft, [t.id]: { ...d, efforts: e.target.value } })}
+                      />
+                    </td>
                     <td></td>
-                    <td className="narrow"><Button variant="primary" disabled={!d.model.trim()} onClick={() => addModel(t.id)}>Adicionar</Button></td>
+                    <td className="narrow">
+                      <Button variant="primary" disabled={!d.model.trim()} onClick={() => addModel(t.id)}>
+                        Adicionar
+                      </Button>
+                    </td>
                   </tr>
                 </tbody>
               </table>

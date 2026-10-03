@@ -23,8 +23,8 @@ function block(selector: string): Tokens {
 
 const base = block('body');
 const themes = {
-  light: { ...base, ...block('body[data-theme=light]') },
-  dark: { ...base, ...block('body[data-theme=dark]') },
+  light: { ...base, ...block("body[data-theme='light']") },
+  dark: { ...base, ...block("body[data-theme='dark']") },
 };
 
 /** Resolve `var(--x)` recursivamente até chegar num valor literal. */
@@ -38,21 +38,39 @@ function resolveToken(tokens: Tokens, name: string, seen: string[] = []): string
 // pares [frente, fundo, mínimo]. --border é decorativa (separadores, contornos de cartão) e não entra:
 // o contraste exigido para bordas de controle fica em --border-strong/--input-border.
 const pairs: Array<[string, string, number]> = [
-  ['--fg', '--bg', 4.5], ['--fg', '--card-bg', 4.5], ['--fg', '--col-bg', 4.5], ['--fg', '--hover', 4.5],
-  ['--muted', '--bg', 4.5], ['--muted', '--card-bg', 4.5], ['--muted', '--col-bg', 4.5], ['--muted', '--hover', 4.5],
-  ['--link', '--bg', 4.5], ['--link', '--card-bg', 4.5], ['--link', '--col-bg', 4.5],
-  ['--error', '--bg', 4.5], ['--error', '--card-bg', 4.5], ['--error', '--col-bg', 4.5],
-  ['--btn-fg', '--btn-bg', 4.5], ['--btn-fg', '--btn-bg-hover', 4.5],
-  ['--btn2-fg', '--btn2-bg', 4.5], ['--btn2-fg', '--btn2-bg-hover', 4.5],
+  ['--fg', '--bg', 4.5],
+  ['--fg', '--card-bg', 4.5],
+  ['--fg', '--col-bg', 4.5],
+  ['--fg', '--hover', 4.5],
+  ['--muted', '--bg', 4.5],
+  ['--muted', '--card-bg', 4.5],
+  ['--muted', '--col-bg', 4.5],
+  ['--muted', '--hover', 4.5],
+  ['--link', '--bg', 4.5],
+  ['--link', '--card-bg', 4.5],
+  ['--link', '--col-bg', 4.5],
+  ['--error', '--bg', 4.5],
+  ['--error', '--card-bg', 4.5],
+  ['--error', '--col-bg', 4.5],
+  ['--btn-fg', '--btn-bg', 4.5],
+  ['--btn-fg', '--btn-bg-hover', 4.5],
+  ['--btn2-fg', '--btn2-bg', 4.5],
+  ['--btn2-fg', '--btn2-bg-hover', 4.5],
   ['--input-fg', '--input-bg', 4.5],
   ['--badge-fg', '--badge-bg', 4.5],
-  ['--fg', '--error-bg', 4.5], ['--fg', '--warn-bg', 4.5], ['--fg', '--code-bg', 4.5],
+  ['--fg', '--error-bg', 4.5],
+  ['--fg', '--warn-bg', 4.5],
+  ['--fg', '--code-bg', 4.5],
   ['--danger-fg', '--danger-bg', 4.5],
   ['--warn-solid-fg', '--warn-solid', 4.5],
-  ['--input-border', '--input-bg', 3], ['--border-strong', '--bg', 3],
-  ['--accent', '--bg', 3], ['--accent', '--card-bg', 3], ['--accent', '--col-bg', 3],
+  ['--input-border', '--input-bg', 3],
+  ['--border-strong', '--bg', 3],
+  ['--accent', '--bg', 3],
+  ['--accent', '--card-bg', 3],
+  ['--accent', '--col-bg', 3],
   ['--warn-border', '--bg', 3],
-  ['--success', '--bg', 3], ['--success', '--col-bg', 3],
+  ['--success', '--bg', 3],
+  ['--success', '--col-bg', 3],
 ];
 
 describe.each(Object.entries(themes))('tokens.css: tema %s', (_name, tokens) => {

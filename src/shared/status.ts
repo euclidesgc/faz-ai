@@ -8,7 +8,13 @@ export const CARD_STATUSES: { id: CardStatus; label: string; color: string; owne
   { id: 'ready', label: 'Pronto', color: '#4c8dff', owner: 'ai', hint: 'A IA pode trabalhar no card' },
   { id: 'running', label: 'Em execução', color: '#9b59b6', owner: 'ai', hint: 'Uma sessão de IA está trabalhando no card' },
   { id: 'waiting_answer', label: 'Aguardando resposta', color: '#f5a623', owner: 'human', hint: 'A IA fez uma pergunta na conversa' },
-  { id: 'waiting_review', label: 'Aguardando revisão', color: '#f5a623', owner: 'human', hint: 'O trabalho da fase está pronto para ser revisado' },
+  {
+    id: 'waiting_review',
+    label: 'Aguardando revisão',
+    color: '#f5a623',
+    owner: 'human',
+    hint: 'O trabalho da fase está pronto para ser revisado',
+  },
   { id: 'approved', label: 'Aprovado', color: '#2ecc71', owner: 'ai', hint: 'A IA deve mover o card para a próxima coluna' },
   { id: 'blocked', label: 'Bloqueado', color: '#e5484d', owner: 'human', hint: 'Há um impedimento' },
 ];
@@ -20,7 +26,9 @@ export const OWNER_LABEL: Record<StatusOwner, string> = { ai: 'com a IA', human:
 
 export type StatusStyles = Record<CardStatus, { label: string; color: string }>;
 
-export const DEFAULT_STATUS_STYLES = Object.fromEntries(CARD_STATUSES.map((s) => [s.id, { label: s.label, color: s.color }])) as StatusStyles;
+export const DEFAULT_STATUS_STYLES = Object.fromEntries(
+  CARD_STATUSES.map((s) => [s.id, { label: s.label, color: s.color }]),
+) as StatusStyles;
 
 /** Rótulos e cores salvos, completando com os padrões o que faltar ou for inválido. */
 export function parseStatusStyles(raw: unknown): StatusStyles {

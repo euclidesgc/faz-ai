@@ -49,7 +49,10 @@ function vscodeEnv(webview: vscode.Webview, router: MessageRouter): HostEnv {
     openFile: async (file) => void (await open(file)),
     openExternal: async (file) => void (await vscode.env.openExternal(vscode.Uri.file(file))),
     revealFile: (file) => vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(file)),
-    pickFiles: async () => (await vscode.window.showOpenDialog({ canSelectMany: true, openLabel: 'Anexar', title: 'Anexar arquivos ao card' }))?.map((u) => u.fsPath),
+    pickFiles: async () =>
+      (await vscode.window.showOpenDialog({ canSelectMany: true, openLabel: 'Anexar', title: 'Anexar arquivos ao card' }))?.map(
+        (u) => u.fsPath,
+      ),
   };
 }
 

@@ -25,7 +25,11 @@ export const fake = {
 };
 
 export class Uri {
-  private constructor(readonly scheme: string, readonly fsPath: string, private readonly raw: string) {}
+  private constructor(
+    readonly scheme: string,
+    readonly fsPath: string,
+    private readonly raw: string,
+  ) {}
   static file(p: string): Uri {
     return new Uri('file', p, `file://${p}`);
   }
@@ -55,13 +59,19 @@ export class EventEmitter<T> {
 }
 
 export class TreeItem {
-  constructor(public label: string, public collapsibleState?: number) {}
+  constructor(
+    public label: string,
+    public collapsibleState?: number,
+  ) {}
 }
 export class ThemeIcon {
   constructor(public id: string) {}
 }
 export class RelativePattern {
-  constructor(public base: unknown, public pattern: string) {}
+  constructor(
+    public base: unknown,
+    public pattern: string,
+  ) {}
 }
 export const TreeItemCollapsibleState = { None: 0, Collapsed: 1, Expanded: 2 };
 export const StatusBarAlignment = { Left: 1, Right: 2 };
@@ -140,7 +150,12 @@ export const workspace = {
   get workspaceFolders() {
     return fake.folder ? [{ uri: Uri.file(fake.folder), name: path.basename(fake.folder), index: 0 }] : undefined;
   },
-  createFileSystemWatcher: () => ({ onDidCreate: () => disposable, onDidChange: () => disposable, onDidDelete: () => disposable, dispose() {} }),
+  createFileSystemWatcher: () => ({
+    onDidCreate: () => disposable,
+    onDidChange: () => disposable,
+    onDidDelete: () => disposable,
+    dispose() {},
+  }),
 };
 
 export const env = {

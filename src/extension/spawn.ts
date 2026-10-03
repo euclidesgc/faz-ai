@@ -22,13 +22,27 @@ export function loginShellPath(): Promise<string | undefined> {
 }
 
 /** Inicia a CLI da ferramenta de IA na pasta do projeto. */
-export function spawnHeadless(command: HeadlessCommand, cwd: string, log: (text: string) => void, pathEnv: string | undefined): RunningProcess {
+export function spawnHeadless(
+  command: HeadlessCommand,
+  cwd: string,
+  log: (text: string) => void,
+  pathEnv: string | undefined,
+): RunningProcess {
   // quem só usa a extensão da ferramenta no editor não tem a CLI no PATH: procura também onde ela costuma ficar
   const executable = resolveCommand(command.command, pathEnv, os.homedir());
   if (!executable) throw new Error(commandNotFound(command.command));
   // um editor aberto de dentro de uma sessão do Claude Code herda as variáveis dela; a execução do board é uma sessão própria
   const env: NodeJS.ProcessEnv = { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), ...command.env };
-  for (const name of ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_HOST_SESSION_ID', 'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_CODE_MESSAGING_TOKEN']) delete env[name];
+  for (const name of [
+    'CLAUDECODE',
+    'CLAUDE_CODE_ENTRYPOINT',
+    'CLAUDE_CODE_SESSION_ID',
+    'CLAUDE_CODE_CHILD_SESSION',
+    'CLAUDE_CODE_HOST_SESSION_ID',
+    'CLAUDE_CODE_MESSAGING_SOCKET',
+    'CLAUDE_CODE_MESSAGING_TOKEN',
+  ])
+    delete env[name];
   const child = spawn(executable, command.args, {
     cwd,
     env,

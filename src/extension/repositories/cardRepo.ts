@@ -14,7 +14,11 @@ export class CardRepo {
 
   create(boardId: string, input: { typeId: string; columnId: string; parentId: string | null; title: string }): string {
     const db = this.db;
-    const col = one(db, 'SELECT c.workflow_id, c.category, c.ai_active, w.kind FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE c.id = ?', [input.columnId]);
+    const col = one(
+      db,
+      'SELECT c.workflow_id, c.category, c.ai_active, w.kind FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE c.id = ?',
+      [input.columnId],
+    );
     if (!col) throw new Error('Coluna não encontrada');
     const kind = str(col.kind);
     if (kind === 'child' && !input.parentId) throw new Error('Sub-tarefa precisa de um card pai');
@@ -34,10 +38,27 @@ export class CardRepo {
         db,
         `INSERT INTO cards(id, number, board_id, workflow_id, column_id, type_id, parent_id, title, description, position, created_at, updated_at, status, status_at)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [id, number, boardId, str(col.workflow_id), input.columnId, input.typeId, input.parentId, input.title.trim() || 'Sem título', '', pos, t, t, entryStatus(col), t],
+        [
+          id,
+          number,
+          boardId,
+          str(col.workflow_id),
+          input.columnId,
+          input.typeId,
+          input.parentId,
+          input.title.trim() || 'Sem título',
+          '',
+          pos,
+          t,
+          t,
+          entryStatus(col),
+          t,
+        ],
       );
       // padrões do tipo (ex.: modelo e skills), só para campos que ainda existem
-      const defaults = JSON.parse(str(one(db, 'SELECT defaults_json FROM card_types WHERE id = ?', [input.typeId])?.defaults_json) || '{}') as Record<string, FieldValue>;
+      const defaults = JSON.parse(
+        str(one(db, 'SELECT defaults_json FROM card_types WHERE id = ?', [input.typeId])?.defaults_json) || '{}',
+      ) as Record<string, FieldValue>;
       for (const [fieldId, value] of Object.entries(defaults)) {
         if (one(db, 'SELECT id FROM field_defs WHERE id = ? AND board_id = ?', [fieldId, boardId]))
           run(db, 'INSERT INTO field_values(card_id, field_id, value_json) VALUES (?,?,?)', [id, fieldId, JSON.stringify(value)]);
@@ -49,9 +70,18 @@ export class CardRepo {
   update(cardId: string, patch: { title?: string; description?: string; typeId?: string }): void {
     const sets: string[] = [];
     const params: (string | number)[] = [];
-    if (patch.title !== undefined) { sets.push('title = ?'); params.push(patch.title); }
-    if (patch.description !== undefined) { sets.push('description = ?'); params.push(patch.description); }
-    if (patch.typeId !== undefined) { sets.push('type_id = ?'); params.push(patch.typeId); }
+    if (patch.title !== undefined) {
+      sets.push('title = ?');
+      params.push(patch.title);
+    }
+    if (patch.description !== undefined) {
+      sets.push('description = ?');
+      params.push(patch.description);
+    }
+    if (patch.typeId !== undefined) {
+      sets.push('type_id = ?');
+      params.push(patch.typeId);
+    }
     if (!sets.length) return;
     sets.push('updated_at = ?');
     params.push(now(), cardId);
@@ -87,7 +117,12 @@ export class CardRepo {
         if (!col) {
           const id = newId();
           const pos = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM columns WHERE workflow_id = ?', [wf])?.p);
-          run(db, "INSERT INTO columns(id, workflow_id, name, position, is_terminal, category) VALUES (?,?,?,?,1,'cancelled')", [id, wf, 'Cancelado', pos]);
+          run(db, "INSERT INTO columns(id, workflow_id, name, position, is_terminal, category) VALUES (?,?,?,?,1,'cancelled')", [
+            id,
+            wf,
+            'Cancelado',
+            pos,
+          ]);
           col = { id };
         }
         target.set(wf, str(col.id));
@@ -107,7 +142,12 @@ export class CardRepo {
 
       const fromCol = str(card.column_id);
       // regra: um card pai só vai para uma coluna de conclusão quando não restam sub-tarefas em aberto
-      if (str(col.category) === 'done' && card.parent_id == null && fromCol !== columnId && this.rules(str(card.board_id)).blockDoneWithOpenChildren) {
+      if (
+        str(col.category) === 'done' &&
+        card.parent_id == null &&
+        fromCol !== columnId &&
+        this.rules(str(card.board_id)).blockDoneWithOpenChildren
+      ) {
         const open = num(
           one(
             db,
@@ -119,7 +159,12 @@ export class CardRepo {
         if (open > 0) throw new Error(`Não é possível concluir "${str(card.title)}": ${open} sub-tarefa(s) ainda em aberto.`);
       }
       // regra: a história só avança de fase quando as sub-tarefas daquela fase (campo "Fase" = coluna atual) saíram de aberto
-      if (card.parent_id == null && fromCol !== columnId && str(col.category) !== 'cancelled' && this.rules(str(card.board_id)).blockPhaseAdvanceWithOpenChildren) {
+      if (
+        card.parent_id == null &&
+        fromCol !== columnId &&
+        str(col.category) !== 'cancelled' &&
+        this.rules(str(card.board_id)).blockPhaseAdvanceWithOpenChildren
+      ) {
         const from = one(db, 'SELECT name, position FROM columns WHERE id = ?', [fromCol]);
         if (from && num(col.position) > num(from.position)) {
           const phase = norm(str(from.name));
@@ -130,26 +175,39 @@ export class CardRepo {
              WHERE c.parent_id = ? AND c.deleted_at IS NULL AND c.archived_at IS NULL AND k.category = 'open' AND lower(f.name) = 'fase'`,
             [cardId],
           ).filter((r) => norm(String(JSON.parse(str(r.value_json)))) === phase).length;
-          if (pending > 0) throw new Error(`Não é possível avançar "${str(card.title)}": ${pending} sub-tarefa(s) da fase ${str(from.name)} ainda em aberto.`);
+          if (pending > 0)
+            throw new Error(
+              `Não é possível avançar "${str(card.title)}": ${pending} sub-tarefa(s) da fase ${str(from.name)} ainda em aberto.`,
+            );
         }
       }
       // regra: a IA só avança um card de uma coluna que exige aprovação depois que uma pessoa aprova; voltar ou cancelar é livre
       if (byAi && fromCol !== columnId && str(col.category) !== 'cancelled') {
         const from = one(db, 'SELECT name, position, requires_approval FROM columns WHERE id = ?', [fromCol]);
         if (from && num(from.requires_approval) === 1 && num(col.position) > num(from.position) && str(card.status) !== 'approved')
-          throw new Error(`"${str(card.title)}" só sai de ${str(from.name)} com a aprovação de uma pessoa. Peça a revisão com request_review e pare; quando o status for "approved", mova o card.`);
+          throw new Error(
+            `"${str(card.title)}" só sai de ${str(from.name)} com a aprovação de uma pessoa. Peça a revisão com request_review e pare; quando o status for "approved", mova o card.`,
+          );
       }
-      const ids = all(db, 'SELECT id FROM cards WHERE column_id = ? AND id != ? ORDER BY position', [columnId, cardId]).map((r) => str(r.id));
+      const ids = all(db, 'SELECT id FROM cards WHERE column_id = ? AND id != ? ORDER BY position', [columnId, cardId]).map((r) =>
+        str(r.id),
+      );
       const idx = Math.max(0, Math.min(position, ids.length));
       ids.splice(idx, 0, cardId);
-      ids.forEach((id, i) => run(db, 'UPDATE cards SET column_id = ?, position = ?, updated_at = ? WHERE id = ?', [columnId, i, now(), id]));
+      ids.forEach((id, i) =>
+        run(db, 'UPDATE cards SET column_id = ?, position = ?, updated_at = ? WHERE id = ?', [columnId, i, now(), id]),
+      );
 
       if (fromCol !== columnId) {
         all(db, 'SELECT id FROM cards WHERE column_id = ? ORDER BY position', [fromCol]).forEach((r, i) =>
           run(db, 'UPDATE cards SET position = ? WHERE id = ?', [i, str(r.id)]),
         );
         // o status vale para a coluna: ao entrar em outra, recomeça
-        run(db, "UPDATE cards SET status = ?, status_reason = '', status_at = ?, status_by = '' WHERE id = ?", [entryStatus(col), now(), cardId]);
+        run(db, "UPDATE cards SET status = ?, status_reason = '', status_at = ?, status_by = '' WHERE id = ?", [
+          entryStatus(col),
+          now(),
+          cardId,
+        ]);
       }
     }
   }
@@ -176,7 +234,13 @@ export class CardRepo {
   }
 
   setStatus(cardId: string, status: CardStatus | null, reason: string, by: string): void {
-    run(this.db, 'UPDATE cards SET status = ?, status_reason = ?, status_at = ?, status_by = ? WHERE id = ?', [status, reason, now(), by, cardId]);
+    run(this.db, 'UPDATE cards SET status = ?, status_reason = ?, status_at = ?, status_by = ? WHERE id = ?', [
+      status,
+      reason,
+      now(),
+      by,
+      cardId,
+    ]);
   }
 
   setWorkspace(cardId: string, branch: string, worktreePath: string): void {
@@ -236,14 +300,23 @@ export class CardRepo {
       const parent = one(db, `SELECT ${col} AS t FROM cards WHERE id = ?`, [str(card.parent_id)]);
       if (parent && parent.t != null) throw new Error(parentError);
     }
-    run(db, `UPDATE cards SET ${col} = NULL, updated_at = ? WHERE id = ? OR (parent_id = ? AND ${col} = ?)`, [now(), cardId, cardId, num(card.t)]);
+    run(db, `UPDATE cards SET ${col} = NULL, updated_at = ? WHERE id = ? OR (parent_id = ? AND ${col} = ?)`, [
+      now(),
+      cardId,
+      cardId,
+      num(card.t),
+    ]);
   }
 
   setFieldValue(cardId: string, fieldId: string, value: FieldValue): void {
     if (value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
       run(this.db, 'DELETE FROM field_values WHERE card_id = ? AND field_id = ?', [cardId, fieldId]);
     } else {
-      run(this.db, 'INSERT OR REPLACE INTO field_values(card_id, field_id, value_json) VALUES (?,?,?)', [cardId, fieldId, JSON.stringify(value)]);
+      run(this.db, 'INSERT OR REPLACE INTO field_values(card_id, field_id, value_json) VALUES (?,?,?)', [
+        cardId,
+        fieldId,
+        JSON.stringify(value),
+      ]);
     }
     run(this.db, 'UPDATE cards SET updated_at = ? WHERE id = ?', [now(), cardId]);
   }

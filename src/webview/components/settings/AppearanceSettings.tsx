@@ -18,9 +18,13 @@ export function AppearanceSettings() {
       <div className="row">
         <h2>Aparência</h2>
         <span className="spacer" />
-        <Button variant="ghost" size="small" disabled={!changed} onClick={() => set(DEFAULT_APPEARANCE)}>Restaurar padrões</Button>
+        <Button variant="ghost" size="small" disabled={!changed} onClick={() => set(DEFAULT_APPEARANCE)}>
+          Restaurar padrões
+        </Button>
       </div>
-      <p className="muted">Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.</p>
+      <p className="muted">
+        Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.
+      </p>
 
       <section className="settings-block">
         <FieldRow label="Tema">
@@ -31,29 +35,61 @@ export function AppearanceSettings() {
         </FieldRow>
         <FieldRow label="Tamanho da fonte">
           <div className="row">
-            <input type="range" min={FONT_SIZE_RANGE.min} max={FONT_SIZE_RANGE.max} step={1} value={appearance.fontSize} onChange={(e) => set({ fontSize: Number(e.target.value) })} />
+            <input
+              type="range"
+              min={FONT_SIZE_RANGE.min}
+              max={FONT_SIZE_RANGE.max}
+              step={1}
+              value={appearance.fontSize}
+              onChange={(e) => set({ fontSize: Number(e.target.value) })}
+            />
             <span>{appearance.fontSize}px</span>
           </div>
         </FieldRow>
       </section>
 
       <h3 className="section-head">Prévia</h3>
-      <div className="markdown" style={{ fontFamily: fontStack(appearance.font), fontSize: appearance.fontSize }} dangerouslySetInnerHTML={{ __html: renderMarkdown(SAMPLE) }} />
+      <div
+        className="markdown"
+        style={{ fontFamily: fontStack(appearance.font), fontSize: appearance.fontSize }}
+        dangerouslySetInnerHTML={{ __html: renderMarkdown(SAMPLE) }}
+      />
 
       <h3 className="section-head">Status dos cards</h3>
       <p className="muted">Os status são fixos, porque as regras do board dependem deles; o nome e a cor de cada um podem ser ajustados.</p>
       <table className="table">
-        <thead><tr><th>Status</th><th>Nome</th><th>Cor</th><th>Com quem fica</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Nome</th>
+            <th>Cor</th>
+            <th>Com quem fica</th>
+          </tr>
+        </thead>
         <tbody>
           {CARD_STATUSES.map((s) => {
             const style = appearance.statuses[s.id];
             const patch = (v: Partial<typeof style>) => set({ statuses: { ...appearance.statuses, [s.id]: { ...style, ...v } } });
             return (
               <tr key={s.id}>
-                <td><StatusBadge status={s.id} short /></td>
-                <td><input key={style.label} defaultValue={style.label} onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== style.label && patch({ label: e.target.value.trim() })} /></td>
-                <td><input type="color" value={style.color} onChange={(e) => patch({ color: e.target.value })} /></td>
-                <td className="muted">{OWNER_LABEL[s.owner]} — {s.hint.toLowerCase()}</td>
+                <td>
+                  <StatusBadge status={s.id} short />
+                </td>
+                <td>
+                  <input
+                    key={style.label}
+                    defaultValue={style.label}
+                    onBlur={(e) =>
+                      e.target.value.trim() && e.target.value.trim() !== style.label && patch({ label: e.target.value.trim() })
+                    }
+                  />
+                </td>
+                <td>
+                  <input type="color" value={style.color} onChange={(e) => patch({ color: e.target.value })} />
+                </td>
+                <td className="muted">
+                  {OWNER_LABEL[s.owner]} — {s.hint.toLowerCase()}
+                </td>
               </tr>
             );
           })}

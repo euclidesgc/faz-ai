@@ -24,7 +24,13 @@ export type WebviewToHost =
   | { type: 'ai.heartbeat.run' }
   | { type: 'card.create'; typeId: Id; columnId: Id; parentId: Id | null; title: string }
   | { type: 'card.update'; cardId: Id; patch: { title?: string; description?: string; typeId?: Id } }
-  | { type: 'card.move'; cardId: Id; columnId: Id; position: number; /** ao cancelar uma história, cancela também as sub-tarefas em aberto */ cancelChildren?: boolean }
+  | {
+      type: 'card.move';
+      cardId: Id;
+      columnId: Id;
+      position: number;
+      /** ao cancelar uma história, cancela também as sub-tarefas em aberto */ cancelChildren?: boolean;
+    }
   | { type: 'card.trash'; cardId: Id }
   | { type: 'card.restore'; cardId: Id }
   | { type: 'card.archive'; cardId: Id }
@@ -57,11 +63,35 @@ export type WebviewToHost =
   | { type: 'checklist.add'; cardId: Id; text: string }
   | { type: 'checklist.update'; itemId: Id; patch: { text?: string; done?: boolean } }
   | { type: 'checklist.delete'; itemId: Id }
-  | { type: 'settings.column.create'; workflowId: Id; name: string; /** índice na linha; por padrão, antes da primeira coluna de conclusão */ position?: number }
-  | { type: 'settings.column.update'; columnId: Id; patch: { name?: string; category?: ColumnCategory; position?: number; collapsed?: boolean; aiActive?: boolean; requiresApproval?: boolean; aiInstruction?: string; artifactName?: string; artifactTemplate?: string; execProfile?: Id | null } }
+  | {
+      type: 'settings.column.create';
+      workflowId: Id;
+      name: string;
+      /** índice na linha; por padrão, antes da primeira coluna de conclusão */ position?: number;
+    }
+  | {
+      type: 'settings.column.update';
+      columnId: Id;
+      patch: {
+        name?: string;
+        category?: ColumnCategory;
+        position?: number;
+        collapsed?: boolean;
+        aiActive?: boolean;
+        requiresApproval?: boolean;
+        aiInstruction?: string;
+        artifactName?: string;
+        artifactTemplate?: string;
+        execProfile?: Id | null;
+      };
+    }
   | { type: 'settings.column.delete'; columnId: Id; moveCardsTo: Id }
   | { type: 'settings.type.create'; name: string; color: string; defaultWorkflowId: Id }
-  | { type: 'settings.type.update'; typeId: Id; patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue> } }
+  | {
+      type: 'settings.type.update';
+      typeId: Id;
+      patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue> };
+    }
   | { type: 'settings.type.delete'; typeId: Id }
   | {
       type: 'settings.field.create';
@@ -78,7 +108,10 @@ export type WebviewToHost =
     }
   | { type: 'settings.field.delete'; fieldId: Id }
   | { type: 'settings.workflow.update'; workflowId: Id; patch: { name?: string; collapsed?: boolean; archiveCollapsed?: boolean } }
-  | { type: 'settings.board.update'; patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance>; runner?: Partial<RunnerConfig>; git?: Partial<GitConfig> } }
+  | {
+      type: 'settings.board.update';
+      patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance>; runner?: Partial<RunnerConfig>; git?: Partial<GitConfig> };
+    }
   /** apaga tudo e recria o board com o padrão atual */
   | { type: 'settings.board.reset' }
   /** leva o board ao padrão atual sem recriá-lo: só acrescenta e completa, os cards não saem do lugar */

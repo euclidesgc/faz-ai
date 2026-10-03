@@ -53,7 +53,8 @@ function setCodexPolicy(skillDir: string, mode: SkillMode): void {
   // sem a chave vale o padrão da ferramenta (automática): só grava quando é para desligar
   if (mode === 'auto') return;
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  if (/^policy:\s*$/m.test(text)) return fs.writeFileSync(file, text.replace(/^policy:\s*$/m, `policy:\n  allow_implicit_invocation: ${value}`));
+  if (/^policy:\s*$/m.test(text))
+    return fs.writeFileSync(file, text.replace(/^policy:\s*$/m, `policy:\n  allow_implicit_invocation: ${value}`));
   fs.writeFileSync(file, `${text}${text && !text.endsWith('\n') ? '\n' : ''}policy:\n  allow_implicit_invocation: ${value}\n`);
 }
 

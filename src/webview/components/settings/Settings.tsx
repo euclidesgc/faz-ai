@@ -33,11 +33,18 @@ export function Settings() {
     <div className="settings">
       <div className="settings-side">
         <FieldRow label="Nome do board">
-          <input defaultValue={state.board.name} onBlur={(e) => e.target.value.trim() && e.target.value !== state.board.name && settings.updateBoard({ name: e.target.value.trim() })} />
+          <input
+            defaultValue={state.board.name}
+            onBlur={(e) =>
+              e.target.value.trim() && e.target.value !== state.board.name && settings.updateBoard({ name: e.target.value.trim() })
+            }
+          />
         </FieldRow>
         <nav className="tabs-vertical">
           {TABS.map(([id, label]) => (
-            <Button key={id} active={tab === id} onClick={() => setTab(id)}>{label}</Button>
+            <Button key={id} active={tab === id} onClick={() => setTab(id)}>
+              {label}
+            </Button>
           ))}
         </nav>
         {state.pendingUpgrade.length > 0 && (
@@ -52,9 +59,13 @@ export function Settings() {
                 onConfirm: () => settings.upgradeBoard(),
               })
             }
-          >Atualizar board</Button>
+          >
+            Atualizar board
+          </Button>
         )}
-        <Button title="Registra o board como servidor MCP para o Claude Code e outros clientes de IA" onClick={() => ui.connectAI()}>Conectar IA (MCP)</Button>
+        <Button title="Registra o board como servidor MCP para o Claude Code e outros clientes de IA" onClick={() => ui.connectAI()}>
+          Conectar IA (MCP)
+        </Button>
         <DeleteButton
           variant="ghost"
           title="Apaga todos os cards e configurações e recria o board com o padrão atual"

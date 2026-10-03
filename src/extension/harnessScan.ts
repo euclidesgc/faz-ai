@@ -53,7 +53,8 @@ const entries = (dir: string): string[] => {
     return [];
   }
 };
-const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+const obj = (v: unknown): Record<string, unknown> =>
+  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 const short = (s: string, max = 160) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
 
 /** `description` de um arquivo markdown (frontmatter YAML, valor de uma linha) ou TOML. */
@@ -61,7 +62,12 @@ function descriptionOf(file: string): string {
   const text = head(file);
   if (file.endsWith('.toml')) return /^description\s*=\s*"((?:[^"\\]|\\.)*)"/m.exec(text)?.[1]?.replace(/\\(.)/g, '$1') ?? '';
   const fm = /^---\r?\n([\s\S]*?)(\r?\n---|$)/.exec(text)?.[1] ?? '';
-  return /^description:\s*(.*)$/m.exec(fm)?.[1]?.trim().replace(/^["']|["']$/g, '') ?? '';
+  return (
+    /^description:\s*(.*)$/m
+      .exec(fm)?.[1]
+      ?.trim()
+      .replace(/^["']|["']$/g, '') ?? ''
+  );
 }
 
 function walk(dir: string, ext: string, depth = 0): string[] {
@@ -89,7 +95,8 @@ function skillFiles(dir: string, rel = '', depth = 0): string[] {
 }
 
 /** O comando de um hook, em qualquer dos formatos das ferramentas (command, bash, powershell). */
-export const hookCommand = (h: Record<string, unknown>): string => [h.command, h.bash, h.powershell].find((x): x is string => typeof x === 'string') ?? '';
+export const hookCommand = (h: Record<string, unknown>): string =>
+  [h.command, h.bash, h.powershell].find((x): x is string => typeof x === 'string') ?? '';
 
 /** Hooks de um evento, um por comando, com o filtro do grupo ou da própria entrada. */
 function hookEntries(value: unknown): { matcher: string; command: string; type: string }[] {
@@ -125,7 +132,9 @@ const MAX_DIGEST_BYTES = 256 * 1024;
 
 function digest(file: string): string | undefined {
   try {
-    return fs.statSync(file).size > MAX_DIGEST_BYTES ? undefined : createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 12);
+    return fs.statSync(file).size > MAX_DIGEST_BYTES
+      ? undefined
+      : createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 12);
   } catch {
     return undefined;
   }
@@ -153,14 +162,28 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
     case 'file':
       return isFile(target) ? [item(path.basename(target), src.kind === 'settings' ? '' : descriptionOf(target), target)] : [];
     case 'files':
-      return walk(target, src.ext).map((f) => item(path.relative(target, f).slice(0, -src.ext.length).replace(/\.agent$/, ''), descriptionOf(f), f));
+      return walk(target, src.ext).map((f) =>
+        item(
+          path
+            .relative(target, f)
+            .slice(0, -src.ext.length)
+            .replace(/\.agent$/, ''),
+          descriptionOf(f),
+          f,
+        ),
+      );
     case 'skills':
       return entries(target)
         .filter((n) => !n.startsWith('.') && isFile(path.join(target, n, 'SKILL.md')))
-        .map((n) => ({ ...item(n, descriptionOf(path.join(target, n, 'SKILL.md')), path.join(target, n, 'SKILL.md')), mode: skillMode(path.join(target, n, 'SKILL.md')), files: skillFiles(path.join(target, n)) }));
+        .map((n) => ({
+          ...item(n, descriptionOf(path.join(target, n, 'SKILL.md')), path.join(target, n, 'SKILL.md')),
+          mode: skillMode(path.join(target, n, 'SKILL.md')),
+          files: skillFiles(path.join(target, n)),
+        }));
     case 'json-keys': {
       const section = obj(readJson(target)?.[src.key]);
-      if (src.kind === 'hook') return Object.entries(section).flatMap(([event, v]) => hookEntries(v).map((h) => hookItem(event, h, target)));
+      if (src.kind === 'hook')
+        return Object.entries(section).flatMap(([event, v]) => hookEntries(v).map((h) => hookItem(event, h, target)));
       return Object.entries(section).map(([name, v]) => item(name, short(mcpSummary(v)), target));
     }
     case 'claude-json': {
@@ -188,13 +211,22 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
         .split(new RegExp(`^\\[\\[${src.table}\\]\\]\\s*$`, 'm'))
         .slice(1)
         .map((raw) => raw.split(/^\[/m)[0]!)
-        .map((block) => ({ ...item(tomlString(block, 'event') || 'hook', short(tomlString(block, 'command')), target), detail: tomlString(block, 'command') }));
+        .map((block) => ({
+          ...item(tomlString(block, 'event') || 'hook', short(tomlString(block, 'command')), target),
+          detail: tomlString(block, 'command'),
+        }));
     }
     case 'hook-files':
-      return walk(target, '.json').flatMap((f) => Object.entries(obj(readJson(f)?.hooks)).flatMap(([event, v]) => hookEntries(v).map((h) => hookItem(event, h, f))));
+      return walk(target, '.json').flatMap((f) =>
+        Object.entries(obj(readJson(f)?.hooks)).flatMap(([event, v]) => hookEntries(v).map((h) => hookItem(event, h, f))),
+      );
     case 'json-permissions': {
       const permissions = obj(readJson(target)?.permissions);
-      return src.lists.flatMap((list) => (Array.isArray(permissions[list]) ? (permissions[list] as unknown[]) : []).filter((r): r is string => typeof r === 'string').map((rule) => ({ ...item(rule, PERMISSION_LIST_LABEL[list] ?? list, target), detail: list })));
+      return src.lists.flatMap((list) =>
+        (Array.isArray(permissions[list]) ? (permissions[list] as unknown[]) : [])
+          .filter((r): r is string => typeof r === 'string')
+          .map((rule) => ({ ...item(rule, PERMISSION_LIST_LABEL[list] ?? list, target), detail: list })),
+      );
     }
   }
 }
@@ -227,7 +259,15 @@ function scanPlugins(tool: AiTool, ctx: Ctx): Found[] {
     for (const { dir, manifest } of latestGenerations(pluginDirs(path.join(ctx.homeDir, root.path), root.manifests))) {
       const meta = readJson(manifest) ?? {};
       const plugin = typeof meta.name === 'string' && meta.name ? meta.name : path.basename(dir).replace(/~g\d+$/, '');
-      out.push({ kind: 'plugin', scope: 'plugin', name: plugin, description: typeof meta.description === 'string' ? short(meta.description) : '', path: manifest, plugin, layout: 'entry' });
+      out.push({
+        kind: 'plugin',
+        scope: 'plugin',
+        name: plugin,
+        description: typeof meta.description === 'string' ? short(meta.description) : '',
+        path: manifest,
+        plugin,
+        layout: 'entry',
+      });
       const parts: HarnessSource[] = [
         { kind: 'skill', scope: 'user', layout: 'skills', path: 'skills' },
         { kind: 'agent', scope: 'user', layout: 'files', path: 'agents', ext: '.md' },

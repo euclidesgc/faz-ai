@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { aiToolInfo } from '../../../shared/harness';
-import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelLabel, modelValue, type ModelRule, type RuleCondition } from '../../../shared/models';
+import {
+  EFFORT_FIELD,
+  TYPE_CONDITION,
+  describeRule,
+  modelLabel,
+  modelValue,
+  type ModelRule,
+  type RuleCondition,
+} from '../../../shared/models';
 import type { BoardState } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
@@ -26,21 +34,46 @@ function sources(state: BoardState): { id: string; name: string; values: string[
 
 const valueText = (v: string): string => (v === 'true' ? 'Sim' : v === 'false' ? 'Não' : v);
 
-function ConditionRow({ state, condition, onChange, onRemove }: { state: BoardState; condition: RuleCondition; onChange: (c: RuleCondition) => void; onRemove: () => void }) {
+function ConditionRow({
+  state,
+  condition,
+  onChange,
+  onRemove,
+}: {
+  state: BoardState;
+  condition: RuleCondition;
+  onChange: (c: RuleCondition) => void;
+  onRemove: () => void;
+}) {
   const all = sources(state);
   const source = all.find((s) => s.id === condition.fieldId);
   return (
     <div className="row condition">
-      <select value={condition.fieldId} onChange={(e) => onChange({ ...condition, fieldId: e.target.value, value: all.find((s) => s.id === e.target.value)?.values[0] ?? '' })}>
+      <select
+        value={condition.fieldId}
+        onChange={(e) =>
+          onChange({ ...condition, fieldId: e.target.value, value: all.find((s) => s.id === e.target.value)?.values[0] ?? '' })
+        }
+      >
         {!source && <option value={condition.fieldId}>(campo apagado)</option>}
-        {all.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        {all.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
       </select>
       <EnumSelect options={OPS} value={condition.op} onChange={(op) => onChange({ ...condition, op })} />
       <select value={condition.value} onChange={(e) => onChange({ ...condition, value: e.target.value })}>
         {source && !source.values.includes(condition.value) && <option value={condition.value}>{valueText(condition.value) || '—'}</option>}
-        {source?.values.map((v) => <option key={v} value={v}>{valueText(v)}</option>)}
+        {source?.values.map((v) => (
+          <option key={v} value={v}>
+            {valueText(v)}
+          </option>
+        ))}
       </select>
-      <Button variant="icon" title="Remover a condição" onClick={onRemove}>✕</Button>
+      <Button variant="icon" title="Remover a condição" onClick={onRemove}>
+        ✕
+      </Button>
     </div>
   );
 }
@@ -51,7 +84,8 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
   const [rule, setRule] = useState(initial);
   const first = sources(state).find((s) => s.name.toLowerCase() === EFFORT_FIELD.toLowerCase()) ?? sources(state)[0]!;
   const blank = (): RuleCondition => ({ fieldId: first.id, op: 'is', value: first.values[0] ?? '' });
-  const setGroup = (gi: number, group: RuleCondition[]) => setRule({ ...rule, groups: rule.groups.map((g, i) => (i === gi ? group : g)).filter((g) => g.length) });
+  const setGroup = (gi: number, group: RuleCondition[]) =>
+    setRule({ ...rule, groups: rule.groups.map((g, i) => (i === gi ? group : g)).filter((g) => g.length) });
   const valid = rule.groups.length > 0 && rule.groups.every((g) => g.length > 0 && g.every((c) => c.value !== '')) && rule.model !== '';
 
   return (
@@ -68,23 +102,50 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
             {group.map((c, ci) => (
               <div key={ci}>
                 {ci > 0 && <div className="joiner">E</div>}
-                <ConditionRow state={state} condition={c} onChange={(next) => setGroup(gi, group.map((x, i) => (i === ci ? next : x)))} onRemove={() => setGroup(gi, group.filter((_, i) => i !== ci))} />
+                <ConditionRow
+                  state={state}
+                  condition={c}
+                  onChange={(next) =>
+                    setGroup(
+                      gi,
+                      group.map((x, i) => (i === ci ? next : x)),
+                    )
+                  }
+                  onRemove={() =>
+                    setGroup(
+                      gi,
+                      group.filter((_, i) => i !== ci),
+                    )
+                  }
+                />
               </div>
             ))}
-            <Button variant="ghost" size="small" onClick={() => setGroup(gi, [...group, blank()])}>+ E (outra condição neste grupo)</Button>
+            <Button variant="ghost" size="small" onClick={() => setGroup(gi, [...group, blank()])}>
+              + E (outra condição neste grupo)
+            </Button>
           </div>
         </div>
       ))}
-      <div><Button variant="ghost" size="small" onClick={() => setRule({ ...rule, groups: [...rule.groups, [blank()]] })}>+ OU (grupo alternativo)</Button></div>
+      <div>
+        <Button variant="ghost" size="small" onClick={() => setRule({ ...rule, groups: [...rule.groups, [blank()]] })}>
+          + OU (grupo alternativo)
+        </Button>
+      </div>
 
       <FieldRow label="Sugerir">
         <ModelEditor value={rule.model} onChange={(v) => setRule({ ...rule, model: typeof v === 'string' ? v : '' })} />
       </FieldRow>
-      <div className="muted small">{describeRule(state, rule)} → {modelLabel(state.board.modelCatalog, rule.model, true) || '(escolha um modelo)'}</div>
+      <div className="muted small">
+        {describeRule(state, rule)} → {modelLabel(state.board.modelCatalog, rule.model, true) || '(escolha um modelo)'}
+      </div>
 
       <div className="row">
-        <Button variant="primary" disabled={!valid} onClick={() => onSave(rule)}>{state.board.modelRules.some((r) => r.id === rule.id) ? 'Salvar regra' : 'Adicionar à lista'}</Button>
-        <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
+        <Button variant="primary" disabled={!valid} onClick={() => onSave(rule)}>
+          {state.board.modelRules.some((r) => r.id === rule.id) ? 'Salvar regra' : 'Adicionar à lista'}
+        </Button>
+        <Button variant="ghost" onClick={onCancel}>
+          Cancelar
+        </Button>
       </div>
     </section>
   );
@@ -112,7 +173,13 @@ export function ModelRulesEditor() {
     const src = sources(state);
     const first = src.find((s) => s.name.toLowerCase() === EFFORT_FIELD.toLowerCase()) ?? src[0]!;
     const o = catalog[0];
-    setEditing({ id: newId(), name: '', enabled: true, groups: [[{ fieldId: first.id, op: 'is', value: first.values[0] ?? '' }]], model: o ? modelValue(o.id, o.defaultEffort) : '' });
+    setEditing({
+      id: newId(),
+      name: '',
+      enabled: true,
+      groups: [[{ fieldId: first.id, op: 'is', value: first.values[0] ?? '' }]],
+      model: o ? modelValue(o.id, o.defaultEffort) : '',
+    });
   };
   const tool = aiToolInfo(aiTool);
   const hasEffort = state.fieldDefs.some((f) => f.name.toLowerCase() === EFFORT_FIELD.toLowerCase());
@@ -121,43 +188,78 @@ export function ModelRulesEditor() {
     <div>
       <h2 className="section-head">Sugestão de modelo</h2>
       <p className="muted">
-        Regras que sugerem um modelo a partir dos atributos do card. As regras são avaliadas de cima para baixo e a primeira ligada que casa vence.
-        O resultado é sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.
+        Regras que sugerem um modelo a partir dos atributos do card. As regras são avaliadas de cima para baixo e a primeira ligada que casa
+        vence. O resultado é sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.
       </p>
 
       <table className="table">
-        <thead><tr><th></th><th>Regra</th><th>Quando</th><th>Sugere</th><th></th></tr></thead>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Regra</th>
+            <th>Quando</th>
+            <th>Sugere</th>
+            <th></th>
+          </tr>
+        </thead>
         <tbody>
           {rules.map((r, i) => (
             <tr key={r.id} className={r.enabled ? '' : 'off'}>
-              <td className="narrow"><input type="checkbox" title={r.enabled ? 'Regra em uso' : 'Regra desligada'} checked={r.enabled} onChange={(e) => setRules(rules.map((x) => (x.id === r.id ? { ...x, enabled: e.target.checked } : x)))} /></td>
+              <td className="narrow">
+                <input
+                  type="checkbox"
+                  title={r.enabled ? 'Regra em uso' : 'Regra desligada'}
+                  checked={r.enabled}
+                  onChange={(e) => setRules(rules.map((x) => (x.id === r.id ? { ...x, enabled: e.target.checked } : x)))}
+                />
+              </td>
               <td>{r.name || <span className="muted">(sem nome)</span>}</td>
               <td>{describeRule(state, r)}</td>
               <td>{modelLabel(allModels, r.model, true)}</td>
               <td className="narrow">
-                <Button variant="icon" title="Subir (tem prioridade sobre as de baixo)" disabled={i === 0} onClick={() => move(i, -1)}>↑</Button>
-                <Button variant="icon" title="Descer" disabled={i === rules.length - 1} onClick={() => move(i, 1)}>↓</Button>
-                <Button variant="icon" title="Editar" onClick={() => setEditing(r)}>✎</Button>
+                <Button variant="icon" title="Subir (tem prioridade sobre as de baixo)" disabled={i === 0} onClick={() => move(i, -1)}>
+                  ↑
+                </Button>
+                <Button variant="icon" title="Descer" disabled={i === rules.length - 1} onClick={() => move(i, 1)}>
+                  ↓
+                </Button>
+                <Button variant="icon" title="Editar" onClick={() => setEditing(r)}>
+                  ✎
+                </Button>
                 {/* sem confirmação de propósito: a regra pode ser remontada em segundos */}
-                <Button variant="icon" danger title="Remover da lista" onClick={() => setRules(rules.filter((x) => x.id !== r.id))}>🗑</Button>
+                <Button variant="icon" danger title="Remover da lista" onClick={() => setRules(rules.filter((x) => x.id !== r.id))}>
+                  🗑
+                </Button>
               </td>
             </tr>
           ))}
-          {rules.length === 0 && <tr><td colSpan={5} className="muted">Nenhuma regra na lista: o board não sugere modelo.</td></tr>}
+          {rules.length === 0 && (
+            <tr>
+              <td colSpan={5} className="muted">
+                Nenhuma regra na lista: o board não sugere modelo.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
 
-      {editing
-        ? <RuleBuilder key={editing.id} initial={editing} onSave={save} onCancel={() => setEditing(null)} />
-        : (
-          <div className="row">
-            <Button variant="primary" disabled={!catalog.length} onClick={startNew}>Montar nova regra</Button>
-            <span className="spacer" />
-            <Button disabled={!hasEffort} title={`Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do ${tool.label}`} onClick={() => settings.suggestModelRules(aiTool)}>
-              Recriar as regras de "{EFFORT_FIELD}"
-            </Button>
-          </div>
-        )}
+      {editing ? (
+        <RuleBuilder key={editing.id} initial={editing} onSave={save} onCancel={() => setEditing(null)} />
+      ) : (
+        <div className="row">
+          <Button variant="primary" disabled={!catalog.length} onClick={startNew}>
+            Montar nova regra
+          </Button>
+          <span className="spacer" />
+          <Button
+            disabled={!hasEffort}
+            title={`Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do ${tool.label}`}
+            onClick={() => settings.suggestModelRules(aiTool)}
+          >
+            Recriar as regras de "{EFFORT_FIELD}"
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

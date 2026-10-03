@@ -11,7 +11,8 @@ function template(tool: AiTool, src: HarnessSource, file: string, name: string, 
   if (src.layout === 'skills') return skillTemplate(name, oneLine, 'Instruções da skill.');
   if (src.kind === 'agent') {
     const spec = aiToolInfo(tool).agents;
-    if (spec) return agentTemplate({ ...spec, format: file.endsWith('.toml') ? 'toml' : 'markdown' }, name, oneLine, 'Instruções do agente.');
+    if (spec)
+      return agentTemplate({ ...spec, format: file.endsWith('.toml') ? 'toml' : 'markdown' }, name, oneLine, 'Instruções do agente.');
   }
   if (file.endsWith('.json')) return '{}\n';
   if (file.endsWith('.toml') || file.endsWith('.rules')) return '';
@@ -23,7 +24,10 @@ function template(tool: AiTool, src: HarnessSource, file: string, name: string, 
 
 /** Cria, apaga e copia itens do harness no projeto e na pasta do usuário. Nunca escreve em plugins. Não depende da API do VSCode. */
 export class HarnessOps {
-  constructor(private projectDir: string, private homeDir: string) {}
+  constructor(
+    private projectDir: string,
+    private homeDir: string,
+  ) {}
 
   private base(scope: 'project' | 'user'): string {
     const dir = scope === 'project' ? this.projectDir : this.homeDir;
@@ -38,13 +42,15 @@ export class HarnessOps {
   /** Cria o item na fonte do catálogo indicada e devolve o caminho do arquivo criado. */
   create(tool: AiTool, source: number, name: string, description: string): string {
     const src = HARNESS_CATALOG[tool][source];
-    if (!src || src.builtin || (src.layout !== 'file' && src.layout !== 'files' && src.layout !== 'skills')) throw new Error('Não é possível criar um item neste lugar.');
+    if (!src || src.builtin || (src.layout !== 'file' && src.layout !== 'files' && src.layout !== 'skills'))
+      throw new Error('Não é possível criar um item neste lugar.');
     const root = path.join(this.base(src.scope), src.path);
     let file = root;
     if (src.layout !== 'file') {
       this.checkName(name);
       file = src.layout === 'skills' ? path.join(root, name, 'SKILL.md') : path.join(root, `${name}${src.createExt ?? src.ext}`);
-      if ((src.layout === 'skills' || src.kind === 'agent') && !description.trim()) throw new Error('Informe a descrição: é por ela que a IA decide quando usar o item.');
+      if ((src.layout === 'skills' || src.kind === 'agent') && !description.trim())
+        throw new Error('Informe a descrição: é por ela que a IA decide quando usar o item.');
     }
     if (fs.existsSync(file)) throw new Error(`Já existe: ${file}`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -69,7 +75,8 @@ export class HarnessOps {
   private skillFile(item: HarnessItem, rel: string): string {
     this.own(item);
     if (item.layout !== 'skills') throw new Error('Só skills têm arquivos de apoio.');
-    if (!SKILL_FILE_PATTERN.test(rel) || rel.split('/').includes('..') || rel === 'SKILL.md') throw new Error('Nome de arquivo inválido: use pasta/arquivo.ext, com letras, números, hífen, ponto e sublinhado.');
+    if (!SKILL_FILE_PATTERN.test(rel) || rel.split('/').includes('..') || rel === 'SKILL.md')
+      throw new Error('Nome de arquivo inválido: use pasta/arquivo.ext, com letras, números, hífen, ponto e sublinhado.');
     return path.join(path.dirname(item.path), ...rel.split('/'));
   }
 
@@ -112,7 +119,10 @@ export class HarnessOps {
   copy(tool: AiTool, item: HarnessItem, to: 'project' | 'user'): string {
     if (item.layout !== 'files' && item.layout !== 'skills') throw new Error('Este item não pode ser copiado.');
     const target = copyTarget(tool, item.kind, item.layout, to);
-    if (!target) throw new Error(`O ${aiToolInfo(tool).label} não tem uma pasta de ${to === 'project' ? 'projeto' : 'usuário'} para este tipo de item.`);
+    if (!target)
+      throw new Error(
+        `O ${aiToolInfo(tool).label} não tem uma pasta de ${to === 'project' ? 'projeto' : 'usuário'} para este tipo de item.`,
+      );
     const root = path.join(this.base(to), target.path);
     if (item.layout === 'skills') {
       const from = path.dirname(item.path);

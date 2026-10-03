@@ -21,7 +21,10 @@ const AUTHOR = 'Faz AI';
 export class AutoMerger {
   private merging = new Set<string>();
 
-  constructor(private router: MessageRouter, private deps: MergeDeps) {
+  constructor(
+    private router: MessageRouter,
+    private deps: MergeDeps,
+  ) {
     router.onDidApprove((cardId) => void this.onApproved(cardId));
   }
 
@@ -40,10 +43,18 @@ export class AutoMerger {
     const done = card && this.target(card);
     if (!card || !done) return;
     const ref = cardRef(card);
-    const block = (reason: string) => this.router.handle({ type: 'card.status.set', cardId, status: 'blocked', note: reason }, { author: AUTHOR, source: 'ai' });
+    const block = (reason: string) =>
+      this.router.handle({ type: 'card.status.set', cardId, status: 'blocked', note: reason }, { author: AUTHOR, source: 'ai' });
 
-    const openKids = state.cards.filter((k) => k.parentId === cardId && k.deletedAt === null && k.archivedAt === null && state.columns.find((c) => c.id === k.columnId)?.category === 'open').length;
-    if (openKids && state.board.rules.blockDoneWithOpenChildren) return void block(`O merge de ${card.prUrl} não foi feito: ${openKids} sub-tarefa(s) da história ainda em aberto.`);
+    const openKids = state.cards.filter(
+      (k) =>
+        k.parentId === cardId &&
+        k.deletedAt === null &&
+        k.archivedAt === null &&
+        state.columns.find((c) => c.id === k.columnId)?.category === 'open',
+    ).length;
+    if (openKids && state.board.rules.blockDoneWithOpenChildren)
+      return void block(`O merge de ${card.prUrl} não foi feito: ${openKids} sub-tarefa(s) da história ainda em aberto.`);
 
     this.merging.add(cardId);
     // "Em execução" tira o card da fila da IA enquanto o merge acontece

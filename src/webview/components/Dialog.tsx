@@ -36,14 +36,29 @@ export function Dialog() {
           <label className="field-row">
             <span>{dialog.choices.label}</span>
             <select value={choice} onChange={(e) => setChoice(e.target.value)}>
-              {dialog.choices.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              {dialog.choices.options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           </label>
         )}
         <div className="row end wrap">
           <button onClick={() => ask(null)}>{dialog.cancelLabel ?? 'Cancelar'}</button>
-          {dialog.secondary && <button onClick={() => { ask(null); dialog.secondary!.onClick(); }}>{dialog.secondary.label}</button>}
-          <button autoFocus className={dialog.danger ? 'primary danger-bg' : 'primary'} onClick={confirm}>{dialog.confirmLabel ?? 'Confirmar'}</button>
+          {dialog.secondary && (
+            <button
+              onClick={() => {
+                ask(null);
+                dialog.secondary!.onClick();
+              }}
+            >
+              {dialog.secondary.label}
+            </button>
+          )}
+          <button autoFocus className={dialog.danger ? 'primary danger-bg' : 'primary'} onClick={confirm}>
+            {dialog.confirmLabel ?? 'Confirmar'}
+          </button>
         </div>
       </div>
     </div>

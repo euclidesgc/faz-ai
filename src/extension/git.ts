@@ -20,7 +20,8 @@ const tryGit = (cwd: string, args: string[]): string | null => {
   }
 };
 
-const branchExists = (repo: string, branch: string): boolean => tryGit(repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]) !== null;
+const branchExists = (repo: string, branch: string): boolean =>
+  tryGit(repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]) !== null;
 
 /** Branch de onde as histórias partem: a padrão do remoto, senão main/master, senão a atual. */
 export function baseBranch(repo: string): string {
@@ -40,10 +41,16 @@ export interface PreparedWorkspace {
  * Garante a branch da história e, no modo worktree, a pasta de trabalho dela. Pode ser chamada
  * várias vezes: o que já existe é reaproveitado. Nunca troca a branch da pasta do projeto.
  */
-export function prepareWorkspace(input: { projectDir: string; mode: Exclude<WorkspaceMode, 'off'>; branch: string; worktreePath: string }): PreparedWorkspace {
+export function prepareWorkspace(input: {
+  projectDir: string;
+  mode: Exclude<WorkspaceMode, 'off'>;
+  branch: string;
+  worktreePath: string;
+}): PreparedWorkspace {
   const repo = tryGit(input.projectDir, ['rev-parse', '--show-toplevel']);
   if (!repo) throw new Error('A pasta do projeto não é um repositório git.');
-  if (tryGit(repo, ['rev-parse', '--verify', '--quiet', 'HEAD']) === null) throw new Error('O repositório ainda não tem nenhum commit: faça o primeiro commit antes de criar branches de histórias.');
+  if (tryGit(repo, ['rev-parse', '--verify', '--quiet', 'HEAD']) === null)
+    throw new Error('O repositório ainda não tem nenhum commit: faça o primeiro commit antes de criar branches de histórias.');
 
   if (input.mode === 'branch') {
     if (!branchExists(repo, input.branch)) git(repo, ['branch', input.branch, baseBranch(repo)]);
@@ -51,7 +58,9 @@ export function prepareWorkspace(input: { projectDir: string; mode: Exclude<Work
   }
 
   const dir = path.resolve(repo, input.worktreePath);
-  const registered = git(repo, ['worktree', 'list', '--porcelain']).split('\n').some((l) => l === `worktree ${fs.existsSync(dir) ? fs.realpathSync(dir) : dir}`);
+  const registered = git(repo, ['worktree', 'list', '--porcelain'])
+    .split('\n')
+    .some((l) => l === `worktree ${fs.existsSync(dir) ? fs.realpathSync(dir) : dir}`);
   if (registered) return { branch: input.branch, path: dir };
   if (fs.existsSync(dir) && fs.readdirSync(dir).length) throw new Error(`A pasta ${dir} já existe e não é uma worktree deste repositório.`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });

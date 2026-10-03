@@ -68,7 +68,8 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
     if (exec?.deniedTools.length) args.push('--disallowedTools', ...exec.deniedTools);
     // sem perfil que restrinja os servidores, o do board vai junto dos já configurados: a execução não
     // depende de "Conectar ao board" nem da aprovação do .mcp.json, que o modo -p não tem como pedir
-    const mcpConfig = exec?.mcpConfig ?? (boardServer ? JSON.stringify({ mcpServers: { [SERVER]: { type: 'stdio', ...boardServer } } }) : null);
+    const mcpConfig =
+      exec?.mcpConfig ?? (boardServer ? JSON.stringify({ mcpServers: { [SERVER]: { type: 'stdio', ...boardServer } } }) : null);
     if (exec?.mcpConfig) args.push('--strict-mcp-config');
     if (mcpConfig) args.push('--mcp-config', tmpArg(MCP_CONFIG));
     // sessão limpa: sem as configurações da pasta do usuário e sem skills ou comandos invocáveis (as do card vão pelo caminho)
@@ -84,10 +85,25 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
     // as ferramentas do board não podem ficar esperando aprovação: ninguém acompanha a execução
     const key = (name: string) => (/^[\w-]+$/.test(name) ? name : JSON.stringify(name));
     const profile = [
-      ...(exec?.model ? ['--model', exec.model.name, ...(exec.model.effort ? ['-c', `model_reasoning_effort="${exec.model.effort}"`] : [])] : []),
+      ...(exec?.model
+        ? ['--model', exec.model.name, ...(exec.model.effort ? ['-c', `model_reasoning_effort="${exec.model.effort}"`] : [])]
+        : []),
       ...(exec?.mcpBlocked ?? []).flatMap((n) => ['-c', `mcp_servers.${key(n)}.enabled=false`]),
     ];
-    return { command: 'codex', args: ['exec', ...modes[permission], '--skip-git-repo-check', ...addDirs.flatMap((d) => ['--add-dir', d]), ...profile, '-c', `mcp_servers.${SERVER}.default_tools_approval_mode="approve"`, '-'], stdin: prompt };
+    return {
+      command: 'codex',
+      args: [
+        'exec',
+        ...modes[permission],
+        '--skip-git-repo-check',
+        ...addDirs.flatMap((d) => ['--add-dir', d]),
+        ...profile,
+        '-c',
+        `mcp_servers.${SERVER}.default_tools_approval_mode="approve"`,
+        '-',
+      ],
+      stdin: prompt,
+    };
   },
   copilot: ({ prompt, permission, addDirs = [], exec }) => {
     const modes: Record<RunnerPermission, string[]> = {
@@ -104,12 +120,33 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
       ...(exec?.mcpBlocked ?? []).map((n) => `--disable-mcp-server=${n}`),
       ...(exec?.clean ? ['--no-custom-instructions'] : []),
     ];
-    return { command: 'copilot', args: ['-p', prompt, ...modes[permission], ...addDirs.map((d) => `--add-dir=${d}`), ...profile, '--no-ask-user'], env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' } };
+    return {
+      command: 'copilot',
+      args: ['-p', prompt, ...modes[permission], ...addDirs.map((d) => `--add-dir=${d}`), ...profile, '--no-ask-user'],
+      env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' },
+    };
   },
-  cursor: ({ prompt, permission, exec }) => (permission === 'full' ? { command: 'agent', args: ['-p', '--force', '--approve-mcps', '--trust', ...(exec?.model ? ['--model', exec.model.name] : []), prompt] } : null),
+  cursor: ({ prompt, permission, exec }) =>
+    permission === 'full'
+      ? {
+          command: 'agent',
+          args: ['-p', '--force', '--approve-mcps', '--trust', ...(exec?.model ? ['--model', exec.model.name] : []), prompt],
+        }
+      : null,
   // no -p o Kimi não pede aprovação de nada e recusa flags de permissão
   kimi: ({ prompt, permission, addDirs = [], exec }) =>
-    permission === 'full' ? { command: 'kimi', args: ['-p', prompt, ...addDirs.flatMap((d) => ['--add-dir', d]), ...(exec?.model ? ['--model', exec.model.name] : []), ...(exec?.agent ? ['--agent', exec.agent] : [])] } : null,
+    permission === 'full'
+      ? {
+          command: 'kimi',
+          args: [
+            '-p',
+            prompt,
+            ...addDirs.flatMap((d) => ['--add-dir', d]),
+            ...(exec?.model ? ['--model', exec.model.name] : []),
+            ...(exec?.agent ? ['--agent', exec.agent] : []),
+          ],
+        }
+      : null,
 };
 
 /** Por que o board não pode executar a ferramenta com esta permissão; null quando pode. */

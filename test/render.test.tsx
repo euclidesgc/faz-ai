@@ -49,7 +49,11 @@ beforeAll(async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-render-'));
   const db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
   const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
-    workspaceKey: 'ws', folderName: 'Projeto', author: 'Pessoa', attachmentsDir: path.join(dir, 'attachments'), workspaceDir: dir,
+    workspaceKey: 'ws',
+    folderName: 'Projeto',
+    author: 'Pessoa',
+    attachmentsDir: path.join(dir, 'attachments'),
+    workspaceDir: dir,
   });
   let s = router.snapshot();
   const parentWf = s.workflows.find((w) => w.kind === 'parent')!;
@@ -69,7 +73,11 @@ beforeAll(async () => {
   router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Modelo').id, value: 'claude:opus@high' });
   router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Esforço da atividade').id, value: 'Baixo' });
   router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Modelo').id, value: 'kimi:kimi-code/k3@max' });
-  router.handle({ type: 'settings.type.update', typeId: typeOf(childWf.id).id, patch: { defaults: { [field('Modelo').id]: 'claude:sonnet@medium' } } });
+  router.handle({
+    type: 'settings.type.update',
+    typeId: typeOf(childWf.id).id,
+    patch: { defaults: { [field('Modelo').id]: 'claude:sonnet@medium' } },
+  });
   router.handle({ type: 'checklist.add', cardId: storyId, text: 'item' });
   router.handle({ type: 'comment.add', cardId: storyId, body: 'oi' });
   router.handle({ type: 'attachment.addData', cardId: storyId, filename: 'spec.md', base64: Buffer.from('x').toString('base64') });
@@ -119,9 +127,12 @@ describe('telas montam sem erro', () => {
     expect(foreign).not.toContain('Editar');
     useBoardStore.setState({ state: st });
     // card aguardando revisão: selo com quem está a pendência e as ações de revisão
-    useBoardStore.setState({ state: { ...st, cards: st.cards.map((c) => (c.id === storyId ? { ...c, status: 'waiting_review' as const } : c)) } });
+    useBoardStore.setState({
+      state: { ...st, cards: st.cards.map((c) => (c.id === storyId ? { ...c, status: 'waiting_review' as const } : c)) },
+    });
     const reviewing = html(<CardDrawer cardId={storyId} />);
-    for (const text of ['Aguardando revisão', 'com você', 'Aprovar', 'Pedir ajustes', 'Conversa', 'Criar branch da história']) expect(reviewing).toContain(text);
+    for (const text of ['Aguardando revisão', 'com você', 'Aprovar', 'Pedir ajustes', 'Conversa', 'Criar branch da história'])
+      expect(reviewing).toContain(text);
     expect(html(<Board />)).toContain('status-badge');
     // o artefato fica na história; a sub-tarefa mostra um link para ele
     useBoardStore.setState({ state: { ...st, attachments: st.attachments.map((a) => ({ ...a, artifact: true })) } });
@@ -137,7 +148,8 @@ describe('telas montam sem erro', () => {
       state: { ...st, aiRuns: [storyId], comments: st.comments.map((c) => ({ ...c, body: `veja ![tela](attachment:${image.filename})` })) },
     });
     const talking = html(<CommentsTab cardId={storyId} />);
-    for (const text of ['Chamar IA', 'está trabalhando neste card', 'Parar', `src="https://anexos/${storyId}/${image.storedName}"`]) expect(talking).toContain(text);
+    for (const text of ['Chamar IA', 'está trabalhando neste card', 'Parar', `src="https://anexos/${storyId}/${image.storedName}"`])
+      expect(talking).toContain(text);
     useBoardStore.setState({ state: { ...st, aiRunUnsupported: 'Sem suporte' } });
     expect(html(<CommentsTab cardId={storyId} />)).toContain('não está disponível');
     useBoardStore.setState({ state: st, attachmentsBaseUri: '' });
@@ -153,9 +165,29 @@ describe('telas montam sem erro', () => {
 
   it('configurações', () => {
     expect(html(<Settings />)).toContain('Harness de IA');
-    for (const text of ['Worktree por história', 'Nome da branch', 'historia/12-login-com-google', 'Pasta das worktrees', 'Fazer o merge do PR ao aprovar a homologação', 'Squash']) expect(html(<GitSettings />)).toContain(text);
+    for (const text of [
+      'Worktree por história',
+      'Nome da branch',
+      'historia/12-login-com-google',
+      'Pasta das worktrees',
+      'Fazer o merge do PR ao aprovar a homologação',
+      'Squash',
+    ])
+      expect(html(<GitSettings />)).toContain(text);
     const cols = html(<ColumnsSettings />);
-    for (const text of ['PRD', 'Começa colapsada', 'Linha começa colapsada', 'Arquivados', 'IA atua', 'Exige aprovação', 'Fase', 'PRD.md', 'Discovery', 'Homologação']) expect(cols).toContain(text);
+    for (const text of [
+      'PRD',
+      'Começa colapsada',
+      'Linha começa colapsada',
+      'Arquivados',
+      'IA atua',
+      'Exige aprovação',
+      'Fase',
+      'PRD.md',
+      'Discovery',
+      'Homologação',
+    ])
+      expect(cols).toContain(text);
     const types = html(<TypesSettings />);
     expect(types).toContain('Padrões por tipo');
     expect(types).toContain('Modelo');
@@ -165,26 +197,88 @@ describe('telas montam sem erro', () => {
     expect(rules).toContain('Preencher o modelo sugerido');
     const models = html(<ModelsSettings />);
     expect(models).not.toContain('gpt-6.1-sol'); // só a ferramenta em uso
-    for (const text of ['Detectar modelos', 'Fable 5.1', 'Sugestão de modelo', 'Esforço da atividade = Baixo', 'Montar nova regra', 'xhigh']) expect(models).toContain(text);
+    for (const text of [
+      'Detectar modelos',
+      'Fable 5.1',
+      'Sugestão de modelo',
+      'Esforço da atividade = Baixo',
+      'Montar nova regra',
+      'xhigh',
+    ])
+      expect(models).toContain(text);
     const s = useBoardStore.getState().state!;
     const tags = s.fieldDefs.find((f) => f.name === 'Tags')!.id;
     const builder = html(
       <RuleBuilder
-        initial={{ id: 'r', name: 'Teste', enabled: true, model: 'claude:opus@high', groups: [[{ fieldId: tags, op: 'is', value: 'backend' }, { fieldId: '@type', op: 'isNot', value: 'Bug' }], [{ fieldId: tags, op: 'is', value: 'docs' }]] }}
+        initial={{
+          id: 'r',
+          name: 'Teste',
+          enabled: true,
+          model: 'claude:opus@high',
+          groups: [
+            [
+              { fieldId: tags, op: 'is', value: 'backend' },
+              { fieldId: '@type', op: 'isNot', value: 'Bug' },
+            ],
+            [{ fieldId: tags, op: 'is', value: 'docs' }],
+          ],
+        }}
         onSave={() => {}}
         onCancel={() => {}}
       />,
     );
-    for (const text of ['Tipo do card', 'OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
+    for (const text of ['Tipo do card', 'OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs'])
+      expect(builder).toContain(text);
 
     const look = html(<AppearanceSettings />);
-    for (const text of ['Tema', 'Sistema (acompanha o editor ou o sistema)', 'Fonte dos textos', 'Sem serifa do sistema', '14px', 'Prévia', 'Status dos cards', 'Aguardando resposta']) expect(look).toContain(text);
+    for (const text of [
+      'Tema',
+      'Sistema (acompanha o editor ou o sistema)',
+      'Fonte dos textos',
+      'Sem serifa do sistema',
+      '14px',
+      'Prévia',
+      'Status dos cards',
+      'Aguardando resposta',
+    ])
+      expect(look).toContain(text);
     const toggle = html(<ThemeToggle />);
     for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
     const profiles = html(<ExecProfilesSettings />);
-    for (const text of ['Perfis de execução', 'na execução pelo board', 'imposto', 'orientado', 'Novo perfil', 'Nenhum perfil ainda']) expect(profiles).toContain(text);
+    for (const text of ['Perfis de execução', 'na execução pelo board', 'imposto', 'orientado', 'Novo perfil', 'Nenhum perfil ainda'])
+      expect(profiles).toContain(text);
     const harness = html(<HarnessSettings />);
-    for (const text of ['Ferramenta deste projeto', 'type="radio"', 'Claude Code', 'Codex', 'Cursor', 'Kimi Code', 'GitHub Copilot', 'AGENTS.md', 'Usar o AGENTS.md', 'revisar-spec', 'Desligada', '.kimi-code/skills', 'Tudo que cada ferramenta carrega', 'Servidores MCP', 'Hooks', 'deste projeto', 'não encontrada', 'ao board (MCP)', 'Instalar skill do fluxo', 'Execução pela conversa e heartbeat', 'Só o board', 'Tempo limite por execução', 'Heartbeat ligado', 'Rodar agora', 'Agentes', 'Novo agente', 'revisor-de-spec', '.claude/agents/revisor-de-spec.md']) expect(harness).toContain(text);
+    for (const text of [
+      'Ferramenta deste projeto',
+      'type="radio"',
+      'Claude Code',
+      'Codex',
+      'Cursor',
+      'Kimi Code',
+      'GitHub Copilot',
+      'AGENTS.md',
+      'Usar o AGENTS.md',
+      'revisar-spec',
+      'Desligada',
+      '.kimi-code/skills',
+      'Tudo que cada ferramenta carrega',
+      'Servidores MCP',
+      'Hooks',
+      'deste projeto',
+      'não encontrada',
+      'ao board (MCP)',
+      'Instalar skill do fluxo',
+      'Execução pela conversa e heartbeat',
+      'Só o board',
+      'Tempo limite por execução',
+      'Heartbeat ligado',
+      'Rodar agora',
+      'Agentes',
+      'Novo agente',
+      'revisor-de-spec',
+      '.claude/agents/revisor-de-spec.md',
+    ])
+      expect(harness).toContain(text);
   });
 });

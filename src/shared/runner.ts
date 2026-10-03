@@ -14,9 +14,21 @@ export interface RunnerConfig {
 }
 
 export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint: string }[] = [
-  { value: 'board', label: 'Só o board', hint: 'A IA lê o projeto e usa as ferramentas do board (conversa, anexos, status, mover cards). Não altera arquivos do projeto nem roda comandos.' },
-  { value: 'edits', label: 'Board e arquivos do projeto', hint: 'Além do board, a IA cria e altera arquivos do projeto sem pedir confirmação. Comandos de terminal continuam fora.' },
-  { value: 'full', label: 'Sem restrições', hint: 'A IA altera arquivos e roda qualquer comando sem pedir confirmação. Use só em projetos e máquinas em que isso é aceitável.' },
+  {
+    value: 'board',
+    label: 'Só o board',
+    hint: 'A IA lê o projeto e usa as ferramentas do board (conversa, anexos, status, mover cards). Não altera arquivos do projeto nem roda comandos.',
+  },
+  {
+    value: 'edits',
+    label: 'Board e arquivos do projeto',
+    hint: 'Além do board, a IA cria e altera arquivos do projeto sem pedir confirmação. Comandos de terminal continuam fora.',
+  },
+  {
+    value: 'full',
+    label: 'Sem restrições',
+    hint: 'A IA altera arquivos e roda qualquer comando sem pedir confirmação. Use só em projetos e máquinas em que isso é aceitável.',
+  },
 ];
 
 export const TIMEOUT_RANGE = { min: 1, max: 240 };
@@ -36,8 +48,16 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
   const interval = Math.round(Number(raw.heartbeatMinutes));
   return {
     heartbeat: raw.heartbeat === true,
-    heartbeatMinutes: Number.isFinite(interval) && interval > 0 ? Math.min(HEARTBEAT_RANGE.max, Math.max(HEARTBEAT_RANGE.min, interval)) : DEFAULT_RUNNER.heartbeatMinutes,
-    permission: RUNNER_PERMISSIONS.some((p) => p.value === raw.permission) ? (raw.permission as RunnerPermission) : DEFAULT_RUNNER.permission,
-    timeoutMinutes: Number.isFinite(minutes) && minutes > 0 ? Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, minutes)) : DEFAULT_RUNNER.timeoutMinutes,
+    heartbeatMinutes:
+      Number.isFinite(interval) && interval > 0
+        ? Math.min(HEARTBEAT_RANGE.max, Math.max(HEARTBEAT_RANGE.min, interval))
+        : DEFAULT_RUNNER.heartbeatMinutes,
+    permission: RUNNER_PERMISSIONS.some((p) => p.value === raw.permission)
+      ? (raw.permission as RunnerPermission)
+      : DEFAULT_RUNNER.permission,
+    timeoutMinutes:
+      Number.isFinite(minutes) && minutes > 0
+        ? Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, minutes))
+        : DEFAULT_RUNNER.timeoutMinutes,
   };
 }
