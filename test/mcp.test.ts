@@ -1193,6 +1193,26 @@ describe('modo autônomo (YOLO)', () => {
     expect(card(1).prUrl).toBe('https://github.com/org/repo/pull/1');
   });
 
+  it('get_card: autonomousNote na última coluna da IA manda registrar o pull request e parar, sem mover para a conclusão', async () => {
+    await call('create_card', { title: 'Login', column: 'Backlog' });
+    setYolo(1, true);
+    await call('move_card', { card: 1, column: 'Homologação' });
+
+    const note = (await call('get_card', { card: 1 })).data.phase.autonomousNote;
+    expect(note).toContain('set_pull_request');
+    expect(note).toMatch(/pare/);
+    expect(note).not.toContain('próxima coluna');
+  });
+
+  it('get_card: autonomousNote numa coluna do meio continua mandando mover para a próxima coluna', async () => {
+    await call('create_card', { title: 'Login', column: 'Backlog' });
+    setYolo(1, true);
+    await call('move_card', { card: 1, column: 'Implementação' });
+
+    const note = (await call('get_card', { card: 1 })).data.phase.autonomousNote;
+    expect(note).toContain('próxima coluna');
+  });
+
   it('set_pull_request numa história bloqueada não entrega: o impedimento continua de pé', async () => {
     await call('create_card', { title: 'Login', column: 'Backlog' });
     setYolo(1, true);

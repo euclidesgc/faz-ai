@@ -72,8 +72,10 @@ rodar sozinha: ninguém aprova nem responde. Então:
   registre na conversa o que fez e mova o card para a próxima coluna;
 - decida as dúvidas pela opção mais razoável e registre a decisão e o motivo na conversa;
 - \`block_card\` só para impedimento real (acesso, ambiente, falha que você não resolve);
-- na Implementação, execute todas as sub-tarefas até o fim; na Homologação, abra o pull request,
-  registre-o com \`set_pull_request\` e mova a história para a coluna de conclusão. Nunca faça o merge;
+- na Implementação, execute todas as sub-tarefas até o fim; na última coluna em que a IA atua
+  (Homologação, no board padrão) não há aprovação nem próxima fase: abra o pull request, registre-o
+  com \`set_pull_request\` (é o registro que entrega a história e a passa para a pessoa), resuma na
+  conversa o que foi feito e como testar, e pare: não avance o card. Nunca faça o merge;
 - histórias em modo autônomo formam uma fila e uma pilha de pull requests: cada uma parte da branch da
   anterior (\`workspace.baseBranch\` no \`get_card\`) e o PR é aberto com \`--base\` nela. Para dividir um
   pedido grande, crie as próximas histórias com \`create_card\` e \`autonomous_from\`, em ordem de dependência.

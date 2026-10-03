@@ -13,7 +13,7 @@ import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
 import { childProgress, linkedCards } from '../../shared/links';
 import { childrenOf, columnOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
-import { isYolo, storyOf } from '../../shared/story';
+import { isYolo, lastAiColumn, storyOf } from '../../shared/story';
 import {
   cardRef,
   type BoardState,
@@ -278,7 +278,10 @@ function phaseOf(s: BoardState, c: Card) {
     requiresApproval: col.requiresApproval && !story.yolo,
     ...(story.yolo
       ? {
-          autonomousNote: `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Decida as dúvidas por conta própria e registre a decisão na conversa.`,
+          autonomousNote:
+            col.id === lastAiColumn(s, story.workflowId)?.id
+              ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
+              : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Decida as dúvidas por conta própria e registre a decisão na conversa.`,
         }
       : col.requiresApproval
         ? { reviewNote: `Ao terminar, chame request_review na história ${cardRef(story)} e pare.` }

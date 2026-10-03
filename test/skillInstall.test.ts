@@ -4,6 +4,14 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fetchSource, findSkills, installSkills, parseSource } from '../src/extension/skillInstall';
+import { FLOW_SKILL } from '../src/extension/flowSkill';
+
+it('a skill do fluxo, no modo autônomo, manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
+  const autonomo = FLOW_SKILL.body.slice(FLOW_SKILL.body.indexOf('## Modo autônomo'));
+  expect(autonomo).not.toContain('coluna de conclusão');
+  expect(autonomo).toContain('set_pull_request');
+  expect(autonomo).toMatch(/pare/);
+});
 
 let root: string;
 const write = (base: string, rel: string, content: string) => {
