@@ -108,6 +108,10 @@ Portuguese, so names of screens and buttons appear as you see them on screen.
   title, the state badge and the actions on the right; each section has its main button at the top
   (Nova skill, Novo agente, Conectar ao board, Rodar agora, Atualizar). Creation forms, selectors,
   switches, checkboxes and the tool tabs use Radix Themes, like Campos, Workflows and Regras.
+- **Execution profiles with the new design**: the **Novo perfil** button is at the top right; each
+  profile is a card with the name in a text box, the "padrão" badge and the actions on the right,
+  and the editor uses the Radix Themes selectors, switches and fields. The **model and effort**
+  selector (also used in the open card) is now the Radix one.
 
 ## 0.29.1
 

@@ -2,6 +2,7 @@ import { lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Theme } from '@radix-ui/themes';
 import { Board } from '../../src/webview/components/Board';
 import { CardDrawer } from '../../src/webview/components/CardDrawer';
 import { useBoardStore } from '../../src/webview/store/boardStore';
@@ -19,13 +20,21 @@ beforeEach(() => syncStore(board.router));
 /** Abre o drawer da história como o App faz: `openCardId` na store e o componente com o id. */
 function openStory() {
   useBoardStore.getState().openCard(board.storyId);
-  render(<CardDrawer cardId={board.storyId} />);
+  render(
+    <Theme>
+      <CardDrawer cardId={board.storyId} />
+    </Theme>,
+  );
 }
 
 /** Abre o drawer de um card qualquer; devolve o resultado do render (para desmontar). */
 function openCardDrawer(id: string) {
   useBoardStore.getState().openCard(id);
-  return render(<CardDrawer cardId={id} />);
+  return render(
+    <Theme>
+      <CardDrawer cardId={id} />
+    </Theme>,
+  );
 }
 
 /** Altera o estado da store sem passar pelo host (o que o host mandaria num novo `boardState`). */
@@ -173,7 +182,11 @@ describe('CardDrawer', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await userEvent.type(screen.getByPlaceholderText(/Descreva o problema/), 'Da história');
     posted.mockClear();
-    rerender(<CardDrawer cardId={board.subId} />);
+    rerender(
+      <Theme>
+        <CardDrawer cardId={board.subId} />
+      </Theme>,
+    );
     expect(sentOf('card.update')).toEqual([{ type: 'card.update', cardId: board.storyId, patch: { description: 'Da história' } }]);
   });
 
@@ -181,7 +194,11 @@ describe('CardDrawer', () => {
     const { rerender } = openCardDrawer(board.storyId);
     await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await userEvent.click(screen.getByRole('button', { name: 'Anexos' }));
-    rerender(<CardDrawer cardId={board.subId} />);
+    rerender(
+      <Theme>
+        <CardDrawer cardId={board.subId} />
+      </Theme>,
+    );
     expect(screen.getByRole('button', { name: 'Detalhes' })).toHaveClass('active');
     expect(screen.getByDisplayValue('Tarefa')).toBeInTheDocument();
     expect(screen.getByText('Clique para adicionar uma descrição…')).toBeInTheDocument();
@@ -340,7 +357,11 @@ describe('CardDrawer', () => {
 
 describe('Board / Column', () => {
   it('"+ Novo card" abre o formulário e Enter cria o card na coluna', async () => {
-    render(<Board />);
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
     const s = board.router.snapshot();
     const parentWf = s.workflows.find((w) => w.kind === 'parent')!;
     const firstCol = s.columns.filter((c) => c.workflowId === parentWf.id).sort((a, b) => a.position - b.position)[0]!;
@@ -351,12 +372,20 @@ describe('Board / Column', () => {
   });
 
   it('sem história selecionada, "+ Nova sub-tarefa" fica desligado', () => {
-    render(<Board />);
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
     for (const b of screen.getAllByRole('button', { name: '+ Nova sub-tarefa' })) expect(b).toBeDisabled();
   });
 
   it('clicar no cabeçalho da linha colapsa a linha e compartilha com o host', async () => {
-    render(<Board />);
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
     const parentWf = board.router.snapshot().workflows.find((w) => w.kind === 'parent')!;
     await userEvent.click(screen.getByRole('heading', { name: parentWf.name }));
     expect(useBoardStore.getState().collapsed[parentWf.id]).toBe(true);

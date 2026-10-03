@@ -1,6 +1,7 @@
 import { lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import { Theme } from '@radix-ui/themes';
 import userEvent from '@testing-library/user-event';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { Settings } from '../../src/webview/components/settings/Settings';
@@ -22,7 +23,11 @@ beforeAll(async () => {
 
 describe('TypesSettings', () => {
   it('cada tipo tem a prévia do card com a cor e o nome; cor boa não mostra aviso', () => {
-    render(<TypesSettings />);
+    render(
+      <Theme>
+        <TypesSettings />
+      </Theme>,
+    );
     const t = useBoardStore.getState().state!.cardTypes[0]!;
     const preview = screen.getByLabelText(`Prévia do card do tipo ${t.name}`);
     expect(preview.querySelector('.card-bar')).toHaveTextContent(t.name);
@@ -34,7 +39,11 @@ describe('TypesSettings', () => {
     const t = useBoardStore.getState().state!.cardTypes[0]!;
     board.router.handle({ type: 'settings.type.update', typeId: t.id, patch: { color: '#00aaaa' } });
     syncStore(board.router);
-    render(<TypesSettings />);
+    render(
+      <Theme>
+        <TypesSettings />
+      </Theme>,
+    );
     expect(screen.getByText('Texto difícil de ler nesta cor.')).toBeInTheDocument();
     await userEvent.click(screen.getByTitle('Usar #009191'));
     expect(lastSent('settings.type.update')).toMatchObject({ typeId: t.id, patch: { color: '#009191' } });
@@ -49,7 +58,11 @@ describe('TypesSettings', () => {
   }
 
   it('o botão Novo tipo abre uma linha na tabela, com foco no nome, e fica desligado enquanto ela está aberta', async () => {
-    render(<TypesSettings />);
+    render(
+      <Theme>
+        <TypesSettings />
+      </Theme>,
+    );
     expect(screen.queryByPlaceholderText('Nome do tipo')).toBeNull();
     const name = await openDraft();
     expect(name).toHaveFocus();
@@ -62,7 +75,11 @@ describe('TypesSettings', () => {
   });
 
   it('Enter cria o tipo com o workflow escolhido e fecha a linha', async () => {
-    render(<TypesSettings />);
+    render(
+      <Theme>
+        <TypesSettings />
+      </Theme>,
+    );
     const wf = useBoardStore.getState().state!.workflows[1]!;
     const name = await openDraft();
     await userEvent.selectOptions(within(name.closest('tr')!).getByLabelText('Workflow'), wf.id);
@@ -73,7 +90,11 @@ describe('TypesSettings', () => {
   });
 
   it('o botão Adicionar faz o mesmo que o Enter e fica desligado sem nome', async () => {
-    render(<TypesSettings />);
+    render(
+      <Theme>
+        <TypesSettings />
+      </Theme>,
+    );
     const name = await openDraft();
     expect(screen.getByRole('button', { name: 'Adicionar' })).toBeDisabled();
     await userEvent.type(name, 'Melhoria');
@@ -82,13 +103,21 @@ describe('TypesSettings', () => {
   });
 
   it('Enter com o nome vazio não envia nada', async () => {
-    render(<TypesSettings />);
+    render(
+      <Theme>
+        <TypesSettings />
+      </Theme>,
+    );
     await userEvent.type(await openDraft(), '   {Enter}');
     expect(sentOf('settings.type.create')).toHaveLength(0);
   });
 
   it('Esc e Cancelar fecham a linha sem criar', async () => {
-    render(<TypesSettings />);
+    render(
+      <Theme>
+        <TypesSettings />
+      </Theme>,
+    );
     await userEvent.type(await openDraft(), 'Rascunho{Escape}');
     expect(screen.queryByPlaceholderText('Nome do tipo')).toBeNull();
     await openDraft();
@@ -99,10 +128,10 @@ describe('TypesSettings', () => {
 
   it('apagar abre o diálogo e só envia a exclusão depois de confirmar', async () => {
     render(
-      <>
+      <Theme>
         <TypesSettings />
         <Dialog />
-      </>,
+      </Theme>,
     );
     const type = useBoardStore.getState().state!.cardTypes.find((t) => t.name === 'Sem uso')!;
     const row = screen.getByDisplayValue('Sem uso').closest('tr')!;
@@ -117,10 +146,10 @@ describe('TypesSettings', () => {
 
   it('cancelar o diálogo não apaga', async () => {
     render(
-      <>
+      <Theme>
         <TypesSettings />
         <Dialog />
-      </>,
+      </Theme>,
     );
     const row = screen.getByDisplayValue('Sem uso').closest('tr')!;
     await userEvent.click(within(row).getByTitle('Apagar'));
@@ -130,7 +159,11 @@ describe('TypesSettings', () => {
   });
 
   it('tipo em uso tem o botão de apagar desligado', () => {
-    render(<TypesSettings />);
+    render(
+      <Theme>
+        <TypesSettings />
+      </Theme>,
+    );
     const story = useBoardStore
       .getState()
       .state!.cardTypes.find((t) => t.defaultWorkflowId === board.router.snapshot().workflows[0]!.id && t.name !== 'Sem uso')!;
@@ -142,7 +175,11 @@ describe('TypesSettings', () => {
 describe('Settings: menu lateral', () => {
   it('recolhe numa faixa de ícones: rótulos somem, as seções seguem acessíveis pelo nome e o estado fica lembrado', async () => {
     useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
-    render(<Settings />);
+    render(
+      <Theme>
+        <Settings />
+      </Theme>,
+    );
     expect(screen.getByLabelText('Nome do board')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Recolher o menu' }));
     expect(useBoardStore.getState().settingsNavCollapsed).toBe(true);
