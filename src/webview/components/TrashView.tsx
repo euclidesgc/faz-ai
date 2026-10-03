@@ -3,7 +3,7 @@ import { cardRef } from '../../shared/model';
 import { columnOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { cards, trash } from '../commands';
-import { Button, DeleteButton } from './ui';
+import { Button, DeleteButton, IconParent } from './ui';
 
 export function TrashView() {
   const state = useBoardStore((s) => s.state)!;
@@ -61,7 +61,7 @@ export function TrashView() {
                     {kids > 0 && <span className="muted"> + {kids} sub-tarefa(s)</span>}
                     {parent && (
                       <div className="muted small">
-                        ↳ {cardRef(parent)} {parent.title}
+                        <IconParent /> {cardRef(parent)} {parent.title}
                       </div>
                     )}
                   </td>

@@ -1,7 +1,7 @@
 import { checklistOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { checklist } from '../../commands';
-import { AddInput, Button } from '../ui';
+import { AddInput, Button, IconClose } from '../ui';
 
 /** Checklist do card: marcar, renomear, excluir e adicionar itens. */
 export function ChecklistSection({ cardId }: { cardId: string }) {
@@ -27,8 +27,8 @@ export function ChecklistSection({ cardId }: { cardId: string }) {
               defaultValue={item.text}
               onBlur={(e) => e.target.value !== item.text && checklist.update(item.id, { text: e.target.value })}
             />
-            <Button variant="icon" onClick={() => checklist.delete(item.id)}>
-              ✕
+            <Button variant="icon" title="Remover o item" aria-label="Remover o item" onClick={() => checklist.delete(item.id)}>
+              <IconClose />
             </Button>
           </li>
         ))}

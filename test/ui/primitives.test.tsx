@@ -1,6 +1,6 @@
 import { seedBoard } from './setup';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { Dialog } from '../../src/webview/components/Dialog';
@@ -48,7 +48,7 @@ describe('Menu', () => {
   it('abre a lista abaixo do botão, marca aria-expanded e executa o item escolhido', async () => {
     const onClick = vi.fn();
     render(<Menu items={[{ label: 'Arquivar', onClick }, 'sep', { label: 'Excluir', danger: true, onClick: () => {} }]} />);
-    const trigger = screen.getByRole('button', { name: '⋯' });
+    const trigger = screen.getByRole('button', { name: 'Mais ações' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
 
     await userEvent.click(trigger);
@@ -180,7 +180,7 @@ describe('DeleteButton', () => {
     await userEvent.click(btn);
     expect(useBoardStore.getState().dialog).toMatchObject({ title: 'Apagar isto?', confirmLabel: 'Apagar', danger: true });
     expect(onConfirm).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: 'Apagar' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Apagar' }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(useBoardStore.getState().dialog).toBeNull();
   });

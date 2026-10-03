@@ -7,7 +7,7 @@ import { columnOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { ai, cards } from '../commands';
 import { renderMarkdown } from './MarkdownEditor';
-import { Button } from './ui';
+import { Button, IconRun } from './ui';
 
 /** Selo do status de trabalho, com quem está a pendência. */
 export function StatusBadge({ status, short = false }: { status: CardStatus; short?: boolean }) {
@@ -86,7 +86,7 @@ export function StatusBar({ card }: { card: Card }) {
             }
             onClick={() => ai.run(card.id)}
           >
-            ▶ Chamar IA
+            <IconRun /> Chamar IA
           </Button>
         )}
         {card.status !== 'blocked' && (

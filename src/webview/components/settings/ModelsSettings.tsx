@@ -4,7 +4,7 @@ import { modelId, type ModelOption } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { ModelRulesEditor } from './ModelRulesEditor';
-import { Button } from '../ui';
+import { Button, IconTrash } from '../ui';
 
 const splitList = (s: string): string[] =>
   s
@@ -135,7 +135,7 @@ export function ModelsSettings() {
                           title="Remover do catálogo"
                           onClick={() => setCatalog(catalog.filter((x) => x.id !== o.id))}
                         >
-                          🗑
+                          <IconTrash />
                         </Button>
                       </td>
                     </tr>

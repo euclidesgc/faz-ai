@@ -11,7 +11,7 @@ import { MAX_ATTACHMENT_BYTES, toBase64 } from './AttachmentsTab';
 const ATTACHMENT_SCHEME = 'attachment:';
 const ATTACHMENT_LINK = /\]\(attachment:([^)\s]+)\)/g;
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
-import { Button, DeleteButton } from '../ui';
+import { Button, DeleteButton, IconRun } from '../ui';
 
 /** Conversa do card: é por aqui que a pessoa e a IA falam sobre o trabalho. */
 export function CommentsTab({ cardId }: { cardId: string }) {
@@ -110,7 +110,13 @@ export function CommentsTab({ cardId }: { cardId: string }) {
             }
             onClick={callAi}
           >
-            {draft.trim() ? 'Enviar e chamar IA' : '▶ Chamar IA'}
+            {draft.trim() ? (
+              'Enviar e chamar IA'
+            ) : (
+              <>
+                <IconRun /> Chamar IA
+              </>
+            )}
           </Button>
         </div>
       </div>
