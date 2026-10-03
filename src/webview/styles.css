@@ -497,17 +497,19 @@ button.chip.on:hover:where(:not(:disabled)) {
 .drawer-backdrop {
   position: fixed;
   inset: 0;
+  z-index: 60;
   background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
   width: min(760px, 95vw);
+  max-height: min(90vh, 100%);
   background: var(--bg);
-  border-left: 1px solid var(--border);
-  box-shadow: -8px 0 24px var(--shadow-color);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
   overflow-y: auto;
   padding: var(--sp-12) var(--sp-16) var(--sp-24);
   display: flex;
