@@ -506,12 +506,13 @@ por exemplo), eles precisam ser refeitos:
 | `.claude/skills/publicar-extensao/` | passo a passo da publicação para a IA | copiar a pasta da máquina original |
 
 Os três últimos só são necessários para publicar. A `main` só aceita mudanças por pull request, e o
-script já cuida disso: `npm run release -- <patch|minor|major>` roda a main limpa, testa, empacota,
-publica nas duas lojas e abre o PR `release/vX.Y.Z` com a versão nova (e os CHANGELOGs com "Não
-lançado" renomeado para a versão). Você mergeia o PR e o script, que espera até 30 minutos, cria a
-tag e a GitHub Release com o `.vsix`. Se o merge demorar mais, `npm run release -- finish` conclui
-depois, sem publicar de novo. `--dry-run` ensaia sem publicar. As opções estão no topo de
-`scripts/release.mjs`.
+script já cuida disso: `npm run release -- <patch|minor|major>` parte da main atualizada e limpa,
+testa, cria a branch `release/vX.Y.Z` e nela ajusta a versão e os CHANGELOGs ("Não lançado" vira a
+versão), faz o commit e empacota. Publica nas duas lojas, envia a branch, abre o PR para a main e,
+com o push concluído, faz o merge (squash). Por fim atualiza a main local, apaga a branch de release
+(local e remota) e cria a tag e a GitHub Release com o `.vsix`. Se algo parar depois da publicação,
+`npm run release -- finish` retoma de onde parou (na branch de release ou na main), sem publicar de
+novo. `--dry-run` ensaia sem publicar. As opções estão no topo de `scripts/release.mjs`.
 
 ## Histórico de versões
 

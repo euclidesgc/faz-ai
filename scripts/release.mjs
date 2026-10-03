@@ -3,16 +3,21 @@
 //
 //   npm run release -- <patch|minor|major|x.y.z|current|finish> [opções]
 //
-// A main só aceita mudanças por pull request. Por isso, depois de publicar nas lojas, o script
-// leva o commit da versão por um PR (release/vX.Y.Z), espera o merge e só então cria a tag e a
-// GitHub Release sobre o commit mergeado. Se o merge demorar, o script para e avisa; depois do
-// merge, `npm run release -- finish` conclui (tag e GitHub Release) sem publicar de novo.
+// A main só aceita mudanças por pull request, então o release nunca faz push nela:
+//   1. cria a branch release/vX.Y.Z a partir da main atualizada e, nela, ajusta a versão
+//      (package.json) e os CHANGELOGs ("Não lançado" vira a versão), faz o commit e empacota;
+//   2. publica nas lojas;
+//   3. envia a branch (push), abre o PR para a main e, com o push concluído, faz o merge (squash);
+//   4. atualiza a main local, apaga a branch de release (local e remota);
+//   5. cria a tag e a GitHub Release sobre o commit mergeado.
+// Se algo parar depois da publicação nas lojas, `npm run release -- finish` retoma de onde parou
+// (na branch release/vX.Y.Z ou na main), sem publicar de novo.
 //
 // Opções:
 //   --dry-run          valida, testa e gera o .vsix, mas não publica nem faz commit/tag
 //   --no-marketplace   não publica no Visual Studio Marketplace
 //   --no-ovsx          não publica no Open VSX (Cursor, Kimi e outros forks do VS Code)
-//   --no-git           não faz commit, PR, tag nem GitHub Release
+//   --no-git           não faz commit, PR, merge, tag nem GitHub Release
 //   --allow-dirty      permite rodar com alterações não commitadas
 //   --allow-branch     permite rodar fora da branch main
 //
@@ -31,7 +36,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const flags = new Set(args.filter((a) => a.startsWith('--')));
 const bump = args.find((a) => !a.startsWith('--'));
-const MERGE_WAIT_MINUTES = 30;
 
 const dryRun = flags.has('--dry-run');
 const toMarketplace = !flags.has('--no-marketplace');
@@ -84,32 +88,58 @@ function renameUnreleased(next) {
   }
 }
 
-// Leva o commit da versão para a main por pull request e espera o merge
-async function versionPullRequest(next, tag) {
-  const releaseBranch = `release/${tag}`;
-  run(`git switch -c ${releaseBranch}`);
-  run('git add package.json package-lock.json');
-  renameUnreleased(next);
-  run(`git commit -m "Release ${tag}"`);
-  run(`git push -u origin ${releaseBranch}`);
-  const body = `Versão ${next}, já publicada nas lojas. Depois do merge, o release cria a tag ${tag} e a GitHub Release.`;
-  const url = read(`gh pr create --base main --head ${releaseBranch} --title "Release ${tag}" --body "${body}"`).split('\n').pop();
-  console.log(`\n▶ PR da versão: ${url}\n  Esperando o merge (até ${MERGE_WAIT_MINUTES} min)...`);
-  const deadline = Date.now() + MERGE_WAIT_MINUTES * 60_000;
-  while (read(`gh pr view ${url} --json state -q .state`) !== 'MERGED') {
-    if (Date.now() > deadline) {
-      fail(`O PR ${url} ainda não foi mergeado. Depois do merge, rode: npm run release -- finish`);
+// Próxima versão a partir da atual (o mesmo que o `npm version` calcularia)
+function nextVersion(current, kind) {
+  if (/^\d+\.\d+\.\d+$/.test(kind)) return kind;
+  const [major, minor, patch] = current.split('.').map(Number);
+  if (kind === 'major') return `${major + 1}.0.0`;
+  if (kind === 'minor') return `${major}.${minor + 1}.0`;
+  return `${major}.${minor}.${patch + 1}`;
+}
+
+// Merge do PR da versão. Se o gh falhar, confere se o PR acabou mergeado (ex.: só a exclusão da
+// branch falhou) e tenta de novo algumas vezes, porque o GitHub leva uns segundos para calcular
+// se o PR é mergeável logo depois de aberto.
+async function mergePullRequest(url) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      run(`gh pr merge ${url} --squash --delete-branch`);
+      return;
+    } catch {
+      if (read(`gh pr view ${url} --json state -q .state`) === 'MERGED') return;
+      if (attempt === 5) fail(`Não consegui mergear ${url}. Mergeie o PR e rode: npm run release -- finish`);
+      console.log(`  Merge recusado (tentativa ${attempt}/5); tentando de novo em 5 s...`);
+      await sleep(5_000);
     }
-    await sleep(15_000);
   }
-  run(`git switch ${branch}`);
+}
+
+// Envia a branch de release, abre o PR (se ainda não existir), mergeia, atualiza a main local e
+// apaga a branch de release, local e remota
+async function mergeVersionPullRequest(next, tag) {
+  const releaseBranch = `release/${tag}`;
+  run(`git push -u origin ${releaseBranch}`);
+  let pr = JSON.parse(read(`gh pr list --head ${releaseBranch} --state all --json url,state`))[0];
+  if (!pr) {
+    const body = `Versão ${next}, já publicada nas lojas. Depois do merge, o release cria a tag ${tag} e a GitHub Release.`;
+    const url = read(`gh pr create --base main --head ${releaseBranch} --title "Release ${tag}" --body "${body}"`).split('\n').pop();
+    pr = { url, state: 'OPEN' };
+  }
+  console.log(`\n▶ PR da versão: ${pr.url}`);
+  if (pr.state === 'CLOSED') fail(`O PR ${pr.url} foi fechado sem merge. Reabra-o e rode: npm run release -- finish`);
+  run('git switch main');
+  if (pr.state === 'OPEN') await mergePullRequest(pr.url);
+  run('git pull --ff-only origin main');
+  if (read(`git branch --list ${releaseBranch}`)) run(`git branch -D ${releaseBranch}`);
+  if (read(`git ls-remote --heads origin ${releaseBranch}`)) run(`git push origin --delete ${releaseBranch}`);
+  run('git fetch --prune origin');
 }
 
 // Tag e GitHub Release sobre a main já com a versão
 function tagAndRelease(next, tag, vsix) {
-  run(`git switch ${branch}`);
-  run(`git pull --ff-only origin ${branch}`);
-  if (version() !== next) fail(`A ${branch} está na versão ${version()}, e não na ${next}. Mergeie o PR da versão antes.`);
+  run('git switch main');
+  run('git pull --ff-only origin main');
+  if (version() !== next) fail(`A main está na versão ${version()}, e não na ${next}. O PR da versão não foi mergeado.`);
   if (read(`git ls-remote --tags origin ${tag}`)) fail(`A tag ${tag} já existe no remoto.`);
   run(`git tag -a ${tag} -m "${tag}"`);
   run(`git push origin ${tag}`);
@@ -124,14 +154,15 @@ loadEnvFile();
 
 // Pré-condições
 const branch = read('git rev-parse --abbrev-ref HEAD');
-if (withGit && !dryRun && branch !== 'main' && !flags.has('--allow-branch')) {
+const finishing = bump === 'finish';
+if (withGit && !dryRun && !finishing && branch !== 'main' && !flags.has('--allow-branch')) {
   fail(`Você está na branch "${branch}". Faça o release a partir da main ou use --allow-branch.`);
 }
 if (!flags.has('--allow-dirty') && read('git status --porcelain')) {
   fail('Há alterações não commitadas. Faça commit/stash antes ou use --allow-dirty.');
 }
 const marketplaceAuth = process.env.VSCE_PAT ? '' : ' --azure-credential';
-if (!dryRun && toMarketplace && marketplaceAuth) {
+if (!dryRun && !finishing && toMarketplace && marketplaceAuth) {
   try {
     read('az account show');
   } catch {
@@ -139,13 +170,15 @@ if (!dryRun && toMarketplace && marketplaceAuth) {
   }
   run('npx vsce verify-pat euclidesgc --azure-credential');
 }
-if (!dryRun && toOvsx && !process.env.OVSX_PAT) {
+if (!dryRun && !finishing && toOvsx && !process.env.OVSX_PAT) {
   fail('OVSX_PAT não definido (env ou .env.release). Use --no-ovsx para pular.');
 }
 
-// Concluir um release já publicado: só a tag e a GitHub Release, depois do merge do PR da versão
-if (bump === 'finish') {
+// Retomar um release já publicado nas lojas: na branch release/vX.Y.Z, conclui o PR (push, merge e
+// limpeza das branches); na main, só a tag e a GitHub Release
+if (finishing) {
   const finished = version();
+  if (branch.startsWith('release/')) await mergeVersionPullRequest(finished, `v${finished}`);
   tagAndRelease(finished, `v${finished}`, `releases/faz-ai-${finished}.vsix`);
   console.log(`\n✔ v${finished} concluído.`);
   process.exit(0);
@@ -153,24 +186,51 @@ if (bump === 'finish') {
 
 // Versão
 const previous = version();
-if (bump !== 'current') {
-  run(`npm version ${bump} --no-git-tag-version`, { stdio: 'pipe' });
-}
-const next = version();
+const next = bump === 'current' ? previous : nextVersion(previous, bump);
 const tag = `v${next}`;
 if (withGit && (read(`git tag --list ${tag}`) || read(`git ls-remote --tags origin ${tag}`))) {
   fail(`A tag ${tag} já existe.`);
 }
 console.log(`\n▶ Release ${previous} → ${next}${dryRun ? ' (dry-run)' : ''}`);
 
-// Validação e empacotamento (vsce roda "vscode:prepublish", que faz o build)
+// A branch de release parte da main atualizada: nada de commits locais soltos indo junto no PR
+const viaPullRequest = withGit && !dryRun && bump !== 'current';
+if (viaPullRequest && branch === 'main') {
+  run('git fetch origin main');
+  if (read('git rev-list --count HEAD..origin/main') !== '0') fail('A main local está atrás da origin/main. Rode: git pull --ff-only');
+  if (read('git rev-list --count origin/main..HEAD') !== '0')
+    fail('A main local tem commits que não estão na origin/main. Eles iriam no PR da versão.');
+}
+
+// Validação (a versão não influencia os testes, então roda antes de mexer em qualquer branch)
 run('npm run typecheck');
 run('npm test');
-// Os pacotes ficam em releases/ (fora do git): um por versão e uma cópia da última
-mkdirSync(join(root, 'releases'), { recursive: true });
+
+// Versão, CHANGELOGs e commit, na branch de release (a main nunca recebe push direto)
+const releaseBranch = `release/${tag}`;
+if (viaPullRequest) run(`git switch -c ${releaseBranch}`);
+if (bump !== 'current') run(`npm version ${next} --no-git-tag-version`, { stdio: 'pipe' });
+if (viaPullRequest) {
+  run('git add package.json package-lock.json');
+  renameUnreleased(next);
+  run(`git commit -m "Release ${tag}"`);
+}
+
+// Empacotamento (vsce roda "vscode:prepublish", que faz o build). Os pacotes ficam em releases/
+// (fora do git): um por versão e uma cópia da última. Se falhar, nada saiu da máquina: a branch
+// de release é descartada e a main fica como estava.
 const vsix = `releases/faz-ai-${next}.vsix`;
-run(`npx vsce package --out ${vsix}`);
-copyFileSync(join(root, vsix), join(root, 'releases/faz-ai-latest.vsix'));
+try {
+  mkdirSync(join(root, 'releases'), { recursive: true });
+  run(`npx vsce package --out ${vsix}`);
+  copyFileSync(join(root, vsix), join(root, 'releases/faz-ai-latest.vsix'));
+} catch (err) {
+  if (viaPullRequest) {
+    run('git switch main');
+    run(`git branch -D ${releaseBranch}`);
+  }
+  throw err;
+}
 
 if (dryRun) {
   console.log(`\n✔ Dry-run concluído: ${vsix} gerado. Nada foi publicado.`);
@@ -182,9 +242,9 @@ if (dryRun) {
 if (toMarketplace) run(`npx vsce publish --packagePath ${vsix}${marketplaceAuth}`);
 if (toOvsx) run(`npx ovsx publish ${vsix}`);
 
-// Git: PR da versão (a main é protegida), tag e GitHub Release com o .vsix anexado
+// Git: PR da versão (push da branch de release, merge e limpeza), tag e GitHub Release com o .vsix
 if (withGit) {
-  if (bump !== 'current') await versionPullRequest(next, tag);
+  if (viaPullRequest) await mergeVersionPullRequest(next, tag);
   tagAndRelease(next, tag, vsix);
 }
 
