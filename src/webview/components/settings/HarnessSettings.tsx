@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AI_TOOLS, RULE_FILES, SKILL_MODES, SKILL_NAME_PATTERN, aiToolInfo, type Agent, type AiTool, type RuleFile, type Skill, type SkillMode } from '../../../shared/harness';
 import { HEARTBEAT_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE } from '../../../shared/runner';
 import { useBoardStore } from '../../store/boardStore';
-import { useBoardPatch } from '../../store/useBoardPatch';
+import { ai, harness, settings, ui } from '../../commands';
 import { Button, DeleteButton, EnumSelect, FieldRow, NumberField } from '../ui';
 import { HarnessInventory } from './HarnessInventory';
 
@@ -38,14 +38,12 @@ const FLOW_SKILL_NAME = 'faz-ai-fluxo';
 
 export function HarnessSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const harness = state.harness;
-  const send = useBoardStore((s) => s.send);
+  const harnessState = state.harness;
   const tool = aiToolInfo(state.board.aiTool);
-  const agents = harness.rules.find((r) => r.name === 'AGENTS.md');
-  const patchBoard = useBoardPatch();
-  const chooseTool = (id: AiTool) => id !== tool.id && patchBoard({ aiTool: id });
+  const agents = harnessState.rules.find((r) => r.name === 'AGENTS.md');
+  const chooseTool = (id: AiTool) => id !== tool.id && settings.updateBoard({ aiTool: id });
   // o arquivo de regras da ferramenta em uso; com o Claude Code, o AGENTS.md também aparece porque pode ser importado
-  const rules = harness.rules.filter((r) => r.name === tool.rules || (tool.id === 'claude' && r.name === 'AGENTS.md' && r.exists));
+  const rules = harnessState.rules.filter((r) => r.name === tool.rules || (tool.id === 'claude' && r.name === 'AGENTS.md' && r.exists));
   const [editing, setEditing] = useState<Editing>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -53,10 +51,10 @@ export function HarnessSettings() {
 
   const isEditing = (kind: 'rule' | 'skill' | 'agent', n: string) => editing !== null && editing.kind === kind && editing.name === n;
   const toggle = (kind: 'rule' | 'skill' | 'agent', n: string) => setEditing(isEditing(kind, n) ? null : { kind, name: n });
-  const nameOk = SKILL_NAME_PATTERN.test(name) && !harness.skills.some((k) => k.name === name);
+  const nameOk = SKILL_NAME_PATTERN.test(name) && !harnessState.skills.some((k) => k.name === name);
 
   const [model, setModel] = useState('');
-  const agentNameOk = SKILL_NAME_PATTERN.test(name) && !harness.agents.some((a) => a.name === name);
+  const agentNameOk = SKILL_NAME_PATTERN.test(name) && !harnessState.agents.some((a) => a.name === name);
   const clearForm = () => {
     setName('');
     setDescription('');
@@ -65,7 +63,7 @@ export function HarnessSettings() {
     setEditing(null);
   };
   const createAgent = () => {
-    send({ type: 'harness.agent.create', name, description: description.trim(), content: body, model: model.trim() || undefined });
+    harness.createAgent({ name, description: description.trim(), content: body, model: model.trim() || undefined });
     clearForm();
   };
 
@@ -80,17 +78,17 @@ export function HarnessSettings() {
           title="Apagar o agente"
           question={`Apagar o agente "${a.name}"?`}
           message="O arquivo do agente é removido do projeto."
-          onConfirm={() => send({ type: 'harness.agent.delete', name: a.name })}
+          onConfirm={() => harness.deleteAgent(a.name)}
         />
       </div>
       <div className="muted small">{a.description || 'Sem descrição no frontmatter.'}</div>
       <div className="muted small"><code>{a.path}</code></div>
-      {isEditing('agent', a.name) && <FileEditor saved={a.content} onSave={(content) => send({ type: 'harness.agent.write', name: a.name, content })} onClose={() => setEditing(null)} />}
+      {isEditing('agent', a.name) && <FileEditor saved={a.content} onSave={(content) => harness.writeAgent(a.name, content)} onClose={() => setEditing(null)} />}
     </section>
   );
 
   const createSkill = () => {
-    send({ type: 'harness.skill.create', name, description: description.trim(), content: body });
+    harness.createSkill(name, description.trim(), body);
     setName('');
     setDescription('');
     setBody('');
@@ -107,7 +105,7 @@ export function HarnessSettings() {
           <span className="muted small">Lido por: {readBy}</span>
           <span className="spacer" />
           {r.name === 'CLAUDE.md' && !r.exists && agents?.exists && (
-            <Button title="Cria um CLAUDE.md que só importa o AGENTS.md, para as regras ficarem num arquivo só" onClick={() => send({ type: 'harness.rule.write', name: 'CLAUDE.md', content: '@AGENTS.md\n' })}>
+            <Button title="Cria um CLAUDE.md que só importa o AGENTS.md, para as regras ficarem num arquivo só" onClick={() => harness.writeRule('CLAUDE.md', '@AGENTS.md\n')}>
               Usar o AGENTS.md
             </Button>
           )}
@@ -117,11 +115,11 @@ export function HarnessSettings() {
               title="Apagar o arquivo"
               question={`Apagar ${r.name}?`}
               message="O arquivo é removido da pasta do projeto."
-              onConfirm={() => send({ type: 'harness.rule.delete', name: r.name })}
+              onConfirm={() => harness.deleteRule(r.name)}
             />
           )}
         </div>
-        {isEditing('rule', r.name) && <FileEditor saved={r.content} onSave={(content) => send({ type: 'harness.rule.write', name: r.name, content })} onClose={() => setEditing(null)} />}
+        {isEditing('rule', r.name) && <FileEditor saved={r.content} onSave={(content) => harness.writeRule(r.name, content)} onClose={() => setEditing(null)} />}
       </section>
     );
   };
@@ -130,15 +128,15 @@ export function HarnessSettings() {
   const skillPath = (k: Skill) => state.harness.inventory.find((t) => t.tool === tool.id)?.items.find((i) => i.kind === 'skill' && i.scope === 'project' && i.location === k.path)?.path;
   const setMode = (skills: Skill[], mode: SkillMode) => {
     const paths = skills.map(skillPath).filter((p): p is string => !!p);
-    if (paths.length) send({ type: 'harness.skill.setMode', tool: tool.id, paths, mode });
+    if (paths.length) harness.setSkillMode(tool.id, paths, mode);
   };
-  const automatic = harness.skills.filter((k) => k.enabled && k.mode === 'auto');
+  const automatic = harnessState.skills.filter((k) => k.enabled && k.mode === 'auto');
 
   const skillRow = (k: Skill) => (
     <section key={k.name} className={`settings-block ${k.enabled ? '' : 'rule off'}`}>
       <div className="row">
         <label className="switch" title={k.enabled ? 'Desligar: tira a skill do contexto das ferramentas de IA' : 'Ligar a skill'}>
-          <input type="checkbox" checked={k.enabled} onChange={(e) => send({ type: 'harness.skill.setEnabled', name: k.name, enabled: e.target.checked })} />
+          <input type="checkbox" checked={k.enabled} onChange={(e) => harness.setSkillEnabled(k.name, e.target.checked)} />
         </label>
         <h3 className="plain">{k.name}</h3>
         <span className={`pill ${k.enabled ? '' : 'off'}`}>{k.enabled ? 'Ligada' : 'Desligada'}</span>
@@ -151,12 +149,12 @@ export function HarnessSettings() {
           title="Apagar a skill"
           question={`Apagar a skill "${k.name}"?`}
           message="A pasta da skill é removida do projeto, com todos os arquivos dela."
-          onConfirm={() => send({ type: 'harness.skill.delete', name: k.name })}
+          onConfirm={() => harness.deleteSkill(k.name)}
         />
       </div>
       <div className="muted small">{k.description || 'Sem descrição no frontmatter.'}</div>
       <div className="muted small"><code>{k.path}</code></div>
-      {isEditing('skill', k.name) && <FileEditor saved={k.content} onSave={(content) => send({ type: 'harness.skill.write', name: k.name, content })} onClose={() => setEditing(null)} />}
+      {isEditing('skill', k.name) && <FileEditor saved={k.content} onSave={(content) => harness.writeSkill(k.name, content)} onClose={() => setEditing(null)} />}
     </section>
   );
 
@@ -188,7 +186,7 @@ export function HarnessSettings() {
         </tbody>
       </table>
       <div className="row">
-        <Button variant="primary" onClick={() => send({ type: 'ui.connectAI' })}>Conectar o {tool.label} ao board (MCP)</Button>
+        <Button variant="primary" onClick={() => ui.connectAI()}>Conectar o {tool.label} ao board (MCP)</Button>
         <span className="muted small">Registra o servidor do board em {tool.mcp}.</span>
       </div>
 
@@ -202,12 +200,12 @@ export function HarnessSettings() {
       ) : (
         <section className="settings-block runner-settings">
           <FieldRow label="O que a IA pode fazer">
-            <EnumSelect options={RUNNER_PERMISSIONS} value={state.board.runner.permission} onChange={(permission) => patchBoard({ runner: { permission } })} />
+            <EnumSelect options={RUNNER_PERMISSIONS} value={state.board.runner.permission} onChange={(permission) => settings.updateBoard({ runner: { permission } })} />
           </FieldRow>
           <p className={`small ${state.board.runner.permission === 'full' ? 'banner warn' : 'muted'}`}>{RUNNER_PERMISSIONS.find((p) => p.value === state.board.runner.permission)!.hint}</p>
           <FieldRow label="Tempo limite por execução">
             <div className="row">
-              <NumberField min={TIMEOUT_RANGE.min} max={TIMEOUT_RANGE.max} value={state.board.runner.timeoutMinutes} onCommit={(timeoutMinutes) => patchBoard({ runner: { timeoutMinutes } })} />
+              <NumberField min={TIMEOUT_RANGE.min} max={TIMEOUT_RANGE.max} value={state.board.runner.timeoutMinutes} onCommit={(timeoutMinutes) => settings.updateBoard({ runner: { timeoutMinutes } })} />
               <span className="muted">minutos</span>
             </div>
           </FieldRow>
@@ -217,14 +215,14 @@ export function HarnessSettings() {
             responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. Sem pendência, nada é executado.
           </p>
           <label className="switch">
-            <input type="checkbox" checked={state.board.runner.heartbeat} onChange={(e) => patchBoard({ runner: { heartbeat: e.target.checked } })} />
+            <input type="checkbox" checked={state.board.runner.heartbeat} onChange={(e) => settings.updateBoard({ runner: { heartbeat: e.target.checked } })} />
             Heartbeat ligado
           </label>
           <FieldRow label="Intervalo">
             <div className="row">
-              <NumberField min={HEARTBEAT_RANGE.min} max={HEARTBEAT_RANGE.max} value={state.board.runner.heartbeatMinutes} onCommit={(heartbeatMinutes) => patchBoard({ runner: { heartbeatMinutes } })} />
+              <NumberField min={HEARTBEAT_RANGE.min} max={HEARTBEAT_RANGE.max} value={state.board.runner.heartbeatMinutes} onCommit={(heartbeatMinutes) => settings.updateBoard({ runner: { heartbeatMinutes } })} />
               <span className="muted">minutos</span>
-              <Button title="Começa uma rodada agora, mesmo com o heartbeat desligado" onClick={() => send({ type: 'ai.heartbeat.run' })}>Rodar agora</Button>
+              <Button title="Começa uma rodada agora, mesmo com o heartbeat desligado" onClick={() => ai.runHeartbeat()}>Rodar agora</Button>
             </div>
           </FieldRow>
         </section>
@@ -237,8 +235,8 @@ export function HarnessSettings() {
       <div className="row section-head">
         <h3>Skills</h3>
         <span className="spacer" />
-        {!harness.skills.some((k) => k.name === FLOW_SKILL_NAME) && (
-          <Button title="Cria a skill que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências" onClick={() => send({ type: 'harness.flowSkill.install' })}>
+        {!harnessState.skills.some((k) => k.name === FLOW_SKILL_NAME) && (
+          <Button title="Cria a skill que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências" onClick={() => harness.installFlowSkill()}>
             Instalar skill do fluxo
           </Button>
         )}
@@ -280,8 +278,8 @@ export function HarnessSettings() {
       )}
 
       <div className="stack">
-        {harness.skills.map(skillRow)}
-        {harness.skills.length === 0 && <p className="muted">Nenhuma skill em <code>{tool.skills}</code> ainda.</p>}
+        {harnessState.skills.map(skillRow)}
+        {harnessState.skills.length === 0 && <p className="muted">Nenhuma skill em <code>{tool.skills}</code> ainda.</p>}
       </div>
 
       <div className="row section-head">
@@ -317,8 +315,8 @@ export function HarnessSettings() {
             </section>
           )}
           <div className="stack">
-            {harness.agents.map(agentRow)}
-            {harness.agents.length === 0 && <p className="muted">Nenhum agente em <code>{tool.agents.dir}</code> ainda.</p>}
+            {harnessState.agents.map(agentRow)}
+            {harnessState.agents.length === 0 && <p className="muted">Nenhum agente em <code>{tool.agents.dir}</code> ainda.</p>}
           </div>
         </>
       ) : (

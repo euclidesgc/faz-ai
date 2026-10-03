@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { badgeStyle } from '../../../shared/color';
 import { fieldsForType, useBoardStore } from '../../store/boardStore';
+import { settings } from '../../commands';
 import { FieldEditor } from '../FieldRenderer';
 import { AddInput, DeleteButton, FieldRow } from '../ui';
 
 export function TypesSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const send = useBoardStore((s) => s.send);
   const [color, setColor] = useState('#4c8dff');
   const [wf, setWf] = useState(state.workflows[0]?.id ?? '');
 
   const add = (name: string) => {
     if (!wf) return false;
-    send({ type: 'settings.type.create', name, color, defaultWorkflowId: wf });
+    settings.createType(name, color, wf);
   };
 
   return (
@@ -26,10 +26,10 @@ export function TypesSettings() {
             const used = state.cards.filter((c) => c.typeId === t.id).length;
             return (
               <tr key={t.id}>
-                <td><input type="color" value={t.color} onChange={(e) => send({ type: 'settings.type.update', typeId: t.id, patch: { color: e.target.value } })} /></td>
-                <td><input defaultValue={t.name} onBlur={(e) => e.target.value.trim() && e.target.value !== t.name && send({ type: 'settings.type.update', typeId: t.id, patch: { name: e.target.value.trim() } })} /></td>
+                <td><input type="color" value={t.color} onChange={(e) => settings.updateType(t.id, { color: e.target.value })} /></td>
+                <td><input defaultValue={t.name} onBlur={(e) => e.target.value.trim() && e.target.value !== t.name && settings.updateType(t.id, { name: e.target.value.trim() })} /></td>
                 <td>
-                  <select value={t.defaultWorkflowId} disabled={used > 0} onChange={(e) => send({ type: 'settings.type.update', typeId: t.id, patch: { defaultWorkflowId: e.target.value } })}>
+                  <select value={t.defaultWorkflowId} disabled={used > 0} onChange={(e) => settings.updateType(t.id, { defaultWorkflowId: e.target.value })}>
                     {state.workflows.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select>
                 </td>
@@ -39,7 +39,7 @@ export function TypesSettings() {
                     disabled={used > 0}
                     title={used ? 'Tipo em uso' : 'Apagar'}
                     question={`Apagar o tipo "${t.name}"?`}
-                    onConfirm={() => send({ type: 'settings.type.delete', typeId: t.id })}
+                    onConfirm={() => settings.deleteType(t.id)}
                   />
                 </td>
               </tr>
@@ -69,7 +69,7 @@ export function TypesSettings() {
                 <FieldRow key={f.id} label={f.name}>
                   {f.kind === 'multiselect' && f.options.length === 0
                     ? <span className="muted small">Sem opções ainda.</span>
-                    : <FieldEditor field={f} value={t.defaults[f.id] ?? null} onChange={(v) => send({ type: 'settings.type.update', typeId: t.id, patch: { defaults: { ...t.defaults, [f.id]: v } } })} />}
+                    : <FieldEditor field={f} value={t.defaults[f.id] ?? null} onChange={(v) => settings.updateType(t.id, { defaults: { ...t.defaults, [f.id]: v } })} />}
                 </FieldRow>
               ))}
             </section>

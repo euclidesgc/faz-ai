@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type CompleteParentMode, type ConfirmMode } from '../../../shared/rules';
 import { columnsOf, useBoardStore } from '../../store/boardStore';
+import { settings } from '../../commands';
 import { Button, EnumSelect } from '../ui';
 
 const CONFIRM_OPTIONS: { value: ConfirmMode; label: string }[] = [
@@ -39,9 +40,8 @@ function Rule({ title, when, then, active, control }: { title: string; when: str
 
 export function RulesSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const send = useBoardStore((s) => s.send);
   const rules = state.board.rules;
-  const set = (patch: Partial<BoardRules>) => send({ type: 'settings.rules.update', patch });
+  const set = (patch: Partial<BoardRules>) => settings.updateRules(patch);
 
   const parentWf = state.workflows.find((w) => w.kind === 'parent');
   const names = (category: 'done' | 'cancelled') => {

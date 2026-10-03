@@ -15,7 +15,7 @@ import { useBoardStore } from '../../src/webview/store/boardStore';
 /** Tudo que a tela mandaria ao host passa por `postToHost`: aqui ele só anota as mensagens. */
 export const posted = vi.fn<(msg: WebviewToHost) => void>();
 
-// tanto `send` quanto os filtros compartilhados (`view.set`) chamam postToHost; trocar só ele cobre os dois
+// tanto os comandos (src/webview/commands.ts) quanto os filtros compartilhados (`view.set`) chamam postToHost; trocar só ele cobre os dois
 vi.mock('../../src/webview/vscode', async (original) => {
   const mod = await original<typeof import('../../src/webview/vscode')>();
   return { ...mod, postToHost: (msg: WebviewToHost) => posted(msg) };

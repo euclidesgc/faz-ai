@@ -1,7 +1,7 @@
 import { DEFAULT_APPEARANCE, FONTS, FONT_SIZE_RANGE, THEMES, fontStack, type Appearance } from '../../../shared/appearance';
 import { CARD_STATUSES, OWNER_LABEL } from '../../../shared/status';
 import { useBoardStore } from '../../store/boardStore';
-import { useBoardPatch } from '../../store/useBoardPatch';
+import { settings } from '../../commands';
 import { StatusBadge } from '../StatusBar';
 import { renderMarkdown } from '../MarkdownEditor';
 import { Button, EnumSelect, FieldRow } from '../ui';
@@ -10,8 +10,7 @@ const SAMPLE = '## Exemplo de descrição\n\nTexto de um card com **negrito**, _
 
 export function AppearanceSettings() {
   const appearance = useBoardStore((s) => s.state)!.board.appearance;
-  const patchBoard = useBoardPatch();
-  const set = (patch: Partial<Appearance>) => patchBoard({ appearance: patch });
+  const set = (patch: Partial<Appearance>) => settings.updateBoard({ appearance: patch });
   const changed = JSON.stringify(appearance) !== JSON.stringify(DEFAULT_APPEARANCE);
 
   return (

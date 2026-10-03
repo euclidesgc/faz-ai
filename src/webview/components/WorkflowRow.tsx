@@ -14,6 +14,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { archiveKey } from '../../shared/filters';
 import type { Card as CardModel, Workflow } from '../../shared/model';
 import { archivedIn, cardsIn, columnsOf, useBoardStore, useFilteredIds } from '../store/boardStore';
+import { cards, settings } from '../commands';
 import { requestArchive, requestMove } from '../store/actions';
 import { CollapsedColumn, Column } from './Column';
 import { CardView, SortableCard } from './Card';
@@ -26,7 +27,6 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
   const overrides = useBoardStore((s) => s.collapsed);
   const setCollapsed = useBoardStore((s) => s.setCollapsed);
-  const send = useBoardStore((s) => s.send);
   const filtered = useFilteredIds();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [newColumn, setNewColumn] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
       position = idx < 0 ? ordered.length : idx;
     }
     if (current.archivedAt) {
-      send({ type: 'card.unarchive', cardId, columnId: targetColumnId, position });
+      cards.unarchive(cardId, { columnId: targetColumnId, position });
       return;
     }
     if (current.columnId === targetColumnId && current.position === position) return;
@@ -73,7 +73,7 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
   };
 
   const addColumn = () => {
-    if (newColumn?.trim()) send({ type: 'settings.column.create', workflowId: workflow.id, name: newColumn.trim() });
+    if (newColumn?.trim()) settings.createColumn(workflow.id, newColumn.trim());
     setNewColumn(null);
   };
 

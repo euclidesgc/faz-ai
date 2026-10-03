@@ -1,12 +1,11 @@
 import { DEFAULT_GIT, MERGE_METHODS, WORKSPACE_MODES, branchName, type GitConfig } from '../../../shared/git';
 import { useBoardStore } from '../../store/boardStore';
-import { useBoardPatch } from '../../store/useBoardPatch';
+import { settings } from '../../commands';
 import { EnumSelect, FieldRow } from '../ui';
 
 export function GitSettings() {
   const git = useBoardStore((s) => s.state)!.board.git;
-  const patchBoard = useBoardPatch();
-  const set = (patch: Partial<GitConfig>) => patchBoard({ git: patch });
+  const set = (patch: Partial<GitConfig>) => settings.updateBoard({ git: patch });
   const off = git.mode === 'off';
 
   return (

@@ -4,6 +4,7 @@ import type { Card } from '../../shared/model';
 import { CARD_STATUSES, OWNER_LABEL, statusInfo, type CardStatus } from '../../shared/status';
 import { aiToolInfo } from '../../shared/harness';
 import { useBoardStore } from '../store/boardStore';
+import { ai, cards } from '../commands';
 import { renderMarkdown } from './MarkdownEditor';
 import { Button } from './ui';
 
@@ -23,7 +24,6 @@ type Pending = { status: CardStatus; title: string; confirm: string; required: b
 /** Status do card no drawer: o selo, as ações de revisão e a troca manual. */
 export function StatusBar({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
-  const send = useBoardStore((s) => s.send);
   const [pending, setPending] = useState<Pending | null>(null);
   const [note, setNote] = useState('');
   const column = state.columns.find((c) => c.id === card.columnId);
@@ -31,7 +31,7 @@ export function StatusBar({ card }: { card: Card }) {
   const running = state.aiRuns.includes(card.id);
   const toolLabel = aiToolInfo(state.board.aiTool).label;
 
-  const set = (status: CardStatus | null, text?: string) => send({ type: 'card.status.set', cardId: card.id, status, note: text });
+  const set = (status: CardStatus | null, text?: string) => cards.setStatus(card.id, status, text);
   const start = (p: Pending) => {
     setNote('');
     setPending(p);
@@ -55,12 +55,12 @@ export function StatusBar({ card }: { card: Card }) {
         )}
         {card.status === 'blocked' && <Button variant="primary" onClick={() => set('ready')}>Desbloquear</Button>}
         {running ? (
-          <Button title={`Interrompe o ${toolLabel}; o status volta ao que era`} onClick={() => send({ type: 'ai.stop', cardId: card.id })}><span className="spinner" /> Parar a IA</Button>
+          <Button title={`Interrompe o ${toolLabel}; o status volta ao que era`} onClick={() => ai.stop(card.id)}><span className="spinner" /> Parar a IA</Button>
         ) : (
           <Button
             disabled={!!state.aiRunUnsupported}
             title={state.aiRunUnsupported ?? `Roda o ${toolLabel} em segundo plano para trabalhar neste card. A resposta chega na conversa.`}
-            onClick={() => send({ type: 'ai.run', cardId: card.id })}
+            onClick={() => ai.run(card.id)}
           >▶ Chamar IA</Button>
         )}
         {card.status !== 'blocked' && (

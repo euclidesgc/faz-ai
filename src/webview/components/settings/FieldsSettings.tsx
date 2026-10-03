@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FieldDef, FieldDisplay, FieldKind } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
+import { settings } from '../../commands';
 import { Button, Chip, ChipsEditor, DeleteButton, EnumSelect, FieldRow as Row } from '../ui';
 
 const KINDS: { value: FieldKind; label: string }[] = [
@@ -15,7 +16,6 @@ const hasOptions = (k: FieldKind) => k === 'select' || k === 'multiselect';
 
 export function FieldsSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const send = useBoardStore((s) => s.send);
   const [name, setName] = useState('');
   const [kind, setKind] = useState<FieldKind>('text');
   const [display, setDisplay] = useState<FieldDisplay>('inline');
@@ -23,7 +23,7 @@ export function FieldsSettings() {
 
   const add = () => {
     if (!name.trim()) return;
-    send({ type: 'settings.field.create', name: name.trim(), kind, display, options: hasOptions(kind) ? splitOpts(options) : [], appliesToTypes: null });
+    settings.createField({ name: name.trim(), kind, display, options: hasOptions(kind) ? splitOpts(options) : [], appliesToTypes: null });
     setName(''); setOptions('');
   };
 
@@ -48,26 +48,25 @@ export function FieldsSettings() {
 
 function FieldRow({ field }: { field: FieldDef }) {
   const state = useBoardStore((s) => s.state)!;
-  const send = useBoardStore((s) => s.send);
   const all = field.appliesToTypes === null;
   const allIds = state.cardTypes.map((t) => t.id);
 
   return (
     <section className="settings-block">
       <div className="row wrap">
-        <input className="h3-input" defaultValue={field.name} onBlur={(e) => e.target.value.trim() && e.target.value !== field.name && send({ type: 'settings.field.update', fieldId: field.id, patch: { name: e.target.value.trim() } })} />
+        <input className="h3-input" defaultValue={field.name} onBlur={(e) => e.target.value.trim() && e.target.value !== field.name && settings.updateField(field.id, { name: e.target.value.trim() })} />
         <span className="muted">{KINDS.find((k) => k.value === field.kind)?.label}</span>
-        <EnumSelect options={DISPLAYS} value={field.display} onChange={(display) => send({ type: 'settings.field.update', fieldId: field.id, patch: { display } })} />
+        <EnumSelect options={DISPLAYS} value={field.display} onChange={(display) => settings.updateField(field.id, { display })} />
         <span className="spacer" />
         <DeleteButton
           question={`Apagar o campo "${field.name}"?`}
           message="Os valores deste campo em todos os cards serão apagados."
-          onConfirm={() => send({ type: 'settings.field.delete', fieldId: field.id })}
+          onConfirm={() => settings.deleteField(field.id)}
         />
       </div>
       {hasOptions(field.kind) && (
         <Row label="Opções">
-          <input defaultValue={field.options.join(', ')} onBlur={(e) => send({ type: 'settings.field.update', fieldId: field.id, patch: { options: splitOpts(e.target.value) } })} />
+          <input defaultValue={field.options.join(', ')} onBlur={(e) => settings.updateField(field.id, { options: splitOpts(e.target.value) })} />
         </Row>
       )}
       <Row as="div" label="Aplica-se a">
@@ -75,8 +74,8 @@ function FieldRow({ field }: { field: FieldDef }) {
           options={state.cardTypes.map((t) => ({ value: t.id, label: t.name }))}
           values={field.appliesToTypes ?? allIds}
           // marcar todos os tipos equivale a "Todos" (null)
-          onChange={(next) => send({ type: 'settings.field.update', fieldId: field.id, patch: { appliesToTypes: next.length === allIds.length ? null : next } })}
-          before={<Chip on={all} onClick={() => send({ type: 'settings.field.update', fieldId: field.id, patch: { appliesToTypes: all ? [] : null } })}>Todos</Chip>}
+          onChange={(next) => settings.updateField(field.id, { appliesToTypes: next.length === allIds.length ? null : next })}
+          before={<Chip on={all} onClick={() => settings.updateField(field.id, { appliesToTypes: all ? [] : null })}>Todos</Chip>}
         />
       </Row>
     </section>

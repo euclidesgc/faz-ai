@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, type ExecAspect, type ExecProfile } from '../../../shared/execution';
 import { aiToolInfo } from '../../../shared/harness';
 import { useBoardStore } from '../../store/boardStore';
+import { settings } from '../../commands';
 import { ModelEditor } from '../FieldRenderer';
 import { Button, ChipsEditor, DeleteButton } from '../ui';
 
@@ -11,7 +12,6 @@ const list = (text: string): string[] => [...new Set(text.split(/[,\n]/).map((x)
 /** Perfis de execução: o que a sessão de IA recebe para trabalhar num card, definido antes da execução. */
 export function ExecProfilesSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const send = useBoardStore((s) => s.send);
   const [open, setOpen] = useState<string | null>(null);
   const profiles = state.board.execProfiles;
   const tool = aiToolInfo(state.board.aiTool);
@@ -21,7 +21,7 @@ export function ExecProfilesSettings() {
   const servers = [...new Set(items.filter((i) => i.kind === 'mcp').map((i) => i.name))].filter((n) => n !== 'faz-ai').sort();
   const skills = state.fieldDefs.find((f) => f.kind === 'multiselect' && f.name.toLowerCase() === 'skills')?.options ?? [];
 
-  const save = (next: ExecProfile[]) => send({ type: 'settings.execProfiles.set', profiles: next });
+  const save = (next: ExecProfile[]) => settings.setExecProfiles(next);
   const patch = (id: string, p: Partial<ExecProfile>) => save(profiles.map((x) => (x.id === id ? { ...x, ...p } : p.isDefault ? { ...x, isDefault: false } : x)));
   const add = () => {
     const id = newId();

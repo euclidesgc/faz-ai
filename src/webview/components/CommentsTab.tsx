@@ -3,6 +3,7 @@ import type { Comment } from '../../shared/model';
 import { aiToolInfo } from '../../shared/harness';
 import { RUNNER_PERMISSIONS } from '../../shared/runner';
 import { useBoardStore } from '../store/boardStore';
+import { ai, attachments, comments } from '../commands';
 import { MAX_ATTACHMENT_BYTES, toBase64 } from './AttachmentsTab';
 
 /** Referência a um anexo do card dentro de uma mensagem: `attachment:<nome do arquivo>`. */
@@ -14,12 +15,11 @@ import { Button, DeleteButton } from './ui';
 /** Conversa do card: é por aqui que a pessoa e a IA falam sobre o trabalho. */
 export function CommentsTab({ cardId }: { cardId: string }) {
   const state = useBoardStore((s) => s.state)!;
-  const send = useBoardStore((s) => s.send);
   const baseUri = useBoardStore((s) => s.attachmentsBaseUri);
   const setError = useBoardStore((s) => s.setError);
   const openSettings = useBoardStore((s) => s.openSettings);
   const [draft, setDraft] = useState('');
-  const comments = state.comments.filter((c) => c.cardId === cardId);
+  const cardComments = state.comments.filter((c) => c.cardId === cardId);
   const card = state.cards.find((c) => c.id === cardId);
   const running = state.aiRuns.includes(cardId);
   const toolLabel = aiToolInfo(state.board.aiTool).label;
@@ -28,14 +28,14 @@ export function CommentsTab({ cardId }: { cardId: string }) {
 
   const submit = () => {
     if (!draft.trim()) return;
-    send({ type: 'comment.add', cardId, body: draft.trim() });
+    comments.add(cardId, draft.trim());
     setDraft('');
   };
 
   /** Envia o que estiver escrito e chama a IA para o card. */
   const callAi = () => {
     submit();
-    send({ type: 'ai.run', cardId });
+    ai.run(cardId);
   };
 
   // imagem colada vira anexo do card e entra na mensagem como referência a ele
@@ -48,7 +48,7 @@ export function CommentsTab({ cardId }: { cardId: string }) {
         }
         const ext = (file.name.split('.').pop() || file.type.split('/').pop() || 'png').replace(/[^a-z0-9]/gi, '').toLowerCase();
         const filename = `colado-${Date.now()}${i ? `-${i}` : ''}.${ext}`;
-        void toBase64(file).then((base64) => send({ type: 'attachment.addData', cardId, filename, base64 }));
+        void toBase64(file).then((base64) => attachments.addData({ cardId, filename, base64 }));
         return file.type.startsWith('image/') ? `![${filename}](${ATTACHMENT_SCHEME}${filename})` : `[${filename}](${ATTACHMENT_SCHEME}${filename})`;
       })
       .filter(Boolean)
@@ -63,14 +63,14 @@ export function CommentsTab({ cardId }: { cardId: string }) {
 
   return (
     <section className="drawer-section comments">
-      {comments.length === 0 && <p className="muted">Nenhuma mensagem ainda. A conversa com a IA sobre este card acontece aqui.</p>}
-      {comments.map((c) => <CommentItem key={c.id} comment={c} mine={c.author === state.currentUser} render={resolve} />)}
+      {cardComments.length === 0 && <p className="muted">Nenhuma mensagem ainda. A conversa com a IA sobre este card acontece aqui.</p>}
+      {cardComments.map((c) => <CommentItem key={c.id} comment={c} mine={c.author === state.currentUser} render={resolve} />)}
       {running && (
         <div className="banner ai-running">
           <span className="spinner" />
           <span>{toolLabel} está trabalhando neste card… A resposta aparece aqui quando terminar.</span>
           <span className="spacer" />
-          <Button variant="ghost" size="small" onClick={() => send({ type: 'ai.stop', cardId })}>Parar</Button>
+          <Button variant="ghost" size="small" onClick={() => ai.stop(cardId)}>Parar</Button>
         </div>
       )}
       <div className="comment-new">
@@ -95,11 +95,10 @@ export function CommentsTab({ cardId }: { cardId: string }) {
 }
 
 function CommentItem({ comment, mine, render }: { comment: Comment; mine: boolean; render: (body: string) => string }) {
-  const send = useBoardStore((s) => s.send);
   const [editing, setEditing] = useState<string | null>(null);
 
   const save = () => {
-    if (editing?.trim() && editing !== comment.body) send({ type: 'comment.update', commentId: comment.id, body: editing.trim() });
+    if (editing?.trim() && editing !== comment.body) comments.update(comment.id, editing.trim());
     setEditing(null);
   };
 
@@ -118,7 +117,7 @@ function CommentItem({ comment, mine, render }: { comment: Comment; mine: boolea
               variant="ghost"
               size="small"
               question={mine ? 'Apagar esta mensagem?' : `Apagar a mensagem de ${comment.author}?`}
-              onConfirm={() => send({ type: 'comment.delete', commentId: comment.id })}
+              onConfirm={() => comments.delete(comment.id)}
             >
               Apagar
             </DeleteButton>

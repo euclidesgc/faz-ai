@@ -1,7 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { create } from 'zustand';
 import type { BoardState, Card, Column, FieldDef, Id } from '../../shared/model';
-import type { WebviewToHost } from '../../shared/messages';
 import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../../shared/filters';
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 
@@ -51,7 +50,6 @@ interface BoardStore extends UiState, ViewState {
   /** esquece a escolha manual, voltando ao padrão das configurações */
   resetCollapsed(key: string): void;
   ask(dialog: DialogSpec | null): void;
-  send(msg: WebviewToHost): void;
 }
 
 const persisted = getUiState<Partial<UiState>>();
@@ -108,7 +106,6 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       setShared({ collapsed: rest });
     },
     ask: (dialog) => set({ dialog }),
-    send: (msg) => postToHost(msg),
   };
 });
 
