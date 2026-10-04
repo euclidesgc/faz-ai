@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import type { DbHandle } from '../db/database';
 import type { Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
@@ -6,7 +7,8 @@ import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import type { AttachmentStore } from '../attachments';
 import type { HarnessStore } from '../harness';
 import { headlessUnsupported } from '../headless';
-import { BoardContext, type Handler, type HandlerMap, type MessageType, type RouterOptions } from './handlers/context';
+import type { RunResolver } from '../log/eventLog';
+import { BoardContext, type Actor, type Handler, type HandlerMap, type MessageType, type RouterOptions } from './handlers/context';
 import { boardSettingsHandlers } from './handlers/boardSettings';
 import { addAttachment, cardContentHandlers } from './handlers/cardContent';
 import { cardHandlers, createCard } from './handlers/cards';
@@ -15,6 +17,12 @@ import { initModels, modelHandlers } from './handlers/models';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 
 export type { RouterOptions };
+
+/** De onde vem a mensagem: quem assina (`author`) e se é a pessoa (padrão) ou a IA. */
+export interface Origin {
+  author?: string;
+  source?: 'human' | 'ai';
+}
 
 /** As mensagens do webview que o chat executa. */
 export type ChatMessageIn = Extract<WebviewToHost, { type: 'chat.send' | 'chat.stop' | 'chat.clear' }>;
@@ -113,18 +121,35 @@ export class MessageRouter {
    * Aplica a mutação e devolve o snapshot atualizado. `ctx.author` assina o que vem de outra origem
    * (ex.: IA via MCP) e `ctx.source` diz se quem age é a pessoa (padrão) ou a IA.
    */
-  handle(msg: WebviewToHost, ctx: { author?: string; source?: 'human' | 'ai' } = {}): BoardState {
+  handle(msg: WebviewToHost, ctx: Origin = {}): BoardState {
     // o mapa garante o handler do tipo certo; o cast só junta a união de handlers numa assinatura
     const handler = HANDLERS[msg.type] as Handler<MessageType>;
-    const changed = handler(msg, this.ctx, { author: ctx.author ?? this.ctx.opts.author, byAi: ctx.source === 'ai' });
+    const actor = this.actorOf(ctx);
+    // o log: sonda antes, registro depois — só quando o handler diz que o board mudou (o que não aconteceu não entra)
+    const probe = this.ctx.log.probe(msg);
+    const changed = handler(msg, this.ctx, actor);
+    if (changed) this.ctx.log.record(msg, actor, probe);
     return changed ? this.changed() : this.snapshot();
   }
 
   /** Como `card.create`, mas devolve o id do card criado. */
-  createCard(input: { typeId: string; columnId: string; parentId: string | null; title: string }): string {
+  createCard(input: { typeId: string; columnId: string; parentId: string | null; title: string }, ctx: Origin = {}): string {
+    const msg: WebviewToHost = { type: 'card.create', ...input };
+    const actor = this.actorOf(ctx);
+    const probe = this.ctx.log.probe(msg);
     const id = createCard(this.ctx, input);
+    this.ctx.log.record(msg, actor, probe);
     this.changed();
     return id;
+  }
+
+  /** Quem diz qual execução de IA está em curso num card (o executor), para o `run_id` dos eventos. */
+  setRunResolver(fn: RunResolver | null): void {
+    this.ctx.log.setRunResolver(fn);
+  }
+
+  private actorOf(ctx: Origin): Actor {
+    return { author: ctx.author ?? this.ctx.opts.author, byAi: ctx.source === 'ai' };
   }
 
   /** Cards em que a extensão está executando a IA (informado pelo executor). */
@@ -170,8 +195,15 @@ export class MessageRouter {
   }
 
   /** Copia arquivos do disco como anexos do card (usado pelo seletor de arquivos). */
-  addAttachmentFiles(cardId: string, paths: string[], artifact = false): BoardState {
-    for (const p of paths) addAttachment(this.ctx, cardId, artifact, (target) => this.store.importFile(target, p));
+  addAttachmentFiles(cardId: string, paths: string[], artifact = false, ctx: Origin = {}): BoardState {
+    const actor = this.actorOf(ctx);
+    for (const p of paths) {
+      // o mesmo par sonda/registro do `attachment.addData`, com a mensagem equivalente
+      const msg: WebviewToHost = { type: 'attachment.addData', cardId, filename: path.basename(p), base64: '', artifact };
+      const probe = this.ctx.log.probe(msg);
+      addAttachment(this.ctx, cardId, artifact, (target) => this.store.importFile(target, p));
+      this.ctx.log.record(msg, actor, probe);
+    }
     return this.changed();
   }
 

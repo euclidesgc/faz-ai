@@ -4,6 +4,8 @@ import type { WebviewToHost } from '../../../shared/messages';
 import { AttachmentStore } from '../../attachments';
 import { pendingUpgrade, upgradeBoard } from '../../db/boardTemplate';
 import { HarnessStore } from '../../harness';
+import { CardEventRepo } from '../../log/cardEventRepo';
+import { EventLog } from '../../log/eventLog';
 import { AttachmentRepo } from '../../repositories/attachmentRepo';
 import { BoardRepo } from '../../repositories/boardRepo';
 import { CardRepo } from '../../repositories/cardRepo';
@@ -22,6 +24,8 @@ export interface RouterOptions {
   workspaceDir?: string;
   /** home do usuário, de onde se leem os modelos configurados nas ferramentas; sem ela vale só a lista embutida */
   homeDir?: string;
+  /** canal de log da extensão; sem ele as falhas do log do board vão para o console */
+  log?: (line: string) => void;
 }
 
 /** Repositórios, anexos e harness do board aberto, compartilhados pelo router e pelos handlers. */
@@ -35,6 +39,8 @@ export class BoardContext {
   readonly attachments: AttachmentRepo;
   readonly store: AttachmentStore;
   readonly harness: BoardHarness;
+  /** o log de utilização: sonda antes do handler e registro depois, feitos pelo router */
+  readonly log: EventLog;
   /** muda quando o board é recriado (settings.board.reset) */
   boardId: string;
   /** cards aprovados por uma pessoa; o router avisa depois de gravar */
@@ -53,6 +59,7 @@ export class BoardContext {
     this.comments = new CommentRepo(db);
     this.attachments = new AttachmentRepo(db);
     this.store = new AttachmentStore(opts.attachmentsDir);
+    this.log = new EventLog(db, new CardEventRepo(db), { boardId: () => this.boardId, log: opts.log });
     const board = this.boards.getOrCreate(opts.workspaceKey, opts.folderName);
     this.boardId = board.id;
     // nada a mudar para chegar ao padrão atual: só registra a versão, sem perguntar

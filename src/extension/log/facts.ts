@@ -18,12 +18,15 @@ export interface CardFacts {
   trashed: boolean;
   parentId: string | null;
   prUrl: string;
+  /** a branch da história (vazia quando ainda não há); é o `subject` de `workspace_prepared` */
+  branch: string;
 }
 
 const SELECT = `
   SELECT c.id AS id, c.number AS number, c.title AS title, t.name AS card_type, w.name AS workflow,
          col.name AS column_name, col.category AS column_category, c.status AS status,
-         c.archived_at AS archived_at, c.deleted_at AS deleted_at, c.parent_id AS parent_id, c.pr_url AS pr_url
+         c.archived_at AS archived_at, c.deleted_at AS deleted_at, c.parent_id AS parent_id, c.pr_url AS pr_url,
+         c.branch AS branch
   FROM cards c
   JOIN columns col ON col.id = c.column_id
   JOIN card_types t ON t.id = c.type_id
@@ -44,6 +47,7 @@ function toFacts(r: Row): CardFacts {
     trashed: r.deleted_at != null,
     parentId: strOrNull(r.parent_id),
     prUrl: str(r.pr_url),
+    branch: str(r.branch),
   };
 }
 
@@ -70,5 +74,32 @@ export function cardFacts(db: Database, ids: string[]): Map<string, CardFacts> {
  */
 export function cardAndChildrenFacts(db: Database, id: string): Map<string, CardFacts> {
   const rows = all(db, `${SELECT} WHERE c.id = ? OR c.parent_id = ?`, [id, id]);
+  return toMap(rows);
+}
+
+/**
+ * Fatos do card `id`, do pai dele e dos filhos, numa única consulta — o recorte da sonda do log para
+ * as mensagens de um card: as cascatas do board mexem nos filhos (cancelar a história, lixeira) e os
+ * eventos da sub-tarefa (`subtask_created`, `subtask_done`, artefato) ficam no pai.
+ */
+export function cardFamilyFacts(db: Database, id: string): Map<string, CardFacts> {
+  const rows = all(db, `${SELECT} WHERE c.id = ? OR c.parent_id = ? OR c.id = (SELECT parent_id FROM cards WHERE id = ?)`, [id, id, id]);
+  return toMap(rows);
+}
+
+/** Fatos dos cards na lixeira e dos filhos deles: o que `trash.empty` vai apagar. Uma consulta. */
+export function trashedCardFacts(db: Database, boardId: string): Map<string, CardFacts> {
+  const rows = all(
+    db,
+    `${SELECT} WHERE c.board_id = ? AND (c.deleted_at IS NOT NULL
+       OR c.parent_id IN (SELECT id FROM cards WHERE board_id = ? AND deleted_at IS NOT NULL))`,
+    [boardId, boardId],
+  );
+  return toMap(rows);
+}
+
+/** Fatos do card de maior número do board: o que acabou de nascer (o número nunca é reutilizado). Uma consulta. */
+export function newestCardFacts(db: Database, boardId: string): Map<string, CardFacts> {
+  const rows = all(db, `${SELECT} WHERE c.board_id = ? ORDER BY c.number DESC LIMIT 1`, [boardId]);
   return toMap(rows);
 }

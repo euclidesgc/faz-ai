@@ -39,7 +39,7 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       if (!column) throw new Error(`O workflow "${wf.name}" não tem colunas.`);
       // valida os campos antes de criar, para não deixar um card pela metade
       validateFields(s, a.fields);
-      const id = router.createCard({ typeId: type.id, columnId: column.id, parentId: parent?.id ?? null, title: a.title });
+      const id = router.createCard({ typeId: type.id, columnId: column.id, parentId: parent?.id ?? null, title: a.title }, aiOrigin(ctx));
       if (a.description) router.handle({ type: 'card.update', cardId: id, patch: { description: a.description } });
       setFields(router, s, id, a.fields);
       if (origin) router.handle({ type: 'card.yolo.inherit', cardId: id, fromId: origin.id }, aiOrigin(ctx));

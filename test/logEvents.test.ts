@@ -19,6 +19,7 @@ const facts = (over: Partial<CardFacts> & { id: string; number: number }): CardF
   trashed: false,
   parentId: null,
   prUrl: '',
+  branch: '',
   ...over,
 });
 
