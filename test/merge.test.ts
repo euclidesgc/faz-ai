@@ -428,6 +428,23 @@ describe('MergeWatcher', () => {
     expect(afterRuns).toEqual([2]);
   });
 
+  it('com a detecção de merges desligada, nenhuma das duas rodadas acontece (RF1)', async () => {
+    ghResult = OPEN;
+    router.handle({ type: 'settings.board.update', patch: { git: { watchMerges: false } } });
+    now += 60 * MINUTE;
+    watcher.tick();
+    await flush();
+    expect(calls).toEqual([]);
+    expect(afterRuns).toEqual([]);
+
+    // o mesmo liga/desliga vale para as duas: religado, a rodada faz a consulta de merges e o gancho
+    router.handle({ type: 'settings.board.update', patch: { git: { watchMerges: true } } });
+    watcher.tick();
+    await flush();
+    expect(calls).toHaveLength(1);
+    expect(afterRuns).toEqual([1]);
+  });
+
   it('um erro do gancho não escapa da rodada e não trava a rodada seguinte', async () => {
     ghResult = OPEN;
     after = async () => {

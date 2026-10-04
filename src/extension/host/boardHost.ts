@@ -12,6 +12,7 @@ import { BoardRepo } from '../repositories/boardRepo';
 import { registerClients } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
+import { ReleaseWatcher } from '../release';
 import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
@@ -132,6 +133,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       );
     });
   const gh = run('gh');
+  const git = run('git');
   new AutoMerger(router, {
     cwd: o.folderPath,
     log: o.log,
@@ -149,6 +151,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
   const heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: o.log });
+  // sem timer próprio: o arquivamento das histórias publicadas acontece no fim da rodada de merges,
+  // com o mesmo liga/desliga, o mesmo intervalo e a mesma janela dona
+  const releaseWatcher = new ReleaseWatcher(router, { cwd: o.folderPath, log: o.log, gh, git });
   const mergeWatcher = new MergeWatcher(router, {
     cwd: o.folderPath,
     log: o.log,
@@ -156,6 +161,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     removeWorktree,
     now: () => Date.now(),
     canRun: o.ownsBoard,
+    afterRound: () => releaseWatcher.sweep(),
   });
 
   const gitignore = path.join(o.folderPath, '.gitignore');
