@@ -6,6 +6,16 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Dividir um pedido grande em histórias agora as vincula de verdade.** Ao criar uma história com
+  `autonomous_from`, ela ganha um vínculo **relativo** com a história de origem — antes, a origem só
+  ficava registrada em texto, num comentário que nem a interface nem a IA liam como relação. Se já
+  existir qualquer vínculo entre as duas (caso de uma história ligada à mão), a criação é pulada em
+  silêncio, sem duplicar.
+- **A seção Vínculos do card aberto passa a mostrar a relação de sub-tarefa.** Numa sub-tarefa, um
+  grupo "Pai" com a história; numa história, a contagem de sub-tarefas com um atalho até a seção
+  Sub-tarefas (sem repetir a lista). A relação é somente leitura e não entra nas regras de
+  conclusão, que continuam valendo só para o vínculo manual de pai/filho.
+
 - **O board passou a guardar o histórico do que acontece nele.** Cada acontecimento de um card
   (criação, passagem de coluna com de/para, mudança de status, mensagem da conversa, anexo e
   artefato, sub-tarefa, vínculo, pull request, conclusão, arquivamento e lixeira) e cada execução de

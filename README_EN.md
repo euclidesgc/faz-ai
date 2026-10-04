@@ -185,6 +185,11 @@ completion column, the board asks (or moves on its own, depending on the rule) w
 should also go to completion. The AI uses the `link_cards` and `unlink_cards` tools, and `get_card`
 returns the links.
 
+The **Vínculos** section also shows, display-only, the sub-task relation: on a sub-task, a "Pai"
+(parent) group with the story; on a story, the sub-task count with a shortcut to the
+**Sub-tarefas** section. This relation is read-only (no remove button) and does not enter the
+completion rule above, which still applies only to the manual parent/child link.
+
 ### The board in the browser, outside the editor
 
 The board does not depend on the editor window:
@@ -365,8 +370,9 @@ story by itself, **without asking for authorization or confirmation on anything*
   on it, forming a stack of PRs; when the board order runs a story before a lower-numbered one, its
   branch starts from the main branch and its pull request stands alone, outside the stack.
 - **Splitting a large request**: the AI can create the following stories from an autonomous story
-  (`create_card` with `autonomous_from`). They are born autonomous and join the queue. It never
-  turns the mode on for a story you did not turn on.
+  (`create_card` with `autonomous_from`). They are born autonomous, join the queue, and get a
+  **related** link to the origin story (skipped silently if any link already exists between the
+  two). It never turns the mode on for a story you did not turn on.
 - **Brakes**: the autopilot stops when the AI blocks the card or when a run fails (the card is
   Bloqueado, with the reason), and blocks the story after 3 consecutive runs that advanced nothing.
   Once you unblock the card it carries on by itself.
