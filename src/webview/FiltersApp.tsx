@@ -37,7 +37,7 @@ export function FiltersApp() {
         <span className="spacer" />
         {active > 0 && (
           <Button variant="ghost" size="small" onClick={clearFilters}>
-            {t('Limpar ({n})', { n: active })}
+            {t('Limpar filtros ({n})', { n: active })}
           </Button>
         )}
       </div>

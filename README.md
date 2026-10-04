@@ -310,7 +310,7 @@ aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma hi
   decide é a posição do card, não o número dele nem o que já foi aprovado.
 - Cards que estão com você (aguardando revisão ou resposta, bloqueados) não são tocados, a menos
   que você tenha deixado uma mensagem sem resposta na conversa.
-- **Rodar agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
+- **Chamar a IA agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
   uma rodada na hora, mesmo com o heartbeat desligado. **Faz AI: Parar as execuções da IA e o modo autônomo**
   interrompe tudo.
 - A barra de status mostra os cards em execução e a hora da próxima rodada.
@@ -324,7 +324,7 @@ colunas. Você mesmo pode mover qualquer card sem aprovação.
 
 ### Modo autônomo (YOLO)
 
-Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo (YOLO)**
+Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo**
 (o board pede uma confirmação, porque o modo abre mão de toda aprovação). A partir daí a IA toca a
 história sozinha, **sem pedir autorização nem confirmação para nada**:
 
@@ -354,9 +354,9 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   fica Bloqueado, com o motivo) e bloqueia a história depois de 3 execuções seguidas que não
   avançaram nada. Ao destravar o card, ele continua sozinho.
 
-O **botão "Autônomo"** no topo do board aparece enquanto houver história na fila: aceso quando o
-autopiloto está tocando, apagado quando está pausado; um clique pausa (e interrompe a IA) ou
-retoma. Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
+O **botão do modo autônomo** no topo do board aparece enquanto houver história na fila e diz o que
+o clique faz: **Pausar modo autônomo** (aceso, com o autopiloto tocando; pausar interrompe a IA) ou
+**Retomar modo autônomo** (apagado, pausado). Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
 (YOLO)** e **Faz AI: Parar as execuções da IA e o modo autônomo**. Ao abrir o editor, o autopiloto
 não começa sozinho: ele liga quando você ativa o modo numa história ou retoma. O heartbeat não
 toca histórias em modo autônomo; elas são do autopiloto.

@@ -32,7 +32,7 @@ export function ProjectRules({ tool, edit }: { tool: AiToolInfo; edit: ProjectEd
             </Button>
           )}
           <Button variant="soft" color="gray" onClick={() => edit.toggle('rule', r.name)}>
-            {edit.isEditing('rule', r.name) ? t('Fechar') : r.exists ? t('Editar') : t('Criar')}
+            {edit.isEditing('rule', r.name) ? t('Fechar edição') : r.exists ? t('Editar') : t('Criar')}
           </Button>
           {r.exists && (
             <DeleteButton

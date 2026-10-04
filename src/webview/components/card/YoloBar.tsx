@@ -40,7 +40,7 @@ export function YoloBar({ card }: { card: Card }) {
   return (
     <div className="drawer-workspace yolo-bar">
       <label title={warning}>
-        <input type="checkbox" checked={card.yolo} onChange={(e) => toggle(e.target.checked)} /> <IconYolo /> {t('Modo autônomo (YOLO)')}
+        <input type="checkbox" checked={card.yolo} onChange={(e) => toggle(e.target.checked)} /> <IconYolo /> {t('Modo autônomo')}
       </label>
       {card.yolo && (
         <>
@@ -48,16 +48,16 @@ export function YoloBar({ card }: { card: Card }) {
             {autopilot.note
               ? t(autopilot.note)
               : autopilot.active
-                ? t('O autopiloto está tocando a fila.')
-                : t('O autopiloto está pausado.')}
+                ? t('O modo autônomo está tocando a fila.')
+                : t('O modo autônomo está pausado.')}
           </span>
           {autopilot.active ? (
             <Button variant="ghost" size="small" onClick={() => ai.pauseAutopilot()}>
-              {t('Pausar')}
+              {t('Pausar modo autônomo')}
             </Button>
           ) : (
             <Button variant="ghost" size="small" onClick={() => ai.resumeAutopilot()}>
-              {t('Retomar')}
+              {t('Retomar modo autônomo')}
             </Button>
           )}
         </>

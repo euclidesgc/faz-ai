@@ -160,11 +160,11 @@ export function AgentsSettings() {
                       title={t('Usado quando nem o card nem a coluna indicam um agente')}
                       onClick={() => patch(p.id, { isDefault: true })}
                     >
-                      {t('Tornar padrão')}
+                      {t('Tornar agente padrão')}
                     </Button>
                   )}
                   <Button variant="soft" color="gray" onClick={() => setOpen(open === p.id ? null : p.id)}>
-                    {open === p.id ? t('Fechar') : t('Editar')}
+                    {open === p.id ? t('Fechar edição') : t('Editar')}
                   </Button>
                   <DeleteButton
                     title={profiles.length === 1 ? t('Precisa haver ao menos um agente') : t('Apagar o agente')}
@@ -291,7 +291,7 @@ export function AgentsSettings() {
                             title={t('Sem lista: vale o que o nível de permissão libera')}
                             onClick={() => patch(p.id, { tools: [] })}
                           >
-                            {t('Liberar o padrão')}
+                            {t('Usar as ferramentas do nível de permissão')}
                           </Button>
                         </div>
                         <TextField.Root

@@ -31,7 +31,7 @@ export function AppearanceSettings() {
         title={t('Aparência')}
         actions={
           <Button variant="soft" color="gray" disabled={!changed} onClick={() => set(DEFAULT_APPEARANCE)}>
-            {t('Restaurar padrões')}
+            {t('Restaurar aparência padrão')}
           </Button>
         }
       >

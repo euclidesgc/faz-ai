@@ -242,7 +242,7 @@ describe('HarnessInventory', () => {
     const row = screen.getByText('revisar-spec').closest('li')!;
     await userEvent.click(within(row).getByRole('button', { name: 'Arquivos (1)' }));
     const files = document.querySelector<HTMLElement>('.skill-files')!;
-    await userEvent.click(within(files).getByRole('button', { name: 'Abrir' }));
+    await userEvent.click(within(files).getByRole('button', { name: 'Abrir no editor' }));
     expect(lastSent('harness.skill.file.open')).toEqual({
       type: 'harness.skill.file.open',
       tool: 'claude',
@@ -304,7 +304,7 @@ describe('HarnessInventory', () => {
 
   it('buscar e instalar: Enter procura as skills da origem', async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'Buscar e instalar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Buscar skills para instalar' }));
     await userEvent.type(screen.getByPlaceholderText(/dono\/repositorio/), 'dono/repo{Enter}');
     expect(lastSent('harness.install.scan')).toEqual({ type: 'harness.install.scan', source: 'dono/repo' });
   });

@@ -109,7 +109,7 @@ describe('HarnessSettings: ferramenta e execução', () => {
     expect(lastSent('ui.connectAI')).toEqual({ type: 'ui.connectAI' });
   });
 
-  it('permissão, tempo limite, heartbeat e Rodar agora', async () => {
+  it('permissão, tempo limite, heartbeat e Chamar a IA agora', async () => {
     renderScreen('tool');
     const runner = document.querySelector<HTMLElement>('.runner-settings')!;
     await choose(
@@ -129,7 +129,7 @@ describe('HarnessSettings: ferramenta e execução', () => {
     expect(lastSent('settings.board.update').patch).toEqual({
       runner: { heartbeat: !useBoardStore.getState().state!.board.runner.heartbeat },
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Rodar agora' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Chamar a IA agora' }));
     expect(lastSent('ai.heartbeat.run')).toEqual({ type: 'ai.heartbeat.run' });
   });
 
@@ -156,7 +156,8 @@ describe('HarnessSettings: regras', () => {
     const save = rule.getByRole('button', { name: 'Salvar' });
     expect(save).toBeDisabled();
     // o botão da linha e o do editor
-    expect(rule.getAllByRole('button', { name: 'Fechar' })).toHaveLength(2);
+    expect(rule.getByRole('button', { name: 'Fechar edição' })).toBeInTheDocument();
+    expect(rule.getByRole('button', { name: 'Fechar' })).toBeInTheDocument();
     await userEvent.type(rule.getAllByRole('textbox')[0]!, 'Regra nova');
     expect(rule.getByText('Alterações não salvas')).toBeInTheDocument();
     await userEvent.click(save);

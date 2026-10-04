@@ -70,13 +70,13 @@ describe('modo autônomo no painel do card', () => {
     patchCard(board.storyId, { yolo: true });
     autopilot({ active: true, note: null });
     openDrawer(board.storyId);
-    expect(screen.getByText('O autopiloto está tocando a fila.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Pausar' }));
+    expect(screen.getByText('O modo autônomo está tocando a fila.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Pausar modo autônomo' }));
     expect(lastSent('ai.autopilot.pause')).toEqual({ type: 'ai.autopilot.pause' });
 
     act(() => autopilot({ active: false, note: '#1 está bloqueado: Sem acesso' }));
     expect(screen.getByText('#1 está bloqueado: Sem acesso')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Retomar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retomar modo autônomo' }));
     expect(lastSent('ai.autopilot.resume')).toEqual({ type: 'ai.autopilot.resume' });
   });
 
@@ -97,7 +97,7 @@ describe('selo no card do board', () => {
   it('a história em modo autônomo ganha o selo', () => {
     patchCard(board.storyId, { yolo: true });
     render(<Board />);
-    expect(screen.getAllByTitle(/Modo autônomo \(YOLO\)/).length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle(/Modo autônomo: a IA toca/).length).toBeGreaterThan(0);
   });
 });
 
@@ -111,15 +111,15 @@ describe('botão do autopiloto no topo', () => {
     patchCard(board.storyId, { yolo: true });
     autopilot({ active: true, note: null });
     const { rerender } = render(<AutopilotButton />);
-    const button = screen.getByRole('button', { name: /Autônomo/ });
+    const button = screen.getByRole('button', { name: /modo autônomo/ });
     expect(button).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(button);
     expect(lastSent('ai.autopilot.pause')).toBeTruthy();
 
     act(() => autopilot({ active: false, note: null }));
     rerender(<AutopilotButton />);
-    expect(screen.getByRole('button', { name: /Autônomo pausado/ })).toHaveAttribute('aria-pressed', 'false');
-    await userEvent.click(screen.getByRole('button', { name: /Autônomo pausado/ }));
+    expect(screen.getByRole('button', { name: 'Retomar modo autônomo' })).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(screen.getByRole('button', { name: 'Retomar modo autônomo' }));
     expect(lastSent('ai.autopilot.resume')).toBeTruthy();
   });
 });

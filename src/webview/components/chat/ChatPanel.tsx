@@ -45,7 +45,7 @@ export function ChatPanel() {
       <header className="chat-head">
         <h3>{t('Chat com {tool}', { tool: tool.label })}</h3>
         <Button variant="ghost" size="1" disabled={messages.length === 0 && !busy} onClick={chat.clear}>
-          {t('Limpar')}
+          {t('Limpar conversa')}
         </Button>
       </header>
       <div className="chat-log" ref={log} role="log" aria-live="polite">
@@ -96,7 +96,7 @@ export function ChatPanel() {
           <ModelEditor value={model} onChange={(v) => setModel(typeof v === 'string' ? v : null)} />
           {busy ? (
             <Button color="red" variant="soft" onClick={chat.stop}>
-              <IconStop /> {t('Parar')}
+              <IconStop /> {t('Parar a IA')}
             </Button>
           ) : (
             <Button disabled={!text.trim()} onClick={send}>
