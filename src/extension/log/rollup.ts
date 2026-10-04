@@ -5,20 +5,31 @@
 // números batem com o detalhe por construção (RF-21), não há duas verdades para sincronizar, e
 // nenhuma escrita a mais entra nas mutações do board — que é o requisito de desempenho.
 //
-// A tabela de totais é longa (`metric`/`dim`/`value`), não larga: a #70 acrescenta tokens e custo e a
-// #71 vai querer cortes novos; no formato largo cada corte novo seria uma migration.
+// A tabela de totais é longa (`metric`/`dim`/`value`), não larga: a #70 acrescentou tokens, custo e o
+// inventário de uso (`tokens`, `cost`, `usage`) sem migration, e a #71 vai querer cortes novos; no
+// formato largo cada métrica ou corte novo seria uma migration.
+//
+// Arquivar tokens, custo e inventário aqui é o que mantém a pergunta "quanto custou março" respondível
+// depois que o detalhe de março é descartado: um comentário desatualizado se corrige, um número
+// descartado não volta.
 import type { Database } from 'sql.js';
 import type { LogMetric } from '../../shared/log';
 import { dayOf, monthOf } from '../../shared/log';
 import { all, num, run, str, transaction } from '../db/query';
 
 /**
- * Meses completos de detalhe guardados além do mês corrente. Fixo e documentado, não configurável
- * nesta entrega: mexer nisto pede tela de configuração, que é assunto do painel (#71). Dá para
- * comparar o mesmo mês do ano anterior no nível do detalhe, e o arquivo do board fica limitado.
- * Os totais por mês, em `log_months`, nunca expiram.
+ * Meses completos de detalhe guardados além do mês corrente (RF-32). Fixo e documentado, não
+ * configurável nesta entrega: mexer nisto pede tela de configuração, que é assunto do painel (#71).
+ *
+ * São 6 e não 12 porque 12 estouravam o teto de 10 MB do arquivo do board: a medição deu 11,8 a
+ * 14,2 MB em 12 meses com a linha pesada (a que inclui o inventário cheio, que a #70 passa a gravar).
+ * E não é só disco: o `sql.js` reescreve o arquivo inteiro a cada gravação, então um arquivo grande
+ * deixa toda operação do board mais lenta.
+ *
+ * Os totais por mês, em `log_months`, nunca expiram: a comparação ano a ano continua existindo, só
+ * deixa de existir no nível do detalhe.
  */
-export const RETENTION_MONTHS = 12;
+export const RETENTION_MONTHS = 6;
 
 /** As dimensões de `runs`: o nome na tabela de totais e a coluna de `ai_runs` de onde o valor sai. */
 const RUN_DIMS: [dim: string, column: string][] = [
@@ -56,6 +67,9 @@ export function detailMonths(db: Database, boardId: string): string[] {
   return rows.map((r) => str(r.month));
 }
 
+/** As dimensões de `usage` são os tipos do inventário; o `value` é o nome do item. */
+const USAGE_KINDS = ['tool', 'mcp_tool', 'agent', 'skill'];
+
 /** Soma de uma métrica num mês; a chave é `metric`/`dim`/`value`. */
 type Totals = Map<string, { metric: LogMetric['metric']; dim: string; value: string; n: number; total: number }>;
 
@@ -69,10 +83,14 @@ function bump(totals: Totals, metric: LogMetric['metric'], dim: string, value: s
 }
 
 /**
- * Totais de um mês calculados do detalhe. Duas consultas agrupadas (uma de eventos, uma de
- * execuções); os cortes saem delas em memória, em vez de uma consulta por dimensão.
+ * Totais de um mês calculados do detalhe. Três consultas agrupadas (eventos, execuções e inventário
+ * de uso); os cortes saem delas em memória, em vez de uma consulta por dimensão.
  * O valor `''` numa dimensão é o "não definido" da coluna (execução sem modelo, sem esforço, sem
  * perfil) — e não zero: continua sendo uma execução contada.
+ *
+ * `tokens` e `cost` só contam as execuções que têm o número: `n` é a contagem MEDIDA (ou com custo),
+ * não a de execuções, para que uma média por mês arquivado não divida o custo por execuções que nem
+ * foram medidas. "Não medido" não é zero (RF-14): a execução sem medida não gera linha nenhuma.
  */
 function totalsFromDetail(db: Database, boardId: string, month: string): LogMetric[] {
   const totals: Totals = new Map();
@@ -102,7 +120,14 @@ function totalsFromDetail(db: Database, boardId: string, month: string): LogMetr
   for (const r of all(
     db,
     `SELECT outcome, phase, card_type, model, tool, effort, profile,
-            COUNT(*) AS n, SUM(COALESCE(duration_ms, 0)) AS ms FROM ai_runs
+            COUNT(*) AS n, SUM(COALESCE(duration_ms, 0)) AS ms,
+            SUM(CASE WHEN measure <> 'none' THEN 1 ELSE 0 END) AS measured,
+            SUM(CASE WHEN measure <> 'none'
+                THEN COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0) + COALESCE(cache_read_tokens, 0) + COALESCE(cache_write_tokens, 0)
+                ELSE 0 END) AS tokens,
+            SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS costed,
+            SUM(COALESCE(cost_usd, 0)) AS cost
+     FROM ai_runs
      WHERE board_id = ? AND month = ?
      GROUP BY outcome, phase, card_type, model, tool, effort, profile`,
     [boardId, month],
@@ -113,6 +138,32 @@ function totalsFromDetail(db: Database, boardId: string, month: string): LogMetr
     const ms = num(r.ms);
     bump(totals, 'runs', '', '', n, ms);
     for (const [dim, column] of RUN_DIMS) bump(totals, 'runs', dim, str(r[column]), n, ms);
+
+    const measured = num(r.measured);
+    if (measured > 0) {
+      const tokens = num(r.tokens);
+      bump(totals, 'tokens', '', '', measured, tokens);
+      for (const [dim, column] of RUN_DIMS) bump(totals, 'tokens', dim, str(r[column]), measured, tokens);
+    }
+    const costed = num(r.costed);
+    if (costed > 0) {
+      const cost = num(r.cost);
+      bump(totals, 'cost', '', '', costed, cost);
+      for (const [dim, column] of RUN_DIMS) bump(totals, 'cost', dim, str(r[column]), costed, cost);
+    }
+  }
+
+  // inventário: `n` são as execuções que usaram o item, `total` a soma das chamadas
+  for (const r of all(
+    db,
+    `SELECT u.kind, u.name, COUNT(*) AS n, SUM(u.calls) AS calls FROM ai_run_usage u
+     JOIN ai_runs r ON r.id = u.run_id
+     WHERE r.board_id = ? AND r.month = ?
+     GROUP BY u.kind, u.name`,
+    [boardId, month],
+  )) {
+    const kind = str(r.kind);
+    if (USAGE_KINDS.includes(kind)) bump(totals, 'usage', kind, str(r.name), num(r.n), num(r.calls));
   }
 
   return [...totals.values()]
