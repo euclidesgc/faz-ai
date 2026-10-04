@@ -73,9 +73,7 @@ export function parseGit(json: string | null | undefined): GitConfig {
     mergeMethod: MERGE_METHODS.some((m) => m.value === raw.mergeMethod) ? (raw.mergeMethod as MergeMethod) : DEFAULT_GIT.mergeMethod,
     watchMerges: raw.watchMerges !== false,
     watchMergeMinutes:
-      Number.isFinite(n) && n > 0
-        ? Math.min(MERGE_WATCH_RANGE.max, Math.max(MERGE_WATCH_RANGE.min, n))
-        : DEFAULT_GIT.watchMergeMinutes,
+      Number.isFinite(n) && n > 0 ? Math.min(MERGE_WATCH_RANGE.max, Math.max(MERGE_WATCH_RANGE.min, n)) : DEFAULT_GIT.watchMergeMinutes,
   };
 }
 

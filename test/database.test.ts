@@ -195,7 +195,7 @@ describe('migração 21 → 22 (log de utilização)', () => {
 
 /** Esquema de um board na versão 22 (log de utilização, sem merge_commit), para testar a migração 23. */
 const SCHEMA_V22 = SCHEMA_V21.replace(
-  'exec_profiles_json TEXT NOT NULL DEFAULT \'[]\'\n  );',
+  "exec_profiles_json TEXT NOT NULL DEFAULT '[]'\n  );",
   `exec_profiles_json TEXT NOT NULL DEFAULT '[]',
     log_since INTEGER NOT NULL DEFAULT 0,
     log_rollup_day TEXT NOT NULL DEFAULT ''
@@ -305,7 +305,7 @@ describe('banco novo', () => {
     migrate(fresh);
 
     expect(fresh.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
-    const columns = fresh.exec("PRAGMA table_info(cards)")[0]!.values.map((r) => r[1]);
+    const columns = fresh.exec('PRAGMA table_info(cards)')[0]!.values.map((r) => r[1]);
     expect(columns).toContain('merge_commit');
   });
 });

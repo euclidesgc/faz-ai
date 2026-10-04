@@ -97,8 +97,9 @@ describe('parseGit', () => {
   });
 
   it('preserva watchMerges: true para git_json antigo de board (sem as chaves novas)', () => {
-    expect(parseGit(JSON.stringify({ mode: 'worktree', branchPattern: '{tipo}/{numero}-{titulo}', autoMerge: true })))
-      .toMatchObject({ watchMerges: true });
+    expect(parseGit(JSON.stringify({ mode: 'worktree', branchPattern: '{tipo}/{numero}-{titulo}', autoMerge: true }))).toMatchObject({
+      watchMerges: true,
+    });
   });
 
   it('respeita watchMerges: false', () => {
