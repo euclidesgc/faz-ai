@@ -194,21 +194,32 @@ function detailByRunColumn(db: Database, boardId: string, q: MetricsQuery, colum
   return map;
 }
 
-/** Linhas por card (só detalhe: `card` não existe em `log_months`). */
+/**
+ * Rótulo da linha das execuções sem card (RF-20). Fica à parte das linhas '#N título' — nunca '#0' — e
+ * o contrato do painel decide como ela viaja (`value: ''`).
+ */
+export const NO_CARD_LABEL = 'sem card';
+
+/**
+ * Linhas por card (só detalhe: `card` não existe em `log_months`). Uma linha por número de card: o
+ * título é o da execução mais recente (RF-19), porque `card_title` é coluna simples num `GROUP BY` com
+ * um único `MAX()` — o SQLite devolve nela o valor da linha que deu o máximo. `card_number` nulo agrupa
+ * junto e vira a linha "sem card" (RF-20), em vez de ser descartado.
+ */
 function detailByCard(db: Database, boardId: string, q: MetricsQuery): Map<string, Accumulator> {
   const { sql: where, params } = runsWhere(boardId, q);
   const rows = all(
     db,
-    `SELECT card_number, card_title, COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
+    `SELECT card_number, MAX(started_at) AS last, card_title, COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
             SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS measured,
             SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)) AS tok,
             SUM(COALESCE(cost_usd,0)) AS cost
-     FROM ai_runs WHERE ${where} AND card_number IS NOT NULL GROUP BY card_number, card_title`,
+     FROM ai_runs WHERE ${where} GROUP BY card_number`,
     params,
   );
   const map = new Map<string, Accumulator>();
   for (const r of rows) {
-    const label = `#${num(r.card_number)} ${str(r.card_title)}`.trim();
+    const label = r.card_number == null ? NO_CARD_LABEL : `#${num(r.card_number)} ${str(r.card_title)}`.trim();
     bump(map, label, {
       runs: num(r.n),
       measuredRuns: num(r.measured),
