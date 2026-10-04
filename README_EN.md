@@ -387,7 +387,11 @@ answers pending messages and works on ready cards, one story at a time. In "Work
 história" mode, **Histórias ao mesmo tempo** (stories at the same time, 1 to 6, on the same screen)
 makes the heartbeat drive several stories in parallel, each in its own working folder; the limit
 counts every run in progress, including the ones called by hand. Outside that mode, and in
-autonomous mode (whose stories are stacked), it stays one at a time.
+autonomous mode (whose stories are stacked), it stays one at a time, and the field is disabled. The
+Git screen explains why in each mode: with a branch in the project folder, two stories at once would
+switch the branch under each other and mix their changes; with worktrees they are isolated, at the
+cost of one more copy of the files on disk per story (with dependencies installed in each) and more
+memory and CPU while several AI sessions, tests and builds run together.
 
 - With nothing pending for the AI, nothing runs.
 - The round follows the board order: bugs first, then top to bottom — what decides is the card's

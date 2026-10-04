@@ -121,7 +121,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
                     'Quantas histórias o heartbeat toca em paralelo. Cada uma trabalha na sua própria pasta (worktree). Mais histórias ao mesmo tempo gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas.',
                   )
                 : t(
-                    'Só vale no modo "Worktree por história" (Configurações > Git): fora dele as histórias dividem a mesma pasta, e o heartbeat toca uma por vez.',
+                    'Desligado: só vale no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.',
                   )
             }
           >
@@ -131,7 +131,8 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
                   id={id}
                   min={PARALLEL_RANGE.min}
                   max={PARALLEL_RANGE.max}
-                  value={runner.parallelStories}
+                  value={board.git.mode === 'worktree' ? runner.parallelStories : 1}
+                  disabled={board.git.mode !== 'worktree'}
                   onCommit={(parallelStories) => settings.updateBoard({ runner: { parallelStories } })}
                 />
                 <Text size="2" color="gray">

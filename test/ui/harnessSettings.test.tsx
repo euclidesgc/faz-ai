@@ -124,6 +124,11 @@ describe('HarnessSettings: ferramenta e execução', () => {
     await userEvent.clear(interval!);
     await userEvent.type(interval!, '45{Enter}');
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { heartbeatMinutes: 45 } });
+    const parallel = within(runner).getByLabelText('Histórias ao mesmo tempo');
+    expect(parallel).toBeEnabled();
+    await userEvent.clear(parallel);
+    await userEvent.type(parallel, '3{Enter}');
+    expect(lastSent('settings.board.update').patch).toEqual({ runner: { parallelStories: 3 } });
     const heartbeat = within(runner).getByRole('switch', { name: 'Heartbeat ligado' });
     await userEvent.click(heartbeat);
     expect(lastSent('settings.board.update').patch).toEqual({

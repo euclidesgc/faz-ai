@@ -12,6 +12,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   heartbeat runs in parallel. It only applies in "Worktree por história" mode, where each story works
   in its own folder; outside it, and in autonomous mode (stacked stories), it stays one at a time. The
   limit counts every run in progress, and more stories in parallel use more of the account usage limit.
+  The Git screen now explains, in each mode, whether parallel is available and why: a branch in the
+  same folder causes conflicts between stories; worktrees isolate them, but take more disk and use
+  more memory and CPU while several run together.
 
 - **Independent sub-tasks run at the same time.** A card can now **depend** on another (new link,
   in Vínculos: "precisa terminar antes deste card" / "só começa depois deste card", with the groups

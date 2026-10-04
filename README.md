@@ -370,7 +370,11 @@ aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma hi
 "Worktree por história", **Histórias ao mesmo tempo** (de 1 a 6, na mesma tela) faz o heartbeat tocar
 várias histórias em paralelo, cada uma na sua pasta de trabalho; o limite conta toda execução em
 andamento, inclusive as chamadas à mão. Fora desse modo, e no modo autônomo (cujas histórias são
-empilhadas), continua uma por vez.
+empilhadas), continua uma por vez, e o campo fica desligado. A tela de Git explica o motivo em cada
+modo: com branch na própria pasta, duas histórias ao mesmo tempo trocariam a branch uma debaixo da
+outra e misturariam alterações; com worktree elas ficam isoladas, ao custo de mais uma cópia dos
+arquivos em disco por história (com as dependências instaladas em cada uma) e de mais memória e
+processador enquanto várias sessões de IA, testes e builds rodam juntos.
 
 - Sem pendência com a IA, nada é executado.
 - A fila da rodada segue a ordem do board: os bugs primeiro e, depois, de cima para baixo — o que

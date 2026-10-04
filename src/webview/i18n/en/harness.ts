@@ -355,7 +355,7 @@ export const harness: Record<string, string> = {
   'Histórias ao mesmo tempo': 'Stories at the same time',
   'Quantas histórias o heartbeat toca em paralelo. Cada uma trabalha na sua própria pasta (worktree). Mais histórias ao mesmo tempo gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas.':
     'How many stories the heartbeat drives in parallel. Each one works in its own folder (worktree). More stories at once use more of your account usage limit. Autonomous mode stays one at a time, because its stories are stacked.',
-  'Só vale no modo "Worktree por história" (Configurações > Git): fora dele as histórias dividem a mesma pasta, e o heartbeat toca uma por vez.':
-    'Only applies in "Worktree por história" mode (Settings > Git): outside it the stories share the same folder, and the heartbeat drives one at a time.',
+  'Desligado: só vale no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.':
+    'Off: only applies in "Worktree por história" mode (Settings > Git). Outside it the stories share the same folder and would cause conflicts, so the heartbeat drives one at a time.',
   histórias: 'stories',
 };

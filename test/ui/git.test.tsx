@@ -27,6 +27,22 @@ describe('GitSettings', () => {
     expect(lastSent('settings.board.update').patch).toEqual({ git: { mode: 'branch' } });
   });
 
+  it('explica o paralelismo de histórias conforme o modo: disponível no worktree, uma por vez nos outros', () => {
+    const note = () => screen.getByRole('note', { name: 'Histórias em paralelo' });
+    const first = show();
+    expect(note()).toHaveTextContent('disponíveis neste modo');
+    expect(note()).toHaveTextContent('mais uma cópia dos arquivos do projeto em disco');
+    first.unmount();
+    board.router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
+    syncStore(board.router);
+    const second = show();
+    expect(note()).toHaveTextContent('trata uma história por vez');
+    expect(note()).toHaveTextContent('causando conflitos');
+    second.unmount();
+    board.router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree' } } });
+    syncStore(board.router);
+  });
+
   it('o nome da branch grava ao sair do campo, não a cada tecla', async () => {
     show();
     const name = screen.getByLabelText('Nome da branch');

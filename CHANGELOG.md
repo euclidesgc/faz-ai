@@ -11,6 +11,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   executa em paralelo. Só vale no modo "Worktree por história", em que cada história trabalha na sua
   própria pasta; fora dele, e no modo autônomo (histórias empilhadas), continua uma por vez. O limite
   conta toda execução em andamento, e mais histórias em paralelo gastam mais do limite de uso da conta.
+  A tela de Git passa a explicar, em cada modo, se o paralelo está disponível e por quê: branch na
+  mesma pasta causa conflito entre histórias; worktree isola, mas ocupa mais disco e usa mais memória
+  e processador enquanto várias rodam juntas.
 
 - **Sub-tarefas independentes rodam ao mesmo tempo.** Um card pode agora **depender** de outro
   (novo vínculo, em Vínculos: "precisa terminar antes deste card" / "só começa depois deste card",
