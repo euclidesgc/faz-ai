@@ -89,9 +89,14 @@ export class CardRepo {
   }
 
   /** Move para coluna (mesmo workflow) e reindexa as posições das colunas afetadas. */
-  move(cardId: string, columnId: string, position: number, opts: { cancelChildren?: boolean; byAi?: boolean } = {}): void {
+  move(
+    cardId: string,
+    columnId: string,
+    position: number,
+    opts: { cancelChildren?: boolean; byAi?: boolean; allowOpenChildren?: boolean } = {},
+  ): void {
     transaction(this.db, () => {
-      this.moveInner(cardId, columnId, position, opts.byAi);
+      this.moveInner(cardId, columnId, position, opts.byAi, opts.allowOpenChildren);
       if (opts.cancelChildren) this.cancelOpenChildren(cardId, columnId);
     });
   }
@@ -131,7 +136,14 @@ export class CardRepo {
     }
   }
 
-  private moveInner(cardId: string, columnId: string, position: number, byAi = false): void {
+  /**
+   * `allowOpenChildren` desliga só a checagem de `blockDoneWithOpenChildren` abaixo; nenhuma outra
+   * validação deste método é afetada. Quem usa: o `MergeWatcher`, porque o merge do pull request já
+   * aconteceu e é irreversível — bloquear a conclusão descreveria um impedimento que não existe mais.
+   * Não é exposta pela interface nem pelo MCP: um `true` descuidado em outro lugar passaria a regra
+   * por cima sem aviso.
+   */
+  private moveInner(cardId: string, columnId: string, position: number, byAi = false, allowOpenChildren = false): void {
     const db = this.db;
     {
       const card = one(db, 'SELECT board_id, workflow_id, column_id, parent_id, title, status FROM cards WHERE id = ?', [cardId]);
@@ -146,6 +158,7 @@ export class CardRepo {
         str(col.category) === 'done' &&
         card.parent_id == null &&
         fromCol !== columnId &&
+        !allowOpenChildren &&
         this.rules(str(card.board_id)).blockDoneWithOpenChildren
       ) {
         const open = num(
@@ -274,6 +287,10 @@ export class CardRepo {
 
   setPullRequest(cardId: string, url: string): void {
     run(this.db, 'UPDATE cards SET pr_url = ? WHERE id = ?', [url, cardId]);
+  }
+
+  setMergeCommit(cardId: string, commit: string): void {
+    run(this.db, 'UPDATE cards SET merge_commit = ? WHERE id = ?', [commit, cardId]);
   }
 
   status(cardId: string): CardStatus | null {

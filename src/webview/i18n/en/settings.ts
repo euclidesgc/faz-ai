@@ -174,6 +174,12 @@ export const settings: Record<string, string> = {
   'Tipo de merge': 'Merge type',
   'Requer o GitHub CLI (<code>gh</code>) instalado e autenticado. No modo worktree, a pasta de trabalho da história é removida depois do merge; a branch fica.':
     "Requires the GitHub CLI (<code>gh</code>) installed and authenticated. In worktree mode, the story's working folder is removed after the merge; the branch stays.",
+  'Concluir a história quando o pull request for mergeado': 'Complete the story when the pull request is merged',
+  'O board consulta o GitHub periodicamente para detectar quando o pull request foi mergeado e conclui a história automaticamente. Essa opção apenas lê o estado — o merge continua sendo feito por você.':
+    'The board checks GitHub periodically to detect when the pull request is merged and completes the story automatically. This option only reads the state — you still do the merge.',
+  'Verificar a cada (minutos)': 'Check every (minutes)',
+  'Intervalo entre as verificações de merge no GitHub. Mínimo {min} minutos, máximo {max} minutos.':
+    'Interval between merge checks on GitHub. Minimum {min} minutes, maximum {max} minutes.',
   'Worktree por história': 'Worktree per story',
   'Branch na própria pasta': 'Branch in the project folder',
   Desligado: 'Off',

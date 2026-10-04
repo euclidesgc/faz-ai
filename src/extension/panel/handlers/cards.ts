@@ -67,7 +67,11 @@ export const cardHandlers = {
     return true;
   },
   'card.move': (msg, ctx, { byAi }) => {
-    ctx.cards.move(msg.cardId, msg.columnId, msg.position, { cancelChildren: msg.cancelChildren, byAi });
+    ctx.cards.move(msg.cardId, msg.columnId, msg.position, {
+      cancelChildren: msg.cancelChildren,
+      byAi,
+      allowOpenChildren: msg.allowOpenChildren,
+    });
     return true;
   },
   'card.trash': (msg, ctx) => {

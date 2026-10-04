@@ -113,7 +113,7 @@ async function main(): Promise<void> {
     bridgePath,
     log,
   });
-  const { router, runner, heartbeat } = host;
+  const { router, runner, heartbeat, mergeWatcher } = host;
   const stopMcp = await startMcpServer(address, { getRouter: async () => router, workspaceDir: folderPath, version: FAZAI_VERSION });
   const key = workspaceKey(folderPath);
   const viewState = new ViewStateStore(fileMemento(path.join(dataDir, 'view', `${key}.json`)));
@@ -147,7 +147,10 @@ async function main(): Promise<void> {
     },
   });
 
-  const timer = setInterval(() => heartbeat.tick(), 60_000);
+  const timer = setInterval(() => {
+    heartbeat.tick();
+    mergeWatcher.tick();
+  }, 60_000);
   // regras e skills editadas por fora aparecem no board
   const refresh = setInterval(() => router.refreshHarness(), 15_000);
 

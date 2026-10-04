@@ -14,6 +14,7 @@ import { ViewStateStore } from './viewState';
 import type { AiRunner } from './runner';
 import type { Autopilot } from './autopilot';
 import type { Heartbeat } from './heartbeat';
+import type { MergeWatcher } from './merge';
 import { revealInSystem } from './web/osOpen';
 import { preferredPort, startWebServer, type WebServer } from './web/webServer';
 import { cardRef } from '../shared/model';
@@ -23,6 +24,7 @@ let host: BoardHost | null = null;
 let stopMcp: (() => void) | null = null;
 let runner: AiRunner | null = null;
 let heartbeat: Heartbeat | null = null;
+let mergeWatcher: MergeWatcher | null = null;
 let autopilot: Autopilot | null = null;
 let heartbeatTimer: NodeJS.Timeout | undefined;
 let web: WebServer | null = null;
@@ -101,6 +103,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       onBoardChange();
       runner = host.runner;
       heartbeat = host.heartbeat;
+      mergeWatcher = host.mergeWatcher;
       autopilot = host.autopilot;
       heartbeat.onDidChange(updateStatusBar);
       router.onDidChange(updateStatusBar);
@@ -109,8 +112,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       router.onDidChange(rememberHeartbeat);
       rememberHeartbeat();
       updateStatusBar();
-      // só a janela que serve o board desta pasta (dona do servidor MCP) roda o heartbeat, para duas janelas não chamarem a IA em dobro
-      heartbeatTimer = setInterval(() => stopMcp && heartbeat?.tick(), 60_000);
+      // só a janela que serve o board desta pasta (dona do servidor MCP) roda o heartbeat e o watcher, para duas janelas não chamarem a IA em dobro
+      heartbeatTimer = setInterval(() => {
+        if (stopMcp) {
+          heartbeat?.tick();
+          mergeWatcher?.tick();
+        }
+      }, 60_000);
       void offerBoardUpgrade(context, router);
       return router;
     })();
@@ -336,6 +344,7 @@ export async function deactivate(): Promise<void> {
   web?.close();
   web = null;
   heartbeat = null;
+  mergeWatcher = null;
   autopilot = null;
   runner = null;
   stopMcp?.();

@@ -118,6 +118,8 @@ export interface Card {
   baseBranch: string;
   /** endereço do pull request da história; vazio enquanto não foi aberto */
   prUrl: string;
+  /** commit do merge do pull request da história; vazio enquanto não foi mergeado */
+  mergeCommit: string;
   /** agente de execução escolhido para este card; null = o da coluna */
   execProfile: Id | null;
   /** modo autônomo (YOLO), só em histórias: a IA toca o card sem pedir aprovação nem confirmação */

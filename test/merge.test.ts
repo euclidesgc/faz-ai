@@ -5,7 +5,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
 import { createMcpServer } from '../src/extension/mcp/server';
-import { AutoMerger } from '../src/extension/merge';
+import { AutoMerger, MergeWatcher, mergeWatchTargets } from '../src/extension/merge';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -133,5 +133,275 @@ describe('pull request e merge na homologação', () => {
     expect(calls).toEqual([]);
     expect(card(1).statusReason).toContain('sub-tarefa(s) da história ainda em aberto');
     expect(merger).toBeDefined();
+  });
+});
+
+describe('MergeWatcher', () => {
+  const MINUTE = 60_000;
+  let now: number;
+  let log: string[];
+  let watcher: MergeWatcher;
+  let canRun: () => boolean;
+
+  const json = (pr: Record<string, unknown>) => async () => JSON.stringify(pr);
+  const MERGED = json({ state: 'MERGED', mergedAt: '2026-10-04T10:00:00Z', mergeCommit: { oid: 'abc123' } });
+  const CLOSED = json({ state: 'CLOSED', mergedAt: null, mergeCommit: null });
+  const OPEN = json({ state: 'OPEN', mergedAt: null, mergeCommit: null });
+  const prOf = (n: number) => `https://github.com/acme/app/pull/${n}`;
+  const comments = (n: number) => router.snapshot().comments.filter((c) => c.cardId === card(n).id && c.author === 'Faz AI');
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  /** deixa a história entregue: modo autônomo, pull request registrado e status com a pessoa */
+  const deliver = async (n: number, url = prOf(n)) => {
+    router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled: true });
+    await call('set_pull_request', { card: n, url });
+    router.handle({ type: 'card.status.set', cardId: card(n).id, status: 'waiting_review' });
+  };
+
+  beforeEach(async () => {
+    now = 1_000_000;
+    log = [];
+    canRun = () => true;
+    watcher = new MergeWatcher(router, {
+      cwd: '/projeto',
+      log: (line) => log.push(line),
+      gh: (args) => {
+        calls.push(args);
+        return ghResult();
+      },
+      removeWorktree: (_dir, p) => {
+        removed.push(p);
+      },
+      now: () => now,
+      canRun: () => canRun(),
+    });
+    await deliver(1);
+  });
+
+  it('consulta só as histórias entregues: uma chamada gh por alvo (RF1/RF2)', async () => {
+    await call('create_card', { title: 'Entregue também', column: 'Homologação' }); // #2
+    await deliver(2);
+    await call('create_card', { title: 'Não autônoma', column: 'Homologação' }); // #3
+    await call('set_pull_request', { card: 3, url: prOf(3) });
+    router.handle({ type: 'card.status.set', cardId: card(3).id, status: 'waiting_review' });
+    await call('create_card', { title: 'Bloqueada', column: 'Homologação' }); // #4
+    await deliver(4);
+    router.handle({ type: 'card.status.set', cardId: card(4).id, status: 'blocked', note: 'impedimento' });
+    await call('create_card', { title: 'Na implementação', column: 'Implementação' }); // #5
+    await deliver(5);
+    await call('create_card', { title: 'Sem PR', column: 'Homologação' }); // #6
+    router.handle({ type: 'card.yolo.set', cardId: card(6).id, enabled: true });
+    router.handle({ type: 'card.status.set', cardId: card(6).id, status: 'waiting_review' });
+    await call('create_card', { title: 'Sub-tarefa', parent: 1 }); // #7
+    router.handle({ type: 'card.status.set', cardId: card(7).id, status: 'waiting_review' });
+
+    expect(mergeWatchTargets(router.snapshot()).map((c) => c.number)).toEqual([1, 2]);
+    ghResult = OPEN;
+    expect(await watcher.runNow()).toBe(2);
+    expect(calls).toEqual([
+      ['pr', 'view', prOf(1), '--json', 'state,mergedAt,mergeCommit'],
+      ['pr', 'view', prOf(2), '--json', 'state,mergedAt,mergeCommit'],
+    ]);
+  });
+
+  it('mergeado: grava o commit, comenta, conclui e remove a pasta de trabalho (RF3-RF6)', async () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree' } } });
+    (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
+    ghResult = MERGED;
+    await watcher.runNow();
+    expect(columnOf(1)).toBe('Concluído');
+    expect(card(1)).toMatchObject({ mergeCommit: 'abc123', worktreePath: '', status: null });
+    expect(removed).toEqual(['/projeto.worktrees/1-login']);
+    const last = comments(1).at(-1)!;
+    expect(last.body).toContain(prOf(1));
+    expect(last.body).toContain('abc123');
+    expect(last.body).toContain('História concluída pelo board');
+    expect(log).toEqual([`[#1] Pull request ${prOf(1)} mergeado (abc123); história concluída.`]);
+  });
+
+  it('mergeado sem commit informado: conclui mesmo assim e registra o commit ausente', async () => {
+    ghResult = json({ state: 'MERGED', mergedAt: null, mergeCommit: null });
+    await watcher.runNow();
+    expect(columnOf(1)).toBe('Concluído');
+    expect(card(1).mergeCommit).toBe('');
+    expect(comments(1).at(-1)!.body).toContain('commit não informado');
+  });
+
+  it('é idempotente: rodadas seguidas e em paralelo concluem uma vez só (RF11)', async () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree' } } });
+    (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
+    ghResult = MERGED;
+    await Promise.all([watcher.runNow(), watcher.runNow()]);
+    await watcher.runNow();
+    await watcher.runNow();
+    expect(columnOf(1)).toBe('Concluído');
+    expect(comments(1).filter((c) => c.body.includes('mergeado'))).toHaveLength(1);
+    expect(removed).toEqual(['/projeto.worktrees/1-login']);
+    expect(log.filter((l) => l.includes('mergeado'))).toHaveLength(1);
+    // depois de concluída, a história sai dos alvos: nenhuma consulta nova
+    expect(calls).toHaveLength(2);
+  });
+
+  it('fechado sem merge: avisa uma vez e não move nem bloqueia (RF7)', async () => {
+    ghResult = CLOSED;
+    await watcher.runNow();
+    await watcher.runNow();
+    await watcher.runNow();
+    expect(calls).toHaveLength(3);
+    expect(columnOf(1)).toBe('Homologação');
+    expect(card(1).status).toBe('waiting_review');
+    const closed = comments(1).filter((c) => c.body.includes('fechado sem merge'));
+    expect(closed).toHaveLength(1);
+    expect(closed[0]!.body).toBe(`Pull request ${prOf(1)} foi fechado sem merge. A história continua em Homologação.`);
+    expect(log).toEqual([`[#1] Pull request ${prOf(1)} fechado sem merge; a história fica onde está.`]);
+  });
+
+  it('aberto: não faz nada (RF8)', async () => {
+    ghResult = OPEN;
+    const before = router.snapshot().comments.length;
+    await watcher.runNow();
+    await watcher.runNow();
+    expect(calls).toHaveLength(2);
+    expect(columnOf(1)).toBe('Homologação');
+    expect(card(1).status).toBe('waiting_review');
+    expect(router.snapshot().comments).toHaveLength(before);
+    expect(log).toEqual([]);
+  });
+
+  it('falha do gh: nada muda e o log tem uma linha por causa (RF9/RF10)', async () => {
+    await call('create_card', { title: 'Outra', column: 'Homologação' }); // #2
+    await deliver(2);
+    ghResult = async () => {
+      throw new Error('o comando "gh" (GitHub CLI) não foi encontrado.');
+    };
+    for (let i = 0; i < 10; i++) await watcher.runNow();
+    expect(calls).toHaveLength(20);
+    expect(columnOf(1)).toBe('Homologação');
+    expect(columnOf(2)).toBe('Homologação');
+    expect(card(1).status).toBe('waiting_review');
+    expect(card(2).status).toBe('waiting_review');
+    expect(log).toEqual(['Merges: o comando "gh" (GitHub CLI) não foi encontrado.']);
+
+    // uma consulta boa zera a memória da falha: a mesma causa volta a aparecer
+    ghResult = OPEN;
+    await watcher.runNow();
+    ghResult = async () => {
+      throw new Error('o comando "gh" (GitHub CLI) não foi encontrado.');
+    };
+    await watcher.runNow();
+    expect(log).toHaveLength(2);
+
+    // causa diferente: linha nova
+    ghResult = async () => {
+      throw new Error('HTTP 401: Bad credentials');
+    };
+    await watcher.runNow();
+    expect(log.at(-1)).toBe('Merges: HTTP 401: Bad credentials');
+    expect(log).toHaveLength(3);
+  });
+
+  it('JSON inesperado ou vazio é falha de consulta, não pull request aberto (RF9)', async () => {
+    ghResult = async () => 'gh: not logged in';
+    await watcher.runNow();
+    ghResult = async () => '';
+    await watcher.runNow();
+    ghResult = json({ mergedAt: null });
+    await watcher.runNow();
+    expect(columnOf(1)).toBe('Homologação');
+    expect(comments(1).filter((c) => c.body.includes('Pull request'))).toHaveLength(0);
+    expect(log).toHaveLength(3);
+    expect(log[0]).toContain('resposta inesperada do gh');
+    expect(log[1]).toContain('(vazia)');
+  });
+
+  it('conclui a história mergeada mesmo com sub-tarefa em aberto e avisa na conversa (RF12)', async () => {
+    expect(router.snapshot().board.rules.blockDoneWithOpenChildren).toBe(true);
+    await call('create_card', { title: 'Tarefa aberta', parent: 1 }); // #2
+    // o caminho normal continua recusando
+    expect((await call('move_card', { card: 1, column: 'Concluído' })).error).toBe(true);
+    ghResult = MERGED;
+    await watcher.runNow();
+    expect(columnOf(1)).toBe('Concluído');
+    expect(card(1).mergeCommit).toBe('abc123');
+    expect(comments(1).at(-1)!.body).toContain('Havia 1 sub-tarefa(s) em aberto no momento do merge.');
+    expect(columnOf(2)).toBe('A fazer');
+    expect(log.some((l) => l.includes('mergeado'))).toBe(true);
+  });
+
+  it('sem coluna de conclusão depois da coluna do card, nada acontece (RF4)', async () => {
+    const s = router.snapshot();
+    const story = s.workflows.find((w) => w.id === card(1).workflowId)!;
+    const col = (name: string) => s.columns.find((c) => c.workflowId === story.id && c.name === name)!;
+    router.handle({ type: 'settings.column.delete', columnId: col('Cancelado').id, moveCardsTo: col('Homologação').id });
+    router.handle({ type: 'settings.column.delete', columnId: col('Concluído').id, moveCardsTo: col('Homologação').id });
+    expect(mergeWatchTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
+    ghResult = MERGED;
+    await watcher.runNow();
+    expect(calls).toHaveLength(1);
+    expect(columnOf(1)).toBe('Homologação');
+    expect(card(1).status).toBe('waiting_review');
+    expect(card(1).mergeCommit).toBe('');
+    expect(comments(1).filter((c) => c.body.includes('Pull request'))).toHaveLength(0);
+    expect(log).toEqual([]);
+  });
+
+  it('tick respeita o liga/desliga e o intervalo configurado (RF13/RF14)', async () => {
+    ghResult = OPEN;
+    router.handle({ type: 'settings.board.update', patch: { git: { watchMerges: false, watchMergeMinutes: 15 } } });
+    now += 60 * MINUTE;
+    watcher.tick();
+    await flush();
+    expect(calls).toEqual([]);
+
+    // desligado, o relógio não anda: ao religar com o intervalo vencido, a rodada acontece
+    router.handle({ type: 'settings.board.update', patch: { git: { watchMerges: true } } });
+    watcher.tick();
+    await flush();
+    expect(calls).toHaveLength(1);
+
+    // a rodada zera a contagem: o tick seguinte espera outro intervalo inteiro
+    now += 14 * MINUTE;
+    watcher.tick();
+    await flush();
+    expect(calls).toHaveLength(1);
+
+    now += MINUTE;
+    watcher.tick();
+    await flush();
+    expect(calls).toHaveLength(2);
+  });
+
+  it('a primeira rodada acontece um intervalo depois de abrir o board, não na abertura', async () => {
+    ghResult = OPEN;
+    watcher.tick();
+    await flush();
+    expect(calls).toEqual([]);
+    now += 15 * MINUTE;
+    watcher.tick();
+    await flush();
+    expect(calls).toHaveLength(1);
+  });
+
+  it('só a janela dona do board consulta (RF15)', async () => {
+    ghResult = OPEN;
+    canRun = () => false;
+    now += 60 * MINUTE;
+    watcher.tick();
+    await flush();
+    expect(calls).toEqual([]);
+    canRun = () => true;
+    watcher.tick();
+    await flush();
+    expect(calls).toHaveLength(1);
+  });
+
+  it('nunca bloqueia nem deixa um erro escapar do tick', async () => {
+    ghResult = async () => {
+      throw new Error('sem rede');
+    };
+    now += 60 * MINUTE;
+    expect(() => watcher.tick()).not.toThrow();
+    await flush();
+    expect(card(1).status).toBe('waiting_review');
+    expect(log).toEqual(['Merges: sem rede']);
   });
 });

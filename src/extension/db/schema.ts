@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 22;
+export const SCHEMA_VERSION = 23;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -317,6 +317,10 @@ const MIGRATIONS: Record<number, string> = {
 
     ALTER TABLE boards ADD COLUMN log_since INTEGER NOT NULL DEFAULT 0;      -- início da série (RF-24)
     ALTER TABLE boards ADD COLUMN log_rollup_day TEXT NOT NULL DEFAULT '';   -- 'YYYY-MM-DD' da última consolidação
+  `,
+  23: `
+    -- commit do merge do pull request da história: insumo para detectar a versão publicada
+    ALTER TABLE cards ADD COLUMN merge_commit TEXT NOT NULL DEFAULT '';
   `,
 };
 

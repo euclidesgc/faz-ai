@@ -262,7 +262,8 @@ commits na branch da história.
   botão **Criar branch da história** no card.
 - O card mostra a branch e abre a pasta de trabalho numa janela nova.
 - Em Configurações → **Git** ficam o modo (worktree, branch na própria pasta ou desligado), o
-  padrão do nome da branch e a pasta das worktrees.
+  padrão do nome da branch, a pasta das worktrees, o merge automático do PR ao aprovar a homologação
+  e a detecção automática de merges (ligada por padrão).
 - Cada worktree é uma cópia de trabalho: as dependências precisam ser instaladas nela.
 
 ### Pull request e merge na Homologação
@@ -280,6 +281,23 @@ aprova uma história que está na última coluna antes da conclusão:
 
 O merge não acontece se a história não tiver PR registrado ou ainda tiver sub-tarefas em aberto. Com
 o merge automático desligado, aprovar só marca o card, e a IA o move para Concluído.
+
+### Detecção automática de merges
+
+O board pode observar o pull request de uma história entregue e detectar quando ele é mergeado,
+concluindo a história automaticamente. A opção nasce ligada (Configurações → Git, **Concluir a
+história quando o pull request for mergeado**). Uma rotina periódica verifica o estado do PR a cada
+intervalo configurável (**Verificar a cada (minutos)**, padrão 15, faixa de 5 a 1440). Quando o
+merge é detectado:
+
+1. o board grava o commit do merge no card;
+2. registra na conversa que a história foi concluída;
+3. move o card para Concluído e remove a pasta de trabalho.
+
+Se o pull request é fechado sem merge, o board registra um aviso na conversa uma única vez. O merge
+continua sendo feito pela pessoa, manualmente ou pelo merge automático; o board só observa. Falhas
+na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado) não bloqueiam nada
+— o aviso aparece no log, e a rotina continua tentando no próximo intervalo.
 
 ### Heartbeat
 

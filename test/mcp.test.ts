@@ -96,6 +96,11 @@ describe('servidor MCP', () => {
     expect(blocked.error).toBe(true);
     expect(blocked.text).toContain('sub-tarefa(s) ainda em aberto');
 
+    // move_card não oferece allowOpenChildren: o mesmo cenário continua recusando mesmo tentando a opção
+    const stillBlocked = await call('move_card', { card: 1, column: 'Concluído', allowOpenChildren: true });
+    expect(stillBlocked.error).toBe(true);
+    expect(stillBlocked.text).toContain('sub-tarefa(s) ainda em aberto');
+
     const moved = (await call('move_card', { card: 2, column: 'concluido' })).data;
     expect(moved.card).toMatchObject({ column: 'Concluído', status: 'done' });
     expect(moved.hint).toContain('#1');

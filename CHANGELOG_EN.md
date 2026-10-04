@@ -62,6 +62,14 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   technology (Flutter, Dart, React, TypeScript, Python, Rust, Docker, GitHub and about 80 others,
   also by nickname: "node", "ts", "k8s") get their logo, in the brand color, on the card, in the
   card's selector and in the filters. Options that are not technologies stay as before.
+- **The board detects pull request merges and concludes the story.** A periodic routine checks, at
+  a configurable interval, whether a pull request from a story delivered in autonomous mode has been
+  merged: when the merge is detected, the board records the merge commit on the card, registers in
+  the conversation, moves the story to the completion column and removes the working folder. The
+  warning of a PR closed without merge appears only once. **The feature is on by default** (Settings
+  → Git, **Concluir a história quando o pull request for mergeado**), and the check interval is
+  configurable (**Verificar a cada (minutos)**, default 15, range 5 to 1440). The merge is still
+  done by the person (manually or by automatic merge); the board only observes.
 
 ## 0.30.0
 

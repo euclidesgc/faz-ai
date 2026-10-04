@@ -102,4 +102,12 @@ export const workspaceHandlers = {
     }
     return true;
   },
+  // Sem efeito colateral de propósito: ao contrário do card.pr.set (que fecha a entrega e avisa a
+  // pessoa), este registro é só o insumo que a #49 vai cruzar com as releases publicadas; não muda
+  // status nem grava comentário.
+  'card.merge.set': (msg, ctx) => {
+    const storyId = storyOfCard(ctx, msg.cardId).id;
+    ctx.cards.setMergeCommit(storyId, msg.commit.trim());
+    return true;
+  },
 } satisfies Partial<HandlerMap>;

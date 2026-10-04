@@ -34,6 +34,12 @@ export type WebviewToHost =
       columnId: Id;
       position: number;
       /** ao cancelar uma história, cancela também as sub-tarefas em aberto */ cancelChildren?: boolean;
+      /**
+       * desliga só a checagem de `blockDoneWithOpenChildren` ao concluir uma história; nenhuma outra
+       * validação do `moveInner` é afetada. Não é exposta pela interface nem pelo MCP: só código interno
+       * (o `MergeWatcher`, porque o merge do pull request já aconteceu e é irreversível) deve usá-la.
+       */
+      allowOpenChildren?: boolean;
     }
   | { type: 'card.trash'; cardId: Id }
   | { type: 'card.restore'; cardId: Id }
@@ -45,6 +51,8 @@ export type WebviewToHost =
   | { type: 'card.workspace.prepare'; cardId: Id }
   /** registra o pull request da história do card */
   | { type: 'card.pr.set'; cardId: Id; url: string }
+  /** registra o commit do merge do pull request da história do card; sem efeito colateral (ao contrário do card.pr.set) */
+  | { type: 'card.merge.set'; cardId: Id; commit: string }
   /** liga ou desliga o modo autônomo (YOLO) da história do card */
   | { type: 'card.yolo.set'; cardId: Id; enabled: boolean }
   /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */
