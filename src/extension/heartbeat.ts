@@ -3,6 +3,7 @@ import { cardRef, type BoardState, type Card } from '../shared/model';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { isLive } from '../shared/selectors';
 import { statusInfo } from '../shared/status';
+import { parallelLimit } from '../shared/runner';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
 export interface HeartbeatRunner {
@@ -41,7 +42,7 @@ export function heartbeatTargets(s: BoardState): Card[] {
 
 /**
  * Rotina periódica: quando há pendência com a IA, executa a ferramenta do projeto para cada
- * história da fila, uma por vez. Sem pendência, não executa nada. Não depende da API do VSCode.
+ * história da fila, uma por vez ou, no modo worktree, até o limite configurado ao mesmo tempo. Sem pendência, não executa nada. Não depende da API do VSCode.
  */
 export class Heartbeat {
   private queue: string[] = [];
@@ -107,9 +108,14 @@ export class Heartbeat {
     return targets.length;
   }
 
-  /** Inicia a próxima história da fila quando nenhuma execução está em andamento. */
+  /**
+   * Inicia as próximas histórias da fila enquanto houver vaga. O limite conta toda execução em andamento
+   * (também as chamadas à mão e o modo autônomo), para o board nunca passar do que a pessoa configurou.
+   */
   private pump(): void {
-    while (this.queue.length && this.runner.running.length === 0) {
+    const { board } = this.deps.snapshot();
+    const limit = parallelLimit(board.runner, board.git.mode);
+    while (this.queue.length && this.runner.running.length < limit) {
       const id = this.queue.shift()!;
       // a situação pode ter mudado desde que a fila foi montada (a pessoa agiu, outra execução resolveu)
       if (!heartbeatTargets(this.deps.snapshot()).some((c) => c.id === id)) continue;

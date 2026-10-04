@@ -382,11 +382,23 @@ describe('executor da IA', () => {
   });
 
   it('guarda permissão e tempo limite, recusando valores inválidos', () => {
-    expect(router.snapshot().board.runner).toEqual({ permission: 'board', timeoutMinutes: 30, heartbeat: false, heartbeatMinutes: 60 });
+    expect(router.snapshot().board.runner).toEqual({
+      permission: 'board',
+      timeoutMinutes: 30,
+      heartbeat: false,
+      heartbeatMinutes: 60,
+      parallel: false,
+      parallelStories: 2,
+    });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'edits', timeoutMinutes: 999 } } });
     expect(router.snapshot().board.runner).toMatchObject({ permission: 'edits', timeoutMinutes: 240 });
     router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true, heartbeatMinutes: 1 } } });
     expect(router.snapshot().board.runner).toMatchObject({ heartbeat: true, heartbeatMinutes: 5 });
+    // histórias ao mesmo tempo: entre 2 e 6, e o paralelo nasce desligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallelStories: 99 } } });
+    expect(router.snapshot().board.runner.parallelStories).toBe(6);
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallelStories: 1 } } });
+    expect(router.snapshot().board.runner.parallelStories).toBe(2);
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'tudo' as never } } });
     expect(router.snapshot().board.runner.permission).toBe('board'); // valor desconhecido volta ao mais restrito
   });

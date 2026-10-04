@@ -366,7 +366,16 @@ não têm o commit do merge guardado, continuam sendo arquivadas por você, com 
 
 Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
 intervalo, enquanto o editor estiver aberto na pasta do projeto. Em cada rodada ela avança os cards
-aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez.
+aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. No modo
+"Worktree por história", **Tocar histórias em paralelo** (na mesma tela; nasce desligado) faz o heartbeat
+tocar várias histórias ao mesmo tempo, cada uma na sua pasta de trabalho: duas por padrão, até seis em
+**Histórias ao mesmo tempo**; o limite conta toda execução em
+andamento, inclusive as chamadas à mão. Fora desse modo, e no modo autônomo (cujas histórias são
+empilhadas), continua uma por vez, e o campo fica desligado. A tela de Git explica o motivo em cada
+modo: com branch na própria pasta, duas histórias ao mesmo tempo trocariam a branch uma debaixo da
+outra e misturariam alterações; com worktree elas ficam isoladas, ao custo de mais uma cópia dos
+arquivos em disco por história (com as dependências instaladas em cada uma) e de mais memória e
+processador enquanto várias sessões de IA, testes e builds rodam juntos.
 
 - Sem pendência com a IA, nada é executado.
 - A fila da rodada segue a ordem do board: os bugs primeiro e, depois, de cima para baixo — o que

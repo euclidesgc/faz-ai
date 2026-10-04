@@ -1,5 +1,5 @@
 import { Button, Callout, Card, Text } from '@radix-ui/themes';
-import { HEARTBEAT_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE } from '../../../../shared/runner';
+import { HEARTBEAT_RANGE, PARALLEL_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE } from '../../../../shared/runner';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { useBoardStore } from '../../../store/boardStore';
 import { ai, settings } from '../../../commands';
@@ -13,6 +13,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
   const unsupported = useBoardStore((s) => s.state!.aiRunUnsupported);
   const runner = board.runner;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === runner.permission)!;
+  const worktree = board.git.mode === 'worktree';
   return (
     <>
       <SectionHeader
@@ -93,7 +94,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
           />
           <Text as="p" size="1" color="gray">
             {t(
-              'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. Sem pendência, nada é executado.',
+              'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
               { tool: tool.label },
             )}
           </Text>
@@ -113,6 +114,40 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
               </div>
             )}
           </FormField>
+          <div className="form-divider" />
+          <SwitchField
+            label={t('Tocar histórias em paralelo')}
+            checked={worktree && runner.parallel}
+            disabled={!worktree}
+            onChange={(parallel) => settings.updateBoard({ runner: { parallel } })}
+          />
+          <Text as="p" size="1" color="gray">
+            {worktree
+              ? t(
+                  'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas. As sub-tarefas independentes de cada história já rodam em paralelo, sem limite, conforme o plano.',
+                )
+              : t(
+                  'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.',
+                )}
+          </Text>
+          {worktree && runner.parallel && (
+            <FormField label={t('Histórias ao mesmo tempo')}>
+              {(id) => (
+                <div className="unit-field">
+                  <NumberField
+                    id={id}
+                    min={PARALLEL_RANGE.min}
+                    max={PARALLEL_RANGE.max}
+                    value={runner.parallelStories}
+                    onCommit={(parallelStories) => settings.updateBoard({ runner: { parallelStories } })}
+                  />
+                  <Text size="2" color="gray">
+                    {t('histórias')}
+                  </Text>
+                </div>
+              )}
+            </FormField>
+          )}
         </Card>
       )}
     </>

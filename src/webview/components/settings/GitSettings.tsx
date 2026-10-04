@@ -33,6 +33,24 @@ export function GitSettings() {
             />
           )}
         </FormField>
+        <Callout.Root color={git.mode === 'worktree' ? 'blue' : 'orange'} size="1" role="note" aria-label={t('Histórias em paralelo')}>
+          <Callout.Icon>
+            <IconWarning />
+          </Callout.Icon>
+          <Callout.Text>
+            {git.mode === 'worktree'
+              ? t(
+                  'Histórias em paralelo: disponíveis neste modo. Cada história tem a sua pasta, então o heartbeat pode tocar várias ao mesmo tempo (ligue "Tocar histórias em paralelo", na execução pela IA). O custo: cada worktree é mais uma cópia dos arquivos do projeto em disco e precisa das próprias dependências instaladas; e cada história em paralelo é mais um processo de IA, com os testes e builds dela, usando memória e processador ao mesmo tempo.',
+                )
+              : git.mode === 'branch'
+                ? t(
+                    'Neste modo o board trata uma história por vez. Todas as histórias trabalham na mesma pasta: duas ao mesmo tempo trocariam a branch uma debaixo da outra e misturariam as alterações, causando conflitos e commits na branch errada. Para tocar histórias em paralelo, escolha "Worktree por história".',
+                  )
+                : t(
+                    'Sem branches nem worktrees, o board trata uma história por vez: todas trabalham direto na pasta do projeto, e duas ao mesmo tempo misturariam as alterações. Para tocar histórias em paralelo, escolha "Worktree por história".',
+                  )}
+          </Callout.Text>
+        </Callout.Root>
 
         <FormField
           label={t('Nome da branch')}

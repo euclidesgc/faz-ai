@@ -11,6 +11,10 @@ export interface RunnerConfig {
   heartbeat: boolean;
   /** intervalo entre as rodadas do heartbeat, em minutos */
   heartbeatMinutes: number;
+  /** o heartbeat toca várias histórias ao mesmo tempo; só vale no modo worktree, em que cada história tem a sua pasta */
+  parallel: boolean;
+  /** com `parallel` ligado, quantas histórias ao mesmo tempo (no mínimo duas) */
+  parallelStories: number;
 }
 
 export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint: string }[] = [
@@ -33,7 +37,22 @@ export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint:
 
 export const TIMEOUT_RANGE = { min: 1, max: 240 };
 export const HEARTBEAT_RANGE = { min: 5, max: 1440 };
-export const DEFAULT_RUNNER: RunnerConfig = { permission: 'board', timeoutMinutes: 30, heartbeat: false, heartbeatMinutes: 60 };
+export const PARALLEL_RANGE = { min: 2, max: 6 };
+export const DEFAULT_RUNNER: RunnerConfig = {
+  permission: 'board',
+  timeoutMinutes: 30,
+  heartbeat: false,
+  heartbeatMinutes: 60,
+  parallel: false,
+  parallelStories: 2,
+};
+
+/**
+ * Quantas histórias o heartbeat pode tocar ao mesmo tempo. Fora do modo worktree é sempre uma: as
+ * histórias dividiriam a mesma pasta, e uma trocaria a branch debaixo da outra.
+ */
+export const parallelLimit = (runner: RunnerConfig, workspaceMode: string): number =>
+  workspaceMode === 'worktree' && runner.parallel ? runner.parallelStories : 1;
 
 /** Lê a configuração salva, completando com os padrões o que faltar ou for inválido. */
 export function parseRunner(json: string | null | undefined): RunnerConfig {
@@ -46,12 +65,18 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
   }
   const minutes = Math.round(Number(raw.timeoutMinutes));
   const interval = Math.round(Number(raw.heartbeatMinutes));
+  const parallel = Math.round(Number(raw.parallelStories));
   return {
     heartbeat: raw.heartbeat === true,
     heartbeatMinutes:
       Number.isFinite(interval) && interval > 0
         ? Math.min(HEARTBEAT_RANGE.max, Math.max(HEARTBEAT_RANGE.min, interval))
         : DEFAULT_RUNNER.heartbeatMinutes,
+    parallel: raw.parallel === true,
+    parallelStories:
+      Number.isFinite(parallel) && parallel > 0
+        ? Math.min(PARALLEL_RANGE.max, Math.max(PARALLEL_RANGE.min, parallel))
+        : DEFAULT_RUNNER.parallelStories,
     permission: RUNNER_PERMISSIONS.some((p) => p.value === raw.permission)
       ? (raw.permission as RunnerPermission)
       : DEFAULT_RUNNER.permission,
