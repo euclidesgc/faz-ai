@@ -27,7 +27,7 @@ export function heartbeatTargets(s: BoardState): Card[] {
   const byId = new Map(s.cards.map((c) => [c.id, c]));
   const unanswered = new Set(p.ai.unanswered.map((c) => c.id));
   const out: Card[] = [];
-  for (const card of aiQueue(p)) {
+  for (const card of aiQueue(s, p)) {
     const story = card.parentId ? byId.get(card.parentId) : card;
     // as histórias em modo autônomo são do autopiloto, que não espera o intervalo
     if (!story || !isLive(story) || story.yolo || out.includes(story)) continue;

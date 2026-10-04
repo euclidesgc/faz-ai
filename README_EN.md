@@ -306,6 +306,8 @@ interval, while the editor is open in the project folder. In each round it advan
 answers pending messages and works on ready cards, one story at a time.
 
 - With nothing pending for the AI, nothing runs.
+- The round follows the board order: bugs first, then top to bottom — what decides is the card's
+  position, not its number nor what has already been approved.
 - Cards that are with you (waiting for review or an answer, blocked) are not touched, unless you
   left an unanswered message in the conversation.
 - **Rodar agora** (run now), in the settings or with the command **Faz AI: Rodar o heartbeat
@@ -336,10 +338,12 @@ story by itself, **without asking for authorization or confirmation on anything*
 - **No merge**: Concluído means an open pull request. Merging stays with you.
 - **No restrictions**: in the mode's runs the AI uses the "Sem restrições" permission (edits files
   and runs commands), because it needs git and `gh`. Turning the mode on accepts this for the story.
-- **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in number
-  order, and moves on to the next when the current one finishes, without waiting for the heartbeat
-  interval. Each story's branch starts from the previous story's branch and its pull request is
-  opened with `--base` on it, forming a stack of PRs.
+- **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in board
+  order — bugs first, then top to bottom — and moves on to the next when the current one finishes,
+  without waiting for the heartbeat interval. Each story's branch starts from the branch of the
+  closest lower-numbered story that already has one, and its pull request is opened with `--base`
+  on it, forming a stack of PRs; when the board order runs a story before a lower-numbered one, its
+  branch starts from the main branch and its pull request stands alone, outside the stack.
 - **Splitting a large request**: the AI can create the following stories from an autonomous story
   (`create_card` with `autonomous_from`). They are born autonomous and join the queue. It never
   turns the mode on for a story you did not turn on.

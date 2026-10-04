@@ -288,6 +288,8 @@ intervalo, enquanto o editor estiver aberto na pasta do projeto. Em cada rodada 
 aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez.
 
 - Sem pendência com a IA, nada é executado.
+- A fila da rodada segue a ordem do board: os bugs primeiro e, depois, de cima para baixo — o que
+  decide é a posição do card, não o número dele nem o que já foi aprovado.
 - Cards que estão com você (aguardando revisão ou resposta, bloqueados) não são tocados, a menos
   que você tenha deixado uma mensagem sem resposta na conversa.
 - **Rodar agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
@@ -319,9 +321,11 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
 - **Sem restrições**: nas execuções do modo, a IA roda com a permissão "Sem restrições" (altera
   arquivos e roda comandos), porque precisa de git e do `gh`. Ligar o modo é aceitar isso para a história.
 - **Em fila e em pilha**: o **autopiloto** toca as histórias em modo autônomo uma de cada vez, na
-  ordem do número, e passa à próxima quando a atual conclui, sem esperar o intervalo do
-  heartbeat. A branch de cada história parte da branch da anterior e o pull request é aberto com
-  `--base` nela, formando uma pilha de PRs.
+  ordem do board — bugs na frente, depois de cima para baixo —, e passa à próxima quando a atual
+  conclui, sem esperar o intervalo do heartbeat. A branch de cada história parte da branch da
+  história de número anterior que já tem branch, e o pull request é aberto com `--base` nela,
+  formando uma pilha de PRs; quando a ordem do board faz uma história rodar antes de outra de
+  número menor, a branch dela parte da principal e o pull request sai solto, fora da pilha.
 - **Dividir um pedido grande**: a IA pode criar as histórias seguintes a partir de uma história em
   modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo e entram na
   fila. Ela nunca liga o modo numa história que você não ligou.

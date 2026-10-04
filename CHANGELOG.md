@@ -6,6 +6,15 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **A fila da IA segue a ordem do board, não o número do card.** O heartbeat, o autopiloto e o
+  `get_pending_work` passam a pegar os cards com os bugs na frente e, depois, de cima para baixo —
+  o que decide é a posição do card no board. A categoria também deixou de pesar: um bug pronto não
+  fica mais atrás de um card aprovado que está mais abaixo. O `get_pending_work` ganhou o campo
+  `order` com a fila inteira em ordem; os grupos `approved`, `unanswered` e `ready` continuam
+  dizendo o que fazer com cada card. A base da branch das histórias em modo autônomo continua sendo
+  a da história de número anterior, então uma história que roda antes de outra de número menor abre
+  o pull request fora da pilha.
+
 - **Release sem push direto na `main`.** O `npm run release` agora cria a branch `release/vX.Y.Z`
   a partir da main atualizada e ajusta nela a versão e os CHANGELOGs ("Não lançado" vira a versão).
   Depois de publicar nas lojas, envia a branch, abre o PR e, com o push concluído, faz o merge
