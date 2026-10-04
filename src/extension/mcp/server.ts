@@ -37,6 +37,7 @@ export function createMcpServer(opts: McpOptions): McpServer {
         'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
         'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +
         'Sem um pedido específico, comece por get_pending_work: ele lista o que está com você (aprovados para avançar, mensagens sem resposta, cards prontos). ' +
+        'Para perguntas de uso, custo e tempo (quanto custou, qual fase/modelo consome mais, quanto tempo levou), use get_metrics em vez de abrir o painel. ' +
         'get_card devolve em `model` a ferramenta, o modelo e o nível de esforço que devem executar o card: antes de trabalhar nele, ' +
         'se o modelo ou o esforço forem diferentes dos seus, delegue o trabalho a um subagente com esse modelo e esforço; ' +
         'se não for possível, avise a pessoa em vez de executar com outra configuração. ' +

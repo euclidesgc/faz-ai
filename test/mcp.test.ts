@@ -56,6 +56,7 @@ describe('servidor MCP', () => {
     expect(names).toEqual(
       expect.arrayContaining([
         'get_board',
+        'get_metrics',
         'list_cards',
         'get_card',
         'create_card',
@@ -146,6 +147,20 @@ describe('servidor MCP', () => {
     expect((await call('get_card', { card: 1 })).data.attachments).toHaveLength(2);
     await call('delete_attachment', { attachment_id: att.attachmentId });
     expect((await call('get_card', { card: 1 })).data.attachments).toHaveLength(1);
+  });
+
+  it('get_metrics responde em texto, aceita card como string ou número, e rejeita group_by inválido', async () => {
+    await call('create_card', { title: 'História' });
+    const empty = await call('get_metrics', {});
+    expect(empty.error).toBeFalsy();
+    expect(typeof empty.text).toBe('string');
+    expect(empty.text).not.toMatch(/^\s*[{[]/); // nunca JSON (RF-08)
+
+    expect((await call('get_metrics', { card: '#1' })).error).toBeFalsy();
+    expect((await call('get_metrics', { card: 1 })).error).toBeFalsy();
+    expect((await call('get_metrics', { group_by: 'phase' })).error).toBeFalsy();
+    expect((await call('get_metrics', { group_by: 'nao-existe' })).error).toBe(true);
+    expect((await call('get_metrics', { start_date: '2026-02-01', end_date: '2026-01-01' })).error).toBe(true);
   });
 
   it('configura colunas, campos e regras', async () => {
@@ -1275,9 +1290,7 @@ describe('modo autônomo (YOLO)', () => {
     expect(router.snapshot().links).toHaveLength(1);
 
     // reproduz o caso #19/#48: o vínculo já existe (manual) quando a herança do modo autônomo roda
-    expect(() =>
-      router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id }, { source: 'ai' }),
-    ).not.toThrow();
+    expect(() => router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id }, { source: 'ai' })).not.toThrow();
     expect(router.snapshot().links).toHaveLength(1);
   });
 
