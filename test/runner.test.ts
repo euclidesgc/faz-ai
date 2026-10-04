@@ -97,6 +97,16 @@ it('o prompt da execução leva as skills do card pelo caminho', () => {
     'leia estas skills, obrigatórias para este card: commit (/home/.claude/skills/commit/SKILL.md).',
   );
 });
+
+it('com triage=true, o bloco de triagem entra antes do trabalho da fase; sem triage, o prompt não muda', () => {
+  const semTriage = cardPrompt('#1', [], [], false);
+  expect(semTriage).toBe(cardPrompt('#1')); // default (omitido) é idêntico, byte a byte, ao atual
+  expect(semTriage).not.toContain('Tags, Esforço da atividade, Modelo e Skills');
+
+  const comTriage = cardPrompt('#1', [], [], false, true);
+  expect(comTriage).toContain('Tags, Esforço da atividade, Modelo e Skills');
+  expect(comTriage.indexOf('Tags, Esforço da atividade, Modelo e Skills')).toBeLessThan(comTriage.indexOf('Faça o trabalho da fase'));
+});
 import type { HeadlessCommand } from '../src/extension/headless';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -175,7 +185,7 @@ describe('executor da IA', () => {
     expect(procs[0]!.cwd).toBe(dir);
     expect(procs[0]!.command).toEqual(
       headlessCommand('claude', {
-        prompt: cardPrompt('#1', [], [PERMISSION_ADVICE.board!]),
+        prompt: cardPrompt('#1', [], [PERMISSION_ADVICE.board!], false, true),
         permission: 'board',
         addDirs: [`${dir}.worktrees`],
       }),
@@ -208,7 +218,7 @@ describe('executor da IA', () => {
       runner.start(storyId);
       expect(procs[0]!.command).toEqual(
         headlessCommand('claude', {
-          prompt: cardPrompt('#1', [], [], true),
+          prompt: cardPrompt('#1', [], [], true, true),
           permission: 'full',
           addDirs: [`${dir}.worktrees`],
         }),
@@ -295,7 +305,10 @@ describe('executor da IA', () => {
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
     expect(router.snapshot().aiRunUnsupported).toBeNull();
     runner.start(storyId);
-    expect(procs[0]!.command).toEqual({ command: 'kimi', args: ['-p', cardPrompt('#1'), '--add-dir', `${dir}.worktrees`] });
+    expect(procs[0]!.command).toEqual({
+      command: 'kimi',
+      args: ['-p', cardPrompt('#1', [], [], false, true), '--add-dir', `${dir}.worktrees`],
+    });
   });
 
   it('monta o comando de cada ferramenta conforme a permissão', () => {

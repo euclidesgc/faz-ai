@@ -9,7 +9,7 @@ import type { RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
 import { headlessCommand, tmpArg, type HeadlessCommand } from './headless';
-import { requiredSkills } from './mcp/format';
+import { needsTriage, requiredSkills } from './mcp/format';
 import type { MessageRouter } from './panel/messageRouter';
 
 /** Processo da ferramenta de IA em execução. */
@@ -77,12 +77,17 @@ export const AUTONOMOUS_ADVICE = [
   'Se o pedido for grande demais para uma entrega só (partes independentes), divida-o no Discovery: mantenha nesta história a primeira entrega e crie as seguintes com create_card (autonomous_from = esta história), em ordem de dependência. Elas entram na fila e cada uma parte da branch da anterior, com o pull request empilhado (--base na branch anterior).',
 ].join('\n');
 
+/** O que a IA recebe a mais quando os quatro campos de triagem do card (Tags, Esforço, Modelo, Skills) estão vazios. */
+export const TRIAGE_ADVICE =
+  'Os campos Tags, Esforço da atividade, Modelo e Skills deste card estão todos vazios: antes do trabalho da fase, leia a descrição do card e decida um valor para cada um. Use o catálogo de skills e as regras de modelo em `get_board`/`get_harness`/`get_models` como apoio, mas a decisão final é sua — diverja da sugestão quando a descrição pedir algo diferente. Aplique os quatro campos com `update_card` (fields) e crie com `add_checklist_item` os passos de trabalho que a descrição pede. Registre na conversa do card, com `add_comment`, os valores escolhidos e por quê.';
+
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
 export const cardPrompt = (
   ref: string,
   skills: { name: string; path?: string }[] = [],
   advice: string[] = [],
   autonomous = false,
+  triage = false,
 ): string =>
   [
     `Trabalhe no card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai".`,
@@ -97,6 +102,7 @@ export const cardPrompt = (
       : []),
     'Se a skill "faz-ai-fluxo" existir no projeto, siga-a.',
     `Leia o card com get_card (descrição, conversa, anexos e a fase em \`phase\`). Se a última mensagem da conversa for da pessoa, responda a ela pela conversa do card.`,
+    ...(triage ? [TRIAGE_ADVICE] : []),
     'Faça o trabalho da fase em que o card está e termine passando a vez: request_review quando houver algo para revisar, ask_question quando precisar de uma resposta, block_card se houver um impedimento, ou mova o card se a fase não exigir aprovação.',
     ...(autonomous ? [AUTONOMOUS_ADVICE] : []),
     ...advice,
@@ -142,6 +148,7 @@ export class AiRunner {
         requiredSkills(state, card),
         [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
         autonomous,
+        needsTriage(state, card),
       ),
       permission,
       addDirs: this.router.aiWorkDirs(),

@@ -66,6 +66,18 @@ export function findField(s: BoardState, name: string): FieldDef {
   return f;
 }
 
+const TRIAGE_FIELDS = ['Tags', 'Esforço da atividade', 'Modelo', 'Skills'];
+
+const isEmpty = (v: FieldValue): boolean => v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
+
+/** Um card novo, sem nenhum dos quatro campos de triagem preenchido, ainda não passou pela triagem automática. */
+export function needsTriage(s: BoardState, c: Card): boolean {
+  const fields = TRIAGE_FIELDS.map((name) => findField(s, name)).filter(
+    (f) => f.appliesToTypes === null || f.appliesToTypes.includes(c.typeId),
+  );
+  return fields.every((f) => isEmpty(valueOf(s, c.id, f.id)));
+}
+
 /** Valida e normaliza o valor de um campo conforme o seu tipo. */
 export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOption[]): FieldValue {
   if (value === null || value === undefined || value === '') return null;
