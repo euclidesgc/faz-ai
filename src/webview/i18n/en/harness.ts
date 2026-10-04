@@ -290,8 +290,8 @@ export const harness: Record<string, string> = {
   'Tempo limite por execução': 'Timeout per run',
   minutos: 'minutes',
   'Heartbeat ligado': 'Heartbeat on',
-  'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. Sem pendência, nada é executado.':
-    'With the heartbeat on and the board open in this folder (in the editor or through the faz-ai command), the board calls {tool} on its own at every interval: it moves approved cards forward, answers pending messages and works on ready cards, one story at a time. With nothing pending, nothing is run.',
+  'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.':
+    'With the heartbeat on and the board open in this folder (in the editor or through the faz-ai command), the board calls {tool} on its own at every interval: it moves approved cards forward, answers pending messages and works on ready cards, one story at a time or several at once, according to the limit below. With nothing pending, nothing is run.',
   Intervalo: 'Interval',
 
   // --- ScopeGroup
@@ -352,4 +352,10 @@ export const harness: Record<string, string> = {
   'Chamar a IA agora': 'Call the AI now',
   'Buscar skills para instalar': 'Find skills to install',
   'Abrir no editor': 'Open in editor',
+  'Histórias ao mesmo tempo': 'Stories at the same time',
+  'Quantas histórias o heartbeat toca em paralelo. Cada uma trabalha na sua própria pasta (worktree). Mais histórias ao mesmo tempo gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas.':
+    'How many stories the heartbeat drives in parallel. Each one works in its own folder (worktree). More stories at once use more of your account usage limit. Autonomous mode stays one at a time, because its stories are stacked.',
+  'Só vale no modo "Worktree por história" (Configurações > Git): fora dele as histórias dividem a mesma pasta, e o heartbeat toca uma por vez.':
+    'Only applies in "Worktree por história" mode (Settings > Git): outside it the stories share the same folder, and the heartbeat drives one at a time.',
+  histórias: 'stories',
 };

@@ -7,6 +7,12 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **The heartbeat can drive several stories at the same time.** In the settings, under execution by
+  the AI, **Histórias ao mesmo tempo** (1 to 6; the default is still 1) sets how many stories the
+  heartbeat runs in parallel. It only applies in "Worktree por história" mode, where each story works
+  in its own folder; outside it, and in autonomous mode (stacked stories), it stays one at a time. The
+  limit counts every run in progress, and more stories in parallel use more of the account usage limit.
+
 - **Independent sub-tasks run at the same time.** A card can now **depend** on another (new link,
   in Vínculos: "precisa terminar antes deste card" / "só começa depois deste card", with the groups
   "Depende de" and "Libera"). In Plan the AI declares the order between sub-tasks (`create_card` with

@@ -366,7 +366,11 @@ não têm o commit do merge guardado, continuam sendo arquivadas por você, com 
 
 Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
 intervalo, enquanto o editor estiver aberto na pasta do projeto. Em cada rodada ela avança os cards
-aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez.
+aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. No modo
+"Worktree por história", **Histórias ao mesmo tempo** (de 1 a 6, na mesma tela) faz o heartbeat tocar
+várias histórias em paralelo, cada uma na sua pasta de trabalho; o limite conta toda execução em
+andamento, inclusive as chamadas à mão. Fora desse modo, e no modo autônomo (cujas histórias são
+empilhadas), continua uma por vez.
 
 - Sem pendência com a IA, nada é executado.
 - A fila da rodada segue a ordem do board: os bugs primeiro e, depois, de cima para baixo — o que

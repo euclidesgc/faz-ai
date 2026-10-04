@@ -11,6 +11,8 @@ export interface RunnerConfig {
   heartbeat: boolean;
   /** intervalo entre as rodadas do heartbeat, em minutos */
   heartbeatMinutes: number;
+  /** quantas histórias o heartbeat toca ao mesmo tempo; só vale acima de 1 no modo worktree, em que cada história tem a sua pasta */
+  parallelStories: number;
 }
 
 export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint: string }[] = [
@@ -33,7 +35,21 @@ export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint:
 
 export const TIMEOUT_RANGE = { min: 1, max: 240 };
 export const HEARTBEAT_RANGE = { min: 5, max: 1440 };
-export const DEFAULT_RUNNER: RunnerConfig = { permission: 'board', timeoutMinutes: 30, heartbeat: false, heartbeatMinutes: 60 };
+export const PARALLEL_RANGE = { min: 1, max: 6 };
+export const DEFAULT_RUNNER: RunnerConfig = {
+  permission: 'board',
+  timeoutMinutes: 30,
+  heartbeat: false,
+  heartbeatMinutes: 60,
+  parallelStories: 1,
+};
+
+/**
+ * Quantas histórias o heartbeat pode tocar ao mesmo tempo. Fora do modo worktree é sempre uma: as
+ * histórias dividiriam a mesma pasta, e uma trocaria a branch debaixo da outra.
+ */
+export const parallelLimit = (runner: RunnerConfig, workspaceMode: string): number =>
+  workspaceMode === 'worktree' ? runner.parallelStories : 1;
 
 /** Lê a configuração salva, completando com os padrões o que faltar ou for inválido. */
 export function parseRunner(json: string | null | undefined): RunnerConfig {
@@ -46,12 +62,17 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
   }
   const minutes = Math.round(Number(raw.timeoutMinutes));
   const interval = Math.round(Number(raw.heartbeatMinutes));
+  const parallel = Math.round(Number(raw.parallelStories));
   return {
     heartbeat: raw.heartbeat === true,
     heartbeatMinutes:
       Number.isFinite(interval) && interval > 0
         ? Math.min(HEARTBEAT_RANGE.max, Math.max(HEARTBEAT_RANGE.min, interval))
         : DEFAULT_RUNNER.heartbeatMinutes,
+    parallelStories:
+      Number.isFinite(parallel) && parallel > 0
+        ? Math.min(PARALLEL_RANGE.max, Math.max(PARALLEL_RANGE.min, parallel))
+        : DEFAULT_RUNNER.parallelStories,
     permission: RUNNER_PERMISSIONS.some((p) => p.value === raw.permission)
       ? (raw.permission as RunnerPermission)
       : DEFAULT_RUNNER.permission,

@@ -1,5 +1,5 @@
 import { Button, Callout, Card, Text } from '@radix-ui/themes';
-import { HEARTBEAT_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE } from '../../../../shared/runner';
+import { HEARTBEAT_RANGE, PARALLEL_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE } from '../../../../shared/runner';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { useBoardStore } from '../../../store/boardStore';
 import { ai, settings } from '../../../commands';
@@ -93,7 +93,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
           />
           <Text as="p" size="1" color="gray">
             {t(
-              'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. Sem pendência, nada é executado.',
+              'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
               { tool: tool.label },
             )}
           </Text>
@@ -109,6 +109,33 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
                 />
                 <Text size="2" color="gray">
                   {t('minutos')}
+                </Text>
+              </div>
+            )}
+          </FormField>
+          <FormField
+            label={t('Histórias ao mesmo tempo')}
+            hint={
+              board.git.mode === 'worktree'
+                ? t(
+                    'Quantas histórias o heartbeat toca em paralelo. Cada uma trabalha na sua própria pasta (worktree). Mais histórias ao mesmo tempo gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas.',
+                  )
+                : t(
+                    'Só vale no modo "Worktree por história" (Configurações > Git): fora dele as histórias dividem a mesma pasta, e o heartbeat toca uma por vez.',
+                  )
+            }
+          >
+            {(id) => (
+              <div className="unit-field">
+                <NumberField
+                  id={id}
+                  min={PARALLEL_RANGE.min}
+                  max={PARALLEL_RANGE.max}
+                  value={runner.parallelStories}
+                  onCommit={(parallelStories) => settings.updateBoard({ runner: { parallelStories } })}
+                />
+                <Text size="2" color="gray">
+                  {t('histórias')}
                 </Text>
               </div>
             )}
