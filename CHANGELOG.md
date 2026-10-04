@@ -59,6 +59,14 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   que nomeiam uma tecnologia (Flutter, Dart, React, TypeScript, Python, Rust, Docker, GitHub e cerca
   de 80 outras, também por apelido: "node", "ts", "k8s") ganham o logo, na cor da marca, no card,
   no seletor do card e nos filtros. Opções que não são tecnologia ficam como antes.
+- **O board detecta o merge do pull request e conclui a história.** Uma rotina periódica observa, a
+  cada intervalo configurável, se um pull request de uma história entregue em modo autônomo foi
+  mergeado: quando o merge é detectado, o board grava o commit do merge no card, registra na
+  conversa, move a história para a coluna de conclusão e remove a pasta de trabalho. O aviso de PR
+  fechado sem merge aparece uma única vez. O **recurso está ligado por padrão** (Configurações → Git,
+  **Concluir a história quando o pull request for mergeado**), e o intervalo de consulta é
+  configurável (**Verificar a cada (minutos)**, padrão 15, faixa 5 a 1440). O merge continua sendo
+  feito pela pessoa (manualmente ou pelo merge automático); o board só observa.
 
 ## 0.30.0
 

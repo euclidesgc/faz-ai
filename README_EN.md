@@ -279,7 +279,8 @@ progress. Sub-tasks commit to the story's branch.
   the **Criar branch da história** (create the story's branch) button on the card.
 - The card shows the branch and opens the working folder in a new window.
 - Configurações → **Git** holds the mode (worktree, branch in the same folder, or off), the branch
-  name pattern and the worktrees folder.
+  name pattern, the worktrees folder, automatic PR merge when approving acceptance, and automatic
+  merge detection (on by default).
 - Each worktree is a working copy: dependencies have to be installed in it.
 
 ### Pull request and merge in Homologação
@@ -298,6 +299,22 @@ approve a story that is in the last column before completion:
 
 The merge does not happen if the story has no PR recorded or still has open sub-tasks. With
 automatic merge off, approving only marks the card, and the AI moves it to Concluído.
+
+### Automatic merge detection
+
+The board can watch a delivered story's pull request and detect when it is merged, concluding the
+story automatically. The feature starts on (Configurações → Git, **Concluir a história quando o
+pull request for mergeado**). A periodic routine checks the PR state at every configurable interval
+(**Verificar a cada (minutos)**, default 15, range 5 to 1440). When the merge is detected:
+
+1. the board records the merge commit on the card;
+2. registers in the conversation that the story was completed;
+3. moves the card to Concluído and removes the working folder.
+
+If the pull request is closed without a merge, the board registers a warning in the conversation
+once only. The merge is still done by the person, manually or through automatic merge; the board
+only observes. Failures in querying the PR state (no connection, no authentication, etc.) do not
+block anything — the warning appears in the log, and the routine keeps trying at the next interval.
 
 ### Heartbeat
 
