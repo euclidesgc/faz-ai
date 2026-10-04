@@ -77,6 +77,35 @@ describe('nome da branch', () => {
   });
 });
 
+describe('parseGit', () => {
+  it('retorna valores padrão para JSON vazio', () => {
+    expect(parseGit('{}')).toMatchObject({
+      watchMerges: true,
+      watchMergeMinutes: 15,
+    });
+  });
+
+  it('limita watchMergeMinutes ao range [5, 1440]', () => {
+    expect(parseGit(JSON.stringify({ watchMergeMinutes: 2 }))).toMatchObject({ watchMergeMinutes: 5 });
+    expect(parseGit(JSON.stringify({ watchMergeMinutes: 9999 }))).toMatchObject({ watchMergeMinutes: 1440 });
+  });
+
+  it('usa o padrão para watchMergeMinutes inválido (string, 0, ausente)', () => {
+    expect(parseGit(JSON.stringify({ watchMergeMinutes: 'abc' }))).toMatchObject({ watchMergeMinutes: 15 });
+    expect(parseGit(JSON.stringify({ watchMergeMinutes: 0 }))).toMatchObject({ watchMergeMinutes: 15 });
+    expect(parseGit('{}')).toMatchObject({ watchMergeMinutes: 15 });
+  });
+
+  it('preserva watchMerges: true para git_json antigo de board (sem as chaves novas)', () => {
+    expect(parseGit(JSON.stringify({ mode: 'worktree', branchPattern: '{tipo}/{numero}-{titulo}', autoMerge: true })))
+      .toMatchObject({ watchMerges: true });
+  });
+
+  it('respeita watchMerges: false', () => {
+    expect(parseGit(JSON.stringify({ watchMerges: false }))).toMatchObject({ watchMerges: false });
+  });
+});
+
 describe('branch e worktree por história', () => {
   it('cria a worktree da história com a branch nova, sem tocar na pasta do projeto', async () => {
     await call('create_card', { title: 'Login com Google', column: 'Implementação' });
