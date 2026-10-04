@@ -15,9 +15,9 @@ export function HeartbeatButton({ offline }: { offline: boolean }) {
   const every = t('a cada {n} min', { n: runner.heartbeatMinutes });
   const label =
     beat.kind === 'beating'
-      ? t('Heartbeat ligado: o board chama a IA {every} quando há pendência com ela. Clique para desligar.', { every })
+      ? t('Desligar heartbeat. Ligado agora: o board chama a IA {every} quando há pendência com ela.', { every })
       : beat.kind === 'off'
-        ? t('Heartbeat desligado. Clique para ligar: o board passa a chamar a IA {every} quando há pendência com ela.', { every })
+        ? t('Ligar heartbeat: o board passa a chamar a IA {every} quando há pendência com ela.', { every })
         : t('Heartbeat parado: {reason}', { reason: t(beat.reason) });
 
   return (

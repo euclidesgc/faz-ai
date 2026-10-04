@@ -40,7 +40,7 @@ export function SkillFiles({ tool, skill, editable }: { tool: AiTool; skill: Har
           <code>{f}</code>
           <span className="spacer" />
           <Button variant="ghost" size="1" onClick={() => harness.openSkillFile(tool, skill.path, f)}>
-            {t('Abrir')}
+            {t('Abrir no editor')}
           </Button>
           {editable && (
             <DeleteButton

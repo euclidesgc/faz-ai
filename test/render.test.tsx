@@ -112,7 +112,7 @@ describe('telas montam sem erro', () => {
     expect(custom).toContain('workflow workflow-child collapsed');
     expect(custom).not.toContain('A fazer'); // linha de baixo fechada não mostra as colunas
     useBoardStore.setState({ collapsed: {} }); // a história tem modelo manual diferente da sugestão
-    expect(html(<FilterBar />)).toContain('Filtros');
+    expect(html(<FilterBar />)).toContain('Abrir filtros');
     expect(html(<FiltersApp />)).toContain('aria-label="Com quem está"');
     expect(html(<TrashView />)).toContain('Lixo');
     const drawer = html(<CardDrawer cardId={storyId} />);
@@ -285,7 +285,7 @@ describe('telas montam sem erro', () => {
       'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',
       'Heartbeat ligado',
-      'Rodar agora',
+      'Chamar a IA agora',
       'Subagentes',
       'Novo subagente',
       'revisor-de-spec',

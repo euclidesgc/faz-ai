@@ -89,7 +89,7 @@ export function RulesSettings() {
         title={t('Regras')}
         actions={
           <Button variant="soft" color="gray" disabled={!changed} onClick={() => set(DEFAULT_RULES)}>
-            {t('Restaurar padrões')}
+            {t('Restaurar regras padrão')}
           </Button>
         }
       >

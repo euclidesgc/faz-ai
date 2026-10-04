@@ -109,6 +109,11 @@ export interface MergeWatchDeps extends MergeDeps {
   now(): number;
   /** esta janela é a dona do board; padrão: sempre (RF15) */
   canRun?(): boolean;
+  /**
+   * Gancho do fim da rodada: é por aqui que a rodada de publicação (#49) acontece, na mesma rodada,
+   * com o mesmo liga/desliga e o mesmo intervalo da detecção de merges. Um erro dele é descartado.
+   */
+  afterRound?: () => Promise<void>;
 }
 
 /** Histórias cujo pull request o watcher consulta: as entregues (`isDelivered`), sem regra nova. */
@@ -197,6 +202,16 @@ export class MergeWatcher {
       // uma a uma, não em paralelo: ordem previsível no log e sem rajada de processos gh
       const targets = mergeWatchTargets(this.router.snapshot());
       for (const card of targets) await this.check(card);
+      // depois do laço, não antes: uma história cujo merge é detectado agora e cuja versão já saiu é
+      // concluída e arquivada na mesma rodada. O `catch` é a rede de segurança — quem está no gancho
+      // trata as próprias falhas, e nada daqui pode fazer o `tick()` rejeitar.
+      if (this.deps.afterRound) {
+        try {
+          await this.deps.afterRound();
+        } catch {
+          /* o gancho é responsável pelo próprio log */
+        }
+      }
       return targets.length;
     } finally {
       this.busy = false;

@@ -87,7 +87,7 @@ describe('AgentsSettings', () => {
     expect(lastSent('settings.execProfiles.set').profiles[0]).toMatchObject({ purpose: 'revisa a spec e aponta lacunas' });
   });
 
-  it('conjuntos de ferramentas prontos preenchem a lista; Liberar o padrão a esvazia', async () => {
+  it('conjuntos de ferramentas prontos preenchem a lista; Usar as ferramentas do nível de permissão a esvazia', async () => {
     show();
     const p = card('Revisão');
     await userEvent.click(p.getByRole('button', { name: 'Editar' }));
@@ -95,7 +95,7 @@ describe('AgentsSettings', () => {
     expect(lastSent('settings.execProfiles.set').profiles[0]!.tools).toEqual(['Read', 'Grep', 'Glob']);
     await userEvent.click(p.getByRole('button', { name: 'Editar código' }));
     expect(lastSent('settings.execProfiles.set').profiles[0]!.tools).toContain('Edit');
-    await userEvent.click(p.getByRole('button', { name: 'Liberar o padrão' }));
+    await userEvent.click(p.getByRole('button', { name: 'Usar as ferramentas do nível de permissão' }));
     expect(lastSent('settings.execProfiles.set').profiles[0]!.tools).toEqual([]);
   });
 

@@ -227,9 +227,9 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
             )}
             <div className="row">
               <Button variant="primary" onClick={submit}>
-                {t('Adicionar')}
+                {workflow.kind === 'child' ? t('Criar sub-tarefa') : t('Criar card')}
               </Button>
-              <Button onClick={() => setAdding(false)}>{t('Fechar')}</Button>
+              <Button onClick={() => setAdding(false)}>{t('Cancelar')}</Button>
             </div>
           </div>
         ) : (

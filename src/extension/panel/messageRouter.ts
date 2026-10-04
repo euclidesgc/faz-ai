@@ -11,6 +11,7 @@ import type { AttachmentStore } from '../attachments';
 import type { HarnessStore } from '../harness';
 import { headlessUnsupported } from '../headless';
 import type { RunResolver } from '../log/eventLog';
+import { getMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
 import { BoardContext, type Actor, type Handler, type HandlerMap, type MessageType, type RouterOptions } from './handlers/context';
 import { boardBackupHandlers } from './handlers/boardBackup';
 import { boardSettingsHandlers } from './handlers/boardSettings';
@@ -233,6 +234,11 @@ export class MessageRouter {
 
   getAttachment(id: string): Attachment | undefined {
     return this.ctx.attachments.get(id);
+  }
+
+  /** Agregação do log de utilização (contagem, duração, tokens, custo) — a única porta até ele a partir do MCP. */
+  metrics(query: MetricsQuery): MetricsResult {
+    return getMetrics(this.ctx.dbHandle.db, this.ctx.boardId, query);
   }
 
   /** Copia arquivos do disco como anexos do card (usado pelo seletor de arquivos). */
