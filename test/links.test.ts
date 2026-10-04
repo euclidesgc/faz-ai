@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { childProgress, linkBetween, linkedCards, linkedParentsToComplete, linkProblem } from '../src/shared/links';
+import {
+  childProgress,
+  linkBetween,
+  linkedCards,
+  linkedParentsToComplete,
+  linkProblem,
+  openPredecessors,
+  subtaskWaves,
+} from '../src/shared/links';
 import type { CardLink } from '../src/shared/model';
 import { DEFAULT_RULES } from '../src/shared/rules';
 import { boardState, card, sub } from './fakes/board';
@@ -79,5 +87,39 @@ describe('vínculos entre cards', () => {
       const off = { ...done, board: { ...done.board, rules: { ...DEFAULT_RULES, onAllChildrenDone: 'off' as const } } };
       expect(linkedParentsToComplete(off, off.cards[1]!, target)).toEqual([]);
     });
+  });
+});
+
+describe('dependência entre cards (precedes)', () => {
+  it('separa de quem o card depende e quem depende dele, sem misturar com pai e filho', () => {
+    const s = state([link('1', 'a', 'b', 'precedes')]);
+    expect(linkedCards(s, 'b')).toMatchObject({ predecessors: [{ id: 'a' }], successors: [], parents: [], children: [] });
+    expect(linkedCards(s, 'a')).toMatchObject({ successors: [{ id: 'b' }], predecessors: [], children: [] });
+    // dependência não entra no progresso de filhos
+    expect(childProgress(s, 'a')).toEqual({ done: 0, total: 0 });
+  });
+
+  it('só a dependência ainda em aberto segura o card', () => {
+    // a está concluído, r está em aberto
+    const s = state([link('1', 'a', 'b', 'precedes'), link('2', 'r', 'b', 'precedes')]);
+    expect(openPredecessors(s, 'b').map((c) => c.id)).toEqual(['r']);
+    expect(openPredecessors(s, 'r')).toEqual([]);
+  });
+
+  it('recusa ciclo de dependência, direto ou por outros cards', () => {
+    const s = state([link('1', 'p', 'b', 'precedes'), link('2', 'b', 'r', 'precedes')]);
+    expect(linkProblem(s, 'r', 'p', 'precedes')).toMatch(/dependeria dele mesmo/);
+    expect(linkProblem(s, 'p', 'r', 'precedes')).toBeNull();
+  });
+
+  it('subtaskWaves: o que pode rodar junto agora e o que espera; concluir a dependência libera a seguinte', () => {
+    const cards = [card('h'), sub('s1', 'h', 'todo'), sub('s2', 'h', 'todo'), sub('s3', 'h', 'todo'), sub('s4', 'h', 'finished')];
+    const links = [link('1', 's1', 's3', 'precedes'), link('2', 's4', 's2', 'precedes')];
+    const before = subtaskWaves(boardState({ cards, links }), 'h');
+    expect(before.ready.map((c) => c.id)).toEqual(['s1', 's2']);
+    expect(before.waiting.map((c) => c.id)).toEqual(['s3']);
+    const after = subtaskWaves(boardState({ cards: cards.map((c) => (c.id === 's1' ? { ...c, columnId: 'finished' } : c)), links }), 'h');
+    expect(after.ready.map((c) => c.id)).toEqual(['s2', 's3']);
+    expect(after.waiting).toEqual([]);
   });
 });

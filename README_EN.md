@@ -190,6 +190,25 @@ The **Vínculos** section also shows, display-only, the sub-task relation: on a 
 **Sub-tarefas** section. This relation is read-only (no remove button) and does not enter the
 completion rule above, which still applies only to the manual parent/child link.
 
+#### Dependencies and sub-tasks in parallel
+
+A card can **depend** on another: in **Vínculos**, pick "precisa terminar antes deste card" (the
+other one is a prerequisite) or "só começa depois deste card". The open card shows the groups
+**Depende de** (depends on, with how many dependencies are still open) and **Libera** (unblocks).
+The board refuses a dependency cycle.
+
+The AI uses this to speed up Implementation. In Plan it declares the order between sub-tasks
+(`create_card` with `depends_on`, or `link_cards` with `depends_on`): one depends on another when it
+uses what the other produces or when both change the same files. In Implementation, the story's
+`get_card` returns in `subtasksNow` what can run now, and the AI delegates **the sub-tasks with no
+pending dependency to simultaneous subagents**, each with its card's model; at the end of the round
+it verifies the whole, commits and moves on to the next round. `start_work` refuses a sub-task that
+is still waiting for another. With no dependencies declared, all open sub-tasks are considered
+independent. It depends on the AI tool having subagents (Claude Code does); without them, execution
+goes one at a time, in dependency order. Projects that already had the flow skill installed keep its
+old text (the board does not overwrite a skill you may have adjusted): delete it and install it
+again in the settings to get the new instruction.
+
 ### The board in the browser, outside the editor
 
 The board does not depend on the editor window:

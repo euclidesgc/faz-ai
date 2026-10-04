@@ -6,6 +6,15 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Sub-tarefas independentes rodam ao mesmo tempo.** Um card pode agora **depender** de outro
+  (novo vínculo, em Vínculos: "precisa terminar antes deste card" / "só começa depois deste card",
+  com os grupos "Depende de" e "Libera"). No Plan a IA declara a ordem entre as sub-tarefas
+  (`create_card` com `depends_on`); na Implementação ela delega as que não têm dependência pendente
+  a subagentes simultâneos, cada um com o modelo do seu card, e segue em rodadas (`subtasksNow` no
+  `get_card` da história). `start_work` recusa a sub-tarefa que ainda espera outra. Antes era sempre
+  uma sub-tarefa por vez. Quem já tinha a skill do fluxo instalada precisa apagá-la e instalar de
+  novo para receber a instrução nova.
+
 - **O LED do card agora parece um LED e diz o estado de relance.** Antes era um ponto na cor do
   texto da barra, com um pulso quase invisível. Agora ele fica verde e pisca devagar enquanto a IA
   trabalha no card (ou numa sub-tarefa da história), amarelo quando o card espera por você, vermelho

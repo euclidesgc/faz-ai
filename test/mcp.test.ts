@@ -1122,6 +1122,39 @@ describe('vínculos entre cards', () => {
     expect((await call('unlink_cards', { card: filho.id, other: pai.id })).error).toBe(true);
   });
 
+  it('dependência entre sub-tarefas: depends_on, rodadas em subtasksNow e start_work recusando a que espera', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const base = (await call('create_card', { title: 'Modelo de dados', parent: story.id })).data;
+    const tela = (await call('create_card', { title: 'Tela', parent: story.id })).data;
+    const api = (await call('create_card', { title: 'API', parent: story.id, depends_on: [base.id] })).data;
+    expect(api.links.dependsOn).toMatchObject([{ id: base.id }]);
+    expect(router.snapshot().links).toMatchObject([{ kind: 'precedes' }]);
+
+    // a história mostra o que roda junto agora e o que espera
+    const before = (await call('get_card', { card: story.id })).data;
+    expect(before.subtasksNow).toEqual({ canRunTogether: [base.id, tela.id], waiting: [api.id] });
+    expect(before.subtaskList.find((k: { id: string }) => k.id === api.id).waitingFor).toEqual([base.id]);
+
+    // a que espera não começa; as independentes começam ao mesmo tempo
+    const refused = await call('start_work', { card: api.id });
+    expect(refused.error).toBe(true);
+    expect(refused.text).toContain(`depende de ${base.id}`);
+    expect((await call('start_work', { card: base.id })).error).toBe(false);
+    expect((await call('start_work', { card: tela.id })).error).toBe(false);
+
+    // concluir a dependência libera a seguinte
+    const done = router.snapshot().columns.find((c) => c.workflowId === router.snapshot().workflows[1]!.id && c.category === 'done')!;
+    await call('move_card', { card: base.id, column: done.name });
+    expect((await call('get_card', { card: api.id })).data.waitingFor).toBeUndefined();
+    expect((await call('start_work', { card: api.id })).error).toBe(false);
+
+    // link_cards também registra a dependência, e recusa o ciclo
+    expect((await call('link_cards', { card: tela.id, other: api.id, relation: 'depends_on' })).error).toBe(false);
+    expect((await call('link_cards', { card: api.id, other: tela.id, relation: 'depends_on' })).error).toBe(true);
+    // depends_on só vale em sub-tarefa
+    expect((await call('create_card', { title: 'Solta', depends_on: [base.id] })).error).toBe(true);
+  });
+
   it('`parent` faz de other o pai do card', async () => {
     const a = (await call('create_card', { title: 'A' })).data;
     const b = (await call('create_card', { title: 'B' })).data;

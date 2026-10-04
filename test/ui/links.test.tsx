@@ -108,4 +108,24 @@ describe('LinksSection', () => {
     show(board.subId);
     expect(section().queryByText('Este card não está vinculado a nenhum outro.')).toBeNull();
   });
+
+  it('dependência: "precisa terminar antes deste card" vincula o outro como pré-requisito e aparece em Depende de', async () => {
+    show(a);
+    await choose(section().getByLabelText('Tipo de vínculo'), 'precisa terminar antes deste card');
+    await userEvent.type(section().getByLabelText('Buscar card para vincular'), 'cadastro');
+    await userEvent.click(within(section().getByRole('list', { name: 'Cards encontrados' })).getByRole('button'));
+    expect(lastSent('link.add')).toEqual({ type: 'link.add', fromId: b, toId: a, kind: 'precedes' });
+  });
+
+  it('mostra de quem o card depende (com o que falta) e quem ele libera', () => {
+    board.router.handle({ type: 'link.add', fromId: b, toId: a, kind: 'precedes' });
+    syncStore(board.router);
+    const first = show(a);
+    const group = within(section().getByRole('group', { name: 'Depende de' }));
+    expect(group.getByText('Tela de cadastro')).toBeInTheDocument();
+    expect(group.getByText('1 em aberto: este card espera')).toBeInTheDocument();
+    first.unmount();
+    show(b);
+    expect(within(section().getByRole('group', { name: 'Libera' })).getByText('Spec do login')).toBeInTheDocument();
+  });
 });

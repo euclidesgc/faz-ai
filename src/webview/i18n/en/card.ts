@@ -216,4 +216,11 @@ export const card: Record<string, string> = {
   'Modo autônomo: a IA toca esta história sozinha, sem aprovação': 'Autonomous mode: the AI drives this story by itself, without approval',
   'Salvar descrição': 'Save description',
   'Aplicar seleção': 'Apply selection',
+  'precisa terminar antes deste card': 'must finish before this card',
+  'só começa depois deste card': 'only starts after this card',
+  'Depende de': 'Depends on',
+  '{n} em aberto: este card espera': '{n} still open: this card waits',
+  'tudo encerrado: pode começar': 'all closed: ready to start',
+  Libera: 'Unblocks',
+  'só começam depois deste card': 'only start after this card',
 };

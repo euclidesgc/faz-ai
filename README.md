@@ -178,6 +178,25 @@ grupo "Pai" com a história; numa história, a contagem de sub-tarefas com um at
 **Sub-tarefas**. Essa relação é somente leitura (sem botão de remover) e não entra na regra de
 conclusão acima, que continua valendo só para o vínculo manual de pai/filho.
 
+#### Dependência e sub-tarefas em paralelo
+
+Um card pode **depender** de outro: em **Vínculos**, escolha "precisa terminar antes deste card" (o
+outro é pré-requisito) ou "só começa depois deste card". O card aberto mostra os grupos **Depende
+de** (com quantas dependências ainda estão em aberto) e **Libera**. O board recusa ciclo de
+dependência.
+
+A IA usa isso para acelerar a Implementação. No Plan ela declara a ordem entre as sub-tarefas
+(`create_card` com `depends_on`, ou `link_cards` com `depends_on`): uma depende da outra quando usa o
+que ela produz ou quando as duas alteram os mesmos arquivos. Na Implementação, o `get_card` da
+história devolve em `subtasksNow` o que pode rodar agora, e a IA delega **as sub-tarefas sem
+dependência pendente a subagentes simultâneos**, cada um com o modelo do seu card; ao fim da rodada
+ela verifica o conjunto, faz o commit e parte para a rodada seguinte. `start_work` recusa a
+sub-tarefa que ainda espera outra. Sem dependências declaradas, todas as sub-tarefas em aberto são
+consideradas independentes. Depende de a ferramenta de IA ter subagentes (o Claude Code tem); sem
+eles, a execução segue uma por vez, na ordem das dependências. Projetos que já tinham a skill do
+fluxo instalada continuam com o texto antigo dela (o board não sobrescreve uma skill que você pode
+ter ajustado): apague-a e instale de novo em Configurações para receber a instrução nova.
+
 ### Board no navegador, fora do editor
 
 O board não depende da janela do editor:
