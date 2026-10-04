@@ -11,14 +11,15 @@ import type { DefineTool, ToolContext } from './registry';
 export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): void {
   tool(
     'link_cards',
-    'Vincula dois cards, de qualquer workflow. `relation` diz o que `other` é para `card`: "parent" (o pai dele), "child" (um filho dele) ou "related" (só relacionado). O pai só deve ser concluído quando todos os filhos vinculados estiverem encerrados. Recusa vínculo duplicado e ciclo.',
-    { card: cardArg, other: cardArg, relation: z.enum(['parent', 'child', 'related']) },
+    'Vincula dois cards, de qualquer workflow. `relation` diz o que `other` é para `card`: "parent" (o pai dele), "child" (um filho dele), "related" (só relacionado), "depends_on" (`card` só começa depois que `other` terminar) ou "precedes" (`other` só começa depois que `card` terminar). O pai só deve ser concluído quando todos os filhos vinculados estiverem encerrados. Sub-tarefas sem dependência pendente entre si podem ser executadas ao mesmo tempo. Recusa vínculo duplicado e ciclo.',
+    { card: cardArg, other: cardArg, relation: z.enum(['parent', 'child', 'related', 'depends_on', 'precedes']) },
     (a, router) => {
       const s = router.snapshot();
       const card = findCard(s, a.card);
       const other = findCard(s, a.other);
-      const [fromId, toId] = a.relation === 'parent' ? [other.id, card.id] : [card.id, other.id];
-      router.handle({ type: 'link.add', fromId, toId, kind: a.relation === 'related' ? 'related' : 'child' }, aiOrigin(ctx));
+      const [fromId, toId] = a.relation === 'parent' || a.relation === 'depends_on' ? [other.id, card.id] : [card.id, other.id];
+      const kind = a.relation === 'related' ? 'related' : a.relation === 'depends_on' || a.relation === 'precedes' ? 'precedes' : 'child';
+      router.handle({ type: 'link.add', fromId, toId, kind }, aiOrigin(ctx));
       return detail(router, card.id).links;
     },
   );

@@ -7,6 +7,15 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Independent sub-tasks run at the same time.** A card can now **depend** on another (new link,
+  in Vínculos: "precisa terminar antes deste card" / "só começa depois deste card", with the groups
+  "Depende de" and "Libera"). In Plan the AI declares the order between sub-tasks (`create_card` with
+  `depends_on`); in Implementation it delegates the ones with no pending dependency to simultaneous
+  subagents, each with its card's model, and proceeds in rounds (`subtasksNow` in the story's
+  `get_card`). `start_work` refuses a sub-task that is still waiting for another. It used to be
+  always one sub-task at a time. If you already had the flow skill installed, delete it and install
+  it again to get the new instruction.
+
 - **The card's LED now looks like an LED and tells the state at a glance.** It used to be a dot in
   the bar's text color, with a nearly invisible pulse. It is now green and blinks slowly while the
   AI is working on the card (or on one of the story's sub-tasks), yellow when the card is waiting on

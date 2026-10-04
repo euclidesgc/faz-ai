@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { openPredecessors } from '../../../shared/links';
+import { cardRef } from '../../../shared/model';
 import { isDelivered, isYolo, storyOf } from '../../../shared/story';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { cardSummary, findCard } from '../format';
@@ -28,16 +30,24 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'start_work',
-    'Marca que você começou a trabalhar no card (status "running"). Chame antes de executar o trabalho de um card.',
+    'Marca que você começou a trabalhar no card (status "running"). Chame antes de executar o trabalho de um card. Recusa enquanto o card depender de outro que ainda não terminou (`waitingFor`).',
     { card: cardArg },
-    (a, router) =>
-      setStatus(
+    (a, router) => {
+      const s = router.snapshot();
+      const card = live(findCard(s, a.card));
+      const pending = openPredecessors(s, card.id);
+      if (pending.length)
+        throw new Error(
+          `${cardRef(card)} depende de ${pending.map(cardRef).join(', ')}, que ainda não terminou. Conclua a dependência antes, ou remova o vínculo com unlink_cards se ele não fizer mais sentido.`,
+        );
+      return setStatus(
         router,
         a.card,
         'running',
         undefined,
         'Ao terminar, peça a revisão com request_review, pergunte com ask_question ou mova o card.',
-      ),
+      );
+    },
   );
 
   tool(

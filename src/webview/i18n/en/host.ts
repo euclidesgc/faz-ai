@@ -86,6 +86,7 @@ export const host: Record<string, string> = {
   'Um card não pode se vincular a ele mesmo.': 'A card cannot link to itself.',
   'Estes cards já estão vinculados. Remova o vínculo antes de criar outro.':
     'These cards are already linked. Remove the link before creating another.',
+  'O vínculo criaria um ciclo: um card dependeria dele mesmo.': 'The link would create a cycle: a card would depend on itself.',
   'O vínculo criaria um ciclo: o pai já é filho deste card.': 'The link would create a cycle: the parent is already a child of this card.',
 
   // status, aprovação e ações do card

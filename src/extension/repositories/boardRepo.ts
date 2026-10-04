@@ -287,7 +287,12 @@ export class BoardRepo {
       db,
       'SELECT l.* FROM card_links l JOIN cards c ON c.id = l.from_id WHERE c.board_id = ? ORDER BY l.rowid',
       [boardId],
-    ).map((r) => ({ id: str(r.id), fromId: str(r.from_id), toId: str(r.to_id), kind: r.kind === 'related' ? 'related' : 'child' }));
+    ).map((r) => ({
+      id: str(r.id),
+      fromId: str(r.from_id),
+      toId: str(r.to_id),
+      kind: r.kind === 'related' || r.kind === 'precedes' ? r.kind : 'child',
+    }));
 
     const comments: Comment[] = all(
       db,

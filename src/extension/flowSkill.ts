@@ -50,12 +50,34 @@ No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, o camp
 atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e as Skills
 necessárias.
 
+Declare a ordem entre elas: em \`create_card\`, \`depends_on\` lista as sub-tarefas que precisam
+terminar antes (ou use \`link_cards\` com \`depends_on\` depois). Uma sub-tarefa depende de outra
+quando usa o que a outra produz **ou quando as duas alteram os mesmos arquivos**. Só deixe sem
+dependência as que são de fato independentes: elas serão executadas ao mesmo tempo. Prefira recortar
+os passos de modo que cada um mexa em arquivos diferentes.
+
 Antes de alterar código do projeto, chame \`prepare_workspace\` na história: o board cria a branch e a
 pasta de trabalho dela e devolve onde trabalhar (também em \`workspace\` no \`get_card\`). Altere o
 código só ali e não crie branches por conta própria.
 
-Na Implementação, execute uma sub-tarefa por vez: \`start_work\`, mova para "Em andamento", faça o
-trabalho, verifique e mova para a coluna de conclusão, registrando na conversa o que foi feito.
+Na Implementação, trabalhe em rodadas. \`get_card\` na história traz em \`subtasksNow\` o que pode
+rodar agora (\`canRunTogether\`) e o que espera outra sub-tarefa (\`waiting\`):
+
+1. Se a sua ferramenta tem subagentes, delegue **cada** sub-tarefa de \`canRunTogether\` a um subagente,
+   todos lançados na mesma mensagem para rodarem ao mesmo tempo, cada um com o modelo e o esforço do
+   card dele (\`model\` no \`get_card\`). Diga a cada subagente: o número da sub-tarefa, a pasta de
+   trabalho da história, que ele altere só os arquivos da tarefa dele, que não faça commit nem troque
+   de branch, e o ciclo abaixo.
+2. O ciclo de cada sub-tarefa: \`start_work\`, mova para "Em andamento", faça o trabalho, verifique e
+   mova para a coluna de conclusão, registrando na conversa do card o que foi feito.
+3. Quando a rodada terminar, confira o resultado junto (testes e build do projeto), faça o commit e
+   leia a história de novo: as sub-tarefas liberadas formam a próxima rodada. Repita até não sobrar
+   nenhuma em aberto.
+
+\`start_work\` recusa a sub-tarefa que ainda depende de outra em aberto. Sem subagentes, ou com uma
+sub-tarefa só na rodada, execute uma por vez, na ordem das dependências. Se duas sub-tarefas da
+mesma rodada precisarem do mesmo arquivo, não as rode juntas: registre a dependência com
+\`link_cards\` e deixe uma para a rodada seguinte.
 
 ## Homologação
 

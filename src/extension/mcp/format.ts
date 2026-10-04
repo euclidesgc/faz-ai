@@ -10,7 +10,7 @@ import {
   type ModelOption,
 } from '../../shared/models';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
-import { childProgress, linkedCards } from '../../shared/links';
+import { childProgress, linkedCards, openPredecessors, subtaskWaves } from '../../shared/links';
 import { childrenOf, columnOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
 import { isYolo, lastAiColumn, storyOf } from '../../shared/story';
@@ -137,17 +137,19 @@ export function workStatus(s: BoardState, c: Card) {
   };
 }
 
-/** Cards vinculados (pai, filhos e relativos), com o progresso dos filhos; vazio quando o card não tem vínculos. */
+/** Cards vinculados (pai, filhos, relativos e dependências), com o progresso dos filhos; vazio quando o card não tem vínculos. */
 function linksOf(s: BoardState, c: Card) {
   const l = linkedCards(s, c.id);
   const line = (k: Card) => ({ id: cardRef(k), title: k.title, column: columnOf(s, k)?.name, status: cardStatus(s, k) });
-  if (!l.parents.length && !l.children.length && !l.related.length) return {};
+  if (!l.parents.length && !l.children.length && !l.related.length && !l.predecessors.length && !l.successors.length) return {};
   const p = childProgress(s, c.id);
   return {
     links: {
       ...(l.parents.length ? { parents: l.parents.map(line) } : {}),
       ...(l.children.length ? { children: l.children.map(line), childrenProgress: `${p.done}/${p.total} encerrados` } : {}),
       ...(l.related.length ? { related: l.related.map(line) } : {}),
+      ...(l.predecessors.length ? { dependsOn: l.predecessors.map(line) } : {}),
+      ...(l.successors.length ? { precedes: l.successors.map(line) } : {}),
     },
   };
 }
@@ -170,6 +172,8 @@ export function cardSummary(s: BoardState, c: Card) {
     ...(Object.keys(fieldsOf(s, c)).length ? { fields: fieldsOf(s, c) } : {}),
     ...(kids.length ? { subtasks: `${kids.filter((k) => cardStatus(s, k) !== 'open').length}/${kids.length} fora de aberto` } : {}),
     ...(checklist.length ? { checklist: `${checklist.filter((i) => i.done).length}/${checklist.length}` } : {}),
+    // dependências ainda abertas: enquanto houver, o card não pode começar
+    ...(openPredecessors(s, c.id).length ? { waitingFor: openPredecessors(s, c.id).map(cardRef) } : {}),
     ...(linkedCards(s, c.id).children.length
       ? { linkedChildren: `${childProgress(s, c.id).done}/${childProgress(s, c.id).total} encerrados` }
       : {}),
@@ -358,8 +362,19 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
         title: k.title,
         column: columnOf(s, k)?.name,
         status: cardStatus(s, k),
+        ...(workStatus(s, k) ? { work: workStatus(s, k) } : {}),
         fields: fieldsOf(s, k),
+        ...(openPredecessors(s, k.id).length ? { waitingFor: openPredecessors(s, k.id).map(cardRef) } : {}),
       })),
+    // o que da Implementação pode rodar agora, ao mesmo tempo, e o que espera outra sub-tarefa terminar
+    ...(subtaskWaves(s, c.id).waiting.length || subtaskWaves(s, c.id).ready.length > 1
+      ? {
+          subtasksNow: {
+            canRunTogether: subtaskWaves(s, c.id).ready.map(cardRef),
+            waiting: subtaskWaves(s, c.id).waiting.map(cardRef),
+          },
+        }
+      : {}),
     checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })),
     ...linksOf(s, c),
     comments: s.comments

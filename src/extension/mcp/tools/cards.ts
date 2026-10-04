@@ -17,6 +17,12 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       type: z.string().optional().describe('Nome do tipo de card; por padrão, o primeiro tipo do workflow'),
       column: z.string().optional().describe('Nome da coluna; por padrão, a primeira do workflow'),
       fields: fieldsArg.optional(),
+      depends_on: z
+        .array(cardArg)
+        .optional()
+        .describe(
+          'Só em sub-tarefa: outras sub-tarefas que precisam terminar antes desta começar (as que ela usa, ou que mexem nos mesmos arquivos). Sem dependência pendente, as sub-tarefas podem ser executadas ao mesmo tempo.',
+        ),
       autonomous_from: cardArg
         .optional()
         .describe(
@@ -30,6 +36,8 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       const origin = a.autonomous_from !== undefined ? live(findCard(s, a.autonomous_from)) : null;
       if (origin && !origin.yolo) throw new Error(`#${origin.number} não está em modo autônomo; só uma pessoa liga o modo numa história.`);
       const parent = a.parent !== undefined ? live(findCard(s, a.parent)) : null;
+      if (a.depends_on?.length && !parent) throw new Error('depends_on vale para sub-tarefas: informe `parent`.');
+      const dependsOn = (a.depends_on ?? []).map((ref) => live(findCard(s, ref)));
       if (parent?.parentId) throw new Error(`#${parent.number} é uma sub-tarefa; o pai precisa ser uma história.`);
       const wf = s.workflows.find((w) => w.kind === (parent ? 'child' : 'parent'));
       if (!wf) throw new Error('Workflow não encontrado.');
@@ -42,6 +50,7 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       const id = router.createCard({ typeId: type.id, columnId: column.id, parentId: parent?.id ?? null, title: a.title }, aiOrigin(ctx));
       if (a.description) router.handle({ type: 'card.update', cardId: id, patch: { description: a.description } });
       setFields(router, s, id, a.fields);
+      for (const dep of dependsOn) router.handle({ type: 'link.add', fromId: dep.id, toId: id, kind: 'precedes' }, aiOrigin(ctx));
       if (origin) router.handle({ type: 'card.yolo.inherit', cardId: id, fromId: origin.id }, aiOrigin(ctx));
       return detail(router, id);
     },
