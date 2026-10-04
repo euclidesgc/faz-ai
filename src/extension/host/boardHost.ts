@@ -29,6 +29,8 @@ export interface BoardHostOptions {
   /** caminho estável do bridge.js, entregue à ferramenta de IA para ela falar com o board */
   bridgePath: string;
   log(line: string): void;
+  /** versão da extensão (vai no cabeçalho do arquivo exportado) */
+  version?: string;
   /** esta janela é a dona do board (serve o MCP), a única que roda o autopiloto; padrão: sempre */
   ownsBoard?: () => boolean;
 }
@@ -83,6 +85,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     workspaceDir: o.folderPath,
     homeDir,
     log: o.log,
+    extensionVersion: o.version,
   });
   const runLog = createRunLog(handle.db, o.log);
   // execuções que a sessão anterior não fechou (a janela caiu, a máquina desligou) viram 'unknown' em

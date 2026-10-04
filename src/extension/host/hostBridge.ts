@@ -2,6 +2,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs/promises';
 import { fetchSource, parseSource } from '../skillInstall';
 import { MAX_ATTACHMENT_BYTES } from '../attachments';
+import { parseExportFile, type ImportResult } from '../db/boardExport';
 import type { HostToWebview, WebviewToHost } from '../../shared/messages';
 import type { ViewStateStore } from '../viewState';
 import type { MessageRouter } from '../panel/messageRouter';
@@ -32,10 +33,26 @@ export interface HostEnv {
   pickFiles(): Promise<string[] | undefined>;
   /** abre o diálogo nativo de "salvar como" e copia o arquivo do anexo para o destino escolhido; undefined quando a pessoa desiste ou o ambiente não suporta (web) */
   saveFileAs?(sourcePath: string, suggestedName: string): Promise<void>;
+  /** abre o diálogo nativo de "salvar como" e grava o texto; devolve o caminho gravado, ou undefined quando a pessoa desiste (só no editor) */
+  saveTextAs?(content: string, suggestedName: string): Promise<string | undefined>;
+  /** deixa a pessoa escolher um arquivo de export do board; sem ele, vale `pickFiles` */
+  pickBackupFile?(): Promise<string | undefined>;
   /** abre o board no navegador (só faz sentido dentro do editor) */
   openInBrowser?(): unknown;
   /** mostra o chat na barra lateral (só faz sentido dentro do editor) */
   showChat?(): unknown;
+}
+
+/** Mensagem de resultado da exportação: onde ficou, os cards com anexo sem arquivo e o aviso sobre o conteúdo. */
+export function exportNotice(savedPath: string, warnings: string[]): string {
+  const missing = warnings.length ? ` Anexos sem arquivo: ${warnings.join(', ')}.` : '';
+  return `Board exportado em ${savedPath}.${missing} O arquivo contém conversas e anexos: guarde-o com cuidado.`;
+}
+
+/** Mensagem de resultado da importação: o board, os totais e os cards cujo anexo ficou sem arquivo. */
+export function importNotice(r: ImportResult): string {
+  const missing = r.warnings.length ? ` Anexos sem arquivo: ${r.warnings.join(', ')}.` : '';
+  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}`;
 }
 
 /**
@@ -177,6 +194,30 @@ export class HostBridge {
           }
           const content = await fs.readFile(file, 'utf8');
           this.post({ type: 'attachment.readResult', requestId: msg.requestId, content });
+          return;
+        }
+        case 'backup.export': {
+          const { text, name, warnings } = this.router.exportBoardFile();
+          const saved = await this.env.saveTextAs?.(text, name);
+          if (!saved) return;
+          this.post({ type: 'notice', message: exportNotice(saved, warnings) });
+          return;
+        }
+        case 'backup.import.pick': {
+          const file = this.env.pickBackupFile ? await this.env.pickBackupFile() : (await this.env.pickFiles())?.[0];
+          if (!file) return;
+          const text = await fs.readFile(file, 'utf8');
+          const parsed = parseExportFile(text);
+          const { token, summary } = this.router.parkImport(parsed, Buffer.byteLength(text));
+          this.post({ type: 'backup.import.summary', token, summary });
+          return;
+        }
+        case 'backup.import.cancel':
+          this.router.discardImport(msg.token);
+          return;
+        case 'backup.import.apply': {
+          const result = this.router.applyImport(msg.token);
+          this.post({ type: 'notice', message: importNotice(result) });
           return;
         }
         case 'attachment.write': {

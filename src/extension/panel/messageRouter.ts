@@ -1,5 +1,8 @@
 import * as path from 'node:path';
 import type { DbHandle } from '../db/database';
+import { exportBoard, exportFileName, summarize, type BoardExportFile, type ImportResult } from '../db/boardExport';
+import { newId } from '../db/ids';
+import type { ImportSummary } from '../../shared/backup';
 import type { Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
 import type { AiTool } from '../../shared/harness';
@@ -9,6 +12,7 @@ import type { HarnessStore } from '../harness';
 import { headlessUnsupported } from '../headless';
 import type { RunResolver } from '../log/eventLog';
 import { BoardContext, type Actor, type Handler, type HandlerMap, type MessageType, type RouterOptions } from './handlers/context';
+import { boardBackupHandlers } from './handlers/boardBackup';
 import { boardSettingsHandlers } from './handlers/boardSettings';
 import { addAttachment, cardContentHandlers } from './handlers/cardContent';
 import { cardHandlers, createCard } from './handlers/cards';
@@ -55,6 +59,9 @@ const bridgeOnly = {
   'attachment.read': viaBridge,
   'attachment.write': viaBridge,
   'attachment.saveAs': viaBridge,
+  'backup.export': viaBridge,
+  'backup.import.pick': viaBridge,
+  'backup.import.cancel': viaBridge,
 } satisfies Partial<HandlerMap>;
 
 /** Um handler por tipo de mensagem, agrupados por domínio em ./handlers. */
@@ -64,6 +71,7 @@ const HANDLERS: HandlerMap = {
   ...cardContentHandlers,
   ...workspaceHandlers,
   ...boardSettingsHandlers,
+  ...boardBackupHandlers,
   ...modelHandlers,
   ...harnessHandlers,
 };
@@ -155,7 +163,40 @@ export class MessageRouter {
   /** Cards em que a extensão está executando a IA (informado pelo executor). */
   setAiRuns(cardIds: string[]): void {
     this.aiRuns = cardIds;
+    this.ctx.aiRuns = cardIds;
     this.notify();
+  }
+
+  /** O board como arquivo de export (texto JSON), o nome sugerido e os cards com anexo sem arquivo. */
+  exportBoardFile(now = Date.now()): { text: string; name: string; warnings: string[] } {
+    const { file, warnings } = exportBoard(this.ctx.dbHandle.db, this.ctx.boardId, this.store, {
+      extensionVersion: this.ctx.opts.extensionVersion ?? '0',
+      now,
+    });
+    return { text: JSON.stringify(file), name: exportFileName(this.ctx.boards.snapshot(this.ctx.boardId).board.name, now), warnings };
+  }
+
+  /** Estaciona um arquivo de export já validado e devolve o token e o resumo para a confirmação. Só o último fica guardado. */
+  parkImport(file: BoardExportFile, sizeBytes: number): { token: string; summary: ImportSummary } {
+    this.ctx.pendingImports.clear();
+    const token = newId();
+    this.ctx.pendingImports.set(token, file);
+    return { token, summary: summarize(file, sizeBytes) };
+  }
+
+  discardImport(token: string): void {
+    this.ctx.pendingImports.delete(token);
+  }
+
+  /** Aplica a importação estacionada sob `token` (pelo handler, com log e aviso aos webviews) e grava o banco em seguida. */
+  applyImport(token: string, ctx: Origin = {}): ImportResult {
+    this.ctx.lastImport = null;
+    this.handle({ type: 'backup.import.apply', token }, ctx);
+    const result = this.ctx.lastImport;
+    if (!result) throw new Error('Importação expirada: escolha o arquivo de novo.');
+    // o .bak já foi gravado e a pessoa pode fechar o editor logo depois: grava agora, sem esperar o debounce
+    void this.ctx.dbHandle.flush?.().catch((e: unknown) => console.error('[fazai] falha ao salvar o board importado', e));
+    return result;
   }
 
   /** O chat com a IA (informado pela sessão de chat): as mensagens e se a IA está respondendo. */

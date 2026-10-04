@@ -112,6 +112,7 @@ async function main(): Promise<void> {
     folderName: path.basename(folderPath),
     bridgePath,
     log,
+    version: FAZAI_VERSION,
   });
   const { router, runner, heartbeat, mergeWatcher } = host;
   const stopMcp = await startMcpServer(address, { getRouter: async () => router, workspaceDir: folderPath, version: FAZAI_VERSION });

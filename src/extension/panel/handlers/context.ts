@@ -1,6 +1,7 @@
 import type { DbHandle } from '../../db/database';
 import type { BoardState } from '../../../shared/model';
 import type { WebviewToHost } from '../../../shared/messages';
+import type { BoardExportFile, ImportResult } from '../../db/boardExport';
 import { AttachmentStore } from '../../attachments';
 import { pendingUpgrade, upgradeBoard } from '../../db/boardTemplate';
 import { HarnessStore } from '../../harness';
@@ -26,6 +27,8 @@ export interface RouterOptions {
   homeDir?: string;
   /** canal de log da extensão; sem ele as falhas do log do board vão para o console */
   log?: (line: string) => void;
+  /** versão da extensão, gravada no cabeçalho do arquivo exportado */
+  extensionVersion?: string;
 }
 
 /** Repositórios, anexos e harness do board aberto, compartilhados pelo router e pelos handlers. */
@@ -45,6 +48,12 @@ export class BoardContext {
   boardId: string;
   /** cards aprovados por uma pessoa; o router avisa depois de gravar */
   readonly approved: string[] = [];
+  /** cards em que a IA está executando agora (informado pelo executor): a importação recusa enquanto houver */
+  aiRuns: string[] = [];
+  /** arquivos de export lidos e validados, à espera da confirmação da pessoa, por token */
+  readonly pendingImports = new Map<string, BoardExportFile>();
+  /** resultado da última importação, para a mensagem de resultado */
+  lastImport: ImportResult | null = null;
 
   constructor(
     readonly dbHandle: DbHandle,

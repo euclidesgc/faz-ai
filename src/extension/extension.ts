@@ -81,6 +81,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         folderName: f.name,
         bridgePath,
         log,
+        version: String((context.extension.packageJSON as { version?: string }).version ?? '0'),
         ownsBoard: () => !!stopMcp,
       });
       const router = host.router;
