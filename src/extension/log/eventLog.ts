@@ -2,6 +2,11 @@
 // `record(msg, actor, probe)` relê depois, chama `eventsFor` e grava os eventos. A regra de "o que
 // aconteceu" é de `eventsFor` (puro); aqui é só a leitura por `id` e a gravação.
 //
+// Limite conhecido e aceito: o log só vê o que passa pelo router. Mudança feita por fora — alguém
+// editando o arquivo do banco à mão, ou uma sessão de IA aberta no terminal em vez de pelo board —
+// não gera evento e não gera reclamação (RF-12), e o evento que ela produzir pelas ferramentas MCP
+// fica sem `run_id`, porque não há execução do board a que ligá-lo (RF-20).
+//
 // Orçamento: a sonda roda em TODA mutação do board. Ela lê só o card e a família dele, por `id`,
 // numa consulta — nunca `snapshot()`, que monta o `BoardState` inteiro. E grava os eventos dentro da
 // mesma mutação, antes do `scheduleSave()` que a operação já faria: o `sql.js` reescreve o arquivo

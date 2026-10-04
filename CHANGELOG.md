@@ -6,6 +6,21 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **O board passou a guardar o histórico do que acontece nele.** Cada acontecimento de um card
+  (criação, passagem de coluna com de/para, mudança de status, mensagem da conversa, anexo e
+  artefato, sub-tarefa, vínculo, pull request, conclusão, arquivamento e lixeira) e cada execução de
+  IA iniciada pelo board (card, coluna e fase no momento da chamada, ferramenta, modelo, esforço,
+  agente, permissão, modo autônomo, origem, duração e desfecho) ficam registrados no próprio arquivo
+  do board. É a base para o painel de métricas, que ainda não existe: nesta versão não há tela nem
+  consulta — o histórico só começa a ser acumulado. Ele vale de agora em diante: nada é reconstruído
+  para trás, e sessões de IA abertas por você no terminal, fora do board, não são medidas.
+- **Nenhum conteúdo de conversa vai para o histórico.** O registro guarda o que aconteceu, não o que
+  foi dito: o texto dos comentários, das descrições e das respostas da IA não entra, e os títulos de
+  card são cortados em 120 caracteres. O detalhe fica 12 meses completos além do mês corrente e
+  depois é descartado, sobrando os totais por mês, que não expiram. Reiniciar o board apaga o
+  histórico junto com o resto, e apagar um card não apaga o histórico dele — é o que mantém os
+  totais de meses fechados estáveis.
+
 - **O pacote publicado sai com as notas da versão no topo do changelog, não mais com "Não
   lançado".** O `npm run release` agora abre o `.vsix` gerado e confere o README e o CHANGELOG (nos
   dois idiomas) antes de publicar: recusa se o changelog ainda tiver "Não lançado" sobrando, se a
