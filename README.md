@@ -275,6 +275,33 @@ O botão também fica no cabeçalho do card, ao lado do status.
 - Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo e o fim da
   saída da ferramenta. O log completo está no painel **Saída → Faz AI** (ou no terminal do `faz-ai`).
 
+### Consumo, custo e inventário de cada execução
+
+Cada vez que a IA roda (pela conversa, pelo heartbeat ou pelo modo autônomo), o board registra no
+banco o que a execução consumiu: tokens de entrada, de saída, de leitura de cache e de criação de
+cache, o custo em dólar, o número de turnos e o id da sessão da ferramenta. Registra também o
+**inventário** do que a IA usou: ferramentas nativas, ferramentas de MCP (com o servidor de cada
+uma), subagentes e skills, com a contagem de chamadas.
+
+- **O custo vem de duas fontes.** Quando a ferramenta informa o custo, o board grava esse valor.
+  Quando não informa, ele estima: multiplica os tokens pelo **preço por milhão de tokens** do modelo,
+  que você preenche em Configurações → **Modelos de IA** (os quatro preços: entrada, saída, leitura e
+  criação de cache) ou pelo MCP com `upsert_model`. O custo estimado vem sempre marcado como
+  "(estimado)". Modelo sem os quatro preços não tem custo calculado: o valor fica em branco, nunca 0.
+- **No canal de log** (**Saída → Faz AI**), a saída da ferramenta aparece em linhas legíveis, e no fim
+  de cada execução vem uma linha de resumo com entrada, saída, leitura e criação de cache, turnos e
+  custo, por exemplo `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação
+  de cache · 8 turnos · US$ 0,4210 (estimado)`. Turnos e custo ficam de fora quando a ferramenta não
+  os informa.
+- **O Copilot fica sem consumo medido.** Ele não tem saída estruturada, então as execuções dele são
+  registradas, mas sem tokens, custo nem inventário. Onde aparecer "não medido", é isso: falta de
+  medição, não consumo zero. O mesmo vale para execuções que terminam antes de a ferramenta informar
+  o consumo.
+- **Perguntas no chat do board** também entram no registro, sem card associado.
+- **O detalhe de cada execução é guardado por 6 meses** (o mês corrente mais os 6 anteriores). Depois
+  disso o detalhe é descartado, mas os **totais por mês nunca expiram**. Antes eram 12 meses; o prazo
+  menor mantém o arquivo do banco dentro do limite de tamanho.
+
 ### Métricas de uso com get_metrics
 
 Durante a conversa de um card, a IA pode consultar estatísticas agregadas do histórico do board — uso,
@@ -289,11 +316,11 @@ economizar tokens.
   (ex. fase, modelo, tipo de card).
 - Nas dimensões **agente** e **skill** a tabela mostra só a contagem de execuções e de usos (sem
   tokens nem custo, que não é possível repartir entre componentes de uma execução).
-- Valores não medidos aparecem como "-" (nunca 0): custo e tokens dependem da história #70, que
-  ainda não está implementada. A resposta marca a cifra como estimada.
+- Valores não medidos aparecem como "-" (nunca 0), por exemplo as execuções do Copilot. Custo
+  estimado a partir do preço do modelo vem marcado como estimado.
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
-  (sem detalhe por execução). Períodos muito antigos (mais de ~12 meses) não têm detalhe e só
-  agregam os totais já consolidados.
+  (sem detalhe por execução). Períodos fora da janela de 6 meses não têm detalhe e só agregam os
+  totais já consolidados.
 
 ### Branch e pasta de trabalho por história
 
@@ -545,13 +572,14 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
 | Agentes | Como a IA trabalha em cada card: skills, servidores MCP, ferramentas e modelo; sempre há um padrão; por fase, com troca por card e sugestão pela intenção |
 | Harness de IA | Ferramenta do projeto, arquivo de regras, skills e agentes; execução pela conversa e heartbeat; tudo que cada ferramenta carrega, por escopo (ver [Harness de IA](#harness-de-ia)) |
-| Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
+| Modelos de IA | Modelos e níveis de esforço da ferramenta; o preço por milhão de tokens de cada modelo (entrada, saída, leitura e criação de cache), usado para estimar o custo; regras que sugerem o modelo de cada card |
 | Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English), tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
 | Backup | Exportar o board num arquivo e importar um arquivo no lugar do board atual (ver [Backup do board](#backup-do-board)) |
 
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração
-local; nas outras, uma lista embutida que pode ser editada). As regras de sugestão combinam
+local; nas outras, uma lista embutida que pode ser editada); os preços que você preencheu continuam
+lá depois de detectar de novo. As regras de sugestão combinam
 condições com E e OU, por exemplo `Esforço da atividade = Alto E Tags = backend`. O resultado é
 sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.
 

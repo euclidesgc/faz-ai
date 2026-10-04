@@ -7,6 +7,23 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **The board records the consumption, cost and inventory of each AI run.** For each run it stores
+  input, output, cache read and cache creation tokens, the cost in dollars, the turns and the
+  session id, plus the inventory of what was used: tools, MCP tools (with the server), subagents and
+  skills. When the tool does not report the cost, the board estimates it from the model's **price
+  per million tokens**, which you fill in under Configurações → Modelos de IA (Settings → AI models,
+  or through MCP with `upsert_model`), and the estimated value is marked. A model without a price
+  gets no cost, never 0. In the log channel, the tool's output now appears as readable lines, and
+  each run ends with a consumption summary line. Copilot has no structured output: its runs are
+  recorded **with no measured consumption** ("não medido", not zero). Questions in the board chat
+  are recorded too, with no card. `get_metrics` now returns tokens and cost.
+
+- **The detail of each run in the board's file dropped from 12 to 6 months.** What the board keeps
+  per run (now with consumption and inventory) stays for 6 months besides the current month; after
+  that only the monthly totals remain, and they never expire. If you are upgrading, you lose the
+  individual detail of runs older than 6 months, not the totals. The shorter window keeps the
+  database file within its size limit.
+
 - **One click on the branch name copies it.** In the open card, the story's branch became a button:
   clicking copies the name to the clipboard and the screen confirms with "Nome copiado" (name copied).
 
@@ -76,9 +93,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 - **The AI can query the board's usage metrics straight in the card's conversation with `get_metrics`.** The
   tool aggregates history data — runs, duration, cost, and tokens — by phase, card type, tool, model,
   card, agent, or skill, with period and card filters. It replies in a compact table. It does not
-  list individual runs (aggregation by card is enough for the AI to know each one's cost). Cost and
-  tokens still show "-" (not measured) until story #70 starts recording them; until then the tool
-  works normally and marks the figure as estimated.
+  list individual runs (aggregation by card is enough for the AI to know each one's cost). Values
+  that were not measured show as "-" (never 0), and a cost estimated from the model's price is
+  marked as estimated.
 
 ## 0.31.1
 

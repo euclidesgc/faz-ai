@@ -292,6 +292,34 @@ The button is also in the card header, next to the status.
   of the tool's output. The full log is in the **Output → Faz AI** panel (or in the `faz-ai`
   terminal).
 
+### Consumption, cost and inventory of each run
+
+Every time the AI runs (from the conversation, the heartbeat or autonomous mode), the board records
+in the database what the run consumed: input tokens, output tokens, cache read tokens and cache
+creation tokens, the cost in dollars, the number of turns and the tool's session id. It also
+records the **inventory** of what the AI used: native tools, MCP tools (with the server of each
+one), subagents and skills, with the number of calls.
+
+- **Cost comes from two sources.** When the tool reports the cost, the board stores that value.
+  When it does not, the board estimates it: tokens multiplied by the model's **price per million
+  tokens**, which you fill in under Configurações → **Modelos de IA** (Settings → AI models; four
+  prices: input, output, cache read and cache creation) or through MCP with `upsert_model`. An
+  estimated cost is always marked "(estimado)". A model without all four prices gets no calculated
+  cost: the value stays blank, never 0.
+- **In the log channel** (**Output → Faz AI**), the tool's output appears as readable lines, and at
+  the end of each run a summary line follows with input, output, cache read and cache creation,
+  turns and cost, for example `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100
+  criação de cache · 8 turnos · US$ 0,4210 (estimado)`. Turns and cost are left out when the tool
+  does not report them. The line is written in Portuguese, as the board's log channel is.
+- **Copilot has no measured consumption.** It has no structured output, so its runs are recorded,
+  but without tokens, cost or inventory. Wherever you see "não medido" (not measured), this is why:
+  missing measurement, not zero consumption. The same applies to runs that end before the tool
+  reports consumption.
+- **Questions in the board chat** are recorded too, with no card attached.
+- **The detail of each run is kept for 6 months** (the current month plus the 6 before it). After
+  that the detail is discarded, but the **monthly totals never expire**. It used to be 12 months;
+  the shorter window keeps the database file within its size limit.
+
 ### Usage metrics with get_metrics
 
 During a card's conversation, the AI can query aggregated statistics from the board's history — usage,
@@ -305,10 +333,10 @@ used most?". The tool replies with a compact table, optimized to save tokens.
   (e.g. phase, model, card type).
 - On the **agent** and **skill** dimensions the table shows only the count of runs and uses (no tokens
   or cost, which cannot be split among a run's components).
-- Unmeasured values appear as "-" (never 0): cost and tokens depend on story #70, not yet
-  implemented. The response marks the figure as estimated.
+- Unmeasured values appear as "-" (never 0), for example Copilot runs. A cost estimated from the
+  model's price is marked as estimated.
 - Always tells you when the board's history started and which periods have only monthly totals
-  (without per-run detail). Very old periods (more than ~12 months) have no detail and aggregate only
+  (without per-run detail). Periods outside the 6-month window have no detail and aggregate only
   the already-consolidated totals.
 
 ### Branch and working folder per story
@@ -570,13 +598,14 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
 | Agentes | How the AI works on each card: skills, MCP servers, tools and model; there is always a default; per phase, changeable per card, with suggestions from intent |
 | Harness de IA | The project's tool, rules file, skills and agents; runs from the conversation and the heartbeat; everything each tool loads, by scope (see [AI harness](#ai-harness)) |
-| Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
+| Modelos de IA | The tool's models and effort levels; each model's price per million tokens (input, output, cache read and cache creation), used to estimate cost; rules that suggest each card's model |
 | Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
 | Aparência | **Language** (automatic, Português (Brasil) or English), theme (system, light, dark), font and size of long texts; name and color of the statuses |
 | Backup | Export the board to a file and import a file in place of the current board (see [Board backup](#board-backup)) |
 
 About models: **Detectar modelos** (detect models) reads the tool's list (for Kimi Code, from the
-local configuration; for the others, a built-in list you can edit). Suggestion rules combine
+local configuration; for the others, a built-in list you can edit); the prices you filled in stay
+there after detecting again. Suggestion rules combine
 conditions with AND and OR, for example `Esforço da atividade = Alto E Tags = backend`. The result
 is always a suggestion: on the card, the model and the effort can be changed at any time.
 
