@@ -3,7 +3,9 @@ import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
 import type { HostToWebview, WebviewToHost } from '../../shared/messages';
-import { HostBridge, type HostEnv } from '../host/hostBridge';
+import { LARGE_EXPORT_BYTES } from '../../shared/backup';
+import { parseExportFile } from '../db/boardExport';
+import { HostBridge, exportNotice, type HostEnv } from '../host/hostBridge';
 import type { MessageRouter } from '../panel/messageRouter';
 import type { ViewStateStore } from '../viewState';
 
@@ -49,6 +51,26 @@ const MIME: Record<string, string> = {
 const COOKIE = 'fazai_session';
 /** anexos chegam em base64 dentro da mensagem: 20 MB de arquivo viram ~27 MB de texto */
 const MAX_BODY = 30 * 1024 * 1024;
+/** o arquivo de export do board inteiro, com os anexos embutidos; separado do limite das mensagens */
+const MAX_IMPORT_BODY = LARGE_EXPORT_BYTES;
+
+/** Lê o corpo até `max` bytes; acima disso responde 413 e devolve null. */
+function readBody(req: http.IncomingMessage, res: http.ServerResponse, max: number): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > max) {
+        res.writeHead(413).end('Mensagem grande demais');
+        req.destroy();
+        resolve(null);
+      } else chunks.push(chunk);
+    });
+    req.on('end', () => resolve(size > max ? null : Buffer.concat(chunks)));
+    req.on('error', () => resolve(null));
+  });
+}
 
 function readToken(file: string): string {
   try {
@@ -152,20 +174,11 @@ export async function startWebServer(o: WebServerOptions): Promise<WebServer> {
       if (origin && origin !== `http://${req.headers.host}`) return void res.writeHead(403).end();
       const client = clients.get(id);
       if (!client) return void res.writeHead(409).end('Sessão encerrada');
-      const chunks: Buffer[] = [];
-      let size = 0;
-      req.on('data', (chunk: Buffer) => {
-        size += chunk.length;
-        if (size > MAX_BODY) {
-          res.writeHead(413).end('Mensagem grande demais');
-          req.destroy();
-        } else chunks.push(chunk);
-      });
-      req.on('end', () => {
-        if (size > MAX_BODY) return;
+      void readBody(req, res, MAX_BODY).then((body) => {
+        if (!body) return;
         let msg: WebviewToHost;
         try {
-          msg = JSON.parse(Buffer.concat(chunks).toString('utf8')) as WebviewToHost;
+          msg = JSON.parse(body.toString('utf8')) as WebviewToHost;
         } catch {
           return void res.writeHead(400).end('Mensagem inválida');
         }
@@ -174,7 +187,49 @@ export async function startWebServer(o: WebServerOptions): Promise<WebServer> {
       });
       return;
     }
+    // importação do board em duas etapas: o arquivo sobe aqui, é validado e fica estacionado com um resumo;
+    // a confirmação segue pela mensagem backup.import.apply normal, como no editor
+    if (req.method === 'POST' && url.pathname === '/backup/import') {
+      const origin = req.headers.origin;
+      if (origin && origin !== `http://${req.headers.host}`) return void res.writeHead(403).end();
+      const client = clients.get(id);
+      if (!client) return void res.writeHead(409).end('Sessão encerrada');
+      void readBody(req, res, MAX_IMPORT_BODY).then((body) => {
+        if (!body) return;
+        try {
+          const parsed = parseExportFile(body.toString('utf8'));
+          const result = o.router.parkImport(parsed, body.length);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+          res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }).end(e instanceof Error ? e.message : String(e));
+        }
+      });
+      return;
+    }
     if (req.method !== 'GET') return void res.writeHead(405).end();
+
+    // exportação: a página navega até aqui e o navegador baixa o arquivo; o aviso vai pelo canal de eventos
+    if (url.pathname === '/backup/export') {
+      const client = clients.get(id);
+      if (!client) return void res.writeHead(409).end('Sessão encerrada');
+      try {
+        const { text, name, warnings } = o.router.exportBoardFile();
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${name.replace(/["\\]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+        });
+        res.end(text);
+        client.bridge.post({ type: 'notice', message: exportNotice(name, warnings) });
+      } catch (e) {
+        if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(e instanceof Error ? e.message : String(e));
+        client.bridge.post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
 
     if (url.pathname === '/events') {
       if (!/^[\w-]{8,64}$/.test(id)) return void res.writeHead(400).end();
