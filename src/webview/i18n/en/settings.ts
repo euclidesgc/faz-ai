@@ -56,7 +56,6 @@ export const settings: Record<string, string> = {
   'avisar e pedir confirmação se o card levar sub-tarefas ou anexos junto; cards simples seguem direto.':
     'warn and ask for confirmation if the card takes sub-tasks or attachments with it; simple cards go straight through.',
   Regras: 'Rules',
-  'Restaurar padrões': 'Restore defaults',
   'Regras deste board. O que conta como conclusão ou cancelamento vem de "Esta coluna representa", no menu de ações de cada coluna.':
     'Rules of this board. What counts as done or cancelled comes from "This column represents", in each column\'s actions menu.',
   'Concluir história com sub-tarefas em aberto': 'Complete a story with open sub-tasks',
@@ -121,7 +120,6 @@ export const settings: Record<string, string> = {
   'Nome do tipo novo': 'Name of the new type',
   'Nome do tipo': 'Type name',
   Cancelar: 'Cancel',
-  Adicionar: 'Add',
   'Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.':
     'Board theme and typography of long texts: the card description and the conversation, both when writing and when reading.',
   'Tema e fonte': 'Theme and font',
@@ -318,4 +316,8 @@ export const settings: Record<string, string> = {
   'Texto com o nome do campo antes do valor.': 'Text with the field name before the value.',
   Oculto: 'Hidden',
   'Não aparece no board, só no card aberto.': 'Not shown on the board, only on the open card.',
+  'Adicionar modelo': 'Add model',
+  'Criar tipo': 'Create type',
+  'Restaurar aparência padrão': 'Restore default appearance',
+  'Restaurar regras padrão': 'Restore default rules',
 };

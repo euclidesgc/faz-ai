@@ -52,7 +52,7 @@ describe('FilterPanel', () => {
 describe('FilterBar', () => {
   it('no editor, o botão Filtros pede ao host para mostrar a barra lateral', async () => {
     renderThemed(<FilterBar />);
-    await userEvent.click(screen.getByRole('button', { name: 'Filtros' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir filtros' }));
     expect(lastSent('ui.showFilters')).toEqual({ type: 'ui.showFilters' });
   });
 
@@ -70,7 +70,7 @@ describe('FilterBar', () => {
     await userEvent.click(screen.getByText(`Tipo: ${type.name}`));
     expect(filters().typeIds).toEqual([]);
     expect(filters().owner).toBe('ai');
-    await userEvent.click(screen.getByRole('button', { name: 'Limpar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }));
     expect(filters().owner).toBe('any');
     expect(lastSent('view.set').patch).toMatchObject({ selectedParentId: null, filters: { owner: 'any', typeIds: [] } });
   });

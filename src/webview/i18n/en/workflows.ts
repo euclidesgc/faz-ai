@@ -13,8 +13,6 @@ export const workflows: Record<string, string> = {
   'A IA atua em {name}': 'AI works in {name}',
   '{name} exige aprovação': '{name} requires approval',
   'Instrução para a IA e modelo do documento desta fase': 'AI instruction and document template for this phase',
-  Instrução: 'Instruction',
-  Definir: 'Set',
   'Um workflow precisa de ao menos uma coluna': 'A workflow needs at least one column',
   'Excluir a coluna': 'Delete the column',
   'Excluir a coluna "{name}"?': 'Delete the column "{name}"?',
@@ -28,7 +26,6 @@ export const workflows: Record<string, string> = {
   'No início': 'At the start',
   'Depois de {name}': 'After {name}',
   Cancelar: 'Cancel',
-  Adicionar: 'Add',
 
   // Workflow novo
   'Workflow novo': 'New workflow',
@@ -108,7 +105,6 @@ export const workflows: Record<string, string> = {
   'Nome do agente': 'Agent name',
   padrão: 'default',
   'Usado quando nem o card nem a coluna indicam um agente': 'Used when neither the card nor the column specifies an agent',
-  'Tornar padrão': 'Make default',
   Fechar: 'Close',
   Editar: 'Edit',
   'Precisa haver ao menos um agente': 'There must be at least one agent',
@@ -133,7 +129,6 @@ export const workflows: Record<string, string> = {
   'Nomes separados por vírgula, como a ferramenta os chama; vazio = as que o nível de permissão da execução libera.':
     "Names separated by commas, as the tool calls them; empty = the ones the run's permission level allows.",
   'Sem lista: vale o que o nível de permissão libera': 'No list: whatever the permission level allows applies',
-  'Liberar o padrão': 'Allow the default',
   'Ex.: Read, Grep, Glob, Edit': 'E.g. Read, Grep, Glob, Edit',
   'Ferramentas negadas': 'Denied tools',
   'Ex.: WebFetch, Bash(git push *)': 'E.g. WebFetch, Bash(git push *)',
@@ -153,4 +148,10 @@ export const workflows: Record<string, string> = {
   'Editar código': 'Edit code',
   'Lê e busca arquivos; não edita nem roda comandos.': 'Reads and searches files; does not edit or run commands.',
   'Lê, edita arquivos e roda comandos no terminal.': 'Reads, edits files and runs commands in the terminal.',
+  'Criar coluna': 'Create column',
+  'Fechar edição': 'Close editing',
+  'Tornar agente padrão': 'Make agent the default',
+  'Usar as ferramentas do nível de permissão': "Use the permission level's tools",
+  'Editar instrução': 'Edit instruction',
+  'Definir instrução': 'Set instruction',
 };

@@ -13,6 +13,14 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   you, red when it is blocked, and off when nothing is happening. Only green blinks. This applies to
   the cards on the board, the sub-tasks and the header of the open card.
 
+- **Buttons say what the click does.** Labels that showed only a state or a generic name became
+  actions: at the top, "Pausar modo autônomo" / "Retomar modo autônomo" (pause / resume autonomous
+  mode), "Ver 2 com você" / "Ver todos os cards" and "Abrir chat" / "Fechar chat"; on the board,
+  "Mostrar filtros", "Limpar filtros", "+ Nova coluna" and "Criar card"; on the card, "Parar a IA"
+  and "Salvar descrição"; in the settings, "Criar tipo", "Criar coluna", "Adicionar modelo", "Fechar
+  edição", "Reler pastas", "Chamar a IA agora", "Restaurar aparência padrão" and others. In the
+  interface, autonomous mode now goes by a single name (no "YOLO" or "autopiloto" in the labels).
+
 ## 0.31.1
 
 - **The open card works again.** In 0.31.0 the card opened stuck to the left and closed on any

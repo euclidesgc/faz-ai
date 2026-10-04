@@ -73,7 +73,7 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
         </span>
       )}
       {card.yolo && (
-        <span className="yolo-mark" title={t('Modo autônomo (YOLO): a IA toca esta história sozinha, sem aprovação')}>
+        <span className="yolo-mark" title={t('Modo autônomo: a IA toca esta história sozinha, sem aprovação')}>
           <IconYolo />
         </span>
       )}

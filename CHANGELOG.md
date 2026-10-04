@@ -12,6 +12,14 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   quando está bloqueado e apagado quando não há nada acontecendo. Só o verde pisca. Vale para os
   cards do board, as sub-tarefas e o cabeçalho do card aberto.
 
+- **Os botões dizem o que o clique faz.** Rótulos que mostravam só um estado ou um nome genérico
+  viraram ações: no topo, "Pausar modo autônomo" / "Retomar modo autônomo", "Ver 2 com você" /
+  "Ver todos os cards" e "Abrir chat" / "Fechar chat"; no board, "Mostrar filtros", "Limpar
+  filtros", "+ Nova coluna" e "Criar card"; no card, "Parar a IA" e "Salvar descrição"; nas
+  configurações, "Criar tipo", "Criar coluna", "Adicionar modelo", "Fechar edição", "Reler pastas",
+  "Chamar a IA agora", "Restaurar aparência padrão" e outros. Na interface, o modo autônomo passa a
+  ter um nome só (sem "YOLO" nem "autopiloto" nos rótulos).
+
 ## 0.31.1
 
 - **O card aberto voltou a funcionar.** Na 0.31.0 o card abria encostado à esquerda e fechava a

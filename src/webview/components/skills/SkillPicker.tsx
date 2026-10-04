@@ -155,10 +155,10 @@ export function SkillPicker({ value, onChange, intent = '', title }: Props) {
             <span className="muted small">{t('{n} marcadas', { n: value.length })}</span>
             {value.length > 0 && (
               <Button variant="ghost" size="1" onClick={() => onChange([])}>
-                {t('Limpar')}
+                {t('Limpar seleção')}
               </Button>
             )}
-            <Button onClick={() => setOpen(false)}>{t('Concluir')}</Button>
+            <Button onClick={() => setOpen(false)}>{t('Aplicar seleção')}</Button>
           </div>
         </Dialog.Content>
       </Dialog.Root>

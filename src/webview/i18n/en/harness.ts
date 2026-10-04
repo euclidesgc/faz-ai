@@ -12,7 +12,6 @@ export const harness: Record<string, string> = {
   // --- HarnessInventory
   'Tudo que cada ferramenta carrega': 'Everything each tool loads',
   'Relê as pastas do projeto e do usuário': 'Re-reads the project and user folders',
-  Atualizar: 'Refresh',
   'O que cada ferramenta de IA lê neste projeto e na sua pasta de usuário, separado por escopo. <b>Projeto</b> vale só aqui; <b>Global</b> vale em todos os seus projetos; <b>Plugins</b> vem de pacotes instalados e não pode ser alterado, mas pode ser copiado. "Abrir" mostra o arquivo no editor, onde ele também é editado.':
     'What each AI tool reads in this project and in your user folder, split by scope. <b>Project</b> applies only here; <b>Global</b> applies to all your projects; <b>Plugins</b> come from installed packages and cannot be changed, but can be copied. "Open" shows the file in the editor, where it is also edited.',
   'deste projeto': 'this project',
@@ -272,7 +271,6 @@ export const harness: Record<string, string> = {
   // --- RunnerSettings
   'Execução pela conversa e heartbeat': 'Run from chat and heartbeat',
   'Começa uma rodada agora, mesmo com o heartbeat desligado': 'Starts a round now, even with the heartbeat off',
-  'Rodar agora': 'Run now',
   'O botão "Chamar IA" da conversa de um card roda o {tool} em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ele pode fazer nessas execuções. O {tool} precisa estar instalado e autenticado nesta máquina{suffix}.':
     'The "Call AI" button in a card\'s conversation runs {tool} in the background in this folder, with nobody approving each step. Here you set what it can do in those runs. {tool} must be installed and signed in on this machine{suffix}.',
   '; o board é entregue a ele em cada execução, sem depender do botão acima':
@@ -350,4 +348,8 @@ export const harness: Record<string, string> = {
   'A pasta da skill é removida, com todos os arquivos dela: {location}':
     "The skill's folder is removed, along with all its files: {location}",
   'O arquivo é removido: {location}': 'The file is removed: {location}',
+  'Reler pastas': 'Reread folders',
+  'Chamar a IA agora': 'Call the AI now',
+  'Buscar skills para instalar': 'Find skills to install',
+  'Abrir no editor': 'Open in editor',
 };

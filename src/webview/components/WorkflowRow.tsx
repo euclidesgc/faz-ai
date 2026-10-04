@@ -119,7 +119,7 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
         <div className="column-add">
           {newColumn === null ? (
             <Button variant="ghost" title={t('Nova coluna')} onClick={() => setNewColumn('')}>
-              {t('+ Coluna')}
+              {t('+ Nova coluna')}
             </Button>
           ) : (
             <TextField.Root

@@ -110,7 +110,7 @@ describe('WorkflowsSettings', () => {
       `Depois de ${cols[firstDone - 1]!.name}`,
     );
     await userEvent.type(within(stories).getByLabelText('Nome da coluna'), 'x');
-    await userEvent.click(within(stories).getByRole('button', { name: 'Adicionar' }));
+    await userEvent.click(within(stories).getByRole('button', { name: 'Criar coluna' }));
     expect(lastSent('settings.column.create').position).toBe(firstDone);
   });
 
