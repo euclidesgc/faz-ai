@@ -8,8 +8,8 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 ## Unreleased
 
 - **The heartbeat can drive several stories at the same time.** In the settings, under execution by
-  the AI, **Histórias ao mesmo tempo** (1 to 6; the default is still 1) sets how many stories the
-  heartbeat runs in parallel. It only applies in "Worktree por história" mode, where each story works
+  the AI, the **Tocar histórias em paralelo** switch (off by default) makes the heartbeat run several
+  stories together: two by default, up to six in **Histórias ao mesmo tempo**. It only applies in "Worktree por história" mode, where each story works
   in its own folder; outside it, and in autonomous mode (stacked stories), it stays one at a time. The
   limit counts every run in progress, and more stories in parallel use more of the account usage limit.
   The Git screen now explains, in each mode, whether parallel is available and why: a branch in the

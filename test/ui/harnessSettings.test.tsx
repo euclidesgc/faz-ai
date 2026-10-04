@@ -124,8 +124,13 @@ describe('HarnessSettings: ferramenta e execução', () => {
     await userEvent.clear(interval!);
     await userEvent.type(interval!, '45{Enter}');
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { heartbeatMinutes: 45 } });
+    // o número só aparece com o paralelo ligado, e começa em duas histórias
+    expect(within(runner).queryByLabelText('Histórias ao mesmo tempo')).toBeNull();
+    await userEvent.click(within(runner).getByRole('switch', { name: 'Tocar histórias em paralelo' }));
+    expect(lastSent('settings.board.update').patch).toEqual({ runner: { parallel: true } });
+    act(() => setState((st) => ({ board: { ...st.board, runner: { ...st.board.runner, parallel: true } } })));
     const parallel = within(runner).getByLabelText('Histórias ao mesmo tempo');
-    expect(parallel).toBeEnabled();
+    expect(parallel).toHaveValue(2);
     await userEvent.clear(parallel);
     await userEvent.type(parallel, '3{Enter}');
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { parallelStories: 3 } });

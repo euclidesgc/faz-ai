@@ -7,8 +7,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 ## Não lançado
 
 - **O heartbeat pode tocar várias histórias ao mesmo tempo.** Em Configurações, na execução pela IA,
-  **Histórias ao mesmo tempo** (de 1 a 6; o padrão continua 1) define quantas histórias o heartbeat
-  executa em paralelo. Só vale no modo "Worktree por história", em que cada história trabalha na sua
+  o interruptor **Tocar histórias em paralelo** (nasce desligado) faz o heartbeat executar várias
+  histórias juntas: duas por padrão, até seis em **Histórias ao mesmo tempo**. Só vale no modo "Worktree por história", em que cada história trabalha na sua
   própria pasta; fora dele, e no modo autônomo (histórias empilhadas), continua uma por vez. O limite
   conta toda execução em andamento, e mais histórias em paralelo gastam mais do limite de uso da conta.
   A tela de Git passa a explicar, em cada modo, se o paralelo está disponível e por quê: branch na

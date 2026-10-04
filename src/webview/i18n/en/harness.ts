@@ -353,9 +353,10 @@ export const harness: Record<string, string> = {
   'Buscar skills para instalar': 'Find skills to install',
   'Abrir no editor': 'Open in editor',
   'Histórias ao mesmo tempo': 'Stories at the same time',
-  'Quantas histórias o heartbeat toca em paralelo. Cada uma trabalha na sua própria pasta (worktree). Mais histórias ao mesmo tempo gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas.':
-    'How many stories the heartbeat drives in parallel. Each one works in its own folder (worktree). More stories at once use more of your account usage limit. Autonomous mode stays one at a time, because its stories are stacked.',
-  'Desligado: só vale no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.':
-    'Off: only applies in "Worktree por história" mode (Settings > Git). Outside it the stories share the same folder and would cause conflicts, so the heartbeat drives one at a time.',
   histórias: 'stories',
+  'Tocar histórias em paralelo': 'Drive stories in parallel',
+  'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas. As sub-tarefas independentes de cada história já rodam em paralelo, sem limite, conforme o plano.':
+    'When on, the heartbeat drives several stories at once, each in its own folder (worktree). More stories in parallel use more memory and CPU and more of your account usage limit. Autonomous mode stays one at a time, because its stories are stacked. The independent sub-tasks of each story already run in parallel, with no limit, according to the plan.',
+  'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.':
+    'Only available in "Worktree por história" mode (Settings > Git). Outside it the stories share the same folder and would cause conflicts, so the heartbeat drives one at a time.',
 };

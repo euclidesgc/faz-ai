@@ -384,8 +384,9 @@ version, which have no merge commit recorded, stay yours to archive with one cli
 With the heartbeat on (Configurações → Harness de IA), the board calls the AI on its own at every
 interval, while the editor is open in the project folder. In each round it advances approved cards,
 answers pending messages and works on ready cards, one story at a time. In "Worktree por
-história" mode, **Histórias ao mesmo tempo** (stories at the same time, 1 to 6, on the same screen)
-makes the heartbeat drive several stories in parallel, each in its own working folder; the limit
+história" mode, **Tocar histórias em paralelo** (drive stories in parallel; on the same screen, off by
+default) makes the heartbeat drive several stories at once, each in its own working folder: two by
+default, up to six in **Histórias ao mesmo tempo**; the limit
 counts every run in progress, including the ones called by hand. Outside that mode, and in
 autonomous mode (whose stories are stacked), it stays one at a time, and the field is disabled. The
 Git screen explains why in each mode: with a branch in the project folder, two stories at once would

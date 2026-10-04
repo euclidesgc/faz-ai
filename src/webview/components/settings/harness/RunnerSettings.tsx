@@ -13,6 +13,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
   const unsupported = useBoardStore((s) => s.state!.aiRunUnsupported);
   const runner = board.runner;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === runner.permission)!;
+  const worktree = board.git.mode === 'worktree';
   return (
     <>
       <SectionHeader
@@ -113,34 +114,40 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
               </div>
             )}
           </FormField>
-          <FormField
-            label={t('Histórias ao mesmo tempo')}
-            hint={
-              board.git.mode === 'worktree'
-                ? t(
-                    'Quantas histórias o heartbeat toca em paralelo. Cada uma trabalha na sua própria pasta (worktree). Mais histórias ao mesmo tempo gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas.',
-                  )
-                : t(
-                    'Desligado: só vale no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.',
-                  )
-            }
-          >
-            {(id) => (
-              <div className="unit-field">
-                <NumberField
-                  id={id}
-                  min={PARALLEL_RANGE.min}
-                  max={PARALLEL_RANGE.max}
-                  value={board.git.mode === 'worktree' ? runner.parallelStories : 1}
-                  disabled={board.git.mode !== 'worktree'}
-                  onCommit={(parallelStories) => settings.updateBoard({ runner: { parallelStories } })}
-                />
-                <Text size="2" color="gray">
-                  {t('histórias')}
-                </Text>
-              </div>
-            )}
-          </FormField>
+          <div className="form-divider" />
+          <SwitchField
+            label={t('Tocar histórias em paralelo')}
+            checked={worktree && runner.parallel}
+            disabled={!worktree}
+            onChange={(parallel) => settings.updateBoard({ runner: { parallel } })}
+          />
+          <Text as="p" size="1" color="gray">
+            {worktree
+              ? t(
+                  'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas. As sub-tarefas independentes de cada história já rodam em paralelo, sem limite, conforme o plano.',
+                )
+              : t(
+                  'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.',
+                )}
+          </Text>
+          {worktree && runner.parallel && (
+            <FormField label={t('Histórias ao mesmo tempo')}>
+              {(id) => (
+                <div className="unit-field">
+                  <NumberField
+                    id={id}
+                    min={PARALLEL_RANGE.min}
+                    max={PARALLEL_RANGE.max}
+                    value={runner.parallelStories}
+                    onCommit={(parallelStories) => settings.updateBoard({ runner: { parallelStories } })}
+                  />
+                  <Text size="2" color="gray">
+                    {t('histórias')}
+                  </Text>
+                </div>
+              )}
+            </FormField>
+          )}
         </Card>
       )}
     </>
