@@ -285,7 +285,7 @@ progress. Sub-tasks commit to the story's branch.
 - The card shows the branch and opens the working folder in a new window.
 - Configurações → **Git** holds the mode (worktree, branch in the same folder, or off), the branch
   name pattern, the worktrees folder, automatic PR merge when approving acceptance, and automatic
-  merge detection (on by default).
+  merge detection, with the archiving of already published stories (on by default).
 - Each worktree is a working copy: dependencies have to be installed in it.
 
 ### Pull request and merge in Homologação
@@ -320,6 +320,26 @@ If the pull request is closed without a merge, the board registers a warning in 
 once only. The merge is still done by the person, manually or through automatic merge; the board
 only observes. Failures in querying the PR state (no network, no authentication, no `gh`
 installed) do not block anything — the warning appears in the log, and the routine keeps trying at the next interval.
+
+In the same round, after looking at the pull requests, the board takes the last step of the cycle:
+**when the version containing a concluded story is published, it records in the conversation which
+version carried it (tag and release link) and archives the card**. That way the Concluído column
+holds only what is merged and has not reached your users yet; what was already delivered goes to the
+workflow's archived area, from which you can unarchive it at any time. There is nothing to turn on:
+the step comes along with merge detection, on the same interval and the same switch, and it is on by
+default with it.
+
+A story counts as published when there is a tag that **contains** the merge commit **and** that has a
+**published release** on GitHub — which is what this project's `npm run release` creates. A tag
+without a release does not count, a draft release does not count, a prerelease does. The recorded
+version is the oldest among those containing the commit, by publication date. The criterion is
+deliberately conservative: archiving late fixes itself on the next round, archiving early hides a
+card with nobody noticing.
+
+Everything here is best effort. A project with no releases, outside GitHub or on a machine without
+`gh` simply archives nothing: no card is blocked and the reason appears once in the log. The board
+never publishes a version — it only reads what you published — and stories concluded before this
+version, which have no merge commit recorded, stay yours to archive with one click.
 
 ### Heartbeat
 

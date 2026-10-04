@@ -30,6 +30,19 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   Sub-tarefas (sem repetir a lista). A relação é somente leitura e não entra nas regras de
   conclusão, que continuam valendo só para o vínculo manual de pai/filho.
 
+- **A história sai do board quando a versão dela é publicada.** Na mesma rodada que olha os pull
+  requests, o board verifica se o commit do merge de uma história concluída já está numa versão
+  publicada — uma tag que contém o commit **e** que tem release publicada no GitHub. Está: ele
+  registra na conversa qual versão levou a história (tag e link da release) e arquiva o card, que vai
+  para os arquivados do workflow e pode ser desarquivado com um clique. A coluna Concluído passa a
+  significar "mergeado e ainda não entregue". O **recurso nasce ligado**, junto com a detecção de
+  merges e no mesmo intervalo dela: não há ajuste novo para ligar. Tag sem release não conta, release
+  em rascunho não conta, pré-lançamento conta, e a versão registrada é a mais antiga entre as que
+  contêm o commit, pela data de publicação. É melhor esforço: projeto sem releases, fora do GitHub ou
+  sem o `gh` não arquiva nada, sem bloquear card nenhum. O board não publica versão — o
+  `npm run release` continua como está —, e histórias concluídas antes desta versão, sem o commit do
+  merge guardado, continuam sendo arquivadas por você.
+
 ## 0.31.1
 
 - **O card aberto voltou a funcionar.** Na 0.31.0 o card abria encostado à esquerda e fechava a
