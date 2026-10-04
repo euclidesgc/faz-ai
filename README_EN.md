@@ -304,7 +304,7 @@ automatic merge off, approving only marks the card, and the AI moves it to Concl
 
 The board can watch a delivered story's pull request and detect when it is merged, concluding the
 story automatically. The feature starts on (Configurações → Git, **Concluir a história quando o
-pull request for mergeado**). A periodic routine checks the PR state at every configurable interval
+pull request for mergeado**). A periodic routine checks the PR state at a configurable interval
 (**Verificar a cada (minutos)**, default 15, range 5 to 1440). When the merge is detected:
 
 1. the board records the merge commit on the card;
@@ -313,8 +313,8 @@ pull request for mergeado**). A periodic routine checks the PR state at every co
 
 If the pull request is closed without a merge, the board registers a warning in the conversation
 once only. The merge is still done by the person, manually or through automatic merge; the board
-only observes. Failures in querying the PR state (no connection, no authentication, etc.) do not
-block anything — the warning appears in the log, and the routine keeps trying at the next interval.
+only observes. Failures in querying the PR state (no network, no authentication, no `gh`
+installed) do not block anything — the warning appears in the log, and the routine keeps trying at the next interval.
 
 ### Heartbeat
 

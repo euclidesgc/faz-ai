@@ -285,10 +285,10 @@ o merge automático desligado, aprovar só marca o card, e a IA o move para Conc
 ### Detecção automática de merges
 
 O board pode observar o pull request de uma história entregue e detectar quando ele é mergeado,
-concludendo a história automaticamente. A feature começa ligada (Configurações → Git, **Concluir a
+concluindo a história automaticamente. A opção nasce ligada (Configurações → Git, **Concluir a
 história quando o pull request for mergeado**). Uma rotina periódica verifica o estado do PR a cada
-intervalo configurável (**Verificar a cada (minutos)**, padrão 15, intervalo de 5 a 1440). Quando
-o merge é detectado:
+intervalo configurável (**Verificar a cada (minutos)**, padrão 15, faixa de 5 a 1440). Quando o
+merge é detectado:
 
 1. o board grava o commit do merge no card;
 2. registra na conversa que a história foi concluída;
@@ -296,8 +296,8 @@ o merge é detectado:
 
 Se o pull request é fechado sem merge, o board registra um aviso na conversa uma única vez. O merge
 continua sendo feito pela pessoa, manualmente ou pelo merge automático; o board só observa. Falhas
-na consulta do estado do PR (sem ligação, sem autenticação, etc.) não bloqueiam nada — o aviso
-aparece no log, e a rotina continua tentando no próximo intervalo.
+na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado) não bloqueiam nada
+— o aviso aparece no log, e a rotina continua tentando no próximo intervalo.
 
 ### Heartbeat
 
