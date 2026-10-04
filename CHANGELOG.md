@@ -6,6 +6,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **O pacote publicado sai com as notas da versão no topo do changelog, não mais com "Não
+  lançado".** O `npm run release` agora abre o `.vsix` gerado e confere o README e o CHANGELOG (nos
+  dois idiomas) antes de publicar: recusa se o changelog ainda tiver "Não lançado" sobrando, se a
+  primeira seção não for a versão que está saindo, ou se faltar algum dos blocos de aviso do README
+  (fase alpha e agradecimento). Antes, era possível publicar com o changelog desatualizado.
 - **O modo autônomo (YOLO) para na Homologação, com o pull request aberto, em vez de ir até
   Concluído.** A IA vai do Backlog até a última coluna em que ela atua (Homologação, no board
   padrão), abre o pull request, registra com `set_pull_request` e para ali: a história fica

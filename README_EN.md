@@ -549,6 +549,24 @@ and the GitHub Release with the `.vsix`. If anything stops after publishing,
 `npm run release -- finish` picks up where it left off (on the release branch or on main), without
 publishing again. `--dry-run` rehearses without publishing. The options are at the top of `scripts/release.mjs`.
 
+Between packaging and publishing, the release opens the `.vsix` and checks the four showcase files
+(`README.md`, `README_EN.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`): the changelog needs the version
+being released as its top heading, with no leftover "Não lançado"/"Unreleased" anywhere, and the
+README needs the alpha-notice and thank-you blocks. If anything fails, the release refuses before
+publishing to any store. Renaming "Não lançado"/"Unreleased" to the version happens in every mode, including
+`--dry-run`; when the release doesn't get to commit (dry-run or `--no-git`), the renamed CHANGELOGs
+are restored to their original content at the end. With no "Não lançado"/"Unreleased" section to
+rename, use `--allow-no-notes` — it's only required when that section is missing **and** the
+CHANGELOG's first section isn't the version being released.
+
+Two things to watch for:
+
+- if you rewrite the text of a README notice block, update the `SHOWCASE` table in
+  `scripts/releaseCheck.mjs` with the new text; otherwise the release refuses to publish a correct
+  README, by design (false positive).
+- a Ctrl+C in the middle of a release can leave the CHANGELOGs with the renamed heading on disk;
+  undo with `git checkout CHANGELOG.md CHANGELOG_EN.md`.
+
 ## Version history
 
 What changed in each version is in [CHANGELOG_EN.md](CHANGELOG_EN.md).

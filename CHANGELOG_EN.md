@@ -7,6 +7,12 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **The published package now ships with the version's release notes at the top of the changelog,
+  instead of "Unreleased".** `npm run release` now opens the generated `.vsix` and checks the README
+  and the CHANGELOG (in both languages) before publishing: it refuses if the changelog still has a
+  leftover "Unreleased", if the first section isn't the version being released, or if either of the
+  README's notice blocks (alpha phase and thank you) is missing. Before, it was possible to publish
+  with a stale changelog.
 - **Autonomous mode (YOLO) now stops at Homologação, with the pull request open, instead of going
   on to Concluído.** The AI goes from Backlog to the last column it works in (Homologação, on the
   default board), opens the pull request, records it with `set_pull_request` and stops there: the
