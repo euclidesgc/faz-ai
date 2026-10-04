@@ -255,6 +255,7 @@ export class BoardRepo {
       worktreePath: str(r.worktree_path),
       baseBranch: str(r.base_branch),
       prUrl: str(r.pr_url),
+      mergeCommit: str(r.merge_commit),
       execProfile: r.exec_profile == null ? null : str(r.exec_profile),
       yolo: num(r.yolo) === 1,
     }));

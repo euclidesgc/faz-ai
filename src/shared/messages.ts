@@ -45,6 +45,8 @@ export type WebviewToHost =
   | { type: 'card.workspace.prepare'; cardId: Id }
   /** registra o pull request da história do card */
   | { type: 'card.pr.set'; cardId: Id; url: string }
+  /** registra o commit do merge do pull request da história do card; sem efeito colateral (ao contrário do card.pr.set) */
+  | { type: 'card.merge.set'; cardId: Id; commit: string }
   /** liga ou desliga o modo autônomo (YOLO) da história do card */
   | { type: 'card.yolo.set'; cardId: Id; enabled: boolean }
   /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */

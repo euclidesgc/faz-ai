@@ -34,6 +34,7 @@ const card = (id: string, over: Partial<Card> = {}): Card => ({
   worktreePath: '',
   baseBranch: '',
   prUrl: '',
+  mergeCommit: '',
   execProfile: null,
   yolo: false,
   ...over,
