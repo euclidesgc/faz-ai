@@ -263,7 +263,8 @@ commits na branch da história.
 - O card mostra a branch e abre a pasta de trabalho numa janela nova.
 - Em Configurações → **Git** ficam o modo (worktree, branch na própria pasta ou desligado), o
   padrão do nome da branch, a pasta das worktrees, o merge automático do PR ao aprovar a homologação
-  e a detecção automática de merges (ligada por padrão).
+  e a detecção automática de merges, com o arquivamento das histórias já publicadas (ligada por
+  padrão).
 - Cada worktree é uma cópia de trabalho: as dependências precisam ser instaladas nela.
 
 ### Pull request e merge na Homologação
@@ -298,6 +299,24 @@ Se o pull request é fechado sem merge, o board registra um aviso na conversa um
 continua sendo feito pela pessoa, manualmente ou pelo merge automático; o board só observa. Falhas
 na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado) não bloqueiam nada
 — o aviso aparece no log, e a rotina continua tentando no próximo intervalo.
+
+Na mesma rodada, depois de olhar os pull requests, o board dá o último passo do ciclo: **quando a
+versão que contém uma história concluída é publicada, ele registra na conversa qual versão a levou
+(tag e link da release) e arquiva o card**. Assim a coluna Concluído fica só com o que está mergeado
+e ainda não chegou a quem usa; o que já foi entregue vai para os arquivados do workflow, de onde você
+pode desarquivar a qualquer momento. Não há o que ligar: o passo vem junto com a detecção de merges,
+no mesmo intervalo e no mesmo liga/desliga, e nasce ligado com ela.
+
+Uma história conta como publicada quando existe uma tag que **contém** o commit do merge **e** que
+tem uma **release publicada** no GitHub — é o que o `npm run release` deste projeto cria. Tag sem
+release não vale, release em rascunho não vale, pré-lançamento vale. A versão registrada é a mais
+antiga entre as que contêm o commit, pela data de publicação. O critério é conservador de propósito:
+arquivar tarde se corrige na rodada seguinte, arquivar cedo esconde um card sem ninguém notar.
+
+Tudo aqui é melhor esforço. Projeto sem releases, fora do GitHub ou numa máquina sem o `gh`
+simplesmente não arquiva nada: nenhum card é bloqueado e o motivo aparece uma vez no log. O board
+nunca publica versão — ele só lê o que você publicou — e histórias concluídas antes desta versão, que
+não têm o commit do merge guardado, continuam sendo arquivadas por você, com um clique.
 
 ### Heartbeat
 

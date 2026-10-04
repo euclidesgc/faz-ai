@@ -70,6 +70,18 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   → Git, **Concluir a história quando o pull request for mergeado**), and the check interval is
   configurable (**Verificar a cada (minutos)**, default 15, range 5 to 1440). The merge is still
   done by the person (manually or by automatic merge); the board only observes.
+- **A story leaves the board when its version is published.** In the same round that looks at the
+  pull requests, the board checks whether the merge commit of a concluded story is already in a
+  published version — a tag that contains the commit **and** that has a published release on GitHub.
+  It is: the board registers in the conversation which version carried the story (tag and release
+  link) and archives the card, which goes to the workflow's archived area and can be unarchived with
+  one click. The Concluído column now means "merged and not delivered yet". **The feature is on by
+  default**, along with merge detection and on the same interval: there is no new setting to turn on.
+  A tag without a release does not count, a draft release does not count, a prerelease does, and the
+  recorded version is the oldest among those containing the commit, by publication date. It is best
+  effort: a project with no releases, outside GitHub or without `gh` archives nothing and blocks no
+  card. The board does not publish versions — `npm run release` stays as it is — and stories
+  concluded before this version, with no merge commit recorded, stay yours to archive.
 
 ## 0.30.0
 
