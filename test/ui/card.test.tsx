@@ -354,6 +354,15 @@ describe('CardDrawer', () => {
     await userEvent.click(container.querySelector('.drawer-backdrop')!);
     expect(useBoardStore.getState().openCardId).toBeNull();
   });
+
+  it('o card fica dentro do fundo, e clicar no card não o fecha', async () => {
+    const { container } = openCardDrawer(board.storyId);
+    const drawer = container.querySelector('.drawer')!;
+    expect(drawer.parentElement).toBe(container.querySelector('.drawer-backdrop'));
+    await userEvent.click(drawer);
+    await userEvent.click(drawer.querySelector('.drawer-footer')!);
+    expect(useBoardStore.getState().openCardId).toBe(board.storyId);
+  });
 });
 
 describe('Board / Column', () => {
