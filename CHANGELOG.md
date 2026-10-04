@@ -6,6 +6,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Um clique no nome da branch copia o nome.** No card aberto, a branch da história virou um botão:
+  clicar copia o nome para a área de transferência e a tela confirma com "Nome copiado".
+
 - **Sub-tarefas independentes rodam ao mesmo tempo.** Um card pode agora **depender** de outro
   (novo vínculo, em Vínculos: "precisa terminar antes deste card" / "só começa depois deste card",
   com os grupos "Depende de" e "Libera"). No Plan a IA declara a ordem entre as sub-tarefas

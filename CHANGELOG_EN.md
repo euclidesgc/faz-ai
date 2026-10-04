@@ -7,6 +7,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **One click on the branch name copies it.** In the open card, the story's branch became a button:
+  clicking copies the name to the clipboard and the screen confirms with "Nome copiado" (name copied).
+
 - **Independent sub-tasks run at the same time.** A card can now **depend** on another (new link,
   in Vínculos: "precisa terminar antes deste card" / "só começa depois deste card", with the groups
   "Depende de" and "Libera"). In Plan the AI declares the order between sub-tasks (`create_card` with

@@ -34,7 +34,6 @@ export const card: Record<string, string> = {
   'sessão limpa': 'clean session',
 
   // WorkspaceBar
-  'Branch da história': 'Story branch',
   'Abrir a pasta de trabalho': 'Open the working folder',
   'Cria a branch da história e, no modo worktree, a pasta de trabalho dela':
     'Creates the story branch and, in worktree mode, its working folder',
@@ -223,4 +222,6 @@ export const card: Record<string, string> = {
   'tudo encerrado: pode começar': 'all closed: ready to start',
   Libera: 'Unblocks',
   'só começam depois deste card': 'only start after this card',
+  'Copiar o nome da branch': 'Copy the branch name',
+  'Nome copiado': 'Name copied',
 };
