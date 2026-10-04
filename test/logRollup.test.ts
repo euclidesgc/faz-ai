@@ -516,7 +516,7 @@ describe('tokens por tipo, custo por origem e o corte por workflow (#71)', () =>
     });
     const before = monthlyTotals(db, boardId, ['2024-03']);
 
-    expect(consolidate(db, boardId, TODAY)).toEqual(['2024-03']);
+    expect(consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS)).toEqual(['2024-03']);
     expect(runs.byMonth('2024-03')).toEqual([]);
     expect(events.byMonth('2024-03')).toEqual([]);
 
