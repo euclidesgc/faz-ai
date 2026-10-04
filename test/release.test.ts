@@ -5,7 +5,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
 import { createMcpServer } from '../src/extension/mcp/server';
-import { parseReleases, publishedVersion, publishWatchTargets } from '../src/extension/release';
+import { parseReleases, publishedVersion, publishWatchTargets, ReleaseWatcher } from '../src/extension/release';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -177,5 +177,295 @@ describe('publishedVersion: qual versão levou a história (RF5)', () => {
   it('devolve null sem releases e sem tags', () => {
     expect(publishedVersion([], ['v0.9.0'])).toBeNull();
     expect(publishedVersion(releases, [])).toBeNull();
+  });
+});
+
+describe('ReleaseWatcher: a rodada que comenta a versão e arquiva o card', () => {
+  const RELEASE_LIST = ['release', 'list', '--limit', '100', '--json', 'tagName,isDraft,isPrerelease,publishedAt'];
+  const FETCH = ['fetch', '--tags', '--force'];
+  const URL = 'https://github.com/acme/app/releases/tag/v0.32.0';
+
+  let watcher: ReleaseWatcher;
+  let calls: string[][];
+  let ops: string[];
+  let log: string[];
+  /** o que o `gh release list` devolve; por padrão uma release publicada da v0.32.0 */
+  let releases: Record<string, unknown>[];
+  /** saída crua do `gh release list`, quando o teste quer passar por cima do JSON */
+  let rawList: string | null;
+  /** as tags que contêm o commit, por sha */
+  let tagsOf: (sha: string) => string[];
+  /** ganchos para simular falha de cada comando */
+  let failFetch: string | null;
+  let failList: string | null;
+  let failTags: string | null;
+  let failView: string | null;
+  /** commits que existem neste clone; `null` = todos */
+  let knownCommits: string[] | null;
+  /** faz o `card.archive` falhar */
+  let failArchive: string | null;
+
+  const release = (tagName: string, publishedAt: string, extra: Record<string, unknown> = {}) => ({
+    tagName,
+    publishedAt,
+    isDraft: false,
+    isPrerelease: false,
+    ...extra,
+  });
+  const comments = (n: number) => router.snapshot().comments.filter((c) => c.cardId === card(n).id);
+  const versionComments = (n: number) => comments(n).filter((c) => c.body.includes('saiu na versão'));
+  const columnName = (n: number) => router.snapshot().columns.find((c) => c.id === card(n).columnId)!.name;
+  const archived = (n: number) => card(n).archivedAt !== null;
+
+  beforeEach(async () => {
+    calls = [];
+    ops = [];
+    log = [];
+    releases = [release('v0.32.0', '2026-03-01T00:00:00Z')];
+    rawList = null;
+    tagsOf = () => ['v0.32.0'];
+    failFetch = failList = failTags = failView = failArchive = null;
+    knownCommits = null;
+
+    // o router de verdade, com um espião: a ordem das operações é o que o RF8 exige verificar
+    const handle = router.handle.bind(router);
+    (router as any).handle = (msg: any, meta?: any) => {
+      ops.push(msg.type);
+      if (msg.type === 'card.archive' && failArchive) throw new Error(failArchive);
+      return handle(msg, meta);
+    };
+
+    watcher = new ReleaseWatcher(router, {
+      cwd: '/projeto',
+      log: (line) => log.push(line),
+      gh: async (args) => {
+        calls.push(['gh', ...args]);
+        if (args[1] === 'list') {
+          if (failList) throw new Error(failList);
+          return rawList ?? JSON.stringify(releases);
+        }
+        if (failView) throw new Error(failView);
+        return JSON.stringify({ url: URL });
+      },
+      git: async (args) => {
+        calls.push(['git', ...args]);
+        if (args[0] === 'fetch') {
+          if (failFetch) throw new Error(failFetch);
+          return '';
+        }
+        if (args[0] === 'rev-parse') {
+          const sha = args[3]!.replace('^{commit}', '');
+          if (knownCommits && !knownCommits.includes(sha)) throw new Error('fatal: malformed object name');
+          return `${sha}\n`;
+        }
+        if (failTags) throw new Error(failTags);
+        return `${tagsOf(args[2]!).join('\n')}\n`;
+      },
+    });
+  });
+
+  it('sem candidato: nenhuma chamada de git nem de gh (RF11/RF12)', async () => {
+    await call('create_card', { title: 'Em homologação', column: 'Homologação' }); // #1
+    router.handle({ type: 'card.merge.set', cardId: card(1).id, commit: 'sha1' });
+    await watcher.sweep();
+    expect(calls).toEqual([]);
+    expect(log).toEqual([]);
+  });
+
+  it('caminho feliz: comenta com a tag e o link, arquiva e leva as sub-tarefas (RF6/RF9)', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await call('create_card', { title: 'Sub-tarefa', parent: 1 }); // #2
+    await merged(1, '9cf7766aaaa');
+    await watcher.sweep();
+
+    expect(calls).toEqual([
+      ['git', ...FETCH],
+      ['gh', ...RELEASE_LIST],
+      ['git', 'rev-parse', '--verify', '--quiet', '9cf7766aaaa^{commit}'],
+      ['git', 'tag', '--contains', '9cf7766aaaa'],
+      ['gh', 'release', 'view', 'v0.32.0', '--json', 'url'],
+    ]);
+    const body = versionComments(1).at(-1)!.body;
+    expect(body).toContain('saiu na versão v0.32.0');
+    expect(body).toContain(URL);
+    expect(body).toContain('9cf7766');
+    expect(versionComments(1).at(-1)!.author).toBe('Faz AI');
+    expect(archived(1)).toBe(true);
+    expect(archived(2)).toBe(true);
+    expect(log).toEqual(['[#1] Publicada na v0.32.0; card arquivado.']);
+  });
+
+  it('o comentário é gravado antes do arquivamento (RF8)', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    ops = [];
+    await watcher.sweep();
+    expect(ops.filter((o) => o === 'comment.add' || o === 'card.archive')).toEqual(['comment.add', 'card.archive']);
+  });
+
+  it('arquivamento que falha deixa o card visível com o comentário, e a rodada seguinte não repete o comentário (RF8/RF10)', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    failArchive = 'banco em uso';
+    await watcher.sweep();
+    expect(archived(1)).toBe(false);
+    expect(columnName(1)).toBe('Concluído');
+    expect(versionComments(1)).toHaveLength(1);
+    expect(log).toEqual(['Publicações: [#1] banco em uso']);
+
+    // a rodada seguinte consegue arquivar e não comenta de novo
+    failArchive = null;
+    await watcher.sweep();
+    expect(archived(1)).toBe(true);
+    expect(versionComments(1)).toHaveLength(1);
+  });
+
+  it('duas rodadas seguidas depois da publicação: exatamente um comentário de versão (RF10)', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    await watcher.sweep();
+    await watcher.sweep();
+    expect(versionComments(1)).toHaveLength(1);
+    // arquivada, ela sai dos candidatos: a segunda rodada não faz chamada nenhuma
+    expect(calls.filter((c) => c[1] === 'release' && c[2] === 'list')).toHaveLength(1);
+  });
+
+  it('tag sem release publicada não arquiva; rascunho não arquiva; pré-lançamento arquiva (RF4)', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    tagsOf = () => ['v1.0.0'];
+    await watcher.sweep();
+    expect(archived(1)).toBe(false);
+
+    tagsOf = () => ['v0.33.0'];
+    releases = [release('v0.33.0', '2026-04-01T00:00:00Z', { isDraft: true })];
+    await watcher.sweep();
+    expect(archived(1)).toBe(false);
+
+    releases = [release('v0.33.0', '2026-04-01T00:00:00Z', { isPrerelease: true })];
+    await watcher.sweep();
+    expect(archived(1)).toBe(true);
+    expect(versionComments(1).at(-1)!.body).toContain('v0.33.0');
+    expect(log).toEqual(['[#1] Publicada na v0.33.0; card arquivado.']);
+  });
+
+  it('entre duas tags que contêm o commit, a de publicação mais antiga (RF5)', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    releases = [release('v0.10.0', '2026-03-01T00:00:00Z'), release('v0.9.0', '2026-01-01T00:00:00Z')];
+    // a ordem do `git tag --contains` é alfabética: põe v0.10.0 antes de v0.9.0
+    tagsOf = () => ['v0.10.0', 'v0.9.0'];
+    await watcher.sweep();
+    expect(versionComments(1).at(-1)!.body).toContain('saiu na versão v0.9.0');
+    expect(log).toEqual(['[#1] Publicada na v0.9.0; card arquivado.']);
+  });
+
+  it('cinco candidatos: um único gh release list e um git tag --contains por candidato (RF12)', async () => {
+    for (let n = 1; n <= 5; n++) {
+      await call('create_card', { title: `Publicada ${n}`, column: 'Homologação' });
+      await merged(n);
+    }
+    await watcher.sweep();
+    expect(calls.filter((c) => c[1] === 'release' && c[2] === 'list')).toHaveLength(1);
+    expect(calls.filter((c) => c[1] === 'tag')).toHaveLength(5);
+    // o link da release é memorizado por tag: uma consulta, não cinco
+    expect(calls.filter((c) => c[2] === 'view')).toHaveLength(1);
+    expect([1, 2, 3, 4, 5].every((n) => archived(n))).toBe(true);
+  });
+
+  it('git fetch --tags falhando: a avaliação segue pelas tags locais (RF11)', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    failFetch = 'fatal: unable to access remote';
+    await watcher.sweep();
+    expect(archived(1)).toBe(true);
+    expect(log).toEqual(['Publicações: fatal: unable to access remote', '[#1] Publicada na v0.32.0; card arquivado.']);
+  });
+
+  it('gh ausente, JSON inesperado e saída vazia: nenhum card muda e nenhum status muda (RF13)', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    const status = card(1).status;
+    failList = 'o comando "gh" (GitHub CLI) não foi encontrado.';
+    await watcher.sweep();
+    failList = null;
+    releases = [{ nada: true }] as never;
+    await watcher.sweep();
+    rawList = '';
+    await watcher.sweep();
+
+    expect(archived(1)).toBe(false);
+    expect(columnName(1)).toBe('Concluído');
+    expect(card(1).status).toBe(status);
+    expect(versionComments(1)).toHaveLength(0);
+    expect(log).toEqual([
+      'Publicações: o comando "gh" (GitHub CLI) não foi encontrado.',
+      'Publicações: resposta inesperada do gh: [{"nada":true}]',
+      'Publicações: resposta inesperada do gh: (vazia)',
+    ]);
+  });
+
+  it('log sem repetição: a mesma causa em dez candidatos e três rodadas aparece uma vez; causa nova aparece (RF14)', async () => {
+    for (let n = 1; n <= 10; n++) {
+      await call('create_card', { title: `Publicada ${n}`, column: 'Homologação' });
+      await merged(n);
+    }
+    failTags = 'fatal: bad object';
+    await watcher.sweep();
+    await watcher.sweep();
+    await watcher.sweep();
+    // uma linha só: o que se compara é a causa, não a linha com o número do card
+    expect(log).toHaveLength(1);
+    expect(log[0]).toContain('fatal: bad object');
+    expect(log[0]).toMatch(/^Publicações: \[#\d+\] /);
+
+    failTags = 'error: index.lock exists';
+    await watcher.sweep();
+    expect(log).toHaveLength(2);
+    expect(log[1]).toContain('error: index.lock exists');
+  });
+
+  it('commit que este clone não conhece: nada acontece e nada vai para o log (RF11/RF13)', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1, 'desconhecido');
+    knownCommits = [];
+    await watcher.sweep();
+    expect(archived(1)).toBe(false);
+    expect(log).toEqual([]);
+    // o `--contains` nem é tentado: ele falharia com "malformed object name" e pareceria defeito
+    expect(calls.filter((c) => c[1] === 'tag')).toEqual([]);
+  });
+
+  it('gh release view falhando: comentário só com a tag e arquivamento feito (RF7)', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    failView = 'release not found';
+    await watcher.sweep();
+    const body = versionComments(1).at(-1)!.body;
+    expect(body).toContain('saiu na versão v0.32.0.');
+    expect(body).not.toContain('http');
+    expect(archived(1)).toBe(true);
+    expect(log).toEqual(['[#1] Publicada na v0.32.0; card arquivado.']);
+  });
+
+  it('arquiva sem pendência nem diálogo, mesmo com sub-tarefa em aberto e confirmação sempre ligada (RF15)', async () => {
+    router.handle({ type: 'settings.rules.update', patch: { confirmArchive: 'always' } });
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await call('create_card', { title: 'Sub-tarefa aberta', parent: 1 }); // #2
+    await merged(1);
+    expect(router.snapshot().board.rules.confirmArchive).toBe('always');
+    await watcher.sweep();
+    expect(archived(1)).toBe(true);
+    expect(archived(2)).toBe(true);
+  });
+
+  it('nada escapa do sweep, nem com o router quebrado (RF13)', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    (router as any).handle = () => {
+      throw new Error('router quebrado');
+    };
+    await expect(watcher.sweep()).resolves.toBeUndefined();
+    expect(log).toEqual(['Publicações: [#1] router quebrado']);
   });
 });
