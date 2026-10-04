@@ -5,13 +5,13 @@ import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { headlessCommand, headlessUnsupported } from '../src/extension/headless';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt } from '../src/extension/runner';
+import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt, consumptionLine } from '../src/extension/runner';
 import type { RunnerDeps } from '../src/extension/runner';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { executionPlan } from '../src/extension/execution';
-import { monthOf } from '../src/shared/log';
+import { monthOf, type RunReport } from '../src/shared/log';
 import type { Database } from 'sql.js';
 
 it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
@@ -123,6 +123,10 @@ it('com triage=true, o bloco de triagem entra antes do trabalho da fase; sem tri
 import type { HeadlessCommand } from '../src/extension/headless';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
+/** a saída real do Claude Code no modo estruturado, capturada no probe da #70 */
+const FIXTURE = fs.readFileSync(path.join(__dirname, 'fixtures', 'claude-stream-json.jsonl'), 'utf8');
+/** o mesmo fluxo cortado antes dos eventos finais: a execução que morre no meio */
+const HALF = FIXTURE.slice(0, FIXTURE.indexOf('{"duration_api_ms"'));
 
 let dir: string;
 let db: Database;
@@ -132,10 +136,21 @@ let runner: AiRunner;
 let deps: RunnerDeps;
 let log: string[];
 /** processos iniciados pelo executor, na ordem; `exit` simula o fim do processo */
-let procs: { command: HeadlessCommand; cwd: string; killed: boolean; exit(code: number | null, error?: Error): void }[];
+let procs: {
+  command: HeadlessCommand;
+  cwd: string;
+  killed: boolean;
+  /** um pedaço de saída do processo, como a CLI escreveria */
+  emit(text: string, stream?: 'stdout' | 'stderr'): void;
+  exit(code: number | null, error?: Error): void;
+}[];
+/** false = o processo falso não escreve nada ao começar (a recusa de argumento sai com o `stdout` vazio) */
+let speaks: boolean;
 let storyId: string;
 
 const card = () => router.snapshot().cards.find((c) => c.id === storyId)!;
+/** um evento de texto do assistente, como o `stream-json` do Claude Code escreve */
+const assistant = (text: string) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text }] } });
 const lastMessage = () =>
   router
     .snapshot()
@@ -164,6 +179,7 @@ beforeEach(async () => {
   });
   log = [];
   procs = [];
+  speaks = true;
   // sem `runLog`: o executor padrão dos testes é o de um board sem log, que tem de funcionar como antes
   deps = {
     cwd: dir,
@@ -174,10 +190,12 @@ beforeEach(async () => {
         command,
         cwd,
         killed: false,
+        emit: (text: string, stream: 'stdout' | 'stderr' = 'stdout') => out(text, stream),
         exit: (code: number | null, error?: Error) => listener(code, error),
       };
       procs.push(proc);
-      out('saída da ferramenta\n', 'stdout');
+      // no modo estruturado a ferramenta escreve eventos; o texto vem dentro de um evento do assistente
+      if (speaks) out(command.format === 'text' ? 'saída da ferramenta\n' : `${assistant('saída da ferramenta')}\n`, 'stdout');
       return {
         onExit: (fn) => (listener = fn),
         kill: () => {
@@ -206,6 +224,7 @@ describe('executor da IA', () => {
         prompt: cardPrompt('#1', [], [PERMISSION_ADVICE.board!], false, true),
         permission: 'board',
         addDirs: [`${dir}.worktrees`],
+        structured: true,
       }),
     );
     expect(card()).toMatchObject({ status: 'running', statusBy: 'Claude Code' });
@@ -239,6 +258,7 @@ describe('executor da IA', () => {
           prompt: cardPrompt('#1', [], [], true, true),
           permission: 'full',
           addDirs: [`${dir}.worktrees`],
+          structured: true,
         }),
       );
       expect(procs[0]!.command.args).toContain('bypassPermissions');
@@ -325,8 +345,8 @@ describe('executor da IA', () => {
     runner.start(storyId);
     expect(procs[0]!.command).toEqual({
       command: 'kimi',
-      args: ['-p', cardPrompt('#1', [], [], false, true), '--add-dir', `${dir}.worktrees`],
-      format: 'text',
+      args: ['-p', cardPrompt('#1', [], [], false, true), '--output-format', 'stream-json', '--add-dir', `${dir}.worktrees`],
+      format: 'stream-json',
     });
   });
 
@@ -625,5 +645,170 @@ describe('log das execuções de IA', () => {
     procs[0]!.exit(0);
     expect(rows()).toEqual([]);
     expect(runner.runIdOf(storyId)).toBeNull();
+  });
+
+  /** A medição de consumo pela porta do executor (#70): do processo ao banco, passando pelo canal e pela conversa do card. */
+  describe('consumo medido', () => {
+    const channel = () => log.filter((l) => l.startsWith('[#1] '));
+
+    it('a jornada do card: chamada estruturada, linhas legíveis, consumo e inventário gravados e o resumo no canal', () => {
+      logged.start(storyId);
+      const args = procs[0]!.command.args;
+      expect(args).toContain('--verbose');
+      expect(args[args.indexOf('--output-format') + 1]).toBe('stream-json');
+      expect(procs[0]!.command.format).toBe('claude-stream-json');
+
+      procs[0]!.emit(FIXTURE);
+      ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+      procs[0]!.exit(0);
+
+      expect(channel()).toContain('[#1] Read(a.txt)');
+      expect(channel()).toContain('[#1] Agent(Explore)');
+      expect(channel()).toContain('[#1] Subagente Explore concluído');
+      for (const line of log) expect(line).not.toContain('{"');
+      expect(only()).toMatchObject({
+        outcome: 'done',
+        measure: 'full',
+        inputTokens: 54,
+        outputTokens: 1221,
+        cacheReadTokens: 106009,
+        cacheWriteTokens: 28908,
+        turns: 5,
+        sessionId: '11111111-2222-3333-4444-555555555555',
+        costEstimated: false,
+      });
+      expect(only().costUsd).toBeCloseTo(0.06478465, 8);
+      expect(runs.usage(only().id)).toEqual([
+        { kind: 'agent', name: 'Explore', calls: 1 },
+        { kind: 'tool', name: 'Bash', calls: 1 },
+        { kind: 'tool', name: 'Read', calls: 2 },
+      ]);
+      expect(log).toContain(
+        '[#1] Consumo: 54 entrada · 1.221 saída · 106.009 leitura de cache · 28.908 criação de cache · 5 turnos · US$ 0,0648',
+      );
+      expect(card().status).toBe('waiting_answer');
+    });
+
+    it('RF-07: a CLI recusa a saída estruturada (código 1, nada no stdout): uma segunda chamada em texto, e a execução segue', () => {
+      speaks = false;
+      logged.start(storyId);
+      procs[0]!.emit('error: unknown option --output-format\n', 'stderr');
+      procs[0]!.exit(1);
+
+      expect(procs).toHaveLength(2);
+      expect(procs[1]!.command.format).toBe('text');
+      expect(procs[1]!.command.args).not.toContain('--output-format');
+      expect(card().status).toBe('running');
+
+      procs[1]!.emit('trabalho feito\n');
+      ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+      procs[1]!.exit(0);
+
+      expect(card().status).toBe('waiting_answer');
+      expect(only()).toMatchObject({ outcome: 'done', exitCode: 0, measure: 'none', outputTokens: null, costUsd: null });
+      expect(log.join('\n')).toContain('não aceita a saída estruturada');
+      // o motivo já está no canal: o resumo não o repete
+      expect(log).toContain('[#1] Consumo não medido.');
+    });
+
+    it('RF-07: a falha DEPOIS de eventos não repete a chamada, e o fim da saída no card é texto legível', () => {
+      logged.start(storyId);
+      procs[0]!.emit(FIXTURE);
+      procs[0]!.exit(1);
+
+      expect(procs).toHaveLength(1);
+      expect(card().status).toBe('blocked');
+      expect(card().statusReason).toContain('código 1');
+      expect(card().statusReason).toContain('Subagente Explore concluído');
+      expect(card().statusReason).not.toContain('{"');
+      // a linha da chamada é do board, não da ferramenta: não explica a falha
+      expect(card().statusReason).not.toContain('Chamando');
+      expect(only()).toMatchObject({ outcome: 'failed', exitCode: 1, measure: 'full', outputTokens: 1221 });
+    });
+
+    it('interromper no meio grava o consumo parcial, e o desfecho continua stopped', () => {
+      logged.start(storyId);
+      procs[0]!.emit(HALF);
+      logged.stop(storyId);
+
+      expect(procs).toHaveLength(1);
+      expect(only()).toMatchObject({ outcome: 'stopped', measure: 'partial', costUsd: null });
+      expect(only().inputTokens).toBeGreaterThan(0);
+      expect(log.some((l) => l.startsWith('[#1] Consumo parcial: '))).toBe(true);
+    });
+
+    it('interromper antes de qualquer evento grava "não medido", com o motivo no canal', () => {
+      speaks = false;
+      logged.start(storyId);
+      logged.stop(storyId);
+
+      expect(procs).toHaveLength(1);
+      expect(only()).toMatchObject({ outcome: 'stopped', measure: 'none', inputTokens: null });
+      expect(log).toContain('[#1] Consumo não medido: a execução terminou antes de informar o consumo.');
+    });
+
+    it('o tempo limite no meio grava o consumo parcial, e o desfecho continua timeout', () => {
+      vi.useFakeTimers();
+      router.handle({ type: 'settings.board.update', patch: { runner: { timeoutMinutes: 5 } } });
+      logged.start(storyId);
+      procs[0]!.emit(HALF);
+      vi.advanceTimersByTime(5 * 60_000);
+
+      expect(procs).toHaveLength(1);
+      expect(only()).toMatchObject({ outcome: 'timeout', measure: 'partial' });
+      expect(card().statusReason).toContain('tempo limite');
+    });
+
+    it('a ferramenta sem saída estruturada (Copilot) roda igual e diz no canal por que não mediu', () => {
+      router.handle({ type: 'settings.board.update', patch: { aiTool: 'copilot' } });
+      logged.start(storyId);
+      procs[0]!.exit(0);
+
+      expect(procs).toHaveLength(1);
+      expect(only()).toMatchObject({ outcome: 'done', measure: 'none' });
+      expect(log.find((l) => l.startsWith('[#1] Consumo não medido'))).toContain('não produz saída estruturada');
+    });
+  });
+});
+
+describe('consumptionLine', () => {
+  const report = (patch: Partial<RunReport> = {}, consumption: Partial<NonNullable<RunReport['consumption']>> = {}): RunReport => ({
+    measure: 'full',
+    consumption: {
+      inputTokens: 1234,
+      outputTokens: 5,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 1000000,
+      turns: 1,
+      sessionId: null,
+      costUsd: 1.5,
+      costEstimated: true,
+      ...consumption,
+    },
+    inventory: [],
+    answer: '',
+    reason: null,
+    ...patch,
+  });
+
+  it('números em português, "turno" no singular, custo com duas a quatro casas e marcado quando estimado', () => {
+    expect(consumptionLine(report())).toBe(
+      'Consumo: 1.234 entrada · 5 saída · 0 leitura de cache · 1.000.000 criação de cache · 1 turno · US$ 1,50 (estimado)',
+    );
+  });
+
+  it('turnos e custo que a ferramenta não informou ficam fora da linha, em vez de virarem zero', () => {
+    expect(consumptionLine(report({ measure: 'partial' }, { turns: null, costUsd: null }))).toBe(
+      'Consumo parcial: 1.234 entrada · 5 saída · 0 leitura de cache · 1.000.000 criação de cache',
+    );
+  });
+
+  it('sem consumo: o motivo de quem chama, o do relatório, ou nada quando ele já está no canal', () => {
+    const none = report({ measure: 'none', consumption: null, reason: 'A medição não foi possível nesta execução.' });
+    expect(consumptionLine(none)).toBe('Consumo não medido. A medição não foi possível nesta execução.');
+    expect(consumptionLine(none, { reason: 'a execução terminou antes de informar o consumo.' })).toBe(
+      'Consumo não medido: a execução terminou antes de informar o consumo.',
+    );
+    expect(consumptionLine(none, { explained: true })).toBe('Consumo não medido.');
   });
 });
