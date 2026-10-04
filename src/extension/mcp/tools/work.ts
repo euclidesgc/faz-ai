@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isYolo } from '../../../shared/story';
+import { isDelivered, isYolo, storyOf } from '../../../shared/story';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { cardSummary, findCard } from '../format';
 import { cardArg } from './args';
@@ -116,7 +116,20 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
     (a, router) => {
       const card = live(findCard(router.snapshot(), a.card));
       router.handle({ type: 'card.pr.set', cardId: card.id, url: a.url }, aiOrigin(ctx));
-      return detail(router, card.id).workspace ?? { pullRequest: a.url };
+      const result = detail(router, card.id).workspace ?? { pullRequest: a.url };
+      // na última coluna da IA, o pull request fecha a entrega: o status já passou para a pessoa.
+      // Fora dela, nada muda aqui: a fase segue o fluxo normal (request_review, move_card).
+      const s = router.snapshot();
+      const story = storyOf(
+        s,
+        s.cards.find((c) => c.id === card.id)!,
+      );
+      if (story && isDelivered(s, story))
+        return {
+          ...result,
+          next: 'A história foi entregue: o status passou para a pessoa (aguardando revisão). Pare aqui — não mova o card para a conclusão nem faça o merge; isso é dela.',
+        };
+      return result;
     },
   );
 }

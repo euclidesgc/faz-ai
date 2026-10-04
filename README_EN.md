@@ -328,19 +328,22 @@ A **story** can be marked **YOLO**: in the card panel, turn on **Modo autônomo 
 asks for confirmation, because the mode gives up every approval). From then on the AI drives the
 story by itself, **without asking for authorization or confirmation on anything**:
 
-- From **Backlog** to the end: it does Discovery, PRD, Spec and Plan, creates the sub-tasks,
-  implements them one by one and, at Homologação, opens the pull request. Columns that require
-  approval stop holding the card, and the AI's review request becomes an approval right away, with
-  its summary recorded in the conversation.
+- From **Backlog** to the last column the AI works in (Homologação, on the default board): it does
+  Discovery, PRD, Spec and Plan, creates the sub-tasks, implements them one by one and, in that
+  last column, opens the pull request, records it with `set_pull_request` and stops there — the
+  story waits for your review. Columns that require approval stop holding the card, and the AI's
+  review request becomes an approval right away, with its summary recorded in the conversation.
 - **No questions**: the AI does not use `ask_question`; faced with a doubt it decides and records
   the decision and the reason in the conversation. Only a real impediment (access, environment, a
   failure it cannot fix) blocks the card.
-- **No merge**: Concluído means an open pull request. Merging stays with you.
+- **No merge**: the AI stops at the last column it works in, with the pull request open; merging and
+  moving the card on to Concluído stay with you. Concluído means merged.
 - **No restrictions**: in the mode's runs the AI uses the "Sem restrições" permission (edits files
   and runs commands), because it needs git and `gh`. Turning the mode on accepts this for the story.
 - **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in board
-  order — bugs first, then top to bottom — and moves on to the next when the current one finishes,
-  without waiting for the heartbeat interval. Each story's branch starts from the branch of the
+  order — bugs first, then top to bottom — and moves on to the next story in the queue as soon as
+  the current one is delivered (stopped at the AI's last column, with the pull request recorded),
+  without waiting for your review or the heartbeat interval. Each story's branch starts from the branch of the
   closest lower-numbered story that already has one, and its pull request is opened with `--base`
   on it, forming a stack of PRs; when the board order runs a story before a lower-numbered one, its
   branch starts from the main branch and its pull request stands alone, outside the stack.

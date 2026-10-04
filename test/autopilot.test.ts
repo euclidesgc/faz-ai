@@ -41,6 +41,15 @@ const move = (n: number, column: string) =>
   });
 const status = (n: number, s: CardStatus | null, note?: string) => ai({ type: 'card.status.set', cardId: card(n).id, status: s, note });
 const yolo = (n: number, enabled = true) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled });
+/**
+ * Marca a história como entregue: na última coluna da IA, com pull request e aguardando revisão. Usa
+ * `card.status.set` direto (sem `source: 'ai'`) para não cair no auto-aprovar do modo autônomo, que
+ * trocaria `waiting_review` por `approved`.
+ */
+const deliver = (n: number) => {
+  router.handle({ type: 'card.status.set', cardId: card(n).id, status: 'waiting_review' });
+  ai({ type: 'card.pr.set', cardId: card(n).id, url: `https://github.com/org/repo/pull/${n}` });
+};
 /** Cria uma história com um tipo escolhido pelo nome (ex.: Bug), na coluna dada. */
 const createTyped = (typeName: string, title: string, column: string) => {
   const s = router.snapshot();
@@ -161,6 +170,57 @@ describe('autopilotStep', () => {
     yolo(2);
     move(1, 'Concluído');
     expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 2 } });
+  });
+
+  it('a história entregue deixa a fila andar: a vez passa para a próxima, aberta no Backlog', () => {
+    create('A', 'Homologação'); // #1
+    create('B', 'Backlog'); // #2
+    yolo(1);
+    yolo(2);
+    deliver(1);
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 2 } });
+  });
+
+  it('história bloqueada segura a fila mesmo com pull request registrado na última coluna da IA', () => {
+    createTyped('Bug', 'A', 'Homologação'); // #1, bug: garante a vez dela na fila, qualquer que seja a coluna
+    create('B', 'Backlog'); // #2
+    yolo(1);
+    yolo(2);
+    deliver(1); // bloqueio é exceção: entrega não vale enquanto houver impedimento
+    status(1, 'blocked', 'Sem acesso ao repositório');
+    expect(autopilotStep(router.snapshot())).toMatchObject({
+      kind: 'paused',
+      story: { number: 1 },
+      reason: expect.stringContaining('Sem acesso'),
+    });
+  });
+
+  it('história aguardando resposta segura a fila', () => {
+    createTyped('Bug', 'A', 'PRD'); // #1, bug: garante a vez dela na fila
+    create('B', 'Backlog'); // #2
+    yolo(1);
+    yolo(2);
+    status(1, 'waiting_answer');
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'paused', story: { number: 1 } });
+  });
+
+  it('história aguardando revisão numa coluna antes da última da IA segura a fila: ainda não chegou à entrega', () => {
+    createTyped('Bug', 'A', 'Implementação'); // #1, bug: garante a vez dela na fila
+    create('B', 'Backlog'); // #2
+    yolo(1);
+    yolo(2);
+    // card.status.set direto, sem source 'ai': o autoaprovar do modo autônomo só vale para a IA
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'waiting_review' });
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'paused', story: { number: 1 } });
+  });
+
+  it('história na última coluna da IA aguardando revisão sem pull request segura a fila: falta a entrega', () => {
+    createTyped('Bug', 'A', 'Homologação'); // #1, bug: garante a vez dela na fila
+    create('B', 'Backlog'); // #2
+    yolo(1);
+    yolo(2);
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'waiting_review' });
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'paused', story: { number: 1 } });
   });
 });
 
@@ -294,6 +354,47 @@ describe('autopiloto', () => {
     status(1, 'running'); // a sessão caiu sem avisar
     yolo(1);
     expect(runner.started).toEqual([card(1).id]);
+  });
+
+  it('história entregue: a IA não a retoma, não a move, e o disjuntor de falta de progresso não a alcança', () => {
+    create('A', 'Homologação'); // #1
+    status(1, 'blocked', 'Preparando'); // estado neutro: ligar o modo autônomo não dispara nada nela ainda
+    yolo(1);
+    deliver(1); // só depois de ligado: registra o pull request e libera para waiting_review
+    create('B', 'PRD'); // #2
+    yolo(2);
+    flush();
+    expect(runner.started).not.toContain(card(1).id);
+    expect(columnName(1)).toBe('Homologação');
+    expect(card(1).status).toBe('waiting_review');
+
+    for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS; i++) runner.finish(() => status(2, 'ready')); // B sem progresso
+    expect(card(2).status).toBe('blocked'); // o disjuntor agiu sobre B, a história da vez
+    expect(card(1).status).toBe('waiting_review'); // A nunca foi tocada
+    expect(runner.started).not.toContain(card(1).id);
+  });
+
+  it('todas as histórias entregues: o autopiloto fica inativo e o log registra o fim da fila', () => {
+    create('A', 'Homologação'); // #1
+    status(1, 'blocked', 'Preparando');
+    yolo(1);
+    deliver(1);
+    flush();
+    expect(autopilotStep(router.snapshot()).kind).toBe('idle');
+    expect(autopilot.isActive).toBe(false);
+    expect(log.at(-1)).toContain('nenhuma história em modo autônomo pendente');
+  });
+
+  it('a linha de log de história entregue é registrada uma vez, não a cada mudança do board', () => {
+    create('A', 'Homologação'); // #1
+    status(1, 'blocked', 'Preparando');
+    yolo(1);
+    deliver(1);
+    flush();
+    ai({ type: 'comment.add', cardId: card(1).id, body: 'Mais uma mudança qualquer no board.' });
+    flush();
+    const deliveredLines = log.filter((l) => l.includes('entregue'));
+    expect(deliveredLines).toHaveLength(1);
   });
 });
 

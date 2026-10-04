@@ -1156,6 +1156,74 @@ describe('modo autônomo (YOLO)', () => {
     expect(approvals).toEqual([]);
   });
 
+  it('set_pull_request na última coluna da IA entrega a história YOLO: waiting_review (não approved) e aviso na conversa', async () => {
+    await call('create_card', { title: 'Login', column: 'Backlog' });
+    setYolo(1, true);
+    await call('move_card', { card: 1, column: 'Homologação' });
+    const approvals: string[] = [];
+    router.onDidApprove((id) => approvals.push(id));
+
+    const res = (await call('set_pull_request', { card: 1, url: 'https://github.com/org/repo/pull/1' })).data;
+    expect(card(1).status).toBe('waiting_review');
+    expect(card(1).prUrl).toBe('https://github.com/org/repo/pull/1');
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('entregue');
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('https://github.com/org/repo/pull/1');
+    expect(res.next).toContain('entregue');
+    expect(approvals).toEqual([]); // o merge só sai da aprovação de uma pessoa, não da entrega automática
+  });
+
+  it('set_pull_request numa coluna anterior à última da IA não entrega: status inalterado', async () => {
+    await call('create_card', { title: 'Login', column: 'Backlog' });
+    setYolo(1, true);
+    await call('move_card', { card: 1, column: 'Implementação' });
+    const before = card(1).status;
+
+    await call('set_pull_request', { card: 1, url: 'https://github.com/org/repo/pull/1' });
+    expect(card(1).status).toBe(before);
+    expect(card(1).prUrl).toBe('https://github.com/org/repo/pull/1');
+  });
+
+  it('set_pull_request na última coluna sem modo autônomo não entrega: status inalterado', async () => {
+    await call('create_card', { title: 'Login', column: 'Backlog' });
+    await call('move_card', { card: 1, column: 'Homologação' });
+    const before = card(1).status;
+
+    await call('set_pull_request', { card: 1, url: 'https://github.com/org/repo/pull/1' });
+    expect(card(1).status).toBe(before);
+    expect(card(1).prUrl).toBe('https://github.com/org/repo/pull/1');
+  });
+
+  it('get_card: autonomousNote na última coluna da IA manda registrar o pull request e parar, sem mover para a conclusão', async () => {
+    await call('create_card', { title: 'Login', column: 'Backlog' });
+    setYolo(1, true);
+    await call('move_card', { card: 1, column: 'Homologação' });
+
+    const note = (await call('get_card', { card: 1 })).data.phase.autonomousNote;
+    expect(note).toContain('set_pull_request');
+    expect(note).toMatch(/pare/);
+    expect(note).not.toContain('próxima coluna');
+  });
+
+  it('get_card: autonomousNote numa coluna do meio continua mandando mover para a próxima coluna', async () => {
+    await call('create_card', { title: 'Login', column: 'Backlog' });
+    setYolo(1, true);
+    await call('move_card', { card: 1, column: 'Implementação' });
+
+    const note = (await call('get_card', { card: 1 })).data.phase.autonomousNote;
+    expect(note).toContain('próxima coluna');
+  });
+
+  it('set_pull_request numa história bloqueada não entrega: o impedimento continua de pé', async () => {
+    await call('create_card', { title: 'Login', column: 'Backlog' });
+    setYolo(1, true);
+    await call('move_card', { card: 1, column: 'Homologação' });
+    await call('block_card', { card: 1, reason: 'Sem acesso ao repositório remoto' });
+
+    await call('set_pull_request', { card: 1, url: 'https://github.com/org/repo/pull/1' });
+    expect(card(1).status).toBe('blocked');
+    expect(card(1).prUrl).toBe('https://github.com/org/repo/pull/1');
+  });
+
   it('ask_question é recusada: a IA decide sozinha', async () => {
     await call('create_card', { title: 'Login', column: 'Discovery' });
     setYolo(1, true);

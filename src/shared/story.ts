@@ -1,6 +1,7 @@
-import type { BoardState, Card } from './model';
-import { columnOf, isLive } from './selectors';
+import type { BoardState, Card, Column, Id } from './model';
+import { columnOf, columnsOf, isLive } from './selectors';
 import { byExecutionOrder } from './priority';
+import { statusInfo } from './status';
 
 // Regras da história: o card principal, que guarda a branch, a worktree e o pull request das sub-tarefas.
 
@@ -29,3 +30,27 @@ export function stackBaseOf(state: Pick<BoardState, 'cards'>, story: Card): Card
 /** Histórias em modo autônomo ainda em aberto, na ordem de execução da fila: bug primeiro, depois de cima para baixo no board. */
 export const yoloStories = (state: BoardState): Card[] =>
   state.cards.filter((c) => c.yolo && !c.parentId && isLive(c) && columnOf(state, c)?.category === 'open').sort(byExecutionOrder(state));
+
+/**
+ * Onde a IA para de atuar num workflow: a última coluna em aberto com `aiActive`, por posição — nunca
+ * pelo nome ("Homologação" é só a configuração padrão; as colunas são renomeáveis). `undefined` se o
+ * workflow não tiver nenhuma.
+ */
+export const lastAiColumn = (state: BoardState, workflowId: Id): Column | undefined =>
+  columnsOf(state, workflowId)
+    .filter((c) => c.category === 'open' && c.aiActive)
+    .at(-1);
+
+/**
+ * A história (não a sub-tarefa) está entregue: modo autônomo, parada na última coluna em que a IA
+ * atua, com pull request registrado e o status passado para a pessoa — exceto bloqueio, que é
+ * impedimento, não entrega.
+ */
+export function isDelivered(state: BoardState, card: Card): boolean {
+  if (!card.yolo || card.parentId) return false;
+  const column = columnOf(state, card);
+  if (!isLive(card) || column?.category !== 'open') return false;
+  if (column.id !== lastAiColumn(state, card.workflowId)?.id) return false;
+  if (!card.prUrl) return false;
+  return card.status !== null && card.status !== 'blocked' && statusInfo(card.status).owner === 'human';
+}

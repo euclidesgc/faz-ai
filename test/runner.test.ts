@@ -5,7 +5,13 @@ import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { headlessCommand, headlessUnsupported } from '../src/extension/headless';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { AiRunner, PERMISSION_ADVICE, cardPrompt } from '../src/extension/runner';
+import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt } from '../src/extension/runner';
+
+it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
+  expect(AUTONOMOUS_ADVICE).not.toContain('coluna de conclusão');
+  expect(AUTONOMOUS_ADVICE).toContain('set_pull_request');
+  expect(AUTONOMOUS_ADVICE).toMatch(/pare/);
+});
 
 it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP num arquivo temporário e o resto no prompt', async () => {
   const fs = await import('node:fs');

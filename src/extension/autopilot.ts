@@ -2,7 +2,7 @@ import { cardRef, type BoardState, type Card, type Column } from '../shared/mode
 import { aiQueue, pendingWork } from '../shared/pending';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { statusInfo } from '../shared/status';
-import { yoloStories } from '../shared/story';
+import { isDelivered, yoloStories } from '../shared/story';
 import type { MessageRouter } from './panel/messageRouter';
 
 const AUTHOR = 'Faz AI';
@@ -45,7 +45,8 @@ export type AutopilotStep =
  * impedimento segura a fila, em vez de a seguinte passar na frente.
  */
 export function autopilotStep(s: BoardState): AutopilotStep {
-  const story = yoloStories(s)[0];
+  // uma história entregue já passou para a pessoa: não segura a fila, a próxima assume
+  const story = yoloStories(s).find((c) => !isDelivered(s, c));
   if (!story) return { kind: 'idle' };
   const column = columnOf(s, story)!;
   if (isAiWorking(s, story) || childrenOf(s, story.id).some((c) => isAiWorking(s, c))) return { kind: 'wait', story };
@@ -91,6 +92,8 @@ export class Autopilot {
   private known: Set<string>;
   /** estado da história quando a última execução começou, e quantas execuções seguidas não mudaram nada */
   private progress = new Map<string, { sig: string; stalls: number }>();
+  /** histórias entregues já anunciadas no log, para não repetir a linha a cada mudança do board */
+  private deliveredLogged = new Set<string>();
 
   constructor(
     private router: MessageRouter,
@@ -167,6 +170,15 @@ export class Autopilot {
     );
   }
 
+  /** Anuncia, uma vez por história, que uma entrega parou de ocupar a fila e o autopiloto seguiu adiante. */
+  private logDelivered(s: BoardState): void {
+    for (const story of yoloStories(s).filter((c) => isDelivered(s, c))) {
+      if (this.deliveredLogged.has(story.id)) continue;
+      this.deliveredLogged.add(story.id);
+      this.deps.log(`Autopiloto: ${cardRef(story)} entregue (pull request aberto, aguardando revisão); seguindo para a próxima.`);
+    }
+  }
+
   private canRun(): boolean {
     return this.deps.canRun?.() ?? true;
   }
@@ -179,6 +191,7 @@ export class Autopilot {
     try {
       for (let guard = 0; guard < 50; guard++) {
         this.recoverStale();
+        this.logDelivered(this.router.snapshot());
         const step = autopilotStep(this.router.snapshot());
         this.publish(step.kind === 'paused' ? step.reason : null);
         if (step.kind === 'idle') {
@@ -227,7 +240,8 @@ export class Autopilot {
   private recoverStale(): void {
     if (this.runner.running.length) return;
     const s = this.router.snapshot();
-    const story = yoloStories(s)[0];
+    // entregue não tem execução a recuperar: é a mesma primeira história não entregue do autopilotStep
+    const story = yoloStories(s).find((c) => !isDelivered(s, c));
     if (!story) return;
     for (const c of [story, ...childrenOf(s, story.id).filter(isLive)])
       if (c.status === 'running' && !s.aiRuns.includes(c.id))
