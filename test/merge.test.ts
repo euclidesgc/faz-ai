@@ -142,6 +142,10 @@ describe('MergeWatcher', () => {
   let log: string[];
   let watcher: MergeWatcher;
   let canRun: () => boolean;
+  /** o gancho do fim da rodada (a rodada de publicação, #49); por padrão não faz nada */
+  let after: () => Promise<void>;
+  /** quantas chamadas de `gh` já tinham acontecido a cada vez que o gancho rodou */
+  let afterRuns: number[];
 
   const json = (pr: Record<string, unknown>) => async () => JSON.stringify(pr);
   const MERGED = json({ state: 'MERGED', mergedAt: '2026-10-04T10:00:00Z', mergeCommit: { oid: 'abc123' } });
@@ -161,6 +165,8 @@ describe('MergeWatcher', () => {
     now = 1_000_000;
     log = [];
     canRun = () => true;
+    after = async () => {};
+    afterRuns = [];
     watcher = new MergeWatcher(router, {
       cwd: '/projeto',
       log: (line) => log.push(line),
@@ -173,6 +179,10 @@ describe('MergeWatcher', () => {
       },
       now: () => now,
       canRun: () => canRun(),
+      afterRound: () => {
+        afterRuns.push(calls.length);
+        return after();
+      },
     });
     await deliver(1);
   });
@@ -403,5 +413,33 @@ describe('MergeWatcher', () => {
     await flush();
     expect(card(1).status).toBe('waiting_review');
     expect(log).toEqual(['Merges: sem rede']);
+  });
+
+  it('o gancho do fim da rodada roda uma vez, depois do último pull request consultado', async () => {
+    await call('create_card', { title: 'Entregue também', column: 'Homologação' }); // #2
+    await deliver(2);
+    ghResult = OPEN;
+    await watcher.runNow();
+    expect(calls).toEqual([
+      ['pr', 'view', prOf(1), '--json', 'state,mergedAt,mergeCommit'],
+      ['pr', 'view', prOf(2), '--json', 'state,mergedAt,mergeCommit'],
+    ]);
+    // uma vez só, e com as duas consultas já feitas: o gancho vem depois do laço de merges
+    expect(afterRuns).toEqual([2]);
+  });
+
+  it('um erro do gancho não escapa da rodada e não trava a rodada seguinte', async () => {
+    ghResult = OPEN;
+    after = async () => {
+      throw new Error('falha do gancho');
+    };
+    await expect(watcher.runNow()).resolves.toBe(1);
+    expect(log).toEqual([]);
+
+    // o `busy` voltou a false: o tick seguinte, com o intervalo vencido, faz outra rodada
+    now += 60 * MINUTE;
+    expect(() => watcher.tick()).not.toThrow();
+    await flush();
+    expect(afterRuns).toHaveLength(2);
   });
 });
