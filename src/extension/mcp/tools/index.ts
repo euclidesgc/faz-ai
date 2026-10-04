@@ -4,6 +4,7 @@ import { registerCardContentTools } from './cardContent';
 import { registerCardTools } from './cards';
 import { registerHarnessTools } from './harness';
 import { registerLifecycleTools } from './lifecycle';
+import { registerMetricsTools } from './metrics';
 import { registerModelTools } from './models';
 import { registerQueryTools } from './query';
 import { toolRegistrar, type ToolContext } from './registry';
@@ -16,6 +17,7 @@ export type { ToolContext } from './registry';
 export function registerTools(server: McpServer, ctx: ToolContext): void {
   const tool = toolRegistrar(server, ctx);
   registerQueryTools(tool);
+  registerMetricsTools(tool);
   registerCardTools(tool, ctx);
   registerWorkTools(tool, ctx);
   registerLifecycleTools(tool);

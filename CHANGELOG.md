@@ -43,6 +43,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   `npm run release` continua como está —, e histórias concluídas antes desta versão, sem o commit do
   merge guardado, continuam sendo arquivadas por você.
 
+- **A IA pode consultar as métricas de uso do board direto na conversa do card com `get_metrics`.** A
+  ferramenta agrega dados do histórico — execuções, duração, custo e tokens — por fase, tipo de card,
+  ferramenta, modelo, card, agente ou skill, com filtros de período e card. Responde em tabela
+  compacta. Não lista execuções individuais (a agregação por card já basta para a IA saber o custo de
+  cada um). Custo e tokens ainda têm "-" (não medidos) até a história #70 passar a gravá-los; até
+  lá a ferramenta funciona normalmente e marca a cifra como estimada.
+
 ## 0.31.1
 
 - **O card aberto voltou a funcionar.** Na 0.31.0 o card abria encostado à esquerda e fechava a
