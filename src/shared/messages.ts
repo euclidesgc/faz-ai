@@ -34,6 +34,12 @@ export type WebviewToHost =
       columnId: Id;
       position: number;
       /** ao cancelar uma história, cancela também as sub-tarefas em aberto */ cancelChildren?: boolean;
+      /**
+       * desliga só a checagem de `blockDoneWithOpenChildren` ao concluir uma história; nenhuma outra
+       * validação do `moveInner` é afetada. Não é exposta pela interface nem pelo MCP: só código interno
+       * (o `MergeWatcher`, porque o merge do pull request já aconteceu e é irreversível) deve usá-la.
+       */
+      allowOpenChildren?: boolean;
     }
   | { type: 'card.trash'; cardId: Id }
   | { type: 'card.restore'; cardId: Id }

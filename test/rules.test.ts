@@ -176,6 +176,25 @@ describe('regras configuráveis', () => {
   });
 });
 
+describe('allowOpenChildren: concluir história mergeada com sub-tarefa em aberto', () => {
+  it('com a opção, conclui mesmo com o bloqueio ligado e sub-tarefa em aberto', () => {
+    const done = col('parent', 'Concluído').id;
+    cards.move(story, done, 0, { allowOpenChildren: true });
+    expect(columnOf(story)).toBe('Concluído');
+    expect(columnOf(sub1)).toBe('A fazer'); // sub-tarefa em aberto não é afetada
+  });
+
+  it('sem a opção, o mesmo cenário continua recusando com a mesma mensagem de hoje', () => {
+    const done = col('parent', 'Concluído').id;
+    expect(() => cards.move(story, done, 0)).toThrow('Não é possível concluir "Login": 1 sub-tarefa(s) ainda em aberto.');
+  });
+
+  it('não afasta nenhuma outra validação do moveInner (ex.: mover entre workflows)', () => {
+    const otherWorkflowColumn = col('child', 'A fazer').id;
+    expect(() => cards.move(story, otherWorkflowColumn, 0, { allowOpenChildren: true })).toThrow('Não é possível mover entre workflows');
+  });
+});
+
 describe('regra: história só avança de fase sem sub-tarefas da fase em aberto', () => {
   const setFase = (cardId: string, fase: string) => cards.setFieldValue(cardId, snap().fieldDefs.find((f) => f.name === 'Fase')!.id, fase);
   const mk = (title: string, parentId: string | null) =>
