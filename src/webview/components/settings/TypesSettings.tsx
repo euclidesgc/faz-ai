@@ -193,7 +193,7 @@ function NewTypeRow({ onDone }: { onDone: () => void }) {
             {t('Cancelar')}
           </Button>
           <Button disabled={!ready} onClick={add}>
-            {t('Adicionar')}
+            {t('Criar tipo')}
           </Button>
         </div>
       </td>

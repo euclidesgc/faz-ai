@@ -74,7 +74,6 @@ export const card: Record<string, string> = {
     'No messages yet. The conversation with the AI about this card happens here.',
   '{tool} está trabalhando neste card… A resposta aparece aqui quando terminar.':
     '{tool} is working on this card… The reply appears here when it finishes.',
-  Parar: 'Stop',
   'Escreva uma mensagem… (Cmd+Enter envia; cole imagens direto aqui)': 'Write a message… (Cmd+Enter sends; paste images right here)',
   'Chamar a IA daqui não está disponível para o {tool}.': 'Calling the AI from here is not available for {tool}.',
   'Permissão do {tool} ao ser chamado: {permission}.': '{tool} permission when called: {permission}.',
@@ -104,7 +103,6 @@ export const card: Record<string, string> = {
 
   // Descrição
   Descrição: 'Description',
-  Concluir: 'Done',
   'Descreva o problema, o contexto e o critério de aceite. Markdown suportado.':
     'Describe the problem, the context and the acceptance criteria. Markdown supported.',
   'Clique para adicionar uma descrição…': 'Click to add a description…',
@@ -127,6 +125,9 @@ export const card: Record<string, string> = {
   Filhos: 'Children',
   Relativos: 'Related',
   '{done}/{total} encerrados': '{done}/{total} closed',
+  estrutura: 'structural',
+  'sub-tarefas': 'sub-tasks',
+  '{count} sub-tarefa(s) — ver na seção Sub-tarefas': '{count} sub-task(s) — see the Sub-tasks section',
   'Tipo de vínculo': 'Link type',
   'Buscar card para vincular': 'Search for a card to link',
   'Buscar card por número ou título…': 'Search card by number or title…',
@@ -201,7 +202,6 @@ export const card: Record<string, string> = {
   'Nenhuma skill nesta aba.': 'No skills in this tab.',
   'Mostrando {shown} de {total}: refine a busca para ver as outras.': 'Showing {shown} of {total}: refine the search to see the rest.',
   '{n} marcadas': '{n} selected',
-  Limpar: 'Clear',
 
   'A IA trabalha nesta sub-tarefa sem pedir aprovação, como na história':
     'The AI works on this sub-task without asking for approval, as in the story',
@@ -210,11 +210,10 @@ export const card: Record<string, string> = {
     'The AI drives this story by itself, from Backlog to the pull request: it writes the document of each phase, the plan and the sub-tasks, implements them one by one and opens the PR. Nothing is asked of you: there is no approval, question or confirmation. The AI runs with the "Sem restrições" (no restrictions) permission (it edits files and runs commands) and does not merge. The next autonomous stories join the queue and become a stack of pull requests. Stop at any time with the button at the top of the board.',
   'Ligar o modo autônomo em {ref}?': 'Turn on autonomous mode for {ref}?',
   'Ligar o modo autônomo': 'Turn on autonomous mode',
-  'Modo autônomo (YOLO)': 'Autonomous mode (YOLO)',
-  'O autopiloto está tocando a fila.': 'The autopilot is driving the queue.',
-  'O autopiloto está pausado.': 'The autopilot is paused.',
-  Pausar: 'Pause',
-  Retomar: 'Resume',
-  'Modo autônomo (YOLO): a IA toca esta história sozinha, sem aprovação':
-    'Autonomous mode (YOLO): the AI drives this story by itself, without approval',
+  'O modo autônomo está tocando a fila.': 'Autonomous mode is driving the queue.',
+  'O modo autônomo está pausado.': 'Autonomous mode is paused.',
+  'Modo autônomo': 'Autonomous mode',
+  'Modo autônomo: a IA toca esta história sozinha, sem aprovação': 'Autonomous mode: the AI drives this story by itself, without approval',
+  'Salvar descrição': 'Save description',
+  'Aplicar seleção': 'Apply selection',
 };

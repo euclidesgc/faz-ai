@@ -102,7 +102,7 @@ export function App() {
               setFilters({ owner: onlyMine ? 'any' : 'human' });
             }}
           >
-            {t('{n} com você', { n: withYou })}
+            {onlyMine ? t('Ver todos os cards') : t('Ver {n} com você', { n: withYou })}
           </Button>
         )}
         {!isWeb && (
@@ -116,7 +116,7 @@ export function App() {
           title={isWeb ? t('Conversar com a IA sobre o board') : t('Abre o chat com a IA na barra lateral')}
           onClick={() => (isWeb ? setChatOpen(!chatOpen) : ui.showChat())}
         >
-          <IconChat /> {t('Chat')}
+          <IconChat /> {isWeb && chatOpen ? t('Fechar chat') : t('Abrir chat')}
         </Button>
         <AutopilotButton />
         <HeartbeatButton offline={offline} />

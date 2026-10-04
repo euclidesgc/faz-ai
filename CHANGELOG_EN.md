@@ -7,6 +7,52 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **The card's LED now looks like an LED and tells the state at a glance.** It used to be a dot in
+  the bar's text color, with a nearly invisible pulse. It is now green and blinks slowly while the
+  AI is working on the card (or on one of the story's sub-tasks), yellow when the card is waiting on
+  you, red when it is blocked, and off when nothing is happening. Only green blinks. This applies to
+  the cards on the board, the sub-tasks and the header of the open card.
+
+- **Buttons say what the click does.** Labels that showed only a state or a generic name became
+  actions: at the top, "Pausar modo autônomo" / "Retomar modo autônomo" (pause / resume autonomous
+  mode), "Ver 2 com você" / "Ver todos os cards" and "Abrir chat" / "Fechar chat"; on the board,
+  "Mostrar filtros", "Limpar filtros", "+ Nova coluna" and "Criar card"; on the card, "Parar a IA"
+  and "Salvar descrição"; in the settings, "Criar tipo", "Criar coluna", "Adicionar modelo", "Fechar
+  edição", "Reler pastas", "Chamar a IA agora", "Restaurar aparência padrão" and others. In the
+  interface, autonomous mode now goes by a single name (no "YOLO" or "autopiloto" in the labels).
+
+- **Splitting a large request into stories now actually links them.** Creating a story with
+  `autonomous_from` now gives it a **related** link to the origin story — before, the origin was
+  only recorded as text, in a comment that neither the interface nor the AI read as a relation. If
+  any link already exists between the two (e.g. a story linked by hand), the creation is skipped
+  silently, without duplicating.
+- **The Vínculos (links) section of the open card now shows the sub-task relation.** On a sub-task,
+  a "Pai" (parent) group with the story; on a story, the sub-task count with a shortcut to the
+  Sub-tarefas section (without repeating the list). The relation is read-only and does not enter the
+  completion rules, which still apply only to the manual parent/child link.
+
+- **A story leaves the board when its version is published.** In the same round that looks at the
+  pull requests, the board checks whether the merge commit of a concluded story is already in a
+  published version — a tag that contains the commit **and** that has a published release on GitHub.
+  It is: the board registers in the conversation which version carried the story (tag and release
+  link) and archives the card, which goes to the workflow's archived area and can be unarchived with
+  one click. The Concluído column now means "merged and not delivered yet". **The feature is on by
+  default**, along with merge detection and on the same interval: there is no new setting to turn on.
+  A tag without a release does not count, a draft release does not count, a prerelease does, and the
+  recorded version is the oldest among those containing the commit, by publication date. It is best
+  effort: a project with no releases, outside GitHub or without `gh` archives nothing and blocks no
+  card. The board does not publish versions — `npm run release` stays as it is — and stories
+  concluded before this version, with no merge commit recorded, stay yours to archive.
+
+## 0.31.1
+
+- **The open card works again.** In 0.31.0 the card opened stuck to the left and closed on any
+  click: the dark backdrop sat on top of it. It now opens as a centered window, closes only when you
+  click outside it or press Esc, and the card's selectors and menus open above it. The Esc that
+  closes an open selector no longer closes the card with it.
+
+## 0.31.0
+
 - **The board now keeps a history of what happens on it.** Every card event (creation, column
   change with from/to, status change, conversation message, attachment and artifact, subtask, link,
   pull request, completion, archiving and trash) and every AI run started by the board (card, column
@@ -62,6 +108,17 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   technology (Flutter, Dart, React, TypeScript, Python, Rust, Docker, GitHub and about 80 others,
   also by nickname: "node", "ts", "k8s") get their logo, in the brand color, on the card, in the
   card's selector and in the filters. Options that are not technologies stay as before.
+- **Attachments open in a window inside the board.** Clicking an attachment opens a modal instead
+  of an external editor or app: text and JSON can be read and edited there, images are displayed
+  and other types say that no preview is available. The modal offers **Save as** (the editor's
+  dialog or, in the browser, a download) and **Copy content**.
+- **Automatic triage on the AI's first call.** On a card with no Tags, Task effort, Model or
+  Skills, the AI reads the description, chooses and fills in the four fields and creates the
+  checklist before starting the phase's work. If any of them is already filled in, no triage happens.
+- **AI LED at the top of the open card.** The AI activity LED also appears in the header of the
+  open card and lights up when the AI is working on the card or on one of its sub-tasks.
+- **The open card no longer covers the chat.** The card opens as a window centered on the screen,
+  no longer as a panel pinned to the right, which used to sit on top of the AI chat.
 - **The board detects pull request merges and concludes the story.** A periodic routine checks, at
   a configurable interval, whether a pull request from a story delivered in autonomous mode has been
   merged: when the merge is detected, the board records the merge commit on the card, registers in
@@ -70,18 +127,6 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   → Git, **Concluir a história quando o pull request for mergeado**), and the check interval is
   configurable (**Verificar a cada (minutos)**, default 15, range 5 to 1440). The merge is still
   done by the person (manually or by automatic merge); the board only observes.
-- **A story leaves the board when its version is published.** In the same round that looks at the
-  pull requests, the board checks whether the merge commit of a concluded story is already in a
-  published version — a tag that contains the commit **and** that has a published release on GitHub.
-  It is: the board registers in the conversation which version carried the story (tag and release
-  link) and archives the card, which goes to the workflow's archived area and can be unarchived with
-  one click. The Concluído column now means "merged and not delivered yet". **The feature is on by
-  default**, along with merge detection and on the same interval: there is no new setting to turn on.
-  A tag without a release does not count, a draft release does not count, a prerelease does, and the
-  recorded version is the oldest among those containing the commit, by publication date. It is best
-  effort: a project with no releases, outside GitHub or without `gh` archives nothing and blocks no
-  card. The board does not publish versions — `npm run release` stays as it is — and stories
-  concluded before this version, with no merge commit recorded, stay yours to archive.
 
 ## 0.30.0
 

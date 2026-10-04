@@ -101,7 +101,7 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
                       title={t('Instrução para a IA e modelo do documento desta fase')}
                       onClick={() => setPhaseOpen(phaseOpen === c.id ? null : c.id)}
                     >
-                      {c.artifactName || (c.aiInstruction ? t('Instrução') : t('Definir'))} <IconChevronDown />
+                      {c.artifactName || (c.aiInstruction ? t('Editar instrução') : t('Definir instrução'))} <IconChevronDown />
                     </Button>
                   </td>
                   <td>

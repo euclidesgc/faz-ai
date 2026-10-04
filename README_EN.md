@@ -170,7 +170,7 @@ Below it come the title (in full in the tooltip when it doesn't fit), the status
 who the next step is waiting on (a robot for the AI, a person for you) and how long it has been
 like that, the fields, the AI model (e.g. "Sonnet 5.5 - baixo", with the effort in Portuguese) and,
 in the footer, the counters, the branch and the PR. Cards waiting on you get a border in the
-status color, and the LED on the bar blinks slowly while the AI is working on the card (on a story, also when it works on one of its sub-tasks); when it finishes, the LED stays there, turned off.
+status color, and the LED on the bar tells the card's state at a glance: green and blinking slowly while the AI is working on it (on a story, also when it works on one of its sub-tasks), yellow when it is waiting on you, red when it is blocked, and off when nothing is happening.
 
 ### Links between cards
 
@@ -184,6 +184,11 @@ A linked parent follows the rule in Configurações → Regras: when the last op
 completion column, the board asks (or moves on its own, depending on the rule) whether the parent
 should also go to completion. The AI uses the `link_cards` and `unlink_cards` tools, and `get_card`
 returns the links.
+
+The **Vínculos** section also shows, display-only, the sub-task relation: on a sub-task, a "Pai"
+(parent) group with the story; on a story, the sub-task count with a shortcut to the
+**Sub-tarefas** section. This relation is read-only (no remove button) and does not enter the
+completion rule above, which still applies only to the manual parent/child link.
 
 ### The board in the browser, outside the editor
 
@@ -347,7 +352,7 @@ answers pending messages and works on ready cards, one story at a time.
   position, not its number nor what has already been approved.
 - Cards that are with you (waiting for review or an answer, blocked) are not touched, unless you
   left an unanswered message in the conversation.
-- **Rodar agora** (run now), in the settings or with the command **Faz AI: Rodar o heartbeat
+- **Chamar a IA agora** (call the AI now), in the settings or with the command **Faz AI: Rodar o heartbeat
   agora**, starts a round right away, even with the heartbeat off. **Faz AI: Parar as execuções da
   IA** stops everything.
 - The status bar shows the cards being run and the time of the next round.
@@ -361,7 +366,7 @@ e colunas. You can always move any card yourself without approval.
 
 ### Autonomous mode (YOLO)
 
-A **story** can be marked **YOLO**: in the card panel, turn on **Modo autônomo (YOLO)** (the board
+A **story** can be marked **YOLO**: in the card panel, turn on **Modo autônomo** (the board
 asks for confirmation, because the mode gives up every approval). From then on the AI drives the
 story by itself, **without asking for authorization or confirmation on anything**:
 
@@ -385,15 +390,16 @@ story by itself, **without asking for authorization or confirmation on anything*
   on it, forming a stack of PRs; when the board order runs a story before a lower-numbered one, its
   branch starts from the main branch and its pull request stands alone, outside the stack.
 - **Splitting a large request**: the AI can create the following stories from an autonomous story
-  (`create_card` with `autonomous_from`). They are born autonomous and join the queue. It never
-  turns the mode on for a story you did not turn on.
+  (`create_card` with `autonomous_from`). They are born autonomous, join the queue, and get a
+  **related** link to the origin story (skipped silently if any link already exists between the
+  two). It never turns the mode on for a story you did not turn on.
 - **Brakes**: the autopilot stops when the AI blocks the card or when a run fails (the card is
   Bloqueado, with the reason), and blocks the story after 3 consecutive runs that advanced nothing.
   Once you unblock the card it carries on by itself.
 
-The **"Autônomo" button** at the top of the board shows while there is a story in the queue: lit
-when the autopilot is driving, dimmed when paused; a click pauses (and interrupts the AI) or
-resumes. From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
+The **autonomous mode button** at the top of the board shows while there is a story in the queue
+and says what the click does: **Pausar modo autônomo** (pause; lit, with the autopilot driving;
+pausing interrupts the AI) or **Retomar modo autônomo** (resume; dimmed, paused). From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
 autônomo (YOLO)** and **Faz AI: Parar as execuções da IA e o modo autônomo**. When the editor
 opens the autopilot does not start by itself: it starts when you turn the mode on for a story or
 resume. The heartbeat does not drive autonomous stories; they belong to the autopilot.

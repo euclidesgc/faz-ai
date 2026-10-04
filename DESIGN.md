@@ -68,10 +68,14 @@ olho.
   razão WCAG 2 não serve aqui: ela escolhe preto sobre azul e vermelho médios, que fica difícil de
   ler em letra pequena. Abaixo de Lc 60 (`MIN_BADGE_LC`) as telas de configuração avisam e
   sugerem a mesma cor mais escura ou mais clara (`readableVariants()`).
-- A barra do card usa a cor do tipo via `badgeStyle()`. O que fica sobre ela (ID, botões, LED da
-  IA) usa `currentColor`, para herdar o preto ou branco escolhido pelo contraste. Uma cor fixa
-  (um LED verde, por exemplo) some sobre um tipo da mesma cor.
-- Animação contínua (o LED da IA) para com `prefers-reduced-motion`: o LED aceso fica fixo, sem piscar. O LED está sempre no card: apagado é só o contorno, aceso é cheio; a diferença não depende de movimento nem de cor.
+- A barra do card usa a cor do tipo via `badgeStyle()`. O que fica sobre ela (ID, botões) usa
+  `currentColor`, para herdar o preto ou branco escolhido pelo contraste. Uma cor fixa solta some
+  sobre um tipo da mesma cor; por isso o LED do card, que tem cores próprias (`--led-*`), fica
+  dentro de um soquete escuro com aro, que o separa de qualquer cor de barra.
+- O LED está sempre no card e tem quatro estados: apagado (lente escura), verde piscando devagar
+  (IA trabalhando no card ou numa sub-tarefa dele), amarelo fixo (espera a pessoa) e vermelho fixo
+  (bloqueado). Só o verde pisca, e para com `prefers-reduced-motion` (fica aceso, fixo). O estado
+  também está no rótulo do LED (`aria-label`/`title`), para não depender só de cor.
 - `tokens.css` tem uma declaração por linha, porque `test/tokens.test.ts` faz parse do arquivo.
 
 ## Ícones

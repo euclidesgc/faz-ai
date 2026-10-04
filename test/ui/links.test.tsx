@@ -88,4 +88,24 @@ describe('LinksSection', () => {
     expect(section().getByText(/Nenhum card disponível/)).toBeInTheDocument();
     expect(sentOf('link.add')).toHaveLength(0);
   });
+
+  it('should show the parent story in a read-only "Pai" group when the card is a subtask', () => {
+    show(board.subId);
+    const parentGroup = within(section().getByRole('group', { name: 'Pai' }));
+    expect(parentGroup.getByText('Login com Google')).toBeInTheDocument();
+    expect(parentGroup.queryByRole('button', { name: /Remover o vínculo/ })).toBeNull();
+  });
+
+  it('should show the subtask count with a shortcut when the card is a story with subtasks', () => {
+    show(board.storyId);
+    const childrenGroup = within(section().getByRole('group', { name: 'Filhos' }));
+    expect(childrenGroup.getByRole('button', { name: /1 sub-tarefa/ })).toBeInTheDocument();
+    // a lista de sub-tarefas não é repetida dentro de Vínculos
+    expect(section().queryByRole('listitem')).toBeNull();
+  });
+
+  it('should not show the "not linked" message when only the derived relation exists', () => {
+    show(board.subId);
+    expect(section().queryByText('Este card não está vinculado a nenhum outro.')).toBeNull();
+  });
 });

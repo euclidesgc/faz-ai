@@ -24,7 +24,7 @@ const input = () => screen.getByLabelText('Mensagem para a IA');
 describe('ChatPanel', () => {
   it('sem conversa, mostra pedidos de exemplo que só preenchem o campo', async () => {
     renderThemed(<ChatPanel />);
-    expect(screen.getByRole('button', { name: 'Limpar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Limpar conversa' })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: /Resuma o que está parado/ }));
     expect(input()).toHaveValue('Resuma o que está parado no board e o que espera por mim.');
     expect(sentOf('chat.send')).toHaveLength(0);
@@ -61,7 +61,7 @@ describe('ChatPanel', () => {
     expect(log.getByText('crie o card Login').closest('.chat-msg')).toHaveClass('user');
     expect(log.getByText('#3').tagName).toBe('STRONG');
     expect(log.getByText('Interrompido.').closest('.chat-msg')).toHaveClass('error');
-    expect(screen.getByRole('button', { name: 'Limpar' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Limpar conversa' })).toBeEnabled();
   });
 
   it('enquanto a IA responde, mostra o andamento, troca Enviar por Parar e não envia outra', async () => {
@@ -71,14 +71,14 @@ describe('ChatPanel', () => {
     expect(screen.queryByRole('button', { name: 'Enviar' })).toBeNull();
     await userEvent.type(input(), 'outra{Enter}');
     expect(sentOf('chat.send')).toHaveLength(0);
-    await userEvent.click(screen.getByRole('button', { name: 'Parar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Parar a IA' }));
     expect(lastSent('chat.stop')).toEqual({ type: 'chat.stop' });
   });
 
   it('Limpar apaga a conversa', async () => {
     setChat({ messages: [msg('user', 'oi')], busy: false });
     renderThemed(<ChatPanel />);
-    await userEvent.click(screen.getByRole('button', { name: 'Limpar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Limpar conversa' }));
     expect(lastSent('chat.clear')).toEqual({ type: 'chat.clear' });
   });
 });

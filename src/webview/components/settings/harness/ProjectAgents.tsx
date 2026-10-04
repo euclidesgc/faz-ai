@@ -34,7 +34,7 @@ export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
       actions={
         <>
           <Button variant="soft" color="gray" onClick={() => edit.toggle('agent', a.name)}>
-            {edit.isEditing('agent', a.name) ? t('Fechar') : t('Editar')}
+            {edit.isEditing('agent', a.name) ? t('Fechar edição') : t('Editar')}
           </Button>
           <DeleteButton
             title={t('Apagar o subagente')}

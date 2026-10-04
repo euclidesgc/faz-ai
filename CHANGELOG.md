@@ -6,6 +6,52 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **O LED do card agora parece um LED e diz o estado de relance.** Antes era um ponto na cor do
+  texto da barra, com um pulso quase invisível. Agora ele fica verde e pisca devagar enquanto a IA
+  trabalha no card (ou numa sub-tarefa da história), amarelo quando o card espera por você, vermelho
+  quando está bloqueado e apagado quando não há nada acontecendo. Só o verde pisca. Vale para os
+  cards do board, as sub-tarefas e o cabeçalho do card aberto.
+
+- **Os botões dizem o que o clique faz.** Rótulos que mostravam só um estado ou um nome genérico
+  viraram ações: no topo, "Pausar modo autônomo" / "Retomar modo autônomo", "Ver 2 com você" /
+  "Ver todos os cards" e "Abrir chat" / "Fechar chat"; no board, "Mostrar filtros", "Limpar
+  filtros", "+ Nova coluna" e "Criar card"; no card, "Parar a IA" e "Salvar descrição"; nas
+  configurações, "Criar tipo", "Criar coluna", "Adicionar modelo", "Fechar edição", "Reler pastas",
+  "Chamar a IA agora", "Restaurar aparência padrão" e outros. Na interface, o modo autônomo passa a
+  ter um nome só (sem "YOLO" nem "autopiloto" nos rótulos).
+
+- **Dividir um pedido grande em histórias agora as vincula de verdade.** Ao criar uma história com
+  `autonomous_from`, ela ganha um vínculo **relativo** com a história de origem — antes, a origem só
+  ficava registrada em texto, num comentário que nem a interface nem a IA liam como relação. Se já
+  existir qualquer vínculo entre as duas (caso de uma história ligada à mão), a criação é pulada em
+  silêncio, sem duplicar.
+- **A seção Vínculos do card aberto passa a mostrar a relação de sub-tarefa.** Numa sub-tarefa, um
+  grupo "Pai" com a história; numa história, a contagem de sub-tarefas com um atalho até a seção
+  Sub-tarefas (sem repetir a lista). A relação é somente leitura e não entra nas regras de
+  conclusão, que continuam valendo só para o vínculo manual de pai/filho.
+
+- **A história sai do board quando a versão dela é publicada.** Na mesma rodada que olha os pull
+  requests, o board verifica se o commit do merge de uma história concluída já está numa versão
+  publicada — uma tag que contém o commit **e** que tem release publicada no GitHub. Está: ele
+  registra na conversa qual versão levou a história (tag e link da release) e arquiva o card, que vai
+  para os arquivados do workflow e pode ser desarquivado com um clique. A coluna Concluído passa a
+  significar "mergeado e ainda não entregue". O **recurso nasce ligado**, junto com a detecção de
+  merges e no mesmo intervalo dela: não há ajuste novo para ligar. Tag sem release não conta, release
+  em rascunho não conta, pré-lançamento conta, e a versão registrada é a mais antiga entre as que
+  contêm o commit, pela data de publicação. É melhor esforço: projeto sem releases, fora do GitHub ou
+  sem o `gh` não arquiva nada, sem bloquear card nenhum. O board não publica versão — o
+  `npm run release` continua como está —, e histórias concluídas antes desta versão, sem o commit do
+  merge guardado, continuam sendo arquivadas por você.
+
+## 0.31.1
+
+- **O card aberto voltou a funcionar.** Na 0.31.0 o card abria encostado à esquerda e fechava a
+  qualquer clique: o fundo escuro ficava por cima dele. Agora ele abre como uma janela centralizada,
+  só fecha ao clicar fora dela ou com Esc, e os seletores e menus do card abrem por cima. O Esc que
+  fecha um seletor aberto não fecha mais o card junto.
+
+## 0.31.0
+
 - **O board passou a guardar o histórico do que acontece nele.** Cada acontecimento de um card
   (criação, passagem de coluna com de/para, mudança de status, mensagem da conversa, anexo e
   artefato, sub-tarefa, vínculo, pull request, conclusão, arquivamento e lixeira) e cada execução de
@@ -59,6 +105,17 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   que nomeiam uma tecnologia (Flutter, Dart, React, TypeScript, Python, Rust, Docker, GitHub e cerca
   de 80 outras, também por apelido: "node", "ts", "k8s") ganham o logo, na cor da marca, no card,
   no seletor do card e nos filtros. Opções que não são tecnologia ficam como antes.
+- **Anexo abre numa janela do próprio board.** Clicar num anexo abre uma modal em vez de um editor
+  ou aplicativo externo: texto e JSON podem ser lidos e editados ali, imagens são exibidas e os
+  outros tipos avisam que não há pré-visualização. A modal traz **Salvar como** (o diálogo do
+  editor ou, no navegador, o download) e **Copiar conteúdo**.
+- **Triagem automática na primeira chamada da IA.** Num card sem Tags, Esforço da atividade, Modelo
+  e Skills, a IA lê a descrição, escolhe e preenche os quatro campos e cria a checklist antes de
+  começar o trabalho da fase. Se qualquer um deles já estiver preenchido, a triagem não acontece.
+- **LED da IA no topo do card aberto.** O LED de atividade da IA aparece também no cabeçalho do card
+  aberto e acende quando a IA está trabalhando no card ou numa de suas sub-tarefas.
+- **O card aberto não cobre mais o chat.** O card abre como uma janela centralizada na tela, e não
+  mais como um painel preso à direita, que ficava por cima do chat com a IA.
 - **O board detecta o merge do pull request e conclui a história.** Uma rotina periódica observa, a
   cada intervalo configurável, se um pull request de uma história entregue em modo autônomo foi
   mergeado: quando o merge é detectado, o board grava o commit do merge no card, registra na
@@ -67,18 +124,6 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   **Concluir a história quando o pull request for mergeado**), e o intervalo de consulta é
   configurável (**Verificar a cada (minutos)**, padrão 15, faixa 5 a 1440). O merge continua sendo
   feito pela pessoa (manualmente ou pelo merge automático); o board só observa.
-- **A história sai do board quando a versão dela é publicada.** Na mesma rodada que olha os pull
-  requests, o board verifica se o commit do merge de uma história concluída já está numa versão
-  publicada — uma tag que contém o commit **e** que tem release publicada no GitHub. Está: ele
-  registra na conversa qual versão levou a história (tag e link da release) e arquiva o card, que vai
-  para os arquivados do workflow e pode ser desarquivado com um clique. A coluna Concluído passa a
-  significar "mergeado e ainda não entregue". O **recurso nasce ligado**, junto com a detecção de
-  merges e no mesmo intervalo dela: não há ajuste novo para ligar. Tag sem release não conta, release
-  em rascunho não conta, pré-lançamento conta, e a versão registrada é a mais antiga entre as que
-  contêm o commit, pela data de publicação. É melhor esforço: projeto sem releases, fora do GitHub ou
-  sem o `gh` não arquiva nada, sem bloquear card nenhum. O board não publica versão — o
-  `npm run release` continua como está —, e histórias concluídas antes desta versão, sem o commit do
-  merge guardado, continuam sendo arquivadas por você.
 
 ## 0.30.0
 

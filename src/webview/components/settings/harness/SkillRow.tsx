@@ -33,7 +33,7 @@ export function SkillRow({ skill: k, edit, onMode }: { skill: Skill; edit: Proje
             />
           )}
           <Button variant="soft" color="gray" onClick={() => edit.toggle('skill', k.name)}>
-            {edit.isEditing('skill', k.name) ? t('Fechar') : t('Editar')}
+            {edit.isEditing('skill', k.name) ? t('Fechar edição') : t('Editar')}
           </Button>
           <DeleteButton
             title={t('Apagar a skill')}

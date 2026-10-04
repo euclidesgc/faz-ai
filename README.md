@@ -158,7 +158,7 @@ Cada card tem uma barra na cor do tipo, com o ID, o tipo e os botões de abrir e
 vêm o título (inteiro no tooltip, se não couber), o status com um ícone de com quem está a
 pendência (robô para a IA, pessoa para você) e há quanto tempo ele está assim, os campos, o modelo
 de IA (ex.: "Sonnet 5.5 - baixo") e, no rodapé, os contadores, a branch e o PR. Cards com
-pendência sua ganham a borda na cor do status, e o LED da barra pisca devagar enquanto a IA trabalha no card (na história, também quando ela trabalha numa sub-tarefa); quando ela termina, o LED continua lá, apagado.
+pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do card de relance: verde piscando devagar enquanto a IA trabalha nele (na história, também quando ela trabalha numa sub-tarefa), amarelo quando ele espera por você, vermelho quando está bloqueado e apagado quando não há nada acontecendo.
 
 ### Vínculos entre cards
 
@@ -172,6 +172,11 @@ Um pai vinculado segue a regra de Configurações → Regras: quando o último f
 coluna de conclusão, o board pergunta (ou move sozinho, conforme a regra) se o pai também vai para a
 conclusão. A IA usa as ferramentas `link_cards` e `unlink_cards`, e o `get_card` devolve os
 vínculos.
+
+A seção **Vínculos** também mostra, só para exibição, a relação de sub-tarefa: numa sub-tarefa, um
+grupo "Pai" com a história; numa história, a contagem de sub-tarefas com um atalho até a seção
+**Sub-tarefas**. Essa relação é somente leitura (sem botão de remover) e não entra na regra de
+conclusão acima, que continua valendo só para o vínculo manual de pai/filho.
 
 ### Board no navegador, fora do editor
 
@@ -329,7 +334,7 @@ aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma hi
   decide é a posição do card, não o número dele nem o que já foi aprovado.
 - Cards que estão com você (aguardando revisão ou resposta, bloqueados) não são tocados, a menos
   que você tenha deixado uma mensagem sem resposta na conversa.
-- **Rodar agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
+- **Chamar a IA agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
   uma rodada na hora, mesmo com o heartbeat desligado. **Faz AI: Parar as execuções da IA e o modo autônomo**
   interrompe tudo.
 - A barra de status mostra os cards em execução e a hora da próxima rodada.
@@ -343,7 +348,7 @@ colunas. Você mesmo pode mover qualquer card sem aprovação.
 
 ### Modo autônomo (YOLO)
 
-Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo (YOLO)**
+Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo**
 (o board pede uma confirmação, porque o modo abre mão de toda aprovação). A partir daí a IA toca a
 história sozinha, **sem pedir autorização nem confirmação para nada**:
 
@@ -367,15 +372,16 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   formando uma pilha de PRs; quando a ordem do board faz uma história rodar antes de outra de
   número menor, a branch dela parte da principal e o pull request sai solto, fora da pilha.
 - **Dividir um pedido grande**: a IA pode criar as histórias seguintes a partir de uma história em
-  modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo e entram na
-  fila. Ela nunca liga o modo numa história que você não ligou.
+  modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo, entram na fila
+  e ganham um vínculo **relativo** com a história de origem (pulado em silêncio se já existir
+  qualquer vínculo entre as duas). Ela nunca liga o modo numa história que você não ligou.
 - **Freios**: o autopiloto para quando a IA bloqueia o card ou quando uma execução falha (o card
   fica Bloqueado, com o motivo) e bloqueia a história depois de 3 execuções seguidas que não
   avançaram nada. Ao destravar o card, ele continua sozinho.
 
-O **botão "Autônomo"** no topo do board aparece enquanto houver história na fila: aceso quando o
-autopiloto está tocando, apagado quando está pausado; um clique pausa (e interrompe a IA) ou
-retoma. Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
+O **botão do modo autônomo** no topo do board aparece enquanto houver história na fila e diz o que
+o clique faz: **Pausar modo autônomo** (aceso, com o autopiloto tocando; pausar interrompe a IA) ou
+**Retomar modo autônomo** (apagado, pausado). Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
 (YOLO)** e **Faz AI: Parar as execuções da IA e o modo autônomo**. Ao abrir o editor, o autopiloto
 não começa sozinho: ele liga quando você ativa o modo numa história ou retoma. O heartbeat não
 toca histórias em modo autônomo; elas são do autopiloto.
