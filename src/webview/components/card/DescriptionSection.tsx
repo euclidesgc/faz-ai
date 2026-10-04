@@ -25,7 +25,7 @@ export function DescriptionSection({ draft }: { draft: DescriptionDraft }) {
               setEditing(false);
             }}
           >
-            {t('Concluir')}
+            {t('Salvar descrição')}
           </Button>
         )}
       </div>

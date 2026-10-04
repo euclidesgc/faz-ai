@@ -196,6 +196,35 @@ describe('heartbeat', () => {
     expect(log.at(-1)).toBe('Heartbeat: nada pendente com a IA.');
   });
 
+  it('no modo worktree toca até o limite de histórias ao mesmo tempo e preenche a vaga quando uma termina', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallel: true }, git: { mode: 'worktree' } } });
+    create('A', 'PRD');
+    create('B', 'Spec');
+    create('C', 'Plan');
+    expect(heartbeat.runNow()).toBe(3);
+    expect(runner.started.map(number)).toEqual([1, 2]);
+    expect(heartbeat.queued).toBe(1);
+    runner.finish(); // a primeira termina: a vaga vai para a terceira, com a segunda ainda rodando
+    expect(runner.started.map(number)).toEqual([1, 2, 3]);
+    expect(runner.running).toHaveLength(2);
+  });
+
+  it('com o paralelo desligado (o padrão), mesmo no modo worktree é uma história por vez', () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree' } } });
+    create('A', 'PRD');
+    create('B', 'Spec');
+    heartbeat.runNow();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+
+  it('fora do modo worktree o limite não vale: uma história por vez', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallel: true, parallelStories: 3 }, git: { mode: 'branch' } } });
+    create('A', 'PRD');
+    create('B', 'Spec');
+    heartbeat.runNow();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+
   it('desligado não roda sozinho; parar esvazia a fila; falha ao iniciar encerra a rodada', () => {
     create('A', 'PRD');
     create('B', 'Spec');

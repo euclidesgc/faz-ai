@@ -115,7 +115,7 @@ function NewModelCard({
           {t('Cancelar')}
         </Button>
         <Button disabled={!ready} onClick={add}>
-          {t('Adicionar')}
+          {t('Adicionar modelo')}
         </Button>
       </div>
     </Card>

@@ -147,7 +147,7 @@ describe('CardDrawer', () => {
     openStory();
     await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await userEvent.type(screen.getByPlaceholderText(/Descreva o problema/), 'Contexto');
-    await userEvent.click(screen.getByRole('button', { name: 'Concluir' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar descrição' }));
     expect(lastSent('card.update')).toEqual({ type: 'card.update', cardId: board.storyId, patch: { description: 'Contexto' } });
     expect(screen.queryByPlaceholderText(/Descreva o problema/)).toBeNull();
     expect(screen.getByText('Contexto')).toBeInTheDocument();
@@ -280,6 +280,15 @@ describe('CardDrawer', () => {
     expect(screen.getByRole('link', { name: 'Pull request' })).toHaveAttribute('href', 'https://example.com/pr/1');
     await userEvent.click(screen.getByRole('button', { name: 'Abrir a pasta de trabalho' }));
     expect(lastSent('card.workspace.open')).toEqual({ type: 'card.workspace.open', cardId: board.subId });
+  });
+
+  it('clicar no nome da branch copia o nome e confirma na tela', async () => {
+    patchCard(board.storyId, { branch: 'feat/login' });
+    const user = userEvent.setup();
+    openCardDrawer(board.storyId);
+    await user.click(screen.getByRole('button', { name: 'feat/login' }));
+    expect(await navigator.clipboard.readText()).toBe('feat/login');
+    expect(await screen.findByText('Nome copiado')).toBeInTheDocument();
   });
 
   it('com git desligado não mostra a área de branch', () => {

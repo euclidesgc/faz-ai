@@ -28,7 +28,8 @@ const MIME: Record<string, string> = {
 };
 
 const mimeOf = (filename: string): string => MIME[path.extname(filename).slice(1).toLowerCase()] ?? 'application/octet-stream';
-const safeName = (filename: string): string =>
+/** Nome seguro para um arquivo: só o nome base, sem caracteres especiais, até 120 caracteres. */
+export const safeName = (filename: string): string =>
   path
     .basename(filename)
     .replace(/[^\w.\-() ]+/g, '_')

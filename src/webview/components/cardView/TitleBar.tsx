@@ -14,7 +14,7 @@ export function TitleBar({ card, type, work, overlay }: { card: Card; type?: Car
   const archived = card.archivedAt !== null;
 
   return (
-    <CardBar id={cardRef(card)} typeName={type && dt(type.name)} color={type?.color} work={work}>
+    <CardBar id={cardRef(card)} typeName={type && dt(type.name)} color={type?.color} work={work} status={archived ? null : card.status}>
       {!overlay && (
         <span className="card-actions">
           <Button

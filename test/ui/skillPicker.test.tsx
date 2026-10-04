@@ -90,9 +90,9 @@ describe('SkillPicker', () => {
     expect(within(dialog().getByRole('list', { name: 'Skills' })).getAllByRole('listitem')).toHaveLength(1);
     await userEvent.click(dialog().getByRole('checkbox', { name: 'revisar-spec' }));
     expect(screen.getByLabelText('valor')).toHaveTextContent('revisar-spec');
-    await userEvent.click(dialog().getByRole('button', { name: 'Limpar' }));
+    await userEvent.click(dialog().getByRole('button', { name: 'Limpar seleção' }));
     expect(screen.getByLabelText('valor')).toHaveTextContent('');
-    await userEvent.click(dialog().getByRole('button', { name: 'Concluir' }));
+    await userEvent.click(dialog().getByRole('button', { name: 'Aplicar seleção' }));
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 

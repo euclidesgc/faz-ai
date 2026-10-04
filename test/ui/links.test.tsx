@@ -88,4 +88,44 @@ describe('LinksSection', () => {
     expect(section().getByText(/Nenhum card disponível/)).toBeInTheDocument();
     expect(sentOf('link.add')).toHaveLength(0);
   });
+
+  it('should show the parent story in a read-only "Pai" group when the card is a subtask', () => {
+    show(board.subId);
+    const parentGroup = within(section().getByRole('group', { name: 'Pai' }));
+    expect(parentGroup.getByText('Login com Google')).toBeInTheDocument();
+    expect(parentGroup.queryByRole('button', { name: /Remover o vínculo/ })).toBeNull();
+  });
+
+  it('should show the subtask count with a shortcut when the card is a story with subtasks', () => {
+    show(board.storyId);
+    const childrenGroup = within(section().getByRole('group', { name: 'Filhos' }));
+    expect(childrenGroup.getByRole('button', { name: /1 sub-tarefa/ })).toBeInTheDocument();
+    // a lista de sub-tarefas não é repetida dentro de Vínculos
+    expect(section().queryByRole('listitem')).toBeNull();
+  });
+
+  it('should not show the "not linked" message when only the derived relation exists', () => {
+    show(board.subId);
+    expect(section().queryByText('Este card não está vinculado a nenhum outro.')).toBeNull();
+  });
+
+  it('dependência: "precisa terminar antes deste card" vincula o outro como pré-requisito e aparece em Depende de', async () => {
+    show(a);
+    await choose(section().getByLabelText('Tipo de vínculo'), 'precisa terminar antes deste card');
+    await userEvent.type(section().getByLabelText('Buscar card para vincular'), 'cadastro');
+    await userEvent.click(within(section().getByRole('list', { name: 'Cards encontrados' })).getByRole('button'));
+    expect(lastSent('link.add')).toEqual({ type: 'link.add', fromId: b, toId: a, kind: 'precedes' });
+  });
+
+  it('mostra de quem o card depende (com o que falta) e quem ele libera', () => {
+    board.router.handle({ type: 'link.add', fromId: b, toId: a, kind: 'precedes' });
+    syncStore(board.router);
+    const first = show(a);
+    const group = within(section().getByRole('group', { name: 'Depende de' }));
+    expect(group.getByText('Tela de cadastro')).toBeInTheDocument();
+    expect(group.getByText('1 em aberto: este card espera')).toBeInTheDocument();
+    first.unmount();
+    show(b);
+    expect(within(section().getByRole('group', { name: 'Libera' })).getByText('Spec do login')).toBeInTheDocument();
+  });
 });

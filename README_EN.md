@@ -170,7 +170,7 @@ Below it come the title (in full in the tooltip when it doesn't fit), the status
 who the next step is waiting on (a robot for the AI, a person for you) and how long it has been
 like that, the fields, the AI model (e.g. "Sonnet 5.5 - baixo", with the effort in Portuguese) and,
 in the footer, the counters, the branch and the PR. Cards waiting on you get a border in the
-status color, and the LED on the bar blinks slowly while the AI is working on the card (on a story, also when it works on one of its sub-tasks); when it finishes, the LED stays there, turned off.
+status color, and the LED on the bar tells the card's state at a glance: green and blinking slowly while the AI is working on it (on a story, also when it works on one of its sub-tasks), yellow when it is waiting on you, red when it is blocked, and off when nothing is happening.
 
 ### Links between cards
 
@@ -184,6 +184,30 @@ A linked parent follows the rule in Configurações → Regras: when the last op
 completion column, the board asks (or moves on its own, depending on the rule) whether the parent
 should also go to completion. The AI uses the `link_cards` and `unlink_cards` tools, and `get_card`
 returns the links.
+
+The **Vínculos** section also shows, display-only, the sub-task relation: on a sub-task, a "Pai"
+(parent) group with the story; on a story, the sub-task count with a shortcut to the
+**Sub-tarefas** section. This relation is read-only (no remove button) and does not enter the
+completion rule above, which still applies only to the manual parent/child link.
+
+#### Dependencies and sub-tasks in parallel
+
+A card can **depend** on another: in **Vínculos**, pick "precisa terminar antes deste card" (the
+other one is a prerequisite) or "só começa depois deste card". The open card shows the groups
+**Depende de** (depends on, with how many dependencies are still open) and **Libera** (unblocks).
+The board refuses a dependency cycle.
+
+The AI uses this to speed up Implementation. In Plan it declares the order between sub-tasks
+(`create_card` with `depends_on`, or `link_cards` with `depends_on`): one depends on another when it
+uses what the other produces or when both change the same files. In Implementation, the story's
+`get_card` returns in `subtasksNow` what can run now, and the AI delegates **the sub-tasks with no
+pending dependency to simultaneous subagents**, each with its card's model; at the end of the round
+it verifies the whole, commits and moves on to the next round. `start_work` refuses a sub-task that
+is still waiting for another. With no dependencies declared, all open sub-tasks are considered
+independent. It depends on the AI tool having subagents (Claude Code does); without them, execution
+goes one at a time, in dependency order. Projects that already had the flow skill installed keep its
+old text (the board does not overwrite a skill you may have adjusted): delete it and install it
+again in the settings to get the new instruction.
 
 ### The board in the browser, outside the editor
 
@@ -268,6 +292,25 @@ The button is also in the card header, next to the status.
   of the tool's output. The full log is in the **Output → Faz AI** panel (or in the `faz-ai`
   terminal).
 
+### Usage metrics with get_metrics
+
+During a card's conversation, the AI can query aggregated statistics from the board's history — usage,
+duration, and cost of runs — without opening any panel. Call the `get_metrics` tool in natural language:
+"how much AI time did card #72 use?", "which card type uses the most this month?", "which agent was
+used most?". The tool replies with a compact table, optimized to save tokens.
+
+- The aggregation can group by phase, card type, tool, model, card, agent, or skill. Omit to get only
+  the period's total.
+- Period filters (start and end date, in `YYYY-MM-DD`), card (e.g. `72` or `#72`), and dimensions
+  (e.g. phase, model, card type).
+- On the **agent** and **skill** dimensions the table shows only the count of runs and uses (no tokens
+  or cost, which cannot be split among a run's components).
+- Unmeasured values appear as "-" (never 0): cost and tokens depend on story #70, not yet
+  implemented. The response marks the figure as estimated.
+- Always tells you when the board's history started and which periods have only monthly totals
+  (without per-run detail). Very old periods (more than ~12 months) have no detail and aggregate only
+  the already-consolidated totals.
+
 ### Branch and working folder per story
 
 Each story works on its own branch, created by the board (for example
@@ -280,7 +323,7 @@ progress. Sub-tasks commit to the story's branch.
 - The card shows the branch and opens the working folder in a new window.
 - Configurações → **Git** holds the mode (worktree, branch in the same folder, or off), the branch
   name pattern, the worktrees folder, automatic PR merge when approving acceptance, and automatic
-  merge detection (on by default).
+  merge detection, with the archiving of already published stories (on by default).
 - Each worktree is a working copy: dependencies have to be installed in it.
 
 ### Pull request and merge in Homologação
@@ -316,18 +359,47 @@ once only. The merge is still done by the person, manually or through automatic 
 only observes. Failures in querying the PR state (no network, no authentication, no `gh`
 installed) do not block anything — the warning appears in the log, and the routine keeps trying at the next interval.
 
+In the same round, after looking at the pull requests, the board takes the last step of the cycle:
+**when the version containing a concluded story is published, it records in the conversation which
+version carried it (tag and release link) and archives the card**. That way the Concluído column
+holds only what is merged and has not reached your users yet; what was already delivered goes to the
+workflow's archived area, from which you can unarchive it at any time. There is nothing to turn on:
+the step comes along with merge detection, on the same interval and the same switch, and it is on by
+default with it.
+
+A story counts as published when there is a tag that **contains** the merge commit **and** that has a
+**published release** on GitHub — which is what this project's `npm run release` creates. A tag
+without a release does not count, a draft release does not count, a prerelease does. The recorded
+version is the oldest among those containing the commit, by publication date. The criterion is
+deliberately conservative: archiving late fixes itself on the next round, archiving early hides a
+card with nobody noticing.
+
+Everything here is best effort. A project with no releases, outside GitHub or on a machine without
+`gh` simply archives nothing: no card is blocked and the reason appears once in the log. The board
+never publishes a version — it only reads what you published — and stories concluded before this
+version, which have no merge commit recorded, stay yours to archive with one click.
+
 ### Heartbeat
 
 With the heartbeat on (Configurações → Harness de IA), the board calls the AI on its own at every
 interval, while the editor is open in the project folder. In each round it advances approved cards,
-answers pending messages and works on ready cards, one story at a time.
+answers pending messages and works on ready cards, one story at a time. In "Worktree por
+história" mode, **Tocar histórias em paralelo** (drive stories in parallel; on the same screen, off by
+default) makes the heartbeat drive several stories at once, each in its own working folder: two by
+default, up to six in **Histórias ao mesmo tempo**; the limit
+counts every run in progress, including the ones called by hand. Outside that mode, and in
+autonomous mode (whose stories are stacked), it stays one at a time, and the field is disabled. The
+Git screen explains why in each mode: with a branch in the project folder, two stories at once would
+switch the branch under each other and mix their changes; with worktrees they are isolated, at the
+cost of one more copy of the files on disk per story (with dependencies installed in each) and more
+memory and CPU while several AI sessions, tests and builds run together.
 
 - With nothing pending for the AI, nothing runs.
 - The round follows the board order: bugs first, then top to bottom — what decides is the card's
   position, not its number nor what has already been approved.
 - Cards that are with you (waiting for review or an answer, blocked) are not touched, unless you
   left an unanswered message in the conversation.
-- **Rodar agora** (run now), in the settings or with the command **Faz AI: Rodar o heartbeat
+- **Chamar a IA agora** (call the AI now), in the settings or with the command **Faz AI: Rodar o heartbeat
   agora**, starts a round right away, even with the heartbeat off. **Faz AI: Parar as execuções da
   IA** stops everything.
 - The status bar shows the cards being run and the time of the next round.
@@ -341,7 +413,7 @@ e colunas. You can always move any card yourself without approval.
 
 ### Autonomous mode (YOLO)
 
-A **story** can be marked **YOLO**: in the card panel, turn on **Modo autônomo (YOLO)** (the board
+A **story** can be marked **YOLO**: in the card panel, turn on **Modo autônomo** (the board
 asks for confirmation, because the mode gives up every approval). From then on the AI drives the
 story by itself, **without asking for authorization or confirmation on anything**:
 
@@ -365,15 +437,16 @@ story by itself, **without asking for authorization or confirmation on anything*
   on it, forming a stack of PRs; when the board order runs a story before a lower-numbered one, its
   branch starts from the main branch and its pull request stands alone, outside the stack.
 - **Splitting a large request**: the AI can create the following stories from an autonomous story
-  (`create_card` with `autonomous_from`). They are born autonomous and join the queue. It never
-  turns the mode on for a story you did not turn on.
+  (`create_card` with `autonomous_from`). They are born autonomous, join the queue, and get a
+  **related** link to the origin story (skipped silently if any link already exists between the
+  two). It never turns the mode on for a story you did not turn on.
 - **Brakes**: the autopilot stops when the AI blocks the card or when a run fails (the card is
   Bloqueado, with the reason), and blocks the story after 3 consecutive runs that advanced nothing.
   Once you unblock the card it carries on by itself.
 
-The **"Autônomo" button** at the top of the board shows while there is a story in the queue: lit
-when the autopilot is driving, dimmed when paused; a click pauses (and interrupts the AI) or
-resumes. From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
+The **autonomous mode button** at the top of the board shows while there is a story in the queue
+and says what the click does: **Pausar modo autônomo** (pause; lit, with the autopilot driving;
+pausing interrupts the AI) or **Retomar modo autônomo** (resume; dimmed, paused). From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
 autônomo (YOLO)** and **Faz AI: Parar as execuções da IA e o modo autônomo**. When the editor
 opens the autopilot does not start by itself: it starts when you turn the mode on for a story or
 resume. The heartbeat does not drive autonomous stories; they belong to the autopilot.
@@ -500,6 +573,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
 | Aparência | **Language** (automatic, Português (Brasil) or English), theme (system, light, dark), font and size of long texts; name and color of the statuses |
+| Backup | Export the board to a file and import a file in place of the current board (see [Board backup](#board-backup)) |
 
 About models: **Detectar modelos** (detect models) reads the tool's list (for Kimi Code, from the
 local configuration; for the others, a built-in list you can edit). Suggestion rules combine
@@ -519,6 +593,29 @@ interfere with each other. The first time, the board starts from a copy of the s
 earlier versions (`fazai.db`), which is left untouched. Rules and skills are files in the project
 folder and go into git as usual. Avoid opening the same folder in two editor windows at the same
 time: the last one to save wins (the extension warns when that happens).
+
+### Board backup
+
+To take the board to another machine or keep a copy, use **Configurações → Backup** (Settings →
+Backup):
+
+- **Exportar board** (export board) creates a `<board name>-<date>.fazai.json` file with
+  everything on the board: columns, types, fields, rules, models, agents, cards (including archived
+  and trashed ones), conversations, checklists, links, history and the embedded attachments. Only
+  the current folder's board goes into the file. It contains the conversations and attachments:
+  keep it safe.
+- **Importar de um arquivo…** (import from a file) shows a summary (name, cards, attachments, size,
+  version) and, after confirmation, writes a copy of the database (`<file>.bak`, next to it),
+  deletes the current board and replaces it with the one from the file, keeping the card numbers.
+  The imported board becomes this folder's board. Nothing changes in the database if the file is
+  invalid or something fails midway.
+
+A file exported by an earlier version of the extension is upgraded on import; a file from a newer
+version is refused with the required version. Importing while the AI is running on a card is not
+allowed: wait for the run to finish. In the browser the flow is the same, with the download and the
+file picker handled by the page itself. Known limits: the monthly consolidated log history does not
+go into the file, and the stories' branches and working folders are imported as they were on the
+source machine (recreate the folder from the card's button).
 
 ## Development
 

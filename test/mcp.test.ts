@@ -56,6 +56,7 @@ describe('servidor MCP', () => {
     expect(names).toEqual(
       expect.arrayContaining([
         'get_board',
+        'get_metrics',
         'list_cards',
         'get_card',
         'create_card',
@@ -146,6 +147,20 @@ describe('servidor MCP', () => {
     expect((await call('get_card', { card: 1 })).data.attachments).toHaveLength(2);
     await call('delete_attachment', { attachment_id: att.attachmentId });
     expect((await call('get_card', { card: 1 })).data.attachments).toHaveLength(1);
+  });
+
+  it('get_metrics responde em texto, aceita card como string ou número, e rejeita group_by inválido', async () => {
+    await call('create_card', { title: 'História' });
+    const empty = await call('get_metrics', {});
+    expect(empty.error).toBeFalsy();
+    expect(typeof empty.text).toBe('string');
+    expect(empty.text).not.toMatch(/^\s*[{[]/); // nunca JSON (RF-08)
+
+    expect((await call('get_metrics', { card: '#1' })).error).toBeFalsy();
+    expect((await call('get_metrics', { card: 1 })).error).toBeFalsy();
+    expect((await call('get_metrics', { group_by: 'phase' })).error).toBeFalsy();
+    expect((await call('get_metrics', { group_by: 'nao-existe' })).error).toBe(true);
+    expect((await call('get_metrics', { start_date: '2026-02-01', end_date: '2026-01-01' })).error).toBe(true);
   });
 
   it('configura colunas, campos e regras', async () => {
@@ -1154,6 +1169,39 @@ describe('vínculos entre cards', () => {
     expect((await call('unlink_cards', { card: filho.id, other: pai.id })).error).toBe(true);
   });
 
+  it('dependência entre sub-tarefas: depends_on, rodadas em subtasksNow e start_work recusando a que espera', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const base = (await call('create_card', { title: 'Modelo de dados', parent: story.id })).data;
+    const tela = (await call('create_card', { title: 'Tela', parent: story.id })).data;
+    const api = (await call('create_card', { title: 'API', parent: story.id, depends_on: [base.id] })).data;
+    expect(api.links.dependsOn).toMatchObject([{ id: base.id }]);
+    expect(router.snapshot().links).toMatchObject([{ kind: 'precedes' }]);
+
+    // a história mostra o que roda junto agora e o que espera
+    const before = (await call('get_card', { card: story.id })).data;
+    expect(before.subtasksNow).toEqual({ canRunTogether: [base.id, tela.id], waiting: [api.id] });
+    expect(before.subtaskList.find((k: { id: string }) => k.id === api.id).waitingFor).toEqual([base.id]);
+
+    // a que espera não começa; as independentes começam ao mesmo tempo
+    const refused = await call('start_work', { card: api.id });
+    expect(refused.error).toBe(true);
+    expect(refused.text).toContain(`depende de ${base.id}`);
+    expect((await call('start_work', { card: base.id })).error).toBe(false);
+    expect((await call('start_work', { card: tela.id })).error).toBe(false);
+
+    // concluir a dependência libera a seguinte
+    const done = router.snapshot().columns.find((c) => c.workflowId === router.snapshot().workflows[1]!.id && c.category === 'done')!;
+    await call('move_card', { card: base.id, column: done.name });
+    expect((await call('get_card', { card: api.id })).data.waitingFor).toBeUndefined();
+    expect((await call('start_work', { card: api.id })).error).toBe(false);
+
+    // link_cards também registra a dependência, e recusa o ciclo
+    expect((await call('link_cards', { card: tela.id, other: api.id, relation: 'depends_on' })).error).toBe(false);
+    expect((await call('link_cards', { card: api.id, other: tela.id, relation: 'depends_on' })).error).toBe(true);
+    // depends_on só vale em sub-tarefa
+    expect((await call('create_card', { title: 'Solta', depends_on: [base.id] })).error).toBe(true);
+  });
+
   it('`parent` faz de other o pai do card', async () => {
     const a = (await call('create_card', { title: 'A' })).data;
     const b = (await call('create_card', { title: 'B' })).data;
@@ -1302,6 +1350,28 @@ describe('modo autônomo (YOLO)', () => {
     expect((await call('create_card', { title: 'Passo', parent: 1, autonomous_from: 1 })).error).toBe(true);
     // a mensagem só vale vinda da IA
     expect(() => router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id })).toThrow('card.yolo.set');
+  });
+
+  it('should link the new card to the origin when autonomous_from is used', async () => {
+    const story = (await call('create_card', { title: 'Grande', column: 'Discovery' })).data;
+    setYolo(1, true);
+    const part = (await call('create_card', { title: 'Parte 2', autonomous_from: 1 })).data;
+
+    expect((await call('get_card', { card: 1 })).data.links.related).toMatchObject([{ id: part.id }]);
+    expect((await call('get_card', { card: part.id })).data.links.related).toMatchObject([{ id: story.id }]);
+    expect(router.snapshot().links).toHaveLength(1);
+  });
+
+  it('should not duplicate the link when one already exists between the cards', async () => {
+    const story = (await call('create_card', { title: 'Grande', column: 'Discovery' })).data;
+    const part = (await call('create_card', { title: 'Parte 2' })).data;
+    setYolo(1, true);
+    await call('link_cards', { card: story.id, other: part.id, relation: 'parent' });
+    expect(router.snapshot().links).toHaveLength(1);
+
+    // reproduz o caso #19/#48: o vínculo já existe (manual) quando a herança do modo autônomo roda
+    expect(() => router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id }, { source: 'ai' })).not.toThrow();
+    expect(router.snapshot().links).toHaveLength(1);
   });
 
   it('ligar libera o que esperava uma pessoa', async () => {

@@ -26,7 +26,7 @@ export function AutopilotButton() {
       aria-pressed={active}
       onClick={() => (active ? ai.pauseAutopilot() : ai.resumeAutopilot())}
     >
-      <IconYolo /> {active ? t('Autônomo') : t('Autônomo pausado')}
+      <IconYolo /> {active ? t('Pausar modo autônomo') : t('Retomar modo autônomo')}
     </Button>
   );
 }

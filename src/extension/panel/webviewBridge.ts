@@ -67,6 +67,25 @@ function vscodeEnv(webview: vscode.Webview, router: MessageRouter): HostEnv {
       if (!uri) return;
       await fs.copyFile(sourcePath, uri.fsPath);
     },
+    saveTextAs: async (content, suggestedName) => {
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(path.join(os.homedir(), suggestedName)),
+        filters: { 'Export do Faz AI': ['json'] },
+        title: 'Exportar board',
+      });
+      if (!uri) return undefined;
+      await fs.writeFile(uri.fsPath, content, 'utf8');
+      return uri.fsPath;
+    },
+    pickBackupFile: async () =>
+      (
+        await vscode.window.showOpenDialog({
+          canSelectMany: false,
+          filters: { 'Export do Faz AI': ['json'] },
+          openLabel: 'Importar',
+          title: 'Importar board de um arquivo',
+        })
+      )?.[0]?.fsPath,
   };
 }
 

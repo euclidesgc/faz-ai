@@ -14,7 +14,6 @@ export const board: Record<string, string> = {
   'Mostrando só o que espera por você. Clique para ver tudo.': 'Showing only what is waiting on you. Click to see everything.',
   'Cards esperando revisão, resposta ou desbloqueio. Clique para ver só eles.':
     'Cards waiting for review, an answer or unblocking. Click to see only those.',
-  '{n} com você': '{n} with you',
   'Abre este board no navegador, fora do editor': 'Opens this board in the browser, outside the editor',
   'Abrir no navegador': 'Open in browser',
   'Conversar com a IA sobre o board': 'Chat with the AI about the board',
@@ -36,7 +35,6 @@ export const board: Record<string, string> = {
   'Buscar palavras-chave…': 'Search keywords…',
   '{shown} de {total} cards': '{shown} of {total} cards',
   '{total} cards': '{total} cards',
-  'Limpar ({n})': 'Clear ({n})',
 
   // Board, colunas e workflows
   '<b>Este board ainda não tem cards.</b> Crie uma história em <i>+ Novo card</i>, na primeira coluna. Um clique na história mostra as sub-tarefas dela no workflow de sub-tarefas; dois cliques abrem o card, onde ficam a descrição, a conversa com a IA e o botão <i>Chamar IA</i>.':
@@ -75,13 +73,11 @@ export const board: Record<string, string> = {
   'Título do card': 'Card title',
   'Título (Enter adiciona)': 'Title (Enter adds)',
   'Tipo do card': 'Card type',
-  Adicionar: 'Add',
   Fechar: 'Close',
   'Clique numa história para criar sub-tarefas dela': 'Click a story to create its sub-tasks',
   '+ Nova sub-tarefa': '+ New sub-task',
   '+ Novo card': '+ New card',
   'Nova coluna': 'New column',
-  '+ Coluna': '+ Column',
   'Nome da coluna': 'Column name',
   Arquivados: 'Archived',
   'Arraste um card para cá para arquivar.': 'Drag a card here to archive it.',
@@ -90,7 +86,6 @@ export const board: Record<string, string> = {
   'Esvaziar a lixeira?': 'Empty the trash?',
   '{n} card(s) serão apagados definitivamente, com comentários e anexos. Não dá para desfazer.':
     '{n} card(s) will be permanently deleted, along with comments and attachments. This cannot be undone.',
-  Esvaziar: 'Empty',
   'Esvaziar lixeira': 'Empty trash',
   'A lixeira está vazia. Cards excluídos ficam aqui até você restaurar ou apagar de vez.':
     'The trash is empty. Deleted cards stay here until you restore them or delete them for good.',
@@ -134,7 +129,6 @@ export const board: Record<string, string> = {
   'Abrir os filtros na barra lateral': 'Open the filters in the sidebar',
   Filtros: 'Filters',
   'Remover este filtro': 'Remove this filter',
-  Limpar: 'Clear',
   Pendência: 'Pending',
   'Com quem está': 'Who has it',
   Qualquer: 'Any',
@@ -160,10 +154,6 @@ export const board: Record<string, string> = {
 
   // Heartbeat e tema
   'a cada {n} min': 'every {n} min',
-  'Heartbeat ligado: o board chama a IA {every} quando há pendência com ela. Clique para desligar.':
-    'Heartbeat on: the board calls the AI {every} when something is waiting on it. Click to turn off.',
-  'Heartbeat desligado. Clique para ligar: o board passa a chamar a IA {every} quando há pendência com ela.':
-    'Heartbeat off. Click to turn on: the board will call the AI {every} when something is waiting on it.',
   'Heartbeat parado: {reason}': 'Heartbeat stopped: {reason}',
   'Tema: {current}. Clique para mudar para {next}.': 'Theme: {current}. Click to switch to {next}.',
   Sistema: 'System',
@@ -206,6 +196,8 @@ export const board: Record<string, string> = {
 
   // Card no board
   'IA parada neste card': 'AI idle on this card',
+  'Card bloqueado': 'Card blocked',
+  'Este card precisa da sua atenção': 'This card needs your attention',
   'IA trabalhando neste card': 'AI working on this card',
   'IA trabalhando em {n} sub-tarefa deste card': 'AI working on {n} sub-task of this card',
   'IA trabalhando em {n} sub-tarefas deste card': 'AI working on {n} sub-tasks of this card',
@@ -240,7 +232,6 @@ export const board: Record<string, string> = {
   '{tool} está respondendo…': '{tool} is answering…',
   'Mensagem para a IA': 'Message to the AI',
   'Escreva para a IA… (Enter envia, Shift+Enter quebra a linha)': 'Write to the AI… (Enter sends, Shift+Enter adds a line break)',
-  Parar: 'Stop',
   Enviar: 'Send',
 
   // Confirmações de mover, arquivar e excluir (store/actions.ts)
@@ -284,6 +275,23 @@ export const board: Record<string, string> = {
     'Autonomous mode: driving {n} queued story(ies).{detail} Click to pause and interrupt the AI.',
   'Modo autônomo pausado.{detail} {n} história(s) esperando. Clique para retomar.':
     'Autonomous mode paused.{detail} {n} story(ies) waiting. Click to resume.',
-  Autônomo: 'Autonomous',
-  'Autônomo pausado': 'Autonomous paused',
+  'Pausar modo autônomo': 'Pause autonomous mode',
+  'Retomar modo autônomo': 'Resume autonomous mode',
+  'Ver todos os cards': 'See all cards',
+  'Ver {n} com você': 'See {n} with you',
+  'Abrir chat': 'Open chat',
+  'Fechar chat': 'Close chat',
+  'Desligar heartbeat. Ligado agora: o board chama a IA {every} quando há pendência com ela.':
+    'Turn heartbeat off. On now: the board calls the AI {every} when something is pending with it.',
+  'Ligar heartbeat: o board passa a chamar a IA {every} quando há pendência com ela.':
+    'Turn heartbeat on: the board will call the AI {every} when something is pending with it.',
+  'Esconder filtros': 'Hide filters',
+  'Mostrar filtros': 'Show filters',
+  'Abrir filtros': 'Open filters',
+  'Limpar filtros': 'Clear filters',
+  'Limpar filtros ({n})': 'Clear filters ({n})',
+  'Limpar conversa': 'Clear conversation',
+  '+ Nova coluna': '+ New column',
+  'Criar sub-tarefa': 'Create sub-task',
+  'Criar card': 'Create card',
 };

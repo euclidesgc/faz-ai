@@ -332,12 +332,13 @@ const MIGRATIONS: Record<number, string> = {
   `,
 };
 
-export function migrate(db: Database): void {
+/** Aplica as migrações pendentes até `upTo` (por padrão, a versão atual). */
+export function migrate(db: Database, upTo = SCHEMA_VERSION): void {
   db.run('PRAGMA foreign_keys = ON;');
   db.run('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);');
   const res = db.exec("SELECT value FROM meta WHERE key = 'schema_version'");
   let current = res[0]?.values[0]?.[0] ? Number(res[0].values[0][0]) : 0;
-  while (current < SCHEMA_VERSION) {
+  while (current < upTo) {
     const next = current + 1;
     const sql = MIGRATIONS[next];
     if (!sql) throw new Error(`Migration ${next} não encontrada`);

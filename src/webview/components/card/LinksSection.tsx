@@ -1,23 +1,25 @@
 import { useState } from 'react';
-import { childProgress, linkedCards, linkProblem } from '../../../shared/links';
+import { childProgress, linkedCards, linkProblem, openPredecessors } from '../../../shared/links';
 import { cardRef, type Card, type LinkKind } from '../../../shared/model';
-import { columnOf, isLive } from '../../../shared/selectors';
+import { childrenOf, columnOf, isLive } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { links } from '../../commands';
 import { Button as RxButton, IconButton, TextField } from '@radix-ui/themes';
 import { IconTrash, SelectField } from '../ui';
 import { t, dt } from '../../i18n';
 
-type Relation = 'parent' | 'child' | 'related';
+type Relation = 'parent' | 'child' | 'related' | 'depends' | 'precedes';
 const RELATIONS: { value: Relation; label: string }[] = [
   { value: 'parent', label: 'é o pai deste card' },
   { value: 'child', label: 'é filho deste card' },
   { value: 'related', label: 'é relativo' },
+  { value: 'depends', label: 'precisa terminar antes deste card' },
+  { value: 'precedes', label: 'só começa depois deste card' },
 ];
 /** Quantos cards a busca mostra por vez. */
 const RESULTS = 6;
 
-/** Vínculos do card com outros, de qualquer workflow: pai, filhos (com o progresso) e relativos. */
+/** Vínculos do card com outros, de qualquer workflow: pai, filhos (com o progresso), relativos e dependências. */
 export function LinksSection({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const openCard = useBoardStore((s) => s.openCard);
@@ -25,9 +27,20 @@ export function LinksSection({ card }: { card: Card }) {
   const [query, setQuery] = useState('');
   const linked = linkedCards(state, card.id);
   const progress = childProgress(state, card.id);
-  const total = linked.parents.length + linked.children.length + linked.related.length;
-  const kind = (r: Relation): LinkKind => (r === 'related' ? 'related' : 'child');
-  const ends = (other: Card, r: Relation): [string, string] => (r === 'parent' ? [other.id, card.id] : [card.id, other.id]);
+  const structuralParent = card.parentId ? state.cards.find((c) => c.id === card.parentId) : undefined;
+  const subtasks = childrenOf(state, card.id);
+  const total =
+    linked.parents.length +
+    linked.children.length +
+    linked.related.length +
+    linked.predecessors.length +
+    linked.successors.length +
+    (structuralParent ? 1 : 0) +
+    subtasks.length;
+  const pending = openPredecessors(state, card.id).length;
+  const kind = (r: Relation): LinkKind => (r === 'related' ? 'related' : r === 'depends' || r === 'precedes' ? 'precedes' : 'child');
+  const ends = (other: Card, r: Relation): [string, string] =>
+    r === 'parent' || r === 'depends' ? [other.id, card.id] : [card.id, other.id];
 
   const q = query.trim().toLowerCase().replace(/^#/, '');
   const found = q
@@ -76,9 +89,44 @@ export function LinksSection({ card }: { card: Card }) {
         </h3>
       </div>
       {total === 0 && <p className="muted small">{t('Este card não está vinculado a nenhum outro.')}</p>}
+      {structuralParent && (
+        <div className="link-group" role="group" aria-label={t('Pai')}>
+          <h4>
+            {t('Pai')} <small className="muted">{t('estrutura')}</small>
+          </h4>
+          <ul className="children">
+            <li>
+              <a onClick={() => openCard(structuralParent.id)}>
+                <span className="card-id">{cardRef(structuralParent)}</span> {structuralParent.title}
+              </a>
+              <span className="muted">{dt(columnOf(state, structuralParent)?.name ?? '')}</span>
+            </li>
+          </ul>
+        </div>
+      )}
       {group(t('Pai'), linked.parents)}
       {group(t('Filhos'), linked.children, t('{done}/{total} encerrados', { done: progress.done, total: progress.total }))}
       {group(t('Relativos'), linked.related)}
+      {group(
+        t('Depende de'),
+        linked.predecessors,
+        pending ? t('{n} em aberto: este card espera', { n: pending }) : t('tudo encerrado: pode começar'),
+      )}
+      {group(t('Libera'), linked.successors, t('só começam depois deste card'))}
+      {subtasks.length > 0 && (
+        <div className="link-group" role="group" aria-label={t('Filhos')}>
+          <h4>
+            {t('Filhos')} <small className="muted">{t('sub-tarefas')}</small>
+          </h4>
+          <button
+            type="button"
+            className="link-shortcut"
+            onClick={() => document.getElementById('subtasks-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          >
+            {t('{count} sub-tarefa(s) — ver na seção Sub-tarefas', { count: subtasks.length })}
+          </button>
+        </div>
+      )}
       <div className="link-add">
         <SelectField<Relation>
           size="1"

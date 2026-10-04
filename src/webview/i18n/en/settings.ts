@@ -8,6 +8,27 @@ export const settings: Record<string, string> = {
   'Modelos de IA': 'AI models',
   Git: 'Git',
   Aparência: 'Appearance',
+  Backup: 'Backup',
+  'Leve o board para outra máquina ou guarde uma cópia. O arquivo inclui configurações, cards, conversas e anexos.':
+    'Take the board to another machine or keep a copy. The file includes settings, cards, conversations and attachments.',
+  Exportar: 'Export',
+  'Gera um arquivo .fazai.json com tudo o que está neste board, inclusive cards arquivados e na lixeira. O arquivo contém as conversas e os anexos: guarde-o com cuidado.':
+    'Creates a .fazai.json file with everything on this board, including archived and trashed cards. The file contains the conversations and attachments: keep it safe.',
+  'Exportar board': 'Export board',
+  'Exportando…': 'Exporting…',
+  Importar: 'Import',
+  'Substitui o board atual pelo de um arquivo exportado, com os mesmos números de card. Você confirma depois de ver o resumo, e uma cópia de segurança do banco é gravada antes.':
+    'Replaces the current board with the one from an exported file, keeping the card numbers. You confirm after seeing the summary, and a backup copy of the database is written first.',
+  'Importar de um arquivo…': 'Import from a file…',
+  'Lendo o arquivo…': 'Reading the file…',
+  'Espere a execução da IA terminar': 'Wait for the AI run to finish',
+  'Board "{name}" com {cards} card(s) e {attachments} anexo(s), {size}, exportado em {date} pelo Faz AI {version} (formato {format}).':
+    'Board "{name}" with {cards} card(s) and {attachments} attachment(s), {size}, exported on {date} by Faz AI {version} (format {format}).',
+  'O arquivo tem mais de 200 MB: a importação pode demorar.': 'The file is larger than 200 MB: the import may take a while.',
+  'Tudo o que está neste board será apagado e substituído. Uma cópia de segurança (.bak) fica ao lado do banco.':
+    'Everything on this board will be deleted and replaced. A backup copy (.bak) is kept next to the database.',
+  'Substituir o board atual?': 'Replace the current board?',
+  'Importar e substituir': 'Import and replace',
   'Expandir o menu': 'Expand the menu',
   'Recolher o menu': 'Collapse the menu',
   'Nome do board': 'Board name',
@@ -56,7 +77,6 @@ export const settings: Record<string, string> = {
   'avisar e pedir confirmação se o card levar sub-tarefas ou anexos junto; cards simples seguem direto.':
     'warn and ask for confirmation if the card takes sub-tasks or attachments with it; simple cards go straight through.',
   Regras: 'Rules',
-  'Restaurar padrões': 'Restore defaults',
   'Regras deste board. O que conta como conclusão ou cancelamento vem de "Esta coluna representa", no menu de ações de cada coluna.':
     'Rules of this board. What counts as done or cancelled comes from "This column represents", in each column\'s actions menu.',
   'Concluir história com sub-tarefas em aberto': 'Complete a story with open sub-tasks',
@@ -121,7 +141,6 @@ export const settings: Record<string, string> = {
   'Nome do tipo novo': 'Name of the new type',
   'Nome do tipo': 'Type name',
   Cancelar: 'Cancel',
-  Adicionar: 'Add',
   'Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.':
     'Board theme and typography of long texts: the card description and the conversation, both when writing and when reading.',
   'Tema e fonte': 'Theme and font',
@@ -329,4 +348,15 @@ export const settings: Record<string, string> = {
   'Texto com o nome do campo antes do valor.': 'Text with the field name before the value.',
   Oculto: 'Hidden',
   'Não aparece no board, só no card aberto.': 'Not shown on the board, only on the open card.',
+  'Adicionar modelo': 'Add model',
+  'Criar tipo': 'Create type',
+  'Restaurar aparência padrão': 'Restore default appearance',
+  'Restaurar regras padrão': 'Restore default rules',
+  'Histórias em paralelo': 'Stories in parallel',
+  'Histórias em paralelo: disponíveis neste modo. Cada história tem a sua pasta, então o heartbeat pode tocar várias ao mesmo tempo (ligue "Tocar histórias em paralelo", na execução pela IA). O custo: cada worktree é mais uma cópia dos arquivos do projeto em disco e precisa das próprias dependências instaladas; e cada história em paralelo é mais um processo de IA, com os testes e builds dela, usando memória e processador ao mesmo tempo.':
+    'Stories in parallel: available in this mode. Each story has its own folder, so the heartbeat can drive several at once (turn on "Tocar histórias em paralelo", under execution by the AI). The cost: each worktree is one more copy of the project files on disk and needs its own dependencies installed; and each story in parallel is one more AI process, with its tests and builds, using memory and CPU at the same time.',
+  'Neste modo o board trata uma história por vez. Todas as histórias trabalham na mesma pasta: duas ao mesmo tempo trocariam a branch uma debaixo da outra e misturariam as alterações, causando conflitos e commits na branch errada. Para tocar histórias em paralelo, escolha "Worktree por história".':
+    'In this mode the board handles one story at a time. All stories work in the same folder: two at once would switch the branch under each other and mix their changes, causing conflicts and commits on the wrong branch. To drive stories in parallel, choose "Worktree por história".',
+  'Sem branches nem worktrees, o board trata uma história por vez: todas trabalham direto na pasta do projeto, e duas ao mesmo tempo misturariam as alterações. Para tocar histórias em paralelo, escolha "Worktree por história".':
+    'With no branches or worktrees, the board handles one story at a time: they all work directly in the project folder, and two at once would mix their changes. To drive stories in parallel, choose "Worktree por história".',
 };

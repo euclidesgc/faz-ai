@@ -76,10 +76,44 @@ function pickFilesInBrowser(cardId: string): void {
   input.click();
 }
 
+/** No navegador, exportar é baixar o arquivo pela rota do servidor; o aviso de resultado chega pelo canal de eventos. */
+function exportInBrowser(): void {
+  const link = document.createElement('a');
+  link.href = `/backup/export?c=${clientId}`;
+  link.download = '';
+  link.click();
+  deliver({ type: 'backup.done' });
+}
+
+/** No navegador, importar é escolher o arquivo e enviá-lo à rota do servidor, que devolve o resumo para a confirmação. */
+function pickBackupInBrowser(): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.oncancel = () => deliver({ type: 'backup.done' });
+  input.onchange = () => {
+    const file = input.files?.[0];
+    if (!file) return deliver({ type: 'backup.done' });
+    fetch(`/backup/import?c=${clientId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: file })
+      .then(async (res) => {
+        if (res.ok) {
+          const { token, summary } = (await res.json()) as Extract<HostToWebview, { type: 'backup.import.summary' }>;
+          deliver({ type: 'backup.import.summary', token, summary });
+        } else if (res.status === 413) deliver({ type: 'error', message: 'O arquivo é grande demais para enviar (limite de 200 MB).' });
+        else deliver({ type: 'error', message: (await res.text()) || 'Não foi possível ler o arquivo.' });
+      })
+      .catch(() => deliver({ type: 'error', message: 'Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.' }))
+      .finally(() => deliver({ type: 'backup.done' }));
+  };
+  input.click();
+}
+
 export function postToHost(msg: WebviewToHost): void {
   if (api) return api.postMessage(msg);
   if (!isWeb) return console.log('[dev] postMessage', msg);
   if (msg.type === 'attachment.pick') return pickFilesInBrowser(msg.cardId);
+  if (msg.type === 'backup.export') return exportInBrowser();
+  if (msg.type === 'backup.import.pick') return pickBackupInBrowser();
   if (connected) sendWeb(msg);
   else queue.push(msg);
 }

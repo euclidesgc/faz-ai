@@ -79,7 +79,7 @@ export function CommentsTab({ cardId }: { cardId: string }) {
           <span>{t('{tool} está trabalhando neste card… A resposta aparece aqui quando terminar.', { tool: toolLabel })}</span>
           <span className="spacer" />
           <Button variant="ghost" size="small" onClick={() => ai.stop(cardId)}>
-            {t('Parar')}
+            {t('Parar a IA')}
           </Button>
         </div>
       )}

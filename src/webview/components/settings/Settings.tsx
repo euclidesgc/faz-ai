@@ -11,11 +11,13 @@ import { ModelsSettings } from './ModelsSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { AgentsSettings } from './AgentsSettings';
 import { GitSettings } from './GitSettings';
+import { BackupSettings } from './BackupSettings';
 import {
   Button,
   DeleteButton,
   FormField,
   IconAppearance,
+  IconBackup,
   IconBranch,
   IconColumns,
   IconConnect,
@@ -42,6 +44,7 @@ const TABS: [SettingsTab, string, Icon][] = [
   ['models', 'Modelos de IA', IconModels],
   ['git', 'Git', IconBranch],
   ['appearance', 'Aparência', IconAppearance],
+  ['backup', 'Backup', IconBackup],
 ];
 
 /** Conteúdo de um botão do menu: ícone sempre; o rótulo só com o menu aberto (recolhido, ele vira o nome acessível). */
@@ -146,6 +149,7 @@ export function Settings() {
         {tab === 'harness' && <HarnessSettings />}
         {tab === 'git' && <GitSettings />}
         {tab === 'agents' && <AgentsSettings />}
+        {tab === 'backup' && <BackupSettings />}
       </div>
     </div>
   );

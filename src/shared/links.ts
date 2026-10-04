@@ -8,6 +8,10 @@ export interface Linked {
   parents: Card[];
   children: Card[];
   related: Card[];
+  /** de quem o card depende: precisam terminar antes de ele começar */
+  predecessors: Card[];
+  /** quem depende do card: só começam depois que ele terminar */
+  successors: Card[];
 }
 
 const alive = (state: BoardState, id: Id): Card | undefined => {
@@ -16,12 +20,13 @@ const alive = (state: BoardState, id: Id): Card | undefined => {
 };
 
 export function linkedCards(state: BoardState, cardId: Id): Linked {
-  const out: Linked = { parents: [], children: [], related: [] };
+  const out: Linked = { parents: [], children: [], related: [], predecessors: [], successors: [] };
   for (const l of state.links) {
     if (l.fromId !== cardId && l.toId !== cardId) continue;
     const other = alive(state, l.fromId === cardId ? l.toId : l.fromId);
     if (!other) continue;
     if (l.kind === 'related') out.related.push(other);
+    else if (l.kind === 'precedes') (l.fromId === cardId ? out.successors : out.predecessors).push(other);
     else (l.fromId === cardId ? out.children : out.parents).push(other);
   }
   return out;
@@ -59,12 +64,44 @@ function descendants(state: BoardState, id: Id): Set<Id> {
   return seen;
 }
 
+/** Dependências do card que ainda não terminaram (em coluna aberta, fora do arquivo e da lixeira): enquanto houver, ele não começa. */
+export const openPredecessors = (state: BoardState, cardId: Id): Card[] =>
+  linkedCards(state, cardId).predecessors.filter((p) => isLive(p) && !closed(state, p));
+
+/** Todos os cards que só começam depois de `id`, direta ou indiretamente, para barrar ciclos de dependência. */
+function successorsOf(state: BoardState, id: Id): Set<Id> {
+  const seen = new Set<Id>();
+  const stack = [id];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    for (const l of state.links) {
+      if (l.kind !== 'precedes' || l.fromId !== cur || seen.has(l.toId)) continue;
+      seen.add(l.toId);
+      stack.push(l.toId);
+    }
+  }
+  return seen;
+}
+
+/**
+ * Sub-tarefas em aberto da história separadas pelo que pode começar agora: `ready` não tem dependência
+ * pendente (podem rodar ao mesmo tempo) e `waiting` espera alguma outra terminar.
+ */
+export function subtaskWaves(state: BoardState, storyId: Id): { ready: Card[]; waiting: Card[] } {
+  const open = state.cards.filter((c) => c.parentId === storyId && isLive(c) && !closed(state, c)).sort((a, b) => a.number - b.number);
+  return {
+    ready: open.filter((c) => openPredecessors(state, c.id).length === 0),
+    waiting: open.filter((c) => openPredecessors(state, c.id).length > 0),
+  };
+}
+
 /** Por que o vínculo não pode ser criado, ou null se pode. */
 export function linkProblem(state: BoardState, fromId: Id, toId: Id, kind: LinkKind): string | null {
   if (fromId === toId) return 'Um card não pode se vincular a ele mesmo.';
   if (!alive(state, fromId) || !alive(state, toId)) return 'Card não encontrado.';
   if (linkBetween(state, fromId, toId)) return 'Estes cards já estão vinculados. Remova o vínculo antes de criar outro.';
   if (kind === 'child' && descendants(state, toId).has(fromId)) return 'O vínculo criaria um ciclo: o pai já é filho deste card.';
+  if (kind === 'precedes' && successorsOf(state, toId).has(fromId)) return 'O vínculo criaria um ciclo: um card dependeria dele mesmo.';
   return null;
 }
 

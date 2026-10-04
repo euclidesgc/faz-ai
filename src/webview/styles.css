@@ -354,35 +354,59 @@ button.active {
 .card-bar button.icon:hover:where(:not(:disabled)) {
   background: color-mix(in srgb, currentColor 18%, transparent);
 }
-/* LED da IA, sempre na barra do card: na cor do texto da barra (preto ou branco pelo contraste), para aparecer sobre
-   qualquer cor de tipo. Apagado = só o contorno; aceso = cheio e pulsando com um halo que se expande e some */
+/* LED do card, sempre na barra: um soquete escuro com cores próprias, para ler igual sobre qualquer cor de tipo.
+   Apagado = lente escura; verde piscando devagar = IA trabalhando; amarelo = espera a pessoa; vermelho = bloqueado.
+   Só o verde pisca */
 .ai-led {
   flex: none;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, currentColor 50%, transparent);
+  background: var(--led-socket);
+  box-shadow:
+    0 0 0 1.5px var(--led-rim),
+    inset 0 1px 2px var(--led-shade);
+  position: relative;
 }
-.ai-led.on {
-  background: currentColor;
-  box-shadow: none;
-  animation: led-pulse 1.6s ease-in-out infinite;
+/* a luz fica numa camada por cima do soquete: é ela que acende, apaga e brilha */
+.ai-led::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--led-shine) 0, var(--led) 45%);
+  box-shadow: 0 0 6px 1px var(--led);
+  opacity: 0;
 }
-@keyframes led-pulse {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent);
-  }
-  70% {
-    box-shadow: 0 0 0 5px transparent;
-  }
+.ai-led.working {
+  --led: var(--led-working);
+}
+.ai-led.attention {
+  --led: var(--led-attention);
+}
+.ai-led.error {
+  --led: var(--led-error);
+}
+.ai-led.attention::after,
+.ai-led.error::after {
+  opacity: 1;
+}
+.ai-led.working::after {
+  animation: led-blink 1.8s ease-in-out infinite;
+}
+@keyframes led-blink {
+  0%,
   100% {
-    box-shadow: 0 0 0 0 transparent;
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ai-led.on {
+  .ai-led.working::after {
     animation: none;
+    opacity: 1;
   }
 }
 .card.selected {
@@ -1601,6 +1625,17 @@ code {
   padding: var(--sp-2) var(--sp-4);
   font-size: var(--fs-sm);
   color: var(--muted);
+}
+/* nome da branch: um clique copia; o tamanho do texto acompanha a barra, não o do botão pequeno */
+.drawer-workspace .branch-copy {
+  font-size: inherit;
+  cursor: copy;
+}
+.drawer-workspace .branch-copied {
+  color: var(--success);
+}
+.drawer-workspace .branch-copied:empty {
+  display: none;
 }
 
 /* Ordenação das colunas nas configurações: alça de arrastar */

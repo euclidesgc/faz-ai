@@ -158,7 +158,7 @@ Cada card tem uma barra na cor do tipo, com o ID, o tipo e os botões de abrir e
 vêm o título (inteiro no tooltip, se não couber), o status com um ícone de com quem está a
 pendência (robô para a IA, pessoa para você) e há quanto tempo ele está assim, os campos, o modelo
 de IA (ex.: "Sonnet 5.5 - baixo") e, no rodapé, os contadores, a branch e o PR. Cards com
-pendência sua ganham a borda na cor do status, e o LED da barra pisca devagar enquanto a IA trabalha no card (na história, também quando ela trabalha numa sub-tarefa); quando ela termina, o LED continua lá, apagado.
+pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do card de relance: verde piscando devagar enquanto a IA trabalha nele (na história, também quando ela trabalha numa sub-tarefa), amarelo quando ele espera por você, vermelho quando está bloqueado e apagado quando não há nada acontecendo.
 
 ### Vínculos entre cards
 
@@ -172,6 +172,30 @@ Um pai vinculado segue a regra de Configurações → Regras: quando o último f
 coluna de conclusão, o board pergunta (ou move sozinho, conforme a regra) se o pai também vai para a
 conclusão. A IA usa as ferramentas `link_cards` e `unlink_cards`, e o `get_card` devolve os
 vínculos.
+
+A seção **Vínculos** também mostra, só para exibição, a relação de sub-tarefa: numa sub-tarefa, um
+grupo "Pai" com a história; numa história, a contagem de sub-tarefas com um atalho até a seção
+**Sub-tarefas**. Essa relação é somente leitura (sem botão de remover) e não entra na regra de
+conclusão acima, que continua valendo só para o vínculo manual de pai/filho.
+
+#### Dependência e sub-tarefas em paralelo
+
+Um card pode **depender** de outro: em **Vínculos**, escolha "precisa terminar antes deste card" (o
+outro é pré-requisito) ou "só começa depois deste card". O card aberto mostra os grupos **Depende
+de** (com quantas dependências ainda estão em aberto) e **Libera**. O board recusa ciclo de
+dependência.
+
+A IA usa isso para acelerar a Implementação. No Plan ela declara a ordem entre as sub-tarefas
+(`create_card` com `depends_on`, ou `link_cards` com `depends_on`): uma depende da outra quando usa o
+que ela produz ou quando as duas alteram os mesmos arquivos. Na Implementação, o `get_card` da
+história devolve em `subtasksNow` o que pode rodar agora, e a IA delega **as sub-tarefas sem
+dependência pendente a subagentes simultâneos**, cada um com o modelo do seu card; ao fim da rodada
+ela verifica o conjunto, faz o commit e parte para a rodada seguinte. `start_work` recusa a
+sub-tarefa que ainda espera outra. Sem dependências declaradas, todas as sub-tarefas em aberto são
+consideradas independentes. Depende de a ferramenta de IA ter subagentes (o Claude Code tem); sem
+eles, a execução segue uma por vez, na ordem das dependências. Projetos que já tinham a skill do
+fluxo instalada continuam com o texto antigo dela (o board não sobrescreve uma skill que você pode
+ter ajustado): apague-a e instale de novo em Configurações para receber a instrução nova.
 
 ### Board no navegador, fora do editor
 
@@ -251,6 +275,26 @@ O botão também fica no cabeçalho do card, ao lado do status.
 - Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo e o fim da
   saída da ferramenta. O log completo está no painel **Saída → Faz AI** (ou no terminal do `faz-ai`).
 
+### Métricas de uso com get_metrics
+
+Durante a conversa de um card, a IA pode consultar estatísticas agregadas do histórico do board — uso,
+duração e custo de execuções — sem precisar abrir nenhum painel. Chame a ferramenta `get_metrics` em
+linguagem natural: "quanto tempo de IA o card #72 consumiu?", "qual tipo de card consome mais este
+mês?", "qual agente foi usado mais?". A ferramenta responde em uma tabela compacta, otimizada para
+economizar tokens.
+
+- A agregação pode agrupar por fase, tipo de card, ferramenta, modelo, card, agente ou skill. Omita
+  para obter apenas o total do período.
+- Filtros de período (data inicial e final, em `AAAA-MM-DD`), card (ex. `72` ou `#72`), e dimensões
+  (ex. fase, modelo, tipo de card).
+- Nas dimensões **agente** e **skill** a tabela mostra só a contagem de execuções e de usos (sem
+  tokens nem custo, que não é possível repartir entre componentes de uma execução).
+- Valores não medidos aparecem como "-" (nunca 0): custo e tokens dependem da história #70, que
+  ainda não está implementada. A resposta marca a cifra como estimada.
+- Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
+  (sem detalhe por execução). Períodos muito antigos (mais de ~12 meses) não têm detalhe e só
+  agregam os totais já consolidados.
+
 ### Branch e pasta de trabalho por história
 
 Cada história trabalha numa branch própria, criada pelo board (ex.: `historia/12-login-com-google`).
@@ -263,7 +307,8 @@ commits na branch da história.
 - O card mostra a branch e abre a pasta de trabalho numa janela nova.
 - Em Configurações → **Git** ficam o modo (worktree, branch na própria pasta ou desligado), o
   padrão do nome da branch, a pasta das worktrees, o merge automático do PR ao aprovar a homologação
-  e a detecção automática de merges (ligada por padrão).
+  e a detecção automática de merges, com o arquivamento das histórias já publicadas (ligada por
+  padrão).
 - Cada worktree é uma cópia de trabalho: as dependências precisam ser instaladas nela.
 
 ### Pull request e merge na Homologação
@@ -299,18 +344,45 @@ continua sendo feito pela pessoa, manualmente ou pelo merge automático; o board
 na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado) não bloqueiam nada
 — o aviso aparece no log, e a rotina continua tentando no próximo intervalo.
 
+Na mesma rodada, depois de olhar os pull requests, o board dá o último passo do ciclo: **quando a
+versão que contém uma história concluída é publicada, ele registra na conversa qual versão a levou
+(tag e link da release) e arquiva o card**. Assim a coluna Concluído fica só com o que está mergeado
+e ainda não chegou a quem usa; o que já foi entregue vai para os arquivados do workflow, de onde você
+pode desarquivar a qualquer momento. Não há o que ligar: o passo vem junto com a detecção de merges,
+no mesmo intervalo e no mesmo liga/desliga, e nasce ligado com ela.
+
+Uma história conta como publicada quando existe uma tag que **contém** o commit do merge **e** que
+tem uma **release publicada** no GitHub — é o que o `npm run release` deste projeto cria. Tag sem
+release não vale, release em rascunho não vale, pré-lançamento vale. A versão registrada é a mais
+antiga entre as que contêm o commit, pela data de publicação. O critério é conservador de propósito:
+arquivar tarde se corrige na rodada seguinte, arquivar cedo esconde um card sem ninguém notar.
+
+Tudo aqui é melhor esforço. Projeto sem releases, fora do GitHub ou numa máquina sem o `gh`
+simplesmente não arquiva nada: nenhum card é bloqueado e o motivo aparece uma vez no log. O board
+nunca publica versão — ele só lê o que você publicou — e histórias concluídas antes desta versão, que
+não têm o commit do merge guardado, continuam sendo arquivadas por você, com um clique.
+
 ### Heartbeat
 
 Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
 intervalo, enquanto o editor estiver aberto na pasta do projeto. Em cada rodada ela avança os cards
-aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez.
+aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. No modo
+"Worktree por história", **Tocar histórias em paralelo** (na mesma tela; nasce desligado) faz o heartbeat
+tocar várias histórias ao mesmo tempo, cada uma na sua pasta de trabalho: duas por padrão, até seis em
+**Histórias ao mesmo tempo**; o limite conta toda execução em
+andamento, inclusive as chamadas à mão. Fora desse modo, e no modo autônomo (cujas histórias são
+empilhadas), continua uma por vez, e o campo fica desligado. A tela de Git explica o motivo em cada
+modo: com branch na própria pasta, duas histórias ao mesmo tempo trocariam a branch uma debaixo da
+outra e misturariam alterações; com worktree elas ficam isoladas, ao custo de mais uma cópia dos
+arquivos em disco por história (com as dependências instaladas em cada uma) e de mais memória e
+processador enquanto várias sessões de IA, testes e builds rodam juntos.
 
 - Sem pendência com a IA, nada é executado.
 - A fila da rodada segue a ordem do board: os bugs primeiro e, depois, de cima para baixo — o que
   decide é a posição do card, não o número dele nem o que já foi aprovado.
 - Cards que estão com você (aguardando revisão ou resposta, bloqueados) não são tocados, a menos
   que você tenha deixado uma mensagem sem resposta na conversa.
-- **Rodar agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
+- **Chamar a IA agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
   uma rodada na hora, mesmo com o heartbeat desligado. **Faz AI: Parar as execuções da IA e o modo autônomo**
   interrompe tudo.
 - A barra de status mostra os cards em execução e a hora da próxima rodada.
@@ -324,7 +396,7 @@ colunas. Você mesmo pode mover qualquer card sem aprovação.
 
 ### Modo autônomo (YOLO)
 
-Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo (YOLO)**
+Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo**
 (o board pede uma confirmação, porque o modo abre mão de toda aprovação). A partir daí a IA toca a
 história sozinha, **sem pedir autorização nem confirmação para nada**:
 
@@ -348,15 +420,16 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   formando uma pilha de PRs; quando a ordem do board faz uma história rodar antes de outra de
   número menor, a branch dela parte da principal e o pull request sai solto, fora da pilha.
 - **Dividir um pedido grande**: a IA pode criar as histórias seguintes a partir de uma história em
-  modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo e entram na
-  fila. Ela nunca liga o modo numa história que você não ligou.
+  modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo, entram na fila
+  e ganham um vínculo **relativo** com a história de origem (pulado em silêncio se já existir
+  qualquer vínculo entre as duas). Ela nunca liga o modo numa história que você não ligou.
 - **Freios**: o autopiloto para quando a IA bloqueia o card ou quando uma execução falha (o card
   fica Bloqueado, com o motivo) e bloqueia a história depois de 3 execuções seguidas que não
   avançaram nada. Ao destravar o card, ele continua sozinho.
 
-O **botão "Autônomo"** no topo do board aparece enquanto houver história na fila: aceso quando o
-autopiloto está tocando, apagado quando está pausado; um clique pausa (e interrompe a IA) ou
-retoma. Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
+O **botão do modo autônomo** no topo do board aparece enquanto houver história na fila e diz o que
+o clique faz: **Pausar modo autônomo** (aceso, com o autopiloto tocando; pausar interrompe a IA) ou
+**Retomar modo autônomo** (apagado, pausado). Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
 (YOLO)** e **Faz AI: Parar as execuções da IA e o modo autônomo**. Ao abrir o editor, o autopiloto
 não começa sozinho: ele liga quando você ativa o modo numa história ou retoma. O heartbeat não
 toca histórias em modo autônomo; elas são do autopiloto.
@@ -475,6 +548,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English), tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
+| Backup | Exportar o board num arquivo e importar um arquivo no lugar do board atual (ver [Backup do board](#backup-do-board)) |
 
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração
 local; nas outras, uma lista embutida que pode ser editada). As regras de sugestão combinam
@@ -493,6 +567,26 @@ interferem uma na outra. Na primeira vez, o board parte de uma cópia do banco �
 anteriores (`fazai.db`), que fica intacto. Regras e skills são arquivos da pasta do projeto e
 entram no git normalmente. Evite abrir a mesma pasta em duas janelas do editor ao mesmo tempo: a
 última a salvar vence (a extensão avisa quando isso acontece).
+
+### Backup do board
+
+Para levar o board a outra máquina ou guardar uma cópia, use **Configurações → Backup**:
+
+- **Exportar board** gera um arquivo `<nome do board>-<data>.fazai.json` com tudo o que está no
+  board: colunas, tipos, campos, regras, modelos, agentes, cards (inclusive arquivados e na
+  lixeira), conversas, checklists, vínculos, histórico e os anexos embutidos. Só o board da pasta
+  atual sai no arquivo. Ele contém as conversas e os anexos: guarde-o com cuidado.
+- **Importar de um arquivo…** mostra um resumo (nome, cards, anexos, tamanho, versão) e, depois da
+  confirmação, grava uma cópia do banco (`<arquivo>.bak`, ao lado dele), apaga o board atual e o
+  substitui pelo do arquivo, com os mesmos números de card. O board importado passa a ser o desta
+  pasta. Nada muda no banco se o arquivo for inválido ou se algo falhar no meio.
+
+Um arquivo exportado por uma versão anterior da extensão é atualizado ao ser importado; um arquivo
+de versão mais nova é recusado com a versão necessária. Importar com a IA executando um card não é
+permitido: espere a execução terminar. No navegador o fluxo é o mesmo, com o download e a escolha
+do arquivo feitos pela própria página. Limites conhecidos: o histórico mensal consolidado do log
+não vai no arquivo, e as branches e pastas de trabalho das histórias são importadas como estavam na
+máquina de origem (recrie a pasta pelo botão do card).
 
 ## Desenvolvimento
 

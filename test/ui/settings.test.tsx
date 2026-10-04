@@ -96,9 +96,9 @@ describe('TypesSettings', () => {
       </Theme>,
     );
     const name = await openDraft();
-    expect(screen.getByRole('button', { name: 'Adicionar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Criar tipo' })).toBeDisabled();
     await userEvent.type(name, 'Melhoria');
-    await userEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Criar tipo' }));
     expect(lastSent('settings.type.create').name).toBe('Melhoria');
   });
 

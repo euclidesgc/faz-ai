@@ -4,6 +4,81 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **Um clique no nome da branch copia o nome.** No card aberto, a branch da história virou um botão:
+  clicar copia o nome para a área de transferência e a tela confirma com "Nome copiado".
+
+- **O heartbeat pode tocar várias histórias ao mesmo tempo.** Em Configurações, na execução pela IA,
+  o interruptor **Tocar histórias em paralelo** (nasce desligado) faz o heartbeat executar várias
+  histórias juntas: duas por padrão, até seis em **Histórias ao mesmo tempo**. Só vale no modo "Worktree por história", em que cada história trabalha na sua
+  própria pasta; fora dele, e no modo autônomo (histórias empilhadas), continua uma por vez. O limite
+  conta toda execução em andamento, e mais histórias em paralelo gastam mais do limite de uso da conta.
+  A tela de Git passa a explicar, em cada modo, se o paralelo está disponível e por quê: branch na
+  mesma pasta causa conflito entre histórias; worktree isola, mas ocupa mais disco e usa mais memória
+  e processador enquanto várias rodam juntas.
+
+- **Sub-tarefas independentes rodam ao mesmo tempo.** Um card pode agora **depender** de outro
+  (novo vínculo, em Vínculos: "precisa terminar antes deste card" / "só começa depois deste card",
+  com os grupos "Depende de" e "Libera"). No Plan a IA declara a ordem entre as sub-tarefas
+  (`create_card` com `depends_on`); na Implementação ela delega as que não têm dependência pendente
+  a subagentes simultâneos, cada um com o modelo do seu card, e segue em rodadas (`subtasksNow` no
+  `get_card` da história). `start_work` recusa a sub-tarefa que ainda espera outra. Antes era sempre
+  uma sub-tarefa por vez. Quem já tinha a skill do fluxo instalada precisa apagá-la e instalar de
+  novo para receber a instrução nova.
+
+- **O LED do card agora parece um LED e diz o estado de relance.** Antes era um ponto na cor do
+  texto da barra, com um pulso quase invisível. Agora ele fica verde e pisca devagar enquanto a IA
+  trabalha no card (ou numa sub-tarefa da história), amarelo quando o card espera por você, vermelho
+  quando está bloqueado e apagado quando não há nada acontecendo. Só o verde pisca. Vale para os
+  cards do board, as sub-tarefas e o cabeçalho do card aberto.
+
+- **Os botões dizem o que o clique faz.** Rótulos que mostravam só um estado ou um nome genérico
+  viraram ações: no topo, "Pausar modo autônomo" / "Retomar modo autônomo", "Ver 2 com você" /
+  "Ver todos os cards" e "Abrir chat" / "Fechar chat"; no board, "Mostrar filtros", "Limpar
+  filtros", "+ Nova coluna" e "Criar card"; no card, "Parar a IA" e "Salvar descrição"; nas
+  configurações, "Criar tipo", "Criar coluna", "Adicionar modelo", "Fechar edição", "Reler pastas",
+  "Chamar a IA agora", "Restaurar aparência padrão" e outros. Na interface, o modo autônomo passa a
+  ter um nome só (sem "YOLO" nem "autopiloto" nos rótulos).
+
+- **Exportar e importar o board.** Em **Configurações → Backup**, **Exportar board** gera um
+  arquivo `.fazai.json` com tudo o que está no board da pasta: configurações, cards (inclusive
+  arquivados e na lixeira), conversas, checklists, vínculos, histórico e os anexos embutidos.
+  **Importar de um arquivo…** mostra um resumo, pede confirmação, grava uma cópia do banco
+  (`.bak`) e substitui o board atual pelo do arquivo, com os mesmos números de card. Arquivo de
+  versão anterior é atualizado ao importar; de versão mais nova é recusado. Importar com a IA
+  executando um card é recusado. Funciona no editor e no navegador. É o caminho para migrar o
+  board entre máquinas, já que ele fica fora do repositório.
+- **Dividir um pedido grande em histórias agora as vincula de verdade.** Ao criar uma história com
+  `autonomous_from`, ela ganha um vínculo **relativo** com a história de origem — antes, a origem só
+  ficava registrada em texto, num comentário que nem a interface nem a IA liam como relação. Se já
+  existir qualquer vínculo entre as duas (caso de uma história ligada à mão), a criação é pulada em
+  silêncio, sem duplicar.
+- **A seção Vínculos do card aberto passa a mostrar a relação de sub-tarefa.** Numa sub-tarefa, um
+  grupo "Pai" com a história; numa história, a contagem de sub-tarefas com um atalho até a seção
+  Sub-tarefas (sem repetir a lista). A relação é somente leitura e não entra nas regras de
+  conclusão, que continuam valendo só para o vínculo manual de pai/filho.
+
+- **A história sai do board quando a versão dela é publicada.** Na mesma rodada que olha os pull
+  requests, o board verifica se o commit do merge de uma história concluída já está numa versão
+  publicada — uma tag que contém o commit **e** que tem release publicada no GitHub. Está: ele
+  registra na conversa qual versão levou a história (tag e link da release) e arquiva o card, que vai
+  para os arquivados do workflow e pode ser desarquivado com um clique. A coluna Concluído passa a
+  significar "mergeado e ainda não entregue". O **recurso nasce ligado**, junto com a detecção de
+  merges e no mesmo intervalo dela: não há ajuste novo para ligar. Tag sem release não conta, release
+  em rascunho não conta, pré-lançamento conta, e a versão registrada é a mais antiga entre as que
+  contêm o commit, pela data de publicação. É melhor esforço: projeto sem releases, fora do GitHub ou
+  sem o `gh` não arquiva nada, sem bloquear card nenhum. O board não publica versão — o
+  `npm run release` continua como está —, e histórias concluídas antes desta versão, sem o commit do
+  merge guardado, continuam sendo arquivadas por você.
+
+- **A IA pode consultar as métricas de uso do board direto na conversa do card com `get_metrics`.** A
+  ferramenta agrega dados do histórico — execuções, duração, custo e tokens — por fase, tipo de card,
+  ferramenta, modelo, card, agente ou skill, com filtros de período e card. Responde em tabela
+  compacta. Não lista execuções individuais (a agregação por card já basta para a IA saber o custo de
+  cada um). Custo e tokens ainda têm "-" (não medidos) até a história #70 passar a gravá-los; até
+  lá a ferramenta funciona normalmente e marca a cifra como estimada.
+
 ## 0.31.1
 
 - **O card aberto voltou a funcionar.** Na 0.31.0 o card abria encostado à esquerda e fechava a

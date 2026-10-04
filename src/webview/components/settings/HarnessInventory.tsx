@@ -32,7 +32,7 @@ export function HarnessInventory() {
         title={t('Tudo que cada ferramenta carrega')}
         actions={
           <Button variant="soft" color="gray" title={t('Relê as pastas do projeto e do usuário')} onClick={() => harness.refresh()}>
-            {t('Atualizar')}
+            {t('Reler pastas')}
           </Button>
         }
       >

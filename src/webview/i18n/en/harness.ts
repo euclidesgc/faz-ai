@@ -12,7 +12,6 @@ export const harness: Record<string, string> = {
   // --- HarnessInventory
   'Tudo que cada ferramenta carrega': 'Everything each tool loads',
   'Relê as pastas do projeto e do usuário': 'Re-reads the project and user folders',
-  Atualizar: 'Refresh',
   'O que cada ferramenta de IA lê neste projeto e na sua pasta de usuário, separado por escopo. <b>Projeto</b> vale só aqui; <b>Global</b> vale em todos os seus projetos; <b>Plugins</b> vem de pacotes instalados e não pode ser alterado, mas pode ser copiado. "Abrir" mostra o arquivo no editor, onde ele também é editado.':
     'What each AI tool reads in this project and in your user folder, split by scope. <b>Project</b> applies only here; <b>Global</b> applies to all your projects; <b>Plugins</b> come from installed packages and cannot be changed, but can be copied. "Open" shows the file in the editor, where it is also edited.',
   'deste projeto': 'this project',
@@ -272,7 +271,6 @@ export const harness: Record<string, string> = {
   // --- RunnerSettings
   'Execução pela conversa e heartbeat': 'Run from chat and heartbeat',
   'Começa uma rodada agora, mesmo com o heartbeat desligado': 'Starts a round now, even with the heartbeat off',
-  'Rodar agora': 'Run now',
   'O botão "Chamar IA" da conversa de um card roda o {tool} em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ele pode fazer nessas execuções. O {tool} precisa estar instalado e autenticado nesta máquina{suffix}.':
     'The "Call AI" button in a card\'s conversation runs {tool} in the background in this folder, with nobody approving each step. Here you set what it can do in those runs. {tool} must be installed and signed in on this machine{suffix}.',
   '; o board é entregue a ele em cada execução, sem depender do botão acima':
@@ -292,8 +290,8 @@ export const harness: Record<string, string> = {
   'Tempo limite por execução': 'Timeout per run',
   minutos: 'minutes',
   'Heartbeat ligado': 'Heartbeat on',
-  'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. Sem pendência, nada é executado.':
-    'With the heartbeat on and the board open in this folder (in the editor or through the faz-ai command), the board calls {tool} on its own at every interval: it moves approved cards forward, answers pending messages and works on ready cards, one story at a time. With nothing pending, nothing is run.',
+  'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.':
+    'With the heartbeat on and the board open in this folder (in the editor or through the faz-ai command), the board calls {tool} on its own at every interval: it moves approved cards forward, answers pending messages and works on ready cards, one story at a time or several at once, according to the limit below. With nothing pending, nothing is run.',
   Intervalo: 'Interval',
 
   // --- ScopeGroup
@@ -350,4 +348,15 @@ export const harness: Record<string, string> = {
   'A pasta da skill é removida, com todos os arquivos dela: {location}':
     "The skill's folder is removed, along with all its files: {location}",
   'O arquivo é removido: {location}': 'The file is removed: {location}',
+  'Reler pastas': 'Reread folders',
+  'Chamar a IA agora': 'Call the AI now',
+  'Buscar skills para instalar': 'Find skills to install',
+  'Abrir no editor': 'Open in editor',
+  'Histórias ao mesmo tempo': 'Stories at the same time',
+  histórias: 'stories',
+  'Tocar histórias em paralelo': 'Drive stories in parallel',
+  'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas. As sub-tarefas independentes de cada história já rodam em paralelo, sem limite, conforme o plano.':
+    'When on, the heartbeat drives several stories at once, each in its own folder (worktree). More stories in parallel use more memory and CPU and more of your account usage limit. Autonomous mode stays one at a time, because its stories are stacked. The independent sub-tasks of each story already run in parallel, with no limit, according to the plan.',
+  'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.':
+    'Only available in "Worktree por história" mode (Settings > Git). Outside it the stories share the same folder and would cause conflicts, so the heartbeat drives one at a time.',
 };

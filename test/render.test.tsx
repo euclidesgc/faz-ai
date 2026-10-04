@@ -25,6 +25,7 @@ import { ModelsSettings } from '../src/webview/components/settings/ModelsSetting
 import { RulesSettings } from '../src/webview/components/settings/RulesSettings';
 import { Settings } from '../src/webview/components/settings/Settings';
 import { GitSettings } from '../src/webview/components/settings/GitSettings';
+import { BackupSettings } from '../src/webview/components/settings/BackupSettings';
 import { TypesSettings } from '../src/webview/components/settings/TypesSettings';
 import { FiltersApp } from '../src/webview/FiltersApp';
 import { useBoardStore } from '../src/webview/store/boardStore';
@@ -111,7 +112,7 @@ describe('telas montam sem erro', () => {
     expect(custom).toContain('workflow workflow-child collapsed');
     expect(custom).not.toContain('A fazer'); // linha de baixo fechada não mostra as colunas
     useBoardStore.setState({ collapsed: {} }); // a história tem modelo manual diferente da sugestão
-    expect(html(<FilterBar />)).toContain('Filtros');
+    expect(html(<FilterBar />)).toContain('Abrir filtros');
     expect(html(<FiltersApp />)).toContain('aria-label="Com quem está"');
     expect(html(<TrashView />)).toContain('Lixo');
     const drawer = html(<CardDrawer cardId={storyId} />);
@@ -182,6 +183,22 @@ describe('telas montam sem erro', () => {
       'Tipo de merge',
     ])
       expect(html(<GitSettings />)).toContain(text);
+    const settingsHtml = html(<Settings />);
+    expect(settingsHtml).toContain('Backup');
+    const backup = html(<BackupSettings />);
+    for (const text of ['Exportar board', 'Importar de um arquivo…', 'guarde-o com cuidado']) expect(backup).toContain(text);
+    expect(backup).not.toContain('Espere a execução da IA terminar');
+    // com a IA executando um card, importar fica desativado com a dica
+    const withRun = useBoardStore.getState().state!;
+    useBoardStore.setState({ state: { ...withRun, aiRuns: [withRun.cards[0]!.id] } });
+    const blocked = html(<BackupSettings />);
+    expect(blocked).toContain('Espere a execução da IA terminar');
+    expect(blocked).toMatch(/<button[^>]*disabled[^>]*>Importar de um arquivo…/);
+    useBoardStore.setState({ state: withRun });
+    // lendo o arquivo escolhido: os dois botões ficam desativados
+    useBoardStore.setState({ backupBusy: 'import' });
+    expect(html(<BackupSettings />)).toContain('Lendo o arquivo…');
+    useBoardStore.setState({ backupBusy: null });
     const cols = html(<WorkflowsSettings />);
     for (const text of ['PRD', 'Novo workflow', 'Nova coluna', 'IA atua', 'Exige aprovação', 'Fase', 'PRD.md', 'Discovery', 'Homologação'])
       expect(cols).toContain(text);
@@ -268,7 +285,7 @@ describe('telas montam sem erro', () => {
       'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',
       'Heartbeat ligado',
-      'Rodar agora',
+      'Chamar a IA agora',
       'Subagentes',
       'Novo subagente',
       'revisor-de-spec',

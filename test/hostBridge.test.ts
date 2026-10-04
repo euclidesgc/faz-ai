@@ -3,7 +3,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
-import { HostBridge, type HostEnv } from '../src/extension/host/hostBridge';
+import { HostBridge, exportNotice, importNotice, type HostEnv } from '../src/extension/host/hostBridge';
+import { parseExportFile } from '../src/extension/db/boardExport';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import type { HostToWebview } from '../src/shared/messages';
 
@@ -106,5 +107,122 @@ describe('HostBridge: attachment.read / attachment.write', () => {
     expect(last.type).toBe('attachment.writeResult');
     expect(last.ok).toBe(false);
     expect(last.error).toBeTruthy();
+  });
+});
+
+describe('HostBridge: backup (exportar e importar o board)', () => {
+  let saved: { content: string; name: string }[];
+  let picked: string | undefined;
+
+  function createCard(title: string): string {
+    const snap = router.snapshot();
+    const story = snap.cardTypes.find((t) => t.name === 'História')!;
+    const col = snap.columns.find((c) => c.workflowId === story.defaultWorkflowId)!;
+    return router.createCard({ typeId: story.id, columnId: col.id, parentId: null, title });
+  }
+
+  beforeEach(() => {
+    saved = [];
+    picked = undefined;
+    env.saveTextAs = async (content, name) => {
+      saved.push({ content, name });
+      return `/tmp/${name}`;
+    };
+    env.pickBackupFile = async () => picked;
+    router.handle({ type: 'settings.board.update', patch: { name: 'Meu Board' } });
+    createCard('Card 1');
+  });
+
+  it('backup.export grava o JSON pelo saveTextAs e avisa onde ficou', async () => {
+    await bridge.handle({ type: 'backup.export' });
+    expect(saved).toHaveLength(1);
+    expect(saved[0]!.name).toMatch(/^Meu Board-\d{4}-\d{2}-\d{2}\.fazai\.json$/);
+    const file = parseExportFile(saved[0]!.content);
+    expect(file.board.name).toBe('Meu Board');
+    expect(file.tables.cards!.map((c) => c.title)).toEqual(['Card 1']);
+    expect(sent.at(-1)).toEqual({
+      type: 'notice',
+      message: `Board exportado em /tmp/${saved[0]!.name}. O arquivo contém conversas e anexos: guarde-o com cuidado.`,
+    });
+  });
+
+  it('quando a pessoa desiste de salvar ou de escolher, só o "terminou" chega, sem aviso', async () => {
+    env.saveTextAs = async () => undefined;
+    await bridge.handle({ type: 'backup.export' });
+    await bridge.handle({ type: 'backup.import.pick' });
+    expect(sent.filter((m) => m.type !== 'boardState' && m.type !== 'viewState')).toEqual([
+      { type: 'backup.done' },
+      { type: 'backup.done' },
+    ]);
+  });
+
+  it('backup.import.pick lê, valida e devolve o resumo com um token; apply substitui o board e avisa', async () => {
+    const { text } = router.exportBoardFile();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-export-'));
+    picked = path.join(dir, 'board.fazai.json');
+    fs.writeFileSync(picked, text);
+    const oldBoardId = router.boardId;
+    createCard('Card 2');
+
+    await bridge.handle({ type: 'backup.import.pick' });
+    // o resumo vem antes do "terminou" (backup.done), que libera os botões da aba
+    expect(sent.at(-1)).toEqual({ type: 'backup.done' });
+    const summary = sent.at(-2)!;
+    expect(summary.type).toBe('backup.import.summary');
+    if (summary.type !== 'backup.import.summary') return;
+    expect(summary.summary).toMatchObject({
+      boardName: 'Meu Board',
+      cards: 1,
+      attachments: 0,
+      sizeBytes: Buffer.byteLength(text),
+      large: false,
+    });
+
+    let changes = 0;
+    router.onDidChange(() => changes++);
+    await bridge.handle({ type: 'backup.import.apply', token: summary.token });
+    expect(sent.at(-1)).toEqual({ type: 'notice', message: 'Board "Meu Board" importado: 1 card(s) e 0 anexo(s).' });
+    expect(changes).toBe(1);
+    expect(router.boardId).toBe(oldBoardId); // o arquivo veio deste mesmo board: os ids se preservam
+    expect(router.snapshot().cards.map((c) => c.title)).toEqual(['Card 1']);
+    expect(router.snapshot().board.workspaceKey).toBe('ws');
+  });
+
+  it('o token só vale uma vez; cancelar descarta; token desconhecido responde erro', async () => {
+    const { token } = router.parkImport(parseExportFile(router.exportBoardFile().text), 10);
+    await bridge.handle({ type: 'backup.import.cancel', token });
+    await bridge.handle({ type: 'backup.import.apply', token });
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'Importação expirada: escolha o arquivo de novo.' });
+    await bridge.handle({ type: 'backup.import.apply', token: 'nope' });
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'Importação expirada: escolha o arquivo de novo.' });
+  });
+
+  it('com a IA executando um card, a importação é recusada e o board fica como está', async () => {
+    const { token } = router.parkImport(parseExportFile(router.exportBoardFile().text), 10);
+    createCard('Card 2');
+    router.setAiRuns([router.snapshot().cards[0]!.id]);
+    await bridge.handle({ type: 'backup.import.apply', token });
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'Espere a execução da IA terminar para importar o board.' });
+    expect(router.snapshot().cards).toHaveLength(2);
+    router.setAiRuns([]);
+    await bridge.handle({ type: 'backup.import.apply', token });
+    expect(router.snapshot().cards).toHaveLength(1);
+  });
+
+  it('arquivo inválido escolhido: erro com o motivo, sem resumo', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-export-'));
+    picked = path.join(dir, 'x.json');
+    fs.writeFileSync(picked, '{"oi": 1}');
+    await bridge.handle({ type: 'backup.import.pick' });
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'Arquivo não é um export do Faz AI: falta o marcador "board-export".' });
+  });
+
+  it('as mensagens de resultado listam os cards com anexo sem arquivo', () => {
+    expect(exportNotice('/x/b.fazai.json', ['#3', '#8'])).toBe(
+      'Board exportado em /x/b.fazai.json. Anexos sem arquivo: #3, #8. O arquivo contém conversas e anexos: guarde-o com cuidado.',
+    );
+    expect(importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: ['#3'] })).toBe(
+      'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3.',
+    );
   });
 });

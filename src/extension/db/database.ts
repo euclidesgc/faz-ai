@@ -23,6 +23,16 @@ async function getSqlJs(wasmDir: string): Promise<SqlJsStatic> {
   return sqlJs;
 }
 
+/**
+ * Banco vazio em memória, sem schema: etapa intermediária da importação de um board (o arquivo é
+ * materializado na versão de schema dele e migrado antes de entrar no banco real). Só funciona depois
+ * de `openInMemory` ou `openFile` terem carregado o sql.js.
+ */
+export function newDatabase(): Database {
+  if (!sqlJs) throw new Error('sql.js ainda não foi carregado');
+  return new sqlJs.Database();
+}
+
 /** Cria um banco em memória (testes). */
 export async function openInMemory(wasmDir: string): Promise<Database> {
   const SQL = await getSqlJs(wasmDir);

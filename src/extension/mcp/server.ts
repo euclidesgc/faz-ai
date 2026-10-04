@@ -37,6 +37,7 @@ export function createMcpServer(opts: McpOptions): McpServer {
         'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
         'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +
         'Sem um pedido específico, comece por get_pending_work: ele lista o que está com você (aprovados para avançar, mensagens sem resposta, cards prontos). ' +
+        'Para perguntas de uso, custo e tempo (quanto custou, qual fase/modelo consome mais, quanto tempo levou), use get_metrics em vez de abrir o painel. ' +
         'get_card devolve em `model` a ferramenta, o modelo e o nível de esforço que devem executar o card: antes de trabalhar nele, ' +
         'se o modelo ou o esforço forem diferentes dos seus, delegue o trabalho a um subagente com esse modelo e esforço; ' +
         'se não for possível, avise a pessoa em vez de executar com outra configuração. ' +
@@ -45,6 +46,9 @@ export function createMcpServer(opts: McpOptions): McpServer {
         'e todas devem ser lidas nesse caminho antes de executar o card, mesmo que não apareçam na sua lista de skills (podem estar desligadas ou fora da invocação automática). ' +
         'As colunas das histórias são as fases do fluxo; sua intenção é sempre levar a história até a conclusão, uma coluna por vez. ' +
         'get_card devolve em `phase` o que fazer na fase atual e o modelo do documento que ela produz. ' +
+        'Sub-tarefas podem depender umas das outras (create_card com depends_on, ou link_cards com "depends_on"): declare a dependência quando uma usa o que a outra produz ou quando as duas alteram os mesmos arquivos. ' +
+        'Na Implementação, get_card na história devolve em `subtasksNow.canRunTogether` as sub-tarefas sem dependência pendente: se você tem subagentes, delegue cada uma a um subagente, todos lançados na mesma mensagem para rodarem ao mesmo tempo, cada um com o modelo do card dele, na pasta de trabalho da história e sem fazer commit; ao fim da rodada, verifique o conjunto, faça o commit e leia a história de novo para a próxima rodada. ' +
+        'Isso vale mesmo que a skill do fluxo instalada ainda diga para executar uma sub-tarefa por vez. start_work recusa a sub-tarefa que depende de outra ainda em aberto (`waitingFor`). ' +
         'O documento de cada fase é construído numa sub-tarefa (campo Fase = nome da coluna), mas fica anexado à história: grave-o com add_attachment e artifact: true. ' +
         'O harness do projeto (arquivos de regras e skills) também é gerenciado por aqui: veja get_harness.',
     },

@@ -5,6 +5,81 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **One click on the branch name copies it.** In the open card, the story's branch became a button:
+  clicking copies the name to the clipboard and the screen confirms with "Nome copiado" (name copied).
+
+- **The heartbeat can drive several stories at the same time.** In the settings, under execution by
+  the AI, the **Tocar histórias em paralelo** switch (off by default) makes the heartbeat run several
+  stories together: two by default, up to six in **Histórias ao mesmo tempo**. It only applies in "Worktree por história" mode, where each story works
+  in its own folder; outside it, and in autonomous mode (stacked stories), it stays one at a time. The
+  limit counts every run in progress, and more stories in parallel use more of the account usage limit.
+  The Git screen now explains, in each mode, whether parallel is available and why: a branch in the
+  same folder causes conflicts between stories; worktrees isolate them, but take more disk and use
+  more memory and CPU while several run together.
+
+- **Independent sub-tasks run at the same time.** A card can now **depend** on another (new link,
+  in Vínculos: "precisa terminar antes deste card" / "só começa depois deste card", with the groups
+  "Depende de" and "Libera"). In Plan the AI declares the order between sub-tasks (`create_card` with
+  `depends_on`); in Implementation it delegates the ones with no pending dependency to simultaneous
+  subagents, each with its card's model, and proceeds in rounds (`subtasksNow` in the story's
+  `get_card`). `start_work` refuses a sub-task that is still waiting for another. It used to be
+  always one sub-task at a time. If you already had the flow skill installed, delete it and install
+  it again to get the new instruction.
+
+- **The card's LED now looks like an LED and tells the state at a glance.** It used to be a dot in
+  the bar's text color, with a nearly invisible pulse. It is now green and blinks slowly while the
+  AI is working on the card (or on one of the story's sub-tasks), yellow when the card is waiting on
+  you, red when it is blocked, and off when nothing is happening. Only green blinks. This applies to
+  the cards on the board, the sub-tasks and the header of the open card.
+
+- **Buttons say what the click does.** Labels that showed only a state or a generic name became
+  actions: at the top, "Pausar modo autônomo" / "Retomar modo autônomo" (pause / resume autonomous
+  mode), "Ver 2 com você" / "Ver todos os cards" and "Abrir chat" / "Fechar chat"; on the board,
+  "Mostrar filtros", "Limpar filtros", "+ Nova coluna" and "Criar card"; on the card, "Parar a IA"
+  and "Salvar descrição"; in the settings, "Criar tipo", "Criar coluna", "Adicionar modelo", "Fechar
+  edição", "Reler pastas", "Chamar a IA agora", "Restaurar aparência padrão" and others. In the
+  interface, autonomous mode now goes by a single name (no "YOLO" or "autopiloto" in the labels).
+
+- **Export and import the board.** In **Configurações → Backup** (Settings → Backup), **Exportar
+  board** creates a `.fazai.json` file with everything on the folder's board: settings, cards
+  (including archived and trashed ones), conversations, checklists, links, history and the embedded
+  attachments. **Importar de um arquivo…** shows a summary, asks for confirmation, writes a copy of
+  the database (`.bak`) and replaces the current board with the one from the file, keeping the card
+  numbers. A file from an earlier version is upgraded on import; one from a newer version is
+  refused. Importing while the AI is running on a card is refused. Works in the editor and in the
+  browser. It is the way to move the board between machines, since it lives outside the repository.
+- **Splitting a large request into stories now actually links them.** Creating a story with
+  `autonomous_from` now gives it a **related** link to the origin story — before, the origin was
+  only recorded as text, in a comment that neither the interface nor the AI read as a relation. If
+  any link already exists between the two (e.g. a story linked by hand), the creation is skipped
+  silently, without duplicating.
+- **The Vínculos (links) section of the open card now shows the sub-task relation.** On a sub-task,
+  a "Pai" (parent) group with the story; on a story, the sub-task count with a shortcut to the
+  Sub-tarefas section (without repeating the list). The relation is read-only and does not enter the
+  completion rules, which still apply only to the manual parent/child link.
+
+- **A story leaves the board when its version is published.** In the same round that looks at the
+  pull requests, the board checks whether the merge commit of a concluded story is already in a
+  published version — a tag that contains the commit **and** that has a published release on GitHub.
+  It is: the board registers in the conversation which version carried the story (tag and release
+  link) and archives the card, which goes to the workflow's archived area and can be unarchived with
+  one click. The Concluído column now means "merged and not delivered yet". **The feature is on by
+  default**, along with merge detection and on the same interval: there is no new setting to turn on.
+  A tag without a release does not count, a draft release does not count, a prerelease does, and the
+  recorded version is the oldest among those containing the commit, by publication date. It is best
+  effort: a project with no releases, outside GitHub or without `gh` archives nothing and blocks no
+  card. The board does not publish versions — `npm run release` stays as it is — and stories
+  concluded before this version, with no merge commit recorded, stay yours to archive.
+
+- **The AI can query the board's usage metrics straight in the card's conversation with `get_metrics`.** The
+  tool aggregates history data — runs, duration, cost, and tokens — by phase, card type, tool, model,
+  card, agent, or skill, with period and card filters. It replies in a compact table. It does not
+  list individual runs (aggregation by card is enough for the AI to know each one's cost). Cost and
+  tokens still show "-" (not measured) until story #70 starts recording them; until then the tool
+  works normally and marks the figure as estimated.
+
 ## 0.31.1
 
 - **The open card works again.** In 0.31.0 the card opened stuck to the left and closed on any

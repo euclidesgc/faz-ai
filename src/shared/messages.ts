@@ -1,4 +1,5 @@
 import type { Appearance } from './appearance';
+import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
 import type { ExecProfile } from './execution';
 import type { AiTool, HarnessKind, SkillMode } from './harness';
@@ -197,7 +198,15 @@ export type WebviewToHost =
   /** mostra o chat na barra lateral do editor */
   | { type: 'ui.showChat' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
-  | { type: 'harness.flowSkill.install' };
+  | { type: 'harness.flowSkill.install' }
+  /** exporta o board num arquivo JSON (no editor, abre o "salvar como"; na web a página baixa pela rota /backup/export) */
+  | { type: 'backup.export' }
+  /** escolhe um arquivo de export, valida e devolve o resumo em `backup.import.summary` (na web a página envia por /backup/import) */
+  | { type: 'backup.import.pick' }
+  /** substitui o board atual pelo arquivo estacionado sob `token`; grava o .bak antes */
+  | { type: 'backup.import.apply'; token: string }
+  /** descarta o arquivo estacionado */
+  | { type: 'backup.import.cancel'; token: string };
 
 export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }
@@ -209,6 +218,10 @@ export type HostToWebview =
   /** resposta a `attachment.read`, correlacionada por `requestId` */
   | { type: 'attachment.readResult'; requestId: string; content?: string; error?: string }
   /** resposta a `attachment.write`, correlacionada por `requestId` */
-  | { type: 'attachment.writeResult'; requestId: string; ok: boolean; error?: string };
+  | { type: 'attachment.writeResult'; requestId: string; ok: boolean; error?: string }
+  /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */
+  | { type: 'backup.import.summary'; token: string; summary: ImportSummary }
+  /** a exportação ou a escolha do arquivo terminou (com sucesso ou porque a pessoa desistiu): a interface sai do estado "ocupado" */
+  | { type: 'backup.done' };
 
 export type { WorkflowKind };
