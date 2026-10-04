@@ -90,9 +90,10 @@ export const links = {
 export const attachments = {
   pick: (cardId: Id) => post({ type: 'attachment.pick', cardId }),
   addData: (input: Payload<'attachment.addData'>) => post({ type: 'attachment.addData', ...input }),
-  open: (attachmentId: Id) => post({ type: 'attachment.open', attachmentId }),
   reveal: (attachmentId: Id) => post({ type: 'attachment.reveal', attachmentId }),
   delete: (attachmentId: Id) => post({ type: 'attachment.delete', attachmentId }),
+  /** pede ao host para abrir o diálogo nativo de "salvar como" (só faz sentido fora da web) */
+  saveAs: (attachmentId: Id) => post({ type: 'attachment.saveAs', attachmentId }),
 };
 
 export const settings = {

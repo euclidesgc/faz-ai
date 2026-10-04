@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import type { HostToWebview, WebviewToHost } from '../../shared/messages';
 import { HostBridge, type HostEnv } from '../host/hostBridge';
 import type { ViewStateStore } from '../viewState';
@@ -56,6 +59,14 @@ function vscodeEnv(webview: vscode.Webview, router: MessageRouter): HostEnv {
       (await vscode.window.showOpenDialog({ canSelectMany: true, openLabel: 'Anexar', title: 'Anexar arquivos ao card' }))?.map(
         (u) => u.fsPath,
       ),
+    saveFileAs: async (sourcePath, suggestedName) => {
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(path.join(os.homedir(), suggestedName)),
+        title: 'Salvar anexo como',
+      });
+      if (!uri) return;
+      await fs.copyFile(sourcePath, uri.fsPath);
+    },
   };
 }
 

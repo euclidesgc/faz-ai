@@ -1,5 +1,7 @@
 import * as os from 'node:os';
+import * as fs from 'node:fs/promises';
 import { fetchSource, parseSource } from '../skillInstall';
+import { MAX_ATTACHMENT_BYTES } from '../attachments';
 import type { HostToWebview, WebviewToHost } from '../../shared/messages';
 import type { ViewStateStore } from '../viewState';
 import type { MessageRouter } from '../panel/messageRouter';
@@ -28,6 +30,8 @@ export interface HostEnv {
   revealFile(file: string): unknown;
   /** deixa a pessoa escolher arquivos do disco; undefined quando ela desiste */
   pickFiles(): Promise<string[] | undefined>;
+  /** abre o diálogo nativo de "salvar como" e copia o arquivo do anexo para o destino escolhido; undefined quando a pessoa desiste ou o ambiente não suporta (web) */
+  saveFileAs?(sourcePath: string, suggestedName: string): Promise<void>;
   /** abre o board no navegador (só faz sentido dentro do editor) */
   openInBrowser?(): unknown;
   /** mostra o chat na barra lateral (só faz sentido dentro do editor) */
@@ -147,14 +151,52 @@ export class HostBridge {
           if (files?.length) this.router.addAttachmentFiles(msg.cardId, files);
           return;
         }
-        case 'attachment.open':
         case 'attachment.reveal': {
           const a = this.router.getAttachment(msg.attachmentId);
           if (!a) throw new Error('Anexo não encontrado');
+          await this.env.revealFile(this.router.store.pathOf(a));
+          return;
+        }
+        case 'attachment.saveAs': {
+          const a = this.router.getAttachment(msg.attachmentId);
+          if (!a) throw new Error('Anexo não encontrado');
+          await this.env.saveFileAs?.(this.router.store.pathOf(a), a.filename);
+          return;
+        }
+        case 'attachment.read': {
+          const a = this.router.getAttachment(msg.attachmentId);
+          if (!a) {
+            this.post({ type: 'attachment.readResult', requestId: msg.requestId, error: 'Anexo não encontrado' });
+            return;
+          }
           const file = this.router.store.pathOf(a);
-          if (msg.type === 'attachment.reveal') await this.env.revealFile(file);
-          else if (/^(text\/|application\/json)/.test(a.mime)) await this.env.openFile(file);
-          else await this.env.openExternal(file);
+          const stat = await fs.stat(file);
+          if (stat.size > MAX_ATTACHMENT_BYTES) {
+            this.post({ type: 'attachment.readResult', requestId: msg.requestId, error: 'Anexo maior que 20 MB' });
+            return;
+          }
+          const content = await fs.readFile(file, 'utf8');
+          this.post({ type: 'attachment.readResult', requestId: msg.requestId, content });
+          return;
+        }
+        case 'attachment.write': {
+          const a = this.router.getAttachment(msg.attachmentId);
+          if (!a) {
+            this.post({ type: 'attachment.writeResult', requestId: msg.requestId, ok: false, error: 'Anexo não encontrado' });
+            return;
+          }
+          const file = this.router.store.pathOf(a);
+          try {
+            await fs.writeFile(file, msg.content, 'utf8');
+            this.post({ type: 'attachment.writeResult', requestId: msg.requestId, ok: true });
+          } catch (e) {
+            this.post({
+              type: 'attachment.writeResult',
+              requestId: msg.requestId,
+              ok: false,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
           return;
         }
         default:

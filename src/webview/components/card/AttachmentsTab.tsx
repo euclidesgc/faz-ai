@@ -23,6 +23,7 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
   const state = useBoardStore((s) => s.state)!;
   const baseUri = useBoardStore((s) => s.attachmentsBaseUri);
   const setError = useBoardStore((s) => s.setError);
+  const openAttachmentModal = useBoardStore((s) => s.openAttachmentModal);
   const [over, setOver] = useState(false);
   const cardAttachments = state.attachments.filter((a) => a.cardId === cardId);
   // os documentos das fases ficam na história; a sub-tarefa só aponta para eles
@@ -66,11 +67,11 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
           <ul className="attachments">
             {storyArtifacts.map((a) => (
               <li key={a.id}>
-                <span className="thumb file" onClick={() => attachments.open(a.id)}>
+                <span className="thumb file" onClick={() => openAttachmentModal(a.id)}>
                   {(a.filename.split('.').pop() ?? '').slice(0, 4).toUpperCase() || '?'}
                 </span>
                 <div className="att-info">
-                  <a title={t('Abre o documento anexado à história')} onClick={() => attachments.open(a.id)}>
+                  <a title={t('Abre o documento anexado à história')} onClick={() => openAttachmentModal(a.id)}>
                     {a.filename}
                   </a>
                   <span className="muted small">
@@ -110,15 +111,15 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
                 className="thumb"
                 src={`${baseUri}/${a.cardId}/${encodeURIComponent(a.storedName)}`}
                 alt=""
-                onClick={() => attachments.open(a.id)}
+                onClick={() => openAttachmentModal(a.id)}
               />
             ) : (
-              <span className="thumb file" onClick={() => attachments.open(a.id)}>
+              <span className="thumb file" onClick={() => openAttachmentModal(a.id)}>
                 {(a.filename.split('.').pop() ?? '').slice(0, 4).toUpperCase() || '?'}
               </span>
             )}
             <div className="att-info">
-              <a onClick={() => attachments.open(a.id)}>{a.filename}</a>
+              <a onClick={() => openAttachmentModal(a.id)}>{a.filename}</a>
               {a.artifact && (
                 <span className="badge artifact-badge" title={t('Documento de uma fase')}>
                   {t('artefato')}

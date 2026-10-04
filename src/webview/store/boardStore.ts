@@ -23,6 +23,14 @@ export interface DialogSpec {
   cancelLabel?: string;
 }
 
+/**
+ * Anexo aberto na modal de visualização/edição. Guarda só o id: o `Attachment` completo vem de
+ * `state.attachments`, para a modal nunca mostrar dados velhos de um anexo que mudou ou saiu da lista.
+ */
+export interface AttachmentModalState {
+  attachmentId: Id;
+}
+
 /** Estado só deste webview (o que é compartilhado com a barra lateral vive em ViewState, no host). */
 interface UiState {
   view: View;
@@ -46,6 +54,8 @@ interface BoardStore extends UiState, ViewState {
   /** aviso informativo vindo do host */
   notice: string | null;
   dialog: DialogSpec | null;
+  /** anexo aberto na modal; null quando não há modal de anexo na tela */
+  attachmentModal: AttachmentModalState | null;
   setState(state: BoardState, attachmentsBaseUri: string): void;
   setViewState(view: ViewState): void;
   setError(msg: string | null): void;
@@ -63,6 +73,9 @@ interface BoardStore extends UiState, ViewState {
   /** esquece a escolha manual, voltando ao padrão das configurações */
   resetCollapsed(key: string): void;
   ask(dialog: DialogSpec | null): void;
+  /** abre a modal de um anexo (visualização; a edição é escolhida dentro dela) */
+  openAttachmentModal(attachmentId: Id): void;
+  closeAttachmentModal(): void;
 }
 
 const persisted = getUiState<Partial<UiState>>();
@@ -80,6 +93,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     error: null,
     notice: null,
     dialog: null,
+    attachmentModal: null,
     view: persisted?.view ?? 'board',
     settingsTab: persisted?.settingsTab ?? 'columns',
     harnessTab: persisted?.harnessTab ?? 'tool',
@@ -113,7 +127,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       persist(get());
     },
     openSettings(settingsTab) {
-      set({ view: 'settings', settingsTab, openCardId: null });
+      set({ view: 'settings', settingsTab, openCardId: null, attachmentModal: null });
       persist(get());
     },
     setSettingsNavCollapsed(settingsNavCollapsed) {
@@ -122,7 +136,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     },
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
     openCard(id) {
-      set({ openCardId: id });
+      // trocar (ou fechar) o card deixa a modal de anexo sem contexto: fecha junto
+      set({ openCardId: id, attachmentModal: null });
       persist(get());
     },
     setFilters: (patch) => setShared({ filters: { ...get().filters, ...patch } }),
@@ -133,6 +148,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       setShared({ collapsed: rest });
     },
     ask: (dialog) => set({ dialog }),
+    openAttachmentModal: (attachmentId) => set({ attachmentModal: { attachmentId } }),
+    closeAttachmentModal: () => set({ attachmentModal: null }),
   };
 });
 

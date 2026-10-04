@@ -865,6 +865,51 @@ button.ghost.on {
   line-height: 1.4;
 }
 
+/* modal de anexo: mais larga que o diálogo, com o conteúdo rolando dentro dela */
+.modal.attachment-modal {
+  width: min(880px, 94vw);
+  max-height: 88vh;
+}
+.attachment-modal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.attachment-modal-head h2 {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attachment-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  min-height: 120px;
+  overflow: auto;
+}
+.attachment-modal-body pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.attachment-modal-body textarea {
+  width: 100%;
+  min-height: 50vh;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  resize: vertical;
+}
+.attachment-modal-body img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  align-self: center;
+}
+
 /* barra de filtros */
 .filterbar {
   border-bottom: 1px solid var(--border);
