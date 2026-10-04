@@ -282,6 +282,15 @@ describe('CardDrawer', () => {
     expect(lastSent('card.workspace.open')).toEqual({ type: 'card.workspace.open', cardId: board.subId });
   });
 
+  it('clicar no nome da branch copia o nome e confirma na tela', async () => {
+    patchCard(board.storyId, { branch: 'feat/login' });
+    const user = userEvent.setup();
+    openCardDrawer(board.storyId);
+    await user.click(screen.getByRole('button', { name: 'feat/login' }));
+    expect(await navigator.clipboard.readText()).toBe('feat/login');
+    expect(await screen.findByText('Nome copiado')).toBeInTheDocument();
+  });
+
   it('com git desligado não mostra a área de branch', () => {
     patchState((s) => ({ board: { ...s.board, git: { ...s.board.git, mode: 'off' } } }));
     openStory();

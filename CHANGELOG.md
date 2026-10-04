@@ -6,6 +6,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Um clique no nome da branch copia o nome.** No card aberto, a branch da história virou um botão:
+  clicar copia o nome para a área de transferência e a tela confirma com "Nome copiado".
+
 - **O heartbeat pode tocar várias histórias ao mesmo tempo.** Em Configurações, na execução pela IA,
   o interruptor **Tocar histórias em paralelo** (nasce desligado) faz o heartbeat executar várias
   histórias juntas: duas por padrão, até seis em **Histórias ao mesmo tempo**. Só vale no modo "Worktree por história", em que cada história trabalha na sua

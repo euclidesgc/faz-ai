@@ -7,6 +7,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **One click on the branch name copies it.** In the open card, the story's branch became a button:
+  clicking copies the name to the clipboard and the screen confirms with "Nome copiado" (name copied).
+
 - **The heartbeat can drive several stories at the same time.** In the settings, under execution by
   the AI, the **Tocar histórias em paralelo** switch (off by default) makes the heartbeat run several
   stories together: two by default, up to six in **Histórias ao mesmo tempo**. It only applies in "Worktree por história" mode, where each story works

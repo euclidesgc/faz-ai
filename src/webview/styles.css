@@ -1611,6 +1611,17 @@ code {
   font-size: var(--fs-sm);
   color: var(--muted);
 }
+/* nome da branch: um clique copia; o tamanho do texto acompanha a barra, não o do botão pequeno */
+.drawer-workspace .branch-copy {
+  font-size: inherit;
+  cursor: copy;
+}
+.drawer-workspace .branch-copied {
+  color: var(--success);
+}
+.drawer-workspace .branch-copied:empty {
+  display: none;
+}
 
 /* Ordenação das colunas nas configurações: alça de arrastar */
 .drag-cell {
