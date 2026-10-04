@@ -3,6 +3,14 @@ import { AI_TOOLS, type AiTool } from './harness';
 import type { BoardState, Card, FieldDef, FieldValue, Id } from './model';
 import { valueOf } from './selectors';
 
+/** Preço do modelo em dólar por milhão de tokens. Sem preço = o board não calcula custo. */
+export interface ModelPrice {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
 /** Um modelo de LLM disponível em uma ferramenta, com os níveis de esforço que ele aceita. */
 export interface ModelOption {
   /** `<ferramenta>:<modelo>`, único no catálogo */
@@ -14,6 +22,27 @@ export interface ModelOption {
   /** níveis de esforço/raciocínio aceitos; vazio = o modelo não tem esse ajuste */
   efforts: string[];
   defaultEffort: string | null;
+  /** ausente ou incompleto = modelo sem preço; nunca zero por omissão */
+  price?: ModelPrice;
+}
+
+/**
+ * O preço de um modelo, ou `null` quando ele não está completo. Exige os QUATRO números: tratar o
+ * campo que falta como zero é o `catch` que devolve `[]` da skill `error-handling`, com dinheiro no
+ * lugar da lista — um custo menor que o verdadeiro, somável com os outros, e com cara de completo.
+ */
+export function modelPrice(o: ModelOption): ModelPrice | null {
+  // `price` chega de JSON.parse do banco: nada garante que os campos existem nem que são números.
+  const p: unknown = o.price;
+  if (!p || typeof p !== 'object') return null;
+  const r = p as Record<string, unknown>;
+  const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+  const input = num(r.input);
+  const output = num(r.output);
+  const cacheRead = num(r.cacheRead);
+  const cacheWrite = num(r.cacheWrite);
+  if (input === null || output === null || cacheRead === null || cacheWrite === null) return null;
+  return { input, output, cacheRead, cacheWrite };
 }
 
 /** Campo especial usado em condições: o tipo do card. */
