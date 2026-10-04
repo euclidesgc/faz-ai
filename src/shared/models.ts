@@ -22,8 +22,11 @@ export interface ModelOption {
   /** níveis de esforço/raciocínio aceitos; vazio = o modelo não tem esse ajuste */
   efforts: string[];
   defaultEffort: string | null;
-  /** ausente ou incompleto = modelo sem preço; nunca zero por omissão */
-  price?: ModelPrice;
+  /**
+   * ausente ou incompleto = modelo sem preço; nunca zero por omissão. Pode estar pela metade (a
+   * pessoa preencheu só alguns dos quatro campos): quem usa o preço lê por `modelPrice`.
+   */
+  price?: Partial<ModelPrice>;
 }
 
 /**
@@ -43,6 +46,25 @@ export function modelPrice(o: ModelOption): ModelPrice | null {
   const cacheWrite = num(r.cacheWrite);
   if (input === null || output === null || cacheRead === null || cacheWrite === null) return null;
   return { input, output, cacheRead, cacheWrite };
+}
+
+/** O que mudar no preço de um modelo: número grava, `null` apaga o campo, ausente deixa como está. */
+export type PricePatch = { [K in keyof ModelPrice]?: number | null };
+
+/**
+ * O modelo com o preço alterado campo a campo. Campo vazio é **ausência**, não zero: o campo
+ * apagado some do objeto, e sem nenhum campo o modelo fica sem a chave `price`.
+ */
+export function withPrice(o: ModelOption, patch: PricePatch): ModelOption {
+  const price: Partial<ModelPrice> = { ...o.price };
+  for (const key of Object.keys(patch) as (keyof ModelPrice)[]) {
+    const v = patch[key];
+    if (v === undefined) continue;
+    if (v === null) delete price[key];
+    else price[key] = v;
+  }
+  const { price: _antigo, ...rest } = o;
+  return Object.keys(price).length ? { ...rest, price } : rest;
 }
 
 /** Campo especial usado em condições: o tipo do card. */

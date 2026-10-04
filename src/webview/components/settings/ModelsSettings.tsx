@@ -1,10 +1,10 @@
 import { useState, type KeyboardEvent } from 'react';
 import { AI_TOOLS, type AiTool } from '../../../shared/harness';
-import { modelId, type ModelOption } from '../../../shared/models';
+import { modelId, withPrice, type ModelOption, type ModelPrice } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { t } from '../../i18n';
-import { Button, Card, IconButton, TextField } from '@radix-ui/themes';
+import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
 import { FormField, IconPlus, IconTrash, SelectField } from '../ui';
 import { ModelRulesEditor } from './ModelRulesEditor';
 import { SettingsCard } from './SettingsCard';
@@ -23,6 +23,22 @@ const SOURCES: Record<AiTool, string> = {
   cursor: 'lista embutida na extensão (o Cursor não guarda a lista em arquivo)',
   kimi: 'lida do config.toml do Kimi nesta máquina, com os esforços de cada modelo',
   copilot: 'lista embutida na extensão (o GitHub Copilot não guarda a lista em arquivo)',
+};
+
+/** Os quatro campos do preço de um modelo, na ordem em que aparecem na tabela. */
+function priceFields(model: string): { key: keyof ModelPrice; caption: string; label: string }[] {
+  return [
+    { key: 'input', caption: t('entrada'), label: t('Preço de entrada de {model}', { model }) },
+    { key: 'output', caption: t('saída'), label: t('Preço de saída de {model}', { model }) },
+    { key: 'cacheRead', caption: t('leitura de cache'), label: t('Preço de leitura de cache de {model}', { model }) },
+    { key: 'cacheWrite', caption: t('criação de cache'), label: t('Preço de criação de cache de {model}', { model }) },
+  ];
+}
+
+/** O que está gravado no campo, ou '' quando vazio (vazio é ausência de preço, não zero). */
+const priceText = (o: ModelOption, key: keyof ModelPrice): string => {
+  const v = o.price?.[key];
+  return typeof v === 'number' ? String(v) : '';
 };
 
 const EMPTY_DRAFT = { model: '', label: '', efforts: '' };
@@ -112,6 +128,8 @@ export function ModelsSettings() {
   const [adding, setAdding] = useState(false);
 
   const setCatalog = (next: ModelOption[]) => settings.setModels(next);
+  const setPrice = (o: ModelOption, key: keyof ModelPrice, value: number | null) =>
+    setCatalog(catalog.map((x) => (x.id === o.id ? withPrice(x, { [key]: value }) : x)));
   const patchModel = (id: string, patch: Partial<ModelOption>) => setCatalog(catalog.map((o) => (o.id === id ? { ...o, ...patch } : o)));
 
   // o projeto trabalha com uma ferramenta por vez: só os modelos dela aparecem
@@ -169,6 +187,7 @@ export function ModelsSettings() {
                   <th>{t('Identificador na ferramenta')}</th>
                   <th>{t('Esforços aceitos (separados por vírgula)')}</th>
                   <th>{t('Esforço padrão')}</th>
+                  <th>{t('Preço (US$ por milhão de tokens)')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -216,6 +235,35 @@ export function ModelsSettings() {
                         />
                       )}
                     </td>
+                    <td>
+                      <div className="price-grid">
+                        {priceFields(o.model).map((f) => (
+                          <div key={f.key} className="price-field">
+                            <span className="muted small" aria-hidden="true">
+                              {f.caption}
+                            </span>
+                            <TextField.Root
+                              type="number"
+                              min="0"
+                              step="any"
+                              aria-label={f.label}
+                              key={`${f.key}:${priceText(o, f.key)}`}
+                              defaultValue={priceText(o, f.key)}
+                              onBlur={(e) => {
+                                const text = e.target.value.trim();
+                                const value = text === '' ? null : Number(text);
+                                if (value !== null && (!Number.isFinite(value) || value < 0)) {
+                                  e.target.value = priceText(o, f.key); // número inválido: volta ao que estava gravado
+                                  return;
+                                }
+                                if (value !== (o.price?.[f.key] ?? null)) setPrice(o, f.key, value);
+                              }}
+                              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </td>
                     {/* sem confirmação de propósito: a lista pode ser refeita com "Detectar modelos" */}
                     <td className="narrow">
                       <IconButton
@@ -232,13 +280,18 @@ export function ModelsSettings() {
                 ))}
                 {mine.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="muted">
+                    <td colSpan={6} className="muted">
                       {t('Nenhum modelo. Use "Detectar modelos" ou "Novo modelo".')}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            <Text as="p" size="1" color="gray" className="price-hint">
+              {t(
+                'O custo informado pela ferramenta tem preferência; o preço aqui é usado para estimar o custo das ferramentas que não informam.',
+              )}
+            </Text>
           </SettingsCard>
         );
       })}

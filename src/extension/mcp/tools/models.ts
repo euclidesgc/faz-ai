@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ALL_AI_TOOLS, type AiTool } from '../../../shared/harness';
-import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../../../shared/models';
+import { TYPE_CONDITION, modelId, resolveModelInput, withPrice, type ModelRule } from '../../../shared/models';
 import { newId } from '../../db/ids';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { findField, modelsOverview } from '../format';
@@ -31,7 +31,7 @@ export function registerModelTools(tool: DefineTool): void {
 
   tool(
     'upsert_model',
-    'Cria ou atualiza um modelo no catálogo. Use para registrar os modelos e níveis de esforço que você (a ferramenta de IA em uso) realmente tem disponíveis.',
+    'Cria ou atualiza um modelo no catálogo. Use para registrar os modelos e níveis de esforço que você (a ferramenta de IA em uso) realmente tem disponíveis. Os quatro preços (dólar por milhão de tokens) são opcionais: o que não vier fica como estava, e o board só estima custo de um modelo com os quatro preenchidos.',
     {
       tool: toolArg,
       model: z.string().min(1).describe('Identificador usado pela ferramenta para escolher o modelo, ex.: "opus", "k3", "gpt-6.1-sol"'),
@@ -41,21 +41,30 @@ export function registerModelTools(tool: DefineTool): void {
         .optional()
         .describe('Níveis de esforço/raciocínio aceitos, do menor para o maior; vazio se o modelo não tem esse ajuste'),
       default_effort: z.string().optional(),
+      price_input: z.number().min(0).optional().describe('Preço da entrada, em US$ por milhão de tokens'),
+      price_output: z.number().min(0).optional().describe('Preço da saída, em US$ por milhão de tokens'),
+      price_cache_read: z.number().min(0).optional().describe('Preço da leitura de cache, em US$ por milhão de tokens'),
+      price_cache_write: z.number().min(0).optional().describe('Preço da criação de cache, em US$ por milhão de tokens'),
     },
     (a, router) => {
       const catalog = [...router.snapshot().board.modelCatalog];
       const id = modelId(a.tool as AiTool, a.model);
       const efforts = a.efforts ?? [];
       if (a.default_effort && !efforts.includes(a.default_effort)) throw new Error('default_effort precisa ser um dos efforts.');
-      const entry = {
-        id,
-        tool: a.tool as AiTool,
-        model: a.model,
-        label: a.label ?? a.model,
-        efforts,
-        defaultEffort: a.default_effort ?? null,
-      };
       const at = catalog.findIndex((o) => o.id === id);
+      const entry = withPrice(
+        {
+          id,
+          tool: a.tool as AiTool,
+          model: a.model,
+          label: a.label ?? a.model,
+          efforts,
+          defaultEffort: a.default_effort ?? null,
+          // o preço é do catálogo: chamada que não o menciona não o apaga
+          ...(at >= 0 && catalog[at]!.price ? { price: catalog[at]!.price } : {}),
+        },
+        { input: a.price_input, output: a.price_output, cacheRead: a.price_cache_read, cacheWrite: a.price_cache_write },
+      );
       if (at >= 0) catalog[at] = entry;
       else catalog.push(entry);
       router.handle({ type: 'settings.models.set', catalog });
