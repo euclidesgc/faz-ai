@@ -186,14 +186,59 @@ export interface LogMetric {
   boardId: string;
   month: string;
   metric: 'events' | 'runs' | 'cards_done' | 'tokens' | 'cost' | 'usage';
-  /** '' (total) | 'kind' | 'outcome' | 'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile' */
+  /**
+   * '' (total) | 'kind' | 'workflow' | 'outcome' | 'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile'
+   * | 'source' (só em 'cost': `estimated` | `informed`) | os tipos do inventário (só em 'usage').
+   * Em 'tokens', `kind` é o tipo de token: `input` | `output` | `cache_read` | `cache_write`.
+   */
   dim: string;
   /** o valor da dimensão; '' quando `dim` é '' */
   value: string;
+  /** contagem; em 'tokens' e 'cost' é quantas execuções tinham o número (medidas / com custo), não quantas houve */
   n: number;
-  /** soma na unidade da métrica (ms para 'runs'; soma dos quatro tipos de token para 'tokens'; soma de cost_usd para 'cost'; soma de calls para 'usage') */
+  /**
+   * soma na unidade da métrica: ms para 'runs'; tokens para 'tokens' (a soma dos quatro tipos, ou só a
+   * do tipo na linha `dim='kind'`); dólares para 'cost'; chamadas para 'usage'
+   */
   total: number;
 }
+
+/** Primeiro e último dia (inclusive) do mês 'AAAA-MM'. */
+export function monthSpan(month: string): [string, string] {
+  const [y, m] = month.split('-').map(Number);
+  const lastDay = new Date(y!, m!, 0).getDate();
+  return [`${month}-01`, `${month}-${String(lastDay).padStart(2, '0')}`];
+}
+
+/**
+ * Meses 'AAAA-MM' entre dois outros, inclusive, em ordem crescente. Única cópia de propósito: duas
+ * respostas para "quais meses há entre A e B" é como a lacuna vira zero num dos lados.
+ */
+export function monthRange(from: string, to: string): string[] {
+  const [y1, m1] = from.split('-').map(Number);
+  const [y2, m2] = to.split('-').map(Number);
+  const out: string[] = [];
+  let y = y1!;
+  let m = m1!;
+  while (y < y2! || (y === y2 && m <= m2!)) {
+    out.push(`${y}-${String(m).padStart(2, '0')}`);
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+  return out;
+}
+
+/**
+ * Bytes aproximados que uma linha de detalhe (`card_events`, `ai_runs` ou `ai_run_usage`) ocupa no
+ * arquivo do board, para mostrar o preço da janela de retenção (RF-25 de #71). Medido num banco em
+ * memória com um mês de uso intenso (30 dias × 50 eventos + 20 execuções medidas por dia, cada uma com
+ * 8 itens de inventário), depois de `VACUUM`: 1,64 MB para 6.900 linhas. É estimativa para a tela,
+ * não conta de disco: o arquivo real varia com o tamanho dos títulos e do inventário.
+ */
+export const LOG_BYTES_PER_ROW = 240;
 
 /** 'YYYY-MM' de `ts`, no fuso da máquina (nunca UTC: mudar o fuso depois não reescreve o passado). */
 export function monthOf(ts: number): string {

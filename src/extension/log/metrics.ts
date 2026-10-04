@@ -9,6 +9,7 @@
 // qualquer outra combinação não tem como ser montada a partir de um total já fundido, e o mês fica de
 // fora dos números — mas sempre listado em `archivedMonths`, para a resposta nunca fingir silêncio.
 import type { Database } from 'sql.js';
+import { monthRange, monthSpan } from '../../shared/log';
 import { all, num, str } from '../db/query';
 import { splitMcpName, type InventoryKind } from '../../shared/log';
 import { detailMonths } from './rollup';
@@ -94,13 +95,6 @@ function dayBoundary(date: string, end: boolean): number {
 
 function monthOfDay(date: string): string {
   return date.slice(0, 7);
-}
-
-/** Primeiro e último dia (inclusive) do mês 'AAAA-MM'. */
-function monthSpan(month: string): [string, string] {
-  const [y, m] = month.split('-').map(Number);
-  const lastDay = new Date(y!, m!, 0).getDate();
-  return [`${month}-01`, `${month}-${String(lastDay).padStart(2, '0')}`];
 }
 
 interface Accumulator {
@@ -264,24 +258,6 @@ function archiveByDim(db: Database, boardId: string, month: string, dim: string)
 
 function merge(into: Map<string, Accumulator>, from: Map<string, Accumulator>): void {
   for (const [label, acc] of from) bump(into, label, acc);
-}
-
-/** Meses 'AAAA-MM' entre dois outros, inclusive, em ordem crescente. */
-function monthRange(from: string, to: string): string[] {
-  const [y1, m1] = from.split('-').map(Number);
-  const [y2, m2] = to.split('-').map(Number);
-  const out: string[] = [];
-  let y = y1!;
-  let m = m1!;
-  while (y < y2! || (y === y2 && m <= m2!)) {
-    out.push(`${y}-${String(m).padStart(2, '0')}`);
-    m++;
-    if (m > 12) {
-      m = 1;
-      y++;
-    }
-  }
-  return out;
 }
 
 /**

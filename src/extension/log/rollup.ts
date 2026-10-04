@@ -17,8 +17,13 @@ import type { LogMetric } from '../../shared/log';
 import { dayOf, monthOf } from '../../shared/log';
 import { all, num, run, str, transaction } from '../db/query';
 
-/** As dimensões de `runs`: o nome na tabela de totais e a coluna de `ai_runs` de onde o valor sai. */
+/**
+ * As dimensões de `runs` (e de `tokens` e `cost`): o nome na tabela de totais e a coluna de `ai_runs`
+ * de onde o valor sai. `workflow` está aqui para o filtro de workflow do painel (#71) não morrer na
+ * consolidação.
+ */
 const RUN_DIMS: [dim: string, column: string][] = [
+  ['workflow', 'workflow'],
   ['outcome', 'outcome'],
   ['phase', 'phase'],
   ['card_type', 'card_type'],
@@ -81,46 +86,58 @@ function bump(totals: Totals, metric: LogMetric['metric'], dim: string, value: s
  *
  * `tokens` e `cost` só contam as execuções que têm o número: `n` é a contagem MEDIDA (ou com custo),
  * não a de execuções, para que uma média por mês arquivado não divida o custo por execuções que nem
- * foram medidas. "Não medido" não é zero (RF-14): a execução sem medida não gera linha nenhuma.
+ * foram medidas — e para o painel poder dizer "3 de 11 execuções não foram medidas" (com `runs.n`)
+ * depois de o detalhe ir embora. "Não medido" não é zero (RF-14): a execução sem medida não gera
+ * linha nenhuma. Tokens têm também o corte por tipo (`dim='kind'`) e custo o corte por origem
+ * (`dim='source'`, estimado pelo preço do catálogo ou informado pela ferramenta).
  */
 function totalsFromDetail(db: Database, boardId: string, month: string): LogMetric[] {
   const totals: Totals = new Map();
 
   for (const r of all(
     db,
-    `SELECT kind, column_name, card_type, COUNT(*) AS n FROM card_events
-     WHERE board_id = ? AND month = ? GROUP BY kind, column_name, card_type`,
+    `SELECT kind, column_name, card_type, workflow, COUNT(*) AS n FROM card_events
+     WHERE board_id = ? AND month = ? GROUP BY kind, column_name, card_type, workflow`,
     [boardId, month],
   )) {
     const n = num(r.n);
     const phase = str(r.column_name);
     const cardType = str(r.card_type);
+    const workflow = str(r.workflow);
     bump(totals, 'events', '', '', n, n);
     bump(totals, 'events', 'kind', str(r.kind), n, n);
     bump(totals, 'events', 'phase', phase, n, n);
     bump(totals, 'events', 'card_type', cardType, n, n);
+    bump(totals, 'events', 'workflow', workflow, n, n);
     // `done` é evento próprio justamente para isto: contar atividades concluídas sem precisar saber
     // que categoria uma coluna tinha num mês cujo detalhe já foi descartado
     if (str(r.kind) === 'done') {
       bump(totals, 'cards_done', '', '', n, n);
       bump(totals, 'cards_done', 'phase', phase, n, n);
       bump(totals, 'cards_done', 'card_type', cardType, n, n);
+      bump(totals, 'cards_done', 'workflow', workflow, n, n);
     }
   }
 
+  // as somas de token só olham a execução medida (`measure <> 'none'`); as de custo, a que tem custo.
+  // `cost_estimated` é 1 (preço do catálogo) ou 0 (informado pela ferramenta) sempre que `cost_usd`
+  // existe; só o 0 conta como informado — na dúvida, "estimado" é a afirmação mais fraca
   for (const r of all(
     db,
-    `SELECT outcome, phase, card_type, model, tool, effort, profile,
+    `SELECT workflow, outcome, phase, card_type, model, tool, effort, profile,
             COUNT(*) AS n, SUM(COALESCE(duration_ms, 0)) AS ms,
             SUM(CASE WHEN measure <> 'none' THEN 1 ELSE 0 END) AS measured,
-            SUM(CASE WHEN measure <> 'none'
-                THEN COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0) + COALESCE(cache_read_tokens, 0) + COALESCE(cache_write_tokens, 0)
-                ELSE 0 END) AS tokens,
-            SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS costed,
-            SUM(COALESCE(cost_usd, 0)) AS cost
+            SUM(CASE WHEN measure <> 'none' THEN COALESCE(input_tokens, 0) ELSE 0 END) AS input,
+            SUM(CASE WHEN measure <> 'none' THEN COALESCE(output_tokens, 0) ELSE 0 END) AS output,
+            SUM(CASE WHEN measure <> 'none' THEN COALESCE(cache_read_tokens, 0) ELSE 0 END) AS cache_read,
+            SUM(CASE WHEN measure <> 'none' THEN COALESCE(cache_write_tokens, 0) ELSE 0 END) AS cache_write,
+            SUM(CASE WHEN cost_usd IS NOT NULL AND cost_estimated = 0 THEN 1 ELSE 0 END) AS informed_n,
+            SUM(CASE WHEN cost_usd IS NOT NULL AND cost_estimated = 0 THEN cost_usd ELSE 0 END) AS informed,
+            SUM(CASE WHEN cost_usd IS NOT NULL AND COALESCE(cost_estimated, 1) <> 0 THEN 1 ELSE 0 END) AS estimated_n,
+            SUM(CASE WHEN cost_usd IS NOT NULL AND COALESCE(cost_estimated, 1) <> 0 THEN cost_usd ELSE 0 END) AS estimated
      FROM ai_runs
      WHERE board_id = ? AND month = ?
-     GROUP BY outcome, phase, card_type, model, tool, effort, profile`,
+     GROUP BY workflow, outcome, phase, card_type, model, tool, effort, profile`,
     [boardId, month],
   )) {
     const n = num(r.n);
@@ -132,14 +149,29 @@ function totalsFromDetail(db: Database, boardId: string, month: string): LogMetr
 
     const measured = num(r.measured);
     if (measured > 0) {
-      const tokens = num(r.tokens);
+      const byKind: [kind: string, total: number][] = [
+        ['input', num(r.input)],
+        ['output', num(r.output)],
+        ['cache_read', num(r.cache_read)],
+        ['cache_write', num(r.cache_write)],
+      ];
+      const tokens = byKind.reduce((sum, [, total]) => sum + total, 0);
       bump(totals, 'tokens', '', '', measured, tokens);
+      // as quatro linhas de tipo existem sempre que há medida, mesmo com zero: zero medido é um número
+      for (const [kind, total] of byKind) bump(totals, 'tokens', 'kind', kind, measured, total);
       for (const [dim, column] of RUN_DIMS) bump(totals, 'tokens', dim, str(r[column]), measured, tokens);
     }
-    const costed = num(r.costed);
+
+    const bySource: [source: string, n: number, total: number][] = [
+      ['estimated', num(r.estimated_n), num(r.estimated)],
+      ['informed', num(r.informed_n), num(r.informed)],
+    ];
+    const costed = bySource.reduce((sum, [, count]) => sum + count, 0);
     if (costed > 0) {
-      const cost = num(r.cost);
+      const cost = bySource.reduce((sum, [, , total]) => sum + total, 0);
       bump(totals, 'cost', '', '', costed, cost);
+      // a origem sem execução não gera linha: "nenhum custo informado" não é "custo informado zero"
+      for (const [source, count, total] of bySource) if (count > 0) bump(totals, 'cost', 'source', source, count, total);
       for (const [dim, column] of RUN_DIMS) bump(totals, 'cost', dim, str(r[column]), costed, cost);
     }
   }

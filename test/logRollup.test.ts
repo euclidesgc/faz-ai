@@ -6,6 +6,7 @@ import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { consolidate, detailMonths, keepMonths, monthlyTotals } from '../src/extension/log/rollup';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
+import { LOG_BYTES_PER_ROW, monthRange, monthSpan } from '../src/shared/log';
 import type { CardEvent, InventoryItem, LogMetric, RunReport } from '../src/shared/log';
 import { DEFAULT_LOG_RETENTION_MONTHS } from '../src/shared/rules';
 
@@ -409,6 +410,137 @@ describe('tokens, custo e inventário (#70)', () => {
     expect(of(totals, 'events')).toMatchObject({ n: 1, total: 1 });
     expect(of(totals, 'runs')).toMatchObject({ n: 1, total: 4000 });
     expect(of(totals, 'tokens')).toMatchObject({ n: 1, total: 100 });
+  });
+});
+
+describe('tokens por tipo, custo por origem e o corte por workflow (#71)', () => {
+  it('tokens: uma linha por tipo, `n` contando só as execuções medidas', () => {
+    runs.measure(run(at(2024, 3), 1000), measured());
+    runs.measure(run(at(2024, 3), 1000), measured({ inputTokens: 1, outputTokens: 2, cacheReadTokens: 3, cacheWriteTokens: 4 }));
+    runs.measure(run(at(2024, 3), 1000), notMeasured());
+    const totals = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(of(totals, 'runs')).toMatchObject({ n: 3 });
+    expect(of(totals, 'tokens')).toMatchObject({ n: 2, total: 110 });
+    expect(of(totals, 'tokens', 'kind', 'input')).toMatchObject({ n: 2, total: 11 });
+    expect(of(totals, 'tokens', 'kind', 'output')).toMatchObject({ n: 2, total: 22 });
+    expect(of(totals, 'tokens', 'kind', 'cache_read')).toMatchObject({ n: 2, total: 33 });
+    expect(of(totals, 'tokens', 'kind', 'cache_write')).toMatchObject({ n: 2, total: 44 });
+    // os quatro tipos somam o total, sem tipo a mais
+    const kinds = totals.filter((t) => t.metric === 'tokens' && t.dim === 'kind');
+    expect(kinds).toHaveLength(4);
+    expect(kinds.reduce((sum, t) => sum + t.total, 0)).toBe(of(totals, 'tokens')!.total);
+  });
+
+  it('tokens: medido e zero gera as linhas com zero — zero medido é um número', () => {
+    runs.measure(run(at(2024, 3), 1000), measured({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }));
+    const totals = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(of(totals, 'tokens')).toMatchObject({ n: 1, total: 0 });
+    expect(of(totals, 'tokens', 'kind', 'cache_write')).toMatchObject({ n: 1, total: 0 });
+  });
+
+  it('cost: separa estimado (preço do catálogo) de informado (pela ferramenta), e a sem custo fica de fora', () => {
+    runs.measure(run(at(2024, 3), 1000), measured({ costUsd: 0.25, costEstimated: true }));
+    runs.measure(run(at(2024, 3), 1000), measured({ costUsd: 0.75, costEstimated: true }));
+    runs.measure(run(at(2024, 3), 1000), measured({ costUsd: 2, costEstimated: false }));
+    runs.measure(run(at(2024, 3), 1000), measured({ costUsd: null }));
+    const totals = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(of(totals, 'cost')).toMatchObject({ n: 3, total: 3 });
+    expect(of(totals, 'cost', 'source', 'estimated')).toMatchObject({ n: 2, total: 1 });
+    expect(of(totals, 'cost', 'source', 'informed')).toMatchObject({ n: 1, total: 2 });
+    // o custo é das execuções com custo, mas os tokens são de todas as medidas
+    expect(of(totals, 'tokens')).toMatchObject({ n: 4 });
+  });
+
+  it('cost: a origem sem nenhuma execução não vira linha de zero', () => {
+    runs.measure(run(at(2024, 3), 1000), measured({ costUsd: 0.5, costEstimated: true }));
+    const totals = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(of(totals, 'cost', 'source', 'estimated')).toMatchObject({ n: 1, total: 0.5 });
+    expect(of(totals, 'cost', 'source', 'informed')).toBeUndefined();
+  });
+
+  it('workflow: corta eventos, atividades concluídas, execuções, tokens e custo', () => {
+    event(at(2024, 3), { kind: 'created' });
+    event(at(2024, 3), { kind: 'done', columnName: 'Concluído' });
+    event(at(2024, 3), { kind: 'done', columnName: 'Concluído', workflow: 'Sub-tarefas' });
+    runs.measure(run(at(2024, 3), 1000), measured({ costUsd: 0.5 }));
+    const sub = runs.start({
+      boardId,
+      startedAt: at(2024, 3),
+      origin: 'heartbeat',
+      tool: 'claude',
+      cardId: 'c2',
+      cardNumber: 2,
+      cardTitle: 'Tela',
+      cardType: 'Sub-tarefa',
+      workflow: 'Sub-tarefas',
+      columnName: 'Em andamento',
+      phase: 'Em andamento',
+    });
+    runs.finish(sub, 'done', 0);
+    runs.measure(sub, measured({ costUsd: 1.5 }));
+    const totals = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(of(totals, 'events', 'workflow', 'Histórias')).toMatchObject({ n: 2, total: 2 });
+    expect(of(totals, 'events', 'workflow', 'Sub-tarefas')).toMatchObject({ n: 1, total: 1 });
+    expect(of(totals, 'cards_done', 'workflow', 'Histórias')).toMatchObject({ n: 1 });
+    expect(of(totals, 'cards_done', 'workflow', 'Sub-tarefas')).toMatchObject({ n: 1 });
+    expect(of(totals, 'runs', 'workflow', 'Histórias')).toMatchObject({ n: 1, total: 1000 });
+    expect(of(totals, 'runs', 'workflow', 'Sub-tarefas')).toMatchObject({ n: 1 });
+    expect(of(totals, 'tokens', 'workflow', 'Sub-tarefas')).toMatchObject({ n: 1, total: 100 });
+    expect(of(totals, 'cost', 'workflow', 'Histórias')).toMatchObject({ n: 1, total: 0.5 });
+    expect(of(totals, 'cost', 'workflow', 'Sub-tarefas')).toMatchObject({ n: 1, total: 1.5 });
+  });
+
+  it('RF-14: custo, tokens, execuções, tempo e atividades concluídas lidos depois da consolidação são os mesmos de antes', () => {
+    event(at(2024, 3), { kind: 'created' });
+    event(at(2024, 3), { kind: 'done', columnName: 'Concluído' });
+    event(at(2024, 3), { kind: 'done', columnName: 'Concluído', workflow: 'Sub-tarefas', cardType: 'Sub-tarefa' });
+    runs.measure(run(at(2024, 3), 1000), measured({ costUsd: 0.1, costEstimated: true }));
+    runs.measure(run(at(2024, 3), 2000, { model: 'haiku' }), measured({ costUsd: 0.2, costEstimated: false, inputTokens: 7 }));
+    runs.measure(run(at(2024, 3), 4000, { effort: null }), measured({ costUsd: null }));
+    runs.measure(run(at(2024, 3), 8000), notMeasured());
+
+    const pick = (totals: LogMetric[]) => ({
+      cost: of(totals, 'cost'),
+      costEstimated: of(totals, 'cost', 'source', 'estimated'),
+      costInformed: of(totals, 'cost', 'source', 'informed'),
+      tokens: of(totals, 'tokens'),
+      tokensByKind: totals.filter((t) => t.metric === 'tokens' && t.dim === 'kind'),
+      runs: of(totals, 'runs'),
+      cardsDone: of(totals, 'cards_done'),
+      byWorkflow: totals.filter((t) => t.dim === 'workflow'),
+    });
+    const before = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(consolidate(db, boardId, TODAY)).toEqual(['2024-03']);
+    expect(runs.byMonth('2024-03')).toEqual([]);
+    expect(events.byMonth('2024-03')).toEqual([]);
+
+    const after = monthlyTotals(db, boardId, ['2024-03']);
+    expect(pick(after)).toEqual(pick(before));
+    expect(after).toEqual(before);
+    // e os números são os que o detalhe dava, não só iguais entre si
+    expect(of(after, 'runs')).toMatchObject({ n: 4, total: 15000 });
+    expect(of(after, 'tokens')).toMatchObject({ n: 3, total: 297 });
+    expect(of(after, 'cost')!.n).toBe(2);
+    expect(of(after, 'cost')!.total).toBeCloseTo(0.3, 10);
+    expect(of(after, 'cost', 'source', 'informed')).toMatchObject({ n: 1, total: 0.2 });
+    expect(of(after, 'cards_done')).toMatchObject({ n: 2 });
+    expect(of(after, 'cards_done', 'workflow', 'Sub-tarefas')).toMatchObject({ n: 1 });
+  });
+
+  it('monthSpan e monthRange, a única cópia dos meses de um recorte', () => {
+    expect(monthSpan('2024-02')).toEqual(['2024-02-01', '2024-02-29']);
+    expect(monthSpan('2026-02')).toEqual(['2026-02-01', '2026-02-28']);
+    expect(monthSpan('2026-12')).toEqual(['2026-12-01', '2026-12-31']);
+    expect(monthRange('2025-11', '2026-02')).toEqual(['2025-11', '2025-12', '2026-01', '2026-02']);
+    expect(monthRange('2026-03', '2026-03')).toEqual(['2026-03']);
+    expect(monthRange('2026-04', '2026-03')).toEqual([]);
+    expect(LOG_BYTES_PER_ROW).toBeGreaterThan(0);
   });
 });
 
