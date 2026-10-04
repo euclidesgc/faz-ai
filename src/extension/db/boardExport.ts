@@ -1,9 +1,11 @@
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { Database, SqlValue } from 'sql.js';
 import { LARGE_EXPORT_BYTES, type ImportSummary } from '../../shared/backup';
 import { safeName, type AttachmentStore } from '../attachments';
-import { all, num, one, str, type Row } from './query';
-import { SCHEMA_VERSION } from './schema';
+import { newDatabase } from './database';
+import { all, num, one, run, str, transaction, type Row } from './query';
+import { migrate, SCHEMA_VERSION } from './schema';
 
 /**
  * Exportar e importar um board como um único arquivo JSON (`<nome>-<AAAA-MM-DD>.fazai.json`). O arquivo
@@ -217,4 +219,156 @@ export function summarize(file: BoardExportFile, sizeBytes: number): ImportSumma
     exportedAt: file.exportedAt,
     large: sizeBytes > LARGE_EXPORT_BYTES,
   };
+}
+
+/** Onde a importação escreve: o banco real (e a cópia de segurança dele), a pasta de anexos e a pasta aberta. */
+export interface ImportTarget {
+  db: Database;
+  /** grava o `.bak` antes de apagar o board; sem ele (testes em memória) a importação segue sem cópia */
+  backup?: () => void;
+  store: Pick<AttachmentStore, 'pathOf' | 'removeCard'>;
+  /** chave da pasta aberta: o board importado passa a ser o desta pasta */
+  workspaceKey: string;
+  /** o board atual, que é substituído */
+  boardId: string;
+}
+
+export interface ImportResult {
+  boardId: string;
+  boardName: string;
+  cards: number;
+  attachments: number;
+  /** `#n` dos cards cujo anexo ficou sem arquivo (sem conteúdo no export ou falha ao gravar) */
+  warnings: string[];
+}
+
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+
+/**
+ * Substitui o board `target.boardId` pelo do arquivo. Tudo o que pode falhar acontece antes de tocar o
+ * banco real: os anexos são decodificados, o arquivo é materializado num banco em memória na versão de
+ * schema dele e migrado até a atual. Só então o `.bak` é gravado, o board atual apagado e as tabelas
+ * copiadas, numa transação. Os arquivos de anexos são gravados depois do COMMIT: falha neles vira aviso.
+ */
+export function importBoard(target: ImportTarget, file: BoardExportFile): ImportResult {
+  const db = target.db;
+  const newBoardId = str(file.board.id);
+  const boardName = str(file.board.name);
+
+  // 1. anexos: decodifica tudo antes (base64 inválido lança aqui, com o board intacto)
+  const attachmentRows = file.tables.attachments ?? [];
+  const nameOf = new Map(attachmentRows.map((a) => [str(a.id), str(a.filename)]));
+  const contents = new Map<string, Buffer>();
+  for (const f of file.files) {
+    if (f.base64 === undefined) continue;
+    const clean = f.base64.replace(/\s+/g, '');
+    if (!BASE64.test(clean) || clean.length % 4 !== 0)
+      throw new Error(`Anexo "${nameOf.get(f.attachmentId) ?? f.attachmentId}" com conteúdo inválido no arquivo.`);
+    contents.set(f.attachmentId, Buffer.from(clean, 'base64'));
+  }
+
+  // 2. banco em memória na versão do arquivo, com as linhas, migrado até a versão atual
+  const mem = newDatabase();
+  try {
+    migrate(mem, file.schemaVersion);
+    const boardRow: Row = { ...file.board, workspace_key: target.workspaceKey };
+    if (columnsOf(mem, 'boards').includes('log_rollup_day')) boardRow.log_rollup_day = '';
+    insertRows(mem, 'boards', [boardRow]);
+    for (const t of EXPORT_TABLES) {
+      const rows = file.tables[t.name] ?? [];
+      if (!tableExists(mem, t.name)) {
+        if (rows.length) throw invalid(`a tabela "${t.name}" não existe no banco versão ${file.schemaVersion}.`);
+        continue;
+      }
+      insertRows(mem, t.name, t.name === 'cards' ? parentsFirst(rows) : rows);
+    }
+    migrate(mem);
+
+    // 3. o outro board com o mesmo id (o mesmo arquivo importado em duas pastas do mesmo banco) não pode ser engolido
+    const clash = one(db, 'SELECT id FROM boards WHERE id = ? AND id != ?', [newBoardId, target.boardId]);
+    if (clash) throw new Error('Este board já foi importado em outra pasta que usa o mesmo banco.');
+
+    // 4. cópia de segurança; se falhar, nada é apagado
+    target.backup?.();
+
+    // 5. troca no banco real, numa transação
+    const oldCards = all(db, 'SELECT id FROM cards WHERE board_id = ?', [target.boardId]).map((r) => str(r.id));
+    transaction(db, () => {
+      run(db, 'DELETE FROM boards WHERE id = ?', [target.boardId]);
+      insertRows(db, 'boards', all(mem, 'SELECT * FROM boards WHERE id = ?', [newBoardId]));
+      for (const t of EXPORT_TABLES)
+        insertRows(db, t.name, all(mem, `SELECT * FROM ${t.name} WHERE ${t.where} ORDER BY rowid`, [newBoardId]));
+    });
+
+    // 6. arquivos de anexos, depois do COMMIT
+    for (const id of oldCards) target.store.removeCard(id);
+    const numbers = new Map((file.tables.cards ?? []).map((c) => [str(c.id), num(c.number)]));
+    const warnings: string[] = [];
+    const warn = (cardId: string) => {
+      const n = `#${numbers.get(cardId) ?? '?'}`;
+      if (!warnings.includes(n)) warnings.push(n);
+    };
+    for (const a of attachmentRows) {
+      const data = contents.get(str(a.id));
+      const cardId = str(a.card_id);
+      if (!data) {
+        warn(cardId);
+        continue;
+      }
+      try {
+        const dest = target.store.pathOf({ cardId, storedName: str(a.stored_name) });
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.writeFileSync(dest, data);
+      } catch {
+        warn(cardId);
+      }
+    }
+    return { boardId: newBoardId, boardName, cards: numbers.size, attachments: attachmentRows.length, warnings };
+  } finally {
+    mem.close();
+  }
+}
+
+const tableExists = (db: Database, table: string): boolean =>
+  !!one(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [table]);
+
+const columnsOf = (db: Database, table: string): string[] => all(db, `PRAGMA table_info(${table})`).map((c) => str(c.name));
+
+/** Insere as linhas usando só as colunas que a tabela tem (as demais ficam com o DEFAULT do schema). */
+function insertRows(db: Database, table: string, rows: Row[]): void {
+  if (!rows.length) return;
+  const known = new Set(columnsOf(db, table));
+  const cols = Object.keys(rows[0]!).filter((c) => known.has(c));
+  if (!cols.length) return;
+  const sql = `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`;
+  const stmt = db.prepare(sql);
+  try {
+    for (const row of rows) {
+      stmt.run(cols.map((c) => row[c] ?? null));
+    }
+  } finally {
+    stmt.free();
+  }
+}
+
+/** Cards com o pai antes dos filhos (a FK de `parent_id` exige), mantendo a ordem entre irmãos. */
+function parentsFirst(rows: Row[]): Row[] {
+  const ids = new Set(rows.map((r) => str(r.id)));
+  const done = new Set<string>();
+  const out: Row[] = [];
+  let pending = rows;
+  while (pending.length) {
+    const next: Row[] = [];
+    for (const r of pending) {
+      const parent = r.parent_id == null ? null : str(r.parent_id);
+      if (parent === null || done.has(parent) || !ids.has(parent)) {
+        out.push(r);
+        done.add(str(r.id));
+      } else next.push(r);
+    }
+    // ciclo (pai aponta para descendente): entrega o resto como está e deixa a FK reclamar
+    if (next.length === pending.length) return [...out, ...next];
+    pending = next;
+  }
+  return out;
 }

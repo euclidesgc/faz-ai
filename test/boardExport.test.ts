@@ -9,12 +9,15 @@ import {
   NOT_EXPORTED,
   exportBoard,
   exportFileName,
+  importBoard,
   parseExportFile,
   summarize,
   type BoardExportFile,
 } from '../src/extension/db/boardExport';
-import { SCHEMA_VERSION } from '../src/extension/db/schema';
-import { all, str } from '../src/extension/db/query';
+import { newDatabase, openFile } from '../src/extension/db/database';
+import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
+import type { BoardState } from '../src/shared/model';
+import { all, run, str } from '../src/extension/db/query';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { LARGE_EXPORT_BYTES } from '../src/shared/backup';
 
@@ -176,8 +179,8 @@ describe('exportBoard', () => {
 
 describe('parseExportFile', () => {
   const valid = (): BoardExportFile => doExport().file;
-  const bad = (mut: (f: BoardExportFile & Record<string, unknown>) => void): string => {
-    const f = valid() as BoardExportFile & Record<string, unknown>;
+  const bad = (mut: (f: any) => void): string => {
+    const f = valid();
     mut(f);
     return JSON.stringify(f);
   };
@@ -239,5 +242,210 @@ describe('summarize', () => {
       large: false,
     });
     expect(summarize(file, LARGE_EXPORT_BYTES + 1).large).toBe(true);
+  });
+});
+
+/** O snapshot sem o que muda de propósito na importação (a chave da pasta) e sem o que não vem do banco. */
+function comparable(s: BoardState) {
+  const {
+    board,
+    harness: _h,
+    chat: _c,
+    aiRuns: _a,
+    autopilot: _p,
+    aiRunUnsupported: _u,
+    harnessInstall: _i,
+    pendingUpgrade: _g,
+    ...rest
+  } = s;
+  const { workspaceKey: _k, ...b } = board;
+  return { ...rest, board: b };
+}
+
+const readAll = (r: MessageRouter) =>
+  Object.fromEntries(r.snapshot().attachments.map((a) => [a.id, fs.readFileSync(r.store.pathOf(a)).toString('base64')]));
+
+const target = (r: MessageRouter, backup?: () => void) => ({ db, backup, store: r.store, workspaceKey: 'ws-a', boardId: r.boardId });
+
+describe('importBoard', () => {
+  it('ida e volta: o board volta igual (ids, números, conteúdo, configuração e anexos)', () => {
+    const before = comparable(router.snapshot());
+    const files = readAll(router);
+    const { file } = doExport();
+    const text = JSON.stringify(file);
+
+    // apaga o board da pasta e deixa o roteador recriar um vazio, como "Recriar board padrão" faz
+    router.handle({ type: 'settings.board.reset' });
+    expect(router.snapshot().cards).toHaveLength(0);
+    expect(fs.existsSync(router.store.pathOf(router.snapshot().attachments[0] ?? { cardId: storyId, storedName: 'x' }))).toBe(false);
+
+    const result = importBoard(target(router), parseExportFile(text));
+    expect(result).toEqual({ boardId: before.board.id, boardName: 'Meu Board', cards: 4, attachments: 2, warnings: [] });
+
+    const other = openRouter(db, 'ws-a', 'A'); // reabre a pasta: o board é o importado
+    expect(other.boardId).toBe(before.board.id);
+    const after = comparable(other.snapshot());
+    expect(after).toEqual(before);
+    expect(other.snapshot().board.workspaceKey).toBe('ws-a');
+    expect(readAll(other)).toEqual(files);
+    expect(
+      other
+        .snapshot()
+        .cards.map((c) => c.number)
+        .sort(),
+    ).toEqual([1, 2, 3, 4]);
+  });
+
+  it('zera log_rollup_day e mantém next_card_number', () => {
+    const { file } = doExport();
+    run(db, "UPDATE boards SET log_rollup_day = '2026-10-01' WHERE id = ?", [router.boardId]);
+    const exported = exportBoard(db, router.boardId, router.store, { extensionVersion: 'x' }).file;
+    expect(exported.board.log_rollup_day).toBe('2026-10-01');
+    importBoard(target(router), exported);
+    const row = all(db, 'SELECT log_rollup_day, next_card_number FROM boards WHERE id = ?', [str(file.board.id)])[0]!;
+    expect(row.log_rollup_day).toBe('');
+    expect(row.next_card_number).toBe(5);
+  });
+
+  it('dois boards no mesmo banco: importar em A não toca B', () => {
+    const other = openRouter(db, 'ws-b', 'B');
+    populate(other);
+    const beforeB = comparable(other.snapshot());
+    const filesB = readAll(other);
+    const { file } = doExport();
+    router.handle({ type: 'card.trash', cardId: storyId });
+    importBoard(target(router), file);
+    expect(comparable(openRouter(db, 'ws-b', 'B').snapshot())).toEqual(beforeB);
+    expect(readAll(other)).toEqual(filesB);
+    expect(
+      openRouter(db, 'ws-a', 'A')
+        .snapshot()
+        .cards.find((c) => c.id === storyId)!.deletedAt,
+    ).toBeNull();
+  });
+
+  it('arquivo de schema antigo: materializa na versão dele, migra e importa com as colunas novas no default', () => {
+    // o board nasce na versão 5 e sobe até a 21, para receber os campos padrão que as migrações 6, 7 e 9 inserem
+    const old = newDatabase();
+    migrate(old, 5);
+    old.run(`
+      INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws-old', 'Antigo');
+      INSERT INTO workflows (id, board_id, name, position, kind) VALUES ('w', 'b', 'Histórias', 0, 'parent');
+      INSERT INTO columns (id, workflow_id, name, position) VALUES ('c', 'w', 'Backlog', 0);
+      INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t', 'b', 'História', '#000', 'w');
+      INSERT INTO cards (id, board_id, workflow_id, column_id, type_id, parent_id, title, position, created_at, updated_at, number)
+        VALUES ('k', 'b', 'w', 'c', 't', NULL, 'Card antigo', 0, 1, 1, 7);
+    `);
+    migrate(old, 21);
+    expect(
+      all(old, 'SELECT name FROM field_defs')
+        .map((f) => f.name)
+        .sort(),
+    ).toEqual(['Esforço da atividade', 'Modelo', 'Skills']);
+    const tables: Record<string, ReturnType<typeof all>> = {};
+    for (const t of EXPORT_TABLES)
+      tables[t.name] = all(old, 'SELECT name FROM sqlite_master WHERE name = ?', [t.name]).length
+        ? all(old, `SELECT * FROM ${t.name}`)
+        : [];
+    const board = all(old, 'SELECT * FROM boards')[0]!;
+    delete board.workspace_key;
+    old.close();
+    const file = parseExportFile(
+      JSON.stringify({
+        fazai: 'board-export',
+        formatVersion: 1,
+        schemaVersion: 21,
+        extensionVersion: '0.27.0',
+        exportedAt: '',
+        board,
+        tables,
+        files: [],
+      }),
+    );
+    const result = importBoard(target(router), file);
+    expect(result.cards).toBe(1);
+    const card = all(db, 'SELECT number, merge_commit, yolo FROM cards WHERE id = ?', ['k'])[0]!;
+    expect(card).toEqual({ number: 7, merge_commit: '', yolo: 0 });
+    const b = all(db, 'SELECT workspace_key, log_since FROM boards WHERE id = ?', ['b'])[0]!;
+    expect(b.workspace_key).toBe('ws-a');
+    expect(
+      openRouter(db, 'ws-a', 'A')
+        .snapshot()
+        .cards.map((c) => c.title),
+    ).toEqual(['Card antigo']);
+  });
+
+  it('atomicidade: base64 inválido lança antes de tocar o banco, e o board original fica como estava', () => {
+    const before = comparable(router.snapshot());
+    const files = readAll(router);
+    const { file } = doExport();
+    file.files[1]!.base64 = '%%% não é base64';
+    expect(() => importBoard(target(router), file)).toThrow(/Anexo "(foto\.png|spec\.md)" com conteúdo inválido no arquivo\./);
+    expect(comparable(openRouter(db, 'ws-a', 'A').snapshot())).toEqual(before);
+    expect(readAll(router)).toEqual(files);
+  });
+
+  it('se a cópia de segurança falhar, nada é apagado', () => {
+    const before = comparable(router.snapshot());
+    const { file } = doExport();
+    expect(() =>
+      importBoard(
+        target(router, () => {
+          throw new Error('disco cheio');
+        }),
+        file,
+      ),
+    ).toThrow('disco cheio');
+    expect(comparable(openRouter(db, 'ws-a', 'A').snapshot())).toEqual(before);
+  });
+
+  it('anexo sem conteúdo no arquivo é importado como registro, sem arquivo, e vai aos avisos', () => {
+    const { file } = doExport();
+    const a = file.tables.attachments!.find((x) => x.filename === 'foto.png')!;
+    delete file.files.find((x) => x.attachmentId === a.id)!.base64;
+    const result = importBoard(target(router), file);
+    const sub = router.snapshot().cards.find((c) => c.id === subId)!;
+    expect(result.warnings).toEqual([`#${sub.number}`]);
+    expect(result.attachments).toBe(2);
+    const snap = openRouter(db, 'ws-a', 'A').snapshot();
+    const imported = snap.attachments.find((x) => x.id === a.id)!;
+    expect(imported.filename).toBe('foto.png');
+    expect(fs.existsSync(router.store.pathOf(imported))).toBe(false);
+  });
+
+  it('o mesmo arquivo importado em outra pasta do mesmo banco é recusado em vez de engolir o outro board', () => {
+    const { file } = doExport();
+    const other = openRouter(db, 'ws-b', 'B');
+    expect(() => importBoard({ ...target(other), workspaceKey: 'ws-b', boardId: other.boardId }, file)).toThrow(
+      'Este board já foi importado em outra pasta que usa o mesmo banco.',
+    );
+    expect(openRouter(db, 'ws-b', 'B').snapshot().board.name).toBe('B');
+  });
+
+  it('.bak: com o banco em arquivo, a cópia de segurança é gravada antes e abre com o board anterior', async () => {
+    const dbFile = path.join(dir, 'boards', 'a.db');
+    const handle = await openFile(dbFile, WASM_DIR, 10);
+    const r = new MessageRouter(handle, {
+      workspaceKey: 'ws-file',
+      folderName: 'F',
+      author: 'Pessoa',
+      attachmentsDir: path.join(dir, 'att-file'),
+      workspaceDir: path.join(dir, 'ws-file'),
+      homeDir: path.join(dir, 'home'),
+    });
+    r.handle({ type: 'settings.board.update', patch: { name: 'Antes' } });
+    await handle.flush();
+    const { file } = doExport();
+    importBoard({ db: handle.db, backup: () => handle.backup(), store: r.store, workspaceKey: 'ws-file', boardId: r.boardId }, file);
+    await handle.flush();
+    expect(fs.existsSync(`${dbFile}.bak`)).toBe(true);
+    const bak = await openFile(`${dbFile}.bak`, WASM_DIR);
+    expect(all(bak.db, 'SELECT name FROM boards').map((b) => b.name)).toEqual(['Antes']);
+    await bak.close();
+    const reopened = await openFile(dbFile, WASM_DIR);
+    expect(all(reopened.db, 'SELECT name FROM boards').map((b) => b.name)).toEqual(['Meu Board']);
+    expect(all(reopened.db, 'SELECT COUNT(*) AS n FROM cards')[0]!.n).toBe(4);
+    await reopened.close();
+    await handle.close();
   });
 });
