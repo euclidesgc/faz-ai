@@ -7,6 +7,14 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Export and import the board.** In **Configurações → Backup** (Settings → Backup), **Exportar
+  board** creates a `.fazai.json` file with everything on the folder's board: settings, cards
+  (including archived and trashed ones), conversations, checklists, links, history and the embedded
+  attachments. **Importar de um arquivo…** shows a summary, asks for confirmation, writes a copy of
+  the database (`.bak`) and replaces the current board with the one from the file, keeping the card
+  numbers. A file from an earlier version is upgraded on import; one from a newer version is
+  refused. Importing while the AI is running on a card is refused. Works in the editor and in the
+  browser. It is the way to move the board between machines, since it lives outside the repository.
 - **Splitting a large request into stories now actually links them.** Creating a story with
   `autonomous_from` now gives it a **related** link to the origin story — before, the origin was
   only recorded as text, in a comment that neither the interface nor the AI read as a relation. If

@@ -6,6 +6,14 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Exportar e importar o board.** Em **Configurações → Backup**, **Exportar board** gera um
+  arquivo `.fazai.json` com tudo o que está no board da pasta: configurações, cards (inclusive
+  arquivados e na lixeira), conversas, checklists, vínculos, histórico e os anexos embutidos.
+  **Importar de um arquivo…** mostra um resumo, pede confirmação, grava uma cópia do banco
+  (`.bak`) e substitui o board atual pelo do arquivo, com os mesmos números de card. Arquivo de
+  versão anterior é atualizado ao importar; de versão mais nova é recusado. Importar com a IA
+  executando um card é recusado. Funciona no editor e no navegador. É o caminho para migrar o
+  board entre máquinas, já que ele fica fora do repositório.
 - **Dividir um pedido grande em histórias agora as vincula de verdade.** Ao criar uma história com
   `autonomous_from`, ela ganha um vínculo **relativo** com a história de origem — antes, a origem só
   ficava registrada em texto, num comentário que nem a interface nem a IA liam como relação. Se já

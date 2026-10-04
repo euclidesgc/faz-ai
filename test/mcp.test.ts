@@ -1275,9 +1275,7 @@ describe('modo autônomo (YOLO)', () => {
     expect(router.snapshot().links).toHaveLength(1);
 
     // reproduz o caso #19/#48: o vínculo já existe (manual) quando a herança do modo autônomo roda
-    expect(() =>
-      router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id }, { source: 'ai' }),
-    ).not.toThrow();
+    expect(() => router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id }, { source: 'ai' })).not.toThrow();
     expect(router.snapshot().links).toHaveLength(1);
   });
 

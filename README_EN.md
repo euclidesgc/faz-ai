@@ -506,6 +506,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
 | Aparência | **Language** (automatic, Português (Brasil) or English), theme (system, light, dark), font and size of long texts; name and color of the statuses |
+| Backup | Export the board to a file and import a file in place of the current board (see [Board backup](#board-backup)) |
 
 About models: **Detectar modelos** (detect models) reads the tool's list (for Kimi Code, from the
 local configuration; for the others, a built-in list you can edit). Suggestion rules combine
@@ -525,6 +526,29 @@ interfere with each other. The first time, the board starts from a copy of the s
 earlier versions (`fazai.db`), which is left untouched. Rules and skills are files in the project
 folder and go into git as usual. Avoid opening the same folder in two editor windows at the same
 time: the last one to save wins (the extension warns when that happens).
+
+### Board backup
+
+To take the board to another machine or keep a copy, use **Configurações → Backup** (Settings →
+Backup):
+
+- **Exportar board** (export board) creates a `<board name>-<date>.fazai.json` file with
+  everything on the board: columns, types, fields, rules, models, agents, cards (including archived
+  and trashed ones), conversations, checklists, links, history and the embedded attachments. Only
+  the current folder's board goes into the file. It contains the conversations and attachments:
+  keep it safe.
+- **Importar de um arquivo…** (import from a file) shows a summary (name, cards, attachments, size,
+  version) and, after confirmation, writes a copy of the database (`<file>.bak`, next to it),
+  deletes the current board and replaces it with the one from the file, keeping the card numbers.
+  The imported board becomes this folder's board. Nothing changes in the database if the file is
+  invalid or something fails midway.
+
+A file exported by an earlier version of the extension is upgraded on import; a file from a newer
+version is refused with the required version. Importing while the AI is running on a card is not
+allowed: wait for the run to finish. In the browser the flow is the same, with the download and the
+file picker handled by the page itself. Known limits: the monthly consolidated log history does not
+go into the file, and the stories' branches and working folders are imported as they were on the
+source machine (recreate the folder from the card's button).
 
 ## Development
 

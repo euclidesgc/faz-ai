@@ -481,6 +481,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English), tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
+| Backup | Exportar o board num arquivo e importar um arquivo no lugar do board atual (ver [Backup do board](#backup-do-board)) |
 
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração
 local; nas outras, uma lista embutida que pode ser editada). As regras de sugestão combinam
@@ -499,6 +500,26 @@ interferem uma na outra. Na primeira vez, o board parte de uma cópia do banco �
 anteriores (`fazai.db`), que fica intacto. Regras e skills são arquivos da pasta do projeto e
 entram no git normalmente. Evite abrir a mesma pasta em duas janelas do editor ao mesmo tempo: a
 última a salvar vence (a extensão avisa quando isso acontece).
+
+### Backup do board
+
+Para levar o board a outra máquina ou guardar uma cópia, use **Configurações → Backup**:
+
+- **Exportar board** gera um arquivo `<nome do board>-<data>.fazai.json` com tudo o que está no
+  board: colunas, tipos, campos, regras, modelos, agentes, cards (inclusive arquivados e na
+  lixeira), conversas, checklists, vínculos, histórico e os anexos embutidos. Só o board da pasta
+  atual sai no arquivo. Ele contém as conversas e os anexos: guarde-o com cuidado.
+- **Importar de um arquivo…** mostra um resumo (nome, cards, anexos, tamanho, versão) e, depois da
+  confirmação, grava uma cópia do banco (`<arquivo>.bak`, ao lado dele), apaga o board atual e o
+  substitui pelo do arquivo, com os mesmos números de card. O board importado passa a ser o desta
+  pasta. Nada muda no banco se o arquivo for inválido ou se algo falhar no meio.
+
+Um arquivo exportado por uma versão anterior da extensão é atualizado ao ser importado; um arquivo
+de versão mais nova é recusado com a versão necessária. Importar com a IA executando um card não é
+permitido: espere a execução terminar. No navegador o fluxo é o mesmo, com o download e a escolha
+do arquivo feitos pela própria página. Limites conhecidos: o histórico mensal consolidado do log
+não vai no arquivo, e as branches e pastas de trabalho das histórias são importadas como estavam na
+máquina de origem (recrie a pasta pelo botão do card).
 
 ## Desenvolvimento
 
