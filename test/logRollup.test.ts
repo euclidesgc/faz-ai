@@ -1,0 +1,282 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
+import type { Database } from 'sql.js';
+import { openInMemory } from '../src/extension/db/database';
+import { AiRunRepo } from '../src/extension/log/aiRunRepo';
+import { CardEventRepo } from '../src/extension/log/cardEventRepo';
+import { RETENTION_MONTHS, consolidate, detailMonths, keepMonths, monthlyTotals } from '../src/extension/log/rollup';
+import { BoardRepo } from '../src/extension/repositories/boardRepo';
+import type { CardEvent, LogMetric } from '../src/shared/log';
+
+const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
+/** data fixa de referência dos testes: 15 de junho de 2026, meio-dia, no fuso da máquina */
+const TODAY = new Date(2026, 5, 15, 12, 0, 0).getTime();
+/** meio-dia do dia 10 de um mês qualquer, no fuso da máquina (nunca UTC) */
+const at = (year: number, month: number, day = 10) => new Date(year, month - 1, day, 12, 0, 0).getTime();
+
+let db: Database;
+let boardId: string;
+let events: CardEventRepo;
+let runs: AiRunRepo;
+
+beforeEach(async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(TODAY);
+  db = await openInMemory(WASM_DIR);
+  boardId = new BoardRepo(db).getOrCreate('ws', 'Projeto').id;
+  events = new CardEventRepo(db);
+  runs = new AiRunRepo(db);
+});
+
+afterEach(() => vi.useRealTimers());
+
+const event = (when: number, over: Partial<CardEvent> = {}): string =>
+  events.add({
+    boardId,
+    at: when,
+    kind: 'column_changed',
+    cardId: 'c1',
+    cardNumber: 1,
+    cardTitle: 'Login',
+    cardType: 'História',
+    workflow: 'Histórias',
+    columnName: 'Discovery',
+    fromValue: 'Backlog',
+    toValue: 'Discovery',
+    subject: '',
+    author: 'Ana',
+    source: 'human',
+    runId: null,
+    ...over,
+  });
+
+/** uma execução já fechada, com duração exata: `vi.setSystemTime` fixa o instante do `finish` */
+const run = (startedAt: number, durationMs: number, over: Partial<Parameters<AiRunRepo['describe']>[1]> = {}): string => {
+  vi.setSystemTime(startedAt);
+  const id = runs.start({
+    boardId,
+    startedAt,
+    origin: 'manual',
+    tool: 'claude',
+    cardId: 'c1',
+    cardNumber: 1,
+    cardTitle: 'Login',
+    cardType: 'História',
+    workflow: 'Histórias',
+    columnName: 'Discovery',
+    phase: 'Discovery',
+  });
+  runs.describe(id, {
+    model: 'opus',
+    effort: 'high',
+    profile: 'Agente padrão',
+    agent: '',
+    permission: 'full',
+    autonomous: false,
+    clean: false,
+    skills: [],
+    mcp: null,
+    ...over,
+  });
+  vi.setSystemTime(startedAt + durationMs);
+  runs.finish(id, 'done', 0);
+  vi.setSystemTime(TODAY);
+  return id;
+};
+
+const of = (totals: LogMetric[], metric: string, dim = '', value = '') =>
+  totals.find((t) => t.metric === metric && t.dim === dim && t.value === value);
+
+describe('keepMonths', () => {
+  it('guarda o mês corrente e os doze anteriores, treze marcadores', () => {
+    const keep = keepMonths(TODAY);
+    expect(keep).toHaveLength(RETENTION_MONTHS + 1);
+    expect(keep[0]).toBe('2026-06');
+    expect(keep.at(-1)).toBe('2025-06');
+  });
+
+  it('atravessa a virada do ano', () => {
+    expect(keepMonths(at(2026, 1, 5))).toContain('2025-01');
+    expect(keepMonths(at(2026, 1, 5))[1]).toBe('2025-12');
+  });
+
+  it('num dia 31 não deixa fevereiro escapar do descarte', () => {
+    // passar de 31/03 para "31/02" empurraria a conta de volta para março e um mês sobraria
+    const keep = keepMonths(new Date(2026, 2, 31, 12).getTime());
+    expect(keep).toEqual([...new Set(keep)]);
+    expect(keep).toContain('2026-02');
+    expect(keep).toContain('2025-03');
+  });
+
+  it('não depende do fuso: o mês é o da máquina, como o `month` gravado', () => {
+    // último instante do mês no fuso local já é o mês seguinte em UTC; o marcador segue o local
+    expect(keepMonths(new Date(2026, 5, 30, 23, 59).getTime())[0]).toBe('2026-06');
+  });
+});
+
+describe('monthlyTotals', () => {
+  it('conta os eventos do mês no total, por tipo, por fase e por tipo de card', () => {
+    event(at(2026, 6), { kind: 'created' });
+    event(at(2026, 6), { kind: 'column_changed' });
+    event(at(2026, 6), { kind: 'column_changed', columnName: 'PRD' });
+    const totals = monthlyTotals(db, boardId, ['2026-06']);
+
+    expect(of(totals, 'events')).toMatchObject({ n: 3, total: 3 });
+    expect(of(totals, 'events', 'kind', 'column_changed')).toMatchObject({ n: 2 });
+    expect(of(totals, 'events', 'kind', 'created')).toMatchObject({ n: 1 });
+    expect(of(totals, 'events', 'phase', 'Discovery')).toMatchObject({ n: 2 });
+    expect(of(totals, 'events', 'phase', 'PRD')).toMatchObject({ n: 1 });
+    expect(of(totals, 'events', 'card_type', 'História')).toMatchObject({ n: 3 });
+  });
+
+  it('as atividades concluídas são contagem direta do evento `done`, não de categoria de coluna', () => {
+    event(at(2026, 6), { kind: 'done', columnName: 'Concluído' });
+    event(at(2026, 6), { kind: 'done', columnName: 'Concluído', cardType: 'Bug' });
+    event(at(2026, 6), { kind: 'cancelled', columnName: 'Cancelado' });
+    const totals = monthlyTotals(db, boardId, ['2026-06']);
+
+    expect(of(totals, 'cards_done')).toMatchObject({ n: 2 });
+    expect(of(totals, 'cards_done', 'card_type', 'Bug')).toMatchObject({ n: 1 });
+    expect(of(totals, 'cards_done', 'phase', 'Concluído')).toMatchObject({ n: 2 });
+  });
+
+  it('a unidade de `runs` é o tempo: conta as execuções e soma a duração, por todos os cortes', () => {
+    run(at(2026, 6), 1000);
+    run(at(2026, 6), 3000, { model: 'haiku', effort: null, profile: null });
+    const totals = monthlyTotals(db, boardId, ['2026-06']);
+
+    expect(of(totals, 'runs')).toMatchObject({ n: 2, total: 4000 });
+    expect(of(totals, 'runs', 'outcome', 'done')).toMatchObject({ n: 2, total: 4000 });
+    expect(of(totals, 'runs', 'model', 'opus')).toMatchObject({ n: 1, total: 1000 });
+    expect(of(totals, 'runs', 'model', 'haiku')).toMatchObject({ n: 1, total: 3000 });
+    expect(of(totals, 'runs', 'tool', 'claude')).toMatchObject({ n: 2 });
+    expect(of(totals, 'runs', 'phase', 'Discovery')).toMatchObject({ n: 2 });
+    // o não definido tem lugar próprio (''), e continua sendo uma execução contada — não um zero
+    expect(of(totals, 'runs', 'effort', '')).toMatchObject({ n: 1, total: 3000 });
+    expect(of(totals, 'runs', 'profile', '')).toMatchObject({ n: 1 });
+  });
+
+  it('a execução sem duração entra na contagem sem inflar o tempo', () => {
+    const id = runs.start({
+      boardId,
+      startedAt: at(2026, 6),
+      origin: 'manual',
+      tool: 'claude',
+      cardId: null,
+      cardNumber: null,
+      cardTitle: '',
+      cardType: '',
+      workflow: '',
+      columnName: '',
+      phase: '',
+    });
+    runs.finish(id, 'unknown');
+    expect(of(monthlyTotals(db, boardId, ['2026-06']), 'runs')).toMatchObject({ n: 1, total: 0 });
+  });
+
+  it('separa os meses e devolve em ordem crescente, sem precisar da lista de meses', () => {
+    event(at(2026, 5));
+    event(at(2026, 6));
+    event(at(2026, 6));
+    const totals = monthlyTotals(db, boardId).filter((t) => t.metric === 'events' && t.dim === '');
+    expect(totals.map((t) => [t.month, t.n])).toEqual([
+      ['2026-05', 1],
+      ['2026-06', 2],
+    ]);
+  });
+
+  it('mês sem nada não aparece e não vira linha de zeros', () => {
+    event(at(2026, 6));
+    expect([...new Set(monthlyTotals(db, boardId).map((t) => t.month))]).toEqual(['2026-06']);
+    expect(monthlyTotals(db, boardId, ['2026-01'])).toEqual([]);
+  });
+});
+
+describe('consolidate', () => {
+  it('RF-21: os totais arquivados são idênticos aos que o detalhe daria antes do descarte', () => {
+    event(at(2024, 3), { kind: 'created' });
+    event(at(2024, 3), { kind: 'done', columnName: 'Concluído' });
+    run(at(2024, 3), 5000);
+    const before = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(consolidate(db, boardId, TODAY)).toEqual(['2024-03']);
+    expect(events.byMonth('2024-03')).toEqual([]);
+    expect(runs.byMonth('2024-03')).toEqual([]);
+    expect(monthlyTotals(db, boardId, ['2024-03'])).toEqual(before);
+  });
+
+  it('RF-22: catorze meses de detalhe ficam treze; os de dentro da janela não são tocados', () => {
+    // um evento por mês, de maio de 2025 a junho de 2026: catorze meses
+    for (let i = 0; i < 14; i++) event(at(2025, 5 + i));
+    expect(detailMonths(db, boardId)).toHaveLength(14);
+
+    expect(consolidate(db, boardId, TODAY)).toEqual(['2025-05']);
+    expect(detailMonths(db, boardId)).toHaveLength(13);
+    expect(detailMonths(db, boardId)[0]).toBe('2025-06');
+    // o mês descartado continua somando, pelo arquivo
+    expect(of(monthlyTotals(db, boardId, ['2025-05']), 'events')).toMatchObject({ n: 1 });
+  });
+
+  it('os totais por mês nunca expiram: consolidar de novo não apaga arquivo nem duplica linha', () => {
+    event(at(2024, 3));
+    consolidate(db, boardId, TODAY);
+    const first = monthlyTotals(db, boardId, ['2024-03']);
+    consolidate(db, boardId, TODAY);
+    expect(monthlyTotals(db, boardId, ['2024-03'])).toEqual(first);
+  });
+
+  it('o mês que voltou a ter detalhe vale pelo detalhe, para não contar duas vezes', () => {
+    event(at(2024, 3));
+    consolidate(db, boardId, TODAY);
+    // um evento atrasado cai num mês já arquivado
+    event(at(2024, 3));
+    expect(of(monthlyTotals(db, boardId, ['2024-03']), 'events')).toMatchObject({ n: 1 });
+  });
+
+  it('o inventário da execução vai por cascata quando o detalhe é descartado', () => {
+    const id = run(at(2024, 3), 1000);
+    db.run('INSERT INTO ai_run_usage(run_id, kind, name, calls) VALUES (?,?,?,?)', [id, 'tool', 'Bash', 7]);
+    consolidate(db, boardId, TODAY);
+    expect(db.exec('SELECT COUNT(*) FROM ai_run_usage')[0]!.values[0]![0]).toBe(0);
+  });
+
+  it('nada a consolidar: grava o dia e não mexe no detalhe', () => {
+    event(at(2026, 6));
+    expect(consolidate(db, boardId, TODAY)).toEqual([]);
+    expect(events.byMonth('2026-06')).toHaveLength(1);
+    expect(new BoardRepo(db).openedNow(boardId, TODAY).rollupDay).toBe('2026-06-15');
+  });
+});
+
+describe('a consolidação na abertura do board', () => {
+  /** o que o `boardHost` decide na abertura: roda a consolidação só quando o dia virou */
+  const openBoard = (now: number): string[] => {
+    const boards = new BoardRepo(db);
+    const { rollupDay } = boards.openedNow(boardId, now);
+    const day = new Date(now);
+    const today = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    return rollupDay === today ? [] : consolidate(db, boardId, now);
+  };
+
+  it('RF-23: abrir duas vezes no mesmo dia consolida uma vez; no dia seguinte consolida de novo', () => {
+    event(at(2024, 3));
+    event(at(2024, 4));
+    expect(openBoard(TODAY)).toEqual(['2024-03', '2024-04']);
+    // nada mudou, mas o ponto é não repetir o trabalho no mesmo dia
+    expect(openBoard(TODAY + 60_000)).toEqual([]);
+    expect(openBoard(at(2026, 6, 16))).toEqual([]);
+    expect(new BoardRepo(db).openedNow(boardId, TODAY).rollupDay).toBe('2026-06-16');
+  });
+
+  it('RF-24: num board que já existia antes do log, a série começa na primeira abertura', () => {
+    db.run('UPDATE boards SET log_since = 0 WHERE id = ?', [boardId]);
+    const boards = new BoardRepo(db);
+    expect(boards.openedNow(boardId, TODAY).logSince).toBe(TODAY);
+    // a abertura seguinte não move o início da série
+    expect(boards.openedNow(boardId, TODAY + 86_400_000).logSince).toBe(TODAY);
+  });
+
+  it('RF-24: num board criado agora, a série começa na criação', () => {
+    expect(new BoardRepo(db).openedNow(boardId, TODAY + 86_400_000).logSince).toBe(TODAY);
+  });
+});

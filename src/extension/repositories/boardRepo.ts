@@ -37,6 +37,8 @@ export class BoardRepo {
     if (!row) {
       seedBoard(this.db, workspaceKey, name);
       row = one(this.db, 'SELECT * FROM boards WHERE workspace_key = ?', [workspaceKey])!;
+      // a série do log começa quando o board nasce: nada é inventado para trás (RF-24)
+      run(this.db, 'UPDATE boards SET log_since = ? WHERE id = ?', [Date.now(), str(row.id)]);
     }
     return {
       id: str(row.id),
@@ -52,6 +54,21 @@ export class BoardRepo {
       git: parseGit(str(row.git_json)),
       execProfiles: parseProfiles(str(row.exec_profiles_json)),
     };
+  }
+
+  /**
+   * Abertura do board, para o log: garante o início da série (`log_since`) de um board que já existia
+   * antes do log e informa o dia da última consolidação, para quem decide se ela roda hoje.
+   * Quem grava o dia é a própria consolidação (`consolidate`), não esta função.
+   */
+  openedNow(boardId: string, now: number): { logSince: number; rollupDay: string } {
+    const row = one(this.db, 'SELECT log_since, log_rollup_day FROM boards WHERE id = ?', [boardId]);
+    if (!row) throw new Error('Board não encontrado');
+    const logSince = num(row.log_since);
+    // zero é "board anterior ao log": a série começa agora, e não na data de criação do board, para
+    // o painel não mostrar meses vazios que nunca foram medidos
+    if (!logSince) run(this.db, 'UPDATE boards SET log_since = ? WHERE id = ?', [now, boardId]);
+    return { logSince: logSince || now, rollupDay: str(row.log_rollup_day) };
   }
 
   updateRules(boardId: string, patch: Partial<BoardRules>): void {
