@@ -1,5 +1,6 @@
 import type { RunReport } from '../../shared/log';
 import type { ModelOption } from '../../shared/models';
+import { claudeReader } from './claude';
 import { textReader } from './text';
 
 /** Formato que a CLI vai produzir; é ele que escolhe o leitor. */
@@ -26,11 +27,16 @@ export interface OutputReader {
 }
 
 /**
- * O leitor do formato. Nesta entrega todo formato cai no leitor de texto: os leitores de
- * `claude-stream-json` entram no passo 4 desta história e os de `codex-json`/`stream-json` no
- * passo 5. `deps` ainda não é usado aqui — passa a ser quando esses leitores existirem, para
- * resolver o custo quando a ferramenta não informa o modelo.
+ * O leitor do formato. Um leitor por formato, e não um genérico: Claude, Codex e os `stream-json`
+ * de Cursor/Kimi não têm nem o mesmo nome de evento nem a mesma noção de turno, e um leitor "que
+ * entende todos" é um leitor que erra em silêncio quando uma delas muda — que é o risco principal
+ * desta entrega. Os leitores de `codex-json` e `stream-json` entram no passo 5 desta história.
  */
-export function readerFor(_format: OutputFormat, _deps: ReaderDeps): OutputReader {
-  return textReader();
+export function readerFor(format: OutputFormat, deps: ReaderDeps): OutputReader {
+  switch (format) {
+    case 'claude-stream-json':
+      return claudeReader(deps);
+    default:
+      return textReader();
+  }
 }
