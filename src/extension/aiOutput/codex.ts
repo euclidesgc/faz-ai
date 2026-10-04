@@ -36,16 +36,18 @@ const addTokens = (a: AiRunTokens, b: AiRunTokens): AiRunTokens => ({
  * - `reasoning_output_tokens` NÃO entra na soma: a mesma coisa foi medida duas vezes no probe do
  *   Claude Code (o `thinkingTokens` já vem DENTRO do `outputTokens`) e a doc do Codex expõe o campo
  *   do mesmo jeito, como irmão de `output_tokens` e não como extra. Somar aqui infla a saída.
- * - `cacheWriteTokens` fica sempre 0, fixo: a doc não lista nenhum campo de criação de cache para o
- *   Codex. Isto é "a ferramenta não tem esse conceito neste relatório", não "mediu e deu zero" — a
- *   mesma distinção que `json.ts` já aplica campo a campo, aqui é o leitor que a aplica no agregado.
+ * - a criação de cache: a página de referência do modo não interativo não lista o campo, mas o
+ *   fonte da CLI (`exec_events.rs`) tem `cache_write_input_tokens` no `usage`. Lemos o campo quando
+ *   ele vier, em vez de fixar 0: fixar 0 subnotificaria a criação de cache em toda execução, e o
+ *   cache é justamente o que pesa na conta. Quando o campo não vier, 0 é o único valor que o tipo
+ *   permite — e aí é o `measure` da execução, não este número, que diz se houve medição.
  */
 function tokensFromUsage(v: Json): AiRunTokens {
   return {
     inputTokens: asNumber(v.input_tokens) ?? 0,
     outputTokens: asNumber(v.output_tokens) ?? 0,
     cacheReadTokens: asNumber(v.cached_input_tokens) ?? 0,
-    cacheWriteTokens: 0,
+    cacheWriteTokens: asNumber(v.cache_write_input_tokens) ?? 0,
   };
 }
 

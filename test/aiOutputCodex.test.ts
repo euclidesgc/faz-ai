@@ -89,8 +89,22 @@ describe('leitor do codex exec --json, pela documentação (sem CLI instalada pa
     expect(readCodex(EVENTS).reader.report().consumption!.turns).toBe(2);
   });
 
-  it('`cacheWriteTokens` é 0: o Codex não informa criação de cache, e isso não é "mediu e deu zero"', () => {
+  it('sem o campo de criação de cache no `usage`, `cacheWriteTokens` fica 0', () => {
+    // a página de referência do modo não interativo não lista o campo: estes eventos não o trazem
     expect(readCodex(EVENTS).reader.report().consumption!.cacheWriteTokens).toBe(0);
+  });
+
+  it('com o campo de criação de cache, ele é lido em vez de fixado em zero', () => {
+    // o fonte da CLI tem `cache_write_input_tokens` no `usage`; fixar 0 subnotificaria justamente o
+    // cache, que é o que pesa na conta
+    const comCache = [
+      JSON.stringify({ type: 'thread.started', thread_id: 's' }),
+      JSON.stringify({
+        type: 'turn.completed',
+        usage: { input_tokens: 10, cached_input_tokens: 5, output_tokens: 7, cache_write_input_tokens: 4321 },
+      }),
+    ];
+    expect(readCodex(comCache).reader.report().consumption!.cacheWriteTokens).toBe(4321);
   });
 
   it('o id da sessão vem de `thread.started.thread_id`, cortado em 8 caracteres', () => {
