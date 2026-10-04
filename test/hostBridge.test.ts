@@ -146,10 +146,14 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     });
   });
 
-  it('quando a pessoa desiste de salvar, nada acontece', async () => {
+  it('quando a pessoa desiste de salvar ou de escolher, só o "terminou" chega, sem aviso', async () => {
     env.saveTextAs = async () => undefined;
     await bridge.handle({ type: 'backup.export' });
-    expect(sent.filter((m) => m.type === 'notice' || m.type === 'error')).toEqual([]);
+    await bridge.handle({ type: 'backup.import.pick' });
+    expect(sent.filter((m) => m.type !== 'boardState' && m.type !== 'viewState')).toEqual([
+      { type: 'backup.done' },
+      { type: 'backup.done' },
+    ]);
   });
 
   it('backup.import.pick lê, valida e devolve o resumo com um token; apply substitui o board e avisa', async () => {
@@ -161,7 +165,9 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     createCard('Card 2');
 
     await bridge.handle({ type: 'backup.import.pick' });
-    const summary = sent.at(-1)!;
+    // o resumo vem antes do "terminou" (backup.done), que libera os botões da aba
+    expect(sent.at(-1)).toEqual({ type: 'backup.done' });
+    const summary = sent.at(-2)!;
     expect(summary.type).toBe('backup.import.summary');
     if (summary.type !== 'backup.import.summary') return;
     expect(summary.summary).toMatchObject({

@@ -106,6 +106,8 @@ export const host: Record<string, string> = {
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}.':
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}.',
   'Espere a execução da IA terminar para importar o board.': 'Wait for the AI run to finish before importing the board.',
+  'O arquivo é grande demais para enviar (limite de 200 MB).': 'The file is too large to send (200 MB limit).',
+  'Não foi possível ler o arquivo.': 'Could not read the file.',
   'Importação expirada: escolha o arquivo de novo.': 'Import expired: choose the file again.',
   'Este board já foi importado em outra pasta que usa o mesmo banco.':
     'This board was already imported into another folder that uses the same database.',

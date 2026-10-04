@@ -220,6 +220,8 @@ export type HostToWebview =
   /** resposta a `attachment.write`, correlacionada por `requestId` */
   | { type: 'attachment.writeResult'; requestId: string; ok: boolean; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */
-  | { type: 'backup.import.summary'; token: string; summary: ImportSummary };
+  | { type: 'backup.import.summary'; token: string; summary: ImportSummary }
+  /** a exportação ou a escolha do arquivo terminou (com sucesso ou porque a pessoa desistiu): a interface sai do estado "ocupado" */
+  | { type: 'backup.done' };
 
 export type { WorkflowKind };

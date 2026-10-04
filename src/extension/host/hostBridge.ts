@@ -199,17 +199,22 @@ export class HostBridge {
         case 'backup.export': {
           const { text, name, warnings } = this.router.exportBoardFile();
           const saved = await this.env.saveTextAs?.(text, name);
+          this.post({ type: 'backup.done' });
           if (!saved) return;
           this.post({ type: 'notice', message: exportNotice(saved, warnings) });
           return;
         }
         case 'backup.import.pick': {
           const file = this.env.pickBackupFile ? await this.env.pickBackupFile() : (await this.env.pickFiles())?.[0];
-          if (!file) return;
-          const text = await fs.readFile(file, 'utf8');
-          const parsed = parseExportFile(text);
-          const { token, summary } = this.router.parkImport(parsed, Buffer.byteLength(text));
-          this.post({ type: 'backup.import.summary', token, summary });
+          if (!file) return void this.post({ type: 'backup.done' });
+          try {
+            const text = await fs.readFile(file, 'utf8');
+            const parsed = parseExportFile(text);
+            const { token, summary } = this.router.parkImport(parsed, Buffer.byteLength(text));
+            this.post({ type: 'backup.import.summary', token, summary });
+          } finally {
+            this.post({ type: 'backup.done' });
+          }
           return;
         }
         case 'backup.import.cancel':

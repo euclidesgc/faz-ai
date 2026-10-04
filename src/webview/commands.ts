@@ -123,6 +123,13 @@ export const settings = {
   setExecProfiles: (profiles: ExecProfile[]) => post({ type: 'settings.execProfiles.set', profiles }),
 };
 
+export const backup = {
+  export: () => post({ type: 'backup.export' }),
+  importPick: () => post({ type: 'backup.import.pick' }),
+  importApply: (token: string) => post({ type: 'backup.import.apply', token }),
+  importCancel: (token: string) => post({ type: 'backup.import.cancel', token }),
+};
+
 export const harness = {
   refresh: () => post({ type: 'harness.refresh' }),
   openItem: (path: string) => post({ type: 'harness.item.open', path }),

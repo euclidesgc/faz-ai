@@ -8,6 +8,27 @@ export const settings: Record<string, string> = {
   'Modelos de IA': 'AI models',
   Git: 'Git',
   Aparência: 'Appearance',
+  Backup: 'Backup',
+  'Leve o board para outra máquina ou guarde uma cópia. O arquivo inclui configurações, cards, conversas e anexos.':
+    'Take the board to another machine or keep a copy. The file includes settings, cards, conversations and attachments.',
+  Exportar: 'Export',
+  'Gera um arquivo .fazai.json com tudo o que está neste board, inclusive cards arquivados e na lixeira. O arquivo contém as conversas e os anexos: guarde-o com cuidado.':
+    'Creates a .fazai.json file with everything on this board, including archived and trashed cards. The file contains the conversations and attachments: keep it safe.',
+  'Exportar board': 'Export board',
+  'Exportando…': 'Exporting…',
+  Importar: 'Import',
+  'Substitui o board atual pelo de um arquivo exportado, com os mesmos números de card. Você confirma depois de ver o resumo, e uma cópia de segurança do banco é gravada antes.':
+    'Replaces the current board with the one from an exported file, keeping the card numbers. You confirm after seeing the summary, and a backup copy of the database is written first.',
+  'Importar de um arquivo…': 'Import from a file…',
+  'Lendo o arquivo…': 'Reading the file…',
+  'Espere a execução da IA terminar': 'Wait for the AI run to finish',
+  'Board "{name}" com {cards} card(s) e {attachments} anexo(s), {size}, exportado em {date} pelo Faz AI {version} (formato {format}).':
+    'Board "{name}" with {cards} card(s) and {attachments} attachment(s), {size}, exported on {date} by Faz AI {version} (format {format}).',
+  'O arquivo tem mais de 200 MB: a importação pode demorar.': 'The file is larger than 200 MB: the import may take a while.',
+  'Tudo o que está neste board será apagado e substituído. Uma cópia de segurança (.bak) fica ao lado do banco.':
+    'Everything on this board will be deleted and replaced. A backup copy (.bak) is kept next to the database.',
+  'Substituir o board atual?': 'Replace the current board?',
+  'Importar e substituir': 'Import and replace',
   'Expandir o menu': 'Expand the menu',
   'Recolher o menu': 'Collapse the menu',
   'Nome do board': 'Board name',
