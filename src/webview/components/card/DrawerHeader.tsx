@@ -1,11 +1,13 @@
 import type { Card } from '../../../shared/model';
-import { cardsIn, columnsOf, typesOf } from '../../../shared/selectors';
+import { cardsIn, columnsOf, typesOf, isAiWorking, aiWorkingChildren } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { requestArchive, requestMove, requestTrash } from '../../store/actions';
 import { Menu } from '../Menu';
 import { Button, IconChevronDown, IconClose, SelectField } from '../ui';
 import { t, dt } from '../../i18n';
+import { AiLed } from '../cardView/AiLed';
+import type { AiWork } from '../cardView/AiLed';
 
 /** Barra do topo do drawer: tipo, coluna, ações do card e fechar. */
 export function DrawerHeader({ card }: { card: Card }) {
@@ -14,11 +16,21 @@ export function DrawerHeader({ card }: { card: Card }) {
   const close = () => openCard(null);
   const trashed = card.deletedAt !== null;
   const archived = card.archivedAt !== null;
+  const isParent = state.workflows.find((w) => w.id === card.workflowId)?.kind === 'parent';
+  const workingChildren = isParent ? aiWorkingChildren(state, card) : 0;
+  const work: AiWork = archived
+    ? null
+    : isAiWorking(state, card)
+      ? { mode: 'self' }
+      : workingChildren
+        ? { mode: 'children', count: workingChildren }
+        : null;
   const types = typesOf(state, card.workflowId).map((ty) => ({ value: ty.id, label: dt(ty.name) }));
   const columns = columnsOf(state, card.workflowId).map((c) => ({ value: c.id, label: dt(c.name) }));
 
   return (
     <header className="drawer-header">
+      <AiLed work={work} />
       <SelectField aria-label={t('Tipo')} options={types} value={card.typeId} onChange={(typeId) => cards.update(card.id, { typeId })} />
       <SelectField
         aria-label={t('Coluna')}
