@@ -173,6 +173,11 @@ coluna de conclusão, o board pergunta (ou move sozinho, conforme a regra) se o 
 conclusão. A IA usa as ferramentas `link_cards` e `unlink_cards`, e o `get_card` devolve os
 vínculos.
 
+A seção **Vínculos** também mostra, só para exibição, a relação de sub-tarefa: numa sub-tarefa, um
+grupo "Pai" com a história; numa história, a contagem de sub-tarefas com um atalho até a seção
+**Sub-tarefas**. Essa relação é somente leitura (sem botão de remover) e não entra na regra de
+conclusão acima, que continua valendo só para o vínculo manual de pai/filho.
+
 ### Board no navegador, fora do editor
 
 O board não depende da janela do editor:
@@ -348,8 +353,9 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   formando uma pilha de PRs; quando a ordem do board faz uma história rodar antes de outra de
   número menor, a branch dela parte da principal e o pull request sai solto, fora da pilha.
 - **Dividir um pedido grande**: a IA pode criar as histórias seguintes a partir de uma história em
-  modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo e entram na
-  fila. Ela nunca liga o modo numa história que você não ligou.
+  modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo, entram na fila
+  e ganham um vínculo **relativo** com a história de origem (pulado em silêncio se já existir
+  qualquer vínculo entre as duas). Ela nunca liga o modo numa história que você não ligou.
 - **Freios**: o autopiloto para quando a IA bloqueia o card ou quando uma execução falha (o card
   fica Bloqueado, com o motivo) e bloqueia a história depois de 3 execuções seguidas que não
   avançaram nada. Ao destravar o card, ele continua sozinho.

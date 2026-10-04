@@ -20,6 +20,16 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   "Chamar a IA agora", "Restaurar aparência padrão" e outros. Na interface, o modo autônomo passa a
   ter um nome só (sem "YOLO" nem "autopiloto" nos rótulos).
 
+- **Dividir um pedido grande em histórias agora as vincula de verdade.** Ao criar uma história com
+  `autonomous_from`, ela ganha um vínculo **relativo** com a história de origem — antes, a origem só
+  ficava registrada em texto, num comentário que nem a interface nem a IA liam como relação. Se já
+  existir qualquer vínculo entre as duas (caso de uma história ligada à mão), a criação é pulada em
+  silêncio, sem duplicar.
+- **A seção Vínculos do card aberto passa a mostrar a relação de sub-tarefa.** Numa sub-tarefa, um
+  grupo "Pai" com a história; numa história, a contagem de sub-tarefas com um atalho até a seção
+  Sub-tarefas (sem repetir a lista). A relação é somente leitura e não entra nas regras de
+  conclusão, que continuam valendo só para o vínculo manual de pai/filho.
+
 ## 0.31.1
 
 - **O card aberto voltou a funcionar.** Na 0.31.0 o card abria encostado à esquerda e fechava a

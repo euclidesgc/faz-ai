@@ -21,6 +21,16 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   edição", "Reler pastas", "Chamar a IA agora", "Restaurar aparência padrão" and others. In the
   interface, autonomous mode now goes by a single name (no "YOLO" or "autopiloto" in the labels).
 
+- **Splitting a large request into stories now actually links them.** Creating a story with
+  `autonomous_from` now gives it a **related** link to the origin story — before, the origin was
+  only recorded as text, in a comment that neither the interface nor the AI read as a relation. If
+  any link already exists between the two (e.g. a story linked by hand), the creation is skipped
+  silently, without duplicating.
+- **The Vínculos (links) section of the open card now shows the sub-task relation.** On a sub-task,
+  a "Pai" (parent) group with the story; on a story, the sub-task count with a shortcut to the
+  Sub-tarefas section (without repeating the list). The relation is read-only and does not enter the
+  completion rules, which still apply only to the manual parent/child link.
+
 ## 0.31.1
 
 - **The open card works again.** In 0.31.0 the card opened stuck to the left and closed on any

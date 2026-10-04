@@ -1,3 +1,5 @@
+import { linkProblem } from '../../../shared/links';
+
 import type { BoardContext, HandlerMap, MessageOf } from './context';
 import { applySuggestion, suggestionFor } from './models';
 
@@ -30,6 +32,7 @@ function inheritYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.inherit'>, aut
   if (card.parentId) throw new Error('O modo autônomo vale para a história, não para uma sub-tarefa.');
   ctx.cards.setYolo(card.id, true);
   ctx.comments.add(card.id, author, `Criada em modo autônomo a partir de #${from.number} ${from.title}.`, 'ai');
+  if (!linkProblem(ctx.state(), card.id, from.id, 'related')) ctx.links.add(card.id, from.id, 'related');
 }
 
 /**

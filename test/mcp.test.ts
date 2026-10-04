@@ -1257,6 +1257,30 @@ describe('modo autônomo (YOLO)', () => {
     expect(() => router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id })).toThrow('card.yolo.set');
   });
 
+  it('should link the new card to the origin when autonomous_from is used', async () => {
+    const story = (await call('create_card', { title: 'Grande', column: 'Discovery' })).data;
+    setYolo(1, true);
+    const part = (await call('create_card', { title: 'Parte 2', autonomous_from: 1 })).data;
+
+    expect((await call('get_card', { card: 1 })).data.links.related).toMatchObject([{ id: part.id }]);
+    expect((await call('get_card', { card: part.id })).data.links.related).toMatchObject([{ id: story.id }]);
+    expect(router.snapshot().links).toHaveLength(1);
+  });
+
+  it('should not duplicate the link when one already exists between the cards', async () => {
+    const story = (await call('create_card', { title: 'Grande', column: 'Discovery' })).data;
+    const part = (await call('create_card', { title: 'Parte 2' })).data;
+    setYolo(1, true);
+    await call('link_cards', { card: story.id, other: part.id, relation: 'parent' });
+    expect(router.snapshot().links).toHaveLength(1);
+
+    // reproduz o caso #19/#48: o vínculo já existe (manual) quando a herança do modo autônomo roda
+    expect(() =>
+      router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id }, { source: 'ai' }),
+    ).not.toThrow();
+    expect(router.snapshot().links).toHaveLength(1);
+  });
+
   it('ligar libera o que esperava uma pessoa', async () => {
     await call('create_card', { title: 'Login', column: 'PRD' });
     await call('request_review', { card: 1, summary: 'PRD pronto' });
