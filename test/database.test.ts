@@ -297,6 +297,50 @@ describe('migração 22 → 23 (commit do merge)', () => {
   });
 });
 
+/** Esquema de um board na versão 23 (com merge_commit, sem o consumo medido), para testar a migração 24. */
+const SCHEMA_V23 = SCHEMA_V22.replace(
+  "status_by TEXT NOT NULL DEFAULT '',",
+  `status_by TEXT NOT NULL DEFAULT '',
+    merge_commit TEXT NOT NULL DEFAULT '',`,
+);
+
+describe('migração 23 → 24 (consumo da execução)', () => {
+  it('sobe um board v23 com uma execução sem perder dado, e a execução antiga fica não medida', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    old.run(SCHEMA_V23);
+    old.run(`
+      INSERT INTO meta VALUES ('schema_version', '23');
+      INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto');
+      INSERT INTO workflows (id, board_id, name, position, kind) VALUES ('w', 'b', 'Histórias', 0, 'parent');
+      INSERT INTO columns (id, workflow_id, name, position) VALUES ('c', 'w', 'Backlog', 0);
+      INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t', 'b', 'História', '#fff', 'w');
+      INSERT INTO cards (id, board_id, workflow_id, column_id, type_id, parent_id, title, position, created_at, updated_at, number)
+        VALUES ('k1', 'b', 'w', 'c', 't', NULL, 'Primeiro card', 0, 1, 1, 1);
+      INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission)
+        VALUES ('r1', 'b', 1, '2024-01', 'manual', 'claude', 'default');
+    `);
+
+    migrate(old);
+
+    // versão atual e dado existente preservado, sem vão
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+
+    // execução antiga não é zero, é não medida: measure cai no padrão 'none' e as colunas novas ficam nulas
+    const [measure, turns, sessionId, costEstimated] = old.exec(
+      "SELECT measure, turns, session_id, cost_estimated FROM ai_runs WHERE id = 'r1'",
+    )[0]!.values[0]!;
+    expect(measure).toBe('none');
+    expect(turns).toBeNull();
+    expect(sessionId).toBeNull();
+    expect(costEstimated).toBeNull();
+
+    // as quatro colunas novas existem em ai_runs
+    const columns = old.exec('PRAGMA table_info(ai_runs)')[0]!.values.map((r) => r[1]);
+    expect(columns).toEqual(expect.arrayContaining(['turns', 'session_id', 'cost_estimated', 'measure']));
+  });
+});
+
 describe('banco novo', () => {
   it('chega na versão atual do esquema e já tem a coluna merge_commit', async () => {
     const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
@@ -305,8 +349,21 @@ describe('banco novo', () => {
     migrate(fresh);
 
     expect(fresh.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
-    const columns = fresh.exec('PRAGMA table_info(cards)')[0]!.values.map((r) => r[1]);
-    expect(columns).toContain('merge_commit');
+    const cardColumns = fresh.exec('PRAGMA table_info(cards)')[0]!.values.map((r) => r[1]);
+    expect(cardColumns).toContain('merge_commit');
+
+    // as quatro colunas do consumo medido (#70) já existem num board novo
+    const aiRunColumns = fresh.exec('PRAGMA table_info(ai_runs)')[0]!.values.map((r) => r[1]);
+    expect(aiRunColumns).toEqual(expect.arrayContaining(['turns', 'session_id', 'cost_estimated', 'measure']));
+
+    // sem medição ainda: o padrão de measure é 'none', não um booleano disfarçado
+    fresh.run(`
+      INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto');
+      INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission)
+        VALUES ('r1', 'b', 1, '2024-01', 'manual', 'claude', 'default');
+    `);
+    const measure = fresh.exec("SELECT measure FROM ai_runs WHERE id = 'r1'")[0]!.values[0]![0];
+    expect(measure).toBe('none');
   });
 });
 

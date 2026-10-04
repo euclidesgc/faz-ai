@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 24;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -285,7 +285,7 @@ const MIGRATIONS: Record<number, string> = {
       clean INTEGER NOT NULL DEFAULT 0,
       skills_json TEXT NOT NULL DEFAULT '[]',
       mcp_json TEXT,                     -- NULL = sem restrição de servidores MCP
-      -- consumo: sempre NULL nesta entrega; #70 passa a preencher (RF-19)
+      -- consumo: #70 passa a preenchê-las (RF-19)
       input_tokens INTEGER, output_tokens INTEGER,
       cache_read_tokens INTEGER, cache_write_tokens INTEGER,
       cost_usd REAL
@@ -321,6 +321,14 @@ const MIGRATIONS: Record<number, string> = {
   23: `
     -- commit do merge do pull request da história: insumo para detectar a versão publicada
     ALTER TABLE cards ADD COLUMN merge_commit TEXT NOT NULL DEFAULT '';
+  `,
+  24: `
+    -- #70: consumo medido da execução. Antes desta migração as colunas de token/custo existiam e eram
+    -- sempre NULL (migração 22); 'measure' é o que distingue "não medido" de "medido e zero".
+    ALTER TABLE ai_runs ADD COLUMN turns INTEGER;            -- soma dos turnos dos segmentos; NULL = não medido
+    ALTER TABLE ai_runs ADD COLUMN session_id TEXT;          -- id da sessão na CLI, para reabrir
+    ALTER TABLE ai_runs ADD COLUMN cost_estimated INTEGER;   -- 1 = calculado pelo preço; 0 = informado; NULL = sem custo
+    ALTER TABLE ai_runs ADD COLUMN measure TEXT NOT NULL DEFAULT 'none';  -- 'none' | 'partial' | 'full'
   `,
 };
 
