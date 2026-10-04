@@ -20,7 +20,7 @@ export function SubtasksSection({ story }: { story: Card }) {
   };
 
   return (
-    <section className="drawer-section">
+    <section id="subtasks-section" className="drawer-section">
       <div className="section-head">
         <h3>
           {t('Sub-tarefas')} <small>{children.length}</small>
