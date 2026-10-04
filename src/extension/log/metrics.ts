@@ -10,9 +10,23 @@
 // fora dos números — mas sempre listado em `archivedMonths`, para a resposta nunca fingir silêncio.
 import type { Database } from 'sql.js';
 import { all, num, str } from '../db/query';
+import { splitMcpName, type InventoryKind } from '../../shared/log';
 import { detailMonths } from './rollup';
 
-export type MetricsDim = 'phase' | 'card_type' | 'model' | 'tool' | 'card' | 'agent' | 'skill';
+/**
+ * `tool` é a ferramenta de IA da execução (claude, codex), coluna de `ai_runs`. `used_tool` é outra coisa:
+ * uma ferramenta que a execução USOU (Read, Bash), do inventário em `ai_run_usage`. Por isso o nome
+ * não se repete — a mesma palavra significaria duas coisas em dois lugares.
+ */
+export type MetricsDim = 'phase' | 'card_type' | 'model' | 'tool' | 'card' | 'agent' | 'skill' | 'used_tool' | 'mcp_tool';
+
+/** As quatro dimensões de inventário e o `kind` de `ai_run_usage` que cada uma lê (o CHECK da tabela). */
+const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind>> = {
+  used_tool: 'tool',
+  mcp_tool: 'mcp_tool',
+  agent: 'agent',
+  skill: 'skill',
+};
 
 /** As quatro dimensões que `log_months` também guarda (ver RUN_DIMS de rollup.ts). As outras três — `card`, `agent`, `skill` — só existem no detalhe. */
 const ARCHIVE_DIMS = new Set<MetricsDim>(['phase', 'card_type', 'model', 'tool']);
@@ -50,8 +64,10 @@ export interface MetricsRow {
   tokens: number | null | undefined;
   /** null = nenhuma execução do grupo tem custo medido ainda; undefined = dimensão de inventário, não aplicável */
   costUsd: number | null | undefined;
-  /** só nas dimensões de inventário (agent/skill): soma de usos, pode ser > runs */
+  /** só nas dimensões de inventário (used_tool/mcp_tool/agent/skill): soma de usos, pode ser > runs */
   calls?: number;
+  /** só nas linhas de `mcp_tool`: o servidor do nome; '' = o registro não trouxe o servidor (RF-26) */
+  server?: string;
 }
 
 export interface MetricsResult {
@@ -204,8 +220,8 @@ function detailByCard(db: Database, boardId: string, q: MetricsQuery): Map<strin
   return map;
 }
 
-/** Linhas de inventário (agent/skill): só contagem de execuções e de usos, nunca tokens/custo (RF-03). */
-function detailByInventory(db: Database, boardId: string, q: MetricsQuery, kind: 'agent' | 'skill'): Map<string, Accumulator> {
+/** Linhas de inventário (used_tool/mcp_tool/agent/skill): só contagem de execuções e de usos, nunca tokens/custo (RF-03). */
+function detailByInventory(db: Database, boardId: string, q: MetricsQuery, kind: InventoryKind): Map<string, Accumulator> {
   const { sql: where, params } = runsWhere(boardId, q, 'r.');
   const rows = all(
     db,
@@ -259,7 +275,7 @@ function monthRange(from: string, to: string): string[] {
 
 /**
  * Agregação do log por dimensão e período. `group_by` omitido devolve um total só; nas dimensões de
- * inventário (`agent`/`skill`) as linhas não têm `tokens`/`costUsd` — ver cabeçalho do arquivo.
+ * inventário (`used_tool`/`mcp_tool`/`agent`/`skill`) as linhas não têm `tokens`/`costUsd` — ver cabeçalho do arquivo.
  */
 export function getMetrics(db: Database, boardId: string, query: MetricsQuery = {}): MetricsResult {
   if (query.startDate && query.endDate && query.startDate > query.endDate) throw new Error('end_date anterior a start_date.');
@@ -289,18 +305,20 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
     return (!!query.startDate && query.startDate > first) || (!!query.endDate && query.endDate < last);
   });
 
+  const inventoryKind = dim ? INVENTORY_KIND[dim] : undefined;
   let acc: Map<string, Accumulator>;
   if (dim === 'card') acc = detailByCard(db, boardId, query);
-  else if (dim === 'agent' || dim === 'skill') acc = detailByInventory(db, boardId, query, dim);
+  else if (inventoryKind) acc = detailByInventory(db, boardId, query, inventoryKind);
   else {
-    const column = dim ? RUN_COLUMN[dim] : null;
+    // aqui `dim` já não é `card` nem de inventário: sobram as quatro colunas de `ai_runs`
+    const column = dim ? RUN_COLUMN[dim as keyof typeof RUN_COLUMN] : null;
     acc = detailByRunColumn(db, boardId, query, column);
     // meses arquivados só entram quando a dimensão existe em log_months e não há outro filtro (RF-05)
     const canUseArchive = (dim === undefined || ARCHIVE_DIMS.has(dim)) && !hasDimensionFilter(query) && query.card === undefined;
     if (canUseArchive) for (const month of archivedMonths) merge(acc, archiveByDim(db, boardId, month, dim ?? ''));
   }
 
-  const isInventory = dim === 'agent' || dim === 'skill';
+  const isInventory = !!inventoryKind;
   const sorted = [...acc.entries()].sort(
     (a, b) => (isInventory ? b[1].calls - a[1].calls : b[1].runs - a[1].runs) || a[0].localeCompare(b[0]),
   );
@@ -309,7 +327,16 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
 
   const toRow = (label: string, a: Accumulator): MetricsRow =>
     isInventory
-      ? { label, runs: a.runs, durationMs: a.durationMs, tokens: undefined, costUsd: undefined, calls: a.calls }
+      ? {
+          label,
+          runs: a.runs,
+          durationMs: a.durationMs,
+          tokens: undefined,
+          costUsd: undefined,
+          calls: a.calls,
+          // a linha "outros" soma vários servidores: não tem um
+          ...(dim === 'mcp_tool' && label !== 'outros' ? { server: splitMcpName(label).server } : {}),
+        }
       : {
           label,
           runs: a.runs,

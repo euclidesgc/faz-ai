@@ -139,6 +139,32 @@ export interface InventoryItem {
 }
 
 /**
+ * Separa o servidor da ferramenta no nome de uma ferramenta MCP do inventário. Reconhece as duas
+ * formas que existem: `mcp__<servidor>__<ferramenta>` (a do Claude Code) e `<servidor>/<ferramenta>`
+ * (como o leitor da saída grava em `ai_run_usage`). O corte é no PRIMEIRO separador — nome de servidor
+ * com `_` é comum e com `/` não é —, então um separador repetido fica na ferramenta. Não casou (sem
+ * servidor, ou com servidor ou ferramenta vazios): devolve o nome como veio e `server: ''`, que a tela
+ * lê como "servidor não registrado" — nunca se adivinha o servidor (RF-26).
+ */
+export function splitMcpName(name: string): { server: string; tool: string } {
+  const notFound = { server: '', tool: name };
+  let sep: string;
+  let from: number;
+  if (name.startsWith('mcp__')) {
+    sep = '__';
+    from = 'mcp__'.length;
+  } else {
+    sep = '/';
+    from = 0;
+  }
+  const at = name.indexOf(sep, from);
+  if (at < 0) return notFound;
+  const server = name.slice(from, at);
+  const tool = name.slice(at + sep.length);
+  return server && tool ? { server, tool } : notFound;
+}
+
+/**
  * O que a camada de leitura da saída da CLI entrega ao log no fim da execução.
  * Duas invariantes, que são o requisito de honestidade do PRD em forma de tipo:
  * - `measure === 'none'` ⇔ `consumption === null` E `inventory.length === 0`. Zero medido é
