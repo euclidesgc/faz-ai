@@ -59,6 +59,17 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   que nomeiam uma tecnologia (Flutter, Dart, React, TypeScript, Python, Rust, Docker, GitHub e cerca
   de 80 outras, também por apelido: "node", "ts", "k8s") ganham o logo, na cor da marca, no card,
   no seletor do card e nos filtros. Opções que não são tecnologia ficam como antes.
+- **Anexo abre numa janela do próprio board.** Clicar num anexo abre uma modal em vez de um editor
+  ou aplicativo externo: texto e JSON podem ser lidos e editados ali, imagens são exibidas e os
+  outros tipos avisam que não há pré-visualização. A modal traz **Salvar como** (o diálogo do
+  editor ou, no navegador, o download) e **Copiar conteúdo**.
+- **Triagem automática na primeira chamada da IA.** Num card sem Tags, Esforço da atividade, Modelo
+  e Skills, a IA lê a descrição, escolhe e preenche os quatro campos e cria a checklist antes de
+  começar o trabalho da fase. Se qualquer um deles já estiver preenchido, a triagem não acontece.
+- **LED da IA no topo do card aberto.** O LED de atividade da IA aparece também no cabeçalho do card
+  aberto e acende quando a IA está trabalhando no card ou numa de suas sub-tarefas.
+- **O card aberto não cobre mais o chat.** O card abre como uma janela centralizada na tela, e não
+  mais como um painel preso à direita, que ficava por cima do chat com a IA.
 - **O board detecta o merge do pull request e conclui a história.** Uma rotina periódica observa, a
   cada intervalo configurável, se um pull request de uma história entregue em modo autônomo foi
   mergeado: quando o merge é detectado, o board grava o commit do merge no card, registra na
