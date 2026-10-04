@@ -6,6 +6,23 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **O board registra o consumo, o custo e o inventário de cada execução da IA.** Para cada execução
+  ficam gravados os tokens de entrada, de saída, de leitura de cache e de criação de cache, o custo
+  em dólar, os turnos e o id da sessão, mais o inventário do que foi usado: ferramentas, ferramentas
+  de MCP (com o servidor), subagentes e skills. Quando a ferramenta não informa o custo, o board o
+  estima pelo **preço por milhão de tokens** do modelo, que você preenche em Configurações → Modelos
+  de IA (ou pelo MCP, com `upsert_model`), e o valor estimado vem marcado. Modelo sem preço fica sem
+  custo, nunca com 0. No canal de log, a saída da ferramenta passa a aparecer em linhas legíveis, e
+  cada execução termina com uma linha de resumo do consumo. O Copilot não tem saída estruturada: as
+  execuções dele ficam registradas **sem consumo medido** ("não medido", e não zero). Perguntas no
+  chat do board também entram no registro, sem card. O `get_metrics` passa a trazer tokens e custo.
+
+- **O detalhe de cada execução no arquivo do board caiu de 12 para 6 meses.** O que o board guarda
+  por execução (agora com consumo e inventário) fica por 6 meses além do mês corrente; depois disso
+  só permanecem os totais por mês, que nunca expiram. Quem atualiza perde o detalhe individual das
+  execuções com mais de 6 meses, não os totais. A janela menor mantém o arquivo do banco dentro do
+  limite de tamanho.
+
 - **Um clique no nome da branch copia o nome.** No card aberto, a branch da história virou um botão:
   clicar copia o nome para a área de transferência e a tela confirma com "Nome copiado".
 
@@ -76,8 +93,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   ferramenta agrega dados do histórico — execuções, duração, custo e tokens — por fase, tipo de card,
   ferramenta, modelo, card, agente ou skill, com filtros de período e card. Responde em tabela
   compacta. Não lista execuções individuais (a agregação por card já basta para a IA saber o custo de
-  cada um). Custo e tokens ainda têm "-" (não medidos) até a história #70 passar a gravá-los; até
-  lá a ferramenta funciona normalmente e marca a cifra como estimada.
+  cada um). Valores não medidos aparecem como "-" (nunca 0), e o custo estimado pelo preço do modelo
+  vem marcado como estimado.
 
 ## 0.31.1
 
