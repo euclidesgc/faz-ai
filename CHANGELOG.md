@@ -4,6 +4,14 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **O LED do card agora parece um LED e diz o estado de relance.** Antes era um ponto na cor do
+  texto da barra, com um pulso quase invisível. Agora ele fica verde e pisca devagar enquanto a IA
+  trabalha no card (ou numa sub-tarefa da história), amarelo quando o card espera por você, vermelho
+  quando está bloqueado e apagado quando não há nada acontecendo. Só o verde pisca. Vale para os
+  cards do board, as sub-tarefas e o cabeçalho do card aberto.
+
 ## 0.31.1
 
 - **O card aberto voltou a funcionar.** Na 0.31.0 o card abria encostado à esquerda e fechava a

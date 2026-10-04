@@ -206,6 +206,8 @@ export const board: Record<string, string> = {
 
   // Card no board
   'IA parada neste card': 'AI idle on this card',
+  'Card bloqueado': 'Card blocked',
+  'Este card precisa da sua atenção': 'This card needs your attention',
   'IA trabalhando neste card': 'AI working on this card',
   'IA trabalhando em {n} sub-tarefa deste card': 'AI working on {n} sub-task of this card',
   'IA trabalhando em {n} sub-tarefas deste card': 'AI working on {n} sub-tasks of this card',
