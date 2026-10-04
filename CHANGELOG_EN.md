@@ -32,6 +32,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   everything else, and deleting a card does not delete its history — that's what keeps the totals of
   closed months stable.
 
+- **The AI can query the board's usage metrics straight in the card's conversation with `get_metrics`.** The
+  tool aggregates history data — runs, duration, cost, and tokens — by phase, card type, tool, model,
+  card, agent, or skill, with period and card filters. It replies in a compact table. It does not
+  list individual runs (aggregation by card is enough for the AI to know each one's cost). Cost and
+  tokens still show "-" (not measured) until story #70 starts recording them; until then the tool
+  works normally and marks the figure as estimated.
+
 - **The published package now ships with the version's release notes at the top of the changelog,
   instead of "Unreleased".** `npm run release` now opens the generated `.vsix` and checks the README
   and the CHANGELOG (in both languages) before publishing: it refuses if the changelog still has a

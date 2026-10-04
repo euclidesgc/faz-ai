@@ -273,6 +273,25 @@ The button is also in the card header, next to the status.
   of the tool's output. The full log is in the **Output → Faz AI** panel (or in the `faz-ai`
   terminal).
 
+### Usage metrics with get_metrics
+
+During a card's conversation, the AI can query aggregated statistics from the board's history — usage,
+duration, and cost of runs — without opening any panel. Call the `get_metrics` tool in natural language:
+"how much AI time did card #72 use?", "which card type uses the most this month?", "which agent was
+used most?". The tool replies with a compact table, optimized to save tokens.
+
+- The aggregation can group by phase, card type, tool, model, card, agent, or skill. Omit to get only
+  the period's total.
+- Period filters (start and end date, in `YYYY-MM-DD`), card (e.g. `72` or `#72`), and dimensions
+  (e.g. phase, model, card type).
+- On the **agent** and **skill** dimensions the table shows only the count of runs and uses (no tokens
+  or cost, which cannot be split among a run's components).
+- Unmeasured values appear as "-" (never 0): cost and tokens depend on story #70, not yet
+  implemented. The response marks the figure as estimated.
+- Always tells you when the board's history started and which periods have only monthly totals
+  (without per-run detail). Very old periods (more than ~12 months) have no detail and aggregate only
+  the already-consolidated totals.
+
 ### Branch and working folder per story
 
 Each story works on its own branch, created by the board (for example

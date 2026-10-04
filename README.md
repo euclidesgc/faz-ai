@@ -256,6 +256,26 @@ O botão também fica no cabeçalho do card, ao lado do status.
 - Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo e o fim da
   saída da ferramenta. O log completo está no painel **Saída → Faz AI** (ou no terminal do `faz-ai`).
 
+### Métricas de uso com get_metrics
+
+Durante a conversa de um card, a IA pode consultar estatísticas agregadas do histórico do board — uso,
+duração e custo de execuções — sem precisar abrir nenhum painel. Chame a ferramenta `get_metrics` em
+linguagem natural: "quanto tempo de IA o card #72 consumiu?", "qual tipo de card consome mais este
+mês?", "qual agente foi usado mais?". A ferramenta responde em uma tabela compacta, otimizada para
+economizar tokens.
+
+- A agregação pode agrupar por fase, tipo de card, ferramenta, modelo, card, agente ou skill. Omita
+  para obter apenas o total do período.
+- Filtros de período (data inicial e final, em `AAAA-MM-DD`), card (ex. `72` ou `#72`), e dimensões
+  (ex. fase, modelo, tipo de card).
+- Nas dimensões **agente** e **skill** a tabela mostra só a contagem de execuções e de usos (sem
+  tokens nem custo, que não é possível repartir entre componentes de uma execução).
+- Valores não medidos aparecem como "-" (nunca 0): custo e tokens dependem da história #70, que
+  ainda não está implementada. A resposta marca a cifra como estimada.
+- Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
+  (sem detalhe por execução). Períodos muito antigos (mais de ~12 meses) não têm detalhe e só
+  agregam os totais já consolidados.
+
 ### Branch e pasta de trabalho por história
 
 Cada história trabalha numa branch própria, criada pelo board (ex.: `historia/12-login-com-google`).
