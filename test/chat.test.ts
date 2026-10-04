@@ -19,7 +19,7 @@ let router: MessageRouter;
 let runLog: ReturnType<typeof createRunLog> | undefined;
 let spawned: {
   command: HeadlessCommand;
-  emit: (text: string) => void;
+  emit: (text: string, stream?: 'stdout' | 'stderr') => void;
   exit: (code: number | null, error?: Error) => void;
   killed: boolean;
 }[];
@@ -30,8 +30,13 @@ const build = () =>
     log: () => {},
     runLog,
     file: path.join(dir, 'chat.json'),
-    spawn: (command, _cwd, log) => {
-      const entry = { command, emit: log, exit: (_c: number | null, _e?: Error) => {}, killed: false };
+    spawn: (command, _cwd, out) => {
+      const entry = {
+        command,
+        emit: (text: string, stream: 'stdout' | 'stderr' = 'stdout') => out(text, stream),
+        exit: (_c: number | null, _e?: Error) => {},
+        killed: false,
+      };
       spawned.push(entry);
       return {
         kill: () => {

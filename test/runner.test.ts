@@ -177,7 +177,7 @@ beforeEach(async () => {
         exit: (code: number | null, error?: Error) => listener(code, error),
       };
       procs.push(proc);
-      out('saída da ferramenta\n');
+      out('saída da ferramenta\n', 'stdout');
       return {
         onExit: (fn) => (listener = fn),
         kill: () => {
@@ -326,6 +326,7 @@ describe('executor da IA', () => {
     expect(procs[0]!.command).toEqual({
       command: 'kimi',
       args: ['-p', cardPrompt('#1', [], [], false, true), '--add-dir', `${dir}.worktrees`],
+      format: 'text',
     });
   });
 
@@ -336,6 +337,7 @@ describe('executor da IA', () => {
       command: 'claude',
       args: ['-p', '--permission-mode', 'dontAsk', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep'],
       stdin: 'P',
+      format: 'text',
     });
     expect(cmd('claude', 'edits')).toMatchObject({ args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*'] });
     expect(cmd('claude', 'full')).toMatchObject({ args: ['-p', '--permission-mode', 'bypassPermissions'] });
@@ -351,13 +353,15 @@ describe('executor da IA', () => {
         '-',
       ],
       stdin: 'P',
+      format: 'text',
     });
     expect(cmd('copilot', 'board')).toEqual({
       command: 'copilot',
       args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', '--no-ask-user'],
       env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' },
+      format: 'text',
     });
-    expect(cmd('cursor', 'full')).toEqual({ command: 'agent', args: ['-p', '--force', '--approve-mcps', '--trust', 'P'] });
+    expect(cmd('cursor', 'full')).toEqual({ command: 'agent', args: ['-p', '--force', '--approve-mcps', '--trust', 'P'], format: 'text' });
     expect(headlessUnsupported('claude', 'board')).toBeNull();
     expect(headlessUnsupported('cursor', 'board')).toContain('Cursor');
   });

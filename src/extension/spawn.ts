@@ -1,5 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import * as os from 'node:os';
+import type { OutputStream } from './aiOutput/reader';
 import type { HeadlessCommand } from './headless';
 import type { RunningProcess } from './runner';
 import { commandNotFound, resolveCommand } from './cliResolve';
@@ -21,11 +22,18 @@ export function loginShellPath(): Promise<string | undefined> {
   return shellPath;
 }
 
-/** Inicia a CLI da ferramenta de IA na pasta do projeto. */
+/**
+ * Inicia a CLI da ferramenta de IA na pasta do projeto.
+ *
+ * `out` recebe de qual canal o pedaço veio. Os dois canais ficam separados de propósito: no modo de
+ * saída estruturada o `stderr` é texto de gente (um aviso, um pedido de atualização) e, se entrasse
+ * no interpretador de JSONL, inventaria "saída estruturada quebrada" em toda execução que escreve
+ * um aviso.
+ */
 export function spawnHeadless(
   command: HeadlessCommand,
   cwd: string,
-  log: (text: string) => void,
+  out: (text: string, stream: OutputStream) => void,
   pathEnv: string | undefined,
 ): RunningProcess {
   // quem só usa a extensão da ferramenta no editor não tem a CLI no PATH: procura também onde ela costuma ficar
@@ -50,8 +58,8 @@ export function spawnHeadless(
     // no Windows as CLIs instaladas pelo npm são .cmd e só rodam pelo shell
     shell: process.platform === 'win32',
   });
-  child.stdout.on('data', (d: Buffer) => log(d.toString()));
-  child.stderr.on('data', (d: Buffer) => log(d.toString()));
+  child.stdout.on('data', (d: Buffer) => out(d.toString(), 'stdout'));
+  child.stderr.on('data', (d: Buffer) => out(d.toString(), 'stderr'));
   child.stdin.on('error', () => {});
   child.stdin.end(command.stdin ?? '');
 

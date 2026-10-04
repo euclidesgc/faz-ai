@@ -1,5 +1,6 @@
 import { aiToolInfo, type AiTool } from '../shared/harness';
 import type { RunnerPermission } from '../shared/runner';
+import type { OutputFormat } from './aiOutput/reader';
 import { BOARD_SERVER, type ExecInput } from './execution';
 
 /** Comando que roda a CLI de uma ferramenta de IA sem interface, para um prompt, até terminar. */
@@ -11,6 +12,8 @@ export interface HeadlessCommand {
   env?: Record<string, string>;
   /** arquivos temporários da execução (nome → conteúdo), referidos nos argumentos por `tmpArg` */
   tempFiles?: Record<string, string>;
+  /** o que este comando vai escrever na saída, e portanto qual leitor a interpreta */
+  format: OutputFormat;
 }
 
 export interface HeadlessInput {
@@ -22,6 +25,13 @@ export interface HeadlessInput {
   exec?: ExecInput;
   /** como iniciar o servidor MCP do board; quando a ferramenta aceita, vai na linha de comando e dispensa o registro no projeto */
   boardServer?: { command: string; args: string[] };
+  /**
+   * Pedir a saída estruturada da ferramenta, para medir consumo e inventário. Quem não tem saída
+   * estruturada no modo sem interface (o Copilot) ignora e devolve `format: 'text'`. Não há tabela
+   * de "a partir da versão X": quem decide é a tentativa, e a recusa de argumento foi verificada
+   * saindo na hora, com `stdout` vazio e zero token gasto.
+   */
+  structured?: boolean;
 }
 
 const SERVER = BOARD_SERVER;
@@ -48,9 +58,20 @@ const MCP_CONFIG = 'mcp.json';
  * - Copilot: --agent, --model, --effort, --available-tools, --excluded-tools, --disable-mcp-server, --no-custom-instructions
  * - Cursor: --model. Kimi: --model e --agent.
  * O que a ferramenta não aceita por parâmetro segue no prompt, como orientação (ver executionPlan).
+ *
+ * Saída estruturada (`structured`), de onde saem tokens, custo e inventário:
+ * - Claude Code: `--output-format stream-json` EXIGE `--verbose` (verificado na máquina: sem ele a
+ *   CLI recusa com "When using --print, --output-format=stream-json requires --verbose"). É o único
+ *   formato desta entrega verificado contra saída real.
+ * - Codex: `exec --json`.
+ * - Cursor e Kimi: `--output-format stream-json`, pela documentação; nenhum dos dois está instalado
+ *   nesta máquina, e a documentação deles não promete bloco de uso.
+ * - Copilot: NÃO TEM no modo `-p`. O `--output-format json` que a documentação mostra é do
+ *   `copilot workflow run`, outro comando. Por isso o builder dele devolve sempre `format: 'text'`:
+ *   a execução acontece e fica registrada sem consumo.
  */
 const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null> = {
-  claude: ({ prompt, permission, addDirs = [], exec, boardServer }) => {
+  claude: ({ prompt, permission, addDirs = [], exec, boardServer, structured }) => {
     // sem pasta confiada, o `-p` ignora as permissões do projeto: elas vão todas na linha de comando
     const modes: Record<RunnerPermission, string[]> = {
       // dontAsk nega tudo o que não está liberado: só o board e a leitura do projeto
@@ -58,7 +79,8 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
       edits: ['--permission-mode', 'acceptEdits', '--allowedTools', `mcp__${SERVER}__*`],
       full: ['--permission-mode', 'bypassPermissions'],
     };
-    const args = ['-p', ...modes[permission]];
+    // `--verbose` é obrigatório junto do `stream-json`: sem ele a CLI recusa o argumento e nada roda
+    const args = ['-p', ...(structured ? ['--output-format', 'stream-json', '--verbose'] : []), ...modes[permission]];
     // os servidores liberados no agente também rodam sem pedir aprovação
     if (exec?.mcpAllowed && permission !== 'full') args.push(...exec.mcpAllowed.map((n) => `mcp__${n}__*`));
     args.push(...addDirs.flatMap((d) => ['--add-dir', d]));
@@ -74,9 +96,15 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
     if (mcpConfig) args.push('--mcp-config', tmpArg(MCP_CONFIG));
     // sessão limpa: sem as configurações da pasta do usuário e sem skills ou comandos invocáveis (as do card vão pelo caminho)
     if (exec?.clean) args.push('--setting-sources', 'project,local', '--disable-slash-commands');
-    return { command: 'claude', args, stdin: prompt, ...(mcpConfig ? { tempFiles: { [MCP_CONFIG]: mcpConfig } } : {}) };
+    return {
+      command: 'claude',
+      args,
+      stdin: prompt,
+      format: structured ? 'claude-stream-json' : 'text',
+      ...(mcpConfig ? { tempFiles: { [MCP_CONFIG]: mcpConfig } } : {}),
+    };
   },
-  codex: ({ prompt, permission, addDirs = [], exec }) => {
+  codex: ({ prompt, permission, addDirs = [], exec, structured }) => {
     const modes: Record<RunnerPermission, string[]> = {
       board: ['--sandbox', 'read-only'],
       edits: ['--sandbox', 'workspace-write'],
@@ -94,6 +122,7 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
       command: 'codex',
       args: [
         'exec',
+        ...(structured ? ['--json'] : []),
         ...modes[permission],
         '--skip-git-repo-check',
         ...addDirs.flatMap((d) => ['--add-dir', d]),
@@ -103,6 +132,7 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
         '-',
       ],
       stdin: prompt,
+      format: structured ? 'codex-json' : 'text',
     };
   },
   copilot: ({ prompt, permission, addDirs = [], exec }) => {
@@ -124,27 +154,42 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
       command: 'copilot',
       args: ['-p', prompt, ...modes[permission], ...addDirs.map((d) => `--add-dir=${d}`), ...profile, '--no-ask-user'],
       env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' },
+      // o modo `-p` do Copilot não tem saída estruturada: a execução fica registrada sem consumo
+      format: 'text',
     };
   },
-  cursor: ({ prompt, permission, exec }) =>
+  cursor: ({ prompt, permission, exec, structured }) =>
     permission === 'full'
       ? {
           command: 'agent',
-          args: ['-p', '--force', '--approve-mcps', '--trust', ...(exec?.model ? ['--model', exec.model.name] : []), prompt],
+          args: [
+            '-p',
+            ...(structured ? ['--output-format', 'stream-json'] : []),
+            '--force',
+            '--approve-mcps',
+            '--trust',
+            ...(exec?.model ? ['--model', exec.model.name] : []),
+            prompt,
+          ],
+          format: structured ? 'stream-json' : 'text',
         }
       : null,
   // no -p o Kimi não pede aprovação de nada e recusa flags de permissão
-  kimi: ({ prompt, permission, addDirs = [], exec }) =>
+  kimi: ({ prompt, permission, addDirs = [], exec, structured }) =>
     permission === 'full'
       ? {
           command: 'kimi',
           args: [
             '-p',
             prompt,
+            // a documentação do Kimi liga `--output-format` ao `--prompt`; se o `-p` não for a forma
+            // curta dele, a CLI recusa o argumento e a execução cai para texto, pelo caminho normal
+            ...(structured ? ['--output-format', 'stream-json'] : []),
             ...addDirs.flatMap((d) => ['--add-dir', d]),
             ...(exec?.model ? ['--model', exec.model.name] : []),
             ...(exec?.agent ? ['--agent', exec.agent] : []),
           ],
+          format: structured ? 'stream-json' : 'text',
         }
       : null,
 };

@@ -9,6 +9,7 @@ import { isYolo } from '../shared/story';
 import type { RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
+import type { SpawnFn } from './aiOutput/measured';
 import { headlessCommand, tmpArg, type HeadlessCommand } from './headless';
 import type { RunLog } from './log/runLog';
 import { needsTriage, requiredSkills } from './mcp/format';
@@ -22,8 +23,8 @@ export interface RunningProcess {
 }
 
 export interface RunnerDeps {
-  /** inicia o comando na pasta do projeto; a saída do processo vai para `log` */
-  spawn(command: HeadlessCommand, cwd: string, log: (text: string) => void): RunningProcess;
+  /** inicia o comando na pasta do projeto; cada pedaço de saída vai para `out`, com o canal de onde veio */
+  spawn: SpawnFn;
   log(line: string): void;
   cwd: string;
   /** home do usuário, de onde se lê a configuração de servidores MCP da ferramenta */
