@@ -60,6 +60,8 @@ const bridgeOnly = {
   'attachment.read': viaBridge,
   'attachment.write': viaBridge,
   'attachment.saveAs': viaBridge,
+  // #156: o caminho de consulta de verdade entra na sub-tarefa 156
+  'metrics.query': viaBridge,
   'backup.export': viaBridge,
   'backup.import.pick': viaBridge,
   'backup.import.cancel': viaBridge,

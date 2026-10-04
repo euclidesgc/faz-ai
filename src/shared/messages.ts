@@ -4,6 +4,7 @@ import type { ViewState } from './filters';
 import type { ExecProfile } from './execution';
 import type { AiTool, HarnessKind, SkillMode } from './harness';
 import type { HookInput, McpServerInput } from './harnessCatalog';
+import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
@@ -78,6 +79,8 @@ export type WebviewToHost =
   | { type: 'attachment.read'; requestId: string; attachmentId: Id }
   /** grava o conteúdo editado de volta no arquivo do anexo */
   | { type: 'attachment.write'; requestId: string; attachmentId: Id; content: string }
+  /** consulta o log para o painel de métricas; não altera nada, a resposta é `metrics.result` */
+  | { type: 'metrics.query'; requestId: string; query: MetricsPanelQuery }
   /** diálogo nativo de "salvar como" (só no editor; na web a modal faz o download direto) */
   | { type: 'attachment.saveAs'; attachmentId: Id }
   | { type: 'attachment.delete'; attachmentId: Id }
@@ -219,6 +222,8 @@ export type HostToWebview =
   | { type: 'attachment.readResult'; requestId: string; content?: string; error?: string }
   /** resposta a `attachment.write`, correlacionada por `requestId` */
   | { type: 'attachment.writeResult'; requestId: string; ok: boolean; error?: string }
+  /** resposta a `metrics.query`, correlacionada por `requestId` */
+  | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */
   | { type: 'backup.import.summary'; token: string; summary: ImportSummary }
   /** a exportação ou a escolha do arquivo terminou (com sucesso ou porque a pessoa desistiu): a interface sai do estado "ocupado" */
