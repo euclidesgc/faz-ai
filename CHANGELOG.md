@@ -4,6 +4,13 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **O card aberto voltou a funcionar.** Na 0.31.0 o card abria encostado à esquerda e fechava a
+  qualquer clique: o fundo escuro ficava por cima dele. Agora ele abre como uma janela centralizada,
+  só fecha ao clicar fora dela ou com Esc, e os seletores e menus do card abrem por cima. O Esc que
+  fecha um seletor aberto não fecha mais o card junto.
+
 ## 0.31.0
 
 - **O board passou a guardar o histórico do que acontece nele.** Cada acontecimento de um card

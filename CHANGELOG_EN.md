@@ -5,6 +5,13 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **The open card works again.** In 0.31.0 the card opened stuck to the left and closed on any
+  click: the dark backdrop sat on top of it. It now opens as a centered window, closes only when you
+  click outside it or press Esc, and the card's selectors and menus open above it. The Esc that
+  closes an open selector no longer closes the card with it.
+
 ## 0.31.0
 
 - **The board now keeps a history of what happens on it.** Every card event (creation, column

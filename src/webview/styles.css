@@ -503,6 +503,11 @@ button.chip.on:hover:where(:not(:disabled)) {
   align-items: center;
   justify-content: center;
 }
+/* seletores e menus do Radix saem em portal, sem camada própria: sem isto abrem atrás do card
+   aberto e das janelas (camada 60) */
+[data-radix-popper-content-wrapper] {
+  z-index: 70 !important;
+}
 .drawer {
   width: min(760px, 95vw);
   max-height: min(90vh, 100%);
@@ -806,7 +811,7 @@ button.ghost.on {
 /* menu flutuante */
 .menu {
   position: fixed;
-  z-index: 50;
+  z-index: 70;
   width: 200px;
   padding: var(--sp-4);
   display: flex;

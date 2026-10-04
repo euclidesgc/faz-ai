@@ -34,7 +34,8 @@ export function CardDrawer({ cardId }: { cardId: string }) {
 
   useEffect(() => {
     if (dialogOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && openCard(null);
+    // Esc que um seletor ou menu aberto já tratou (o Radix marca com preventDefault) não fecha o card
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && openCard(null);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [openCard, dialogOpen]);
@@ -45,8 +46,9 @@ export function CardDrawer({ cardId }: { cardId: string }) {
   const isStory = state.workflows.find((w) => w.id === card.workflowId)!.kind === 'parent';
 
   return (
-    <>
-      <div className="drawer-backdrop" onClick={() => openCard(null)} />
+    // o fundo centraliza o card e fecha só no clique que começa nele mesmo: o que vem de dentro do
+    // card (inclusive de menus e janelas em portal, que sobem pela árvore do React) não fecha
+    <div className="drawer-backdrop" onMouseDown={(e) => e.target === e.currentTarget && openCard(null)}>
       <aside className="drawer">
         <DrawerHeader card={card} />
         <CardHeading card={card} />
@@ -77,6 +79,6 @@ export function CardDrawer({ cardId }: { cardId: string }) {
           })}
         </footer>
       </aside>
-    </>
+    </div>
   );
 }
