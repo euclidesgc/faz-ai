@@ -62,6 +62,17 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   technology (Flutter, Dart, React, TypeScript, Python, Rust, Docker, GitHub and about 80 others,
   also by nickname: "node", "ts", "k8s") get their logo, in the brand color, on the card, in the
   card's selector and in the filters. Options that are not technologies stay as before.
+- **Attachments open in a window inside the board.** Clicking an attachment opens a modal instead
+  of an external editor or app: text and JSON can be read and edited there, images are displayed
+  and other types say that no preview is available. The modal offers **Save as** (the editor's
+  dialog or, in the browser, a download) and **Copy content**.
+- **Automatic triage on the AI's first call.** On a card with no Tags, Task effort, Model or
+  Skills, the AI reads the description, chooses and fills in the four fields and creates the
+  checklist before starting the phase's work. If any of them is already filled in, no triage happens.
+- **AI LED at the top of the open card.** The AI activity LED also appears in the header of the
+  open card and lights up when the AI is working on the card or on one of its sub-tasks.
+- **The open card no longer covers the chat.** The card opens as a window centered on the screen,
+  no longer as a panel pinned to the right, which used to sit on top of the AI chat.
 - **The board detects pull request merges and concludes the story.** A periodic routine checks, at
   a configurable interval, whether a pull request from a story delivered in autonomous mode has been
   merged: when the merge is detected, the board records the merge commit on the card, registers in
