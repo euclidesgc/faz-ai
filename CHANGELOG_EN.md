@@ -7,6 +7,21 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **The board now keeps a history of what happens on it.** Every card event (creation, column
+  change with from/to, status change, conversation message, attachment and artifact, subtask, link,
+  pull request, completion, archiving and trash) and every AI run started by the board (card, column
+  and phase at the moment of the call, tool, model, effort, agent, permission, autonomous mode,
+  origin, duration and outcome) is recorded in the board's own file. This is the groundwork for the
+  metrics panel, which doesn't exist yet: this version has no screen and no queries — the history
+  only starts being collected. It counts from now on: nothing is reconstructed backwards, and AI
+  sessions you open in the terminal, outside the board, are not measured.
+- **No conversation content goes into the history.** The record keeps what happened, not what was
+  said: the text of comments, descriptions and AI answers is not stored, and card titles are cut at
+  120 characters. The detail is kept for 12 full months beyond the current one and then discarded,
+  leaving the monthly totals, which never expire. Resetting the board erases the history along with
+  everything else, and deleting a card does not delete its history — that's what keeps the totals of
+  closed months stable.
+
 - **The published package now ships with the version's release notes at the top of the changelog,
   instead of "Unreleased".** `npm run release` now opens the generated `.vsix` and checks the README
   and the CHANGELOG (in both languages) before publishing: it refuses if the changelog still has a

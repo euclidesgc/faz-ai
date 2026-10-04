@@ -5,11 +5,18 @@ import * as path from 'node:path';
 import { ChatSession, chatPrompt } from '../src/extension/chat';
 import type { HeadlessCommand } from '../src/extension/headless';
 import { openInMemory } from '../src/extension/db/database';
+import { AiRunRepo } from '../src/extension/log/aiRunRepo';
+import { createRunLog } from '../src/extension/log/runLog';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import type { ChatMessage } from '../src/shared/chat';
+import { monthOf } from '../src/shared/log';
+import type { Database } from 'sql.js';
 
 let dir: string;
+let db: Database;
 let router: MessageRouter;
+/** passado ao chat só nos testes do log; nos demais o chat roda sem log, como num board sem ele */
+let runLog: ReturnType<typeof createRunLog> | undefined;
 let spawned: {
   command: HeadlessCommand;
   emit: (text: string) => void;
@@ -21,6 +28,7 @@ const build = () =>
   new ChatSession(router, {
     cwd: dir,
     log: () => {},
+    runLog,
     file: path.join(dir, 'chat.json'),
     spawn: (command, _cwd, log) => {
       const entry = { command, emit: log, exit: (_c: number | null, _e?: Error) => {}, killed: false };
@@ -39,7 +47,8 @@ const build = () =>
 
 beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-chat-'));
-  const db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
+  db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
+  runLog = undefined;
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
     folderName: 'P',
@@ -153,5 +162,64 @@ describe('ChatSession', () => {
     }
     expect(messages().length).toBeLessThanOrEqual(100);
     expect(messages().at(-1)!.text).toBe('A IA terminou sem escrever uma resposta.');
+  });
+});
+
+/** O chat é a quarta origem de execução de IA, e a única sem card (RF-16). */
+describe('ChatSession no log das execuções', () => {
+  let runs: AiRunRepo;
+
+  beforeEach(() => {
+    runs = new AiRunRepo(db);
+    runLog = createRunLog(db);
+    build();
+  });
+
+  const only = () => {
+    const rows = runs.byMonth(monthOf(Date.now()));
+    expect(rows).toHaveLength(1);
+    return rows[0]!;
+  };
+
+  it('a execução do chat é registrada com origem "chat" e sem card', () => {
+    router.chatCommand({ type: 'chat.send', text: 'crie um card', model: null });
+    expect(only()).toMatchObject({
+      origin: 'chat',
+      cardId: null,
+      cardNumber: null,
+      cardTitle: '',
+      workflow: '',
+      columnName: '',
+      tool: 'claude',
+      permission: 'board',
+      outcome: null,
+    });
+  });
+
+  it('no chat não existem perfil nem subagente: as duas dimensões ficam NULL, e o modelo escolhido é gravado', () => {
+    const o = router.snapshot().board.modelCatalog.find((m) => m.tool === 'claude' && m.efforts.length > 0)!;
+    router.chatCommand({ type: 'chat.send', text: 'oi', model: `${o.id}@${o.efforts[0]}` });
+    expect(only()).toMatchObject({ model: o.model, effort: o.efforts[0], profile: null, agent: null, skills: [], mcp: null });
+  });
+
+  it('o desfecho do chat segue o mesmo vocabulário do executor de cards', () => {
+    router.chatCommand({ type: 'chat.send', text: 'a', model: null });
+    spawned[0]!.exit(0);
+    expect(runs.byMonth(monthOf(Date.now()))[0]).toMatchObject({ outcome: 'done', exitCode: 0 });
+
+    router.chatCommand({ type: 'chat.send', text: 'b', model: null });
+    spawned[1]!.exit(2);
+    expect(runs.byMonth(monthOf(Date.now()))[1]).toMatchObject({ outcome: 'failed', exitCode: 2 });
+
+    router.chatCommand({ type: 'chat.send', text: 'c', model: null });
+    router.chatCommand({ type: 'chat.stop' });
+    expect(runs.byMonth(monthOf(Date.now()))[2]).toMatchObject({ outcome: 'stopped' });
+  });
+
+  it('sem ferramenta que rode nesta permissão, a tentativa fica registrada como unsupported', () => {
+    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
+    expect(() => router.chatCommand({ type: 'chat.send', text: 'a', model: null })).toThrow(/Sem restrições/);
+    expect(spawned).toHaveLength(0);
+    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'kimi' });
   });
 });

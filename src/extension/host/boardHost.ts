@@ -3,8 +3,12 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openFile, type DbHandle } from '../db/database';
+import { dayOf } from '../../shared/log';
 import { Autopilot } from '../autopilot';
 import { Heartbeat } from '../heartbeat';
+import { createRunLog } from '../log/runLog';
+import { consolidate } from '../log/rollup';
+import { BoardRepo } from '../repositories/boardRepo';
 import { registerClients } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger } from '../merge';
@@ -76,15 +80,31 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     attachmentsDir: path.join(o.storageDir, 'attachments'),
     workspaceDir: o.folderPath,
     homeDir,
+    log: o.log,
   });
+  const runLog = createRunLog(handle.db, o.log);
+  // execuções que a sessão anterior não fechou (a janela caiu, a máquina desligou) viram 'unknown' em
+  // vez de ficarem abertas para sempre. Só a janela dona do board faz isso: duas janelas na mesma
+  // pasta compartilham o arquivo do banco, e a segunda a abrir marcaria como inconclusiva uma
+  // execução viva da primeira. É a mesma ambiguidade que o `ownsBoard` existe para conter.
+  const ownsBoard = !o.ownsBoard || o.ownsBoard();
+  if (ownsBoard) runLog.closeOpen(Date.now());
+  // a retenção: fora da janela, o detalhe do mês vira total em `log_months`. Roda aqui, na abertura,
+  // no máximo uma vez por dia — nunca durante uma mutação do board, para não entrar no custo de uma
+  // operação comum da pessoa mesmo que fique lenta.
+  const opened = new BoardRepo(handle.db).openedNow(router.boardId, Date.now());
+  if (ownsBoard && opened.rollupDay !== dayOf(Date.now())) consolidate(handle.db, router.boardId, Date.now());
   const pathEnv = await loginShellPath();
   const runner = new AiRunner(router, {
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
     log: o.log,
+    runLog,
     spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
   });
+  // o log do board liga cada evento à execução em curso no card (`run_id`); sem execução, fica nulo
+  router.setRunResolver((cardId) => runner.runIdOf(cardId));
   new AutoMerger(router, {
     cwd: o.folderPath,
     log: o.log,
@@ -112,6 +132,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     homeDir,
     bridgePath: o.bridgePath,
     log: o.log,
+    runLog,
     spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
     file: path.join(o.storageDir, 'chat', `${workspaceKey(o.folderPath)}.json`),
   });

@@ -97,7 +97,7 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
       if (a.path) {
         const file = path.resolve(ctx.workspaceDir, a.path);
         if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`Arquivo não encontrado: ${file}`);
-        router.addAttachmentFiles(card.id, [file], a.artifact);
+        router.addAttachmentFiles(card.id, [file], a.artifact, aiOrigin(ctx));
       } else if (a.filename && a.content !== undefined) {
         router.handle({
           type: 'attachment.addData',

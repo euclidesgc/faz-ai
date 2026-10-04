@@ -1,3 +1,4 @@
+import type { AiRunOrigin } from '../shared/log';
 import { cardRef, type BoardState, type Card, type Column } from '../shared/model';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
@@ -12,7 +13,7 @@ export const MAX_RUNS_WITHOUT_PROGRESS = 3;
 /** O que o autopiloto precisa do executor: iniciar um card e saber quando termina. */
 export interface AutopilotRunner {
   readonly running: string[];
-  start(cardId: string): void;
+  start(cardId: string, origin?: AiRunOrigin): void;
   stop(cardId: string): void;
   onDidFinish(listener: (cardId: string) => void): void;
 }
@@ -219,7 +220,7 @@ export class Autopilot {
       this.deps.log(`Autopiloto: chamando a IA em ${cardRef(story)}.`);
       const s = this.router.snapshot();
       this.progress.set(story.id, { sig: progressOf(s, story), stalls: this.progress.get(story.id)?.stalls ?? 0 });
-      this.runner.start(story.id);
+      this.runner.start(story.id, 'autopilot');
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       this.deps.log(`Autopiloto: ${reason}`);

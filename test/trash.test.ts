@@ -10,6 +10,7 @@ import { AttachmentRepo } from '../src/extension/repositories/attachmentRepo';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 import { CommentRepo } from '../src/extension/repositories/commentRepo';
+import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -63,6 +64,56 @@ describe('lixeira', () => {
     const ids = cards.emptyTrash(boardId);
     expect(ids.sort()).toEqual([story, sub1, sub2].sort());
     expect(snap().cards).toHaveLength(0);
+  });
+});
+
+describe('o log do board e o fim do board', () => {
+  const event = (kind: 'created' | 'deleted') =>
+    new CardEventRepo(db).add({
+      boardId,
+      at: Date.now(),
+      kind,
+      cardId: story,
+      cardNumber: 1,
+      cardTitle: 'história',
+      cardType: 'História',
+      workflow: 'Histórias',
+      columnName: 'Backlog',
+      fromValue: '',
+      toValue: '',
+      subject: '',
+      author: 'Ana',
+      source: 'human',
+      runId: null,
+    });
+  const count = (table: string) => Number(db.exec(`SELECT COUNT(*) FROM ${table}`)[0]!.values[0]![0]);
+
+  it('RF-25: apagar o board leva o log junto, pela cascata da chave estrangeira', () => {
+    event('created');
+    db.run('INSERT INTO log_months(board_id, month, metric, dim, value, n, total) VALUES (?,?,?,?,?,?,?)', [
+      boardId,
+      '2025-01',
+      'events',
+      '',
+      '',
+      3,
+      3,
+    ]);
+    expect(count('card_events')).toBe(1);
+
+    // é o que o "reiniciar o board" faz: o log é dado do board, não um arquivo paralelo
+    boards.deleteBoard(boardId);
+    expect(count('card_events')).toBe(0);
+    expect(count('log_months')).toBe(0);
+  });
+
+  it('RF-11: esvaziar a lixeira não apaga o histórico dos cards removidos', () => {
+    event('deleted');
+    cards.trash(story);
+    cards.emptyTrash(boardId);
+    expect(snap().cards).toHaveLength(0);
+    // o evento sobrevive porque `card_id` não tem chave estrangeira: os totais de meses fechados não mudam
+    expect(count('card_events')).toBe(1);
   });
 });
 

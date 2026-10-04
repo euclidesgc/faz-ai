@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { Heartbeat, heartbeatTargets } from '../src/extension/heartbeat';
+import type { AiRunOrigin } from '../src/shared/log';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BUG_TYPE } from '../src/shared/priority';
 import type { CardStatus } from '../src/shared/status';
@@ -18,8 +19,10 @@ let log: string[];
 let runner: {
   running: string[];
   started: string[];
+  /** a origem que o heartbeat informou em cada start, na mesma ordem de `started` */
+  origins: (AiRunOrigin | undefined)[];
   fail: boolean;
-  start(id: string): void;
+  start(id: string, origin?: AiRunOrigin): void;
   stop(id: string): void;
   onDidFinish(fn: (id: string) => void): void;
   finish(status?: CardStatus): void;
@@ -72,11 +75,13 @@ beforeEach(async () => {
   runner = {
     running: [],
     started: [],
+    origins: [],
     fail: false,
-    start(id) {
+    start(id, origin) {
       if (this.fail) throw new Error('ferramenta indisponível');
       this.running.push(id);
       this.started.push(id);
+      this.origins.push(origin);
       router.handle({ type: 'card.status.set', cardId: id, status: 'running' }, { source: 'ai' });
     },
     stop(id) {
@@ -159,6 +164,13 @@ describe('heartbeat', () => {
     heartbeat.tick();
     expect(runner.started.map(number)).toEqual([1]);
     expect(heartbeat.nextRoundAt).toBe(now + 60 * MIN);
+  });
+
+  it('a execução que o heartbeat inicia é registrada no log com a origem "heartbeat"', () => {
+    create('A', 'PRD');
+    expect(heartbeat.runNow()).toBe(1);
+    expect(runner.started).toHaveLength(1);
+    expect(runner.origins).toEqual(['heartbeat']);
   });
 
   it('executa uma história por vez e não sobrepõe rodadas', () => {

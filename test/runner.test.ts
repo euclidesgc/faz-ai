@@ -6,6 +6,13 @@ import { openInMemory } from '../src/extension/db/database';
 import { headlessCommand, headlessUnsupported } from '../src/extension/headless';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt } from '../src/extension/runner';
+import type { RunnerDeps } from '../src/extension/runner';
+import { AiRunRepo } from '../src/extension/log/aiRunRepo';
+import { CardEventRepo } from '../src/extension/log/cardEventRepo';
+import { createRunLog } from '../src/extension/log/runLog';
+import { executionPlan } from '../src/extension/execution';
+import { monthOf } from '../src/shared/log';
+import type { Database } from 'sql.js';
 
 it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
   expect(AUTONOMOUS_ADVICE).not.toContain('coluna de conclusão');
@@ -118,8 +125,11 @@ import type { HeadlessCommand } from '../src/extension/headless';
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
 let dir: string;
+let db: Database;
 let router: MessageRouter;
 let runner: AiRunner;
+/** as dependências do executor, para montar um segundo executor (com log) sobre o mesmo board */
+let deps: RunnerDeps;
 let log: string[];
 /** processos iniciados pelo executor, na ordem; `exit` simula o fim do processo */
 let procs: { command: HeadlessCommand; cwd: string; killed: boolean; exit(code: number | null, error?: Error): void }[];
@@ -136,7 +146,7 @@ const ai = (msg: Parameters<MessageRouter['handle']>[0]) => router.handle(msg, {
 
 beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-runner-'));
-  const db = await openInMemory(WASM_DIR);
+  db = await openInMemory(WASM_DIR);
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
     folderName: 'Projeto',
@@ -154,7 +164,8 @@ beforeEach(async () => {
   });
   log = [];
   procs = [];
-  runner = new AiRunner(router, {
+  // sem `runLog`: o executor padrão dos testes é o de um board sem log, que tem de funcionar como antes
+  deps = {
     cwd: dir,
     log: (line) => log.push(line),
     spawn: (command, cwd, out) => {
@@ -175,7 +186,8 @@ beforeEach(async () => {
         },
       };
     },
-  });
+  };
+  runner = new AiRunner(router, deps);
 });
 
 afterEach(() => {
@@ -377,5 +389,225 @@ describe('executor da IA', () => {
     expect(router.snapshot().board.runner).toMatchObject({ heartbeat: true, heartbeatMinutes: 5 });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'tudo' as never } } });
     expect(router.snapshot().board.runner.permission).toBe('board'); // valor desconhecido volta ao mais restrito
+  });
+});
+
+/**
+ * O log das execuções de IA (RF-13 a RF-20). O executor dos testes acima não tem `runLog`: aqui um
+ * segundo executor, com log, roda sobre o mesmo board e o mesmo banco.
+ */
+describe('log das execuções de IA', () => {
+  let logged: AiRunner;
+  let runs: AiRunRepo;
+
+  beforeEach(() => {
+    runs = new AiRunRepo(db);
+    logged = new AiRunner(router, { ...deps, runLog: createRunLog(db, (line) => log.push(line)) });
+  });
+
+  /** as execuções gravadas neste mês, da mais antiga para a mais recente */
+  const rows = () => runs.byMonth(monthOf(Date.now()));
+  const only = () => {
+    expect(rows()).toHaveLength(1);
+    return rows()[0]!;
+  };
+  /** uma coluna de `ai_runs` lida crua, para distinguir NULL de 0 */
+  const raw = (column: string): unknown[] => db.exec(`SELECT ${column} FROM ai_runs`)[0]!.values.map((v) => v[0]);
+
+  it('RF-13: a linha existe desde o começo da execução, aberta e sem desfecho', () => {
+    logged.start(storyId);
+    expect(only()).toMatchObject({ endedAt: null, durationMs: null, outcome: null, exitCode: null, origin: 'manual' });
+    expect(only().startedAt).toBeGreaterThan(0);
+  });
+
+  it('RF-14: o contexto é o do momento da chamada e não segue o card que a IA move durante a execução', () => {
+    const backlog = router.snapshot().columns.find((c) => c.name === 'Backlog')!.id;
+    logged.start(storyId);
+    ai({ type: 'card.move', cardId: storyId, columnId: backlog, position: 0 });
+    procs[0]!.exit(0);
+    expect(card().columnId).toBe(backlog);
+    expect(only()).toMatchObject({
+      cardNumber: 1,
+      cardTitle: 'Login',
+      cardType: 'História',
+      workflow: 'Histórias',
+      columnName: 'Discovery',
+      phase: 'Discovery',
+      tool: 'claude',
+    });
+  });
+
+  it('RF-15: a configuração gravada é a mesma que o resumo manda para o canal de log', () => {
+    // o perfil restringe os servidores MCP, e para isso o Claude Code precisa ver o do board na pasta
+    fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: { 'faz-ai': { command: 'node' } } }));
+    router.refreshHarness();
+    const o = router.snapshot().board.modelCatalog.find((m) => m.tool === 'claude' && m.efforts.length > 0)!;
+    const base = { purpose: '', skills: ['sql-queries'], tools: [], deniedTools: ['WebFetch'], isDefault: true };
+    router.handle({
+      type: 'settings.execProfiles.set',
+      profiles: [{ ...base, id: 'p', name: 'Restrito', agent: 'revisor', model: `${o.id}@${o.efforts[0]}`, clean: true, mcpServers: [] }],
+    });
+    const summary = executionPlan(router.snapshot(), card(), dir, '').summary.join(' | ');
+    logged.start(storyId);
+
+    const row = only();
+    expect(row).toMatchObject({
+      model: o.model,
+      effort: o.efforts[0],
+      profile: 'Restrito',
+      agent: 'revisor',
+      permission: 'board',
+      autonomous: false,
+      clean: true,
+      skills: ['sql-queries'],
+      mcp: [],
+    });
+    // o que foi gravado tem de aparecer no resumo que a pessoa lê no canal de log: uma verdade só
+    expect(summary).toContain(`Agente do board: ${row.profile}`);
+    expect(summary).toContain(`Subagente da ferramenta: ${row.agent}`);
+    expect(summary).toContain(`Skills: ${row.skills.join(', ')}`);
+    expect(summary).toContain(`Modelo: ${row.model} · ${row.effort}`);
+    expect(summary).toContain('Sessão limpa');
+    expect(log.join('\n')).toContain(summary);
+  });
+
+  it('RF-15: sem perfil e sem modelo, o não definido fica NULL — nunca string vazia nem zero', () => {
+    logged.start(storyId);
+    // sem modelo escolhido a execução usa o padrão da ferramenta, que o board não conhece: não definido
+    expect(only()).toMatchObject({ model: null, effort: null, skills: [], mcp: null });
+    // o subagente é dimensão desta execução e nenhum foi escolhido: definido e vazio, não "não se aplica"
+    expect(only().agent).toBe('');
+    // o perfil, ao contrário, existe sempre num card: o board tem um agente padrão
+    expect(only().profile).toBe('Agente padrão');
+    expect(raw('model')).toEqual([null]);
+    expect(raw('effort')).toEqual([null]);
+    expect(raw('mcp_json')).toEqual([null]);
+  });
+
+  it('RF-15: em modo autônomo grava permissão sem restrições e autonomous', () => {
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    logged.start(storyId);
+    expect(only()).toMatchObject({ permission: 'full', autonomous: true });
+  });
+
+  it('RF-16: a origem é "manual" por padrão e a informada quando o heartbeat ou o autopiloto chamam', () => {
+    logged.start(storyId, 'heartbeat');
+    procs[0]!.exit(0);
+    logged.start(storyId, 'autopilot');
+    procs[1]!.exit(0);
+    logged.start(storyId);
+    expect(rows().map((r) => r.origin)).toEqual(['heartbeat', 'autopilot', 'manual']);
+  });
+
+  it('RF-17: terminar bem grava done, com ended_at, duração e o código de saída', () => {
+    logged.start(storyId);
+    procs[0]!.exit(0);
+    const row = only();
+    expect(row).toMatchObject({ outcome: 'done', exitCode: 0 });
+    expect(row.endedAt).toBeGreaterThanOrEqual(row.startedAt);
+    expect(row.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('RF-17: código diferente de zero e erro ao executar gravam failed, com o código quando houver', () => {
+    logged.start(storyId);
+    procs[0]!.exit(2);
+    expect(rows()[0]).toMatchObject({ outcome: 'failed', exitCode: 2 });
+
+    logged.start(storyId);
+    procs[1]!.exit(null, new Error('comando "claude" não encontrado.'));
+    expect(rows()[1]).toMatchObject({ outcome: 'failed', exitCode: null });
+  });
+
+  it('RF-17: interromper grava stopped, não failed, mesmo com o processo morrendo com código', () => {
+    logged.start(storyId);
+    logged.stop(storyId);
+    expect(procs[0]!.killed).toBe(true);
+    expect(only()).toMatchObject({ outcome: 'stopped' });
+  });
+
+  it('RF-17: o tempo limite grava timeout, não failed', () => {
+    vi.useFakeTimers();
+    router.handle({ type: 'settings.board.update', patch: { runner: { timeoutMinutes: 5 } } });
+    logged.start(storyId);
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(only()).toMatchObject({ outcome: 'timeout' });
+  });
+
+  it('RF-17: a ferramenta sem suporte fecha a linha com unsupported antes de o erro subir', () => {
+    // o Cursor em segundo plano não aceita limite por linha de comando: com permissão menor, não roda
+    router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor', runner: { permission: 'edits' } } });
+    expect(() => logged.start(storyId)).toThrow('Sem restrições');
+    expect(procs).toHaveLength(0);
+    // a tentativa também é informação: a linha existe, fechada, com a ferramenta que não deu
+    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'cursor' });
+    // a duração existe e é curta (o tempo até descobrir que não dá); só 'unknown' fica sem duração
+    expect(only().durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('RF-18: as execuções que a sessão anterior não fechou viram unknown, sem duração', () => {
+    logged.start(storyId);
+    createRunLog(db).closeOpen(Date.now());
+    expect(only()).toMatchObject({ outcome: 'unknown', durationMs: null });
+    expect(only().endedAt).toBeGreaterThan(0);
+  });
+
+  it('RF-19: consumo e custo ficam NULL, não zero — "não medido" é diferente de "custou nada"', () => {
+    logged.start(storyId);
+    procs[0]!.exit(0);
+    for (const column of ['input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens', 'cost_usd'])
+      expect(raw(column)).toEqual([null]);
+  });
+
+  it('RF-20: com o resolvedor ligado, os eventos do card apontam para a execução em curso', () => {
+    router.setRunResolver((cardId) => logged.runIdOf(cardId));
+    const events = new CardEventRepo(db);
+    logged.start(storyId);
+    const runId = only().id;
+    expect(logged.runIdOf(storyId)).toBe(runId);
+    ai({ type: 'comment.add', cardId: storyId, body: 'Discovery pronto.' });
+    procs[0]!.exit(0);
+
+    const comment = events.byCard(1).find((e) => e.kind === 'comment')!;
+    expect(comment.runId).toBe(runId);
+    // a execução terminou: o que a pessoa fizer depois não é mais dela
+    expect(logged.runIdOf(storyId)).toBeNull();
+    router.handle({ type: 'comment.add', cardId: storyId, body: 'Obrigado.' });
+    expect(
+      events
+        .byCard(1)
+        .filter((e) => e.kind === 'comment')
+        .at(-1)!.runId,
+    ).toBeNull();
+  });
+
+  it('RF-20: o desfecho da execução ainda é dela: o bloqueio de uma falha fica ligado à execução', () => {
+    router.setRunResolver((cardId) => logged.runIdOf(cardId));
+    const events = new CardEventRepo(db);
+    logged.start(storyId);
+    const runId = only().id;
+    procs[0]!.exit(2);
+    expect(card().status).toBe('blocked');
+    expect(
+      events
+        .byCard(1)
+        .filter((e) => e.kind === 'status_changed')
+        .at(-1)!.runId,
+    ).toBe(runId);
+  });
+
+  it('falha no log não derruba a execução: vai para o canal de log e a IA roda igual', () => {
+    db.run('DROP TABLE ai_runs');
+    logged.start(storyId);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('running');
+    procs[0]!.exit(0);
+    expect(log.join('\n')).toContain('[fazai] falha ao registrar a execução de IA:');
+  });
+
+  it('sem runLog o executor não grava nada e funciona como antes', () => {
+    runner.start(storyId);
+    procs[0]!.exit(0);
+    expect(rows()).toEqual([]);
+    expect(runner.runIdOf(storyId)).toBeNull();
   });
 });
