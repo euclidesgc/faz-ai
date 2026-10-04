@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
 import { aiToolInfo } from '../shared/harness';
+import type { AiRunOutcome } from '../shared/log';
 import { parseModelValue } from '../shared/models';
 import type { BoardState } from '../shared/model';
 import { BOARD_SERVER, type ExecInput } from './execution';
@@ -100,15 +101,51 @@ export class ChatSession {
     const state = this.router.snapshot();
     const tool = aiToolInfo(state.board.aiTool);
     const permission = state.board.runner.permission;
-    const built = headlessCommand(state.board.aiTool, {
-      prompt: chatPrompt(this.messages, body, PERMISSION_ADVICE[permission]),
-      permission,
-      addDirs: this.router.aiWorkDirs(),
-      exec: execFor(state, model),
-      boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined,
-    });
-    if ('unsupported' in built) throw new Error(built.unsupported);
+    const exec = execFor(state, model);
+    // o chat é a quarta origem de execução, e a única sem card: nenhuma execução nasce da conversa de
+    // um card (ela devolve o card para "pronto" e quem executa depois é o heartbeat ou o autopiloto)
+    const logId = this.deps.runLog
+      ? this.deps.runLog.start({
+          boardId: this.router.boardId,
+          startedAt: Date.now(),
+          origin: 'chat',
+          tool: state.board.aiTool,
+          cardId: null,
+          cardNumber: null,
+          cardTitle: '',
+          cardType: '',
+          workflow: '',
+          columnName: '',
+          phase: '',
+        })
+      : '';
+    let built;
+    try {
+      built = headlessCommand(state.board.aiTool, {
+        prompt: chatPrompt(this.messages, body, PERMISSION_ADVICE[permission]),
+        permission,
+        addDirs: this.router.aiWorkDirs(),
+        exec,
+        boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined,
+      });
+      if ('unsupported' in built) throw new Error(built.unsupported);
+    } catch (e) {
+      this.deps.runLog?.finish(logId, 'unsupported');
+      throw e;
+    }
     const { command, cleanup } = materialize(built);
+    // no chat não há agente do board nem subagente escolhido: `null` é "não definido", não "vazio"
+    this.deps.runLog?.describe(logId, {
+      model: exec.model?.name ?? null,
+      effort: exec.model?.effort ?? null,
+      profile: null,
+      agent: null,
+      permission,
+      autonomous: false,
+      clean: false,
+      skills: [],
+      mcp: null,
+    });
 
     this.add({ role: 'user', text: body, ...(model ? { model } : {}) });
     const out: string[] = [];
@@ -117,6 +154,8 @@ export class ChatSession {
       proc = this.deps.spawn(command, this.deps.cwd, (chunk) => out.push(chunk));
     } catch (e) {
       cleanup();
+      // sem processo não há desfecho a medir: o mesmo `unsupported` do executor de cards
+      this.deps.runLog?.finish(logId, 'unsupported');
       this.add({ role: 'error', text: e instanceof Error ? e.message : String(e) });
       return;
     }
@@ -135,6 +174,8 @@ export class ChatSession {
       cleanup();
       this.proc = null;
       const text = out.join('').replace(ANSI, '').trim();
+      const outcome: AiRunOutcome = this.stopped ? 'stopped' : timedOut ? 'timeout' : error || code !== 0 ? 'failed' : 'done';
+      this.deps.runLog?.finish(logId, outcome, code);
       if (this.stopped) this.add({ role: 'error', text: 'Interrompido.' });
       else if (timedOut)
         this.add({ role: 'error', text: `A resposta passou do tempo limite (${state.board.runner.timeoutMinutes} min) e foi encerrada.` });

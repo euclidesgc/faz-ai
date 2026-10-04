@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { openFile, type DbHandle } from '../db/database';
 import { Autopilot } from '../autopilot';
 import { Heartbeat } from '../heartbeat';
+import { createRunLog } from '../log/runLog';
 import { registerClients } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger } from '../merge';
@@ -76,15 +77,25 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     attachmentsDir: path.join(o.storageDir, 'attachments'),
     workspaceDir: o.folderPath,
     homeDir,
+    log: o.log,
   });
+  const runLog = createRunLog(handle.db, o.log);
+  // execuções que a sessão anterior não fechou (a janela caiu, a máquina desligou) viram 'unknown' em
+  // vez de ficarem abertas para sempre. Só a janela dona do board faz isso: duas janelas na mesma
+  // pasta compartilham o arquivo do banco, e a segunda a abrir marcaria como inconclusiva uma
+  // execução viva da primeira. É a mesma ambiguidade que o `ownsBoard` existe para conter.
+  if (!o.ownsBoard || o.ownsBoard()) runLog.closeOpen(Date.now());
   const pathEnv = await loginShellPath();
   const runner = new AiRunner(router, {
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
     log: o.log,
+    runLog,
     spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
   });
+  // o log do board liga cada evento à execução em curso no card (`run_id`); sem execução, fica nulo
+  router.setRunResolver((cardId) => runner.runIdOf(cardId));
   new AutoMerger(router, {
     cwd: o.folderPath,
     log: o.log,
@@ -112,6 +123,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     homeDir,
     bridgePath: o.bridgePath,
     log: o.log,
+    runLog,
     spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
     file: path.join(o.storageDir, 'chat', `${workspaceKey(o.folderPath)}.json`),
   });

@@ -1,3 +1,4 @@
+import type { AiRunOrigin } from '../shared/log';
 import { cardRef, type BoardState, type Card } from '../shared/model';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { isLive } from '../shared/selectors';
@@ -6,7 +7,7 @@ import { statusInfo } from '../shared/status';
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
 export interface HeartbeatRunner {
   readonly running: string[];
-  start(cardId: string): void;
+  start(cardId: string, origin?: AiRunOrigin): void;
   stop(cardId: string): void;
   onDidFinish(listener: (cardId: string) => void): void;
 }
@@ -113,7 +114,7 @@ export class Heartbeat {
       // a situação pode ter mudado desde que a fila foi montada (a pessoa agiu, outra execução resolveu)
       if (!heartbeatTargets(this.deps.snapshot()).some((c) => c.id === id)) continue;
       try {
-        this.runner.start(id);
+        this.runner.start(id, 'heartbeat');
       } catch (e) {
         this.deps.log(`Heartbeat: ${e instanceof Error ? e.message : String(e)}`);
         // sem como executar a ferramenta, não adianta tentar as demais

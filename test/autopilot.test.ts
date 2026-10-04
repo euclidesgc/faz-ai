@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { Autopilot, MAX_RUNS_WITHOUT_PROGRESS, autopilotStep } from '../src/extension/autopilot';
 import { openInMemory } from '../src/extension/db/database';
 import { heartbeatTargets } from '../src/extension/heartbeat';
+import type { AiRunOrigin } from '../src/shared/log';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import type { CardStatus } from '../src/shared/status';
 
@@ -22,8 +23,10 @@ const flush = () => {
 let runner: {
   running: string[];
   started: string[];
+  /** a origem que o autopiloto informou em cada start, na mesma ordem de `started` */
+  origins: (AiRunOrigin | undefined)[];
   failToStart: string | null;
-  start(id: string): void;
+  start(id: string, origin?: AiRunOrigin): void;
   stop(id: string): void;
   onDidFinish(fn: (id: string) => void): void;
   finish(act?: () => void): void;
@@ -87,11 +90,13 @@ beforeEach(async () => {
   runner = {
     running: [],
     started: [],
+    origins: [],
     failToStart: null,
-    start(id) {
+    start(id, origin) {
       if (this.failToStart) throw new Error(this.failToStart);
       this.running.push(id);
       this.started.push(id);
+      this.origins.push(origin);
       router.handle({ type: 'card.status.set', cardId: id, status: 'running' }, { source: 'ai' });
     },
     stop(id) {
@@ -232,6 +237,8 @@ describe('autopiloto', () => {
     expect(columnName(1)).toBe('Discovery');
     expect(runner.started).toEqual([card(1).id]);
     expect(router.snapshot().autopilot).toEqual({ active: true, note: null });
+    // a execução é registrada no log com a origem do autopiloto, não como chamada manual
+    expect(runner.origins).toEqual(['autopilot']);
   });
 
   it('segue de execução em execução e passa para a próxima história quando a atual conclui', () => {
