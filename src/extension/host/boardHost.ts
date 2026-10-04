@@ -11,7 +11,8 @@ import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
 import { registerClients } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
-import { AutoMerger } from '../merge';
+import { AutoMerger, MergeWatcher } from '../merge';
+import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
@@ -37,6 +38,7 @@ export interface BoardHost {
   router: MessageRouter;
   runner: AiRunner;
   heartbeat: Heartbeat;
+  mergeWatcher: MergeWatcher;
   chat: ChatSession;
   /** toca sozinho as histórias em modo autônomo (YOLO) */
   autopilot: Autopilot;
@@ -105,27 +107,29 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   // o log do board liga cada evento à execução em curso no card (`run_id`); sem execução, fica nulo
   router.setRunResolver((cardId) => runner.runIdOf(cardId));
+  const gh = (args: string[], cwd: string) =>
+    new Promise<string>((resolve, reject) => {
+      execFile(
+        'gh',
+        args,
+        { cwd, timeout: 120_000, env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) } },
+        (err, stdout, stderr) =>
+          err
+            ? reject(
+                new Error(
+                  (err as NodeJS.ErrnoException).code === 'ENOENT'
+                    ? 'o comando "gh" (GitHub CLI) não foi encontrado.'
+                    : stderr.trim() || err.message,
+                ),
+              )
+            : resolve(stdout),
+      );
+    });
   new AutoMerger(router, {
     cwd: o.folderPath,
     log: o.log,
-    gh: (args, cwd) =>
-      new Promise((resolve, reject) => {
-        execFile(
-          'gh',
-          args,
-          { cwd, timeout: 120_000, env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) } },
-          (err, stdout, stderr) =>
-            err
-              ? reject(
-                  new Error(
-                    (err as NodeJS.ErrnoException).code === 'ENOENT'
-                      ? 'o comando "gh" (GitHub CLI) não foi encontrado.'
-                      : stderr.trim() || err.message,
-                  ),
-                )
-              : resolve(stdout),
-        );
-      }),
+    gh,
+    removeWorktree,
   });
   const chat = new ChatSession(router, {
     cwd: o.folderPath,
@@ -138,12 +142,21 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
   const heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: o.log });
+  const mergeWatcher = new MergeWatcher(router, {
+    cwd: o.folderPath,
+    log: o.log,
+    gh,
+    removeWorktree,
+    now: () => Date.now(),
+    canRun: o.ownsBoard,
+  });
 
   const gitignore = path.join(o.folderPath, '.gitignore');
   return {
     router,
     runner,
     heartbeat,
+    mergeWatcher,
     chat,
     autopilot,
     connectAI() {

@@ -34,7 +34,10 @@ export function concludeStory(
 ): void {
   const ref = cardRef(card);
   router.handle({ type: 'comment.add', cardId: card.id, body: extra ? `${body} ${extra}` : body }, { author: AUTHOR, source: 'ai' });
-  router.handle({ type: 'card.move', cardId: card.id, columnId: done.id, position: Number.MAX_SAFE_INTEGER, allowOpenChildren }, { author: AUTHOR });
+  router.handle(
+    { type: 'card.move', cardId: card.id, columnId: done.id, position: Number.MAX_SAFE_INTEGER, allowOpenChildren },
+    { author: AUTHOR },
+  );
 
   if (router.snapshot().board.git.mode === 'worktree' && card.worktreePath) {
     try {
