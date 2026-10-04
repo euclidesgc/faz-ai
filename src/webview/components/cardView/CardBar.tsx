@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { badgeStyle } from '../../../shared/color';
 import { t } from '../../i18n';
+import type { CardStatus } from '../../../shared/status';
 import { AiLed, type AiWork } from './AiLed';
 
 /**
@@ -13,17 +14,19 @@ export function CardBar({
   typeName,
   color,
   work = null,
+  status = null,
   children,
 }: {
   id: string;
   typeName?: string;
   color?: string;
   work?: AiWork;
+  status?: CardStatus | null;
   children?: ReactNode;
 }) {
   return (
     <div className="card-bar" style={badgeStyle(color)}>
-      <AiLed work={work} />
+      <AiLed work={work} status={status} />
       <span className="card-id" title={t('ID do card')}>
         {id}
       </span>

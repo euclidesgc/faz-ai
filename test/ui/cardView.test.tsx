@@ -73,7 +73,7 @@ describe('CardView', () => {
   /** O LED do card renderizado: sempre existe; `on` diz se está aceso. */
   const ledOf = (container: HTMLElement) => {
     const led = container.querySelector('.ai-led')!;
-    return { on: led.classList.contains('on'), label: led.getAttribute('aria-label') };
+    return { on: led.classList.contains('working'), label: led.getAttribute('aria-label') };
   };
 
   it('o LED está sempre no card: apagado quando a IA não trabalha, aceso quando trabalha (extensão ou "Em execução")', () => {
@@ -92,9 +92,22 @@ describe('CardView', () => {
     expect(ledOf(byStatus.container).on).toBe(true);
     byStatus.unmount();
 
-    // terminou: o LED continua no card, só apagado
-    patchCard(board.subId, { status: 'waiting_review', statusAt: Date.now() });
+    // terminou e voltou para a IA: o LED continua no card, só apagado
+    patchCard(board.subId, { status: 'ready', statusAt: Date.now() });
     expect(ledOf(show(board.subId).container)).toEqual({ on: false, label: 'IA parada neste card' });
+  });
+
+  it('o LED fica amarelo quando o card espera a pessoa e vermelho quando está bloqueado, sem piscar', () => {
+    patchCard(board.subId, { status: 'waiting_review', statusAt: Date.now() });
+    const waiting = show(board.subId);
+    expect(waiting.container.querySelector('.ai-led')).toHaveClass('attention');
+    expect(ledOf(waiting.container)).toEqual({ on: false, label: 'Este card precisa da sua atenção' });
+    waiting.unmount();
+
+    patchCard(board.subId, { status: 'blocked', statusReason: 'Falta a chave da API', statusAt: Date.now() });
+    const blocked = show(board.subId);
+    expect(blocked.container.querySelector('.ai-led')).toHaveClass('error');
+    expect(ledOf(blocked.container).label).toBe('Card bloqueado');
   });
 
   it('a história acende o LED quando a IA trabalha numa sub-tarefa dela, e diz quantas', () => {

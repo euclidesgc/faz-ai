@@ -5,6 +5,14 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **The card's LED now looks like an LED and tells the state at a glance.** It used to be a dot in
+  the bar's text color, with a nearly invisible pulse. It is now green and blinks slowly while the
+  AI is working on the card (or on one of the story's sub-tasks), yellow when the card is waiting on
+  you, red when it is blocked, and off when nothing is happening. Only green blinks. This applies to
+  the cards on the board, the sub-tasks and the header of the open card.
+
 ## 0.31.1
 
 - **The open card works again.** In 0.31.0 the card opened stuck to the left and closed on any
