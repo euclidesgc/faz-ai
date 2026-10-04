@@ -5,7 +5,7 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+## 0.31.0
 
 - **The board now keeps a history of what happens on it.** Every card event (creation, column
   change with from/to, status change, conversation message, attachment and artifact, subtask, link,

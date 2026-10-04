@@ -4,7 +4,7 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+## 0.31.0
 
 - **O board passou a guardar o histórico do que acontece nele.** Cada acontecimento de um card
   (criação, passagem de coluna com de/para, mudança de status, mensagem da conversa, anexo e
