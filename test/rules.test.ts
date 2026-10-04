@@ -6,7 +6,7 @@ import { migrate } from '../src/extension/db/schema';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 import { SettingsRepo } from '../src/extension/repositories/settingsRepo';
-import { DEFAULT_RULES, parseRules } from '../src/shared/rules';
+import { DEFAULT_LOG_RETENTION_MONTHS, DEFAULT_RULES, parseRules } from '../src/shared/rules';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -158,6 +158,28 @@ describe('regras configuráveis', () => {
     expect(parseRules('não é json')).toEqual(DEFAULT_RULES);
     expect(DEFAULT_RULES.onAllChildrenDone).toBe('ask');
     expect(parseRules('{"onAllChildrenDone":"auto"}').onAllChildrenDone).toBe('auto');
+  });
+
+  it('janela de retenção do log: padrão 6; só inteiro de 1 a 24 vale, o resto cai no padrão', () => {
+    expect(DEFAULT_LOG_RETENTION_MONTHS).toBe(6);
+    expect(DEFAULT_RULES.logRetentionMonths).toBe(6);
+    expect(snap().board.rules.logRetentionMonths).toBe(6);
+    const months = (v: string) => parseRules(`{"logRetentionMonths":${v}}`).logRetentionMonths;
+    expect(months('1')).toBe(1);
+    expect(months('12')).toBe(12);
+    expect(months('24')).toBe(24);
+    for (const bad of ['0', '-1', '2.5', '25', '"6"', 'null', 'true']) expect(months(bad)).toBe(6);
+    // ausente: banco anterior à regra
+    expect(parseRules('{"confirmTrash":"never"}').logRetentionMonths).toBe(6);
+  });
+
+  it('retentionMonths lê a janela do board sem montar o Board; updateRules a persiste e valida', () => {
+    expect(boards.retentionMonths(boardId)).toBe(6);
+    boards.updateRules(boardId, { logRetentionMonths: 12 });
+    expect(boards.retentionMonths(boardId)).toBe(12);
+    boards.updateRules(boardId, { logRetentionMonths: 99 });
+    expect(boards.retentionMonths(boardId)).toBe(6);
+    expect(() => boards.retentionMonths('inexistente')).toThrow();
   });
 
   it('updateRules persiste só o que foi alterado', () => {

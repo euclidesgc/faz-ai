@@ -17,20 +17,6 @@ import type { LogMetric } from '../../shared/log';
 import { dayOf, monthOf } from '../../shared/log';
 import { all, num, run, str, transaction } from '../db/query';
 
-/**
- * Meses completos de detalhe guardados além do mês corrente (RF-32). Fixo e documentado, não
- * configurável nesta entrega: mexer nisto pede tela de configuração, que é assunto do painel (#71).
- *
- * São 6 e não 12 porque 12 estouravam o teto de 10 MB do arquivo do board: a medição deu 11,8 a
- * 14,2 MB em 12 meses com a linha pesada (a que inclui o inventário cheio, que a #70 passa a gravar).
- * E não é só disco: o `sql.js` reescreve o arquivo inteiro a cada gravação, então um arquivo grande
- * deixa toda operação do board mais lenta.
- *
- * Os totais por mês, em `log_months`, nunca expiram: a comparação ano a ano continua existindo, só
- * deixa de existir no nível do detalhe.
- */
-export const RETENTION_MONTHS = 6;
-
 /** As dimensões de `runs`: o nome na tabela de totais e a coluna de `ai_runs` de onde o valor sai. */
 const RUN_DIMS: [dim: string, column: string][] = [
   ['outcome', 'outcome'],
@@ -43,14 +29,19 @@ const RUN_DIMS: [dim: string, column: string][] = [
 ];
 
 /**
- * Os meses que conservam o detalhe: o corrente e os `RETENTION_MONTHS` anteriores.
+ * Os meses que conservam o detalhe: o corrente e os `months` anteriores. A janela vem da regra
+ * `logRetentionMonths` do board (padrão 6, de 1 a 24; ver `shared/rules.ts`), e não de uma constante:
+ * 12 meses estouravam o teto de 10 MB do arquivo (medição de 11,8 a 14,2 MB com a linha pesada, a que
+ * inclui o inventário cheio), e o `sql.js` reescreve o arquivo inteiro a cada gravação, então não é só
+ * disco — um arquivo grande deixa toda operação do board mais lenta. Quem precisa de mais histórico
+ * aumenta a janela sabendo o custo. Os totais por mês, em `log_months`, nunca expiram.
  * Anda de mês em mês pelo dia 1 de propósito: partir do dia de hoje faria 31 de março voltar para
  * "31 de fevereiro", que o `Date` empurra para março de novo, e um mês escaparia do descarte.
  */
-export function keepMonths(now: number): string[] {
+export function keepMonths(now: number, months: number): string[] {
   const d = new Date(now);
   const out: string[] = [];
-  for (let i = 0; i <= RETENTION_MONTHS; i++) out.push(monthOf(new Date(d.getFullYear(), d.getMonth() - i, 1).getTime()));
+  for (let i = 0; i <= months; i++) out.push(monthOf(new Date(d.getFullYear(), d.getMonth() - i, 1).getTime()));
   return out;
 }
 
@@ -200,13 +191,13 @@ export function monthlyTotals(db: Database, boardId: string, months?: string[]):
 
 /**
  * Arquiva os totais dos meses que saíram da janela de retenção e descarta o detalhe deles. Devolve
- * os meses consolidados. Chamada na abertura do board, no máximo uma vez por dia e nunca durante
+ * os meses consolidados. `months` é a janela de retenção do board (`BoardRepo.retentionMonths`). Chamada na abertura do board, no máximo uma vez por dia e nunca durante
  * uma mutação: é isso que protege o desempenho da gravação mesmo se a consolidação ficar lenta.
  */
-export function consolidate(db: Database, boardId: string, now: number): string[] {
-  const keep = new Set(keepMonths(now));
-  const months = detailMonths(db, boardId).filter((m) => !keep.has(m));
-  for (const month of months)
+export function consolidate(db: Database, boardId: string, now: number, months: number): string[] {
+  const keep = new Set(keepMonths(now, months));
+  const expired = detailMonths(db, boardId).filter((m) => !keep.has(m));
+  for (const month of expired)
     // uma transação por mês: um mês arquivado pela metade mentiria para sempre
     transaction(db, () => {
       for (const t of totalsFromDetail(db, boardId, month))
@@ -224,5 +215,5 @@ export function consolidate(db: Database, boardId: string, now: number): string[
       run(db, 'DELETE FROM ai_runs WHERE board_id = ? AND month = ?', [boardId, month]);
     });
   run(db, 'UPDATE boards SET log_rollup_day = ? WHERE id = ?', [dayOf(now), boardId]);
-  return months;
+  return expired;
 }

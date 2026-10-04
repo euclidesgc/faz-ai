@@ -4,9 +4,10 @@ import type { Database } from 'sql.js';
 import { openInMemory } from '../src/extension/db/database';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
-import { RETENTION_MONTHS, consolidate, detailMonths, keepMonths, monthlyTotals } from '../src/extension/log/rollup';
+import { consolidate, detailMonths, keepMonths, monthlyTotals } from '../src/extension/log/rollup';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import type { CardEvent, InventoryItem, LogMetric, RunReport } from '../src/shared/log';
+import { DEFAULT_LOG_RETENTION_MONTHS } from '../src/shared/rules';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 /** data fixa de referência dos testes: 15 de junho de 2026, meio-dia, no fuso da máquina */
@@ -109,16 +110,30 @@ const of = (totals: LogMetric[], metric: string, dim = '', value = '') =>
   totals.find((t) => t.metric === metric && t.dim === dim && t.value === value);
 
 describe('keepMonths', () => {
+  const keepMonthsDefault = (now: number) => keepMonths(now, DEFAULT_LOG_RETENTION_MONTHS);
+
   it('RF-32: guarda o mês corrente e os seis anteriores, sete marcadores', () => {
-    const keep = keepMonths(TODAY);
-    expect(RETENTION_MONTHS).toBe(6);
-    expect(keep).toHaveLength(RETENTION_MONTHS + 1);
+    const keep = keepMonthsDefault(TODAY);
+    expect(DEFAULT_LOG_RETENTION_MONTHS).toBe(6);
+    expect(keep).toHaveLength(DEFAULT_LOG_RETENTION_MONTHS + 1);
     expect(keep[0]).toBe('2026-06');
     expect(keep.at(-1)).toBe('2025-12');
   });
 
+  it('a janela recebida manda: 3, 6, 12 e 24 meses dão janela + 1 marcadores, sem repetir nenhum', () => {
+    for (const months of [3, 6, 12, 24]) {
+      const keep = keepMonths(TODAY, months);
+      expect(keep).toHaveLength(months + 1);
+      expect(new Set(keep).size).toBe(months + 1);
+      expect(keep[0]).toBe('2026-06');
+    }
+    expect(keepMonths(TODAY, 3).at(-1)).toBe('2026-03');
+    expect(keepMonths(TODAY, 12).at(-1)).toBe('2025-06');
+    expect(keepMonths(TODAY, 24).at(-1)).toBe('2024-06');
+  });
+
   it('atravessa a virada do ano', () => {
-    const keep = keepMonths(at(2026, 1, 5));
+    const keep = keepMonthsDefault(at(2026, 1, 5));
     expect(keep).toContain('2025-07');
     expect(keep).not.toContain('2025-06');
     expect(keep[1]).toBe('2025-12');
@@ -126,15 +141,27 @@ describe('keepMonths', () => {
 
   it('num dia 31 não deixa fevereiro escapar do descarte', () => {
     // passar de 31/03 para "31/02" empurraria a conta de volta para março e um mês sobraria
-    const keep = keepMonths(new Date(2026, 2, 31, 12).getTime());
+    const keep = keepMonthsDefault(new Date(2026, 2, 31, 12).getTime());
     expect(keep).toEqual([...new Set(keep)]);
     expect(keep).toContain('2026-02');
     expect(keep).toContain('2025-09');
   });
 
+  it('num dia 31 anda pelo dia 1 em qualquer janela: 12 e 24 meses também não repetem nem pulam mês', () => {
+    const now = new Date(2026, 2, 31, 12).getTime();
+    for (const months of [3, 12, 24]) {
+      const keep = keepMonths(now, months);
+      expect(keep).toHaveLength(months + 1);
+      expect(new Set(keep).size).toBe(months + 1);
+      expect(keep).toContain('2026-02');
+    }
+    expect(keepMonths(now, 12).at(-1)).toBe('2025-03');
+    expect(keepMonths(now, 24).at(-1)).toBe('2024-03');
+  });
+
   it('não depende do fuso: o mês é o da máquina, como o `month` gravado', () => {
     // último instante do mês no fuso local já é o mês seguinte em UTC; o marcador segue o local
-    expect(keepMonths(new Date(2026, 5, 30, 23, 59).getTime())[0]).toBe('2026-06');
+    expect(keepMonthsDefault(new Date(2026, 5, 30, 23, 59).getTime())[0]).toBe('2026-06');
   });
 });
 
@@ -223,7 +250,7 @@ describe('consolidate', () => {
     run(at(2024, 3), 5000);
     const before = monthlyTotals(db, boardId, ['2024-03']);
 
-    expect(consolidate(db, boardId, TODAY)).toEqual(['2024-03']);
+    expect(consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS)).toEqual(['2024-03']);
     expect(events.byMonth('2024-03')).toEqual([]);
     expect(runs.byMonth('2024-03')).toEqual([]);
     expect(monthlyTotals(db, boardId, ['2024-03'])).toEqual(before);
@@ -235,24 +262,44 @@ describe('consolidate', () => {
     expect(detailMonths(db, boardId)).toHaveLength(9);
 
     // os seis completos (2025-12 a 2026-05) e o corrente ficam; outubro e novembro são arquivados
-    expect(consolidate(db, boardId, TODAY)).toEqual(['2025-10', '2025-11']);
+    expect(consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS)).toEqual(['2025-10', '2025-11']);
     expect(detailMonths(db, boardId)).toHaveLength(7);
     expect(detailMonths(db, boardId)[0]).toBe('2025-12');
     // o mês descartado continua somando, pelo arquivo
     expect(of(monthlyTotals(db, boardId, ['2025-10']), 'events')).toMatchObject({ n: 1 });
   });
 
+  it('descarta conforme a janela recebida: com 3 meses sobram quatro marcadores, com 24 nada sai', () => {
+    // um evento por mês, de outubro de 2025 a junho de 2026: nove meses
+    for (let i = 0; i < 9; i++) event(at(2025, 10 + i));
+
+    // 3 completos (2026-03 a 2026-05) e o corrente ficam; de outubro a fevereiro são arquivados
+    expect(consolidate(db, boardId, TODAY, 3)).toEqual(['2025-10', '2025-11', '2025-12', '2026-01', '2026-02']);
+    expect(detailMonths(db, boardId)).toEqual(['2026-03', '2026-04', '2026-05', '2026-06']);
+
+    // alargar a janela depois não traz o detalhe de volta, mas também não arquiva mais nada
+    expect(consolidate(db, boardId, TODAY, 24)).toEqual([]);
+    expect(detailMonths(db, boardId)).toHaveLength(4);
+  });
+
+  it('a janela de 24 meses guarda dois anos de detalhe', () => {
+    event(at(2024, 6));
+    event(at(2024, 5));
+    expect(consolidate(db, boardId, TODAY, 24)).toEqual(['2024-05']);
+    expect(detailMonths(db, boardId)).toEqual(['2024-06']);
+  });
+
   it('os totais por mês nunca expiram: consolidar de novo não apaga arquivo nem duplica linha', () => {
     event(at(2024, 3));
-    consolidate(db, boardId, TODAY);
+    consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS);
     const first = monthlyTotals(db, boardId, ['2024-03']);
-    consolidate(db, boardId, TODAY);
+    consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS);
     expect(monthlyTotals(db, boardId, ['2024-03'])).toEqual(first);
   });
 
   it('o mês que voltou a ter detalhe vale pelo detalhe, para não contar duas vezes', () => {
     event(at(2024, 3));
-    consolidate(db, boardId, TODAY);
+    consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS);
     // um evento atrasado cai num mês já arquivado
     event(at(2024, 3));
     expect(of(monthlyTotals(db, boardId, ['2024-03']), 'events')).toMatchObject({ n: 1 });
@@ -261,13 +308,13 @@ describe('consolidate', () => {
   it('o inventário da execução vai por cascata quando o detalhe é descartado', () => {
     const id = run(at(2024, 3), 1000);
     db.run('INSERT INTO ai_run_usage(run_id, kind, name, calls) VALUES (?,?,?,?)', [id, 'tool', 'Bash', 7]);
-    consolidate(db, boardId, TODAY);
+    consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS);
     expect(db.exec('SELECT COUNT(*) FROM ai_run_usage')[0]!.values[0]![0]).toBe(0);
   });
 
   it('nada a consolidar: grava o dia e não mexe no detalhe', () => {
     event(at(2026, 6));
-    expect(consolidate(db, boardId, TODAY)).toEqual([]);
+    expect(consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS)).toEqual([]);
     expect(events.byMonth('2026-06')).toHaveLength(1);
     expect(new BoardRepo(db).openedNow(boardId, TODAY).rollupDay).toBe('2026-06-15');
   });
@@ -343,7 +390,7 @@ describe('tokens, custo e inventário (#70)', () => {
     seedMarch();
     const before = monthlyTotals(db, boardId, ['2024-03']);
 
-    expect(consolidate(db, boardId, TODAY)).toEqual(['2024-03']);
+    expect(consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS)).toEqual(['2024-03']);
     expect(runs.byMonth('2024-03')).toEqual([]);
     expect(db.exec('SELECT COUNT(*) FROM ai_run_usage')[0]!.values[0]![0]).toBe(0);
 
@@ -372,7 +419,7 @@ describe('a consolidação na abertura do board', () => {
     const { rollupDay } = boards.openedNow(boardId, now);
     const day = new Date(now);
     const today = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-    return rollupDay === today ? [] : consolidate(db, boardId, now);
+    return rollupDay === today ? [] : consolidate(db, boardId, now, boards.retentionMonths(boardId));
   };
 
   it('RF-23: abrir duas vezes no mesmo dia consolida uma vez; no dia seguinte consolida de novo', () => {
