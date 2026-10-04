@@ -1,4 +1,4 @@
-import { cardRef, type Card } from '../shared/model';
+import { cardRef, type Card, type Column } from '../shared/model';
 import { columnsOf, openChildren } from '../shared/selectors';
 import { removeWorktree } from './git';
 import type { MessageRouter } from './panel/messageRouter';
@@ -13,6 +13,29 @@ export interface MergeDeps {
 }
 
 const AUTHOR = 'Faz AI';
+
+/**
+ * Conclui a história: comenta, move para a coluna de conclusão e, no modo `worktree`, remove a
+ * pasta de trabalho. Se a remoção falhar, o motivo vai para o log e a conclusão permanece.
+ *
+ * `extra`, quando presente, acrescenta um aviso ao corpo do comentário — é o gancho que o passo 5
+ * (MergeWatcher) usa para o aviso de sub-tarefas em aberto.
+ */
+export function concludeStory(router: MessageRouter, deps: MergeDeps, card: Card, done: Column, body: string, extra?: string): void {
+  const ref = cardRef(card);
+  router.handle({ type: 'comment.add', cardId: card.id, body: extra ? `${body} ${extra}` : body }, { author: AUTHOR, source: 'ai' });
+  router.handle({ type: 'card.move', cardId: card.id, columnId: done.id, position: Number.MAX_SAFE_INTEGER }, { author: AUTHOR });
+
+  if (router.snapshot().board.git.mode === 'worktree' && card.worktreePath) {
+    try {
+      (deps.removeWorktree ?? removeWorktree)(deps.cwd, card.worktreePath);
+      router.handle({ type: 'card.workspace.clear', cardId: card.id });
+    } catch (e) {
+      // alterações não commitadas na worktree: fica para a pessoa decidir
+      deps.log(`[${ref}] A pasta de trabalho ${card.worktreePath} não foi removida: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+}
 
 /**
  * Merge automático na homologação: quando uma pessoa aprova uma história cuja próxima coluna é a
@@ -65,17 +88,6 @@ export class AutoMerger {
     }
     this.merging.delete(cardId);
     this.deps.log(`[${ref}] Merge feito; card concluído.`);
-    this.router.handle({ type: 'comment.add', cardId, body: `Merge de ${card.prUrl} feito.` }, { author: AUTHOR, source: 'ai' });
-    this.router.handle({ type: 'card.move', cardId, columnId: done.id, position: Number.MAX_SAFE_INTEGER }, { author: AUTHOR });
-
-    if (state.board.git.mode === 'worktree' && card.worktreePath) {
-      try {
-        (this.deps.removeWorktree ?? removeWorktree)(this.deps.cwd, card.worktreePath);
-        this.router.handle({ type: 'card.workspace.clear', cardId });
-      } catch (e) {
-        // alterações não commitadas na worktree: fica para a pessoa decidir
-        this.deps.log(`[${ref}] A pasta de trabalho ${card.worktreePath} não foi removida: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    }
+    concludeStory(this.router, this.deps, card, done, `Merge de ${card.prUrl} feito.`);
   }
 }
