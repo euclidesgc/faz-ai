@@ -63,7 +63,7 @@ export function NewColumnRow({
             {t('Cancelar')}
           </Button>
           <Button disabled={!ready} onClick={add}>
-            {t('Adicionar')}
+            {t('Criar coluna')}
           </Button>
         </div>
       </td>

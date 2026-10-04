@@ -18,7 +18,7 @@ const setup = (heartbeat: boolean, unsupported: string | null = null) => {
   useBoardStore.setState({ state: { ...useBoardStore.getState().state!, aiRunUnsupported: unsupported } });
   posted.mockClear();
 };
-const heart = () => screen.getByRole('button', { name: /Heartbeat/ });
+const heart = () => screen.getByRole('button', { name: /heartbeat/i });
 
 describe('heartbeatState', () => {
   const on = { ...DEFAULT_RUNNER, heartbeat: true };

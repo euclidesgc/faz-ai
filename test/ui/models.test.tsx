@@ -38,7 +38,7 @@ describe('ModelsSettings', () => {
     await userEvent.type(draft.getByLabelText('Nome'), 'Teste 9');
     await userEvent.type(draft.getByLabelText('Identificador na ferramenta'), 'teste-9');
     await userEvent.type(draft.getByLabelText('Esforços aceitos'), 'low, high');
-    await userEvent.click(draft.getByRole('button', { name: 'Adicionar' }));
+    await userEvent.click(draft.getByRole('button', { name: 'Adicionar modelo' }));
     const added = lastSent('settings.models.set').catalog.find((m) => m.model === 'teste-9');
     expect(added).toMatchObject({ tool: tool(), label: 'Teste 9', efforts: ['low', 'high'], defaultEffort: 'low' });
     expect(screen.queryByLabelText('Modelo novo')).toBeNull();
@@ -50,7 +50,7 @@ describe('ModelsSettings', () => {
     const draft = within(screen.getByLabelText('Modelo novo'));
     const existing = state().board.modelCatalog.find((m) => m.tool === tool())!;
     await userEvent.type(draft.getByLabelText('Identificador na ferramenta'), existing.model);
-    expect(draft.getByRole('button', { name: 'Adicionar' })).toBeDisabled();
+    expect(draft.getByRole('button', { name: 'Adicionar modelo' })).toBeDisabled();
     expect(draft.getByText('Já existe um modelo com este identificador.')).toBeInTheDocument();
   });
 

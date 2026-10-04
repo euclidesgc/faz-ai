@@ -48,9 +48,9 @@ describe('RulesSettings', () => {
     expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { confirmTrash: 'never' } });
   });
 
-  it('Restaurar padrões fica desligado enquanto nada mudou', () => {
+  it('Restaurar regras padrão fica desligado enquanto nada mudou', () => {
     show();
-    expect(screen.getByRole('button', { name: 'Restaurar padrões' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Restaurar regras padrão' })).toBeDisabled();
     expect(sentOf('settings.rules.update')).toHaveLength(0);
   });
 });

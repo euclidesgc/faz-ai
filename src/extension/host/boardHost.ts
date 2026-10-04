@@ -12,11 +12,15 @@ import { BoardRepo } from '../repositories/boardRepo';
 import { registerClients } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
+import { ReleaseWatcher } from '../release';
 import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { loginShellPath, spawnHeadless } from '../spawn';
+
+/** Complemento do nome na mensagem de "comando não encontrado", para não piorar o que a pessoa já lê no log. */
+const COMMAND_HINT: Record<string, string> = { gh: ' (GitHub CLI)' };
 
 export interface BoardHostOptions {
   /** pasta de dados do Faz AI (bancos e anexos) */
@@ -107,10 +111,13 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   // o log do board liga cada evento à execução em curso no card (`run_id`); sem execução, fica nulo
   router.setRunResolver((cardId) => runner.runIdOf(cardId));
-  const gh = (args: string[], cwd: string) =>
+  // os comandos externos das rotinas periódicas: resolvem com a saída padrão, rejeitam com a mensagem
+  // do comando (é ela que vai para o log). `git` aqui é assíncrono de propósito — o `src/extension/git.ts`
+  // é síncrono, feito para o que a pessoa dispara, e travaria o processo da extensão numa rodada de fundo.
+  const run = (cmd: string) => (args: string[], cwd: string) =>
     new Promise<string>((resolve, reject) => {
       execFile(
-        'gh',
+        cmd,
         args,
         { cwd, timeout: 120_000, env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) } },
         (err, stdout, stderr) =>
@@ -118,13 +125,15 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
             ? reject(
                 new Error(
                   (err as NodeJS.ErrnoException).code === 'ENOENT'
-                    ? 'o comando "gh" (GitHub CLI) não foi encontrado.'
+                    ? `o comando "${cmd}"${COMMAND_HINT[cmd] ?? ''} não foi encontrado.`
                     : stderr.trim() || err.message,
                 ),
               )
             : resolve(stdout),
       );
     });
+  const gh = run('gh');
+  const git = run('git');
   new AutoMerger(router, {
     cwd: o.folderPath,
     log: o.log,
@@ -142,6 +151,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
   const heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: o.log });
+  // sem timer próprio: o arquivamento das histórias publicadas acontece no fim da rodada de merges,
+  // com o mesmo liga/desliga, o mesmo intervalo e a mesma janela dona
+  const releaseWatcher = new ReleaseWatcher(router, { cwd: o.folderPath, log: o.log, gh, git });
   const mergeWatcher = new MergeWatcher(router, {
     cwd: o.folderPath,
     log: o.log,
@@ -149,6 +161,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     removeWorktree,
     now: () => Date.now(),
     canRun: o.ownsBoard,
+    afterRound: () => releaseWatcher.sweep(),
   });
 
   const gitignore = path.join(o.folderPath, '.gitignore');

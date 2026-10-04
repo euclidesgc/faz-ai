@@ -30,7 +30,7 @@ export function DrawerHeader({ card }: { card: Card }) {
 
   return (
     <header className="drawer-header">
-      <AiLed work={work} />
+      <AiLed work={work} status={archived || trashed ? null : card.status} />
       <SelectField aria-label={t('Tipo')} options={types} value={card.typeId} onChange={(typeId) => cards.update(card.id, { typeId })} />
       <SelectField
         aria-label={t('Coluna')}

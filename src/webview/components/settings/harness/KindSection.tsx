@@ -74,7 +74,7 @@ export function KindSection({
         <>
           {k.id === 'skill' && (
             <Button variant="soft" color="gray" onClick={() => onInstalling(!installing)}>
-              {t('Buscar e instalar')}
+              {t('Buscar skills para instalar')}
             </Button>
           )}
           {k.id === 'settings' && permissionFiles.length > 0 && (

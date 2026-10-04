@@ -170,7 +170,7 @@ Below it come the title (in full in the tooltip when it doesn't fit), the status
 who the next step is waiting on (a robot for the AI, a person for you) and how long it has been
 like that, the fields, the AI model (e.g. "Sonnet 5.5 - baixo", with the effort in Portuguese) and,
 in the footer, the counters, the branch and the PR. Cards waiting on you get a border in the
-status color, and the LED on the bar blinks slowly while the AI is working on the card (on a story, also when it works on one of its sub-tasks); when it finishes, the LED stays there, turned off.
+status color, and the LED on the bar tells the card's state at a glance: green and blinking slowly while the AI is working on it (on a story, also when it works on one of its sub-tasks), yellow when it is waiting on you, red when it is blocked, and off when nothing is happening.
 
 ### Links between cards
 
@@ -304,7 +304,7 @@ progress. Sub-tasks commit to the story's branch.
 - The card shows the branch and opens the working folder in a new window.
 - Configurações → **Git** holds the mode (worktree, branch in the same folder, or off), the branch
   name pattern, the worktrees folder, automatic PR merge when approving acceptance, and automatic
-  merge detection (on by default).
+  merge detection, with the archiving of already published stories (on by default).
 - Each worktree is a working copy: dependencies have to be installed in it.
 
 ### Pull request and merge in Homologação
@@ -340,6 +340,26 @@ once only. The merge is still done by the person, manually or through automatic 
 only observes. Failures in querying the PR state (no network, no authentication, no `gh`
 installed) do not block anything — the warning appears in the log, and the routine keeps trying at the next interval.
 
+In the same round, after looking at the pull requests, the board takes the last step of the cycle:
+**when the version containing a concluded story is published, it records in the conversation which
+version carried it (tag and release link) and archives the card**. That way the Concluído column
+holds only what is merged and has not reached your users yet; what was already delivered goes to the
+workflow's archived area, from which you can unarchive it at any time. There is nothing to turn on:
+the step comes along with merge detection, on the same interval and the same switch, and it is on by
+default with it.
+
+A story counts as published when there is a tag that **contains** the merge commit **and** that has a
+**published release** on GitHub — which is what this project's `npm run release` creates. A tag
+without a release does not count, a draft release does not count, a prerelease does. The recorded
+version is the oldest among those containing the commit, by publication date. The criterion is
+deliberately conservative: archiving late fixes itself on the next round, archiving early hides a
+card with nobody noticing.
+
+Everything here is best effort. A project with no releases, outside GitHub or on a machine without
+`gh` simply archives nothing: no card is blocked and the reason appears once in the log. The board
+never publishes a version — it only reads what you published — and stories concluded before this
+version, which have no merge commit recorded, stay yours to archive with one click.
+
 ### Heartbeat
 
 With the heartbeat on (Configurações → Harness de IA), the board calls the AI on its own at every
@@ -351,7 +371,7 @@ answers pending messages and works on ready cards, one story at a time.
   position, not its number nor what has already been approved.
 - Cards that are with you (waiting for review or an answer, blocked) are not touched, unless you
   left an unanswered message in the conversation.
-- **Rodar agora** (run now), in the settings or with the command **Faz AI: Rodar o heartbeat
+- **Chamar a IA agora** (call the AI now), in the settings or with the command **Faz AI: Rodar o heartbeat
   agora**, starts a round right away, even with the heartbeat off. **Faz AI: Parar as execuções da
   IA** stops everything.
 - The status bar shows the cards being run and the time of the next round.
@@ -365,7 +385,7 @@ e colunas. You can always move any card yourself without approval.
 
 ### Autonomous mode (YOLO)
 
-A **story** can be marked **YOLO**: in the card panel, turn on **Modo autônomo (YOLO)** (the board
+A **story** can be marked **YOLO**: in the card panel, turn on **Modo autônomo** (the board
 asks for confirmation, because the mode gives up every approval). From then on the AI drives the
 story by itself, **without asking for authorization or confirmation on anything**:
 
@@ -396,9 +416,9 @@ story by itself, **without asking for authorization or confirmation on anything*
   Bloqueado, with the reason), and blocks the story after 3 consecutive runs that advanced nothing.
   Once you unblock the card it carries on by itself.
 
-The **"Autônomo" button** at the top of the board shows while there is a story in the queue: lit
-when the autopilot is driving, dimmed when paused; a click pauses (and interrupts the AI) or
-resumes. From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
+The **autonomous mode button** at the top of the board shows while there is a story in the queue
+and says what the click does: **Pausar modo autônomo** (pause; lit, with the autopilot driving;
+pausing interrupts the AI) or **Retomar modo autônomo** (resume; dimmed, paused). From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
 autônomo (YOLO)** and **Faz AI: Parar as execuções da IA e o modo autônomo**. When the editor
 opens the autopilot does not start by itself: it starts when you turn the mode on for a story or
 resume. The heartbeat does not drive autonomous stories; they belong to the autopilot.

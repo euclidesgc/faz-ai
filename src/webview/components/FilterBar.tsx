@@ -89,7 +89,7 @@ export function FilterBar() {
           onClick={() => (isWeb ? setPanelOpen(!panelOpen) : ui.showFilters())}
           title={isWeb ? t('Mostrar ou esconder os filtros') : t('Abrir os filtros na barra lateral')}
         >
-          {t('Filtros')}
+          {isWeb ? (panelOpen ? t('Esconder filtros') : t('Mostrar filtros')) : t('Abrir filtros')}
           {count > 0 && ` (${count})`}
         </button>
         {chips.map((c) => (
@@ -99,7 +99,7 @@ export function FilterBar() {
         ))}
         {(count > 0 || parent) && (
           <button className="ghost" onClick={clearFilters}>
-            {t('Limpar')}
+            {t('Limpar filtros')}
           </button>
         )}
       </div>

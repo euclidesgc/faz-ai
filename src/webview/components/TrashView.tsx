@@ -29,7 +29,7 @@ export function TrashView() {
               message: t('{n} card(s) serão apagados definitivamente, com comentários e anexos. Não dá para desfazer.', {
                 n: deleted.length,
               }),
-              confirmLabel: t('Esvaziar'),
+              confirmLabel: t('Esvaziar lixeira'),
               danger: true,
               onConfirm: () => trash.empty(),
             })

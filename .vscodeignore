@@ -17,3 +17,11 @@ scripts/**
 .env*
 .mcp.json
 releases/**
+.code-review-graph/**
+.impeccable/**
+.playwright-mcp/**
+eslint.config.mjs
+.prettierignore
+.prettierrc*
+.git-blame-ignore-revs
+DESIGN.md

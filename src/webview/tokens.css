@@ -48,6 +48,15 @@ body {
   --danger-fg: #ffffff;
   --warn-solid-fg: #1c2024;
   --overlay: rgba(0, 0, 0, 0.4);
+  /* LED do card: cores próprias, iguais nos dois temas, porque ele fica sobre a barra na cor do tipo */
+  --led: transparent;
+  --led-socket: #2a2d31;
+  --led-rim: rgba(0, 0, 0, 0.45);
+  --led-shade: rgba(0, 0, 0, 0.6);
+  --led-shine: #ffffff;
+  --led-working: #2fe06a;
+  --led-attention: #ffb62e;
+  --led-error: #ff4d4f;
   scrollbar-color: var(--border-strong) transparent;
   accent-color: var(--accent);
 }
