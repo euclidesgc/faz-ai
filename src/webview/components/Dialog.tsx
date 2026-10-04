@@ -17,6 +17,7 @@ export function Dialog() {
       if (e.key === 'Escape') {
         e.stopPropagation();
         ask(null);
+        dialog.onCancel?.();
       }
     };
     window.addEventListener('keydown', onKey, true);
@@ -24,13 +25,17 @@ export function Dialog() {
   }, [dialog, ask]);
 
   if (!dialog) return null;
+  const cancel = () => {
+    ask(null);
+    dialog.onCancel?.();
+  };
   const confirm = () => {
     ask(null);
     dialog.onConfirm(dialog.choices ? choice : undefined);
   };
 
   return (
-    <div className="modal-backdrop" onMouseDown={() => ask(null)}>
+    <div className="modal-backdrop" onMouseDown={cancel}>
       <div className="modal" role="dialog" onMouseDown={(e) => e.stopPropagation()}>
         <h2>{dialog.title}</h2>
         {dialog.message && <p>{dialog.message}</p>}
@@ -41,7 +46,7 @@ export function Dialog() {
           </label>
         )}
         <div className="row end wrap">
-          <button onClick={() => ask(null)}>{dialog.cancelLabel ?? t('Cancelar')}</button>
+          <button onClick={cancel}>{dialog.cancelLabel ?? t('Cancelar')}</button>
           {dialog.secondary && (
             <button
               onClick={() => {

@@ -188,6 +188,86 @@ it('recusa mensagens de outra origem e de sessões que não existem', async () =
   page.close();
 });
 
+it('backup pelo navegador: GET /backup/export baixa o arquivo e POST /backup/import estaciona o resumo até a confirmação', async () => {
+  const page = await events('cliente-bk-1234');
+  const first = page.next('boardState');
+  await post('cliente-bk-1234', { type: 'ready' });
+  const initial = (await first) as Extract<HostToWebview, { type: 'boardState' }>;
+  const wf = initial.state.workflows.find((w) => w.kind === 'parent')!;
+  const created = page.next('boardState');
+  await post('cliente-bk-1234', {
+    type: 'card.create',
+    typeId: initial.state.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+    columnId: initial.state.columns.find((c) => c.workflowId === wf.id)!.id,
+    parentId: null,
+    title: 'Antes do backup',
+  });
+  await created;
+
+  // exportar: JSON com Content-Disposition, e o aviso chega pelo canal de eventos
+  expect((await request('GET', '/backup/export?c=sessao-desconhecida', { headers: { cookie } })).status).toBe(409);
+  const notice = page.next('notice');
+  const exported = await request('GET', '/backup/export?c=cliente-bk-1234', { headers: { cookie } });
+  expect(exported.status).toBe(200);
+  expect(exported.headers['content-type']).toBe('application/json; charset=utf-8');
+  expect(exported.headers['content-disposition']).toMatch(/^attachment; filename="Projeto-\d{4}-\d{2}-\d{2}\.fazai\.json"/);
+  const file = JSON.parse(exported.body);
+  expect(file.fazai).toBe('board-export');
+  expect(file.tables.cards.map((c: { title: string }) => c.title)).toEqual(['Antes do backup']);
+  expect(((await notice) as Extract<HostToWebview, { type: 'notice' }>).message).toMatch(
+    /^Board exportado em Projeto-.*guarde-o com cuidado\.$/,
+  );
+
+  // muda o board depois do export: a importação deve voltar ao estado exportado
+  const second = page.next('boardState');
+  await post('cliente-bk-1234', {
+    type: 'card.create',
+    typeId: initial.state.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+    columnId: initial.state.columns.find((c) => c.workflowId === wf.id)!.id,
+    parentId: null,
+    title: 'Depois do backup',
+  });
+  await second;
+  expect(router.snapshot().cards).toHaveLength(2);
+
+  // importar: arquivo inválido é 400 com o motivo; sem sessão é 409; de outra origem é 403
+  const headers = { cookie, 'content-type': 'application/json' };
+  const invalid = await request('POST', '/backup/import?c=cliente-bk-1234', { headers, body: '{"x":1}' });
+  expect(invalid.status).toBe(400);
+  expect(invalid.body).toBe('Arquivo não é um export do Faz AI: falta o marcador "board-export".');
+  expect((await request('POST', '/backup/import?c=nao-existe', { headers, body: exported.body })).status).toBe(409);
+  expect(
+    (
+      await request('POST', '/backup/import?c=cliente-bk-1234', {
+        headers: { ...headers, origin: 'https://fora.example' },
+        body: exported.body,
+      })
+    ).status,
+  ).toBe(403);
+
+  // arquivo válido: devolve token e resumo, e o board ainda não mudou
+  const parked = await request('POST', '/backup/import?c=cliente-bk-1234', { headers, body: exported.body });
+  expect(parked.status).toBe(200);
+  const { token, summary } = JSON.parse(parked.body);
+  expect(typeof token).toBe('string');
+  expect(summary).toMatchObject({
+    boardName: 'Projeto',
+    cards: 1,
+    attachments: 0,
+    sizeBytes: Buffer.byteLength(exported.body),
+    large: false,
+  });
+  expect(router.snapshot().cards).toHaveLength(2);
+
+  // a confirmação segue pela mensagem normal e todas as páginas recebem o board novo
+  const imported = page.next('boardState');
+  const done = page.next('notice');
+  await post('cliente-bk-1234', { type: 'backup.import.apply', token });
+  expect(((await imported) as Extract<HostToWebview, { type: 'boardState' }>).state.cards.map((c) => c.title)).toEqual(['Antes do backup']);
+  expect(await done).toEqual({ type: 'notice', message: 'Board "Projeto" importado: 1 card(s) e 0 anexo(s).' });
+  page.close();
+});
+
 it('cada pasta tem o seu banco, partindo de uma cópia do banco único das versões anteriores', () => {
   const storage = path.join(dir, 'dados');
   fs.mkdirSync(storage);

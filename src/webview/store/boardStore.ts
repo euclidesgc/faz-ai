@@ -4,11 +4,14 @@ import type { BoardState, Id } from '../../shared/model';
 import { isLive } from '../../shared/selectors';
 import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../../shared/filters';
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
+import { formatBytes, type ImportSummary } from '../../shared/backup';
+import { formatDateTime, t } from '../i18n';
+import { backup } from '../commands';
 
 export type View = 'board' | 'trash' | 'settings';
 /** Abas da tela de Harness de IA: a ferramenta e a execução, o que é do projeto, e tudo que a ferramenta carrega. */
 export type HarnessTab = 'tool' | 'project' | 'all';
-export type SettingsTab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'agents' | 'git' | 'appearance';
+export type SettingsTab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'agents' | 'git' | 'appearance' | 'backup';
 
 export interface DialogSpec {
   title: string;
@@ -18,6 +21,8 @@ export interface DialogSpec {
   /** quando presente, mostra um seletor e passa o valor escolhido ao confirmar */
   choices?: { label: string; options: { value: string; label: string }[] };
   onConfirm(choice?: string): void;
+  /** chamada quando a pessoa desiste (botão, Escape ou clique fora) */
+  onCancel?(): void;
   /** ação alternativa, mostrada entre Voltar e a confirmação */
   secondary?: { label: string; onClick(): void };
   cancelLabel?: string;
@@ -56,6 +61,9 @@ interface BoardStore extends UiState, ViewState {
   dialog: DialogSpec | null;
   /** anexo aberto na modal; null quando não há modal de anexo na tela */
   attachmentModal: AttachmentModalState | null;
+  /** backup do board em andamento: exportando, ou lendo o arquivo escolhido para importar */
+  backupBusy: 'export' | 'import' | null;
+  setBackupBusy(busy: 'export' | 'import' | null): void;
   setState(state: BoardState, attachmentsBaseUri: string): void;
   setViewState(view: ViewState): void;
   setError(msg: string | null): void;
@@ -94,6 +102,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     notice: null,
     dialog: null,
     attachmentModal: null,
+    backupBusy: null,
+    setBackupBusy: (backupBusy) => set({ backupBusy }),
     view: persisted?.view ?? 'board',
     settingsTab: persisted?.settingsTab ?? 'columns',
     harnessTab: persisted?.harnessTab ?? 'tool',
@@ -172,9 +182,15 @@ export function useHostSync(): void {
       const s = useBoardStore.getState();
       if (msg.type === 'boardState') s.setState(msg.state, msg.attachmentsBaseUri);
       else if (msg.type === 'viewState') s.setViewState(msg.view);
-      else if (msg.type === 'error') s.setError(msg.message);
-      else if (msg.type === 'notice') s.setNotice(msg.message);
-      else if (msg.type === 'ui.openCard') {
+      else if (msg.type === 'error') {
+        s.setError(msg.message);
+        s.setBackupBusy(null);
+      } else if (msg.type === 'notice') s.setNotice(msg.message);
+      else if (msg.type === 'backup.done') s.setBackupBusy(null);
+      else if (msg.type === 'backup.import.summary') {
+        s.setBackupBusy(null);
+        s.ask(importDialog(msg.token, msg.summary));
+      } else if (msg.type === 'ui.openCard') {
         s.setView('board');
         s.openCard(msg.cardId);
       }
@@ -189,4 +205,31 @@ export function useFilteredIds(): Set<Id> | null {
   const state = useBoardStore((s) => s.state);
   const filters = useBoardStore((s) => s.filters);
   return useMemo(() => (state ? applyFilters(state, filters) : null), [state, filters]);
+}
+
+/** O diálogo de confirmação da importação: o resumo do arquivo e o aviso de que o board atual será apagado. */
+export function importDialog(token: string, summary: ImportSummary): DialogSpec {
+  const when = summary.exportedAt ? formatDateTime(Date.parse(summary.exportedAt)) : '?';
+  const intro = t(
+    'Board "{name}" com {cards} card(s) e {attachments} anexo(s), {size}, exportado em {date} pelo Faz AI {version} (formato {format}).',
+    {
+      name: summary.boardName,
+      cards: summary.cards,
+      attachments: summary.attachments,
+      size: formatBytes(summary.sizeBytes),
+      date: when,
+      version: summary.extensionVersion || '?',
+      format: summary.formatVersion,
+    },
+  );
+  const large = summary.large ? ` ${t('O arquivo tem mais de 200 MB: a importação pode demorar.')}` : '';
+  const warning = t('Tudo o que está neste board será apagado e substituído. Uma cópia de segurança (.bak) fica ao lado do banco.');
+  return {
+    title: t('Substituir o board atual?'),
+    message: `${intro}${large} ${warning}`,
+    confirmLabel: t('Importar e substituir'),
+    danger: true,
+    onConfirm: () => backup.importApply(token),
+    onCancel: () => backup.importCancel(token),
+  };
 }

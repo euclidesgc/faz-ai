@@ -14,6 +14,7 @@ import {
   Columns3,
   CornerDownRight,
   Cpu,
+  DatabaseBackup,
   Ellipsis,
   ExternalLink,
   GitBranch,
@@ -145,3 +146,4 @@ export const IconAppearance = icon(Palette, 'IconAppearance');
 export const IconConnect = icon(Plug, 'IconConnect');
 export const IconUpgrade = icon(CircleArrowUp, 'IconUpgrade');
 export const IconReset = icon(RotateCcw, 'IconReset');
+export const IconBackup = icon(DatabaseBackup, 'IconBackup');
