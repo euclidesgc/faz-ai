@@ -130,7 +130,7 @@ export function KindSection({
             ))}
           </ul>
           {t(
-            'Para aproveitar só uma skill de um plugin ou de um repositório, use "Buscar e instalar" na seção Skills, ou "Copiar para o projeto" na skill do plugin.',
+            'Para aproveitar só uma skill de um plugin ou de um repositório, use "Buscar skills para instalar" na seção Skills, ou "Copiar para o projeto" na skill do plugin.',
           )}
         </div>
       )}

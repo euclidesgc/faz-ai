@@ -6,6 +6,14 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Agentes, modelos e regras não perdem uma mudança feita logo depois de outra.** Escrever a
+  intenção de um agente e logo clicar em **Só leitura** apagava a intenção: a segunda mudança partia
+  da lista de antes da primeira. O mesmo valia para o catálogo de modelos e para as regras de
+  sugestão. Agora cada mudança parte da última enviada.
+- **Regras de sugestão em inglês:** o nome do campo "Esforço da atividade", as opções e o nome das
+  regras criadas pelo board aparecem traduzidos ("Task effort = Low"), como no card.
+- **Imagens do README refeitas** com a interface desta versão, em português e em inglês.
+
 - **Windows, macOS e Linux: o mesmo board, sem perda de dados.**
   - **Mesmo board no editor e no terminal:** no Windows, o `faz-ai` do terminal e o servidor do
     board iniciado pela IA chegavam à pasta com a letra do drive maiúscula (`C:\`), e o editor com

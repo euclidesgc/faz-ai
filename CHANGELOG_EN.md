@@ -7,6 +7,14 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Agents, models and rules no longer lose a change made right after another.** Writing an agent's
+  intent and then clicking **Só leitura** (read-only) erased the intent: the second change started
+  from the list before the first. The same went for the model catalog and the suggestion rules. Each
+  change now starts from the last one sent.
+- **Suggestion rules in English:** the "Esforço da atividade" field name, its options and the names
+  of the rules the board creates are shown translated ("Task effort = Low"), as on the card.
+- **README images redone** with this version's interface, in Portuguese and English.
+
 - **Windows, macOS and Linux: the same board, with no data loss.**
   - **Same board in the editor and in the terminal:** on Windows, the terminal's `faz-ai` and the
     board server started by the AI reached the folder with an uppercase drive letter (`C:\`), and the

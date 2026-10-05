@@ -8,6 +8,7 @@ import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
 import { FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../ui';
 import { ModelRulesEditor } from './ModelRulesEditor';
 import { SettingsCard } from './SettingsCard';
+import { useSentList } from './useSentList';
 import { PageHeader } from './PageHeader';
 
 const splitList = (s: string): string[] =>
@@ -127,10 +128,13 @@ export function ModelsSettings() {
   const { modelCatalog: catalog, aiTool } = state.board;
   const [adding, setAdding] = useState(false);
 
-  const setCatalog = (next: ModelOption[]) => settings.setModels(next);
+  // as mudanças partem da última lista enviada (ver useSentList)
+  const sent = useSentList(catalog, settings.setModels);
+  const setCatalog = sent.save;
   const setPrice = (o: ModelOption, key: keyof ModelPrice, value: number | null) =>
-    setCatalog(catalog.map((x) => (x.id === o.id ? withPrice(x, { [key]: value }) : x)));
-  const patchModel = (id: string, patch: Partial<ModelOption>) => setCatalog(catalog.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+    setCatalog(sent.current().map((x) => (x.id === o.id ? withPrice(x, { [key]: value }) : x)));
+  const patchModel = (id: string, patch: Partial<ModelOption>) =>
+    setCatalog(sent.current().map((o) => (o.id === id ? { ...o, ...patch } : o)));
 
   // o projeto trabalha com uma ferramenta por vez: só os modelos dela aparecem
   const tools = AI_TOOLS.filter((tl) => tl.id === aiTool);
@@ -190,7 +194,7 @@ export function ModelsSettings() {
               <NewModelCard
                 tool={tl.id}
                 taken={(id) => catalog.some((o) => o.id === id)}
-                onAdd={(m) => setCatalog([...catalog, m])}
+                onAdd={(m) => setCatalog([...sent.current(), m])}
                 onDone={() => setAdding(false)}
               />
             )}
@@ -285,7 +289,7 @@ export function ModelsSettings() {
                         color="red"
                         title={t('Remover do catálogo')}
                         aria-label={t('Remover {model} do catálogo', { model: o.model })}
-                        onClick={() => setCatalog(catalog.filter((x) => x.id !== o.id))}
+                        onClick={() => setCatalog(sent.current().filter((x) => x.id !== o.id))}
                       >
                         <IconTrash />
                       </IconButton>

@@ -10,6 +10,7 @@ import { Badge, Button, Card, TextArea, TextField } from '@radix-ui/themes';
 import { ChipsEditor, DeleteButton, FormField, IconPlus, SelectField, SwitchField } from '../ui';
 import { PageHeader } from './PageHeader';
 import { t } from '../../i18n';
+import { useSentList } from './useSentList';
 import { rich } from '../../i18n/rich';
 
 /** O Select do Radix não aceita `value` vazio: "sem subagente" usa este valor. */
@@ -41,13 +42,15 @@ export function AgentsSettings() {
   );
   const serverNames = servers.map((s) => s.name);
 
-  const save = (next: ExecProfile[]) => settings.setExecProfiles(next);
+  // as mudanças partem da última lista enviada (ver useSentList)
+  const sent = useSentList(profiles, settings.setExecProfiles);
+  const save = sent.save;
   const patch = (id: string, p: Partial<ExecProfile>) =>
-    save(profiles.map((x) => (x.id === id ? { ...x, ...p } : p.isDefault ? { ...x, isDefault: false } : x)));
+    save(sent.current().map((x) => (x.id === id ? { ...x, ...p } : p.isDefault ? { ...x, isDefault: false } : x)));
   const add = () => {
     const id = newId();
     save([
-      ...profiles,
+      ...sent.current(),
       {
         id,
         name: t('Agente {n}', { n: profiles.length + 1 }),
@@ -173,7 +176,8 @@ export function AgentsSettings() {
                     message={t('Colunas e cards que usam este agente voltam ao padrão.')}
                     onConfirm={() =>
                       save(
-                        profiles
+                        sent
+                          .current()
                           .filter((x) => x.id !== p.id)
                           // apagar o padrão passa o posto para o primeiro que sobra
                           .map((x, i) => (p.isDefault ? { ...x, isDefault: i === 0 } : x)),

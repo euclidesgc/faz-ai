@@ -117,8 +117,8 @@ export const harness: Record<string, string> = {
   'gh skill search <termo>': 'gh skill search <term>',
   'agent plugin marketplace add <endereço git>': 'agent plugin marketplace add <git URL>',
   '/plugins install <pasta, zip ou endereço do GitHub>': '/plugins install <folder, zip or GitHub URL>',
-  'Para aproveitar só uma skill de um plugin ou de um repositório, use "Buscar e instalar" na seção Skills, ou "Copiar para o projeto" na skill do plugin.':
-    'To use just one skill from a plugin or a repository, use "Find and install" in the Skills section, or "Copy to the project" on the plugin skill.',
+  'Para aproveitar só uma skill de um plugin ou de um repositório, use "Buscar skills para instalar" na seção Skills, ou "Copiar para o projeto" na skill do plugin.':
+    'To use just one skill from a plugin or a repository, use "Find skills to install" in the Skills section, or "Copy to the project" on the plugin skill.',
   'Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.':
     'A hook is a command the tool runs on its own on your computer. Only add commands you know.',
   'Os hooks do Kimi Code ficam no <code>~/.kimi-code/config.toml</code> (<code>[[hooks]]</code>): aparecem aqui e são editados no arquivo.':
