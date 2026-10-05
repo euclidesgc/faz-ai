@@ -2931,3 +2931,211 @@ body.host-web .drawer {
   border-radius: var(--radius-sm);
   background: var(--chart-bar);
 }
+
+/* card 177, painel de métricas: o inventário de uso (ferramentas, MCP, subagentes e skills) */
+.metrics-inventory {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  min-width: 0;
+}
+.metrics-inventory-group {
+  min-width: 0;
+}
+.metrics-inventory-title {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.metrics-inventory-empty {
+  margin: 0;
+  color: var(--muted);
+}
+.metrics-inventory-unknown {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* card 176, painel de métricas: permanência por fase e lead time. A mediana é o número grande; o resto fica ao lado */
+.metrics-times-hint,
+.metrics-times-empty {
+  margin: var(--sp-4) 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.metrics-times-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.metrics-lead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  min-width: 0;
+}
+.metrics-lead-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  gap: var(--sp-8);
+  margin: 0;
+}
+.metrics-lead-summary > div {
+  display: flex;
+  flex-direction: column-reverse;
+  min-width: 0;
+}
+.metrics-lead-summary dt {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.metrics-lead-summary dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.metrics-lead-summary .metrics-lead-median {
+  font-size: var(--fs-xl);
+}
+
+/* card 174, painel de métricas: a tabela ordenável dos rankings. Botão nativo de 44 px no cabeçalho (RF-35, WCAG 2.5.5) */
+.ranking {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  min-width: 0;
+}
+.ranking-sort-note {
+  margin: 0;
+  color: var(--muted);
+}
+.metrics-table th.is-sortable {
+  padding: 0;
+}
+.ranking-table .ranking-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--sp-4) var(--sp-8);
+  font-weight: 600;
+  text-align: inherit;
+}
+.ranking-table th.is-number .ranking-sort {
+  justify-content: flex-end;
+}
+.ranking-table th[aria-sort='ascending'] .ranking-sort,
+.ranking-table th[aria-sort='descending'] .ranking-sort {
+  color: var(--fg);
+}
+.ranking-table .ranking-sort:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+.ranking-table tbody th {
+  font-weight: 400;
+}
+.ranking-table tfoot th,
+.ranking-table tfoot td {
+  color: var(--muted);
+}
+.ranking-more {
+  align-self: flex-start;
+  min-height: 44px;
+}
+
+/* card 175, painel de métricas: o corte por dimensão. Barras horizontais em SVG fluido, rótulos em HTML fora do
+   SVG (não encolhem no zoom nem giram) e a tabela das quatro medidas, visível, ao lado ou abaixo (RF-38, RF-40) */
+.metrics-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  min-width: 0;
+}
+.metrics-breakdown-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8) var(--sp-12);
+}
+.metrics-breakdown-title {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.metrics-breakdown-empty {
+  margin: 0;
+  color: var(--muted);
+}
+.metrics-breakdown-view {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--sp-12) var(--sp-16);
+  min-width: 0;
+}
+.metrics-breakdown-chart {
+  display: grid;
+  grid-template-columns: minmax(5rem, 40%) minmax(0, 1fr);
+  gap: var(--sp-6);
+  flex: 1 1 16rem;
+  min-width: 0;
+  font-size: var(--fs-xs);
+}
+/* a altura de cada linha é a mesma de uma faixa do SVG (ROW_EM em Breakdown.tsx): rótulo e barra alinhados */
+.metrics-breakdown-labels {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+.metrics-breakdown-labels li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  height: 1.75em;
+  line-height: 1.75em;
+  min-width: 0;
+}
+/* nome longo é abreviado aqui; o texto inteiro está na tabela ao lado e no title (RF-40) */
+.metrics-breakdown-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.metrics-breakdown-mark {
+  flex: none;
+  font-size: var(--fs-micro);
+  color: var(--muted);
+}
+.metrics-breakdown-plot {
+  min-width: 0;
+}
+.metrics-breakdown-svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+.metrics-breakdown-bar {
+  fill: var(--chart-bar);
+}
+.metrics-breakdown-axis {
+  stroke: var(--chart-axis);
+  stroke-width: 1px;
+}
+.metrics-breakdown-scale {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  margin-top: var(--sp-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.metrics-breakdown-table {
+  flex: 2 1 22rem;
+  min-width: 0;
+  overflow-x: auto;
+}

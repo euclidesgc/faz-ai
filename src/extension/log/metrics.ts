@@ -981,6 +981,7 @@ function panelCell(value: string, a: Accumulator): MetricsCell {
     value,
     runs: a.runs,
     measuredRuns: a.measuredRuns,
+    costedRuns: a.costedRuns,
     durationMs: a.durationMs,
     tokens: a.measuredRuns > 0 ? a.tokens : null,
     costUsd: a.costedRuns > 0 ? a.costUsd : null,

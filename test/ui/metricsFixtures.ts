@@ -7,6 +7,7 @@ import { METRICS_BREAKDOWN_DIMS, type MetricsBreakdown, type MetricsCell, type M
 const emptyCovered: Omit<MetricsCell, 'value'> = {
   runs: 0,
   measuredRuns: 0,
+  costedRuns: 0,
   durationMs: 0,
   tokens: null,
   costUsd: null,

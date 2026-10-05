@@ -135,7 +135,7 @@ describe('tokens medidos, custo não medido', () => {
     run(at(2026, 6, 3), 1000, { cardNumber: 7 });
     const model = cut('model');
     expect(model.cells).toEqual([
-      { value: 'opus', runs: 2, measuredRuns: 1, durationMs: 2000, tokens: 100, costUsd: null, costEstimatedUsd: null },
+      { value: 'opus', runs: 2, measuredRuns: 1, costedRuns: 0, durationMs: 2000, tokens: 100, costUsd: null, costEstimatedUsd: null },
     ]);
     expect(model.covered).toMatchObject({ measuredRuns: 1, tokens: 100, costUsd: null });
     expect(sections().cards.cells[0]).toMatchObject({ value: '#7 Card', measuredRuns: 1, tokens: 100, costUsd: null });

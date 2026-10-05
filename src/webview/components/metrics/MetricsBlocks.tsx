@@ -1,7 +1,11 @@
 import { t } from '../../i18n';
 import { useBoardStore } from '../../store/boardStore';
 import type { MetricsPanelResult } from '../../../shared/metrics';
+import { Breakdown } from './Breakdown';
+import { Inventory } from './Inventory';
 import { MetricsBlock, MetricsBlockGroup } from './MetricsBlock';
+import { CardRanking, PhaseRanking } from './RankingTable';
+import { DwellTable, LeadTable } from './Times';
 
 /**
  * Os cinco blocos abaixo da série por mês (card 173): cortes, permanência por fase, lead time, os dois
@@ -20,10 +24,6 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
   const sections = result.sections;
   const blocks = useBoardStore((s) => s.metricsBlocks);
   const setBlocks = useBoardStore((s) => s.setMetricsBlocks);
-  // enquanto os quatro cards de baixo não montam seus componentes, estes valores só esperam por eles
-  void sections;
-  void blocks;
-  void setBlocks;
 
   return (
     <div className="metrics-blocks">
@@ -33,7 +33,7 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
         horizon="series"
         result={result}
       >
-        {/* card 175 Cortes: <Breakdown result={result} sections={sections} dim={blocks.dim} measure={blocks.measure} onChange={setBlocks} /> */}
+        <Breakdown result={result} sections={sections} dim={blocks.dim} measure={blocks.measure} onChange={setBlocks} />
       </MetricsBlock>
 
       <MetricsBlock
@@ -42,7 +42,7 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
         horizon="detail"
         result={result}
       >
-        {/* card 176 Permanência: <DwellTable result={result} sections={sections} /> */}
+        <DwellTable result={result} sections={sections} />
       </MetricsBlock>
 
       <MetricsBlock
@@ -51,7 +51,7 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
         horizon="detail"
         result={result}
       >
-        {/* card 176 Lead time: <LeadTable result={result} sections={sections} sort={blocks.leadSort} onSort={(leadSort) => setBlocks({ leadSort })} /> */}
+        <LeadTable result={result} sections={sections} sort={blocks.leadSort} onSort={(leadSort) => setBlocks({ leadSort })} />
       </MetricsBlock>
 
       <MetricsBlockGroup
@@ -65,7 +65,7 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
           result={result}
           level={4}
         >
-          {/* card 174 Ranking de fases: <RankingTable ... rows das fases de sections.breakdowns, sort={blocks.phaseSort} onSort={(phaseSort) => setBlocks({ phaseSort })} /> */}
+          <PhaseRanking result={result} sections={sections} sort={blocks.phaseSort} onSort={(phaseSort) => setBlocks({ phaseSort })} />
         </MetricsBlock>
         <MetricsBlock
           title={t('Cards mais caros')}
@@ -74,7 +74,7 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
           result={result}
           level={4}
         >
-          {/* card 174 Ranking por card: <RankingTable ... rows de sections.cards, sort={blocks.cardSort} onSort={(cardSort) => setBlocks({ cardSort })} /> */}
+          <CardRanking result={result} sections={sections} sort={blocks.cardSort} onSort={(cardSort) => setBlocks({ cardSort })} />
         </MetricsBlock>
       </MetricsBlockGroup>
 
@@ -84,7 +84,7 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
         horizon="detail"
         result={result}
       >
-        {/* card 177 Inventário: <Inventory result={result} sections={sections} /> */}
+        <Inventory result={result} sections={sections} />
       </MetricsBlock>
     </div>
   );

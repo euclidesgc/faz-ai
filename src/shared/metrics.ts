@@ -133,6 +133,12 @@ export interface MetricsCell {
    * `costUsd` são `null`, nunca 0: nada medido não é consumo zero (RF-30).
    */
   measuredRuns: number;
+  /**
+   * Execuções do grupo que tinham custo. É contado à parte de `measuredRuns` porque uma execução pode
+   * ter tokens e não ter custo (#70 ainda não grava custo): `0 < costedRuns < runs` = custo parcial, e a
+   * tela marca a linha (RF-30). Com 0, `costUsd` é `null`.
+   */
+  costedRuns: number;
   durationMs: number;
   /** null = nenhuma execução do grupo foi medida; nunca 0 (RF-30) */
   tokens: number | null;

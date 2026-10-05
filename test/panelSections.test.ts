@@ -234,6 +234,15 @@ describe('getPanelMetrics: os seis cortes', () => {
     check();
   });
 
+  it('RF-30: costedRuns conta à parte de measuredRuns, para a tela marcar o custo parcial (card 175)', () => {
+    run(at(2026, 6), 1000, { model: 'opus', tokens: 10, costUsd: 0.5 });
+    run(at(2026, 6), 1000, { model: 'opus', tokens: 10 });
+    run(at(2026, 6), 1000, { model: 'opus' });
+    const b = cut(sections(), 'model');
+    expect(cell(b, 'opus')).toMatchObject({ runs: 3, measuredRuns: 2, costedRuns: 1, tokens: 20, costUsd: 0.5 });
+    expect(b.covered).toMatchObject({ runs: 3, measuredRuns: 2, costedRuns: 1 });
+  });
+
   it('RF-31: a parte estimada do custo chega a cada linha', () => {
     run(at(2026, 6), 1000, { model: 'opus', tokens: 10, costUsd: 0.5 });
     run(at(2026, 6), 1000, { model: 'opus', tokens: 10, costUsd: 0.25, estimated: false });
@@ -290,10 +299,19 @@ describe('getPanelMetrics: ranking por card', () => {
     run(at(2026, 6, 4), 4000, { cardNumber: null });
     const { cards } = sections();
     expect(cards.cells).toEqual([
-      { value: '#7 Título novo', runs: 2, measuredRuns: 1, durationMs: 3000, tokens: 5, costUsd: 0.5, costEstimatedUsd: 0.5 },
-      { value: '', runs: 1, measuredRuns: 0, durationMs: 4000, tokens: null, costUsd: null, costEstimatedUsd: null },
+      {
+        value: '#7 Título novo',
+        runs: 2,
+        measuredRuns: 1,
+        costedRuns: 1,
+        durationMs: 3000,
+        tokens: 5,
+        costUsd: 0.5,
+        costEstimatedUsd: 0.5,
+      },
+      { value: '', runs: 1, measuredRuns: 0, costedRuns: 0, durationMs: 4000, tokens: null, costUsd: null, costEstimatedUsd: null },
     ]);
-    expect(cards.covered).toMatchObject({ runs: 3, durationMs: 7000, measuredRuns: 1 });
+    expect(cards.covered).toMatchObject({ runs: 3, durationMs: 7000, measuredRuns: 1, costedRuns: 1 });
     expect(cards.omitted).toBe(0);
   });
 

@@ -142,4 +142,103 @@ export const metrics: Record<string, string> = {
     'This block depends on the stored detail, and the board has none yet.',
   desconhecido: 'unknown',
   'menos de 1min': 'less than 1m',
+  // card 177: o inventário (Inventory)
+  'Este bloco lê só o detalhe guardado, desde {month}. Os totais mensais de uso (por tipo e nome) também vão para o arquivo mensal, mas não aparecem aqui: depois que o detalhe de um mês é descartado, o que cada execução usou deixa de ser listado.':
+    'This block reads only the stored detail, since {month}. The monthly usage totals (by kind and name) also go to the monthly archive, but they do not show here: once a month detail is discarded, what each run used is no longer listed.',
+  'Este bloco lê só o detalhe guardado. Os totais mensais de uso (por tipo e nome) também vão para o arquivo mensal, mas não aparecem aqui: depois que o detalhe de um mês é descartado, o que cada execução usou deixa de ser listado.':
+    'This block reads only the stored detail. The monthly usage totals (by kind and name) also go to the monthly archive, but they do not show here: once a month detail is discarded, what each run used is no longer listed.',
+  Ferramentas: 'Tools',
+  'Ferramentas de MCP': 'MCP tools',
+  Subagentes: 'Subagents',
+  'Ainda não medido: nenhuma execução deste board gravou o que usou. Não significa que nada foi usado.':
+    'Not measured yet: no run on this board has recorded what it used. It does not mean nothing was used.',
+  'Nenhum registro no período.': 'No records in the period.',
+  Servidor: 'Server',
+  Ferramenta: 'Tool',
+  Execuções: 'Runs',
+  Usos: 'Uses',
+  'servidor não registrado': 'server not recorded',
+  // card 176: permanência por fase e lead time (Times)
+  'sem permanência medida': 'no permanence measured',
+  'Nenhuma fase com permanência neste período.': 'No phase has a permanence in this period.',
+  'Permanência do card em cada fase': 'How long the card stayed in each phase',
+  Permanências: 'Permanences',
+  Mediana: 'Median',
+  Média: 'Mean',
+  Desconhecidas: 'Unknown',
+  'Aqui agora': 'Here now',
+  'Permanências, não cards: um card que volta para uma fase conta duas vezes. Quem está na fase agora aparece em "aqui agora" e fica fora da média e da mediana.':
+    'Permanences, not cards: a card that returns to a phase counts twice. Cards in the phase now show under "here now" and are left out of the mean and the median.',
+  'Desconhecida é a permanência cuja entrada na fase ficou fora do detalhe guardado: ela é contada à parte, nunca como zero nem como tempo curto.':
+    'Unknown is a permanence whose entry into the phase falls outside the stored detail: it is counted separately, never as zero or as a short time.',
+  'Medido da criação do card até a primeira conclusão: um card concluído, reaberto e concluído de novo tem um lead time só.':
+    'Measured from the creation of the card to its first completion: a card completed, reopened and completed again has a single lead time.',
+  'Nenhum card foi concluído neste período.': 'No card was completed in this period.',
+  'Desconhecido é o lead time de um card sem data de criação no detalhe guardado. Há dois motivos possíveis e não dá para separá-los com honestidade: o mês em que o card foi criado pode ter sido descartado, ou o card pode ser anterior ao início da série. A data não é estimada.':
+    'Unknown is the lead time of a card with no creation date in the stored detail. There are two possible reasons and they cannot be told apart honestly: the month the card was created may have been discarded, or the card may predate the start of the series. The date is not estimated.',
+  'Nenhum lead time foi medido neste período: não há mediana nem média para mostrar.':
+    'No lead time was measured in this period: there is no median or mean to show.',
+  'sem valor medido': 'no measured value',
+  'Entraram na conta': 'Counted',
+  Desconhecidos: 'Unknown',
+  'Lead time de cada card concluído': 'Lead time of each completed card',
+  'Concluído em': 'Completed on',
+  '+{n} card concluído não listado': '+{n} completed card not listed',
+  '+{n} cards concluídos não listados': '+{n} completed cards not listed',
+  // card 174: a tabela ordenável dos rankings (RankingTable, CardRanking, PhaseRanking)
+  'Ordenado pela coluna "{column}", decrescente.': 'Sorted by the "{column}" column, descending.',
+  'Ordenado pela coluna "{column}", crescente.': 'Sorted by the "{column}" column, ascending.',
+  'É o padrão quando o período tem custo medido.': 'This is the default when the period has measured cost.',
+  'É o padrão enquanto o período não tem custo medido.': 'This is the default while the period has no measured cost.',
+  'Mostrar só as {n} primeiras linhas': 'Show only the first {n} rows',
+  'Mostrar mais {n} linha': 'Show {n} more row',
+  'Mostrar mais {n} linhas': 'Show {n} more rows',
+  'outros ({n})': 'others ({n})',
+  '{n} grupo além do teto de {cap} linhas não veio na lista: está somado em "outros".':
+    '{n} group beyond the {cap}-row cap was not listed: it is added into "others".',
+  '{n} grupos além do teto de {cap} linhas não vieram na lista: estão somados em "outros".':
+    '{n} groups beyond the {cap}-row cap were not listed: they are added into "others".',
+  'Execuções sem card': 'Runs with no card',
+  'Fase não definida': 'Phase not defined',
+  // card 175: o corte por dimensão (Breakdown); "outros ({n})" já está no bloco do card 174
+  'Recortar por': 'Break down by',
+  'Medida da barra': 'Bar measure',
+  'Tipo de card': 'Card type',
+  'Ferramenta de IA': 'AI tool',
+  'Perfil de agente': 'Agent profile',
+  fase: 'phase',
+  'tipo de card': 'card type',
+  modelo: 'model',
+  'ferramenta de IA': 'AI tool',
+  'esforço do modelo': 'model effort',
+  'perfil de agente': 'agent profile',
+  'Custo por {dim}, {period}': 'Cost by {dim}, {period}',
+  'Tokens por {dim}, {period}': 'Tokens by {dim}, {period}',
+  'Execuções por {dim}, {period}': 'Runs by {dim}, {period}',
+  'Tempo de IA por {dim}, {period}': 'AI time by {dim}, {period}',
+  outros: 'others',
+  'não definido': 'not defined',
+  'nome em mais de um workflow': 'name in more than one workflow',
+  'custo parcial': 'partial cost',
+  'tokens parciais': 'partial tokens',
+  '{n} execução sem custo medido': '{n} run with no measured cost',
+  '{n} execuções sem custo medido': '{n} runs with no measured cost',
+  '{n} execução sem tokens medidos': '{n} run with no measured tokens',
+  '{n} execuções sem tokens medidos': '{n} runs with no measured tokens',
+  'estimado por tabela de preços': 'estimated from a price table',
+  'parte estimada por tabela de preços: {estimated}': 'part estimated from a price table: {estimated}',
+  'Fase é o nome da coluna em que o card estava no momento da chamada, congelado com a execução: mover o card depois não reescreve o passado. Uma coluna renomeada aparece com os dois nomes, como o log os guardou.':
+    'Phase is the name of the column the card was in at the moment of the call, frozen with the run: moving the card later does not rewrite the past. A renamed column shows up under both names, as the log stored them.',
+  '{names}: mais de um workflow tem uma coluna com este nome, e as execuções aparecem somadas numa linha só. Escolher o workflow no filtro separa.':
+    '{names}: more than one workflow has a column with this name, and their runs are added up in a single row. Choosing the workflow in the filter separates them.',
+  '{names}: mais de um workflow tem uma coluna com cada um destes nomes, e as execuções aparecem somadas numa linha só por nome. Escolher o workflow no filtro separa.':
+    '{names}: more than one workflow has a column with each of these names, and their runs are added up in a single row per name. Choosing the workflow in the filter separates them.',
+  '{months} ficou fora deste corte: só tem o total do board inteiro, sem a divisão pelo workflow escolhido.':
+    '{months} is left out of this breakdown: it only has the whole-board total, with no split by the chosen workflow.',
+  '{months} ficaram fora deste corte: só têm o total do board inteiro, sem a divisão pelo workflow escolhido.':
+    '{months} are left out of this breakdown: they only have the whole-board total, with no split by the chosen workflow.',
+  'Nenhuma categoria tem custo medido neste período, então não há barras para desenhar. Escolha outra medida ou leia os números na tabela.':
+    'No category has measured cost in this period, so there are no bars to draw. Choose another measure or read the numbers in the table.',
+  'Nenhuma categoria tem tokens medidos neste período, então não há barras para desenhar. Escolha outra medida ou leia os números na tabela.':
+    'No category has measured tokens in this period, so there are no bars to draw. Choose another measure or read the numbers in the table.',
 };
