@@ -2565,3 +2565,60 @@ body.host-web .drawer {
 .chip.on .tech-logo {
   fill: currentColor;
 }
+
+/* painel de métricas: a visão e os estados (os blocos acrescentam as classes deles abaixo). Enquanto a
+   próxima resposta não chega, os números anteriores ficam como estão, sem esmaecer (o contraste é o
+   mesmo), e o "Atualizando…" do cabeçalho mostra a espera (RF-08) */
+.metrics {
+  padding: var(--sp-12) var(--sp-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  /* largura de barra lateral e zoom de 200%: nada empurra a página para os lados (RF-33) */
+  min-width: 0;
+}
+.metrics-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-12);
+}
+.metrics-updating,
+.metrics-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  color: var(--muted);
+}
+.metrics-state {
+  margin: 0;
+}
+.metrics-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+  min-width: 0;
+}
+.metrics-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  background: var(--error-bg);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-6) var(--sp-12);
+}
+/* aviso de honestidade: pequeno, colado ao número que qualifica (RF-22) */
+.metrics-note {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.metrics-note .glyph {
+  flex: none;
+  align-self: center;
+}

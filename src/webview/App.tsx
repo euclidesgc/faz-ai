@@ -16,6 +16,7 @@ import { AutopilotButton } from './components/AutopilotButton';
 import { HeartbeatButton } from './components/HeartbeatButton';
 import { ThemeToggle } from './components/ThemeToggle';
 import { TrashView } from './components/TrashView';
+import { MetricsView } from './components/metrics/MetricsView';
 import { Settings } from './components/settings/Settings';
 import { Button, IconChat, IconClose, IconExternal } from './components/ui';
 import { isWeb, onConnectionChange } from './vscode';
@@ -71,14 +72,18 @@ export function App() {
       <header className="topbar">
         <h1 title={state.board.name}>{state.board.name}</h1>
         <nav>
-          <Button active={view === 'board'} onClick={() => setView('board')}>
+          {/* a visão atual vai no atributo (aria-current), não só na cor */}
+          <Button active={view === 'board'} aria-current={view === 'board' ? 'page' : undefined} onClick={() => setView('board')}>
             {t('Board')}
           </Button>
-          <Button active={view === 'trash'} onClick={() => setView('trash')}>
+          <Button active={view === 'metrics'} aria-current={view === 'metrics' ? 'page' : undefined} onClick={() => setView('metrics')}>
+            {t('Métricas')}
+          </Button>
+          <Button active={view === 'trash'} aria-current={view === 'trash' ? 'page' : undefined} onClick={() => setView('trash')}>
             {t('Lixeira')}
             {trashCount > 0 && ` (${trashCount})`}
           </Button>
-          <Button active={view === 'settings'} onClick={() => setView('settings')}>
+          <Button active={view === 'settings'} aria-current={view === 'settings' ? 'page' : undefined} onClick={() => setView('settings')}>
             {t('Configurações')}
           </Button>
         </nav>
@@ -129,11 +134,13 @@ export function App() {
           )}
         </div>
       )}
+      {/* a barra de filtros filtra cards, não o log: fica só no board (RF-01) */}
       {view === 'board' && <FilterBar />}
       <main className="content">
         {view === 'board' && <Board />}
         {view === 'trash' && <TrashView />}
         {view === 'settings' && <Settings />}
+        {view === 'metrics' && <MetricsView />}
       </main>
       {isWeb && chatOpen && (
         <aside className="chat-drawer">

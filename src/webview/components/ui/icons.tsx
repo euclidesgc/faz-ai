@@ -23,6 +23,7 @@ import {
   Hand,
   Heart,
   Heading,
+  Info,
   Italic,
   Link,
   List,
@@ -90,6 +91,8 @@ export const IconRun = icon(Play, 'IconRun');
 export const IconDrag = icon(GripVertical, 'IconDrag');
 export const IconExternal = icon(ExternalLink, 'IconExternal');
 export const IconWarning = icon(TriangleAlert, 'IconWarning');
+/** aviso que qualifica um número (painel de métricas) */
+export const IconInfo = icon(Info, 'IconInfo');
 export const IconHeart = icon(Heart, 'IconHeart');
 export const IconYolo = icon(Zap, 'IconYolo');
 export const IconPlus = icon(Plus, 'IconPlus');
