@@ -9,6 +9,7 @@ import { Dialog } from '../../src/webview/components/Dialog';
 import { MetricsView } from '../../src/webview/components/metrics/MetricsView';
 import { RetentionCard } from '../../src/webview/components/metrics/RetentionCard';
 import { useBoardStore } from '../../src/webview/store/boardStore';
+import { emptySections } from './metricsFixtures';
 
 afterEach(() => {
   useBoardStore.setState({ metricsFilters: EMPTY_METRICS_FILTERS });
@@ -43,6 +44,7 @@ function panel(retention: MetricsPanelResult['retention'], over: Partial<Metrics
     detailFrom: '2026-09',
     archivedMonths: [],
     retention,
+    sections: emptySections(),
     ...over,
   };
 }

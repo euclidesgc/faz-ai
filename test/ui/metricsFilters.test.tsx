@@ -7,6 +7,7 @@ import { EMPTY_METRICS_FILTERS, type MetricsMonth, type MetricsPanelResult } fro
 import { setLocale } from '../../src/webview/i18n';
 import { MetricsView } from '../../src/webview/components/metrics/MetricsView';
 import { useBoardStore } from '../../src/webview/store/boardStore';
+import { emptySections } from './metricsFixtures';
 
 afterEach(() => {
   useBoardStore.setState({ metricsFilters: EMPTY_METRICS_FILTERS });
@@ -41,6 +42,7 @@ function panel(over: Partial<MetricsPanelResult> = {}): MetricsPanelResult {
     detailFrom: '2026-09',
     archivedMonths: [],
     retention: { months: 6, detailMonths: 2, detailRows: 40 },
+    sections: emptySections(),
     ...over,
   };
 }

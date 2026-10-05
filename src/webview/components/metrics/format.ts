@@ -10,6 +10,7 @@ import { getLocale, t } from '../../i18n';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 const isEn = (): boolean => getLocale() === 'en';
 
 /** O locale do `Intl` para o idioma da interface. */
@@ -61,6 +62,23 @@ export function formatDuration(ms: number): string {
   const min = isEn() ? 'm' : 'min';
   if (h === 0) return `${m}${min}`;
   return `${formatNumber(h)}h${isEn() ? ' ' : ''}${String(m).padStart(2, '0')}${min}`;
+}
+
+/**
+ * Permanência e lead time, em dias e horas: "3d 4h", "2d", "5h", "45min" (em inglês "45m"). `null` é
+ * "desconhecido" (RF-16), nunca "0". Abaixo de uma hora vai em minutos; abaixo de um minuto, "menos de 1min".
+ * Não há segundos nem semanas: é tempo de relógio que um card passou numa fase, não duração de execução.
+ */
+export function formatSpan(ms: number | null): string {
+  if (ms === null) return t('desconhecido');
+  const total = Math.max(0, Math.round(ms));
+  const min = isEn() ? 'm' : 'min';
+  if (total < MINUTE) return t('menos de 1min');
+  if (total < HOUR) return `${Math.floor(total / MINUTE)}${min}`;
+  const days = Math.floor(total / DAY);
+  const hours = Math.floor((total % DAY) / HOUR);
+  if (days === 0) return `${hours}h`;
+  return hours === 0 ? `${formatNumber(days)}d` : `${formatNumber(days)}d ${hours}h`;
 }
 
 /** 'AAAA-MM-DD' como data local (o log grava o dia no fuso da máquina). */

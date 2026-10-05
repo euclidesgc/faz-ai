@@ -99,4 +99,47 @@ export const metrics: Record<string, string> = {
   'sem dado': 'no data',
   parcial: 'partial',
   'só total mensal': 'monthly total only',
+
+  // card 162 avisos de honestidade (PeriodNote, Horizon)
+  'Log do board desde {date}.': 'Board log since {date}.',
+  'O período pedido começava antes do início da série. O recorte em vigor é {period}. Não existe dado mais antigo: o número não está pequeno, é a série que começa aí.':
+    'The requested period started before the start of the series. The range in effect is {period}. No older data exists: the number is not small, the series is what starts there.',
+  '{months} só têm o total mensal: entram na série, mas sem corte por dimensão nem detalhe por card.':
+    '{months} only have the monthly total: they are in the series, but with no breakdown by dimension or per-card detail.',
+  '{months} só tem o total mensal: entra na série, mas sem corte por dimensão nem detalhe por card.':
+    '{months} only has the monthly total: it is in the series, but with no breakdown by dimension or per-card detail.',
+  'O detalhe vai desde {month}.': 'Detail goes back to {month}.',
+  'Com o workflow {workflow} filtrado, {months} ficaram fora dos números: foram consolidados antes de o log guardar o workflow e só têm o total do board inteiro. Não foram somados por aproximação.':
+    'With the {workflow} workflow filtered, {months} are left out of the numbers: they were consolidated before the log stored the workflow and only have the whole-board total. They were not added up by approximation.',
+  'Com o workflow {workflow} filtrado, {months} ficou fora dos números: foi consolidado antes de o log guardar o workflow e só tem o total do board inteiro. Não foi somado por aproximação.':
+    'With the {workflow} workflow filtered, {months} is left out of the numbers: it was consolidated before the log stored the workflow and only has the whole-board total. It was not added up by approximation.',
+
+  // card 173: os cinco blocos (MetricsBlocks, MetricsBlock) e o formatSpan
+  'Onde o consumo aconteceu': 'Where the usage happened',
+  'O consumo do período repartido por fase, tipo de card, modelo, ferramenta, esforço ou perfil.':
+    'The period usage split by phase, card type, model, tool, effort or profile.',
+  'Quanto tempo o card fica na fase': 'How long a card stays in a phase',
+  'Média e mediana de cada passagem por uma fase, e quantos cards estão nela agora.':
+    'Mean and median of each pass through a phase, and how many cards are in it now.',
+  'Lead time': 'Lead time',
+  'Do primeiro registro do card até a conclusão, dos cards concluídos no período.':
+    'From the first record of the card to its completion, for the cards completed in the period.',
+  'Mais caros e mais demorados': 'Most expensive and slowest',
+  'Os dois rankings olham horizontes diferentes: leia o aviso de cada um antes de compará-los.':
+    'The two rankings look at different horizons: read the notice on each before comparing them.',
+  'Fases mais caras': 'Most expensive phases',
+  'As fases ordenadas pelo consumo, com a série inteira do período.': 'The phases ordered by usage, over the whole series of the period.',
+  'Cards mais caros': 'Most expensive cards',
+  'Os cards ordenados pelo consumo, com as execuções que o detalhe ainda guarda.':
+    'The cards ordered by usage, with the runs the detail still holds.',
+  'O que a IA usou': 'What the AI used',
+  'Ferramentas, ferramentas MCP, agentes e skills que apareceram nas execuções.':
+    'Tools, MCP tools, agents and skills that showed up in the runs.',
+  'Alcança toda a série do período, inclusive os meses já arquivados.': 'Covers the whole series of the period, archived months included.',
+  'Só alcança o detalhe guardado, desde {month}: o que aconteceu antes não aparece aqui.':
+    'Only covers the stored detail, since {month}: what happened before does not show here.',
+  'Este bloco depende do detalhe guardado, e o board ainda não tem nenhum.':
+    'This block depends on the stored detail, and the board has none yet.',
+  desconhecido: 'unknown',
+  'menos de 1min': 'less than 1m',
 };

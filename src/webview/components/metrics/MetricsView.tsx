@@ -1,9 +1,12 @@
 import { t } from '../../i18n';
 import { useBoardStore } from '../../store/boardStore';
 import { Button } from '../ui';
+import { Horizon } from './Horizon';
 import { MetricsFilters } from './MetricsFilters';
+import { MetricsBlocks } from './MetricsBlocks';
 import { MonthSeries } from './MonthSeries';
 import { formatDay, formatRange, isEmptyResult } from './format';
+import { PeriodNote } from './PeriodNote';
 import { Totals } from './Totals';
 import { RetentionCard } from './RetentionCard';
 import { useMetricsQuery } from './useMetricsQuery';
@@ -59,14 +62,15 @@ export function MetricsView() {
         )
       ) : (
         <div className="metrics-body" aria-busy={loading || undefined}>
-          {/* #162 Avisos, o recorte em vigor junto dos filtros (período, "log desde", recorte cortado): <RangeNote result={result} /> */}
+          <PeriodNote result={result} />
           {empty ? (
             <EmptyPeriod logSince={result.logSince} />
           ) : (
             <>
               <Totals result={result} />
               <MonthSeries result={result} />
-              {/* #162 Avisos, o horizonte do detalhe junto do gráfico que ele qualifica (RF-22): <DetailNote result={result} /> */}
+              <Horizon result={result} workflow={filters.workflow} />
+              <MetricsBlocks result={result} />
             </>
           )}
           <RetentionCard result={result} onChanged={refresh} />{' '}

@@ -5,6 +5,7 @@ import { EMPTY_METRICS_FILTERS, type MetricsPanelResult } from '../../src/shared
 import { setLocale } from '../../src/webview/i18n';
 import { Totals } from '../../src/webview/components/metrics/Totals';
 import { useBoardStore } from '../../src/webview/store/boardStore';
+import { emptySections } from './metricsFixtures';
 
 afterEach(() => {
   useBoardStore.setState({ metricsFilters: EMPTY_METRICS_FILTERS });
@@ -36,6 +37,7 @@ function result(over: Partial<MetricsPanelResult['totals']> = {}): MetricsPanelR
     detailFrom: '2026-09',
     archivedMonths: [],
     retention: { months: 6, detailMonths: 2, detailRows: 40 },
+    sections: emptySections(),
   };
 }
 

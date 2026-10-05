@@ -19,6 +19,7 @@ import {
 } from '../../src/webview/components/metrics/format';
 import { toPanelQuery } from '../../src/webview/components/metrics/useMetricsQuery';
 import { useBoardStore } from '../../src/webview/store/boardStore';
+import { emptySections } from './metricsFixtures';
 
 afterEach(() => {
   useBoardStore.setState({ metricsFilters: EMPTY_METRICS_FILTERS });
@@ -55,6 +56,7 @@ function panel(startDate: string, endDate: string, over: Partial<MetricsPanelRes
     detailFrom: '2026-09',
     archivedMonths: [],
     retention: { months: 6, detailMonths: 2, detailRows: 40 },
+    sections: emptySections(),
     ...over,
   };
 }

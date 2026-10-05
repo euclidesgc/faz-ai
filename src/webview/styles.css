@@ -2839,3 +2839,95 @@ body.host-web .drawer {
 .metrics-series-value {
   font-variant-numeric: tabular-nums;
 }
+
+/* card 162, painel de métricas: avisos de honestidade junto do período e do gráfico (RF-20, RF-21, RF-22) */
+.metrics-period-note,
+.metrics-horizon {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/* card 173, painel de métricas: os cinco blocos abaixo da série. Grade auto-fit e tabelas que rolam dentro de si (RF-40) */
+.metrics-blocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--sp-16);
+  min-width: 0;
+}
+.metrics-block,
+.metrics-block-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  min-width: 0;
+  padding: var(--sp-12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+}
+.metrics-block-group {
+  grid-column: 1 / -1;
+}
+.metrics-block-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--sp-12);
+  min-width: 0;
+}
+.metrics-block-pair .metrics-block {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.metrics-block-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.metrics-block-intro {
+  margin: 0;
+  color: var(--muted);
+}
+.metrics-block-body {
+  min-width: 0;
+  max-height: 24rem;
+  overflow: auto;
+}
+.metrics-block-body:empty {
+  display: none;
+}
+.metrics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.metrics-table th,
+.metrics-table td {
+  padding: var(--sp-4) var(--sp-8);
+  text-align: left;
+  overflow-wrap: anywhere;
+  border-top: 1px solid var(--border);
+}
+.metrics-table td.is-number,
+.metrics-table th.is-number {
+  text-align: right;
+}
+.metrics-sticky-head th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--card-bg);
+  color: var(--muted);
+  font-weight: 600;
+}
+.metrics-bar-cell {
+  position: relative;
+  min-width: 6rem;
+}
+.metrics-bar-cell > .metrics-bar {
+  display: block;
+  height: var(--sp-8);
+  border-radius: var(--radius-sm);
+  background: var(--chart-bar);
+}

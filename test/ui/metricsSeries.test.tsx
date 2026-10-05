@@ -8,6 +8,7 @@ import { setLocale } from '../../src/webview/i18n';
 import { MetricsView } from '../../src/webview/components/metrics/MetricsView';
 import { MonthSeries, seriesPoints } from '../../src/webview/components/metrics/MonthSeries';
 import { useBoardStore } from '../../src/webview/store/boardStore';
+import { emptySections } from './metricsFixtures';
 
 // #160: a série de custo e tokens por mês (barras em SVG, alternador e tabela equivalente).
 
@@ -50,6 +51,7 @@ function panel(months: MetricsMonth[], over: Partial<MetricsPanelResult> = {}): 
     detailFrom: '2026-07',
     archivedMonths: [],
     retention: { months: 6, detailMonths: 4, detailRows: 40 },
+    sections: emptySections(),
     ...over,
   };
 }
