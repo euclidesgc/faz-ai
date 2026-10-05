@@ -253,3 +253,43 @@ describe('getMetrics: workflow escolhido e o arquivo (RF-10)', () => {
     expect(row(result, 'opus')).toMatchObject({ runs: 2, durationMs: 3000, tokens: 300, costUsd: 0.75 });
   });
 });
+
+describe('getMetrics: recortes de data (revisão 0.32.0)', () => {
+  it('só start_date: os meses consolidados até hoje continuam na conta (mesmo número antes e depois)', () => {
+    run(at(2026, 1), 1000);
+    run(at(2026, 2), 2000);
+    run(at(2026, 3), 4000);
+    const before = getMetrics(db, boardId, { startDate: '2026-01-01' });
+    expect(before.rows[0]).toMatchObject({ runs: 3, durationMs: 7000 });
+    consolidate(db, boardId, TODAY, 1); // só junho fica com detalhe
+    const after = getMetrics(db, boardId, { startDate: '2026-01-01' });
+    expect(after.rows[0]).toMatchObject({ runs: 3, durationMs: 7000 });
+    expect(after.archivedMonths).toEqual(['2026-01', '2026-02', '2026-03']);
+    // começo no meio do mês: o mês inicial é parcial, os seguintes não
+    expect(getMetrics(db, boardId, { startDate: '2026-02-15' }).partialMonths).toEqual(['2026-02']);
+  });
+
+  describe('fim do dia no horário de verão (TZ=America/New_York)', () => {
+    let tz: string | undefined;
+    beforeEach(() => {
+      tz = process.env.TZ;
+      process.env.TZ = 'America/New_York';
+    });
+    afterEach(() => {
+      if (tz === undefined) delete process.env.TZ;
+      else process.env.TZ = tz;
+    });
+
+    it('dia de 23 horas (8/3/2026): a execução de 00h30 do dia seguinte fica fora', () => {
+      run(new Date(2026, 2, 8, 12, 0).getTime(), 1000);
+      run(new Date(2026, 2, 9, 0, 30).getTime(), 1000);
+      expect(getMetrics(db, boardId, { startDate: '2026-03-08', endDate: '2026-03-08' }).rows[0]?.runs).toBe(1);
+    });
+
+    it('dia de 25 horas (1/11/2026): a execução de 23h30 do próprio dia fica dentro', () => {
+      run(new Date(2026, 10, 1, 12, 0).getTime(), 1000);
+      run(new Date(2026, 10, 1, 23, 30).getTime(), 1000);
+      expect(getMetrics(db, boardId, { startDate: '2026-11-01', endDate: '2026-11-01' }).rows[0]?.runs).toBe(2);
+    });
+  });
+});

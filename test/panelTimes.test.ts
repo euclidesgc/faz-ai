@@ -258,3 +258,12 @@ describe('getPanelMetrics: período sem dado', () => {
     expect(s.lead.rows).toEqual([]);
   });
 });
+
+describe('getPanelMetrics: card arquivado nos tempos (revisão 0.32.0)', () => {
+  it('a consulta traz archived: card arquivado sai de "aqui agora"', () => {
+    ev(at(2026, 6, 2), 'created', 1, { to: 'A fazer' });
+    ev(at(2026, 6, 5), 'archived', 1);
+    const dwell = sections(JUNE).dwell;
+    expect(dwell.find((d) => d.phase === 'A fazer')).toMatchObject({ permanences: 1, openNow: 0 });
+  });
+});

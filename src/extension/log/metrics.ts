@@ -33,7 +33,7 @@ import {
   type MetricsPanelSections,
   type MetricsUsage,
 } from '../../shared/metrics';
-import { leadTimes, phaseDwell, type TimesEventRow, type TimesPeriod } from './times';
+import { DWELL_EVENT_KINDS, leadTimes, phaseDwell, type TimesEventRow, type TimesPeriod } from './times';
 // #171: os seis cortes e o ranking por card (METRICS_ROW_CAP e MetricsPanelSections vêm do import de #172)
 import {
   METRICS_BREAKDOWN_DIMS,
@@ -128,12 +128,17 @@ const DEFAULT_LIMIT = 20;
 
 function dayBoundary(date: string, end: boolean): number {
   const [y, m, d] = date.split('-').map(Number);
-  const base = new Date(y!, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0);
-  return end ? base.getTime() + 24 * 60 * 60 * 1000 : base.getTime();
+  // fim = meia-noite do dia seguinte, não meia-noite + 24h: no dia em que o horário de verão começa ou
+  // termina o dia tem 23 ou 25 horas
+  return new Date(y!, (m ?? 1) - 1, (d ?? 1) + (end ? 1 : 0), 0, 0, 0, 0).getTime();
 }
 
 function monthOfDay(date: string): string {
   return date.slice(0, 7);
+}
+
+function laterMonth(a: string, b: string): string {
+  return a > b ? a : b;
 }
 
 interface Accumulator {
@@ -386,7 +391,8 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
     query.startDate || query.endDate
       ? monthRange(
           query.startDate ? monthOfDay(query.startDate) : (archivedAll[0] ?? monthOfDay(query.endDate!)),
-          query.endDate ? monthOfDay(query.endDate) : monthOfDay(query.startDate!),
+          // sem data final o recorte vai até hoje: os meses arquivados depois do inicial também entram
+          query.endDate ? monthOfDay(query.endDate) : laterMonth(monthOfDay(query.startDate!), monthOf(Date.now())),
         )
       : null;
   const archivedMonths = (rangeMonths ? archivedAll.filter((m) => rangeMonths.includes(m)) : archivedAll).sort();
@@ -489,6 +495,7 @@ function emptyPanelNumbers(): PanelNumbers {
     runsOpen: 0,
     durationMs: 0,
     measuredRuns: 0,
+    costedRuns: 0,
     tokens: null,
     costUsd: null,
     costEstimatedUsd: null,
@@ -521,6 +528,7 @@ function addPanelNumbers(into: PanelNumbers, from: PanelNumbers): void {
   into.runsOpen += from.runsOpen;
   into.durationMs += from.durationMs;
   into.measuredRuns += from.measuredRuns;
+  into.costedRuns = (into.costedRuns ?? 0) + (from.costedRuns ?? 0);
   into.tokens = addTokens(into.tokens, from.tokens);
   into.costUsd = addMeasured(into.costUsd, from.costUsd);
   into.costEstimatedUsd = addMeasured(into.costEstimatedUsd, from.costEstimatedUsd);
@@ -573,6 +581,7 @@ function panelRunsByMonth(db: Database, boardId: string, q: MetricsQuery, months
       runsOpen: num(r.open),
       durationMs: num(r.ms),
       measuredRuns: measured,
+      costedRuns: estimatedN + informedN,
       tokens,
       // a origem sem execução fica null: "nenhum custo informado" não é "custo informado zero"
       costUsd: estimatedN + informedN > 0 ? num(r.estimated) + num(r.informed) : null,
@@ -659,8 +668,10 @@ function panelArchiveByMonth(db: Database, boardId: string, months: string[], wo
       const byKind = kinds.get(month) ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
       byKind[TOKEN_KIND[value]!] = total;
       kinds.set(month, byKind);
-    } else if (key === 'cost/') acc.costUsd = total;
-    else if (key === 'cost/source' && value === 'estimated') acc.costEstimatedUsd = total;
+    } else if (key === 'cost/') {
+      acc.costedRuns = n;
+      acc.costUsd = total;
+    } else if (key === 'cost/source' && value === 'estimated') acc.costEstimatedUsd = total;
     else if (key === 'cost/source' && value === 'informed') acc.costInformedUsd = total;
     // `tokens/workflow` e `cost/workflow` ficam de fora de propósito: ver o comentário da função
   }
@@ -744,10 +755,12 @@ export function getPanelMetrics(db: Database, boardId: string, query: MetricsPan
   // sem início da série (board sem log nenhum), o recorte aberto começa no primeiro mês que tiver dado
   const firstData = [...detail, ...archivedAll].sort()[0];
   const startDate = clamped ? logSince : (query.startDate ?? (logSince || (firstData ? `${firstData}-01` : endDate)));
-  const range = { startDate, endDate };
+  // pedido inteiro antes do início da série: nada a consultar. O recorte volta vazio ('' nos dois lados),
+  // nunca invertido (início da série depois do fim pedido); `clamped` continua dizendo que foi cortado
+  const range = startDate <= endDate ? { startDate, endDate } : { startDate: '', endDate: '' };
 
   // o recorte pode ficar vazio depois do corte (pediu só dias anteriores ao início da série): espinha vazia
-  const spine = startDate <= endDate ? monthRange(monthOfDay(startDate), monthOfDay(endDate)) : [];
+  const spine = range.startDate ? monthRange(monthOfDay(startDate), monthOfDay(endDate)) : [];
   const monthBounds: [string, string] = [spine[0] ?? '', spine[spine.length - 1] ?? ''];
   const spineSet = new Set(spine);
   const archivedMonths = archivedAll.filter((m) => spineSet.has(m));
@@ -835,8 +848,8 @@ function panelDwell(db: Database, boardId: string, period: TimesPeriod, workflow
   for (const r of all(
     db,
     `SELECT card_number, at, kind, from_value, to_value FROM card_events
-     WHERE board_id = ? AND kind IN ('created','column_changed','trashed','deleted') AND at < ?${wf.sql}`,
-    [boardId, period.end, ...wf.params],
+     WHERE board_id = ? AND kind IN (${DWELL_EVENT_KINDS.map(() => '?').join(',')}) AND at < ?${wf.sql}`,
+    [boardId, ...DWELL_EVENT_KINDS, period.end, ...wf.params],
   )) {
     if (r.card_number == null) continue;
     rows.push({

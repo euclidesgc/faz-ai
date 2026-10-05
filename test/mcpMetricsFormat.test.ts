@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatMetrics } from '../src/extension/mcp/tools/metrics';
+import { formatMetrics, isoDateArg } from '../src/extension/mcp/tools/metrics';
 import type { MetricsResult } from '../src/extension/log/metrics';
 
 const BASE: MetricsResult = {
@@ -96,5 +96,18 @@ describe('formatMetrics: dimensões de configuração e inventário (#169)', () 
       rows: [{ label: 'x', server: '', runs: 1, durationMs: 0, tokens: undefined, costUsd: undefined, calls: 1 }],
     };
     expect(formatMetrics(result, 'mcp_tool')).toContain('servidor não registrado');
+  });
+});
+
+describe('get_metrics: validação das datas (revisão 0.32.0)', () => {
+  it('aceita AAAA-MM-DD de um dia que existe', () => {
+    expect(isoDateArg.safeParse('2026-02-28').success).toBe(true);
+    expect(isoDateArg.safeParse('2024-02-29').success).toBe(true);
+  });
+
+  it.each(['2026-02-30', '2026-13-01', '2026-2-3', '03/02/2026', '2026-02-28T10:00', ''])('recusa "%s" com mensagem clara', (value) => {
+    const parsed = isoDateArg.safeParse(value);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toMatch(/AAAA-MM-DD/);
   });
 });
