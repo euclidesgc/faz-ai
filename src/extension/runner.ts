@@ -23,6 +23,11 @@ export interface RunningProcess {
   kill(): void;
 }
 
+/** Como iniciar o servidor MCP do board para a ferramenta; undefined sem o bridge. */
+export function boardServer(deps: RunnerDeps): { command: string; args: string[] } | undefined {
+  return deps.bridgePath ? { command: deps.nodePath ?? 'node', args: [deps.bridgePath, deps.cwd] } : undefined;
+}
+
 export interface RunnerDeps {
   /** inicia o comando na pasta do projeto; cada pedaço de saída vai para `out`, com o canal de onde veio */
   spawn: SpawnFn;
@@ -32,6 +37,8 @@ export interface RunnerDeps {
   homeDir?: string;
   /** bridge.js do servidor MCP do board: com ele a ferramenta alcança o board mesmo sem estar registrada no projeto */
   bridgePath?: string;
+  /** caminho do node que roda o bridge; sem ele, `node`, resolvido pelo PATH de quem inicia o servidor */
+  nodePath?: string;
   /**
    * Log das execuções de IA. Opcional de propósito: sem ele o executor funciona exatamente como antes
    * (é o que mantém os testes e um board sem log valendo). Não se chama `log` porque esse nome já é o
@@ -255,7 +262,7 @@ export class AiRunner {
           permission,
           addDirs: this.router.aiWorkDirs(),
           exec: plan.input,
-          boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined,
+          boardServer: boardServer(this.deps),
         },
         this.deps.cwd,
         {

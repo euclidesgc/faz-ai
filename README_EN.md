@@ -282,12 +282,20 @@ The button is also in the card header, next to the status.
   conversa**: only the board (default), the board and project files, or no restrictions. The level
   in use is shown next to the button, with a shortcut to change it. The AI is told about the limit:
   if the work needs more than the level allows, it blocks the card saying which option to choose.
-- Cursor and Kimi Code, when running in the background, only work at the "no restrictions" level.
+- Kimi Code, when running in the background, only works at the "no restrictions" level. Cursor
+  accepts all three: at "only the board" and "board and files" its session gets only the tools of
+  that level (reading and MCP; reading, MCP and editing), with no terminal.
 - The tool must be installed and signed in. Its CLI does not need to be on the PATH: the board also
   looks in the usual install folders and inside editor extensions (if you only use the Claude Code
-  or Codex extension, you already have the executable).
+  or Codex extension, you already have the executable). Cursor's CLI is `cursor-agent` (the
+  `curl https://cursor.com/install -fsS | bash` installer also creates the `agent` shortcut); sign in
+  once with `cursor-agent login`.
 - With Claude Code, the board's server is passed on the command line of each run: it does not
-  depend on **Conectar IA (MCP)** or on approving `.mcp.json`. For the other tools, connect first.
+  depend on **Conectar IA (MCP)** or on approving `.mcp.json`. With Cursor, the board writes the
+  server to `.cursor/mcp.json` before running, if it is not there yet (and adds the file to
+  `.git/info/exclude` when it creates it). For the other tools, connect first.
+- When the story has its own working folder (worktree), the tool gets that folder along with the
+  project's, Cursor included.
 - If the run fails or exceeds the time limit, the card becomes blocked, with the reason and the end
   of the tool's output. The full log is in the **Output → Faz AI** panel (or in the `faz-ai`
   terminal).

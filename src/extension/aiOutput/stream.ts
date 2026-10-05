@@ -1,13 +1,17 @@
-// Leitor genérico de `stream-json`, usado por Cursor e Kimi. Como `codex.ts` (passo 5), construído
-// só pela documentação de referência — nenhuma das duas CLIs está instalada nesta máquina, não há
-// execução de prova. A diferença para o Claude (único formato medido contra saída real, em
-// `claude.ts`) e para o Codex (que ao menos promete um bloco `usage` por turno) é que a documentação
-// de Cursor e Kimi descreve os eventos `system`, `assistant`, `tool_call` e `result` no espírito do
-// formato do Claude Code, mas NÃO promete nenhum bloco de consumo. Por isso este leitor trata a
-// ausência de `usage` como o caso normal, não como exceção — ver o comentário em `report()`.
+// Leitor genérico de `stream-json`, usado por Cursor e Kimi. Os eventos `system`, `assistant`,
+// `tool_call` e `result` seguem o espírito do formato do Claude Code. O do Cursor foi conferido no
+// código da CLI 2026.10.01 (a documentação pública não descreve o consumo):
+// - `system`/`init` traz em `model` o nome de exibição do modelo que rodou ("Composer 2.5");
+// - `tool_call` sai duas vezes por chamada (`started` e `completed`), com a ferramenta como a chave de
+//   `tool_call` (`{"readToolCall": {...}}`; MCP é `{"mcpToolCall": {"args": {"providerIdentifier",
+//   "toolName"}}}`);
+// - `result` traz `usage` em camelCase (`inputTokens` já sem o cache, `outputTokens`,
+//   `cacheReadTokens`, `cacheWriteTokens`).
+// O Kimi continua só pela documentação, que não promete bloco de consumo: por isso a ausência de
+// `usage` é tratada como caso normal — ver o comentário em `report()`.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
-import { costOf } from './price';
+import { costOf, matchModel } from './price';
 import type { OutputReader, OutputStream, ReaderDeps } from './reader';
 
 /** Tamanho de uma linha que não é JSON, como o modo texto já corta hoje. */
@@ -21,6 +25,20 @@ function mcpSplit(name: string): string {
   return at < 0 ? rest : `${rest.slice(0, at)}/${rest.slice(at + 2)}`;
 }
 
+/**
+ * O identificador do modelo que rodou, para casar com o catálogo. O Cursor informa o nome de
+ * exibição ("Composer 2.5"), não o id: vale o modelo do catálogo com esse rótulo. Com o modelo
+ * `auto`, que não tem preço, o informado é o único que diz o que custou.
+ */
+function effectiveModel(deps: ReaderDeps, reported: string | null): string | null {
+  if (reported) {
+    const byLabel = deps.catalog.find((o) => o.label.toLowerCase() === reported.toLowerCase());
+    if (byLabel) return byLabel.model;
+    if (matchModel(deps.catalog, reported)) return reported;
+  }
+  return deps.model;
+}
+
 export function streamReader(deps: ReaderDeps): OutputReader {
   let sawEvent = false;
   let sessionId: string | null = null;
@@ -32,6 +50,8 @@ export function streamReader(deps: ReaderDeps): OutputReader {
   const resultTexts: string[] = [];
   /** o consumo do último `result` que trouxe um bloco `usage`; `null` enquanto nenhum trouxe */
   let tokens: AiRunTokens | null = null;
+  /** o modelo que a ferramenta disse ter usado, no evento `system`/`init` */
+  let reportedModel: string | null = null;
 
   const count = (kind: InventoryKind, name: string): void => {
     const key = `${kind}\u0000${name}`;
@@ -56,6 +76,10 @@ export function streamReader(deps: ReaderDeps): OutputReader {
   };
 
   const onToolCall = (o: Json): string[] => {
+    // o Cursor manda cada chamada ao começar e de novo ao terminar: conta só o começo
+    if (asText(o.subtype) === 'completed') return [];
+    const call = asObject(o.tool_call);
+    if (call) return onCursorCall(call);
     // os três nomes que aparecem por aí para a mesma coisa; sem nenhum deles, a chamada não conta
     const name = asText(o.name) ?? asText(o.tool_name) ?? asText(o.tool);
     if (!name) return [];
@@ -64,17 +88,53 @@ export function streamReader(deps: ReaderDeps): OutputReader {
     return [name];
   };
 
+  /** `{"readToolCall": {...}}` → `read`; `{"mcpToolCall": {"args": {...}}}` → `servidor/ferramenta`. */
+  const onCursorCall = (call: Json): string[] => {
+    const [key, value] = Object.entries(call)[0] ?? [];
+    if (!key) return [];
+    const body = asObject(value);
+    // forma de reserva da documentação para as demais: `{"function": {"name": ...}}`
+    if (key === 'function') {
+      const name = asText(body?.name);
+      if (!name) return [];
+      count('tool', name);
+      return [name];
+    }
+    if (key === 'mcpToolCall') {
+      const args = asObject(body?.args);
+      const server = asText(args?.providerIdentifier) ?? asText(args?.serverIdentifier);
+      const tool = asText(args?.toolName) ?? asText(args?.name);
+      if (!tool) return [];
+      const name = server ? `${server}/${tool}` : tool;
+      count('mcp_tool', name);
+      return [name];
+    }
+    const name = key.replace(/ToolCall$/, '');
+    count('tool', name);
+    return [name];
+  };
+
   const onResult = (o: Json): string[] => {
     const text = asText(o.result) ?? asText(o.text);
     if (text) resultTexts.push(text);
     const usage = asObject(o.usage);
     if (usage) {
-      tokens = {
-        inputTokens: asNumber(usage.input_tokens) ?? 0,
-        outputTokens: asNumber(usage.output_tokens) ?? 0,
-        cacheReadTokens: asNumber(usage.cache_read_input_tokens) ?? 0,
-        cacheWriteTokens: asNumber(usage.cache_creation_input_tokens) ?? 0,
+      // os nomes no estilo do Claude ou em camelCase (o Cursor); sem nenhum conhecido, o bloco não
+      // vira um consumo de zero, que pareceria medido
+      const pick = (...names: string[]) => names.map((n) => asNumber(usage[n])).find((v) => v !== null && v !== undefined);
+      const read = {
+        inputTokens: pick('input_tokens', 'inputTokens'),
+        outputTokens: pick('output_tokens', 'outputTokens'),
+        cacheReadTokens: pick('cache_read_input_tokens', 'cache_read_tokens', 'cacheReadTokens'),
+        cacheWriteTokens: pick('cache_creation_input_tokens', 'cache_write_tokens', 'cacheWriteTokens'),
       };
+      if (Object.values(read).some((v) => v !== undefined))
+        tokens = {
+          inputTokens: read.inputTokens ?? 0,
+          outputTokens: read.outputTokens ?? 0,
+          cacheReadTokens: read.cacheReadTokens ?? 0,
+          cacheWriteTokens: read.cacheWriteTokens ?? 0,
+        };
     }
     const failed = o.is_error === true || asText(o.subtype) === 'error';
     return [failed ? 'Terminou com erro' : 'Pronto'];
@@ -105,6 +165,9 @@ export function streamReader(deps: ReaderDeps): OutputReader {
           return onToolCall(o);
         case 'result':
           return onResult(o);
+        case 'system':
+          if (asText(o.subtype) === 'init') reportedModel ??= asText(o.model);
+          return [];
         // `system`: não há como saber que campos cada CLI põe ali além do `session_id`, já
         // capturado acima; e qualquer tipo que a próxima versão trouxer
         default:
@@ -123,8 +186,10 @@ export function streamReader(deps: ReaderDeps): OutputReader {
 
       if (tokens) {
         // nem Cursor nem Kimi informam custo: a estimativa sai do preço do catálogo, pelo modelo que
-        // o board pediu (o fluxo não diz qual rodou); sem `deps.model`, não há de onde estimar
-        const byModel = deps.model !== null ? new Map([[deps.model, tokens]]) : null;
+        // rodou quando a ferramenta diz (o Cursor, no `init`, pelo nome de exibição) e senão pelo
+        // que o board pediu; sem nenhum dos dois, não há de onde estimar
+        const model = effectiveModel(deps, reportedModel);
+        const byModel = model !== null ? new Map([[model, tokens]]) : null;
         const estimated = byModel ? costOf(deps.catalog, byModel) : null;
         return {
           measure: 'full',
