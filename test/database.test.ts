@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
 import initSqlJs from 'sql.js';
-import { openFile } from '../src/extension/db/database';
+import { openFile, retryBusy } from '../src/extension/db/database';
 import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
@@ -386,5 +386,30 @@ describe('persistência em arquivo', () => {
     expect(s.cards.map((c) => c.title)).toEqual(['persistido']);
     await h2.close();
     await fs.rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe('banco preso por outro programa', () => {
+  it('um arquivo que existe mas não dá para ler não vira um board vazio', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'fazai-db-'));
+    try {
+      // uma pasta no lugar do arquivo: a leitura falha com outro erro que não "não existe"
+      const file = path.join(dir, 'board.db');
+      await fs.mkdir(file);
+      await expect(openFile(file, WASM_DIR)).rejects.toThrow('Não foi possível ler o banco do board');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('repete enquanto o arquivo está preso, e desiste nos outros erros', async () => {
+    let calls = 0;
+    const busy = Object.assign(new Error('preso'), { code: 'EBUSY' });
+    expect(await retryBusy(async () => (++calls < 3 ? Promise.reject(busy) : 'ok'), 8, 1)).toBe('ok');
+    expect(calls).toBe(3);
+    calls = 0;
+    const other = Object.assign(new Error('outro'), { code: 'ENOSPC' });
+    await expect(retryBusy(async () => (++calls, Promise.reject(other)), 8, 1)).rejects.toThrow('outro');
+    expect(calls).toBe(1);
   });
 });

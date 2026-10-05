@@ -287,6 +287,11 @@ describe('modo de invocação das skills', () => {
     fs.writeFileSync(yaml, 'interface:\n  display_name: "Testar"\n');
     setSkillMode('codex', md, 'manual');
     expect(fs.readFileSync(yaml, 'utf8')).toBe('interface:\n  display_name: "Testar"\npolicy:\n  allow_implicit_invocation: false\n');
+    // arquivo com CRLF (checkout no Windows): lê o modo e troca a chave sem duplicá-la
+    fs.writeFileSync(yaml, 'policy:\r\n  allow_implicit_invocation: false\r\n');
+    expect(scanInventory('codex', project, home).find((i) => i.name === 'testar')?.mode).toBe('manual');
+    setSkillMode('codex', md, 'auto');
+    expect(fs.readFileSync(yaml, 'utf8')).toBe('policy:\r\n  allow_implicit_invocation: true\r\n');
   });
 });
 

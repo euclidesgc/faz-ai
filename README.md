@@ -516,7 +516,7 @@ processador enquanto várias sessões de IA, testes e builds rodam juntos.
   decide é a posição do card, não o número dele nem o que já foi aprovado.
 - Cards que estão com você (aguardando revisão ou resposta, bloqueados) não são tocados, a menos
   que você tenha deixado uma mensagem sem resposta na conversa.
-- **Chamar a IA agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
+- **Rodar o heartbeat agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
   uma rodada na hora, mesmo com o heartbeat desligado. **Faz AI: Parar as execuções da IA e o modo autônomo**
   interrompe tudo.
 - A barra de status mostra os cards em execução e a hora da próxima rodada.

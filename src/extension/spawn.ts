@@ -20,9 +20,16 @@ export function loginShellPath(fresh = false): Promise<string | undefined> {
   shellPath ??= new Promise((resolve) => {
     if (process.platform === 'win32') return resolve(undefined);
     const shell = process.env.SHELL || os.userInfo().shell || '/bin/sh';
-    execFile(shell, ['-ilc', 'printf "__PATH__%s__PATH__" "$PATH"'], { timeout: 5000 }, (err, stdout) => {
-      resolve(err ? undefined : /__PATH__(.*)__PATH__/s.exec(stdout)?.[1] || undefined);
+    // um shell interativo com nvm, conda ou oh-my-zsh pode levar vários segundos para abrir. O PATH vale
+    // mesmo que o shell termine com erro depois de imprimi-lo (um .zshrc que falha no fim)
+    execFile(shell, ['-ilc', 'printf "__PATH__%s__PATH__" "$PATH"'], { timeout: 10_000 }, (_err, stdout) => {
+      resolve(/__PATH__(.*)__PATH__/s.exec(String(stdout ?? ''))?.[1] || undefined);
     });
+  });
+  // sem PATH (o shell travou ou não aceita -ilc), a próxima chamada tenta de novo
+  const current = shellPath;
+  void current.then((p) => {
+    if (!p && shellPath === current) shellPath = undefined;
   });
   return shellPath;
 }

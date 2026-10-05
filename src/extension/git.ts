@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { samePath } from './samePath';
 import type { WorkspaceMode } from '../shared/git';
 
 const git = (cwd: string, args: string[]): string => {
@@ -64,9 +65,11 @@ export function prepareWorkspace(input: {
   }
 
   const dir = path.resolve(repo, input.worktreePath);
+  // o git lista com `/` (também no Windows) e o caminho real (links resolvidos): compara na mesma forma
+  const real = fs.existsSync(dir) ? fs.realpathSync.native(dir) : dir;
   const registered = git(repo, ['worktree', 'list', '--porcelain'])
-    .split('\n')
-    .some((l) => l === `worktree ${fs.existsSync(dir) ? fs.realpathSync(dir) : dir}`);
+    .split(/\r?\n/)
+    .some((l) => l.startsWith('worktree ') && (samePath(l.slice('worktree '.length), real) || samePath(l.slice('worktree '.length), dir)));
   if (registered) return { branch: input.branch, path: dir, base: '' };
   if (fs.existsSync(dir) && fs.readdirSync(dir).length) throw new Error(`A pasta ${dir} já existe e não é uma worktree deste repositório.`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
@@ -77,6 +80,17 @@ export function prepareWorkspace(input: {
 
 /** Remove a worktree de uma história (a branch fica). Não faz nada se ela já não existe. */
 export function removeWorktree(projectDir: string, worktreePath: string): void {
-  if (!fs.existsSync(worktreePath)) return;
-  git(projectDir, ['worktree', 'remove', worktreePath]);
+  if (!fs.existsSync(worktreePath)) {
+    // a pasta já foi apagada à mão: tira o registro que sobrou, para o nome poder ser usado de novo
+    tryGit(projectDir, ['worktree', 'prune']);
+    return;
+  }
+  try {
+    git(projectDir, ['worktree', 'remove', worktreePath]);
+  } catch (e) {
+    // um arquivo preso (outra janela, um processo ainda rodando, o antivírus no Windows) pode deixar
+    // a pasta pela metade: o registro sai, e a mensagem do git segue como veio
+    tryGit(projectDir, ['worktree', 'prune']);
+    throw e;
+  }
 }

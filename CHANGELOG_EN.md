@@ -7,6 +7,31 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Windows, macOS and Linux: the same board, with no data loss.**
+  - **Same board in the editor and in the terminal:** on Windows, the terminal's `faz-ai` and the
+    board server started by the AI reached the folder with an uppercase drive letter (`C:\`), and the
+    editor with a lowercase one (`c:\`): two boards, two databases and two servers. The key is now
+    the same. On macOS, `faz-ai` no longer resolves symbolic links, to get the same folder as the
+    editor.
+  - **The database never opens empty by mistake:** a file that exists but could not be read (on
+    Windows, held by the antivirus or by cloud sync) opened an empty board that erased the real one on
+    the first save. The board now waits for the file to be released, or reports the error. Saving
+    also retries while the file is held.
+  - **Worktrees on Windows:** a story's working folder was refused ("já existe e não é uma worktree",
+    already exists and is not a worktree) from the second phase on, because git lists the path with
+    `/`. A worktree that cannot be removed (locked file) no longer leaves its registration half done.
+  - **Two windows on the same folder on Windows** get the same overwritten-data warning as on macOS
+    and Linux.
+  - **`npm test` on Windows:** `.gitattributes` pins LF, and a CRLF checkout no longer fails every
+    file in Prettier. The Codex skill policy (`agents/openai.yaml`) with CRLF is read and switched
+    without duplicating the key.
+  - **The `faz-ai.cmd` launcher** works with an accented user name. Opening files and folders from
+    the board in the browser no longer goes through `cmd.exe`, which read `&` and `%` in the path as
+    commands.
+  - **Terminal PATH (macOS and Linux):** a shell that is slow to open (nvm, conda, oh-my-zsh) gets
+    more time, and a failure is not kept until the editor reopens. The board also looks for the CLI
+    and node in nvm, Volta, fnm, asdf and mise, and on Windows in the Cursor installer's folder.
+
 - **Sturdier Claude Code and Cursor runs.**
   - **Cursor:** the request goes through standard input, no longer on the command line. On Windows,
     a CLI installed as a `.cmd` went through `cmd.exe`, which cuts the line at 8191 characters and
@@ -38,6 +63,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   - **Edited text attachment:** Esc or a click outside no longer discard the edit without warning,
     and Salvar (save) does not send twice.
   - The search in the Vínculos (links) section does not carry over from one card to the next.
+  - In Harness de IA, the button that starts a heartbeat round is called **Rodar o heartbeat agora**
+    (run the heartbeat now), like the palette command (it was "Chamar a IA agora", easy to confuse
+    with the card buttons).
 
 - **"Chamar IA" became two buttons, each with one job.**
   - **Trabalhar na fase** (work on the phase) is the old Chamar IA, named after what it does: the

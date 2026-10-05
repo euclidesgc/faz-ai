@@ -10,7 +10,8 @@ import type { AiTool, SkillMode } from '../shared/harness';
  * - Codex: `policy.allow_implicit_invocation: false` em `agents/openai.yaml`, na pasta da skill.
  */
 const FRONTMATTER_KEY = /^(disable-model-invocation|disableModelInvocation|disable_model_invocation):\s*(\S+)\s*$/m;
-const CODEX_KEY = /^([ \t]*)allow_implicit_invocation:[ \t]*(\S+)[ \t]*$/m;
+// o `\r?` aceita o arquivo com CRLF (checkout no Windows), e a troca o devolve no fim da linha
+const CODEX_KEY = /^([ \t]*)allow_implicit_invocation:[ \t]*(\S+?)[ \t]*(\r?)$/m;
 const HEAD_BYTES = 8192;
 
 const codexPolicy = (skillDir: string) => path.join(skillDir, 'agents', 'openai.yaml');
@@ -49,7 +50,7 @@ function setCodexPolicy(skillDir: string, mode: SkillMode): void {
   const file = codexPolicy(skillDir);
   const text = read(file);
   const value = mode === 'manual' ? 'false' : 'true';
-  if (CODEX_KEY.test(text)) return fs.writeFileSync(file, text.replace(CODEX_KEY, `$1allow_implicit_invocation: ${value}`));
+  if (CODEX_KEY.test(text)) return fs.writeFileSync(file, text.replace(CODEX_KEY, `$1allow_implicit_invocation: ${value}$3`));
   // sem a chave vale o padrão da ferramenta (automática): só grava quando é para desligar
   if (mode === 'auto') return;
   fs.mkdirSync(path.dirname(file), { recursive: true });

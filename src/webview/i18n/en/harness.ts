@@ -349,7 +349,7 @@ export const harness: Record<string, string> = {
     "The skill's folder is removed, along with all its files: {location}",
   'O arquivo é removido: {location}': 'The file is removed: {location}',
   'Reler pastas': 'Reread folders',
-  'Chamar a IA agora': 'Call the AI now',
+  'Rodar o heartbeat agora': 'Run the heartbeat now',
   'Buscar skills para instalar': 'Find skills to install',
   'Abrir no editor': 'Open in editor',
   'Histórias ao mesmo tempo': 'Stories at the same time',

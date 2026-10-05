@@ -26,7 +26,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
               title={t('Começa uma rodada agora, mesmo com o heartbeat desligado')}
               onClick={() => ai.runHeartbeat()}
             >
-              {t('Chamar a IA agora')}
+              {t('Rodar o heartbeat agora')}
             </Button>
           )
         }

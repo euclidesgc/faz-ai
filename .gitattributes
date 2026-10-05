@@ -1,0 +1,9 @@
+# finais de linha LF em todo checkout (o Git do Windows converte para CRLF por padrão, e o
+# \`prettier --check\` do \`npm test\` recusaria todos os arquivos)
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.vsix binary
+*.wasm binary

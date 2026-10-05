@@ -45,7 +45,9 @@ function installLauncher(extensionPath: string, storage: string): void {
     if (process.platform === 'win32') {
       fs.writeFileSync(
         path.join(bin, 'faz-ai.cmd'),
-        `@echo off\r\nif not defined FAZAI_DATA set "FAZAI_DATA=${storage}"\r\nnode "${cli}" %*\r\n`,
+        // UTF-8 (chcp 65001): o cmd.exe lê o .cmd na página de código do sistema, e um nome com acento
+        // na pasta do usuário viraria outro caminho; `%` é dobrado para não ser lido como variável
+        `@echo off\r\nchcp 65001 >nul\r\nif not defined FAZAI_DATA set "FAZAI_DATA=${storage.replace(/%/g, '%%')}"\r\nnode "${cli.replace(/%/g, '%%')}" %*\r\n`,
       );
     } else {
       const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
