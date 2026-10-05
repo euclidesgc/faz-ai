@@ -8,6 +8,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
 import { createMcpServer, startMcpServer } from '../src/extension/mcp/server';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { forgetModels, parseCursorModels, rememberModels } from '../src/extension/models';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -594,6 +595,28 @@ effort = "high"
       'kimi:kimi-code/k3@max',
     ]);
     expect(modelsFor('kimi', path.join(dir, 'vazio')).length).toBeGreaterThan(0); // sem config local, lista embutida
+  });
+});
+
+describe('modos rápidos do Cursor', () => {
+  afterEach(() => forgetModels('cursor'));
+
+  it('ligar a regra traz as variantes rápidas ao catálogo; desligar as tira, e o resto fica', async () => {
+    rememberModels('cursor', parseCursorModels(fs.readFileSync(path.join(__dirname, 'fixtures', 'cursor-models.txt'), 'utf8')));
+    await call('set_ai_tool', { tool: 'cursor' });
+    const cursorModels = async () =>
+      ((await call('get_models')).data.catalog as { tool: string; model: string }[]).filter((o) => o.tool === 'cursor').map((o) => o.model);
+    await call('detect_models', {});
+    expect(await cursorModels()).toContain('claude-opus-5-5');
+    expect(await cursorModels()).not.toContain('claude-opus-5-5-fast');
+
+    expect((await call('update_rules', { includeFastModels: true })).data.includeFastModels).toBe(true);
+    expect(await cursorModels()).toEqual(expect.arrayContaining(['claude-opus-5-5', 'claude-opus-5-5-fast', 'composer-2.5-fast']));
+
+    await call('update_rules', { includeFastModels: false });
+    const after = await cursorModels();
+    expect(after).toContain('claude-opus-5-5');
+    expect(after.filter((m) => m.endsWith('-fast') && after.includes(m.slice(0, -5)))).toEqual([]);
   });
 });
 

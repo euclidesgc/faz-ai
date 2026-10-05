@@ -20,7 +20,7 @@ import { AiRunner } from '../runner';
 import { cursorModels, cursorSignedIn } from '../cliProbe';
 import { checkRequirements } from '../requirements';
 import { resolveCommand } from '../cliResolve';
-import { onlyBuiltin, rememberModels } from '../models';
+import { isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { loginShellPath, spawnHeadless } from '../spawn';
 
 /** Complemento do nome na mensagem de "comando não encontrado", para não piorar o que a pessoa já lê no log. */
@@ -172,7 +172,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     if (!found.length) return;
     rememberModels('cursor', found);
     const { board } = router.snapshot();
-    if (ownsBoard && board.aiTool === 'cursor' && onlyBuiltin('cursor', board.modelCatalog))
+    // a lista chegou: entra sozinha na primeira vez, ou quando a pessoa ligou os modos rápidos antes
+    // de ela ser lida (o "Detectar" daquele momento só tinha a lista embutida, sem as rápidas)
+    const fastMissing =
+      board.rules.includeFastModels && found.some((m) => isFastVariant(m, found) && !board.modelCatalog.some((o) => o.id === m.id));
+    if (ownsBoard && board.aiTool === 'cursor' && (onlyBuiltin('cursor', board.modelCatalog) || fastMissing))
       router.handle({ type: 'settings.models.detect', tool: 'cursor' });
   };
   // o que falta para o board trabalhar com a ferramenta (CLI, login, servidor MCP, permissão): vira a

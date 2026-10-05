@@ -693,7 +693,11 @@ local configuration; for Cursor, the models of your account, through the `cursor
 command, read when the board opens with the CLI signed in; for the others, a built-in list you can
 edit); the prices you filled in stay there after detecting again. For Cursor, the list has one line per
 level of each model (`claude-opus-5-5-low`, `-medium`, `-high`…); the board groups the variants into
-one model with its levels and leaves out the `-fast` versions. On Cursor's free plan only **Auto**
+one model with its levels. The fast versions (`-fast`, they answer sooner and charge more for the
+same tokens) stay out until you turn on **Incluir os modos rápidos** (include fast modes) on the
+Cursor card: then each one enters as a separate model ("Claude Opus 5.5 1M Fast"), with its own
+price; turning it off removes them from the catalog. Through MCP, it is the `includeFastModels` rule
+of `update_rules`. On Cursor's free plan only **Auto**
 runs: the other models are refused before starting, which is why Cursor's suggestion rules all start
 at Auto. Suggestion rules combine
 conditions with AND and OR, for example `Esforço da atividade = Alto E Tags = backend`. The result

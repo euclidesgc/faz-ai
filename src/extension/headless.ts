@@ -198,8 +198,7 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
       edits: ['--allowed-tools', [...CURSOR_TOOLS.board, ...CURSOR_TOOLS.edits].join(',')],
       full: [],
     };
-    // o esforço é parte do id: `cursor-agent models` lista uma variante por nível (`claude-opus-5-5-high`)
-    const model = exec?.model && (exec.model.effort ? `${exec.model.name}-${exec.model.effort}` : exec.model.name);
+    const model = exec?.model && cursorModelId(exec.model.name, exec.model.effort);
     return {
       command: 'cursor-agent',
       args: [
@@ -237,6 +236,16 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
         }
       : null,
 };
+
+/**
+ * O id que o Cursor aceita em `--model`. O nível é parte do id (`cursor-agent models` lista uma
+ * variante por nível: `claude-opus-5-5-high`) e, na versão rápida, vem antes do `-fast`
+ * (`claude-opus-5-5-high-fast`).
+ */
+export function cursorModelId(name: string, effort: string | null): string {
+  if (!effort) return name;
+  return name.endsWith('-fast') ? `${name.slice(0, -'-fast'.length)}-${effort}-fast` : `${name}-${effort}`;
+}
 
 /** Por que o board não pode executar a ferramenta com esta permissão; null quando pode. */
 export function headlessUnsupported(tool: AiTool, permission: RunnerPermission): string | null {

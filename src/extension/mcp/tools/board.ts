@@ -168,6 +168,12 @@ export function registerBoardRulesTools(tool: DefineTool): void {
         .boolean()
         .optional()
         .describe('Preencher o campo de modelo com a sugestão enquanto ele não foi escolhido à mão'),
+      includeFastModels: z
+        .boolean()
+        .optional()
+        .describe(
+          'Incluir no catálogo do Cursor as variantes rápidas dos modelos (respondem mais rápido e cobram mais pelos mesmos tokens). Ligar acrescenta as da última lista lida do Cursor; desligar as tira do catálogo.',
+        ),
     },
     (a, router) => {
       const patch = Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined));

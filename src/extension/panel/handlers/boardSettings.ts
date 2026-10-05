@@ -1,7 +1,7 @@
 import { workflowDeleteBlocker } from '../../../shared/selectors';
 import { upgradeBoard } from '../../db/boardTemplate';
 import type { HandlerMap } from './context';
-import { initModels, useTool } from './models';
+import { applyFastModels, initModels, useTool } from './models';
 
 /** Configurações do board: colunas, tipos, campos, workflows, regras, agentes de execução e o próprio board. */
 export const boardSettingsHandlers = {
@@ -56,7 +56,9 @@ export const boardSettingsHandlers = {
     return true;
   },
   'settings.rules.update': (msg, ctx) => {
+    const before = ctx.state().board.rules.includeFastModels;
     ctx.boards.updateRules(ctx.boardId, msg.patch);
+    if (ctx.state().board.rules.includeFastModels !== before) applyFastModels(ctx);
     return true;
   },
   'settings.execProfiles.set': (msg, ctx) => {

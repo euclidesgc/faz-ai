@@ -120,6 +120,16 @@ export function parseKimiModels(toml: string): ModelOption[] {
 // eslint-disable-next-line no-control-regex
 const ANSI = /\x1b\[[0-9;]*m/g;
 
+const FAST = '-fast';
+
+/**
+ * Se o modelo é a versão rápida de outro do mesmo catálogo (`composer-2.5-fast` de `composer-2.5`).
+ * No Cursor ela responde mais rápido e cobra mais pelos mesmos tokens.
+ */
+export function isFastVariant(o: ModelOption, catalog: ModelOption[]): boolean {
+  return o.model.endsWith(FAST) && catalog.some((x) => x.tool === o.tool && x.model === o.model.slice(0, -FAST.length));
+}
+
 /** Níveis que a lista do Cursor põe no fim do id, do menor para o maior. */
 const CURSOR_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'extra-high', 'max'];
 const CURSOR_EFFORT_SUFFIX = new RegExp(`^(.+?)-(${[...CURSOR_EFFORTS].sort((a, b) => b.length - a.length).join('|')})$`);
@@ -131,10 +141,12 @@ const EFFORT_WORDS = /\b(none|minimal|low|medium|high|extra high|max)\b/i;
  * `id - Nome de exibição (current, default)`, e no fim uma dica que não é modelo.
  *
  * A lista real tem uma linha por variante (cerca de 250): o nível de esforço vem como sufixo do id
- * (`claude-opus-5-5-low`, `-medium`, `-high`…) e cada um tem também a versão `-fast`. O catálogo
- * junta as variantes num modelo com os níveis dele, para o campo Modelo dos cards não virar uma
- * lista de centenas de itens. As versões `-fast` ficam de fora (quem quiser as acrescenta à mão).
- * O nível padrão é a variante cujo nome não cita nível ("Claude Opus 5.5 1M" é a `-medium`).
+ * (`claude-opus-5-5-low`, `-medium`, `-high`…) e muitas têm também a versão rápida, com `-fast` no
+ * fim (`claude-opus-5-5-high-fast`). O catálogo junta as variantes num modelo com os níveis dele,
+ * para o campo Modelo dos cards não virar uma lista de centenas de itens; as rápidas viram um modelo
+ * à parte (`claude-opus-5-5-fast`), com preço próprio, e só entram no catálogo com a regra
+ * `includeFastModels` (ver `isFastVariant`). O nível padrão é a variante cujo nome não cita nível
+ * ("Claude Opus 5.5 1M" é a `-medium`).
  */
 export function parseCursorModels(text: string): ModelOption[] {
   const lines = text.replace(ANSI, '').split(/\r?\n/);
@@ -159,9 +171,11 @@ export function parseCursorModels(text: string): ModelOption[] {
   const ids = new Set(rows.map((r) => r.id));
   const groups = new Map<string, { plain?: string; variants: { effort: string; label: string }[] }>();
   for (const { id, label } of rows) {
-    if (id.endsWith('-fast') && ids.has(id.slice(0, -'-fast'.length))) continue;
-    const m = CURSOR_EFFORT_SUFFIX.exec(id);
-    const base = m ? m[1]! : id;
+    // a variante rápida de algo que existe sem o `-fast`: o nível fica antes do sufixo
+    const fast = id.endsWith(FAST) && ids.has(id.slice(0, -FAST.length));
+    const stem = fast ? id.slice(0, -FAST.length) : id;
+    const m = CURSOR_EFFORT_SUFFIX.exec(stem);
+    const base = (m ? m[1]! : stem) + (fast ? FAST : '');
     const group = groups.get(base) ?? { variants: [] };
     if (m) group.variants.push({ effort: m[2]!, label });
     else group.plain = label;
