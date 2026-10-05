@@ -53,6 +53,15 @@ describe('AgentsSettings', () => {
     expect(sent[1]).toMatchObject({ name: 'Agente 2', purpose: '', isDefault: false });
   });
 
+  it('escrever a intenção e logo clicar em Só leitura guarda as duas mudanças', async () => {
+    show();
+    await userEvent.click(card('Revisão').getByRole('button', { name: 'Editar' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'O que este agente faz' }), 'Revisa a Spec');
+    // o clique tira o foco do campo (que salva) e aplica o botão, antes de o board devolver a primeira
+    await userEvent.click(screen.getByRole('button', { name: 'Só leitura' }));
+    expect(lastSent('settings.execProfiles.set').profiles[0]).toMatchObject({ purpose: 'Revisa a Spec', tools: ['Read', 'Grep', 'Glob'] });
+  });
+
   it('a página explica o que é um agente e onde ele vale', () => {
     show();
     expect(screen.getByText(/Toda execução pelo board .* roda através de um agente/)).toBeInTheDocument();

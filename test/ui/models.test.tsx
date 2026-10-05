@@ -198,3 +198,26 @@ describe('ModelsSettings: modos rápidos do Cursor', () => {
     board.router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude' } });
   });
 });
+
+describe('regras de modelo em inglês', () => {
+  it('os nomes do board padrão nas regras saem traduzidos: o campo, as opções e o nome das regras', async () => {
+    const { ModelRulesEditor } = await import('../../src/webview/components/settings/ModelRulesEditor');
+    const { setLocale } = await import('../../src/webview/i18n');
+    const seeded = await seedBoard();
+    seeded.router.handle({ type: 'settings.modelRules.suggest', tool: 'claude' });
+    syncStore(seeded.router);
+    setLocale('en');
+    try {
+      render(
+        <Theme>
+          <ModelRulesEditor />
+        </Theme>,
+      );
+      expect(screen.getByText('Task effort low')).toBeInTheDocument();
+      expect(screen.getByText('Task effort = Low')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Recreate the "Task effort" rules' })).toBeInTheDocument();
+    } finally {
+      setLocale('pt-BR');
+    }
+  });
+});

@@ -221,11 +221,20 @@ export function suggestModel(state: BoardState, card: Card): string | null {
 }
 
 /** Texto de uma regra, ex.: `Esforço = Alto E Tags = backend OU Tipo = Bug`. */
-export function describeRule(state: BoardState, rule: ModelRule): string {
+export function describeRule(
+  state: BoardState,
+  rule: ModelRule,
+  /** na interface: `word` traduz as palavras da frase, `name` os nomes do board padrão (campos e opções) */
+  tr: { word: (s: string) => string; name: (s: string) => string } = { word: (s) => s, name: (s) => s },
+): string {
   const name = (c: RuleCondition) =>
-    c.fieldId === TYPE_CONDITION ? 'Tipo' : (state.fieldDefs.find((f) => f.id === c.fieldId)?.name ?? '(campo apagado)');
+    c.fieldId === TYPE_CONDITION
+      ? tr.word('Tipo')
+      : tr.name(state.fieldDefs.find((f) => f.id === c.fieldId)?.name ?? tr.word('(campo apagado)'));
   return (
-    rule.groups.map((g) => g.map((c) => `${name(c)} ${c.op === 'is' ? '=' : '≠'} ${c.value}`).join(' E ')).join(' OU ') || '(sem condições)'
+    rule.groups
+      .map((g) => g.map((c) => `${name(c)} ${c.op === 'is' ? '=' : '≠'} ${tr.name(c.value)}`).join(` ${tr.word('E')} `))
+      .join(` ${tr.word('OU')} `) || tr.word('(sem condições)')
   );
 }
 

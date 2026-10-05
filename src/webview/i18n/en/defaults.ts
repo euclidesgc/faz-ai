@@ -21,6 +21,10 @@ export const defaults: Record<string, string> = {
   Fase: 'Phase',
   Modelo: 'Model',
   'Esforço da atividade': 'Task effort',
+  // os nomes das regras que "Recriar as regras" monta
+  'Esforço da atividade baixo': 'Task effort low',
+  'Esforço da atividade médio': 'Task effort medium',
+  'Esforço da atividade alto': 'Task effort high',
   Baixo: 'Low',
   Médio: 'Medium',
   Alto: 'High',

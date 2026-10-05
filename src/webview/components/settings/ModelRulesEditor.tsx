@@ -9,6 +9,7 @@ import { t, dt } from '../../i18n';
 import { ModelEditor } from '../FieldRenderer';
 import { Button, Card, IconButton, Switch, TextField } from '@radix-ui/themes';
 import { FormField, IconArrowDown, IconArrowUp, IconClose, IconEdit, IconPlus, IconTrash, SelectField } from '../ui';
+import { useSentList } from './useSentList';
 import { SectionHeader } from './SectionHeader';
 
 const OPS: { value: RuleCondition['op']; label: string }[] = [
@@ -144,7 +145,7 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
 
       <FormField
         label={t('Sugerir')}
-        hint={`${describeRule(state, rule)} → ${modelDisplay(state.board.modelCatalog, rule.model, true) || t('(escolha um modelo)')}`}
+        hint={`${describeRule(state, rule, { word: t, name: dt })} → ${modelDisplay(state.board.modelCatalog, rule.model, true) || t('(escolha um modelo)')}`}
       >
         {() => <ModelEditor value={rule.model} onChange={(v) => setRule({ ...rule, model: typeof v === 'string' ? v : '' })} />}
       </FormField>
@@ -168,15 +169,18 @@ export function ModelRulesEditor() {
   const catalog = allModels.filter((o) => o.tool === aiTool);
   const [editing, setEditing] = useState<ModelRule | null>(null);
 
-  const setRules = (next: ModelRule[]) => settings.setModelRules(next);
+  // as mudanças partem da última lista enviada (ver useSentList)
+  const sent = useSentList(rules, settings.setModelRules);
+  const setRules = sent.save;
   const move = (i: number, delta: number) => {
-    const next = [...rules];
+    const next = [...sent.current()];
     const [r] = next.splice(i, 1);
     next.splice(i + delta, 0, r!);
     setRules(next);
   };
   const save = (rule: ModelRule) => {
-    setRules(rules.some((r) => r.id === rule.id) ? rules.map((r) => (r.id === rule.id ? rule : r)) : [...rules, rule]);
+    const current = sent.current();
+    setRules(current.some((r) => r.id === rule.id) ? current.map((r) => (r.id === rule.id ? rule : r)) : [...current, rule]);
     setEditing(null);
   };
   const startNew = () => {
@@ -207,7 +211,7 @@ export function ModelRulesEditor() {
               title={t('Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do {tool}', { tool: tool.label })}
               onClick={() => settings.suggestModelRules(aiTool)}
             >
-              {t('Recriar as regras de "{field}"', { field: EFFORT_FIELD })}
+              {t('Recriar as regras de "{field}"', { field: dt(EFFORT_FIELD) })}
             </Button>
             <Button disabled={!catalog.length || editing !== null} onClick={startNew}>
               <IconPlus /> {t('Montar nova regra')}
@@ -241,11 +245,11 @@ export function ModelRulesEditor() {
                   title={r.enabled ? t('Regra em uso') : t('Regra desligada')}
                   aria-label={t('Regra {name} em uso', { name: r.name || i + 1 })}
                   checked={r.enabled}
-                  onCheckedChange={(enabled) => setRules(rules.map((x) => (x.id === r.id ? { ...x, enabled } : x)))}
+                  onCheckedChange={(enabled) => setRules(sent.current().map((x) => (x.id === r.id ? { ...x, enabled } : x)))}
                 />
               </td>
-              <td>{r.name || <span className="muted">{t('(sem nome)')}</span>}</td>
-              <td>{describeRule(state, r)}</td>
+              <td>{r.name ? dt(r.name) : <span className="muted">{t('(sem nome)')}</span>}</td>
+              <td>{describeRule(state, r, { word: t, name: dt })}</td>
               <td>{modelDisplay(allModels, r.model, true)}</td>
               <td className="narrow">
                 <IconButton
@@ -277,7 +281,7 @@ export function ModelRulesEditor() {
                   color="red"
                   title={t('Remover da lista')}
                   aria-label={t('Remover da lista')}
-                  onClick={() => setRules(rules.filter((x) => x.id !== r.id))}
+                  onClick={() => setRules(sent.current().filter((x) => x.id !== r.id))}
                 >
                   <IconTrash />
                 </IconButton>
