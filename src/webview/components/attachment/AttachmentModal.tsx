@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Attachment } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { attachments } from '../../commands';
@@ -27,6 +27,15 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  // texto editado e não salvo: Esc e clique fora não o descartam sem a pessoa decidir
+  const [unsavedNotice, setUnsavedNotice] = useState(false);
+  const dirty = editing && draft !== (content ?? '');
+  const guard = useRef({ dirty, close });
+  guard.current = { dirty, close };
+  const requestClose = () => (guard.current.dirty ? setUnsavedNotice(true) : guard.current.close());
+  const pendingWrite = useRef<(() => void) | null>(null);
+  useEffect(() => () => pendingWrite.current?.(), []);
 
   const attachmentId = open?.attachmentId ?? null;
   const textual = attachment ? isTextual(attachment.mime) : false;
@@ -36,7 +45,7 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        close();
+        requestClose();
       }
     };
     window.addEventListener('keydown', onKey, true);
@@ -49,6 +58,7 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
     setDraft('');
     setEditing(false);
     setError(null);
+    setUnsavedNotice(false);
     if (!attachmentId || !textual) {
       setLoading(false);
       return;
@@ -73,33 +83,46 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
   };
 
   const save = () => {
-    if (!attachmentId) return;
+    if (!attachmentId || saving) return;
     setError(null);
+    setSaving(true);
     const requestId = crypto.randomUUID();
     const off = onHostMessage((msg) => {
       if (msg.type !== 'attachment.writeResult' || msg.requestId !== requestId) return;
       off();
+      pendingWrite.current = null;
+      setSaving(false);
       // falhou: o texto digitado fica na tela para a pessoa tentar de novo
       if (!msg.ok) return setError(msg.error ?? t('Não foi possível salvar o anexo.'));
       setContent(draft);
       setEditing(false);
+      setUnsavedNotice(false);
     });
+    pendingWrite.current = off;
     postToHost({ type: 'attachment.write', requestId, attachmentId, content: draft });
   };
 
   const image = attachment && attachment.mime.startsWith('image/') && baseUri;
 
   return (
-    <div className="modal-backdrop" onMouseDown={close}>
+    <div className="modal-backdrop" onMouseDown={requestClose}>
       <div className="modal attachment-modal" role="dialog" aria-label={attachment?.filename} onMouseDown={(e) => e.stopPropagation()}>
         <header className="attachment-modal-head">
           <h2 title={attachment?.filename}>{attachment?.filename ?? t('Anexos')}</h2>
-          <Button variant="icon" title={t('Fechar (Esc)')} aria-label={t('Fechar')} onClick={close}>
+          <Button variant="icon" title={t('Fechar (Esc)')} aria-label={t('Fechar')} onClick={requestClose}>
             <IconClose />
           </Button>
         </header>
 
         <div className="attachment-modal-body">
+          {unsavedNotice && (
+            <p className="banner warn" role="alert">
+              {t('O texto editado não foi salvo. Salve, ou clique em Descartar para fechar sem salvar.')}{' '}
+              <Button size="small" onClick={close}>
+                {t('Descartar')}
+              </Button>
+            </p>
+          )}
           {error && (
             <p className="banner warn" role="alert">
               {t(error)}
@@ -125,7 +148,7 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
           {editing ? (
             <>
               <Button onClick={() => setEditing(false)}>{t('Cancelar')}</Button>
-              <Button variant="primary" onClick={save}>
+              <Button variant="primary" onClick={save} disabled={saving}>
                 {t('Salvar')}
               </Button>
             </>

@@ -7,6 +7,19 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **The open card no longer loses what was written.**
+  - **Description rewritten by the AI:** with the card open, the new description shows on screen,
+    and closing the card no longer writes the old one back. A draft of yours still wins over the
+    outside change.
+  - **Esc:** with the Ações (actions) menu open, it closes only the menu, not the card. In a text
+    field, the first Esc only leaves the field (and saves the title or the checklist item); the
+    second closes the card. In a confirmation with an open list of options, it closes only the list.
+  - **Title:** a new title coming from the AI does not erase what you are typing.
+  - **Conversation:** the message being written survives switching tabs.
+  - **Edited text attachment:** Esc or a click outside no longer discard the edit without warning,
+    and Salvar (save) does not send twice.
+  - The search in the Vínculos (links) section does not carry over from one card to the next.
+
 - **"Chamar IA" became two buttons, each with one job.**
   - **Trabalhar na fase** (work on the phase) is the old Chamar IA, named after what it does: the
     work of the column the card is in (in Implementação, code), until it hands over.

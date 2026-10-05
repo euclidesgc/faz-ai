@@ -14,16 +14,23 @@ export function Menu({ items, title, children = <IconMore /> }: { items: MenuIte
   useEffect(() => {
     if (!pos) return;
     const close = () => setPos(null);
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    // na captura e marcado como tratado: o Esc fecha só o menu, e não o card aberto por baixo (que
+    // escuta o Esc depois e ignora o evento já tratado)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    };
     window.addEventListener('mousedown', close);
     window.addEventListener('scroll', close, true);
     window.addEventListener('resize', close);
-    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
     return () => {
       window.removeEventListener('mousedown', close);
       window.removeEventListener('scroll', close, true);
       window.removeEventListener('resize', close);
-      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onKey, true);
     };
   }, [pos]);
 

@@ -16,12 +16,23 @@ import { aiBlockedReason } from '../RequirementsBanner';
 import { Button, DeleteButton, IconRun } from '../ui';
 
 /** Conversa do card: é por aqui que a pessoa e a IA falam sobre o trabalho. */
-export function CommentsTab({ cardId }: { cardId: string }) {
+export function CommentsTab({
+  cardId,
+  draft: kept,
+  onDraft,
+}: {
+  cardId: string;
+  /** a mensagem em escrita, guardada por quem mostra a aba (o card aberto) para sobreviver à troca de aba */
+  draft?: string;
+  onDraft?: (draft: string) => void;
+}) {
   const state = useBoardStore((s) => s.state)!;
   const baseUri = useBoardStore((s) => s.attachmentsBaseUri);
   const setError = useBoardStore((s) => s.setError);
   const openSettings = useBoardStore((s) => s.openSettings);
-  const [draft, setDraft] = useState('');
+  const [own, setOwn] = useState('');
+  const draft = kept ?? own;
+  const setDraft = onDraft ?? setOwn;
   const cardComments = state.comments.filter((c) => c.cardId === cardId);
   const card = state.cards.find((c) => c.id === cardId);
   const running = state.aiRuns.includes(cardId);

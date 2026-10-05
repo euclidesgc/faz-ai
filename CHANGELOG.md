@@ -6,6 +6,18 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **O card aberto não perde mais o que foi escrito.**
+  - **Descrição reescrita pela IA:** com o card aberto, a descrição nova aparece na tela, e fechar o
+    card não grava mais a antiga por cima. Um rascunho seu continua valendo sobre a mudança de fora.
+  - **Esc:** com o menu Ações aberto, fecha só o menu, e não o card. Num campo de texto, o primeiro
+    Esc só sai do campo (e salva o título ou o item do checklist); o segundo fecha o card. Numa
+    confirmação com lista de opções aberta, fecha só a lista.
+  - **Título:** um título novo vindo da IA não apaga o que você está digitando.
+  - **Conversa:** a mensagem em escrita sobrevive à troca de aba.
+  - **Anexo de texto editado:** Esc ou clique fora não descartam mais a edição sem aviso, e Salvar
+    não envia duas vezes.
+  - A busca da seção Vínculos não passa de um card para o outro.
+
 - **O "Chamar IA" virou dois botões, cada um com uma tarefa.**
   - **Trabalhar na fase** é o antigo Chamar IA, com o nome do que ele faz: o trabalho da coluna em
     que o card está (em Implementação, código), até passar a vez.
