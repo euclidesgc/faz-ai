@@ -7,6 +7,8 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **README images** for agents, harness and models redone with this version's interface, in
+  Portuguese and English.
 - **Board MCP and flow skill installed in each tool's section, globally by default** ([#141](https://github.com/euclidesgc/faz-ai/issues/141)).
   - In **Harness de IA → Tudo que a ferramenta carrega**, each tool's **Servidores MCP** section has the board
     server, and its **Skills** section has the flow skill, each with its global and project state and

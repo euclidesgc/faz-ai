@@ -6,6 +6,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Imagens do README** de agentes, harness e modelos refeitas com a interface desta versão, em
+  português e em inglês.
 - **MCP e skill do fluxo instalados na seção de cada ferramenta, no global por padrão** ([#141](https://github.com/euclidesgc/faz-ai/issues/141)).
   - Em **Harness de IA → Tudo que a ferramenta carrega**, a seção **Servidores MCP** de cada
     ferramenta tem o servidor do board, e a seção **Skills** tem a skill do fluxo, cada um com o
