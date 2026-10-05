@@ -1,3 +1,4 @@
+import type { BoardRequirement } from './requirements';
 import type { ExecProfile } from './execution';
 import type { ChatState } from './chat';
 import type { AiTool, Harness, InstallPreview } from './harness';
@@ -234,6 +235,8 @@ export interface BoardState {
   autopilot: Autopilot;
   /** por que a ferramenta do projeto não pode ser executada pelo board; null quando pode */
   aiRunUnsupported: string | null;
+  /** o que falta para o board trabalhar com a ferramenta de IA (CLI, login, servidor MCP…); vazio quando está tudo pronto */
+  requirements: BoardRequirement[];
   /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */
   harnessInstall: InstallPreview | null;
 }

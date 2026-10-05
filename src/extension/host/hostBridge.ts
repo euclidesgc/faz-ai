@@ -109,6 +109,9 @@ export class HostBridge {
         case 'ui.showChat':
           await this.env.showChat?.();
           return;
+        case 'requirements.check':
+          this.router.recheckRequirements();
+          return;
         case 'chat.send':
         case 'chat.stop':
         case 'chat.clear':

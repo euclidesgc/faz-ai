@@ -242,6 +242,16 @@ navegador**; the terminal `faz-ai` warns and does not start.
    the board", "take story #1 and write the PRD" or "check what is pending on the board and move it
    forward".
 
+While something is missing for the board to work with the tool, a yellow bar stays at the top of
+the board, on every screen, and in the chat panel. It checks Node.js (the board's server runs on
+it), the tool's command line, its sign-in (for Cursor, through `cursor-agent status`), the board's
+server registration in the file the tool reads, a registration pointing to a node or path that no
+longer exists, and the permission level. Each item says what it affects and brings the action: the
+command to copy, **Conectar ao board (MCP)** (connect to the board) or the shortcut to the AI
+harness. The bar has no close button: it goes away on its own when the last item is solved. The
+check runs when the board opens, when the tool or permission changes, after connecting, every 5
+minutes and on **Verificar de novo** (check again).
+
 Suggested flow: the AI reads the story and the phase instruction, creates a sub-task to build the
 phase document, attaches the document to the story and asks for review in the card's conversation.
 You answer on the card itself:

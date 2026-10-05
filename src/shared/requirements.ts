@@ -1,0 +1,32 @@
+import type { AiTool } from './harness';
+
+/** O que falta para o board trabalhar com a ferramenta de IA do projeto. */
+export type RequirementId = 'node' | 'cli' | 'signin' | 'mcp' | 'mcp-stale' | 'permission';
+
+/** O que a pessoa pode fazer, pela própria faixa de aviso, para resolver. */
+export type RequirementAction =
+  /** registrar (de novo) o servidor do board na ferramenta: o mesmo "Conectar IA (MCP)" */
+  | { kind: 'connect' }
+  /** um comando para rodar no terminal, com botão de copiar */
+  | { kind: 'command'; command: string }
+  /** a tela de Configurações → Harness de IA */
+  | { kind: 'settings' };
+
+/**
+ * Um requisito que falta. O texto é montado na interface a partir do `id` e dos valores, para sair
+ * no idioma dela; o host só diz o que falta e com que nomes.
+ */
+export interface BoardRequirement {
+  id: RequirementId;
+  tool: AiTool;
+  /** o comando da CLI procurado (`cursor-agent`, `claude`…), em `cli` e `signin` */
+  cli?: string;
+  /** onde instalar quando não há comando de uma linha, em `cli` */
+  where?: string;
+  /** o arquivo de configuração e o caminho que não existe mais, em `mcp-stale` */
+  file?: string;
+  missing?: string;
+  /** a explicação da recusa, em `permission` (a mesma de `aiRunUnsupported`) */
+  reason?: string;
+  action: RequirementAction | null;
+}

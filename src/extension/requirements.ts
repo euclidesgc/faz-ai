@@ -1,0 +1,152 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type { AiTool } from '../shared/harness';
+import type { BoardRequirement } from '../shared/requirements';
+import type { RunnerPermission } from '../shared/runner';
+import { headlessCommand, headlessUnsupported } from './headless';
+
+/** Onde a ferramenta lê o servidor do board, e o que está registrado lá. */
+export interface Registered {
+  /** o arquivo, como a pessoa o reconhece (relativo ao projeto ou com `~`) */
+  file: string;
+  command: string;
+  args: string[];
+}
+
+const SERVER = 'faz-ai';
+
+const readJson = (file: string): Record<string, unknown> | null => {
+  try {
+    const v: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+
+/** O registro do servidor do board num JSON (`mcpServers` ou, no VS Code, `servers`). */
+function fromJson(file: string, shown: string, key = 'mcpServers'): Registered | null {
+  const section = readJson(file)?.[key] as Record<string, { command?: unknown; args?: unknown }> | undefined;
+  const entry = section?.[SERVER];
+  if (!entry || typeof entry.command !== 'string') return null;
+  return { file: shown, command: entry.command, args: Array.isArray(entry.args) ? entry.args.map(String) : [] };
+}
+
+/** O registro na tabela `[mcp_servers.faz-ai]` do TOML do Codex (só `command` e `args`, que é o que o board grava). */
+function fromToml(file: string, shown: string): Registered | null {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return null;
+  }
+  const block = new RegExp(`^\\[mcp_servers\\.${SERVER}\\]\\s*$([\\s\\S]*?)(?=^\\s*\\[|$(?![\\s\\S]))`, 'm').exec(text)?.[1];
+  if (block === undefined) return null;
+  const command = /^\s*command\s*=\s*("(?:[^"\\]|\\.)*")/m.exec(block)?.[1];
+  const args = /^\s*args\s*=\s*(\[.*\])/m.exec(block)?.[1];
+  try {
+    return { file: shown, command: JSON.parse(command ?? '""') as string, args: args ? (JSON.parse(args) as string[]) : [] };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * O servidor do board no arquivo que a ferramenta lê nas conversas da pessoa (fora do board), nos
+ * mesmos lugares em que "Conectar IA (MCP)" grava. null quando não está registrado.
+ */
+export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: string): Registered | null {
+  const inProject = (rel: string) => path.join(workspaceDir, rel);
+  switch (tool) {
+    case 'claude':
+      return fromJson(inProject('.mcp.json'), '.mcp.json');
+    case 'cursor':
+      return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json');
+    case 'codex':
+      return fromToml(inProject('.codex/config.toml'), '.codex/config.toml');
+    case 'copilot':
+      return fromJson(inProject('.vscode/mcp.json'), '.vscode/mcp.json', 'servers');
+    case 'kimi':
+      for (const dir of ['.kimi-code', '.kimi']) {
+        const found = fromJson(path.join(homeDir, dir, 'mcp.json'), `~/${dir}/mcp.json`);
+        if (found) return found;
+      }
+      return null;
+  }
+}
+
+/** Como instalar a CLI de cada ferramenta, quando há um comando de uma linha para isso. */
+const INSTALL: Record<AiTool, { command: string | null; where: string }> = {
+  claude: { command: null, where: 'https://claude.com/claude-code' },
+  codex: { command: 'npm install -g @openai/codex', where: 'https://developers.openai.com/codex' },
+  cursor: {
+    command: process.platform === 'win32' ? null : 'curl https://cursor.com/install -fsS | bash',
+    where: 'https://cursor.com/cli',
+  },
+  kimi: { command: null, where: 'https://moonshotai.github.io/kimi-code' },
+  copilot: { command: 'npm install -g @github/copilot', where: 'https://github.com/features/copilot/cli' },
+};
+
+export interface RequirementProbe {
+  tool: AiTool;
+  permission: RunnerPermission;
+  workspaceDir: string;
+  homeDir: string;
+  /** o bridge.js que este board registra */
+  bridgePath: string;
+  /** o node encontrado no PATH do terminal, com caminho absoluto */
+  nodePath: string | undefined;
+  /** caminho do executável de um comando, ou null */
+  resolve(command: string): string | null;
+  /** se a CLI está autenticada; null quando a ferramenta não tem como dizer */
+  signedIn(tool: AiTool, executable: string): Promise<boolean | null>;
+}
+
+/**
+ * O que falta, agora, para o board trabalhar com a ferramenta do projeto. Lista vazia é tudo pronto.
+ * A ordem é a de resolver: sem node não há servidor, sem CLI não há login, e assim por diante.
+ */
+export async function checkRequirements(p: RequirementProbe): Promise<BoardRequirement[]> {
+  const out: BoardRequirement[] = [];
+  const tool = p.tool;
+
+  if (!p.nodePath) out.push({ id: 'node', tool, action: null });
+
+  const built = headlessCommand(tool, { prompt: '', permission: 'full' });
+  const cli = 'unsupported' in built ? null : built.command;
+  const executable = cli ? p.resolve(cli) : null;
+  if (cli && !executable) {
+    const install = INSTALL[tool];
+    out.push({
+      id: 'cli',
+      tool,
+      cli,
+      where: install.where,
+      action: install.command ? { kind: 'command', command: install.command } : null,
+    });
+  }
+
+  if (cli && executable && (await p.signedIn(tool, executable)) === false)
+    out.push({ id: 'signin', tool, cli, action: { kind: 'command', command: `${cli} login` } });
+
+  const registered = registeredServer(tool, p.workspaceDir, p.homeDir);
+  if (!registered) out.push({ id: 'mcp', tool, action: { kind: 'connect' } });
+  else {
+    const bridge = registered.args[0];
+    const commandMissing = path.isAbsolute(registered.command) ? !fs.existsSync(registered.command) : !p.resolve(registered.command);
+    const bridgeMissing = !!bridge && bridge !== p.bridgePath && !fs.existsSync(bridge);
+    if (commandMissing || bridgeMissing)
+      out.push({
+        id: 'mcp-stale',
+        tool,
+        file: registered.file,
+        missing: commandMissing ? registered.command : bridge,
+        action: { kind: 'connect' },
+      });
+  }
+
+  const unsupported = headlessUnsupported(tool, p.permission);
+  if (unsupported) out.push({ id: 'permission', tool, reason: unsupported, action: { kind: 'settings' } });
+
+  return out;
+}

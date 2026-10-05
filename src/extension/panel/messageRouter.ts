@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import type { BoardRequirement } from '../../shared/requirements';
 import type { DbHandle } from '../db/database';
 import { exportBoard, exportFileName, summarize, type BoardExportFile, type ImportResult } from '../db/boardExport';
 import { newId } from '../db/ids';
@@ -48,6 +49,7 @@ const bridgeOnly = {
   'chat.stop': viaBridge,
   'chat.clear': viaBridge,
   'ui.showChat': viaBridge,
+  'requirements.check': viaBridge,
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
@@ -89,6 +91,8 @@ export class MessageRouter {
   private chat: ChatState = EMPTY_CHAT;
   private chatHandler: ((msg: ChatMessageIn) => void) | null = null;
   private autopilot: Autopilot = { active: false, note: null };
+  private requirements: BoardRequirement[] = [];
+  private requirementsCheck: (() => void) | null = null;
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
 
@@ -125,6 +129,7 @@ export class MessageRouter {
       chat: this.chat,
       autopilot: this.autopilot,
       aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission),
+      requirements: this.requirements,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
     };
   }
@@ -162,6 +167,22 @@ export class MessageRouter {
 
   private actorOf(ctx: Origin): Actor {
     return { author: ctx.author ?? this.ctx.opts.author, byAi: ctx.source === 'ai' };
+  }
+
+  /** O que falta para o board trabalhar com a ferramenta de IA (informado pelo host, que confere). */
+  setRequirements(list: BoardRequirement[]): void {
+    if (JSON.stringify(list) === JSON.stringify(this.requirements)) return;
+    this.requirements = list;
+    this.notify();
+  }
+
+  /** Quem confere os requisitos quando a pessoa pede "Verificar de novo". */
+  onRequirementsCheck(fn: () => void): void {
+    this.requirementsCheck = fn;
+  }
+
+  recheckRequirements(): void {
+    this.requirementsCheck?.();
   }
 
   /** Cards em que a extensão está executando a IA (informado pelo executor). */

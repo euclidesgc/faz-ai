@@ -29,6 +29,7 @@ export const ui = {
   connectAI: () => post({ type: 'ui.connectAI' }),
   openInBrowser: () => post({ type: 'ui.openInBrowser' }),
   showChat: () => post({ type: 'ui.showChat' }),
+  checkRequirements: () => post({ type: 'requirements.check' }),
 };
 
 export const chat = {

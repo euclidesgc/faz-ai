@@ -352,6 +352,7 @@ export class BoardRepo {
       aiRuns: [],
       autopilot: { active: false, note: null },
       aiRunUnsupported: null,
+      requirements: [],
       harnessInstall: null,
     };
   }

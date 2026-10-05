@@ -1811,6 +1811,56 @@ button.heartbeat.stopped:hover {
   border-right: none;
 }
 
+/* requisitos do board: fica no topo, em todas as telas, enquanto faltar alguma coisa */
+.banner.requirements {
+  margin: var(--sp-8) var(--sp-16) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  max-height: 40vh;
+  overflow: auto;
+  flex-shrink: 0;
+}
+.banner.requirements.compact {
+  margin: 0 0 var(--sp-8);
+}
+.requirements-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+}
+.requirements-head svg {
+  color: var(--warn-border);
+  flex-shrink: 0;
+}
+.banner.requirements ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+.banner.requirements li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-4);
+}
+.banner.requirements li p {
+  margin: 0;
+  max-width: 90ch;
+}
+.requirement-command {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-6);
+}
+.requirement-command code {
+  overflow-wrap: anywhere;
+}
+
 /* avisos flutuantes: não empurram o board nem somem atrás do card aberto */
 .toasts {
   position: fixed;
@@ -2513,6 +2563,11 @@ body.host-web .drawer {
   height: 100vh;
   padding: var(--sp-8);
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.chat-view > .chat {
+  flex: 1;
 }
 .chat-drawer {
   position: fixed;

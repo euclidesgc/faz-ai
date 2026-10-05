@@ -228,6 +228,15 @@ o `faz-ai` do terminal avisa e não inicia.
 4. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
    board", "pegue a história #1 e escreva o PRD" ou "veja o que está pendente no board e dê andamento".
 
+Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, uma faixa amarela fica no topo
+do board, em todas as telas, e no painel de chat. Ela confere o Node.js (o servidor do board roda
+com ele), a linha de comando da ferramenta, o login dela (no Cursor, por `cursor-agent status`), o
+registro do servidor do board no arquivo que a ferramenta lê, um registro apontando para um node ou
+um caminho que não existe mais, e o nível de permissão. Cada item diz o efeito e traz a ação: o
+comando para copiar, **Conectar ao board (MCP)** ou o atalho para o Harness de IA. A faixa não
+fecha: some sozinha quando o último item é resolvido. A conferência roda ao abrir o board, quando a
+ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**.
+
 Fluxo sugerido: a IA lê a história e a instrução da fase, cria uma sub-tarefa para construir o
 documento da fase, anexa o documento à história e pede a revisão pela conversa do card. Você
 responde no próprio card:
