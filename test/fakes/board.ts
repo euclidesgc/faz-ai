@@ -102,6 +102,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     autopilot: { active: false, note: null },
     aiRunUnsupported: null,
     requirements: [],
+    requirementsCheckedAt: 0,
     harnessInstall: null,
     ...over,
   };
