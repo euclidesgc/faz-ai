@@ -15,6 +15,8 @@ export function Dialog() {
     if (!dialog) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // com a lista de opções aberta, o Esc é dela: fecha só a lista
+        if (document.querySelector('[data-radix-popper-content-wrapper]')) return;
         e.stopPropagation();
         ask(null);
         dialog.onCancel?.();

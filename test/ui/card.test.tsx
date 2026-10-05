@@ -179,6 +179,55 @@ describe('CardDrawer', () => {
     expect(lastSent('card.update')).toEqual({ type: 'card.update', cardId: board.storyId, patch: { description: 'Pendente' } });
   });
 
+  it('a IA reescreve a descrição com o card aberto: a tela mostra a nova, e fechar não volta a antiga', () => {
+    const { unmount } = openCardDrawer(board.storyId);
+    posted.mockClear();
+    act(() => patchCard(board.storyId, { description: 'Escrita pela IA' }));
+    expect(screen.getByText('Escrita pela IA')).toBeInTheDocument();
+    unmount();
+    expect(sentOf('card.update')).toEqual([]);
+  });
+
+  it('com um rascunho da pessoa, a mudança de fora não apaga o que ela digitou', async () => {
+    const { unmount } = openCardDrawer(board.storyId);
+    await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await userEvent.type(screen.getByPlaceholderText(/Descreva o problema/), 'Meu texto');
+    act(() => patchCard(board.storyId, { description: 'Escrita pela IA' }));
+    expect(screen.getByPlaceholderText(/Descreva o problema/)).toHaveValue('Meu texto');
+    unmount();
+    expect(lastSent('card.update')).toEqual({ type: 'card.update', cardId: board.storyId, patch: { description: 'Meu texto' } });
+  });
+
+  it('Esc com o menu Ações aberto fecha só o menu; o card continua aberto', async () => {
+    openStory();
+    await userEvent.click(screen.getByRole('button', { name: /Ações/ }));
+    expect(screen.getByText('Arquivar')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByText('Arquivar')).toBeNull();
+    expect(useBoardStore.getState().openCardId).toBe(board.storyId);
+  });
+
+  it('Esc no título em edição sai do campo e salva; o segundo Esc fecha o card', async () => {
+    openStory();
+    const title = screen.getByDisplayValue(snap().cards.find((c) => c.id === board.storyId)!.title);
+    await userEvent.clear(title);
+    await userEvent.type(title, 'Título novo');
+    await userEvent.keyboard('{Escape}');
+    expect(lastSent('card.update')).toEqual({ type: 'card.update', cardId: board.storyId, patch: { title: 'Título novo' } });
+    expect(useBoardStore.getState().openCardId).toBe(board.storyId);
+    await userEvent.keyboard('{Escape}');
+    expect(useBoardStore.getState().openCardId).toBeNull();
+  });
+
+  it('a mensagem em escrita na conversa sobrevive à troca de aba', async () => {
+    openStory();
+    await userEvent.click(screen.getByRole('button', { name: /^Conversa/ }));
+    await userEvent.type(screen.getByPlaceholderText(/Escreva uma mensagem/), 'Quase pronta');
+    await userEvent.click(screen.getByRole('button', { name: 'Detalhes' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Conversa/ }));
+    expect(screen.getByPlaceholderText(/Escreva uma mensagem/)).toHaveValue('Quase pronta');
+  });
+
   it('trocar de card com a descrição em edição salva o rascunho no card de antes', async () => {
     const { rerender } = openCardDrawer(board.storyId);
     await userEvent.click(screen.getByRole('button', { name: 'Editar' }));

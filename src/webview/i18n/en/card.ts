@@ -74,6 +74,8 @@ export const card: Record<string, string> = {
   '{tool} está trabalhando neste card… A resposta aparece aqui quando terminar.':
     '{tool} is working on this card… The reply appears here when it finishes.',
   'Escreva uma mensagem… (Cmd+Enter envia; cole imagens direto aqui)': 'Write a message… (Cmd+Enter sends; paste images right here)',
+  'O texto editado não foi salvo. Salve, ou clique em Descartar para fechar sem salvar.':
+    'The edited text was not saved. Save it, or click Discard to close without saving.',
   'Trabalhar na fase daqui não está disponível para o {tool}.': 'Working on the phase from here is not available for {tool}.',
   'Permissão do {tool} ao ser chamado: {permission}.': '{tool} permission when called: {permission}.',
   Mudar: 'Change',

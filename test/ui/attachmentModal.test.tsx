@@ -130,6 +130,34 @@ describe('AttachmentModal', () => {
     expect(screen.getByRole('button', { name: 'Copiar conteúdo' })).toBeDisabled();
   });
 
+  it('com texto editado e não salvo, Esc não descarta: avisa e só fecha em Descartar', async () => {
+    renderThemed(<AttachmentModal />);
+    open(attachment({}));
+    const read = lastSent('attachment.read');
+    reply({ type: 'attachment.readResult', requestId: read.requestId, content: 'antes' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Conteúdo do anexo' }), '!');
+    await userEvent.keyboard('{Escape}');
+    expect(useBoardStore.getState().attachmentModal).not.toBeNull();
+    expect(screen.getByRole('alert')).toHaveTextContent('não foi salvo');
+    expect(screen.getByRole('textbox', { name: 'Conteúdo do anexo' })).toHaveValue('antes!');
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar' }));
+    expect(useBoardStore.getState().attachmentModal).toBeNull();
+  });
+
+  it('Salvar não envia duas vezes enquanto espera a resposta', async () => {
+    renderThemed(<AttachmentModal />);
+    open(attachment({}));
+    const read = lastSent('attachment.read');
+    reply({ type: 'attachment.readResult', requestId: read.requestId, content: 'antes' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Conteúdo do anexo' }), '!');
+    const before = sentOf('attachment.write').length;
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(sentOf('attachment.write')).toHaveLength(before + 1);
+  });
+
   it('Escape fecha a modal', async () => {
     renderThemed(<AttachmentModal />);
     open(attachment({}));
