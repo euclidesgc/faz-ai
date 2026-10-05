@@ -9,6 +9,7 @@
 //
 // Desconhecido é `null` (ou uma contagem à parte), nunca 0: RF-14, RF-16 e RF-32.
 import type { CardEventKind } from '../../shared/log';
+import type { MetricsDwell, MetricsLead, MetricsLeadRow } from '../../shared/metrics';
 
 /** O mínimo de uma linha de `card_events` de que os tempos precisam. */
 export interface TimesEventRow {
@@ -26,40 +27,9 @@ export interface TimesPeriod {
   end: number;
 }
 
-// Os três tipos abaixo são os de `src/shared/metrics.ts` na Spec de #105, com os nomes e campos
-// exatos dela. Moram aqui provisoriamente: sobem para o contrato compartilhado na sub-tarefa #170, e
-// este arquivo passa a importá-los de lá.
-
-/** Uma fase nos tempos. `permanences` conta passagens, não cards (RF-12). */
-export interface MetricsDwell {
-  phase: string;
-  permanences: number;
-  meanMs: number | null;
-  medianMs: number | null;
-  /** permanências cuja entrada está fora do horizonte do detalhe (RF-14) */
-  unknown: number;
-  /** cards que estão nesta fase agora: contados, fora da média (RF-13) */
-  openNow: number;
-}
-
-export interface MetricsLead {
-  medianMs: number | null;
-  meanMs: number | null;
-  counted: number;
-  /** concluídos sem `created` no horizonte: detalhe descartado ou card anterior ao log (RF-16) */
-  unknown: number;
-  rows: MetricsLeadRow[];
-  /** cards concluídos além do teto de linhas; nunca somados, só contados (RF-33) */
-  omitted: number;
-}
-
-export interface MetricsLeadRow {
-  cardNumber: number;
-  title: string;
-  /** null = DESCONHECIDO, nunca 0 (RF-16) */
-  leadMs: number | null;
-  doneAt: number;
-}
+// Os três tipos dos tempos moram em `src/shared/metrics.ts` (o contrato que o webview também lê);
+// são reexportados daqui para quem já os importa deste módulo.
+export type { MetricsDwell, MetricsLead, MetricsLeadRow };
 
 /** Média dos valores; `null` sem nenhum valor (RF-32: nada medido não é média zero). */
 function mean(values: number[]): number | null {
