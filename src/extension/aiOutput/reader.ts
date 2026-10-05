@@ -17,6 +17,8 @@ export interface ReaderDeps {
   catalog: ModelOption[];
   /** o modelo que o board pediu nesta execução, quando pediu; é o nome a usar quando o fluxo não diz qual foi */
   model: string | null;
+  /** a regra do board que soma a tarifa do Cursor aos modelos de terceiros na estimativa */
+  cursorTokenRate?: boolean;
 }
 
 export interface OutputReader {

@@ -193,7 +193,7 @@ export function streamReader(deps: ReaderDeps): OutputReader {
         // que o board pediu; sem nenhum dos dois, não há de onde estimar
         const model = effectiveModel(deps, reportedModel);
         const byModel = model !== null ? new Map([[model, tokens]]) : null;
-        const estimated = byModel ? costOf(deps.catalog, byModel) : null;
+        const estimated = byModel ? costOf(deps.catalog, byModel, { cursorTokenRate: deps.cursorTokenRate }) : null;
         return {
           measure: 'full',
           consumption: {

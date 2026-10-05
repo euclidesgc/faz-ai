@@ -182,6 +182,15 @@ describe('regras configuráveis', () => {
     expect(() => boards.retentionMonths('inexistente')).toThrow();
   });
 
+  it('tarifa do Cursor: desligada por padrão, inclusive em banco anterior à regra; só booleano vale', () => {
+    expect(DEFAULT_RULES.cursorTokenRate).toBe(false);
+    expect(parseRules('{"confirmTrash":"never"}').cursorTokenRate).toBe(false);
+    expect(parseRules('{"cursorTokenRate":true}').cursorTokenRate).toBe(true);
+    expect(parseRules('{"cursorTokenRate":"sim"}').cursorTokenRate).toBe(false);
+    boards.updateRules(boardId, { cursorTokenRate: true });
+    expect(snap().board.rules.cursorTokenRate).toBe(true);
+  });
+
   it('updateRules persiste só o que foi alterado', () => {
     boards.updateRules(boardId, { onCancelParent: 'cascade' });
     boards.updateRules(boardId, { confirmArchive: 'always' });

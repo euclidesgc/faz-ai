@@ -24,6 +24,17 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   - Kimi Code, in the project, writes to `.kimi-code/mcp.json`; before, it always went global.
   - The MCP tool `install_flow_skill` takes `tool`, `scope` (`user`, the default, or `project`) and
     `replace`.
+- **Cursor pricing.** **Auto** now has a **variable price**: Cursor charges the price of the model
+  each request is routed to, so the board does not estimate its cost instead of using a misleading
+  fixed number. The **Preço variável** (variable price) switch exists on every model in **Modelos de
+  IA** (AI models) and in `upsert_model` (`variable_price`), and "Detectar modelos" keeps it.
+- **Cursor Token Rate.** A new switch on the Cursor card, off by default: adds US$ 0.25 per million
+  tokens to the estimate of third-party models, as Cursor charges on Teams and Enterprise plans;
+  Composer, Grok and Auto are exempt. Through MCP, `cursorTokenRate` in `update_rules`. Runs already
+  recorded are not recalculated.
+- The price table hint and the README explain fast mode (a separate model with its own price), long
+  context (not told apart: Cursor only reports the token total) and how the `cursor-agent models`
+  id, the pricing table name and the board's model match.
 
 ## 0.32.0
 

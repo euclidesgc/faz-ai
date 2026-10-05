@@ -32,14 +32,27 @@ export interface ModelOption {
    * pessoa preencheu só alguns dos quatro campos): quem usa o preço lê por `modelPrice`.
    */
   price?: Partial<ModelPrice>;
+  /**
+   * o custo não tem tarifa fixa: o `auto` do Cursor cobra o preço de lista do modelo para o qual cada
+   * pedido foi roteado. Ausente = vale o padrão de `hasVariablePrice` (catálogos gravados antes do campo).
+   */
+  variablePrice?: boolean;
 }
 
+/** Ids que nascem com preço variável quando o catálogo ainda não diz nada (o campo é posterior a eles). */
+const VARIABLE_PRICE_IDS = ['cursor:auto'];
+
+/** Se o modelo cobra por pedido o preço de outro modelo; o campo explícito vence o padrão por id. */
+export const hasVariablePrice = (o: ModelOption): boolean => o.variablePrice ?? VARIABLE_PRICE_IDS.includes(o.id);
+
 /**
- * O preço de um modelo, ou `null` quando ele não está completo. Exige os QUATRO números: tratar o
+ * O preço de um modelo, ou `null` quando ele não está completo ou é variável. Exige os QUATRO números: tratar o
  * campo que falta como zero é o `catch` que devolve `[]` da skill `error-handling`, com dinheiro no
  * lugar da lista — um custo menor que o verdadeiro, somável com os outros, e com cara de completo.
  */
 export function modelPrice(o: ModelOption): ModelPrice | null {
+  // qualquer número fixo para quem tem preço variável seria um chute com cara de medida
+  if (hasVariablePrice(o)) return null;
   // `price` chega de JSON.parse do banco: nada garante que os campos existem nem que são números.
   const p: unknown = o.price;
   if (!p || typeof p !== 'object') return null;

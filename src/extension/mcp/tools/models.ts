@@ -13,7 +13,7 @@ const models = (router: MessageRouter) => modelsOverview(router.snapshot());
 export function registerModelTools(tool: DefineTool): void {
   tool(
     'get_models',
-    'Catálogo de modelos de LLM do board (por ferramenta, com os níveis de esforço que cada um aceita) e as regras que sugerem um modelo a partir dos campos do card.',
+    'Catálogo de modelos de LLM do board (por ferramenta, com os níveis de esforço que cada um aceita, o preço e se o preço é variável) e as regras que sugerem um modelo a partir dos campos do card. O `value` de cada modelo é `<ferramenta>:<model>`; no Cursor, `model` é o id de `cursor-agent models` e `label` é o nome da tabela de preços em https://cursor.com/docs/models-and-pricing.',
     {},
     (_a, router) => models(router),
     true,
@@ -31,7 +31,7 @@ export function registerModelTools(tool: DefineTool): void {
 
   tool(
     'upsert_model',
-    'Cria ou atualiza um modelo no catálogo. Use para registrar os modelos e níveis de esforço que você (a ferramenta de IA em uso) realmente tem disponíveis. Os quatro preços (dólar por milhão de tokens) são opcionais: o que não vier fica como estava, e o board só estima custo de um modelo com os quatro preenchidos.',
+    'Cria ou atualiza um modelo no catálogo. Use para registrar os modelos e níveis de esforço que você (a ferramenta de IA em uso) realmente tem disponíveis. Os quatro preços (dólar por milhão de tokens) são opcionais: o que não vier fica como estava, e o board só estima custo de um modelo com os quatro preenchidos e sem preço variável. No Cursor, `model` é o id que `cursor-agent models` lista (ex.: "claude-opus-5-5"), `label` é o nome do modelo na tabela de preços da documentação (https://cursor.com/docs/models-and-pricing, colunas input, cache write, cache read e output) e o modelo fica no board como `cursor:<model>`; as variantes rápidas (`-fast`) são modelos à parte, com id e preço próprios. O `auto` do Cursor tem preço variável: não informe preço para ele.',
     {
       tool: toolArg,
       model: z.string().min(1).describe('Identificador usado pela ferramenta para escolher o modelo, ex.: "opus", "k3", "gpt-6.1-sol"'),
@@ -45,6 +45,12 @@ export function registerModelTools(tool: DefineTool): void {
       price_output: z.number().min(0).optional().describe('Preço da saída, em US$ por milhão de tokens'),
       price_cache_read: z.number().min(0).optional().describe('Preço da leitura de cache, em US$ por milhão de tokens'),
       price_cache_write: z.number().min(0).optional().describe('Preço da criação de cache, em US$ por milhão de tokens'),
+      variable_price: z
+        .boolean()
+        .optional()
+        .describe(
+          'O custo depende do modelo escolhido a cada pedido (o `auto` do Cursor, que já nasce assim): o board não estima o custo dele, mesmo com preço preenchido. Ausente = fica como estava.',
+        ),
     },
     (a, router) => {
       const catalog = [...router.snapshot().board.modelCatalog];
@@ -60,8 +66,13 @@ export function registerModelTools(tool: DefineTool): void {
           label: a.label ?? a.model,
           efforts,
           defaultEffort: a.default_effort ?? null,
-          // o preço é do catálogo: chamada que não o menciona não o apaga
+          // o preço é do catálogo: chamada que não o menciona não o apaga (nem o "preço variável")
           ...(at >= 0 && catalog[at]!.price ? { price: catalog[at]!.price } : {}),
+          ...(a.variable_price !== undefined
+            ? { variablePrice: a.variable_price }
+            : at >= 0 && catalog[at]!.variablePrice !== undefined
+              ? { variablePrice: catalog[at]!.variablePrice }
+              : {}),
         },
         { input: a.price_input, output: a.price_output, cacheRead: a.price_cache_read, cacheWrite: a.price_cache_write },
       );

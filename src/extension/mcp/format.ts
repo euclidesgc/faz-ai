@@ -2,6 +2,7 @@ import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../s
 import { norm } from '../../shared/filters';
 import {
   describeRule,
+  hasVariablePrice,
   modelFieldOf,
   modelLabel,
   modelPrice,
@@ -199,8 +200,10 @@ export function modelsOverview(s: BoardState) {
       label: o.label,
       efforts: o.efforts,
       defaultEffort: o.defaultEffort,
-      // null = sem preço completo: o board não estima o custo desse modelo
+      // null = sem preço completo ou com preço variável: o board não estima o custo desse modelo
       price: modelPrice(o),
+      // o efetivo: o `auto` do Cursor é variável mesmo num catálogo gravado antes do campo
+      variablePrice: hasVariablePrice(o),
     })),
     rules: s.board.modelRules.map((r) => ({
       ...(r.name ? { name: r.name } : {}),

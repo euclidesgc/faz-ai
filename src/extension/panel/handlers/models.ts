@@ -28,17 +28,26 @@ export function useTool(ctx: BoardContext, tool: AiTool): void {
 
 /**
  * Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. O preço que a
- * pessoa cadastrou é do catálogo, não da ferramenta: um modelo reencontrado mantém o preço que tinha
- * (senão cada "Detectar modelos" zeraria a estimativa de custo das execuções seguintes, sem aviso).
+ * pessoa cadastrou é do catálogo, não da ferramenta: um modelo reencontrado mantém o preço (e o
+ * "preço variável") que tinha (senão cada "Detectar modelos" zeraria a estimativa de custo das
+ * execuções seguintes, sem aviso).
  */
 function detectModels(ctx: BoardContext, tool: AiTool): void {
   const { board } = ctx.state();
-  const priced = new Map(board.modelCatalog.flatMap((o) => (o.price ? [[o.id, o.price] as const] : [])));
+  const saved = new Map(board.modelCatalog.map((o) => [o.id, o] as const));
   const all = modelsFor(tool, ctx.home);
   // as variantes rápidas do Cursor só entram com a regra ligada
   const found = all
     .filter((o) => board.rules.includeFastModels || !isFastVariant(o, all))
-    .map((o) => (priced.has(o.id) ? { ...o, price: priced.get(o.id) } : o));
+    .map((o) => {
+      const before = saved.get(o.id);
+      // o "preço variável" também é escolha da pessoa: sem ele, o modelo voltaria a pedir tarifa fixa
+      return {
+        ...o,
+        ...(before?.price ? { price: before.price } : {}),
+        ...(before?.variablePrice !== undefined ? { variablePrice: before.variablePrice } : {}),
+      };
+    });
   const ids = new Set(found.map((o) => o.id));
   const rest = board.modelCatalog.filter((o) => !ids.has(o.id));
   const at = rest.findIndex((o) => o.tool === tool);

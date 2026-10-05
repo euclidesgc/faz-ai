@@ -23,6 +23,17 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   - O Kimi Code, no projeto, grava em `.kimi-code/mcp.json`; antes, ia sempre para o global.
   - A ferramenta `install_flow_skill` do MCP aceita `tool`, `scope` (`user`, o padrão, ou
     `project`) e `replace`.
+- **Preços do Cursor.** O **Auto** passa a ter **preço variável**: o Cursor cobra o preço do modelo
+  para o qual cada pedido foi roteado, então o board não estima o custo dele em vez de usar um
+  número fixo enganoso. A chave **Preço variável** existe em todo modelo de **Modelos de IA** e no
+  `upsert_model` (`variable_price`), e "Detectar modelos" a preserva.
+- **Tarifa do Cursor (Cursor Token Rate).** Nova chave no cartão do Cursor, desligada por padrão:
+  soma US$ 0,25 por milhão de tokens à estimativa dos modelos de terceiros, como o Cursor cobra nos
+  planos Teams e Enterprise; Composer, Grok e Auto são isentos. Pelo MCP, `cursorTokenRate` no
+  `update_rules`. Execuções já registradas não são recalculadas.
+- A dica da tabela de preços e o README explicam o modo rápido (modelo à parte, com preço próprio),
+  o contexto longo (não separado: o Cursor só informa o total de tokens) e como o id de
+  `cursor-agent models`, o nome da tabela de preços e o modelo do board se correspondem.
 
 ## 0.32.0
 

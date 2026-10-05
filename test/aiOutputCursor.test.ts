@@ -151,4 +151,23 @@ describe('stream-json do Cursor', () => {
     );
     expect(reader.report().consumption).toMatchObject({ costUsd: 1, costEstimated: true });
   });
+
+  it('com a regra da tarifa do Cursor, o modelo de terceiros que rodou custa o preço de lista mais US$ 0,25/M', () => {
+    const opus: ModelOption = { ...composer, id: 'cursor:claude-opus-5-5', model: 'claude-opus-5-5', label: 'Claude Opus 5.5' };
+    const lines = [init('Claude Opus 5.5'), result({ inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 })];
+    expect(read(lines, { catalog: [opus], model: 'auto', cursorTokenRate: true }).reader.report().consumption).toMatchObject({
+      costUsd: 1.25,
+      costEstimated: true,
+    });
+    expect(read(lines, { catalog: [opus], model: 'auto' }).reader.report().consumption).toMatchObject({ costUsd: 1 });
+  });
+
+  it('pelo `auto`, sem saber o modelo que rodou, não há estimativa: o preço dele é variável', () => {
+    const auto: ModelOption = { ...composer, id: 'cursor:auto', model: 'auto', label: 'Auto' };
+    const { reader } = read([result({ inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 })], {
+      catalog: [auto],
+      model: 'auto',
+    });
+    expect(reader.report().consumption).toMatchObject({ costUsd: null, costEstimated: false });
+  });
 });

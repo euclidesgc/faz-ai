@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { costOf, matchModel } from '../src/extension/aiOutput/price';
-import { modelPrice, type ModelOption, type ModelPrice } from '../src/shared/models';
+import { CURSOR_TOKEN_RATE, costOf, cursorTokenRateApplies, matchModel } from '../src/extension/aiOutput/price';
+import { hasVariablePrice, modelPrice, withPrice, type ModelOption, type ModelPrice } from '../src/shared/models';
 import type { AiRunTokens } from '../src/shared/log';
 
 // Monta um ModelOption completo para o teste, só sobrescrevendo o que importa ao caso.
@@ -54,6 +54,56 @@ describe('modelPrice', () => {
 
   it('devolve null quando price está ausente', () => {
     expect(modelPrice(option({}))).toBeNull();
+  });
+
+  it('devolve null para modelo de preço variável, mesmo com os quatro campos preenchidos', () => {
+    expect(modelPrice(option({ price: price(), variablePrice: true }))).toBeNull();
+    expect(modelPrice(option({ price: price(), variablePrice: false }))).toEqual(price());
+  });
+});
+
+describe('hasVariablePrice', () => {
+  const auto = option({ id: 'cursor:auto', tool: 'cursor', model: 'auto', label: 'Auto' });
+
+  it('sem o campo, só o `auto` do Cursor é variável (catálogos gravados antes do campo)', () => {
+    expect(hasVariablePrice(auto)).toBe(true);
+    expect(hasVariablePrice(option({ id: 'cursor:composer-2.5', tool: 'cursor', model: 'composer-2.5' }))).toBe(false);
+    expect(hasVariablePrice(option({}))).toBe(false);
+  });
+
+  it('o campo explícito vence o padrão por id, nos dois sentidos', () => {
+    expect(hasVariablePrice({ ...auto, variablePrice: false })).toBe(false);
+    expect(hasVariablePrice(option({ variablePrice: true }))).toBe(true);
+  });
+
+  it('o `auto` com preço gravado continua sem preço enquanto for variável', () => {
+    expect(modelPrice({ ...auto, price: price() })).toBeNull();
+    expect(modelPrice({ ...auto, price: price(), variablePrice: false })).toEqual(price());
+  });
+
+  it('withPrice preserva o flag de preço variável', () => {
+    expect(withPrice(option({ variablePrice: true }), { input: 3 }).variablePrice).toBe(true);
+  });
+});
+
+describe('cursorTokenRateApplies', () => {
+  const cursor = (model: string) => option({ id: `cursor:${model}`, tool: 'cursor', model, label: model });
+
+  it('vale para modelos de terceiros rodados pelo Cursor', () => {
+    expect(cursorTokenRateApplies(cursor('claude-opus-5-5'))).toBe(true);
+    expect(cursorTokenRateApplies(cursor('gpt-6.1-sol-fast'))).toBe(true);
+  });
+
+  it('isenta os modelos do próprio Cursor (Composer, Grok) e o `auto`', () => {
+    expect(cursorTokenRateApplies(cursor('auto'))).toBe(false);
+    expect(cursorTokenRateApplies(cursor('composer-2.5'))).toBe(false);
+    expect(cursorTokenRateApplies(cursor('composer-2.5-fast'))).toBe(false);
+    expect(cursorTokenRateApplies(cursor('grok-5'))).toBe(false);
+    expect(cursorTokenRateApplies(cursor('xai-grok-code'))).toBe(false);
+  });
+
+  it('não vale fora do Cursor', () => {
+    expect(cursorTokenRateApplies(option({ id: 'claude:opus', model: 'opus' }))).toBe(false);
   });
 });
 
@@ -134,5 +184,42 @@ describe('costOf', () => {
     const esperado = (54 * 3 + 1221 * 15 + 106009 * 0.3 + 28908 * 3.75) / 1e6;
     expect(esperado).toBeCloseTo(0.1586847, 7);
     expect(costOf(catalog, byModel)).toBeCloseTo(esperado, 10);
+  });
+});
+
+describe('costOf com a tarifa do Cursor', () => {
+  const cursor = (model: string, p: ModelPrice = price({ input: 1, output: 2, cacheRead: 0.5, cacheWrite: 1 })) =>
+    option({ id: `cursor:${model}`, tool: 'cursor', model, label: model, price: p });
+  const umDeCada = tokens({ inputTokens: 1_000_000, outputTokens: 1_000_000, cacheReadTokens: 1_000_000, cacheWriteTokens: 1_000_000 });
+
+  it('a tarifa é de US$ 0,25 por milhão', () => {
+    expect(CURSOR_TOKEN_RATE).toBe(0.25);
+  });
+
+  it('com a regra ligada, soma a tarifa aos quatro tipos de token do modelo de terceiros', () => {
+    const catalog = [cursor('claude-opus-5-5')];
+    const byModel = new Map([['claude-opus-5-5', umDeCada]]);
+    // 1 + 2 + 0,5 + 1 = 4,5 de preço de lista, mais 4 × 0,25 de tarifa
+    expect(costOf(catalog, byModel, { cursorTokenRate: true })).toBeCloseTo(5.5, 10);
+  });
+
+  it('sem a regra (ou sem as opções), o custo é só o preço de lista', () => {
+    const catalog = [cursor('claude-opus-5-5')];
+    const byModel = new Map([['claude-opus-5-5', umDeCada]]);
+    expect(costOf(catalog, byModel)).toBeCloseTo(4.5, 10);
+    expect(costOf(catalog, byModel, { cursorTokenRate: false })).toBeCloseTo(4.5, 10);
+  });
+
+  it('Composer e Grok ficam isentos mesmo com a regra ligada', () => {
+    for (const model of ['composer-2.5', 'grok-5']) {
+      const byModel = new Map([[model, umDeCada]]);
+      expect(costOf([cursor(model)], byModel, { cursorTokenRate: true })).toBeCloseTo(4.5, 10);
+    }
+  });
+
+  it('o `auto` não tem estimativa: o preço é variável, com ou sem a regra', () => {
+    const byModel = new Map([['auto', umDeCada]]);
+    expect(costOf([cursor('auto')], byModel, { cursorTokenRate: true })).toBeNull();
+    expect(costOf([cursor('auto')], byModel)).toBeNull();
   });
 });
