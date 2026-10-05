@@ -1,0 +1,99 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { checkRequirements, registeredServer, type RequirementProbe } from '../src/extension/requirements';
+import { registerClients } from '../src/extension/mcp/clientConfig';
+
+let project: string;
+let home: string;
+const BRIDGE = '/dados/faz-ai/mcp/bridge.js';
+
+beforeEach(() => {
+  project = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-req-'));
+  home = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-req-home-'));
+});
+afterEach(() => {
+  fs.rmSync(project, { recursive: true, force: true });
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+/** Uma máquina com tudo pronto; cada teste tira uma coisa. */
+const probe = (over: Partial<RequirementProbe> = {}): RequirementProbe => ({
+  tool: 'cursor',
+  permission: 'board',
+  workspaceDir: project,
+  homeDir: home,
+  bridgePath: BRIDGE,
+  nodePath: process.execPath,
+  resolve: (command) => (command === 'node' ? process.execPath : `/usr/bin/${command}`),
+  signedIn: async () => true,
+  ...over,
+});
+
+const connect = (tool: RequirementProbe['tool'], node = process.execPath) =>
+  registerClients([tool], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: node });
+
+describe('requisitos do board', () => {
+  it('com tudo pronto, nada falta', async () => {
+    connect('cursor');
+    expect(await checkRequirements(probe())).toEqual([]);
+  });
+
+  it('Cursor sem nada: CLI com o comando de instalação e o servidor por conectar', async () => {
+    const list = await checkRequirements(probe({ resolve: (c) => (c === 'node' ? process.execPath : null) }));
+    expect(list.map((r) => r.id)).toEqual(['cli', 'mcp']);
+    expect(list[0]).toMatchObject({ tool: 'cursor', cli: 'cursor-agent' });
+    if (process.platform !== 'win32')
+      expect(list[0]!.action).toEqual({ kind: 'command', command: 'curl https://cursor.com/install -fsS | bash' });
+    expect(list[1]!.action).toEqual({ kind: 'connect' });
+  });
+
+  it('CLI do Cursor sem login: oferece o comando de login', async () => {
+    connect('cursor');
+    const list = await checkRequirements(probe({ signedIn: async () => false }));
+    expect(list).toEqual([
+      { id: 'signin', tool: 'cursor', cli: 'cursor-agent', action: { kind: 'command', command: 'cursor-agent login' } },
+    ]);
+  });
+
+  it('login que não dá para saber (outras ferramentas) não vira aviso', async () => {
+    connect('claude');
+    expect(await checkRequirements(probe({ tool: 'claude', signedIn: async () => null }))).toEqual([]);
+  });
+
+  it('sem node no PATH, o primeiro aviso é o node', async () => {
+    connect('cursor');
+    expect((await checkRequirements(probe({ nodePath: undefined })))[0]).toMatchObject({ id: 'node' });
+  });
+
+  it('registro apontando para um node que sumiu (nvm trocou de versão) pede para conectar de novo', async () => {
+    connect('cursor', path.join(home, '.nvm/versions/node/v20.0.0/bin/node'));
+    const list = await checkRequirements(probe());
+    expect(list).toEqual([
+      {
+        id: 'mcp-stale',
+        tool: 'cursor',
+        file: '.cursor/mcp.json',
+        missing: path.join(home, '.nvm/versions/node/v20.0.0/bin/node'),
+        action: { kind: 'connect' },
+      },
+    ]);
+  });
+
+  it('permissão que a ferramenta não aceita leva às configurações', async () => {
+    connect('kimi');
+    const list = await checkRequirements(probe({ tool: 'kimi', permission: 'edits' }));
+    expect(list.map((r) => [r.id, r.action])).toEqual([['permission', { kind: 'settings' }]]);
+    expect(list[0]!.reason).toContain('Sem restrições');
+  });
+
+  it('acha o registro onde cada ferramenta o lê', () => {
+    for (const tool of ['claude', 'cursor', 'codex', 'copilot', 'kimi'] as const) {
+      expect(registeredServer(tool, project, home)).toBeNull();
+      connect(tool);
+      expect(registeredServer(tool, project, home)).toMatchObject({ command: process.execPath });
+    }
+    expect(registeredServer('codex', project, home)!.args).toEqual([BRIDGE, project]);
+  });
+});

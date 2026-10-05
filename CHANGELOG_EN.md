@@ -7,6 +7,15 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Board requirements warning.** While something is missing for the board to work with the AI
+  tool, a bar stays at the top of the board (on every screen) and in the chat panel, with no close
+  button. It points out: Node.js not on the PATH, the tool's command line not installed, Cursor's
+  CLI not signed in, the board's server not registered in the file the tool reads, a registration
+  pointing to a node or path that no longer exists (nvm switched versions) and a permission level
+  the tool does not accept. Each item brings the action: the command to copy, **Conectar ao board
+  (MCP)** (connect to the board) or the shortcut to the AI harness. The bar goes away on its own when
+  everything is solved; **Verificar de novo** (check again) checks right away.
+
 - **Cursor's models are your account's.** With the CLI signed in, the board reads
   `cursor-agent models` when it opens and when the project switches to Cursor; the first real list
   replaces the built-in one, and after that **Detectar modelos** (detect models) brings it again. The

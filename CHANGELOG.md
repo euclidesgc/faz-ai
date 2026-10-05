@@ -6,6 +6,15 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Aviso dos requisitos do board.** Enquanto faltar alguma coisa para o board trabalhar com a
+  ferramenta de IA, uma faixa fica no topo do board (em todas as telas) e no painel de chat, sem
+  botão de fechar. Ela aponta: Node.js fora do PATH, linha de comando da ferramenta não instalada,
+  CLI do Cursor sem login, servidor do board não registrado no arquivo que a ferramenta lê, registro
+  apontando para um node ou caminho que não existe mais (o nvm trocou de versão) e nível de
+  permissão que a ferramenta não aceita. Cada item traz a ação: o comando para copiar, **Conectar
+  ao board (MCP)** ou o atalho para o Harness de IA. A faixa some sozinha quando tudo é resolvido;
+  **Verificar de novo** confere na hora.
+
 - **Os modelos do Cursor são os da sua conta.** Com a CLI autenticada, o board lê
   `cursor-agent models` ao abrir e quando o projeto passa a usar o Cursor; a primeira lista real
   substitui a embutida, e depois **Detectar modelos** a traz de novo. As cerca de 250 variantes que o

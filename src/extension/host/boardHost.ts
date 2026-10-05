@@ -17,7 +17,8 @@ import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
-import { cursorModels } from '../cliProbe';
+import { cursorModels, cursorSignedIn } from '../cliProbe';
+import { checkRequirements } from '../requirements';
 import { resolveCommand } from '../cliResolve';
 import { onlyBuiltin, rememberModels } from '../models';
 import { loginShellPath, spawnHeadless } from '../spawn';
@@ -174,13 +175,62 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     if (ownsBoard && board.aiTool === 'cursor' && onlyBuiltin('cursor', board.modelCatalog))
       router.handle({ type: 'settings.models.detect', tool: 'cursor' });
   };
+  // o que falta para o board trabalhar com a ferramenta (CLI, login, servidor MCP, permissão): vira a
+  // faixa de aviso da interface, que fica enquanto faltar alguma coisa. Confere ao abrir, quando a
+  // ferramenta ou a permissão mudam, depois de conectar, a cada poucos minutos (a pessoa instala a
+  // CLI ou entra na conta fora do board) e quando ela pede "Verificar de novo".
+  let checking: Promise<void> | null = null;
+  let cursorBlocked = false;
+  let checkAgain = false;
+  const checkNow = (): Promise<void> => {
+    if (checking) {
+      checkAgain = true;
+      return checking;
+    }
+    const { board } = router.snapshot();
+    checking = checkRequirements({
+      tool: board.aiTool,
+      permission: board.runner.permission,
+      workspaceDir: o.folderPath,
+      homeDir,
+      bridgePath: o.bridgePath,
+      nodePath,
+      resolve: (command) => resolveCommand(command, pathEnv, homeDir),
+      signedIn: (tool, exe) => (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : Promise.resolve(null)),
+    })
+      .then((list) => {
+        // a CLI do Cursor acabou de ficar pronta (instalada, com login): só agora dá para ler os modelos da conta
+        const blocked = list.some((r) => r.id === 'cli' || r.id === 'signin');
+        if (cursorBlocked && !blocked && router.snapshot().board.aiTool === 'cursor') void refreshCursorModels();
+        cursorBlocked = blocked;
+        router.setRequirements(list);
+      })
+      .catch((e) => o.log(`Não foi possível conferir os requisitos do board: ${e instanceof Error ? e.message : String(e)}`))
+      .finally(() => {
+        checking = null;
+        if (checkAgain) {
+          checkAgain = false;
+          void checkNow();
+        }
+      });
+    return checking;
+  };
+  router.onRequirementsCheck(() => void checkNow());
+  const requirementsTimer = setInterval(() => void checkNow(), 5 * 60_000);
+  requirementsTimer.unref?.();
+  void checkNow();
+
   let toolInUse = router.snapshot().board.aiTool;
+  let permissionInUse = router.snapshot().board.runner.permission;
   if (toolInUse === 'cursor') void refreshCursorModels();
   router.onDidChange(() => {
-    const tool = router.snapshot().board.aiTool;
-    if (tool === toolInUse) return;
-    toolInUse = tool;
-    if (tool === 'cursor') void refreshCursorModels();
+    const { board } = router.snapshot();
+    if (board.aiTool === toolInUse && board.runner.permission === permissionInUse) return;
+    const toolChanged = board.aiTool !== toolInUse;
+    toolInUse = board.aiTool;
+    permissionInUse = board.runner.permission;
+    void checkNow();
+    if (toolChanged && board.aiTool === 'cursor') void refreshCursorModels();
   });
   const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
   const heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: o.log });
@@ -221,6 +271,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         : [];
       const toIgnore = [...new Set(done.flatMap((d) => (d.projectFile && !ignored.includes(d.projectFile) ? [d.projectFile] : [])))];
       const files = done.map((d) => d.projectFile ?? d.file.replace(homeDir, '~')).join(', ');
+      void checkNow();
       return { message: `Servidor "faz-ai" registrado em: ${files}. ${[...new Set(done.map((d) => d.next))].join(' ')}`, toIgnore };
     },
     addToGitignore(lines) {
@@ -228,6 +279,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       fs.writeFileSync(gitignore, `${current}${current && !current.endsWith('\n') ? '\n' : ''}${lines.join('\n')}\n`);
     },
     async dispose() {
+      clearInterval(requirementsTimer);
       autopilot.pause();
       heartbeat.stop();
       runner.dispose();

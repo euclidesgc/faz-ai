@@ -9,7 +9,10 @@ const INSTALL_HINTS: [pt: string, en: string][] = [
   ],
   ['Instale a CLI do Codex (npm install -g @openai/codex).', 'Install the Codex CLI (npm install -g @openai/codex).'],
   ['Instale a GitHub Copilot CLI (npm install -g @github/copilot).', 'Install the GitHub Copilot CLI (npm install -g @github/copilot).'],
-  ['Instale a CLI do Cursor (https://cursor.com/cli).', 'Install the Cursor CLI (https://cursor.com/cli).'],
+  [
+    'Instale a CLI do Cursor (curl https://cursor.com/install -fsS | bash) e entre na conta com "cursor-agent login".',
+    'Install the Cursor CLI (curl https://cursor.com/install -fsS | bash) and sign in with "cursor-agent login".',
+  ],
   ['Instale a CLI do Kimi Code.', 'Install the Kimi Code CLI.'],
   ['Instale a ferramenta.', 'Install the tool.'],
 ];

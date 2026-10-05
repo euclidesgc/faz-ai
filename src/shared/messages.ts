@@ -200,6 +200,8 @@ export type WebviewToHost =
   | { type: 'chat.clear' }
   /** mostra o chat na barra lateral do editor */
   | { type: 'ui.showChat' }
+  /** confere de novo o que falta para o board trabalhar com a ferramenta de IA */
+  | { type: 'requirements.check' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
   | { type: 'harness.flowSkill.install' }
   /** exporta o board num arquivo JSON (no editor, abre o "salvar como"; na web a página baixa pela rota /backup/export) */

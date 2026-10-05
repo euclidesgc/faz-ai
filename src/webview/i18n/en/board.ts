@@ -294,4 +294,38 @@ export const board: Record<string, string> = {
   '+ Nova coluna': '+ New column',
   'Criar sub-tarefa': 'Create sub-task',
   'Criar card': 'Create card',
+
+  // requisitos do board (RequirementsBanner)
+  'Requisitos do board': 'Board requirements',
+  'Falta 1 requisito para o board trabalhar com a IA': '1 requirement missing for the board to work with the AI',
+  'Faltam {n} requisitos para o board trabalhar com a IA': '{n} requirements missing for the board to work with the AI',
+  'Verificar de novo': 'Check again',
+  'Copiar comando': 'Copy command',
+  Copiado: 'Copied',
+  'Não foi possível copiar. Selecione o comando e copie com o teclado.':
+    'Could not copy. Select the command and copy it with the keyboard.',
+  'Conectar ao board (MCP)': 'Connect to the board (MCP)',
+  'Abrir Harness de IA': 'Open AI harness',
+  'Node.js não encontrado': 'Node.js not found',
+  'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 18 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':
+    "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 18 or newer, and it is not on the terminal's PATH. Without it, {tool} cannot reach the board. Install Node.js and click Check again.",
+  'A linha de comando do {tool} não foi encontrada': "{tool}'s command line was not found",
+  'Sem ela não rodam o Chamar IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale com o comando abaixo e clique em Verificar de novo.':
+    'Without it, the cards\' Chamar IA, the board chat, the heartbeat and autonomous mode do not run. The board looked for "{cli}" in the terminal\'s PATH, the usual install folders and the editor extensions. Install it with the command below and click Check again.',
+  'Sem ela não rodam o Chamar IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale pelo site {where} e clique em Verificar de novo.':
+    'Without it, the cards\' Chamar IA, the board chat, the heartbeat and autonomous mode do not run. The board looked for "{cli}" in the terminal\'s PATH, the usual install folders and the editor extensions. Install it from {where} and click Check again.',
+  'A linha de comando do {tool} está sem login': "{tool}'s command line is not signed in",
+  'Ela está instalada, mas não entrou na conta: as execuções pelo board falham antes de começar. Rode o comando abaixo no terminal, conclua o login no navegador e clique em Verificar de novo.':
+    'It is installed but not signed in: runs from the board fail before starting. Run the command below in the terminal, finish signing in in the browser and click Check again.',
+  'O servidor do board não está registrado no {tool}': "The board's server is not registered in {tool}",
+  'Nas conversas com o {tool} fora do board, a IA não enxerga os cards. As execuções pelo board não dependem disso. Conecte e aprove o servidor "faz-ai" quando a ferramenta pedir.':
+    'In conversations with {tool} outside the board, the AI does not see the cards. Runs from the board do not depend on this. Connect and approve the "faz-ai" server when the tool asks.',
+  'Nas conversas com o Cursor no editor, a IA não enxerga os cards. As execuções pelo board registram o servidor sozinhas, mas a conversa no editor não. Conecte e ative o servidor "faz-ai" em Cursor Settings → MCP.':
+    'In conversations with Cursor in the editor, the AI does not see the cards. Runs from the board register the server on their own, but the editor conversation does not. Connect and enable the "faz-ai" server in Cursor Settings → MCP.',
+  'Nas conversas com o {tool} fora do board, a IA não enxerga os cards, e as execuções pelo board também dependem disso. Conecte e aprove o servidor "faz-ai" quando a ferramenta pedir.':
+    'In conversations with {tool} outside the board, the AI does not see the cards, and runs from the board depend on this too. Connect and approve the "faz-ai" server when the tool asks.',
+  'O registro do servidor do board no {tool} está desatualizado': "The board's server registration in {tool} is out of date",
+  '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). A ferramenta não consegue iniciar o servidor. Conecte de novo para gravar o caminho atual.':
+    '{file} points to "{missing}", which no longer exists on this machine (a node replaced by nvm, or the board installed elsewhere). The tool cannot start the server. Connect again to write the current path.',
+  'O {tool} não roda com o nível de permissão escolhido': '{tool} does not run with the chosen permission level',
 };

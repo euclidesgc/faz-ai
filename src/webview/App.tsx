@@ -18,6 +18,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { TrashView } from './components/TrashView';
 import { MetricsView } from './components/metrics/MetricsView';
 import { Settings } from './components/settings/Settings';
+import { RequirementsBanner } from './components/RequirementsBanner';
 import { Button, IconChat, IconClose, IconExternal } from './components/ui';
 import { isWeb, onConnectionChange } from './vscode';
 
@@ -134,6 +135,7 @@ export function App() {
           )}
         </div>
       )}
+      <RequirementsBanner />
       {/* a barra de filtros filtra cards, não o log: fica só no board (RF-01) */}
       {view === 'board' && <FilterBar />}
       <main className="content">
