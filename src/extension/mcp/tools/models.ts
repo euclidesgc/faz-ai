@@ -21,7 +21,7 @@ export function registerModelTools(tool: DefineTool): void {
 
   tool(
     'detect_models',
-    'Relê os modelos de uma ferramenta e os junta ao catálogo. Para o Kimi, lê a lista real do config.toml local; para as demais, usa a lista embutida na extensão.',
+    'Relê os modelos de uma ferramenta e os junta ao catálogo. Para o Kimi, lê a lista real do config.toml local; para o Cursor, a última lista de `cursor-agent models` lida pelo board (com a CLI autenticada); para as demais, usa a lista embutida na extensão.',
     { tool: toolArg.optional().describe('Por padrão, a ferramenta em uso no projeto') },
     (a, router) => {
       router.handle({ type: 'settings.models.detect', tool: (a.tool as AiTool | undefined) ?? router.snapshot().board.aiTool });

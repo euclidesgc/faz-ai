@@ -112,6 +112,7 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
     ]),
     files('agent', 'project', '.cursor/agents', '.md'),
     files('agent', 'project', '.claude/agents', '.md'),
+    files('agent', 'project', '.grok/agents', '.md'),
     files('agent', 'user', '.cursor/agents', '.md'),
     files('agent', 'user', '.claude/agents', '.md'),
     files('command', 'project', '.cursor/commands', '.md'),
@@ -340,6 +341,11 @@ export const HOOK_EVENTS: Record<AiTool, string[]> = {
     'preCompact',
     'stop',
     'afterAgentResponse',
+    'afterAgentThought',
+    'workspaceOpen',
+    // só no editor: o preenchimento automático (Tab)
+    'beforeTabFileRead',
+    'afterTabFileEdit',
   ],
   copilot: [
     'preToolUse',

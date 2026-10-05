@@ -27,10 +27,11 @@ const BUILTIN: Record<AiTool, Seed[]> = {
     ['gpt-6-astra', 'Astra', CODEX_EFFORTS, 'medium'],
     ['gpt-6-luna', 'GPT-6 Luna', CODEX_EFFORTS.filter((e) => e !== 'ultra'), 'light'],
   ],
+  // só os ids conferidos no código da CLI 2026.10.01; a lista real da conta vem de `cursor-agent models`
   cursor: [
     ['auto', 'Auto', [], null],
     ['composer-2.5', 'Composer 2.5', [], null],
-    ['grok-4.7', 'Grok 4.7', [], null],
+    ['composer-2.5-fast', 'Composer 2.5 Fast', [], null],
   ],
   kimi: [
     ['kimi-code/k3', 'K3', ['low', 'high', 'max'], 'high'],
@@ -62,8 +63,8 @@ const TIERS: Record<AiTool, [string, string | null][]> = {
     ['gpt-6-astra', 'high'],
   ],
   cursor: [
+    ['composer-2.5-fast', null],
     ['auto', null],
-    ['composer-2.5', null],
     ['composer-2.5', null],
   ],
   kimi: [
@@ -115,9 +116,47 @@ export function parseKimiModels(toml: string): ModelOption[] {
   return out;
 }
 
-/** Modelos lidos da configuração local da ferramenta, quando ela guarda a lista em arquivo. */
+// eslint-disable-next-line no-control-regex
+const ANSI = /\x1b\[[0-9;]*m/g;
+
+/**
+ * Lê a saída de `cursor-agent models`: depois de "Available models", uma linha por modelo no formato
+ * `id - Nome de exibição (current, default)`, e no fim uma dica que não é modelo. O esforço vai
+ * dentro do id (`modelo[effort=high]`) e a lista não diz quais modelos o aceitam: os modelos entram
+ * sem níveis, e quem souber os acrescenta no catálogo.
+ */
+export function parseCursorModels(text: string): ModelOption[] {
+  const lines = text.replace(ANSI, '').split(/\r?\n/);
+  const start = lines.findIndex((l) => l.trim() === 'Available models');
+  if (start < 0) return [];
+  const out: ModelOption[] = [];
+  for (const raw of lines.slice(start + 1)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^tip:/i.test(line)) break;
+    const m = /^(\S+)(?:\s+-\s+(.+?))?(?:\s+\((?:current|default)(?:,\s*(?:current|default))*\))?$/.exec(line);
+    if (m) out.push(option('cursor', [m[1]!, m[2]?.trim() || m[1]!, [], null]));
+  }
+  return out;
+}
+
+/** Listas lidas da própria ferramenta por um comando (o Cursor), guardadas para o próximo "Detectar". */
+const fromCli = new Map<AiTool, ModelOption[]>();
+
+/** Guarda a lista que a ferramenta informou; uma lista vazia não apaga a anterior. */
+export function rememberModels(tool: AiTool, found: ModelOption[]): void {
+  if (found.length) fromCli.set(tool, found);
+}
+
+/** Esquece a lista lida da ferramenta (a CLI saiu da conta, ou nos testes). */
+export function forgetModels(tool: AiTool): void {
+  fromCli.delete(tool);
+}
+
+/** Modelos lidos da ferramenta: do arquivo local (Kimi) ou do último comando de listagem (Cursor). */
 export function discoverModels(tool: AiTool, homeDir: string): ModelOption[] {
-  if (tool !== 'kimi' || !homeDir) return [];
+  if (tool !== 'kimi') return fromCli.get(tool) ?? [];
+  if (!homeDir) return [];
   for (const dir of ['.kimi-code', '.kimi']) {
     const file = path.join(homeDir, dir, 'config.toml');
     try {
@@ -128,6 +167,12 @@ export function discoverModels(tool: AiTool, homeDir: string): ModelOption[] {
     }
   }
   return [];
+}
+
+/** Se o catálogo da ferramenta ainda é só a lista embutida (nunca recebeu a lista real nem um modelo à mão). */
+export function onlyBuiltin(tool: AiTool, catalog: ModelOption[]): boolean {
+  const builtin = new Set(BUILTIN[tool].map(([model]) => modelId(tool, model)));
+  return catalog.filter((o) => o.tool === tool).every((o) => builtin.has(o.id));
 }
 
 /** Catálogo de uma ferramenta: a lista real quando dá para ler, senão a lista embutida. */

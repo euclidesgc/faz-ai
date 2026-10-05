@@ -679,8 +679,10 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Backup | Export the board to a file and import a file in place of the current board (see [Board backup](#board-backup)) |
 
 About models: **Detectar modelos** (detect models) reads the tool's list (for Kimi Code, from the
-local configuration; for the others, a built-in list you can edit); the prices you filled in stay
-there after detecting again. Suggestion rules combine
+local configuration; for Cursor, the models of your account, through the `cursor-agent models`
+command, read when the board opens with the CLI signed in; for the others, a built-in list you can
+edit); the prices you filled in stay there after detecting again. For Cursor, the model effort goes
+inside the id (`model[effort=high]`): add the levels to the models that accept them. Suggestion rules combine
 conditions with AND and OR, for example `Esforço da atividade = Alto E Tags = backend`. The result
 is always a suggestion: on the card, the model and the effort can be changed at any time.
 

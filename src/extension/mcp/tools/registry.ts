@@ -1,5 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { MessageRouter } from '../../panel/messageRouter';
 
 export interface ToolContext {
@@ -21,7 +21,10 @@ export type DefineTool = <S extends z.ZodRawShape>(
 
 export function toolRegistrar(server: McpServer, ctx: ToolContext): DefineTool {
   return (name, description, shape, run, readOnly = false) => {
-    server.registerTool(name, { description, inputSchema: shape, annotations: { readOnlyHint: readOnly } }, (async (args: unknown) => {
+    // estrito: um parâmetro com nome errado vira erro com o nome dele, em vez de ser descartado e a
+    // ferramenta seguir com o padrão (um `parent` escrito errado criaria uma história, não a sub-tarefa)
+    const inputSchema = z.object(shape).strict();
+    server.registerTool(name, { description, inputSchema, annotations: { readOnlyHint: readOnly } }, (async (args: unknown) => {
       try {
         const result = run(args as Parameters<typeof run>[0], await ctx.getRouter());
         return { content: [{ type: 'text' as const, text: typeof result === 'string' ? result : JSON.stringify(result, null, 1) }] };

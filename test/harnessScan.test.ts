@@ -327,8 +327,9 @@ describe('servidores MCP nos arquivos de cada ferramenta', () => {
       },
     });
     mcp.add('cursor', at('cursor', '~/.cursor/mcp.json'), stdio);
+    // o Cursor pede `type: "stdio"` nos servidores locais; o remoto vai só com `url`
     expect(json(home, '.cursor/mcp.json')).toEqual({
-      mcpServers: { github: { command: 'npx', args: ['-y', 'gh-mcp'], env: { TOKEN: 'abc' } } },
+      mcpServers: { github: { type: 'stdio', command: 'npx', args: ['-y', 'gh-mcp'], env: { TOKEN: 'abc' } } },
     });
     mcp.add('kimi', at('kimi', '.kimi-code/mcp.json'), stdio);
     expect(json(project, '.kimi-code/mcp.json').mcpServers.github.transport).toBe('stdio');

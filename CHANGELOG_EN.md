@@ -7,6 +7,24 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Cursor's models are your account's.** With the CLI signed in, the board reads
+  `cursor-agent models` when it opens and when the project switches to Cursor; the first real list
+  replaces the built-in one, and after that **Detectar modelos** (detect models) brings it again. The
+  built-in list lost `grok-4.7`, which does not exist in Cursor.
+
+- **The board's tools refuse unknown parameters.** A misspelled name used to be dropped silently and
+  the tool went on with the default: a misspelled `parent` in `create_card` created a story instead
+  of the sub-task. The call now returns an error naming the parameter that does not exist.
+
+- **Cursor catalog updated.** Local MCP servers the board adds to `.cursor/mcp.json` carry
+  `"type": "stdio"`, as the documentation asks; subagents in `.grok/agents` appear in the inventory;
+  and the `afterAgentThought`, `workspaceOpen`, `beforeTabFileRead` and `afterTabFileEdit` hook events
+  are listed.
+
+- **The board's server is registered with the full path of node.** An editor opened from the system
+  menu does not inherit the terminal's PATH; with node installed only through nvm,
+  `"command": "node"` did not start the server.
+
 - **Cursor in the background really works.** The Chamar IA button, the heartbeat and autonomous
   mode with Cursor had four defects, now fixed:
   - **No board server.** If nobody had clicked Conectar IA (MCP), the run had none of the board's

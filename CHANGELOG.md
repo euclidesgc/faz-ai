@@ -6,6 +6,24 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Os modelos do Cursor são os da sua conta.** Com a CLI autenticada, o board lê
+  `cursor-agent models` ao abrir e quando o projeto passa a usar o Cursor; a primeira lista real
+  substitui a embutida, e depois **Detectar modelos** a traz de novo. A lista embutida perdeu o
+  `grok-4.7`, que não existe no Cursor.
+
+- **As ferramentas do board recusam parâmetro desconhecido.** Antes, um nome errado era descartado
+  em silêncio e a ferramenta seguia com o padrão: um `parent` escrito errado no `create_card` criava
+  uma história em vez da sub-tarefa. Agora a chamada volta com erro dizendo qual parâmetro não existe.
+
+- **Catálogo do Cursor atualizado.** Os servidores MCP locais acrescentados pelo board no
+  `.cursor/mcp.json` levam `"type": "stdio"`, como a documentação pede; os subagentes de
+  `.grok/agents` aparecem no inventário; e os eventos de hook `afterAgentThought`, `workspaceOpen`,
+  `beforeTabFileRead` e `afterTabFileEdit` entram na lista.
+
+- **O servidor do board é registrado com o caminho completo do node.** O editor aberto pelo menu do
+  sistema não herda o PATH do terminal; com o node instalado só pelo nvm, `"command": "node"` não
+  iniciava o servidor.
+
 - **O Cursor em segundo plano funciona de verdade.** O botão Chamar IA, o heartbeat e o modo
   autônomo com o Cursor tinham quatro defeitos, corrigidos:
   - **Sem o servidor do board.** Se ninguém tivesse clicado em Conectar IA (MCP), a execução rodava

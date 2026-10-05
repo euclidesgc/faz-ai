@@ -219,8 +219,8 @@ export const settings: Record<string, string> = {
     'list built into the extension (Claude Code does not keep the list in a file)',
   'lista embutida na extensão (o Codex não guarda a lista em arquivo)':
     'list built into the extension (Codex does not keep the list in a file)',
-  'lista embutida na extensão (o Cursor não guarda a lista em arquivo)':
-    'list built into the extension (Cursor does not keep the list in a file)',
+  'lida do comando cursor-agent models, com a conta em uso; sem a CLI autenticada, lista embutida na extensão':
+    'read from the cursor-agent models command, with the account in use; without the CLI signed in, the list built into the extension',
   'lida do config.toml do Kimi nesta máquina, com os esforços de cada modelo':
     "read from Kimi's config.toml on this machine, with each model's efforts",
   'lista embutida na extensão (o GitHub Copilot não guarda a lista em arquivo)':

@@ -17,7 +17,9 @@ import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
+import { cursorModels } from '../cliProbe';
 import { resolveCommand } from '../cliResolve';
+import { onlyBuiltin, rememberModels } from '../models';
 import { loginShellPath, spawnHeadless } from '../spawn';
 
 /** Complemento do nome na mensagem de "comando não encontrado", para não piorar o que a pessoa já lê no log. */
@@ -158,6 +160,27 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     runLog,
     spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
     file: path.join(o.storageDir, 'chat', `${workspaceKey(o.folderPath)}.json`),
+  });
+  // os modelos do Cursor são os da conta, e só a CLI diz quais são: lidos ao abrir o board e ao passar
+  // a usar o Cursor. A primeira lista real substitui a embutida sozinha; depois, só pelo "Detectar
+  // modelos", para não trazer de volta um modelo que a pessoa tirou do catálogo.
+  const refreshCursorModels = async () => {
+    const exe = resolveCommand('cursor-agent', pathEnv, homeDir);
+    if (!exe) return;
+    const found = await cursorModels(exe, pathEnv);
+    if (!found.length) return;
+    rememberModels('cursor', found);
+    const { board } = router.snapshot();
+    if (ownsBoard && board.aiTool === 'cursor' && onlyBuiltin('cursor', board.modelCatalog))
+      router.handle({ type: 'settings.models.detect', tool: 'cursor' });
+  };
+  let toolInUse = router.snapshot().board.aiTool;
+  if (toolInUse === 'cursor') void refreshCursorModels();
+  router.onDidChange(() => {
+    const tool = router.snapshot().board.aiTool;
+    if (tool === toolInUse) return;
+    toolInUse = tool;
+    if (tool === 'cursor') void refreshCursorModels();
   });
   const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
   const heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: o.log });
