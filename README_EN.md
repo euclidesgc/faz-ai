@@ -681,8 +681,11 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 About models: **Detectar modelos** (detect models) reads the tool's list (for Kimi Code, from the
 local configuration; for Cursor, the models of your account, through the `cursor-agent models`
 command, read when the board opens with the CLI signed in; for the others, a built-in list you can
-edit); the prices you filled in stay there after detecting again. For Cursor, the model effort goes
-inside the id (`model[effort=high]`): add the levels to the models that accept them. Suggestion rules combine
+edit); the prices you filled in stay there after detecting again. For Cursor, the list has one line per
+level of each model (`claude-opus-5-5-low`, `-medium`, `-high`…); the board groups the variants into
+one model with its levels and leaves out the `-fast` versions. On Cursor's free plan only **Auto**
+runs: the other models are refused before starting, which is why Cursor's suggestion rules all start
+at Auto. Suggestion rules combine
 conditions with AND and OR, for example `Esforço da atividade = Alto E Tags = backend`. The result
 is always a suggestion: on the card, the model and the effort can be changed at any time.
 

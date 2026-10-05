@@ -8,8 +8,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 - **Os modelos do Cursor são os da sua conta.** Com a CLI autenticada, o board lê
   `cursor-agent models` ao abrir e quando o projeto passa a usar o Cursor; a primeira lista real
-  substitui a embutida, e depois **Detectar modelos** a traz de novo. A lista embutida perdeu o
-  `grok-4.7`, que não existe no Cursor.
+  substitui a embutida, e depois **Detectar modelos** a traz de novo. As cerca de 250 variantes que o
+  Cursor lista (uma por nível, mais as `-fast`) viram umas 50 entradas, cada modelo com os níveis
+  dele. A lista embutida perdeu o `grok-4.7`, que não existe com esse id, e as regras de sugestão do
+  Cursor começam em Auto, o único modelo que o plano gratuito aceita.
 
 - **As ferramentas do board recusam parâmetro desconhecido.** Antes, um nome errado era descartado
   em silêncio e a ferramenta seguia com o padrão: um `parent` escrito errado no `create_card` criava

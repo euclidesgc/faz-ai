@@ -10,7 +10,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 - **Cursor's models are your account's.** With the CLI signed in, the board reads
   `cursor-agent models` when it opens and when the project switches to Cursor; the first real list
   replaces the built-in one, and after that **Detectar modelos** (detect models) brings it again. The
-  built-in list lost `grok-4.7`, which does not exist in Cursor.
+  roughly 250 variants Cursor lists (one per level, plus the `-fast` ones) become about 50 entries,
+  each model with its levels. The built-in list lost `grok-4.7`, which does not exist with that id,
+  and Cursor's suggestion rules start at Auto, the only model the free plan accepts.
 
 - **The board's tools refuse unknown parameters.** A misspelled name used to be dropped silently and
   the tool went on with the default: a misspelled `parent` in `create_card` created a story instead

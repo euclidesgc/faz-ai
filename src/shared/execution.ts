@@ -144,7 +144,16 @@ export function manifestOf(s: BoardState, c: Card): ExecManifest {
     tools: profile?.tools ?? [],
     deniedTools: profile?.deniedTools ?? [],
     model: option
-      ? { name: option.model, effort: chosen!.effort && option.efforts.includes(chosen!.effort) ? chosen!.effort : null }
+      ? {
+          name: option.model,
+          effort:
+            chosen!.effort && option.efforts.includes(chosen!.effort)
+              ? chosen!.effort
+              : // no Cursor o nível é parte do id: um modelo sem variante "pura" precisa do nível padrão dele
+                option.tool === 'cursor'
+                ? option.defaultEffort
+                : null,
+        }
       : null,
     clean: profile?.clean ?? false,
   };

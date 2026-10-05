@@ -27,11 +27,10 @@ const BUILTIN: Record<AiTool, Seed[]> = {
     ['gpt-6-astra', 'Astra', CODEX_EFFORTS, 'medium'],
     ['gpt-6-luna', 'GPT-6 Luna', CODEX_EFFORTS.filter((e) => e !== 'ultra'), 'light'],
   ],
-  // só os ids conferidos no código da CLI 2026.10.01; a lista real da conta vem de `cursor-agent models`
+  // ids conferidos em `cursor-agent models` (2026-10-05); a lista real da conta vem desse comando
   cursor: [
     ['auto', 'Auto', [], null],
     ['composer-2.5', 'Composer 2.5', [], null],
-    ['composer-2.5-fast', 'Composer 2.5 Fast', [], null],
   ],
   kimi: [
     ['kimi-code/k3', 'K3', ['low', 'high', 'max'], 'high'],
@@ -62,10 +61,12 @@ const TIERS: Record<AiTool, [string, string | null][]> = {
     ['gpt-6.1-sol', 'medium'],
     ['gpt-6-astra', 'high'],
   ],
+  // o Auto é o único modelo que todo plano do Cursor aceita (no gratuito, qualquer outro é recusado
+  // antes de começar): fica nos três níveis, e quem tem plano pago troca as regras
   cursor: [
-    ['composer-2.5-fast', null],
     ['auto', null],
-    ['composer-2.5', null],
+    ['auto', null],
+    ['auto', null],
   ],
   kimi: [
     ['kimi-code/k3', 'low'],
@@ -119,25 +120,62 @@ export function parseKimiModels(toml: string): ModelOption[] {
 // eslint-disable-next-line no-control-regex
 const ANSI = /\x1b\[[0-9;]*m/g;
 
+/** Níveis que a lista do Cursor põe no fim do id, do menor para o maior. */
+const CURSOR_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'extra-high', 'max'];
+const CURSOR_EFFORT_SUFFIX = new RegExp(`^(.+?)-(${[...CURSOR_EFFORTS].sort((a, b) => b.length - a.length).join('|')})$`);
+/** As palavras do nível no nome de exibição: a variante sem nenhuma delas é o nível padrão do modelo. */
+const EFFORT_WORDS = /\b(none|minimal|low|medium|high|extra high|max)\b/i;
+
 /**
  * Lê a saída de `cursor-agent models`: depois de "Available models", uma linha por modelo no formato
- * `id - Nome de exibição (current, default)`, e no fim uma dica que não é modelo. O esforço vai
- * dentro do id (`modelo[effort=high]`) e a lista não diz quais modelos o aceitam: os modelos entram
- * sem níveis, e quem souber os acrescenta no catálogo.
+ * `id - Nome de exibição (current, default)`, e no fim uma dica que não é modelo.
+ *
+ * A lista real tem uma linha por variante (cerca de 250): o nível de esforço vem como sufixo do id
+ * (`claude-opus-5-5-low`, `-medium`, `-high`…) e cada um tem também a versão `-fast`. O catálogo
+ * junta as variantes num modelo com os níveis dele, para o campo Modelo dos cards não virar uma
+ * lista de centenas de itens. As versões `-fast` ficam de fora (quem quiser as acrescenta à mão).
+ * O nível padrão é a variante cujo nome não cita nível ("Claude Opus 5.5 1M" é a `-medium`).
  */
 export function parseCursorModels(text: string): ModelOption[] {
   const lines = text.replace(ANSI, '').split(/\r?\n/);
   const start = lines.findIndex((l) => l.trim() === 'Available models');
   if (start < 0) return [];
-  const out: ModelOption[] = [];
+  const rows: { id: string; label: string }[] = [];
   for (const raw of lines.slice(start + 1)) {
     const line = raw.trim();
     if (!line) continue;
     if (/^tip:/i.test(line)) break;
     const m = /^(\S+)(?:\s+-\s+(.+?))?(?:\s+\((?:current|default)(?:,\s*(?:current|default))*\))?$/.exec(line);
-    if (m) out.push(option('cursor', [m[1]!, m[2]?.trim() || m[1]!, [], null]));
+    // os nomes trazem espaços de largura zero e espaços duplos
+    if (m)
+      rows.push({
+        id: m[1]!,
+        label: (m[2] ?? m[1]!)
+          .replace(/[\u200b-\u200d\ufeff]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim(),
+      });
   }
-  return out;
+  const ids = new Set(rows.map((r) => r.id));
+  const groups = new Map<string, { plain?: string; variants: { effort: string; label: string }[] }>();
+  for (const { id, label } of rows) {
+    if (id.endsWith('-fast') && ids.has(id.slice(0, -'-fast'.length))) continue;
+    const m = CURSOR_EFFORT_SUFFIX.exec(id);
+    const base = m ? m[1]! : id;
+    const group = groups.get(base) ?? { variants: [] };
+    if (m) group.variants.push({ effort: m[2]!, label });
+    else group.plain = label;
+    groups.set(base, group);
+  }
+  return [...groups].map(([base, g]) => {
+    const efforts = g.variants.map((v) => v.effort).sort((a, b) => CURSOR_EFFORTS.indexOf(a) - CURSOR_EFFORTS.indexOf(b));
+    // com variante "pura" (sem sufixo), o padrão é ela; sem, a que não cita nível no nome
+    const unnamed = g.variants.find((v) => !EFFORT_WORDS.test(v.label));
+    const def =
+      g.plain !== undefined || !efforts.length ? null : (unnamed?.effort ?? (efforts.includes('medium') ? 'medium' : efforts[0]!));
+    const label = g.plain ?? unnamed?.label ?? g.variants[0]!.label.replace(EFFORT_WORDS, '').replace(/\s+/g, ' ').trim();
+    return option('cursor', [base, label, efforts, def]);
+  });
 }
 
 /** Listas lidas da própria ferramenta por um comando (o Cursor), guardadas para o próximo "Detectar". */
@@ -169,9 +207,12 @@ export function discoverModels(tool: AiTool, homeDir: string): ModelOption[] {
   return [];
 }
 
+/** Modelos que já fizeram parte da lista embutida: um catálogo vindo de versão anterior ainda os tem. */
+const RETIRED: Partial<Record<AiTool, string[]>> = { cursor: ['grok-4.7'] };
+
 /** Se o catálogo da ferramenta ainda é só a lista embutida (nunca recebeu a lista real nem um modelo à mão). */
 export function onlyBuiltin(tool: AiTool, catalog: ModelOption[]): boolean {
-  const builtin = new Set(BUILTIN[tool].map(([model]) => modelId(tool, model)));
+  const builtin = new Set([...BUILTIN[tool].map(([model]) => model), ...(RETIRED[tool] ?? [])].map((model) => modelId(tool, model)));
   return catalog.filter((o) => o.tool === tool).every((o) => builtin.has(o.id));
 }
 
