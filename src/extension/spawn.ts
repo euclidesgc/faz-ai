@@ -1,5 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import * as os from 'node:os';
+import { StringDecoder } from 'node:string_decoder';
 import type { OutputStream } from './aiOutput/reader';
 import type { HeadlessCommand } from './headless';
 import type { RunningProcess } from './runner';
@@ -58,8 +59,21 @@ export function spawnHeadless(
     // no Windows as CLIs instaladas pelo npm são .cmd e só rodam pelo shell
     shell: process.platform === 'win32',
   });
-  child.stdout.on('data', (d: Buffer) => out(d.toString(), 'stdout'));
-  child.stderr.on('data', (d: Buffer) => out(d.toString(), 'stderr'));
+  // um decodificador por canal: o pipe corta onde quiser, inclusive no meio de um caractere acentuado,
+  // e `Buffer.toString()` em cada pedaço trocaria as duas metades por `\uFFFD`. O decodificador guarda
+  // a metade até o próximo pedaço; o `end` devolve o que sobrou quando o canal fecha.
+  for (const stream of ['stdout', 'stderr'] as const) {
+    const decoder = new StringDecoder('utf8');
+    const channel = child[stream];
+    channel.on('data', (d: Buffer) => {
+      const text = decoder.write(d);
+      if (text) out(text, stream);
+    });
+    channel.on('end', () => {
+      const rest = decoder.end();
+      if (rest) out(rest, stream);
+    });
+  }
   child.stdin.on('error', () => {});
   child.stdin.end(command.stdin ?? '');
 
