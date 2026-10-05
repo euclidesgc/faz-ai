@@ -105,15 +105,17 @@ export function resolveCommand(command: string, pathEnv: string | undefined, hom
     return null;
   };
   const pathDirs = (pathEnv ?? process.env.PATH ?? '').split(path.delimiter);
-  for (const name of [command, ...(ALIASES[command] ?? [])]) {
-    const found = inDirs(name, pathDirs) ?? (homeDir ? inDirs(name, commonDirs(command, homeDir)) : null);
+  const lookup = (name: string) => inDirs(name, pathDirs) ?? (homeDir ? inDirs(name, commonDirs(command, homeDir)) : null);
+  const direct = lookup(command);
+  if (direct) return direct;
+  // a instalação do próprio Cursor vem antes do apelido: um `agent` qualquer no PATH pode ser outro programa
+  const installed = homeDir && command === 'cursor-agent' ? cursorVersions(homeDir).find(isExecutable) : undefined;
+  if (installed) return installed;
+  for (const alias of ALIASES[command] ?? []) {
+    const found = lookup(alias);
     if (found) return found;
   }
   if (!homeDir) return null;
-  if (command === 'cursor-agent') {
-    const installed = cursorVersions(homeDir).find(isExecutable);
-    if (installed) return installed;
-  }
   return bundledCandidates(command, homeDir).find(isExecutable) ?? null;
 }
 

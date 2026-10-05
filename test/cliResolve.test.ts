@@ -40,8 +40,11 @@ it.skipIf(process.platform === 'win32')('a CLI do Cursor: cursor-agent, o nome c
   exe(path.join(home, '.local/share/cursor-agent/versions/2026.09.02-a1/cursor-agent'));
   const newest = exe(path.join(home, '.local/share/cursor-agent/versions/2026.10.01-e3/cursor-agent'));
   expect(resolveCommand('cursor-agent', '', home)).toBe(newest);
-  // só o nome curto no PATH
+  // um `agent` qualquer no PATH não passa na frente da instalação do Cursor
   const short = exe(path.join(home, 'tools/agent'));
+  expect(resolveCommand('cursor-agent', path.join(home, 'tools'), home)).toBe(newest);
+  // sem a instalação, vale o nome curto
+  fs.rmSync(path.join(home, '.local/share/cursor-agent'), { recursive: true });
   expect(resolveCommand('cursor-agent', path.join(home, 'tools'), home)).toBe(short);
   // os dois: vale o nome que não se confunde com outro programa
   const full = exe(path.join(home, 'tools/cursor-agent'));

@@ -5,6 +5,7 @@ import { Autopilot, MAX_RUNS_WITHOUT_PROGRESS, autopilotStep } from '../src/exte
 import { openInMemory } from '../src/extension/db/database';
 import { heartbeatTargets } from '../src/extension/heartbeat';
 import type { AiRunOrigin } from '../src/shared/log';
+import type { AiRunMode } from '../src/shared/runner';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import type { CardStatus } from '../src/shared/status';
 
@@ -28,8 +29,8 @@ let runner: {
   failToStart: string | null;
   start(id: string, origin?: AiRunOrigin): void;
   stop(id: string): void;
-  onDidFinish(fn: (id: string) => void): void;
-  finish(act?: () => void): void;
+  onDidFinish(fn: (id: string, mode?: AiRunMode) => void): void;
+  finish(act?: () => void, mode?: AiRunMode): void;
 };
 
 const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
@@ -86,7 +87,7 @@ beforeEach(async () => {
   log = [];
   owns = true;
   deferred = [];
-  let listener: (id: string) => void = () => {};
+  let listener: (id: string, mode?: AiRunMode) => void = () => {};
   runner = {
     running: [],
     started: [],
@@ -107,11 +108,11 @@ beforeEach(async () => {
     onDidFinish(fn) {
       listener = fn;
     },
-    finish(act = () => {}) {
+    finish(act = () => {}, mode) {
       const id = this.running.shift()!;
       act();
       // a execução termina com o card ainda "Em execução" se a IA não mexeu no status
-      listener(id);
+      listener(id, mode);
       flush(); // o que o board avisou durante a execução, já depois do aviso de que ela terminou
     },
   };
@@ -308,6 +309,13 @@ describe('autopiloto', () => {
     expect(card(1).statusReason).toContain('autopiloto parou');
     expect(runner.running).toEqual([]);
     expect(runner.started).toHaveLength(MAX_RUNS_WITHOUT_PROGRESS);
+  });
+
+  it('refinar não conta como execução sem progresso para o disjuntor', () => {
+    create('A', 'PRD');
+    yolo(1);
+    for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS + 1; i++) runner.finish(() => status(1, 'ready'), 'refine');
+    expect(card(1).status).not.toBe('blocked');
   });
 
   it('um avanço entre as execuções zera a contagem do disjuntor', () => {

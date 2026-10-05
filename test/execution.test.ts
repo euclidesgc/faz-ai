@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ExecInput } from '../src/extension/execution';
 import { headlessCommand, tmpArg, type HeadlessCommand } from '../src/extension/headless';
-import { EXEC_ENFORCEMENT, defaultAgent, parseProfiles } from '../src/shared/execution';
+import { EXEC_ENFORCEMENT, defaultAgent, effortToRun, parseProfiles } from '../src/shared/execution';
 import { ALL_AI_TOOLS } from '../src/shared/harness';
 
 const exec: ExecInput = {
@@ -124,5 +124,27 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
     expect(parseProfiles('[]')).toEqual([defaultAgent()]);
     // sem nenhum marcado como padrão, o primeiro assume
     expect(parseProfiles(JSON.stringify([{ id: 'x' }, { id: 'y' }])).map((p) => p.isDefault)).toEqual([true, false]);
+  });
+});
+
+describe('effortToRun', () => {
+  const option = (tool: 'cursor' | 'claude') => ({
+    id: `${tool}:m`,
+    tool,
+    model: 'm',
+    label: 'M',
+    efforts: ['low', 'high'],
+    defaultEffort: 'high',
+  });
+
+  it('o nível escolhido vale quando o modelo o tem', () => {
+    expect(effortToRun(option('claude'), 'low')).toBe('low');
+    expect(effortToRun(option('cursor'), 'low')).toBe('low');
+  });
+
+  it('sem nível válido, o Cursor usa o padrão do modelo (o id sem nível não existe) e as outras ferramentas, nenhum', () => {
+    expect(effortToRun(option('cursor'), null)).toBe('high');
+    expect(effortToRun(option('cursor'), 'max')).toBe('high');
+    expect(effortToRun(option('claude'), null)).toBeNull();
   });
 });

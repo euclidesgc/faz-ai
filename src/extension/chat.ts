@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
 import { aiToolInfo } from '../shared/harness';
 import type { AiRunOutcome, RunReport } from '../shared/log';
+import { effortToRun } from '../shared/execution';
 import { parseModelValue } from '../shared/models';
 import type { BoardState } from '../shared/model';
 import { spawnMeasured, type SpawnFn } from './aiOutput/measured';
@@ -47,9 +48,7 @@ function execFor(s: BoardState, model: string | null): ExecInput {
     mcpConfig: null,
     tools: [],
     deniedTools: [],
-    model: option
-      ? { name: option.model, effort: chosen!.effort && option.efforts.includes(chosen!.effort) ? chosen!.effort : null }
-      : null,
+    model: option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null,
     clean: false,
   };
 }

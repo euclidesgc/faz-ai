@@ -1,4 +1,4 @@
-import { EXEC_ASPECTS, EXEC_ENFORCEMENT, manifestOf } from '../../shared/execution';
+import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
 import { norm } from '../../shared/filters';
 import {
   describeRule,
@@ -186,7 +186,7 @@ export function describeModel(s: BoardState, value: FieldValue) {
   const v = parseModelValue(value);
   const o = v && s.board.modelCatalog.find((x) => x.id === v.id);
   if (!v || !o) return { value };
-  return { tool: o.tool, model: o.model, effort: v.effort, label: modelLabel(s.board.modelCatalog, value, true), value };
+  return { tool: o.tool, model: o.model, effort: effortToRun(o, v.effort), label: modelLabel(s.board.modelCatalog, value, true), value };
 }
 
 /** Catálogo de modelos e regras de sugestão do board. */

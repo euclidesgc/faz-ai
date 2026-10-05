@@ -296,9 +296,11 @@ execução" (with a **Parar** button to stop it).
   on it: rewrites the title and description (without inventing requirements; whatever is ambiguous
   becomes a "Dúvidas em aberto" list), reviews Tags, Esforço da atividade, Modelo and Skills even if
   they already have a value, and adds the missing steps to the checklist. It does not work on the
-  phase, create sub-tasks, move the card or touch files: it always runs with the board only. At the
-  end it summarizes in the conversation what changed (with the previous description, if it rewrote
-  it) and the card returns to the status it had.
+  phase, create sub-tasks, move the card or touch files: it runs with the board only (in Kimi, which
+  lacks that level, the request forbids touching files). At the end it summarizes in the conversation
+  what changed (with the previous description, if it rewrote it) and the card returns to the status
+  it had, also when the run fails: the failure goes to the conversation, without blocking the card. A
+  refine does not count as a run without progress for the autonomous mode.
 
 Images pasted into the message become card attachments and the AI receives them.
 

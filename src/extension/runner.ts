@@ -183,7 +183,7 @@ export const cardPrompt = (
  */
 export class AiRunner {
   private runs = new Map<string, Run>();
-  private finishListeners: ((cardId: string) => void)[] = [];
+  private finishListeners: ((cardId: string, mode: AiRunMode) => void)[] = [];
 
   constructor(
     private router: MessageRouter,
@@ -360,7 +360,7 @@ export class AiRunner {
           this.runs.delete(cardId);
         }
         this.publish();
-        this.finishListeners.forEach((fn) => fn(cardId));
+        this.finishListeners.forEach((fn) => fn(cardId, run.mode));
       });
     } catch (e) {
       // nem chegou a existir processo (ferramenta sem suporte, plano impossível, spawn que falhou):
@@ -372,7 +372,7 @@ export class AiRunner {
   }
 
   /** Avisa quando a execução de um card termina, seja como for. */
-  onDidFinish(listener: (cardId: string) => void): void {
+  onDidFinish(listener: (cardId: string, mode: AiRunMode) => void): void {
     this.finishListeners.push(listener);
   }
 
@@ -403,19 +403,26 @@ export class AiRunner {
     const output = run.tail.length
       ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${run.tail.join('\n').replace(/```/g, "'''")}\n\`\`\``
       : '';
-    if (run.timedOut)
-      return this.block(
-        cardId,
-        `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness de IA.${output}`,
-      );
-    if (error) return this.block(cardId, `Não foi possível executar o ${toolLabel}: ${error.message}`);
-    if (code !== 0) return this.block(cardId, `O ${toolLabel} terminou com erro (código ${code}).${output}`);
-    // refinar não passa a vez: o card volta ao status que tinha, com o resumo na conversa
-    if (run.mode === 'refine')
+    const failure = run.timedOut
+      ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness de IA.${output}`
+      : error
+        ? `Não foi possível executar o ${toolLabel}: ${error.message}`
+        : code !== 0
+          ? `O ${toolLabel} terminou com erro (código ${code}).${output}`
+          : null;
+    // refinar não passa a vez, nem quando falha: o card volta ao status que tinha, e a falha fica na conversa
+    if (run.mode === 'refine') {
+      if (failure)
+        this.router.handle(
+          { type: 'comment.add', cardId, body: `O refinamento do card não terminou. ${failure}` },
+          { author: RUNNER_AUTHOR, source: 'ai' },
+        );
       return void this.router.handle(
         { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
         { author: RUNNER_AUTHOR },
       );
+    }
+    if (failure) return this.block(cardId, failure);
     // em modo autônomo não há pessoa para esperar: o card volta para a IA seguir (o autopiloto limita as voltas sem progresso)
     if (replied && isYolo(this.router.snapshot(), card)) return this.setStatus(cardId, 'ready', toolLabel);
     // respondeu na conversa e encerrou: a vez é da pessoa

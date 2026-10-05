@@ -12,9 +12,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
     work of the column the card is in (in Implementação, code), until it hands over.
   - **Refinar com IA** (refine with AI) is new: rewrites the title and description clearly, reviews
     Tags, Esforço da atividade, Modelo and Skills and completes the checklist, without working on the
-    phase, moving the card or touching files (it always runs with the board only). The summary of
-    what changed stays in the conversation, with the previous description, and the card returns to
-    the status it had.
+    phase, moving the card or touching files (it runs with the board only; in Kimi, which lacks
+    that level, the request forbids it). The summary of what changed stays in the conversation, with
+    the previous description, and the card returns to the status it had, also when the run fails
+    (the failure goes to the conversation, without blocking the card). Refining does not count as a
+    run without progress for the autonomous mode.
 
 - **Cursor fast modes.** In Configurações → Modelos de IA (Settings → AI models), the Cursor card got
   the **Incluir os modos rápidos** (include fast modes) switch, off by default. When on, the fast
@@ -74,13 +76,17 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 - **Cursor accepts the "only the board" and "board and files" levels.** It used to run only with
   "no restrictions". At the lower levels the session gets only that level's tools, no terminal.
 
-- **Cursor's CLI is looked up as `cursor-agent`.** The short `agent` name still works, and the board
-  also finds the CLI in the installer's folder. The model effort goes as a suffix of the
-  id (`claude-opus-5-5-high`), the way `cursor-agent models` lists the variants.
+- **Cursor's CLI is looked up as `cursor-agent`.** The board also finds the CLI in the installer's
+  folder, before trying the short `agent` name (which may be another program). The model effort goes
+  as a suffix of the id (`claude-opus-5-5-high`), the way `cursor-agent models` lists the variants; a
+  model with no level chosen runs at its default level, also in the board chat and in the model
+  `get_card` reports.
 
 - **Windows: the prompt reaches npm-installed CLIs intact.** Quotes, `&` and `|` in the text were
   interpreted by `cmd.exe`, and **Parar** (Stop) left the CLI running. Arguments are now escaped and
-  Stop ends the whole process tree.
+  Stop ends the whole process tree; if the process still does not close, the run ends for the board
+  instead of leaving the card "Em execução" (running). Cursor's sign-in and model list are also read
+  on Windows.
 
 - **The board records the consumption, cost and inventory of each AI run.** For each run it stores
   input, output, cache read and cache creation tokens, the cost in dollars, the turns and the
