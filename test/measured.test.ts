@@ -386,13 +386,31 @@ describe('o servidor do board para o Cursor em segundo plano', () => {
       expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(true);
 
       // um registro feito pela pessoa (outro node) fica como está, e o resto do arquivo também
-      config.mcpServers['faz-ai'].command = '/opt/node/bin/node';
+      config.mcpServers['faz-ai'].command = process.execPath;
       config.mcpServers.github = { command: 'gh-mcp' };
       fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), JSON.stringify(config));
       lines.length = 0;
       spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l), catalog: [] });
       expect(JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'))).toEqual(config);
       expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(false);
+
+      // um registro de outra pasta (veio de um colega, ou o projeto mudou de lugar) é refeito, mantendo o node da pessoa
+      config.mcpServers['faz-ai'].args = ['/dados/bridge.js', '/outro/projeto'];
+      fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), JSON.stringify(config));
+      lines.length = 0;
+      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l), catalog: [] });
+      const repaired = JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'));
+      expect(repaired.mcpServers['faz-ai']).toEqual({ type: 'stdio', command: process.execPath, args: server.args });
+      expect(repaired.mcpServers.github).toEqual({ command: 'gh-mcp' });
+      expect(lines.some((l) => l.includes('foi refeito'))).toBe(true);
+
+      // um arquivo que não é JSON (com comentário) não impede a execução: fica como está, com aviso no log
+      fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), '// meu\n{}');
+      lines.length = 0;
+      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l), catalog: [] });
+      expect(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8')).toBe('// meu\n{}');
+      expect(lines.some((l) => l.includes('não é um JSON válido'))).toBe(true);
+      expect(started.length).toBeGreaterThan(0);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

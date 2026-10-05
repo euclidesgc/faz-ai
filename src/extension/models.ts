@@ -127,7 +127,12 @@ const FAST = '-fast';
  * No Cursor ela responde mais rápido e cobra mais pelos mesmos tokens.
  */
 export function isFastVariant(o: ModelOption, catalog: ModelOption[]): boolean {
-  return o.model.endsWith(FAST) && catalog.some((x) => x.tool === o.tool && x.model === o.model.slice(0, -FAST.length));
+  return o.model.endsWith(FAST) && catalog.some((x) => x.id === fastBaseId(o));
+}
+
+/** O id do modelo de que esta é a versão rápida (`cursor:x-fast` → `cursor:x`). */
+export function fastBaseId(o: ModelOption): string {
+  return modelId(o.tool, o.model.endsWith(FAST) ? o.model.slice(0, -FAST.length) : o.model);
 }
 
 /** Níveis que a lista do Cursor põe no fim do id, do menor para o maior. */
@@ -169,12 +174,19 @@ export function parseCursorModels(text: string): ModelOption[] {
       });
   }
   const ids = new Set(rows.map((r) => r.id));
+  // um id com variantes próprias (`x-max` ao lado de `x-max-high`) é um modelo, não o nível "max" de `x`
+  const hasVariants = (stem: string) => rows.some((r) => r.id.startsWith(`${stem}-`) && r.id !== `${stem}${FAST}`);
+  const effortOf = (stem: string) => (hasVariants(stem) ? null : CURSOR_EFFORT_SUFFIX.exec(stem));
+  const baseOf = (stem: string) => effortOf(stem)?.[1] ?? stem;
+  const plainBases = new Set(rows.filter((r) => !r.id.endsWith(FAST)).map((r) => baseOf(r.id)));
   const groups = new Map<string, { plain?: string; variants: { effort: string; label: string }[] }>();
   for (const { id, label } of rows) {
-    // a variante rápida de algo que existe sem o `-fast`: o nível fica antes do sufixo
-    const fast = id.endsWith(FAST) && ids.has(id.slice(0, -FAST.length));
-    const stem = fast ? id.slice(0, -FAST.length) : id;
-    const m = CURSOR_EFFORT_SUFFIX.exec(stem);
+    // a variante rápida de algo que existe sem o `-fast` (no mesmo nível, ou o mesmo modelo em outro
+    // nível): o nível fica antes do sufixo
+    const cut = id.slice(0, -FAST.length);
+    const fast = id.endsWith(FAST) && (ids.has(cut) || plainBases.has(baseOf(cut)));
+    const stem = fast ? cut : id;
+    const m = effortOf(stem);
     const base = (m ? m[1]! : stem) + (fast ? FAST : '');
     const group = groups.get(base) ?? { variants: [] };
     if (m) group.variants.push({ effort: m[2]!, label });
@@ -188,7 +200,7 @@ export function parseCursorModels(text: string): ModelOption[] {
     const def =
       g.plain !== undefined || !efforts.length ? null : (unnamed?.effort ?? (efforts.includes('medium') ? 'medium' : efforts[0]!));
     const label = g.plain ?? unnamed?.label ?? g.variants[0]!.label.replace(EFFORT_WORDS, '').replace(/\s+/g, ' ').trim();
-    return option('cursor', [base, label, efforts, def]);
+    return { ...option('cursor', [base, label, efforts, def]), fromTool: true as const };
   });
 }
 
@@ -227,7 +239,7 @@ const RETIRED: Partial<Record<AiTool, string[]>> = { cursor: ['grok-4.7'] };
 /** Se o catálogo da ferramenta ainda é só a lista embutida (nunca recebeu a lista real nem um modelo à mão). */
 export function onlyBuiltin(tool: AiTool, catalog: ModelOption[]): boolean {
   const builtin = new Set([...BUILTIN[tool].map(([model]) => model), ...(RETIRED[tool] ?? [])].map((model) => modelId(tool, model)));
-  return catalog.filter((o) => o.tool === tool).every((o) => builtin.has(o.id));
+  return catalog.filter((o) => o.tool === tool).every((o) => builtin.has(o.id) && !o.fromTool);
 }
 
 /** Catálogo de uma ferramenta: a lista real quando dá para ler, senão a lista embutida. */

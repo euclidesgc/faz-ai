@@ -400,9 +400,13 @@ export class AiRunner {
         { author: RUNNER_AUTHOR },
       );
     // o fim do que a ferramenta escreveu vai junto: a pessoa entende a falha sem sair do card
-    const output = run.tail.length
-      ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${run.tail.join('\n').replace(/```/g, "'''")}\n\`\`\``
+    // o plano gratuito do Cursor só roda o Auto: a recusa diz pouco, e a saída é o modelo do card
+    const freePlan = run.tail.some((l) => /free plans can only use auto/i.test(l))
+      ? `\n\nO plano gratuito do Cursor só roda o modelo Auto: escolha Auto no campo Modelo do card, ou use o botão Recriar as regras de "Esforço da atividade" em Configurações → Modelos de IA, que no Cursor sugere Auto.`
       : '';
+    const output =
+      freePlan +
+      (run.tail.length ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${run.tail.join('\n').replace(/```/g, "'''")}\n\`\`\`` : '');
     const failure = run.timedOut
       ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness de IA.${output}`
       : error

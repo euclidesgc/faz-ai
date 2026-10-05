@@ -1,7 +1,7 @@
 import type { AiTool } from './harness';
 
 /** O que falta para o board trabalhar com a ferramenta de IA do projeto. */
-export type RequirementId = 'node' | 'cli' | 'signin' | 'mcp' | 'mcp-stale' | 'permission';
+export type RequirementId = 'node' | 'cli' | 'signin' | 'mcp' | 'mcp-stale' | 'mcp-elsewhere' | 'permission';
 
 /** O que a pessoa pode fazer, pela própria faixa de aviso, para resolver. */
 export type RequirementAction =
@@ -23,10 +23,15 @@ export interface BoardRequirement {
   cli?: string;
   /** onde instalar quando não há comando de uma linha, em `cli` */
   where?: string;
-  /** o arquivo de configuração e o caminho que não existe mais, em `mcp-stale` */
+  /** o arquivo de configuração e o caminho que não existe mais (`mcp-stale`) ou a outra pasta (`mcp-elsewhere`) */
   file?: string;
   missing?: string;
   /** a explicação da recusa, em `permission` (a mesma de `aiRunUnsupported`) */
   reason?: string;
+  /**
+   * recomendado, mas não impede as execuções pelo board (o servidor do board no Claude e no Cursor,
+   * que as execuções levam sozinhas): o aviso mostra, sem contar como requisito que falta
+   */
+  optional?: true;
   action: RequirementAction | null;
 }

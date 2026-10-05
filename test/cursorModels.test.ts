@@ -89,6 +89,31 @@ describe('modelos do Cursor', () => {
     // o catálogo de quem vem da versão anterior ainda tem o modelo que saiu da lista embutida
     expect(onlyBuiltin('cursor', [...builtin, { ...builtin[0]!, id: 'cursor:grok-4.7', model: 'grok-4.7', label: 'Grok 4.7' }])).toBe(true);
     expect(onlyBuiltin('cursor', [...builtin, ...parseCursorModels(OUTPUT)])).toBe(false);
+    // a lista real já entrou e a pessoa a reduziu aos mesmos ids da embutida: não volta a lista inteira
+    const real = parseCursorModels('Available models\n\nauto - Auto\ncomposer-2.5 - Composer 2.5\n');
+    expect(real.every((o) => o.fromTool)).toBe(true);
+    expect(onlyBuiltin('cursor', real)).toBe(false);
+  });
+
+  it('um modelo cujo nome termina numa palavra de nível, com variantes próprias, continua um modelo', () => {
+    const list = parseCursorModels(
+      ['Available models', '', 'gpt-x-codex - Codex', 'gpt-x-codex-max - Codex Max', 'gpt-x-codex-max-high - Codex Max High'].join('\n'),
+    );
+    expect(list.map((o) => [o.model, o.efforts, o.label])).toEqual([
+      ['gpt-x-codex', [], 'Codex'],
+      ['gpt-x-codex-max', ['high'], 'Codex Max'],
+    ]);
+  });
+
+  it('uma versão rápida sem a gêmea no mesmo nível ainda é versão rápida do modelo', () => {
+    const all = parseCursorModels(['Available models', '', 'm-low - M Low', 'm-high - M', 'm-high-fast - M Fast'].join('\n'));
+    expect(all.map((o) => o.model)).toEqual(['m', 'm-fast']);
+    expect(isFastVariant(all[1]!, all)).toBe(true);
+    const lone = parseCursorModels(['Available models', '', 'm-low - M Low', 'm-medium - M', 'm-high-fast - M High Fast'].join('\n'));
+    expect(lone.map((o) => [o.model, o.efforts])).toEqual([
+      ['m', ['low', 'medium']],
+      ['m-fast', ['high']],
+    ]);
   });
 });
 

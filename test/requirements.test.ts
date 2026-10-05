@@ -74,8 +74,43 @@ describe('requisitos do board', () => {
       {
         id: 'mcp-stale',
         tool: 'cursor',
+        optional: true,
         file: '.cursor/mcp.json',
         missing: path.join(home, '.nvm/versions/node/v20.0.0/bin/node'),
+        action: { kind: 'connect' },
+      },
+    ]);
+  });
+
+  it('no Claude e no Cursor o servidor não registrado é recomendado, não requisito; no Codex é requisito', async () => {
+    const ids = async (tool: RequirementProbe['tool']) =>
+      (await checkRequirements(probe({ tool, permission: 'full' }))).map((r) => [r.id, r.optional ?? false]);
+    expect(await ids('claude')).toEqual([['mcp', true]]);
+    expect(await ids('cursor')).toEqual([['mcp', true]]);
+    expect(await ids('codex')).toEqual([['mcp', false]]);
+  });
+
+  it('o registro do Claude para o usuário inteiro ou só para esta pasta (~/.claude.json) também vale', async () => {
+    const server = { command: process.execPath, args: [BRIDGE, project] };
+    fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ mcpServers: { 'faz-ai': server } }));
+    expect(registeredServer('claude', project, home)).toMatchObject({ file: '~/.claude.json', args: server.args });
+    fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ projects: { [project]: { mcpServers: { 'faz-ai': server } } } }));
+    expect(await checkRequirements(probe({ tool: 'claude' }))).toEqual([]);
+  });
+
+  it('registro de outra pasta (veio pelo git, ou o projeto mudou de lugar) pede para conectar de novo', async () => {
+    fs.mkdirSync(path.join(project, '.cursor'));
+    fs.writeFileSync(
+      path.join(project, '.cursor', 'mcp.json'),
+      JSON.stringify({ mcpServers: { 'faz-ai': { command: process.execPath, args: [BRIDGE, '/outro/projeto'] } } }),
+    );
+    expect(await checkRequirements(probe())).toEqual([
+      {
+        id: 'mcp-elsewhere',
+        tool: 'cursor',
+        optional: true,
+        file: '.cursor/mcp.json',
+        missing: '/outro/projeto',
         action: { kind: 'connect' },
       },
     ]);

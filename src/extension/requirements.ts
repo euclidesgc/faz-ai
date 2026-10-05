@@ -58,8 +58,20 @@ function fromToml(file: string, shown: string): Registered | null {
 export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: string): Registered | null {
   const inProject = (rel: string) => path.join(workspaceDir, rel);
   switch (tool) {
-    case 'claude':
-      return fromJson(inProject('.mcp.json'), '.mcp.json');
+    case 'claude': {
+      // `claude mcp add` grava no projeto (.mcp.json) ou no ~/.claude.json: para o usuário inteiro,
+      // ou só para esta pasta (escopo "local", dentro de `projects`)
+      const found = fromJson(inProject('.mcp.json'), '.mcp.json');
+      if (found) return found;
+      const user = readJson(path.join(homeDir, '.claude.json'));
+      const local = (user?.projects as Record<string, Record<string, unknown>> | undefined)?.[workspaceDir];
+      for (const section of [local?.mcpServers, user?.mcpServers]) {
+        const entry = (section as Record<string, { command?: unknown; args?: unknown }> | undefined)?.[SERVER];
+        if (entry && typeof entry.command === 'string')
+          return { file: '~/.claude.json', command: entry.command, args: Array.isArray(entry.args) ? entry.args.map(String) : [] };
+      }
+      return null;
+    }
     case 'cursor':
       return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json');
     case 'codex':
@@ -129,18 +141,24 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
   if (cli && executable && (await p.signedIn(tool, executable)) === false)
     out.push({ id: 'signin', tool, cli, action: { kind: 'command', command: `${cli} login` } });
 
+  // no Claude e no Cursor as execuções pelo board levam o servidor sozinhas: o registro só falta nas
+  // conversas da pessoa fora do board, e o aviso diz isso sem contar como requisito
+  const optional = tool === 'claude' || tool === 'cursor' ? { optional: true as const } : {};
   const registered = registeredServer(tool, p.workspaceDir, p.homeDir);
-  if (!registered) out.push({ id: 'mcp', tool, action: { kind: 'connect' } });
+  if (!registered) out.push({ id: 'mcp', tool, ...optional, action: { kind: 'connect' } });
   else {
-    const bridge = registered.args[0];
+    const [bridge, folder] = registered.args;
     const commandMissing = path.isAbsolute(registered.command) ? !fs.existsSync(registered.command) : !p.resolve(registered.command);
     const bridgeMissing = !!bridge && bridge !== p.bridgePath && !fs.existsSync(bridge);
-    if (commandMissing || bridgeMissing)
+    // o registro de outra pasta (veio de um colega pelo git, o projeto mudou de lugar) liga a IA a outro board
+    const otherFolder = !!folder && path.resolve(folder) !== path.resolve(p.workspaceDir);
+    if (commandMissing || bridgeMissing || otherFolder)
       out.push({
-        id: 'mcp-stale',
+        id: commandMissing || bridgeMissing ? 'mcp-stale' : 'mcp-elsewhere',
         tool,
+        ...optional,
         file: registered.file,
-        missing: commandMissing ? registered.command : bridge,
+        missing: commandMissing ? registered.command : bridgeMissing ? bridge : folder,
         action: { kind: 'connect' },
       });
   }

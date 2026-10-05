@@ -3,7 +3,7 @@ import type { FieldDef } from '../../../shared/model';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelRule } from '../../../shared/models';
 import { valueOf } from '../../../shared/selectors';
 import { newId } from '../../db/ids';
-import { detectTools, effortTiers, isFastVariant, modelsFor } from '../../models';
+import { detectTools, effortTiers, fastBaseId, isFastVariant, modelsFor } from '../../models';
 import type { BoardContext, HandlerMap } from './context';
 
 /**
@@ -52,11 +52,26 @@ function detectModels(ctx: BoardContext, tool: AiTool): void {
  */
 export function applyFastModels(ctx: BoardContext): void {
   const { board } = ctx.state();
-  if (board.rules.includeFastModels) return detectModels(ctx, 'cursor');
+  if (board.rules.includeFastModels) return addFastModels(ctx);
   ctx.boards.setModelCatalog(
     ctx.boardId,
     board.modelCatalog.filter((o) => o.tool !== 'cursor' || !isFastVariant(o, board.modelCatalog)),
   );
+}
+
+/**
+ * Junta as versões rápidas dos modelos do Cursor que estão no catálogo, cada uma logo depois do
+ * modelo dela. Não traz de volta o que a pessoa tirou: sem o modelo, a versão rápida também não entra.
+ */
+function addFastModels(ctx: BoardContext): void {
+  const catalog = [...ctx.state().board.modelCatalog];
+  const all = modelsFor('cursor', ctx.home);
+  for (const o of all) {
+    if (!isFastVariant(o, all) || catalog.some((x) => x.id === o.id)) continue;
+    const at = catalog.findIndex((x) => x.id === fastBaseId(o));
+    if (at >= 0) catalog.splice(at + 1, 0, o);
+  }
+  ctx.boards.setModelCatalog(ctx.boardId, catalog);
 }
 
 /** Troca as regras do campo "Esforço" por um modelo leve, um intermediário e um forte da ferramenta. */
@@ -109,7 +124,8 @@ export const modelHandlers = {
     return true;
   },
   'settings.models.detect': (msg, ctx) => {
-    detectModels(ctx, msg.tool);
+    if (msg.fastOnly) addFastModels(ctx);
+    else detectModels(ctx, msg.tool);
     return true;
   },
   'settings.modelRules.set': (msg, ctx) => {

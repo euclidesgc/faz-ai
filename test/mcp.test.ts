@@ -618,6 +618,34 @@ describe('modos rápidos do Cursor', () => {
     expect(after).toContain('claude-opus-5-5');
     expect(after.filter((m) => m.endsWith('-fast') && after.includes(m.slice(0, -5)))).toEqual([]);
   });
+
+  it('ligar a regra não traz de volta o que a pessoa tirou do catálogo, nem a versão rápida dele', async () => {
+    rememberModels('cursor', parseCursorModels(fs.readFileSync(path.join(__dirname, 'fixtures', 'cursor-models.txt'), 'utf8')));
+    await call('set_ai_tool', { tool: 'cursor' });
+    await call('detect_models', {});
+    const catalog = async () => ((await call('get_models')).data.catalog as { value: string }[]).map((o) => o.value);
+    await call('delete_model', { model: 'cursor:claude-opus-5-5' });
+    const before = await catalog();
+    await call('update_rules', { includeFastModels: true });
+    const after = await catalog();
+    expect(after).not.toContain('cursor:claude-opus-5-5');
+    expect(after).not.toContain('cursor:claude-opus-5-5-fast');
+    // só entraram versões rápidas, cada uma logo depois do modelo dela
+    const added = after.filter((id) => !before.includes(id));
+    expect(added.length).toBeGreaterThan(0);
+    for (const id of added) {
+      expect(id.endsWith('-fast')).toBe(true);
+      expect(after[after.indexOf(id) - 1]).toBe(id.slice(0, -5));
+    }
+  });
+
+  it('num board de outra ferramenta, ligar a regra não enche o catálogo de modelos do Cursor', async () => {
+    rememberModels('cursor', parseCursorModels(fs.readFileSync(path.join(__dirname, 'fixtures', 'cursor-models.txt'), 'utf8')));
+    await call('set_ai_tool', { tool: 'claude' });
+    const before = ((await call('get_models')).data.catalog as unknown[]).length;
+    await call('update_rules', { includeFastModels: true });
+    expect(((await call('get_models')).data.catalog as unknown[]).length).toBe(before);
+  });
 });
 
 describe('regras de modelo com E e OU', () => {

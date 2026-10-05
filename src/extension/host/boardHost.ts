@@ -20,7 +20,7 @@ import { AiRunner } from '../runner';
 import { cursorModels, cursorSignedIn } from '../cliProbe';
 import { checkRequirements } from '../requirements';
 import { resolveCommand } from '../cliResolve';
-import { isFastVariant, onlyBuiltin, rememberModels } from '../models';
+import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { loginShellPath, spawnHeadless } from '../spawn';
 
 /** Complemento do nome na mensagem de "comando não encontrado", para não piorar o que a pessoa já lê no log. */
@@ -109,14 +109,17 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const opened = boardRepo.openedNow(router.boardId, Date.now());
   if (ownsBoard && opened.rollupDay !== dayOf(Date.now()))
     consolidate(handle.db, router.boardId, Date.now(), boardRepo.retentionMonths(router.boardId));
-  const pathEnv = await loginShellPath();
-  // o node do PATH do terminal, com caminho absoluto: é ele que a ferramenta usa para iniciar o servidor do board
-  const nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
+  let pathEnv = await loginShellPath();
+  // o node do PATH do terminal, com caminho absoluto: é ele que a ferramenta usa para iniciar o servidor do board.
+  // Procurado de novo a cada conferência dos requisitos: a pessoa pode instalar o node com o board aberto
+  let nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
   const runner = new AiRunner(router, {
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
-    nodePath,
+    get nodePath() {
+      return nodePath;
+    },
     log: o.log,
     runLog,
     spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
@@ -156,28 +159,39 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
-    nodePath,
+    get nodePath() {
+      return nodePath;
+    },
     log: o.log,
     runLog,
     spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
     file: path.join(o.storageDir, 'chat', `${workspaceKey(o.folderPath)}.json`),
   });
   // os modelos do Cursor são os da conta, e só a CLI diz quais são: lidos ao abrir o board e ao passar
-  // a usar o Cursor. A primeira lista real substitui a embutida sozinha; depois, só pelo "Detectar
-  // modelos", para não trazer de volta um modelo que a pessoa tirou do catálogo.
-  const refreshCursorModels = async () => {
+  // a usar o Cursor, só na janela dona do board (é ela que mexe no catálogo). A primeira lista real
+  // substitui a embutida sozinha; depois, só pelo "Detectar modelos", para não trazer de volta um
+  // modelo que a pessoa tirou do catálogo. Uma leitura de cada vez.
+  let readingModels: Promise<void> | null = null;
+  const readCursorModels = async () => {
     const exe = resolveCommand('cursor-agent', pathEnv, homeDir);
     if (!exe) return;
     const found = await cursorModels(exe, pathEnv);
     if (!found.length) return;
     rememberModels('cursor', found);
     const { board } = router.snapshot();
-    // a lista chegou: entra sozinha na primeira vez, ou quando a pessoa ligou os modos rápidos antes
-    // de ela ser lida (o "Detectar" daquele momento só tinha a lista embutida, sem as rápidas)
-    const fastMissing =
-      board.rules.includeFastModels && found.some((m) => isFastVariant(m, found) && !board.modelCatalog.some((o) => o.id === m.id));
-    if (ownsBoard && board.aiTool === 'cursor' && (onlyBuiltin('cursor', board.modelCatalog) || fastMissing))
-      router.handle({ type: 'settings.models.detect', tool: 'cursor' });
+    if (board.aiTool !== 'cursor') return;
+    if (onlyBuiltin('cursor', board.modelCatalog)) return void router.handle({ type: 'settings.models.detect', tool: 'cursor' });
+    // a pessoa ligou os modos rápidos antes de a lista ser lida (o "Detectar" daquele momento só tinha
+    // a lista embutida): entram só as versões rápidas dos modelos que estão no catálogo
+    const has = (id: string) => board.modelCatalog.some((o) => o.id === id);
+    const fastMissing = board.rules.includeFastModels && found.some((m) => isFastVariant(m, found) && !has(m.id) && has(fastBaseId(m)));
+    if (fastMissing) router.handle({ type: 'settings.models.detect', tool: 'cursor', fastOnly: true });
+  };
+  const refreshCursorModels = () => {
+    if (!ownsBoard || readingModels) return;
+    readingModels = readCursorModels()
+      .catch((e) => o.log(`Não foi possível ler os modelos do Cursor: ${e instanceof Error ? e.message : String(e)}`))
+      .finally(() => (readingModels = null));
   };
   // o que falta para o board trabalhar com a ferramenta (CLI, login, servidor MCP, permissão): vira a
   // faixa de aviso da interface, que fica enquanto faltar alguma coisa. Confere ao abrir, quando a
@@ -192,6 +206,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return checking;
     }
     const { board } = router.snapshot();
+    // a pessoa pode ter instalado o node com o board aberto
+    nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
     checking = checkRequirements({
       tool: board.aiTool,
       permission: board.runner.permission,
@@ -204,8 +220,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     })
       .then((list) => {
         // a CLI do Cursor acabou de ficar pronta (instalada, com login): só agora dá para ler os modelos da conta
-        const blocked = list.some((r) => r.id === 'cli' || r.id === 'signin');
-        if (cursorBlocked && !blocked && router.snapshot().board.aiTool === 'cursor') void refreshCursorModels();
+        const blocked = board.aiTool === 'cursor' && list.some((r) => r.id === 'cli' || r.id === 'signin');
+        if (cursorBlocked && !blocked && router.snapshot().board.aiTool === 'cursor') refreshCursorModels();
         cursorBlocked = blocked;
         router.setRequirements(list);
       })
@@ -219,14 +235,20 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       });
     return checking;
   };
-  router.onRequirementsCheck(() => void checkNow());
+  // o "Verificar de novo" relê também o PATH do terminal, para achar o que acabou de ser instalado
+  router.onRequirementsCheck(
+    () =>
+      void loginShellPath(true)
+        .then((fresh) => (pathEnv = fresh ?? pathEnv))
+        .finally(() => void checkNow()),
+  );
   const requirementsTimer = setInterval(() => void checkNow(), 5 * 60_000);
   requirementsTimer.unref?.();
   void checkNow();
 
   let toolInUse = router.snapshot().board.aiTool;
   let permissionInUse = router.snapshot().board.runner.permission;
-  if (toolInUse === 'cursor') void refreshCursorModels();
+  if (toolInUse === 'cursor') refreshCursorModels();
   router.onDidChange(() => {
     const { board } = router.snapshot();
     if (board.aiTool === toolInUse && board.runner.permission === permissionInUse) return;
@@ -234,7 +256,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     toolInUse = board.aiTool;
     permissionInUse = board.runner.permission;
     void checkNow();
-    if (toolChanged && board.aiTool === 'cursor') void refreshCursorModels();
+    if (toolChanged && board.aiTool === 'cursor') refreshCursorModels();
   });
   const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
   const heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: o.log });

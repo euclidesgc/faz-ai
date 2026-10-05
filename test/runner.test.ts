@@ -339,6 +339,15 @@ describe('executor da IA', () => {
     expect(card().status).toBe('waiting_review');
   });
 
+  it('a recusa do plano gratuito do Cursor vem com a saída: escolher Auto', () => {
+    router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor', runner: { permission: 'board' } } });
+    runner.start(storyId);
+    procs[0]!.emit('Named models unavailable Free plans can only use Auto\n', 'stderr');
+    procs[0]!.exit(1);
+    expect(card().status).toBe('blocked');
+    expect(card().statusReason).toContain('plano gratuito do Cursor só roda o modelo Auto');
+  });
+
   it('Refinar com IA que falha não bloqueia o card: o status volta e a falha fica na conversa', () => {
     router.handle({ type: 'card.status.set', cardId: storyId, status: 'approved' });
     runner.start(storyId, 'manual', 'refine');

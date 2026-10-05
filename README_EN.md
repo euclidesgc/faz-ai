@@ -245,12 +245,14 @@ navegador**; the terminal `faz-ai` warns and does not start.
 While something is missing for the board to work with the tool, a yellow bar stays at the top of
 the board, on every screen, and in the chat panel. It checks Node.js (the board's server runs on
 it), the tool's command line, its sign-in (for Cursor, through `cursor-agent status`), the board's
-server registration in the file the tool reads, a registration pointing to a node or path that no
-longer exists, and the permission level. Each item says what it affects and brings the action: the
+server registration in the file the tool reads (for Claude, the registration for your user from
+`claude mcp add -s user` also counts), a registration pointing to a node or path that no longer
+exists or to another folder, and the permission level. Each item says what it affects and brings the action: the
 command to copy, **Conectar ao board (MCP)** (connect to the board) or the shortcut to the AI
 harness. The bar has no close button: it goes away on its own when the last item is solved. The
 check runs when the board opens, when the tool or permission changes, after connecting, every 5
-minutes and on **Verificar de novo** (check again).
+minutes and on **Verificar de novo** (check again), which also rereads the terminal PATH (a node
+installed with the board open is found without reloading the window).
 
 Suggested flow: the AI reads the story and the phase instruction, creates a sub-task to build the
 phase document, attaches the document to the story and asks for review in the card's conversation.
@@ -706,15 +708,17 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 
 About models: **Detectar modelos** (detect models) reads the tool's list (for Kimi Code, from the
 local configuration; for Cursor, the models of your account, through the `cursor-agent models`
-command, read when the board opens with the CLI signed in; for the others, a built-in list you can
+command, read when the board opens with the CLI signed in, and the first list read replaces the built-in one
+only once; for the others, a built-in list you can
 edit); the prices you filled in stay there after detecting again. For Cursor, the list has one line per
 level of each model (`claude-opus-5-5-low`, `-medium`, `-high`…); the board groups the variants into
 one model with its levels. The fast versions (`-fast`, they answer sooner and charge more for the
 same tokens) stay out until you turn on **Incluir os modos rápidos** (include fast modes) on the
 Cursor card: then each one enters as a separate model ("Claude Opus 5.5 1M Fast"), with its own
-price; turning it off removes them from the catalog. Through MCP, it is the `includeFastModels` rule
+price, only for the models in the catalog; turning it off removes them from the catalog. Through MCP, it is the `includeFastModels` rule
 of `update_rules`. On Cursor's free plan only **Auto**
-runs: the other models are refused before starting, which is why Cursor's suggestion rules all start
+runs: the other models are refused before starting (the blocked card explains how to pick Auto),
+which is why Cursor's suggestion rules all start
 at Auto. Suggestion rules combine
 conditions with AND and OR, for example `Esforço da atividade = Alto E Tags = backend`. The result
 is always a suggestion: on the card, the model and the effort can be changed at any time.

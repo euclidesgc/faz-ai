@@ -231,11 +231,14 @@ o `faz-ai` do terminal avisa e não inicia.
 Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, uma faixa amarela fica no topo
 do board, em todas as telas, e no painel de chat. Ela confere o Node.js (o servidor do board roda
 com ele), a linha de comando da ferramenta, o login dela (no Cursor, por `cursor-agent status`), o
-registro do servidor do board no arquivo que a ferramenta lê, um registro apontando para um node ou
-um caminho que não existe mais, e o nível de permissão. Cada item diz o efeito e traz a ação: o
+registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
+para o seu usuário, de `claude mcp add -s user`), um registro apontando para um node ou um caminho
+que não existe mais ou para outra pasta, e o nível de permissão. Cada item diz o efeito e traz a ação: o
 comando para copiar, **Conectar ao board (MCP)** ou o atalho para o Harness de IA. A faixa não
 fecha: some sozinha quando o último item é resolvido. A conferência roda ao abrir o board, quando a
-ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**.
+ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**,
+que relê também o PATH do terminal (um node instalado com o board aberto é encontrado sem recarregar
+a janela).
 
 Fluxo sugerido: a IA lê a história e a instrução da fase, cria uma sub-tarefa para construir o
 documento da fase, anexa o documento à história e pede a revisão pela conversa do card. Você
@@ -674,15 +677,16 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração
 local; no Cursor, dos modelos da sua conta, pelo comando `cursor-agent models`, lido ao abrir o board
-com a CLI autenticada; nas outras, uma lista embutida que pode ser editada); os preços que você
+com a CLI autenticada, e a primeira lista lida substitui a embutida uma vez só; nas outras, uma lista embutida que pode ser editada); os preços que você
 preencheu continuam lá depois de detectar de novo. No Cursor, a lista traz uma linha por nível de cada modelo
 (`claude-opus-5-5-low`, `-medium`, `-high`…); o board junta as variantes num modelo com os níveis
 dele. As versões rápidas (`-fast`, respondem mais depressa e cobram mais pelos mesmos tokens) ficam
 de fora até você ligar **Incluir os modos rápidos** no cartão do Cursor: aí cada uma entra como um
-modelo à parte ("Claude Opus 5.5 1M Fast"), com preço próprio; desligar a chave as tira do catálogo.
+modelo à parte ("Claude Opus 5.5 1M Fast"), com preço próprio, só para os modelos que estão no
+catálogo; desligar a chave as tira do catálogo.
 Pelo MCP, é a regra `includeFastModels` do `update_rules`. No plano gratuito do Cursor só o **Auto** roda: os outros
-modelos são recusados antes de começar, e por isso as regras de sugestão do Cursor começam todas
-em Auto. As regras de sugestão combinam
+modelos são recusados antes de começar (o card bloqueado explica como escolher Auto), e por isso
+as regras de sugestão do Cursor começam todas em Auto. As regras de sugestão combinam
 condições com E e OU, por exemplo `Esforço da atividade = Alto E Tags = backend`. O resultado é
 sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.
 
