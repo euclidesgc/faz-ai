@@ -1,6 +1,6 @@
 import { choose, lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { ModelsSettings } from '../../src/webview/components/settings/ModelsSettings';
@@ -196,6 +196,67 @@ describe('ModelsSettings: modos rápidos do Cursor', () => {
     await userEvent.click(toggle);
     expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { includeFastModels: true } });
     board.router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude' } });
+  });
+});
+
+describe('ModelsSettings: preços do Cursor', () => {
+  const useCursor = () => {
+    board.router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
+    board.router.handle({ type: 'settings.models.detect', tool: 'cursor' });
+    syncStore(board.router);
+  };
+  const back = () => board.router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude' } });
+
+  it('a tarifa do Cursor só aparece no Cursor, explica a cobrança e grava a regra', async () => {
+    show();
+    expect(screen.queryByRole('switch', { name: 'Somar a tarifa do Cursor (Cursor Token Rate)' })).toBeNull();
+    useCursor();
+    show();
+    const toggle = screen.getAllByRole('switch', { name: 'Somar a tarifa do Cursor (Cursor Token Rate)' }).at(-1)!;
+    expect(toggle).not.toBeChecked();
+    expect(screen.getAllByText(/US\$ 0,25 por milhão de tokens/).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'Sobre a tarifa' }).at(-1)).toHaveAttribute(
+      'href',
+      'https://cursor.com/help/models-and-usage/token-rate',
+    );
+    await userEvent.click(toggle);
+    expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { cursorTokenRate: true } });
+    back();
+  });
+
+  it('o `auto` nasce com preço variável: sem os campos de preço, com o texto e o link da documentação', async () => {
+    useCursor();
+    show();
+    const auto = screen.getByRole('switch', { name: 'Preço variável de auto' });
+    expect(auto).toBeChecked();
+    expect(screen.queryByLabelText('Preço de entrada de auto')).toBeNull();
+    expect(screen.getAllByText(/O custo depende do modelo escolhido a cada pedido/)).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'Preços do Cursor' })[0]).toHaveAttribute(
+      'href',
+      'https://cursor.com/docs/models-and-pricing',
+    );
+    // os outros modelos continuam com os campos
+    expect(screen.getByRole('switch', { name: 'Preço variável de composer-2.5' })).not.toBeChecked();
+    expect(screen.getByLabelText('Preço de entrada de composer-2.5')).toBeInTheDocument();
+    back();
+  });
+
+  it('desligar o preço variável grava o flag e volta os campos; ligar num modelo comum os esconde', async () => {
+    useCursor();
+    show();
+    await userEvent.click(screen.getByRole('switch', { name: 'Preço variável de auto' }));
+    const sentAuto = lastSent('settings.models.set').catalog.find((m) => m.id === 'cursor:auto')!;
+    expect(sentAuto.variablePrice).toBe(false);
+    board.router.handle(lastSent('settings.models.set'));
+    syncStore(board.router);
+    expect(await screen.findByLabelText('Preço de entrada de auto')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('switch', { name: 'Preço variável de composer-2.5' }));
+    expect(lastSent('settings.models.set').catalog.find((m) => m.id === 'cursor:composer-2.5')!.variablePrice).toBe(true);
+    board.router.handle(lastSent('settings.models.set'));
+    syncStore(board.router);
+    await waitFor(() => expect(screen.queryByLabelText('Preço de entrada de composer-2.5')).toBeNull());
+    back();
   });
 });
 

@@ -363,4 +363,15 @@ export const settings: Record<string, string> = {
   'Incluir os modos rápidos': 'Include fast modes',
   'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"), com preço próprio para a estimativa de custo; desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.':
     'Cursor has a fast version of many models: it answers sooner and charges more for the same tokens. When on, each one enters the catalog as a separate model (for example, "Claude Opus 5.5 1M Fast"), with its own price for the cost estimate; when off, they leave the catalog. The list comes from the cursor-agent models command, read with the CLI signed in.',
+  'Somar a tarifa do Cursor (Cursor Token Rate)': 'Add the Cursor fee (Cursor Token Rate)',
+  'Nos planos Teams e Enterprise, o Cursor cobra US$ 0,25 por milhão de tokens (input, output e cache) por cima do preço dos modelos de terceiros. Ligado, a estimativa de custo soma essa tarifa; Composer, Grok e Auto são isentos. Execuções já registradas não mudam.':
+    'On Teams and Enterprise plans, Cursor charges US$ 0.25 per million tokens (input, output and cache) on top of the price of third-party models. When on, the cost estimate adds this fee; Composer, Grok and Auto are exempt. Runs already recorded do not change.',
+  'Sobre a tarifa': 'About the fee',
+  'Preço variável': 'Variable price',
+  'Preço variável de {model}': 'Variable price of {model}',
+  'O custo depende do modelo escolhido a cada pedido; o board não estima o custo deste modelo.':
+    'The cost depends on the model picked for each request; the board does not estimate the cost of this model.',
+  'Preços do Cursor': 'Cursor pricing',
+  'No Cursor, a estimativa usa a tarifa cadastrada: o modo rápido é um modelo à parte, com preço próprio, e o contexto longo (mais de 256 mil tokens, que pode custar 2x) não é separado, porque o Cursor só informa o total de tokens.':
+    'In Cursor, the estimate uses the price entered here: fast mode is a separate model with its own price, and long context (over 256 thousand tokens, which may cost 2x) is not told apart, because Cursor only reports the token total.',
 };

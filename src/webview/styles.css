@@ -1366,6 +1366,14 @@ button.ghost.on {
 .price-hint {
   margin-top: var(--sp-6);
 }
+/* "preço variável" fica em cima dos campos; ligado, troca os campos por um texto do mesmo tamanho */
+.price-variable {
+  margin-bottom: var(--sp-4);
+}
+.price-variable-note {
+  margin: 0;
+  max-width: 40ch;
+}
 
 /* regras de sugestão de modelo */
 .suggest-model {
