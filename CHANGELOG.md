@@ -23,8 +23,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   restrições". Nos níveis menores, a sessão recebe só as ferramentas do nível, sem terminal.
 
 - **A CLI do Cursor é procurada como `cursor-agent`.** O nome curto `agent` continua valendo, e o
-  board também acha a CLI na pasta do instalador. O esforço do modelo vai dentro do id
-  (`modelo[effort=high]`), como o Cursor pede.
+  board também acha a CLI na pasta do instalador. O esforço do modelo vai como sufixo do id
+  (`claude-opus-5-5-high`), como `cursor-agent models` lista as variantes.
 
 - **Windows: o prompt chega inteiro às CLIs instaladas pelo npm.** Aspas, `&` e `|` no texto eram
   interpretados pelo `cmd.exe`, e **Parar** deixava a CLI rodando. Agora os argumentos são escapados

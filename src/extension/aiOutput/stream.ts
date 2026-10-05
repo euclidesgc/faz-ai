@@ -1,6 +1,7 @@
 // Leitor genérico de `stream-json`, usado por Cursor e Kimi. Os eventos `system`, `assistant`,
-// `tool_call` e `result` seguem o espírito do formato do Claude Code. O do Cursor foi conferido no
-// código da CLI 2026.10.01 (a documentação pública não descreve o consumo):
+// `tool_call` e `result` seguem o espírito do formato do Claude Code. O do Cursor foi conferido
+// contra execuções reais da CLI 2026.10.01 (test/fixtures/cursor-stream-json.jsonl; a documentação
+// pública não descreve o consumo):
 // - `system`/`init` traz em `model` o nome de exibição do modelo que rodou ("Composer 2.5");
 // - `tool_call` sai duas vezes por chamada (`started` e `completed`), com a ferramenta como a chave de
 //   `tool_call` (`{"readToolCall": {...}}`; MCP é `{"mcpToolCall": {"args": {"providerIdentifier",
@@ -90,7 +91,9 @@ export function streamReader(deps: ReaderDeps): OutputReader {
 
   /** `{"readToolCall": {...}}` → `read`; `{"mcpToolCall": {"args": {...}}}` → `servidor/ferramenta`. */
   const onCursorCall = (call: Json): string[] => {
-    const [key, value] = Object.entries(call)[0] ?? [];
+    // o objeto traz outras chaves junto da ferramenta (`toolCallId`, `startedAtMs`,
+    // `hookAdditionalContexts`): vale a que nomeia a ferramenta, não a primeira
+    const [key, value] = Object.entries(call).find(([k]) => k.endsWith('ToolCall') || k === 'function') ?? [];
     if (!key) return [];
     const body = asObject(value);
     // forma de reserva da documentação para as demais: `{"function": {"name": ...}}`

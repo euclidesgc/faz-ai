@@ -1,7 +1,9 @@
-// O `stream-json` do Cursor, com os eventos montados como a CLI 2026.10.01 os escreve: os objetos
-// abaixo copiam os campos que o código da própria CLI põe em cada `JSON.stringify` (`system`/`init`,
-// `tool_call` em `started` e `completed`, `result` com `usage`). Não há saída real capturada porque
-// a execução exige login na conta do Cursor.
+// O `stream-json` do Cursor. O primeiro bloco roda contra a SAÍDA REAL de duas execuções de
+// `cursor-agent` 2026.10.01 (test/fixtures/cursor-stream-json*.jsonl, com os caminhos locais
+// trocados): uma no nível "só o board", que chama o `get_board` e não consegue criar um arquivo, e uma
+// que lê o projeto. Os casos de borda abaixo dela montam eventos com os mesmos campos.
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { streamReader } from '../src/extension/aiOutput/stream';
 import type { ReaderDeps } from '../src/extension/aiOutput/reader';
@@ -74,6 +76,36 @@ function read(lines: string[], deps: Partial<ReaderDeps> = {}) {
   const shown = lines.flatMap((l) => reader.push(l, 'stdout'));
   return { reader, shown };
 }
+
+const fixture = (name: string) =>
+  fs
+    .readFileSync(path.join(__dirname, 'fixtures', name), 'utf8')
+    .split('\n')
+    .filter(Boolean);
+
+describe('stream-json do Cursor, contra a saída real', () => {
+  it('nível "só o board": a chamada MCP com o servidor, cada chamada contada uma vez, e o consumo', () => {
+    const { reader, shown } = read(fixture('cursor-stream-json.jsonl'));
+    const report = reader.report();
+    expect(report.measure).toBe('full');
+    expect(report.consumption).toMatchObject({ inputTokens: 36800, outputTokens: 928, cacheReadTokens: 90880, cacheWriteTokens: 0 });
+    expect(report.inventory).toContainEqual({ kind: 'mcp_tool', name: 'faz-ai/get_board', calls: 1 });
+    expect(report.inventory).toContainEqual({ kind: 'tool', name: 'read', calls: 1 });
+    // nenhuma ferramenta de escrita: o nível não as entrega à sessão
+    expect(report.inventory.map((i) => i.name)).not.toContain('edit');
+    expect(report.answer).toContain('9 colunas');
+    expect(shown).toContain('faz-ai/get_board');
+  });
+
+  it('o objeto `tool_call` traz outras chaves junto da ferramenta: vale a que termina em ToolCall', () => {
+    const report = read(fixture('cursor-stream-json-read.jsonl')).reader.report();
+    expect(report.inventory).toEqual([
+      { kind: 'tool', name: 'glob', calls: 1 },
+      { kind: 'tool', name: 'read', calls: 1 },
+    ]);
+    expect(report.consumption).toMatchObject({ inputTokens: 21061, outputTokens: 170, cacheReadTokens: 20224 });
+  });
+});
 
 describe('stream-json do Cursor', () => {
   it('conta cada chamada uma vez, com o nome da ferramenta e o servidor MCP', () => {

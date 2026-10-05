@@ -86,7 +86,7 @@ const MCP_CONFIG = 'mcp.json';
  *   --strict-mcp-config, --setting-sources e --disable-slash-commands (code.claude.com/docs/en/cli-reference)
  * - Codex: --model e `-c` para model_reasoning_effort e mcp_servers.<id>.enabled
  * - Copilot: --agent, --model, --effort, --available-tools, --excluded-tools, --disable-mcp-server, --no-custom-instructions
- * - Cursor: --model, com o esforço dentro do id (`modelo[effort=high]`). Kimi: --model e --agent.
+ * - Cursor: --model, com o esforço como sufixo do id (`modelo-high`). Kimi: --model e --agent.
  * O que a ferramenta não aceita por parâmetro segue no prompt, como orientação (ver executionPlan).
  *
  * Saída estruturada (`structured`), de onde saem tokens, custo e inventário:
@@ -198,7 +198,8 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
       edits: ['--allowed-tools', [...CURSOR_TOOLS.board, ...CURSOR_TOOLS.edits].join(',')],
       full: [],
     };
-    const model = exec?.model && (exec.model.effort ? `${exec.model.name}[effort=${exec.model.effort}]` : exec.model.name);
+    // o esforço é parte do id: `cursor-agent models` lista uma variante por nível (`claude-opus-5-5-high`)
+    const model = exec?.model && (exec.model.effort ? `${exec.model.name}-${exec.model.effort}` : exec.model.name);
     return {
       command: 'cursor-agent',
       args: [

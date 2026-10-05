@@ -25,8 +25,8 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   "no restrictions". At the lower levels the session gets only that level's tools, no terminal.
 
 - **Cursor's CLI is looked up as `cursor-agent`.** The short `agent` name still works, and the board
-  also finds the CLI in the installer's folder. The model effort goes inside the id
-  (`model[effort=high]`), as Cursor expects.
+  also finds the CLI in the installer's folder. The model effort goes as a suffix of the
+  id (`claude-opus-5-5-high`), the way `cursor-agent models` lists the variants.
 
 - **Windows: the prompt reaches npm-installed CLIs intact.** Quotes, `&` and `|` in the text were
   interpreted by `cmd.exe`, and **Parar** (Stop) left the CLI running. Arguments are now escaped and
