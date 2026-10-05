@@ -16,6 +16,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   (MCP)** (connect to the board) or the shortcut to the AI harness. The bar goes away on its own when
   everything is solved; **Verificar de novo** (check again) checks right away.
 
+- **Chamar IA shows the error on the board itself.** When the run does not even start (CLI not
+  found, for example), the reason appears as a notice on the board screen and stays in the Faz AI
+  channel. It used to go only to the editor's notifications, which Cursor keeps in the center
+  without showing: the click seemed to do nothing.
+
 - **Cursor's models are your account's.** With the CLI signed in, the board reads
   `cursor-agent models` when it opens and when the project switches to Cursor; the first real list
   replaces the built-in one, and after that **Detectar modelos** (detect models) brings it again. The

@@ -330,7 +330,8 @@ export class AiRunner {
       });
     } catch (e) {
       // nem chegou a existir processo (ferramenta sem suporte, plano impossível, spawn que falhou):
-      // a linha fecha aqui, antes de o erro subir para quem chamou
+      // a linha fecha aqui, antes de o erro subir para quem chamou, e o motivo fica também no canal
+      this.deps.log(`[${cardRef(card)}] Não foi possível executar: ${e instanceof Error ? e.message : String(e)}`);
       this.deps.runLog?.finish(logId, 'unsupported');
       throw e;
     }

@@ -15,6 +15,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   ao board (MCP)** ou o atalho para o Harness de IA. A faixa some sozinha quando tudo é resolvido;
   **Verificar de novo** confere na hora.
 
+- **Chamar IA mostra o erro no próprio board.** Quando a execução nem começa (CLI não encontrada, por
+  exemplo), o motivo aparece como aviso na tela do board e fica no canal Faz AI. Antes ele ia só
+  para as notificações do editor, que o Cursor guarda na central sem mostrar: o clique parecia não
+  fazer nada.
+
 - **Os modelos do Cursor são os da sua conta.** Com a CLI autenticada, o board lê
   `cursor-agent models` ao abrir e quando o projeto passa a usar o Cursor; a primeira lista real
   substitui a embutida, e depois **Detectar modelos** a traz de novo. As cerca de 250 variantes que o

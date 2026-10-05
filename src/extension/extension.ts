@@ -128,11 +128,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const output = vscode.window.createOutputChannel('Faz AI');
   /** Chama ou interrompe a IA num card; erros (ferramenta sem suporte, card já em execução) aparecem como aviso. */
-  const aiCommand = (action: 'start' | 'stop') => async (cardId: string) => {
+  // vindo do board (`fromBoard`), o erro volta para ele e vira aviso na própria tela: o Cursor guarda as
+  // notificações do editor na central, sem mostrar, e a pessoa clicava em Chamar IA sem ver nada acontecer
+  const aiCommand = (action: 'start' | 'stop') => async (cardId: string, opts?: { fromBoard?: boolean }) => {
     if (!(await getRouter()) || !runner) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
     try {
       runner[action](cardId);
     } catch (e) {
+      if (opts?.fromBoard) throw e;
       vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
     }
   };
