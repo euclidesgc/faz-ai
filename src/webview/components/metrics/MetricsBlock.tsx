@@ -69,7 +69,10 @@ export function MetricsBlock({ title, intro, horizon, result, level = 3, childre
       </Heading>
       <p className="metrics-block-intro">{intro}</p>
       <HorizonNote horizon={horizon} result={result} />
-      <div className="metrics-block-body">{children}</div>
+      {/* o corpo rola dentro de si (RF-40): recebe foco pelo teclado para rolar com as setas, com nome próprio */}
+      <div className="metrics-block-body" tabIndex={0} role="region" aria-label={t('{title}: área rolável', { title })}>
+        {children}
+      </div>
     </section>
   );
 }

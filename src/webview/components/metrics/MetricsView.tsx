@@ -2,7 +2,7 @@ import { t } from '../../i18n';
 import { useBoardStore } from '../../store/boardStore';
 import { Button } from '../ui';
 import { Horizon } from './Horizon';
-import { MetricsFilters } from './MetricsFilters';
+import { MetricsFilters, isInvertedRange } from './MetricsFilters';
 import { MetricsBlocks } from './MetricsBlocks';
 import { MonthSeries } from './MonthSeries';
 import { formatDay, formatRange, isEmptyResult } from './format';
@@ -26,6 +26,9 @@ export function MetricsView() {
   const empty = result !== null && isEmptyResult(result);
   const period = result ? formatRange(result.range) : '';
   // muda só quando uma resposta é aceita; o leitor de tela anuncia sem tirar o foco de onde está (RF-32)
+  // intervalo invertido: o filtro já mostra e anuncia o erro (RF-04); o mesmo erro devolvido pelo host não
+  // vira um segundo alerta, e "consultar de novo" não teria o que consertar
+  const shownError = error && !isInvertedRange(filters) ? error : null;
   const announcement =
     result && !loading && !error ? (period ? t('Números atualizados: {period}', { period }) : t('Números atualizados.')) : '';
 
@@ -45,9 +48,9 @@ export function MetricsView() {
 
       <MetricsFilters workflows={result?.workflows ?? []} range={result?.range} />
 
-      {error && (
+      {shownError && (
         <div className="metrics-error" role="alert">
-          <span>{t(error)}</span>
+          <span>{t(shownError)}</span>
           <Button size="small" onClick={refresh}>
             {t('Consultar de novo')}
           </Button>

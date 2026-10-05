@@ -1,10 +1,11 @@
 import { useId } from 'react';
 import type { MetricsLead, MetricsLeadRow } from '../../../shared/metrics';
-import { t } from '../../i18n';
+import { t, tn } from '../../i18n';
 import type { MetricsSort } from '../../store/boardStore';
 import { formatNumber, formatSpan, intlLocale } from './format';
 import type { MetricsBlockProps } from './MetricsBlock';
 import { Note } from './Note';
+import { RankingNoteRow, RankingTable, type RankingColumn } from './RankingTable';
 
 /**
  * Os dois blocos de tempo de relógio do painel (card 176): quanto tempo o card fica em cada fase
@@ -28,9 +29,9 @@ export function DwellTable({ sections }: MetricsBlockProps) {
   const hasUnknown = rows.some((r) => r.unknown > 0);
   return (
     <>
-      <table className="metrics-table metrics-sticky-head" aria-describedby={`${uid}-n`}>
+      <table className="metrics-table" aria-describedby={`${uid}-n`}>
         <caption className="sr-only">{t('Permanência do card em cada fase')}</caption>
-        <thead>
+        <thead className="metrics-sticky-head">
           <tr>
             <th scope="col">{t('Fase')}</th>
             <th scope="col" className="is-number">
@@ -92,7 +93,7 @@ interface LeadTableProps extends MetricsBlockProps {
  * semanas move a média do mês inteiro. Sem nenhum valor conhecido, a tela diz isso em vez de mostrar
  * mediana vazia ou zero.
  */
-export function LeadTable({ sections }: LeadTableProps) {
+export function LeadTable({ sections, sort, onSort }: LeadTableProps) {
   const uid = useId();
   const lead = sections.lead;
   const known = lead.medianMs !== null;
@@ -115,7 +116,7 @@ export function LeadTable({ sections }: LeadTableProps) {
             </Note>
           )}
           {!known && <Note>{t('Nenhum lead time foi medido neste período: não há mediana nem média para mostrar.')}</Note>}
-          {lead.rows.length > 0 && <LeadList rows={lead.rows} omitted={lead.omitted} />}
+          {lead.rows.length > 0 && <LeadList rows={lead.rows} omitted={lead.omitted} sort={sort} onSort={onSort} />}
         </>
       )}
     </div>
@@ -148,39 +149,45 @@ function LeadSummary({ lead, known, noteId }: { lead: MetricsLead; known: boolea
 /** A data em que o card concluiu, no idioma da interface. */
 const doneDay = (ms: number): string => new Intl.DateTimeFormat(intlLocale(), { dateStyle: 'medium' }).format(new Date(ms));
 
-function LeadList({ rows, omitted }: { rows: MetricsLeadRow[]; omitted: number }) {
+/** O padrão da lista: a ordem em que o host manda, da conclusão mais recente para a mais antiga. */
+export const DEFAULT_LEAD_SORT: MetricsSort = { key: 'done', dir: 'desc' };
+
+/**
+ * A lista por card na `RankingTable` (RF-33): sem linha "outros", porque somar lead times não significa
+ * nada; o corte vira a contagem "+N cards concluídos não listados", com N = linhas fora do limite da
+ * tabela mais as que o host deixou fora do teto (`omitted`). "Desconhecido" vai para o fim nas duas
+ * direções, nunca como o menor lead time.
+ */
+function LeadList({ rows, omitted, sort, onSort }: { rows: MetricsLeadRow[]; omitted: number } & Pick<LeadTableProps, 'sort' | 'onSort'>) {
+  const columns: RankingColumn<MetricsLeadRow>[] = [
+    {
+      key: 'card',
+      header: t('Card'),
+      rowHeader: true,
+      firstDir: 'asc',
+      cell: (r) => `#${r.cardNumber} ${r.title}`,
+      sortValue: (r) => r.cardNumber,
+    },
+    { key: 'lead', header: t('Lead time'), numeric: true, cell: (r) => formatSpan(r.leadMs), sortValue: (r) => r.leadMs },
+    { key: 'done', header: t('Concluído em'), numeric: true, cell: (r) => doneDay(r.doneAt), sortValue: (r) => r.doneAt },
+  ];
   return (
-    <>
-      <table className="metrics-table metrics-sticky-head">
-        <caption className="sr-only">{t('Lead time de cada card concluído')}</caption>
-        <thead>
-          <tr>
-            <th scope="col">{t('Card')}</th>
-            <th scope="col" className="is-number">
-              {t('Lead time')}
-            </th>
-            <th scope="col" className="is-number">
-              {t('Concluído em')}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.cardNumber}>
-              <th scope="row">{`#${row.cardNumber} ${row.title}`}</th>
-              <td className="is-number">{formatSpan(row.leadMs)}</td>
-              <td className="is-number">{doneDay(row.doneAt)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {omitted > 0 && (
-        <p className="metrics-times-hint">
-          {omitted === 1
-            ? t('+{n} card concluído não listado', { n: formatNumber(omitted) })
-            : t('+{n} cards concluídos não listados', { n: formatNumber(omitted) })}
-        </p>
-      )}
-    </>
+    <RankingTable
+      caption={t('Lead time de cada card concluído')}
+      columns={columns}
+      rows={rows}
+      rowKey={(r) => String(r.cardNumber)}
+      sort={sort ?? DEFAULT_LEAD_SORT}
+      onSort={onSort}
+      sortReason={sort ? undefined : t('É o padrão: os concluídos mais recentes primeiro.')}
+      footer={({ hidden, colSpan }) => {
+        const n = hidden + omitted;
+        return n > 0 ? (
+          <RankingNoteRow colSpan={colSpan}>
+            {tn(n, '+{n} card concluído não listado', '+{n} cards concluídos não listados', { n: formatNumber(n) })}
+          </RankingNoteRow>
+        ) : null;
+      }}
+    />
   );
 }

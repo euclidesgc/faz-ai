@@ -389,7 +389,8 @@ export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
             </Note>
           )}
 
-          <div className="metrics-breakdown-table">
+          {/* rola na horizontal em largura de barra lateral: recebe foco para rolar pelo teclado */}
+          <div className="metrics-breakdown-table" tabIndex={0} role="region" aria-labelledby={titleId}>
             <table className="metrics-table">
               <caption className="sr-only">{title}</caption>
               <thead className="metrics-sticky-head">

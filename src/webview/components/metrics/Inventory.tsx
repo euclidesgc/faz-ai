@@ -53,9 +53,9 @@ function UsageGroup({ title, rows, measured, mcp = false }: { title: string; row
           {t('Nenhum registro no período.')}
         </p>
       ) : (
-        <table className="metrics-table metrics-sticky-head">
+        <table className="metrics-table">
           <caption className="sr-only">{title}</caption>
-          <thead>
+          <thead className="metrics-sticky-head">
             <tr>
               {mcp ? (
                 <>

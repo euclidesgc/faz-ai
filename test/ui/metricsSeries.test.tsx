@@ -64,7 +64,7 @@ const fourMonths = [
   month('2026-10', { partial: true, costUsd: 12.5, tokens: tokens(4000) }),
 ];
 
-const plain = (s: string | null | undefined) => (s ?? '').replace(/ /g, ' ');
+const plain = (s: string | null | undefined) => (s ?? '').replace(/\u00a0/g, ' ');
 const bars = (c: HTMLElement) => [...c.querySelectorAll<SVGRectElement>('rect.metrics-series-bar')];
 const bar = (c: HTMLElement, m: string) => c.querySelector<SVGRectElement>(`rect.metrics-series-bar[data-month="${m}"]`);
 const row = (m: string) => document.querySelector<HTMLTableRowElement>(`tbody tr[data-month="${m}"]`)!;

@@ -105,7 +105,8 @@ export function MetricsFilters({ workflows, range }: Props) {
         </div>
       )}
       {inverted && (
-        <p id={errorId} className="metrics-filters-error">
+        // role="alert": o erro aparece enquanto a pessoa digita a data e é anunciado sem mover o foco
+        <p id={errorId} className="metrics-filters-error" role="alert">
           {t('A data final vem antes da inicial.')}
         </p>
       )}

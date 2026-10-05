@@ -91,7 +91,7 @@ describe('MetricsFilters', () => {
     renderThemed(<MetricsView />);
     answer(panel());
     act(() => useBoardStore.getState().setMetricsFilters({ period: 'custom', from: '2026-10-04', to: '2026-10-01' }));
-    expect(screen.getByText('A data final vem antes da inicial.')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('A data final vem antes da inicial.');
     expect(screen.getByLabelText('Até')).toHaveAttribute('aria-invalid', 'true');
     await waitFor(() => expect(sentOf('metrics.query')).toHaveLength(2));
     reply({ type: 'metrics.result', requestId: lastSent('metrics.query').requestId, error: 'A data final vem antes da inicial.' });

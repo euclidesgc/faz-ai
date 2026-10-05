@@ -2727,7 +2727,8 @@ body.host-web .drawer {
 .retention-field .rt-TextFieldRoot {
   width: calc(var(--sp-20) * 4);
 }
-.retention-price {
+.retention-price,
+.retention-help {
   color: var(--muted);
 }
 .retention-text {
@@ -2896,6 +2897,13 @@ body.host-web .drawer {
 }
 .metrics-block-body:empty {
   display: none;
+}
+/* as áreas que rolam dentro de si recebem foco pelo teclado (para rolar com as setas): foco visível por dentro,
+   porque o contorno por fora seria cortado pelo overflow do bloco */
+.metrics-block-body:focus-visible,
+.metrics-breakdown-table:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 .metrics-table {
   width: 100%;

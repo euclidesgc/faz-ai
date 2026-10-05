@@ -127,8 +127,9 @@ export function RankingTable<R>({
   return (
     <div className="ranking">
       {active && (
-        // a frase muda a cada troca de critério e o leitor de tela a anuncia sem tirar o foco do botão (RF-39)
-        <p className="ranking-sort-note" role="status">
+        // a frase muda a cada troca de critério e o leitor de tela a anuncia sem tirar o foco do botão (RF-39).
+        // aria-live sem role="status": o único status do painel é o "Números atualizados" do MetricsView
+        <p className="ranking-sort-note" aria-live="polite" aria-atomic="true">
           {sort.dir === 'desc'
             ? t('Ordenado pela coluna "{column}", decrescente.', { column: active.header })
             : t('Ordenado pela coluna "{column}", crescente.', { column: active.header })}

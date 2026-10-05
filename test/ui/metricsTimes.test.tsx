@@ -1,6 +1,9 @@
 import { renderThemed } from './setup';
 import { afterEach, describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
+import type { MetricsSort } from '../../src/webview/store/boardStore';
 import { EMPTY_METRICS_FILTERS, type MetricsPanelResult, type MetricsPanelSections } from '../../src/shared/metrics';
 import { setLocale } from '../../src/webview/i18n';
 import { DwellTable, LeadTable } from '../../src/webview/components/metrics/Times';
@@ -148,6 +151,34 @@ describe('LeadTable: lead time', () => {
     renderThemed(withLead({ medianMs: DAY, meanMs: DAY, counted: 1, unknown: 0, rows: [rows[0]!], omitted: 4 }));
     expect(screen.getByText('+4 cards concluídos não listados')).toBeInTheDocument();
     expect(screen.queryByText(/outros/i)).not.toBeInTheDocument();
+  });
+
+  it('a lista por card é a tabela ordenável: padrão pela conclusão mais recente, e o corte vira contagem', async () => {
+    const many = Array.from({ length: 12 }, (_, k) => ({
+      cardNumber: k + 1,
+      title: `Card ${k + 1}`,
+      leadMs: k === 0 ? null : (k + 1) * HOUR,
+      doneAt: Date.UTC(2026, 9, 3) - k * HOUR,
+    }));
+    function Lead() {
+      const [sort, setSort] = useState<MetricsSort | null>(null);
+      const sections = {
+        ...emptySections(),
+        lead: { ...emptySections().lead, medianMs: DAY, meanMs: DAY, counted: 11, unknown: 1, rows: many, omitted: 3 },
+      };
+      return <LeadTable result={result(sections)} sections={sections} sort={sort} onSort={setSort} />;
+    }
+    renderThemed(<Lead />);
+    const table = screen.getByRole('table', { name: 'Lead time de cada card concluído' });
+    expect(within(table).getByRole('columnheader', { name: 'Concluído em' })).toHaveAttribute('aria-sort', 'descending');
+    expect(screen.getByText(/É o padrão: os concluídos mais recentes primeiro\./)).toBeInTheDocument();
+    // 10 linhas visíveis; as 2 de fora mais as 3 que o host não mandou viram contagem, sem "outros"
+    expect(within(table).getByText('+5 cards concluídos não listados')).toBeInTheDocument();
+    expect(screen.queryByText(/outros/i)).not.toBeInTheDocument();
+    await userEvent.click(within(table).getByRole('button', { name: 'Lead time' }));
+    expect(within(table).getByRole('columnheader', { name: 'Lead time' })).toHaveAttribute('aria-sort', 'descending');
+    const firstRow = within(table).getAllByRole('row')[1]!;
+    expect(firstRow).toHaveTextContent('#12 Card 12');
   });
 
   it('sem nenhum concluído, diz isso', () => {

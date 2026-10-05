@@ -3,7 +3,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HostToWebview } from '../../src/shared/messages';
-import { EMPTY_METRICS_FILTERS, type MetricsMonth, type MetricsPanelResult } from '../../src/shared/metrics';
+import {
+  EMPTY_METRICS_FILTERS,
+  type MetricsCell,
+  type MetricsMonth,
+  type MetricsPanelResult,
+  type MetricsPanelSections,
+} from '../../src/shared/metrics';
 import { setLocale } from '../../src/webview/i18n';
 import { MetricsView } from '../../src/webview/components/metrics/MetricsView';
 import { Note } from '../../src/webview/components/metrics/Note';
@@ -61,6 +67,44 @@ function panel(startDate: string, endDate: string, over: Partial<MetricsPanelRes
   };
 }
 
+const cell = (value: string, i: number): MetricsCell => ({
+  value,
+  runs: i,
+  measuredRuns: i,
+  costedRuns: i,
+  durationMs: i * 60_000,
+  tokens: i * 100,
+  costUsd: i,
+  costEstimatedUsd: 0,
+});
+
+/** Todos os blocos com dado: os seis cortes, permanência, lead time, ranking por card e o inventário. */
+function fullSections(): MetricsPanelSections {
+  const sections = emptySections();
+  for (const b of sections.breakdowns) {
+    b.cells = [cell('A', 1), cell('B', 2)];
+    b.covered = { ...cell('', 3) };
+  }
+  sections.dwell = [{ phase: 'Implementação', permanences: 2, medianMs: 3_600_000, meanMs: 3_600_000, unknown: 0, openNow: 1 }];
+  sections.lead = {
+    medianMs: 86_400_000,
+    meanMs: 86_400_000,
+    counted: 1,
+    unknown: 0,
+    rows: [{ cardNumber: 7, title: 'Login', leadMs: 86_400_000, doneAt: Date.UTC(2026, 9, 3) }],
+    omitted: 0,
+  };
+  sections.cards = { cells: [cell('#7 Login', 1), cell('#8 Busca', 2)], covered: { ...cell('', 3) }, omitted: 0 };
+  sections.inventory = {
+    measured: true,
+    tools: [{ server: '', name: 'Read', runs: 2, calls: 5 }],
+    mcpTools: [{ server: 'faz-ai', name: 'get_card', runs: 1, calls: 2 }],
+    agents: [{ server: '', name: 'Explore', runs: 1, calls: 1 }],
+    skills: [{ server: '', name: 'accessibility-review', runs: 1, calls: 1 }],
+  };
+  return sections;
+}
+
 const emptyMonths = [month('2026-09', { present: false, cardsDone: 0, runs: 0, durationMs: 0 })];
 
 /** O host respondendo (o canal real é um `message` na janela). */
@@ -116,10 +160,10 @@ describe('MetricsView: consulta e estados', () => {
   it('erro de consulta aparece como alerta, sem trocar o que estava na tela, e "Consultar de novo" refaz o pedido na hora', async () => {
     renderThemed(<MetricsView />);
     answer(lastSent('metrics.query').requestId, panel('2026-09-01', '2026-10-04', { months: emptyMonths }));
-    act(() => useBoardStore.getState().setMetricsFilters({ period: 'custom', from: '2026-10-04', to: '2026-10-01' }));
+    act(() => useBoardStore.getState().setMetricsFilters({ period: '7d' }));
     await waitFor(() => expect(sentOf('metrics.query')).toHaveLength(2));
-    reply({ type: 'metrics.result', requestId: lastSent('metrics.query').requestId, error: 'A data final vem antes da inicial.' });
-    expect(screen.getByRole('alert')).toHaveTextContent('A data final vem antes da inicial.');
+    reply({ type: 'metrics.result', requestId: lastSent('metrics.query').requestId, error: 'Não foi possível consultar as métricas.' });
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível consultar as métricas.');
     // a resposta anterior continua na tela; nada é anunciado como atualizado
     expect(screen.getByText(/O log do board tem dados desde/)).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('');
@@ -127,6 +171,47 @@ describe('MetricsView: consulta e estados', () => {
     expect(sentOf('metrics.query')).toHaveLength(3);
     answer(lastSent('metrics.query').requestId, panel('2026-09-01', '2026-10-04'));
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('intervalo invertido: um alerta só, o do filtro, mesmo com o host devolvendo o mesmo erro', async () => {
+    renderThemed(<MetricsView />);
+    answer(lastSent('metrics.query').requestId, panel('2026-09-01', '2026-10-04'));
+    act(() => useBoardStore.getState().setMetricsFilters({ period: 'custom', from: '2026-10-04', to: '2026-10-01' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('A data final vem antes da inicial.');
+    await waitFor(() => expect(sentOf('metrics.query')).toHaveLength(2));
+    reply({ type: 'metrics.result', requestId: lastSent('metrics.query').requestId, error: 'A data final vem antes da inicial.' });
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Consultar de novo' })).toBeNull();
+  });
+
+  it('com dado em todos os blocos, o painel continua com um único status, e só ele anuncia a resposta', () => {
+    renderThemed(<MetricsView />);
+    answer(lastSent('metrics.query').requestId, panel('2026-09-01', '2026-10-04', { sections: fullSections() }));
+    // os cinco blocos estão preenchidos: o corte, a permanência, o lead time na tabela ordenável, os dois rankings e o inventário
+    expect(screen.getByRole('table', { name: 'Permanência do card em cada fase' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Lead time de cada card concluído' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Cards mais caros' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Fases mais caras' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Ferramentas de MCP' })).toBeInTheDocument();
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.getByRole('status')).toHaveTextContent('Números atualizados: 1 de setembro de 2026 a 4 de outubro de 2026');
+    // as frases de critério e a troca do corte são regiões aria-live sem role, e só mudam com a ação delas
+    const live = [...document.querySelectorAll('[aria-live]')].filter((el) => el.getAttribute('role') !== 'status');
+    expect(live.length).toBeGreaterThanOrEqual(4);
+    for (const el of live) expect(el).not.toHaveTextContent('Números atualizados');
+  });
+
+  it('as áreas que rolam recebem foco pelo teclado e têm nome (RF-40)', () => {
+    renderThemed(<MetricsView />);
+    answer(lastSent('metrics.query').requestId, panel('2026-09-01', '2026-10-04', { sections: fullSections() }));
+    const bodies = [...document.querySelectorAll('.metrics-block-body')];
+    expect(bodies).toHaveLength(6);
+    for (const body of bodies) {
+      expect(body).toHaveAttribute('tabindex', '0');
+      expect(body).toHaveAttribute('role', 'region');
+      expect(body.getAttribute('aria-label')).toMatch(/: área rolável$/);
+    }
+    expect(screen.getByRole('region', { name: 'Lead time: área rolável' })).toBe(bodies[2]);
   });
 
   it('erro antes da primeira resposta: só o alerta, sem o "carregando" eterno', () => {

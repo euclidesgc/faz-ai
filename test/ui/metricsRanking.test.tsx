@@ -103,6 +103,8 @@ function cardsSections(n: number, { measured = true, omitted = 0, extraRuns = 0 
 const CARDS = { 'pt-BR': 'Cards mais caros', en: 'Most expensive cards' };
 let lang: keyof typeof CARDS = 'pt-BR';
 const cardsBlock = () => screen.getByRole('region', { name: CARDS[lang] });
+/** a frase do critério: região aria-live, sem role="status" (o único status do painel é o do MetricsView) */
+const sortNote = () => cardsBlock().querySelector('.ranking-sort-note')!;
 const table = () => within(cardsBlock()).getByRole('table', { name: CARDS[lang] });
 const header = (name: string) => within(table()).getByRole('columnheader', { name });
 const bodyRows = () =>
@@ -251,15 +253,15 @@ describe('RankingTable: corte, "mostrar mais" e "outros" (RF-18, RF-33)', () => 
 describe('RankingTable: o critério em vigor, escrito na tela (RF-21, RF-22)', () => {
   it('com custo medido, o padrão é custo, e a tela diz por quê', () => {
     renderThemed(<MetricsBlocks result={result(cardsSections(3))} />);
-    expect(within(cardsBlock()).getByRole('status')).toHaveTextContent(
-      'Ordenado pela coluna "Custo", decrescente. É o padrão quando o período tem custo medido.',
-    );
+    expect(sortNote()).toHaveTextContent('Ordenado pela coluna "Custo", decrescente. É o padrão quando o período tem custo medido.');
+    expect(sortNote()).toHaveAttribute('aria-live', 'polite');
+    expect(sortNote()).not.toHaveAttribute('role');
   });
 
   it('sem custo medido, o padrão é o tempo de IA, e "não medido" aparece no lugar do custo', () => {
     renderThemed(<MetricsBlocks result={result(cardsSections(3, { measured: false }))} />);
     expect(header('Tempo de IA')).toHaveAttribute('aria-sort', 'descending');
-    expect(within(cardsBlock()).getByRole('status')).toHaveTextContent(
+    expect(sortNote()).toHaveTextContent(
       'Ordenado pela coluna "Tempo de IA", decrescente. É o padrão enquanto o período não tem custo medido.',
     );
     expect(within(bodyRows()[0]!).getAllByText('não medido')).toHaveLength(2);
@@ -277,7 +279,7 @@ describe('RankingTable: o critério em vigor, escrito na tela (RF-21, RF-22)', (
     const user = userEvent.setup();
     renderThemed(<MetricsBlocks result={result(cardsSections(3))} />);
     await user.click(within(header('Execuções')).getByRole('button'));
-    expect(within(cardsBlock()).getByRole('status')).toHaveTextContent(/^Ordenado pela coluna "Execuções", decrescente\.$/);
+    expect(sortNote()).toHaveTextContent(/^Ordenado pela coluna "Execuções", decrescente\.$/);
   });
 
   it('todo número está em texto, e o grupo sem card tem nome (RF-38, RF-20)', () => {
@@ -304,9 +306,7 @@ describe('RankingTable: o critério em vigor, escrito na tela (RF-21, RF-22)', (
     setLocale('en');
     lang = 'en';
     renderThemed(<MetricsBlocks result={result(cardsSections(11))} />);
-    expect(within(cardsBlock()).getByRole('status')).toHaveTextContent(
-      'Sorted by the "Cost" column, descending. This is the default when the period has measured cost.',
-    );
+    expect(sortNote()).toHaveTextContent('Sorted by the "Cost" column, descending. This is the default when the period has measured cost.');
     expect(within(cardsBlock()).getByText('others (1)')).toBeInTheDocument();
   });
 });

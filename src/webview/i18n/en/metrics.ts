@@ -185,6 +185,10 @@ export const metrics: Record<string, string> = {
   'Concluído em': 'Completed on',
   '+{n} card concluído não listado': '+{n} completed card not listed',
   '+{n} cards concluídos não listados': '+{n} completed cards not listed',
+  'É o padrão: os concluídos mais recentes primeiro.': 'This is the default: the most recently completed first.',
+  // card 178: acabamentos de acessibilidade
+  '{title}: área rolável': '{title}: scrollable area',
+  'Grava ao pressionar Enter ou ao sair do campo.': 'Saved when you press Enter or leave the field.',
   // card 174: a tabela ordenável dos rankings (RankingTable, CardRanking, PhaseRanking)
   'Ordenado pela coluna "{column}", decrescente.': 'Sorted by the "{column}" column, descending.',
   'Ordenado pela coluna "{column}", crescente.': 'Sorted by the "{column}" column, ascending.',

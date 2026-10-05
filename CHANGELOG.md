@@ -29,6 +29,40 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   tabela com os mesmos números. Os avisos ficam junto do número: desde quando o log do board existe,
   o período cortado no início do log e os meses que só têm o total mensal.
 
+- **O painel de métricas mostra onde o consumo aconteceu, quanto o card espera em cada fase e o que
+  a IA usou.** Cinco blocos novos abaixo da série por mês, cada um dizendo até onde enxerga: a série
+  inteira do período ou só o detalhe guardado, com o mês em que ele começa.
+  - **Onde o consumo aconteceu:** o consumo repartido por fase, tipo de card, modelo, ferramenta de
+    IA, esforço ou perfil, em barras horizontais na medida escolhida (custo, tokens, execuções ou
+    tempo de IA), com a tabela das quatro medidas ao lado.
+  - **Quanto tempo o card fica na fase:** mediana e média de cada passagem por uma fase, quantas
+    permanências ficaram desconhecidas e quantos cards estão na fase agora. É tempo de relógio, não
+    tempo de IA: o card pode estar parado esperando alguém.
+  - **Lead time:** da criação do card até a primeira conclusão, com a mediana em destaque, a média, a
+    contagem de desconhecidos e a lista por card. Desconhecido é o card cuja criação ficou fora do
+    detalhe guardado; a data não é estimada.
+  - **Fases mais caras e Cards mais caros:** dois rankings lado a lado, em tabelas ordenáveis por
+    qualquer medida. O padrão é o custo quando o período tem custo medido e o tempo de IA quando não
+    tem, e a tela escreve o critério em vigor. O que passa do limite de linhas soma numa linha
+    "outros".
+  - **O que a IA usou:** ferramentas, ferramentas de MCP (com o servidor em coluna própria),
+    subagentes e skills, com execuções e usos. "Ainda não medido" e "nenhum registro no período" são
+    estados diferentes.
+
+  Tokens contam mesmo quando o modelo não tem preço configurado; o custo soma só as execuções que
+  têm preço, e o aviso diz quantas ficaram de fora. Os tempos e o inventário leem só o detalhe
+  guardado: quando um mês sai da janela de retenção, ele sai desses blocos. As tabelas que rolam
+  recebem foco pelo teclado, o erro de intervalo invertido é anunciado ao leitor de tela, e o campo
+  da janela de retenção diz que grava ao pressionar Enter ou ao sair dele.
+
+- **O `get_metrics` agrupa por esforço, perfil, ferramenta usada e ferramenta de MCP.** As
+  dimensões novas são `effort`, `profile`, `used_tool` e `mcp_tool`. Cuidado com os nomes: `tool` é
+  a ferramenta de IA que rodou (claude, codex); `used_tool` e `mcp_tool` são o que a execução usou
+  (Read, Bash, `get_card`), e `mcp_tool` traz o servidor numa coluna própria, ou "servidor não
+  registrado" quando o nome não o trouxe. Como em `agent` e `skill`, as dimensões de inventário só
+  contam execuções e usos, sem tokens nem custo. `effort` e `profile` têm tokens e custo. Os tempos
+  do painel (permanência e lead time) não estão no `get_metrics`.
+
 - **A janela do detalhe de cada execução é configurável, de 1 a 24 meses, e o padrão caiu de 12
   para 6.** No bloco **Detalhe guardado** da visão Métricas você escolhe quantos meses de detalhe
   (consumo e inventário por execução) o board guarda além do mês corrente; depois disso só

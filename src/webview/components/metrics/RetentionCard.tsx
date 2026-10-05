@@ -63,7 +63,7 @@ export function RetentionCard({ result, onChanged }: { result: MetricsPanelResul
         <label htmlFor={id}>{t('Meses de detalhe guardados')}</label>
         <NumberField
           id={id}
-          aria-describedby={`${id}-price`}
+          aria-describedby={`${id}-price ${id}-help`}
           value={months}
           min={LOG_RETENTION_MIN}
           max={LOG_RETENTION_MAX}
@@ -71,6 +71,9 @@ export function RetentionCard({ result, onChanged }: { result: MetricsPanelResul
         />
         <span id={`${id}-price`} className="retention-price">
           {formatSize(detailRows * LOG_BYTES_PER_ROW)} · {tn(detailMonths, '{n} mês com detalhe', '{n} meses com detalhe')}
+        </span>
+        <span id={`${id}-help`} className="retention-help">
+          {t('Grava ao pressionar Enter ou ao sair do campo.')}
         </span>
       </div>
       {months > 12 && <Note>{t('Acima de 12 meses o arquivo do board pode passar do teto de 10 MB.')}</Note>}

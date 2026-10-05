@@ -82,6 +82,7 @@ describe('RetentionCard (#161)', () => {
     renderCard();
     expect(screen.getByText(/cerca de 1,2 MB · 8 meses com detalhe/)).toBeInTheDocument();
     expect(field()).toHaveAccessibleDescription(/1,2 MB/);
+    expect(field()).toHaveAccessibleDescription(/Grava ao pressionar Enter ou ao sair do campo\./);
   });
 
   it('um mês só fica no singular e detalhe pequeno diz "menos de"', () => {
