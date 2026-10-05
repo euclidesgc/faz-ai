@@ -4,7 +4,7 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+## 0.33.0
 
 - **Imagens do README** de agentes, harness e modelos refeitas com a interface desta versão, em
   português e em inglês.
