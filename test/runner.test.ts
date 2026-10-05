@@ -101,6 +101,21 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   fs.writeFileSync(path.join(project, '.mcp.json'), JSON.stringify({ mcpServers: { github: { command: 'gh-mcp' } } }));
   router.refreshHarness();
   expect(() => executionPlan(router.snapshot(), card(), project, home)).toThrow('servidor do board não está registrado');
+  // com o servidor da execução, o registro em arquivo não é preciso, e o de arquivo (de outra pasta) não vale
+  const server = { command: '/usr/bin/node', args: ['/dados/bridge.js', project] };
+  expect(JSON.parse(executionPlan(router.snapshot(), card(), project, home, server).input.mcpConfig!).mcpServers['faz-ai']).toEqual({
+    type: 'stdio',
+    ...server,
+  });
+  // os servidores da pasta no ~/.claude.json valem com o caminho escrito de outro jeito (o Claude Code grava com /)
+  fs.writeFileSync(path.join(project, '.mcp.json'), JSON.stringify({ mcpServers: {} }));
+  fs.writeFileSync(
+    path.join(home, '.claude.json'),
+    JSON.stringify({ projects: { [`${project}/`]: { mcpServers: { github: { command: 'gh-mcp' } } } } }),
+  );
+  expect(JSON.parse(executionPlan(router.snapshot(), card(), project, home, server).input.mcpConfig!).mcpServers.github).toEqual({
+    command: 'gh-mcp',
+  });
   fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -405,6 +420,7 @@ describe('executor da IA', () => {
       command: 'kimi',
       args: ['-p', cardPrompt('#1', [], [], false, true), '--output-format', 'stream-json', '--add-dir', `${dir}.worktrees`],
       format: 'stream-json',
+      promptArg: { index: 1, addDirFlag: '--add-dir' },
     });
   });
 
@@ -417,7 +433,9 @@ describe('executor da IA', () => {
       stdin: 'P',
       format: 'text',
     });
-    expect(cmd('claude', 'edits')).toMatchObject({ args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*'] });
+    expect(cmd('claude', 'edits')).toMatchObject({
+      args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep'],
+    });
     expect(cmd('claude', 'full')).toMatchObject({ args: ['-p', '--permission-mode', 'bypassPermissions'] });
     expect(cmd('codex', 'edits')).toEqual({
       command: 'codex',
@@ -438,15 +456,18 @@ describe('executor da IA', () => {
       args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', '--no-ask-user'],
       env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' },
       format: 'text',
+      promptArg: { index: 1, addDirFlag: '--add-dir=' },
     });
+    // o pedido do Cursor vai pela entrada padrão, nunca na linha de comando
     expect(cmd('cursor', 'full')).toEqual({
       command: 'cursor-agent',
-      args: ['-p', '--force', '--approve-mcps', '--trust', 'P'],
+      args: ['-p', '--force', '--approve-mcps', '--trust'],
+      stdin: 'P',
       format: 'text',
     });
     // nos níveis menores, a sessão do Cursor só recebe as ferramentas do nível
     expect(cmd('cursor', 'board')).toMatchObject({
-      args: ['-p', '--force', '--approve-mcps', '--trust', '--allowed-tools', CURSOR_TOOLS.board.join(','), 'P'],
+      args: ['-p', '--force', '--approve-mcps', '--trust', '--allowed-tools', CURSOR_TOOLS.board.join(',')],
     });
     const edits = (cmd('cursor', 'edits') as HeadlessCommand).args;
     expect(edits[edits.indexOf('--allowed-tools') + 1]!.split(',')).toEqual([...CURSOR_TOOLS.board, ...CURSOR_TOOLS.edits]);
@@ -455,12 +476,15 @@ describe('executor da IA', () => {
     expect(headlessUnsupported('claude', 'board')).toBeNull();
     expect(headlessUnsupported('cursor', 'board')).toBeNull();
     expect(headlessUnsupported('kimi', 'board')).toContain('Kimi');
+    // o Claude Code recusa pular as permissões como root
+    expect(headlessUnsupported('claude', 'full', 0)).toContain('root');
+    expect(headlessUnsupported('claude', 'full', 1000)).toBeNull();
   });
 
   it('o Cursor recebe as worktrees por --add-dir e o servidor do board pelo .cursor/mcp.json', () => {
     const boardServer = { command: '/usr/bin/node', args: ['/dados/mcp/bridge.js', '/projeto'] };
     const built = headlessCommand('cursor', { prompt: 'P', permission: 'full', boardServer, addDirs: ['/w/a', '/w/b'] }) as HeadlessCommand;
-    expect(built.args).toEqual(['-p', '--force', '--approve-mcps', '--trust', '--add-dir', '/w/a', '--add-dir', '/w/b', 'P']);
+    expect(built.args).toEqual(['-p', '--force', '--approve-mcps', '--trust', '--add-dir', '/w/a', '--add-dir', '/w/b']);
     expect(built.projectMcp).toEqual({ file: '.cursor/mcp.json', entry: boardServer });
   });
 

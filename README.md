@@ -313,6 +313,9 @@ Imagens coladas na mensagem viram anexos do card e a IA as recebe.
   quando o cria). Nas outras ferramentas, conecte antes.
 - Quando a história tem pasta de trabalho própria (worktree), a ferramenta recebe essa pasta junto
   com a do projeto, inclusive o Cursor.
+- Parar e o tempo limite encerram a ferramenta e tudo o que ela iniciou (servidores MCP, testes,
+  comandos). O Claude Code não roda "sem restrições" como root (contêineres, WSL como root): o
+  board avisa. Sem Node.js no PATH, o servidor do board roda com o runtime do próprio editor.
 - Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo e o fim da
   saída da ferramenta. O log completo está no painel **Saída → Faz AI** (ou no terminal do `faz-ai`).
 

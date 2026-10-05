@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { samePath } from '../samePath';
 import type { AiTool } from '../../shared/harness';
 
 export interface RegisterOptions {
@@ -61,7 +62,7 @@ export type ProjectServerResult = 'kept' | 'added' | 'repaired' | 'invalid';
 export function ensureProjectServer(
   workspaceDir: string,
   relFile: string,
-  entry: { command: string; args: string[] },
+  entry: { command: string; args: string[]; env?: Record<string, string> },
 ): ProjectServerResult {
   const file = path.join(workspaceDir, relFile);
   let current: { command?: unknown; args?: unknown } | undefined;
@@ -76,13 +77,13 @@ export function ensureProjectServer(
   let command = entry.command;
   if (current) {
     const args = Array.isArray(current.args) ? current.args.map(String) : [];
-    const same = args.length === entry.args.length && args.every((a, i) => path.resolve(a) === path.resolve(entry.args[i]!));
+    const same = args.length === entry.args.length && args.every((a, i) => samePath(a, entry.args[i]!));
     const usable =
       typeof current.command === 'string' && (path.isAbsolute(current.command) ? fs.existsSync(current.command) : !!current.command);
     if (same && usable) return 'kept';
     if (usable) command = current.command as string;
   }
-  mergeJson(file, { type: 'stdio', command, args: entry.args });
+  mergeJson(file, { type: 'stdio', command, args: entry.args, ...(entry.env && command === entry.command ? { env: entry.env } : {}) });
   excludeLocally(workspaceDir, relFile);
   return current ? 'repaired' : 'added';
 }

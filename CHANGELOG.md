@@ -6,6 +6,25 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Execuções do Claude Code e do Cursor mais robustas.**
+  - **Cursor:** o pedido vai pela entrada padrão, e não mais na linha de comando. No Windows, a CLI
+    instalada como `.cmd` passava pelo `cmd.exe`, que corta a linha em 8191 caracteres e junta as
+    linhas do pedido. No Copilot e no Kimi, que só recebem o pedido na linha de comando, um pedido
+    longo vai para um arquivo que a ferramenta lê.
+  - **Agente que restringe os servidores MCP (Claude Code):** usa o servidor do board da própria
+    execução. Antes copiava o do `.mcp.json`, e falhava sem o registro ou rodava contra outra pasta.
+    Os servidores da pasta no `~/.claude.json` são encontrados também no Windows.
+  - **Nível "Board e arquivos" (Claude Code):** a leitura fica liberada também fora do projeto, onde
+    estão as skills obrigatórias do card (`~/.claude/skills`).
+  - **Parar e o tempo limite encerram a árvore inteira** (servidores MCP, testes, comandos que a IA
+    iniciou), e não só a CLI.
+  - **Como root** (contêineres, WSL como root), o Claude Code não roda "Sem restrições": o board
+    avisa, em vez de cada execução falhar.
+  - **Sem Node.js no PATH,** o servidor do board roda com o próprio runtime do editor.
+  - O Claude Code embutido na extensão do editor é encontrado também no lado remoto (SSH, WSL,
+    contêiner). Pastas temporárias de execuções interrompidas são apagadas no dia seguinte, e nomes
+    de servidores MCP com ponto ou espaço são liberados certo.
+
 - **O card aberto não perde mais o que foi escrito.**
   - **Descrição reescrita pela IA:** com o card aberto, a descrição nova aparece na tela, e fechar o
     card não grava mais a antiga por cima. Um rascunho seu continua valendo sobre a mudança de fora.

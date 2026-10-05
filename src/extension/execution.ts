@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { EXEC_ENFORCEMENT, manifestOf, type ExecManifest } from '../shared/execution';
 import type { AiTool } from '../shared/harness';
+import { byPath } from './samePath';
 import type { BoardState, Card } from '../shared/model';
 
 /** Nome do servidor MCP do board, como registrado em cada ferramenta. */
@@ -51,12 +52,19 @@ function claudeServers(projectDir: string, homeDir: string): Record<string, unkn
   return {
     ...obj(user.mcpServers),
     ...obj(readJson(path.join(projectDir, '.mcp.json')).mcpServers),
-    ...obj(obj(obj(user.projects)[projectDir]).mcpServers),
+    ...obj(obj(byPath(obj(user.projects), projectDir)).mcpServers),
   };
 }
 
 /** Traduz o agente do card no que a execução pelo board impõe e no que só orienta. */
-export function executionPlan(s: BoardState, c: Card, projectDir: string, homeDir: string): ExecPlan {
+export function executionPlan(
+  s: BoardState,
+  c: Card,
+  projectDir: string,
+  homeDir: string,
+  /** o servidor do board desta execução: vale mais que um registro de arquivo, que pode ser de outra pasta */
+  board?: { command: string; args: string[] },
+): ExecPlan {
   const tool: AiTool = s.board.aiTool;
   const manifest = manifestOf(s, c);
   const how = EXEC_ENFORCEMENT[tool];
@@ -68,6 +76,7 @@ export function executionPlan(s: BoardState, c: Card, projectDir: string, homeDi
   let mcpConfig: string | null = null;
   if (allowed && tool === 'claude') {
     const defs = claudeServers(projectDir, homeDir);
+    if (board) defs[BOARD_SERVER] = { type: 'stdio', ...board };
     if (!defs[BOARD_SERVER])
       throw new Error(
         'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Use "Conectar IA (MCP)" em Configurações.',
