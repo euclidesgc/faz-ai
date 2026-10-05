@@ -1,4 +1,4 @@
-import { lastSent, posted, renderThemed, seedBoard, syncStore } from './setup';
+import { lastSent, posted, renderThemed, seedBoard, sentOf, syncStore } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -51,8 +51,11 @@ describe('faixa de requisitos do board', () => {
     // uma região, não um alerta: o leitor de tela não relê tudo a cada vez que a faixa aparece
     expect(screen.queryByRole('alert')).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: /Conectar IA \(MCP\)/ }));
-    expect(lastSent('ui.connectAI')).toEqual({ type: 'ui.connectAI' });
+    // leva à seção Servidores MCP da ferramenta, onde se escolhe entre global e projeto
+    await userEvent.click(screen.getByRole('button', { name: /Instalar o MCP do board/ }));
+    expect(sentOf('ui.connectAI')).toHaveLength(0);
+    expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness', harnessTab: 'all' });
+    useBoardStore.setState({ view: 'board' });
     await userEvent.click(screen.getByRole('button', { name: 'Abrir Harness de IA' }));
     expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness' });
   });

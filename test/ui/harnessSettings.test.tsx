@@ -103,10 +103,10 @@ describe('HarnessSettings: ferramenta e execução', () => {
     expect(lastSent('settings.board.update')).toEqual({ type: 'settings.board.update', patch: { aiTool: 'codex' } });
   });
 
-  it('conectar ao board pede ao host para registrar o MCP', async () => {
+  it('a aba da ferramenta não instala o MCP: aponta para a seção da ferramenta', () => {
     renderScreen('tool');
-    await userEvent.click(screen.getByRole('button', { name: 'Conectar o Claude Code ao board (MCP)' }));
-    expect(lastSent('ui.connectAI')).toEqual({ type: 'ui.connectAI' });
+    expect(screen.queryByRole('button', { name: /MCP/ })).toBeNull();
+    expect(screen.getByText(/nas seções Servidores MCP e Skills de cada ferramenta/)).toBeInTheDocument();
   });
 
   it('permissão, tempo limite, heartbeat e Rodar o heartbeat agora', async () => {
@@ -241,12 +241,10 @@ describe('HarnessSettings: skills', () => {
     });
   });
 
-  it('instalar a skill do fluxo; o botão some quando ela já existe', async () => {
+  it('a skill do fluxo não é instalada aqui: o texto aponta para a seção Skills da ferramenta', () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'Instalar skill do fluxo' }));
-    expect(lastSent('harness.flowSkill.install')).toEqual({ type: 'harness.flowSkill.install' });
-    act(() => setState((s) => ({ harness: { ...s.harness, skills: [...SKILLS, skill('faz-ai-fluxo')] } })));
-    expect(screen.queryByRole('button', { name: 'Instalar skill do fluxo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /skill do fluxo/i })).toBeNull();
+    expect(screen.getByText(/A skill do fluxo do board é instalada em/)).toBeInTheDocument();
   });
 
   it('nova skill: normaliza o nome, recusa nome usado e cria', async () => {
@@ -330,5 +328,79 @@ describe('HarnessSettings: agentes', () => {
     expect(screen.getByText(/Nenhum subagente em/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Novo subagente' }));
     expect(screen.queryByPlaceholderText('vazio = o modelo da sessão')).toBeNull();
+  });
+});
+
+describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada ferramenta', () => {
+  const item = (kind: 'mcp' | 'skill', scope: 'project' | 'user', name: string): HarnessItem => ({
+    kind,
+    scope,
+    name,
+    description: '',
+    path: `/abs/${scope}/${name}`,
+    location: name,
+    layout: kind === 'mcp' ? 'entry' : 'skills',
+    files: [],
+    digest: `${scope}-${name}`,
+  });
+  const withItems = (items: HarnessItem[]) =>
+    setState((s) => ({ harness: { ...s.harness, inventory: [{ tool: 'claude', installed: true, items }] } }));
+  const installBlock = (label: string) => within(screen.getByRole('generic', { name: label }));
+
+  it('um só lugar por tipo: o MCP na seção Servidores MCP e a skill na seção Skills', () => {
+    renderScreen('all');
+    expect(screen.getAllByLabelText('Servidor do board')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Skill do fluxo')).toHaveLength(1);
+    expect(installBlock('Servidor do board').getByText('global: não instalado')).toBeInTheDocument();
+    expect(installBlock('Servidor do board').getByText(/~\/\.claude\.json/)).toBeInTheDocument();
+    expect(installBlock('Skill do fluxo').getByText('~/.claude/skills/faz-ai-fluxo')).toBeInTheDocument();
+  });
+
+  it('o padrão da ferramenta instala no global, depois de confirmar', async () => {
+    renderScreen('all');
+    await userEvent.click(installBlock('Servidor do board').getByRole('button', { name: 'Instalar (padrão da ferramenta)' }));
+    expect(sentOf('ui.connectAI')).toHaveLength(0);
+    expect(dialog().getByText(/vale para todos os seus projetos/)).toBeInTheDocument();
+    await userEvent.click(dialog().getByRole('button', { name: 'Instalar' }));
+    expect(lastSent('ui.connectAI')).toEqual({ type: 'ui.connectAI', tool: 'claude', scope: 'user' });
+
+    await userEvent.click(installBlock('Skill do fluxo').getByRole('button', { name: 'Instalar (padrão da ferramenta)' }));
+    await userEvent.click(dialog().getByRole('button', { name: 'Instalar' }));
+    expect(lastSent('harness.flowSkill.install')).toEqual({
+      type: 'harness.flowSkill.install',
+      tool: 'claude',
+      scope: 'user',
+      replace: false,
+    });
+  });
+
+  it('no projeto sem global instala direto; com global, pergunta antes', async () => {
+    renderScreen('all');
+    await userEvent.click(installBlock('Servidor do board').getByRole('button', { name: 'Instalar neste projeto' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(lastSent('ui.connectAI')).toEqual({ type: 'ui.connectAI', tool: 'claude', scope: 'project' });
+
+    posted.mockClear();
+    act(() => withItems([item('mcp', 'user', 'faz-ai')]));
+    expect(installBlock('Servidor do board').getByText('global: instalado')).toBeInTheDocument();
+    await userEvent.click(installBlock('Servidor do board').getByRole('button', { name: 'Instalar neste projeto' }));
+    expect(sentOf('ui.connectAI')).toHaveLength(0);
+    expect(dialog().getByText(/Já está instalado no global/)).toBeInTheDocument();
+    await userEvent.click(dialog().getByRole('button', { name: 'Instalar' }));
+    expect(lastSent('ui.connectAI')).toEqual({ type: 'ui.connectAI', tool: 'claude', scope: 'project' });
+  });
+
+  it('a skill que já existe no destino só é substituída depois de confirmar', async () => {
+    withItems([item('skill', 'project', 'faz-ai-fluxo')]);
+    renderScreen('all');
+    await userEvent.click(installBlock('Skill do fluxo').getByRole('button', { name: 'Reinstalar neste projeto' }));
+    expect(dialog().getByText(/será substituída/)).toBeInTheDocument();
+    await userEvent.click(dialog().getByRole('button', { name: 'Substituir' }));
+    expect(lastSent('harness.flowSkill.install')).toEqual({
+      type: 'harness.flowSkill.install',
+      tool: 'claude',
+      scope: 'project',
+      replace: true,
+    });
   });
 });

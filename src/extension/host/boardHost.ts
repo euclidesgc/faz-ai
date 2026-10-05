@@ -17,7 +17,8 @@ import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
-import { cursorModels, cursorSignedIn } from '../cliProbe';
+import { cursorModels, cursorSignedIn, runCli } from '../cliProbe';
+import type { AiTool, InstallScope } from '../../shared/harness';
 import { checkRequirements } from '../requirements';
 import { resolveCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
@@ -53,8 +54,11 @@ export interface BoardHost {
   chat: ChatSession;
   /** toca sozinho as histórias em modo autônomo (YOLO) */
   autopilot: Autopilot;
-  /** registra o servidor MCP do board na ferramenta de IA do projeto e devolve o resumo do que foi feito */
-  connectAI(): { message: string; toIgnore: string[] };
+  /**
+   * Registra o servidor MCP do board numa ferramenta de IA (padrão: a do projeto) e devolve o resumo do
+   * que foi feito. `user` (o padrão) instala na configuração global da ferramenta; `project`, só aqui.
+   */
+  connectAI(target?: { tool?: AiTool; scope?: InstallScope }): Promise<{ message: string; toIgnore: string[] }>;
   addToGitignore(lines: string[]): void;
   dispose(): Promise<void>;
 }
@@ -283,13 +287,30 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     mergeWatcher,
     chat,
     autopilot,
-    connectAI() {
-      const done = registerClients([router.snapshot().board.aiTool], {
+    async connectAI(target = {}) {
+      const tool = target.tool ?? router.snapshot().board.aiTool;
+      const scope = target.scope ?? 'user';
+      const done = registerClients([tool], {
         bridgePath: o.bridgePath,
         workspaceDir: o.folderPath,
         homeDir,
         nodeCommand: nodePath,
+        scope,
       });
+      for (const step of done.flatMap((d) => d.run ?? [])) {
+        const exe = resolveCommand(step.command, pathEnv, homeDir);
+        const manual = `${step.command} ${step.args.map((a) => (/[\s"{}]/.test(a) ? `'${a}'` : a)).join(' ')}`;
+        if (!exe) {
+          if (step.mayFail) continue;
+          throw new Error(`A linha de comando "${step.command}" não foi encontrada. Rode no terminal: ${manual}`);
+        }
+        const r = await runCli(exe, step.args, pathEnv);
+        if (r.code !== 0 && !step.mayFail)
+          throw new Error(
+            `"${step.command}" não conseguiu registrar o servidor (${(r.stderr || r.stdout).trim()}). Rode no terminal: ${manual}`,
+          );
+      }
+      router.handle({ type: 'harness.refresh' });
       // arquivos do projeto guardam caminhos desta máquina, então normalmente não devem ir para o repositório
       const ignored = fs.existsSync(gitignore)
         ? fs

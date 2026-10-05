@@ -54,17 +54,19 @@ function fromToml(file: string, shown: string): Registered | null {
 
 /**
  * O servidor do board no arquivo que a ferramenta lê nas conversas da pessoa (fora do board), nos
- * mesmos lugares em que "Conectar IA (MCP)" grava. null quando não está registrado.
+ * mesmos lugares em que a instalação do MCP grava: primeiro o do projeto, que vale sobre o global
+ * nas ferramentas, e depois o global. null quando não está registrado.
  */
 export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: string): Registered | null {
   const inProject = (rel: string) => path.join(workspaceDir, rel);
+  const inHome = (rel: string) => path.join(homeDir, rel);
   switch (tool) {
     case 'claude': {
       // `claude mcp add` grava no projeto (.mcp.json) ou no ~/.claude.json: para o usuário inteiro,
       // ou só para esta pasta (escopo "local", dentro de `projects`)
       const found = fromJson(inProject('.mcp.json'), '.mcp.json');
       if (found) return found;
-      const user = readJson(path.join(homeDir, '.claude.json'));
+      const user = readJson(inHome('.claude.json'));
       const local = byPath(user?.projects as Record<string, Record<string, unknown>> | undefined, workspaceDir);
       for (const section of [local?.mcpServers, user?.mcpServers]) {
         const entry = (section as Record<string, { command?: unknown; args?: unknown }> | undefined)?.[SERVER];
@@ -74,17 +76,25 @@ export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: st
       return null;
     }
     case 'cursor':
-      return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json');
+      return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json') ?? fromJson(inHome('.cursor/mcp.json'), '~/.cursor/mcp.json');
     case 'codex':
-      return fromToml(inProject('.codex/config.toml'), '.codex/config.toml');
+      return (
+        fromToml(inProject('.codex/config.toml'), '.codex/config.toml') ?? fromToml(inHome('.codex/config.toml'), '~/.codex/config.toml')
+      );
     case 'copilot':
-      return fromJson(inProject('.vscode/mcp.json'), '.vscode/mcp.json', 'servers');
-    case 'kimi':
+      return (
+        fromJson(inProject('.vscode/mcp.json'), '.vscode/mcp.json', 'servers') ??
+        fromJson(inHome('.copilot/mcp-config.json'), '~/.copilot/mcp-config.json')
+      );
+    case 'kimi': {
+      const found = fromJson(inProject('.kimi-code/mcp.json'), '.kimi-code/mcp.json');
+      if (found) return found;
       for (const dir of ['.kimi-code', '.kimi']) {
-        const found = fromJson(path.join(homeDir, dir, 'mcp.json'), `~/${dir}/mcp.json`);
-        if (found) return found;
+        const global = fromJson(inHome(`${dir}/mcp.json`), `~/${dir}/mcp.json`);
+        if (global) return global;
       }
       return null;
+    }
   }
 }
 

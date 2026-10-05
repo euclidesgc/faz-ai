@@ -124,6 +124,10 @@ export function aiBlockedReason(state: BoardState): string | null {
 /** Um item do aviso: título, explicação e a ação que o resolve. */
 function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
   const openSettings = useBoardStore((s) => s.openSettings);
+  const openMcpInstall = () => {
+    useBoardStore.setState({ harnessTab: 'all' });
+    openSettings('harness');
+  };
   const { title, detail } = texts(r);
   const settings = r.action?.kind === 'settings' && !compact;
   // na versão compacta (o painel de chat) a explicação só fica de fora quando há um botão que resolve
@@ -137,8 +141,9 @@ function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
       {(!compact || !actionable) && <p>{detail}</p>}
       {r.action?.kind === 'command' && <CopyCommand command={r.action.command} />}
       {r.action?.kind === 'connect' && (
-        <Button size="small" onClick={() => ui.connectAI()}>
-          <IconConnect /> {t('Conectar IA (MCP)')}
+        // a instalação mora na seção Servidores MCP da ferramenta, onde se escolhe global ou projeto
+        <Button size="small" onClick={() => openMcpInstall()}>
+          <IconConnect /> {t('Instalar o MCP do board')}
         </Button>
       )}
       {settings && (

@@ -41,6 +41,16 @@ const NEXT_STEPS: [pt: string, en: string][] = [
     'Codex: the project must be marked as trusted; open a new session (codex mcp list checks it).',
   ],
   ['Kimi Code: abra uma sessão nova a partir da pasta do projeto.', 'Kimi Code: open a new session from the project folder.'],
+  ['Kimi Code: abra uma sessão nova na pasta do projeto.', 'Kimi Code: open a new session in the project folder.'],
+  [
+    'Claude Code: abra uma sessão nova em qualquer projeto com o board aberto (/mcp mostra o estado).',
+    'Claude Code: open a new session in any project with the board open (/mcp shows its state).',
+  ],
+  ['Codex: abra uma sessão nova (codex mcp list confere).', 'Codex: open a new session (codex mcp list checks it).'],
+  [
+    'Copilot CLI: abra uma sessão nova. No VS Code, o servidor global fica no perfil do editor (MCP: Open User Configuration).',
+    'Copilot CLI: open a new session. In VS Code, the global server lives in the editor profile (MCP: Open User Configuration).',
+  ],
   [
     'GitHub Copilot no VS Code: confirme a confiança e inicie o servidor (MCP: List Servers). Copilot CLI: abra uma sessão nova na pasta e confirme a confiança nela.',
     'GitHub Copilot in VS Code: confirm trust and start the server (MCP: List Servers). Copilot CLI: open a new session in the folder and confirm trust in it.',
@@ -58,6 +68,10 @@ const connectAI: Record<string, string> = Object.fromEntries(
 export const host: Record<string, string> = {
   ...commandNotFound,
   ...connectAI,
+  'A linha de comando "{command}" não foi encontrada. Rode no terminal: {manual}':
+    'The "{command}" command line was not found. Run in the terminal: {manual}',
+  '"{command}" não conseguiu registrar o servidor ({reason}). Rode no terminal: {manual}':
+    '"{command}" could not register the server ({reason}). Run in the terminal: {manual}',
 
   // cartões, colunas, workflows e boards (repositórios e telas)
   'Card não encontrado': 'Card not found',
@@ -173,8 +187,8 @@ export const host: Record<string, string> = {
   'A IA terminou sem escrever uma resposta.': 'The AI finished without writing a reply.',
   'O {tool}, quando roda em segundo plano, não pede aprovação de nada e não aceita limites por linha de comando. Para chamá-lo pelo board, escolha "Sem restrições" em Configurações → Harness de IA → Execução pela conversa.':
     'When {tool} runs in the background, it asks for approval of nothing and does not accept command-line limits. To call it from the board, choose "No restrictions" in Settings → AI harness → Execution through the conversation.',
-  'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Use "Conectar IA (MCP)" em Configurações.':
-    'The agent restricts MCP servers, but the board server is not registered for Claude Code in this folder. Use "Connect AI (MCP)" in Settings.',
+  'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Instale o servidor em Configurações → Harness de IA → Tudo que a ferramenta carrega → Claude Code → Servidores MCP.':
+    'The agent restricts MCP servers, but the board server is not registered for Claude Code in this folder. Install the server in Settings → AI harness → Everything the tool loads → Claude Code → MCP servers.',
   'Servidores MCP do agente não encontrados na configuração do Claude Code: {servers}.':
     "The agent's MCP servers were not found in the Claude Code configuration: {servers}.",
 

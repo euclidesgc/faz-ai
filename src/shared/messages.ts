@@ -2,7 +2,7 @@ import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
 import type { ExecProfile } from './execution';
-import type { AiTool, HarnessKind, SkillMode } from './harness';
+import type { AiTool, HarnessKind, InstallScope, SkillMode } from './harness';
 import type { HookInput, McpServerInput } from './harnessCatalog';
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { ModelOption, ModelRule } from './models';
@@ -16,7 +16,8 @@ export type WebviewToHost =
   | { type: 'ready' }
   | { type: 'view.set'; patch: Partial<ViewState> }
   | { type: 'ui.showFilters' }
-  | { type: 'ui.connectAI' }
+  /** instala o servidor MCP do board numa ferramenta (padrão: a do projeto), global (padrão) ou só no projeto */
+  | { type: 'ui.connectAI'; tool?: AiTool; scope?: InstallScope }
   /** abre este board no navegador, fora do editor */
   | { type: 'ui.openInBrowser' }
   /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */
@@ -207,7 +208,11 @@ export type WebviewToHost =
   /** confere de novo o que falta para o board trabalhar com a ferramenta de IA */
   | { type: 'requirements.check' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
-  | { type: 'harness.flowSkill.install' }
+  /**
+   * instala a skill do fluxo numa ferramenta (padrão: a do projeto), global (padrão) ou só no projeto;
+   * `replace` troca uma skill de mesmo nome que já esteja no destino (sem ele, a que existe fica)
+   */
+  | { type: 'harness.flowSkill.install'; tool?: AiTool; scope?: InstallScope; replace?: boolean }
   /** exporta o board num arquivo JSON (no editor, abre o "salvar como"; na web a página baixa pela rota /backup/export) */
   | { type: 'backup.export' }
   /** escolhe um arquivo de export, valida e devolve o resumo em `backup.import.summary` (na web a página envia por /backup/import) */

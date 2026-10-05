@@ -1,5 +1,5 @@
 import type { WebviewToHost } from '../shared/messages';
-import type { AiTool, HarnessKind, SkillMode } from '../shared/harness';
+import type { AiTool, HarnessKind, InstallScope, SkillMode } from '../shared/harness';
 import type { HookInput, McpServerInput } from '../shared/harnessCatalog';
 import type { CardStatus } from '../shared/status';
 import type { ExecProfile } from '../shared/execution';
@@ -26,7 +26,8 @@ const post = (msg: WebviewToHost): void => postToHost(msg);
  */
 export const ui = {
   showFilters: () => post({ type: 'ui.showFilters' }),
-  connectAI: () => post({ type: 'ui.connectAI' }),
+  /** instala o servidor MCP do board: padrão é a ferramenta do projeto, no escopo global */
+  connectAI: (tool?: AiTool, scope?: InstallScope) => post({ type: 'ui.connectAI', tool, scope }),
   openInBrowser: () => post({ type: 'ui.openInBrowser' }),
   showChat: () => post({ type: 'ui.showChat' }),
   checkRequirements: () => post({ type: 'requirements.check' }),
@@ -164,7 +165,8 @@ export const harness = {
   removePermission: (tool: AiTool, path: string, list: string, rule: string) =>
     post({ type: 'harness.permission.remove', tool, path, list, rule }),
   createReferenceSkill: () => post({ type: 'harness.referenceSkill.create' }),
-  installFlowSkill: () => post({ type: 'harness.flowSkill.install' }),
+  installFlowSkill: (tool: AiTool, scope: InstallScope, replace = false) =>
+    post({ type: 'harness.flowSkill.install', tool, scope, replace }),
   scanInstall: (source: string) => post({ type: 'harness.install.scan', source }),
   applyInstall: (tool: AiTool, to: HarnessScope, rels: string[]) => post({ type: 'harness.install.apply', tool, to, rels }),
   cancelInstall: () => post({ type: 'harness.install.cancel' }),

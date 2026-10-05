@@ -238,7 +238,8 @@ describe('Settings: menu lateral', () => {
     expect(nav).not.toHaveTextContent('Tipos de card');
     await userEvent.click(within(nav).getByRole('button', { name: 'Tipos de card' }));
     expect(useBoardStore.getState().settingsTab).toBe('types');
-    expect(screen.getByRole('button', { name: 'Conectar IA (MCP)' })).toBeInTheDocument();
+    // a instalação do MCP fica na seção da ferramenta, no Harness de IA, e não no menu
+    expect(screen.queryByRole('button', { name: /MCP/ })).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Expandir o menu' }));
     expect(nav).toHaveTextContent('Tipos de card');

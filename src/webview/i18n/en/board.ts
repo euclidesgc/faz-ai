@@ -340,4 +340,5 @@ export const board: Record<string, string> = {
   '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). A ferramenta não consegue iniciar o servidor. Conecte de novo para gravar o caminho atual.':
     '{file} points to "{missing}", which no longer exists on this machine (a node replaced by nvm, or the board installed elsewhere). The tool cannot start the server. Connect again to write the current path.',
   'O {tool} não roda com o nível de permissão escolhido': '{tool} does not run with the chosen permission level',
+  'Instalar o MCP do board': 'Install the board MCP',
 };
