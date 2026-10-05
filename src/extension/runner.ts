@@ -24,8 +24,20 @@ export interface RunningProcess {
 }
 
 /** Como iniciar o servidor MCP do board para a ferramenta; undefined sem o bridge. */
-export function boardServer(deps: RunnerDeps): { command: string; args: string[] } | undefined {
-  return deps.bridgePath ? { command: deps.nodePath ?? 'node', args: [deps.bridgePath, deps.cwd] } : undefined;
+export function boardServer(deps: RunnerDeps): BoardServer | undefined {
+  if (!deps.bridgePath) return undefined;
+  const args = [deps.bridgePath, deps.cwd];
+  if (deps.nodePath) return { command: deps.nodePath, args };
+  // sem node no PATH (o Claude Code do instalador nativo não precisa dele), o próprio runtime do
+  // editor roda o servidor: no Electron, como node, com ELECTRON_RUN_AS_NODE
+  return { command: process.execPath, args, env: { ELECTRON_RUN_AS_NODE: '1' } };
+}
+
+/** Como a ferramenta inicia o servidor do board. */
+export interface BoardServer {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
 }
 
 export interface RunnerDeps {
@@ -233,7 +245,7 @@ export class AiRunner {
         })
       : '';
     try {
-      const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '');
+      const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '', boardServer(this.deps));
       // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo
       const refine = mode === 'refine';
       const autonomous = !refine && isYolo(state, card);

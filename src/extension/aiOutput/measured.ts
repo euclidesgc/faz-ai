@@ -87,6 +87,29 @@ const isJson = (line: string): boolean => {
  * argumentos pelos caminhos. Mora aqui porque é o transporte que monta o comando — antes desta
  * entrega o executor de cards e o chat tinham cada um a sua cópia desta função.
  */
+/**
+ * Apaga as pastas temporárias de execuções antigas (`fazai-run-*`, `fazai-prompt-*`) que ficaram para
+ * trás quando o editor fechou ou caiu no meio da execução: podem guardar segredos dos servidores MCP.
+ * Só as de mais de um dia, para não tirar o arquivo de uma execução de outra janela.
+ */
+export function cleanStaleTemp(now = Date.now(), dir = os.tmpdir()): void {
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const name of entries) {
+    if (!/^fazai-(run|prompt)-/.test(name)) continue;
+    const full = path.join(dir, name);
+    try {
+      if (now - fs.statSync(full).mtimeMs > 24 * 3600_000) fs.rmSync(full, { recursive: true, force: true });
+    } catch {
+      /* outra janela apagou antes, ou sem permissão: fica */
+    }
+  }
+}
+
 export function materialize(command: HeadlessCommand): { command: HeadlessCommand; cleanup: () => void } {
   const files = Object.entries(command.tempFiles ?? {});
   if (!files.length) return { command, cleanup: () => {} };

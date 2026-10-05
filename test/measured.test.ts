@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { spawnMeasured } from '../src/extension/aiOutput/measured';
+import { spawnMeasured, cleanStaleTemp } from '../src/extension/aiOutput/measured';
 import type { OutputStream } from '../src/extension/aiOutput/reader';
 import { headlessCommand, type HeadlessCommand, type HeadlessInput } from '../src/extension/headless';
 import type { RunningProcess } from '../src/extension/runner';
@@ -411,6 +411,28 @@ describe('o servidor do board para o Cursor em segundo plano', () => {
       expect(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8')).toBe('// meu\n{}');
       expect(lines.some((l) => l.includes('não é um JSON válido'))).toBe(true);
       expect(started.length).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('pastas temporárias de execuções antigas', () => {
+  it('apaga as de mais de um dia e deixa as recentes e as de outros programas', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-tmp-test-'));
+    try {
+      const make = (name: string, ageH: number) => {
+        const p = path.join(dir, name);
+        fs.mkdirSync(p);
+        const t = (Date.now() - ageH * 3600_000) / 1000;
+        fs.utimesSync(p, t, t);
+      };
+      make('fazai-run-velha', 30);
+      make('fazai-prompt-velha', 30);
+      make('fazai-run-nova', 1);
+      make('outro-programa', 100);
+      cleanStaleTemp(Date.now(), dir);
+      expect(fs.readdirSync(dir).sort()).toEqual(['fazai-run-nova', 'outro-programa']);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

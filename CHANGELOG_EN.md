@@ -7,6 +7,25 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Sturdier Claude Code and Cursor runs.**
+  - **Cursor:** the request goes through standard input, no longer on the command line. On Windows,
+    a CLI installed as a `.cmd` went through `cmd.exe`, which cuts the line at 8191 characters and
+    joins the request's lines. For Copilot and Kimi, which only take the request on the command line,
+    a long request goes to a file the tool reads.
+  - **Agent that restricts MCP servers (Claude Code):** it uses the board server of the run itself.
+    It used to copy the one in `.mcp.json`, and failed without the registration or ran against
+    another folder. The folder's servers in `~/.claude.json` are also found on Windows.
+  - **"Board e arquivos" (board and files) level (Claude Code):** reading is also allowed outside the
+    project, where the card's required skills live (`~/.claude/skills`).
+  - **Stop and the time limit end the whole tree** (MCP servers, tests, commands the AI started), not
+    only the CLI.
+  - **As root** (containers, WSL as root), Claude Code does not run "Sem restrições" (unrestricted):
+    the board warns, instead of every run failing.
+  - **Without Node.js on the PATH,** the board server runs with the editor's own runtime.
+  - The Claude Code bundled in the editor extension is also found on the remote side (SSH, WSL,
+    container). Temporary folders of interrupted runs are deleted the next day, and MCP server names
+    with a dot or space are allowed correctly.
+
 - **The open card no longer loses what was written.**
   - **Description rewritten by the AI:** with the card open, the new description shows on screen,
     and closing the card no longer writes the old one back. A draft of yours still wins over the

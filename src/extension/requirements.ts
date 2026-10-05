@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import type { AiTool } from '../shared/harness';
 import type { BoardRequirement } from '../shared/requirements';
 import type { RunnerPermission } from '../shared/runner';
+import { byPath, samePath } from './samePath';
 import { headlessCommand, headlessUnsupported } from './headless';
 
 /** Onde a ferramenta lê o servidor do board, e o que está registrado lá. */
@@ -64,7 +65,7 @@ export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: st
       const found = fromJson(inProject('.mcp.json'), '.mcp.json');
       if (found) return found;
       const user = readJson(path.join(homeDir, '.claude.json'));
-      const local = (user?.projects as Record<string, Record<string, unknown>> | undefined)?.[workspaceDir];
+      const local = byPath(user?.projects as Record<string, Record<string, unknown>> | undefined, workspaceDir);
       for (const section of [local?.mcpServers, user?.mcpServers]) {
         const entry = (section as Record<string, { command?: unknown; args?: unknown }> | undefined)?.[SERVER];
         if (entry && typeof entry.command === 'string')
@@ -149,9 +150,9 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
   else {
     const [bridge, folder] = registered.args;
     const commandMissing = path.isAbsolute(registered.command) ? !fs.existsSync(registered.command) : !p.resolve(registered.command);
-    const bridgeMissing = !!bridge && bridge !== p.bridgePath && !fs.existsSync(bridge);
+    const bridgeMissing = !!bridge && !samePath(bridge, p.bridgePath) && !fs.existsSync(bridge);
     // o registro de outra pasta (veio de um colega pelo git, o projeto mudou de lugar) liga a IA a outro board
-    const otherFolder = !!folder && path.resolve(folder) !== path.resolve(p.workspaceDir);
+    const otherFolder = !!folder && !samePath(folder, p.workspaceDir);
     if (commandMissing || bridgeMissing || otherFolder)
       out.push({
         id: commandMissing || bridgeMissing ? 'mcp-stale' : 'mcp-elsewhere',

@@ -199,7 +199,7 @@ describe('branch e worktree por história', () => {
     expect(router.aiWorkDirs()).toEqual([root]);
     expect(fs.existsSync(root)).toBe(true);
     expect(headlessCommand('claude', { prompt: 'P', permission: 'edits', addDirs: [root] })).toMatchObject({
-      args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', '--add-dir', root],
+      args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', '--add-dir', root],
     });
     expect(headlessCommand('copilot', { prompt: 'P', permission: 'board', addDirs: [root] })).toMatchObject({
       args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', `--add-dir=${root}`, '--no-ask-user'],

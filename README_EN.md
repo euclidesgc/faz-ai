@@ -331,6 +331,9 @@ Images pasted into the message become card attachments and the AI receives them.
   `.git/info/exclude` when it creates it). For the other tools, connect first.
 - When the story has its own working folder (worktree), the tool gets that folder along with the
   project's, Cursor included.
+- Stop and the time limit end the tool and everything it started (MCP servers, tests, commands).
+  Claude Code does not run "no restrictions" as root (containers, WSL as root): the board warns.
+  Without Node.js on the PATH, the board server runs with the editor's own runtime.
 - If the run fails or exceeds the time limit, the card becomes blocked, with the reason and the end
   of the tool's output. The full log is in the **Output → Faz AI** panel (or in the `faz-ai`
   terminal).

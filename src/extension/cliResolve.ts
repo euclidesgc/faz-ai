@@ -2,7 +2,17 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 /** Pastas de extensões dos editores baseados no VS Code, dentro da home. */
-const EDITOR_DIRS = ['.vscode', '.vscode-insiders', '.cursor', '.windsurf', '.vscode-oss'];
+const EDITOR_DIRS = [
+  '.vscode',
+  '.vscode-insiders',
+  '.cursor',
+  '.windsurf',
+  '.vscode-oss',
+  // o lado remoto (SSH, WSL, contêiner): lá a extensão do editor roda, e lá fica o binário embutido
+  '.vscode-server',
+  '.vscode-server-insiders',
+  '.cursor-server',
+];
 
 const isWindows = process.platform === 'win32';
 

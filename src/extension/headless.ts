@@ -18,7 +18,14 @@ export interface HeadlessCommand {
    * Servidor do board a garantir num arquivo de configuração do projeto antes de rodar, para a
    * ferramenta que não recebe servidores MCP pela linha de comando (o Cursor só lê `.cursor/mcp.json`).
    */
-  projectMcp?: { file: string; entry: { command: string; args: string[] } };
+  projectMcp?: { file: string; entry: { command: string; args: string[]; env?: Record<string, string> } };
+  /**
+   * O pedido vai na linha de comando, em `args[index]` (a ferramenta não o lê da entrada padrão). No
+   * Windows, por um `.cmd`, a linha passa pelo cmd.exe e não pode passar de 8191 caracteres: um pedido
+   * longo vai para um arquivo, e `addDirFlag` libera a pasta dele para a ferramenta ler (terminada em
+   * `=`, o caminho vai junto: `--add-dir=<pasta>`; senão, no argumento seguinte).
+   */
+  promptArg?: { index: number; addDirFlag: string };
 }
 
 export interface HeadlessInput {
@@ -29,7 +36,7 @@ export interface HeadlessInput {
   /** o que o agente do card pede: subagente, servidores MCP, ferramentas, modelo, sessão limpa */
   exec?: ExecInput;
   /** como iniciar o servidor MCP do board; quando a ferramenta aceita, vai na linha de comando e dispensa o registro no projeto */
-  boardServer?: { command: string; args: string[] };
+  boardServer?: { command: string; args: string[]; env?: Record<string, string> };
   /**
    * Pedir a saída estruturada da ferramenta, para medir consumo e inventário. Quem não tem saída
    * estruturada no modo sem interface (o Copilot) ignora e devolve `format: 'text'`. Não há tabela
@@ -108,13 +115,15 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
     const modes: Record<RunnerPermission, string[]> = {
       // dontAsk nega tudo o que não está liberado: só o board e a leitura do projeto
       board: ['--permission-mode', 'dontAsk', '--allowedTools', `mcp__${SERVER}__*`, 'Read', 'Glob', 'Grep'],
-      edits: ['--permission-mode', 'acceptEdits', '--allowedTools', `mcp__${SERVER}__*`],
+      // a leitura liberada vale também fora do projeto: as skills obrigatórias do card ficam em ~/.claude
+      edits: ['--permission-mode', 'acceptEdits', '--allowedTools', `mcp__${SERVER}__*`, 'Read', 'Glob', 'Grep'],
       full: ['--permission-mode', 'bypassPermissions'],
     };
     // `--verbose` é obrigatório junto do `stream-json`: sem ele a CLI recusa o argumento e nada roda
     const args = ['-p', ...(structured ? ['--output-format', 'stream-json', '--verbose'] : []), ...modes[permission]];
     // os servidores liberados no agente também rodam sem pedir aprovação
-    if (exec?.mcpAllowed && permission !== 'full') args.push(...exec.mcpAllowed.map((n) => `mcp__${n}__*`));
+    // o Claude Code troca por `_` o que não for letra, número, `_` ou `-` no nome do servidor
+    if (exec?.mcpAllowed && permission !== 'full') args.push(...exec.mcpAllowed.map((n) => `mcp__${n.replace(/[^A-Za-z0-9_-]/g, '_')}__*`));
     args.push(...addDirs.flatMap((d) => ['--add-dir', d]));
     if (exec?.model) args.push('--model', exec.model.name, ...(exec.model.effort ? ['--effort', exec.model.effort] : []));
     if (exec?.agent) args.push('--agent', exec.agent);
@@ -186,6 +195,7 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
       command: 'copilot',
       args: ['-p', prompt, ...modes[permission], ...addDirs.map((d) => `--add-dir=${d}`), ...profile, '--no-ask-user'],
       env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' },
+      promptArg: { index: 1, addDirFlag: '--add-dir=' },
       // o modo `-p` do Copilot não tem saída estruturada: a execução fica registrada sem consumo
       format: 'text',
     };
@@ -210,8 +220,10 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
         ...modes[permission],
         ...addDirs.flatMap((d) => ['--add-dir', d]),
         ...(model ? ['--model', model] : []),
-        prompt,
       ],
+      // o pedido vai pela entrada padrão (o `-p` sem texto a lê): na linha de comando, no Windows, o
+      // `.cmd` da CLI passaria pelo cmd.exe, que corta a linha em 8191 caracteres e achata as quebras
+      stdin: prompt,
       format: structured ? 'stream-json' : 'text',
       // o Cursor não recebe servidores pela linha de comando: o do board vai para o .cursor/mcp.json
       ...(boardServer ? { projectMcp: { file: '.cursor/mcp.json', entry: boardServer } } : {}),
@@ -233,6 +245,7 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
             ...(exec?.agent ? ['--agent', exec.agent] : []),
           ],
           format: structured ? 'stream-json' : 'text',
+          promptArg: { index: 1, addDirFlag: '--add-dir' },
         }
       : null,
 };
@@ -248,7 +261,10 @@ export function cursorModelId(name: string, effort: string | null): string {
 }
 
 /** Por que o board não pode executar a ferramenta com esta permissão; null quando pode. */
-export function headlessUnsupported(tool: AiTool, permission: RunnerPermission): string | null {
+export function headlessUnsupported(tool: AiTool, permission: RunnerPermission, uid = process.getuid?.()): string | null {
+  // o Claude Code recusa pular as permissões rodando como root (contêiner, WSL como root)
+  if (tool === 'claude' && permission === 'full' && uid === 0)
+    return 'O Claude Code não roda "Sem restrições" como root (comum em contêineres e no WSL como root), e o modo autônomo usa esse nível. Rode o editor com um usuário comum, ou escolha "Board e arquivos" em Configurações → Harness de IA → Execução pela conversa.';
   if (BUILDERS[tool]({ prompt: '', permission })) return null;
   return `O ${aiToolInfo(tool).label}, quando roda em segundo plano, não pede aprovação de nada e não aceita limites por linha de comando. Para chamá-lo pelo board, escolha "Sem restrições" em Configurações → Harness de IA → Execução pela conversa.`;
 }
