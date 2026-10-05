@@ -30,7 +30,7 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   ao board (MCP)** ou o atalho para o Harness de IA. A faixa some sozinha quando tudo é resolvido;
   **Verificar de novo** confere na hora.
 
-- **Chamar IA mostra o erro no próprio board.** Quando a execução nem começa (CLI não encontrada, por
+- **Os botões de IA do card mostram o erro no próprio board.** Quando a execução nem começa (CLI não encontrada, por
   exemplo), o motivo aparece como aviso na tela do board e fica no canal Faz AI. Antes ele ia só
   para as notificações do editor, que o Cursor guarda na central sem mostrar: o clique parecia não
   fazer nada.
@@ -55,7 +55,7 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   sistema não herda o PATH do terminal; com o node instalado só pelo nvm, `"command": "node"` não
   iniciava o servidor.
 
-- **O Cursor em segundo plano funciona de verdade.** O botão Chamar IA, o heartbeat e o modo
+- **O Cursor em segundo plano funciona de verdade.** O botão Trabalhar na fase (antigo Chamar IA), o heartbeat e o modo
   autônomo com o Cursor tinham quatro defeitos, corrigidos:
   - **Sem o servidor do board.** Se ninguém tivesse clicado em Conectar IA (MCP), a execução rodava
     sem as ferramentas do board e terminava como sucesso sem mover nem comentar nada. Agora o board

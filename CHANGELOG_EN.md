@@ -32,7 +32,7 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   (MCP)** (connect to the board) or the shortcut to the AI harness. The bar goes away on its own when
   everything is solved; **Verificar de novo** (check again) checks right away.
 
-- **Chamar IA shows the error on the board itself.** When the run does not even start (CLI not
+- **The card's AI buttons show the error on the board itself.** When the run does not even start (CLI not
   found, for example), the reason appears as a notice on the board screen and stays in the Faz AI
   channel. It used to go only to the editor's notifications, which Cursor keeps in the center
   without showing: the click seemed to do nothing.
@@ -57,7 +57,7 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   menu does not inherit the terminal's PATH; with node installed only through nvm,
   `"command": "node"` did not start the server.
 
-- **Cursor in the background really works.** The Chamar IA button, the heartbeat and autonomous
+- **Cursor in the background really works.** The Trabalhar na fase button (formerly Chamar IA), the heartbeat and autonomous
   mode with Cursor had four defects, now fixed:
   - **No board server.** If nobody had clicked Conectar IA (MCP), the run had none of the board's
     tools and ended as a success without moving or commenting anything. The board now writes the
