@@ -4,7 +4,7 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+## 0.32.0
 
 - **Agentes, modelos e regras não perdem uma mudança feita logo depois de outra.** Escrever a
   intenção de um agente e logo clicar em **Só leitura** apagava a intenção: a segunda mudança partia

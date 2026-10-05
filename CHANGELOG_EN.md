@@ -5,7 +5,7 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+## 0.32.0
 
 - **Agents, models and rules no longer lose a change made right after another.** Writing an agent's
   intent and then clicking **Só leitura** (read-only) erased the intent: the second change started
