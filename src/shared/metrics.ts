@@ -99,7 +99,8 @@ export interface MetricsPanelResult {
   /** a janela em vigor e o que ela está guardando */
   retention: { months: number; detailMonths: number; detailRows: number };
   /** os cortes, os tempos, o ranking por card e o inventário (as quatro seções do painel) */
-  // #172: passa a ser obrigatório quando getPanelMetrics devolver as quatro seções
+  // getPanelMetrics já devolve as quatro seções (#171, #172). Fica opcional só porque os resultados
+  // montados à mão em test/ui/metrics*.test.tsx ainda não têm `sections`; obrigatório junto com eles.
   sections?: MetricsPanelSections;
 }
 

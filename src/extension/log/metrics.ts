@@ -23,6 +23,25 @@ import { detailMonths } from './rollup';
 import { dayOf, monthOf } from '../../shared/log';
 import type { MetricsMonth, MetricsPanelQuery, MetricsPanelResult, MetricsTokens } from '../../shared/metrics';
 import { parseRules } from '../../shared/rules';
+// #172: os tempos e o inventário do painel
+import type { CardEventKind } from '../../shared/log';
+import {
+  METRICS_ROW_CAP,
+  type MetricsDwell,
+  type MetricsInventory,
+  type MetricsLead,
+  type MetricsPanelSections,
+  type MetricsUsage,
+} from '../../shared/metrics';
+import { leadTimes, phaseDwell, type TimesEventRow, type TimesPeriod } from './times';
+// #171: os seis cortes e o ranking por card (METRICS_ROW_CAP e MetricsPanelSections vêm do import de #172)
+import {
+  METRICS_BREAKDOWN_DIMS,
+  type MetricsBreakdown,
+  type MetricsBreakdownDim,
+  type MetricsCell,
+  type MetricsRanking,
+} from '../../shared/metrics';
 
 /**
  * `tool` é a ferramenta de IA da execução (claude, codex), coluna de `ai_runs`. `used_tool` é outra coisa:
@@ -122,10 +141,13 @@ interface Accumulator {
   tokens: number;
   costUsd: number;
   calls: number;
+  /** a parte estimada de `costUsd` e quantas execuções a tiveram (o painel marca a linha estimada, RF-31) */
+  estimatedRuns: number;
+  costEstimatedUsd: number;
 }
 
 function newAcc(): Accumulator {
-  return { runs: 0, measuredRuns: 0, durationMs: 0, tokens: 0, costUsd: 0, calls: 0 };
+  return { runs: 0, measuredRuns: 0, durationMs: 0, tokens: 0, costUsd: 0, calls: 0, estimatedRuns: 0, costEstimatedUsd: 0 };
 }
 
 function bump(map: Map<string, Accumulator>, label: string, patch: Partial<Accumulator>): void {
@@ -136,6 +158,8 @@ function bump(map: Map<string, Accumulator>, label: string, patch: Partial<Accum
   acc.tokens += patch.tokens ?? 0;
   acc.costUsd += patch.costUsd ?? 0;
   acc.calls += patch.calls ?? 0;
+  acc.estimatedRuns += patch.estimatedRuns ?? 0;
+  acc.costEstimatedUsd += patch.costEstimatedUsd ?? 0;
   map.set(label, acc);
 }
 
@@ -222,6 +246,14 @@ function detailByRunColumn(db: Database, boardId: string, q: MetricsQuery, colum
 export const NO_CARD_LABEL = 'sem card';
 
 /**
+ * A parte estimada do custo, com o critério de `totalsFromDetail` (rollup.ts): só `cost_estimated = 0`
+ * é "informado"; na dúvida, "estimado" é a afirmação mais fraca. `getMetrics` não a devolve; o painel
+ * a usa para marcar a linha (RF-31).
+ */
+const ESTIMATED_SUMS = `SUM(CASE WHEN cost_usd IS NOT NULL AND COALESCE(cost_estimated, 1) <> 0 THEN 1 ELSE 0 END) AS est_n,
+            SUM(CASE WHEN cost_usd IS NOT NULL AND COALESCE(cost_estimated, 1) <> 0 THEN cost_usd ELSE 0 END) AS est`;
+
+/**
  * Linhas por card (só detalhe: `card` não existe em `log_months`). Uma linha por número de card: o
  * título é o da execução mais recente (RF-19), porque `card_title` é coluna simples num `GROUP BY` com
  * um único `MAX()` — o SQLite devolve nela o valor da linha que deu o máximo. `card_number` nulo agrupa
@@ -234,7 +266,7 @@ function detailByCard(db: Database, boardId: string, q: MetricsQuery): Map<strin
     `SELECT card_number, MAX(started_at) AS last, card_title, COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
             SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS measured,
             SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)) AS tok,
-            SUM(COALESCE(cost_usd,0)) AS cost
+            SUM(COALESCE(cost_usd,0)) AS cost, ${ESTIMATED_SUMS}
      FROM ai_runs WHERE ${where} GROUP BY card_number`,
     params,
   );
@@ -247,6 +279,8 @@ function detailByCard(db: Database, boardId: string, q: MetricsQuery): Map<strin
       durationMs: num(r.ms),
       tokens: num(r.tok),
       costUsd: num(r.cost),
+      estimatedRuns: num(r.est_n),
+      costEstimatedUsd: num(r.est),
     });
   }
   return map;
@@ -286,14 +320,18 @@ function archiveByDim(db: Database, boardId: string, month: string, dim: string)
     [boardId, month, dim],
   );
   const map = new Map<string, Accumulator>();
-  for (const r of rows) {
-    const label = dim ? str(r.value) : 'total';
-    const metric = str(r.metric);
-    if (metric === 'runs') bump(map, label, { runs: num(r.n), durationMs: num(r.total) });
-    else if (metric === 'tokens') bump(map, label, { tokens: num(r.total) });
-    else bump(map, label, { measuredRuns: num(r.n), costUsd: num(r.total) });
-  }
+  for (const r of rows) bumpArchiveRow(map, dim ? str(r.value) : 'total', str(r.metric), num(r.n), num(r.total));
   return map;
+}
+
+/**
+ * Uma linha `runs`/`tokens`/`cost` de `log_months` no acumulador. Única leitura do arquivo por dimensão:
+ * `getMetrics` e os cortes do painel (#171) passam por aqui, e é isso que os faz responder o mesmo número.
+ */
+function bumpArchiveRow(map: Map<string, Accumulator>, label: string, metric: string, n: number, total: number): void {
+  if (metric === 'runs') bump(map, label, { runs: n, durationMs: total });
+  else if (metric === 'tokens') bump(map, label, { tokens: total });
+  else bump(map, label, { measuredRuns: n, costUsd: total });
 }
 
 function merge(into: Map<string, Accumulator>, from: Map<string, Accumulator>): void {
@@ -720,15 +758,340 @@ export function getPanelMetrics(db: Database, boardId: string, query: MetricsPan
     };
   });
 
+  // As quatro seções. #172 monta os tempos e o inventário; #171 acrescenta `breakdowns` e `cards`.
+  const sections: MetricsPanelSections = {
+    ...panelCutSections(db, boardId, range, workflow, archivedMonths, spine.length === 0),
+    ...panelTimesSections(db, boardId, range, workflow, spine.length === 0),
+  };
+
   return {
     range,
     clamped,
     totals,
     months,
+    sections,
     workflows: spine.length ? panelWorkflows(db, boardId, range, archivedMonths) : [],
     logSince,
     detailFrom: detail[0] ?? '',
     archivedMonths,
     retention: { months: retentionMonths, detailMonths: detail.length, detailRows: panelDetailRows(db, boardId) },
   };
+}
+
+// ---------------------------------------------------------------------------------------------------
+// #172: os tempos (permanência por fase e lead time) e o inventário do painel (#105). Aqui só as três
+// consultas e a montagem: as regras dos tempos são `phaseDwell` e `leadTimes` (times.ts), puras.
+//
+// Os tempos varrem `card_events` do INÍCIO DO HORIZONTE DO DETALHE até o fim do período, não do início
+// do período (RF-14): a entrada numa fase pode ser anterior ao período e ainda ser conhecida. Como a
+// consolidação já apagou o detalhe de fora do horizonte, "do início do horizonte" é simplesmente sem
+// limite inferior. O único filtro é o de workflow que o painel já tem (RF-34): `card_events` guarda o
+// workflow, e é ele que separa o lead time das histórias do das sub-tarefas.
+// ---------------------------------------------------------------------------------------------------
+
+/** O workflow escolhido, como cláusula extra sobre `card_events`; '' = todos. */
+function eventsWorkflowClause(workflow: string): { sql: string; params: string[] } {
+  return workflow ? { sql: ' AND workflow = ?', params: [workflow] } : { sql: '', params: [] };
+}
+
+/**
+ * As movimentações para `phaseDwell`. Sem `ORDER BY`, de propósito: ordenar em JavaScript (`phaseDwell`
+ * já ordena por card) mediu mais rápido que no SQLite (44 contra 49 ms) — nenhum índice serve ao
+ * `kind IN (...)` e a `card_number, at` ao mesmo tempo. Não "melhore" isto com `LEAD()`: perde a mediana.
+ */
+function panelDwell(db: Database, boardId: string, period: TimesPeriod, workflow: string): MetricsDwell[] {
+  const wf = eventsWorkflowClause(workflow);
+  const rows: TimesEventRow[] = [];
+  for (const r of all(
+    db,
+    `SELECT card_number, at, kind, from_value, to_value FROM card_events
+     WHERE board_id = ? AND kind IN ('created','column_changed','trashed','deleted') AND at < ?${wf.sql}`,
+    [boardId, period.end, ...wf.params],
+  )) {
+    if (r.card_number == null) continue;
+    rows.push({
+      cardNumber: num(r.card_number),
+      at: num(r.at),
+      kind: str(r.kind) as CardEventKind,
+      fromValue: str(r.from_value),
+      toValue: str(r.to_value),
+      cardTitle: '',
+    });
+  }
+  return phaseDwell(rows, period);
+}
+
+/**
+ * O lead time: uma linha agregada por card sobre todo o horizonte. `MIN(done)` é a PRIMEIRA conclusão
+ * (RF-17); `card_title` ao lado de um único `MAX(at)` vem da linha mais recente (comportamento do SQLite,
+ * o mesmo de `detailByCard`). A linha vira até dois eventos sintéticos para `leadTimes` — quem decide
+ * desconhecido, período e teto é ela, não esta consulta.
+ */
+function panelLead(db: Database, boardId: string, period: TimesPeriod, workflow: string): MetricsLead {
+  const wf = eventsWorkflowClause(workflow);
+  const rows: TimesEventRow[] = [];
+  for (const r of all(
+    db,
+    `SELECT card_number, MIN(CASE WHEN kind = 'created' THEN at END) AS created_at,
+            MIN(CASE WHEN kind = 'done' THEN at END) AS done_at, MAX(at) AS last, card_title
+     FROM card_events WHERE board_id = ? AND kind IN ('created','done')${wf.sql} GROUP BY card_number`,
+    [boardId, ...wf.params],
+  )) {
+    if (r.card_number == null || r.done_at == null) continue;
+    const base = { cardNumber: num(r.card_number), fromValue: '', toValue: '', cardTitle: str(r.card_title) };
+    if (r.created_at != null) rows.push({ ...base, at: num(r.created_at), kind: 'created' });
+    rows.push({ ...base, at: num(r.done_at), kind: 'done' });
+  }
+  return leadTimes(rows, period, METRICS_ROW_CAP);
+}
+
+const INVENTORY_GROUP: Record<InventoryKind, keyof Omit<MetricsInventory, 'measured'>> = {
+  tool: 'tools',
+  mcp_tool: 'mcpTools',
+  agent: 'agents',
+  skill: 'skills',
+};
+
+/**
+ * O inventário do período: o `JOIN` com `ai_runs` é o único caminho de `ai_run_usage` até o board e o
+ * período (a tabela não tem `board_id` nem `month`). Nas ferramentas de MCP o nome é separado em servidor
+ * e ferramenta por `splitMcpName`; dois nomes crus que dão o mesmo par (as duas grafias) somam numa linha.
+ *
+ * `measured` é "o board já teve alguma linha de inventário", não um sinalizador: nunca teve ⇒ "ainda
+ * não medido"; já teve ⇒ período vazio é "nenhum registro no período" (RF-27).
+ *
+ * Sem teto de linhas: `MetricsInventory` não tem onde contar o que ficasse de fora, e cortar calado
+ * esconderia uso (RF-33). Ordem: mais usos primeiro, depois nome.
+ */
+function inventoryMeasured(db: Database, boardId: string): boolean {
+  return all(db, 'SELECT 1 AS x FROM ai_run_usage u JOIN ai_runs r ON r.id = u.run_id WHERE r.board_id = ? LIMIT 1', [boardId]).length > 0;
+}
+
+function panelInventory(db: Database, boardId: string, q: MetricsQuery): MetricsInventory {
+  const measured = inventoryMeasured(db, boardId);
+  const inventory: MetricsInventory = { measured, tools: [], mcpTools: [], agents: [], skills: [] };
+  if (!measured) return inventory;
+
+  const { sql: where, params } = runsWhere(boardId, q, 'r.');
+  const byKey = new Map<string, { group: keyof Omit<MetricsInventory, 'measured'>; usage: MetricsUsage }>();
+  for (const r of all(
+    db,
+    `SELECT u.kind AS kind, u.name AS name, COUNT(DISTINCT u.run_id) AS n, SUM(u.calls) AS calls
+     FROM ai_run_usage u JOIN ai_runs r ON r.id = u.run_id
+     WHERE ${where} GROUP BY u.kind, u.name`,
+    params,
+  )) {
+    const kind = str(r.kind) as InventoryKind;
+    const group = INVENTORY_GROUP[kind];
+    if (!group) continue;
+    const split = kind === 'mcp_tool' ? splitMcpName(str(r.name)) : { server: '', tool: str(r.name) };
+    const key = `${kind}\u0000${split.server}\u0000${split.tool}`;
+    const found = byKey.get(key);
+    if (found) {
+      // a mesma ferramenta nas duas grafias: cada execução registra uma grafia só, então somar não conta
+      // a mesma execução duas vezes
+      found.usage.runs += num(r.n);
+      found.usage.calls += num(r.calls);
+    } else byKey.set(key, { group, usage: { name: split.tool, server: split.server, runs: num(r.n), calls: num(r.calls) } });
+  }
+  for (const { group, usage } of byKey.values()) inventory[group].push(usage);
+  for (const group of Object.values(INVENTORY_GROUP))
+    inventory[group].sort((a, b) => b.calls - a.calls || a.name.localeCompare(b.name) || a.server.localeCompare(b.server));
+  return inventory;
+}
+
+/** As três seções de #172 para o recorte já resolvido por `getPanelMetrics`. Recorte vazio ⇒ seções vazias, sem zeros inventados (RF-32). */
+function panelTimesSections(
+  db: Database,
+  boardId: string,
+  range: { startDate: string; endDate: string },
+  workflow: string,
+  empty: boolean,
+): Pick<MetricsPanelSections, 'dwell' | 'lead' | 'inventory'> {
+  if (empty)
+    return {
+      dwell: [],
+      lead: { medianMs: null, meanMs: null, counted: 0, unknown: 0, rows: [], omitted: 0 },
+      inventory: { measured: inventoryMeasured(db, boardId), tools: [], mcpTools: [], agents: [], skills: [] },
+    };
+  const period: TimesPeriod = { start: dayBoundary(range.startDate, false), end: dayBoundary(range.endDate, true) };
+  return {
+    dwell: panelDwell(db, boardId, period, workflow),
+    lead: panelLead(db, boardId, period, workflow),
+    inventory: panelInventory(db, boardId, { startDate: range.startDate, endDate: range.endDate, ...(workflow ? { workflow } : {}) }),
+  };
+}
+
+// ---------------------------------------------------------------------------------------------------
+// #171: os seis cortes por dimensão e o ranking por card do painel (#105).
+//
+// Os seis cortes saem de UMA consulta agrupada pelas sete colunas (workflow + as seis dimensões), com as
+// somas de consumo de `detailByRunColumn`; as marginais se somam em memória. Não troque por uma consulta
+// por dimensão: medido na Spec, 40 ms contra ~110 ms, porque cada consulta varreria `ai_runs` de novo.
+// `workflow` entra no agrupamento só para achar as fases de nome igual em workflows diferentes (RF-07).
+//
+// NULL e '' caem na mesma categoria '' = "não definido" (RF-04): `str()` funde os dois no rótulo do
+// `Map`, como o arquivo mensal já funde na consolidação.
+//
+// O ranking de fases NÃO tem consulta própria: é o corte por fase, e quem ordena é a tela (RF-23). Uma
+// segunda consulta poderia divergir dele — e a RF-23 manda justamente poder conferi-los lado a lado.
+//
+// A resposta leva todas as categorias com as quatro medidas e o total coberto: ordenar, cortar em 10 e
+// calcular "outros" é do cliente — zero consulta por clique.
+// ---------------------------------------------------------------------------------------------------
+
+const PANEL_DIMS = METRICS_BREAKDOWN_DIMS;
+
+/**
+ * Uma categoria no formato do contrato. "Não medido" fica null, nunca 0 (RF-30). A parte estimada de um
+ * mês arquivado conta como estimada (ver `panelArchiveDims`).
+ */
+function panelCell(value: string, a: Accumulator): MetricsCell {
+  return {
+    value,
+    runs: a.runs,
+    measuredRuns: a.measuredRuns,
+    durationMs: a.durationMs,
+    tokens: a.measuredRuns > 0 ? a.tokens : null,
+    costUsd: a.measuredRuns > 0 ? a.costUsd : null,
+    costEstimatedUsd: a.estimatedRuns > 0 ? a.costEstimatedUsd : null,
+  };
+}
+
+/** O total do que um bloco cobre: a soma de todas as categorias, inclusive as que não vão em `cells` (RF-33). */
+function panelCovered(groups: Iterable<Accumulator>): Omit<MetricsCell, 'value'> {
+  const sum = new Map<string, Accumulator>();
+  for (const a of groups) bump(sum, '', a);
+  const { value: _value, ...covered } = panelCell('', sum.get('') ?? newAcc());
+  return covered;
+}
+
+/** Mais execuções primeiro, depois o rótulo: ordem estável para o teto e para os testes. A tela reordena. */
+function byRunsThenLabel(a: [string, Accumulator], b: [string, Accumulator]): number {
+  return b[1].runs - a[1].runs || a[0].localeCompare(b[0]);
+}
+
+/**
+ * Os meses arquivados para as seis dimensões, numa consulta só, lidos por `bumpArchiveRow` — a mesma
+ * leitura de `archiveByDim`, que é o que mantém o corte do painel igual a `getMetrics` antes e depois de
+ * consolidar (RF-08). O arquivo não guarda a origem do custo por dimensão (só no total, `dim='source'`):
+ * o custo de um mês arquivado entra como estimado, que é a afirmação mais fraca — o mesmo critério de
+ * `totalsFromDetail` na dúvida.
+ */
+function panelArchiveDims(db: Database, boardId: string, months: string[]): Map<MetricsBreakdownDim, Map<string, Accumulator>> {
+  const out = new Map<MetricsBreakdownDim, Map<string, Accumulator>>(PANEL_DIMS.map((d) => [d, new Map()]));
+  if (!months.length) return out;
+  const rows = all(
+    db,
+    `SELECT dim, metric, value, n, total FROM log_months
+     WHERE board_id = ? AND month IN (${months.map(() => '?').join(',')})
+       AND dim IN (${PANEL_DIMS.map(() => '?').join(',')}) AND metric IN ('runs', 'tokens', 'cost')`,
+    [boardId, ...months, ...PANEL_DIMS],
+  );
+  for (const r of rows) {
+    const map = out.get(str(r.dim) as MetricsBreakdownDim);
+    if (map) bumpArchiveRow(map, str(r.value), str(r.metric), num(r.n), num(r.total));
+  }
+  for (const map of out.values())
+    for (const a of map.values()) {
+      a.estimatedRuns = a.measuredRuns;
+      a.costEstimatedUsd = a.costUsd;
+    }
+  return out;
+}
+
+/**
+ * Os seis cortes. Com workflow em "Todos", os meses arquivados do recorte entram (RF-08); com um workflow
+ * escolhido eles saem e vão para `excludedMonths`, porque o arquivo guarda marginais e não o cruzamento
+ * dimensão × workflow (RF-10). `ambiguous` só olha o detalhe: o arquivo também não cruza fase × workflow.
+ * Os nomes ambíguos continuam somados — separá-los só nos meses com detalhe daria um corte que muda de
+ * significado no meio do período.
+ */
+function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archivedMonths: string[]): MetricsBreakdown[] {
+  const { sql: where, params } = runsWhere(boardId, q);
+  const byDim = new Map<MetricsBreakdownDim, Map<string, Accumulator>>(PANEL_DIMS.map((d) => [d, new Map()]));
+  const workflowsByPhase = new Map<string, Set<string>>();
+  for (const r of all(
+    db,
+    `SELECT workflow, phase, card_type, model, tool, effort, profile,
+            COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
+            SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS measured,
+            SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)) AS tok,
+            SUM(COALESCE(cost_usd,0)) AS cost, ${ESTIMATED_SUMS}
+     FROM ai_runs WHERE ${where}
+     GROUP BY workflow, phase, card_type, model, tool, effort, profile`,
+    params,
+  )) {
+    const patch: Partial<Accumulator> = {
+      runs: num(r.n),
+      measuredRuns: num(r.measured),
+      durationMs: num(r.ms),
+      tokens: num(r.tok),
+      costUsd: num(r.cost),
+      estimatedRuns: num(r.est_n),
+      costEstimatedUsd: num(r.est),
+    };
+    for (const dim of PANEL_DIMS) bump(byDim.get(dim)!, str(r[RUN_COLUMN[dim]]), patch);
+    const phase = str(r.phase);
+    if (phase) {
+      const set = workflowsByPhase.get(phase) ?? new Set<string>();
+      set.add(str(r.workflow));
+      workflowsByPhase.set(phase, set);
+    }
+  }
+
+  const includesArchive = !q.workflow && archivedMonths.length > 0;
+  if (includesArchive) for (const [dim, map] of panelArchiveDims(db, boardId, archivedMonths)) merge(byDim.get(dim)!, map);
+  const excludedMonths = q.workflow ? [...archivedMonths] : [];
+  const ambiguous = [...workflowsByPhase]
+    .filter(([, set]) => set.size > 1)
+    .map(([phase]) => phase)
+    .sort((a, b) => a.localeCompare(b));
+
+  return PANEL_DIMS.map((dim) => {
+    const map = byDim.get(dim)!;
+    return {
+      dim,
+      cells: [...map.entries()].sort(byRunsThenLabel).map(([value, a]) => panelCell(value, a)),
+      covered: panelCovered(map.values()),
+      includesArchive,
+      excludedMonths,
+      ambiguous: dim === 'phase' ? ambiguous : [],
+    };
+  });
+}
+
+/**
+ * O ranking por card: `detailByCard` (um grupo por número, título da execução mais recente, linha "sem
+ * card"), só detalhe — `card` não é arquivado. Até `METRICS_ROW_CAP` linhas, as de mais execuções; o
+ * resto fica somado em `covered` e contado em `omitted` (RF-33). A linha "sem card" viaja como `value: ''`.
+ */
+function panelCardRanking(db: Database, boardId: string, q: MetricsQuery): MetricsRanking {
+  const map = detailByCard(db, boardId, q);
+  const sorted = [...map.entries()].sort(byRunsThenLabel);
+  return {
+    cells: sorted.slice(0, METRICS_ROW_CAP).map(([label, a]) => panelCell(label === NO_CARD_LABEL ? '' : label, a)),
+    covered: panelCovered(map.values()),
+    omitted: Math.max(0, sorted.length - METRICS_ROW_CAP),
+  };
+}
+
+/** As duas seções de #171 para o recorte já resolvido por `getPanelMetrics`. Recorte vazio ⇒ seções vazias (RF-34). */
+function panelCutSections(
+  db: Database,
+  boardId: string,
+  range: { startDate: string; endDate: string },
+  workflow: string,
+  archivedMonths: string[],
+  empty: boolean,
+): Pick<MetricsPanelSections, 'breakdowns' | 'cards'> {
+  const q: MetricsQuery = { startDate: range.startDate, endDate: range.endDate, ...(workflow ? { workflow } : {}) };
+  if (empty) {
+    const covered = panelCovered([]);
+    return {
+      breakdowns: PANEL_DIMS.map((dim) => ({ dim, cells: [], covered, includesArchive: false, excludedMonths: [], ambiguous: [] })),
+      cards: { cells: [], covered, omitted: 0 },
+    };
+  }
+  return { breakdowns: panelBreakdowns(db, boardId, q, archivedMonths), cards: panelCardRanking(db, boardId, q) };
 }
