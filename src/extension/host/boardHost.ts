@@ -110,7 +110,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     bridgePath: o.bridgePath,
     log: o.log,
     runLog,
-    spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
+    spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
   });
   // o log do board liga cada evento à execução em curso no card (`run_id`); sem execução, fica nulo
   router.setRunResolver((cardId) => runner.runIdOf(cardId));
@@ -149,7 +149,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     bridgePath: o.bridgePath,
     log: o.log,
     runLog,
-    spawn: (command, cwd, log) => spawnHeadless(command, cwd, log, pathEnv),
+    spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
     file: path.join(o.storageDir, 'chat', `${workspaceKey(o.folderPath)}.json`),
   });
   const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });

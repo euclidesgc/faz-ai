@@ -1,0 +1,185 @@
+// O transporte da execução medida: monta o comando no modo estruturado, inicia o processo, passa
+// cada pedaço de `stdout` pelo partidor de linhas e pelo leitor, e devolve o mesmo
+// `RunningProcess` de sempre mais um `report()` lido no fim.
+//
+// Duas coisas que valem dinheiro e por isso são regra, não gosto:
+//
+// 1. **A volta para texto acontece uma vez, e só se nada aconteceu.** Se o processo morreu sem o
+//    leitor ter entendido um único evento, a CLI recusou o argumento antes de gastar token
+//    (verificado: sai na hora, código 1, `stdout` vazio) e repetir é de graça. Se morreu DEPOIS de
+//    eventos, o trabalho aconteceu e repetir cobraria duas vezes — então não repete.
+// 2. **O `onExit` de quem chamou dispara uma vez só**, no fim da última tentativa. É isso que
+//    mantém o executor de cards e o chat sem máquina de estado nova.
+//
+// O `stderr` vai direto para o `log` de quem chamou, com o seu próprio partidor de linhas, sem passar
+// pelo leitor: é texto de gente, e dentro do interpretador de JSONL viraria "saída quebrada".
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { aiToolInfo, type AiTool } from '../../shared/harness';
+import type { RunReport } from '../../shared/log';
+import type { ModelOption } from '../../shared/models';
+import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
+import type { RunningProcess } from '../runner';
+import { MeasureBrokenError, MeasureRefusedError, MeasureUnsupportedError, type MeasureError } from './errors';
+import { cut } from './json';
+import { lineSplitter } from './lines';
+import { readerFor, type OutputReader, type OutputStream } from './reader';
+
+/** Como o board inicia um processo da CLI. O `out` recebe de qual canal cada pedaço veio. */
+export type SpawnFn = (command: HeadlessCommand, cwd: string, out: (text: string, stream: OutputStream) => void) => RunningProcess;
+
+export interface MeasuredDeps {
+  spawn: SpawnFn;
+  /**
+   * Cada linha legível que a ferramenta produziu, mais os recados do board sobre a execução (a
+   * chamada, a volta para texto). Quem chama decide para onde vão: o executor de cards manda para o
+   * canal do editor e para o `tail` da falha; o chat guarda para a resposta e para o `tail` do erro.
+   */
+  log: (line: string) => void;
+  /** catálogo de modelos do board, para estimar o custo quando a ferramenta não informa */
+  catalog: ModelOption[];
+}
+
+export interface Measured {
+  /** O mesmo contrato de sempre: `onExit` dispara uma vez, `kill` encerra a tentativa em curso. */
+  proc: RunningProcess;
+  /** O acumulado da execução, para ler no `onExit`. */
+  report: () => RunReport;
+}
+
+/** Tamanho de cada argumento na linha que mostra a chamada, como o executor já cortava. */
+const ARG_MAX = 80;
+
+/** Tamanho da linha de evento pela metade no canal, o mesmo corte que os leitores dão à linha ruim. */
+const REST_MAX = 300;
+
+/**
+ * Grava os arquivos temporários do comando numa pasta só do usuário e troca os `{tmp:nome}` dos
+ * argumentos pelos caminhos. Mora aqui porque é o transporte que monta o comando — antes desta
+ * entrega o executor de cards e o chat tinham cada um a sua cópia desta função.
+ */
+export function materialize(command: HeadlessCommand): { command: HeadlessCommand; cleanup: () => void } {
+  const files = Object.entries(command.tempFiles ?? {});
+  if (!files.length) return { command, cleanup: () => {} };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-run-'));
+  let args = command.args;
+  for (const [name, content] of files) {
+    const file = path.join(dir, name);
+    // pode ter segredos (variáveis dos servidores MCP): só o dono lê
+    fs.writeFileSync(file, content, { mode: 0o600 });
+    args = args.map((a) => a.split(tmpArg(name)).join(file));
+  }
+  return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+}
+
+export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, deps: MeasuredDeps): Measured {
+  const label = aiToolInfo(tool).label;
+  // o custo estimado sai do preço dos modelos DESTA ferramenta: o mesmo nome curto pode existir em duas
+  const catalog = deps.catalog.filter((o) => o.tool === tool);
+  const model = input.exec?.model?.name ?? null;
+
+  const listeners: ((code: number | null, error?: Error) => void)[] = [];
+  let current: RunningProcess | null = null;
+  let killed = false;
+  let done = false;
+  /** o leitor da tentativa em curso; o `report()` é sempre o da última */
+  let reader: OutputReader = readerFor('text', { catalog, model });
+  /** por que a medição não aconteceu, quando não aconteceu */
+  let failure: MeasureError | null = null;
+
+  const finish = (code: number | null, error?: Error): void => {
+    if (done) return;
+    done = true;
+    for (const fn of listeners) fn(code, error);
+  };
+
+  const attempt = (structured: boolean): void => {
+    const built = headlessCommand(tool, { ...input, structured });
+    if ('unsupported' in built) throw new Error(built.unsupported);
+    const { command, cleanup } = materialize(built);
+    const format = command.format;
+    // o leitor desta tentativa, preso nela: um pedaço atrasado da tentativa anterior não suja o seguinte
+    const read = readerFor(format, { catalog, model });
+    reader = read;
+    // pediu estruturado e o builder devolveu texto: esta ferramenta não tem o modo (o Copilot)
+    if (structured && format === 'text') failure ??= new MeasureUnsupportedError(label);
+
+    // um partidor por canal: os dois chegam entremeados, e um aviso no `stderr` no meio de uma linha
+    // de evento partida emendaria texto de gente no JSON e quebraria os dois
+    const stdout = lineSplitter();
+    const stderr = lineSplitter();
+    const toLog = (line: string): void => {
+      if (line) deps.log(line);
+    };
+    const feed = (text: string, stream: OutputStream): void => {
+      if (stream === 'stderr') {
+        stderr.push(text).forEach(toLog);
+        return;
+      }
+      for (const line of stdout.push(text)) for (const out of read.push(line, 'stdout')) deps.log(out);
+    };
+    // esta linha é onde se confere que a chamada foi com os argumentos do modo estruturado
+    deps.log(
+      `Chamando ${label}: ${command.command} ${command.args.map((a) => (a.length > ARG_MAX ? `${a.slice(0, ARG_MAX)}…` : a)).join(' ')}`,
+    );
+
+    let proc: RunningProcess;
+    try {
+      proc = deps.spawn(command, cwd, feed);
+    } catch (e) {
+      cleanup();
+      throw e;
+    }
+    current = proc;
+
+    let exited = false;
+    proc.onExit((code, error) => {
+      // cada tentativa termina uma vez: um segundo aviso de saída não repete nem revive nada
+      if (exited) return;
+      exited = true;
+      // o resto que ficou sem quebra de linha vira linha de texto no canal e NÃO é interpretado: é
+      // uma linha de evento pela metade, e o que já foi lido vale (`measure: 'partial'`). No modo
+      // texto ele é o fim da resposta, e o leitor de texto não interpreta nada: segue por ele.
+      for (const rest of stdout.flush()) {
+        if (format === 'text') read.push(rest, 'stdout').forEach(toLog);
+        else toLog(cut(rest, REST_MAX));
+      }
+      stderr.flush().forEach(toLog);
+      cleanup();
+      // morreu sem ter produzido um único evento válido: foi recusa de argumento, e repetir é de
+      // graça. Com `error` não se repete: comando que não existe não passa a existir na segunda vez.
+      if (structured && format !== 'text' && !killed && !error && code !== 0 && !read.sawEvent) {
+        failure = new MeasureRefusedError(label);
+        deps.log(failure.message);
+        try {
+          attempt(false);
+        } catch (e) {
+          finish(null, e instanceof Error ? e : new Error(String(e)));
+        }
+        return;
+      }
+      finish(code, error);
+    });
+  };
+
+  attempt(true);
+
+  return {
+    proc: {
+      onExit: (fn) => listeners.push(fn),
+      kill: () => {
+        killed = true;
+        current?.kill();
+      },
+    },
+    report: () => {
+      const report = reader.report();
+      // o motivo é do transporte, não do leitor: é aqui que se sabe o rótulo da ferramenta e o que
+      // aconteceu com o processo. Sem nada medido e sem motivo conhecido, o formato veio e não
+      // trouxe consumo.
+      if (report.measure !== 'none') return report;
+      return { ...report, reason: (failure ?? new MeasureBrokenError(label)).message };
+    },
+  };
+}

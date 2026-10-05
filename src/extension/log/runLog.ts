@@ -1,12 +1,13 @@
 // A interface fina que o executor e o chat usam para registrar uma execução de IA: abre a linha
-// (`start`), completa a configuração depois do plano (`describe`) e grava o desfecho (`finish`).
+// (`start`), completa a configuração depois do plano (`describe`), grava o consumo medido (`measure`) e o desfecho
+// (`finish`).
 // A regra de "o que gravar" é de `AiRunRepo`; aqui é só engolir falha.
 //
-// Falha no log não derruba a execução da pessoa: os quatro pontos escrevem no canal de log e seguem.
+// Falha no log não derruba a execução da pessoa: os cinco pontos escrevem no canal de log e seguem.
 // `start` devolve `''` quando não conseguiu gravar, e os demais não fazem nada com um id vazio — quem
 // chama não precisa saber se o log está funcionando.
 import type { Database } from 'sql.js';
-import type { AiRunConfig, AiRunOutcome, AiRunStart } from '../../shared/log';
+import type { AiRunConfig, AiRunOutcome, AiRunStart, RunReport } from '../../shared/log';
 import { AiRunRepo } from './aiRunRepo';
 
 export interface RunLog {
@@ -16,6 +17,8 @@ export interface RunLog {
   describe(id: string, config: AiRunConfig): void;
   /** Fecha a linha com o desfecho e o código de saída, quando houver. */
   finish(id: string, outcome: AiRunOutcome, exitCode?: number | null): void;
+  /** Grava o consumo e o inventário medidos, de uma vez, junto do desfecho. `measure: 'none'` grava só "não medido". */
+  measure(id: string, report: RunReport): void;
   /**
    * Marca como `unknown` as execuções que a sessão anterior não chegou a fechar. Chamada na abertura
    * do board, só pela janela dona dele.
@@ -53,6 +56,10 @@ export function createRunLog(db: Database, log?: (line: string) => void): RunLog
     finish(id, outcome, exitCode) {
       if (!id) return;
       guard(() => runs.finish(id, outcome, exitCode));
+    },
+    measure(id, report) {
+      if (!id) return;
+      guard(() => runs.measure(id, report));
     },
     closeOpen(at) {
       guard(() => runs.closeOpen(at));

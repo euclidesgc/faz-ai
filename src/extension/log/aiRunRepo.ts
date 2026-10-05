@@ -2,10 +2,19 @@
 // (`describe`) e ao desfecho (`finish`). A ligação com o executor é do passo 4 (`runLog.ts` /
 // `runner.ts`); aqui é só o repositório.
 import type { Database } from 'sql.js';
-import type { AiRunConfig, AiRunOrigin, AiRunOutcome, AiRunStart } from '../../shared/log';
+import type {
+  AiRunConfig,
+  AiRunMeasure,
+  AiRunOrigin,
+  AiRunOutcome,
+  AiRunStart,
+  InventoryItem,
+  InventoryKind,
+  RunReport,
+} from '../../shared/log';
 import { monthOf, truncateTitle } from '../../shared/log';
 import { newId } from '../db/ids';
-import { all, num, one, run, str, strOrNull, type Row } from '../db/query';
+import { all, num, one, run, str, strOrNull, transaction, type Row } from '../db/query';
 
 /** Uma linha de `ai_runs`, como lida de volta (ver `AiRunStart`/`AiRunConfig` para o que cada campo significa). */
 export interface AiRun {
@@ -35,7 +44,21 @@ export interface AiRun {
   clean: boolean;
   skills: string[];
   mcp: string[] | null;
+  /** consumo (#70): `null` em tudo quando `measure` é 'none' — "não medido" não é zero */
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  costUsd: number | null;
+  /** true = custo calculado pela tabela de preços; false = informado pela ferramenta; null = sem custo */
+  costEstimated: boolean | null;
+  turns: number | null;
+  sessionId: string | null;
+  /** linha gravada antes da migração 24 lê 'none' (RF-16) */
+  measure: AiRunMeasure;
 }
+
+const numOrNull = (v: Row[string] | undefined): number | null => (v == null ? null : num(v));
 
 function toRun(r: Row): AiRun {
   const mcpJson = strOrNull(r.mcp_json);
@@ -66,6 +89,15 @@ function toRun(r: Row): AiRun {
     clean: num(r.clean) === 1,
     skills: JSON.parse(str(r.skills_json) || '[]'),
     mcp: mcpJson == null ? null : JSON.parse(mcpJson),
+    inputTokens: numOrNull(r.input_tokens),
+    outputTokens: numOrNull(r.output_tokens),
+    cacheReadTokens: numOrNull(r.cache_read_tokens),
+    cacheWriteTokens: numOrNull(r.cache_write_tokens),
+    costUsd: numOrNull(r.cost_usd),
+    costEstimated: r.cost_estimated == null ? null : num(r.cost_estimated) === 1,
+    turns: numOrNull(r.turns),
+    sessionId: strOrNull(r.session_id),
+    measure: str(r.measure) as AiRunMeasure,
   };
 }
 
@@ -142,6 +174,59 @@ export class AiRunRepo {
       exitCode ?? null,
       id,
     ]);
+  }
+
+  /**
+   * Grava o consumo e o inventário da execução, numa transação só: um `UPDATE` em `ai_runs` e os
+   * `INSERT` em `ai_run_usage`. Uma escrita por execução, no fim (o `sql.js` reescreve o arquivo inteiro
+   * a cada gravação).
+   *
+   * `measure: 'none'` deixa tokens, custo, turnos e sessão NULL e não escreve inventário: "não medido"
+   * não é "zero" (RF-14). O custo é congelado aqui (RF-30): nada o recalcula depois, e mudar o preço
+   * vale da próxima execução em diante. O inventário usa `INSERT OR REPLACE` sobre a chave
+   * `(run_id, kind, name)`: uma segunda chamada com o mesmo inventário não duplica linha.
+   */
+  measure(id: string, report: RunReport): void {
+    const c = report.measure === 'none' ? null : report.consumption;
+    const inventory = c ? report.inventory : [];
+    transaction(this.db, () => {
+      run(
+        this.db,
+        `UPDATE ai_runs SET input_tokens = ?, output_tokens = ?, cache_read_tokens = ?, cache_write_tokens = ?,
+           cost_usd = ?, cost_estimated = ?, turns = ?, session_id = ?, measure = ?
+         WHERE id = ?`,
+        [
+          c ? c.inputTokens : null,
+          c ? c.outputTokens : null,
+          c ? c.cacheReadTokens : null,
+          c ? c.cacheWriteTokens : null,
+          c ? c.costUsd : null,
+          c && c.costUsd != null ? (c.costEstimated ? 1 : 0) : null,
+          c ? c.turns : null,
+          c ? c.sessionId : null,
+          report.measure,
+          id,
+        ],
+      );
+      if (this.db.getRowsModified() === 0) throw new Error('Execução de IA não encontrada');
+      for (const item of inventory) {
+        run(this.db, 'INSERT OR REPLACE INTO ai_run_usage(run_id, kind, name, calls) VALUES (?,?,?,?)', [
+          id,
+          item.kind,
+          item.name,
+          item.calls,
+        ]);
+      }
+    });
+  }
+
+  /** O inventário gravado de uma execução (ferramentas, ferramentas MCP, subagentes e skills), ordenado por tipo e nome. */
+  usage(id: string): InventoryItem[] {
+    return all(this.db, 'SELECT kind, name, calls FROM ai_run_usage WHERE run_id = ? ORDER BY kind, name', [id]).map((r) => ({
+      kind: str(r.kind) as InventoryKind,
+      name: str(r.name),
+      calls: num(r.calls),
+    }));
   }
 
   /**

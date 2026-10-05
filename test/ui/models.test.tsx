@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { ModelsSettings } from '../../src/webview/components/settings/ModelsSettings';
+import { modelPrice, type ModelOption } from '../../src/shared/models';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 let board: SeededBoard;
@@ -96,5 +97,89 @@ describe('ModelsSettings', () => {
     show();
     await userEvent.click(screen.getByRole('switch', { name: 'Regra Teste em uso' }));
     expect(lastSent('settings.modelRules.set').rules[0]!.enabled).toBe(false);
+  });
+
+  describe('preço por milhão de tokens', () => {
+    const mine = () => state().board.modelCatalog.find((x) => x.tool === tool())!;
+    const field = (kind: string) => screen.getByLabelText(`Preço de ${kind} de ${mine().model}`) as HTMLInputElement;
+    const saved = (): ModelOption => lastSent('settings.models.set').catalog.find((x) => x.id === mine().id)!;
+    /** O host aplica o que a tela mandou e devolve o estado novo, como no uso real. */
+    const applyLast = () => {
+      board.router.handle(lastSent('settings.models.set'));
+      syncStore(board.router);
+    };
+    const setPrices = (price: ModelOption['price']) => {
+      const catalog = state().board.modelCatalog.map((o) => {
+        const { price: _antigo, ...rest } = o;
+        return o.id === mine().id && price ? { ...rest, price } : rest;
+      });
+      board.router.handle({ type: 'settings.models.set', catalog });
+      syncStore(board.router);
+    };
+    beforeEach(() => setPrices(undefined));
+
+    it('os quatro campos aparecem vazios: o board não embute tabela de preço', () => {
+      show();
+      expect(screen.getByText('Preço (US$ por milhão de tokens)')).toBeInTheDocument();
+      for (const kind of ['entrada', 'saída', 'leitura de cache', 'criação de cache']) {
+        expect(field(kind)).toHaveValue(null);
+      }
+      expect(screen.getByText(/O custo informado pela ferramenta tem preferência/)).toBeInTheDocument();
+    });
+
+    it('um número digitado grava ao sair do campo e reaparece quando a tela relê o catálogo', async () => {
+      show();
+      await userEvent.type(field('entrada'), '15.5');
+      expect(sentOf('settings.models.set')).toHaveLength(0);
+      await userEvent.tab();
+      expect(saved().price).toEqual({ input: 15.5 });
+      applyLast();
+      expect(field('entrada')).toHaveValue(15.5);
+    });
+
+    it('preencher só um campo não vira preço válido; os quatro viram, e zero é preço', async () => {
+      show();
+      await userEvent.type(field('entrada'), '3');
+      await userEvent.tab();
+      expect(modelPrice(saved())).toBeNull();
+
+      for (const [kind, value] of [
+        ['saída', '15'],
+        ['leitura de cache', '0.3'],
+        ['criação de cache', '0'],
+      ] as const) {
+        applyLast();
+        await userEvent.type(field(kind), value);
+        await userEvent.tab();
+      }
+      expect(modelPrice(saved())).toEqual({ input: 3, output: 15, cacheRead: 0.3, cacheWrite: 0 });
+    });
+
+    it('esvaziar um campo apaga só aquele preço (ausência, não zero)', async () => {
+      setPrices({ input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 });
+      show();
+      await userEvent.clear(field('saída'));
+      await userEvent.tab();
+      expect(saved().price).toEqual({ input: 3, cacheRead: 0.3, cacheWrite: 3.75 });
+      expect(modelPrice(saved())).toBeNull();
+    });
+
+    it('sair de um campo sem mudar o valor não grava nada', async () => {
+      setPrices({ input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 });
+      show();
+      await userEvent.click(field('entrada'));
+      await userEvent.tab();
+      expect(sentOf('settings.models.set')).toHaveLength(0);
+    });
+
+    it('Detectar modelos não apaga o preço que já estava no catálogo (RF-24, RF-30)', async () => {
+      const price = { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 };
+      setPrices(price);
+      show();
+      await userEvent.click(screen.getByRole('button', { name: 'Detectar modelos' }));
+      board.router.handle(lastSent('settings.models.detect'));
+      syncStore(board.router);
+      expect(mine().price).toEqual(price);
+    });
   });
 });

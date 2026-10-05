@@ -6,7 +6,7 @@ import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { RETENTION_MONTHS, consolidate, detailMonths, keepMonths, monthlyTotals } from '../src/extension/log/rollup';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
-import type { CardEvent, LogMetric } from '../src/shared/log';
+import type { CardEvent, InventoryItem, LogMetric, RunReport } from '../src/shared/log';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 /** data fixa de referência dos testes: 15 de junho de 2026, meio-dia, no fuso da máquina */
@@ -84,20 +84,44 @@ const run = (startedAt: number, durationMs: number, over: Partial<Parameters<AiR
   return id;
 };
 
+/** relatório de uma execução medida: 10+20+30+40 = 100 tokens e US$ 0,50, salvo o que `over` trocar */
+const measured = (over: Partial<NonNullable<RunReport['consumption']>> = {}, inventory: InventoryItem[] = []): RunReport => ({
+  measure: 'full',
+  consumption: {
+    inputTokens: 10,
+    outputTokens: 20,
+    cacheReadTokens: 30,
+    cacheWriteTokens: 40,
+    turns: 3,
+    sessionId: 's1',
+    costUsd: 0.5,
+    costEstimated: false,
+    ...over,
+  },
+  inventory,
+  answer: '',
+  reason: null,
+});
+
+const notMeasured = (): RunReport => ({ measure: 'none', consumption: null, inventory: [], answer: '', reason: 'sem medida' });
+
 const of = (totals: LogMetric[], metric: string, dim = '', value = '') =>
   totals.find((t) => t.metric === metric && t.dim === dim && t.value === value);
 
 describe('keepMonths', () => {
-  it('guarda o mês corrente e os doze anteriores, treze marcadores', () => {
+  it('RF-32: guarda o mês corrente e os seis anteriores, sete marcadores', () => {
     const keep = keepMonths(TODAY);
+    expect(RETENTION_MONTHS).toBe(6);
     expect(keep).toHaveLength(RETENTION_MONTHS + 1);
     expect(keep[0]).toBe('2026-06');
-    expect(keep.at(-1)).toBe('2025-06');
+    expect(keep.at(-1)).toBe('2025-12');
   });
 
   it('atravessa a virada do ano', () => {
-    expect(keepMonths(at(2026, 1, 5))).toContain('2025-01');
-    expect(keepMonths(at(2026, 1, 5))[1]).toBe('2025-12');
+    const keep = keepMonths(at(2026, 1, 5));
+    expect(keep).toContain('2025-07');
+    expect(keep).not.toContain('2025-06');
+    expect(keep[1]).toBe('2025-12');
   });
 
   it('num dia 31 não deixa fevereiro escapar do descarte', () => {
@@ -105,7 +129,7 @@ describe('keepMonths', () => {
     const keep = keepMonths(new Date(2026, 2, 31, 12).getTime());
     expect(keep).toEqual([...new Set(keep)]);
     expect(keep).toContain('2026-02');
-    expect(keep).toContain('2025-03');
+    expect(keep).toContain('2025-09');
   });
 
   it('não depende do fuso: o mês é o da máquina, como o `month` gravado', () => {
@@ -205,16 +229,17 @@ describe('consolidate', () => {
     expect(monthlyTotals(db, boardId, ['2024-03'])).toEqual(before);
   });
 
-  it('RF-22: catorze meses de detalhe ficam treze; os de dentro da janela não são tocados', () => {
-    // um evento por mês, de maio de 2025 a junho de 2026: catorze meses
-    for (let i = 0; i < 14; i++) event(at(2025, 5 + i));
-    expect(detailMonths(db, boardId)).toHaveLength(14);
+  it('RF-22 e RF-32: nove meses de detalhe ficam sete; os de dentro da janela não são tocados', () => {
+    // um evento por mês, de outubro de 2025 a junho de 2026: nove meses
+    for (let i = 0; i < 9; i++) event(at(2025, 10 + i));
+    expect(detailMonths(db, boardId)).toHaveLength(9);
 
-    expect(consolidate(db, boardId, TODAY)).toEqual(['2025-05']);
-    expect(detailMonths(db, boardId)).toHaveLength(13);
-    expect(detailMonths(db, boardId)[0]).toBe('2025-06');
+    // os seis completos (2025-12 a 2026-05) e o corrente ficam; outubro e novembro são arquivados
+    expect(consolidate(db, boardId, TODAY)).toEqual(['2025-10', '2025-11']);
+    expect(detailMonths(db, boardId)).toHaveLength(7);
+    expect(detailMonths(db, boardId)[0]).toBe('2025-12');
     // o mês descartado continua somando, pelo arquivo
-    expect(of(monthlyTotals(db, boardId, ['2025-05']), 'events')).toMatchObject({ n: 1 });
+    expect(of(monthlyTotals(db, boardId, ['2025-10']), 'events')).toMatchObject({ n: 1 });
   });
 
   it('os totais por mês nunca expiram: consolidar de novo não apaga arquivo nem duplica linha', () => {
@@ -245,6 +270,98 @@ describe('consolidate', () => {
     expect(consolidate(db, boardId, TODAY)).toEqual([]);
     expect(events.byMonth('2026-06')).toHaveLength(1);
     expect(new BoardRepo(db).openedNow(boardId, TODAY).rollupDay).toBe('2026-06-15');
+  });
+});
+
+describe('tokens, custo e inventário (#70)', () => {
+  const inventory: InventoryItem[] = [
+    { kind: 'tool', name: 'Read', calls: 5 },
+    { kind: 'mcp_tool', name: 'faz-ai/get_card', calls: 2 },
+    { kind: 'agent', name: 'Explore', calls: 1 },
+    { kind: 'skill', name: 'unit-testing', calls: 1 },
+  ];
+
+  /** março de 2024 (fora da janela): 3 execuções, 2 medidas, uma delas sem custo */
+  const seedMarch = (): void => {
+    runs.measure(run(at(2024, 3), 1000), measured({}, inventory));
+    runs.measure(
+      run(at(2024, 3), 2000, { model: 'haiku' }),
+      measured({ inputTokens: 100, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: null }, [
+        { kind: 'tool', name: 'Read', calls: 3 },
+      ]),
+    );
+    runs.measure(run(at(2024, 3), 3000), notMeasured());
+  };
+
+  it('tokens: soma os quatro tipos, por todos os cortes, e `n` conta só a execução medida', () => {
+    seedMarch();
+    const totals = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(of(totals, 'runs')).toMatchObject({ n: 3 });
+    expect(of(totals, 'tokens')).toMatchObject({ n: 2, total: 200 });
+    expect(of(totals, 'tokens', 'model', 'opus')).toMatchObject({ n: 1, total: 100 });
+    expect(of(totals, 'tokens', 'model', 'haiku')).toMatchObject({ n: 1, total: 100 });
+    for (const dim of ['outcome', 'phase', 'card_type', 'tool', 'effort', 'profile'])
+      expect(totals.filter((t) => t.metric === 'tokens' && t.dim === dim).length).toBeGreaterThan(0);
+  });
+
+  it('cost: a execução sem custo não entra, e `n` conta só as que têm custo', () => {
+    seedMarch();
+    const totals = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(of(totals, 'cost')).toMatchObject({ n: 1, total: 0.5 });
+    expect(of(totals, 'cost', 'model', 'opus')).toMatchObject({ n: 1, total: 0.5 });
+    expect(of(totals, 'cost', 'model', 'haiku')).toBeUndefined();
+  });
+
+  it('a execução não medida não gera linha de tokens nem de custo, e não vira zero', () => {
+    runs.measure(run(at(2024, 3), 1000), notMeasured());
+    const totals = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(of(totals, 'runs')).toMatchObject({ n: 1 });
+    expect(totals.filter((t) => t.metric === 'tokens' || t.metric === 'cost' || t.metric === 'usage')).toEqual([]);
+  });
+
+  it('usage: um `dim` por tipo do inventário, `value` é o nome, `n` são as execuções e `total` as chamadas', () => {
+    seedMarch();
+    const totals = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(of(totals, 'usage', 'tool', 'Read')).toMatchObject({ n: 2, total: 8 });
+    expect(of(totals, 'usage', 'mcp_tool', 'faz-ai/get_card')).toMatchObject({ n: 1, total: 2 });
+    expect(of(totals, 'usage', 'agent', 'Explore')).toMatchObject({ n: 1, total: 1 });
+    expect(of(totals, 'usage', 'skill', 'unit-testing')).toMatchObject({ n: 1, total: 1 });
+  });
+
+  it('o inventário de um mês não entra no total de outro', () => {
+    runs.measure(run(at(2024, 3), 1000), measured({}, inventory));
+    runs.measure(run(at(2024, 4), 1000), measured({}, [{ kind: 'tool', name: 'Read', calls: 1 }]));
+
+    expect(of(monthlyTotals(db, boardId, ['2024-04']), 'usage', 'tool', 'Read')).toMatchObject({ n: 1, total: 1 });
+  });
+
+  it('o arquivo guarda o mesmo que o detalhe daria: tokens, custo e inventário sobrevivem ao descarte', () => {
+    seedMarch();
+    const before = monthlyTotals(db, boardId, ['2024-03']);
+
+    expect(consolidate(db, boardId, TODAY)).toEqual(['2024-03']);
+    expect(runs.byMonth('2024-03')).toEqual([]);
+    expect(db.exec('SELECT COUNT(*) FROM ai_run_usage')[0]!.values[0]![0]).toBe(0);
+
+    const after = monthlyTotals(db, boardId, ['2024-03']);
+    expect(after).toEqual(before);
+    expect(of(after, 'tokens')).toMatchObject({ n: 2, total: 200 });
+    expect(of(after, 'cost')).toMatchObject({ n: 1, total: 0.5 });
+    expect(of(after, 'usage', 'tool', 'Read')).toMatchObject({ n: 2, total: 8 });
+  });
+
+  it('RF-21 de #37 não regride: num mês com detalhe, os totais de `runs` e `events` continuam batendo', () => {
+    event(at(2026, 6));
+    runs.measure(run(at(2026, 6), 4000), measured({}, inventory));
+    const totals = monthlyTotals(db, boardId, ['2026-06']);
+
+    expect(of(totals, 'events')).toMatchObject({ n: 1, total: 1 });
+    expect(of(totals, 'runs')).toMatchObject({ n: 1, total: 4000 });
+    expect(of(totals, 'tokens')).toMatchObject({ n: 1, total: 100 });
   });
 });
 

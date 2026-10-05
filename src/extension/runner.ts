@@ -1,15 +1,16 @@
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
 import { cardRef } from '../shared/model';
 import { aiToolInfo } from '../shared/harness';
-import type { AiRunOrigin, AiRunOutcome } from '../shared/log';
+import type { AiRunOrigin, AiRunOutcome, RunReport } from '../shared/log';
 import { columnOf, isLive } from '../shared/selectors';
 import { isYolo } from '../shared/story';
 import type { RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
-import { headlessCommand, tmpArg, type HeadlessCommand } from './headless';
+import { MeasureBrokenError } from './aiOutput/errors';
+import { cut } from './aiOutput/json';
+import { spawnMeasured, type SpawnFn } from './aiOutput/measured';
+import type { OutputFormat } from './aiOutput/reader';
+import { headlessUnsupported } from './headless';
 import type { RunLog } from './log/runLog';
 import { needsTriage, requiredSkills } from './mcp/format';
 import type { MessageRouter } from './panel/messageRouter';
@@ -22,8 +23,8 @@ export interface RunningProcess {
 }
 
 export interface RunnerDeps {
-  /** inicia o comando na pasta do projeto; a saída do processo vai para `log` */
-  spawn(command: HeadlessCommand, cwd: string, log: (text: string) => void): RunningProcess;
+  /** inicia o comando na pasta do projeto; cada pedaço de saída vai para `out`, com o canal de onde veio */
+  spawn: SpawnFn;
   log(line: string): void;
   cwd: string;
   /** home do usuário, de onde se lê a configuração de servidores MCP da ferramenta */
@@ -53,6 +54,8 @@ interface Run {
 
 const RUNNER_AUTHOR = 'Faz AI';
 const TAIL_LINES = 12;
+/** Tamanho de cada linha do `tail`: a explicação da falha no card não vira despejo de saída. */
+const TAIL_CHARS = 300;
 const WHERE = 'Configurações → Harness de IA → "O que a IA pode fazer"';
 
 /** O que a IA precisa saber sobre o limite da execução, para explicar à pessoa em vez de falhar sem contexto. */
@@ -73,19 +76,34 @@ function outcomeOf(run: Run, code: number | null, error: Error | undefined): AiR
   return 'done';
 }
 
-/** Grava os arquivos temporários do comando numa pasta só do usuário e troca os `{tmp:nome}` dos argumentos pelos caminhos. */
-function materialize(command: HeadlessCommand): { command: HeadlessCommand; cleanup: () => void } {
-  const files = Object.entries(command.tempFiles ?? {});
-  if (!files.length) return { command, cleanup: () => {} };
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-run-'));
-  let args = command.args;
-  for (const [name, content] of files) {
-    const file = path.join(dir, name);
-    // pode ter segredos (variáveis dos servidores MCP): só o dono lê
-    fs.writeFileSync(file, content, { mode: 0o600 });
-    args = args.map((a) => a.split(tmpArg(name)).join(file));
+const COUNT = new Intl.NumberFormat('pt-BR');
+const USD = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
+/**
+ * A linha de resumo do consumo que vai para o canal de log no fim da execução. Os números são os
+ * gravados no log, formatados em português; o que a ferramenta não informou (turnos, custo) fica de
+ * fora da linha em vez de aparecer como zero. Nenhuma palavra aqui é nome de campo da CLI.
+ *
+ * Sem consumo, a linha diz por quê: `reason` é o motivo que só quem chama conhece (a execução
+ * terminou antes do fim); `explained` diz que o motivo já foi escrito no canal (a volta para texto)
+ * e não precisa se repetir; sem nenhum dos dois vale o motivo do relatório.
+ */
+export function consumptionLine(report: RunReport, why: { reason?: string | null; explained?: boolean } = {}): string {
+  const c = report.consumption;
+  if (c) {
+    const parts = [
+      `${COUNT.format(c.inputTokens)} entrada`,
+      `${COUNT.format(c.outputTokens)} saída`,
+      `${COUNT.format(c.cacheReadTokens)} leitura de cache`,
+      `${COUNT.format(c.cacheWriteTokens)} criação de cache`,
+      ...(c.turns !== null ? [`${COUNT.format(c.turns)} ${c.turns === 1 ? 'turno' : 'turnos'}`] : []),
+      ...(c.costUsd !== null ? [`US$ ${USD.format(c.costUsd)}${c.costEstimated ? ' (estimado)' : ''}`] : []),
+    ];
+    return `${report.measure === 'partial' ? 'Consumo parcial' : 'Consumo'}: ${parts.join(' · ')}`;
   }
-  return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+  if (why.explained) return 'Consumo não medido.';
+  if (why.reason) return `Consumo não medido: ${why.reason}`;
+  return report.reason ? `Consumo não medido. ${report.reason}` : 'Consumo não medido.';
 }
 
 /** O que a IA recebe a mais quando a história está em modo autônomo (YOLO): sem aprovação, sem perguntas, até o pull request. */
@@ -188,21 +206,9 @@ export class AiRunner {
       const autonomous = isYolo(state, card);
       const permission = autonomous ? 'full' : state.board.runner.permission;
       const permissionAdvice = PERMISSION_ADVICE[permission];
-      const built = headlessCommand(state.board.aiTool, {
-        prompt: cardPrompt(
-          cardRef(card),
-          requiredSkills(state, card),
-          [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
-          autonomous,
-          needsTriage(state, card),
-        ),
-        permission,
-        addDirs: this.router.aiWorkDirs(),
-        exec: plan.input,
-        boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined,
-      });
-      if ('unsupported' in built) throw new Error(built.unsupported);
-      const { command, cleanup } = materialize(built);
+      // a ferramenta sem suporte para esta permissão nem começa: confere antes de gravar a configuração
+      const unsupported = headlessUnsupported(state.board.aiTool, permission);
+      if (unsupported) throw new Error(unsupported);
       // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
       this.deps.runLog?.describe(logId, {
         model: plan.manifest.model?.name ?? null,
@@ -220,24 +226,47 @@ export class AiRunner {
       const messagesBefore = this.aiMessages(cardId);
       if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
       if (plan.manifest.profile || plan.manifest.model) log(plan.summary.join(' | '));
-      log(`Chamando ${tool.label}: ${command.command} ${command.args.map((a) => (a.length > 80 ? `${a.slice(0, 80)}…` : a)).join(' ')}`);
       const tail: string[] = [];
-      let proc: RunningProcess;
-      try {
-        proc = this.deps.spawn(command, this.deps.cwd, (text) =>
-          text
-            .split(/\r?\n/)
-            .filter(Boolean)
-            .forEach((line) => {
-              log(line);
-              tail.push(line.length > 300 ? `${line.slice(0, 300)}…` : line);
-              if (tail.length > TAIL_LINES) tail.shift();
-            }),
-        );
-      } catch (e) {
-        cleanup();
-        throw e;
-      }
+      // quantos processos a execução abriu (2 = a CLI recusou a saída estruturada e o trabalho rodou
+      // em texto) e o formato do último: é o que explica, no fim, por que o consumo não foi medido
+      let attempts = 0;
+      let format: OutputFormat = 'text';
+      const spawn: SpawnFn = (command, cwd, out) => {
+        attempts++;
+        format = command.format;
+        // o que veio antes deste processo (a linha da chamada e, na volta para texto, a tentativa
+        // recusada) não explica a falha dele: o `tail` recomeça aqui
+        tail.length = 0;
+        return this.deps.spawn(command, cwd, out);
+      };
+      // a medição entra sob a mesma porta: o `log` recebe as linhas legíveis, nunca a saída crua, e é
+      // delas que sai o `tail` que explica uma falha na conversa do card
+      const { proc, report } = spawnMeasured(
+        state.board.aiTool,
+        {
+          prompt: cardPrompt(
+            cardRef(card),
+            requiredSkills(state, card),
+            [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+            autonomous,
+            needsTriage(state, card),
+          ),
+          permission,
+          addDirs: this.router.aiWorkDirs(),
+          exec: plan.input,
+          boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined,
+        },
+        this.deps.cwd,
+        {
+          spawn,
+          log: (line) => {
+            log(line);
+            tail.push(cut(line, TAIL_CHARS));
+            if (tail.length > TAIL_LINES) tail.shift();
+          },
+          catalog: state.board.modelCatalog,
+        },
+      );
       const run: Run = {
         proc,
         previous: card.status,
@@ -256,7 +285,6 @@ export class AiRunner {
 
       proc.onExit((code, error) => {
         clearTimeout(run.timer);
-        cleanup();
         log(
           error
             ? `Falhou: ${error.message}`
@@ -267,6 +295,19 @@ export class AiRunner {
                 : `Terminou (código ${code}).`,
         );
         this.deps.runLog?.finish(logId, outcomeOf(run, code, error), code);
+        const measured = report();
+        this.deps.runLog?.measure(logId, measured);
+        log(
+          consumptionLine(
+            // sem consumo e sem motivo (o fluxo trouxe ferramentas, mas nenhum número): a saída não trouxe o consumo
+            measured.consumption || measured.reason ? measured : { ...measured, reason: new MeasureBrokenError(tool.label).message },
+            attempts > 1
+              ? { explained: true }
+              : format !== 'text' && (run.stopped || run.timedOut || error || code !== 0)
+                ? { reason: 'a execução terminou antes de informar o consumo.' }
+                : {},
+          ),
+        );
         try {
           // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
           // mudança de status que explicam o fim da execução ficam ligados a ela

@@ -19,10 +19,24 @@ let router: MessageRouter;
 let runLog: ReturnType<typeof createRunLog> | undefined;
 let spawned: {
   command: HeadlessCommand;
-  emit: (text: string) => void;
+  emit: (text: string, stream?: 'stdout' | 'stderr') => void;
+  /** escreve no `stdout` sem passar pelo falso: o fluxo da CLI como ela o escreveu */
+  raw: (text: string) => void;
   exit: (code: number | null, error?: Error) => void;
   killed: boolean;
 }[];
+
+/** a saída real do Claude Code no modo estruturado, capturada no probe da #70 */
+const FIXTURE = fs.readFileSync(path.join(__dirname, 'fixtures', 'claude-stream-json.jsonl'), 'utf8');
+
+/** o que o Claude Code escreve no modo estruturado para uma resposta: o texto do assistente e o `result` */
+const events = (text: string, failed = false) =>
+  [
+    { type: 'assistant', message: { content: text ? [{ type: 'text', text }] : [] } },
+    { type: 'result', subtype: failed ? 'error' : 'success', is_error: failed, result: text },
+  ]
+    .map((e) => `${JSON.stringify(e)}\n`)
+    .join('');
 
 const build = () =>
   new ChatSession(router, {
@@ -30,8 +44,26 @@ const build = () =>
     log: () => {},
     runLog,
     file: path.join(dir, 'chat.json'),
-    spawn: (command, _cwd, log) => {
-      const entry = { command, emit: log, exit: (_c: number | null, _e?: Error) => {}, killed: false };
+    spawn: (command, _cwd, out) => {
+      // no modo estruturado a ferramenta escreve eventos: o falso junta o que o teste emitiu e, ao
+      // sair, escreve um evento do assistente e um `result` com esse texto, como o Claude Code faz
+      const structured = command.format !== 'text';
+      let said = '';
+      /** o teste já escreveu o fluxo inteiro (`raw`): o falso não acrescenta eventos seus */
+      let scripted = false;
+      const entry = {
+        command,
+        emit: (text: string, stream: 'stdout' | 'stderr' = 'stdout') => {
+          if (structured && stream === 'stdout') said += text;
+          else out(text, stream);
+        },
+        raw: (text: string) => {
+          scripted = true;
+          out(text, 'stdout');
+        },
+        exit: (_c: number | null, _e?: Error) => {},
+        killed: false,
+      };
       spawned.push(entry);
       return {
         kill: () => {
@@ -39,7 +71,10 @@ const build = () =>
           entry.exit(143);
         },
         onExit: (fn) => {
-          entry.exit = (code, error) => fn(code, error);
+          entry.exit = (code, error) => {
+            if (structured && !error && !scripted) out(events(said, code !== 0), 'stdout');
+            fn(code, error);
+          };
         },
       };
     },
@@ -163,6 +198,31 @@ describe('ChatSession', () => {
     expect(messages().length).toBeLessThanOrEqual(100);
     expect(messages().at(-1)!.text).toBe('A IA terminou sem escrever uma resposta.');
   });
+
+  it('a resposta é o texto do ÚLTIMO resultado da ferramenta, sem nada do fluxo de eventos', () => {
+    router.chatCommand({ type: 'chat.send', text: 'liste os arquivos', model: null });
+    expect(spawned[0]!.command.args).toContain('stream-json');
+    spawned[0]!.raw(FIXTURE);
+    spawned[0]!.exit(0);
+    const answer = messages().at(-1)!;
+    expect(answer.role).toBe('assistant');
+    // o primeiro resultado do probe era um recado intermediário ("o subagente foi lançado")
+    expect(answer.text).toContain('Aqui estão os três resultados');
+    expect(answer.text).not.toContain('{"');
+  });
+
+  it('com código diferente de zero, o fim da saída no aviso de erro é texto legível', () => {
+    router.chatCommand({ type: 'chat.send', text: 'a', model: null });
+    spawned[0]!.raw(FIXTURE);
+    spawned[0]!.exit(1);
+    const error = messages().at(-1)!;
+    expect(error.role).toBe('error');
+    expect(error.text).toContain('código 1');
+    expect(error.text).toContain('Subagente Explore concluído');
+    expect(error.text).not.toContain('{"');
+    // a linha da chamada é do board, não da ferramenta
+    expect(error.text).not.toContain('Chamando');
+  });
 });
 
 /** O chat é a quarta origem de execução de IA, e a única sem card (RF-16). */
@@ -221,5 +281,23 @@ describe('ChatSession no log das execuções', () => {
     expect(() => router.chatCommand({ type: 'chat.send', text: 'a', model: null })).toThrow(/Sem restrições/);
     expect(spawned).toHaveLength(0);
     expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'kimi' });
+  });
+
+  it('RF-15: a execução do chat grava o consumo e o inventário com origem "chat" e sem card', () => {
+    router.chatCommand({ type: 'chat.send', text: 'liste os arquivos', model: null });
+    spawned[0]!.raw(FIXTURE);
+    spawned[0]!.exit(0);
+    expect(only()).toMatchObject({
+      origin: 'chat',
+      cardId: null,
+      outcome: 'done',
+      measure: 'full',
+      inputTokens: 54,
+      outputTokens: 1221,
+      cacheReadTokens: 106009,
+      cacheWriteTokens: 28908,
+      turns: 5,
+    });
+    expect(runs.usage(only().id)).toContainEqual({ kind: 'agent', name: 'Explore', calls: 1 });
   });
 });

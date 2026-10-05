@@ -3,7 +3,16 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Database } from 'sql.js';
-import { CARD_TITLE_MAX_LENGTH, dayOf, monthOf, type AiRunConfig, type AiRunStart, type CardEvent } from '../src/shared/log';
+import {
+  CARD_TITLE_MAX_LENGTH,
+  dayOf,
+  monthOf,
+  type AiRunConfig,
+  type AiRunConsumption,
+  type AiRunStart,
+  type CardEvent,
+  type RunReport,
+} from '../src/shared/log';
 import type { BoardState } from '../src/shared/model';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
@@ -11,6 +20,7 @@ import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
+import { createRunLog } from '../src/extension/log/runLog';
 import { cardAndChildrenFacts, cardFacts, cardFamilyFacts, newestCardFacts, trashedCardFacts } from '../src/extension/log/facts';
 
 // Fixa o fuso para o teste não depender do fuso da máquina que roda o CI, e ainda assim exercitar um
@@ -276,6 +286,145 @@ describe('AiRunRepo', () => {
     runs.deleteMonth('2026-01');
     expect(runs.byMonth('2026-01')).toHaveLength(0);
     expect(runs.byMonth('2026-02')).toHaveLength(1);
+  });
+
+  describe('measure', () => {
+    const consumption = (over: Partial<AiRunConsumption> = {}): AiRunConsumption => ({
+      inputTokens: 1200,
+      outputTokens: 340,
+      cacheReadTokens: 5000,
+      cacheWriteTokens: 800,
+      turns: 7,
+      sessionId: 'sess-1',
+      costUsd: 0.42,
+      costEstimated: false,
+      ...over,
+    });
+    const report = (over: Partial<RunReport> = {}): RunReport => ({
+      measure: 'full',
+      consumption: consumption(),
+      inventory: [
+        { kind: 'tool', name: 'Read', calls: 4 },
+        { kind: 'mcp_tool', name: 'faz-ai/get_card', calls: 2 },
+      ],
+      answer: '',
+      reason: null,
+      ...over,
+    });
+    const none = (): RunReport => ({ measure: 'none', consumption: null, inventory: [], answer: '', reason: 'texto' });
+    const rows = (id: string) => db.exec(`SELECT COUNT(*) FROM ai_run_usage WHERE run_id = '${id}'`)[0]!.values[0]![0];
+    const read = (id: string) => runs.byMonth('2026-01').find((r) => r.id === id)!;
+
+    it('relatório full grava e lê de volta tokens, custo, turnos, sessão, measure e inventário', () => {
+      const id = runs.start(baseStart());
+      runs.measure(id, report());
+      const r = read(id);
+      expect(r.inputTokens).toBe(1200);
+      expect(r.outputTokens).toBe(340);
+      expect(r.cacheReadTokens).toBe(5000);
+      expect(r.cacheWriteTokens).toBe(800);
+      expect(r.costUsd).toBe(0.42);
+      expect(r.costEstimated).toBe(false);
+      expect(r.turns).toBe(7);
+      expect(r.sessionId).toBe('sess-1');
+      expect(r.measure).toBe('full');
+      expect(runs.usage(id)).toEqual([
+        { kind: 'mcp_tool', name: 'faz-ai/get_card', calls: 2 },
+        { kind: 'tool', name: 'Read', calls: 4 },
+      ]);
+    });
+
+    it('relatório none deixa tokens, custo, turnos e sessão nulos e não escreve inventário', () => {
+      const id = runs.start(baseStart());
+      runs.measure(id, none());
+      const r = read(id);
+      expect(r.measure).toBe('none');
+      expect([r.inputTokens, r.outputTokens, r.cacheReadTokens, r.cacheWriteTokens]).toEqual([null, null, null, null]);
+      expect([r.costUsd, r.costEstimated, r.turns, r.sessionId]).toEqual([null, null, null, null]);
+      expect(rows(id)).toBe(0);
+    });
+
+    it('relatório partial grava o que foi lido e measure partial', () => {
+      const id = runs.start(baseStart());
+      runs.measure(id, report({ measure: 'partial', consumption: consumption({ turns: null, sessionId: null, costUsd: null }) }));
+      const r = read(id);
+      expect(r.measure).toBe('partial');
+      expect(r.inputTokens).toBe(1200);
+      expect(r.turns).toBeNull();
+      expect(r.sessionId).toBeNull();
+      expect(runs.usage(id)).toHaveLength(2);
+    });
+
+    it('custo estimado grava cost_estimated verdadeiro; zero medido continua zero, não nulo', () => {
+      const id = runs.start(baseStart());
+      runs.measure(id, report({ consumption: consumption({ costUsd: 0.1, costEstimated: true, inputTokens: 0 }) }));
+      const r = read(id);
+      expect(r.costEstimated).toBe(true);
+      expect(r.inputTokens).toBe(0);
+    });
+
+    it('sem custo, cost_usd e cost_estimated ficam nulos mesmo com tokens medidos', () => {
+      const id = runs.start(baseStart());
+      runs.measure(id, report({ consumption: consumption({ costUsd: null, costEstimated: true }) }));
+      const r = read(id);
+      expect(r.costUsd).toBeNull();
+      expect(r.costEstimated).toBeNull();
+      expect(r.outputTokens).toBe(340);
+    });
+
+    it('duas chamadas com o mesmo inventário não duplicam linha', () => {
+      const id = runs.start(baseStart());
+      runs.measure(id, report());
+      runs.measure(id, report());
+      expect(rows(id)).toBe(2);
+    });
+
+    it('execução nunca medida lê measure none e consumo nulo (RF-16)', () => {
+      const id = runs.start(baseStart());
+      const r = read(id);
+      expect(r.measure).toBe('none');
+      expect(r.inputTokens).toBeNull();
+      expect(r.costUsd).toBeNull();
+      expect(runs.usage(id)).toEqual([]);
+    });
+
+    it('apagar a execução leva o inventário por cascata', () => {
+      const id = runs.start(baseStart());
+      runs.measure(id, report());
+      runs.deleteMonth('2026-01');
+      expect(rows(id)).toBe(0);
+    });
+
+    it('execução inexistente falha e não deixa inventário órfão', () => {
+      expect(() => runs.measure('nao-existe', report())).toThrow('Execução de IA não encontrada');
+      expect(rows('nao-existe')).toBe(0);
+    });
+
+    it('RunLog.measure grava pelo mesmo caminho e ignora id vazio', () => {
+      const lines: string[] = [];
+      const runLog = createRunLog(db, (l) => lines.push(l));
+      const id = runLog.start(baseStart());
+      runLog.measure(id, report());
+      runLog.measure('', report());
+      expect(read(id).measure).toBe('full');
+      expect(lines).toEqual([]);
+    });
+
+    it('RunLog.measure com um banco que lança escreve no canal e não propaga a exceção', () => {
+      const lines: string[] = [];
+      const quebrado = {
+        run: () => {
+          throw new Error('disco cheio');
+        },
+        exec: () => {
+          throw new Error('disco cheio');
+        },
+      } as unknown as Database;
+      const runLog = createRunLog(quebrado, (l) => lines.push(l));
+      expect(() => runLog.measure('abc', report())).not.toThrow();
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain('disco cheio');
+    });
   });
 });
 

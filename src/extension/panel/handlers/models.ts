@@ -26,10 +26,15 @@ export function useTool(ctx: BoardContext, tool: AiTool): void {
   suggestRules(ctx, tool);
 }
 
-/** Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. */
+/**
+ * Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. O preço que a
+ * pessoa cadastrou é do catálogo, não da ferramenta: um modelo reencontrado mantém o preço que tinha
+ * (senão cada "Detectar modelos" zeraria a estimativa de custo das execuções seguintes, sem aviso).
+ */
 function detectModels(ctx: BoardContext, tool: AiTool): void {
   const { board } = ctx.state();
-  const found = modelsFor(tool, ctx.home);
+  const priced = new Map(board.modelCatalog.flatMap((o) => (o.price ? [[o.id, o.price] as const] : [])));
+  const found = modelsFor(tool, ctx.home).map((o) => (priced.has(o.id) ? { ...o, price: priced.get(o.id) } : o));
   const ids = new Set(found.map((o) => o.id));
   const rest = board.modelCatalog.filter((o) => !ids.has(o.id));
   const at = rest.findIndex((o) => o.tool === tool);

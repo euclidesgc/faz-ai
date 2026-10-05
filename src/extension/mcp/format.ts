@@ -4,6 +4,7 @@ import {
   describeRule,
   modelFieldOf,
   modelLabel,
+  modelPrice,
   parseModelValue,
   resolveModelInput,
   suggestModel,
@@ -198,6 +199,8 @@ export function modelsOverview(s: BoardState) {
       label: o.label,
       efforts: o.efforts,
       defaultEffort: o.defaultEffort,
+      // null = sem preço completo: o board não estima o custo desse modelo
+      price: modelPrice(o),
     })),
     rules: s.board.modelRules.map((r) => ({
       ...(r.name ? { name: r.name } : {}),

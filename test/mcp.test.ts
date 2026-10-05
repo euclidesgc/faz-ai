@@ -462,6 +462,53 @@ describe('modelos de IA', () => {
     expect((await set('modelo-que-nao-existe')).text).toContain('não está no catálogo');
   });
 
+  it('upsert_model grava o preço, get_models devolve, e uma chamada sem preço preserva o que havia', async () => {
+    const entry = async (value: string) => (await call('get_models')).data.catalog.find((o: any) => o.value === value);
+    expect((await entry('claude:opus')).price).toBeNull(); // o board não embute preço
+
+    const preco = { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 };
+    const withPrice = await call('upsert_model', {
+      tool: 'claude',
+      model: 'opus',
+      label: 'Opus',
+      efforts: ['low', 'high'],
+      default_effort: 'low',
+      price_input: 15,
+      price_output: 75,
+      price_cache_read: 1.5,
+      price_cache_write: 18.75,
+    });
+    expect(withPrice.data.catalog.find((o: any) => o.value === 'claude:opus')).toMatchObject({ label: 'Opus', price: preco });
+
+    // sem preço na chamada: o resto é substituído como antes e o preço continua (RF-25)
+    await call('upsert_model', { tool: 'claude', model: 'opus', label: 'Opus renomeado', efforts: ['low'] });
+    expect(await entry('claude:opus')).toMatchObject({ label: 'Opus renomeado', efforts: ['low'], price: preco });
+
+    // preço novo de um campo só: troca esse campo e mantém os outros três
+    await call('upsert_model', { tool: 'claude', model: 'opus', price_output: 80 });
+    expect((await entry('claude:opus')).price).toEqual({ ...preco, output: 80 });
+
+    // preço zero é preço (de graça), não ausência
+    await call('upsert_model', { tool: 'claude', model: 'opus', price_input: 0, price_cache_read: 0 });
+    expect((await entry('claude:opus')).price).toEqual({ ...preco, output: 80, input: 0, cacheRead: 0 });
+
+    // preço incompleto é modelo sem preço: get_models mostra null
+    await call('upsert_model', { tool: 'claude', model: 'novo-sem-tudo', price_input: 2 });
+    expect((await entry('claude:novo-sem-tudo')).price).toBeNull();
+    expect(router.snapshot().board.modelCatalog.find((o) => o.id === 'claude:novo-sem-tudo')!.price).toEqual({ input: 2 });
+
+    // preço negativo é recusado
+    expect((await call('upsert_model', { tool: 'claude', model: 'opus', price_input: -1 })).error).toBe(true);
+
+    // "Detectar modelos" mantém o preço do catálogo (RF-24, RF-30)
+    await call('detect_models');
+    expect((await entry('claude:opus')).price).toEqual({ ...preco, output: 80, input: 0, cacheRead: 0 });
+
+    // e delete_model continua removendo o modelo
+    const after = await call('delete_model', { model: 'claude:opus' });
+    expect(after.data.catalog.some((o: any) => o.value === 'claude:opus')).toBe(false);
+  });
+
   it('sugere o modelo pelo esforço da tarefa sem trocar uma escolha manual', async () => {
     // regras iniciais: Esforço Baixo/Médio/Alto → modelo leve/intermediário/forte da primeira ferramenta
     const rules = (await call('get_models')).data.rules;

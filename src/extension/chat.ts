@@ -1,13 +1,13 @@
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
 import { aiToolInfo } from '../shared/harness';
-import type { AiRunOutcome } from '../shared/log';
+import type { AiRunOutcome, RunReport } from '../shared/log';
 import { parseModelValue } from '../shared/models';
 import type { BoardState } from '../shared/model';
+import { spawnMeasured, type SpawnFn } from './aiOutput/measured';
 import { BOARD_SERVER, type ExecInput } from './execution';
-import { headlessCommand, tmpArg, type HeadlessCommand } from './headless';
+import { headlessUnsupported } from './headless';
 import type { MessageRouter } from './panel/messageRouter';
 import { PERMISSION_ADVICE, type RunnerDeps, type RunningProcess } from './runner';
 
@@ -33,20 +33,6 @@ export function chatPrompt(history: ChatMessage[], text: string, advice: string 
     ...(past.length ? ['Conversa até agora:', ...past] : []),
     `Pessoa: ${text}`,
   ].join('\n');
-}
-
-/** Troca os `{tmp:nome}` dos argumentos por arquivos temporários, como no executor de cards. */
-function materialize(command: HeadlessCommand): { command: HeadlessCommand; cleanup: () => void } {
-  const files = Object.entries(command.tempFiles ?? {});
-  if (!files.length) return { command, cleanup: () => {} };
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-chat-'));
-  let args = command.args;
-  for (const [name, content] of files) {
-    const file = path.join(dir, name);
-    fs.writeFileSync(file, content, { mode: 0o600 });
-    args = args.map((a) => a.split(tmpArg(name)).join(file));
-  }
-  return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
 /** O modelo escolhido no chat, no formato que a linha de comando da ferramenta pede; null = o padrão dela. */
@@ -119,21 +105,12 @@ export class ChatSession {
           phase: '',
         })
       : '';
-    let built;
-    try {
-      built = headlessCommand(state.board.aiTool, {
-        prompt: chatPrompt(this.messages, body, PERMISSION_ADVICE[permission]),
-        permission,
-        addDirs: this.router.aiWorkDirs(),
-        exec,
-        boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined,
-      });
-      if ('unsupported' in built) throw new Error(built.unsupported);
-    } catch (e) {
+    // a ferramenta sem suporte para esta permissão nem começa: confere antes de gravar a configuração
+    const unsupported = headlessUnsupported(state.board.aiTool, permission);
+    if (unsupported) {
       this.deps.runLog?.finish(logId, 'unsupported');
-      throw e;
+      throw new Error(unsupported);
     }
-    const { command, cleanup } = materialize(built);
     // no chat não há agente do board nem subagente escolhido: `null` é "não definido", não "vazio"
     this.deps.runLog?.describe(logId, {
       model: exec.model?.name ?? null,
@@ -148,12 +125,38 @@ export class ChatSession {
     });
 
     this.add({ role: 'user', text: body, ...(model ? { model } : {}) });
-    const out: string[] = [];
+    // as últimas linhas legíveis, para explicar um erro; nunca a saída crua, que no modo estruturado é JSONL
+    const tail: string[] = [];
+    const spawn: SpawnFn = (command, cwd, out) => {
+      // a linha da chamada e, na volta para texto, a tentativa recusada não explicam o erro do processo
+      tail.length = 0;
+      return this.deps.spawn(command, cwd, out);
+    };
     let proc: RunningProcess;
+    let report: () => RunReport;
     try {
-      proc = this.deps.spawn(command, this.deps.cwd, (chunk) => out.push(chunk));
+      ({ proc, report } = spawnMeasured(
+        state.board.aiTool,
+        {
+          prompt: chatPrompt(this.messages, body, PERMISSION_ADVICE[permission]),
+          permission,
+          addDirs: this.router.aiWorkDirs(),
+          exec,
+          boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined,
+        },
+        this.deps.cwd,
+        {
+          spawn,
+          log: (raw) => {
+            const line = raw.replace(ANSI, '');
+            this.deps.log(`[chat] ${line}`);
+            tail.push(line);
+            if (tail.length > TAIL_LINES) tail.shift();
+          },
+          catalog: state.board.modelCatalog,
+        },
+      ));
     } catch (e) {
-      cleanup();
       // sem processo não há desfecho a medir: o mesmo `unsupported` do executor de cards
       this.deps.runLog?.finish(logId, 'unsupported');
       this.add({ role: 'error', text: e instanceof Error ? e.message : String(e) });
@@ -167,22 +170,23 @@ export class ChatSession {
       proc.kill();
     }, state.board.runner.timeoutMinutes * 60_000);
     this.publish();
-    this.deps.log(`[chat] Chamando ${tool.label}`);
 
     proc.onExit((code, error) => {
       clearTimeout(timer);
-      cleanup();
       this.proc = null;
-      const text = out.join('').replace(ANSI, '').trim();
       const outcome: AiRunOutcome = this.stopped ? 'stopped' : timedOut ? 'timeout' : error || code !== 0 ? 'failed' : 'done';
       this.deps.runLog?.finish(logId, outcome, code);
+      const measured = report();
+      this.deps.runLog?.measure(logId, measured);
+      // a resposta é o texto final que a ferramenta deu, nunca o fluxo de eventos
+      const text = measured.answer.replace(ANSI, '').trim();
       if (this.stopped) this.add({ role: 'error', text: 'Interrompido.' });
       else if (timedOut)
         this.add({ role: 'error', text: `A resposta passou do tempo limite (${state.board.runner.timeoutMinutes} min) e foi encerrada.` });
       else if (error) this.add({ role: 'error', text: `Não foi possível executar o ${tool.label}: ${error.message}` });
       else if (code !== 0) {
-        const tail = text.split(/\r?\n/).slice(-TAIL_LINES).join('\n');
-        this.add({ role: 'error', text: `O ${tool.label} terminou com erro (código ${code}).${tail ? `\n\n${tail}` : ''}` });
+        const lines = tail.join('\n');
+        this.add({ role: 'error', text: `O ${tool.label} terminou com erro (código ${code}).${lines ? `\n\n${lines}` : ''}` });
       } else this.add({ role: 'assistant', text: text || 'A IA terminou sem escrever uma resposta.' });
     });
   }
