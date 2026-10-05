@@ -703,6 +703,31 @@ Quando uma versão nova da extensão muda o board padrão, o board pergunta se v
 (ou use **Faz AI: Atualizar board para o padrão atual**). A atualização só acrescenta o que falta:
 nenhum card sai do lugar e o que você personalizou é mantido. Uma cópia do banco é gravada antes.
 
+### Preços do Cursor
+
+A referência é a [tabela de preços do Cursor](https://cursor.com/docs/models-and-pricing). O board
+não a consulta sozinho: os preços são mantidos à mão em **Modelos de IA** ou pela IA com
+`upsert_model`.
+
+- **Auto tem preço variável.** O Cursor cobra o preço de lista do modelo para o qual cada pedido foi
+  roteado, então não há tarifa fixa para cadastrar. O modelo `auto` já vem com **Preço variável**
+  ligado: os campos de preço dão lugar a um aviso, e a execução fica sem custo estimado (em branco,
+  nunca um número inventado). A chave existe em todo modelo; pelo MCP, é o `variable_price` do
+  `upsert_model`.
+- **Tarifa do Cursor (Cursor Token Rate).** Nos planos Teams e Enterprise, o Cursor cobra US$ 0,25
+  por milhão de tokens (entrada, saída e cache) por cima do preço dos modelos de terceiros; os
+  modelos do próprio Cursor (Composer e Grok) são isentos. Ligue **Somar a tarifa do Cursor** no
+  cartão do Cursor (pelo MCP, `cursorTokenRate` no `update_rules`) e a estimativa passa a somá-la.
+  Vale para as execuções seguintes: o custo das já registradas não muda.
+- **Modo rápido e contexto longo.** O modo rápido costuma custar 2x e entra como um modelo à parte,
+  com preço próprio (ver **Incluir os modos rápidos** acima). O contexto longo (mais de 256 mil
+  tokens) pode custar 2x, e 3x junto com o modo rápido, mas não é separado: o Cursor só informa o
+  total de tokens da execução, e a estimativa usa a tarifa cadastrada.
+- **Como os nomes se correspondem.** O identificador na ferramenta é o id que `cursor-agent models`
+  lista (`claude-opus-5-5`); o nome é o da linha na tabela de preços; no board o modelo fica como
+  `cursor:claude-opus-5-5`, e cada versão rápida tem o seu (`cursor:claude-opus-5-5-fast`). Com isso
+  a IA consegue ler a tabela e preencher os preços pelo `upsert_model`.
+
 ## Onde ficam os dados
 
 O board e os anexos ficam no armazenamento da extensão, fora do repositório. Cada pasta tem o seu

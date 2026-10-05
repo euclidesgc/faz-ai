@@ -738,6 +738,31 @@ update it (or use **Faz AI: Atualizar board para o padrão atual**). The update 
 missing: no card leaves its place and what you customized is kept. A copy of the database is saved
 first.
 
+### Cursor pricing
+
+The reference is [Cursor's pricing table](https://cursor.com/docs/models-and-pricing). The board does
+not read it on its own: prices are kept by hand in **Modelos de IA** (AI models) or by the AI through
+`upsert_model`.
+
+- **Auto has a variable price.** Cursor charges the list price of the model each request is routed
+  to, so there is no fixed rate to enter. The `auto` model comes with **Preço variável** (variable
+  price) on: the price fields give way to a notice, and the run has no estimated cost (blank, never a
+  made-up number). Every model has the switch; through MCP, it is `variable_price` in
+  `upsert_model`.
+- **Cursor Token Rate.** On Teams and Enterprise plans, Cursor charges US$ 0.25 per million tokens
+  (input, output and cache) on top of the price of third-party models; Cursor's own models (Composer
+  and Grok) are exempt. Turn on **Somar a tarifa do Cursor** (add the Cursor fee) on the Cursor card
+  (through MCP, `cursorTokenRate` in `update_rules`) and the estimate adds it. It applies to the
+  next runs: the cost of runs already recorded does not change.
+- **Fast mode and long context.** Fast mode usually costs 2x and enters as a separate model with its
+  own price (see **Incluir os modos rápidos** above). Long context (over 256 thousand tokens) may cost
+  2x, and 3x together with fast mode, but it is not told apart: Cursor only reports the run's token
+  total, and the estimate uses the price entered.
+- **How names match.** The identifier in the tool is the id `cursor-agent models` lists
+  (`claude-opus-5-5`); the name is the row in the pricing table; on the board the model is
+  `cursor:claude-opus-5-5`, and each fast version has its own (`cursor:claude-opus-5-5-fast`). With
+  that, the AI can read the table and fill in the prices through `upsert_model`.
+
 ## Where the data lives
 
 The board and the attachments live in the extension's storage, outside the repository. Each folder
