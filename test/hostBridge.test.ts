@@ -13,11 +13,15 @@ let sent: HostToWebview[];
 let env: HostEnv;
 let shown: string[];
 let bridge: HostBridge;
+let saves: number;
+let rawDb: Awaited<ReturnType<typeof openInMemory>>;
 
 beforeEach(async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-bridge-'));
   const db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
-  router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+  rawDb = db;
+  saves = 0;
+  router = new MessageRouter({ db, scheduleSave: () => void saves++, close: async () => {} } as never, {
     workspaceKey: 'ws',
     folderName: 'P',
     author: 'Pessoa',
@@ -224,5 +228,38 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     expect(importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: ['#3'] })).toBe(
       'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3.',
     );
+  });
+});
+
+describe('HostBridge: metrics.query', () => {
+  const count = (table: string) => Number(rawDb.exec(`SELECT COUNT(*) FROM ${table}`)[0]!.values[0]![0]);
+
+  it('responde metrics.result com o mesmo requestId', async () => {
+    await bridge.handle({ type: 'metrics.query', requestId: 'm1', query: {} });
+    const msg = sent.at(-1) as Extract<HostToWebview, { type: 'metrics.result' }>;
+    expect(msg.type).toBe('metrics.result');
+    expect(msg.requestId).toBe('m1');
+    expect(msg.error).toBeUndefined();
+    expect(msg.result).toBeDefined();
+  });
+
+  it('consulta que lança vira error dentro de metrics.result, com o requestId', async () => {
+    await bridge.handle({ type: 'metrics.query', requestId: 'm2', query: { startDate: '2026-02-01', endDate: '2026-01-01' } });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toEqual({ type: 'metrics.result', requestId: 'm2', error: 'end_date anterior a start_date.' });
+  });
+
+  it('dez consultas seguidas não escrevem nada: sem card_events, sem ai_runs, sem onDidChange, sem scheduleSave', async () => {
+    let changes = 0;
+    router.onDidChange(() => void changes++);
+    const events = count('card_events');
+    const runs = count('ai_runs');
+    saves = 0;
+    for (let i = 0; i < 10; i++) await bridge.handle({ type: 'metrics.query', requestId: `q${i}`, query: {} });
+    expect(sent.filter((m) => m.type === 'metrics.result')).toHaveLength(10);
+    expect(count('card_events')).toBe(events);
+    expect(count('ai_runs')).toBe(runs);
+    expect(changes).toBe(0);
+    expect(saves).toBe(0);
   });
 });

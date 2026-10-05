@@ -101,8 +101,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // a retenção: fora da janela, o detalhe do mês vira total em `log_months`. Roda aqui, na abertura,
   // no máximo uma vez por dia — nunca durante uma mutação do board, para não entrar no custo de uma
   // operação comum da pessoa mesmo que fique lenta.
-  const opened = new BoardRepo(handle.db).openedNow(router.boardId, Date.now());
-  if (ownsBoard && opened.rollupDay !== dayOf(Date.now())) consolidate(handle.db, router.boardId, Date.now());
+  const boardRepo = new BoardRepo(handle.db);
+  const opened = boardRepo.openedNow(router.boardId, Date.now());
+  if (ownsBoard && opened.rollupDay !== dayOf(Date.now()))
+    consolidate(handle.db, router.boardId, Date.now(), boardRepo.retentionMonths(router.boardId));
   const pathEnv = await loginShellPath();
   const runner = new AiRunner(router, {
     cwd: o.folderPath,

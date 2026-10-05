@@ -5,6 +5,12 @@ export type CancelChildrenMode = 'ask' | 'cascade' | 'keep';
 /** O que fazer com a história quando a última sub-tarefa em aberto é concluída. */
 export type CompleteParentMode = 'ask' | 'auto' | 'off';
 
+/** Meses completos de detalhe do log guardados, além do mês corrente, quando a regra não foi escolhida. */
+export const DEFAULT_LOG_RETENTION_MONTHS = 6;
+/** Limites da janela de retenção: abaixo de 1 o painel ficaria sem mês completo; acima de 24 o arquivo do board estoura o teto de tamanho. */
+export const LOG_RETENTION_MIN = 1;
+export const LOG_RETENTION_MAX = 24;
+
 /** Regras do board, configuráveis em Configurações → Regras. */
 export interface BoardRules {
   /** história não entra em coluna de conclusão com sub-tarefas em aberto */
@@ -17,6 +23,8 @@ export interface BoardRules {
   confirmArchive: ConfirmMode;
   /** preenche o campo de modelo com a sugestão enquanto ele não foi escolhido à mão */
   autoApplyModelSuggestion: boolean;
+  /** meses completos de detalhe do log guardados além do mês corrente (de 1 a 24); os totais por mês nunca expiram */
+  logRetentionMonths: number;
 }
 
 export const DEFAULT_RULES: BoardRules = {
@@ -27,6 +35,7 @@ export const DEFAULT_RULES: BoardRules = {
   confirmTrash: 'whenDependents',
   confirmArchive: 'whenDependents',
   autoApplyModelSuggestion: true,
+  logRetentionMonths: DEFAULT_LOG_RETENTION_MONTHS,
 };
 
 /** Lê o JSON salvo, completando com os padrões o que faltar ou for inválido. */
@@ -53,5 +62,13 @@ export function parseRules(json: string | null | undefined): BoardRules {
     confirmArchive: pick(raw.confirmArchive, confirm, DEFAULT_RULES.confirmArchive),
     autoApplyModelSuggestion:
       typeof raw.autoApplyModelSuggestion === 'boolean' ? raw.autoApplyModelSuggestion : DEFAULT_RULES.autoApplyModelSuggestion,
+    // só número inteiro dentro dos limites: "6" em texto, 2.5, 0 e 25 voltam ao padrão em vez de serem arredondados
+    logRetentionMonths:
+      typeof raw.logRetentionMonths === 'number' &&
+      Number.isInteger(raw.logRetentionMonths) &&
+      raw.logRetentionMonths >= LOG_RETENTION_MIN &&
+      raw.logRetentionMonths <= LOG_RETENTION_MAX
+        ? raw.logRetentionMonths
+        : DEFAULT_RULES.logRetentionMonths,
   };
 }

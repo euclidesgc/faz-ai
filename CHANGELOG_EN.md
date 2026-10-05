@@ -18,11 +18,58 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   recorded **with no measured consumption** ("não medido", not zero). Questions in the board chat
   are recorded too, with no card. `get_metrics` now returns tokens and cost.
 
-- **The detail of each run in the board's file dropped from 12 to 6 months.** What the board keeps
-  per run (now with consumption and inventory) stays for 6 months besides the current month; after
-  that only the monthly totals remain, and they never expire. If you are upgrading, you lose the
-  individual detail of runs older than 6 months, not the totals. The shorter window keeps the
-  database file within its size limit.
+- **New Métricas (Metrics) view, the fourth navigation button.** It shows the board's work and AI
+  usage, in the editor and in the board in the browser. It has period filters (Hoje, 7 dias, 30
+  dias, Este mês, Últimos 12 meses, Tudo and a free range) and a workflow filter, and five totals:
+  completed activities, AI runs, tokens, cost and AI time. AI time is the sum of each run's
+  duration, so simultaneous runs add up and the total can exceed the elapsed time. What was not
+  measured shows as "não medido" (not measured), never as 0.
+
+- **The metrics panel has the cost and tokens series per month.** A bar chart, one series at a time.
+  The month in progress is hatched, a month with no data is a gap marked "sem dado" (no data), and a
+  table has the same numbers. The notes sit next to the number: since when the board's log exists,
+  the period cut at the start of the log, and the months that only have the monthly total.
+
+- **The metrics panel shows where the usage happened, how long a card waits in each phase and what
+  the AI used.** Five new blocks below the monthly series, each one saying how far it sees: the
+  whole series of the period or only the detail kept, with the month it starts.
+  - **Where the usage happened:** usage split by phase, card type, model, AI tool, effort or profile,
+    as horizontal bars in the chosen measure (cost, tokens, runs or AI time), with the table of the
+    four measures beside them.
+  - **How long a card stays in a phase:** median and mean of each pass through a phase, how many
+    permanences are unknown and how many cards are in the phase now. It is clock time, not AI time:
+    the card may be sitting there waiting for someone.
+  - **Lead time:** from the card's creation to its first completion, with the median in front, the
+    mean, the count of unknowns and the list per card. Unknown is a card whose creation fell outside
+    the detail kept; the date is not estimated.
+  - **Most expensive phases and Most expensive cards:** two rankings side by side, in tables sortable
+    by any measure. The default is cost when the period has measured cost and AI time when it does
+    not, and the screen writes the criterion in force. What goes past the row limit adds up in an
+    "others" row.
+  - **What the AI used:** tools, MCP tools (with the server in its own column), subagents and
+    skills, with runs and uses. "Not measured yet" and "no records in the period" are different
+    states.
+
+  Tokens count even when the model has no price configured; cost adds up only the runs that have a
+  price, and the note says how many were left out. The times and the inventory read only the detail
+  kept: when a month leaves the retention window, it leaves these blocks. Tables that scroll take
+  keyboard focus, the inverted range error is announced to screen readers, and the retention window
+  field says it saves when you press Enter or leave it.
+
+- **`get_metrics` groups by effort, profile, used tool and MCP tool.** The new dimensions are
+  `effort`, `profile`, `used_tool` and `mcp_tool`. Mind the names: `tool` is the AI tool that ran
+  (claude, codex); `used_tool` and `mcp_tool` are what the run used (Read, Bash, `get_card`), and
+  `mcp_tool` brings the server in its own column, or "servidor não registrado" (server not recorded)
+  when the name did not carry it. As with `agent` and `skill`, the inventory dimensions only count
+  runs and uses, with no tokens or cost. `effort` and `profile` have tokens and cost. The panel's
+  times (permanence and lead time) are not in `get_metrics`.
+
+- **The window for each run's detail is configurable, from 1 to 24 months, and the default dropped
+  from 12 to 6.** In the **Detalhe guardado** (Detail kept) block of the Metrics view you choose how
+  many months of detail (consumption and inventory per run) the board keeps besides the current
+  month; after that only the monthly totals remain, and they never expire. Lowering the window asks
+  for confirmation and the discard happens the next time the board opens. If you are upgrading, you
+  lose the individual detail of runs older than 6 months, not the totals. The shorter default keeps the database file within its size limit.
 
 - **One click on the branch name copies it.** In the open card, the story's branch became a button:
   clicking copies the name to the clipboard and the screen confirms with "Nome copiado" (name copied).

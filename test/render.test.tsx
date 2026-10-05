@@ -28,6 +28,8 @@ import { GitSettings } from '../src/webview/components/settings/GitSettings';
 import { BackupSettings } from '../src/webview/components/settings/BackupSettings';
 import { TypesSettings } from '../src/webview/components/settings/TypesSettings';
 import { FiltersApp } from '../src/webview/FiltersApp';
+import { App } from '../src/webview/App';
+import { MetricsView } from '../src/webview/components/metrics/MetricsView';
 import { useBoardStore } from '../src/webview/store/boardStore';
 
 // na renderização de servidor o zustand lê o estado inicial da store; aqui as telas precisam do estado atual
@@ -292,5 +294,24 @@ describe('telas montam sem erro', () => {
       '.claude/agents/revisor-de-spec.md',
     ])
       expect(harness).toContain(text);
+  });
+});
+
+describe('visão Métricas no shell', () => {
+  it('é a quarta visão da nav, marcada como atual no atributo, e a barra de filtros de cards não aparece nela (RF-01)', () => {
+    useBoardStore.setState({ view: 'board' });
+    const onBoard = html(<App />);
+    expect(onBoard).toContain('Abrir filtros');
+    expect(onBoard).toMatch(/<button[^>]*>Métricas<\/button>/);
+    expect(onBoard).not.toMatch(/aria-current="page"[^>]*>Métricas/);
+    useBoardStore.setState({ view: 'metrics' });
+    const onMetrics = html(<App />);
+    expect(onMetrics).toMatch(/<button[^>]*aria-current="page"[^>]*>Métricas<\/button>/);
+    expect(onMetrics).not.toContain('Abrir filtros');
+    expect(onMetrics).toContain('class="metrics"');
+    expect(onMetrics).toContain('Carregando métricas…');
+    expect(onMetrics).toContain('aria-live="polite"');
+    useBoardStore.setState({ view: 'board' });
+    expect(html(<MetricsView />)).toContain('<h2 id="metrics-title">Métricas</h2>');
   });
 });

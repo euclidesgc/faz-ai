@@ -2,7 +2,8 @@ import { z } from 'zod';
 import type { MetricsDim, MetricsResult, MetricsRow } from '../../log/metrics';
 import type { DefineTool } from './registry';
 
-const GROUP_BY = ['phase', 'card_type', 'model', 'tool', 'card', 'agent', 'skill'] as const;
+const GROUP_BY = ['phase', 'card_type', 'model', 'tool', 'card', 'agent', 'skill', 'effort', 'profile', 'used_tool', 'mcp_tool'] as const;
+const INVENTORY_DIMS = new Set<MetricsDim | undefined>(['agent', 'skill', 'used_tool', 'mcp_tool']);
 
 function parseCardNumber(ref: string | number): number {
   const n = Number(String(ref).trim().replace(/^#/, ''));
@@ -23,13 +24,26 @@ function formatCost(usd: number): string {
   return `US$ ${usd.toFixed(2)}`;
 }
 
-const HEADERS: Record<'normal' | 'inventory', string[]> = {
+type TableVariant = 'normal' | 'inventory' | 'mcp';
+
+const HEADERS: Record<TableVariant, string[]> = {
   normal: ['grupo', 'execuções', 'duração', 'tokens', 'custo(estimado)'],
   inventory: ['grupo', 'execuções', 'usos'],
+  mcp: ['grupo', 'servidor', 'execuções', 'usos'],
 };
 
-function formatRow(r: MetricsRow, inventory: boolean): string[] {
-  if (inventory) return [r.label, String(r.runs), String(r.calls ?? 0)];
+function variantOf(groupBy: MetricsDim | undefined): TableVariant {
+  if (groupBy === 'mcp_tool') return 'mcp';
+  return INVENTORY_DIMS.has(groupBy) ? 'inventory' : 'normal';
+}
+
+function formatRow(r: MetricsRow, variant: TableVariant): string[] {
+  if (variant === 'inventory') return [r.label, String(r.runs), String(r.calls ?? 0)];
+  if (variant === 'mcp') {
+    // A linha "outros" não tem servidor (soma de vários): "-". Vazio = servidor não registrado (RF-26).
+    const server = r.server === undefined ? '-' : r.server === '' ? 'servidor não registrado' : r.server;
+    return [r.label, server, String(r.runs), String(r.calls ?? 0)];
+  }
   return [
     r.label,
     String(r.runs),
@@ -53,28 +67,36 @@ function formatCoverage(result: MetricsResult): string {
   if (result.partialMonths.length)
     lines.push(`recorte parcial de mês consolidado (valor do mês inteiro): ${result.partialMonths.join(', ')}`);
   if (result.othersCount > 0) lines.push(`"outros" soma ${result.othersCount} grupo(s) fora do limite`);
-  if (result.costPartial) lines.push('custo e tokens são estimados e parciais: parte das execuções do recorte não tem consumo medido');
-  else if (result.rows.some((r) => r.costUsd != null)) lines.push('custo estimado');
+  // tokens e custo têm cada um a sua cobertura: execução medida sem preço no catálogo tem tokens e não tem custo
+  if (result.tokensPartial) lines.push('tokens parciais: parte das execuções do recorte não tem consumo medido');
+  const hasCost = result.rows.some((r) => r.costUsd != null);
+  if (result.costPartial)
+    lines.push(
+      hasCost
+        ? 'custo estimado e parcial: parte das execuções do recorte não tem custo medido'
+        : 'custo não medido: nenhuma execução do recorte tem custo (sem preço no catálogo ou sem medição)',
+    );
+  else if (hasCost) lines.push('custo estimado');
   return lines.join('\n');
 }
 
 /** Formata a resposta de `get_metrics`: tabela compacta + a cobertura do período (RF-05/RF-06/RF-08). */
 export function formatMetrics(result: MetricsResult, groupBy: MetricsDim | undefined): string {
   if (result.rows.length === 0) return `nenhum grupo no recorte.\n${formatCoverage(result)}`;
-  const inventory = groupBy === 'agent' || groupBy === 'skill';
-  const headers = inventory ? HEADERS.inventory : HEADERS.normal;
+  const variant = variantOf(groupBy);
   return `${table(
-    headers,
-    result.rows.map((r) => formatRow(r, inventory)),
+    HEADERS[variant],
+    result.rows.map((r) => formatRow(r, variant)),
   )}\n\n${formatCoverage(result)}`;
 }
 
 export function registerMetricsTools(tool: DefineTool): void {
   tool(
     'get_metrics',
-    'Uso, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta, agente ou skill, ' +
+    'Uso, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
       'com filtros de período e card. Resposta em tabela compacta; custo e tokens vêm marcados como estimados e "-" quando não medidos (nunca 0). ' +
-      'Nas dimensões "agent" e "skill" não há tokens/custo (não é possível repartir o custo de uma execução entre o que ela usou).',
+      '"tool" é a ferramenta de IA que rodou (claude, codex); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"). ' +
+      'Nas dimensões "agent", "skill", "used_tool" e "mcp_tool" não há tokens/custo (não é possível repartir o custo de uma execução entre o que ela usou); "effort" e "profile" têm.',
     {
       group_by: z.enum(GROUP_BY).optional().describe('Dimensão de agrupamento; omitido = total do recorte'),
       start_date: z.string().optional().describe('AAAA-MM-DD, inclusive'),
@@ -83,7 +105,10 @@ export function registerMetricsTools(tool: DefineTool): void {
       phase: z.string().optional().describe('Filtra por fase (nome da coluna no momento da execução)'),
       card_type: z.string().optional().describe('Filtra por tipo de card'),
       model: z.string().optional(),
-      tool: z.string().optional().describe('Ferramenta de IA (claude, codex...), não ferramenta usada'),
+      tool: z
+        .string()
+        .optional()
+        .describe('Ferramenta de IA (claude, codex...), não a ferramenta usada pela execução (essa é a dimensão used_tool/mcp_tool)'),
       limit: z.number().int().min(1).max(100).optional().describe('Linhas antes de somar o resto em "outros"; padrão 20'),
     },
     (a, router) => {

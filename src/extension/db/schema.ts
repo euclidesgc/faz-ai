@@ -307,8 +307,8 @@ const MIGRATIONS: Record<number, string> = {
     CREATE TABLE IF NOT EXISTS log_months (
       board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
       month TEXT NOT NULL,
-      metric TEXT NOT NULL,   -- 'events' | 'runs' | 'cards_done'
-      dim TEXT NOT NULL,      -- '' (total) | 'kind' | 'outcome' | 'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile'
+      metric TEXT NOT NULL,   -- 'events' | 'runs' | 'cards_done' | 'tokens' | 'cost' | 'usage' (sem CHECK: métrica nova não pede migração)
+      dim TEXT NOT NULL,      -- '' (total) | 'kind' | 'workflow' | 'outcome' | 'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile' | 'source' | tipo do inventário
       value TEXT NOT NULL,    -- o valor da dimensão ('' quando dim = '')
       n INTEGER NOT NULL DEFAULT 0,
       total REAL NOT NULL DEFAULT 0,   -- soma na unidade da métrica (ms para 'runs')

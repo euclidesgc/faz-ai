@@ -11,7 +11,8 @@ import type { AttachmentStore } from '../attachments';
 import type { HarnessStore } from '../harness';
 import { headlessUnsupported } from '../headless';
 import type { RunResolver } from '../log/eventLog';
-import { getMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
+import { getMetrics, getPanelMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
+import type { MetricsPanelQuery, MetricsPanelResult } from '../../shared/metrics';
 import { BoardContext, type Actor, type Handler, type HandlerMap, type MessageType, type RouterOptions } from './handlers/context';
 import { boardBackupHandlers } from './handlers/boardBackup';
 import { boardSettingsHandlers } from './handlers/boardSettings';
@@ -60,6 +61,8 @@ const bridgeOnly = {
   'attachment.read': viaBridge,
   'attachment.write': viaBridge,
   'attachment.saveAs': viaBridge,
+  // ler o log não muda o board: a `HostBridge` responde por `panelMetrics`, sem passar por `handle`
+  'metrics.query': viaBridge,
   'backup.export': viaBridge,
   'backup.import.pick': viaBridge,
   'backup.import.cancel': viaBridge,
@@ -239,6 +242,11 @@ export class MessageRouter {
   /** Agregação do log de utilização (contagem, duração, tokens, custo) — a única porta até ele a partir do MCP. */
   metrics(query: MetricsQuery): MetricsResult {
     return getMetrics(this.ctx.dbHandle.db, this.ctx.boardId, query);
+  }
+
+  /** Consulta do painel de métricas: só lê o log (sem sonda, sem registro, sem `notify` nem gravação do banco). */
+  panelMetrics(query: MetricsPanelQuery): MetricsPanelResult {
+    return getPanelMetrics(this.ctx.dbHandle.db, this.ctx.boardId, query);
   }
 
   /** Copia arquivos do disco como anexos do card (usado pelo seletor de arquivos). */

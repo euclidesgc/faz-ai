@@ -196,6 +196,15 @@ export class HostBridge {
           this.post({ type: 'attachment.readResult', requestId: msg.requestId, content });
           return;
         }
+        case 'metrics.query': {
+          // ler o log não é mutação do board: não passa por `router.handle`; o erro vai na própria resposta
+          try {
+            this.post({ type: 'metrics.result', requestId: msg.requestId, result: this.router.panelMetrics(msg.query) });
+          } catch (e) {
+            this.post({ type: 'metrics.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+          }
+          return;
+        }
         case 'backup.export': {
           const { text, name, warnings } = this.router.exportBoardFile();
           const saved = await this.env.saveTextAs?.(text, name);

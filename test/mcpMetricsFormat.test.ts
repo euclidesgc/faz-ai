@@ -9,6 +9,7 @@ const BASE: MetricsResult = {
   archivedMonths: [],
   partialMonths: [],
   costPartial: false,
+  tokensPartial: false,
 };
 
 describe('formatMetrics', () => {
@@ -51,5 +52,49 @@ describe('formatMetrics', () => {
     const result: MetricsResult = { ...BASE, archivedMonths: ['2024-03'], partialMonths: ['2024-03'] };
     const text = formatMetrics(result, undefined);
     expect(text).toContain('2024-03');
+  });
+});
+
+describe('formatMetrics: dimensões de configuração e inventário (#169)', () => {
+  it.each(['effort', 'profile'] as const)('%s usa a tabela normal, com "-" no não medido', (dim) => {
+    const result: MetricsResult = {
+      ...BASE,
+      rows: [{ label: 'alto', runs: 1, durationMs: 0, tokens: null, costUsd: null }],
+      costPartial: true,
+    };
+    const text = formatMetrics(result, dim);
+    expect(text).toMatch(/tokens/);
+    expect(text).toMatch(/custo/);
+    const line = text.split('\n').find((l) => l.startsWith('alto'))!;
+    expect(line).toContain('-');
+    expect(line).not.toMatch(/\b0\b/);
+  });
+
+  it('used_tool usa a tabela de inventário, sem tokens/custo', () => {
+    const result: MetricsResult = {
+      ...BASE,
+      rows: [{ label: 'Bash', runs: 2, durationMs: 0, tokens: undefined, costUsd: undefined, calls: 5 }],
+    };
+    const text = formatMetrics(result, 'used_tool');
+    expect(text).toContain('usos');
+    expect(text).not.toMatch(/tokens|custo|servidor/);
+  });
+
+  it('mcp_tool mostra a coluna servidor', () => {
+    const result: MetricsResult = {
+      ...BASE,
+      rows: [{ label: 'get_card', server: 'faz-ai', runs: 2, durationMs: 0, tokens: undefined, costUsd: undefined, calls: 4 }],
+    };
+    const text = formatMetrics(result, 'mcp_tool');
+    expect(text.split('\n')[0]).toMatch(/^grupo\s+servidor\s+execuções\s+usos/);
+    expect(text.split('\n')[1]).toMatch(/^get_card\s+faz-ai\s+2\s+4/);
+  });
+
+  it('mcp_tool com servidor vazio imprime "servidor não registrado"', () => {
+    const result: MetricsResult = {
+      ...BASE,
+      rows: [{ label: 'x', server: '', runs: 1, durationMs: 0, tokens: undefined, costUsd: undefined, calls: 1 }],
+    };
+    expect(formatMetrics(result, 'mcp_tool')).toContain('servidor não registrado');
   });
 });

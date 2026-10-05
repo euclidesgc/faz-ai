@@ -68,8 +68,16 @@ export function activeFilterCount(f: Filters): number {
 /** Intervalo [from, to] em ms, ou null se o filtro de data não está ativo. */
 export function dateRange(f: Filters, now: number): [number, number] | null {
   if (!f.dateField || !f.datePreset) return null;
+  return presetRange(f.datePreset, f.dateFrom, f.dateTo, now);
+}
+
+/**
+ * Intervalo [from, to] em ms de um preset de data, ou null quando `custom` vem sem nenhum dos lados.
+ * `from` e `to` ('yyyy-mm-dd') só valem em `custom`; um lado vazio fica aberto (-Infinity / Infinity).
+ */
+export function presetRange(preset: DatePreset, from: string, to: string, now: number): [number, number] | null {
   const startOfDay = (t: number) => new Date(t).setHours(0, 0, 0, 0);
-  switch (f.datePreset) {
+  switch (preset) {
     case 'today':
       return [startOfDay(now), startOfDay(now) + DAY - 1];
     case '7d':
@@ -77,10 +85,10 @@ export function dateRange(f: Filters, now: number): [number, number] | null {
     case '30d':
       return [startOfDay(now - 29 * DAY), startOfDay(now) + DAY - 1];
     case 'custom': {
-      const from = f.dateFrom ? parseDay(f.dateFrom) : null;
-      const to = f.dateTo ? parseDay(f.dateTo) : null;
-      if (from === null && to === null) return null;
-      return [from ?? -Infinity, to === null ? Infinity : to + DAY - 1];
+      const start = from ? parseDay(from) : null;
+      const end = to ? parseDay(to) : null;
+      if (start === null && end === null) return null;
+      return [start ?? -Infinity, end === null ? Infinity : end + DAY - 1];
     }
   }
 }

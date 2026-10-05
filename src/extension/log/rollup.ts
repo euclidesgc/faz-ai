@@ -18,21 +18,12 @@ import { dayOf, monthOf } from '../../shared/log';
 import { all, num, run, str, transaction } from '../db/query';
 
 /**
- * Meses completos de detalhe guardados além do mês corrente (RF-32). Fixo e documentado, não
- * configurável nesta entrega: mexer nisto pede tela de configuração, que é assunto do painel (#71).
- *
- * São 6 e não 12 porque 12 estouravam o teto de 10 MB do arquivo do board: a medição deu 11,8 a
- * 14,2 MB em 12 meses com a linha pesada (a que inclui o inventário cheio, que a #70 passa a gravar).
- * E não é só disco: o `sql.js` reescreve o arquivo inteiro a cada gravação, então um arquivo grande
- * deixa toda operação do board mais lenta.
- *
- * Os totais por mês, em `log_months`, nunca expiram: a comparação ano a ano continua existindo, só
- * deixa de existir no nível do detalhe.
+ * As dimensões de `runs` (e de `tokens` e `cost`): o nome na tabela de totais e a coluna de `ai_runs`
+ * de onde o valor sai. `workflow` está aqui para o filtro de workflow do painel (#71) não morrer na
+ * consolidação.
  */
-export const RETENTION_MONTHS = 6;
-
-/** As dimensões de `runs`: o nome na tabela de totais e a coluna de `ai_runs` de onde o valor sai. */
 const RUN_DIMS: [dim: string, column: string][] = [
+  ['workflow', 'workflow'],
   ['outcome', 'outcome'],
   ['phase', 'phase'],
   ['card_type', 'card_type'],
@@ -43,14 +34,19 @@ const RUN_DIMS: [dim: string, column: string][] = [
 ];
 
 /**
- * Os meses que conservam o detalhe: o corrente e os `RETENTION_MONTHS` anteriores.
+ * Os meses que conservam o detalhe: o corrente e os `months` anteriores. A janela vem da regra
+ * `logRetentionMonths` do board (padrão 6, de 1 a 24; ver `shared/rules.ts`), e não de uma constante:
+ * 12 meses estouravam o teto de 10 MB do arquivo (medição de 11,8 a 14,2 MB com a linha pesada, a que
+ * inclui o inventário cheio), e o `sql.js` reescreve o arquivo inteiro a cada gravação, então não é só
+ * disco — um arquivo grande deixa toda operação do board mais lenta. Quem precisa de mais histórico
+ * aumenta a janela sabendo o custo. Os totais por mês, em `log_months`, nunca expiram.
  * Anda de mês em mês pelo dia 1 de propósito: partir do dia de hoje faria 31 de março voltar para
  * "31 de fevereiro", que o `Date` empurra para março de novo, e um mês escaparia do descarte.
  */
-export function keepMonths(now: number): string[] {
+export function keepMonths(now: number, months: number): string[] {
   const d = new Date(now);
   const out: string[] = [];
-  for (let i = 0; i <= RETENTION_MONTHS; i++) out.push(monthOf(new Date(d.getFullYear(), d.getMonth() - i, 1).getTime()));
+  for (let i = 0; i <= months; i++) out.push(monthOf(new Date(d.getFullYear(), d.getMonth() - i, 1).getTime()));
   return out;
 }
 
@@ -90,46 +86,58 @@ function bump(totals: Totals, metric: LogMetric['metric'], dim: string, value: s
  *
  * `tokens` e `cost` só contam as execuções que têm o número: `n` é a contagem MEDIDA (ou com custo),
  * não a de execuções, para que uma média por mês arquivado não divida o custo por execuções que nem
- * foram medidas. "Não medido" não é zero (RF-14): a execução sem medida não gera linha nenhuma.
+ * foram medidas — e para o painel poder dizer "3 de 11 execuções não foram medidas" (com `runs.n`)
+ * depois de o detalhe ir embora. "Não medido" não é zero (RF-14): a execução sem medida não gera
+ * linha nenhuma. Tokens têm também o corte por tipo (`dim='kind'`) e custo o corte por origem
+ * (`dim='source'`, estimado pelo preço do catálogo ou informado pela ferramenta).
  */
 function totalsFromDetail(db: Database, boardId: string, month: string): LogMetric[] {
   const totals: Totals = new Map();
 
   for (const r of all(
     db,
-    `SELECT kind, column_name, card_type, COUNT(*) AS n FROM card_events
-     WHERE board_id = ? AND month = ? GROUP BY kind, column_name, card_type`,
+    `SELECT kind, column_name, card_type, workflow, COUNT(*) AS n FROM card_events
+     WHERE board_id = ? AND month = ? GROUP BY kind, column_name, card_type, workflow`,
     [boardId, month],
   )) {
     const n = num(r.n);
     const phase = str(r.column_name);
     const cardType = str(r.card_type);
+    const workflow = str(r.workflow);
     bump(totals, 'events', '', '', n, n);
     bump(totals, 'events', 'kind', str(r.kind), n, n);
     bump(totals, 'events', 'phase', phase, n, n);
     bump(totals, 'events', 'card_type', cardType, n, n);
+    bump(totals, 'events', 'workflow', workflow, n, n);
     // `done` é evento próprio justamente para isto: contar atividades concluídas sem precisar saber
     // que categoria uma coluna tinha num mês cujo detalhe já foi descartado
     if (str(r.kind) === 'done') {
       bump(totals, 'cards_done', '', '', n, n);
       bump(totals, 'cards_done', 'phase', phase, n, n);
       bump(totals, 'cards_done', 'card_type', cardType, n, n);
+      bump(totals, 'cards_done', 'workflow', workflow, n, n);
     }
   }
 
+  // as somas de token só olham a execução medida (`measure <> 'none'`); as de custo, a que tem custo.
+  // `cost_estimated` é 1 (preço do catálogo) ou 0 (informado pela ferramenta) sempre que `cost_usd`
+  // existe; só o 0 conta como informado — na dúvida, "estimado" é a afirmação mais fraca
   for (const r of all(
     db,
-    `SELECT outcome, phase, card_type, model, tool, effort, profile,
+    `SELECT workflow, outcome, phase, card_type, model, tool, effort, profile,
             COUNT(*) AS n, SUM(COALESCE(duration_ms, 0)) AS ms,
             SUM(CASE WHEN measure <> 'none' THEN 1 ELSE 0 END) AS measured,
-            SUM(CASE WHEN measure <> 'none'
-                THEN COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0) + COALESCE(cache_read_tokens, 0) + COALESCE(cache_write_tokens, 0)
-                ELSE 0 END) AS tokens,
-            SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS costed,
-            SUM(COALESCE(cost_usd, 0)) AS cost
+            SUM(CASE WHEN measure <> 'none' THEN COALESCE(input_tokens, 0) ELSE 0 END) AS input,
+            SUM(CASE WHEN measure <> 'none' THEN COALESCE(output_tokens, 0) ELSE 0 END) AS output,
+            SUM(CASE WHEN measure <> 'none' THEN COALESCE(cache_read_tokens, 0) ELSE 0 END) AS cache_read,
+            SUM(CASE WHEN measure <> 'none' THEN COALESCE(cache_write_tokens, 0) ELSE 0 END) AS cache_write,
+            SUM(CASE WHEN cost_usd IS NOT NULL AND cost_estimated = 0 THEN 1 ELSE 0 END) AS informed_n,
+            SUM(CASE WHEN cost_usd IS NOT NULL AND cost_estimated = 0 THEN cost_usd ELSE 0 END) AS informed,
+            SUM(CASE WHEN cost_usd IS NOT NULL AND COALESCE(cost_estimated, 1) <> 0 THEN 1 ELSE 0 END) AS estimated_n,
+            SUM(CASE WHEN cost_usd IS NOT NULL AND COALESCE(cost_estimated, 1) <> 0 THEN cost_usd ELSE 0 END) AS estimated
      FROM ai_runs
      WHERE board_id = ? AND month = ?
-     GROUP BY outcome, phase, card_type, model, tool, effort, profile`,
+     GROUP BY workflow, outcome, phase, card_type, model, tool, effort, profile`,
     [boardId, month],
   )) {
     const n = num(r.n);
@@ -141,14 +149,29 @@ function totalsFromDetail(db: Database, boardId: string, month: string): LogMetr
 
     const measured = num(r.measured);
     if (measured > 0) {
-      const tokens = num(r.tokens);
+      const byKind: [kind: string, total: number][] = [
+        ['input', num(r.input)],
+        ['output', num(r.output)],
+        ['cache_read', num(r.cache_read)],
+        ['cache_write', num(r.cache_write)],
+      ];
+      const tokens = byKind.reduce((sum, [, total]) => sum + total, 0);
       bump(totals, 'tokens', '', '', measured, tokens);
+      // as quatro linhas de tipo existem sempre que há medida, mesmo com zero: zero medido é um número
+      for (const [kind, total] of byKind) bump(totals, 'tokens', 'kind', kind, measured, total);
       for (const [dim, column] of RUN_DIMS) bump(totals, 'tokens', dim, str(r[column]), measured, tokens);
     }
-    const costed = num(r.costed);
+
+    const bySource: [source: string, n: number, total: number][] = [
+      ['estimated', num(r.estimated_n), num(r.estimated)],
+      ['informed', num(r.informed_n), num(r.informed)],
+    ];
+    const costed = bySource.reduce((sum, [, count]) => sum + count, 0);
     if (costed > 0) {
-      const cost = num(r.cost);
+      const cost = bySource.reduce((sum, [, , total]) => sum + total, 0);
       bump(totals, 'cost', '', '', costed, cost);
+      // a origem sem execução não gera linha: "nenhum custo informado" não é "custo informado zero"
+      for (const [source, count, total] of bySource) if (count > 0) bump(totals, 'cost', 'source', source, count, total);
       for (const [dim, column] of RUN_DIMS) bump(totals, 'cost', dim, str(r[column]), costed, cost);
     }
   }
@@ -200,13 +223,13 @@ export function monthlyTotals(db: Database, boardId: string, months?: string[]):
 
 /**
  * Arquiva os totais dos meses que saíram da janela de retenção e descarta o detalhe deles. Devolve
- * os meses consolidados. Chamada na abertura do board, no máximo uma vez por dia e nunca durante
+ * os meses consolidados. `months` é a janela de retenção do board (`BoardRepo.retentionMonths`). Chamada na abertura do board, no máximo uma vez por dia e nunca durante
  * uma mutação: é isso que protege o desempenho da gravação mesmo se a consolidação ficar lenta.
  */
-export function consolidate(db: Database, boardId: string, now: number): string[] {
-  const keep = new Set(keepMonths(now));
-  const months = detailMonths(db, boardId).filter((m) => !keep.has(m));
-  for (const month of months)
+export function consolidate(db: Database, boardId: string, now: number, months: number): string[] {
+  const keep = new Set(keepMonths(now, months));
+  const expired = detailMonths(db, boardId).filter((m) => !keep.has(m));
+  for (const month of expired)
     // uma transação por mês: um mês arquivado pela metade mentiria para sempre
     transaction(db, () => {
       for (const t of totalsFromDetail(db, boardId, month))
@@ -224,5 +247,5 @@ export function consolidate(db: Database, boardId: string, now: number): string[
       run(db, 'DELETE FROM ai_runs WHERE board_id = ? AND month = ?', [boardId, month]);
     });
   run(db, 'UPDATE boards SET log_rollup_day = ? WHERE id = ?', [dayOf(now), boardId]);
-  return months;
+  return expired;
 }

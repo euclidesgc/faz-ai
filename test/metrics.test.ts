@@ -6,6 +6,7 @@ import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { getMetrics } from '../src/extension/log/metrics';
 import { consolidate } from '../src/extension/log/rollup';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
+import { DEFAULT_LOG_RETENTION_MONTHS } from '../src/shared/rules';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 /** data fixa de referência: 15 de junho de 2026, meio-dia, no fuso da máquina */
@@ -70,7 +71,7 @@ function run(startedAt: number, durationMs: number, opts: RunOpts = {}): string 
   runs.finish(id, 'done', 0);
   if (opts.tokens !== undefined || opts.costUsd !== undefined)
     db.run(
-      'UPDATE ai_runs SET input_tokens = ?, output_tokens = 0, cache_read_tokens = 0, cache_write_tokens = 0, cost_usd = ? WHERE id = ?',
+      "UPDATE ai_runs SET input_tokens = ?, output_tokens = 0, cache_read_tokens = 0, cache_write_tokens = 0, cost_usd = ?, measure = 'full' WHERE id = ?",
       [opts.tokens ?? 0, opts.costUsd ?? 0, id],
     );
   for (const skill of opts.skills ?? [])
@@ -147,7 +148,7 @@ describe('getMetrics', () => {
     it('phase/model devolvem o total arquivado', () => {
       run(at(2024, 3), 1000, { phase: 'Discovery', model: 'opus' });
       run(at(2024, 3), 3000, { phase: 'Discovery', model: 'opus' });
-      consolidate(db, boardId, TODAY);
+      consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS);
 
       const byPhase = getMetrics(db, boardId, { groupBy: 'phase' });
       expect(row(byPhase, 'Discovery')).toMatchObject({ runs: 2, durationMs: 4000 });
@@ -159,7 +160,7 @@ describe('getMetrics', () => {
 
     it('card/agent/skill não têm resposta num mês consolidado, e o mês aparece em archivedMonths', () => {
       run(at(2024, 3), 1000, { cardNumber: 72, skills: ['sql-queries'] });
-      consolidate(db, boardId, TODAY);
+      consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS);
 
       const byCard = getMetrics(db, boardId, { groupBy: 'card' });
       expect(byCard.rows).toHaveLength(0);
@@ -171,7 +172,7 @@ describe('getMetrics', () => {
 
     it('um filtro além de período/card também tira o mês consolidado da conta', () => {
       run(at(2024, 3), 1000, { phase: 'Discovery', model: 'opus' });
-      consolidate(db, boardId, TODAY);
+      consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS);
       const result = getMetrics(db, boardId, { groupBy: 'phase', model: 'opus' });
       expect(result.rows).toHaveLength(0);
       expect(result.archivedMonths).toEqual(['2024-03']);
@@ -180,7 +181,7 @@ describe('getMetrics', () => {
     it('recorte parcial de um mês consolidado devolve o mês inteiro e marca partialMonths', () => {
       run(at(2024, 3, 5), 1000);
       run(at(2024, 3, 25), 2000);
-      consolidate(db, boardId, TODAY);
+      consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS);
       const result = getMetrics(db, boardId, { startDate: '2024-03-10', endDate: '2024-03-20' });
       expect(row(result, 'total')).toMatchObject({ runs: 2, durationMs: 3000 });
       expect(result.partialMonths).toEqual(['2024-03']);
@@ -253,5 +254,20 @@ describe('getMetrics', () => {
 
   it('logSince vem no formato AAAA-MM-DD do início real da série', () => {
     expect(getMetrics(db, boardId, {}).logSince).toBe('2026-06-15');
+  });
+
+  it('logSince é o dia no fuso da máquina, não em UTC (board aberto às 22h30 em Brasília)', () => {
+    const tz = process.env.TZ;
+    process.env.TZ = 'America/Sao_Paulo';
+    try {
+      // 22h30 de 15/6 em Brasília já é 16/6 em UTC
+      const lateNight = new Date(2026, 5, 15, 22, 30, 0).getTime();
+      expect(new Date(lateNight).toISOString().slice(0, 10)).toBe('2026-06-16');
+      db.run('UPDATE boards SET log_since = ? WHERE id = ?', [lateNight, boardId]);
+      expect(getMetrics(db, boardId, {}).logSince).toBe('2026-06-15');
+    } finally {
+      if (tz === undefined) delete process.env.TZ;
+      else process.env.TZ = tz;
+    }
   });
 });

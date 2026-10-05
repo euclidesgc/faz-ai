@@ -298,9 +298,64 @@ uma), subagentes e skills, com a contagem de chamadas.
   medição, não consumo zero. O mesmo vale para execuções que terminam antes de a ferramenta informar
   o consumo.
 - **Perguntas no chat do board** também entram no registro, sem card associado.
-- **O detalhe de cada execução é guardado por 6 meses** (o mês corrente mais os 6 anteriores). Depois
-  disso o detalhe é descartado, mas os **totais por mês nunca expiram**. Antes eram 12 meses; o prazo
-  menor mantém o arquivo do banco dentro do limite de tamanho.
+- **O detalhe de cada execução é guardado por uma janela que você configura**, de 1 a 24 meses (o
+  mês corrente mais os anteriores). O padrão é 6 meses. Depois da janela o detalhe é descartado, mas
+  os **totais por mês nunca expiram**. Antes o prazo era 12 meses; o padrão menor mantém o arquivo do
+  banco dentro do limite de tamanho. Onde ajustar, e o que acontece ao baixar a janela, está em
+  **Painel de métricas**, logo abaixo.
+
+### Painel de métricas
+
+O botão **Métricas**, o quarto da navegação do topo (Board, Métricas, Lixeira, Configurações), mostra
+o que o board registrou sobre o trabalho e o uso da IA. Funciona no editor e também no board aberto
+pelo navegador.
+
+- **Filtros.** O período pode ser Hoje, 7 dias, 30 dias, Este mês, Últimos 12 meses, Tudo ou um
+  Intervalo livre (data inicial e final). O filtro **Workflow** restringe os números a um workflow, e
+  **Limpar filtros** volta ao padrão. Abaixo dos controles o painel escreve o período consultado.
+- **Cinco totais.** Atividades concluídas (cards que chegaram a uma coluna de conclusão), execuções
+  de IA, tokens, custo e tempo de IA. O **tempo de IA é a soma da duração de cada execução**:
+  execuções simultâneas somam, então o total pode passar do tempo decorrido no relógio. O que não
+  foi medido aparece como "não medido", nunca como 0, e quando só parte das execuções foi medida o
+  aviso diz quantas ficaram de fora.
+- **Custo e tokens por mês.** Gráfico de barras, uma série por vez (alternador **Custo** / **Tokens**).
+  O mês em andamento aparece com hachura, porque ainda não terminou; um mês sem nenhum dado é um
+  espaço marcado "sem dado", não uma barra de altura zero. Abaixo do gráfico fica uma tabela com os
+  mesmos números e uma coluna de observação (parcial, sem dado, só total mensal).
+- **Onde o consumo aconteceu.** O consumo do período repartido por **fase, tipo de card, modelo,
+  ferramenta de IA, esforço ou perfil** (seletor **Recortar por**), em barras horizontais na medida
+  escolhida em **Medida da barra**: custo, tokens, execuções ou tempo de IA. Ao lado fica a tabela com
+  as quatro medidas. As categorias além do limite somam numa linha "outros". Alcança a série inteira
+  do período, inclusive os meses já arquivados.
+- **Quanto tempo o card fica na fase.** Uma linha por fase com as permanências, a mediana, a média,
+  as desconhecidas e quantos cards estão nela agora. São permanências, não cards: um card que volta
+  para a fase conta duas vezes. É tempo de relógio, diferente do tempo de IA do corte por fase.
+- **Lead time.** Da criação do card até a **primeira** conclusão, dos cards concluídos no período: a
+  mediana em destaque, a média, quantos entraram na conta, quantos ficaram desconhecidos e a lista por
+  card, ordenável. Desconhecido é o card cuja data de criação não está no detalhe guardado (o mês foi
+  descartado ou o card é anterior ao log); a data não é estimada.
+- **Fases mais caras e Cards mais caros.** Dois rankings lado a lado, em tabelas que você ordena por
+  custo, tokens, execuções ou tempo de IA clicando no cabeçalho (ou com Enter/Espaço). O padrão é o
+  custo quando o período tem custo medido e o tempo de IA quando não tem, e a tela escreve o critério
+  em vigor. As fases alcançam a série inteira; os cards, só o detalhe guardado, e cada bloco avisa
+  isso.
+- **O que a IA usou.** Ferramentas, ferramentas de MCP (com o servidor em coluna própria), subagentes
+  e skills, com o número de execuções e de usos. "Ainda não medido" (nenhuma execução gravou
+  inventário) é diferente de "nenhum registro no período".
+- **Tokens e custo.** Tokens contam mesmo quando o modelo não tem preço configurado; o custo soma só
+  as execuções que têm preço, e o aviso diz quantas ficaram de fora. Antes de o board medir consumo,
+  custo e inventário aparecem como "não medido" e quase todo lead time como desconhecido: é o
+  comportamento esperado, não falha.
+- **Detalhe guardado.** Mostra a janela de retenção do detalhe das execuções e quanto espaço ela
+  ocupa. Dá para configurá-la de 1 a 24 meses (padrão 6). Aumentar grava na hora. **Baixar pede
+  confirmação**, que diz quantos meses perdem o detalhe, e o descarte só acontece na próxima abertura
+  do board. Os totais por mês continuam. O campo grava ao pressionar Enter ou ao sair dele. Os tempos
+  e o inventário leem só o detalhe guardado: um mês descartado sai desses blocos.
+- **Avisos de honestidade**, sempre junto do número: desde quando o log do board existe (antes disso
+  não há dado, o número não está pequeno); o aviso de que o período pedido foi cortado no início do
+  log; e os meses que só têm o total mensal (entram na série, mas sem corte por dimensão nem detalhe
+  por card). Com um workflow filtrado, um mês consolidado antes de o log guardar o workflow fica de
+  fora dos números, e o aviso diz isso.
 
 ### Métricas de uso com get_metrics
 
@@ -310,16 +365,24 @@ linguagem natural: "quanto tempo de IA o card #72 consumiu?", "qual tipo de card
 mês?", "qual agente foi usado mais?". A ferramenta responde em uma tabela compacta, otimizada para
 economizar tokens.
 
-- A agregação pode agrupar por fase, tipo de card, ferramenta, modelo, card, agente ou skill. Omita
-  para obter apenas o total do período.
+- A agregação pode agrupar por fase (`phase`), tipo de card (`card_type`), ferramenta de IA
+  (`tool`), modelo (`model`), esforço (`effort`), perfil (`profile`), card (`card`), agente (`agent`),
+  skill (`skill`), ferramenta usada (`used_tool`) ou ferramenta de MCP (`mcp_tool`). Omita para obter
+  apenas o total do período.
+- `tool` e `used_tool` não são a mesma coisa: `tool` é a ferramenta de IA que rodou (claude, codex);
+  `used_tool` e `mcp_tool` são o que a execução usou (Read, Bash, `get_card`). Em `mcp_tool` o
+  servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe.
 - Filtros de período (data inicial e final, em `AAAA-MM-DD`), card (ex. `72` ou `#72`), e dimensões
   (ex. fase, modelo, tipo de card).
-- Nas dimensões **agente** e **skill** a tabela mostra só a contagem de execuções e de usos (sem
-  tokens nem custo, que não é possível repartir entre componentes de uma execução).
+- Nas dimensões **agent**, **skill**, **used_tool** e **mcp_tool** a tabela mostra só a contagem de
+  execuções e de usos (sem tokens nem custo, que não é possível repartir entre componentes de uma
+  execução). `effort` e `profile` têm tokens e custo.
+- Tokens contam mesmo sem preço configurado para o modelo; o custo vem só das execuções que têm preço.
+- Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`.
 - Valores não medidos aparecem como "-" (nunca 0), por exemplo as execuções do Copilot. Custo
   estimado a partir do preço do modelo vem marcado como estimado.
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
-  (sem detalhe por execução). Períodos fora da janela de 6 meses não têm detalhe e só agregam os
+  (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm detalhe e só agregam os
   totais já consolidados.
 
 ### Branch e pasta de trabalho por história

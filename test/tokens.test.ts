@@ -71,6 +71,13 @@ const pairs: Array<[string, string, number]> = [
   ['--warn-border', '--bg', 3],
   ['--success', '--bg', 3],
   ['--success', '--col-bg', 3],
+  // #160 série por mês: contraste de componente não textual (WCAG 1.4.11) sobre o fundo da visão e o de cartão
+  ['--chart-bar', '--bg', 3],
+  ['--chart-bar', '--card-bg', 3],
+  ['--chart-bar-partial', '--bg', 3],
+  ['--chart-bar-partial', '--card-bg', 3],
+  ['--chart-axis', '--bg', 3],
+  ['--chart-axis', '--card-bg', 3],
 ];
 
 describe.each(Object.entries(themes))('tokens.css: tema %s', (_name, tokens) => {

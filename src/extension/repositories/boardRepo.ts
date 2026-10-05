@@ -71,6 +71,16 @@ export class BoardRepo {
     return { logSince: logSince || now, rollupDay: str(row.log_rollup_day) };
   }
 
+  /**
+   * A janela de retenção do detalhe do log (meses completos além do corrente). A abertura do board só
+   * precisa deste número para consolidar, então lê `rules_json` sem montar o `Board` inteiro.
+   */
+  retentionMonths(boardId: string): number {
+    const row = one(this.db, 'SELECT rules_json FROM boards WHERE id = ?', [boardId]);
+    if (!row) throw new Error('Board não encontrado');
+    return parseRules(str(row.rules_json)).logRetentionMonths;
+  }
+
   updateRules(boardId: string, patch: Partial<BoardRules>): void {
     const row = one(this.db, 'SELECT rules_json FROM boards WHERE id = ?', [boardId]);
     if (!row) throw new Error('Board não encontrado');

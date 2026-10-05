@@ -3,12 +3,41 @@ import { create } from 'zustand';
 import type { BoardState, Id } from '../../shared/model';
 import { isLive } from '../../shared/selectors';
 import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../../shared/filters';
+import { EMPTY_METRICS_FILTERS, type MetricsBreakdownDim, type MetricsFilters, type MetricsMeasure } from '../../shared/metrics';
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 import { formatBytes, type ImportSummary } from '../../shared/backup';
 import { formatDateTime, t } from '../i18n';
 import { backup } from '../commands';
 
-export type View = 'board' | 'trash' | 'settings';
+/** Ordenação de uma tabela do painel: `key` é o id da coluna; `null` em `MetricsBlocksState` = o padrão do bloco. */
+export interface MetricsSort {
+  key: string;
+  dir: 'asc' | 'desc';
+}
+
+/**
+ * Escolhas dos blocos do painel de métricas (card 173): a dimensão e a medida dos cortes e a ordenação
+ * de cada tabela. Mesma regra dos filtros: fora de `persist()`; trocar de visão conserva, reabrir o
+ * board volta ao padrão. `null` na ordenação = o padrão do bloco (o ranking por card decide pelo custo
+ * medido, RF-22), que só quem desenha a tabela sabe.
+ */
+export interface MetricsBlocksState {
+  dim: MetricsBreakdownDim;
+  measure: MetricsMeasure;
+  cardSort: MetricsSort | null;
+  phaseSort: MetricsSort | null;
+  leadSort: MetricsSort | null;
+}
+
+export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
+  dim: 'phase',
+  measure: 'cost',
+  cardSort: null,
+  phaseSort: null,
+  leadSort: null,
+};
+
+export type View = 'board' | 'trash' | 'settings' | 'metrics';
 /** Abas da tela de Harness de IA: a ferramenta e a execução, o que é do projeto, e tudo que a ferramenta carrega. */
 export type HarnessTab = 'tool' | 'project' | 'all';
 export type SettingsTab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'agents' | 'git' | 'appearance' | 'backup';
@@ -76,6 +105,16 @@ interface BoardStore extends UiState, ViewState {
   openCard(id: Id | null): void;
   setFilters(patch: Partial<Filters>): void;
   clearFilters(): void;
+  /**
+   * Filtros do painel de métricas. Ficam fora de `persist()` de propósito: trocar de visão conserva
+   * o que a pessoa escolheu, e reabrir o board volta ao padrão (`12m`, todos os workflows).
+   */
+  metricsFilters: MetricsFilters;
+  setMetricsFilters(patch: Partial<MetricsFilters>): void;
+  clearMetricsFilters(): void;
+  /** dimensão, medida e ordenação dos blocos do painel (fora de `persist()`, como os filtros) */
+  metricsBlocks: MetricsBlocksState;
+  setMetricsBlocks(patch: Partial<MetricsBlocksState>): void;
   /** abre/fecha uma linha ou coluna; `current` é o estado que está na tela */
   setCollapsed(key: string, collapsed: boolean): void;
   /** esquece a escolha manual, voltando ao padrão das configurações */
@@ -152,6 +191,11 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     },
     setFilters: (patch) => setShared({ filters: { ...get().filters, ...patch } }),
     clearFilters: () => setShared({ filters: EMPTY_FILTERS, selectedParentId: null }),
+    metricsFilters: EMPTY_METRICS_FILTERS,
+    setMetricsFilters: (patch) => set({ metricsFilters: { ...get().metricsFilters, ...patch } }),
+    clearMetricsFilters: () => set({ metricsFilters: EMPTY_METRICS_FILTERS }),
+    metricsBlocks: DEFAULT_METRICS_BLOCKS,
+    setMetricsBlocks: (patch) => set({ metricsBlocks: { ...get().metricsBlocks, ...patch } }),
     setCollapsed: (key, collapsed) => setShared({ collapsed: { ...get().collapsed, [key]: collapsed } }),
     resetCollapsed(key) {
       const { [key]: _drop, ...rest } = get().collapsed;
