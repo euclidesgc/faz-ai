@@ -522,6 +522,48 @@ describe('modelos de IA', () => {
     expect(after.data.catalog.some((o: any) => o.value === 'claude:opus')).toBe(false);
   });
 
+  it('preço variável: o `auto` do Cursor já nasce assim, upsert_model liga e desliga, e Detectar preserva', async () => {
+    const entry = async (value: string) => (await call('get_models')).data.catalog.find((o: any) => o.value === value);
+    await call('set_ai_tool', { tool: 'cursor' });
+    await call('detect_models', {});
+    expect(await entry('cursor:auto')).toMatchObject({ variablePrice: true, price: null });
+    expect(await entry('cursor:composer-2.5')).toMatchObject({ variablePrice: false });
+
+    // com preço preenchido e o flag ligado, continua sem preço: o board não estima o variável
+    await call('upsert_model', {
+      tool: 'cursor',
+      model: 'composer-2.5',
+      price_input: 1,
+      price_output: 2,
+      price_cache_read: 0.5,
+      price_cache_write: 1,
+      variable_price: true,
+    });
+    expect(await entry('cursor:composer-2.5')).toMatchObject({ variablePrice: true, price: null });
+    // uma chamada que não menciona o flag não o apaga; o preço ficou guardado
+    await call('upsert_model', { tool: 'cursor', model: 'composer-2.5', label: 'Composer 2.5' });
+    expect(await entry('cursor:composer-2.5')).toMatchObject({ variablePrice: true });
+    await call('detect_models', {});
+    expect(await entry('cursor:composer-2.5')).toMatchObject({ variablePrice: true });
+    // desligado, o preço guardado volta a valer
+    await call('upsert_model', { tool: 'cursor', model: 'composer-2.5', variable_price: false });
+    expect(await entry('cursor:composer-2.5')).toMatchObject({
+      variablePrice: false,
+      price: { input: 1, output: 2, cacheRead: 0.5, cacheWrite: 1 },
+    });
+    // e o `auto` desligado à mão continua desligado depois de Detectar
+    await call('upsert_model', { tool: 'cursor', model: 'auto', label: 'Auto', variable_price: false });
+    await call('detect_models', {});
+    expect(await entry('cursor:auto')).toMatchObject({ variablePrice: false });
+  });
+
+  it('update_rules liga e desliga a tarifa do Cursor sem mexer nas outras regras', async () => {
+    const before = (await call('update_rules', {})).data;
+    expect(before.cursorTokenRate).toBe(false);
+    expect((await call('update_rules', { cursorTokenRate: true })).data).toEqual({ ...before, cursorTokenRate: true });
+    expect((await call('update_rules', { cursorTokenRate: false })).data.cursorTokenRate).toBe(false);
+  });
+
   it('sugere o modelo pelo esforço da tarefa sem trocar uma escolha manual', async () => {
     // regras iniciais: Esforço Baixo/Médio/Alto → modelo leve/intermediário/forte da primeira ferramenta
     const rules = (await call('get_models')).data.rules;
