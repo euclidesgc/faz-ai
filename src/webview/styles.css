@@ -2622,3 +2622,220 @@ body.host-web .drawer {
   flex: none;
   align-self: center;
 }
+
+/* card 158, painel de métricas: filtros de período e de workflow. Os presets quebram de linha em vez de empurrar a página (RF-33) */
+.metrics-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  min-width: 0;
+}
+.metrics-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-12);
+}
+.metrics-periods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+.metrics-filters-label {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.metrics-filters-error {
+  margin: 0;
+  color: var(--error);
+}
+.metrics-filters-range {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* card 159: painel de métricas: os cinco totais. Grade auto-fit: cabe em barra lateral e no zoom de 200% (RF-33) */
+.metrics-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14em), 1fr));
+  gap: var(--sp-12);
+  min-width: 0;
+}
+.metrics-total {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+  padding: var(--sp-12);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.metrics-total-label {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.metrics-total-hint,
+.metrics-total-sub {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.metrics-total-value {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.metrics-breakdown {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+.metrics-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+.metrics-breakdown-row dt {
+  color: var(--muted);
+}
+.metrics-breakdown-row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* painel de métricas, sub-tarefa 161: bloco "Detalhe guardado" (retenção do log) */
+.retention-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-12);
+  min-width: 0;
+}
+.retention-card h3 {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.retention-field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+}
+.retention-field .rt-TextFieldRoot {
+  width: calc(var(--sp-20) * 4);
+}
+.retention-price {
+  color: var(--muted);
+}
+.retention-text {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* card 160, painel de métricas: série de custo e tokens por mês. Barras em SVG fluido (largura 100%, altura em em),
+   rótulos em HTML fora do SVG (não encolhem no zoom nem giram) e a tabela equivalente visível abaixo (RF-30, RF-33) */
+.metrics-series {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  min-width: 0;
+}
+.metrics-series-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+.metrics-series-title {
+  margin: 0;
+  font-size: var(--fs-h);
+}
+.metrics-series-unit {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.metrics-series-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+.metrics-series-chart {
+  display: flex;
+  gap: var(--sp-6);
+  min-width: 0;
+}
+/* um mês só: uma barra rotulada, estreita, sem eixo comprido que sugira continuação (RF-15) */
+.metrics-series-chart.is-single {
+  max-width: 12em;
+}
+.metrics-series-scale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 10em;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.metrics-series-plot {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.metrics-series-svg {
+  display: block;
+  width: 100%;
+  height: 10em;
+  overflow: visible;
+}
+.metrics-series-bar:not(.is-partial) {
+  fill: var(--chart-bar);
+}
+/* mês parcial: hachura e contorno, nunca só outra cor; a palavra "parcial" vai na tabela (RF-17, RF-28) */
+.metrics-series-bar.is-partial {
+  stroke: var(--chart-bar-partial);
+  stroke-width: 1.5px;
+}
+.metrics-series-stripe {
+  fill: var(--chart-bar-partial);
+}
+.metrics-series-axis {
+  stroke: var(--chart-axis);
+  stroke-width: 1px;
+}
+.metrics-series-labels {
+  display: grid;
+  margin: var(--sp-4) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-align: center;
+}
+.metrics-series-labels li {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.metrics-series-mark {
+  font-size: var(--fs-micro);
+}
+.metrics-series-table {
+  min-width: 0;
+  overflow-x: auto;
+}
+.metrics-series-table tbody th {
+  color: var(--fg);
+  font-size: inherit;
+  font-weight: 400;
+  border-top: 1px solid var(--border);
+}
+.metrics-series-value {
+  font-variant-numeric: tabular-nums;
+}

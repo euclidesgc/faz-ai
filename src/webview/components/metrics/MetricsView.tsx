@@ -1,7 +1,11 @@
 import { t } from '../../i18n';
 import { useBoardStore } from '../../store/boardStore';
 import { Button } from '../ui';
+import { MetricsFilters } from './MetricsFilters';
+import { MonthSeries } from './MonthSeries';
 import { formatDay, formatRange, isEmptyResult } from './format';
+import { Totals } from './Totals';
+import { RetentionCard } from './RetentionCard';
 import { useMetricsQuery } from './useMetricsQuery';
 
 /**
@@ -36,7 +40,7 @@ export function MetricsView() {
         {announcement}
       </p>
 
-      {/* #158 Filtros (sempre visível, também no vazio e no erro; os workflows são os da última resposta): <MetricsFilters workflows={result?.workflows ?? []} /> */}
+      <MetricsFilters workflows={result?.workflows ?? []} range={result?.range} />
 
       {error && (
         <div className="metrics-error" role="alert">
@@ -60,12 +64,13 @@ export function MetricsView() {
             <EmptyPeriod logSince={result.logSince} />
           ) : (
             <>
-              {/* #159 Totais: <Totals result={result} /> */}
-              {/* #160 Série por mês: <MonthSeries result={result} /> */}
+              <Totals result={result} />
+              <MonthSeries result={result} />
               {/* #162 Avisos, o horizonte do detalhe junto do gráfico que ele qualifica (RF-22): <DetailNote result={result} /> */}
             </>
           )}
-          {/* #161 Retenção (vale também num período vazio: é do board, não do recorte): <RetentionCard result={result} onChanged={refresh} /> */}
+          <RetentionCard result={result} onChanged={refresh} />{' '}
+          {/* #161 Retenção (vale também num período vazio: é do board, não do recorte) */}
         </div>
       )}
     </section>

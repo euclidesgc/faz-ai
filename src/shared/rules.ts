@@ -8,8 +8,8 @@ export type CompleteParentMode = 'ask' | 'auto' | 'off';
 /** Meses completos de detalhe do log guardados, além do mês corrente, quando a regra não foi escolhida. */
 export const DEFAULT_LOG_RETENTION_MONTHS = 6;
 /** Limites da janela de retenção: abaixo de 1 o painel ficaria sem mês completo; acima de 24 o arquivo do board estoura o teto de tamanho. */
-const LOG_RETENTION_MIN = 1;
-const LOG_RETENTION_MAX = 24;
+export const LOG_RETENTION_MIN = 1;
+export const LOG_RETENTION_MAX = 24;
 
 /** Regras do board, configuráveis em Configurações → Regras. */
 export interface BoardRules {

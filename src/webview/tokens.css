@@ -110,6 +110,10 @@ body[data-theme='light'] {
   --badge-fg: var(--slate-12);
   --code-bg: var(--slate-3);
   --shadow-color: rgba(28, 32, 36, 0.18);
+  /* card 160: série por mês do painel de métricas: barra, barra de mês parcial (hachurada) e linha de base; 3:1 sobre o fundo */
+  --chart-bar: var(--indigo-9);
+  --chart-bar-partial: var(--amber-11);
+  --chart-axis: var(--slate-9);
 }
 
 body[data-theme='dark'] {
@@ -161,6 +165,10 @@ body[data-theme='dark'] {
   --badge-fg: var(--slate-12);
   --code-bg: var(--slate-4);
   --shadow-color: rgba(0, 0, 0, 0.5);
+  /* card 160: série por mês do painel de métricas: barra, barra de mês parcial (hachurada) e linha de base; 3:1 sobre o fundo */
+  --chart-bar: var(--indigo-10);
+  --chart-bar-partial: var(--amber-9);
+  --chart-axis: var(--slate-9);
 }
 
 /* instante antes de o JS definir data-theme: não pinta nada por cima do host */
