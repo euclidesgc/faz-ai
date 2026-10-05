@@ -702,9 +702,11 @@ Backup):
   keep it safe.
 - **Importar de um arquivo…** (import from a file) shows a summary (name, cards, attachments, size,
   version) and, after confirmation, writes a copy of the database (`<file>.bak`, next to it),
-  deletes the current board and replaces it with the one from the file, keeping the card numbers.
-  The imported board becomes this folder's board. Nothing changes in the database if the file is
-  invalid or something fails midway.
+  moves the current board's attachments to a backup folder (`<attachments>.bak-<date>`), deletes the
+  current board and replaces it with the one from the file, keeping the card numbers. The imported
+  board becomes this folder's board. Nothing changes in the database if the file is invalid or
+  something fails midway. The confirmation says the attachments went to backup. An import file with a
+  card id or attachment name containing a path (`../`) is refused.
 
 A file exported by an earlier version of the extension is upgraded on import; a file from a newer
 version is refused with the required version. Importing while the AI is running on a card is not
