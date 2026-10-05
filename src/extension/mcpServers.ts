@@ -5,15 +5,15 @@ import { HARNESS_CATALOG, MCP_NAME_PATTERN, type HarnessSource, type McpServerIn
 
 /**
  * Entrada de um servidor no formato de cada arquivo, como a documentação de cada ferramenta descreve:
- * `type: stdio|http` no Claude Code e no VS Code, `transport` no Kimi Code, só `command` ou `url` no Cursor,
- * e `tools` na Copilot CLI (.mcp.json e ~/.copilot/mcp-config.json).
+ * `type: stdio|http` no Claude Code e no VS Code, `transport` no Kimi Code, `type: stdio` ou só `url` no
+ * Cursor (cursor.com/docs/context/mcp), e `tools` na Copilot CLI (.mcp.json e ~/.copilot/mcp-config.json).
  */
 function jsonEntry(tool: AiTool, src: HarnessSource, s: McpServerInput): Record<string, unknown> {
   const stdio = s.transport === 'stdio';
   const body = stdio
     ? { command: s.command, ...(s.args.length ? { args: s.args } : {}), ...(Object.keys(s.env).length ? { env: s.env } : {}) }
     : { url: s.url, ...(Object.keys(s.headers).length ? { headers: s.headers } : {}) };
-  if (tool === 'cursor') return body;
+  if (tool === 'cursor') return stdio ? { type: 'stdio', ...body } : body;
   if (tool === 'kimi') return stdio ? { transport: 'stdio', ...body } : body;
   const copilotCli = tool === 'copilot' && src.path !== '.vscode/mcp.json';
   return { type: stdio ? 'stdio' : 'http', ...body, ...(copilotCli ? { tools: ['*'] } : {}) };

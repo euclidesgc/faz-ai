@@ -73,6 +73,17 @@ describe('servidor MCP', () => {
     ]);
   });
 
+  it('parâmetro desconhecido é erro com o nome dele, e nada é criado', async () => {
+    // um nome errado não pode virar o comportamento padrão: `story` no lugar de `parent` criaria uma história
+    const res = await call('create_card', { title: 'Subtrair', story: 1 });
+    expect(res.error).toBe(true);
+    expect(res.text).toContain('story');
+    expect(router.snapshot().cards).toHaveLength(0);
+    // e o schema publicado diz que não há outros parâmetros
+    const create = (await client.listTools()).tools.find((t) => t.name === 'create_card')!;
+    expect(create.inputSchema.additionalProperties).toBe(false);
+  });
+
   it('cria história e sub-tarefas, com campos por nome, e avisa o board', async () => {
     const story = (await call('create_card', { title: 'Login', description: '# PRD' })).data;
     expect(story).toMatchObject({ id: '#1', type: 'História', column: 'Backlog', description: '# PRD' });
@@ -97,10 +108,11 @@ describe('servidor MCP', () => {
     expect(blocked.error).toBe(true);
     expect(blocked.text).toContain('sub-tarefa(s) ainda em aberto');
 
-    // move_card não oferece allowOpenChildren: o mesmo cenário continua recusando mesmo tentando a opção
+    // move_card não oferece allowOpenChildren: tentar a opção é recusado antes de mover qualquer coisa
     const stillBlocked = await call('move_card', { card: 1, column: 'Concluído', allowOpenChildren: true });
     expect(stillBlocked.error).toBe(true);
-    expect(stillBlocked.text).toContain('sub-tarefa(s) ainda em aberto');
+    expect(stillBlocked.text).toContain('allowOpenChildren');
+    expect((await call('get_card', { card: 1 })).data.column).not.toBe('Concluído');
 
     const moved = (await call('move_card', { card: 2, column: 'concluido' })).data;
     expect(moved.card).toMatchObject({ column: 'Concluído', status: 'done' });

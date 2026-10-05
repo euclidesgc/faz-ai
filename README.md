@@ -649,8 +649,13 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Backup | Exportar o board num arquivo e importar um arquivo no lugar do board atual (ver [Backup do board](#backup-do-board)) |
 
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração
-local; nas outras, uma lista embutida que pode ser editada); os preços que você preencheu continuam
-lá depois de detectar de novo. As regras de sugestão combinam
+local; no Cursor, dos modelos da sua conta, pelo comando `cursor-agent models`, lido ao abrir o board
+com a CLI autenticada; nas outras, uma lista embutida que pode ser editada); os preços que você
+preencheu continuam lá depois de detectar de novo. No Cursor, a lista traz uma linha por nível de cada modelo
+(`claude-opus-5-5-low`, `-medium`, `-high`…); o board junta as variantes num modelo com os níveis
+dele e deixa de fora as versões `-fast`. No plano gratuito do Cursor só o **Auto** roda: os outros
+modelos são recusados antes de começar, e por isso as regras de sugestão do Cursor começam todas
+em Auto. As regras de sugestão combinam
 condições com E e OU, por exemplo `Esforço da atividade = Alto E Tags = backend`. O resultado é
 sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.
 
