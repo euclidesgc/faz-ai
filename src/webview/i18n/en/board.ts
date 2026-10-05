@@ -302,11 +302,18 @@ export const board: Record<string, string> = {
   'Falta 1 requisito para o board trabalhar com a IA': '1 requirement missing for the board to work with the AI',
   'Faltam {n} requisitos para o board trabalhar com a IA': '{n} requirements missing for the board to work with the AI',
   'Verificar de novo': 'Check again',
+  'Conferindo…': 'Checking…',
+  'Conferido agora: nada mudou.': 'Checked just now: nothing changed.',
+  recomendado: 'recommended',
+  'Recomendado para a IA enxergar o board nas suas conversas': 'Recommended so the AI sees the board in your conversations',
+  'A linha de comando do {tool} não foi encontrada: veja o aviso no topo do board.':
+    "{tool}'s command line was not found: see the notice at the top of the board.",
+  'A linha de comando do {tool} está sem login: veja o aviso no topo do board.':
+    "{tool}'s command line is not signed in: see the notice at the top of the board.",
   'Copiar comando': 'Copy command',
   Copiado: 'Copied',
   'Não foi possível copiar. Selecione o comando e copie com o teclado.':
     'Could not copy. Select the command and copy it with the keyboard.',
-  'Conectar ao board (MCP)': 'Connect to the board (MCP)',
   'Abrir Harness de IA': 'Open AI harness',
   'Node.js não encontrado': 'Node.js not found',
   'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 18 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':

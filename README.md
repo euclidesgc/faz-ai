@@ -234,11 +234,17 @@ com ele), a linha de comando da ferramenta, o login dela (no Cursor, por `cursor
 registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
 para o seu usuário, de `claude mcp add -s user`), um registro apontando para um node ou um caminho
 que não existe mais ou para outra pasta, e o nível de permissão. Cada item diz o efeito e traz a ação: o
-comando para copiar, **Conectar ao board (MCP)** ou o atalho para o Harness de IA. A faixa não
+comando para copiar, **Conectar IA (MCP)** ou o atalho para o Harness de IA. A faixa não
 fecha: some sozinha quando o último item é resolvido. A conferência roda ao abrir o board, quando a
 ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**,
 que relê também o PATH do terminal (um node instalado com o board aberto é encontrado sem recarregar
-a janela).
+a janela), e diz quando nada mudou.
+
+No Claude e no Cursor, o servidor do board não registrado aparece como **recomendado**, fora da
+contagem: as execuções pelo board levam o servidor sozinhas, e o registro só falta para a IA
+enxergar o board nas suas conversas fora dele. Sozinho, esse item vira uma linha discreta em vez da
+faixa. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
+desligados, com o motivo na dica.
 
 Fluxo sugerido: a IA lê a história e a instrução da fase, cria uma sub-tarefa para construir o
 documento da fase, anexa o documento à história e pede a revisão pela conversa do card. Você

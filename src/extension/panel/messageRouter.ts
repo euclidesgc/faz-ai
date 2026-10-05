@@ -92,6 +92,7 @@ export class MessageRouter {
   private chatHandler: ((msg: ChatMessageIn) => void) | null = null;
   private autopilot: Autopilot = { active: false, note: null };
   private requirements: BoardRequirement[] = [];
+  private requirementsCheckedAt = 0;
   private requirementsCheck: (() => void) | null = null;
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
@@ -130,6 +131,7 @@ export class MessageRouter {
       autopilot: this.autopilot,
       aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission),
       requirements: this.requirements,
+      requirementsCheckedAt: this.requirementsCheckedAt,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
     };
   }
@@ -171,8 +173,9 @@ export class MessageRouter {
 
   /** O que falta para o board trabalhar com a ferramenta de IA (informado pelo host, que confere). */
   setRequirements(list: BoardRequirement[]): void {
-    if (JSON.stringify(list) === JSON.stringify(this.requirements)) return;
+    // avisa mesmo sem mudança: o "Verificar de novo" da interface espera o fim da conferência
     this.requirements = list;
+    this.requirementsCheckedAt = Date.now();
     this.notify();
   }
 

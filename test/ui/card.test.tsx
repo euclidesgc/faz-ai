@@ -434,4 +434,17 @@ describe('botões de IA do card', () => {
     await userEvent.click(screen.getByRole('button', { name: /Refinar com IA/ }));
     expect(lastSent('ai.run')).toEqual({ type: 'ai.run', cardId: storyId, mode: 'refine' });
   });
+
+  it('com a CLI sem login, os dois ficam desligados, com o motivo na dica', async () => {
+    const { router, storyId } = await seedBoard();
+    router.setRequirements([
+      { id: 'signin', tool: 'cursor', cli: 'cursor-agent', action: { kind: 'command', command: 'cursor-agent login' } },
+    ]);
+    syncStore(router);
+    renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
+    for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+      expect(screen.getByRole('button', { name })).toHaveAttribute('title', expect.stringContaining('sem login'));
+    }
+  });
 });

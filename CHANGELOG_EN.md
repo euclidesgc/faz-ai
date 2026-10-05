@@ -30,12 +30,22 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   tool, a bar stays at the top of the board (on every screen) and in the chat panel, with no close
   button. It points out: Node.js not on the PATH, the tool's command line not installed, Cursor's
   CLI not signed in, the board's server not registered in the file the tool reads, a registration
-  pointing to a node or path that no longer exists (nvm switched versions), a registration for another folder (the file came
-  from another machine through git, or the project moved) and a permission level the tool does not
-  accept. For Claude, a server registered for your user (`claude mcp add -s user`) also counts. Each item brings the action: the command to copy, **Conectar ao board
-  (MCP)** (connect to the board) or the shortcut to the AI harness. The bar goes away on its own when
-  everything is solved; **Verificar de novo** (check again) checks right away, rereading the terminal
-  PATH (a node installed with the board open is found without reloading the window).
+  pointing to a node or path that no longer exists (nvm switched versions), a registration for
+  another folder (the file came from another machine through git, or the project moved) and a
+  permission level the tool does not accept. For Claude, a server registered for your user
+  (`claude mcp add -s user`) also counts. Each item brings the action: the command to copy,
+  **Conectar IA (MCP)** (connect AI) or the shortcut to the AI harness. The bar goes away on its own
+  when everything is solved; **Verificar de novo** (check again) checks right away, rereading the
+  terminal PATH (a node installed with the board open is found without reloading the window), and
+  says when nothing changed.
+  - **Recommended is not required.** For Claude and Cursor, runs from the board carry the board
+    server on their own: the registration is only missing in conversations outside the board. That
+    item shows as recommended, out of the count; on its own, it becomes a discreet line instead of
+    the yellow bar.
+  - **The card's AI buttons are disabled** while the command line is missing or not signed in, with
+    the reason in the tooltip, instead of failing after the click.
+  - In the chat panel, the compact version shows the explanation when the item has no button that
+    solves it (Node.js, permission, install site).
 
 - **The card's AI buttons show the error on the board itself.** When the run does not even start (CLI not
   found, for example), the reason appears as a notice on the board screen and stays in the Faz AI

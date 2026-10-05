@@ -31,10 +31,17 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   apontando para um node ou caminho que não existe mais (o nvm trocou de versão), registro de outra
   pasta (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar) e nível de
   permissão que a ferramenta não aceita. No Claude, vale também o servidor registrado para o seu
-  usuário (`claude mcp add -s user`). Cada item traz a ação: o comando para copiar, **Conectar
-  ao board (MCP)** ou o atalho para o Harness de IA. A faixa some sozinha quando tudo é resolvido;
+  usuário (`claude mcp add -s user`). Cada item traz a ação: o comando para copiar, **Conectar IA
+  (MCP)** ou o atalho para o Harness de IA. A faixa some sozinha quando tudo é resolvido;
   **Verificar de novo** confere na hora, relendo o PATH do terminal (um node instalado com o board
-  aberto é encontrado sem recarregar a janela).
+  aberto é encontrado sem recarregar a janela), e diz quando nada mudou.
+  - **Recomendado não é requisito.** No Claude e no Cursor as execuções pelo board levam o servidor
+    do board sozinhas: o registro só falta nas conversas fora do board. Esse item aparece como
+    recomendado, fora da contagem; sozinho, vira uma linha discreta em vez da faixa amarela.
+  - **Os botões de IA do card ficam desligados** enquanto a linha de comando falta ou está sem
+    login, com o motivo na dica, em vez de dar erro depois do clique.
+  - No painel de chat, a versão compacta mostra a explicação quando o item não tem botão que o
+    resolva (Node.js, permissão, site de instalação).
 
 - **Os botões de IA do card mostram o erro no próprio board.** Quando a execução nem começa (CLI não encontrada, por
   exemplo), o motivo aparece como aviso na tela do board e fica no canal Faz AI. Antes ele ia só

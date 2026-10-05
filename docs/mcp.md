@@ -214,7 +214,7 @@ o ciclo completo para a IA.
 
 ### Execução pela conversa
 
-O botão "Chamar IA" roda a CLI da ferramenta do projeto na pasta do projeto, com um prompt que
+O botão "Trabalhar na fase" (e o "Refinar com IA", sempre no nível mais restrito que a ferramenta aceita) roda a CLI da ferramenta do projeto na pasta do projeto, com um prompt que
 manda trabalhar no card. Os comandos, conforme a documentação de cada ferramenta em 2026-10-02:
 
 | Ferramenta | Comando | Permissões |
@@ -222,7 +222,7 @@ manda trabalhar no card. Os comandos, conforme a documentação de cada ferramen
 | Claude Code | `claude -p` (prompt pela entrada padrão) | `--permission-mode dontAsk` com `--allowedTools "mcp__faz-ai__*" Read Glob Grep`; `acceptEdits`; `bypassPermissions` |
 | Codex | `codex exec -` | `--sandbox read-only`; `workspace-write`; `--dangerously-bypass-approvals-and-sandbox` |
 | GitHub Copilot | `copilot -p "<prompt>" --no-ask-user` | `--allow-tool=faz-ai --allow-tool=read`; mais `--allow-tool=write`; `--allow-all` |
-| Cursor | `agent -p --force --approve-mcps --trust` | só "sem restrições" |
+| Cursor | `cursor-agent -p --output-format stream-json --force --approve-mcps --trust` (servidor do board gravado no `.cursor/mcp.json` antes de rodar) | `--allowed-tools` com as ferramentas de leitura e de MCP; mais as de edição; sem `--allowed-tools` |
 | Kimi Code | `kimi -p` | só "sem restrições" (o `-p` não aceita flags de permissão) |
 
 Cuidados por ferramenta:

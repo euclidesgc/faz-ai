@@ -248,11 +248,18 @@ it), the tool's command line, its sign-in (for Cursor, through `cursor-agent sta
 server registration in the file the tool reads (for Claude, the registration for your user from
 `claude mcp add -s user` also counts), a registration pointing to a node or path that no longer
 exists or to another folder, and the permission level. Each item says what it affects and brings the action: the
-command to copy, **Conectar ao board (MCP)** (connect to the board) or the shortcut to the AI
+command to copy, **Conectar IA (MCP)** (connect AI) or the shortcut to the AI
 harness. The bar has no close button: it goes away on its own when the last item is solved. The
 check runs when the board opens, when the tool or permission changes, after connecting, every 5
 minutes and on **Verificar de novo** (check again), which also rereads the terminal PATH (a node
-installed with the board open is found without reloading the window).
+installed with the board open is found without reloading the window), and says when nothing
+changed.
+
+For Claude and Cursor, an unregistered board server shows as **recommended**, out of the count:
+runs from the board carry the server on their own, and the registration is only missing for the AI
+to see the board in your conversations outside it. On its own, that item becomes a discreet line
+instead of the bar. While the command line is missing or not signed in, the card's AI buttons are
+disabled, with the reason in the tooltip.
 
 Suggested flow: the AI reads the story and the phase instruction, creates a sub-task to build the
 phase document, attaches the document to the story and asks for review in the card's conversation.

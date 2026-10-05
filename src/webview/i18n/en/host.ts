@@ -173,8 +173,8 @@ export const host: Record<string, string> = {
   'A IA terminou sem escrever uma resposta.': 'The AI finished without writing a reply.',
   'O {tool}, quando roda em segundo plano, não pede aprovação de nada e não aceita limites por linha de comando. Para chamá-lo pelo board, escolha "Sem restrições" em Configurações → Harness de IA → Execução pela conversa.':
     'When {tool} runs in the background, it asks for approval of nothing and does not accept command-line limits. To call it from the board, choose "No restrictions" in Settings → AI harness → Execution through the conversation.',
-  'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Use "Conectar ao board (MCP)" em Configurações → Harness de IA.':
-    'The agent restricts MCP servers, but the board server is not registered for Claude Code in this folder. Use "Connect to the board (MCP)" in Settings → AI harness.',
+  'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Use "Conectar IA (MCP)" em Configurações.':
+    'The agent restricts MCP servers, but the board server is not registered for Claude Code in this folder. Use "Connect AI (MCP)" in Settings.',
   'Servidores MCP do agente não encontrados na configuração do Claude Code: {servers}.':
     "The agent's MCP servers were not found in the Claude Code configuration: {servers}.",
 

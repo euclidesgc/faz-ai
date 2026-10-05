@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { aiToolInfo } from '../../shared/harness';
+import type { BoardState } from '../../shared/model';
 import type { BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
@@ -108,48 +109,107 @@ function CopyCommand({ command }: { command: string }) {
 }
 
 /**
+ * Por que os botões de IA do card não rodam agora, no idioma da interface; null quando rodam. Além
+ * da permissão que a ferramenta não aceita, a CLI que falta ou está sem login: o clique só daria erro.
+ */
+export function aiBlockedReason(state: BoardState): string | null {
+  if (state.aiRunUnsupported) return t(state.aiRunUnsupported);
+  const cli = state.requirements.find((r) => r.id === 'cli' || r.id === 'signin');
+  if (!cli) return null;
+  return cli.id === 'cli'
+    ? t('A linha de comando do {tool} não foi encontrada: veja o aviso no topo do board.', { tool: aiToolInfo(cli.tool).label })
+    : t('A linha de comando do {tool} está sem login: veja o aviso no topo do board.', { tool: aiToolInfo(cli.tool).label });
+}
+
+/** Um item do aviso: título, explicação e a ação que o resolve. */
+function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
+  const openSettings = useBoardStore((s) => s.openSettings);
+  const { title, detail } = texts(r);
+  const settings = r.action?.kind === 'settings' && !compact;
+  // na versão compacta (o painel de chat) a explicação só fica de fora quando há um botão que resolve
+  const actionable = r.action?.kind === 'command' || r.action?.kind === 'connect' || settings;
+  return (
+    <li>
+      <strong>
+        {title}
+        {r.optional && <span className="muted"> · {t('recomendado')}</span>}
+      </strong>
+      {(!compact || !actionable) && <p>{detail}</p>}
+      {r.action?.kind === 'command' && <CopyCommand command={r.action.command} />}
+      {r.action?.kind === 'connect' && (
+        <Button size="small" onClick={() => ui.connectAI()}>
+          <IconConnect /> {t('Conectar IA (MCP)')}
+        </Button>
+      )}
+      {settings && (
+        <Button size="small" onClick={() => openSettings('harness')}>
+          {t('Abrir Harness de IA')}
+        </Button>
+      )}
+    </li>
+  );
+}
+
+/** "Verificar de novo", com retorno: conferindo, e o resultado quando nada mudou. */
+function RecheckButton() {
+  const checkedAt = useBoardStore((s) => s.state?.requirementsCheckedAt ?? 0);
+  const [askedAt, setAskedAt] = useState<number | null>(null);
+  const done = askedAt !== null && checkedAt > askedAt;
+  return (
+    <>
+      <span role="status" className="small muted">
+        {askedAt !== null && (done ? t('Conferido agora: nada mudou.') : t('Conferindo…'))}
+      </span>
+      <Button
+        size="small"
+        variant="ghost"
+        disabled={askedAt !== null && !done}
+        onClick={() => {
+          setAskedAt(Date.now());
+          ui.checkRequirements();
+        }}
+      >
+        {t('Verificar de novo')}
+      </Button>
+    </>
+  );
+}
+
+/**
  * O que falta para o board trabalhar com a ferramenta de IA. Fica visível em todas as telas enquanto
- * faltar alguma coisa, sem botão de fechar: some sozinho quando a última pendência é resolvida.
+ * faltar alguma coisa, sem botão de fechar: some sozinho quando a última pendência é resolvida. O que
+ * é só recomendado (não impede as execuções pelo board) não conta como pendência: sozinho, vira uma
+ * linha discreta em vez da faixa de aviso.
  */
 export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
   const requirements = useBoardStore((s) => s.state?.requirements ?? []);
-  const openSettings = useBoardStore((s) => s.openSettings);
+  const missing = requirements.filter((r) => !r.optional).length;
+  // a lista muda (algo foi resolvido): o "nada mudou" de antes não vale mais
+  const key = requirements.map((r) => r.id).join();
   if (!requirements.length) return null;
   return (
-    <section className={`banner warn requirements ${compact ? 'compact' : ''}`} role="alert" aria-label={t('Requisitos do board')}>
+    <section
+      key={key}
+      className={`banner requirements ${missing ? 'warn' : 'recommended'} ${compact ? 'compact' : ''}`}
+      role="region"
+      aria-label={t('Requisitos do board')}
+    >
       <div className="requirements-head">
-        <IconWarning />
-        <strong>
-          {requirements.length === 1
-            ? t('Falta 1 requisito para o board trabalhar com a IA')
-            : t('Faltam {n} requisitos para o board trabalhar com a IA', { n: requirements.length })}
+        {missing > 0 && <IconWarning />}
+        <strong role="status">
+          {missing === 0
+            ? t('Recomendado para a IA enxergar o board nas suas conversas')
+            : missing === 1
+              ? t('Falta 1 requisito para o board trabalhar com a IA')
+              : t('Faltam {n} requisitos para o board trabalhar com a IA', { n: missing })}
         </strong>
         <span className="spacer" />
-        <Button size="small" variant="ghost" onClick={() => ui.checkRequirements()}>
-          {t('Verificar de novo')}
-        </Button>
+        <RecheckButton />
       </div>
       <ul>
-        {requirements.map((r) => {
-          const { title, detail } = texts(r);
-          return (
-            <li key={r.id}>
-              <strong>{title}</strong>
-              {!compact && <p>{detail}</p>}
-              {r.action?.kind === 'command' && <CopyCommand command={r.action.command} />}
-              {r.action?.kind === 'connect' && (
-                <Button size="small" onClick={() => ui.connectAI()}>
-                  <IconConnect /> {t('Conectar ao board (MCP)')}
-                </Button>
-              )}
-              {r.action?.kind === 'settings' && !compact && (
-                <Button size="small" onClick={() => openSettings('harness')}>
-                  {t('Abrir Harness de IA')}
-                </Button>
-              )}
-            </li>
-          );
-        })}
+        {requirements.map((r) => (
+          <Item key={r.id} r={r} compact={compact} />
+        ))}
       </ul>
     </section>
   );
