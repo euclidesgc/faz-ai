@@ -6,6 +6,14 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **O "Chamar IA" virou dois botões, cada um com uma tarefa.**
+  - **Trabalhar na fase** é o antigo Chamar IA, com o nome do que ele faz: o trabalho da coluna em
+    que o card está (em Implementação, código), até passar a vez.
+  - **Refinar com IA** é novo: reescreve título e descrição com clareza, revisa Tags, Esforço da
+    atividade, Modelo e Skills e completa o checklist, sem trabalhar a fase, sem mover o card e sem
+    mexer em arquivos (roda sempre só com o board). O resumo do que mudou fica na conversa, com o
+    texto anterior da descrição, e o card volta ao status que tinha.
+
 - **Modos rápidos do Cursor.** Em Configurações → Modelos de IA, o cartão do Cursor ganhou a chave
   **Incluir os modos rápidos**, desligada por padrão. Ligada, a versão rápida de cada modelo (que
   responde mais depressa e cobra mais pelos mesmos tokens) entra no catálogo como um modelo à parte,

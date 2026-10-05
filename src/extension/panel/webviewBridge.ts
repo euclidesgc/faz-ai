@@ -46,7 +46,7 @@ function vscodeEnv(webview: vscode.Webview, router: MessageRouter): HostEnv {
     showChat: () => vscode.commands.executeCommand('fazai.chat.focus'),
     connectAI: () => vscode.commands.executeCommand('fazai.connectAI'),
     openInBrowser: () => vscode.commands.executeCommand('fazai.openInBrowser'),
-    runAi: (cardId) => vscode.commands.executeCommand('fazai.ai.run', cardId, { fromBoard: true }),
+    runAi: (cardId, mode) => vscode.commands.executeCommand('fazai.ai.run', cardId, { fromBoard: true, mode }),
     stopAi: (cardId) => vscode.commands.executeCommand('fazai.ai.stop', cardId, { fromBoard: true }),
     pauseAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.pause'),
     resumeAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.resume'),

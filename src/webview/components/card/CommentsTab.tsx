@@ -110,7 +110,7 @@ export function CommentsTab({ cardId }: { cardId: string }) {
             title={
               state.aiRunUnsupported ??
               t(
-                'Roda o {tool} em segundo plano para ler a conversa e trabalhar neste card. A resposta chega aqui, sem acompanhamento ao vivo.',
+                'Roda o {tool} em segundo plano para ler a conversa e fazer o trabalho da fase em que o card está. A resposta chega aqui, sem acompanhamento ao vivo.',
                 {
                   tool: toolLabel,
                 },
@@ -119,10 +119,10 @@ export function CommentsTab({ cardId }: { cardId: string }) {
             onClick={callAi}
           >
             {draft.trim() ? (
-              t('Enviar e chamar IA')
+              t('Enviar e trabalhar na fase')
             ) : (
               <>
-                <IconRun /> {t('Chamar IA')}
+                <IconRun /> {t('Trabalhar na fase')}
               </>
             )}
           </Button>

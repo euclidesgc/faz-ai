@@ -8,7 +8,7 @@ import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
-import type { RunnerConfig } from './runner';
+import type { AiRunMode, RunnerConfig } from './runner';
 import type { GitConfig } from './git';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
 
@@ -20,7 +20,8 @@ export type WebviewToHost =
   /** abre este board no navegador, fora do editor */
   | { type: 'ui.openInBrowser' }
   /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */
-  | { type: 'ai.run'; cardId: Id }
+  /** `mode`: trabalhar a fase (padrão) ou só refinar o card */
+  | { type: 'ai.run'; cardId: Id; mode?: AiRunMode }
   | { type: 'ai.stop'; cardId: Id }
   /** pausa o autopiloto das histórias em modo autônomo e interrompe a execução em andamento nelas */
   | { type: 'ai.autopilot.pause' }

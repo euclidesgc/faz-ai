@@ -1,10 +1,11 @@
-import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, lastSent, posted, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, vi, beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Board } from '../../src/webview/components/Board';
 import { CardDrawer } from '../../src/webview/components/CardDrawer';
+import { StatusBar } from '../../src/webview/components/StatusBar';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { BoardState, Card } from '../../src/shared/model';
 import { cardRef } from '../../src/shared/model';
@@ -420,5 +421,17 @@ describe('Board / Column', () => {
     await userEvent.click(screen.getByRole('heading', { name: parentWf.name }));
     expect(useBoardStore.getState().collapsed[parentWf.id]).toBe(true);
     expect(lastSent('view.set').patch.collapsed).toEqual({ [parentWf.id]: true });
+  });
+});
+
+describe('botões de IA do card', () => {
+  it('Trabalhar na fase e Refinar com IA mandam o modo certo ao host', async () => {
+    const { router, storyId } = await seedBoard();
+    syncStore(router);
+    renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
+    await userEvent.click(screen.getByRole('button', { name: /Trabalhar na fase/ }));
+    expect(lastSent('ai.run')).toEqual({ type: 'ai.run', cardId: storyId });
+    await userEvent.click(screen.getByRole('button', { name: /Refinar com IA/ }));
+    expect(lastSent('ai.run')).toEqual({ type: 'ai.run', cardId: storyId, mode: 'refine' });
   });
 });

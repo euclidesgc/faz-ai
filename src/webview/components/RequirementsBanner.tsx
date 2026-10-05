@@ -23,11 +23,11 @@ function texts(r: BoardRequirement): { title: string; detail: string } {
         title: t('A linha de comando do {tool} não foi encontrada', { tool }),
         detail: r.action
           ? t(
-              'Sem ela não rodam o Chamar IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale com o comando abaixo e clique em Verificar de novo.',
+              'Sem ela não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale com o comando abaixo e clique em Verificar de novo.',
               { cli: r.cli ?? '' },
             )
           : t(
-              'Sem ela não rodam o Chamar IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale pelo site {where} e clique em Verificar de novo.',
+              'Sem ela não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale pelo site {where} e clique em Verificar de novo.',
               { cli: r.cli ?? '', where: r.where ?? '' },
             ),
       };

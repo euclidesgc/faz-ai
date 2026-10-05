@@ -37,8 +37,8 @@ export const board: Record<string, string> = {
   '{total} cards': '{total} cards',
 
   // Board, colunas e workflows
-  '<b>Este board ainda não tem cards.</b> Crie uma história em <i>+ Novo card</i>, na primeira coluna. Um clique na história mostra as sub-tarefas dela no workflow de sub-tarefas; dois cliques abrem o card, onde ficam a descrição, a conversa com a IA e o botão <i>Chamar IA</i>.':
-    '<b>This board has no cards yet.</b> Create a story with <i>+ New card</i>, in the first column. One click on a story shows its sub-tasks in the sub-tasks workflow; double-click opens the card, where the description, the conversation with the AI and the <i>Call AI</i> button live.',
+  '<b>Este board ainda não tem cards.</b> Crie uma história em <i>+ Novo card</i>, na primeira coluna. Um clique na história mostra as sub-tarefas dela no workflow de sub-tarefas; dois cliques abrem o card, onde ficam a descrição, a conversa com a IA e os botões <i>Trabalhar na fase</i> e <i>Refinar com IA</i>.':
+    '<b>This board has no cards yet.</b> Create a story with <i>+ New card</i>, in the first column. One click on a story shows its sub-tasks in the sub-tasks workflow; double-click opens the card, where the description, the conversation with the AI and the <i>Work on the phase</i> and <i>Refine with AI</i> buttons live.',
   'Expandir o workflow': 'Expand the workflow',
   'Colapsar o workflow': 'Collapse the workflow',
   'Mostrar as sub-tarefas de todas as histórias': 'Show the sub-tasks of all stories',
@@ -185,9 +185,11 @@ export const board: Record<string, string> = {
   Desbloquear: 'Unblock',
   'Interrompe o {tool}; o status volta ao que era': 'Stops {tool}; the status goes back to what it was',
   'Parar a IA': 'Stop the AI',
-  'Roda o {tool} em segundo plano para trabalhar neste card. A resposta chega na conversa.':
-    'Runs {tool} in the background to work on this card. The answer arrives in the conversation.',
-  'Chamar IA': 'Call AI',
+  'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está (o que a coluna pede) e passar a vez: pedir revisão, perguntar ou mover. A resposta chega na conversa.':
+    'Runs {tool} in the background to do the work of the phase the card is in (what the column asks for) and hand over: ask for review, ask a question or move. The answer arrives in the conversation.',
+  'O {tool} deixa o card claro e completo: reescreve título e descrição, preenche Tags, Esforço, Modelo e Skills e sugere o checklist. Não trabalha a fase, não move o card e não mexe em arquivos; o resumo do que mudou chega na conversa.':
+    '{tool} makes the card clear and complete: rewrites the title and description, fills Tags, Effort, Model and Skills and suggests the checklist. It does not work on the phase, does not move the card and does not touch files; the summary of what changed arrives in the conversation.',
+  'Refinar com IA': 'Refine with AI',
   'O que está impedindo o trabalho?': 'What is blocking the work?',
   Bloquear: 'Block',
   Status: 'Status',
@@ -310,10 +312,10 @@ export const board: Record<string, string> = {
   'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 18 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':
     "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 18 or newer, and it is not on the terminal's PATH. Without it, {tool} cannot reach the board. Install Node.js and click Check again.",
   'A linha de comando do {tool} não foi encontrada': "{tool}'s command line was not found",
-  'Sem ela não rodam o Chamar IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale com o comando abaixo e clique em Verificar de novo.':
-    'Without it, the cards\' Chamar IA, the board chat, the heartbeat and autonomous mode do not run. The board looked for "{cli}" in the terminal\'s PATH, the usual install folders and the editor extensions. Install it with the command below and click Check again.',
-  'Sem ela não rodam o Chamar IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale pelo site {where} e clique em Verificar de novo.':
-    'Without it, the cards\' Chamar IA, the board chat, the heartbeat and autonomous mode do not run. The board looked for "{cli}" in the terminal\'s PATH, the usual install folders and the editor extensions. Install it from {where} and click Check again.',
+  'Sem ela não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale com o comando abaixo e clique em Verificar de novo.':
+    'Without it, the cards\' AI buttons, the board chat, the heartbeat and autonomous mode do not run. The board looked for "{cli}" in the terminal\'s PATH, the usual install folders and the editor extensions. Install it with the command below and click Check again.',
+  'Sem ela não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale pelo site {where} e clique em Verificar de novo.':
+    'Without it, the cards\' AI buttons, the board chat, the heartbeat and autonomous mode do not run. The board looked for "{cli}" in the terminal\'s PATH, the usual install folders and the editor extensions. Install it from {where} and click Check again.',
   'A linha de comando do {tool} está sem login': "{tool}'s command line is not signed in",
   'Ela está instalada, mas não entrou na conta: as execuções pelo board falham antes de começar. Rode o comando abaixo no terminal, conclua o login no navegador e clique em Verificar de novo.':
     'It is installed but not signed in: runs from the board fail before starting. Run the command below in the terminal, finish signing in in the browser and click Check again.',

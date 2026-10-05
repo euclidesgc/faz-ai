@@ -66,7 +66,7 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
 3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
    exemplo, "Login com Google") e dê Enter. Duplo clique abre o card: descreva o que você quer, em
    Markdown, e, se quiser, escolha o modelo da IA e as skills que ela deve ler.
-4. **Deixe a IA começar.** Arraste o card para **Discovery** e clique em **Chamar IA** no card. A IA
+4. **Deixe a IA começar.** Arraste o card para **Discovery** e clique em **Trabalhar na fase** no card. A IA
    lê o card pelo board, analisa o problema e conversa com você na aba **Conversa**. Quando termina,
    o status muda para **Aguardando revisão**: é a sua vez.
 5. **Revise e siga.** Leia o documento da fase, responda ou clique em **Aprovar** (ou **Pedir
@@ -262,14 +262,26 @@ interrompe e **Limpar** apaga a conversa. O histórico fica guardado por projeto
 O chat usa a mesma execução em segundo plano dos cards, então vale o limite de Configurações →
 Harness de IA → "O que a IA pode fazer" (por padrão, só o board) e o tempo limite de lá.
 
-### Chamar a IA pela conversa
+### Trabalhar na fase e Refinar com IA
 
-Na conversa de qualquer card, **Chamar IA** roda a ferramenta do projeto em segundo plano para ler
-a conversa e trabalhar naquele card. Não é um chat ao vivo: a resposta chega como mensagem na
-conversa quando a execução termina, e enquanto isso o card fica "Em execução" (com um botão
-**Parar**). Imagens coladas na mensagem viram anexos do card e a IA as recebe.
+O card tem dois botões que chamam a ferramenta do projeto em segundo plano. Não é um chat ao vivo:
+a resposta chega como mensagem na conversa quando a execução termina, e enquanto isso o card fica
+"Em execução" (com um botão **Parar**).
 
-O botão também fica no cabeçalho do card, ao lado do status.
+- **Trabalhar na fase** faz o trabalho da coluna em que o card está, o mesmo que o heartbeat faria:
+  em Discovery analisa o problema, em PRD escreve o PRD, em Implementação escreve o código (se a
+  permissão deixar). Lê a conversa e responde a ela, e termina passando a vez: pede revisão, faz
+  uma pergunta, bloqueia ou move o card. Se Tags, Esforço da atividade, Modelo e Skills estiverem
+  todos vazios, ela os preenche antes. Fica no cabeçalho do card e na conversa (com texto escrito,
+  **Enviar e trabalhar na fase** manda a mensagem antes).
+- **Refinar com IA** só deixa o card claro e completo para quem vai trabalhar nele: reescreve
+  título e descrição (sem inventar requisito; o que estiver ambíguo vira uma lista "Dúvidas em
+  aberto"), revisa Tags, Esforço da atividade, Modelo e Skills mesmo que já tenham valor e
+  acrescenta ao checklist os passos que faltam. Não trabalha a fase, não cria sub-tarefas, não move
+  o card e não mexe em arquivos: roda sempre só com o board. No fim, resume na conversa o que mudou
+  (com o texto anterior da descrição, se a reescreveu) e o card volta ao status que tinha.
+
+Imagens coladas na mensagem viram anexos do card e a IA as recebe.
 
 - O que a IA pode fazer nessas execuções se define em Configurações → Harness de IA → **Execução
   pela conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em
@@ -496,7 +508,7 @@ processador enquanto várias sessões de IA, testes e builds rodam juntos.
 - O **coração** no topo direito do board mostra o heartbeat: vermelho e batendo quando ele está
   rodando; cinza e parado quando está desligado ou não consegue rodar (sem ligação com o Faz AI ou
   sem a ferramenta). Clicar nele liga e desliga o heartbeat.
-- As execuções usam a mesma permissão e o mesmo tempo limite do botão "Chamar IA".
+- As execuções usam a mesma permissão e o mesmo tempo limite do botão "Trabalhar na fase".
 
 Quais colunas exigem aprovação, e em quais a IA atua, se define em Configurações → Workflows e
 colunas. Você mesmo pode mover qualquer card sem aprovação.
@@ -563,7 +575,7 @@ Para configurar sem ter de conhecer cada skill ou ferramenta:
 - **Subagente da ferramenta**: opcional, um arquivo de agente da própria ferramenta (por exemplo,
   `.claude/agents/revisor.md`) para conduzir a sessão.
 
-Cada execução pelo board ("Chamar IA" e heartbeat) é uma sessão nova, só com o que está no card. O
+Cada execução pelo board ("Trabalhar na fase", "Refinar com IA" e heartbeat) é uma sessão nova, só com o que está no card. O
 agente vira parâmetros da linha de comando onde a ferramenta aceita; o resto segue no prompt, como
 instrução:
 

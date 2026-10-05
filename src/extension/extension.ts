@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import type { AiRunMode } from '../shared/runner';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
@@ -130,10 +131,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   /** Chama ou interrompe a IA num card; erros (ferramenta sem suporte, card já em execução) aparecem como aviso. */
   // vindo do board (`fromBoard`), o erro volta para ele e vira aviso na própria tela: o Cursor guarda as
   // notificações do editor na central, sem mostrar, e a pessoa clicava em Chamar IA sem ver nada acontecer
-  const aiCommand = (action: 'start' | 'stop') => async (cardId: string, opts?: { fromBoard?: boolean }) => {
+  const aiCommand = (action: 'start' | 'stop') => async (cardId: string, opts?: { fromBoard?: boolean; mode?: AiRunMode }) => {
     if (!(await getRouter()) || !runner) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
     try {
-      runner[action](cardId);
+      if (action === 'start') runner.start(cardId, 'manual', opts?.mode);
+      else runner.stop(cardId);
     } catch (e) {
       if (opts?.fromBoard) throw e;
       vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
@@ -202,7 +204,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.`
               : message;
           },
-          runAi: (cardId) => h.runner.start(cardId),
+          runAi: (cardId, mode) => h.runner.start(cardId, 'manual', mode),
           stopAi: (cardId) => h.runner.stop(cardId),
           pauseAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.pause'),
           resumeAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.resume'),

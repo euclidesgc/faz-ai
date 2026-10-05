@@ -21,7 +21,7 @@ export function Board() {
       {empty && (
         <div className="board-hint">
           {rich(
-            '<b>Este board ainda não tem cards.</b> Crie uma história em <i>+ Novo card</i>, na primeira coluna. Um clique na história mostra as sub-tarefas dela no workflow de sub-tarefas; dois cliques abrem o card, onde ficam a descrição, a conversa com a IA e o botão <i>Chamar IA</i>.',
+            '<b>Este board ainda não tem cards.</b> Crie uma história em <i>+ Novo card</i>, na primeira coluna. Um clique na história mostra as sub-tarefas dela no workflow de sub-tarefas; dois cliques abrem o card, onde ficam a descrição, a conversa com a IA e os botões <i>Trabalhar na fase</i> e <i>Refinar com IA</i>.',
           )}
         </div>
       )}

@@ -100,7 +100,7 @@ export function AgentsSettings() {
         }
       >
         {t(
-          'Um agente diz como a IA trabalha num card: que skills ela lê, a que servidores MCP e ferramentas ela tem acesso e que modelo usa. Toda execução pelo board ("Chamar IA" e heartbeat) roda através de um agente: o escolhido no card; senão, o da fase (Workflows e colunas → Fase); senão, o padrão. Assim isso é decidido antes, em vez de a ferramenta descobrir sozinha durante a conversa.',
+          'Um agente diz como a IA trabalha num card: que skills ela lê, a que servidores MCP e ferramentas ela tem acesso e que modelo usa. Toda execução pelo board ("Trabalhar na fase", "Refinar com IA" e heartbeat) roda através de um agente: o escolhido no card; senão, o da fase (Workflows e colunas → Fase); senão, o padrão. Assim isso é decidido antes, em vez de a ferramenta descobrir sozinha durante a conversa.',
         )}
       </PageHeader>
       <details className="agents-help">
