@@ -2,7 +2,7 @@
   "name": "faz-ai",
   "displayName": "Faz AI Kanban",
   "description": "Board kanban para Spec-Driven Development com IA, no editor ou no navegador: histórias, sub-tarefas e um servidor MCP para a IA ler e atualizar o board",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "publisher": "euclidesgc",
   "license": "MIT",
   "icon": "media/icon.png",

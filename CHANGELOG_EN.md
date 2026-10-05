@@ -5,7 +5,7 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+## 0.33.0
 
 - **README images** for agents, harness and models redone with this version's interface, in
   Portuguese and English.
