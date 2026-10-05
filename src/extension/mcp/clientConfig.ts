@@ -40,29 +40,51 @@ function mergeJson(file: string, entry: Record<string, unknown>, key = 'mcpServe
   fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n');
 }
 
+/** O que `ensureProjectServer` fez com o registro. */
+export type ProjectServerResult = 'kept' | 'added' | 'repaired' | 'invalid';
+
 /**
  * Garante o servidor do board num JSON de configuração do projeto, para a ferramenta que só lê
- * servidores MCP de arquivo (o Cursor em segundo plano). Um registro que já existe fica como está,
- * mesmo com outro comando: pode ser o caminho do node que a pessoa escolheu. Quando o arquivo nasce
- * aqui, entra no `.git/info/exclude`: guarda caminhos desta máquina e não deve ir para o repositório
- * num `git add` da própria IA, mas também não muda o `.gitignore` de ninguém.
- * Devolve se precisou acrescentar.
+ * servidores MCP de arquivo (o Cursor em segundo plano).
+ *
+ * - Um registro que já aponta para este bridge e esta pasta fica como está, mesmo com outro comando:
+ *   pode ser o caminho do node que a pessoa escolheu.
+ * - Um registro de outra pasta ou de outro bridge (o arquivo veio de um colega pelo git, o projeto
+ *   mudou de lugar) é refeito: a IA falaria com outro board, ou com nenhum. O comando da pessoa fica,
+ *   se ainda existir.
+ * - Um arquivo que não é JSON válido não é tocado (`invalid`): a execução segue, e quem chama avisa.
+ *
+ * O arquivo entra no `.git/info/exclude` quando o board grava nele: guarda caminhos desta máquina e
+ * não deve ir para o repositório num `git add` da própria IA, mas também não muda o `.gitignore` de
+ * ninguém (num arquivo já versionado, a exclusão não tem efeito).
  */
-export function ensureProjectServer(workspaceDir: string, relFile: string, entry: { command: string; args: string[] }): boolean {
+export function ensureProjectServer(
+  workspaceDir: string,
+  relFile: string,
+  entry: { command: string; args: string[] },
+): ProjectServerResult {
   const file = path.join(workspaceDir, relFile);
-  const created = !fs.existsSync(file);
-  if (!created) {
-    let config: { mcpServers?: Record<string, unknown> };
+  let current: { command?: unknown; args?: unknown } | undefined;
+  if (fs.existsSync(file)) {
     try {
-      config = JSON.parse(fs.readFileSync(file, 'utf8')) as typeof config;
+      const config = JSON.parse(fs.readFileSync(file, 'utf8')) as { mcpServers?: Record<string, typeof current> } | null;
+      current = config?.mcpServers?.[SERVER];
     } catch {
-      throw new Error(`${relFile} não é um JSON válido; corrija-o para o board registrar o servidor dele.`);
+      return 'invalid';
     }
-    if (config.mcpServers?.[SERVER]) return false;
   }
-  mergeJson(file, { type: 'stdio', ...entry });
-  if (created) excludeLocally(workspaceDir, relFile);
-  return true;
+  let command = entry.command;
+  if (current) {
+    const args = Array.isArray(current.args) ? current.args.map(String) : [];
+    const same = args.length === entry.args.length && args.every((a, i) => path.resolve(a) === path.resolve(entry.args[i]!));
+    const usable =
+      typeof current.command === 'string' && (path.isAbsolute(current.command) ? fs.existsSync(current.command) : !!current.command);
+    if (same && usable) return 'kept';
+    if (usable) command = current.command as string;
+  }
+  mergeJson(file, { type: 'stdio', command, args: entry.args });
+  excludeLocally(workspaceDir, relFile);
+  return current ? 'repaired' : 'added';
 }
 
 /** Acrescenta o caminho ao `.git/info/exclude` do repositório, se houver um e ele ainda não estiver lá. */

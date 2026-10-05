@@ -23,6 +23,11 @@ export interface ModelOption {
   efforts: string[];
   defaultEffort: string | null;
   /**
+   * veio da lista da própria ferramenta (`cursor-agent models`), e não da lista embutida: um catálogo
+   * com ele já recebeu a lista real, mesmo que a pessoa o tenha reduzido aos mesmos ids da embutida
+   */
+  fromTool?: true;
+  /**
    * ausente ou incompleto = modelo sem preço; nunca zero por omissão. Pode estar pela metade (a
    * pessoa preencheu só alguns dos quatro campos): quem usa o preço lê por `modelPrice`.
    */

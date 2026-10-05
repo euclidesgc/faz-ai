@@ -126,8 +126,17 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
     const built = headlessCommand(tool, { ...input, structured });
     if ('unsupported' in built) throw new Error(built.unsupported);
     // sem o servidor do board no arquivo que a ferramenta lê, a execução rodaria sem mover nem comentar nada
-    if (built.projectMcp && ensureProjectServer(cwd, built.projectMcp.file, built.projectMcp.entry))
-      deps.log(`Servidor do board registrado em ${built.projectMcp.file}, que o ${label} lê em segundo plano.`);
+    if (built.projectMcp) {
+      const { file } = built.projectMcp;
+      const result = ensureProjectServer(cwd, file, built.projectMcp.entry);
+      if (result === 'added') deps.log(`Servidor do board registrado em ${file}, que o ${label} lê em segundo plano.`);
+      if (result === 'repaired')
+        deps.log(`O registro do servidor do board em ${file} apontava para outra pasta ou outro caminho; foi refeito para este projeto.`);
+      if (result === 'invalid')
+        deps.log(
+          `${file} não é um JSON válido e o board não conseguiu registrar o servidor dele: o ${label} pode rodar sem acesso ao board. Corrija o arquivo.`,
+        );
+    }
     const { command, cleanup } = materialize(built);
     const format = command.format;
     // o leitor desta tentativa, preso nela: um pedaço atrasado da tentativa anterior não suja o seguinte

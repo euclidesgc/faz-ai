@@ -20,17 +20,21 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   **Incluir os modos rápidos**, desligada por padrão. Ligada, a versão rápida de cada modelo (que
   responde mais depressa e cobra mais pelos mesmos tokens) entra no catálogo como um modelo à parte,
   por exemplo "Claude Opus 5.5 1M Fast", com preço próprio para a estimativa de custo; o board monta o
-  id que o Cursor espera (`claude-opus-5-5-high-fast`). Desligada, elas saem do catálogo. Pelo MCP, é
-  a regra `includeFastModels` do `update_rules`.
+  id que o Cursor espera (`claude-opus-5-5-high-fast`). Só entram as versões rápidas dos modelos que
+  estão no catálogo: um modelo que você tirou não volta, nem a versão rápida dele. Desligada, elas
+  saem do catálogo. Pelo MCP, é a regra `includeFastModels` do `update_rules`.
 
 - **Aviso dos requisitos do board.** Enquanto faltar alguma coisa para o board trabalhar com a
   ferramenta de IA, uma faixa fica no topo do board (em todas as telas) e no painel de chat, sem
   botão de fechar. Ela aponta: Node.js fora do PATH, linha de comando da ferramenta não instalada,
   CLI do Cursor sem login, servidor do board não registrado no arquivo que a ferramenta lê, registro
-  apontando para um node ou caminho que não existe mais (o nvm trocou de versão) e nível de
-  permissão que a ferramenta não aceita. Cada item traz a ação: o comando para copiar, **Conectar
+  apontando para um node ou caminho que não existe mais (o nvm trocou de versão), registro de outra
+  pasta (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar) e nível de
+  permissão que a ferramenta não aceita. No Claude, vale também o servidor registrado para o seu
+  usuário (`claude mcp add -s user`). Cada item traz a ação: o comando para copiar, **Conectar
   ao board (MCP)** ou o atalho para o Harness de IA. A faixa some sozinha quando tudo é resolvido;
-  **Verificar de novo** confere na hora.
+  **Verificar de novo** confere na hora, relendo o PATH do terminal (um node instalado com o board
+  aberto é encontrado sem recarregar a janela).
 
 - **Os botões de IA do card mostram o erro no próprio board.** Quando a execução nem começa (CLI não encontrada, por
   exemplo), o motivo aparece como aviso na tela do board e fica no canal Faz AI. Antes ele ia só
@@ -39,10 +43,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 - **Os modelos do Cursor são os da sua conta.** Com a CLI autenticada, o board lê
   `cursor-agent models` ao abrir e quando o projeto passa a usar o Cursor; a primeira lista real
-  substitui a embutida, e depois **Detectar modelos** a traz de novo. As cerca de 250 variantes que o
+  substitui a embutida uma vez só, e depois **Detectar modelos** a traz de novo (um catálogo que você
+  reduziu não volta a encher sozinho). As cerca de 250 variantes que o
   Cursor lista (uma por nível, mais as `-fast`) viram umas 50 entradas, cada modelo com os níveis
   dele. A lista embutida perdeu o `grok-4.7`, que não existe com esse id, e as regras de sugestão do
-  Cursor começam em Auto, o único modelo que o plano gratuito aceita.
+  Cursor começam em Auto, o único modelo que o plano gratuito aceita. Num board que já tinha outras
+  regras, a recusa do plano gratuito vem explicada no card, com o caminho para escolher Auto.
 
 - **As ferramentas do board recusam parâmetro desconhecido.** Antes, um nome errado era descartado
   em silêncio e a ferramenta seguia com o padrão: um `parent` escrito errado no `create_card` criava
@@ -61,7 +67,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   autônomo com o Cursor tinham quatro defeitos, corrigidos:
   - **Sem o servidor do board.** Se ninguém tivesse clicado em Conectar IA (MCP), a execução rodava
     sem as ferramentas do board e terminava como sucesso sem mover nem comentar nada. Agora o board
-    grava o servidor no `.cursor/mcp.json` antes de rodar.
+    grava o servidor no `.cursor/mcp.json` antes de rodar, e refaz um registro que aponta para outra
+    pasta. Um `.cursor/mcp.json` que não é JSON válido fica como está, com aviso no canal Faz AI.
   - **Consumo zerado.** O Cursor informa os tokens em camelCase e o board lia os nomes do Claude: as
     execuções apareciam medidas com 0 tokens e custo zero. Agora os tokens são lidos, e o custo é
     estimado pelo modelo que de fato rodou (o Cursor o informa no início; com `auto` era impossível).

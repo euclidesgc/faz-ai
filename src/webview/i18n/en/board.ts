@@ -326,6 +326,9 @@ export const board: Record<string, string> = {
     'In conversations with Cursor in the editor, the AI does not see the cards. Runs from the board register the server on their own, but the editor conversation does not. Connect and enable the "faz-ai" server in Cursor Settings → MCP.',
   'Nas conversas com o {tool} fora do board, a IA não enxerga os cards, e as execuções pelo board também dependem disso. Conecte e aprove o servidor "faz-ai" quando a ferramenta pedir.':
     'In conversations with {tool} outside the board, the AI does not see the cards, and runs from the board depend on this too. Connect and approve the "faz-ai" server when the tool asks.',
+  'O servidor do board no {tool} está registrado para outra pasta': 'The board server in {tool} is registered for another folder',
+  '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). A IA falaria com outro board, ou com nenhum. Conecte de novo para gravar a pasta atual.':
+    '{file} ties the board server to the folder "{missing}", not to this project (the file came from another machine through git, or the project moved). The AI would talk to another board, or to none. Connect again to save the current folder.',
   'O registro do servidor do board no {tool} está desatualizado': "The board's server registration in {tool} is out of date",
   '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). A ferramenta não consegue iniciar o servidor. Conecte de novo para gravar o caminho atual.':
     '{file} points to "{missing}", which no longer exists on this machine (a node replaced by nvm, or the board installed elsewhere). The tool cannot start the server. Connect again to write the current path.',

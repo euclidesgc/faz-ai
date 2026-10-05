@@ -22,17 +22,20 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   the **Incluir os modos rápidos** (include fast modes) switch, off by default. When on, the fast
   version of each model (it answers sooner and charges more for the same tokens) enters the catalog
   as a separate model, for example "Claude Opus 5.5 1M Fast", with its own price for the cost
-  estimate; the board builds the id Cursor expects (`claude-opus-5-5-high-fast`). When off, they
-  leave the catalog. Through MCP, it is the `includeFastModels` rule of `update_rules`.
+  estimate; the board builds the id Cursor expects (`claude-opus-5-5-high-fast`). Only the fast
+  versions of models in the catalog come in: a model you removed does not come back, nor its fast
+  version. When off, they leave the catalog. Through MCP, it is the `includeFastModels` rule of `update_rules`.
 
 - **Board requirements warning.** While something is missing for the board to work with the AI
   tool, a bar stays at the top of the board (on every screen) and in the chat panel, with no close
   button. It points out: Node.js not on the PATH, the tool's command line not installed, Cursor's
   CLI not signed in, the board's server not registered in the file the tool reads, a registration
-  pointing to a node or path that no longer exists (nvm switched versions) and a permission level
-  the tool does not accept. Each item brings the action: the command to copy, **Conectar ao board
+  pointing to a node or path that no longer exists (nvm switched versions), a registration for another folder (the file came
+  from another machine through git, or the project moved) and a permission level the tool does not
+  accept. For Claude, a server registered for your user (`claude mcp add -s user`) also counts. Each item brings the action: the command to copy, **Conectar ao board
   (MCP)** (connect to the board) or the shortcut to the AI harness. The bar goes away on its own when
-  everything is solved; **Verificar de novo** (check again) checks right away.
+  everything is solved; **Verificar de novo** (check again) checks right away, rereading the terminal
+  PATH (a node installed with the board open is found without reloading the window).
 
 - **The card's AI buttons show the error on the board itself.** When the run does not even start (CLI not
   found, for example), the reason appears as a notice on the board screen and stays in the Faz AI
@@ -40,11 +43,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   without showing: the click seemed to do nothing.
 
 - **Cursor's models are your account's.** With the CLI signed in, the board reads
-  `cursor-agent models` when it opens and when the project switches to Cursor; the first real list
-  replaces the built-in one, and after that **Detectar modelos** (detect models) brings it again. The
+  `cursor-agent models` when it opens and when the project switches to Cursor; the first real list replaces the built-in one only once, and after that **Detectar modelos** (detect
+  models) brings it again (a catalog you trimmed does not refill on its own). The
   roughly 250 variants Cursor lists (one per level, plus the `-fast` ones) become about 50 entries,
   each model with its levels. The built-in list lost `grok-4.7`, which does not exist with that id,
-  and Cursor's suggestion rules start at Auto, the only model the free plan accepts.
+  and Cursor's suggestion rules start at Auto, the only model the free plan accepts. On a board that
+  already had other rules, the free plan's refusal comes explained on the card, with the way to pick
+  Auto.
 
 - **The board's tools refuse unknown parameters.** A misspelled name used to be dropped silently and
   the tool went on with the default: a misspelled `parent` in `create_card` created a story instead
@@ -63,7 +68,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   mode with Cursor had four defects, now fixed:
   - **No board server.** If nobody had clicked Conectar IA (MCP), the run had none of the board's
     tools and ended as a success without moving or commenting anything. The board now writes the
-    server to `.cursor/mcp.json` before running.
+    server to `.cursor/mcp.json` before running, and redoes a registration that points to another
+    folder. A `.cursor/mcp.json` that is not valid JSON is left as is, with a warning in the Faz AI
+    channel.
   - **Zeroed consumption.** Cursor reports tokens in camelCase and the board read Claude's names:
     runs showed as measured with 0 tokens and zero cost. Tokens are now read, and the cost is
     estimated from the model that actually ran (Cursor reports it at the start; with `auto` it was

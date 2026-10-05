@@ -12,7 +12,9 @@ let shellPath: Promise<string | undefined> | undefined;
  * PATH do shell de login da pessoa. O editor aberto pelo Dock não herda o PATH do terminal, e é
  * lá que ficam as CLIs das ferramentas de IA (npm global, Homebrew, ~/.local/bin…).
  */
-export function loginShellPath(): Promise<string | undefined> {
+export function loginShellPath(fresh = false): Promise<string | undefined> {
+  // `fresh` lê de novo: a pessoa instalou alguma coisa que mudou o PATH com o editor aberto
+  if (fresh) shellPath = undefined;
   shellPath ??= new Promise((resolve) => {
     if (process.platform === 'win32') return resolve(undefined);
     const shell = process.env.SHELL || os.userInfo().shell || '/bin/sh';

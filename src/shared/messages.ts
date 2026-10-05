@@ -147,8 +147,11 @@ export type WebviewToHost =
   /** leva o board ao padrão atual sem recriá-lo: só acrescenta e completa, os cards não saem do lugar */
   | { type: 'settings.board.upgrade' }
   | { type: 'settings.models.set'; catalog: ModelOption[] }
-  /** relê os modelos da ferramenta (configuração local ou lista embutida) e os junta ao catálogo */
-  | { type: 'settings.models.detect'; tool: AiTool }
+  /**
+   * relê os modelos da ferramenta (configuração local ou lista embutida) e os junta ao catálogo;
+   * `fastOnly` junta só as versões rápidas dos modelos do Cursor que já estão no catálogo
+   */
+  | { type: 'settings.models.detect'; tool: AiTool; fastOnly?: boolean }
   | { type: 'settings.modelRules.set'; rules: ModelRule[] }
   /** recria as regras "Esforço → modelo" com os modelos da ferramenta */
   | { type: 'settings.modelRules.suggest'; tool: AiTool }

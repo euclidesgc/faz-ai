@@ -64,6 +64,14 @@ function texts(r: BoardRequirement): { title: string; detail: string } {
           { file: r.file ?? '', missing: r.missing ?? '' },
         ),
       };
+    case 'mcp-elsewhere':
+      return {
+        title: t('O servidor do board no {tool} está registrado para outra pasta', { tool }),
+        detail: t(
+          '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). A IA falaria com outro board, ou com nenhum. Conecte de novo para gravar a pasta atual.',
+          { file: r.file ?? '', missing: r.missing ?? '' },
+        ),
+      };
     case 'permission':
       return { title: t('O {tool} não roda com o nível de permissão escolhido', { tool }), detail: t(r.reason ?? '') };
   }
