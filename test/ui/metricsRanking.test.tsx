@@ -41,6 +41,7 @@ const month: MetricsMonth = {
   runsOpen: 0,
   durationMs: 1000,
   measuredRuns: 0,
+  costedRuns: 0,
   tokens: null,
   costUsd: null,
   costEstimatedUsd: null,

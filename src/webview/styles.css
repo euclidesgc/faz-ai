@@ -2688,25 +2688,20 @@ body.host-web .drawer {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-/* a lista de tokens dos Totais; `dl.metrics-breakdown` e `.metrics-breakdown-row` são os nomes antigos, que
-   colidiam com o corte por dimensão (`div.metrics-breakdown`): saem quando o Totals.tsx passar para os novos */
-.metrics-token-breakdown,
-dl.metrics-breakdown {
+/* a lista de tokens dos Totais (nome próprio para não colidir com o corte por dimensão, `div.metrics-breakdown`) */
+.metrics-token-breakdown {
   margin: 0;
   font-size: var(--fs-xs);
 }
-.metrics-token-breakdown-row,
-.metrics-breakdown-row {
+.metrics-token-breakdown-row {
   display: flex;
   justify-content: space-between;
   gap: var(--sp-8);
 }
-.metrics-token-breakdown-row dt,
-.metrics-breakdown-row dt {
+.metrics-token-breakdown-row dt {
   color: var(--muted);
 }
-.metrics-token-breakdown-row dd,
-.metrics-breakdown-row dd {
+.metrics-token-breakdown-row dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
 }

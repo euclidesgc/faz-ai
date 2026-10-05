@@ -79,11 +79,9 @@ export interface MetricsMonth {
    * de `measuredRuns`, como em `MetricsCell`: uma execução pode ter tokens e não ter custo (sem preço no
    * catálogo). `0 < costedRuns < runs` = custo parcial; 0 ⇔ `costUsd` null. Mês arquivado visto com um
    * workflow escolhido vem 0: o arquivo não guarda custo por workflow.
-   *
-   * Opcional só por compatibilidade com quem monta o tipo à mão (fixtures da tela): `getPanelMetrics`
-   * sempre preenche, nos meses e nos totais.
+   * `getPanelMetrics` sempre preenche, nos meses e nos totais.
    */
-  costedRuns?: number;
+  costedRuns: number;
   tokens: MetricsTokens | null;
   costUsd: number | null;
   costEstimatedUsd: number | null;

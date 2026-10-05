@@ -25,6 +25,7 @@ function result(over: Partial<MetricsPanelResult['totals']> = {}): MetricsPanelR
       runsOpen: 0,
       durationMs: 3 * 3_600_000 + 12 * 60_000,
       measuredRuns: 11,
+      costedRuns: 11,
       tokens,
       costUsd: 12.5,
       costEstimatedUsd: 12.5,
@@ -85,7 +86,9 @@ describe('Totals: os cinco totais', () => {
 
   it('tokens e custo null viram "não medido", nunca 0 nem US$ 0,00 (RF-18)', () => {
     renderThemed(
-      <Totals result={result({ tokens: null, costUsd: null, costEstimatedUsd: null, costInformedUsd: null, measuredRuns: 0 })} />,
+      <Totals
+        result={result({ tokens: null, costUsd: null, costEstimatedUsd: null, costInformedUsd: null, measuredRuns: 0, costedRuns: 0 })}
+      />,
     );
     expect(within(card('Tokens')).getByText('não medido')).toBeInTheDocument();
     expect(within(card('Custo')).getByText('não medido')).toBeInTheDocument();
@@ -98,14 +101,14 @@ describe('Totals: os cinco totais', () => {
   });
 
   it('o aviso do "não medido" é a descrição do número (aria-describedby)', () => {
-    renderThemed(<Totals result={result({ tokens: null, costUsd: null, measuredRuns: 0 })} />);
+    renderThemed(<Totals result={result({ tokens: null, costUsd: null, measuredRuns: 0, costedRuns: 0 })} />);
     const value = within(card('Custo')).getByText('não medido');
     const note = document.getElementById(value.getAttribute('aria-describedby')!);
     expect(note).toHaveTextContent(/Nenhuma das 11 execuções/);
   });
 
   it('medido em parte traz o número com o aviso de parcialidade (RF-18)', () => {
-    renderThemed(<Totals result={result({ runs: 11, measuredRuns: 8 })} />);
+    renderThemed(<Totals result={result({ runs: 11, measuredRuns: 8, costedRuns: 8 })} />);
     expect(within(card('Custo')).getByText('US$ 12,50')).toBeInTheDocument();
     expect(within(card('Custo')).getByText(/3 de 11 execuções não foram medidas/)).toBeInTheDocument();
     expect(within(card('Tokens')).getByText(/3 de 11 execuções não foram medidas/)).toBeInTheDocument();
@@ -128,9 +131,43 @@ describe('Totals: os cinco totais', () => {
     expect(screen.queryByText(/Estimado/)).toBeNull();
   });
 
+  it('custo não medido com tokens medidos: o aviso do custo se explica e o aria-describedby aponta para ele', () => {
+    renderThemed(<Totals result={result({ costUsd: null, costEstimatedUsd: null, costInformedUsd: null, costedRuns: 0 })} />);
+    const cost = within(card('Custo'));
+    const value = cost.getByText('não medido');
+    expect(cost.getByText(/Nenhuma das 11 execuções teve custo medido/)).toBeInTheDocument();
+    const note = document.getElementById(value.getAttribute('aria-describedby')!);
+    expect(note).toHaveTextContent(/Nenhuma das 11 execuções teve custo medido/);
+    // os tokens seguem o critério deles: tudo medido, sem aviso
+    expect(within(card('Tokens')).queryByText(/não foram medidas|Nenhuma das/)).toBeNull();
+  });
+
+  it('custo parcial (costedRuns < runs) avisa no custo mesmo com todos os tokens medidos', () => {
+    renderThemed(<Totals result={result({ costedRuns: 4 })} />);
+    const cost = within(card('Custo'));
+    expect(cost.getByText(/7 de 11 execuções não foram medidas/)).toBeInTheDocument();
+    const value = cost.getByText('US$ 12,50');
+    expect(document.getElementById(value.getAttribute('aria-describedby')!)).toHaveTextContent(/7 de 11/);
+    expect(within(card('Tokens')).queryByText(/não foram medidas/)).toBeNull();
+  });
+
+  it('o aria-describedby de todo total aponta para um id que existe', () => {
+    renderThemed(<Totals result={result({ costUsd: null, costEstimatedUsd: null, costedRuns: 0, measuredRuns: 5 })} />);
+    for (const el of document.querySelectorAll('[aria-describedby]')) {
+      expect(document.getElementById(el.getAttribute('aria-describedby')!)).not.toBeNull();
+    }
+  });
+
+  it('a lista de tokens usa as classes próprias, sem colidir com o corte por dimensão', () => {
+    const { container } = renderThemed(<Totals result={result()} />);
+    expect(container.querySelector('dl.metrics-token-breakdown')).not.toBeNull();
+    expect(container.querySelectorAll('.metrics-token-breakdown-row')).toHaveLength(4);
+    expect(container.querySelector('.metrics-breakdown, .metrics-breakdown-row')).toBeNull();
+  });
+
   it('em inglês os rótulos e avisos saem traduzidos', () => {
     setLocale('en');
-    renderThemed(<Totals result={result({ tokens: null, costUsd: null, measuredRuns: 0, runsOpen: 1 })} />);
+    renderThemed(<Totals result={result({ tokens: null, costUsd: null, measuredRuns: 0, costedRuns: 0, runsOpen: 1 })} />);
     expect(card('AI time')).toBeInTheDocument();
     expect(within(card('Cost')).getByText('not measured')).toBeInTheDocument();
     expect(within(card('AI runs')).getByText('1 in progress')).toBeInTheDocument();

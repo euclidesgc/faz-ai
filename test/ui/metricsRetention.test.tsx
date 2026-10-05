@@ -26,6 +26,7 @@ const month = (m: string): MetricsMonth => ({
   runsOpen: 0,
   durationMs: 60_000,
   measuredRuns: 0,
+  costedRuns: 0,
   tokens: null,
   costUsd: null,
   costEstimatedUsd: null,
