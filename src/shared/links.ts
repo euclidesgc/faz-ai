@@ -1,5 +1,6 @@
 import type { BoardState, Card, CardLink, Id, LinkKind } from './model';
 import { columnOf, columnsOf, isLive } from './selectors';
+import { statusInfo } from './status';
 
 // Consultas e regras puras sobre os vínculos entre cards.
 
@@ -83,16 +84,50 @@ function successorsOf(state: BoardState, id: Id): Set<Id> {
   return seen;
 }
 
+/** As sub-tarefas em aberto de uma história, separadas pelo que a IA pode tocar agora. */
+export interface SubtaskWaves {
+  /** sem dependência pendente, nem com a pessoa nem rodando: podem começar agora, ao mesmo tempo */
+  ready: Card[];
+  /** esperam outra sub-tarefa (ou outro card) terminar */
+  waiting: Card[];
+  /** a pendência está com a pessoa (pergunta, revisão, bloqueio): a IA não mexe */
+  withPerson: Card[];
+  /** já há uma execução da IA trabalhando nelas */
+  running: Card[];
+}
+
 /**
  * Sub-tarefas em aberto da história separadas pelo que pode começar agora: `ready` não tem dependência
- * pendente (podem rodar ao mesmo tempo) e `waiting` espera alguma outra terminar.
+ * pendente e está com a IA (sem status, pronta ou aprovada), `waiting` espera alguma outra terminar,
+ * `withPerson` está com a pessoa e `running` já está em execução.
  */
-export function subtaskWaves(state: BoardState, storyId: Id): { ready: Card[]; waiting: Card[] } {
+export function subtaskWaves(state: BoardState, storyId: Id): SubtaskWaves {
   const open = state.cards.filter((c) => c.parentId === storyId && isLive(c) && !closed(state, c)).sort((a, b) => a.number - b.number);
-  return {
-    ready: open.filter((c) => openPredecessors(state, c.id).length === 0),
-    waiting: open.filter((c) => openPredecessors(state, c.id).length > 0),
-  };
+  const out: SubtaskWaves = { ready: [], waiting: [], withPerson: [], running: [] };
+  for (const c of open) {
+    if (c.status === 'running') out.running.push(c);
+    else if (c.status && statusInfo(c.status).owner === 'human') out.withPerson.push(c);
+    else if (openPredecessors(state, c.id).length) out.waiting.push(c);
+    else out.ready.push(c);
+  }
+  return out;
+}
+
+/** Todos os ancestrais de um card (pais vinculados e a história da sub-tarefa), direta ou indiretamente. */
+function ancestors(state: BoardState, id: Id): Set<Id> {
+  const seen = new Set<Id>();
+  const stack = [id];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    const parentId = state.cards.find((c) => c.id === cur)?.parentId;
+    const next = [...state.links.filter((l) => l.kind === 'child' && l.toId === cur).map((l) => l.fromId), ...(parentId ? [parentId] : [])];
+    for (const n of next) {
+      if (seen.has(n)) continue;
+      seen.add(n);
+      stack.push(n);
+    }
+  }
+  return seen;
 }
 
 /** Por que o vínculo não pode ser criado, ou null se pode. */
@@ -102,6 +137,9 @@ export function linkProblem(state: BoardState, fromId: Id, toId: Id, kind: LinkK
   if (linkBetween(state, fromId, toId)) return 'Estes cards já estão vinculados. Remova o vínculo antes de criar outro.';
   if (kind === 'child' && descendants(state, toId).has(fromId)) return 'O vínculo criaria um ciclo: o pai já é filho deste card.';
   if (kind === 'precedes' && successorsOf(state, toId).has(fromId)) return 'O vínculo criaria um ciclo: um card dependeria dele mesmo.';
+  // a história só conclui com as sub-tarefas fechadas: depender dela (ou ela depender de uma) trava as duas
+  if (kind === 'precedes' && (ancestors(state, toId).has(fromId) || ancestors(state, fromId).has(toId)))
+    return 'Uma sub-tarefa não pode depender da própria história (ou de um ancestral), nem a história depender dela: uma esperaria a outra para sempre.';
   return null;
 }
 

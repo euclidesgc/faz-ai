@@ -28,6 +28,7 @@ function result(sections: MetricsPanelSections): MetricsPanelResult {
       runsOpen: 0,
       durationMs: 0,
       measuredRuns: 0,
+      costedRuns: 0,
       tokens: null,
       costUsd: null,
       costEstimatedUsd: null,

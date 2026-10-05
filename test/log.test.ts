@@ -19,6 +19,7 @@ import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
+import { streamReader } from '../src/extension/aiOutput/stream';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { cardAndChildrenFacts, cardFacts, cardFamilyFacts, newestCardFacts, trashedCardFacts } from '../src/extension/log/facts';
@@ -353,6 +354,32 @@ describe('AiRunRepo', () => {
       expect(r.turns).toBeNull();
       expect(r.sessionId).toBeNull();
       expect(runs.usage(id)).toHaveLength(2);
+    });
+
+    it('medição parcial sem consumo (Cursor/Kimi sem bloco de uso) grava o inventário, com tokens nulos', () => {
+      // o caso central do leitor genérico: ferramentas lidas, nenhum `usage`
+      const reader = streamReader({ catalog: [], model: null });
+      for (const e of [
+        { type: 'system', session_id: 's' },
+        { type: 'tool_call', name: 'Read' },
+        { type: 'tool_call', name: 'Read' },
+        { type: 'tool_call', name: 'mcp__faz-ai__get_card' },
+        { type: 'result', result: 'feito' },
+      ])
+        reader.push(JSON.stringify(e), 'stdout');
+      const lido = reader.report();
+      expect(lido.measure).toBe('partial');
+      expect(lido.consumption).toBeNull();
+
+      const id = runs.start(baseStart());
+      runs.measure(id, lido);
+      const r = read(id);
+      expect(r.measure).toBe('partial');
+      expect([r.inputTokens, r.outputTokens, r.costUsd, r.turns]).toEqual([null, null, null, null]);
+      expect(runs.usage(id)).toEqual([
+        { kind: 'mcp_tool', name: 'faz-ai/get_card', calls: 1 },
+        { kind: 'tool', name: 'Read', calls: 2 },
+      ]);
     });
 
     it('custo estimado grava cost_estimated verdadeiro; zero medido continua zero, não nulo', () => {

@@ -23,6 +23,7 @@ const month = (m: string, over: Partial<MetricsMonth> = {}): MetricsMonth => ({
   runsOpen: 0,
   durationMs: 60_000,
   measuredRuns: 0,
+  costedRuns: 0,
   tokens: null,
   costUsd: null,
   costEstimatedUsd: null,
@@ -69,6 +70,20 @@ describe('avisos de honestidade (RF-20, RF-21, RF-22)', () => {
     const totals = screen.getAllByRole('heading', { level: 3 })[0]!;
     expect(filters.compareDocumentPosition(warn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(warn.compareDocumentPosition(totals) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('intervalo todo antes do log não aparece invertido: diz que o período é anterior ao início do log', () => {
+    show(panel({ clamped: true, range: { startDate: '2026-08-01', endDate: '2026-06-30' } }));
+    expect(screen.getByText(/anterior ao início do log/, { selector: '.metrics-period-note *' })).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/1 de agosto de 2026 a 30 de junho de 2026/);
+    expect(screen.queryByText(/Período consultado/)).toBeNull();
+  });
+
+  it('recorte vazio do host (período todo antes do log): diz que é anterior ao início do log', () => {
+    show(panel({ clamped: true, months: [], range: { startDate: '', endDate: '' } }));
+    expect(screen.getByText(/anterior ao início do log/, { selector: '.metrics-period-note *' })).toBeInTheDocument();
+    expect(screen.getByText('O período escolhido é anterior ao início do log.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/O recorte em vigor é \./);
   });
 
   it('sem recorte cortado não há aviso de recorte', () => {

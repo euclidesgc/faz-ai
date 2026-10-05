@@ -29,6 +29,7 @@ const month = (m: string, over: Partial<MetricsMonth> = {}): MetricsMonth => ({
   runsOpen: 0,
   durationMs: 60_000,
   measuredRuns: 4,
+  costedRuns: 4,
   tokens: tokens(1000),
   costUsd: 10,
   costEstimatedUsd: 10,
@@ -37,7 +38,17 @@ const month = (m: string, over: Partial<MetricsMonth> = {}): MetricsMonth => ({
 });
 
 const gap = (m: string): MetricsMonth =>
-  month(m, { present: false, cardsDone: 0, runs: 0, durationMs: 0, measuredRuns: 0, tokens: null, costUsd: null, costEstimatedUsd: null });
+  month(m, {
+    present: false,
+    cardsDone: 0,
+    runs: 0,
+    durationMs: 0,
+    measuredRuns: 0,
+    costedRuns: 0,
+    tokens: null,
+    costUsd: null,
+    costEstimatedUsd: null,
+  });
 
 function panel(months: MetricsMonth[], over: Partial<MetricsPanelResult> = {}): MetricsPanelResult {
   const { month: _m, present: _p, archived: _a, partial: _x, ...totals } = month('2026-10');
@@ -114,6 +125,29 @@ describe('MonthSeries: lacuna, zero e parcial', () => {
     expect(points.map((p) => p.partial)).toEqual([true, false, false, true]);
     // presente sem medição é "não medido", não zero nem lacuna
     expect(seriesPoints([month('2026-10', { costUsd: null })], 'cost')[0]).toMatchObject({ state: 'unmeasured', value: null });
+  });
+  it('custo parcial (costedRuns < runs) aparece na série de custo e não na de tokens', async () => {
+    const months = [month('2026-09', { costedRuns: 2 }), month('2026-10', { costedRuns: 4 })];
+    const points = seriesPoints(months, 'cost');
+    expect(points.map((p) => p.costPartial)).toEqual([true, false]);
+    expect(seriesPoints(months, 'tokens').map((p) => p.costPartial)).toEqual([false, false]);
+    const { container } = renderThemed(<MonthSeries result={panel(months)} />);
+    expect(cells('2026-09')[2]).toBe('custo parcial');
+    expect(bar(container, '2026-09')).toHaveClass('is-partial');
+    expect(cells('2026-10')[2]).toBe('');
+    await userEvent.click(screen.getByRole('button', { name: 'Tokens' }));
+    expect(cells('2026-09')[2]).toBe('');
+  });
+
+  it('custo não medido (costedRuns 0) com tokens medidos: "não medido" só na série de custo', async () => {
+    const months = [month('2026-10', { costedRuns: 0, costUsd: null, costEstimatedUsd: null })];
+    expect(seriesPoints(months, 'cost')[0]).toMatchObject({ state: 'unmeasured', costPartial: false });
+    expect(seriesPoints(months, 'tokens')[0]).toMatchObject({ state: 'value' });
+  });
+
+  it('sem costedRuns na resposta cai no comportamento antigo', () => {
+    const legacy = { ...month('2026-10'), costedRuns: undefined } as unknown as MetricsMonth;
+    expect(seriesPoints([legacy], 'cost')[0]?.costPartial).toBe(false);
   });
 });
 

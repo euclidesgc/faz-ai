@@ -5,6 +5,24 @@ import type { DefineTool } from './registry';
 const GROUP_BY = ['phase', 'card_type', 'model', 'tool', 'card', 'agent', 'skill', 'effort', 'profile', 'used_tool', 'mcp_tool'] as const;
 const INVENTORY_DIMS = new Set<MetricsDim | undefined>(['agent', 'skill', 'used_tool', 'mcp_tool']);
 
+const DATE_MESSAGE = 'Data inválida: use AAAA-MM-DD de um dia que existe, ex. 2026-03-31.';
+
+/** 'AAAA-MM-DD' com zeros à esquerda e um dia que existe no calendário (recusa 2026-02-30, 2026-2-3). */
+function isRealIsoDate(value: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d;
+}
+
+/**
+ * Data de `get_metrics`. Antes, um texto qualquer passava e virava resposta vazia calada (a comparação
+ * de strings e o `Date` aceitavam lixo); agora é recusado com a mensagem. Como só passa a forma
+ * normalizada, comparar duas datas como string é comparar os dias.
+ */
+export const isoDateArg = z.string().refine(isRealIsoDate, { message: DATE_MESSAGE });
+
 function parseCardNumber(ref: string | number): number {
   const n = Number(String(ref).trim().replace(/^#/, ''));
   if (!Number.isInteger(n)) throw new Error(`Card "${String(ref)}" inválido: use o número, ex. 72 ou "#72".`);
@@ -99,8 +117,8 @@ export function registerMetricsTools(tool: DefineTool): void {
       'Nas dimensões "agent", "skill", "used_tool" e "mcp_tool" não há tokens/custo (não é possível repartir o custo de uma execução entre o que ela usou); "effort" e "profile" têm.',
     {
       group_by: z.enum(GROUP_BY).optional().describe('Dimensão de agrupamento; omitido = total do recorte'),
-      start_date: z.string().optional().describe('AAAA-MM-DD, inclusive'),
-      end_date: z.string().optional().describe('AAAA-MM-DD, inclusive'),
+      start_date: isoDateArg.optional().describe('AAAA-MM-DD, inclusive'),
+      end_date: isoDateArg.optional().describe('AAAA-MM-DD, inclusive'),
       card: z.union([z.string(), z.number()]).optional().describe('Filtra por um card, ex. 72 ou "#72"'),
       phase: z.string().optional().describe('Filtra por fase (nome da coluna no momento da execução)'),
       card_type: z.string().optional().describe('Filtra por tipo de card'),
@@ -112,6 +130,8 @@ export function registerMetricsTools(tool: DefineTool): void {
       limit: z.number().int().min(1).max(100).optional().describe('Linhas antes de somar o resto em "outros"; padrão 20'),
     },
     (a, router) => {
+      if (a.start_date && a.end_date && a.end_date < a.start_date)
+        throw new Error(`end_date (${a.end_date}) anterior a start_date (${a.start_date}).`);
       const result = router.metrics({
         groupBy: a.group_by,
         startDate: a.start_date,

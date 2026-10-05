@@ -61,7 +61,9 @@ pasta de trabalho dela e devolve onde trabalhar (também em \`workspace\` no \`g
 código só ali e não crie branches por conta própria.
 
 Na Implementação, trabalhe em rodadas. \`get_card\` na história traz em \`subtasksNow\` o que pode
-rodar agora (\`canRunTogether\`) e o que espera outra sub-tarefa (\`waiting\`):
+rodar agora (\`canRunTogether\`), o que espera outra sub-tarefa (\`waiting\`) e, quando houver, o que
+não é seu agora: \`withPerson\` (pergunta, revisão ou bloqueio com a pessoa) e \`running\` (outra
+execução já está nela). Não mexa nessas duas últimas:
 
 1. Se a sua ferramenta tem subagentes, delegue **cada** sub-tarefa de \`canRunTogether\` a um subagente,
    todos lançados na mesma mensagem para rodarem ao mesmo tempo, cada um com o modelo e o esforço do
@@ -70,9 +72,14 @@ rodar agora (\`canRunTogether\`) e o que espera outra sub-tarefa (\`waiting\`):
    de branch, e o ciclo abaixo.
 2. O ciclo de cada sub-tarefa: \`start_work\`, mova para "Em andamento", faça o trabalho, verifique e
    mova para a coluna de conclusão, registrando na conversa do card o que foi feito.
-3. Quando a rodada terminar, confira o resultado junto (testes e build do projeto), faça o commit e
-   leia a história de novo: as sub-tarefas liberadas formam a próxima rodada. Repita até não sobrar
-   nenhuma em aberto.
+3. Quando a rodada terminar, confira o resultado junto (testes e build do projeto), faça o commit
+   (os dois só com terminal; veja abaixo) e leia a história de novo: as sub-tarefas liberadas formam a próxima rodada. Repita até não sobrar
+   nenhuma que você possa tocar agora; se as restantes estiverem com a pessoa (\`withPerson\`), pare.
+
+Testes, build e commit dependem do terminal. Se você não pode rodar comandos nesta execução (permissão
+sem terminal, como "Board e arquivos do projeto"), não tente: implemente, verifique lendo o código e
+registre na conversa da história o que falta rodar (testes, build, commit).
+Essa parte fica para quem tem permissão.
 
 \`start_work\` recusa a sub-tarefa que ainda depende de outra em aberto. Sem subagentes, ou com uma
 sub-tarefa só na rodada, execute uma por vez, na ordem das dependências. Se duas sub-tarefas da

@@ -74,6 +74,14 @@ export interface MetricsMonth {
   runsOpen: number;
   durationMs: number;
   measuredRuns: number;
+  /**
+   * Execuções com custo (`cost_usd` gravado; no mês arquivado, o `n` da linha de custo). Contado à parte
+   * de `measuredRuns`, como em `MetricsCell`: uma execução pode ter tokens e não ter custo (sem preço no
+   * catálogo). `0 < costedRuns < runs` = custo parcial; 0 ⇔ `costUsd` null. Mês arquivado visto com um
+   * workflow escolhido vem 0: o arquivo não guarda custo por workflow.
+   * `getPanelMetrics` sempre preenche, nos meses e nos totais.
+   */
+  costedRuns: number;
   tokens: MetricsTokens | null;
   costUsd: number | null;
   costEstimatedUsd: number | null;
@@ -81,7 +89,10 @@ export interface MetricsMonth {
 }
 
 export interface MetricsPanelResult {
-  /** o recorte efetivamente consultado, já cortado pelo início da série */
+  /**
+   * o recorte efetivamente consultado, já cortado pelo início da série. Pedido inteiro antes do início
+   * da série: os dois lados '' (nada foi consultado), com `clamped: true` e `months` vazio.
+   */
   range: { startDate: string; endDate: string };
   /** true quando o período pedido começava antes do início da série */
   clamped: boolean;

@@ -25,6 +25,10 @@ export const metrics: Record<string, string> = {
   Workflow: 'Workflow',
   Todos: 'All',
   'A data final vem antes da inicial.': 'The end date is before the start date.',
+  'A consulta das métricas demorou demais. Tente de novo.': 'The metrics query took too long. Try again.',
+  'O período escolhido é anterior ao início do log.': 'The chosen period is before the start of the log.',
+  'O período pedido é anterior ao início do log, que começa em {date}. Não existe dado nesse período.':
+    'The requested period is before the start of the log, which begins on {date}. There is no data in that period.',
   'Período consultado: {period}': 'Period queried: {period}',
 
   // card 159: Totais do período (Totals.tsx)

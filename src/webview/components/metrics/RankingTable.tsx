@@ -232,16 +232,19 @@ export function othersOf(covered: Measures, shown: Measures[]): Measures {
     const n = total - shown.reduce((acc, c) => acc + (pick(c) ?? 0), 0);
     return Math.abs(n) < 1e-9 ? 0 : n;
   };
-  const restOrNull = (total: number | null, pick: (c: Measures) => number | null): number | null =>
-    total === null ? null : rest(total, pick);
+  // como o `remainder` do Breakdown: sem execução medida (ou com custo) no que sobrou, é "não medido", não 0
+  const restOrNull = (total: number | null, runs: number, pick: (c: Measures) => number | null): number | null =>
+    total === null || runs <= 0 ? null : rest(total, pick);
+  const measuredRuns = rest(covered.measuredRuns, (c) => c.measuredRuns);
+  const costedRuns = rest(covered.costedRuns, (c) => c.costedRuns);
   return {
     runs: rest(covered.runs, (c) => c.runs),
-    measuredRuns: rest(covered.measuredRuns, (c) => c.measuredRuns),
-    costedRuns: rest(covered.costedRuns, (c) => c.costedRuns),
+    measuredRuns,
+    costedRuns,
     durationMs: rest(covered.durationMs, (c) => c.durationMs),
-    tokens: restOrNull(covered.tokens, (c) => c.tokens),
-    costUsd: restOrNull(covered.costUsd, (c) => c.costUsd),
-    costEstimatedUsd: restOrNull(covered.costEstimatedUsd, (c) => c.costEstimatedUsd),
+    tokens: restOrNull(covered.tokens, measuredRuns, (c) => c.tokens),
+    costUsd: restOrNull(covered.costUsd, costedRuns, (c) => c.costUsd),
+    costEstimatedUsd: restOrNull(covered.costEstimatedUsd, costedRuns, (c) => c.costEstimatedUsd),
   };
 }
 

@@ -668,9 +668,12 @@ Para levar o board a outra máquina ou guardar uma cópia, use **Configurações
   lixeira), conversas, checklists, vínculos, histórico e os anexos embutidos. Só o board da pasta
   atual sai no arquivo. Ele contém as conversas e os anexos: guarde-o com cuidado.
 - **Importar de um arquivo…** mostra um resumo (nome, cards, anexos, tamanho, versão) e, depois da
-  confirmação, grava uma cópia do banco (`<arquivo>.bak`, ao lado dele), apaga o board atual e o
-  substitui pelo do arquivo, com os mesmos números de card. O board importado passa a ser o desta
-  pasta. Nada muda no banco se o arquivo for inválido ou se algo falhar no meio.
+  confirmação, grava uma cópia do banco (`<arquivo>.bak`, ao lado dele), move os anexos do board
+  atual para uma pasta de backup (`<anexos>.bak-<data>`), apaga o board atual e o substitui pelo do
+  arquivo, com os mesmos números de card. O board importado passa a ser o desta pasta. Nada muda no
+  banco se o arquivo for inválido ou se algo falhar no meio. A confirmação diz que os anexos foram
+  para backup. Arquivo de importação com id de card ou nome de anexo contendo caminho (`../`) é
+  recusado.
 
 Um arquivo exportado por uma versão anterior da extensão é atualizado ao ser importado; um arquivo
 de versão mais nova é recusado com a versão necessária. Importar com a IA executando um card não é

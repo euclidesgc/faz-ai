@@ -131,6 +131,16 @@ describe('autopilotStep', () => {
     expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 1 }, column: { name: 'Discovery' } });
   });
 
+  it('história que depende de outro card em aberto não roda: a fila para dizendo de quem ela depende', () => {
+    create('Base', 'PRD'); // #1, fora do modo autônomo
+    create('Y', 'PRD'); // #2
+    ai({ type: 'link.add', fromId: card(1).id, toId: card(2).id, kind: 'precedes' });
+    yolo(2);
+    const step = autopilotStep(router.snapshot());
+    expect(step).toMatchObject({ kind: 'paused', story: { number: 2 } });
+    expect(step.kind === 'paused' && step.reason).toContain('#1');
+  });
+
   it('mover a história de baixo para o topo da coluna dá a vez a ela, mesmo com número maior', () => {
     create('A', 'PRD'); // #1, linha de cima
     create('B', 'PRD'); // #2, logo abaixo

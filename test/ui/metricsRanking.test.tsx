@@ -41,6 +41,7 @@ const month: MetricsMonth = {
   runsOpen: 0,
   durationMs: 1000,
   measuredRuns: 0,
+  costedRuns: 0,
   tokens: null,
   costUsd: null,
   costEstimatedUsd: null,
@@ -236,11 +237,20 @@ describe('RankingTable: corte, "mostrar mais" e "outros" (RF-18, RF-33)', () => 
       costEstimatedUsd: null,
     });
     expect(
-      othersOf({ ...covered, costUsd: 0.3 }, [
+      othersOf({ ...covered, costUsd: 0.3, costedRuns: 9 }, [
         { ...shown[0]!, costUsd: 0.1 },
         { ...shown[0]!, costUsd: 0.2 },
       ]).costUsd,
     ).toBe(0);
+  });
+
+  it('othersOf: sem medição nas linhas restantes, tokens e custo ficam não medidos e não 0', () => {
+    const covered = { runs: 10, measuredRuns: 2, costedRuns: 2, durationMs: 1000, tokens: 50, costUsd: 0.3, costEstimatedUsd: null };
+    const shown = [{ runs: 3, measuredRuns: 2, costedRuns: 2, durationMs: 400, tokens: 50, costUsd: 0.3, costEstimatedUsd: null }];
+    const rest = othersOf(covered, shown);
+    expect(rest.runs).toBe(7);
+    expect(rest.tokens).toBeNull();
+    expect(rest.costUsd).toBeNull();
   });
 
   it('sortRows deixa o "não medido" no fim nas duas direções', () => {

@@ -3,7 +3,7 @@ import type { MetricsFilters as Filters, MetricsPanelResult, MetricsPeriod } fro
 import { t } from '../../i18n';
 import { useBoardStore } from '../../store/boardStore';
 import { Button, FormField, SelectField } from '../ui';
-import { formatRange } from './format';
+import { formatRange, isBeforeLog } from './format';
 
 /** Os sete períodos da RF-03, na ordem em que aparecem. O texto é traduzido na hora de desenhar. */
 const PERIODS: { value: MetricsPeriod; label: () => string }[] = [
@@ -28,13 +28,15 @@ interface Props {
   workflows: readonly string[];
   /** o recorte da última resposta, escrito abaixo dos controles */
   range?: MetricsPanelResult['range'];
+  /** o host recortou o período pedido ao início do log */
+  clamped?: boolean;
 }
 
 /**
  * Os filtros do painel (RF-03 a RF-05), lidos e gravados na store (`metricsFilters`). Só botões e campos
  * nativos, ou o Select do design system: todos recebem foco e respondem a Enter/Espaço (RF-31).
  */
-export function MetricsFilters({ workflows, range }: Props) {
+export function MetricsFilters({ workflows, range, clamped = false }: Props) {
   const filters = useBoardStore((s) => s.metricsFilters);
   const setFilters = useBoardStore((s) => s.setMetricsFilters);
   const clear = useBoardStore((s) => s.clearMetricsFilters);
@@ -45,7 +47,8 @@ export function MetricsFilters({ workflows, range }: Props) {
   // o workflow escolhido continua na lista mesmo que a resposta atual não o traga (recorte sem log dele)
   const names = filters.workflow && !workflows.includes(filters.workflow) ? [...workflows, filters.workflow] : workflows;
   const options = [{ value: ALL, label: t('Todos') }, ...names.map((name) => ({ value: name, label: name }))];
-  const rangeText = range ? formatRange(range) : '';
+  const beforeLog = !!range && isBeforeLog(range, clamped);
+  const rangeText = range && !beforeLog ? formatRange(range) : '';
 
   return (
     <div className="metrics-filters">
@@ -110,6 +113,7 @@ export function MetricsFilters({ workflows, range }: Props) {
           {t('A data final vem antes da inicial.')}
         </p>
       )}
+      {beforeLog && <p className="metrics-filters-range">{t('O período escolhido é anterior ao início do log.')}</p>}
       {rangeText && <p className="metrics-filters-range">{t('Período consultado: {period}', { period: rangeText })}</p>}
     </div>
   );

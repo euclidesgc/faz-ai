@@ -402,3 +402,35 @@ describe('getPanelMetrics', () => {
     expect(result.totals.tokens).toBeNull();
   });
 });
+
+describe('getPanelMetrics: revisão 0.32.0', () => {
+  it('período inteiro antes do início da série: recorte vazio, nunca invertido', () => {
+    setLogSince(TODAY);
+    const result = getPanelMetrics(db, boardId, { startDate: '2026-01-01', endDate: '2026-02-28' });
+    expect(result.range).toEqual({ startDate: '', endDate: '' });
+    expect(result.clamped).toBe(true);
+    expect(result.months).toEqual([]);
+    expect(result.workflows).toEqual([]);
+    expect(result.archivedMonths).toEqual([]);
+  });
+
+  it('costedRuns nos totais e em cada mês: execuções com custo, contadas à parte das medidas', () => {
+    run(at(2026, 5), 1000, { consumption: { input: 10, costUsd: 0.25 } });
+    run(at(2026, 6), 1000, { consumption: { input: 10, costUsd: 0.5, estimated: false } });
+    run(at(2026, 6), 1000, { consumption: { input: 10 } }); // medida sem custo
+    run(at(2026, 6), 1000); // não medida
+    const result = getPanelMetrics(db, boardId, { startDate: '2026-05-01', endDate: '2026-06-30' });
+    expect(result.totals).toMatchObject({ runs: 4, measuredRuns: 3, costedRuns: 2 });
+    expect(month(result, '2026-05')).toMatchObject({ costedRuns: 1 });
+    expect(month(result, '2026-06')).toMatchObject({ costedRuns: 1, measuredRuns: 2 });
+  });
+
+  it('costedRuns sobrevive à consolidação (mês arquivado)', () => {
+    run(at(2026, 3), 1000, { consumption: { input: 10, costUsd: 0.25 } });
+    run(at(2026, 3), 1000, { consumption: { input: 10 } });
+    consolidate(db, boardId, TODAY, 1);
+    const result = getPanelMetrics(db, boardId, { startDate: '2026-03-01', endDate: '2026-03-31' });
+    expect(month(result, '2026-03')).toMatchObject({ archived: true, runs: 2, measuredRuns: 2, costedRuns: 1 });
+    expect(result.totals.costedRuns).toBe(1);
+  });
+});

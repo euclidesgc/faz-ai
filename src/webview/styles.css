@@ -2688,19 +2688,20 @@ body.host-web .drawer {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-.metrics-breakdown {
+/* a lista de tokens dos Totais (nome próprio para não colidir com o corte por dimensão, `div.metrics-breakdown`) */
+.metrics-token-breakdown {
   margin: 0;
   font-size: var(--fs-xs);
 }
-.metrics-breakdown-row {
+.metrics-token-breakdown-row {
   display: flex;
   justify-content: space-between;
   gap: var(--sp-8);
 }
-.metrics-breakdown-row dt {
+.metrics-token-breakdown-row dt {
   color: var(--muted);
 }
-.metrics-breakdown-row dd {
+.metrics-token-breakdown-row dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
@@ -3057,7 +3058,7 @@ body.host-web .drawer {
 
 /* card 175, painel de métricas: o corte por dimensão. Barras horizontais em SVG fluido, rótulos em HTML fora do
    SVG (não encolhem no zoom nem giram) e a tabela das quatro medidas, visível, ao lado ou abaixo (RF-38, RF-40) */
-.metrics-breakdown {
+div.metrics-breakdown {
   display: flex;
   flex-direction: column;
   gap: var(--sp-8);

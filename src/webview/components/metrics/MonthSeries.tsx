@@ -21,6 +21,8 @@ export interface SeriesPoint {
   state: 'gap' | 'unmeasured' | 'value';
   value: number | null;
   partial: boolean;
+  /** Série de custo com `0 < costedRuns < runs`: só parte das execuções do mês tinha custo. Sempre false nos tokens. */
+  costPartial: boolean;
   archived: boolean;
 }
 
@@ -28,7 +30,8 @@ export function seriesPoints(months: MetricsMonth[], kind: SeriesKind): SeriesPo
   return months.map((m) => {
     const value = kind === 'cost' ? m.costUsd : (m.tokens?.total ?? null);
     const state = !m.present ? 'gap' : value === null ? 'unmeasured' : 'value';
-    return { month: m.month, state, value: state === 'value' ? value : null, partial: m.partial, archived: m.archived };
+    const costPartial = kind === 'cost' && state === 'value' && m.costedRuns !== undefined && m.costedRuns > 0 && m.costedRuns < m.runs;
+    return { month: m.month, state, value: state === 'value' ? value : null, partial: m.partial, costPartial, archived: m.archived };
   });
 }
 
@@ -41,6 +44,7 @@ function observation(p: SeriesPoint): string {
   if (p.state === 'gap') return t('sem dado');
   const notes: string[] = [];
   if (p.partial) notes.push(t('parcial'));
+  if (p.costPartial) notes.push(t('custo parcial'));
   if (p.archived) notes.push(t('só total mensal'));
   return notes.join(', ');
 }
@@ -87,7 +91,7 @@ export function MonthSeries({ result }: MetricsBlockProps) {
         : `${formatMonth(first.month, 'long')} – ${formatMonth(last.month, 'long')}`
       : '';
   const gaps = points.filter((p) => p.state === 'gap').length;
-  const partials = points.filter((p) => p.partial && p.state !== 'gap').length;
+  const partials = points.filter((p) => (p.partial || p.costPartial) && p.state !== 'gap').length;
   const summary = [
     `${title}, ${span}.`,
     peak && max > 0
@@ -152,14 +156,14 @@ export function MonthSeries({ result }: MetricsBlockProps) {
                 return (
                   <rect
                     key={p.month}
-                    className={p.partial ? 'metrics-series-bar is-partial' : 'metrics-series-bar'}
+                    className={p.partial || p.costPartial ? 'metrics-series-bar is-partial' : 'metrics-series-bar'}
                     data-month={p.month}
                     data-value={p.value!}
                     x={i * COL + (COL - BAR) / 2}
                     y={HEIGHT - h}
                     width={BAR}
                     height={h}
-                    fill={p.partial ? `url(#${patternId})` : undefined}
+                    fill={p.partial || p.costPartial ? `url(#${patternId})` : undefined}
                     vectorEffect="non-scaling-stroke"
                   />
                 );

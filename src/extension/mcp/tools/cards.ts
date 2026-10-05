@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { linkProblem } from '../../../shared/links';
 import { columnsOf } from '../../../shared/selectors';
 import { cardStatus, cardSummary, findCard, findColumn, findType } from '../format';
 import { cardArg, fieldsArg } from './args';
@@ -37,7 +38,8 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       if (origin && !origin.yolo) throw new Error(`#${origin.number} não está em modo autônomo; só uma pessoa liga o modo numa história.`);
       const parent = a.parent !== undefined ? live(findCard(s, a.parent)) : null;
       if (a.depends_on?.length && !parent) throw new Error('depends_on vale para sub-tarefas: informe `parent`.');
-      const dependsOn = (a.depends_on ?? []).map((ref) => live(findCard(s, ref)));
+      // a mesma dependência informada duas vezes vira um vínculo só
+      const dependsOn = [...new Map((a.depends_on ?? []).map((ref) => live(findCard(s, ref))).map((c) => [c.id, c])).values()];
       if (parent?.parentId) throw new Error(`#${parent.number} é uma sub-tarefa; o pai precisa ser uma história.`);
       const wf = s.workflows.find((w) => w.kind === (parent ? 'child' : 'parent'));
       if (!wf) throw new Error('Workflow não encontrado.');
@@ -47,6 +49,15 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       if (!column) throw new Error(`O workflow "${wf.name}" não tem colunas.`);
       // valida os campos antes de criar, para não deixar um card pela metade
       validateFields(s, a.fields);
+      // e os vínculos de dependência, contra um card provisório no lugar do que vai nascer
+      if (parent && dependsOn.length) {
+        const draft = { ...parent, id: '\0novo', number: 0, parentId: parent.id, workflowId: wf.id, columnId: column.id, status: null };
+        const preview = { ...s, cards: [...s.cards, draft] };
+        for (const dep of dependsOn) {
+          const problem = linkProblem(preview, dep.id, draft.id, 'precedes');
+          if (problem) throw new Error(`depends_on #${dep.number}: ${problem}`);
+        }
+      }
       const id = router.createCard({ typeId: type.id, columnId: column.id, parentId: parent?.id ?? null, title: a.title }, aiOrigin(ctx));
       if (a.description) router.handle({ type: 'card.update', cardId: id, patch: { description: a.description } });
       setFields(router, s, id, a.fields);

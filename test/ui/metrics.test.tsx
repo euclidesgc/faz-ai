@@ -1,5 +1,5 @@
 import { lastSent, renderThemed, sentOf } from './setup';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HostToWebview } from '../../src/shared/messages';
@@ -23,7 +23,7 @@ import {
   formatTokens,
   isEmptyResult,
 } from '../../src/webview/components/metrics/format';
-import { toPanelQuery } from '../../src/webview/components/metrics/useMetricsQuery';
+import { QUERY_TIMEOUT_MS, toPanelQuery } from '../../src/webview/components/metrics/useMetricsQuery';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import { emptySections } from './metricsFixtures';
 
@@ -42,6 +42,7 @@ const month = (m: string, over: Partial<MetricsMonth> = {}): MetricsMonth => ({
   runsOpen: 0,
   durationMs: 60_000,
   measuredRuns: 0,
+  costedRuns: 0,
   tokens: null,
   costUsd: null,
   costEstimatedUsd: null,
@@ -113,6 +114,25 @@ function reply(msg: HostToWebview): void {
 }
 
 const answer = (requestId: string, result: MetricsPanelResult) => reply({ type: 'metrics.result', requestId, result });
+
+describe('MetricsView: o host que não responde', () => {
+  it('depois do tempo-limite vira erro com "Consultar de novo" que refaz o pedido', () => {
+    vi.useFakeTimers();
+    try {
+      renderThemed(<MetricsView />);
+      expect(screen.getByText('Carregando métricas…')).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(QUERY_TIMEOUT_MS + 10);
+      });
+      expect(screen.getByRole('alert')).toHaveTextContent(/demorou demais/);
+      const before = sentOf('metrics.query').length;
+      act(() => screen.getByRole('button', { name: 'Consultar de novo' }).click());
+      expect(sentOf('metrics.query')).toHaveLength(before + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 describe('MetricsView: consulta e estados', () => {
   it('abre carregando e pede o período padrão (últimos 12 meses, todos os workflows)', () => {
@@ -283,6 +303,20 @@ describe('format: números do painel no idioma da interface', () => {
     expect(plain(formatMoney(0.0034))).toBe('US$ 0,0034');
     expect(plain(formatCost(0))).toBe('US$ 0,00');
     expect(formatTokens(1234567)).toBe('1.234.567');
+  });
+
+  it('custo minúsculo diz "menos de", nunca US$ 0,00 nem -US$ 0,00', () => {
+    expect(plain(formatMoney(0.00001))).toBe('menos de US$ 0,0001');
+    expect(plain(formatMoney(0.0001))).toBe('US$ 0,0001');
+    expect(plain(formatMoney(-0.00001))).not.toMatch(/-/);
+    expect(plain(formatMoney(-0.00001))).toBe('menos de US$ 0,0001');
+    setLocale('en');
+    expect(formatMoney(0.00001)).toBe('less than $0.0001');
+  });
+
+  it('duração arredonda antes de escolher a unidade: 59,6 s é 1min, não 60s', () => {
+    expect(formatDuration(59_600)).toBe('1min');
+    expect(formatDuration(59_400)).toBe('59s');
   });
 
   it('duração, dia, mês e recorte em português e em inglês', () => {

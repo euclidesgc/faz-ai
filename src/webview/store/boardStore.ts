@@ -267,7 +267,9 @@ export function importDialog(token: string, summary: ImportSummary): DialogSpec 
     },
   );
   const large = summary.large ? ` ${t('O arquivo tem mais de 200 MB: a importação pode demorar.')}` : '';
-  const warning = t('Tudo o que está neste board será apagado e substituído. Uma cópia de segurança (.bak) fica ao lado do banco.');
+  const warning = t(
+    'Tudo o que está neste board será apagado e substituído. Uma cópia de segurança (.bak) fica ao lado do banco, e os anexos atuais vão para uma pasta de backup ao lado da pasta de anexos.',
+  );
   return {
     title: t('Substituir o board atual?'),
     message: `${intro}${large} ${warning}`,

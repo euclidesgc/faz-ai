@@ -112,13 +112,13 @@ describe('botão do autopiloto no topo', () => {
     autopilot({ active: true, note: null });
     const { rerender } = render(<AutopilotButton />);
     const button = screen.getByRole('button', { name: /modo autônomo/ });
-    expect(button).toHaveAttribute('aria-pressed', 'true');
+    expect(button).not.toHaveAttribute('aria-pressed');
     await userEvent.click(button);
     expect(lastSent('ai.autopilot.pause')).toBeTruthy();
 
     act(() => autopilot({ active: false, note: null }));
     rerender(<AutopilotButton />);
-    expect(screen.getByRole('button', { name: 'Retomar modo autônomo' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Retomar modo autônomo' })).not.toHaveAttribute('aria-pressed');
     await userEvent.click(screen.getByRole('button', { name: 'Retomar modo autônomo' }));
     expect(lastSent('ai.autopilot.resume')).toBeTruthy();
   });

@@ -60,6 +60,21 @@ function byCard(rows: TimesEventRow[]): Map<number, TimesEventRow[]> {
   return cards;
 }
 
+/**
+ * Os eventos que a permanência lê. `getPanelMetrics` filtra `card_events` por esta mesma lista
+ * (`DWELL_EVENT_KINDS`): um tipo novo aqui precisa chegar lá também.
+ */
+export const DWELL_EVENT_KINDS: readonly CardEventKind[] = [
+  'created',
+  'column_changed',
+  'trashed',
+  'archived',
+  'deleted',
+  'restored',
+  'unarchived',
+];
+const DWELL_KINDS = new Set<CardEventKind>(DWELL_EVENT_KINDS);
+
 interface PhaseAcc {
   durations: number[];
   unknown: number;
@@ -72,9 +87,11 @@ interface PhaseAcc {
  * - `column_changed` fecha a aberta (a fase é a do `fromValue`) e abre uma em `toValue`; sem
  *   permanência aberta, a saída vira uma permanência DESCONHECIDA na fase do `fromValue` — a entrada
  *   ficou fora do horizonte do detalhe (RF-14);
- * - `trashed` e `deleted` fecham a aberta sem abrir outra: o card saiu do fluxo. É uma escolha (a
- *   alternativa poria cards da lixeira em "está aqui agora"); por consequência, um card restaurado
- *   volta sem permanência aberta e a próxima saída dele conta como desconhecida;
+ * - `trashed`, `archived` e `deleted` fecham a aberta sem abrir outra: o card saiu do fluxo. É uma
+ *   escolha (a alternativa poria cards da lixeira ou arquivados em "está aqui agora" para sempre);
+ * - `restored` e `unarchived` são uma reentrada DESCONHECIDA: o card volta sem permanência aberta e a
+ *   próxima saída dele conta como desconhecida. Se ainda havia uma aberta (o evento de saída se
+ *   perdeu), ela é descartada sem contar: não se sabe quando terminou;
  * - o que continua aberto no fim do período é "o card está nesta fase agora": conta em `openNow`,
  *   fora da média (RF-13).
  *
@@ -88,9 +105,7 @@ interface PhaseAcc {
  * a ordem do workflow, já que os cards nascem na primeira coluna).
  */
 export function phaseDwell(rows: TimesEventRow[], period: TimesPeriod): MetricsDwell[] {
-  const relevant = rows.filter(
-    (r) => r.at < period.end && (r.kind === 'created' || r.kind === 'column_changed' || r.kind === 'trashed' || r.kind === 'deleted'),
-  );
+  const relevant = rows.filter((r) => r.at < period.end && DWELL_KINDS.has(r.kind));
   const inPeriod = (at: number) => at >= period.start && at < period.end;
 
   // A ordem das fases é a da primeira aparição em ordem cronológica global, não por card.
@@ -120,8 +135,11 @@ export function phaseDwell(rows: TimesEventRow[], period: TimesPeriod): MetricsD
           else acc(e.fromValue).unknown += 1;
         }
         open = { phase: e.toValue, since: e.at };
+      } else if (e.kind === 'restored' || e.kind === 'unarchived') {
+        // reentrada desconhecida: a aberta (se houver) não tem fim conhecido e não conta
+        open = null;
       } else {
-        // trashed / deleted: fecha a aberta sem abrir outra. A permanência terminada conta no período.
+        // trashed / archived / deleted: fecha a aberta sem abrir outra. A permanência terminada conta no período.
         if (open && inPeriod(e.at)) acc(open.phase).durations.push(e.at - open.since);
         open = null;
       }

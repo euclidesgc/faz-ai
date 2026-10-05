@@ -25,8 +25,8 @@ export const settings: Record<string, string> = {
   'Board "{name}" com {cards} card(s) e {attachments} anexo(s), {size}, exportado em {date} pelo Faz AI {version} (formato {format}).':
     'Board "{name}" with {cards} card(s) and {attachments} attachment(s), {size}, exported on {date} by Faz AI {version} (format {format}).',
   'O arquivo tem mais de 200 MB: a importação pode demorar.': 'The file is larger than 200 MB: the import may take a while.',
-  'Tudo o que está neste board será apagado e substituído. Uma cópia de segurança (.bak) fica ao lado do banco.':
-    'Everything on this board will be deleted and replaced. A backup copy (.bak) is kept next to the database.',
+  'Tudo o que está neste board será apagado e substituído. Uma cópia de segurança (.bak) fica ao lado do banco, e os anexos atuais vão para uma pasta de backup ao lado da pasta de anexos.':
+    'Everything on this board will be deleted and replaced. A backup copy (.bak) is kept next to the database, and the current attachments are moved to a backup folder next to the attachments folder.',
   'Substituir o board atual?': 'Replace the current board?',
   'Importar e substituir': 'Import and replace',
   'Expandir o menu': 'Expand the menu',
@@ -353,8 +353,9 @@ export const settings: Record<string, string> = {
   'Restaurar aparência padrão': 'Restore default appearance',
   'Restaurar regras padrão': 'Restore default rules',
   'Histórias em paralelo': 'Stories in parallel',
+  'Não foi possível copiar. Selecione o nome e copie com o teclado:': 'Could not copy. Select the name and copy it with the keyboard:',
   'Histórias em paralelo: disponíveis neste modo. Cada história tem a sua pasta, então o heartbeat pode tocar várias ao mesmo tempo (ligue "Tocar histórias em paralelo", na execução pela IA). O custo: cada worktree é mais uma cópia dos arquivos do projeto em disco e precisa das próprias dependências instaladas; e cada história em paralelo é mais um processo de IA, com os testes e builds dela, usando memória e processador ao mesmo tempo.':
-    'Stories in parallel: available in this mode. Each story has its own folder, so the heartbeat can drive several at once (turn on "Tocar histórias em paralelo", under execution by the AI). The cost: each worktree is one more copy of the project files on disk and needs its own dependencies installed; and each story in parallel is one more AI process, with its tests and builds, using memory and CPU at the same time.',
+    'Stories in parallel: available in this mode. Each story has its own folder, so the heartbeat can drive several at once (turn on "Drive stories in parallel", under execution by the AI). The cost: each worktree is one more copy of the project files on disk and needs its own dependencies installed; and each story in parallel is one more AI process, with its tests and builds, using memory and CPU at the same time.',
   'Neste modo o board trata uma história por vez. Todas as histórias trabalham na mesma pasta: duas ao mesmo tempo trocariam a branch uma debaixo da outra e misturariam as alterações, causando conflitos e commits na branch errada. Para tocar histórias em paralelo, escolha "Worktree por história".':
     'In this mode the board handles one story at a time. All stories work in the same folder: two at once would switch the branch under each other and mix their changes, causing conflicts and commits on the wrong branch. To drive stories in parallel, choose "Worktree por história".',
   'Sem branches nem worktrees, o board trata uma história por vez: todas trabalham direto na pasta do projeto, e duas ao mesmo tempo misturariam as alterações. Para tocar histórias em paralelo, escolha "Worktree por história".':

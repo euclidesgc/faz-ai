@@ -50,10 +50,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
     estados diferentes.
 
   Tokens contam mesmo quando o modelo não tem preço configurado; o custo soma só as execuções que
-  têm preço, e o aviso diz quantas ficaram de fora. Os tempos e o inventário leem só o detalhe
-  guardado: quando um mês sai da janela de retenção, ele sai desses blocos. As tabelas que rolam
-  recebem foco pelo teclado, o erro de intervalo invertido é anunciado ao leitor de tela, e o campo
-  da janela de retenção diz que grava ao pressionar Enter ou ao sair dele.
+  têm preço, e o aviso diz quantas ficaram de fora. Custo não medido ou parcial é explicado nos
+  Totais e na série; custo minúsculo aparece como "menos de US$ 0,0001". Os tempos e o inventário
+  leem só o detalhe guardado: quando um mês sai da janela de retenção, ele sai desses blocos. As
+  tabelas que rolam recebem foco pelo teclado, o erro de intervalo invertido é anunciado ao leitor
+  de tela, e o campo da janela de retenção diz que grava ao pressionar Enter ou ao sair dele. A tela
+  avisa quando a consulta demora mais de 15 s (com "Consultar de novo"). Período escolhido antes do
+  início do log é dito assim.
 
 - **O `get_metrics` agrupa por esforço, perfil, ferramenta usada e ferramenta de MCP.** As
   dimensões novas são `effort`, `profile`, `used_tool` e `mcp_tool`. Cuidado com os nomes: `tool` é
@@ -66,10 +69,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - **A janela do detalhe de cada execução é configurável, de 1 a 24 meses, e o padrão caiu de 12
   para 6.** No bloco **Detalhe guardado** da visão Métricas você escolhe quantos meses de detalhe
   (consumo e inventário por execução) o board guarda além do mês corrente; depois disso só
-  permanecem os totais por mês, que nunca expiram. Baixar a janela pede confirmação e o descarte
-  acontece na próxima abertura do board. Quem atualiza perde o detalhe individual das execuções com
-  mais de 6 meses, não os totais. O padrão menor mantém o
-  arquivo do banco dentro do limite de tamanho.
+  permanecem os totais por mês, que nunca expiram. A retenção só aceita número inteiro (12,5 vira
+  13) e cancelar a redução volta o valor. Baixar a janela pede confirmação e o descarte acontece na
+  próxima abertura do board. Quem atualiza perde o detalhe individual das execuções com mais de 6
+  meses, não os totais. O padrão menor mantém o arquivo do banco dentro do limite de tamanho.
 
 - **Um clique no nome da branch copia o nome.** No card aberto, a branch da história virou um botão:
   clicar copia o nome para a área de transferência e a tela confirma com "Nome copiado".
@@ -80,8 +83,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   própria pasta; fora dele, e no modo autônomo (histórias empilhadas), continua uma por vez. O limite
   conta toda execução em andamento, e mais histórias em paralelo gastam mais do limite de uso da conta.
   A tela de Git passa a explicar, em cada modo, se o paralelo está disponível e por quê: branch na
-  mesma pasta causa conflito entre histórias; worktree isola, mas ocupa mais disco e usa mais memória
-  e processador enquanto várias rodam juntas.
+  mesma pasta causa conflito entre histórias; worktree isola, mas ocupa mais disco e usa mais
+  memória
+  e processador enquanto várias rodam juntas. Card que espera outro (dependência em aberto) não
+  entra na fila; o heartbeat não inicia história com sub-tarefa rodando e usa as vagas livres do
+  limite de execuções em paralelo mesmo com execução ativa; o modo autônomo e o heartbeat se
+  revezam nas vagas; sub-tarefas com a pessoa ou já rodando não entram na rodada paralela; vínculo
+  de dependência entre um card e a própria história é recusado.
 
 - **Sub-tarefas independentes rodam ao mesmo tempo.** Um card pode agora **depender** de outro
   (novo vínculo, em Vínculos: "precisa terminar antes deste card" / "só começa depois deste card",
@@ -110,10 +118,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   arquivo `.fazai.json` com tudo o que está no board da pasta: configurações, cards (inclusive
   arquivados e na lixeira), conversas, checklists, vínculos, histórico e os anexos embutidos.
   **Importar de um arquivo…** mostra um resumo, pede confirmação, grava uma cópia do banco
-  (`.bak`) e substitui o board atual pelo do arquivo, com os mesmos números de card. Arquivo de
-  versão anterior é atualizado ao importar; de versão mais nova é recusado. Importar com a IA
-  executando um card é recusado. Funciona no editor e no navegador. É o caminho para migrar o
-  board entre máquinas, já que ele fica fora do repositório.
+  (`.bak`) e substitui o board atual pelo do arquivo, com os mesmos números de card. Os anexos do
+  board que estava sendo substituído vão para uma pasta de backup ao lado da pasta de anexos
+  (`<anexos>.bak-<data>`), e a confirmação diz isso. Arquivo de importação com id de card ou nome de
+  anexo contendo caminho (`../`) é recusado. Arquivo de versão anterior é atualizado ao importar;
+  de versão mais nova é recusado. Importar com a IA executando um card é recusado. Funciona no
+  editor e no navegador. É o caminho para migrar o board entre máquinas, já que ele fica fora do
+  repositório.
 - **Dividir um pedido grande em histórias agora as vincula de verdade.** Ao criar uma história com
   `autonomous_from`, ela ganha um vínculo **relativo** com a história de origem — antes, a origem só
   ficava registrada em texto, num comentário que nem a interface nem a IA liam como relação. Se já
@@ -142,7 +153,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   ferramenta, modelo, card, agente ou skill, com filtros de período e card. Responde em tabela
   compacta. Não lista execuções individuais (a agregação por card já basta para a IA saber o custo de
   cada um). Valores não medidos aparecem como "-" (nunca 0), e o custo estimado pelo preço do modelo
-  vem marcado como estimado.
+  vem marcado como estimado. Data que não existe (como 2026-02-30) é recusada; só com
+  `start_date`, a consulta vai até o mês atual, inclusive os meses já consolidados.
+
+- **Avisos de configuração do Claude Code saíram do chat e da falha do card.** Linhas como
+  "Permission allow rule …" apareciam no erro do chat e nas linhas de falha do card, empurrando o
+  motivo real para fora. Agora ficam só no canal de log; o motivo do erro (login expirado, por
+  exemplo) continua aparecendo.
 
 ## 0.31.1
 

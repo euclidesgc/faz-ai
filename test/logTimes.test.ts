@@ -233,3 +233,39 @@ describe('leadTimes', () => {
     expect(lead.medianMs).toBe(2 * H);
   });
 });
+
+describe('phaseDwell: arquivar e desarquivar (revisão 0.32.0)', () => {
+  it('archived fecha a permanência sem abrir outra: card arquivado não fica "aqui agora" para sempre', () => {
+    const rows = [ev(1, 0, 'created', '', 'A'), ev(1, 2 * H, 'column_changed', 'A', 'B'), ev(1, 5 * H, 'archived')];
+    const b = phase(phaseDwell(rows, ALL), 'B');
+    expect(b.openNow).toBe(0);
+    expect(b.permanences).toBe(1);
+    expect(b.meanMs).toBe(3 * H);
+  });
+
+  it('unarchived e restored voltam sem permanência aberta: a próxima saída é desconhecida', () => {
+    const rows = [
+      ev(1, 0, 'created', '', 'A'),
+      ev(1, 1 * H, 'archived'),
+      ev(1, 4 * H, 'unarchived'),
+      ev(1, 6 * H, 'column_changed', 'A', 'B'),
+      ev(2, 0, 'created', '', 'A'),
+      ev(2, 1 * H, 'trashed'),
+      ev(2, 2 * H, 'restored'),
+      ev(2, 3 * H, 'column_changed', 'A', 'B'),
+    ];
+    const result = phaseDwell(rows, ALL);
+    const a = phase(result, 'A');
+    expect(a.permanences).toBe(2); // 1h de cada card, até arquivar/apagar
+    expect(a.unknown).toBe(2); // a saída depois da volta não tem entrada conhecida
+    expect(a.openNow).toBe(0);
+    expect(phase(result, 'B').openNow).toBe(2);
+  });
+
+  it('restored sem archived/trashed antes (o evento de saída se perdeu): descarta a aberta, não a conta', () => {
+    const rows = [ev(1, 0, 'created', '', 'A'), ev(1, 5 * H, 'restored'), ev(1, 6 * H, 'column_changed', 'A', 'B')];
+    const a = phase(phaseDwell(rows, ALL), 'A');
+    expect(a.permanences).toBe(0);
+    expect(a.unknown).toBe(1);
+  });
+});

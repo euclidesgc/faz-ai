@@ -182,13 +182,15 @@ export class AiRunRepo {
    * a cada gravação).
    *
    * `measure: 'none'` deixa tokens, custo, turnos e sessão NULL e não escreve inventário: "não medido"
-   * não é "zero" (RF-14). O custo é congelado aqui (RF-30): nada o recalcula depois, e mudar o preço
+   * não é "zero" (RF-14). `partial` sem consumo grava o inventário com os tokens NULL. O custo é congelado aqui (RF-30): nada o recalcula depois, e mudar o preço
    * vale da próxima execução em diante. O inventário usa `INSERT OR REPLACE` sobre a chave
    * `(run_id, kind, name)`: uma segunda chamada com o mesmo inventário não duplica linha.
    */
   measure(id: string, report: RunReport): void {
     const c = report.measure === 'none' ? null : report.consumption;
-    const inventory = c ? report.inventory : [];
+    // o inventário vale sempre que algo foi medido, com ou sem consumo: `partial` sem tokens é o caso
+    // normal de Cursor e Kimi, que não informam uso mas dizem quais ferramentas chamaram
+    const inventory = report.measure === 'none' ? [] : report.inventory;
     transaction(this.db, () => {
       run(
         this.db,

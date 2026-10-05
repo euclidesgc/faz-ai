@@ -79,11 +79,17 @@ function Total({ label, hint, children }: { label: string; hint: string; childre
   );
 }
 
+/**
+ * Quantas execuções entram no custo: `costedRuns` (custo é contado à parte dos tokens, uma execução pode ter
+ * um e não ter o outro). Se a resposta não trouxer o campo, cai no critério dos tokens.
+ */
+const costedOf = (totals: Totals): number => totals.costedRuns ?? totals.measuredRuns;
+
 /** Por que não há número, ou quanto dele ficou de fora: junto do valor, ligado por aria-describedby. */
-function CoverageNote({ totals, id, what }: { totals: Totals; id: string; what: string }) {
-  const missing = totals.runs - totals.measuredRuns;
+function CoverageNote({ totals, measured, id, what }: { totals: Totals; measured: number; id: string; what: string }) {
+  const missing = totals.runs - measured;
   if (totals.runs === 0) return <Note id={id}>{t('Nenhuma execução de IA neste período.')}</Note>;
-  if (totals.measuredRuns === 0)
+  if (measured === 0)
     return (
       <Note id={id}>
         {t('Nenhuma das {runs} execuções teve {what} medido: a ferramenta ainda não informa esse dado.', {
@@ -106,15 +112,15 @@ function CoverageNote({ totals, id, what }: { totals: Totals; id: string; what: 
 
 function TokensBody({ totals, valueId, noteId }: { totals: Totals; valueId: string; noteId: string }) {
   const tokens = totals.tokens;
-  const note = <CoverageNote totals={totals} id={noteId} what={t('tokens')} />;
-  const hasNote = tokens === null || totals.measuredRuns < totals.runs;
+  const note = <CoverageNote totals={totals} measured={totals.measuredRuns} id={noteId} what={t('tokens')} />;
+  const hasNote = totals.runs > 0 ? tokens === null || totals.measuredRuns < totals.runs : tokens === null;
   return (
     <>
       <span id={valueId} className="metrics-total-value" aria-describedby={hasNote ? noteId : undefined}>
         {formatTokens(tokens === null ? null : tokens.total)}
       </span>
       {tokens !== null && (
-        <dl className="metrics-breakdown">
+        <dl className="metrics-token-breakdown">
           <BreakdownRow label={t('Entrada')} value={tokens.input} />
           <BreakdownRow label={t('Saída')} value={tokens.output} />
           <BreakdownRow label={t('Leitura de cache')} value={tokens.cacheRead} />
@@ -128,7 +134,7 @@ function TokensBody({ totals, valueId, noteId }: { totals: Totals; valueId: stri
 
 function BreakdownRow({ label, value }: { label: string; value: number }) {
   return (
-    <div className="metrics-breakdown-row">
+    <div className="metrics-token-breakdown-row">
       <dt>{label}</dt>
       <dd>{formatNumber(value)}</dd>
     </div>
@@ -139,7 +145,8 @@ function CostBody({ totals, valueId, noteId }: { totals: Totals; valueId: string
   const cost = totals.costUsd;
   const estimated = totals.costEstimatedUsd;
   const informed = totals.costInformedUsd;
-  const hasNote = cost === null || totals.measuredRuns < totals.runs;
+  const costed = costedOf(totals);
+  const hasNote = totals.runs > 0 && (cost === null || costed < totals.runs);
   return (
     <>
       <span id={valueId} className="metrics-total-value" aria-describedby={hasNote ? noteId : undefined}>
@@ -155,7 +162,7 @@ function CostBody({ totals, valueId, noteId }: { totals: Totals; valueId: string
             : t('Estimado por tabela de preços: {estimated}', { estimated: formatMoney(estimated) })}
         </span>
       )}
-      <CoverageNote totals={totals} id={noteId} what={t('custo')} />
+      <CoverageNote totals={totals} measured={costed} id={noteId} what={t('custo')} />
     </>
   );
 }

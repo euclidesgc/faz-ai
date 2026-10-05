@@ -26,11 +26,22 @@ export function formatCompact(n: number): string {
   return new Intl.NumberFormat(intlLocale(), { notation: 'compact', maximumFractionDigits: 1 }).format(n);
 }
 
+/** O menor custo que `formatMoney` escreve com quatro casas; abaixo dele diz "menos de". */
+const MIN_SHOWN_USD = 0.0001;
+
 /**
  * Dólares: "US$ 1,23" / "$1.23". Custo de uma execução costuma ficar abaixo de um centavo; ali vão
  * quatro casas, para não aparecer "US$ 0,00" onde houve gasto.
  */
 export function formatMoney(usd: number): string {
+  const abs = Math.abs(usd);
+  if (abs > 0 && abs < MIN_SHOWN_USD) {
+    // abaixo da menor casa mostrável: nem "US$ 0,00" nem "-US$ 0,00", que escondem o gasto
+    const least = new Intl.NumberFormat(intlLocale(), { style: 'currency', currency: 'USD', minimumFractionDigits: 4 }).format(
+      MIN_SHOWN_USD,
+    );
+    return isEn() ? `less than ${least}` : `menos de ${least}`;
+  }
   const tiny = usd !== 0 && Math.abs(usd) < 0.01;
   return new Intl.NumberFormat(intlLocale(), {
     style: 'currency',
@@ -55,8 +66,10 @@ export const formatTokens = (n: number | null, compact = false): string =>
  * propósito: o tempo de IA é soma de execuções e pode passar de 24h sem ser "1 dia" de relógio.
  */
 export function formatDuration(ms: number): string {
-  const total = Math.max(0, Math.round(ms));
-  if (total < MINUTE) return `${Math.round(total / 1000)}s`;
+  // arredonda para segundos antes de escolher a unidade: 59,6 s é "1min", não "60s"
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const total = seconds * 1000;
   const h = Math.floor(total / HOUR);
   const m = Math.floor((total % HOUR) / MINUTE);
   const min = isEn() ? 'm' : 'min';
@@ -115,9 +128,11 @@ export function formatMonth(month: string, style: 'short' | 'medium' | 'long' = 
 
 /**
  * O recorte consultado, com as datas das bordas (RF-03): "4 de outubro de 2026 a 4 de outubro de 2026".
- * Lado vazio (board sem log) vira "desde …" / "até …"; os dois vazios, ''.
+ * Intervalo invertido (`isBeforeLog`) vira ''. Lado vazio (board sem log) vira "desde …" / "até …"; os dois vazios, ''.
  */
 export function formatRange(range: MetricsPanelResult['range']): string {
+  // intervalo todo antes do log: nunca escrever "1 de agosto a 30 de junho"
+  if (isBeforeLog(range)) return '';
   const from = formatDay(range.startDate);
   const to = formatDay(range.endDate);
   if (from && to) return isEn() ? `${from} to ${to}` : `${from} a ${to}`;
@@ -125,6 +140,14 @@ export function formatRange(range: MetricsPanelResult['range']): string {
   if (to) return isEn() ? `until ${to}` : `até ${to}`;
   return '';
 }
+
+/**
+ * O intervalo escolhido ficou todo antes do início do log: o recorte vem cortado no início da série e
+ * `startDate` passa de `endDate`. A tela não escreve esse intervalo invertido (ver `PeriodNote`).
+ */
+export const isBeforeLog = (range: MetricsPanelResult['range'], clamped = false): boolean =>
+  // o host devolve o recorte vazio ('' e '') com `clamped`; respostas antigas vinham invertidas
+  (clamped && !range.startDate && !range.endDate) || (!!range.startDate && !!range.endDate && range.startDate > range.endDate);
 
 /** Período sem dado nenhum: todo mês da espinha é lacuna. A tela não escreve "0" em total nenhum (RF-07). */
 export const isEmptyResult = (result: MetricsPanelResult): boolean => result.months.every((m) => !m.present);

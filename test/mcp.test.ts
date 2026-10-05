@@ -1202,6 +1202,33 @@ describe('vínculos entre cards', () => {
     expect((await call('create_card', { title: 'Solta', depends_on: [base.id] })).error).toBe(true);
   });
 
+  it('subtasksNow separa as sub-tarefas com a pessoa e as já em execução das que podem rodar juntas', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const a = (await call('create_card', { title: 'A', parent: story.id })).data;
+    const b = (await call('create_card', { title: 'B', parent: story.id })).data;
+    const c = (await call('create_card', { title: 'C', parent: story.id })).data;
+    const d = (await call('create_card', { title: 'D', parent: story.id })).data;
+    const byRef = (ref: string) => router.snapshot().cards.find((k) => `#${k.number}` === ref)!;
+    router.handle({ type: 'card.status.set', cardId: byRef(b.id).id, status: 'waiting_answer' });
+    router.handle({ type: 'card.status.set', cardId: byRef(c.id).id, status: 'running' }, { source: 'ai' });
+    const now = (await call('get_card', { card: story.id })).data.subtasksNow;
+    expect(now).toEqual({ canRunTogether: [a.id, d.id], waiting: [], withPerson: [b.id], running: [c.id] });
+  });
+
+  it('create_card com depends_on valida os vínculos antes de criar e ignora repetidos', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const base = (await call('create_card', { title: 'Base', parent: story.id })).data;
+    const before = router.snapshot().cards.length;
+    // depender da própria história travaria as duas: recusa sem deixar card pela metade
+    const own = await call('create_card', { title: 'Depende da história', parent: story.id, depends_on: [story.id] });
+    expect(own.error).toBe(true);
+    expect(router.snapshot().cards).toHaveLength(before);
+    // a mesma dependência repetida vira um vínculo só
+    const dup = await call('create_card', { title: 'Repetida', parent: story.id, depends_on: [base.id, base.id] });
+    expect(dup.error).toBe(false);
+    expect(router.snapshot().links.filter((l) => l.kind === 'precedes')).toHaveLength(1);
+  });
+
   it('`parent` faz de other o pai do card', async () => {
     const a = (await call('create_card', { title: 'A' })).data;
     const b = (await call('create_card', { title: 'B' })).data;

@@ -74,7 +74,10 @@ describe('leitor do codex exec --json, pela documentação (sem CLI instalada pa
 
   it('os quatro tokens de `turn.completed.usage`, somados entre os dois turnos (o oposto do Claude)', () => {
     const c = readCodex(EVENTS).reader.report().consumption!;
-    expect(c.inputTokens).toBe(120);
+    // no Codex `input_tokens` JÁ inclui `cached_input_tokens`: a entrada gravada é o que não veio do
+    // cache, (100 - 10) + (20 - 5) = 105. Gravar 120 contaria os 15 do cache duas vezes, na entrada e
+    // na leitura de cache, e o custo estimado cobraria esses tokens pelo preço cheio E pelo de cache
+    expect(c.inputTokens).toBe(105);
     expect(c.cacheReadTokens).toBe(15);
     expect(c.outputTokens).toBe(65);
   });
@@ -107,6 +110,13 @@ describe('leitor do codex exec --json, pela documentação (sem CLI instalada pa
     expect(readCodex(comCache).reader.report().consumption!.cacheWriteTokens).toBe(4321);
   });
 
+  it('cache maior que a entrada (contador fora do esperado) não grava entrada negativa', () => {
+    const estranho = [JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 5, cached_input_tokens: 9, output_tokens: 1 } })];
+    const c = readCodex(estranho).reader.report().consumption!;
+    expect(c.inputTokens).toBe(0);
+    expect(c.cacheReadTokens).toBe(9);
+  });
+
   it('o id da sessão vem de `thread.started.thread_id`, cortado em 8 caracteres', () => {
     expect(readCodex(EVENTS).reader.report().consumption!.sessionId).toBe('abcdefgh-1111-2222-3333-444444444444');
   });
@@ -115,7 +125,7 @@ describe('leitor do codex exec --json, pela documentação (sem CLI instalada pa
     const preco = { input: 2, output: 10, cacheRead: 0.5, cacheWrite: 1 };
     const { reader } = readCodex(EVENTS, { model: 'codex', catalog: [codexModel(preco)] });
     const c = reader.report().consumption!;
-    const esperado = (120 * preco.input + 65 * preco.output + 15 * preco.cacheRead + 0 * preco.cacheWrite) / 1e6;
+    const esperado = (105 * preco.input + 65 * preco.output + 15 * preco.cacheRead + 0 * preco.cacheWrite) / 1e6;
     expect(c.costUsd).toBeCloseTo(esperado, 10);
     expect(c.costEstimated).toBe(true);
   });
@@ -126,7 +136,7 @@ describe('leitor do codex exec --json, pela documentação (sem CLI instalada pa
     const c = reader.report().consumption!;
     expect(c.costUsd).toBeNull();
     expect(c.costEstimated).toBe(false);
-    expect(c.inputTokens).toBe(120);
+    expect(c.inputTokens).toBe(105);
     expect(c.outputTokens).toBe(65);
   });
 

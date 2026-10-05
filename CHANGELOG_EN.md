@@ -51,10 +51,14 @@ English; names of screens and buttons appear here as they are in the Portuguese 
     states.
 
   Tokens count even when the model has no price configured; cost adds up only the runs that have a
-  price, and the note says how many were left out. The times and the inventory read only the detail
-  kept: when a month leaves the retention window, it leaves these blocks. Tables that scroll take
-  keyboard focus, the inverted range error is announced to screen readers, and the retention window
-  field says it saves when you press Enter or leave it.
+  price, and the note says how many were left out. Unmeasured or partial cost is explained in the
+  Totals and in the series; tiny cost shows as "less than US$ 0.0001". The times and the inventory
+  read only the detail kept: when a month leaves the retention window, it leaves these blocks.
+  Tables
+  that scroll take keyboard focus, the inverted range error is announced to screen readers, and the
+  retention window field says it saves when you press Enter or leave it. The screen warns when a
+  query takes longer than 15 seconds (with "Consultar de novo" / "query again"). A period chosen
+  before the log starts is stated as such.
 
 - **`get_metrics` groups by effort, profile, used tool and MCP tool.** The new dimensions are
   `effort`, `profile`, `used_tool` and `mcp_tool`. Mind the names: `tool` is the AI tool that ran
@@ -67,9 +71,12 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 - **The window for each run's detail is configurable, from 1 to 24 months, and the default dropped
   from 12 to 6.** In the **Detalhe guardado** (Detail kept) block of the Metrics view you choose how
   many months of detail (consumption and inventory per run) the board keeps besides the current
-  month; after that only the monthly totals remain, and they never expire. Lowering the window asks
-  for confirmation and the discard happens the next time the board opens. If you are upgrading, you
-  lose the individual detail of runs older than 6 months, not the totals. The shorter default keeps the database file within its size limit.
+  month; after that only the monthly totals remain, and they never expire. The retention only
+  accepts
+  whole numbers (12.5 becomes 13), and canceling a reduction restores the value. Lowering the window
+  asks for confirmation and the discard happens the next time the board opens. If you are upgrading,
+  you lose the individual detail of runs older than 6 months, not the totals. The shorter default
+  keeps the database file within its size limit.
 
 - **One click on the branch name copies it.** In the open card, the story's branch became a button:
   clicking copies the name to the clipboard and the screen confirms with "Nome copiado" (name copied).
@@ -81,7 +88,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   limit counts every run in progress, and more stories in parallel use more of the account usage limit.
   The Git screen now explains, in each mode, whether parallel is available and why: a branch in the
   same folder causes conflicts between stories; worktrees isolate them, but take more disk and use
-  more memory and CPU while several run together.
+  more memory and CPU while several run together. A card waiting on another (pending dependency)
+  does
+  not enter the queue; the heartbeat does not start a story with a sub-task running and uses the
+  free
+  slots of the parallel run limit even with an active run; autonomous mode and the heartbeat take
+  turns in the slots; sub-tasks with someone or already running do not enter the parallel round; a
+  dependency link between a card and its own story is refused.
 
 - **Independent sub-tasks run at the same time.** A card can now **depend** on another (new link,
   in Vínculos: "precisa terminar antes deste card" / "só começa depois deste card", with the groups
@@ -111,9 +124,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   (including archived and trashed ones), conversations, checklists, links, history and the embedded
   attachments. **Importar de um arquivo…** shows a summary, asks for confirmation, writes a copy of
   the database (`.bak`) and replaces the current board with the one from the file, keeping the card
-  numbers. A file from an earlier version is upgraded on import; one from a newer version is
-  refused. Importing while the AI is running on a card is refused. Works in the editor and in the
-  browser. It is the way to move the board between machines, since it lives outside the repository.
+  numbers. Attachments from the board being replaced go to a backup folder next to the attachments
+  folder (`<attachments>.bak-<date>`), and the confirmation says so. An import file with a card id
+  or
+  attachment name containing a path (`../`) is refused. A file from an earlier version is upgraded
+  on import; one from a newer version is refused. Importing while the AI is running on a card is
+  refused. Works in the editor and in the browser. It is the way to move the board between machines,
+  since it lives outside the repository.
 - **Splitting a large request into stories now actually links them.** Creating a story with
   `autonomous_from` now gives it a **related** link to the origin story — before, the origin was
   only recorded as text, in a comment that neither the interface nor the AI read as a relation. If
@@ -142,7 +159,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   card, agent, or skill, with period and card filters. It replies in a compact table. It does not
   list individual runs (aggregation by card is enough for the AI to know each one's cost). Values
   that were not measured show as "-" (never 0), and a cost estimated from the model's price is
-  marked as estimated.
+  marked as estimated. A date that does not exist (such as 2026-02-30) is refused; with only
+  `start_date`, the query runs up to the current month, including the months already consolidated.
+
+- **Claude Code configuration warnings are gone from the chat and the card failure.** Lines such as
+  "Permission allow rule …" showed up in the chat error and in the card failure lines, pushing the
+  real reason out. They now stay only in the log channel; the error reason (an expired login, for
+  example) still shows.
 
 ## 0.31.1
 

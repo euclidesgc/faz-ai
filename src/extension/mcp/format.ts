@@ -369,15 +369,9 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
         fields: fieldsOf(s, k),
         ...(openPredecessors(s, k.id).length ? { waitingFor: openPredecessors(s, k.id).map(cardRef) } : {}),
       })),
-    // o que da Implementação pode rodar agora, ao mesmo tempo, e o que espera outra sub-tarefa terminar
-    ...(subtaskWaves(s, c.id).waiting.length || subtaskWaves(s, c.id).ready.length > 1
-      ? {
-          subtasksNow: {
-            canRunTogether: subtaskWaves(s, c.id).ready.map(cardRef),
-            waiting: subtaskWaves(s, c.id).waiting.map(cardRef),
-          },
-        }
-      : {}),
+    // o que da Implementação pode rodar agora, ao mesmo tempo, o que espera outra sub-tarefa terminar e o
+    // que não é da IA agora (com a pessoa ou já rodando)
+    ...subtasksNow(s, c.id),
     checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })),
     ...linksOf(s, c),
     comments: s.comments
@@ -386,6 +380,23 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     attachments: s.attachments.filter((a) => a.cardId === c.id).map(attachment),
     // os artefatos das fases ficam na história; a sub-tarefa os enxerga por aqui
     ...(c.parentId ? { storyArtifacts: s.attachments.filter((a) => a.cardId === c.parentId && a.artifact).map(attachment) } : {}),
+  };
+}
+
+/**
+ * As rodadas da Implementação: `canRunTogether` só traz as sub-tarefas que a IA pode tocar agora; as que
+ * estão com a pessoa (`withPerson`) ou já em execução (`running`) vêm em grupos separados, só quando houver.
+ */
+function subtasksNow(s: BoardState, storyId: string) {
+  const w = subtaskWaves(s, storyId);
+  if (!w.waiting.length && !w.withPerson.length && !w.running.length && w.ready.length < 2) return {};
+  return {
+    subtasksNow: {
+      canRunTogether: w.ready.map(cardRef),
+      waiting: w.waiting.map(cardRef),
+      ...(w.withPerson.length ? { withPerson: w.withPerson.map(cardRef) } : {}),
+      ...(w.running.length ? { running: w.running.map(cardRef) } : {}),
+    },
   };
 }
 

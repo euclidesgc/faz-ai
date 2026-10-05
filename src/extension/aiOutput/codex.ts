@@ -43,10 +43,14 @@ const addTokens = (a: AiRunTokens, b: AiRunTokens): AiRunTokens => ({
  *   permite — e aí é o `measure` da execução, não este número, que diz se houve medição.
  */
 function tokensFromUsage(v: Json): AiRunTokens {
+  const cached = asNumber(v.cached_input_tokens) ?? 0;
   return {
-    inputTokens: asNumber(v.input_tokens) ?? 0,
+    // no Codex `input_tokens` JÁ inclui `cached_input_tokens` (no Claude são contadores separados):
+    // a entrada gravada é só o que não veio do cache, senão o cache conta duas vezes — nos tokens e no
+    // custo estimado, que cobraria esses tokens pelo preço cheio e pelo de cache. Nunca negativo.
+    inputTokens: Math.max(0, (asNumber(v.input_tokens) ?? 0) - cached),
     outputTokens: asNumber(v.output_tokens) ?? 0,
-    cacheReadTokens: asNumber(v.cached_input_tokens) ?? 0,
+    cacheReadTokens: cached,
     cacheWriteTokens: asNumber(v.cache_write_input_tokens) ?? 0,
   };
 }

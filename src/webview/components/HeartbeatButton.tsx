@@ -26,7 +26,6 @@ export function HeartbeatButton({ offline }: { offline: boolean }) {
       className={`heartbeat ${beat.kind}`}
       title={label}
       aria-label={label}
-      aria-pressed={runner.heartbeat}
       aria-disabled={beat.kind === 'stopped'}
       onClick={() => beat.kind !== 'stopped' && settings.updateBoard({ runner: { heartbeat: beat.kind === 'off' } })}
     >

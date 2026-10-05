@@ -10,7 +10,7 @@ export abstract class MeasureError extends Error {}
 export class MeasureUnsupportedError extends MeasureError {
   constructor(toolLabel: string) {
     super(
-      `A medição não foi possível nesta execução: o ${toolLabel} não produz saída estruturada quando roda em segundo plano. O trabalho rodou normalmente.`,
+      `A medição não foi possível nesta execução: o ${toolLabel} não produz saída estruturada quando roda em segundo plano, então o consumo não é registrado.`,
     );
     this.name = 'MeasureUnsupportedError';
   }
@@ -23,6 +23,29 @@ export class MeasureRefusedError extends MeasureError {
       `A medição não foi possível nesta execução: a versão instalada do ${toolLabel} não aceita a saída estruturada. O trabalho rodou em modo texto.`,
     );
     this.name = 'MeasureRefusedError';
+  }
+}
+
+/**
+ * A execução no modo estruturado falhou antes do primeiro evento, sem sinal de argumento recusado no
+ * `stderr` (rede, autenticação, cota): não dá para culpar a versão instalada.
+ */
+export class MeasureEndedError extends MeasureError {
+  constructor() {
+    super(
+      'A medição não foi possível nesta execução: a execução terminou antes de informar o consumo. O trabalho foi repetido em modo texto.',
+    );
+    this.name = 'MeasureEndedError';
+  }
+}
+
+/** A CLI aceitou o argumento da saída estruturada, mas respondeu em texto e saiu bem. */
+export class MeasureIgnoredError extends MeasureError {
+  constructor(toolLabel: string) {
+    super(
+      `A medição não foi possível nesta execução: o ${toolLabel} respondeu em texto em vez da saída estruturada. A resposta foi guardada como texto.`,
+    );
+    this.name = 'MeasureIgnoredError';
   }
 }
 

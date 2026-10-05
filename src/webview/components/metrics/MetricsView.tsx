@@ -46,7 +46,7 @@ export function MetricsView() {
         {announcement}
       </p>
 
-      <MetricsFilters workflows={result?.workflows ?? []} range={result?.range} />
+      <MetricsFilters workflows={result?.workflows ?? []} range={result?.range} clamped={result?.clamped} />
 
       {shownError && (
         <div className="metrics-error" role="alert">

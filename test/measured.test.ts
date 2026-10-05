@@ -116,6 +116,13 @@ describe('o comando do modo estruturado, por ferramenta', () => {
     expect(started).toHaveLength(1);
   });
 
+  it('o motivo do Copilot não afirma que o trabalho deu certo: ele aparece também quando a execução falha', () => {
+    const { proc, report } = run('copilot');
+    proc.onExit(() => {});
+    started[0]!.exit(1);
+    expect(report().reason).not.toContain('normalmente');
+  });
+
   it('a chamada aparece no canal com os argumentos, que é onde se confere o modo estruturado', () => {
     run();
     expect(lines[0]).toContain('Chamando Claude Code: claude');
@@ -148,6 +155,40 @@ describe('a volta para texto, que custa dinheiro se errar', () => {
     expect(r.reason).toContain('não aceita a saída estruturada');
     expect(lines.join('\n')).toContain('O trabalho rodou em modo texto.');
     expect(lines.join('\n')).toContain('trabalho feito');
+  });
+
+  it('falha sem nenhum evento e sem recusa de argumento no `stderr`: repete em texto, mas não culpa a versão instalada', () => {
+    const { proc, report } = run();
+    proc.onExit(() => {});
+
+    // uma falha qualquer antes do primeiro evento (rede, autenticação): nada indica argumento recusado
+    started[0]!.emit('erro: sem conexão com o servidor\n', 'stderr');
+    started[0]!.exit(1);
+    expect(started).toHaveLength(2);
+    started[1]!.exit(1);
+
+    const r = report();
+    expect(r.measure).toBe('none');
+    expect(r.reason).not.toContain('não aceita a saída estruturada');
+    expect(r.reason).toContain('a execução terminou antes de informar o consumo');
+    expect(lines.join('\n')).not.toContain('não aceita a saída estruturada');
+  });
+
+  it('a CLI ignora a saída estruturada e responde em texto, com código 0: a resposta não se perde', () => {
+    const { proc, report } = run('codex');
+    const exits: (number | null)[] = [];
+    proc.onExit((code) => exits.push(code));
+
+    started[0]!.emit('Resposta em texto puro.\n\nSegundo parágrafo, bem mais longo que o corte de linha do canal.\n');
+    started[0]!.exit(0);
+
+    // o trabalho aconteceu: nenhuma segunda chamada
+    expect(started).toHaveLength(1);
+    expect(exits).toEqual([0]);
+    const r = report();
+    expect(r.answer).toBe('Resposta em texto puro.\n\nSegundo parágrafo, bem mais longo que o corte de linha do canal.');
+    expect(r.measure).toBe('none');
+    expect(r.reason).toContain('A medição não foi possível');
   });
 
   it('falha DEPOIS de eventos: NÃO repete, porque o trabalho aconteceu e repetir cobraria duas vezes', () => {
@@ -288,6 +329,21 @@ describe('a leitura do fluxo, do byte ao relatório', () => {
     const rest = lines.find((l) => l.startsWith('{'));
     expect(rest).toBeDefined();
     expect(rest!.length).toBeLessThanOrEqual(301);
+  });
+
+  it('a última linha de evento sem quebra de linha no fim é interpretada, não descartada', () => {
+    const { proc, report } = run('claude', INPUT, [haiku]);
+    proc.onExit(() => {});
+
+    // o processo saiu bem, só não escreveu o `\n` depois do `result`
+    started[0]!.emit(FIXTURE.trimEnd());
+    started[0]!.exit(0);
+
+    const r = report();
+    expect(r.measure).toBe('full');
+    expect(r.consumption!.outputTokens).toBe(1221);
+    expect(r.consumption!.costUsd).toBeCloseTo(0.06478465, 8);
+    for (const line of lines) expect(line).not.toContain('{"');
   });
 
   it('no modo texto, o resto sem quebra de linha é o fim da resposta', () => {

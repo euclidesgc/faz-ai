@@ -23,7 +23,6 @@ export function AutopilotButton() {
       variant="ghost"
       className={`autopilot ${active ? 'on' : 'off'}`}
       title={label}
-      aria-pressed={active}
       onClick={() => (active ? ai.pauseAutopilot() : ai.resumeAutopilot())}
     >
       <IconYolo /> {active ? t('Pausar modo autônomo') : t('Retomar modo autônomo')}
