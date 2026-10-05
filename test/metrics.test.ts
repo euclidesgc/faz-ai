@@ -255,4 +255,19 @@ describe('getMetrics', () => {
   it('logSince vem no formato AAAA-MM-DD do início real da série', () => {
     expect(getMetrics(db, boardId, {}).logSince).toBe('2026-06-15');
   });
+
+  it('logSince é o dia no fuso da máquina, não em UTC (board aberto às 22h30 em Brasília)', () => {
+    const tz = process.env.TZ;
+    process.env.TZ = 'America/Sao_Paulo';
+    try {
+      // 22h30 de 15/6 em Brasília já é 16/6 em UTC
+      const lateNight = new Date(2026, 5, 15, 22, 30, 0).getTime();
+      expect(new Date(lateNight).toISOString().slice(0, 10)).toBe('2026-06-16');
+      db.run('UPDATE boards SET log_since = ? WHERE id = ?', [lateNight, boardId]);
+      expect(getMetrics(db, boardId, {}).logSince).toBe('2026-06-15');
+    } finally {
+      if (tz === undefined) delete process.env.TZ;
+      else process.env.TZ = tz;
+    }
+  });
 });
