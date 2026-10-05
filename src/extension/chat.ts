@@ -7,6 +7,7 @@ import { parseModelValue } from '../shared/models';
 import type { BoardState } from '../shared/model';
 import { spawnMeasured, type SpawnFn } from './aiOutput/measured';
 import { BOARD_SERVER, type ExecInput } from './execution';
+import { isCliNoise } from './cliNoise';
 import { headlessUnsupported } from './headless';
 import type { MessageRouter } from './panel/messageRouter';
 import { PERMISSION_ADVICE, type RunnerDeps, type RunningProcess } from './runner';
@@ -124,6 +125,8 @@ export class ChatSession {
       mcp: null,
     });
 
+    // o prompt sai da conversa ANTES de a pergunta entrar nela: senão ela iria duas vezes (no histórico e no fim)
+    const prompt = chatPrompt(this.messages, body, PERMISSION_ADVICE[permission]);
     this.add({ role: 'user', text: body, ...(model ? { model } : {}) });
     // as últimas linhas legíveis, para explicar um erro; nunca a saída crua, que no modo estruturado é JSONL
     const tail: string[] = [];
@@ -138,7 +141,7 @@ export class ChatSession {
       ({ proc, report } = spawnMeasured(
         state.board.aiTool,
         {
-          prompt: chatPrompt(this.messages, body, PERMISSION_ADVICE[permission]),
+          prompt,
           permission,
           addDirs: this.router.aiWorkDirs(),
           exec,
@@ -150,6 +153,8 @@ export class ChatSession {
           log: (raw) => {
             const line = raw.replace(ANSI, '');
             this.deps.log(`[chat] ${line}`);
+            // os avisos de configuração da CLI ficam só no canal: não explicam o erro e empurrariam o motivo real para fora
+            if (isCliNoise(line)) return;
             tail.push(line);
             if (tail.length > TAIL_LINES) tail.shift();
           },

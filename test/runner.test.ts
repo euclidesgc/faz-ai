@@ -726,6 +726,19 @@ describe('log das execuções de IA', () => {
       expect(only()).toMatchObject({ outcome: 'failed', exitCode: 1, measure: 'full', outputTokens: 1221 });
     });
 
+    it('os avisos de regra de permissão do Claude Code ficam no canal, mas não na falha do card', () => {
+      logged.start(storyId);
+      for (let i = 0; i < 15; i++) procs[0]!.emit(`Permission allow rule (Bash(cmd${i}:*)) in userSettings is unreachable\n`, 'stderr');
+      procs[0]!.emit('Your session has expired. Please run /login.\n', 'stderr');
+      procs[0]!.emit('Permission ask rule (WebFetch) will be ignored\n', 'stderr');
+      procs[0]!.exit(1);
+
+      expect(card().status).toBe('blocked');
+      expect(card().statusReason).toContain('Please run /login');
+      expect(card().statusReason).not.toContain('Permission');
+      expect(channel()).toContain('[#1] Permission ask rule (WebFetch) will be ignored');
+    });
+
     it('interromper no meio grava o consumo parcial, e o desfecho continua stopped', () => {
       logged.start(storyId);
       procs[0]!.emit(HALF);
@@ -767,6 +780,17 @@ describe('log das execuções de IA', () => {
       expect(procs).toHaveLength(1);
       expect(only()).toMatchObject({ outcome: 'done', measure: 'none' });
       expect(log.find((l) => l.startsWith('[#1] Consumo não medido'))).toContain('não produz saída estruturada');
+    });
+
+    it('a falha no Copilot não diz no canal que o trabalho rodou normalmente', () => {
+      router.handle({ type: 'settings.board.update', patch: { aiTool: 'copilot' } });
+      logged.start(storyId);
+      procs[0]!.exit(1);
+
+      expect(only()).toMatchObject({ outcome: 'failed', measure: 'none' });
+      const line = log.find((l) => l.startsWith('[#1] Consumo não medido'))!;
+      expect(line).toContain('não produz saída estruturada');
+      expect(line).not.toMatch(/normalmente|rodou/);
     });
   });
 });

@@ -10,6 +10,7 @@ import { MeasureBrokenError } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
 import { spawnMeasured, type SpawnFn } from './aiOutput/measured';
 import type { OutputFormat } from './aiOutput/reader';
+import { isCliNoise } from './cliNoise';
 import { headlessUnsupported } from './headless';
 import type { RunLog } from './log/runLog';
 import { needsTriage, requiredSkills } from './mcp/format';
@@ -61,7 +62,7 @@ const WHERE = 'Configurações → Harness de IA → "O que a IA pode fazer"';
 /** O que a IA precisa saber sobre o limite da execução, para explicar à pessoa em vez de falhar sem contexto. */
 export const PERMISSION_ADVICE: Record<RunnerPermission, string | null> = {
   board: `Nesta execução você só lê o projeto e usa as ferramentas do board: alterar arquivos e rodar comandos está bloqueado. Se o trabalho pedir isso, não tente contornar: chame block_card explicando que a pessoa precisa escolher "Board e arquivos do projeto" ou "Sem restrições" em ${WHERE} e chamar a IA de novo.`,
-  edits: `Nesta execução você cria e altera arquivos do projeto, mas não roda comandos de terminal (testes, git, instalações). Se o trabalho exigir comandos, faça o que der e chame block_card explicando que a pessoa precisa escolher "Sem restrições" em ${WHERE}.`,
+  edits: `Nesta execução você cria e altera arquivos do projeto, mas não roda comandos de terminal (testes, git, instalações). Implemente o que der e registre no card o que ficou sem rodar (testes, build, commit): isso fica para quem tem permissão. Só chame block_card se o trabalho não puder avançar sem comandos, explicando que a pessoa precisa escolher "Sem restrições" em ${WHERE}.`,
   full: null,
 };
 
@@ -261,6 +262,8 @@ export class AiRunner {
           spawn,
           log: (line) => {
             log(line);
+            // os avisos de configuração da CLI ficam só no canal: não explicam a falha e empurrariam o motivo real para fora
+            if (isCliNoise(line)) return;
             tail.push(cut(line, TAIL_CHARS));
             if (tail.length > TAIL_LINES) tail.shift();
           },

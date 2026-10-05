@@ -223,6 +223,29 @@ describe('ChatSession', () => {
     // a linha da chamada é do board, não da ferramenta
     expect(error.text).not.toContain('Chamando');
   });
+
+  it('a pergunta nova vai uma vez só no prompt, depois da conversa anterior', () => {
+    router.chatCommand({ type: 'chat.send', text: 'primeira', model: null });
+    spawned[0]!.emit('resposta um');
+    spawned[0]!.exit(0);
+    router.chatCommand({ type: 'chat.send', text: 'segunda pergunta', model: null });
+    const stdin = spawned[1]!.command.stdin!;
+    expect(stdin.split('Pessoa: segunda pergunta')).toHaveLength(2);
+    expect(stdin).toContain('Pessoa: primeira\nAssistente: resposta um\nPessoa: segunda pergunta');
+    expect(stdin.split('Pessoa: primeira')).toHaveLength(2);
+  });
+
+  it('os avisos de regra de permissão do Claude Code não aparecem no erro; o motivo real aparece', () => {
+    router.chatCommand({ type: 'chat.send', text: 'a', model: null });
+    for (let i = 0; i < 15; i++) spawned[0]!.emit(`Permission allow rule (Bash(cmd${i}:*)) in userSettings is unreachable\n`, 'stderr');
+    spawned[0]!.emit('Invalid API key · Please run /login\n', 'stderr');
+    spawned[0]!.emit('Permission deny rule (Read(./.env)) will be ignored\n', 'stderr');
+    spawned[0]!.exit(1);
+    const error = messages().at(-1)!;
+    expect(error.role).toBe('error');
+    expect(error.text).toContain('Please run /login');
+    expect(error.text).not.toContain('Permission');
+  });
 });
 
 /** O chat é a quarta origem de execução de IA, e a única sem card (RF-16). */
