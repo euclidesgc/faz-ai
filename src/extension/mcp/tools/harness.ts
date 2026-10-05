@@ -106,15 +106,26 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'install_flow_skill',
-    'Instala no projeto a skill "faz-ai-fluxo", que ensina a conduzir os cards pelo fluxo do board (fases, documentos, revisão, pendências). Não sobrescreve uma skill de mesmo nome que já exista.',
-    {},
-    (_a, router) => {
-      const had = router.snapshot().harness.skills.some((k) => k.name === FLOW_SKILL.name);
-      router.handle({ type: 'harness.flowSkill.install' });
+    'Instala a skill "faz-ai-fluxo", que ensina a conduzir os cards pelo fluxo do board (fases, documentos, revisão, pendências). O padrão é o escopo global da ferramenta (vale em todos os projetos da pessoa); "project" instala só neste projeto. Não sobrescreve uma skill de mesmo nome no destino, a menos que replace seja true.',
+    {
+      tool: z.enum(ALL_AI_TOOLS).optional().describe('Ferramenta de IA; padrão: a do projeto'),
+      scope: z.enum(['user', 'project']).optional().describe('"user" (global, padrão) ou "project" (só neste projeto)'),
+      replace: z.boolean().optional().describe('Troca a skill de mesmo nome que já esteja no destino'),
+    },
+    (a, router) => {
+      const tool = a.tool ?? router.snapshot().board.aiTool;
+      const scope = a.scope ?? 'user';
+      const found = () =>
+        router
+          .snapshot()
+          .harness.inventory.find((t) => t.tool === tool)
+          ?.items.find((i) => i.kind === 'skill' && i.scope === scope && i.name === FLOW_SKILL.name);
+      const had = !!found();
+      router.handle({ type: 'harness.flowSkill.install', tool, scope, replace: a.replace });
       return {
-        installed: !had,
-        note: had ? 'A skill já existia e foi mantida como está.' : 'Skill criada.',
-        skill: router.snapshot().harness.skills.find((k) => k.name === FLOW_SKILL.name)?.path,
+        installed: !had || !!a.replace,
+        note: had && !a.replace ? 'A skill já existia no destino e foi mantida como está.' : had ? 'Skill substituída.' : 'Skill criada.',
+        skill: found()?.path,
       };
     },
   );

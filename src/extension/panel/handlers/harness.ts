@@ -9,11 +9,12 @@ import {
   type HarnessItem,
   type HarnessKind,
   type InstallableSkill,
+  type InstallScope,
 } from '../../../shared/harness';
 import { copyTarget } from '../../../shared/harnessCatalog';
 import { SKILLS_FIELD } from '../../db/schema';
 import { FLOW_SKILL } from '../../flowSkill';
-import type { HarnessStore } from '../../harness';
+import { skillTemplate, type HarnessStore } from '../../harness';
 import { HarnessOps } from '../../harnessOps';
 import { HooksAndPermissions } from '../../hooksAndPermissions';
 import { McpServers } from '../../mcpServers';
@@ -159,6 +160,14 @@ export class BoardHarness {
   }
 }
 
+/** O SKILL.md da skill do fluxo na pasta de skills da ferramenta, no projeto ou na pasta do usuário. */
+export function flowSkillFile(ctx: BoardContext, tool: AiTool, scope: InstallScope): string {
+  const target = copyTarget(tool, 'skill', 'skills', scope);
+  const base = scope === 'project' ? ctx.opts.workspaceDir : ctx.home;
+  if (!target || !base) throw new Error('Esta ferramenta não tem uma pasta de skills nesse escopo.');
+  return path.join(base, target.path, FLOW_SKILL.name, 'SKILL.md');
+}
+
 /** Harness: regras, skills, agentes, hooks, permissões, servidores MCP e instalação de skills. */
 export const harnessHandlers = {
   'harness.refresh': (_msg, ctx) => ctx.harness.refresh(),
@@ -220,10 +229,13 @@ export const harnessHandlers = {
   'harness.agent.create': (msg, ctx) => ctx.harness.op((h) => h.createAgent(msg.name, msg.description, msg.content, msg.model)),
   'harness.agent.write': (msg, ctx) => ctx.harness.op((h) => h.writeAgent(msg.name, msg.content)),
   'harness.agent.delete': (msg, ctx) => ctx.harness.op((h) => h.deleteAgent(msg.name)),
-  // não sobrescreve: se a pessoa já ajustou a skill, a versão dela fica
-  'harness.flowSkill.install': (_msg, ctx) =>
-    ctx.harness.op((h) => {
-      if (!ctx.harness.current.skills.some((k) => k.name === FLOW_SKILL.name))
-        h.createSkill(FLOW_SKILL.name, FLOW_SKILL.description, FLOW_SKILL.body);
-    }),
+  // sem `replace`, não sobrescreve: se a pessoa já ajustou a skill, a versão dela fica
+  'harness.flowSkill.install': (msg, ctx) => {
+    const file = flowSkillFile(ctx, msg.tool ?? ctx.state().board.aiTool, msg.scope ?? 'user');
+    if (fs.existsSync(file) && !msg.replace) return false;
+    return ctx.harness.change(() => {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, skillTemplate(FLOW_SKILL.name, FLOW_SKILL.description, FLOW_SKILL.body));
+    });
+  },
 } satisfies Partial<HandlerMap>;

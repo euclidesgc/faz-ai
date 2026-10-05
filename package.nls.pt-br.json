@@ -3,7 +3,7 @@
   "command.openInBrowser.title": "Faz AI: Abrir board no navegador",
   "command.refreshSidebar.title": "Faz AI: Atualizar",
   "command.openCard.title": "Faz AI: Abrir Card",
-  "command.connectAI.title": "Faz AI: Conectar IA (MCP)",
+  "command.connectAI.title": "Faz AI: Instalar o MCP do board (global)",
   "command.upgradeBoard.title": "Faz AI: Atualizar board para o padrão atual",
   "command.heartbeat.runNow.title": "Faz AI: Rodar o heartbeat agora (tratar pendências com a IA)",
   "command.heartbeat.stop.title": "Faz AI: Parar as execuções da IA e o modo autônomo",

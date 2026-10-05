@@ -1056,14 +1056,21 @@ describe('status do card e checkpoint de revisão', () => {
     expect((await call('delete_agent', { agent: 'planejador' })).text).toContain('não encontrado');
   });
 
-  it('instala a skill do fluxo sem sobrescrever', async () => {
-    const first = (await call('install_flow_skill')).data;
-    expect(first).toMatchObject({ installed: true, skill: '.claude/skills/faz-ai-fluxo/SKILL.md' });
-    const file = path.join(dir, first.skill);
+  it('instala a skill do fluxo no global por padrão, ou no projeto, sem sobrescrever', async () => {
+    const global = path.join(dir, 'home-do-usuario', '.claude', 'skills', 'faz-ai-fluxo', 'SKILL.md');
+    expect((await call('install_flow_skill')).data).toMatchObject({ installed: true });
+    expect(fs.readFileSync(global, 'utf8')).toContain('get_pending_work');
+    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'faz-ai-fluxo'))).toBe(false);
+
+    const file = path.join(dir, '.claude', 'skills', 'faz-ai-fluxo', 'SKILL.md');
+    expect((await call('install_flow_skill', { scope: 'project' })).data).toMatchObject({ installed: true });
     expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
     fs.writeFileSync(file, '---\nname: faz-ai-fluxo\ndescription: minha versão\n---\nmeu texto');
-    expect((await call('install_flow_skill')).data.installed).toBe(false);
+    expect((await call('install_flow_skill', { scope: 'project' })).data.installed).toBe(false);
     expect(fs.readFileSync(file, 'utf8')).toContain('meu texto');
+    // só com replace a versão da pessoa é trocada
+    expect((await call('install_flow_skill', { scope: 'project', replace: true })).data).toMatchObject({ note: 'Skill substituída.' });
+    expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
   });
 
   it('pergunta, bloqueio e colunas configuráveis', async () => {
@@ -1146,15 +1153,14 @@ describe('ferramentas de IA', () => {
     );
     const bridge = '/b/com espaço/bridge.js';
     const done = registerClients(['claude', 'codex', 'cursor', 'kimi'], { bridgePath: bridge, workspaceDir: dir, homeDir: home });
-    expect(done.map((d) => d.projectFile)).toEqual(['.mcp.json', '.codex/config.toml', '.cursor/mcp.json', null]);
+    expect(done.map((d) => d.projectFile)).toEqual(['.mcp.json', '.codex/config.toml', '.cursor/mcp.json', '.kimi-code/mcp.json']);
 
     const json = (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')).mcpServers;
     expect(json(path.join(dir, '.mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir] });
     expect(json(path.join(dir, '.cursor', 'mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir] });
-    const kimi = json(path.join(home, '.kimi-code', 'mcp.json'));
-    expect(kimi.outro).toEqual({ command: 'x' });
-    expect(kimi['faz-ai']).toEqual({ transport: 'stdio', command: 'node', args: [bridge] });
-    expect(fs.existsSync(path.join(home, '.kimi'))).toBe(false);
+    expect(json(path.join(dir, '.kimi-code', 'mcp.json'))['faz-ai']).toEqual({ transport: 'stdio', command: 'node', args: [bridge, dir] });
+    // no escopo do projeto, nada vai para a pasta do usuário
+    expect(json(path.join(home, '.kimi-code', 'mcp.json'))['faz-ai']).toBeUndefined();
 
     const toml = fs.readFileSync(path.join(dir, '.codex', 'config.toml'), 'utf8');
     expect(toml).toContain('model = "x"');
@@ -1174,6 +1180,74 @@ describe('ferramentas de IA', () => {
       inputs: [],
     });
     expect(json(path.join(dir, '.mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir], tools: ['*'] });
+  });
+
+  it('registra o servidor no global de cada ferramenta, sem a pasta do projeto', async () => {
+    const { registerClients } = await import('../src/extension/mcp/clientConfig');
+    const home = path.join(dir, 'home-global');
+    const project = path.join(dir, 'projeto-global');
+    fs.mkdirSync(path.join(home, '.kimi-code'), { recursive: true });
+    fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
+    const bridge = '/b/bridge.js';
+    const done = registerClients(['claude', 'codex', 'cursor', 'kimi', 'copilot'], {
+      bridgePath: bridge,
+      workspaceDir: project,
+      homeDir: home,
+      scope: 'user',
+    });
+    // o projeto fica sem arquivo nenhum
+    expect(fs.existsSync(project)).toBe(false);
+    expect(done.every((d) => d.projectFile === null)).toBe(true);
+
+    // o ~/.claude.json é do Claude Code: o registro sai pela linha de comando dele
+    expect(fs.existsSync(path.join(home, '.claude.json'))).toBe(false);
+    expect(done[0]!.run).toEqual([
+      { command: 'claude', args: ['mcp', 'remove', '--scope', 'user', 'faz-ai'], mayFail: true },
+      {
+        command: 'claude',
+        args: ['mcp', 'add-json', '--scope', 'user', 'faz-ai', JSON.stringify({ type: 'stdio', command: 'node', args: [bridge] })],
+      },
+    ]);
+
+    const json = (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')).mcpServers;
+    expect(json(path.join(home, '.cursor', 'mcp.json'))).toEqual({
+      outro: { command: 'x' },
+      'faz-ai': { type: 'stdio', command: 'node', args: [bridge] },
+    });
+    expect(fs.readFileSync(path.join(home, '.codex', 'config.toml'), 'utf8')).toContain(`args = ["${bridge}"]`);
+    expect(json(path.join(home, '.kimi-code', 'mcp.json'))['faz-ai']).toEqual({ transport: 'stdio', command: 'node', args: [bridge] });
+    expect(fs.existsSync(path.join(home, '.kimi'))).toBe(false);
+    expect(json(path.join(home, '.copilot', 'mcp-config.json'))['faz-ai']).toEqual({
+      type: 'stdio',
+      command: 'node',
+      args: [bridge],
+      tools: ['*'],
+    });
+  });
+
+  it('a execução do Cursor usa o registro global quando ele leva a este board', async () => {
+    const { ensureProjectServer, registerClients } = await import('../src/extension/mcp/clientConfig');
+    const home = path.join(dir, 'home-cursor');
+    const project = path.join(dir, 'proj-cursor');
+    fs.mkdirSync(path.join(project, 'sub'), { recursive: true });
+    const entry = { command: process.execPath, args: ['/b/bridge.js', project] };
+    registerClients(['cursor'], {
+      bridgePath: '/b/bridge.js',
+      workspaceDir: project,
+      homeDir: home,
+      nodeCommand: process.execPath,
+      scope: 'user',
+    });
+    expect(ensureProjectServer(project, '.cursor/mcp.json', entry, home)).toBe('global');
+    expect(ensureProjectServer(path.join(project, 'sub'), '.cursor/mcp.json', entry, home)).toBe('global');
+    expect(fs.existsSync(path.join(project, '.cursor'))).toBe(false);
+    // a worktree de uma história fica fora da pasta do board: ali o projeto precisa do registro dele
+    const worktree = path.join(dir, 'worktree-cursor');
+    fs.mkdirSync(worktree);
+    expect(ensureProjectServer(worktree, '.cursor/mcp.json', entry, home)).toBe('added');
+    // outro bridge no global não leva a este board
+    expect(ensureProjectServer(project, '.cursor/mcp.json', { ...entry, args: ['/outro/bridge.js', project] }, home)).toBe('added');
   });
 
   it('sugere modelos do Copilot e o detecta pela CLI ou pela extensão do VS Code', async () => {

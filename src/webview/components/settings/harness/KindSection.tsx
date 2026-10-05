@@ -12,6 +12,7 @@ import { useBoardStore } from '../../../store/boardStore';
 import { Button, Callout } from '@radix-ui/themes';
 import { IconWarning } from '../../ui';
 import { SettingsCard } from '../SettingsCard';
+import { BoardInstall } from './BoardInstall';
 import { InstallSkills } from './InstallSkills';
 import { NewHook } from './NewHook';
 import { NewItem } from './NewItem';
@@ -104,6 +105,7 @@ export function KindSection({
         </>
       }
     >
+      {(k.id === 'mcp' || k.id === 'skill') && <BoardInstall key={tool} artifact={k.id} tool={tool} items={items} />}
       {k.id === 'skill' &&
         tool === state.board.aiTool &&
         !items.some((i) => i.kind === 'skill' && i.scope === 'project' && i.name === REFERENCE_SKILL.name) && (

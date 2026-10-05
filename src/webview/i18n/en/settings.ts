@@ -39,9 +39,6 @@ export const settings: Record<string, string> = {
   'Atualizar board': 'Update board',
   'Leva este board ao padrão atual da extensão, sem mover nenhum card':
     "Brings this board to the extension's current default, without moving any card",
-  'Conectar IA (MCP)': 'Connect AI (MCP)',
-  'Registra o board como servidor MCP para o Claude Code e outros clientes de IA':
-    'Registers the board as an MCP server for Claude Code and other AI clients',
   'Recriar o board do zero?': 'Recreate the board from scratch?',
   'Todos os {count} card(s), conversas, anexos e configurações deste board serão apagados, e o board volta ao padrão. Isso não pode ser desfeito. Regras e skills do projeto não são afetadas.':
     "All {count} card(s), conversations, attachments and settings of this board will be deleted, and the board goes back to the default. This can't be undone. Project rules and skills are not affected.",

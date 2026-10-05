@@ -1,7 +1,8 @@
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { samePath } from '../samePath';
-import type { AiTool } from '../../shared/harness';
+import type { AiTool, InstallScope } from '../../shared/harness';
 
 export interface RegisterOptions {
   /** caminho estável do bridge.js */
@@ -13,6 +14,12 @@ export interface RegisterOptions {
    * com o node instalado só pelo nvm um `"command": "node"` falharia ao iniciar o servidor.
    */
   nodeCommand?: string;
+  /**
+   * `project` grava nos arquivos da pasta do projeto, com a pasta fixa nos argumentos; `user` grava na
+   * configuração global da ferramenta, sem a pasta: a ponte descobre o board pelo diretório em que a
+   * ferramenta foi aberta, e o mesmo registro serve a todos os projetos. Padrão: `project`.
+   */
+  scope?: InstallScope;
 }
 
 export interface Registration {
@@ -23,6 +30,12 @@ export interface Registration {
   projectFile: string | null;
   /** o que a pessoa precisa fazer para a ferramenta carregar o servidor */
   next: string;
+  /**
+   * comandos que quem chama precisa rodar para concluir o registro, em ordem, quando o arquivo é da
+   * própria ferramenta e não deve ser gravado por fora (o `~/.claude.json`). O primeiro de cada par
+   * pode falhar sem problema: é a remoção do registro anterior.
+   */
+  run?: { command: string; args: string[]; mayFail?: true }[];
 }
 
 const SERVER = 'faz-ai';
@@ -42,7 +55,29 @@ function mergeJson(file: string, entry: Record<string, unknown>, key = 'mcpServe
 }
 
 /** O que `ensureProjectServer` fez com o registro. */
-export type ProjectServerResult = 'kept' | 'added' | 'repaired' | 'invalid';
+export type ProjectServerResult = 'kept' | 'global' | 'added' | 'repaired' | 'invalid';
+
+/** O registro do board num JSON de configuração, se houver um; `invalid` quando o arquivo não é JSON. */
+function readEntry(file: string): { command?: unknown; args?: unknown } | undefined | 'invalid' {
+  if (!fs.existsSync(file)) return undefined;
+  try {
+    const config = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+      mcpServers?: Record<string, { command?: unknown; args?: unknown }>;
+    } | null;
+    return config?.mcpServers?.[SERVER];
+  } catch {
+    return 'invalid';
+  }
+}
+
+const usableCommand = (command: unknown): command is string =>
+  typeof command === 'string' && (path.isAbsolute(command) ? fs.existsSync(command) : !!command);
+
+/** A pasta está dentro de `folder` (ou é ela). */
+const within = (dir: string, folder: string): boolean => {
+  const rel = path.relative(folder, dir);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+};
 
 /**
  * Garante o servidor do board num JSON de configuração do projeto, para a ferramenta que só lê
@@ -63,29 +98,41 @@ export function ensureProjectServer(
   workspaceDir: string,
   relFile: string,
   entry: { command: string; args: string[]; env?: Record<string, string> },
+  homeDir: string = os.homedir(),
 ): ProjectServerResult {
-  const file = path.join(workspaceDir, relFile);
-  let current: { command?: unknown; args?: unknown } | undefined;
-  if (fs.existsSync(file)) {
-    try {
-      const config = JSON.parse(fs.readFileSync(file, 'utf8')) as { mcpServers?: Record<string, typeof current> } | null;
-      current = config?.mcpServers?.[SERVER];
-    } catch {
-      return 'invalid';
-    }
-  }
+  const current = readEntry(path.join(workspaceDir, relFile));
+  if (current === 'invalid') return 'invalid';
+  // sem registro no projeto, o global instalado pela pessoa já leva a ferramenta a este board quando
+  // aponta para o mesmo bridge e a pasta da execução fica dentro do board (sem pasta fixa, a ponte a
+  // acha subindo a partir dela): o projeto fica sem arquivo nenhum. A worktree de uma história fica
+  // fora da pasta do board, e ali o registro do projeto continua necessário.
+  if (!current && coveredByGlobal(path.join(homeDir, relFile), workspaceDir, entry.args)) return 'global';
   let command = entry.command;
   if (current) {
     const args = Array.isArray(current.args) ? current.args.map(String) : [];
     const same = args.length === entry.args.length && args.every((a, i) => samePath(a, entry.args[i]!));
-    const usable =
-      typeof current.command === 'string' && (path.isAbsolute(current.command) ? fs.existsSync(current.command) : !!current.command);
+    const usable = usableCommand(current.command);
     if (same && usable) return 'kept';
     if (usable) command = current.command as string;
   }
-  mergeJson(file, { type: 'stdio', command, args: entry.args, ...(entry.env && command === entry.command ? { env: entry.env } : {}) });
+  mergeJson(path.join(workspaceDir, relFile), {
+    type: 'stdio',
+    command,
+    args: entry.args,
+    ...(entry.env && command === entry.command ? { env: entry.env } : {}),
+  });
   excludeLocally(workspaceDir, relFile);
   return current ? 'repaired' : 'added';
+}
+
+/** O registro global em `file` leva ao board de `entryArgs` (bridge, pasta) quando a ferramenta roda em `runDir`. */
+function coveredByGlobal(file: string, runDir: string, entryArgs: string[]): boolean {
+  const global = readEntry(file);
+  if (!global || global === 'invalid' || !usableCommand(global.command)) return false;
+  const [bridge, folder] = Array.isArray(global.args) ? global.args.map(String) : [];
+  const [wantedBridge, board] = entryArgs;
+  if (!bridge || !wantedBridge || !board || !samePath(bridge, wantedBridge)) return false;
+  return folder ? samePath(folder, board) : within(runDir, board);
 }
 
 /** Acrescenta o caminho ao `.git/info/exclude` do repositório, se houver um e ele ainda não estiver lá. */
@@ -119,7 +166,7 @@ export function upsertTomlServer(toml: string, command: string, args: string[]):
 }
 
 /**
- * Registra o servidor MCP do board na configuração que cada ferramenta lê:
+ * Registra o servidor MCP do board na configuração que cada ferramenta lê. No escopo do projeto:
  * - Claude Code: `.mcp.json` do projeto
  * - Cursor: `.cursor/mcp.json` do projeto
  * - Codex: `.codex/config.toml` do projeto (vale em projetos marcados como confiáveis)
@@ -127,6 +174,7 @@ export function upsertTomlServer(toml: string, command: string, args: string[]):
  * - GitHub Copilot: `.vscode/mcp.json` (VS Code) e `.mcp.json` (Copilot CLI) do projeto
  */
 export function registerClients(tools: AiTool[], o: RegisterOptions): Registration[] {
+  if (o.scope === 'user') return tools.flatMap((tool) => registerUser(tool, o));
   const args = [o.bridgePath, o.workspaceDir];
   const node = o.nodeCommand ?? 'node';
   const out: Registration[] = [];
@@ -162,13 +210,9 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
         break;
       }
       case 'kimi': {
-        // Kimi Code usa ~/.kimi-code e a Kimi CLI usa ~/.kimi; grava nas que existirem
-        const dirs = ['.kimi-code', '.kimi'].map((d) => path.join(o.homeDir, d)).filter((d) => fs.existsSync(d));
-        for (const dir of dirs.length ? dirs : [path.join(o.homeDir, '.kimi')]) {
-          const file = path.join(dir, 'mcp.json');
-          mergeJson(file, { transport: 'stdio', command: node, args: [o.bridgePath] });
-          out.push({ tool, file, projectFile: null, next: 'Kimi Code: abra uma sessão nova a partir da pasta do projeto.' });
-        }
+        const file = path.join(o.workspaceDir, '.kimi-code', 'mcp.json');
+        mergeJson(file, { transport: 'stdio', command: node, args });
+        out.push({ tool, file, projectFile: '.kimi-code/mcp.json', next: 'Kimi Code: abra uma sessão nova na pasta do projeto.' });
         break;
       }
       case 'copilot': {
@@ -194,4 +238,70 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
     }
   }
   return out;
+}
+
+/**
+ * Registro global (escopo do usuário), o padrão de cada ferramenta para um servidor que vale em
+ * qualquer projeto. Sem a pasta nos argumentos: a ponte acha o board subindo a partir do diretório
+ * em que a ferramenta foi aberta.
+ * - Claude Code: `claude mcp add-json --scope user` (o `~/.claude.json` é reescrito pela ferramenta o
+ *   tempo todo; gravar nele por fora arrisca perder a mudança ou a dela)
+ * - Cursor: `~/.cursor/mcp.json`
+ * - Codex: `~/.codex/config.toml`
+ * - Kimi Code: `~/.kimi-code/mcp.json` e/ou `~/.kimi/mcp.json` (a Kimi CLI), os que existirem
+ * - GitHub Copilot: `~/.copilot/mcp-config.json` (Copilot CLI); o VS Code guarda o global no perfil do editor
+ */
+function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
+  const node = o.nodeCommand ?? 'node';
+  const args = [o.bridgePath];
+  const home = (...p: string[]) => path.join(o.homeDir, ...p);
+  switch (tool) {
+    case 'claude': {
+      const entry = JSON.stringify({ type: 'stdio', command: node, args });
+      return [
+        {
+          tool,
+          file: home('.claude.json'),
+          projectFile: null,
+          next: 'Claude Code: abra uma sessão nova em qualquer projeto com o board aberto (/mcp mostra o estado).',
+          run: [
+            { command: 'claude', args: ['mcp', 'remove', '--scope', 'user', SERVER], mayFail: true },
+            { command: 'claude', args: ['mcp', 'add-json', '--scope', 'user', SERVER, entry] },
+          ],
+        },
+      ];
+    }
+    case 'cursor': {
+      const file = home('.cursor', 'mcp.json');
+      mergeJson(file, { type: 'stdio', command: node, args });
+      return [{ tool, file, projectFile: null, next: 'Cursor: ative o servidor em Settings → MCP.' }];
+    }
+    case 'codex': {
+      const file = home('.codex', 'config.toml');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, upsertTomlServer(fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '', node, args));
+      return [{ tool, file, projectFile: null, next: 'Codex: abra uma sessão nova (codex mcp list confere).' }];
+    }
+    case 'kimi': {
+      // Kimi Code usa ~/.kimi-code e a Kimi CLI usa ~/.kimi; grava nas que existirem
+      const dirs = ['.kimi-code', '.kimi'].map((d) => home(d)).filter((d) => fs.existsSync(d));
+      return (dirs.length ? dirs : [home('.kimi-code')]).map((dir) => {
+        const file = path.join(dir, 'mcp.json');
+        mergeJson(file, { transport: 'stdio', command: node, args });
+        return { tool, file, projectFile: null, next: 'Kimi Code: abra uma sessão nova a partir da pasta do projeto.' };
+      });
+    }
+    case 'copilot': {
+      const file = home('.copilot', 'mcp-config.json');
+      mergeJson(file, { type: 'stdio', command: node, args, tools: ['*'] });
+      return [
+        {
+          tool,
+          file,
+          projectFile: null,
+          next: 'Copilot CLI: abra uma sessão nova. No VS Code, o servidor global fica no perfil do editor (MCP: Open User Configuration).',
+        },
+      ];
+    }
+  }
 }

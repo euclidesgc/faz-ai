@@ -1,5 +1,5 @@
 import type { Skill, SkillMode } from '../../../../shared/harness';
-import { FLOW_SKILL_NAME, automaticSkills, isFreeName, skillInventoryPaths, type AiToolInfo } from '../../../../shared/harnessProject';
+import { automaticSkills, isFreeName, skillInventoryPaths, type AiToolInfo } from '../../../../shared/harnessProject';
 import { useBoardStore } from '../../../store/boardStore';
 import { harness } from '../../../commands';
 import { Button } from '@radix-ui/themes';
@@ -35,16 +35,6 @@ export function ProjectSkills({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
         title={t('Skills')}
         actions={
           <>
-            {!skills.some((k) => k.name === FLOW_SKILL_NAME) && (
-              <Button
-                variant="soft"
-                color="gray"
-                title={t('Cria a skill que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências')}
-                onClick={() => harness.installFlowSkill()}
-              >
-                {t('Instalar skill do fluxo')}
-              </Button>
-            )}
             <Button onClick={() => edit.toggleNew('newSkill')}>
               <IconPlus /> {t('Nova skill')}
             </Button>
@@ -69,6 +59,12 @@ export function ProjectSkills({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
             )}
           </li>
         </ul>
+        <p className="muted small">
+          {t(
+            'A skill do fluxo do board é instalada em "Tudo que a ferramenta carrega" → {tool} → Skills: no global (padrão) ou neste projeto.',
+            { tool: tool.label },
+          )}
+        </p>
         {automatic.length > 1 && (
           <p>
             {t('{n} skills automáticas no projeto.', { n: automatic.length })}{' '}

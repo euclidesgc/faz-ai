@@ -67,9 +67,10 @@ In five minutes you have a task moving on the board, with the AI working on it.
    marketplace), open your project's folder and click the **Faz AI** icon in the sidebar. Each
    folder has its own board, already set up with the workflow phases.
 2. **Connect the AI to the board.** In **Configurações → Harness de IA** (Settings → AI harness),
-   pick the project's tool (Claude Code, Codex, Cursor, Kimi Code or GitHub Copilot) and click
-   **Conectar IA (MCP)** (connect AI). In the **Do projeto** (project) tab, click **Instalar skill
-   do fluxo** (install the flow skill): it teaches the AI to drive the phases.
+   pick the project's tool (Claude Code, Codex, Cursor, Kimi Code or GitHub Copilot). In the **Tudo
+   que a ferramenta carrega** (everything the tool loads) tab, on that tool, click **Instalar (padrão
+   da ferramenta)** (install, tool default) in the **Servidores MCP** (MCP servers) section and again
+   in the **Skills** section, for the flow skill, which teaches the AI to drive the phases.
 3. **Create the task.** In the **Backlog** column, click **+ Novo card** (new card), type the title
    (for example, "Login with Google") and press Enter. Double-click opens the card: describe what
    you want, in Markdown, and optionally pick the AI model and the skills it must read.
@@ -233,11 +234,28 @@ navegador**; the terminal `faz-ai` warns and does not start.
 
 1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code, Codex,
    Cursor, Kimi Code or GitHub Copilot).
-2. Click **Conectar IA (MCP)** (connect AI). The board registers the server in the file the tool
-   reads.
-3. In **Harness de IA**, in the **Do projeto** tab, click **Instalar skill do fluxo** (install the flow skill): it teaches the
-   AI to take cards through the phases, write the documents, ask for review and pick up pending
-   work. It is a file in your project and can be edited.
+2. In the **Tudo que a ferramenta carrega** (everything the tool loads) tab, pick the tool and, in
+   the **Servidores MCP** (MCP servers) section, click **Instalar (padrão da ferramenta)** (install,
+   tool default). The board registers the `faz-ai` server in the global file the tool reads.
+3. In the **Skills** section of the same tool, click **Instalar (padrão da ferramenta)** for the
+   flow skill (`faz-ai-fluxo`): it teaches the AI to take cards through the phases, write the
+   documents, ask for review and pick up pending work. It can be edited.
+
+**Global or this project.** Both items live only in their section, on each tool, each with two
+buttons:
+
+| | Where it writes | When to use |
+|---|---|---|
+| **Instalar (padrão da ferramenta)** (tool default) | global config: `~/.claude.json` (through `claude mcp add --scope user`), `~/.cursor/mcp.json`, `~/.codex/config.toml`, `~/.kimi-code/mcp.json`, `~/.copilot/mcp-config.json`; the skill in `~/.claude/skills`, `~/.cursor/skills` and equivalents | recommended: the board works in any repository opened with it, with no file in the project |
+| **Instalar neste projeto** (this project) | `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.kimi-code/mcp.json` or `.vscode/mcp.json`; the skill in `.claude/skills`, `.cursor/skills` and equivalents | pinning a version in a repository or a fork, or a skill tailored for the team |
+
+The global registration does not carry the project folder: the board's bridge finds the board by
+walking up from the folder the tool was opened in. The project one takes precedence over the global
+one in that project, so installing in the project when a global one exists asks for confirmation,
+and so does replacing a flow skill that already exists at the destination (changes made to it are
+lost). The **Faz AI: Install the board MCP (global)** palette command does the default install on
+the project's tool, and the MCP tool `install_flow_skill` takes `scope` (`user`, the default, or
+`project`).
 4. Open a new session of the tool in the project folder and ask, for example, "list the cards on
    the board", "take story #1 and write the PRD" or "check what is pending on the board and move it
    forward".
@@ -248,8 +266,8 @@ it), the tool's command line, its sign-in (for Cursor, through `cursor-agent sta
 server registration in the file the tool reads (for Claude, the registration for your user from
 `claude mcp add -s user` also counts), a registration pointing to a node or path that no longer
 exists or to another folder, and the permission level. Each item says what it affects and brings the action: the
-command to copy, **Conectar IA (MCP)** (connect AI) or the shortcut to the AI
-harness. The bar has no close button: it goes away on its own when the last item is solved. The
+command to copy, **Instalar o MCP do board** (install the board MCP, which opens the tool's MCP
+servers section) or the shortcut to the AI harness. The bar has no close button: it goes away on its own when the last item is solved. The
 check runs when the board opens, when the tool or permission changes, after connecting, every 5
 minutes and on **Verificar de novo** (check again), which also rereads the terminal PATH (a node
 installed with the board open is found without reloading the window), and says when nothing
@@ -326,9 +344,10 @@ Images pasted into the message become card attachments and the AI receives them.
   `curl https://cursor.com/install -fsS | bash` installer also creates the `agent` shortcut); sign in
   once with `cursor-agent login`.
 - With Claude Code, the board's server is passed on the command line of each run: it does not
-  depend on **Conectar IA (MCP)** or on approving `.mcp.json`. With Cursor, the board writes the
-  server to `.cursor/mcp.json` before running, if it is not there yet (and adds the file to
-  `.git/info/exclude` when it creates it). For the other tools, connect first.
+  depend on installing the MCP or on approving `.mcp.json`. With Cursor, the board uses the global
+  registration in `~/.cursor/mcp.json` when it leads to this board; without it (or in a worktree
+  outside the project folder), it writes the server to `.cursor/mcp.json` before running (and adds
+  the file to `.git/info/exclude` when it creates it). For the other tools, install first.
 - When the story has its own working folder (worktree), the tool gets that folder along with the
   project's, Cursor included.
 - Stop and the time limit end the tool and everything it started (MCP servers, tests, commands).
@@ -826,7 +845,7 @@ machine, for example), they must be set up again:
 | Item | What it is for | How to get it |
 |---|---|---|
 | Node.js 18+ and git | build, tests and the `faz-ai` command | regular install |
-| `.mcp.json` and `.claude/settings.local.json` | connect the AI to the board; hold machine paths | **Conectar IA (MCP)** in the board settings |
+| `.mcp.json` and `.claude/settings.local.json` | connect the AI to the board; hold machine paths | **Instalar neste projeto** (this project) in the MCP servers section of the AI harness |
 | Board and attachments | live in the extension's storage, not in the repository | the folder's board starts empty on the other machine |
 | `.env.release` with `OVSX_PAT` | publishing to Open VSX | token at https://open-vsx.org/user-settings/tokens |
 | Azure CLI login | publishing to the VS Code Marketplace | `az login --allow-no-subscriptions`, with the account that owns the publisher |

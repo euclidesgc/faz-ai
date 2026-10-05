@@ -231,9 +231,6 @@ export const harness: Record<string, string> = {
     'Instructions loaded in every AI session. The shorter they are, the less context they use.',
 
   // --- ProjectSkills
-  'Cria a skill que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências':
-    'Creates the skill that teaches the AI to take cards through the board flow: phases, documents, review and pending items',
-  'Instalar skill do fluxo': 'Install flow skill',
   'Nova skill': 'New skill',
   'Skills do {tool} em <code>{dir}</code>. Todas viram opções do campo "Skills" dos cards, e um card que indica uma skill entrega à IA o caminho do arquivo. Por isso uma skill não precisa ficar à vista da IA para ser usada:':
     '{tool} skills in <code>{dir}</code>. All of them become options in the "Skills" field of cards, and a card that indicates a skill hands the AI the file path. That is why a skill does not need to be in the AI\'s sight to be used:',
@@ -256,7 +253,6 @@ export const harness: Record<string, string> = {
 
   // --- ProjectTool
   'Ferramenta deste projeto': "This project's tool",
-  'Conectar o {tool} ao board (MCP)': 'Connect {tool} to the board (MCP)',
   'O projeto trabalha com uma ferramenta de IA por vez. Ela define o arquivo de regras, a pasta das skills, onde o servidor MCP é registrado e os modelos oferecidos nos cards. Pastas de outras ferramentas podem existir no projeto, mas o board não mexe nelas. O botão registra o servidor do board em {mcp}.':
     'The project works with one AI tool at a time. It defines the rules file, the skills folder, where the MCP server is registered and the models offered on cards. Folders for other tools can exist in the project, but the board does not touch them. The button registers the board server in {mcp}.',
   'Ferramenta de IA do projeto': 'Project AI tool',
@@ -264,7 +260,7 @@ export const harness: Record<string, string> = {
   Regras: 'Rules',
   '.mcp.json (projeto)': '.mcp.json (project)',
   '.codex/config.toml (projeto confiável)': '.codex/config.toml (trusted project)',
-  '~/.kimi-code/mcp.json ou ~/.kimi/mcp.json (global)': '~/.kimi-code/mcp.json or ~/.kimi/mcp.json (global)',
+  '.kimi-code/mcp.json (projeto)': '.kimi-code/mcp.json (project)',
   '.vscode/mcp.json e .mcp.json (projeto)': '.vscode/mcp.json and .mcp.json (project)',
   '.cursor/mcp.json (projeto)': '.cursor/mcp.json (project)',
 
@@ -359,4 +355,35 @@ export const harness: Record<string, string> = {
     'When on, the heartbeat drives several stories at once, each in its own folder (worktree). More stories in parallel use more memory and CPU and more of your account usage limit. Autonomous mode stays one at a time, because its stories are stacked. The independent sub-tasks of each story already run in parallel, with no limit, according to the plan.',
   'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.':
     'Only available in "Worktree por história" mode (Settings > Git). Outside it the stories share the same folder and would cause conflicts, so the heartbeat drives one at a time.',
+
+  // --- BoardInstall
+  'O registro será gravado em {where}.': 'The registration will be written to {where}.',
+  'A skill será instalada em {where}.': 'The skill will be installed in {where}.',
+  'Já existe uma skill "{name}" em {where}. Ela será substituída pela versão desta extensão, e o que foi ajustado nela se perde.':
+    'A "{name}" skill already exists in {where}. It will be replaced by this extension\'s version, and any changes made to it will be lost.',
+  'Já está instalado no global. O do projeto passa a valer aqui no lugar dele, e o global continua valendo nos outros projetos. Para o board em qualquer repositório, o global basta.':
+    'It is already installed globally. The project one takes its place here, and the global one keeps applying to your other projects. For the board in any repository, the global one is enough.',
+  'Instalar no global do {tool}?': 'Install globally in {tool}?',
+  'Instalar neste projeto, no {tool}?': 'Install in this project, in {tool}?',
+  Substituir: 'Replace',
+  'Servidor do board': 'Board server',
+  'Skill do fluxo': 'Flow skill',
+  'Servidor do board (faz-ai)': 'Board server (faz-ai)',
+  'Skill do fluxo (faz-ai-fluxo)': 'Flow skill (faz-ai-fluxo)',
+  'global: instalado': 'global: installed',
+  'global: não instalado': 'global: not installed',
+  'neste projeto: instalado': 'this project: installed',
+  'neste projeto: não instalado': 'this project: not installed',
+  'Deixa a IA ler e atualizar o board nas suas conversas. As execuções pelo board não dependem disso. <b>Padrão da ferramenta</b> grava no global (<code>{user}</code>) sem a pasta do projeto: vale em qualquer repositório aberto com o board, sem arquivo nenhum no projeto. <b>Neste projeto</b> grava em <code>{project}</code>: use para fixar uma versão neste repositório ou num fork.':
+    'Lets the AI read and update the board in your conversations. Runs from the board do not depend on it. <b>Tool default</b> writes to the global config (<code>{user}</code>) without the project folder: it works in any repository opened with the board, with no file in the project. <b>In this project</b> writes to <code>{project}</code>: use it to pin a version in this repository or in a fork.',
+  'Ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. <b>Padrão da ferramenta</b> instala em <code>{user}</code>, para todos os seus projetos. <b>Neste projeto</b> instala em <code>{project}</code>, que vai no repositório: use para fixar uma versão ajustada para este time.':
+    'Teaches the AI to move cards through the board flow: phases, documents, review and pending items. <b>Tool default</b> installs to <code>{user}</code>, for all your projects. <b>In this project</b> installs to <code>{project}</code>, which goes in the repository: use it to pin a version tailored for this team.',
+  'Reinstalar (padrão da ferramenta)': 'Reinstall (tool default)',
+  'Instalar (padrão da ferramenta)': 'Install (tool default)',
+  'Reinstalar neste projeto': 'Reinstall in this project',
+  'Instalar neste projeto': 'Install in this project',
+  'A skill do fluxo do board é instalada em "Tudo que a ferramenta carrega" → {tool} → Skills: no global (padrão) ou neste projeto.':
+    'The board flow skill is installed in "Everything the tool loads" → {tool} → Skills: globally (default) or in this project.',
+  'O projeto trabalha com uma ferramenta de IA por vez. Ela define o arquivo de regras, a pasta das skills, onde o servidor MCP é registrado e os modelos oferecidos nos cards. Pastas de outras ferramentas podem existir no projeto, mas o board não mexe nelas. O servidor MCP do board e a skill do fluxo são instalados em "Tudo que a ferramenta carrega", nas seções Servidores MCP e Skills de cada ferramenta.':
+    'The project works with one AI tool at a time. It defines the rules file, the skills folder, where the MCP server is registered and the models offered on cards. Folders of other tools may exist in the project, but the board does not touch them. The board MCP server and the flow skill are installed in "Everything the tool loads", in each tool\'s MCP servers and Skills sections.',
 };

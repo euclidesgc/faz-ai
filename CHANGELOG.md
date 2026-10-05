@@ -6,6 +6,23 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **MCP e skill do fluxo instalados na seção de cada ferramenta, no global por padrão** ([#141](https://github.com/euclidesgc/faz-ai/issues/141)).
+  - Em **Harness de IA → Tudo que a ferramenta carrega**, a seção **Servidores MCP** de cada
+    ferramenta tem o servidor do board, e a seção **Skills** tem a skill do fluxo, cada um com o
+    estado no global e no projeto e dois botões: **Instalar (padrão da ferramenta)**, que grava na
+    configuração global (`~/.cursor/mcp.json`, `~/.codex/config.toml`, `claude mcp add --scope user`,
+    `~/.claude/skills`…) e vale em qualquer repositório sem arquivo nenhum no projeto, e **Instalar
+    neste projeto**, para fixar uma versão num repositório ou num fork.
+  - Saíram os botões repetidos: **Conectar IA (MCP)** do menu das configurações e da aba da
+    ferramenta, e **Instalar skill do fluxo** da aba Do projeto. A faixa de requisitos leva à seção
+    Servidores MCP da ferramenta.
+  - Instalar no projeto com um global já instalado pede confirmação, e a skill do fluxo que já existe
+    no destino só é substituída depois de confirmar.
+  - O registro global conta na faixa de requisitos, e as execuções do Cursor pelo board usam o
+    global em vez de gravar `.cursor/mcp.json` no projeto quando ele leva a este board.
+  - O Kimi Code, no projeto, grava em `.kimi-code/mcp.json`; antes, ia sempre para o global.
+  - A ferramenta `install_flow_skill` do MCP aceita `tool`, `scope` (`user`, o padrão, ou
+    `project`) e `replace`.
 - **Preços do Cursor.** O **Auto** passa a ter **preço variável**: o Cursor cobra o preço do modelo
   para o qual cada pedido foi roteado, então o board não estima o custo dele em vez de usar um
   número fixo enganoso. A chave **Preço variável** existe em todo modelo de **Modelos de IA** e no

@@ -44,7 +44,7 @@ function vscodeEnv(webview: vscode.Webview, router: MessageRouter): HostEnv {
     attachmentsBaseUri: () => webview.asWebviewUri(vscode.Uri.file(router.store.baseDir)).toString(),
     showFilters: () => vscode.commands.executeCommand('fazai.filters.focus'),
     showChat: () => vscode.commands.executeCommand('fazai.chat.focus'),
-    connectAI: () => vscode.commands.executeCommand('fazai.connectAI'),
+    connectAI: (target) => vscode.commands.executeCommand('fazai.connectAI', target),
     openInBrowser: () => vscode.commands.executeCommand('fazai.openInBrowser'),
     runAi: (cardId, mode) => vscode.commands.executeCommand('fazai.ai.run', cardId, { fromBoard: true, mode }),
     stopAi: (cardId) => vscode.commands.executeCommand('fazai.ai.stop', cardId, { fromBoard: true }),
