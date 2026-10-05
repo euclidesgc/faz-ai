@@ -6,8 +6,8 @@
 // (`tokens`) e custo (`cost`), cada um no total e por `phase`/`card_type`/`model`/`tool`/`effort`/
 // `profile` (ver RUN_DIMS em rollup.ts) — mas nunca as dimensões `card`, `agent`, `skill`, `used_tool`
 // nem `mcp_tool`. Em `tokens` e `cost` o `n` é quantas execuções tinham o número, não quantas houve: é
-// daí que sai `measuredRuns` de um mês arquivado, e um mês sem nenhuma medição continua "não medido"
-// (null), nunca zero.
+// daí que saem `measuredRuns` (de `tokens`) e `costedRuns` (de `cost`) de um mês arquivado, e uma
+// métrica sem nenhuma medição continua "não medido" (null), nunca zero.
 //
 // O arquivo guarda marginais, não cruzamentos: existe "custo por modelo" e "custo por workflow", mas não
 // "custo por modelo dentro de um workflow". Por isso ele serve a UMA dimensão por consulta (RF-10): um mês
@@ -118,8 +118,10 @@ export interface MetricsResult {
   archivedMonths: string[];
   /** entre `archivedMonths`, os que o recorte de datas não cobre por inteiro (o valor devolvido é do mês inteiro) */
   partialMonths: string[];
-  /** true quando algum grupo tem execução sem custo medido (inclusive por vir de mês arquivado) */
+  /** true quando algum grupo tem execução sem custo (`cost_usd` nulo, inclusive no arquivo mensal) */
   costPartial: boolean;
+  /** true quando algum grupo tem execução sem tokens medidos (`measure = 'none'`) */
+  tokensPartial: boolean;
 }
 
 const DEFAULT_LIMIT = 20;
@@ -136,7 +138,10 @@ function monthOfDay(date: string): string {
 
 interface Accumulator {
   runs: number;
+  /** execuções medidas (`measure <> 'none'`): é delas que `tokens` vem; 0 = tokens "não medido" */
   measuredRuns: number;
+  /** execuções com `cost_usd`: é delas que `costUsd` vem; 0 = custo "não medido" (ver MEASURED_SUMS) */
+  costedRuns: number;
   durationMs: number;
   tokens: number;
   costUsd: number;
@@ -147,13 +152,14 @@ interface Accumulator {
 }
 
 function newAcc(): Accumulator {
-  return { runs: 0, measuredRuns: 0, durationMs: 0, tokens: 0, costUsd: 0, calls: 0, estimatedRuns: 0, costEstimatedUsd: 0 };
+  return { runs: 0, measuredRuns: 0, costedRuns: 0, durationMs: 0, tokens: 0, costUsd: 0, calls: 0, estimatedRuns: 0, costEstimatedUsd: 0 };
 }
 
 function bump(map: Map<string, Accumulator>, label: string, patch: Partial<Accumulator>): void {
   const acc = map.get(label) ?? newAcc();
   acc.runs += patch.runs ?? 0;
   acc.measuredRuns += patch.measuredRuns ?? 0;
+  acc.costedRuns += patch.costedRuns ?? 0;
   acc.durationMs += patch.durationMs ?? 0;
   acc.tokens += patch.tokens ?? 0;
   acc.costUsd += patch.costUsd ?? 0;
@@ -215,18 +221,30 @@ function hasDimensionFilter(q: MetricsQuery): boolean {
   return !!(q.phase || q.cardType || q.model || q.tool || q.workflow);
 }
 
-/** Linhas do detalhe (meses ainda em `ai_runs`), agrupadas por `phase`/`card_type`/`model`/`tool`, ou um total só. */
+/**
+ * Medida e custo são critérios separados, os mesmos de `totalsFromDetail` (rollup.ts) e do arquivo
+ * mensal: a execução é medida quando `measure <> 'none'` (os tokens dela contam) e tem custo quando
+ * `cost_usd` não é nulo. Os dois divergem de verdade: o preço por milhão nasce vazio no catálogo, então
+ * uma execução medida costuma ter tokens e custo nulo — e os tokens dela não podem sumir por isso.
+ */
+const MEASURED_SUMS = `SUM(CASE WHEN measure <> 'none' THEN 1 ELSE 0 END) AS measured,
+            SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS costed`;
+const TOKENS_SUM = `SUM(CASE WHEN measure <> 'none'
+              THEN COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)
+              ELSE 0 END)`;
+
+/** Linhas do detalhe (meses ainda em `ai_runs`), agrupadas por uma das seis colunas de `ai_runs`, ou um total só. */
 function detailByRunColumn(db: Database, boardId: string, q: MetricsQuery, column: string | null): Map<string, Accumulator> {
   const { sql: where, params } = runsWhere(boardId, q);
   const select = column
     ? `SELECT ${column} AS label, COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
-              SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS measured,
-              SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)) AS tok,
+              ${MEASURED_SUMS},
+              ${TOKENS_SUM} AS tok,
               SUM(COALESCE(cost_usd,0)) AS cost
        FROM ai_runs WHERE ${where} GROUP BY ${column}`
     : `SELECT COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
-              SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS measured,
-              SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)) AS tok,
+              ${MEASURED_SUMS},
+              ${TOKENS_SUM} AS tok,
               SUM(COALESCE(cost_usd,0)) AS cost
        FROM ai_runs WHERE ${where}`;
   const map = new Map<string, Accumulator>();
@@ -234,7 +252,14 @@ function detailByRunColumn(db: Database, boardId: string, q: MetricsQuery, colum
     const label = column ? str(r.label) : 'total';
     const n = num(r.n);
     if (n === 0) continue;
-    bump(map, label, { runs: n, measuredRuns: num(r.measured), durationMs: num(r.ms), tokens: num(r.tok), costUsd: num(r.cost) });
+    bump(map, label, {
+      runs: n,
+      measuredRuns: num(r.measured),
+      costedRuns: num(r.costed),
+      durationMs: num(r.ms),
+      tokens: num(r.tok),
+      costUsd: num(r.cost),
+    });
   }
   return map;
 }
@@ -264,8 +289,8 @@ function detailByCard(db: Database, boardId: string, q: MetricsQuery): Map<strin
   const rows = all(
     db,
     `SELECT card_number, MAX(started_at) AS last, card_title, COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
-            SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS measured,
-            SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)) AS tok,
+            ${MEASURED_SUMS},
+            ${TOKENS_SUM} AS tok,
             SUM(COALESCE(cost_usd,0)) AS cost, ${ESTIMATED_SUMS}
      FROM ai_runs WHERE ${where} GROUP BY card_number`,
     params,
@@ -276,6 +301,7 @@ function detailByCard(db: Database, boardId: string, q: MetricsQuery): Map<strin
     bump(map, label, {
       runs: num(r.n),
       measuredRuns: num(r.measured),
+      costedRuns: num(r.costed),
       durationMs: num(r.ms),
       tokens: num(r.tok),
       costUsd: num(r.cost),
@@ -306,11 +332,12 @@ function detailByInventory(db: Database, boardId: string, q: MetricsQuery, kind:
  * Totais de um mês arquivado para uma das seis dimensões que `log_months` guarda (ou '' = total): as
  * três métricas numa consulta só. `runs` dá a contagem e a duração; `tokens` e `cost`, as somas.
  *
- * `measuredRuns` sai do `n` de `cost` (execuções com custo), o mesmo critério do detalhe
- * (`cost_usd IS NOT NULL` em `detailByRunColumn`): é o que faz o número ser o mesmo antes e depois de
- * consolidar (RF-08). Valor sem linha de `cost` fica com `measuredRuns` 0 e sai como "não medido"
- * (null) em `toRow`, nunca como zero (RF-09, RF-30) — inclusive o mês consolidado antes de #71, que só
- * tem `runs`.
+ * Cada métrica leva o seu `n`: `measuredRuns` sai do `n` de `tokens` (execuções medidas) e `costedRuns`
+ * do `n` de `cost` (execuções com custo) — os mesmos critérios do detalhe (MEASURED_SUMS), que é o que
+ * faz o número ser o mesmo antes e depois de consolidar (RF-08). Métrica sem linha no arquivo fica com
+ * o seu `n` em 0 e sai como "não medido" (null) em `toRow`, nunca como zero (RF-09, RF-30) — inclusive
+ * o mês consolidado antes de #71, que só tem `runs`, e o mês medido sem preço no catálogo, que tem
+ * `tokens` e não tem `cost`.
  */
 function archiveByDim(db: Database, boardId: string, month: string, dim: string): Map<string, Accumulator> {
   const rows = all(
@@ -330,8 +357,8 @@ function archiveByDim(db: Database, boardId: string, month: string, dim: string)
  */
 function bumpArchiveRow(map: Map<string, Accumulator>, label: string, metric: string, n: number, total: number): void {
   if (metric === 'runs') bump(map, label, { runs: n, durationMs: total });
-  else if (metric === 'tokens') bump(map, label, { tokens: total });
-  else bump(map, label, { measuredRuns: n, costUsd: total });
+  else if (metric === 'tokens') bump(map, label, { measuredRuns: n, tokens: total });
+  else bump(map, label, { costedRuns: n, costUsd: total });
 }
 
 function merge(into: Map<string, Accumulator>, from: Map<string, Accumulator>): void {
@@ -375,7 +402,7 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
   if (dim === 'card') acc = detailByCard(db, boardId, query);
   else if (inventoryKind) acc = detailByInventory(db, boardId, query, inventoryKind);
   else {
-    // aqui `dim` já não é `card` nem de inventário: sobram as quatro colunas de `ai_runs`
+    // aqui `dim` já não é `card` nem de inventário: sobram as seis colunas de `ai_runs` (RUN_COLUMN), ou o total
     const column = dim ? RUN_COLUMN[dim as keyof typeof RUN_COLUMN] : null;
     acc = detailByRunColumn(db, boardId, query, column);
     // meses arquivados só entram quando a dimensão existe em log_months e não há outro filtro (RF-05)
@@ -407,7 +434,7 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
           runs: a.runs,
           durationMs: a.durationMs,
           tokens: a.measuredRuns > 0 ? a.tokens : null,
-          costUsd: a.measuredRuns > 0 ? a.costUsd : null,
+          costUsd: a.costedRuns > 0 ? a.costUsd : null,
         };
   const rows = head.map(([label, a]) => toRow(label, a));
   const allGroups = [...acc.values()];
@@ -416,6 +443,7 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
     for (const [, a] of tail) {
       other.runs += a.runs;
       other.measuredRuns += a.measuredRuns;
+      other.costedRuns += a.costedRuns;
       other.durationMs += a.durationMs;
       other.tokens += a.tokens;
       other.costUsd += a.costUsd;
@@ -426,9 +454,10 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
 
   const boardRow = all(db, 'SELECT log_since FROM boards WHERE id = ?', [boardId])[0];
   const logSinceMs = boardRow ? num(boardRow.log_since) : 0;
-  // parcial quando alguma execução do recorte entrou na contagem sem ter custo medido — inclusive as
-  // que vieram de mês arquivado, que nunca têm (ver cabeçalho do arquivo)
-  const costPartial = !isInventory && allGroups.some((a) => a.runs > a.measuredRuns);
+  // parcial quando alguma execução do recorte entrou na contagem sem custo (sem preço no catálogo, sem
+  // medição, ou mês consolidado antes de #71) — e, à parte, sem tokens (sem medição)
+  const costPartial = !isInventory && allGroups.some((a) => a.runs > a.costedRuns);
+  const tokensPartial = !isInventory && allGroups.some((a) => a.runs > a.measuredRuns);
 
   return {
     rows,
@@ -438,6 +467,7 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
     archivedMonths,
     partialMonths,
     costPartial,
+    tokensPartial,
   };
 }
 
@@ -953,7 +983,7 @@ function panelCell(value: string, a: Accumulator): MetricsCell {
     measuredRuns: a.measuredRuns,
     durationMs: a.durationMs,
     tokens: a.measuredRuns > 0 ? a.tokens : null,
-    costUsd: a.measuredRuns > 0 ? a.costUsd : null,
+    costUsd: a.costedRuns > 0 ? a.costUsd : null,
     costEstimatedUsd: a.estimatedRuns > 0 ? a.costEstimatedUsd : null,
   };
 }
@@ -994,7 +1024,7 @@ function panelArchiveDims(db: Database, boardId: string, months: string[]): Map<
   }
   for (const map of out.values())
     for (const a of map.values()) {
-      a.estimatedRuns = a.measuredRuns;
+      a.estimatedRuns = a.costedRuns;
       a.costEstimatedUsd = a.costUsd;
     }
   return out;
@@ -1015,8 +1045,8 @@ function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archive
     db,
     `SELECT workflow, phase, card_type, model, tool, effort, profile,
             COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
-            SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS measured,
-            SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)) AS tok,
+            ${MEASURED_SUMS},
+            ${TOKENS_SUM} AS tok,
             SUM(COALESCE(cost_usd,0)) AS cost, ${ESTIMATED_SUMS}
      FROM ai_runs WHERE ${where}
      GROUP BY workflow, phase, card_type, model, tool, effort, profile`,
@@ -1025,6 +1055,7 @@ function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archive
     const patch: Partial<Accumulator> = {
       runs: num(r.n),
       measuredRuns: num(r.measured),
+      costedRuns: num(r.costed),
       durationMs: num(r.ms),
       tokens: num(r.tok),
       costUsd: num(r.cost),

@@ -63,7 +63,7 @@ function run(startedAt: number, durationMs: number, opts: RunOpts = {}): string 
   runs.finish(id, 'done', 0);
   if (opts.tokens !== undefined || opts.costUsd !== undefined)
     db.run(
-      'UPDATE ai_runs SET input_tokens = ?, output_tokens = 0, cache_read_tokens = 0, cache_write_tokens = 0, cost_usd = ? WHERE id = ?',
+      "UPDATE ai_runs SET input_tokens = ?, output_tokens = 0, cache_read_tokens = 0, cache_write_tokens = 0, cost_usd = ?, measure = 'full' WHERE id = ?",
       [opts.tokens ?? 0, opts.costUsd ?? 0, id],
     );
   vi.setSystemTime(TODAY);

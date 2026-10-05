@@ -9,6 +9,7 @@ const BASE: MetricsResult = {
   archivedMonths: [],
   partialMonths: [],
   costPartial: false,
+  tokensPartial: false,
 };
 
 describe('formatMetrics', () => {

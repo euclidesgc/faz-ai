@@ -67,8 +67,16 @@ function formatCoverage(result: MetricsResult): string {
   if (result.partialMonths.length)
     lines.push(`recorte parcial de mês consolidado (valor do mês inteiro): ${result.partialMonths.join(', ')}`);
   if (result.othersCount > 0) lines.push(`"outros" soma ${result.othersCount} grupo(s) fora do limite`);
-  if (result.costPartial) lines.push('custo e tokens são estimados e parciais: parte das execuções do recorte não tem consumo medido');
-  else if (result.rows.some((r) => r.costUsd != null)) lines.push('custo estimado');
+  // tokens e custo têm cada um a sua cobertura: execução medida sem preço no catálogo tem tokens e não tem custo
+  if (result.tokensPartial) lines.push('tokens parciais: parte das execuções do recorte não tem consumo medido');
+  const hasCost = result.rows.some((r) => r.costUsd != null);
+  if (result.costPartial)
+    lines.push(
+      hasCost
+        ? 'custo estimado e parcial: parte das execuções do recorte não tem custo medido'
+        : 'custo não medido: nenhuma execução do recorte tem custo (sem preço no catálogo ou sem medição)',
+    );
+  else if (hasCost) lines.push('custo estimado');
   return lines.join('\n');
 }
 

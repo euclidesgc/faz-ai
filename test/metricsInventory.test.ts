@@ -57,7 +57,7 @@ function run(startedAt: number, inventory: [InventoryKind, string, number][], to
   runs.finish(id, 'done', 0);
   if (tokens !== undefined)
     db.run(
-      'UPDATE ai_runs SET input_tokens = ?, output_tokens = 0, cache_read_tokens = 0, cache_write_tokens = 0, cost_usd = ? WHERE id = ?',
+      "UPDATE ai_runs SET input_tokens = ?, output_tokens = 0, cache_read_tokens = 0, cache_write_tokens = 0, cost_usd = ?, measure = 'full' WHERE id = ?",
       [tokens, costUsd ?? 0, id],
     );
   for (const [kind, name, calls] of inventory)
