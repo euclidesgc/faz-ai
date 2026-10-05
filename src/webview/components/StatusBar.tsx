@@ -9,7 +9,7 @@ import { t } from '../i18n';
 import { ai, cards } from '../commands';
 import { renderMarkdown } from './MarkdownEditor';
 import { TextArea } from '@radix-ui/themes';
-import { Button, IconAi, IconHuman, IconRun, SelectField } from './ui';
+import { Button, IconAi, IconHuman, IconRun, IconSuggest, SelectField } from './ui';
 
 /** O Select do Radix não aceita valor vazio: "sem status" usa este. */
 const NO_STATUS = '__none';
@@ -96,17 +96,37 @@ export function StatusBar({ card }: { card: Card }) {
             <span className="spinner" /> {t('Parar a IA')}
           </Button>
         ) : (
-          <Button
-            disabled={!!state.aiRunUnsupported}
-            title={
-              state.aiRunUnsupported
-                ? t(state.aiRunUnsupported)
-                : t('Roda o {tool} em segundo plano para trabalhar neste card. A resposta chega na conversa.', { tool: toolLabel })
-            }
-            onClick={() => ai.run(card.id)}
-          >
-            <IconRun /> {t('Chamar IA')}
-          </Button>
+          <>
+            <Button
+              disabled={!!state.aiRunUnsupported}
+              title={
+                state.aiRunUnsupported
+                  ? t(state.aiRunUnsupported)
+                  : t(
+                      'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está (o que a coluna pede) e passar a vez: pedir revisão, perguntar ou mover. A resposta chega na conversa.',
+                      { tool: toolLabel },
+                    )
+              }
+              onClick={() => ai.run(card.id)}
+            >
+              <IconRun /> {t('Trabalhar na fase')}
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={!!state.aiRunUnsupported}
+              title={
+                state.aiRunUnsupported
+                  ? t(state.aiRunUnsupported)
+                  : t(
+                      'O {tool} deixa o card claro e completo: reescreve título e descrição, preenche Tags, Esforço, Modelo e Skills e sugere o checklist. Não trabalha a fase, não move o card e não mexe em arquivos; o resumo do que mudou chega na conversa.',
+                      { tool: toolLabel },
+                    )
+              }
+              onClick={() => ai.refine(card.id)}
+            >
+              <IconSuggest /> {t('Refinar com IA')}
+            </Button>
+          </>
         )}
         {card.status !== 'blocked' && (
           <Button

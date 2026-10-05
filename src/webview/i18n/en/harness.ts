@@ -271,8 +271,8 @@ export const harness: Record<string, string> = {
   // --- RunnerSettings
   'Execução pela conversa e heartbeat': 'Run from chat and heartbeat',
   'Começa uma rodada agora, mesmo com o heartbeat desligado': 'Starts a round now, even with the heartbeat off',
-  'O botão "Chamar IA" da conversa de um card roda o {tool} em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ele pode fazer nessas execuções. O {tool} precisa estar instalado e autenticado nesta máquina{suffix}.':
-    'The "Call AI" button in a card\'s conversation runs {tool} in the background in this folder, with nobody approving each step. Here you set what it can do in those runs. {tool} must be installed and signed in on this machine{suffix}.',
+  'O botão "Trabalhar na fase" de um card roda o {tool} em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ele pode fazer nessas execuções ("Refinar com IA" roda sempre só com o board). O {tool} precisa estar instalado e autenticado nesta máquina{suffix}.':
+    'A card\'s "Work on the phase" button runs {tool} in the background in this folder, with nobody approving each step. Here you set what it can do in those runs ("Refine with AI" always runs with the board only). {tool} must be installed and signed in on this machine{suffix}.',
   '; o board é entregue a ele em cada execução, sem depender do botão acima':
     '; the board is handed to it on every run, without depending on the button above',
   ', e o servidor do board conectado (botão acima)': ', and the board server connected (button above)',

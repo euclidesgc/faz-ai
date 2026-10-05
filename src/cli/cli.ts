@@ -133,7 +133,7 @@ async function main(): Promise<void> {
           ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.`
           : message;
       },
-      runAi: (cardId) => runner.start(cardId),
+      runAi: (cardId, mode) => runner.start(cardId, 'manual', mode),
       stopAi: (cardId) => runner.stop(cardId),
       pauseAutopilot: () => host.autopilot.pause(),
       resumeAutopilot: () => host.autopilot.resume(),

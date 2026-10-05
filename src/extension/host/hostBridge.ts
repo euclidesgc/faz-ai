@@ -4,6 +4,7 @@ import { fetchSource, parseSource } from '../skillInstall';
 import { MAX_ATTACHMENT_BYTES } from '../attachments';
 import { parseExportFile, type ImportResult } from '../db/boardExport';
 import type { HostToWebview, WebviewToHost } from '../../shared/messages';
+import type { AiRunMode } from '../../shared/runner';
 import type { ViewStateStore } from '../viewState';
 import type { MessageRouter } from '../panel/messageRouter';
 
@@ -14,7 +15,7 @@ export interface HostEnv {
   showFilters(): unknown;
   /** registra o servidor MCP do board na ferramenta de IA do projeto; o texto devolvido vira um aviso na interface */
   connectAI(): unknown;
-  runAi(cardId: string): unknown;
+  runAi(cardId: string, mode?: AiRunMode): unknown;
   stopAi(cardId: string): unknown;
   /** pausa o autopiloto das histórias em modo autônomo */
   pauseAutopilot(): unknown;
@@ -121,7 +122,7 @@ export class HostBridge {
           await this.env.openInBrowser?.();
           return;
         case 'ai.run':
-          await this.env.runAi(msg.cardId);
+          await this.env.runAi(msg.cardId, msg.mode);
           return;
         case 'ai.stop':
           await this.env.stopAi(msg.cardId);

@@ -3,7 +3,7 @@ import { aiToolInfo } from '../shared/harness';
 import type { AiRunOrigin, AiRunOutcome, RunReport } from '../shared/log';
 import { columnOf, isLive } from '../shared/selectors';
 import { isYolo } from '../shared/story';
-import type { RunnerPermission } from '../shared/runner';
+import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
 import { MeasureBrokenError } from './aiOutput/errors';
@@ -58,6 +58,7 @@ interface Run {
   timedOut: boolean;
   /** últimas linhas que a ferramenta escreveu, para explicar uma falha no próprio card */
   tail: string[];
+  mode: AiRunMode;
 }
 
 const RUNNER_AUTHOR = 'Faz AI';
@@ -128,6 +129,34 @@ export const AUTONOMOUS_ADVICE = [
 export const TRIAGE_ADVICE =
   'Os campos Tags, Esforço da atividade, Modelo e Skills deste card estão todos vazios: antes do trabalho da fase, leia a descrição do card e decida um valor para cada um. Use o catálogo de skills e as regras de modelo em `get_board`/`get_harness`/`get_models` como apoio, mas a decisão final é sua — diverja da sugestão quando a descrição pedir algo diferente. Aplique os quatro campos com `update_card` (fields) e crie com `add_checklist_item` os passos de trabalho que a descrição pede. Registre na conversa do card, com `add_comment`, os valores escolhidos e por quê.';
 
+/** Linha das skills obrigatórias do card: vão pelo caminho e valem mesmo desligadas ou fora da invocação automática. */
+const skillsLine = (skills: { name: string; path?: string }[]): string[] =>
+  skills.some((k) => k.path)
+    ? [
+        `Antes de começar, leia estas skills, obrigatórias para este card: ${skills
+          .filter((k) => k.path)
+          .map((k) => `${k.name} (${k.path})`)
+          .join('; ')}.`,
+      ]
+    : [];
+
+/**
+ * O que a IA recebe no "Refinar com IA": deixar o card claro e completo para quem vai trabalhar nele,
+ * sem fazer o trabalho da fase. O executor devolve o card ao status que tinha quando ela termina.
+ */
+export const refinePrompt = (ref: string, skills: { name: string; path?: string }[] = []): string =>
+  [
+    `Refine o card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Refinar é deixar o card claro e completo para quem vai trabalhar nele; NÃO é fazer o trabalho da fase.`,
+    ...skillsLine(skills),
+    'Leia o card com get_card (descrição, conversa, anexos e campos) e, como apoio, get_board, get_harness e get_models (tipos, campos, catálogos de skills e de modelos). Pode ler o projeto para entender o contexto.',
+    '1. Título e descrição: reescreva com update_card para ficarem claros e objetivos, mantendo a intenção e tudo o que a pessoa escreveu. Não invente requisito: o que estiver ambíguo vira uma lista "Dúvidas em aberto" no fim da descrição. Se o texto já estiver bom, não mexa.',
+    '2. Campos: revise Tags, Esforço da atividade, Modelo e Skills e aplique com update_card (fields), mesmo que já tenham valor; mantenha o que fizer sentido.',
+    '3. Checklist: acrescente com add_checklist_item os passos que faltam para concluir o card, sem repetir os que já existem.',
+    '4. Termine com add_comment na conversa do card, resumindo o que mudou e por quê. Se reescreveu a descrição, inclua o texto anterior, para a pessoa poder voltar a ele.',
+    'Não faça o trabalho da fase: não crie sub-tarefas nem anexos, não mova o card e não mude o status (sem start_work, move_card, request_review, ask_question nem block_card). Não altere arquivos do projeto nem rode comandos.',
+    'Trabalhe só neste card. Ninguém está acompanhando esta sessão.',
+  ].join('\n');
+
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
 export const cardPrompt = (
   ref: string,
@@ -138,15 +167,7 @@ export const cardPrompt = (
 ): string =>
   [
     `Trabalhe no card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai".`,
-    // as skills do card vão pelo caminho: valem mesmo desligadas ou fora da invocação automática
-    ...(skills.some((k) => k.path)
-      ? [
-          `Antes de começar, leia estas skills, obrigatórias para este card: ${skills
-            .filter((k) => k.path)
-            .map((k) => `${k.name} (${k.path})`)
-            .join('; ')}.`,
-        ]
-      : []),
+    ...skillsLine(skills),
     'Se a skill "faz-ai-fluxo" existir no projeto, siga-a.',
     `Leia o card com get_card (descrição, conversa, anexos e a fase em \`phase\`). Se a última mensagem da conversa for da pessoa, responda a ela pela conversa do card.`,
     ...(triage ? [TRIAGE_ADVICE] : []),
@@ -182,8 +203,11 @@ export class AiRunner {
     return this.runs.get(cardId)?.logId || null;
   }
 
-  /** Inicia a execução. Lança erro se não for possível começar; o resultado aparece no status e na conversa do card. */
-  start(cardId: string, origin: AiRunOrigin = 'manual'): void {
+  /**
+   * Inicia a execução. Lança erro se não for possível começar; o resultado aparece no status e na
+   * conversa do card. `mode` escolhe entre trabalhar a fase (o padrão) e só refinar o card.
+   */
+  start(cardId: string, origin: AiRunOrigin = 'manual', mode: AiRunMode = 'phase'): void {
     const state = this.router.snapshot();
     const card = state.cards.find((c) => c.id === cardId);
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
@@ -211,9 +235,15 @@ export class AiRunner {
     try {
       const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '');
       // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo
-      const autonomous = isYolo(state, card);
-      const permission = autonomous ? 'full' : state.board.runner.permission;
-      const permissionAdvice = PERMISSION_ADVICE[permission];
+      const refine = mode === 'refine';
+      const autonomous = !refine && isYolo(state, card);
+      // refinar não mexe em arquivos: roda só com o board, salvo na ferramenta que não tem esse nível (aí o pedido proíbe)
+      const permission = autonomous
+        ? 'full'
+        : refine && !headlessUnsupported(state.board.aiTool, 'board')
+          ? 'board'
+          : state.board.runner.permission;
+      const permissionAdvice = refine ? null : PERMISSION_ADVICE[permission];
       // a ferramenta sem suporte para esta permissão nem começa: confere antes de gravar a configuração
       const unsupported = headlessUnsupported(state.board.aiTool, permission);
       if (unsupported) throw new Error(unsupported);
@@ -233,6 +263,7 @@ export class AiRunner {
       const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
       const messagesBefore = this.aiMessages(cardId);
       if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
+      if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
       if (plan.manifest.profile || plan.manifest.model) log(plan.summary.join(' | '));
       const tail: string[] = [];
       // quantos processos a execução abriu (2 = a CLI recusou a saída estruturada e o trabalho rodou
@@ -252,13 +283,15 @@ export class AiRunner {
       const { proc, report } = spawnMeasured(
         state.board.aiTool,
         {
-          prompt: cardPrompt(
-            cardRef(card),
-            requiredSkills(state, card),
-            [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
-            autonomous,
-            needsTriage(state, card),
-          ),
+          prompt: refine
+            ? refinePrompt(cardRef(card), requiredSkills(state, card))
+            : cardPrompt(
+                cardRef(card),
+                requiredSkills(state, card),
+                [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+                autonomous,
+                needsTriage(state, card),
+              ),
           permission,
           addDirs: this.router.aiWorkDirs(),
           exec: plan.input,
@@ -280,6 +313,7 @@ export class AiRunner {
       const run: Run = {
         proc,
         previous: card.status,
+        mode,
         logId,
         stopped: false,
         timedOut: false,
@@ -376,6 +410,12 @@ export class AiRunner {
       );
     if (error) return this.block(cardId, `Não foi possível executar o ${toolLabel}: ${error.message}`);
     if (code !== 0) return this.block(cardId, `O ${toolLabel} terminou com erro (código ${code}).${output}`);
+    // refinar não passa a vez: o card volta ao status que tinha, com o resumo na conversa
+    if (run.mode === 'refine')
+      return void this.router.handle(
+        { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
+        { author: RUNNER_AUTHOR },
+      );
     // em modo autônomo não há pessoa para esperar: o card volta para a IA seguir (o autopiloto limita as voltas sem progresso)
     if (replied && isYolo(this.router.snapshot(), card)) return this.setStatus(cardId, 'ready', toolLabel);
     // respondeu na conversa e encerrou: a vez é da pessoa

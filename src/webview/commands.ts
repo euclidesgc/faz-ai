@@ -40,6 +40,7 @@ export const chat = {
 
 export const ai = {
   run: (cardId: Id) => post({ type: 'ai.run', cardId }),
+  refine: (cardId: Id) => post({ type: 'ai.run', cardId, mode: 'refine' }),
   stop: (cardId: Id) => post({ type: 'ai.stop', cardId }),
   runHeartbeat: () => post({ type: 'ai.heartbeat.run' }),
   pauseAutopilot: () => post({ type: 'ai.autopilot.pause' }),

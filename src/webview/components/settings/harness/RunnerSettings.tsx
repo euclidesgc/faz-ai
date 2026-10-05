@@ -32,7 +32,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
         }
       >
         {t(
-          'O botão "Chamar IA" da conversa de um card roda o {tool} em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ele pode fazer nessas execuções. O {tool} precisa estar instalado e autenticado nesta máquina{suffix}.',
+          'O botão "Trabalhar na fase" de um card roda o {tool} em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ele pode fazer nessas execuções ("Refinar com IA" roda sempre só com o board). O {tool} precisa estar instalado e autenticado nesta máquina{suffix}.',
           {
             tool: tool.label,
             suffix:

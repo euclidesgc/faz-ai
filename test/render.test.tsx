@@ -153,7 +153,7 @@ describe('telas montam sem erro', () => {
       state: { ...st, aiRuns: [storyId], comments: st.comments.map((c) => ({ ...c, body: `veja ![tela](attachment:${image.filename})` })) },
     });
     const talking = html(<CommentsTab cardId={storyId} />);
-    for (const text of ['Chamar IA', 'está trabalhando neste card', 'Parar', `src="https://anexos/${storyId}/${image.storedName}"`])
+    for (const text of ['Trabalhar na fase', 'está trabalhando neste card', 'Parar', `src="https://anexos/${storyId}/${image.storedName}"`])
       expect(talking).toContain(text);
     useBoardStore.setState({ state: { ...st, aiRunUnsupported: 'Sem suporte' } });
     expect(html(<CommentsTab cardId={storyId} />)).toContain('não está disponível');

@@ -7,6 +7,15 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **"Chamar IA" became two buttons, each with one job.**
+  - **Trabalhar na fase** (work on the phase) is the old Chamar IA, named after what it does: the
+    work of the column the card is in (in Implementação, code), until it hands over.
+  - **Refinar com IA** (refine with AI) is new: rewrites the title and description clearly, reviews
+    Tags, Esforço da atividade, Modelo and Skills and completes the checklist, without working on the
+    phase, moving the card or touching files (it always runs with the board only). The summary of
+    what changed stays in the conversation, with the previous description, and the card returns to
+    the status it had.
+
 - **Cursor fast modes.** In Configurações → Modelos de IA (Settings → AI models), the Cursor card got
   the **Incluir os modos rápidos** (include fast modes) switch, off by default. When on, the fast
   version of each model (it answers sooner and charges more for the same tokens) enters the catalog

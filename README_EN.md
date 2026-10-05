@@ -73,8 +73,8 @@ In five minutes you have a task moving on the board, with the AI working on it.
 3. **Create the task.** In the **Backlog** column, click **+ Novo card** (new card), type the title
    (for example, "Login with Google") and press Enter. Double-click opens the card: describe what
    you want, in Markdown, and optionally pick the AI model and the skills it must read.
-4. **Let the AI start.** Drag the card to **Discovery** and click **Chamar IA** (call AI) on the
-   card. The AI reads the card through the board, analyzes the problem and talks with you in the
+4. **Let the AI start.** Drag the card to **Discovery** and click **Trabalhar na fase** (work on the
+   phase) on the card. The AI reads the card through the board, analyzes the problem and talks with you in the
    **Conversa** (conversation) tab. When it finishes, the status changes to **Aguardando
    revisão** (waiting for review): it is your turn.
 5. **Review and move on.** Read the phase document, answer, or click **Aprovar** (approve) or
@@ -279,14 +279,28 @@ project.
 The chat uses the same background run as the cards, so the limit under Configurações → Harness de
 IA → "O que a IA pode fazer" applies (by default, the board only), and so does the time limit there.
 
-### Calling the AI from the conversation
+### Work on the phase and Refine with AI
 
-In any card's conversation, **Chamar IA** (call AI) runs the project's tool in the background to
-read the conversation and work on that card. It is not a live chat: the answer arrives as a message
-in the conversation when the run ends, and meanwhile the card shows "Em execução" (with a **Parar**
-button to stop it). Images pasted into the message become card attachments and the AI receives them.
+A card has two buttons that run the project's tool in the background. It is not a live chat: the
+answer arrives as a message in the conversation when the run ends, and meanwhile the card shows "Em
+execução" (with a **Parar** button to stop it).
 
-The button is also in the card header, next to the status.
+- **Trabalhar na fase** (work on the phase) does the work of the column the card is in, the same as
+  the heartbeat would: in Discovery it analyzes the problem, in PRD it writes the PRD, in
+  Implementação it writes the code (if the permission allows). It reads the conversation and answers
+  it, and ends by handing over: asks for review, asks a question, blocks or moves the card. If Tags,
+  Esforço da atividade, Modelo and Skills are all empty, it fills them first. It is in the card
+  header and in the conversation (with text typed, **Enviar e trabalhar na fase** sends the message
+  first).
+- **Refinar com IA** (refine with AI) only makes the card clear and complete for whoever will work
+  on it: rewrites the title and description (without inventing requirements; whatever is ambiguous
+  becomes a "Dúvidas em aberto" list), reviews Tags, Esforço da atividade, Modelo and Skills even if
+  they already have a value, and adds the missing steps to the checklist. It does not work on the
+  phase, create sub-tasks, move the card or touch files: it always runs with the board only. At the
+  end it summarizes in the conversation what changed (with the previous description, if it rewrote
+  it) and the card returns to the status it had.
+
+Images pasted into the message become card attachments and the AI receives them.
 
 - What the AI may do in these runs is set in Configurações → Harness de IA → **Execução pela
   conversa**: only the board (default), the board and project files, or no restrictions. The level
@@ -519,7 +533,7 @@ memory and CPU while several AI sessions, tests and builds run together.
 - The **heart** at the top right of the board shows the heartbeat: red and beating while it is
   running; grey and still when it is off or cannot run (no connection to Faz AI, or no tool).
   Clicking it turns the heartbeat on and off.
-- Runs use the same permission and time limit as the "Chamar IA" button.
+- Runs use the same permission and time limit as the "Trabalhar na fase" button.
 
 Which columns require approval, and in which ones the AI works, is set in Configurações → Workflows
 e colunas. You can always move any card yourself without approval.
@@ -588,7 +602,7 @@ To configure without knowing every skill or tool:
 - **Tool subagent**: optional, an agent file of the tool itself (for example
   `.claude/agents/reviewer.md`) to drive the session.
 
-Each run started by the board ("Chamar IA" and the heartbeat) is a new session, with only what is
+Each run started by the board ("Trabalhar na fase", "Refinar com IA" and the heartbeat) is a new session, with only what is
 on the card. The agent becomes command-line parameters where the tool accepts them; the rest goes
 into the prompt, as instructions:
 

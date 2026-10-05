@@ -78,10 +78,10 @@ export const card: Record<string, string> = {
   'Permissão do {tool} ao ser chamado: {permission}.': '{tool} permission when called: {permission}.',
   Mudar: 'Change',
   Enviar: 'Send',
-  'Roda o {tool} em segundo plano para ler a conversa e trabalhar neste card. A resposta chega aqui, sem acompanhamento ao vivo.':
-    'Runs {tool} in the background to read the conversation and work on this card. The reply arrives here, with no live tracking.',
-  'Enviar e chamar IA': 'Send and call AI',
-  'Chamar IA': 'Call AI',
+  'Roda o {tool} em segundo plano para ler a conversa e fazer o trabalho da fase em que o card está. A resposta chega aqui, sem acompanhamento ao vivo.':
+    'Runs {tool} in the background to read the conversation and do the work of the phase the card is in. The reply arrives here, with no live tracking.',
+  'Enviar e trabalhar na fase': 'Send and work on the phase',
+  'Trabalhar na fase': 'Work on the phase',
   editado: 'edited',
   'Apagar esta mensagem?': 'Delete this message?',
   'Apagar a mensagem de {author}?': 'Delete the message from {author}?',

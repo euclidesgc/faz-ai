@@ -323,6 +323,29 @@ describe('executor da IA', () => {
     expect(card().statusReason).toContain('tempo limite');
   });
 
+  it('Refinar com IA: outro pedido, só com o board, sem modo autônomo, e o card volta ao status que tinha', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
+    router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_review' });
+    runner.start(storyId, 'manual', 'refine');
+    const command = procs[0]!.command;
+    expect(command.stdin).toContain('Refine o card #1');
+    expect(command.stdin).toContain('NÃO é fazer o trabalho da fase');
+    expect(command.stdin).not.toContain('Faça o trabalho da fase');
+    // mesmo com o board em "Sem restrições", refinar não mexe em arquivos
+    expect(command.args).toContain('dontAsk');
+    expect(card().status).toBe('running');
+    procs[0]!.exit(0);
+    // não passa a vez: sem resposta na conversa não é bloqueio, e o status volta ao de antes
+    expect(card().status).toBe('waiting_review');
+  });
+
+  it('Refinar com IA numa ferramenta que só roda sem restrições usa a permissão do board', () => {
+    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi', runner: { permission: 'full' } } });
+    runner.start(storyId, 'manual', 'refine');
+    expect(procs[0]!.command.command).toBe('kimi');
+    expect(procs[0]!.command.args.join(' ')).toContain('Não altere arquivos do projeto');
+  });
+
   it('parar devolve o card ao status anterior', () => {
     router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_review' });
     runner.start(storyId);

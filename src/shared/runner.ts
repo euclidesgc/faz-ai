@@ -3,6 +3,13 @@
 /** O que a IA pode fazer sem ninguém aprovando cada passo. */
 export type RunnerPermission = 'board' | 'edits' | 'full';
 
+/**
+ * O que a IA faz ao ser chamada para um card: `phase` trabalha a fase em que o card está (o que a
+ * coluna pede, até passar a vez); `refine` só deixa o card claro e completo (texto, campos,
+ * checklist), sem trabalhar a fase, sem mover e sem mexer em arquivos.
+ */
+export type AiRunMode = 'phase' | 'refine';
+
 export interface RunnerConfig {
   permission: RunnerPermission;
   /** tempo máximo de uma execução, em minutos */
