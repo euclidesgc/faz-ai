@@ -50,6 +50,8 @@ export interface MeasuredDeps {
   log: (line: string) => void;
   /** catálogo de modelos do board, para estimar o custo quando a ferramenta não informa */
   catalog: ModelOption[];
+  /** a regra do board que soma a tarifa do Cursor (Cursor Token Rate) à estimativa dos modelos de terceiros */
+  cursorTokenRate?: boolean;
 }
 
 export interface Measured {
@@ -129,13 +131,14 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
   // o custo estimado sai do preço dos modelos DESTA ferramenta: o mesmo nome curto pode existir em duas
   const catalog = deps.catalog.filter((o) => o.tool === tool);
   const model = input.exec?.model?.name ?? null;
+  const cursorTokenRate = deps.cursorTokenRate ?? false;
 
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
   let current: RunningProcess | null = null;
   let killed = false;
   let done = false;
   /** o leitor da tentativa em curso; o `report()` é sempre o da última */
-  let reader: OutputReader = readerFor('text', { catalog, model });
+  let reader: OutputReader = readerFor('text', { catalog, model, cursorTokenRate });
   /** por que a medição não aconteceu, quando não aconteceu */
   let failure: MeasureError | null = null;
 
@@ -163,7 +166,7 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
     const { command, cleanup } = materialize(built);
     const format = command.format;
     // o leitor desta tentativa, preso nela: um pedaço atrasado da tentativa anterior não suja o seguinte
-    const read = readerFor(format, { catalog, model });
+    const read = readerFor(format, { catalog, model, cursorTokenRate });
     reader = read;
     // pediu estruturado e o builder devolveu texto: esta ferramenta não tem o modo (o Copilot)
     if (structured && format === 'text') failure ??= new MeasureUnsupportedError(label);

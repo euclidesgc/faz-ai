@@ -26,11 +26,33 @@ export function matchModel(catalog: ModelOption[], name: string): ModelOption | 
 }
 
 /**
+ * Tarifa do Cursor (Cursor Token Rate), em US$ por milhão de tokens, cobrada nos planos Teams e
+ * Enterprise por cima do preço de lista dos modelos de terceiros, em todos os tipos de token.
+ * https://cursor.com/help/models-and-usage/token-rate
+ */
+export const CURSOR_TOKEN_RATE = 0.25;
+
+/**
+ * Se a tarifa do Cursor incide sobre o modelo: só os de terceiros rodados pelo Cursor. Os modelos
+ * do próprio Cursor (Composer e Grok) são isentos, e o `auto` não tem modelo conhecido por pedido.
+ */
+export function cursorTokenRateApplies(model: ModelOption): boolean {
+  if (model.tool !== 'cursor') return false;
+  const m = model.model.toLowerCase();
+  return m !== 'auto' && !m.startsWith('composer') && !m.includes('grok');
+}
+
+export interface CostOptions {
+  /** a regra do board "Cursor Token Rate": soma `CURSOR_TOKEN_RATE` aos modelos de terceiros do Cursor */
+  cursorTokenRate?: boolean;
+}
+
+/**
  * Custo estimado em dólar dos tokens consumidos, por modelo, a partir do preço do catálogo.
  * `null` quando não há de onde estimar: nenhum modelo informado, ou **algum** dos modelos que
- * apareceram sem preço completo.
+ * apareceram sem preço completo (ou com preço variável).
  */
-export function costOf(catalog: ModelOption[], byModel: Map<string, AiRunTokens>): number | null {
+export function costOf(catalog: ModelOption[], byModel: Map<string, AiRunTokens>, options: CostOptions = {}): number | null {
   if (byModel.size === 0) return null;
   let totalUsd = 0;
   for (const [name, tokens] of byModel) {
@@ -38,12 +60,14 @@ export function costOf(catalog: ModelOption[], byModel: Map<string, AiRunTokens>
     const price = model ? modelPrice(model) : null;
     // um modelo sem preço completo anula a estimativa inteira: soma parcial parece um custo medido
     // e na verdade é menor que o real, então não há estimativa parcial — só "não medido" (null).
-    if (!price) return null;
+    if (!model || !price) return null;
+    // a tarifa é a mesma para os quatro tipos de token, então entra somada a cada preço
+    const rate = options.cursorTokenRate && cursorTokenRateApplies(model) ? CURSOR_TOKEN_RATE : 0;
     totalUsd +=
-      tokens.inputTokens * price.input +
-      tokens.outputTokens * price.output +
-      tokens.cacheReadTokens * price.cacheRead +
-      tokens.cacheWriteTokens * price.cacheWrite;
+      tokens.inputTokens * (price.input + rate) +
+      tokens.outputTokens * (price.output + rate) +
+      tokens.cacheReadTokens * (price.cacheRead + rate) +
+      tokens.cacheWriteTokens * (price.cacheWrite + rate);
   }
   return totalUsd / 1e6;
 }

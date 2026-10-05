@@ -320,6 +320,7 @@ export class AiRunner {
             if (tail.length > TAIL_LINES) tail.shift();
           },
           catalog: state.board.modelCatalog,
+          cursorTokenRate: state.board.rules.cursorTokenRate,
         },
       );
       const run: Run = {
