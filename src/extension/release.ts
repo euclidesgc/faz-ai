@@ -91,6 +91,8 @@ const AUTHOR = 'Faz AI';
  * no meio — mesma ressalva do `CLOSED_MARK` da detecção de merges.
  */
 const VERSION_MARK = 'saiu na versão';
+/** Marcador próprio, comentário HTML (invisível no markdown): detectar por ele não quebra se a frase for reescrita. Comentários antigos só têm a frase, e `VERSION_MARK` continua valendo para eles. */
+const VERSION_TAG = '<!-- faz-ai:saiu-na-versao -->';
 
 /**
  * Último passo do ciclo, na mesma rodada da detecção de merges (é o `afterRound` dela quem chama o
@@ -132,10 +134,10 @@ export class ReleaseWatcher {
     if (!targets.length) return; // sem candidato, nenhuma chamada de rede nem de git
 
     // melhor esforço: `git tag --contains` só vê as tags deste clone, e numa máquina que não publicou
-    // elas não existiriam. `--force` para não falhar com tag reescrita. Falhar aqui não impede nada:
+    // elas não existiriam. Sem `--force`: uma tag local nunca é sobrescrita por uma reescrita no remoto (o git recusa essa tag e traz as demais). Falhar aqui não impede nada:
     // a avaliação segue pelas tags que já estão presentes.
     try {
-      await this.deps.git(['fetch', '--tags', '--force'], this.deps.cwd);
+      await this.deps.git(['fetch', '--tags'], this.deps.cwd);
     } catch (e) {
       this.noteFailure(e instanceof Error ? e.message : String(e));
     }
@@ -210,14 +212,14 @@ export class ReleaseWatcher {
     if (!live) return;
     const ref = cardRef(live);
     try {
-      const told = s.comments.some((c) => c.cardId === live.id && c.body.includes(VERSION_MARK));
+      const told = s.comments.some((c) => (c.cardId === live.id && c.body.includes(VERSION_TAG)) || c.body.includes(VERSION_MARK));
       if (!told) {
         const where = url ? `${VERSION_MARK} ${tag} (${url}).` : `${VERSION_MARK} ${tag}.`;
         this.router.handle(
           {
             type: 'comment.add',
             cardId: live.id,
-            body: `Esta história ${where} O commit do merge (${live.mergeCommit.slice(0, 7)}) está contido nessa tag. Card arquivado pelo board.`,
+            body: `Esta história ${where} O commit do merge (${live.mergeCommit.slice(0, 7)}) está contido nessa tag. Card arquivado pelo board.\n\n${VERSION_TAG}`,
           },
           { author: AUTHOR, source: 'ai' },
         );

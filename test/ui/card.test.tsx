@@ -1,5 +1,5 @@
 import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, vi, beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
@@ -289,6 +289,17 @@ describe('CardDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'feat/login' }));
     expect(await navigator.clipboard.readText()).toBe('feat/login');
     expect(await screen.findByText('Nome copiado')).toBeInTheDocument();
+  });
+
+  it('copiar falhando: avisa e mostra o nome selecionável', async () => {
+    patchCard(board.storyId, { branch: 'feat/login' });
+    const user = userEvent.setup();
+    openCardDrawer(board.storyId);
+    const spy = vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('negado'));
+    await user.click(screen.getByRole('button', { name: 'feat/login' }));
+    expect(await screen.findByText(/Não foi possível copiar/)).toBeInTheDocument();
+    expect(screen.queryByText('Nome copiado')).toBeNull();
+    spy.mockRestore();
   });
 
   it('com git desligado não mostra a área de branch', () => {

@@ -182,7 +182,7 @@ describe('publishedVersion: qual versão levou a história (RF5)', () => {
 
 describe('ReleaseWatcher: a rodada que comenta a versão e arquiva o card', () => {
   const RELEASE_LIST = ['release', 'list', '--limit', '100', '--json', 'tagName,isDraft,isPrerelease,publishedAt'];
-  const FETCH = ['fetch', '--tags', '--force'];
+  const FETCH = ['fetch', '--tags'];
   const URL = 'https://github.com/acme/app/releases/tag/v0.32.0';
 
   let watcher: ReleaseWatcher;
@@ -371,6 +371,34 @@ describe('ReleaseWatcher: a rodada que comenta a versão e arquiva o card', () =
     // o link da release é memorizado por tag: uma consulta, não cinco
     expect(calls.filter((c) => c[2] === 'view')).toHaveLength(1);
     expect([1, 2, 3, 4, 5].every((n) => archived(n))).toBe(true);
+  });
+
+  it('o fetch não usa --force: tag local reescrita não é sobrescrita', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    await watcher.sweep();
+    const fetch = calls.find((c) => c[1] === 'fetch')!;
+    expect(fetch).not.toContain('--force');
+    expect(fetch).not.toContain('-f');
+  });
+
+  it('o comentário de versão leva um marcador próprio, invisível na tela', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    await watcher.sweep();
+    expect(comments(1).filter((c) => c.body.includes('<!-- faz-ai:saiu-na-versao -->'))).toHaveLength(1);
+  });
+
+  it('comentário antigo, só com a frase (sem marcador), conta como já comentado', async () => {
+    await call('create_card', { title: 'Publicada', column: 'Homologação' }); // #1
+    await merged(1);
+    router.handle(
+      { type: 'comment.add', cardId: card(1).id, body: 'Esta história saiu na versão v0.32.0. Card arquivado pelo board.' },
+      { author: 'Faz AI', source: 'ai' },
+    );
+    await watcher.sweep();
+    expect(comments(1).filter((c) => c.body.includes('saiu na versão'))).toHaveLength(1);
+    expect(archived(1)).toBe(true);
   });
 
   it('git fetch --tags falhando: a avaliação segue pelas tags locais (RF11)', async () => {

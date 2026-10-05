@@ -40,7 +40,7 @@ describe('HeartbeatButton', () => {
     setup(true);
     render(<HeartbeatButton offline={false} />);
     expect(heart()).toHaveClass('beating');
-    expect(heart()).toHaveAttribute('aria-pressed', 'true');
+    expect(heart()).not.toHaveAttribute('aria-pressed');
     expect(heart()).toHaveAttribute('title', expect.stringContaining('a cada 30 min'));
     await userEvent.click(heart());
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { heartbeat: false } });
@@ -51,7 +51,7 @@ describe('HeartbeatButton', () => {
     render(<HeartbeatButton offline={false} />);
     expect(heart()).toHaveClass('off');
     expect(heart()).not.toHaveClass('beating');
-    expect(heart()).toHaveAttribute('aria-pressed', 'false');
+    expect(heart()).not.toHaveAttribute('aria-pressed');
     await userEvent.click(heart());
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { heartbeat: true } });
   });
