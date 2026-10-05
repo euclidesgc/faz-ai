@@ -82,6 +82,19 @@ function cursorVersions(homeDir: string): string[] {
   }
 }
 
+/** As pastas `bin` das versões do Node instaladas pelo nvm, da mais nova para a mais antiga. */
+function nvmBins(homeDir: string): string[] {
+  const dir = path.join(homeDir, '.nvm', 'versions', 'node');
+  try {
+    return fs
+      .readdirSync(dir)
+      .sort(byVersionDesc)
+      .map((v) => path.join(dir, v, 'bin'));
+  } catch {
+    return [];
+  }
+}
+
 /** Onde os instaladores das ferramentas costumam deixar a CLI quando a pasta não está no PATH do editor. */
 function commonDirs(command: string, homeDir: string): string[] {
   const dirs = [
@@ -94,6 +107,16 @@ function commonDirs(command: string, homeDir: string): string[] {
   ];
   if (command === 'claude') dirs.unshift(path.join(homeDir, '.claude', 'local'));
   if (isWindows && process.env.APPDATA) dirs.push(path.join(process.env.APPDATA, 'npm'));
+  // o instalador do Cursor no Windows (PowerShell) deixa a CLI em %LOCALAPPDATA%\cursor-agent
+  if (isWindows && process.env.LOCALAPPDATA) dirs.push(path.join(process.env.LOCALAPPDATA, 'cursor-agent'));
+  // gerenciadores de versão do Node (o node e as CLIs instaladas pelo npm ficam neles)
+  dirs.push(
+    path.join(homeDir, '.volta', 'bin'),
+    path.join(homeDir, '.asdf', 'shims'),
+    path.join(homeDir, '.local', 'share', 'mise', 'shims'),
+    path.join(homeDir, '.local', 'share', 'fnm', 'aliases', 'default', 'bin'),
+    ...nvmBins(homeDir),
+  );
   return dirs;
 }
 

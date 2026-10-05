@@ -10,7 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { createBoardHost } from '../extension/host/boardHost';
 import { startMcpServer } from '../extension/mcp/server';
-import { socketPath, workspaceKey } from '../extension/mcp/socketPath';
+import { canonicalFolder, socketPath, workspaceKey } from '../extension/mcp/socketPath';
 import { ViewStateStore, type Memento } from '../extension/viewState';
 import { openWithSystem, revealInSystem } from '../extension/web/osOpen';
 import { preferredPort, startWebServer } from '../extension/web/webServer';
@@ -88,8 +88,10 @@ async function main(): Promise<void> {
   const noOpen = args.includes('--no-open');
   const unknown = args.find((a) => a.startsWith('-') && a !== '--no-open');
   if (unknown) throw new Error(`Opção desconhecida: ${unknown}. Veja faz-ai --help.`);
-  const folderPath = fs.realpathSync(path.resolve(args.find((a) => !a.startsWith('-')) ?? process.cwd()));
-  if (!fs.statSync(folderPath).isDirectory()) throw new Error(`"${folderPath}" não é uma pasta.`);
+  // sem resolver links simbólicos: o editor usa o caminho como a pasta foi aberta, e a chave do board
+  // precisa ser a mesma dos dois lados (no Windows, a letra do drive é acertada pela própria chave)
+  const folderPath = canonicalFolder(path.resolve(args.find((a) => !a.startsWith('-')) ?? process.cwd()));
+  if (!fs.existsSync(folderPath) || !fs.statSync(folderPath).isDirectory()) throw new Error(`"${folderPath}" não é uma pasta.`);
 
   // o editor já serve o board desta pasta: dois processos gravando o mesmo banco perderiam dados
   const address = socketPath(folderPath);

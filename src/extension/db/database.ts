@@ -71,6 +71,21 @@ export function cleanOrphans(db: Database): number {
 const ORPHANS_CLEANED = 'orphans_cleaned';
 
 /** Cria um banco em memória (testes). */
+/** Erros de arquivo preso por outro programa (antivírus, indexador, sincronização), que passam sozinhos. */
+const BUSY = new Set(['EBUSY', 'EPERM', 'EACCES']);
+
+/** Repete a operação de arquivo enquanto ele estiver preso, por até uns 2 segundos. */
+export async function retryBusy<T>(op: () => Promise<T>, attempts = 8, delayMs = 250): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await op();
+    } catch (e) {
+      if (i >= attempts || !BUSY.has((e as NodeJS.ErrnoException).code ?? '')) throw e;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+}
+
 export async function openInMemory(wasmDir: string): Promise<Database> {
   const SQL = await getSqlJs(wasmDir);
   const db = new SQL.Database();
@@ -81,13 +96,14 @@ export async function openInMemory(wasmDir: string): Promise<Database> {
 /** Abre (ou cria) o arquivo .db e aplica migrations. */
 export async function openFile(filePath: string, wasmDir: string, debounceMs = 500): Promise<DbHandle> {
   const SQL = await getSqlJs(wasmDir);
-  let db: Database;
-  try {
-    const buf = await fs.readFile(filePath);
-    db = new SQL.Database(new Uint8Array(buf));
-  } catch {
-    db = new SQL.Database();
-  }
+  // só um banco que não existe começa vazio: um arquivo que não deu para ler agora (preso pelo
+  // antivírus ou pela sincronização de nuvem no Windows) abriria um board vazio que, no primeiro
+  // salvamento, apagaria o de verdade
+  const buf = await retryBusy(() => fs.readFile(filePath)).catch((e: NodeJS.ErrnoException) => {
+    if (e.code === 'ENOENT') return null;
+    throw new Error(`Não foi possível ler o banco do board (${filePath}): ${e.message}`);
+  });
+  const db: Database = buf ? new SQL.Database(new Uint8Array(buf)) : new SQL.Database();
   migrate(db);
   // limpeza única: o arquivo pode ter órfãos gravados antes de as chaves serem religadas após o save
   if (!db.exec(`SELECT 1 FROM meta WHERE key = '${ORPHANS_CLEANED}'`).length) {
@@ -103,7 +119,8 @@ export async function openFile(filePath: string, wasmDir: string, debounceMs = 5
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     const tmp = `${filePath}.tmp`;
     await fs.writeFile(tmp, Buffer.from(data));
-    await fs.rename(tmp, filePath);
+    // no Windows a troca falha enquanto outro programa está com o arquivo aberto: tenta de novo
+    await retryBusy(() => fs.rename(tmp, filePath));
   };
 
   const flush = async () => {

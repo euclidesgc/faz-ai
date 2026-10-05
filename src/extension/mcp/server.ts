@@ -147,9 +147,12 @@ export async function startMcpServer(address: string, opts: McpOptions): Promise
       .catch(() => socket.destroy());
   });
   await new Promise<void>((resolve, reject) => {
-    listener.once('error', reject);
+    // no Windows o pipe nomeado em uso por outra janela falha com EADDRINUSE: é o mesmo caso do socket vivo
+    listener.once('error', (e: NodeJS.ErrnoException) =>
+      reject(isPipe && e.code === 'EADDRINUSE' ? new Error('Já existe um servidor MCP do Faz AI para esta pasta.') : e),
+    );
     listener.listen(address, () => {
-      listener.off('error', reject);
+      listener.removeAllListeners('error');
       resolve();
     });
   });

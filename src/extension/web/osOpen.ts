@@ -10,7 +10,9 @@ function run(command: string, args: string[]): void {
 /** Abre um arquivo, uma pasta ou um endereço com o programa padrão do sistema. */
 export function openWithSystem(target: string): void {
   if (process.platform === 'darwin') run('open', [target]);
-  else if (process.platform === 'win32') run('cmd', ['/c', 'start', '', target]);
+  // o explorer abre arquivo, pasta e endereço com o programa padrão, sem passar pelo cmd.exe, que
+  // leria `&`, `^` e `%` do caminho como comandos
+  else if (process.platform === 'win32') run('explorer', [target]);
   else run('xdg-open', [target]);
 }
 

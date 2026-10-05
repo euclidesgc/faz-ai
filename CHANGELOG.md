@@ -6,6 +6,29 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Windows, macOS e Linux: o mesmo board, sem perda de dados.**
+  - **Mesmo board no editor e no terminal:** no Windows, o `faz-ai` do terminal e o servidor do
+    board iniciado pela IA chegavam à pasta com a letra do drive maiúscula (`C:\`), e o editor com
+    minúscula (`c:\`): eram dois boards, dois bancos e dois servidores. Agora a chave é a mesma. No
+    macOS, o `faz-ai` não resolve mais links simbólicos, para dar a mesma pasta que o editor.
+  - **O banco nunca abre vazio por engano:** um arquivo que existe mas não pôde ser lido (no
+    Windows, preso pelo antivírus ou pela sincronização de nuvem) abria um board vazio que apagava o
+    verdadeiro no primeiro salvamento. Agora o board espera o arquivo ser liberado, ou avisa o erro.
+    O salvamento também tenta de novo enquanto o arquivo estiver preso.
+  - **Worktrees no Windows:** a pasta de trabalho de uma história era recusada ("já existe e não é
+    uma worktree") a partir da segunda fase, porque o git lista o caminho com `/`. Uma worktree que
+    não sai (arquivo preso) não deixa mais o registro pela metade.
+  - **Duas janelas na mesma pasta no Windows** recebem o mesmo aviso de dados sobrescritos que no
+    macOS e no Linux.
+  - **`npm test` no Windows:** o `.gitattributes` fixa LF, e o checkout com CRLF não reprova mais
+    todos os arquivos no Prettier. A política de skill do Codex (`agents/openai.yaml`) com CRLF é
+    lida e trocada sem duplicar a chave.
+  - **Atalho `faz-ai.cmd`** funciona com acento no nome do usuário. Abrir arquivos e pastas pelo
+    board no navegador não passa mais pelo `cmd.exe`, que lia `&` e `%` do caminho como comandos.
+  - **PATH do terminal (macOS e Linux):** um shell que demora a abrir (nvm, conda, oh-my-zsh) tem
+    mais tempo, e uma falha não fica guardada até reabrir o editor. O board procura a CLI e o node
+    também no nvm, Volta, fnm, asdf e mise, e no Windows na pasta do instalador do Cursor.
+
 - **Execuções do Claude Code e do Cursor mais robustas.**
   - **Cursor:** o pedido vai pela entrada padrão, e não mais na linha de comando. No Windows, a CLI
     instalada como `.cmd` passava pelo `cmd.exe`, que corta a linha em 8191 caracteres e junta as
