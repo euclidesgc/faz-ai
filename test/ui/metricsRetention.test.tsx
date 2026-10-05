@@ -137,6 +137,27 @@ describe('RetentionCard (#161)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('decimal é arredondado antes de comparar: 12,5 vira 13 e grava sem confirmação', async () => {
+    renderCard();
+    await typeValue('12.5');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(lastSent('settings.rules.update').patch).toEqual({ logRetentionMonths: 13 });
+  });
+
+  it('decimal que arredonda para o valor em vigor não grava nada e o campo volta a ele', async () => {
+    renderCard();
+    await typeValue('6.4');
+    expect(sentOf('settings.rules.update')).toEqual([]);
+    expect(field()).toHaveValue(6);
+  });
+
+  it('cancelar a redução devolve ao campo o valor em vigor', async () => {
+    renderCard();
+    await typeValue('3');
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancelar' }));
+    expect(field()).toHaveValue(6);
+  });
+
   it('baixar sem mês que saia da janela hoje explica que o descarte só fica mais cedo', async () => {
     renderCard({ months: 6, detailMonths: 2, detailRows: 100 });
     await typeValue('5');

@@ -7,6 +7,9 @@ import { onHostMessage, postToHost } from '../../vscode';
 /** Quanto a consulta espera o filtro parar de mudar (o `<input type="date">` muda a cada dígito do ano). */
 export const QUERY_DEBOUNCE_MS = 300;
 
+/** Quanto o painel espera a resposta do host antes de virar erro com "Consultar de novo". */
+export const QUERY_TIMEOUT_MS = 15_000;
+
 /** O pedido ao host para estes filtros: o recorte de dias resolvido agora e o workflow, se houver. */
 export function toPanelQuery(filters: MetricsFilters, now: number): MetricsPanelQuery {
   const query: MetricsPanelQuery = resolvePeriod(filters, now);
@@ -57,12 +60,14 @@ export function useMetricsQuery(filters: MetricsFilters): MetricsQueryState {
   const sent = useRef<Sent | null>(null);
   const inFlight = useRef(false);
   const scheduled = useRef(false);
+  const timeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(
     () =>
       onHostMessage((msg) => {
         if (msg.type !== 'metrics.result' || msg.requestId !== sent.current?.requestId) return;
         inFlight.current = false;
+        clearTimeout(timeout.current);
         const loading = scheduled.current;
         if (msg.result && !msg.error) setState({ result: msg.result, loading, error: null });
         else setState((s) => ({ result: s.result, loading, error: msg.error || t('Não foi possível consultar as métricas.') }));
@@ -84,6 +89,13 @@ export function useMetricsQuery(filters: MetricsFilters): MetricsQueryState {
       sent.current = { key, nonce, requestId };
       inFlight.current = true;
       postToHost({ type: 'metrics.query', requestId, query });
+      // o host que não responde não deixa o painel carregando para sempre
+      clearTimeout(timeout.current);
+      timeout.current = setTimeout(() => {
+        if (sent.current?.requestId !== requestId || !inFlight.current || scheduled.current) return;
+        inFlight.current = false;
+        setState((s) => ({ result: s.result, loading: false, error: t('A consulta das métricas demorou demais. Tente de novo.') }));
+      }, QUERY_TIMEOUT_MS);
     };
     setState((s) => (s.loading ? s : { ...s, loading: true }));
     // o primeiro pedido e o "consultar de novo" saem na hora; a troca de filtro espera ele parar de mudar

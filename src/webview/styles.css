@@ -2688,18 +2688,24 @@ body.host-web .drawer {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-.metrics-breakdown {
+/* a lista de tokens dos Totais; `dl.metrics-breakdown` e `.metrics-breakdown-row` são os nomes antigos, que
+   colidiam com o corte por dimensão (`div.metrics-breakdown`): saem quando o Totals.tsx passar para os novos */
+.metrics-token-breakdown,
+dl.metrics-breakdown {
   margin: 0;
   font-size: var(--fs-xs);
 }
+.metrics-token-breakdown-row,
 .metrics-breakdown-row {
   display: flex;
   justify-content: space-between;
   gap: var(--sp-8);
 }
+.metrics-token-breakdown-row dt,
 .metrics-breakdown-row dt {
   color: var(--muted);
 }
+.metrics-token-breakdown-row dd,
 .metrics-breakdown-row dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
@@ -3057,7 +3063,7 @@ body.host-web .drawer {
 
 /* card 175, painel de métricas: o corte por dimensão. Barras horizontais em SVG fluido, rótulos em HTML fora do
    SVG (não encolhem no zoom nem giram) e a tabela das quatro medidas, visível, ao lado ou abaixo (RF-38, RF-40) */
-.metrics-breakdown {
+div.metrics-breakdown {
   display: flex;
   flex-direction: column;
   gap: var(--sp-8);

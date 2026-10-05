@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { LOG_BYTES_PER_ROW } from '../../../shared/log';
 import type { MetricsPanelResult } from '../../../shared/metrics';
 import { LOG_RETENTION_MAX, LOG_RETENTION_MIN } from '../../../shared/rules';
@@ -27,6 +27,9 @@ export function RetentionCard({ result, onChanged }: { result: MetricsPanelResul
   const ask = useBoardStore((s) => s.ask);
   const id = useId();
   const { detailMonths, detailRows } = result.retention;
+  // o campo não é controlado: remontá-lo devolve o valor em vigor (decimal recusado, redução cancelada)
+  const [fieldKey, setFieldKey] = useState(0);
+  const resetField = () => setFieldKey((k) => k + 1);
 
   const write = (next: number) => {
     settings.updateRules({ logRetentionMonths: next });
@@ -34,8 +37,14 @@ export function RetentionCard({ result, onChanged }: { result: MetricsPanelResul
     onChanged?.();
   };
 
-  const change = (next: number) => {
-    if (next >= months) return write(next);
+  const change = (typed: number) => {
+    // a regra só aceita inteiro (`parseRules`): arredonda aqui, antes de comparar e decidir se pede confirmação
+    const next = Math.round(typed);
+    if (next === months) return resetField();
+    if (next > months) {
+      resetField();
+      return write(next);
+    }
     // a janela guarda o mês corrente e `next` meses anteriores: o resto do que já tem detalhe sai
     const lost = Math.max(0, detailMonths - (next + 1));
     ask({
@@ -53,6 +62,7 @@ export function RetentionCard({ result, onChanged }: { result: MetricsPanelResul
       confirmLabel: tn(next, 'Guardar só {n} mês', 'Guardar só {n} meses'),
       danger: true,
       onConfirm: () => write(next),
+      onCancel: resetField,
     });
   };
 
@@ -62,9 +72,11 @@ export function RetentionCard({ result, onChanged }: { result: MetricsPanelResul
       <div className="retention-field">
         <label htmlFor={id}>{t('Meses de detalhe guardados')}</label>
         <NumberField
+          key={fieldKey}
           id={id}
           aria-describedby={`${id}-price ${id}-help`}
           value={months}
+          step={1}
           min={LOG_RETENTION_MIN}
           max={LOG_RETENTION_MAX}
           onCommit={change}
