@@ -7,8 +7,9 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default tseslint.config(
-  // saídas de build e os scripts de build/release (fora do tsconfig) ficam de fora
-  { ignores: ['dist/**', 'node_modules/**', 'releases/**', 'esbuild.mjs', 'scripts/**', '.impeccable/**'] },
+  // saídas de build e os scripts de build/release (fora do tsconfig) ficam de fora, e também `.claude/`,
+  // onde ficam as worktrees locais das sessões: cópias do repositório que o lint contaria em dobro
+  { ignores: ['dist/**', 'node_modules/**', 'releases/**', 'esbuild.mjs', 'scripts/**', '.impeccable/**', '.claude/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
