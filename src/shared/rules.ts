@@ -23,6 +23,8 @@ export interface BoardRules {
   confirmArchive: ConfirmMode;
   /** preenche o campo de modelo com a sugestão enquanto ele não foi escolhido à mão */
   autoApplyModelSuggestion: boolean;
+  /** o catálogo do Cursor inclui as variantes rápidas (`-fast`): respondem mais rápido e gastam mais */
+  includeFastModels: boolean;
   /** meses completos de detalhe do log guardados além do mês corrente (de 1 a 24); os totais por mês nunca expiram */
   logRetentionMonths: number;
 }
@@ -35,6 +37,7 @@ export const DEFAULT_RULES: BoardRules = {
   confirmTrash: 'whenDependents',
   confirmArchive: 'whenDependents',
   autoApplyModelSuggestion: true,
+  includeFastModels: false,
   logRetentionMonths: DEFAULT_LOG_RETENTION_MONTHS,
 };
 
@@ -62,6 +65,7 @@ export function parseRules(json: string | null | undefined): BoardRules {
     confirmArchive: pick(raw.confirmArchive, confirm, DEFAULT_RULES.confirmArchive),
     autoApplyModelSuggestion:
       typeof raw.autoApplyModelSuggestion === 'boolean' ? raw.autoApplyModelSuggestion : DEFAULT_RULES.autoApplyModelSuggestion,
+    includeFastModels: typeof raw.includeFastModels === 'boolean' ? raw.includeFastModels : DEFAULT_RULES.includeFastModels,
     // só número inteiro dentro dos limites: "6" em texto, 2.5, 0 e 25 voltam ao padrão em vez de serem arredondados
     logRetentionMonths:
       typeof raw.logRetentionMonths === 'number' &&

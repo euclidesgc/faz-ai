@@ -5,7 +5,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { t } from '../../i18n';
 import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
-import { FormField, IconPlus, IconTrash, SelectField } from '../ui';
+import { FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../ui';
 import { ModelRulesEditor } from './ModelRulesEditor';
 import { SettingsCard } from './SettingsCard';
 import { PageHeader } from './PageHeader';
@@ -172,6 +172,20 @@ export function ModelsSettings() {
             badge={{ text: t('{count} modelo(s)', { count: mine.length }), on: false }}
             hint={t('Ao detectar: {source}. Modelos que você acrescentou à mão são mantidos.', { source: t(SOURCES[tl.id]) })}
           >
+            {tl.id === 'cursor' && (
+              <div className="models-fast">
+                <SwitchField
+                  label={t('Incluir os modos rápidos')}
+                  checked={state.board.rules.includeFastModels}
+                  onChange={(includeFastModels) => settings.updateRules({ includeFastModels })}
+                />
+                <Text as="p" size="1" color="gray">
+                  {t(
+                    'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"), com preço próprio para a estimativa de custo; desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.',
+                  )}
+                </Text>
+              </div>
+            )}
             {adding && (
               <NewModelCard
                 tool={tl.id}

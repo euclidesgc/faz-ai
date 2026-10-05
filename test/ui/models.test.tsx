@@ -183,3 +183,18 @@ describe('ModelsSettings', () => {
     });
   });
 });
+
+describe('ModelsSettings: modos rápidos do Cursor', () => {
+  it('a chave só aparece no Cursor e grava a regra', async () => {
+    show();
+    expect(screen.queryByRole('switch', { name: 'Incluir os modos rápidos' })).toBeNull();
+    board.router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
+    syncStore(board.router);
+    show();
+    const toggle = screen.getAllByRole('switch', { name: 'Incluir os modos rápidos' }).at(-1)!;
+    expect(toggle).not.toBeChecked();
+    await userEvent.click(toggle);
+    expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { includeFastModels: true } });
+    board.router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude' } });
+  });
+});

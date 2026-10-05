@@ -662,7 +662,10 @@ local; no Cursor, dos modelos da sua conta, pelo comando `cursor-agent models`, 
 com a CLI autenticada; nas outras, uma lista embutida que pode ser editada); os preços que você
 preencheu continuam lá depois de detectar de novo. No Cursor, a lista traz uma linha por nível de cada modelo
 (`claude-opus-5-5-low`, `-medium`, `-high`…); o board junta as variantes num modelo com os níveis
-dele e deixa de fora as versões `-fast`. No plano gratuito do Cursor só o **Auto** roda: os outros
+dele. As versões rápidas (`-fast`, respondem mais depressa e cobram mais pelos mesmos tokens) ficam
+de fora até você ligar **Incluir os modos rápidos** no cartão do Cursor: aí cada uma entra como um
+modelo à parte ("Claude Opus 5.5 1M Fast"), com preço próprio; desligar a chave as tira do catálogo.
+Pelo MCP, é a regra `includeFastModels` do `update_rules`. No plano gratuito do Cursor só o **Auto** roda: os outros
 modelos são recusados antes de começar, e por isso as regras de sugestão do Cursor começam todas
 em Auto. As regras de sugestão combinam
 condições com E e OU, por exemplo `Esforço da atividade = Alto E Tags = backend`. O resultado é

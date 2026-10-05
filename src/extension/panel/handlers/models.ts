@@ -3,7 +3,7 @@ import type { FieldDef } from '../../../shared/model';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelRule } from '../../../shared/models';
 import { valueOf } from '../../../shared/selectors';
 import { newId } from '../../db/ids';
-import { detectTools, effortTiers, modelsFor } from '../../models';
+import { detectTools, effortTiers, isFastVariant, modelsFor } from '../../models';
 import type { BoardContext, HandlerMap } from './context';
 
 /**
@@ -34,12 +34,29 @@ export function useTool(ctx: BoardContext, tool: AiTool): void {
 function detectModels(ctx: BoardContext, tool: AiTool): void {
   const { board } = ctx.state();
   const priced = new Map(board.modelCatalog.flatMap((o) => (o.price ? [[o.id, o.price] as const] : [])));
-  const found = modelsFor(tool, ctx.home).map((o) => (priced.has(o.id) ? { ...o, price: priced.get(o.id) } : o));
+  const all = modelsFor(tool, ctx.home);
+  // as variantes rápidas do Cursor só entram com a regra ligada
+  const found = all
+    .filter((o) => board.rules.includeFastModels || !isFastVariant(o, all))
+    .map((o) => (priced.has(o.id) ? { ...o, price: priced.get(o.id) } : o));
   const ids = new Set(found.map((o) => o.id));
   const rest = board.modelCatalog.filter((o) => !ids.has(o.id));
   const at = rest.findIndex((o) => o.tool === tool);
   rest.splice(at < 0 ? rest.length : at, 0, ...found);
   ctx.boards.setModelCatalog(ctx.boardId, rest);
+}
+
+/**
+ * A regra das variantes rápidas mudou: ligada, elas entram no catálogo pela última lista lida do
+ * Cursor; desligada, saem do catálogo (as que são versão rápida de outro modelo dele).
+ */
+export function applyFastModels(ctx: BoardContext): void {
+  const { board } = ctx.state();
+  if (board.rules.includeFastModels) return detectModels(ctx, 'cursor');
+  ctx.boards.setModelCatalog(
+    ctx.boardId,
+    board.modelCatalog.filter((o) => o.tool !== 'cursor' || !isFastVariant(o, board.modelCatalog)),
+  );
 }
 
 /** Troca as regras do campo "Esforço" por um modelo leve, um intermediário e um forte da ferramenta. */

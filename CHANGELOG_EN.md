@@ -7,6 +7,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Cursor fast modes.** In Configurações → Modelos de IA (Settings → AI models), the Cursor card got
+  the **Incluir os modos rápidos** (include fast modes) switch, off by default. When on, the fast
+  version of each model (it answers sooner and charges more for the same tokens) enters the catalog
+  as a separate model, for example "Claude Opus 5.5 1M Fast", with its own price for the cost
+  estimate; the board builds the id Cursor expects (`claude-opus-5-5-high-fast`). When off, they
+  leave the catalog. Through MCP, it is the `includeFastModels` rule of `update_rules`.
+
 - **Board requirements warning.** While something is missing for the board to work with the AI
   tool, a bar stays at the top of the board (on every screen) and in the chat panel, with no close
   button. It points out: Node.js not on the PATH, the tool's command line not installed, Cursor's

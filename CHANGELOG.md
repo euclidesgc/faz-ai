@@ -6,6 +6,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Modos rápidos do Cursor.** Em Configurações → Modelos de IA, o cartão do Cursor ganhou a chave
+  **Incluir os modos rápidos**, desligada por padrão. Ligada, a versão rápida de cada modelo (que
+  responde mais depressa e cobra mais pelos mesmos tokens) entra no catálogo como um modelo à parte,
+  por exemplo "Claude Opus 5.5 1M Fast", com preço próprio para a estimativa de custo; o board monta o
+  id que o Cursor espera (`claude-opus-5-5-high-fast`). Desligada, elas saem do catálogo. Pelo MCP, é
+  a regra `includeFastModels` do `update_rules`.
+
 - **Aviso dos requisitos do board.** Enquanto faltar alguma coisa para o board trabalhar com a
   ferramenta de IA, uma faixa fica no topo do board (em todas as telas) e no painel de chat, sem
   botão de fechar. Ela aponta: Node.js fora do PATH, linha de comando da ferramenta não instalada,

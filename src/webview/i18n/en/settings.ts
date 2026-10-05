@@ -360,4 +360,7 @@ export const settings: Record<string, string> = {
     'In this mode the board handles one story at a time. All stories work in the same folder: two at once would switch the branch under each other and mix their changes, causing conflicts and commits on the wrong branch. To drive stories in parallel, choose "Worktree por história".',
   'Sem branches nem worktrees, o board trata uma história por vez: todas trabalham direto na pasta do projeto, e duas ao mesmo tempo misturariam as alterações. Para tocar histórias em paralelo, escolha "Worktree por história".':
     'With no branches or worktrees, the board handles one story at a time: they all work directly in the project folder, and two at once would mix their changes. To drive stories in parallel, choose "Worktree por história".',
+  'Incluir os modos rápidos': 'Include fast modes',
+  'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"), com preço próprio para a estimativa de custo; desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.':
+    'Cursor has a fast version of many models: it answers sooner and charges more for the same tokens. When on, each one enters the catalog as a separate model (for example, "Claude Opus 5.5 1M Fast"), with its own price for the cost estimate; when off, they leave the catalog. The list comes from the cursor-agent models command, read with the CLI signed in.',
 };

@@ -3203,3 +3203,15 @@ div.metrics-breakdown {
   min-width: 0;
   overflow-x: auto;
 }
+
+/* Modelos de IA: a chave dos modos rápidos do Cursor, acima da tabela */
+.models-fast {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-12);
+  max-width: 90ch;
+}
+.models-fast p {
+  margin: 0;
+}

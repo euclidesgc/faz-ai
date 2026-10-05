@@ -6,7 +6,16 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { manifestOf } from '../src/shared/execution';
 import type { FieldDef } from '../src/shared/model';
 import { boardState, card } from './fakes/board';
-import { discoverModels, forgetModels, modelsFor, onlyBuiltin, parseCursorModels, rememberModels } from '../src/extension/models';
+import { cursorModelId } from '../src/extension/headless';
+import {
+  discoverModels,
+  isFastVariant,
+  forgetModels,
+  modelsFor,
+  onlyBuiltin,
+  parseCursorModels,
+  rememberModels,
+} from '../src/extension/models';
 
 const cyan = (s: string) => `\x1b[36m${s}\x1b[39m`;
 const dim = (s: string) => `\x1b[2m${s}\x1b[22m`;
@@ -37,8 +46,6 @@ describe('modelos do Cursor', () => {
   it('a lista real: as variantes de nível viram um modelo com os níveis dele, sem as -fast', () => {
     const real = parseCursorModels(fs.readFileSync(path.join(__dirname, 'fixtures', 'cursor-models.txt'), 'utf8'));
     const byModel = new Map(real.map((o) => [o.model, o]));
-    // cerca de 250 linhas viram poucas dezenas de modelos
-    expect(real.length).toBeLessThan(60);
     expect(byModel.get('claude-opus-5-5')).toMatchObject({
       label: 'Claude Opus 5.5 1M',
       efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
@@ -52,7 +59,17 @@ describe('modelos do Cursor', () => {
     expect(byModel.get('gpt-5.3-codex')).toMatchObject({ label: 'Codex 5.3', defaultEffort: null });
     // os espaços de largura zero e os duplos saem do nome
     expect(byModel.get('grok-4.7')!.label).toBe('Grok 4.7');
-    expect(real.some((o) => o.model.endsWith('-fast'))).toBe(false);
+    // as rápidas viram modelos à parte, com os mesmos níveis da versão normal
+    expect(byModel.get('claude-opus-5-5-fast')).toMatchObject({
+      label: 'Claude Opus 5.5 1M Fast',
+      efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+      defaultEffort: 'medium',
+    });
+    expect(byModel.get('composer-2.5-fast')).toMatchObject({ label: 'Composer 2.5 Fast', efforts: [] });
+    expect(isFastVariant(byModel.get('composer-2.5-fast')!, real)).toBe(true);
+    expect(isFastVariant(byModel.get('composer-2.5')!, real)).toBe(false);
+    const normal = real.filter((o) => !isFastVariant(o, real));
+    expect(normal.length).toBeLessThan(60);
     expect(byModel.get('auto')).toMatchObject({ label: 'Auto', efforts: [] });
   });
 
@@ -107,5 +124,22 @@ describe('nível do modelo do Cursor na execução', () => {
     expect(manifestOf(state('cursor', 'cursor:claude-opus-5-5@max'), card('c')).model).toEqual({ name: 'claude-opus-5-5', effort: 'max' });
     // nas outras ferramentas, sem nível escolhido, a ferramenta decide
     expect(manifestOf(state('claude', 'claude:opus'), card('c')).model).toEqual({ name: 'opus', effort: null });
+  });
+});
+
+describe('id do modelo do Cursor no comando', () => {
+  it('o nível vem como sufixo, e na versão rápida antes do -fast', () => {
+    expect(cursorModelId('claude-opus-5-5', 'high')).toBe('claude-opus-5-5-high');
+    expect(cursorModelId('claude-opus-5-5-fast', 'high')).toBe('claude-opus-5-5-high-fast');
+    expect(cursorModelId('composer-2.5-fast', null)).toBe('composer-2.5-fast');
+    expect(cursorModelId('auto', null)).toBe('auto');
+  });
+
+  it('todo id montado a partir do catálogo existe na lista real', () => {
+    const text = fs.readFileSync(path.join(__dirname, 'fixtures', 'cursor-models.txt'), 'utf8');
+    const ids = new Set([...text.matchAll(/^(\S+) - /gm)].map((m) => m[1]));
+    for (const o of parseCursorModels(text))
+      for (const effort of o.efforts.length ? [...o.efforts, ...(o.defaultEffort === null ? [null] : [])] : [null])
+        expect(ids, `${o.model} ${effort}`).toContain(cursorModelId(o.model, effort));
   });
 });
