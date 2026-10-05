@@ -2,7 +2,7 @@ import type { AiRunOrigin } from '../shared/log';
 import { cardRef, type BoardState, type Card, type Column } from '../shared/model';
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
-import { parallelLimit } from '../shared/runner';
+import { parallelLimit, type AiRunMode } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { statusInfo } from '../shared/status';
 import { isDelivered, yoloStories } from '../shared/story';
@@ -17,7 +17,7 @@ export interface AutopilotRunner {
   readonly running: string[];
   start(cardId: string, origin?: AiRunOrigin): void;
   stop(cardId: string): void;
-  onDidFinish(listener: (cardId: string) => void): void;
+  onDidFinish(listener: (cardId: string, mode?: AiRunMode) => void): void;
 }
 
 export interface AutopilotDeps {
@@ -115,7 +115,7 @@ export class Autopilot {
     // histórias que já estavam em modo autônomo ao abrir o editor não disparam nada sozinhas: é preciso retomar
     this.known = new Set(yoloStories(router.snapshot()).map((c) => c.id));
     router.onDidChange(() => this.onBoardChange());
-    runner.onDidFinish((cardId) => this.onRunFinished(cardId));
+    runner.onDidFinish((cardId, mode) => this.onRunFinished(cardId, mode));
   }
 
   get isActive(): boolean {
@@ -155,11 +155,12 @@ export class Autopilot {
     });
   }
 
-  private onRunFinished(cardId: string): void {
+  private onRunFinished(cardId: string, mode?: AiRunMode): void {
     const s = this.router.snapshot();
     const card = s.cards.find((c) => c.id === cardId);
     const story = card && (card.parentId ? s.cards.find((c) => c.id === card.parentId) : card);
-    if (story?.yolo && this.active) this.checkProgress(s, story);
+    // refinar não move a história de propósito: não conta como execução sem progresso
+    if (story?.yolo && this.active && mode !== 'refine') this.checkProgress(s, story);
     // decide depois dos demais ouvintes do fim da execução: o heartbeat guarda a vaga para o autopiloto
     // quando a execução que terminou era dele, e a toma quando era do autopiloto (as filas se intercalam)
     (this.deps.defer ?? queueMicrotask)(() => this.evaluate());

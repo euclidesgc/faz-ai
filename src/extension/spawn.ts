@@ -123,14 +123,17 @@ export function spawnHeadless(
   return {
     onExit: (fn) => listeners.push(fn),
     kill: () => {
-      // pelo cmd.exe, o processo filho é o shell: matar só ele deixaria a CLI rodando sozinha
-      if (launch.shell && child.pid) {
-        execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], () => {});
-        return;
-      }
-      child.kill('SIGTERM');
-      // se a ferramenta ignorar o pedido, encerra à força
-      setTimeout(() => !exited && child.kill('SIGKILL'), 5000).unref();
+      // pelo cmd.exe, o processo filho é o shell: matar só ele deixaria a CLI rodando sozinha. Se o
+      // taskkill falhar (fora do PATH, acesso negado), sobra encerrar o shell
+      if (launch.shell && child.pid) execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], (err) => err && child.kill());
+      else child.kill('SIGTERM');
+      // se a ferramenta ignorar o pedido, encerra à força; e se nem assim o processo fechar (um neto
+      // segurando a saída), a execução termina para o board, em vez de ocupar a vaga para sempre
+      setTimeout(() => {
+        if (exited) return;
+        child.kill('SIGKILL');
+        setTimeout(() => finish(null, new Error('o processo não encerrou depois de interrompido.')), 5000).unref();
+      }, 5000).unref();
     },
   };
 }

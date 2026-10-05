@@ -1,6 +1,6 @@
 import type { AiTool } from './harness';
 import type { BoardState, Card } from './model';
-import { parseModelValue } from './models';
+import { parseModelValue, type ModelOption } from './models';
 import { columnOf, valueOf } from './selectors';
 
 /**
@@ -146,17 +146,20 @@ export function manifestOf(s: BoardState, c: Card): ExecManifest {
     model: option
       ? {
           name: option.model,
-          effort:
-            chosen!.effort && option.efforts.includes(chosen!.effort)
-              ? chosen!.effort
-              : // no Cursor o nível é parte do id: um modelo sem variante "pura" precisa do nível padrão dele
-                option.tool === 'cursor'
-                ? option.defaultEffort
-                : null,
+          effort: effortToRun(option, chosen!.effort),
         }
       : null,
     clean: profile?.clean ?? false,
   };
+}
+
+/**
+ * O nível de esforço que vai para a ferramenta: o escolhido, se o modelo o tem. No Cursor o nível é
+ * parte do id, e um modelo sem variante "pura" precisa do nível padrão dele.
+ */
+export function effortToRun(option: ModelOption, effort: string | null): string | null {
+  if (effort && option.efforts.includes(effort)) return effort;
+  return option.tool === 'cursor' ? option.defaultEffort : null;
 }
 
 export type ExecAspect = 'agent' | 'skills' | 'mcp' | 'tools' | 'model' | 'clean';

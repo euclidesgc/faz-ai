@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import type { ModelOption } from '../shared/models';
 import { parseCursorModels } from './models';
+import { launchSpec } from './spawn';
 
 export interface CliRun {
   /** código de saída; null quando o processo nem rodou ou passou do tempo */
@@ -16,10 +17,17 @@ export interface CliRun {
  */
 export function runCli(file: string, args: string[], pathEnv: string | undefined, timeoutMs = 20_000): Promise<CliRun> {
   return new Promise((resolve) => {
+    // no Windows, uma CLI instalada como .cmd só roda pelo shell, como nas execuções
+    const launch = launchSpec(file, args);
     execFile(
-      file,
-      args,
-      { timeout: timeoutMs, env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), NO_COLOR: '1', NO_OPEN_BROWSER: '1' } },
+      launch.file,
+      launch.args,
+      {
+        timeout: timeoutMs,
+        shell: launch.shell,
+        windowsVerbatimArguments: launch.shell,
+        env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), NO_COLOR: '1', NO_OPEN_BROWSER: '1' },
+      },
       (err, stdout, stderr) => {
         const code = err ? (typeof (err as NodeJS.ErrnoException).code === 'number' ? Number(err.code) : null) : 0;
         resolve({ code, stdout: String(stdout), stderr: String(stderr) });

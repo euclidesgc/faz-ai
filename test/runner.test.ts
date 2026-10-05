@@ -339,6 +339,34 @@ describe('executor da IA', () => {
     expect(card().status).toBe('waiting_review');
   });
 
+  it('Refinar com IA que falha não bloqueia o card: o status volta e a falha fica na conversa', () => {
+    router.handle({ type: 'card.status.set', cardId: storyId, status: 'approved' });
+    runner.start(storyId, 'manual', 'refine');
+    procs[0]!.exit(1);
+    expect(card().status).toBe('approved');
+    expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+    expect(lastMessage().body).toContain('O refinamento do card não terminou');
+    expect(lastMessage().body).toContain('código 1');
+
+    runner.start(storyId, 'manual', 'refine');
+    procs[1]!.exit(null, new Error('comando "claude" não encontrado.'));
+    expect(card().status).toBe('approved');
+    expect(lastMessage().body).toContain('não encontrado');
+  });
+
+  it('o fim da execução diz aos ouvintes se era refinar ou trabalhar na fase', () => {
+    const finished: [string, string][] = [];
+    runner.onDidFinish((id, mode) => finished.push([id, mode]));
+    runner.start(storyId, 'manual', 'refine');
+    procs[0]!.exit(0);
+    runner.start(storyId);
+    procs[1]!.exit(0);
+    expect(finished).toEqual([
+      [storyId, 'refine'],
+      [storyId, 'phase'],
+    ]);
+  });
+
   it('Refinar com IA numa ferramenta que só roda sem restrições usa a permissão do board', () => {
     router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi', runner: { permission: 'full' } } });
     runner.start(storyId, 'manual', 'refine');

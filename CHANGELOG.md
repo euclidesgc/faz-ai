@@ -11,8 +11,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
     que o card está (em Implementação, código), até passar a vez.
   - **Refinar com IA** é novo: reescreve título e descrição com clareza, revisa Tags, Esforço da
     atividade, Modelo e Skills e completa o checklist, sem trabalhar a fase, sem mover o card e sem
-    mexer em arquivos (roda sempre só com o board). O resumo do que mudou fica na conversa, com o
-    texto anterior da descrição, e o card volta ao status que tinha.
+    mexer em arquivos (roda só com o board; no Kimi, que não tem esse nível, o pedido proíbe). O
+    resumo do que mudou fica na conversa, com o texto anterior da descrição, e o card volta ao
+    status que tinha, também quando a execução falha (a falha fica na conversa, sem bloquear o
+    card). Refinar não conta como execução sem progresso para o modo autônomo.
 
 - **Modos rápidos do Cursor.** Em Configurações → Modelos de IA, o cartão do Cursor ganhou a chave
   **Incluir os modos rápidos**, desligada por padrão. Ligada, a versão rápida de cada modelo (que
@@ -71,13 +73,17 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - **O Cursor aceita os níveis "só o board" e "board e arquivos".** Antes ele só rodava "sem
   restrições". Nos níveis menores, a sessão recebe só as ferramentas do nível, sem terminal.
 
-- **A CLI do Cursor é procurada como `cursor-agent`.** O nome curto `agent` continua valendo, e o
-  board também acha a CLI na pasta do instalador. O esforço do modelo vai como sufixo do id
-  (`claude-opus-5-5-high`), como `cursor-agent models` lista as variantes.
+- **A CLI do Cursor é procurada como `cursor-agent`.** O board também acha a CLI na pasta do
+  instalador, antes de tentar o nome curto `agent` (que pode ser outro programa). O esforço do
+  modelo vai como sufixo do id (`claude-opus-5-5-high`), como `cursor-agent models` lista as
+  variantes; um modelo sem nível escolhido roda no nível padrão dele, também no chat do board e no
+  modelo que o `get_card` informa.
 
 - **Windows: o prompt chega inteiro às CLIs instaladas pelo npm.** Aspas, `&` e `|` no texto eram
   interpretados pelo `cmd.exe`, e **Parar** deixava a CLI rodando. Agora os argumentos são escapados
-  e Parar encerra a árvore de processos.
+  e Parar encerra a árvore de processos; se nem assim o processo fechar, a execução termina para o
+  board em vez de deixar o card "Em execução". O login e a lista de modelos do Cursor também são
+  lidos no Windows.
 
 - **O board registra o consumo, o custo e o inventário de cada execução da IA.** Para cada execução
   ficam gravados os tokens de entrada, de saída, de leitura de cache e de criação de cache, o custo

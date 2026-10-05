@@ -278,8 +278,11 @@ a resposta chega como mensagem na conversa quando a execução termina, e enquan
   título e descrição (sem inventar requisito; o que estiver ambíguo vira uma lista "Dúvidas em
   aberto"), revisa Tags, Esforço da atividade, Modelo e Skills mesmo que já tenham valor e
   acrescenta ao checklist os passos que faltam. Não trabalha a fase, não cria sub-tarefas, não move
-  o card e não mexe em arquivos: roda sempre só com o board. No fim, resume na conversa o que mudou
-  (com o texto anterior da descrição, se a reescreveu) e o card volta ao status que tinha.
+  o card e não mexe em arquivos: roda só com o board (no Kimi, que não tem esse nível, o pedido
+  proíbe mexer em arquivos). No fim, resume na conversa o que mudou (com o texto anterior da
+  descrição, se a reescreveu) e o card volta ao status que tinha, também quando a execução falha:
+  a falha fica na conversa, sem bloquear o card. Um refino não conta como execução sem progresso
+  para o modo autônomo.
 
 Imagens coladas na mensagem viram anexos do card e a IA as recebe.
 
