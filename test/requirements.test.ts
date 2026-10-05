@@ -131,4 +131,16 @@ describe('requisitos do board', () => {
     }
     expect(registeredServer('codex', project, home)!.args).toEqual([BRIDGE, project]);
   });
+
+  it('o registro global, sem a pasta, também conta e não vira aviso de outra pasta', async () => {
+    for (const tool of ['cursor', 'codex', 'copilot', 'kimi'] as const) {
+      expect(registeredServer(tool, project, home)).toBeNull();
+      registerClients([tool], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
+      expect(registeredServer(tool, project, home)).toMatchObject({ file: expect.stringMatching(/^~\//), args: [BRIDGE] });
+    }
+    expect(await checkRequirements(probe())).toEqual([]);
+    // o do projeto vale sobre o global
+    connect('cursor');
+    expect(registeredServer('cursor', project, home)).toMatchObject({ file: '.cursor/mcp.json', args: [BRIDGE, project] });
+  });
 });

@@ -55,6 +55,9 @@ export type HarnessKind = 'instructions' | 'skill' | 'agent' | 'command' | 'hook
 /** De onde a ferramenta carrega o item: da pasta do projeto, da pasta do usuário (vale para todos os projetos) ou de um plugin. */
 export type HarnessScope = 'project' | 'user' | 'plugin';
 
+/** Onde o board instala o servidor MCP e a skill do fluxo: global (`user`, o padrão) ou só neste projeto. */
+export type InstallScope = Exclude<HarnessScope, 'plugin'>;
+
 export const HARNESS_KINDS: { id: HarnessKind; label: string; hint: string }[] = [
   {
     id: 'instructions',
@@ -168,7 +171,10 @@ export const AI_TOOLS: {
   label: string;
   rules: string;
   skills: string;
+  /** onde "Instalar neste projeto" registra o servidor do board */
   mcp: string;
+  /** onde a instalação padrão (global) registra o servidor do board */
+  mcpUser: string;
   /** pasta e extensão dos agentes do projeto; null se a ferramenta não os define em arquivos */ agents: AgentSpec | null;
 }[] = [
   {
@@ -177,6 +183,7 @@ export const AI_TOOLS: {
     rules: 'CLAUDE.md',
     skills: '.claude/skills',
     mcp: '.mcp.json (projeto)',
+    mcpUser: '~/.claude.json (claude mcp add --scope user)',
     agents: { dir: '.claude/agents', ext: '.md', format: 'markdown', modelField: 'model' },
   },
   {
@@ -185,6 +192,7 @@ export const AI_TOOLS: {
     rules: 'AGENTS.md',
     skills: '.agents/skills',
     mcp: '.codex/config.toml (projeto confiável)',
+    mcpUser: '~/.codex/config.toml',
     agents: { dir: '.codex/agents', ext: '.toml', format: 'toml', modelField: 'model' },
   },
   {
@@ -193,6 +201,7 @@ export const AI_TOOLS: {
     rules: 'AGENTS.md',
     skills: '.cursor/skills',
     mcp: '.cursor/mcp.json (projeto)',
+    mcpUser: '~/.cursor/mcp.json',
     agents: { dir: '.cursor/agents', ext: '.md', format: 'markdown', modelField: 'model' },
   },
   {
@@ -200,7 +209,8 @@ export const AI_TOOLS: {
     label: 'Kimi Code',
     rules: 'AGENTS.md',
     skills: '.kimi-code/skills',
-    mcp: '~/.kimi-code/mcp.json ou ~/.kimi/mcp.json (global)',
+    mcp: '.kimi-code/mcp.json (projeto)',
+    mcpUser: '~/.kimi-code/mcp.json ou ~/.kimi/mcp.json',
     agents: { dir: '.kimi-code/agents', ext: '.md', format: 'markdown', modelField: null },
   },
   {
@@ -209,6 +219,7 @@ export const AI_TOOLS: {
     rules: 'AGENTS.md',
     skills: '.github/skills',
     mcp: '.vscode/mcp.json e .mcp.json (projeto)',
+    mcpUser: '~/.copilot/mcp-config.json (Copilot CLI)',
     agents: { dir: '.github/agents', ext: '.agent.md', format: 'markdown', modelField: 'model' },
   },
 ];

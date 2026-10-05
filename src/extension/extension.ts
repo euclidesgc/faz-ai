@@ -200,8 +200,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         tokenFile: path.join(os.homedir(), '.faz-ai', 'web-token'),
         iconFile: path.join(context.extensionPath, 'media', 'icon.png'),
         env: {
-          connectAI() {
-            const { message, toIgnore } = h.connectAI();
+          async connectAI(target) {
+            const { message, toIgnore } = await h.connectAI(target);
             return toIgnore.length
               ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.`
               : message;
@@ -239,7 +239,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard(cardId)),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
     vscode.commands.registerCommand('fazai.openInBrowser', openInBrowser),
-    vscode.commands.registerCommand('fazai.connectAI', () => connectAI(getRouter)),
+    vscode.commands.registerCommand('fazai.connectAI', (target?: Parameters<BoardHost['connectAI']>[0]) => connectAI(getRouter, target)),
     output,
     vscode.commands.registerCommand('fazai.ai.run', aiCommand('start')),
     vscode.commands.registerCommand('fazai.ai.stop', aiCommand('stop')),
@@ -330,15 +330,21 @@ async function offerBoardUpgrade(context: vscode.ExtensionContext, router: Messa
   else await context.globalState.update(key, version);
 }
 
-/** Registra o servidor MCP do board na configuração da ferramenta de IA em uso no projeto. */
-async function connectAI(getRouter: () => Promise<MessageRouter | undefined>): Promise<void> {
+/**
+ * Registra o servidor MCP do board numa ferramenta de IA. Pela paleta de comandos, sem argumento, é a
+ * instalação padrão: a ferramenta do projeto, no escopo global.
+ */
+async function connectAI(
+  getRouter: () => Promise<MessageRouter | undefined>,
+  target?: Parameters<BoardHost['connectAI']>[0],
+): Promise<void> {
   if (!(await getRouter()) || !host) {
     vscode.window.showWarningMessage('Abra uma pasta para conectar uma IA ao board.');
     return;
   }
-  let done: ReturnType<BoardHost['connectAI']>;
+  let done: Awaited<ReturnType<BoardHost['connectAI']>>;
   try {
-    done = host.connectAI();
+    done = await host.connectAI(target);
   } catch (e) {
     vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
     return;

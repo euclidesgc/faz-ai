@@ -5,6 +5,7 @@ import { MAX_ATTACHMENT_BYTES } from '../attachments';
 import { parseExportFile, type ImportResult } from '../db/boardExport';
 import type { HostToWebview, WebviewToHost } from '../../shared/messages';
 import type { AiRunMode } from '../../shared/runner';
+import type { AiTool, InstallScope } from '../../shared/harness';
 import type { ViewStateStore } from '../viewState';
 import type { MessageRouter } from '../panel/messageRouter';
 
@@ -14,7 +15,7 @@ export interface HostEnv {
   attachmentsBaseUri(): string;
   showFilters(): unknown;
   /** registra o servidor MCP do board na ferramenta de IA do projeto; o texto devolvido vira um aviso na interface */
-  connectAI(): unknown;
+  connectAI(target: { tool?: AiTool; scope?: InstallScope }): unknown;
   runAi(cardId: string, mode?: AiRunMode): unknown;
   stopAi(cardId: string): unknown;
   /** pausa o autopiloto das histórias em modo autônomo */
@@ -103,7 +104,7 @@ export class HostBridge {
           await this.env.showFilters();
           return;
         case 'ui.connectAI': {
-          const notice = await this.env.connectAI();
+          const notice = await this.env.connectAI({ tool: msg.tool, scope: msg.scope });
           if (typeof notice === 'string') this.post({ type: 'notice', message: notice });
           return;
         }

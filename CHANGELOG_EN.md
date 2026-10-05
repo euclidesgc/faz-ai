@@ -5,6 +5,26 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **Board MCP and flow skill installed in each tool's section, globally by default** ([#141](https://github.com/euclidesgc/faz-ai/issues/141)).
+  - In **Harness de IA → Tudo que a ferramenta carrega**, each tool's **Servidores MCP** section has the board
+    server, and its **Skills** section has the flow skill, each with its global and project state and
+    two buttons: **Instalar (padrão da ferramenta)** (tool default), which writes to the global config
+    (`~/.cursor/mcp.json`, `~/.codex/config.toml`, `claude mcp add --scope user`,
+    `~/.claude/skills`…) and works in any repository with no file in the project, and **Instalar
+    neste projeto**, to pin a version in a repository or a fork.
+  - The duplicated buttons are gone: **Conectar IA (MCP)** from the settings menu and the tool tab,
+    and **Instalar skill do fluxo** from the **Do projeto** tab. The requirements bar leads to the
+    tool's **Servidores MCP** section.
+  - Installing in the project when a global one exists asks for confirmation, and a flow skill that
+    already exists at the destination is only replaced after confirming.
+  - The global registration counts in the requirements bar, and Cursor runs from the board use the
+    global one instead of writing `.cursor/mcp.json` in the project when it leads to this board.
+  - Kimi Code, in the project, writes to `.kimi-code/mcp.json`; before, it always went global.
+  - The MCP tool `install_flow_skill` takes `tool`, `scope` (`user`, the default, or `project`) and
+    `replace`.
+
 ## 0.32.0
 
 - **Agents, models and rules no longer lose a change made right after another.** Writing an agent's

@@ -1,7 +1,7 @@
 import { TextField } from '@radix-ui/themes';
 import { useBoardStore, type SettingsTab } from '../../store/boardStore';
 import { t } from '../../i18n';
-import { settings, ui } from '../../commands';
+import { settings } from '../../commands';
 import { WorkflowsSettings } from './workflows/WorkflowsSettings';
 import { TypesSettings } from './TypesSettings';
 import { FieldsSettings } from './FieldsSettings';
@@ -20,7 +20,6 @@ import {
   IconBackup,
   IconBranch,
   IconColumns,
-  IconConnect,
   IconFields,
   IconHarness,
   IconModels,
@@ -120,11 +119,6 @@ export function Settings() {
               title={t('Leva este board ao padrão atual da extensão, sem mover nenhum card')}
             />
           )}
-          <Button
-            onClick={() => ui.connectAI()}
-            {...navProps(collapsed, t('Conectar IA (MCP)'), IconConnect)}
-            title={t('Registra o board como servidor MCP para o Claude Code e outros clientes de IA')}
-          />
           <DeleteButton
             variant="ghost"
             question={t('Recriar o board do zero?')}

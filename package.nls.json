@@ -3,7 +3,7 @@
   "command.openInBrowser.title": "Faz AI: Open board in the browser",
   "command.refreshSidebar.title": "Faz AI: Refresh",
   "command.openCard.title": "Faz AI: Open Card",
-  "command.connectAI.title": "Faz AI: Connect AI (MCP)",
+  "command.connectAI.title": "Faz AI: Install the board MCP (global)",
   "command.upgradeBoard.title": "Faz AI: Update board to the current default",
   "command.heartbeat.runNow.title": "Faz AI: Run the heartbeat now (handle pending items with the AI)",
   "command.heartbeat.stop.title": "Faz AI: Stop the AI runs and autonomous mode",

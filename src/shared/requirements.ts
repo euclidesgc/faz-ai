@@ -5,7 +5,7 @@ export type RequirementId = 'node' | 'cli' | 'signin' | 'mcp' | 'mcp-stale' | 'm
 
 /** O que a pessoa pode fazer, pela própria faixa de aviso, para resolver. */
 export type RequirementAction =
-  /** registrar (de novo) o servidor do board na ferramenta: o mesmo "Conectar IA (MCP)" */
+  /** registrar (de novo) o servidor do board na ferramenta: a seção Servidores MCP da ferramenta, no Harness de IA */
   | { kind: 'connect' }
   /** um comando para rodar no terminal, com botão de copiar */
   | { kind: 'command'; command: string }

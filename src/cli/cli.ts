@@ -129,8 +129,8 @@ async function main(): Promise<void> {
     tokenFile: path.join(os.homedir(), '.faz-ai', 'web-token'),
     iconFile: path.join(distDir, '..', 'media', 'icon.png'),
     env: {
-      connectAI() {
-        const { message, toIgnore } = host.connectAI();
+      async connectAI(target) {
+        const { message, toIgnore } = await host.connectAI(target);
         return toIgnore.length
           ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.`
           : message;
