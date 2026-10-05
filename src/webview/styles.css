@@ -1824,6 +1824,16 @@ button.heartbeat.stopped:hover {
 .banner.requirements.compact {
   margin: 0 0 var(--sp-8);
 }
+/* só o recomendado: uma linha discreta, não a faixa de aviso */
+.banner.requirements.recommended {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-6) var(--sp-8);
+  color: var(--muted);
+}
+.banner.requirements.recommended li p {
+  display: none;
+}
 .requirements-head {
   display: flex;
   align-items: center;

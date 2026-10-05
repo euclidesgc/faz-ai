@@ -74,7 +74,7 @@ export const card: Record<string, string> = {
   '{tool} está trabalhando neste card… A resposta aparece aqui quando terminar.':
     '{tool} is working on this card… The reply appears here when it finishes.',
   'Escreva uma mensagem… (Cmd+Enter envia; cole imagens direto aqui)': 'Write a message… (Cmd+Enter sends; paste images right here)',
-  'Chamar a IA daqui não está disponível para o {tool}.': 'Calling the AI from here is not available for {tool}.',
+  'Trabalhar na fase daqui não está disponível para o {tool}.': 'Working on the phase from here is not available for {tool}.',
   'Permissão do {tool} ao ser chamado: {permission}.': '{tool} permission when called: {permission}.',
   Mudar: 'Change',
   Enviar: 'Send',

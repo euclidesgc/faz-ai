@@ -70,7 +70,7 @@ export function executionPlan(s: BoardState, c: Card, projectDir: string, homeDi
     const defs = claudeServers(projectDir, homeDir);
     if (!defs[BOARD_SERVER])
       throw new Error(
-        'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Use "Conectar ao board (MCP)" em Configurações → Harness de IA.',
+        'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Use "Conectar IA (MCP)" em Configurações.',
       );
     const missing = allowed.filter((n) => !defs[n]);
     if (missing.length) throw new Error(`Servidores MCP do agente não encontrados na configuração do Claude Code: ${missing.join(', ')}.`);

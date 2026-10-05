@@ -12,6 +12,7 @@ import { formatDateTime, t } from '../../i18n';
 const ATTACHMENT_SCHEME = 'attachment:';
 const ATTACHMENT_LINK = /\]\(attachment:([^)\s]+)\)/g;
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
+import { aiBlockedReason } from '../RequirementsBanner';
 import { Button, DeleteButton, IconRun } from '../ui';
 
 /** Conversa do card: é por aqui que a pessoa e a IA falam sobre o trabalho. */
@@ -26,7 +27,8 @@ export function CommentsTab({ cardId }: { cardId: string }) {
   const running = state.aiRuns.includes(cardId);
   const toolLabel = aiToolInfo(state.board.aiTool).label;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === state.board.runner.permission)!;
-  const canCall = !!card && isLive(card) && !state.aiRunUnsupported;
+  const blocked = aiBlockedReason(state);
+  const canCall = !!card && isLive(card) && !blocked;
 
   const submit = () => {
     if (!draft.trim()) return;
@@ -94,9 +96,9 @@ export function CommentsTab({ cardId }: { cardId: string }) {
           placeholder={t('Escreva uma mensagem… (Cmd+Enter envia; cole imagens direto aqui)')}
         />
         <div className="row wrap">
-          <span className="muted small ai-permission" title={state.aiRunUnsupported ?? t(permission.hint)}>
+          <span className="muted small ai-permission" title={blocked ?? t(permission.hint)}>
             {state.aiRunUnsupported
-              ? t('Chamar a IA daqui não está disponível para o {tool}.', { tool: toolLabel })
+              ? t('Trabalhar na fase daqui não está disponível para o {tool}.', { tool: toolLabel })
               : t('Permissão do {tool} ao ser chamado: {permission}.', { tool: toolLabel, permission: t(permission.label) })}{' '}
             <a onClick={() => openSettings('harness')}>{t('Mudar')}</a>
           </span>
@@ -108,7 +110,7 @@ export function CommentsTab({ cardId }: { cardId: string }) {
             variant="primary"
             disabled={!canCall || running}
             title={
-              state.aiRunUnsupported ??
+              blocked ??
               t(
                 'Roda o {tool} em segundo plano para ler a conversa e fazer o trabalho da fase em que o card está. A resposta chega aqui, sem acompanhamento ao vivo.',
                 {

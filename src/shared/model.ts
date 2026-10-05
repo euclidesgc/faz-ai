@@ -237,6 +237,8 @@ export interface BoardState {
   aiRunUnsupported: string | null;
   /** o que falta para o board trabalhar com a ferramenta de IA (CLI, login, servidor MCP…); vazio quando está tudo pronto */
   requirements: BoardRequirement[];
+  /** quando o host terminou a última conferência dos requisitos (ms), mesmo sem mudança; 0 antes da primeira */
+  requirementsCheckedAt: number;
   /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */
   harnessInstall: InstallPreview | null;
 }
