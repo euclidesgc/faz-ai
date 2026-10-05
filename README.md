@@ -627,7 +627,7 @@ pelo `get_card`, como orientação.
 
 ## Harness de IA
 
-![Lista de skills do projeto e globais, com seleção e ações em massa](docs/images/harness.png)
+![Skills do projeto e globais, com a instalação da skill do fluxo no global ou no projeto](docs/images/harness.png)
 
 Em Configurações → **Harness de IA** fica tudo que as ferramentas de IA carregam, em três abas:
 **Ferramenta e execução** (a IA do projeto e como o board a chama), **Do projeto** (o arquivo de
@@ -689,7 +689,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 
 ## Configurações
 
-![Configurações: catálogo de modelos e regras de sugestão](docs/images/settings.png)
+![Configurações: catálogo de modelos com preço por modelo e regras de sugestão](docs/images/settings.png)
 
 | Seção | O que ajusta |
 | --- | --- |

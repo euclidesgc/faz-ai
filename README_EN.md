@@ -652,7 +652,7 @@ AI through `get_card`, as guidance.
 
 ## AI harness
 
-![List of project and global skills, with selection and bulk actions](docs/images/harness_en.png)
+![Project and global skills, with the flow skill install, global or in the project](docs/images/harness_en.png)
 
 Configurações → **Harness de IA** holds everything the AI tools load, in three tabs: **Ferramenta e
 execução** (tool and run: the project's AI and how the board calls it), **Do projeto** (from the
@@ -720,7 +720,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 
 ## Settings
 
-![Settings: model catalog and suggestion rules](docs/images/settings_en.png)
+![Settings: model catalog with per-model pricing and suggestion rules](docs/images/settings_en.png)
 
 | Section | What it adjusts |
 | --- | --- |
