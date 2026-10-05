@@ -1,4 +1,5 @@
 import type { BoardState, Card, Id } from './model';
+import { openPredecessors } from './links';
 import { byExecutionOrder } from './priority';
 import { isLive } from './selectors';
 import { statusInfo, type CardStatus } from './status';
@@ -33,8 +34,9 @@ export function pendingWork(s: BoardState): PendingWork {
   return {
     ai: {
       approved: withStatus('approved'),
-      // sub-tarefa de uma história que está com a pessoa espera a decisão dela
-      ready: withStatus('ready').filter((c) => !c.parentId || !withHuman(byId.get(c.parentId))),
+      // sub-tarefa de uma história que está com a pessoa espera a decisão dela, e card com dependência
+      // em aberto espera ela terminar
+      ready: withStatus('ready').filter((c) => (!c.parentId || !withHuman(byId.get(c.parentId))) && openPredecessors(s, c.id).length === 0),
       // card bloqueado fica parado até a pessoa desbloquear, mesmo que o motivo esteja na conversa
       unanswered: cards.filter(
         (c) => lastSource.get(c.id) === 'human' && !['ready', 'approved', 'running', 'blocked'].includes(c.status ?? ''),

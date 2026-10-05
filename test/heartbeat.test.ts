@@ -225,6 +225,45 @@ describe('heartbeat', () => {
     expect(runner.started.map(number)).toEqual([1]);
   });
 
+  it('história que depende de outra ainda em aberto não entra na rodada', () => {
+    create('A', 'PRD'); // #1
+    create('B', 'Spec'); // #2: só começa depois de #1
+    router.handle({ type: 'link.add', fromId: card(1).id, toId: card(2).id, kind: 'precedes' });
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
+    // nem pela sub-tarefa pronta: quem executa é a história, que ainda espera #1
+    create('Sub de B', 'A fazer', 2); // #3
+    setStatus(3, 'ready');
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
+  });
+
+  it('história com sub-tarefa em execução não é iniciada de novo', () => {
+    create('A', 'Implementação'); // #1 pronta
+    create('Sub', 'A fazer', 1); // #2
+    create('Outra sub', 'A fazer', 1); // #3
+    router.handle({ type: 'card.status.set', cardId: card(2).id, status: 'running' }, { source: 'ai' });
+    expect(heartbeatTargets(router.snapshot())).toEqual([]);
+  });
+
+  it('com execução em andamento, a rodada usa as vagas livres e "rodar agora" conta as histórias', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallel: true, parallelStories: 3 }, git: { mode: 'worktree' } } });
+    runner.running.push('chamada-a-mao'); // uma execução que o heartbeat não iniciou
+    create('A', 'PRD');
+    create('B', 'Spec');
+    create('C', 'Plan');
+    expect(heartbeat.runNow()).toBe(3);
+    expect(runner.started.map(number)).toEqual([1, 2]); // três vagas, uma já ocupada
+    expect(heartbeat.queued).toBe(1);
+  });
+
+  it('com execução em andamento e o intervalo passado, a rodada automática começa nas vagas livres', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallel: true }, git: { mode: 'worktree' } } });
+    runner.running.push('chamada-a-mao');
+    create('A', 'PRD');
+    now += 60 * MIN;
+    heartbeat.tick();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+
   it('desligado não roda sozinho; parar esvazia a fila; falha ao iniciar encerra a rodada', () => {
     create('A', 'PRD');
     create('B', 'Spec');

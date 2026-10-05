@@ -1,6 +1,8 @@
 import type { AiRunOrigin } from '../shared/log';
 import { cardRef, type BoardState, type Card, type Column } from '../shared/model';
+import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
+import { parallelLimit } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { statusInfo } from '../shared/status';
 import { isDelivered, yoloStories } from '../shared/story';
@@ -67,6 +69,13 @@ export function autopilotStep(s: BoardState): AutopilotStep {
   }
   const queue = aiQueue(s, pendingWork(s));
   if (queue.some((c) => c.id === story.id || c.parentId === story.id)) return { kind: 'run', story };
+  // a fila da IA não traz card que ainda espera uma dependência em aberto: diz de quem a história depende
+  const blockers = [
+    ...new Set(
+      [story, ...childrenOf(s, story.id).filter(isLive)].flatMap((c) => openPredecessors(s, c.id)).filter((p) => p.parentId !== story.id),
+    ),
+  ];
+  if (blockers.length) return { kind: 'paused', story, reason: `${cardRef(story)} espera ${blockers.map(cardRef).join(', ')} terminar.` };
   // nada com a IA e a história continua aberta: o ciclo emperrou
   return { kind: 'paused', story, reason: `${cardRef(story)} não tem nada pendente com a IA, mas ainda não foi concluído.` };
 }
@@ -81,7 +90,9 @@ function progressOf(s: BoardState, story: Card): string {
 
 /**
  * Toca sozinho as histórias em modo autônomo (YOLO): leva a primeira da fila do Backlog ao fim, uma
- * execução da IA após a outra, sem esperar o intervalo do heartbeat, e só então passa à próxima.
+ * execução da IA após a outra, sem esperar o intervalo do heartbeat, e só então passa à próxima. Divide o
+ * limite de execuções simultâneas com o heartbeat: começa numa vaga livre e, quando as duas filas
+ * disputam a mesma vaga, elas se intercalam.
  * Não pede aprovação de nada, mas para quando a IA bloqueia o card, quando uma execução falha, e depois
  * de execuções seguidas que não avançam nada. Não depende da API do VSCode.
  */
@@ -149,7 +160,9 @@ export class Autopilot {
     const card = s.cards.find((c) => c.id === cardId);
     const story = card && (card.parentId ? s.cards.find((c) => c.id === card.parentId) : card);
     if (story?.yolo && this.active) this.checkProgress(s, story);
-    this.evaluate();
+    // decide depois dos demais ouvintes do fim da execução: o heartbeat guarda a vaga para o autopiloto
+    // quando a execução que terminou era dele, e a toma quando era do autopiloto (as filas se intercalam)
+    (this.deps.defer ?? queueMicrotask)(() => this.evaluate());
   }
 
   /** Disjuntor: execuções seguidas sem mudar nada na história a bloqueiam, em vez de gastar sem fim. */
@@ -207,12 +220,18 @@ export class Autopilot {
           );
           continue;
         }
-        if (step.kind === 'run' && this.runner.running.length === 0) this.start(step.story);
+        // o limite conta toda execução em andamento (heartbeat, chamadas à mão): o autopiloto usa uma vaga livre
+        if (step.kind === 'run' && this.runner.running.length < this.limit()) this.start(step.story);
         return;
       }
     } finally {
       this.busy = false;
     }
+  }
+
+  private limit(): number {
+    const { board } = this.router.snapshot();
+    return parallelLimit(board.runner, board.git.mode);
   }
 
   private start(story: Card): void {
@@ -239,12 +258,14 @@ export class Autopilot {
 
   /** Um "Em execução" sem execução de verdade (a sessão caiu): volta para a IA tentar de novo. */
   private recoverStale(): void {
-    if (this.runner.running.length) return;
     const s = this.router.snapshot();
     // entregue não tem execução a recuperar: é a mesma primeira história não entregue do autopilotStep
     const story = yoloStories(s).find((c) => !isDelivered(s, c));
     if (!story) return;
-    for (const c of [story, ...childrenOf(s, story.id).filter(isLive)])
+    const cards = [story, ...childrenOf(s, story.id).filter(isLive)];
+    // só as execuções desta história contam: as do heartbeat em outras histórias não a seguram
+    if (cards.some((c) => this.runner.running.includes(c.id))) return;
+    for (const c of cards)
       if (c.status === 'running' && !s.aiRuns.includes(c.id))
         this.router.handle({ type: 'card.status.set', cardId: c.id, status: 'ready' }, { author: AUTHOR, source: 'ai' });
   }
