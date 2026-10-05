@@ -33,6 +33,43 @@ export function newDatabase(): Database {
   return new sqlJs.Database();
 }
 
+/**
+ * Exporta o banco como bytes e religa as chaves estrangeiras. No sql.js, `db.export()` fecha e reabre a
+ * conexão, o que zera os PRAGMAs: sem religar, todo DELETE depois do primeiro save deixava de cascatear
+ * (vínculos, sub-tarefas e o board substituído na importação ficavam órfãos).
+ */
+export function exportBytes(db: Database): Uint8Array {
+  const data = db.export();
+  db.run('PRAGMA foreign_keys = ON;');
+  return data;
+}
+
+/**
+ * Apaga as linhas que violam chave estrangeira (deixadas pelas versões que gravavam com as chaves
+ * desligadas) e devolve quantas apagou. Todas as FKs do schema são ON DELETE CASCADE ou sem ação: apagar a
+ * linha órfã é o que teria acontecido com as chaves ligadas. Repete porque apagar um órfão pode cascatear.
+ */
+export function cleanOrphans(db: Database): number {
+  let removed = 0;
+  for (let round = 0; round < 20; round++) {
+    const res = db.exec('PRAGMA foreign_key_check');
+    const rows = res[0]?.values ?? [];
+    if (!rows.length) break;
+    const seen = new Set<string>();
+    for (const [table, rowid] of rows) {
+      const key = `${String(table)}:${String(rowid)}`;
+      if (rowid == null || seen.has(key)) continue;
+      seen.add(key);
+      db.run(`DELETE FROM "${String(table)}" WHERE rowid = ?`, [rowid]);
+      removed += db.getRowsModified();
+    }
+  }
+  return removed;
+}
+
+/** Marca em `meta` de que a limpeza única de órfãos (correção da 0.32.0) já rodou neste banco. */
+const ORPHANS_CLEANED = 'orphans_cleaned';
+
 /** Cria um banco em memória (testes). */
 export async function openInMemory(wasmDir: string): Promise<Database> {
   const SQL = await getSqlJs(wasmDir);
@@ -52,12 +89,17 @@ export async function openFile(filePath: string, wasmDir: string, debounceMs = 5
     db = new SQL.Database();
   }
   migrate(db);
+  // limpeza única: o arquivo pode ter órfãos gravados antes de as chaves serem religadas após o save
+  if (!db.exec(`SELECT 1 FROM meta WHERE key = '${ORPHANS_CLEANED}'`).length) {
+    cleanOrphans(db);
+    db.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', [ORPHANS_CLEANED, '1']);
+  }
 
   let timer: NodeJS.Timeout | null = null;
   let writing: Promise<void> = Promise.resolve();
 
   const write = async () => {
-    const data = db.export();
+    const data = exportBytes(db);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     const tmp = `${filePath}.tmp`;
     await fs.writeFile(tmp, Buffer.from(data));
@@ -85,7 +127,7 @@ export async function openFile(filePath: string, wasmDir: string, debounceMs = 5
     flush,
     backup() {
       mkdirSync(path.dirname(filePath), { recursive: true });
-      writeFileSync(`${filePath}.bak`, Buffer.from(db.export()));
+      writeFileSync(`${filePath}.bak`, Buffer.from(exportBytes(db)));
     },
     async close() {
       await flush();

@@ -25,8 +25,8 @@ export const settings: Record<string, string> = {
   'Board "{name}" com {cards} card(s) e {attachments} anexo(s), {size}, exportado em {date} pelo Faz AI {version} (formato {format}).':
     'Board "{name}" with {cards} card(s) and {attachments} attachment(s), {size}, exported on {date} by Faz AI {version} (format {format}).',
   'O arquivo tem mais de 200 MB: a importação pode demorar.': 'The file is larger than 200 MB: the import may take a while.',
-  'Tudo o que está neste board será apagado e substituído. Uma cópia de segurança (.bak) fica ao lado do banco.':
-    'Everything on this board will be deleted and replaced. A backup copy (.bak) is kept next to the database.',
+  'Tudo o que está neste board será apagado e substituído. Uma cópia de segurança (.bak) fica ao lado do banco, e os anexos atuais vão para uma pasta de backup ao lado da pasta de anexos.':
+    'Everything on this board will be deleted and replaced. A backup copy (.bak) is kept next to the database, and the current attachments are moved to a backup folder next to the attachments folder.',
   'Substituir o board atual?': 'Replace the current board?',
   'Importar e substituir': 'Import and replace',
   'Expandir o menu': 'Expand the menu',

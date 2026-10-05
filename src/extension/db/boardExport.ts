@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Database, SqlValue } from 'sql.js';
 import { LARGE_EXPORT_BYTES, type ImportSummary } from '../../shared/backup';
-import { safeName, type AttachmentStore } from '../attachments';
+import { isSafeSegment, safeName, type AttachmentStore } from '../attachments';
 import { newDatabase } from './database';
 import { all, num, one, run, str, transaction, type Row } from './query';
 import { migrate, SCHEMA_VERSION } from './schema';
@@ -184,6 +184,12 @@ export function parseExportFile(text: string): BoardExportFile {
       if (t.hasId && (typeof row.id !== 'string' || !row.id)) throw invalid(`linha sem id em "${t.name}".`);
     }
   }
+  // id de card e nome gravado de anexo viram caminho em disco (<anexos>/<card>/<nome>): nada que saia da pasta
+  for (const c of tables.cards as Row[]) if (!isSafeSegment(str(c.id))) throw invalid('id de card inválido.');
+  for (const a of tables.attachments as Row[]) {
+    if (typeof a.card_id !== 'string' || !isSafeSegment(a.card_id)) throw invalid('id de card inválido.');
+    if (typeof a.stored_name !== 'string' || !isSafeSegment(a.stored_name)) throw invalid('nome de anexo inválido.');
+  }
   if (!Array.isArray(f.files)) throw invalid('falta a lista de arquivos dos anexos.');
   for (const file of f.files) {
     if (!isRow(file) || typeof file.attachmentId !== 'string') throw invalid('item inválido na lista de arquivos dos anexos.');
@@ -226,7 +232,7 @@ export interface ImportTarget {
   db: Database;
   /** grava o `.bak` antes de apagar o board; sem ele (testes em memória) a importação segue sem cópia */
   backup?: () => void;
-  store: Pick<AttachmentStore, 'pathOf' | 'removeCard'>;
+  store: Pick<AttachmentStore, 'pathOf' | 'backupCards'>;
   /** chave da pasta aberta: o board importado passa a ser o desta pasta */
   workspaceKey: string;
   /** o board atual, que é substituído */
@@ -240,6 +246,8 @@ export interface ImportResult {
   attachments: number;
   /** `#n` dos cards cujo anexo ficou sem arquivo (sem conteúdo no export ou falha ao gravar) */
   warnings: string[];
+  /** pasta para onde foram movidos os anexos do board substituído; ausente se ele não tinha anexos em disco */
+  attachmentsBackup?: string;
 }
 
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -249,6 +257,7 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
  * banco real: os anexos são decodificados, o arquivo é materializado num banco em memória na versão de
  * schema dele e migrado até a atual. Só então o `.bak` é gravado, o board atual apagado e as tabelas
  * copiadas, numa transação. Os arquivos de anexos são gravados depois do COMMIT: falha neles vira aviso.
+ * As pastas de anexos do board substituído não são apagadas: vão para `<anexos>.bak-<data>`, par do `.bak`.
  */
 export function importBoard(target: ImportTarget, file: BoardExportFile): ImportResult {
   const db = target.db;
@@ -300,8 +309,13 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
         insertRows(db, t.name, all(mem, `SELECT * FROM ${t.name} WHERE ${t.where} ORDER BY rowid`, [newBoardId]));
     });
 
-    // 6. arquivos de anexos, depois do COMMIT
-    for (const id of oldCards) target.store.removeCard(id);
+    // 6. arquivos de anexos, depois do COMMIT; os do board substituído vão para a pasta de backup
+    let attachmentsBackup: string | undefined;
+    try {
+      attachmentsBackup = target.store.backupCards(oldCards);
+    } catch {
+      // backup dos anexos é cortesia: o banco já trocou, e as pastas antigas ficam onde estão
+    }
     const numbers = new Map((file.tables.cards ?? []).map((c) => [str(c.id), num(c.number)]));
     const warnings: string[] = [];
     const warn = (cardId: string) => {
@@ -323,7 +337,9 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
         warn(cardId);
       }
     }
-    return { boardId: newBoardId, boardName, cards: numbers.size, attachments: attachmentRows.length, warnings };
+    const result: ImportResult = { boardId: newBoardId, boardName, cards: numbers.size, attachments: attachmentRows.length, warnings };
+    if (attachmentsBackup) result.attachmentsBackup = attachmentsBackup;
+    return result;
   } finally {
     mem.close();
   }
