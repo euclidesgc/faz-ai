@@ -18,11 +18,24 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   recorded **with no measured consumption** ("não medido", not zero). Questions in the board chat
   are recorded too, with no card. `get_metrics` now returns tokens and cost.
 
-- **The detail of each run in the board's file dropped from 12 to 6 months.** What the board keeps
-  per run (now with consumption and inventory) stays for 6 months besides the current month; after
-  that only the monthly totals remain, and they never expire. If you are upgrading, you lose the
-  individual detail of runs older than 6 months, not the totals. The shorter window keeps the
-  database file within its size limit.
+- **New Métricas (Metrics) view, the fourth navigation button.** It shows the board's work and AI
+  usage, in the editor and in the board in the browser. It has period filters (Hoje, 7 dias, 30
+  dias, Este mês, Últimos 12 meses, Tudo and a free range) and a workflow filter, and five totals:
+  completed activities, AI runs, tokens, cost and AI time. AI time is the sum of each run's
+  duration, so simultaneous runs add up and the total can exceed the elapsed time. What was not
+  measured shows as "não medido" (not measured), never as 0.
+
+- **The metrics panel has the cost and tokens series per month.** A bar chart, one series at a time.
+  The month in progress is hatched, a month with no data is a gap marked "sem dado" (no data), and a
+  table has the same numbers. The notes sit next to the number: since when the board's log exists,
+  the period cut at the start of the log, and the months that only have the monthly total.
+
+- **The window for each run's detail is configurable, from 1 to 24 months, and the default dropped
+  from 12 to 6.** In the **Detalhe guardado** (Detail kept) block of the Metrics view you choose how
+  many months of detail (consumption and inventory per run) the board keeps besides the current
+  month; after that only the monthly totals remain, and they never expire. Lowering the window asks
+  for confirmation and the discard happens the next time the board opens. If you are upgrading, you
+  lose the individual detail of runs older than 6 months, not the totals. The shorter default keeps the database file within its size limit.
 
 - **One click on the branch name copies it.** In the open card, the story's branch became a button:
   clicking copies the name to the clipboard and the screen confirms with "Nome copiado" (name copied).

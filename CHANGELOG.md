@@ -17,11 +17,25 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   execuções dele ficam registradas **sem consumo medido** ("não medido", e não zero). Perguntas no
   chat do board também entram no registro, sem card. O `get_metrics` passa a trazer tokens e custo.
 
-- **O detalhe de cada execução no arquivo do board caiu de 12 para 6 meses.** O que o board guarda
-  por execução (agora com consumo e inventário) fica por 6 meses além do mês corrente; depois disso
-  só permanecem os totais por mês, que nunca expiram. Quem atualiza perde o detalhe individual das
-  execuções com mais de 6 meses, não os totais. A janela menor mantém o arquivo do banco dentro do
-  limite de tamanho.
+- **Nova visão Métricas, o quarto botão da navegação.** Mostra o trabalho e o uso da IA do board, no
+  editor e no board pelo navegador. Tem filtros de período (Hoje, 7 dias, 30 dias, Este mês, Últimos
+  12 meses, Tudo e intervalo livre) e de workflow, e cinco totais: atividades concluídas, execuções
+  de IA, tokens, custo e tempo de IA. O tempo de IA é a soma da duração de cada execução, então
+  execuções simultâneas somam e o total pode passar do tempo decorrido. O que não foi medido aparece
+  como "não medido", nunca como 0.
+
+- **O painel de métricas traz a série de custo e tokens por mês.** Gráfico de barras, uma série por
+  vez. O mês em andamento vem com hachura, o mês sem dado é um espaço marcado "sem dado" e há uma
+  tabela com os mesmos números. Os avisos ficam junto do número: desde quando o log do board existe,
+  o período cortado no início do log e os meses que só têm o total mensal.
+
+- **A janela do detalhe de cada execução é configurável, de 1 a 24 meses, e o padrão caiu de 12
+  para 6.** No bloco **Detalhe guardado** da visão Métricas você escolhe quantos meses de detalhe
+  (consumo e inventário por execução) o board guarda além do mês corrente; depois disso só
+  permanecem os totais por mês, que nunca expiram. Baixar a janela pede confirmação e o descarte
+  acontece na próxima abertura do board. Quem atualiza perde o detalhe individual das execuções com
+  mais de 6 meses, não os totais. O padrão menor mantém o
+  arquivo do banco dentro do limite de tamanho.
 
 - **Um clique no nome da branch copia o nome.** No card aberto, a branch da história virou um botão:
   clicar copia o nome para a área de transferência e a tela confirma com "Nome copiado".

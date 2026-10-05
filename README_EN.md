@@ -316,9 +316,40 @@ one), subagents and skills, with the number of calls.
   missing measurement, not zero consumption. The same applies to runs that end before the tool
   reports consumption.
 - **Questions in the board chat** are recorded too, with no card attached.
-- **The detail of each run is kept for 6 months** (the current month plus the 6 before it). After
-  that the detail is discarded, but the **monthly totals never expire**. It used to be 12 months;
-  the shorter window keeps the database file within its size limit.
+- **The detail of each run is kept for a window you configure**, from 1 to 24 months (the current
+  month plus the earlier ones). The default is 6 months. After the window the detail is discarded,
+  but the **monthly totals never expire**. It used to be 12 months; the shorter default keeps the
+  database file within its size limit. Where to change it, and what happens when you lower it, is
+  under **Metrics panel**, right below.
+
+### Metrics panel
+
+The **Métricas** (Metrics) button, the fourth in the top navigation (Board, Metrics, Trash,
+Settings), shows what the board recorded about the work and the AI's usage. It works in the editor
+and also in the board opened in the browser.
+
+- **Filters.** The period can be Hoje (today), 7 dias, 30 dias, Este mês (this month), Últimos 12
+  meses (last 12 months), Tudo (all) or a free range (start and end date). The **Workflow** filter
+  limits the numbers to one workflow, and **Limpar filtros** (clear filters) goes back to the
+  default. Below the controls the panel writes the period it queried.
+- **Five totals.** Completed activities (cards that reached a completion column), AI runs, tokens,
+  cost and AI time. **AI time is the sum of each run's duration**: simultaneous runs add up, so the
+  total can exceed the elapsed clock time. What was not measured shows as "não medido" (not
+  measured), never as 0, and when only some of the runs were measured the note says how many were
+  left out.
+- **Cost and tokens per month.** A bar chart, one series at a time (the **Custo** / **Tokens**
+  switch). The month in progress is hatched, because it has not ended yet; a month with no data at
+  all is a gap marked "sem dado" (no data), not a zero-height bar. Below the chart a table has the
+  same numbers and a notes column (partial, no data, monthly total only).
+- **Detail kept** ("Detalhe guardado"). Shows the retention window for the runs' detail and how much
+  space it takes. You can set it from 1 to 24 months (default 6). Raising it saves right away.
+  **Lowering it asks for confirmation**, which says how many months lose their detail, and the
+  discard only happens the next time the board opens. The monthly totals stay.
+- **Honesty notes**, always next to the number: since when the board's log exists (before that
+  there is no data, the number is not small); the note that the requested period was cut at the
+  start of the log; and the months that only have the monthly total (they enter the series, but with
+  no breakdown by dimension and no detail per card). With a workflow filtered, a month consolidated
+  before the log stored the workflow is left out of the numbers, and the note says so.
 
 ### Usage metrics with get_metrics
 
@@ -336,7 +367,7 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 - Unmeasured values appear as "-" (never 0), for example Copilot runs. A cost estimated from the
   model's price is marked as estimated.
 - Always tells you when the board's history started and which periods have only monthly totals
-  (without per-run detail). Periods outside the 6-month window have no detail and aggregate only
+  (without per-run detail). Periods outside the retention window (6 months by default) have no detail and aggregate only
   the already-consolidated totals.
 
 ### Branch and working folder per story

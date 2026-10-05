@@ -298,9 +298,39 @@ uma), subagentes e skills, com a contagem de chamadas.
   medição, não consumo zero. O mesmo vale para execuções que terminam antes de a ferramenta informar
   o consumo.
 - **Perguntas no chat do board** também entram no registro, sem card associado.
-- **O detalhe de cada execução é guardado por 6 meses** (o mês corrente mais os 6 anteriores). Depois
-  disso o detalhe é descartado, mas os **totais por mês nunca expiram**. Antes eram 12 meses; o prazo
-  menor mantém o arquivo do banco dentro do limite de tamanho.
+- **O detalhe de cada execução é guardado por uma janela que você configura**, de 1 a 24 meses (o
+  mês corrente mais os anteriores). O padrão é 6 meses. Depois da janela o detalhe é descartado, mas
+  os **totais por mês nunca expiram**. Antes o prazo era 12 meses; o padrão menor mantém o arquivo do
+  banco dentro do limite de tamanho. Onde ajustar, e o que acontece ao baixar a janela, está em
+  **Painel de métricas**, logo abaixo.
+
+### Painel de métricas
+
+O botão **Métricas**, o quarto da navegação do topo (Board, Métricas, Lixeira, Configurações), mostra
+o que o board registrou sobre o trabalho e o uso da IA. Funciona no editor e também no board aberto
+pelo navegador.
+
+- **Filtros.** O período pode ser Hoje, 7 dias, 30 dias, Este mês, Últimos 12 meses, Tudo ou um
+  Intervalo livre (data inicial e final). O filtro **Workflow** restringe os números a um workflow, e
+  **Limpar filtros** volta ao padrão. Abaixo dos controles o painel escreve o período consultado.
+- **Cinco totais.** Atividades concluídas (cards que chegaram a uma coluna de conclusão), execuções
+  de IA, tokens, custo e tempo de IA. O **tempo de IA é a soma da duração de cada execução**:
+  execuções simultâneas somam, então o total pode passar do tempo decorrido no relógio. O que não
+  foi medido aparece como "não medido", nunca como 0, e quando só parte das execuções foi medida o
+  aviso diz quantas ficaram de fora.
+- **Custo e tokens por mês.** Gráfico de barras, uma série por vez (alternador **Custo** / **Tokens**).
+  O mês em andamento aparece com hachura, porque ainda não terminou; um mês sem nenhum dado é um
+  espaço marcado "sem dado", não uma barra de altura zero. Abaixo do gráfico fica uma tabela com os
+  mesmos números e uma coluna de observação (parcial, sem dado, só total mensal).
+- **Detalhe guardado.** Mostra a janela de retenção do detalhe das execuções e quanto espaço ela
+  ocupa. Dá para configurá-la de 1 a 24 meses (padrão 6). Aumentar grava na hora. **Baixar pede
+  confirmação**, que diz quantos meses perdem o detalhe, e o descarte só acontece na próxima abertura
+  do board. Os totais por mês continuam.
+- **Avisos de honestidade**, sempre junto do número: desde quando o log do board existe (antes disso
+  não há dado, o número não está pequeno); o aviso de que o período pedido foi cortado no início do
+  log; e os meses que só têm o total mensal (entram na série, mas sem corte por dimensão nem detalhe
+  por card). Com um workflow filtrado, um mês consolidado antes de o log guardar o workflow fica de
+  fora dos números, e o aviso diz isso.
 
 ### Métricas de uso com get_metrics
 
@@ -319,7 +349,7 @@ economizar tokens.
 - Valores não medidos aparecem como "-" (nunca 0), por exemplo as execuções do Copilot. Custo
   estimado a partir do preço do modelo vem marcado como estimado.
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
-  (sem detalhe por execução). Períodos fora da janela de 6 meses não têm detalhe e só agregam os
+  (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm detalhe e só agregam os
   totais já consolidados.
 
 ### Branch e pasta de trabalho por história
