@@ -369,13 +369,13 @@ describe('executor da IA', () => {
     procs[0]!.exit(1);
     expect(card().status).toBe('approved');
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
-    expect(lastMessage().body).toContain('O refinamento do card não terminou');
-    expect(lastMessage().body).toContain('código 1');
+    expect(lastMessage()!.body).toContain('O refinamento do card não terminou');
+    expect(lastMessage()!.body).toContain('código 1');
 
     runner.start(storyId, 'manual', 'refine');
     procs[1]!.exit(null, new Error('comando "claude" não encontrado.'));
     expect(card().status).toBe('approved');
-    expect(lastMessage().body).toContain('não encontrado');
+    expect(lastMessage()!.body).toContain('não encontrado');
   });
 
   it('o fim da execução diz aos ouvintes se era refinar ou trabalhar na fase', () => {

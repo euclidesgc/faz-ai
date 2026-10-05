@@ -135,6 +135,7 @@ const state: BoardState = {
   autopilot: { active: false, note: null },
   aiRunUnsupported: null,
   requirements: [],
+  requirementsCheckedAt: 0,
   harnessInstall: null,
 };
 
