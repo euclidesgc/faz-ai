@@ -266,12 +266,20 @@ O botão também fica no cabeçalho do card, ao lado do status.
   pela conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em
   uso aparece ao lado do botão, com um atalho para mudar. A IA é avisada do limite: se o trabalho
   pedir mais do que o nível permite, ela bloqueia o card dizendo qual opção escolher.
-- Cursor e Kimi Code, quando rodam em segundo plano, só funcionam no nível "sem restrições".
+- O Kimi Code, quando roda em segundo plano, só funciona no nível "sem restrições". O Cursor aceita
+  os três: em "só o board" e "board e arquivos" a sessão dele recebe só as ferramentas do nível
+  (leitura e MCP; leitura, MCP e edição), sem terminal.
 - A ferramenta precisa estar instalada e autenticada. A CLI não precisa estar no PATH: o board a
   procura também nas pastas de instalação usuais e dentro das extensões do editor (quem só usa a
-  extensão do Claude Code ou do Codex já tem o executável).
+  extensão do Claude Code ou do Codex já tem o executável). A do Cursor é a `cursor-agent` (o
+  instalador de `curl https://cursor.com/install -fsS | bash` cria também o atalho `agent`); entre na
+  conta uma vez com `cursor-agent login`.
 - Com o Claude Code, o servidor do board vai na linha de comando de cada execução: não depende de
-  **Conectar IA (MCP)** nem da aprovação do `.mcp.json`. Nas outras ferramentas, conecte antes.
+  **Conectar IA (MCP)** nem da aprovação do `.mcp.json`. Com o Cursor, o board grava o servidor no
+  `.cursor/mcp.json` antes de rodar, se ainda não estiver lá (e põe o arquivo no `.git/info/exclude`
+  quando o cria). Nas outras ferramentas, conecte antes.
+- Quando a história tem pasta de trabalho própria (worktree), a ferramenta recebe essa pasta junto
+  com a do projeto, inclusive o Cursor.
 - Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo e o fim da
   saída da ferramenta. O log completo está no painel **Saída → Faz AI** (ou no terminal do `faz-ai`).
 

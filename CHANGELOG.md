@@ -6,6 +6,30 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **O Cursor em segundo plano funciona de verdade.** O botão Chamar IA, o heartbeat e o modo
+  autônomo com o Cursor tinham quatro defeitos, corrigidos:
+  - **Sem o servidor do board.** Se ninguém tivesse clicado em Conectar IA (MCP), a execução rodava
+    sem as ferramentas do board e terminava como sucesso sem mover nem comentar nada. Agora o board
+    grava o servidor no `.cursor/mcp.json` antes de rodar.
+  - **Consumo zerado.** O Cursor informa os tokens em camelCase e o board lia os nomes do Claude: as
+    execuções apareciam medidas com 0 tokens e custo zero. Agora os tokens são lidos, e o custo é
+    estimado pelo modelo que de fato rodou (o Cursor o informa no início; com `auto` era impossível).
+  - **Inventário vazio.** As ferramentas usadas, inclusive as de MCP, não eram contadas. Agora são,
+    uma vez por chamada.
+  - **Fora da worktree.** A pasta de trabalho da história não era entregue ao Cursor; agora vai por
+    `--add-dir`, como nas outras ferramentas.
+
+- **O Cursor aceita os níveis "só o board" e "board e arquivos".** Antes ele só rodava "sem
+  restrições". Nos níveis menores, a sessão recebe só as ferramentas do nível, sem terminal.
+
+- **A CLI do Cursor é procurada como `cursor-agent`.** O nome curto `agent` continua valendo, e o
+  board também acha a CLI na pasta do instalador. O esforço do modelo vai como sufixo do id
+  (`claude-opus-5-5-high`), como `cursor-agent models` lista as variantes.
+
+- **Windows: o prompt chega inteiro às CLIs instaladas pelo npm.** Aspas, `&` e `|` no texto eram
+  interpretados pelo `cmd.exe`, e **Parar** deixava a CLI rodando. Agora os argumentos são escapados
+  e Parar encerra a árvore de processos.
+
 - **O board registra o consumo, o custo e o inventário de cada execução da IA.** Para cada execução
   ficam gravados os tokens de entrada, de saída, de leitura de cache e de criação de cache, o custo
   em dólar, os turnos e o id da sessão, mais o inventário do que foi usado: ferramentas, ferramentas

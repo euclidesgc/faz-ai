@@ -23,6 +23,37 @@ export function loginShellPath(): Promise<string | undefined> {
   return shellPath;
 }
 
+/** Caracteres que o cmd.exe interpreta, mesmo dentro de aspas, e que precisam de `^` na frente. */
+const CMD_META = /([()\][%!^"`<>&|;, *?])/g;
+
+/**
+ * Um argumento pronto para a linha de comando do cmd.exe, como o `cross-spawn` faz: aspas e barras
+ * no padrão do Windows, e os metacaracteres escapados duas vezes, porque o `.cmd` que o npm gera
+ * repassa os argumentos (`%*`) para outro comando, que os lê de novo. Quebra de linha não atravessa
+ * o cmd.exe de jeito nenhum: vira espaço.
+ */
+export function cmdArg(arg: string): string {
+  const a = arg
+    .replace(/\r?\n/g, ' ')
+    .replace(/(\\*)"/g, '$1$1\\"')
+    .replace(/(\\*)$/, '$1$1');
+  return `"${a}"`.replace(CMD_META, '^$1').replace(CMD_META, '^$1');
+}
+
+/**
+ * Como iniciar o executável. No Windows, `.cmd` e `.bat` só rodam pelo cmd.exe, que não recebe a
+ * lista de argumentos e sim uma linha de texto: sem escape, um prompt com aspas, `&` ou `|` seria
+ * cortado ou viraria outro comando. Um `.exe` roda direto, sem shell e sem escape.
+ */
+export function launchSpec(
+  executable: string,
+  args: string[],
+  platform = process.platform,
+): { file: string; args: string[]; shell: boolean } {
+  if (platform !== 'win32' || !/\.(cmd|bat)$/i.test(executable)) return { file: executable, args, shell: false };
+  return { file: `"${executable}"`.replace(CMD_META, '^$1'), args: args.map(cmdArg), shell: true };
+}
+
 /**
  * Inicia a CLI da ferramenta de IA na pasta do projeto.
  *
@@ -52,12 +83,14 @@ export function spawnHeadless(
     'CLAUDE_CODE_MESSAGING_TOKEN',
   ])
     delete env[name];
-  const child = spawn(executable, command.args, {
+  // no Windows as CLIs instaladas pelo npm são .cmd e só rodam pelo shell, com os argumentos escapados
+  const launch = launchSpec(executable, command.args);
+  const child = spawn(launch.file, launch.args, {
     cwd,
     env,
     stdio: ['pipe', 'pipe', 'pipe'],
-    // no Windows as CLIs instaladas pelo npm são .cmd e só rodam pelo shell
-    shell: process.platform === 'win32',
+    shell: launch.shell,
+    windowsVerbatimArguments: launch.shell,
   });
   // um decodificador por canal: o pipe corta onde quiser, inclusive no meio de um caractere acentuado,
   // e `Buffer.toString()` em cada pedaço trocaria as duas metades por `\uFFFD`. O decodificador guarda
@@ -90,6 +123,11 @@ export function spawnHeadless(
   return {
     onExit: (fn) => listeners.push(fn),
     kill: () => {
+      // pelo cmd.exe, o processo filho é o shell: matar só ele deixaria a CLI rodando sozinha
+      if (launch.shell && child.pid) {
+        execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], () => {});
+        return;
+      }
       child.kill('SIGTERM');
       // se a ferramenta ignorar o pedido, encerra à força
       setTimeout(() => !exited && child.kill('SIGKILL'), 5000).unref();

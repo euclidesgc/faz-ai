@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
-import { headlessCommand, headlessUnsupported } from '../src/extension/headless';
+import { CURSOR_TOOLS, headlessCommand, headlessUnsupported } from '../src/extension/headless';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt, consumptionLine } from '../src/extension/runner';
 import type { RunnerDeps } from '../src/extension/runner';
@@ -334,12 +334,10 @@ describe('executor da IA', () => {
   });
 
   it('ferramenta que só roda sem restrições: avisa em vez de rodar com permissão menor', () => {
-    for (const tool of ['cursor', 'kimi'] as const) {
-      router.handle({ type: 'settings.board.update', patch: { aiTool: tool, runner: { permission: 'edits' } } });
-      expect(router.snapshot().aiRunUnsupported).toContain('Sem restrições');
-      expect(() => runner.start(storyId)).toThrow('Sem restrições');
-      expect(procs).toHaveLength(0);
-    }
+    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi', runner: { permission: 'edits' } } });
+    expect(router.snapshot().aiRunUnsupported).toContain('Sem restrições');
+    expect(() => runner.start(storyId)).toThrow('Sem restrições');
+    expect(procs).toHaveLength(0);
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
     expect(router.snapshot().aiRunUnsupported).toBeNull();
     runner.start(storyId);
@@ -381,9 +379,29 @@ describe('executor da IA', () => {
       env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' },
       format: 'text',
     });
-    expect(cmd('cursor', 'full')).toEqual({ command: 'agent', args: ['-p', '--force', '--approve-mcps', '--trust', 'P'], format: 'text' });
+    expect(cmd('cursor', 'full')).toEqual({
+      command: 'cursor-agent',
+      args: ['-p', '--force', '--approve-mcps', '--trust', 'P'],
+      format: 'text',
+    });
+    // nos níveis menores, a sessão do Cursor só recebe as ferramentas do nível
+    expect(cmd('cursor', 'board')).toMatchObject({
+      args: ['-p', '--force', '--approve-mcps', '--trust', '--allowed-tools', CURSOR_TOOLS.board.join(','), 'P'],
+    });
+    const edits = (cmd('cursor', 'edits') as HeadlessCommand).args;
+    expect(edits[edits.indexOf('--allowed-tools') + 1]!.split(',')).toEqual([...CURSOR_TOOLS.board, ...CURSOR_TOOLS.edits]);
+    expect(CURSOR_TOOLS.board).toContain('mcp_tool_call');
+    expect([...CURSOR_TOOLS.board, ...CURSOR_TOOLS.edits]).not.toContain('shell_tool_call');
     expect(headlessUnsupported('claude', 'board')).toBeNull();
-    expect(headlessUnsupported('cursor', 'board')).toContain('Cursor');
+    expect(headlessUnsupported('cursor', 'board')).toBeNull();
+    expect(headlessUnsupported('kimi', 'board')).toContain('Kimi');
+  });
+
+  it('o Cursor recebe as worktrees por --add-dir e o servidor do board pelo .cursor/mcp.json', () => {
+    const boardServer = { command: '/usr/bin/node', args: ['/dados/mcp/bridge.js', '/projeto'] };
+    const built = headlessCommand('cursor', { prompt: 'P', permission: 'full', boardServer, addDirs: ['/w/a', '/w/b'] }) as HeadlessCommand;
+    expect(built.args).toEqual(['-p', '--force', '--approve-mcps', '--trust', '--add-dir', '/w/a', '--add-dir', '/w/b', 'P']);
+    expect(built.projectMcp).toEqual({ file: '.cursor/mcp.json', entry: boardServer });
   });
 
   it('o Claude Code recebe o servidor do board na linha de comando, sem depender do registro no projeto', () => {
@@ -570,12 +588,12 @@ describe('log das execuções de IA', () => {
   });
 
   it('RF-17: a ferramenta sem suporte fecha a linha com unsupported antes de o erro subir', () => {
-    // o Cursor em segundo plano não aceita limite por linha de comando: com permissão menor, não roda
-    router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor', runner: { permission: 'edits' } } });
+    // o Kimi em segundo plano não aceita limite por linha de comando: com permissão menor, não roda
+    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi', runner: { permission: 'edits' } } });
     expect(() => logged.start(storyId)).toThrow('Sem restrições');
     expect(procs).toHaveLength(0);
     // a tentativa também é informação: a linha existe, fechada, com a ferramenta que não deu
-    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'cursor' });
+    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'kimi' });
     // a duração existe e é curta (o tempo até descobrir que não dá); só 'unknown' fica sem duração
     expect(only().durationMs).toBeGreaterThanOrEqual(0);
   });

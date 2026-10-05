@@ -33,3 +33,18 @@ it.skipIf(process.platform === 'win32')('acha a CLI no PATH, nas pastas usuais e
   expect(resolveCommand('codex', path.join(home, 'tools'), home)).toBeNull();
   expect(commandNotFound('claude')).toContain('Claude Code');
 });
+
+it.skipIf(process.platform === 'win32')('a CLI do Cursor: cursor-agent, o nome curto agent e a pasta do instalador', () => {
+  expect(resolveCommand('cursor-agent', '', home)).toBeNull();
+  // instalação que só deixou as versões, sem os atalhos em ~/.local/bin
+  exe(path.join(home, '.local/share/cursor-agent/versions/2026.09.02-a1/cursor-agent'));
+  const newest = exe(path.join(home, '.local/share/cursor-agent/versions/2026.10.01-e3/cursor-agent'));
+  expect(resolveCommand('cursor-agent', '', home)).toBe(newest);
+  // só o nome curto no PATH
+  const short = exe(path.join(home, 'tools/agent'));
+  expect(resolveCommand('cursor-agent', path.join(home, 'tools'), home)).toBe(short);
+  // os dois: vale o nome que não se confunde com outro programa
+  const full = exe(path.join(home, 'tools/cursor-agent'));
+  expect(resolveCommand('cursor-agent', path.join(home, 'tools'), home)).toBe(full);
+  expect(commandNotFound('cursor-agent')).toContain('cursor-agent login');
+});

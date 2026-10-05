@@ -10,7 +10,7 @@ import { BOARD_SERVER, type ExecInput } from './execution';
 import { isCliNoise } from './cliNoise';
 import { headlessUnsupported } from './headless';
 import type { MessageRouter } from './panel/messageRouter';
-import { PERMISSION_ADVICE, type RunnerDeps, type RunningProcess } from './runner';
+import { boardServer, PERMISSION_ADVICE, type RunnerDeps, type RunningProcess } from './runner';
 
 /** Quantas mensagens anteriores entram no prompt, e o tamanho máximo de cada uma. */
 const HISTORY = 12;
@@ -145,7 +145,7 @@ export class ChatSession {
           permission,
           addDirs: this.router.aiWorkDirs(),
           exec,
-          boardServer: this.deps.bridgePath ? { command: 'node', args: [this.deps.bridgePath, this.deps.cwd] } : undefined,
+          boardServer: boardServer(this.deps),
         },
         this.deps.cwd,
         {

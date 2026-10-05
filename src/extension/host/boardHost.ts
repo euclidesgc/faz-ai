@@ -17,6 +17,7 @@ import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
+import { resolveCommand } from '../cliResolve';
 import { loginShellPath, spawnHeadless } from '../spawn';
 
 /** Complemento do nome na mensagem de "comando não encontrado", para não piorar o que a pessoa já lê no log. */
@@ -106,10 +107,13 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   if (ownsBoard && opened.rollupDay !== dayOf(Date.now()))
     consolidate(handle.db, router.boardId, Date.now(), boardRepo.retentionMonths(router.boardId));
   const pathEnv = await loginShellPath();
+  // o node do PATH do terminal, com caminho absoluto: é ele que a ferramenta usa para iniciar o servidor do board
+  const nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
   const runner = new AiRunner(router, {
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
+    nodePath,
     log: o.log,
     runLog,
     spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
@@ -149,6 +153,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
+    nodePath,
     log: o.log,
     runLog,
     spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
@@ -178,7 +183,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     chat,
     autopilot,
     connectAI() {
-      const done = registerClients([router.snapshot().board.aiTool], { bridgePath: o.bridgePath, workspaceDir: o.folderPath, homeDir });
+      const done = registerClients([router.snapshot().board.aiTool], {
+        bridgePath: o.bridgePath,
+        workspaceDir: o.folderPath,
+        homeDir,
+        nodeCommand: nodePath,
+      });
       // arquivos do projeto guardam caminhos desta máquina, então normalmente não devem ir para o repositório
       const ignored = fs.existsSync(gitignore)
         ? fs

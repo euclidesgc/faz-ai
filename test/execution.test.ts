@@ -53,7 +53,8 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
     ])
       expect(copilot).toContain(flag);
 
-    expect(has(args('cursor'), '--model', 'opus')).toBe(true);
+    // o Cursor recebe o esforço como sufixo do id, como `cursor-agent models` lista as variantes
+    expect(has(args('cursor'), '--model', 'opus-high')).toBe(true);
     expect(args('cursor')).not.toContain('--agent');
     expect(has(args('kimi'), '--model', 'opus', '--agent', 'planejador')).toBe(true);
   });

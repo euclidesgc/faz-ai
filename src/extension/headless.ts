@@ -14,6 +14,11 @@ export interface HeadlessCommand {
   tempFiles?: Record<string, string>;
   /** o que este comando vai escrever na saída, e portanto qual leitor a interpreta */
   format: OutputFormat;
+  /**
+   * Servidor do board a garantir num arquivo de configuração do projeto antes de rodar, para a
+   * ferramenta que não recebe servidores MCP pela linha de comando (o Cursor só lê `.cursor/mcp.json`).
+   */
+  projectMcp?: { file: string; entry: { command: string; args: string[] } };
 }
 
 export interface HeadlessInput {
@@ -36,6 +41,31 @@ export interface HeadlessInput {
 
 const SERVER = BOARD_SERVER;
 
+/**
+ * Ferramentas do Cursor liberadas em cada nível menor que "sem restrições", pelos nomes do `oneof`
+ * de ferramentas da CLI. `--allowed-tools` é uma opção escondida da CLI (fora do `--help`), conferida
+ * no código da versão 2026.10.01: ela valida cada nome e recusa a execução se algum não existir,
+ * então uma versão que mude os nomes falha com a mensagem da própria CLI, sem rodar com mais
+ * permissão do que a pedida. `mcp_tool_call` libera os servidores MCP configurados, não só o do board.
+ */
+export const CURSOR_TOOLS = {
+  board: [
+    'read_tool_call',
+    'glob_tool_call',
+    'grep_tool_call',
+    'ls_tool_call',
+    'sem_search_tool_call',
+    'read_lints_tool_call',
+    'read_todos_tool_call',
+    'update_todos_tool_call',
+    'mcp_tool_call',
+    'get_mcp_tools_tool_call',
+    'list_mcp_resources_tool_call',
+    'read_mcp_resource_tool_call',
+  ],
+  edits: ['edit_tool_call', 'delete_tool_call', 'apply_agent_diff_tool_call'],
+};
+
 /** Arquivo temporário que o executor cria antes de rodar e apaga ao terminar; nos argumentos entra como `{tmp:<nome>}`. */
 export const tmpArg = (name: string) => `{tmp:${name}}`;
 const MCP_CONFIG = 'mcp.json';
@@ -48,15 +78,15 @@ const MCP_CONFIG = 'mcp.json';
  * - Cursor: cursor.com/docs/cli/headless
  * - Kimi Code: moonshotai.github.io/kimi-code/en/reference/kimi-command.html
  *
- * Cursor e Kimi não têm, no modo sem interface, um nível de permissão intermediário por linha de
- * comando: só rodam "sem restrições".
+ * O Kimi não tem, no modo sem interface, um nível de permissão intermediário por linha de comando:
+ * só roda "sem restrições". O Cursor tem, por `--allowed-tools` (ver CURSOR_TOOLS).
  *
  * Parâmetros do agente de execução (`exec`), das referências de linha de comando de cada ferramenta:
  * - Claude Code: --agent, --model, --effort, --tools, --disallowedTools, --mcp-config com
  *   --strict-mcp-config, --setting-sources e --disable-slash-commands (code.claude.com/docs/en/cli-reference)
  * - Codex: --model e `-c` para model_reasoning_effort e mcp_servers.<id>.enabled
  * - Copilot: --agent, --model, --effort, --available-tools, --excluded-tools, --disable-mcp-server, --no-custom-instructions
- * - Cursor: --model. Kimi: --model e --agent.
+ * - Cursor: --model, com o esforço como sufixo do id (`modelo-high`). Kimi: --model e --agent.
  * O que a ferramenta não aceita por parâmetro segue no prompt, como orientação (ver executionPlan).
  *
  * Saída estruturada (`structured`), de onde saem tokens, custo e inventário:
@@ -64,8 +94,10 @@ const MCP_CONFIG = 'mcp.json';
  *   CLI recusa com "When using --print, --output-format=stream-json requires --verbose"). É o único
  *   formato desta entrega verificado contra saída real.
  * - Codex: `exec --json`.
- * - Cursor e Kimi: `--output-format stream-json`, pela documentação; nenhum dos dois está instalado
- *   nesta máquina, e a documentação deles não promete bloco de uso.
+ * - Cursor: `--output-format stream-json`. A documentação não descreve o bloco de uso, mas o código
+ *   da CLI 2026.10.01 o põe no `result` (ver aiOutput/stream.ts).
+ * - Kimi: `--output-format stream-json`, pela documentação; a CLI não está instalada nesta máquina,
+ *   e a documentação dela não promete bloco de uso.
  * - Copilot: NÃO TEM no modo `-p`. O `--output-format json` que a documentação mostra é do
  *   `copilot workflow run`, outro comando. Por isso o builder dele devolve sempre `format: 'text'`:
  *   a execução acontece e fica registrada sem consumo.
@@ -158,22 +190,34 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
       format: 'text',
     };
   },
-  cursor: ({ prompt, permission, exec, structured }) =>
-    permission === 'full'
-      ? {
-          command: 'agent',
-          args: [
-            '-p',
-            ...(structured ? ['--output-format', 'stream-json'] : []),
-            '--force',
-            '--approve-mcps',
-            '--trust',
-            ...(exec?.model ? ['--model', exec.model.name] : []),
-            prompt,
-          ],
-          format: structured ? 'stream-json' : 'text',
-        }
-      : null,
+  cursor: ({ prompt, permission, addDirs = [], exec, boardServer, structured }) => {
+    // `--force` aprova sem perguntar o que a sessão pode usar; nos níveis menores, `--allowed-tools`
+    // tira da sessão todo o resto (o modelo nem vê as outras ferramentas)
+    const modes: Record<RunnerPermission, string[]> = {
+      board: ['--allowed-tools', CURSOR_TOOLS.board.join(',')],
+      edits: ['--allowed-tools', [...CURSOR_TOOLS.board, ...CURSOR_TOOLS.edits].join(',')],
+      full: [],
+    };
+    // o esforço é parte do id: `cursor-agent models` lista uma variante por nível (`claude-opus-5-5-high`)
+    const model = exec?.model && (exec.model.effort ? `${exec.model.name}-${exec.model.effort}` : exec.model.name);
+    return {
+      command: 'cursor-agent',
+      args: [
+        '-p',
+        ...(structured ? ['--output-format', 'stream-json'] : []),
+        '--force',
+        '--approve-mcps',
+        '--trust',
+        ...modes[permission],
+        ...addDirs.flatMap((d) => ['--add-dir', d]),
+        ...(model ? ['--model', model] : []),
+        prompt,
+      ],
+      format: structured ? 'stream-json' : 'text',
+      // o Cursor não recebe servidores pela linha de comando: o do board vai para o .cursor/mcp.json
+      ...(boardServer ? { projectMcp: { file: '.cursor/mcp.json', entry: boardServer } } : {}),
+    };
+  },
   // no -p o Kimi não pede aprovação de nada e recusa flags de permissão
   kimi: ({ prompt, permission, addDirs = [], exec, structured }) =>
     permission === 'full'

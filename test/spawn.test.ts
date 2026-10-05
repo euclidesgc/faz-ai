@@ -3,7 +3,7 @@
 // os pedaços cheguem separados como chegariam da CLI.
 import { describe, expect, it } from 'vitest';
 import type { OutputStream } from '../src/extension/aiOutput/reader';
-import { spawnHeadless } from '../src/extension/spawn';
+import { cmdArg, launchSpec, spawnHeadless } from '../src/extension/spawn';
 
 /** Um script que escreve "ação" partindo o "ç" e o "ã" em dois `write` separados por uma pausa. */
 const SCRIPT = `
@@ -39,5 +39,28 @@ describe('spawnHeadless', () => {
   it('o mesmo vale para o stderr, com o seu próprio decodificador', async () => {
     const got = await collect('stderr');
     expect(got.stderr).toBe('ação');
+  });
+});
+
+describe('linha de comando do Windows', () => {
+  it('um .exe roda direto, sem shell e sem escape', () => {
+    expect(launchSpec('C:\\bin\\claude.exe', ['-p', 'a & b'], 'win32')).toEqual({
+      file: 'C:\\bin\\claude.exe',
+      args: ['-p', 'a & b'],
+      shell: false,
+    });
+    expect(launchSpec('/usr/bin/agent', ['x'], 'linux').shell).toBe(false);
+  });
+
+  it('um .cmd vai pelo shell com os argumentos escapados duas vezes: aspas, & e | não viram outro comando', () => {
+    const spec = launchSpec('C:\\npm\\copilot.cmd', ['-p', 'diga "oi" & saia | fim'], 'win32');
+    expect(spec.shell).toBe(true);
+    expect(spec.args[1]).toBe(cmdArg('diga "oi" & saia | fim'));
+    // nenhum metacaractere do cmd.exe fica sem o ^ na frente
+    expect(spec.args[1]).not.toMatch(/(^|[^^])[&|<>]/);
+  });
+
+  it('quebra de linha vira espaço: o cmd.exe não a transporta', () => {
+    expect(cmdArg('linha 1\nlinha 2')).not.toContain('\n');
   });
 });

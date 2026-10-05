@@ -21,6 +21,7 @@ import * as path from 'node:path';
 import { aiToolInfo, type AiTool } from '../../shared/harness';
 import type { RunReport } from '../../shared/log';
 import type { ModelOption } from '../../shared/models';
+import { ensureProjectServer } from '../mcp/clientConfig';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunningProcess } from '../runner';
 import {
@@ -124,6 +125,9 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
   const attempt = (structured: boolean): void => {
     const built = headlessCommand(tool, { ...input, structured });
     if ('unsupported' in built) throw new Error(built.unsupported);
+    // sem o servidor do board no arquivo que a ferramenta lê, a execução rodaria sem mover nem comentar nada
+    if (built.projectMcp && ensureProjectServer(cwd, built.projectMcp.file, built.projectMcp.entry))
+      deps.log(`Servidor do board registrado em ${built.projectMcp.file}, que o ${label} lê em segundo plano.`);
     const { command, cleanup } = materialize(built);
     const format = command.format;
     // o leitor desta tentativa, preso nela: um pedaço atrasado da tentativa anterior não suja o seguinte

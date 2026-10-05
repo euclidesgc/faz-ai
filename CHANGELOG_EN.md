@@ -7,6 +7,31 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Cursor in the background really works.** The Chamar IA button, the heartbeat and autonomous
+  mode with Cursor had four defects, now fixed:
+  - **No board server.** If nobody had clicked Conectar IA (MCP), the run had none of the board's
+    tools and ended as a success without moving or commenting anything. The board now writes the
+    server to `.cursor/mcp.json` before running.
+  - **Zeroed consumption.** Cursor reports tokens in camelCase and the board read Claude's names:
+    runs showed as measured with 0 tokens and zero cost. Tokens are now read, and the cost is
+    estimated from the model that actually ran (Cursor reports it at the start; with `auto` it was
+    impossible).
+  - **Empty inventory.** The tools used, MCP ones included, were not counted. Now they are, once
+    per call.
+  - **Outside the worktree.** The story's working folder was not passed to Cursor; it now goes with
+    `--add-dir`, as for the other tools.
+
+- **Cursor accepts the "only the board" and "board and files" levels.** It used to run only with
+  "no restrictions". At the lower levels the session gets only that level's tools, no terminal.
+
+- **Cursor's CLI is looked up as `cursor-agent`.** The short `agent` name still works, and the board
+  also finds the CLI in the installer's folder. The model effort goes as a suffix of the
+  id (`claude-opus-5-5-high`), the way `cursor-agent models` lists the variants.
+
+- **Windows: the prompt reaches npm-installed CLIs intact.** Quotes, `&` and `|` in the text were
+  interpreted by `cmd.exe`, and **Parar** (Stop) left the CLI running. Arguments are now escaped and
+  Stop ends the whole process tree.
+
 - **The board records the consumption, cost and inventory of each AI run.** For each run it stores
   input, output, cache read and cache creation tokens, the cost in dollars, the turns and the
   session id, plus the inventory of what was used: tools, MCP tools (with the server), subagents and

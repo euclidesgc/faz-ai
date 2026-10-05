@@ -51,6 +51,27 @@ function bundledCandidates(command: string, homeDir: string): string[] {
   return out;
 }
 
+/**
+ * Outros nomes do mesmo executável. O instalador do Cursor cria `cursor-agent` e `agent`; o board
+ * chama `cursor-agent`, que não se confunde com outro programa chamado `agent` no PATH, e aceita
+ * `agent` em instalações que só tenham esse.
+ */
+const ALIASES: Record<string, string[]> = { 'cursor-agent': ['agent'] };
+
+/** Versões da CLI do Cursor guardadas pelo instalador, da mais nova para a mais antiga. */
+function cursorVersions(homeDir: string): string[] {
+  const dir = path.join(homeDir, '.local', 'share', 'cursor-agent', 'versions');
+  try {
+    return fs
+      .readdirSync(dir)
+      .filter((v) => !v.startsWith('.'))
+      .sort(byVersionDesc)
+      .map((v) => path.join(dir, v, 'cursor-agent'));
+  } catch {
+    return [];
+  }
+}
+
 /** Onde os instaladores das ferramentas costumam deixar a CLI quando a pasta não está no PATH do editor. */
 function commonDirs(command: string, homeDir: string): string[] {
   const dirs = [
@@ -73,20 +94,27 @@ function commonDirs(command: string, homeDir: string): string[] {
 export function resolveCommand(command: string, pathEnv: string | undefined, homeDir: string): string | null {
   if (path.isAbsolute(command)) return isExecutable(command) ? command : null;
   const exts = isWindows ? (process.env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';') : [''];
-  const inDirs = (dirs: string[]) => {
+  const inDirs = (name: string, dirs: string[]) => {
     for (const dir of dirs) {
       if (!dir) continue;
       for (const ext of exts) {
-        const file = path.join(dir, command + ext);
+        const file = path.join(dir, name + ext);
         if (isExecutable(file)) return file;
       }
     }
     return null;
   };
-  const fromPath = inDirs((pathEnv ?? process.env.PATH ?? '').split(path.delimiter));
-  if (fromPath) return fromPath;
+  const pathDirs = (pathEnv ?? process.env.PATH ?? '').split(path.delimiter);
+  for (const name of [command, ...(ALIASES[command] ?? [])]) {
+    const found = inDirs(name, pathDirs) ?? (homeDir ? inDirs(name, commonDirs(command, homeDir)) : null);
+    if (found) return found;
+  }
   if (!homeDir) return null;
-  return inDirs(commonDirs(command, homeDir)) ?? bundledCandidates(command, homeDir).find(isExecutable) ?? null;
+  if (command === 'cursor-agent') {
+    const installed = cursorVersions(homeDir).find(isExecutable);
+    if (installed) return installed;
+  }
+  return bundledCandidates(command, homeDir).find(isExecutable) ?? null;
 }
 
 /** Mensagem para quando a CLI não foi encontrada, com o que a pessoa pode fazer. */
@@ -95,7 +123,7 @@ export function commandNotFound(command: string): string {
     claude: 'Instale o Claude Code (https://claude.com/claude-code) ou a extensão dele no editor.',
     codex: 'Instale a CLI do Codex (npm install -g @openai/codex).',
     copilot: 'Instale a GitHub Copilot CLI (npm install -g @github/copilot).',
-    agent: 'Instale a CLI do Cursor (https://cursor.com/cli).',
+    'cursor-agent': 'Instale a CLI do Cursor (curl https://cursor.com/install -fsS | bash) e entre na conta com "cursor-agent login".',
     kimi: 'Instale a CLI do Kimi Code.',
   };
   return `comando "${command}" não encontrado no PATH, nas pastas de instalação usuais nem nas extensões do editor. ${install[command] ?? 'Instale a ferramenta.'} Depois confira no terminal se "${command} --version" responde.`;

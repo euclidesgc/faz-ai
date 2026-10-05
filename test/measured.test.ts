@@ -5,6 +5,7 @@
 // Claude Code (`test/fixtures/claude-stream-json.jsonl`): o caminho inteiro, do byte ao relatório,
 // roda contra o que a ferramenta de verdade escreveu.
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { spawnMeasured } from '../src/extension/aiOutput/measured';
@@ -368,5 +369,32 @@ describe('a leitura do fluxo, do byte ao relatório', () => {
     // o preço existe no catálogo, mas é de outra ferramenta: não serve, e não há custo
     expect(report().consumption!.costUsd).toBeNull();
     expect(report().consumption!.outputTokens).toBe(1221);
+  });
+});
+
+describe('o servidor do board para o Cursor em segundo plano', () => {
+  const server = { command: '/usr/bin/node', args: ['/dados/bridge.js', '/projeto'] };
+
+  it('registra no .cursor/mcp.json antes de rodar, sem esperar "Conectar ao board", e o exclui do git localmente', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-cursor-'));
+    try {
+      fs.mkdirSync(path.join(dir, '.git', 'info'), { recursive: true });
+      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l), catalog: [] });
+      const config = JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'));
+      expect(config.mcpServers['faz-ai']).toEqual({ type: 'stdio', ...server });
+      expect(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8')).toContain('.cursor/mcp.json');
+      expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(true);
+
+      // um registro feito pela pessoa (outro node) fica como está, e o resto do arquivo também
+      config.mcpServers['faz-ai'].command = '/opt/node/bin/node';
+      config.mcpServers.github = { command: 'gh-mcp' };
+      fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), JSON.stringify(config));
+      lines.length = 0;
+      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l), catalog: [] });
+      expect(JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'))).toEqual(config);
+      expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
