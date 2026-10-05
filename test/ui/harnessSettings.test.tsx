@@ -109,7 +109,7 @@ describe('HarnessSettings: ferramenta e execução', () => {
     expect(lastSent('ui.connectAI')).toEqual({ type: 'ui.connectAI' });
   });
 
-  it('permissão, tempo limite, heartbeat e Chamar a IA agora', async () => {
+  it('permissão, tempo limite, heartbeat e Rodar o heartbeat agora', async () => {
     renderScreen('tool');
     const runner = document.querySelector<HTMLElement>('.runner-settings')!;
     await choose(
@@ -139,7 +139,7 @@ describe('HarnessSettings: ferramenta e execução', () => {
     expect(lastSent('settings.board.update').patch).toEqual({
       runner: { heartbeat: !useBoardStore.getState().state!.board.runner.heartbeat },
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Chamar a IA agora' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rodar o heartbeat agora' }));
     expect(lastSent('ai.heartbeat.run')).toEqual({ type: 'ai.heartbeat.run' });
   });
 

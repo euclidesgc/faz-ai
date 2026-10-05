@@ -540,7 +540,7 @@ memory and CPU while several AI sessions, tests and builds run together.
   position, not its number nor what has already been approved.
 - Cards that are with you (waiting for review or an answer, blocked) are not touched, unless you
   left an unanswered message in the conversation.
-- **Chamar a IA agora** (call the AI now), in the settings or with the command **Faz AI: Rodar o heartbeat
+- **Rodar o heartbeat agora** (run the heartbeat now), in the settings or with the command **Faz AI: Rodar o heartbeat
   agora**, starts a round right away, even with the heartbeat off. **Faz AI: Parar as execuções da
   IA** stops everything.
 - The status bar shows the cards being run and the time of the next round.

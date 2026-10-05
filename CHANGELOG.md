@@ -59,6 +59,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   - **Anexo de texto editado:** Esc ou clique fora não descartam mais a edição sem aviso, e Salvar
     não envia duas vezes.
   - A busca da seção Vínculos não passa de um card para o outro.
+  - Em Harness de IA, o botão que começa uma rodada do heartbeat se chama **Rodar o heartbeat
+    agora**, como o comando da paleta (era "Chamar a IA agora", confundível com os botões do card).
 
 - **O "Chamar IA" virou dois botões, cada um com uma tarefa.**
   - **Trabalhar na fase** é o antigo Chamar IA, com o nome do que ele faz: o trabalho da coluna em

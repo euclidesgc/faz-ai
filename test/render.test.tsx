@@ -287,7 +287,7 @@ describe('telas montam sem erro', () => {
       'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',
       'Heartbeat ligado',
-      'Chamar a IA agora',
+      'Rodar o heartbeat agora',
       'Subagentes',
       'Novo subagente',
       'revisor-de-spec',

@@ -63,6 +63,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   - **Edited text attachment:** Esc or a click outside no longer discard the edit without warning,
     and Salvar (save) does not send twice.
   - The search in the Vínculos (links) section does not carry over from one card to the next.
+  - In Harness de IA, the button that starts a heartbeat round is called **Rodar o heartbeat agora**
+    (run the heartbeat now), like the palette command (it was "Chamar a IA agora", easy to confuse
+    with the card buttons).
 
 - **"Chamar IA" became two buttons, each with one job.**
   - **Trabalhar na fase** (work on the phase) is the old Chamar IA, named after what it does: the
