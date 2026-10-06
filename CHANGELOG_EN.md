@@ -12,15 +12,19 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   - The install button shows the result and the error on the board itself. They used to go to the
     editor notifications, which Cursor keeps in its notification center without showing them: the
     install seemed to do nothing.
-  - The global registration tells the server where the open project is: in Cursor (and in VS Code's
-    `mcp.json`) with `${workspaceFolder}`, in Claude Code through the `CLAUDE_PROJECT_DIR` variable.
-    Before, the server started outside the project and did not find the board.
+  - **In Cursor, nothing to install.** Cursor's global scope is a single process for all windows,
+    started without knowing which project to serve: the server showed an error, and when turned on by
+    hand it served the same board in every window. Now the board writes the project's
+    `.cursor/mcp.json` on its own (outside git) as soon as the folder opens in Cursor, and removes the
+    old global entry. The first time in each project, the banner asks you to reload the window and
+    then to turn on `faz-ai` in Cursor Settings → MCP (Cursor keeps every new project server off),
+    and goes away once the server connects.
+  - The other tools' global registration tells the server where the project is: in Claude Code
+    through the `CLAUDE_PROJECT_DIR` variable, in VS Code's `mcp.json` with `${workspaceFolder}`.
   - A broken registration in the project file (a `.cursor/mcp.json` for another folder, or for a node
     that is gone) takes precedence over the global one, and reinstalling the global one did not fix
     it: the banner now has **Corrigir o registro** (fix the registration), which removes it from there
     and leaves the global one in effect.
-  - In Cursor, after installing, the banner turns into **Recarregar a janela** (reload the window),
-    with a button that reloads.
   - The bridge (`bridge.js`) now lives in `~/.faz-ai/mcp/`, the same for VS Code, Cursor and
     `faz-ai`. A registration with the old bridge asks you to install again.
   - GitHub Copilot: the global install also writes the VS Code profile's `mcp.json`.

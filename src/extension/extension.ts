@@ -6,6 +6,9 @@ import * as fs from 'node:fs';
 import { createBoardHost, type BoardHost } from './host/boardHost';
 import { startMcpServer } from './mcp/server';
 import { socketPath, stableBridgePath, workspaceKey } from './mcp/socketPath';
+import { registerCursorProject } from './mcp/clientConfig';
+import { resolveCommand } from './cliResolve';
+import { loginShellPath } from './spawn';
 import { BoardPanel } from './panel/BoardPanel';
 import type { MessageRouter } from './panel/messageRouter';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
@@ -312,6 +315,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     try {
       fs.mkdirSync(path.dirname(bridgePath), { recursive: true });
       fs.copyFileSync(path.join(context.extensionPath, 'dist', 'mcp-bridge.js'), bridgePath);
+      // no Cursor, o servidor do board é registrado no projeto assim que a pasta abre, antes de o board
+      // ser aberto: o chat do editor enxerga o board sem a pessoa instalar nada (o global não funciona
+      // no Cursor; veja registerCursorProject)
+      if (editorName === 'cursor') void registerInCursor(f.uri.fsPath, bridgePath, output);
       stopMcp = await startMcpServer(socketPath(f.uri.fsPath), {
         getRouter,
         workspaceDir: f.uri.fsPath,
@@ -345,6 +352,17 @@ async function offerBoardUpgrade(context: vscode.ExtensionContext, router: Messa
   );
   if (choice === 'Atualizar board') router.handle({ type: 'settings.board.upgrade' });
   else await context.globalState.update(key, version);
+}
+
+/** O registro do board no `.cursor/mcp.json` do projeto, com o node achado no PATH do terminal. */
+async function registerInCursor(folderPath: string, bridgePath: string, output: vscode.OutputChannel): Promise<void> {
+  const homeDir = os.homedir();
+  try {
+    const node = resolveCommand('node', (await loginShellPath()) ?? process.env.PATH, homeDir) ?? undefined;
+    registerCursorProject({ bridgePath, workspaceDir: folderPath, homeDir, nodeCommand: node });
+  } catch (e) {
+    output.appendLine(`Não foi possível registrar o servidor do board no Cursor: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 /**

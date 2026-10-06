@@ -201,7 +201,7 @@ export const AI_TOOLS: {
     rules: 'AGENTS.md',
     skills: '.cursor/skills',
     mcp: '.cursor/mcp.json (projeto)',
-    mcpUser: '~/.cursor/mcp.json',
+    mcpUser: '.cursor/mcp.json (projeto; o global não funciona no Cursor)',
     agents: { dir: '.cursor/agents', ext: '.md', format: 'markdown', modelField: 'model' },
   },
   {

@@ -14,7 +14,7 @@ vale em qualquer projeto aberto com o board, sem arquivo nenhum no repositório:
 | Ferramenta | Onde o servidor é registrado (global) | Como o servidor acha o projeto | Depois de registrar |
 | --- | --- | --- | --- |
 | Claude Code | `~/.claude.json`, por `claude mcp add-json --scope user` | variável `CLAUDE_PROJECT_DIR`, que o Claude Code passa ao servidor | Abra uma sessão nova (`/mcp` mostra o estado) |
-| Cursor (chat do editor e `cursor-agent`) | `~/.cursor/mcp.json` | `${workspaceFolder}`, que o editor troca pela pasta aberta; na CLI, a pasta em que ela roda | Recarregue a janela e confira em Cursor Settings → MCP se o `faz-ai` está ligado |
+| Cursor (chat do editor e `cursor-agent`) | **no projeto**, `.cursor/mcp.json` (fora do git), gravado sozinho ao abrir a pasta no Cursor | a pasta fixa no registro | Na primeira vez: recarregue a janela e ligue o `faz-ai` em Cursor Settings → MCP |
 | Codex | `~/.codex/config.toml` | a pasta em que a sessão foi aberta | Abra uma sessão nova (`codex mcp list` confere) |
 | Kimi Code | `~/.kimi-code/mcp.json` e/ou `~/.kimi/mcp.json` | a pasta em que a sessão foi aberta | Abra uma sessão nova a partir da pasta do projeto |
 | GitHub Copilot | `~/.copilot/mcp-config.json` (Copilot CLI) e o `mcp.json` do perfil do VS Code | no VS Code, `${workspaceFolder}`; na CLI, a pasta em que ela roda | No VS Code, confirme a confiança (**MCP: List Servers**); na CLI, abra uma sessão nova |
@@ -54,12 +54,13 @@ kimi mcp add --transport stdio faz-ai -- node "$BRIDGE"     # Kimi, global
 copilot mcp add faz-ai -- node "$BRIDGE"                    # Copilot CLI, global (~/.copilot/mcp-config.json)
 ```
 
-O Cursor não tem comando de CLI para isso: edite `~/.cursor/mcp.json`. Os formatos gravados pelo
-board no global:
+No Cursor, o registro é sempre o do projeto: o global dele é um processo só para todas as janelas,
+que sobe sem saber qual projeto atender (o `${workspaceFolder}` só é trocado quando a pessoa liga o
+servidor à mão, e aí vale para todas as janelas). Os formatos gravados pelo board:
 
 ```json
-// ~/.cursor/mcp.json (Cursor)
-{ "mcpServers": { "faz-ai": { "type": "stdio", "command": "node", "args": ["<bridge.js>", "${workspaceFolder}"] } } }
+// .cursor/mcp.json do projeto (Cursor)
+{ "mcpServers": { "faz-ai": { "type": "stdio", "command": "node", "args": ["<bridge.js>", "<pasta do projeto>"] } } }
 ```
 
 ```toml
@@ -104,8 +105,9 @@ funcionam com o mesmo comando.
    configuração que esse cliente lê, ou a sessão não foi reiniciada depois do registro.
 4. Se o cliente inicia servidores a partir de outro diretório, passe a pasta do projeto como
    segundo argumento ou em `FAZAI_WORKSPACE`.
-5. No Cursor, recarregue a janela depois de registrar e confira em Cursor Settings → MCP se o
-   `faz-ai` está ligado: servidores novos às vezes chegam desligados.
+5. No Cursor, o servidor do projeto só é lido ao abrir a janela, e chega desligado: recarregue a
+   janela e ligue o `faz-ai` em Cursor Settings → MCP. A CLI (`cursor-agent mcp enable faz-ai`) tem
+   aprovação própria, que não liga o servidor no editor.
 
 ## O que a IA pode fazer
 

@@ -101,8 +101,9 @@ export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: st
       }
       return null;
     }
+    // o global do Cursor é um processo só para todas as janelas e não sabe qual board atender: não conta
     case 'cursor':
-      return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json') ?? fromJson(inHome('.cursor/mcp.json'), '~/.cursor/mcp.json');
+      return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json');
     case 'codex':
       return (
         fromToml(inProject('.codex/config.toml'), '.codex/config.toml') ?? fromToml(inHome('.codex/config.toml'), '~/.codex/config.toml')
@@ -156,6 +157,21 @@ export interface RequirementProbe {
   windowStartedAt?: number;
   /** a pasta de configuração do usuário no VS Code, onde fica o `mcp.json` global do Copilot no editor */
   editorUserDir?: string;
+}
+
+/**
+ * O chat do Cursor já conectou o servidor do board deste projeto alguma vez. O Cursor deixa desligado
+ * todo servidor novo do projeto, e o liga/desliga fica no banco interno dele; o que dá para ler de fora
+ * é a pasta que ele cria ao conectar: `~/.cursor/projects/<pasta do projeto>/mcps/project-<n>-<projeto>-faz-ai`,
+ * com o caminho do projeto virando um nome só de letras, números e hífens.
+ */
+export function cursorConnectedOnce(homeDir: string, workspaceDir: string): boolean {
+  const slug = workspaceDir.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  try {
+    return fs.readdirSync(path.join(homeDir, '.cursor', 'projects', slug, 'mcps')).some((n) => /^project-\d+-.*-faz-ai$/.test(n));
+  } catch {
+    return false;
+  }
 }
 
 /** Quando o arquivo foi gravado pela última vez, em ms; 0 quando não dá para saber. */
@@ -236,6 +252,9 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
       modifiedAt(registered.path) > p.windowStartedAt
     )
       out.push({ id: 'mcp-reload', tool, optional: true, file: registered.file, action: { kind: 'reload' } });
+    // carregado, mas o Cursor deixa desligado todo servidor novo do projeto: só a pessoa liga
+    else if (tool === 'cursor' && p.editor === 'cursor' && !cursorConnectedOnce(p.homeDir, p.workspaceDir))
+      out.push({ id: 'mcp-enable', tool, optional: true, action: null });
   }
 
   const unsupported = headlessUnsupported(tool, p.permission);

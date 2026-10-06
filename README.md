@@ -237,13 +237,17 @@ com dois botões:
 | **Instalar (padrão da ferramenta)** | configuração global: `~/.claude.json` (por `claude mcp add --scope user`), `~/.cursor/mcp.json`, `~/.codex/config.toml`, `~/.kimi-code/mcp.json`, `~/.copilot/mcp-config.json`; a skill em `~/.claude/skills`, `~/.cursor/skills` e equivalentes | o recomendado: o board funciona em qualquer repositório aberto com ele, sem nenhum arquivo no projeto |
 | **Instalar neste projeto** | `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.kimi-code/mcp.json` ou `.vscode/mcp.json`; a skill em `.claude/skills`, `.cursor/skills` e equivalentes | fixar uma versão num repositório ou num fork, ou uma skill ajustada para o time |
 
-O registro global não fixa a pasta do projeto: o Cursor e o VS Code recebem `${workspaceFolder}`,
-que o editor troca pela pasta aberta; o Claude Code informa a pasta pela variável
-`CLAUDE_PROJECT_DIR`; nas outras, a ponte do board acha o board subindo a partir da pasta em que a
-ferramenta foi aberta. No GitHub Copilot, o global vale para a Copilot CLI e, no VS Code, para o
-`mcp.json` do perfil do editor. No Cursor, depois de instalar, a faixa pede para **recarregar a
-janela** (o chat do Cursor só carrega o servidor assim); confira em Cursor Settings → MCP se o
-`faz-ai` está ligado. O do projeto vale sobre o global naquele projeto, então
+O registro global não fixa a pasta do projeto: o Claude Code informa a pasta pela variável
+`CLAUDE_PROJECT_DIR`, o `mcp.json` do VS Code recebe `${workspaceFolder}`, e nas outras a ponte do
+board acha o board subindo a partir da pasta em que a ferramenta foi aberta. No GitHub Copilot, o
+global vale para a Copilot CLI e, no VS Code, para o `mcp.json` do perfil do editor.
+
+**No Cursor não há o que instalar.** O global do Cursor é um processo só para todas as janelas e não
+sabe qual board atender, então o board grava sozinho o `.cursor/mcp.json` do projeto (fora do git,
+pelo `.git/info/exclude`) assim que a pasta abre no Cursor. Na primeira vez em cada projeto, a faixa
+pede para **recarregar a janela** (o Cursor só lê os servidores do projeto ao abrir a janela) e depois
+para **ligar o `faz-ai`** em Cursor Settings → MCP (o Cursor deixa desligado todo servidor novo do
+projeto). O do projeto vale sobre o global naquele projeto, então
 instalar no projeto com um global já instalado pede confirmação, assim como substituir uma skill do
 fluxo que já existe no destino (o que foi ajustado nela se perde). O comando **Faz AI: Instalar o
 MCP do board (global)** da paleta faz a instalação padrão na ferramenta do projeto, e a ferramenta

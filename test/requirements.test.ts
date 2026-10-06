@@ -134,33 +134,58 @@ describe('requisitos do board', () => {
   });
 
   it('o registro global, sem a pasta, também conta e não vira aviso de outra pasta', async () => {
-    for (const tool of ['cursor', 'codex', 'copilot', 'kimi'] as const) {
+    for (const tool of ['codex', 'copilot', 'kimi'] as const) {
       expect(registeredServer(tool, project, home)).toBeNull();
       registerClients([tool], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
-      // o Cursor recebe a pasta aberta pela variável que o editor troca; as outras acham o projeto sozinhas
-      const args = tool === 'cursor' ? [BRIDGE, '${workspaceFolder}'] : [BRIDGE];
-      expect(registeredServer(tool, project, home)).toMatchObject({ file: expect.stringMatching(/^~\//), scope: 'user', args });
+      expect(registeredServer(tool, project, home)).toMatchObject({ file: expect.stringMatching(/^~\//), scope: 'user', args: [BRIDGE] });
     }
-    expect(await checkRequirements(probe())).toEqual([]);
+    expect(await checkRequirements(probe({ tool: 'codex', permission: 'full' }))).toEqual([]);
     // o do projeto vale sobre o global
-    connect('cursor');
-    expect(registeredServer('cursor', project, home)).toMatchObject({ file: '.cursor/mcp.json', args: [BRIDGE, project] });
+    connect('codex');
+    expect(registeredServer('codex', project, home)).toMatchObject({ file: '.codex/config.toml', args: [BRIDGE, project] });
+  });
+
+  it('no Cursor o global não conta: o registro é sempre o do projeto, fora do git', async () => {
+    fs.mkdirSync(path.join(project, '.git', 'info'), { recursive: true });
+    // um global de uma versão anterior, com a ponte do board
+    fs.mkdirSync(path.join(home, '.cursor'));
+    fs.writeFileSync(
+      path.join(home, '.cursor', 'mcp.json'),
+      JSON.stringify({ mcpServers: { outro: { command: 'x' }, 'faz-ai': { command: 'node', args: [BRIDGE, '${workspaceFolder}'] } } }),
+    );
+    expect(registeredServer('cursor', project, home)).toBeNull();
+    // instalar "no global" do Cursor grava no projeto e tira o global antigo
+    registerClients(['cursor'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
+    expect(registeredServer('cursor', project, home)).toMatchObject({
+      file: '.cursor/mcp.json',
+      scope: 'project',
+      args: [BRIDGE, project],
+    });
+    expect(JSON.parse(fs.readFileSync(path.join(home, '.cursor', 'mcp.json'), 'utf8')).mcpServers).toEqual({ outro: { command: 'x' } });
+    expect(fs.readFileSync(path.join(project, '.git', 'info', 'exclude'), 'utf8')).toContain('.cursor/mcp.json');
+    expect(await checkRequirements(probe())).toEqual([]);
   });
 
   it('registro global quebrado pede para conectar de novo, sem mexer no projeto', async () => {
-    registerClients(['cursor'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: '/sumiu/node', scope: 'user' });
-    expect(await checkRequirements(probe())).toEqual([
-      { id: 'mcp-stale', tool: 'cursor', optional: true, file: '~/.cursor/mcp.json', missing: '/sumiu/node', action: { kind: 'connect' } },
+    registerClients(['codex'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: '/sumiu/node', scope: 'user' });
+    expect(await checkRequirements(probe({ tool: 'codex', permission: 'full' }))).toEqual([
+      { id: 'mcp-stale', tool: 'codex', file: '~/.codex/config.toml', missing: '/sumiu/node', action: { kind: 'connect' } },
     ]);
   });
 
   it('no Cursor, o registro gravado depois que a janela abriu pede para recarregar', async () => {
-    registerClients(['cursor'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
-    const written = fs.statSync(path.join(home, '.cursor', 'mcp.json')).mtimeMs;
+    registerClients(['cursor'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath });
+    const written = fs.statSync(path.join(project, '.cursor', 'mcp.json')).mtimeMs;
     expect(await checkRequirements(probe({ editor: 'cursor', windowStartedAt: written - 1000 }))).toEqual([
-      { id: 'mcp-reload', tool: 'cursor', optional: true, file: '~/.cursor/mcp.json', action: { kind: 'reload' } },
+      { id: 'mcp-reload', tool: 'cursor', optional: true, file: '.cursor/mcp.json', action: { kind: 'reload' } },
     ]);
-    // depois de recarregar, a janela é mais nova que o registro
+    // depois de recarregar, a janela é mais nova que o registro, mas o Cursor deixa o servidor novo desligado
+    expect(await checkRequirements(probe({ editor: 'cursor', windowStartedAt: written + 1000 }))).toEqual([
+      { id: 'mcp-enable', tool: 'cursor', optional: true, action: null },
+    ]);
+    // ligado, o Cursor cria a pasta do servidor do projeto, com o caminho virando um nome de hífens
+    const slug = project.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    fs.mkdirSync(path.join(home, '.cursor', 'projects', slug, 'mcps', 'project-0-x-faz-ai'), { recursive: true });
     expect(await checkRequirements(probe({ editor: 'cursor', windowStartedAt: written + 1000 }))).toEqual([]);
     // fora do Cursor (VS Code, navegador) não há o que recarregar
     expect(await checkRequirements(probe({ editor: 'vscode', windowStartedAt: written - 1000 }))).toEqual([]);
@@ -185,9 +210,9 @@ describe('requisitos do board', () => {
     const old = path.join(home, 'Code', 'User', 'globalStorage', 'euclidesgc.faz-ai', 'mcp', 'bridge.js');
     fs.mkdirSync(path.dirname(old), { recursive: true });
     fs.writeFileSync(old, '// ponte antiga');
-    registerClients(['cursor'], { bridgePath: old, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
-    expect(await checkRequirements(probe())).toEqual([
-      { id: 'mcp-outdated', tool: 'cursor', optional: true, file: '~/.cursor/mcp.json', missing: old, action: { kind: 'connect' } },
+    registerClients(['codex'], { bridgePath: old, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
+    expect(await checkRequirements(probe({ tool: 'codex', permission: 'full' }))).toEqual([
+      { id: 'mcp-outdated', tool: 'codex', file: '~/.codex/config.toml', missing: old, action: { kind: 'connect' } },
     ]);
   });
 });

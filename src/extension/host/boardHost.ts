@@ -335,7 +335,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
             .split(/\r?\n/)
             .map((l) => l.trim())
         : [];
-      const toIgnore = [...new Set(done.flatMap((d) => (d.projectFile && !ignored.includes(d.projectFile) ? [d.projectFile] : [])))];
+      const toIgnore = [
+        ...new Set(done.flatMap((d) => (d.projectFile && !d.excluded && !ignored.includes(d.projectFile) ? [d.projectFile] : []))),
+      ];
       const files = done.map((d) => d.projectFile ?? d.file.replace(homeDir, '~')).join(', ');
       void checkNow();
       return { message: `Servidor "faz-ai" registrado em: ${files}. ${[...new Set(done.map((d) => d.next))].join(' ')}`, toIgnore };

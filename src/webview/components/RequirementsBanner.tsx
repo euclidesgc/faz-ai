@@ -98,8 +98,15 @@ function texts(r: BoardRequirement): { title: string; detail: string } {
       return {
         title: t('Servidor do board instalado no {tool}: falta recarregar a janela', { tool }),
         detail: t(
-          'O registro em {file} foi gravado depois que esta janela abriu, e o chat do Cursor só carrega o servidor ao recarregar. Depois de recarregar, confira em Cursor Settings → MCP se o "faz-ai" está ligado.',
+          'O registro em {file} foi gravado depois que esta janela abriu, e o Cursor só lê os servidores do projeto ao abrir a janela. Depois de recarregar, ligue o "faz-ai" em Cursor Settings → MCP.',
           { file: r.file ?? '' },
+        ),
+      };
+    case 'mcp-enable':
+      return {
+        title: t('Ligue o servidor do board no {tool}', { tool }),
+        detail: t(
+          'O Cursor deixa desligado todo servidor novo do projeto. Em Cursor Settings → MCP, clique em "faz-ai" e ligue a chave deste projeto. Depois, clique em Verificar de novo.',
         ),
       };
     case 'permission':
@@ -244,8 +251,8 @@ export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
         {missing > 0 && <IconWarning />}
         <strong role="status">
           {missing === 0
-            ? requirements.every((r) => r.id === 'mcp-reload')
-              ? t('Falta recarregar a janela para a IA do editor enxergar o board')
+            ? requirements.every((r) => r.id === 'mcp-reload' || r.id === 'mcp-enable')
+              ? t('Falta pouco para a IA do editor enxergar o board')
               : t('Recomendado para a IA enxergar o board nas suas conversas')
             : missing === 1
               ? t('Falta 1 requisito para o board trabalhar com a IA')

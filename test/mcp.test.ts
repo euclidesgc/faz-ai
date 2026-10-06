@@ -1190,7 +1190,7 @@ describe('ferramentas de IA', () => {
     fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
     fs.writeFileSync(path.join(home, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
     const bridge = '/b/bridge.js';
-    const done = registerClients(['claude', 'codex', 'cursor', 'kimi', 'copilot'], {
+    const done = registerClients(['claude', 'codex', 'kimi', 'copilot'], {
       bridgePath: bridge,
       workspaceDir: project,
       homeDir: home,
@@ -1211,10 +1211,8 @@ describe('ferramentas de IA', () => {
     ]);
 
     const json = (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')).mcpServers;
-    expect(json(path.join(home, '.cursor', 'mcp.json'))).toEqual({
-      outro: { command: 'x' },
-      'faz-ai': { type: 'stdio', command: 'node', args: [bridge, '${workspaceFolder}'] },
-    });
+    // o Cursor não tem global que funcione: fica como estava
+    expect(json(path.join(home, '.cursor', 'mcp.json'))).toEqual({ outro: { command: 'x' } });
     expect(fs.readFileSync(path.join(home, '.codex', 'config.toml'), 'utf8')).toContain(`args = ["${bridge}"]`);
     expect(json(path.join(home, '.kimi-code', 'mcp.json'))['faz-ai']).toEqual({ transport: 'stdio', command: 'node', args: [bridge] });
     expect(fs.existsSync(path.join(home, '.kimi'))).toBe(false);
@@ -1227,18 +1225,17 @@ describe('ferramentas de IA', () => {
   });
 
   it('a execução do Cursor usa o registro global quando ele leva a este board', async () => {
-    const { ensureProjectServer, registerClients } = await import('../src/extension/mcp/clientConfig');
+    const { ensureProjectServer } = await import('../src/extension/mcp/clientConfig');
     const home = path.join(dir, 'home-cursor');
     const project = path.join(dir, 'proj-cursor');
     fs.mkdirSync(path.join(project, 'sub'), { recursive: true });
     const entry = { command: process.execPath, args: ['/b/bridge.js', project] };
-    registerClients(['cursor'], {
-      bridgePath: '/b/bridge.js',
-      workspaceDir: project,
-      homeDir: home,
-      nodeCommand: process.execPath,
-      scope: 'user',
-    });
+    // o global que a cursor-agent lê (cada execução é um processo na pasta do projeto)
+    fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
+    fs.writeFileSync(
+      path.join(home, '.cursor', 'mcp.json'),
+      JSON.stringify({ mcpServers: { 'faz-ai': { command: process.execPath, args: ['/b/bridge.js', '${workspaceFolder}'] } } }),
+    );
     expect(ensureProjectServer(project, '.cursor/mcp.json', entry, home)).toBe('global');
     expect(ensureProjectServer(path.join(project, 'sub'), '.cursor/mcp.json', entry, home)).toBe('global');
     expect(fs.existsSync(path.join(project, '.cursor'))).toBe(false);

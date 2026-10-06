@@ -2,7 +2,7 @@ import type { AiTool } from './harness';
 
 /** O que falta para o board trabalhar com a ferramenta de IA do projeto. */
 export type RequirementId =
-  'node' | 'cli' | 'signin' | 'mcp' | 'mcp-stale' | 'mcp-elsewhere' | 'mcp-outdated' | 'mcp-reload' | 'permission';
+  'node' | 'cli' | 'signin' | 'mcp' | 'mcp-stale' | 'mcp-elsewhere' | 'mcp-outdated' | 'mcp-reload' | 'mcp-enable' | 'permission';
 
 /** O que a pessoa pode fazer, pela própria faixa de aviso, para resolver. */
 export type RequirementAction =

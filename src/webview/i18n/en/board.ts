@@ -346,9 +346,12 @@ export const board: Record<string, string> = {
   '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). O registro do projeto vale no lugar do global, então a IA falaria com outro board, ou com nenhum. Corrigir tira o registro deste arquivo e deixa valendo o global.':
     '{file} ties the board server to the folder "{missing}", not to this project (the file came from another machine through git, or the project moved). The project registration takes precedence over the global one, so the AI would talk to another board, or to none. Fix removes the registration from this file and leaves the global one in effect.',
   'Servidor do board instalado no {tool}: falta recarregar a janela': 'Board server installed in {tool}: reload the window',
-  'O registro em {file} foi gravado depois que esta janela abriu, e o chat do Cursor só carrega o servidor ao recarregar. Depois de recarregar, confira em Cursor Settings → MCP se o "faz-ai" está ligado.':
-    'The registration in {file} was written after this window opened, and the Cursor chat only loads the server after a reload. After reloading, check in Cursor Settings → MCP that "faz-ai" is turned on.',
-  'Falta recarregar a janela para a IA do editor enxergar o board': 'Reload the window so the editor AI sees the board',
+  'O registro em {file} foi gravado depois que esta janela abriu, e o Cursor só lê os servidores do projeto ao abrir a janela. Depois de recarregar, ligue o "faz-ai" em Cursor Settings → MCP.':
+    'The registration in {file} was written after this window opened, and Cursor only reads the project servers when the window opens. After reloading, turn on "faz-ai" in Cursor Settings → MCP.',
+  'Ligue o servidor do board no {tool}': 'Turn on the board server in {tool}',
+  'O Cursor deixa desligado todo servidor novo do projeto. Em Cursor Settings → MCP, clique em "faz-ai" e ligue a chave deste projeto. Depois, clique em Verificar de novo.':
+    'Cursor keeps every new project server off. In Cursor Settings → MCP, click "faz-ai" and turn on the switch for this project. Then click Verificar de novo (check again).',
+  'Falta pouco para a IA do editor enxergar o board': 'Almost there for the editor AI to see the board',
   'Corrigir o registro': 'Fix the registration',
   'O registro do servidor do board no {tool} é de uma versão anterior':
     'The board server registration in {tool} is from an earlier version',
