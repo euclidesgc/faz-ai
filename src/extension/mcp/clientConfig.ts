@@ -20,6 +20,11 @@ export interface RegisterOptions {
    * ferramenta foi aberta, e o mesmo registro serve a todos os projetos. Padrão: `project`.
    */
   scope?: InstallScope;
+  /**
+   * Pasta de configuração do usuário no VS Code (a do perfil, onde fica o `mcp.json` global do
+   * Copilot no editor). Sem ela, o registro global do Copilot fica só na Copilot CLI.
+   */
+  editorUserDir?: string;
 }
 
 export interface Registration {
@@ -39,6 +44,15 @@ export interface Registration {
 }
 
 const SERVER = 'faz-ai';
+
+/**
+ * A pasta aberta no editor, que o Cursor e o VS Code trocam pelo caminho ao iniciar o servidor. Vai no
+ * registro global dessas ferramentas: sem ela, o servidor sobe fora do projeto e não acha o board.
+ */
+export const WORKSPACE_FOLDER = '${workspaceFolder}';
+
+/** A pasta fixa nos argumentos do registro; uma variável da ferramenta (`${workspaceFolder}`) não é pasta fixa. */
+export const fixedFolder = (arg: string | undefined): string | undefined => (arg && !/\$\{[^}]*\}/.test(arg) ? arg : undefined);
 
 function mergeJson(file: string, entry: Record<string, unknown>, key = 'mcpServers'): void {
   let config: Record<string, Record<string, unknown> | undefined> = {};
@@ -129,7 +143,8 @@ export function ensureProjectServer(
 function coveredByGlobal(file: string, runDir: string, entryArgs: string[]): boolean {
   const global = readEntry(file);
   if (!global || global === 'invalid' || !usableCommand(global.command)) return false;
-  const [bridge, folder] = Array.isArray(global.args) ? global.args.map(String) : [];
+  const [bridge, arg] = Array.isArray(global.args) ? global.args.map(String) : [];
+  const folder = fixedFolder(arg);
   const [wantedBridge, board] = entryArgs;
   if (!bridge || !wantedBridge || !board || !samePath(bridge, wantedBridge)) return false;
   return folder ? samePath(folder, board) : within(runDir, board);
@@ -242,14 +257,17 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
 
 /**
  * Registro global (escopo do usuário), o padrão de cada ferramenta para um servidor que vale em
- * qualquer projeto. Sem a pasta nos argumentos: a ponte acha o board subindo a partir do diretório
- * em que a ferramenta foi aberta.
+ * qualquer projeto. Sem pasta fixa: cada ferramenta diz ao servidor onde está o projeto do jeito que
+ * tem, e a ponte, na falta disso, sobe a partir do diretório em que a ferramenta foi aberta.
  * - Claude Code: `claude mcp add-json --scope user` (o `~/.claude.json` é reescrito pela ferramenta o
- *   tempo todo; gravar nele por fora arrisca perder a mudança ou a dela)
- * - Cursor: `~/.cursor/mcp.json`
+ *   tempo todo; gravar nele por fora arrisca perder a mudança ou a dela). A pasta chega pela variável
+ *   `CLAUDE_PROJECT_DIR`, que o Claude Code passa ao servidor.
+ * - Cursor: `~/.cursor/mcp.json`, com `${workspaceFolder}`, que o editor troca pela pasta aberta (a
+ *   `cursor-agent` lê o mesmo arquivo e roda na pasta do projeto)
  * - Codex: `~/.codex/config.toml`
  * - Kimi Code: `~/.kimi-code/mcp.json` e/ou `~/.kimi/mcp.json` (a Kimi CLI), os que existirem
- * - GitHub Copilot: `~/.copilot/mcp-config.json` (Copilot CLI); o VS Code guarda o global no perfil do editor
+ * - GitHub Copilot: `~/.copilot/mcp-config.json` (Copilot CLI) e, no VS Code, o `mcp.json` do perfil
+ *   do editor, com `${workspaceFolder}`
  */
 function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
   const node = o.nodeCommand ?? 'node';
@@ -273,8 +291,15 @@ function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
     }
     case 'cursor': {
       const file = home('.cursor', 'mcp.json');
-      mergeJson(file, { type: 'stdio', command: node, args });
-      return [{ tool, file, projectFile: null, next: 'Cursor: ative o servidor em Settings → MCP.' }];
+      mergeJson(file, { type: 'stdio', command: node, args: [...args, WORKSPACE_FOLDER] });
+      return [
+        {
+          tool,
+          file,
+          projectFile: null,
+          next: 'Cursor: ative o servidor "faz-ai" em Cursor Settings → MCP e recarregue a janela (Developer: Reload Window).',
+        },
+      ];
     }
     case 'codex': {
       const file = home('.codex', 'config.toml');
@@ -294,14 +319,55 @@ function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
     case 'copilot': {
       const file = home('.copilot', 'mcp-config.json');
       mergeJson(file, { type: 'stdio', command: node, args, tools: ['*'] });
-      return [
-        {
+      const out: Registration[] = [{ tool, file, projectFile: null, next: 'Copilot CLI: abra uma sessão nova.' }];
+      if (o.editorUserDir) {
+        const editorFile = path.join(o.editorUserDir, 'mcp.json');
+        mergeJson(editorFile, { type: 'stdio', command: node, args: [...args, WORKSPACE_FOLDER] }, 'servers');
+        out.push({
           tool,
-          file,
+          file: editorFile,
           projectFile: null,
-          next: 'Copilot CLI: abra uma sessão nova. No VS Code, o servidor global fica no perfil do editor (MCP: Open User Configuration).',
-        },
-      ];
+          next: 'GitHub Copilot no VS Code: confirme a confiança no servidor quando o editor pedir (MCP: List Servers mostra o estado).',
+        });
+      }
+      return out;
     }
   }
+}
+
+/**
+ * Tira o registro do board do arquivo de configuração do projeto, deixando o resto como está. O
+ * registro do projeto vale sobre o global na ferramenta: um registro velho ali (de outra pasta, de um
+ * node que sumiu) estraga o global, por mais que ele seja refeito. false quando não havia o que tirar.
+ */
+export function removeProjectServer(workspaceDir: string, relFile: string): boolean {
+  const file = path.join(workspaceDir, relFile);
+  if (!fs.existsSync(file)) return false;
+  if (relFile.endsWith('.toml')) {
+    const toml = fs.readFileSync(file, 'utf8');
+    const lines = toml.split(/\r?\n/);
+    const start = lines.findIndex((l) => l.trim() === `[mcp_servers.${SERVER}]`);
+    if (start < 0) return false;
+    let end = start + 1;
+    while (end < lines.length && !/^\s*\[/.test(lines[end]!)) end++;
+    lines.splice(start, end - start);
+    fs.writeFileSync(file, lines.join('\n').replace(/\n{3,}/g, '\n\n'));
+    return true;
+  }
+  let config: Record<string, Record<string, unknown> | undefined>;
+  try {
+    config = JSON.parse(fs.readFileSync(file, 'utf8')) as typeof config;
+  } catch {
+    throw new Error(`${file} não é um JSON válido; corrija-o e tente de novo.`);
+  }
+  let removed = false;
+  for (const key of ['mcpServers', 'servers']) {
+    const section = config[key];
+    if (section && SERVER in section) {
+      delete section[SERVER];
+      removed = true;
+    }
+  }
+  if (removed) fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n');
+  return removed;
 }

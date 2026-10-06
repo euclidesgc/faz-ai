@@ -18,6 +18,13 @@ export const workspaceKey = (folderPath: string, platform = process.platform): s
   createHash('sha1').update(canonicalFolder(folderPath, platform)).digest('hex');
 
 /**
+ * Onde fica a ponte (`bridge.js`) que as ferramentas de IA iniciam. Na home e não na pasta de dados
+ * do editor: o VS Code e o Cursor têm pastas diferentes, e o registro global que um deles gravasse
+ * apontaria para uma cópia que o outro não atualiza. A mesma ponte serve aos dois e ao `faz-ai`.
+ */
+export const stableBridgePath = (homeDir = os.homedir()): string => path.join(homeDir, '.faz-ai', 'mcp', 'bridge.js');
+
+/**
  * Endereço do socket local do servidor MCP de uma pasta. Fica na home (e não em tmpdir) porque o
  * VSCode e o cliente de IA podem rodar com TMPDIR diferentes.
  */

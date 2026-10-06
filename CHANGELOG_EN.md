@@ -5,6 +5,26 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **Board server in Cursor and the other tools: a global install that works and a banner that goes
+  away.**
+  - The install button shows the result and the error on the board itself. They used to go to the
+    editor notifications, which Cursor keeps in its notification center without showing them: the
+    install seemed to do nothing.
+  - The global registration tells the server where the open project is: in Cursor (and in VS Code's
+    `mcp.json`) with `${workspaceFolder}`, in Claude Code through the `CLAUDE_PROJECT_DIR` variable.
+    Before, the server started outside the project and did not find the board.
+  - A broken registration in the project file (a `.cursor/mcp.json` for another folder, or for a node
+    that is gone) takes precedence over the global one, and reinstalling the global one did not fix
+    it: the banner now has **Corrigir o registro** (fix the registration), which removes it from there
+    and leaves the global one in effect.
+  - In Cursor, after installing, the banner turns into **Recarregar a janela** (reload the window),
+    with a button that reloads.
+  - The bridge (`bridge.js`) now lives in `~/.faz-ai/mcp/`, the same for VS Code, Cursor and
+    `faz-ai`. A registration with the old bridge asks you to install again.
+  - GitHub Copilot: the global install also writes the VS Code profile's `mcp.json`.
+
 ## 0.33.0
 
 - **README images** for agents, harness and models redone with this version's interface, in

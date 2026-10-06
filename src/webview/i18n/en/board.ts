@@ -341,4 +341,18 @@ export const board: Record<string, string> = {
     '{file} points to "{missing}", which no longer exists on this machine (a node replaced by nvm, or the board installed elsewhere). The tool cannot start the server. Connect again to write the current path.',
   'O {tool} não roda com o nível de permissão escolhido': '{tool} does not run with the chosen permission level',
   'Instalar o MCP do board': 'Install the board MCP',
+  '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). O registro do projeto vale no lugar do global, então a ferramenta não consegue iniciar o servidor. Corrigir tira o registro deste arquivo e deixa valendo o global, com os caminhos atuais.':
+    '{file} points to "{missing}", which no longer exists on this machine (a node switched by nvm, or the board installed elsewhere). The project registration takes precedence over the global one, so the tool cannot start the server. Fix removes the registration from this file and leaves the global one in effect, with the current paths.',
+  '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). O registro do projeto vale no lugar do global, então a IA falaria com outro board, ou com nenhum. Corrigir tira o registro deste arquivo e deixa valendo o global.':
+    '{file} ties the board server to the folder "{missing}", not to this project (the file came from another machine through git, or the project moved). The project registration takes precedence over the global one, so the AI would talk to another board, or to none. Fix removes the registration from this file and leaves the global one in effect.',
+  'Servidor do board instalado no {tool}: falta recarregar a janela': 'Board server installed in {tool}: reload the window',
+  'O registro em {file} foi gravado depois que esta janela abriu, e o chat do Cursor só carrega o servidor ao recarregar. Depois de recarregar, confira em Cursor Settings → MCP se o "faz-ai" está ligado.':
+    'The registration in {file} was written after this window opened, and the Cursor chat only loads the server after a reload. After reloading, check in Cursor Settings → MCP that "faz-ai" is turned on.',
+  'Falta recarregar a janela para a IA do editor enxergar o board': 'Reload the window so the editor AI sees the board',
+  'Corrigir o registro': 'Fix the registration',
+  'O registro do servidor do board no {tool} é de uma versão anterior':
+    'The board server registration in {tool} is from an earlier version',
+  '{file} usa a ponte em "{missing}", de uma versão anterior da extensão, que não é mais atualizada e pode não achar o projeto aberto. Instale de novo para gravar o registro atual.':
+    '{file} uses the bridge at "{missing}", from an earlier version of the extension, which is no longer updated and may not find the open project. Install again to write the current registration.',
+  'Recarregar a janela': 'Reload the window',
 };

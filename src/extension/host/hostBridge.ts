@@ -16,6 +16,10 @@ export interface HostEnv {
   showFilters(): unknown;
   /** registra o servidor MCP do board na ferramenta de IA do projeto; o texto devolvido vira um aviso na interface */
   connectAI(target: { tool?: AiTool; scope?: InstallScope }): unknown;
+  /** tira o registro quebrado do board do arquivo do projeto e refaz o global; o texto devolvido vira um aviso */
+  fixProjectMcp(file: string): Promise<string>;
+  /** recarrega a janela do editor (só faz sentido dentro do editor) */
+  reloadWindow?(): unknown;
   runAi(cardId: string, mode?: AiRunMode): unknown;
   stopAi(cardId: string): unknown;
   /** pausa o autopiloto das histórias em modo autônomo */
@@ -108,6 +112,12 @@ export class HostBridge {
           if (typeof notice === 'string') this.post({ type: 'notice', message: notice });
           return;
         }
+        case 'ui.fixProjectMcp':
+          this.post({ type: 'notice', message: await this.env.fixProjectMcp(msg.file) });
+          return;
+        case 'ui.reloadWindow':
+          await this.env.reloadWindow?.();
+          return;
         case 'ui.showChat':
           await this.env.showChat?.();
           return;

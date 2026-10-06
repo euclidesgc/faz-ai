@@ -237,8 +237,13 @@ com dois botões:
 | **Instalar (padrão da ferramenta)** | configuração global: `~/.claude.json` (por `claude mcp add --scope user`), `~/.cursor/mcp.json`, `~/.codex/config.toml`, `~/.kimi-code/mcp.json`, `~/.copilot/mcp-config.json`; a skill em `~/.claude/skills`, `~/.cursor/skills` e equivalentes | o recomendado: o board funciona em qualquer repositório aberto com ele, sem nenhum arquivo no projeto |
 | **Instalar neste projeto** | `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.kimi-code/mcp.json` ou `.vscode/mcp.json`; a skill em `.claude/skills`, `.cursor/skills` e equivalentes | fixar uma versão num repositório ou num fork, ou uma skill ajustada para o time |
 
-O registro global não leva a pasta do projeto: a ponte do board acha o board subindo a partir da
-pasta em que a ferramenta foi aberta. O do projeto vale sobre o global naquele projeto, então
+O registro global não fixa a pasta do projeto: o Cursor e o VS Code recebem `${workspaceFolder}`,
+que o editor troca pela pasta aberta; o Claude Code informa a pasta pela variável
+`CLAUDE_PROJECT_DIR`; nas outras, a ponte do board acha o board subindo a partir da pasta em que a
+ferramenta foi aberta. No GitHub Copilot, o global vale para a Copilot CLI e, no VS Code, para o
+`mcp.json` do perfil do editor. No Cursor, depois de instalar, a faixa pede para **recarregar a
+janela** (o chat do Cursor só carrega o servidor assim); confira em Cursor Settings → MCP se o
+`faz-ai` está ligado. O do projeto vale sobre o global naquele projeto, então
 instalar no projeto com um global já instalado pede confirmação, assim como substituir uma skill do
 fluxo que já existe no destino (o que foi ajustado nela se perde). O comando **Faz AI: Instalar o
 MCP do board (global)** da paleta faz a instalação padrão na ferramenta do projeto, e a ferramenta
@@ -251,9 +256,11 @@ do board, em todas as telas, e no painel de chat. Ela confere o Node.js (o servi
 com ele), a linha de comando da ferramenta, o login dela (no Cursor, por `cursor-agent status`), o
 registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
 para o seu usuário, de `claude mcp add -s user`), um registro apontando para um node ou um caminho
-que não existe mais ou para outra pasta, e o nível de permissão. Cada item diz o efeito e traz a ação: o
-comando para copiar, **Instalar o MCP do board** (abre a seção Servidores MCP da ferramenta) ou o
-atalho para o Harness de IA. A faixa não
+que não existe mais, para outra pasta ou para a ponte de uma versão anterior, e o nível de
+permissão. Cada item diz o efeito e traz a ação: o comando para copiar, **Instalar o MCP do board**
+(abre a seção Servidores MCP da ferramenta), **Corrigir o registro** (um registro quebrado no arquivo
+do projeto vale no lugar do global; corrigir tira ele dali e deixa o global valendo), **Recarregar a
+janela** ou o atalho para o Harness de IA. A faixa não
 fecha: some sozinha quando o último item é resolvido. A conferência roda ao abrir o board, quando a
 ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**,
 que relê também o PATH do terminal (um node instalado com o board aberto é encontrado sem recarregar

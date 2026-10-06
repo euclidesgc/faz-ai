@@ -41,6 +41,8 @@ const bridgeOnly = {
   'view.set': viaBridge,
   'ui.showFilters': viaBridge,
   'ui.connectAI': viaBridge,
+  'ui.fixProjectMcp': viaBridge,
+  'ui.reloadWindow': viaBridge,
   'ui.openInBrowser': viaBridge,
   'ai.run': viaBridge,
   'ai.stop': viaBridge,

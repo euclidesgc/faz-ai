@@ -31,6 +31,8 @@ export const ui = {
   openInBrowser: () => post({ type: 'ui.openInBrowser' }),
   showChat: () => post({ type: 'ui.showChat' }),
   checkRequirements: () => post({ type: 'requirements.check' }),
+  fixProjectMcp: (file: string) => post({ type: 'ui.fixProjectMcp', file }),
+  reloadWindow: () => post({ type: 'ui.reloadWindow' }),
 };
 
 export const chat = {

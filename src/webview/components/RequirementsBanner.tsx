@@ -5,6 +5,7 @@ import type { BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { ui } from '../commands';
+import { isWeb } from '../vscode';
 import { Button, IconCheck, IconConnect, IconWarning } from './ui';
 
 /** Título e explicação de cada requisito, no idioma da interface. */
@@ -60,17 +61,45 @@ function texts(r: BoardRequirement): { title: string; detail: string } {
     case 'mcp-stale':
       return {
         title: t('O registro do servidor do board no {tool} está desatualizado', { tool }),
-        detail: t(
-          '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). A ferramenta não consegue iniciar o servidor. Conecte de novo para gravar o caminho atual.',
-          { file: r.file ?? '', missing: r.missing ?? '' },
-        ),
+        detail:
+          r.action?.kind === 'fixProject'
+            ? t(
+                '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). O registro do projeto vale no lugar do global, então a ferramenta não consegue iniciar o servidor. Corrigir tira o registro deste arquivo e deixa valendo o global, com os caminhos atuais.',
+                { file: r.file ?? '', missing: r.missing ?? '' },
+              )
+            : t(
+                '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). A ferramenta não consegue iniciar o servidor. Conecte de novo para gravar o caminho atual.',
+                { file: r.file ?? '', missing: r.missing ?? '' },
+              ),
       };
     case 'mcp-elsewhere':
       return {
         title: t('O servidor do board no {tool} está registrado para outra pasta', { tool }),
+        detail:
+          r.action?.kind === 'fixProject'
+            ? t(
+                '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). O registro do projeto vale no lugar do global, então a IA falaria com outro board, ou com nenhum. Corrigir tira o registro deste arquivo e deixa valendo o global.',
+                { file: r.file ?? '', missing: r.missing ?? '' },
+              )
+            : t(
+                '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). A IA falaria com outro board, ou com nenhum. Conecte de novo para gravar a pasta atual.',
+                { file: r.file ?? '', missing: r.missing ?? '' },
+              ),
+      };
+    case 'mcp-outdated':
+      return {
+        title: t('O registro do servidor do board no {tool} é de uma versão anterior', { tool }),
         detail: t(
-          '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). A IA falaria com outro board, ou com nenhum. Conecte de novo para gravar a pasta atual.',
+          '{file} usa a ponte em "{missing}", de uma versão anterior da extensão, que não é mais atualizada e pode não achar o projeto aberto. Instale de novo para gravar o registro atual.',
           { file: r.file ?? '', missing: r.missing ?? '' },
+        ),
+      };
+    case 'mcp-reload':
+      return {
+        title: t('Servidor do board instalado no {tool}: falta recarregar a janela', { tool }),
+        detail: t(
+          'O registro em {file} foi gravado depois que esta janela abriu, e o chat do Cursor só carrega o servidor ao recarregar. Depois de recarregar, confira em Cursor Settings → MCP se o "faz-ai" está ligado.',
+          { file: r.file ?? '' },
         ),
       };
     case 'permission':
@@ -131,7 +160,9 @@ function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
   const { title, detail } = texts(r);
   const settings = r.action?.kind === 'settings' && !compact;
   // na versão compacta (o painel de chat) a explicação só fica de fora quando há um botão que resolve
-  const actionable = r.action?.kind === 'command' || r.action?.kind === 'connect' || settings;
+  // recarregar a janela só existe dentro do editor; no navegador, fica a explicação
+  const reload = r.action?.kind === 'reload' && !isWeb;
+  const actionable = r.action?.kind === 'command' || r.action?.kind === 'connect' || r.action?.kind === 'fixProject' || reload || settings;
   return (
     <li>
       <strong>
@@ -144,6 +175,16 @@ function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
         // a instalação mora na seção Servidores MCP da ferramenta, onde se escolhe global ou projeto
         <Button size="small" onClick={() => openMcpInstall()}>
           <IconConnect /> {t('Instalar o MCP do board')}
+        </Button>
+      )}
+      {r.action?.kind === 'fixProject' && (
+        <Button size="small" onClick={() => r.action?.kind === 'fixProject' && ui.fixProjectMcp(r.action.file)}>
+          <IconConnect /> {t('Corrigir o registro')}
+        </Button>
+      )}
+      {reload && (
+        <Button size="small" onClick={() => ui.reloadWindow()}>
+          {t('Recarregar a janela')}
         </Button>
       )}
       {settings && (
@@ -203,7 +244,9 @@ export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
         {missing > 0 && <IconWarning />}
         <strong role="status">
           {missing === 0
-            ? t('Recomendado para a IA enxergar o board nas suas conversas')
+            ? requirements.every((r) => r.id === 'mcp-reload')
+              ? t('Falta recarregar a janela para a IA do editor enxergar o board')
+              : t('Recomendado para a IA enxergar o board nas suas conversas')
             : missing === 1
               ? t('Falta 1 requisito para o board trabalhar com a IA')
               : t('Faltam {n} requisitos para o board trabalhar com a IA', { n: missing })}

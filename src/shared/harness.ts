@@ -219,7 +219,7 @@ export const AI_TOOLS: {
     rules: 'AGENTS.md',
     skills: '.github/skills',
     mcp: '.vscode/mcp.json e .mcp.json (projeto)',
-    mcpUser: '~/.copilot/mcp-config.json (Copilot CLI)',
+    mcpUser: '~/.copilot/mcp-config.json (Copilot CLI) e o mcp.json do perfil do VS Code',
     agents: { dir: '.github/agents', ext: '.agent.md', format: 'markdown', modelField: 'model' },
   },
 ];

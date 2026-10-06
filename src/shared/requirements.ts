@@ -1,12 +1,20 @@
 import type { AiTool } from './harness';
 
 /** O que falta para o board trabalhar com a ferramenta de IA do projeto. */
-export type RequirementId = 'node' | 'cli' | 'signin' | 'mcp' | 'mcp-stale' | 'mcp-elsewhere' | 'permission';
+export type RequirementId =
+  'node' | 'cli' | 'signin' | 'mcp' | 'mcp-stale' | 'mcp-elsewhere' | 'mcp-outdated' | 'mcp-reload' | 'permission';
 
 /** O que a pessoa pode fazer, pela própria faixa de aviso, para resolver. */
 export type RequirementAction =
   /** registrar (de novo) o servidor do board na ferramenta: a seção Servidores MCP da ferramenta, no Harness de IA */
   | { kind: 'connect' }
+  /**
+   * tirar o registro quebrado do arquivo do projeto, que vale sobre o global na ferramenta, e deixar o
+   * global (refeito com os caminhos atuais) valendo: reinstalar só o global não resolveria
+   */
+  | { kind: 'fixProject'; file: string }
+  /** recarregar a janela do editor, para o chat dele carregar o servidor recém-registrado */
+  | { kind: 'reload' }
   /** um comando para rodar no terminal, com botão de copiar */
   | { kind: 'command'; command: string }
   /** a tela de Configurações → Harness de IA */

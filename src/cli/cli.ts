@@ -10,7 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { createBoardHost } from '../extension/host/boardHost';
 import { startMcpServer } from '../extension/mcp/server';
-import { canonicalFolder, socketPath, workspaceKey } from '../extension/mcp/socketPath';
+import { canonicalFolder, socketPath, stableBridgePath, workspaceKey } from '../extension/mcp/socketPath';
 import { ViewStateStore, type Memento } from '../extension/viewState';
 import { openWithSystem, revealInSystem } from '../extension/web/osOpen';
 import { preferredPort, startWebServer } from '../extension/web/webServer';
@@ -103,7 +103,7 @@ async function main(): Promise<void> {
 
   const distDir = __dirname;
   const log = (line: string) => process.stdout.write(`${new Date().toLocaleTimeString()} ${line}\n`);
-  const bridgePath = path.join(dataDir, 'mcp', 'bridge.js');
+  const bridgePath = stableBridgePath();
   fs.mkdirSync(path.dirname(bridgePath), { recursive: true });
   fs.copyFileSync(path.join(distDir, 'mcp-bridge.js'), bridgePath);
 
@@ -135,6 +135,7 @@ async function main(): Promise<void> {
           ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.`
           : message;
       },
+      fixProjectMcp: (file) => host.fixProjectServer(file),
       runAi: (cardId, mode) => runner.start(cardId, 'manual', mode),
       stopAi: (cardId) => runner.stop(cardId),
       pauseAutopilot: () => host.autopilot.pause(),

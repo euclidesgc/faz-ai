@@ -77,7 +77,8 @@ describe('requisitos do board', () => {
         optional: true,
         file: '.cursor/mcp.json',
         missing: path.join(home, '.nvm/versions/node/v20.0.0/bin/node'),
-        action: { kind: 'connect' },
+        // o registro do projeto vale sobre o global: corrigir é tirá-lo dali
+        action: { kind: 'fixProject', file: '.cursor/mcp.json' },
       },
     ]);
   });
@@ -111,7 +112,7 @@ describe('requisitos do board', () => {
         optional: true,
         file: '.cursor/mcp.json',
         missing: '/outro/projeto',
-        action: { kind: 'connect' },
+        action: { kind: 'fixProject', file: '.cursor/mcp.json' },
       },
     ]);
   });
@@ -136,11 +137,57 @@ describe('requisitos do board', () => {
     for (const tool of ['cursor', 'codex', 'copilot', 'kimi'] as const) {
       expect(registeredServer(tool, project, home)).toBeNull();
       registerClients([tool], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
-      expect(registeredServer(tool, project, home)).toMatchObject({ file: expect.stringMatching(/^~\//), args: [BRIDGE] });
+      // o Cursor recebe a pasta aberta pela variável que o editor troca; as outras acham o projeto sozinhas
+      const args = tool === 'cursor' ? [BRIDGE, '${workspaceFolder}'] : [BRIDGE];
+      expect(registeredServer(tool, project, home)).toMatchObject({ file: expect.stringMatching(/^~\//), scope: 'user', args });
     }
     expect(await checkRequirements(probe())).toEqual([]);
     // o do projeto vale sobre o global
     connect('cursor');
     expect(registeredServer('cursor', project, home)).toMatchObject({ file: '.cursor/mcp.json', args: [BRIDGE, project] });
+  });
+
+  it('registro global quebrado pede para conectar de novo, sem mexer no projeto', async () => {
+    registerClients(['cursor'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: '/sumiu/node', scope: 'user' });
+    expect(await checkRequirements(probe())).toEqual([
+      { id: 'mcp-stale', tool: 'cursor', optional: true, file: '~/.cursor/mcp.json', missing: '/sumiu/node', action: { kind: 'connect' } },
+    ]);
+  });
+
+  it('no Cursor, o registro gravado depois que a janela abriu pede para recarregar', async () => {
+    registerClients(['cursor'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
+    const written = fs.statSync(path.join(home, '.cursor', 'mcp.json')).mtimeMs;
+    expect(await checkRequirements(probe({ editor: 'cursor', windowStartedAt: written - 1000 }))).toEqual([
+      { id: 'mcp-reload', tool: 'cursor', optional: true, file: '~/.cursor/mcp.json', action: { kind: 'reload' } },
+    ]);
+    // depois de recarregar, a janela é mais nova que o registro
+    expect(await checkRequirements(probe({ editor: 'cursor', windowStartedAt: written + 1000 }))).toEqual([]);
+    // fora do Cursor (VS Code, navegador) não há o que recarregar
+    expect(await checkRequirements(probe({ editor: 'vscode', windowStartedAt: written - 1000 }))).toEqual([]);
+    expect(await checkRequirements(probe())).toEqual([]);
+  });
+
+  it('o mcp.json global do VS Code conta para o Copilot', async () => {
+    const userDir = path.join(home, 'Code', 'User');
+    registerClients(['copilot'], {
+      bridgePath: BRIDGE,
+      workspaceDir: project,
+      homeDir: home,
+      nodeCommand: process.execPath,
+      scope: 'user',
+      editorUserDir: userDir,
+    });
+    fs.rmSync(path.join(home, '.copilot'), { recursive: true });
+    expect(registeredServer('copilot', project, home, userDir)).toMatchObject({ scope: 'user', args: [BRIDGE, '${workspaceFolder}'] });
+  });
+
+  it('registro com a ponte de antes (na pasta de dados do editor) pede para instalar de novo', async () => {
+    const old = path.join(home, 'Code', 'User', 'globalStorage', 'euclidesgc.faz-ai', 'mcp', 'bridge.js');
+    fs.mkdirSync(path.dirname(old), { recursive: true });
+    fs.writeFileSync(old, '// ponte antiga');
+    registerClients(['cursor'], { bridgePath: old, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
+    expect(await checkRequirements(probe())).toEqual([
+      { id: 'mcp-outdated', tool: 'cursor', optional: true, file: '~/.cursor/mcp.json', missing: old, action: { kind: 'connect' } },
+    ]);
   });
 });
