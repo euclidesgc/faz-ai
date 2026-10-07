@@ -8,17 +8,25 @@ import * as path from 'node:path';
 import { socketPath } from '../extension/mcp/socketPath';
 
 /**
- * Pasta do board: o argumento, a variável FAZAI_WORKSPACE ou o diretório atual. Neste último caso
- * sobe pelos diretórios pais até achar uma pasta com servidor ativo, para funcionar em clientes
- * configurados globalmente (sem a pasta fixa) e iniciados de dentro de uma subpasta do projeto.
+ * Valor que a ferramenta deveria ter trocado e não trocou (`${workspaceFolder}` numa ferramenta que
+ * não interpola variáveis): vale como ausente.
+ */
+const given = (value: string | undefined): string | undefined => (value && !/\$\{[^}]*\}/.test(value) ? value : undefined);
+
+/**
+ * Pasta do board: o argumento, a variável FAZAI_WORKSPACE ou a pasta do projeto que a ferramenta
+ * informa (o Claude Code passa `CLAUDE_PROJECT_DIR` aos servidores), e na falta dela o diretório
+ * atual. Nos dois últimos casos sobe pelos diretórios pais até achar uma pasta com servidor ativo,
+ * para funcionar em clientes configurados globalmente (sem a pasta fixa) e iniciados de dentro de uma
+ * subpasta do projeto.
  */
 function resolveFolder(): string {
-  const explicit = process.argv[2] ?? process.env.FAZAI_WORKSPACE;
+  const explicit = given(process.argv[2]) ?? given(process.env.FAZAI_WORKSPACE);
   if (explicit) return path.resolve(explicit);
-  const cwd = process.cwd();
-  for (let dir = cwd; ; dir = path.dirname(dir)) {
+  const start = path.resolve(given(process.env.CLAUDE_PROJECT_DIR) ?? process.cwd());
+  for (let dir = start; ; dir = path.dirname(dir)) {
     if (fs.existsSync(socketPath(dir))) return dir;
-    if (dir === path.dirname(dir)) return cwd;
+    if (dir === path.dirname(dir)) return start;
   }
 }
 

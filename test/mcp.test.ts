@@ -1190,7 +1190,7 @@ describe('ferramentas de IA', () => {
     fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
     fs.writeFileSync(path.join(home, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
     const bridge = '/b/bridge.js';
-    const done = registerClients(['claude', 'codex', 'cursor', 'kimi', 'copilot'], {
+    const done = registerClients(['claude', 'codex', 'kimi', 'copilot'], {
       bridgePath: bridge,
       workspaceDir: project,
       homeDir: home,
@@ -1211,10 +1211,8 @@ describe('ferramentas de IA', () => {
     ]);
 
     const json = (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')).mcpServers;
-    expect(json(path.join(home, '.cursor', 'mcp.json'))).toEqual({
-      outro: { command: 'x' },
-      'faz-ai': { type: 'stdio', command: 'node', args: [bridge] },
-    });
+    // o Cursor não tem global que funcione: fica como estava
+    expect(json(path.join(home, '.cursor', 'mcp.json'))).toEqual({ outro: { command: 'x' } });
     expect(fs.readFileSync(path.join(home, '.codex', 'config.toml'), 'utf8')).toContain(`args = ["${bridge}"]`);
     expect(json(path.join(home, '.kimi-code', 'mcp.json'))['faz-ai']).toEqual({ transport: 'stdio', command: 'node', args: [bridge] });
     expect(fs.existsSync(path.join(home, '.kimi'))).toBe(false);
@@ -1227,18 +1225,17 @@ describe('ferramentas de IA', () => {
   });
 
   it('a execução do Cursor usa o registro global quando ele leva a este board', async () => {
-    const { ensureProjectServer, registerClients } = await import('../src/extension/mcp/clientConfig');
+    const { ensureProjectServer } = await import('../src/extension/mcp/clientConfig');
     const home = path.join(dir, 'home-cursor');
     const project = path.join(dir, 'proj-cursor');
     fs.mkdirSync(path.join(project, 'sub'), { recursive: true });
     const entry = { command: process.execPath, args: ['/b/bridge.js', project] };
-    registerClients(['cursor'], {
-      bridgePath: '/b/bridge.js',
-      workspaceDir: project,
-      homeDir: home,
-      nodeCommand: process.execPath,
-      scope: 'user',
-    });
+    // o global que a cursor-agent lê (cada execução é um processo na pasta do projeto)
+    fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
+    fs.writeFileSync(
+      path.join(home, '.cursor', 'mcp.json'),
+      JSON.stringify({ mcpServers: { 'faz-ai': { command: process.execPath, args: ['/b/bridge.js', '${workspaceFolder}'] } } }),
+    );
     expect(ensureProjectServer(project, '.cursor/mcp.json', entry, home)).toBe('global');
     expect(ensureProjectServer(path.join(project, 'sub'), '.cursor/mcp.json', entry, home)).toBe('global');
     expect(fs.existsSync(path.join(project, '.cursor'))).toBe(false);
@@ -1248,6 +1245,27 @@ describe('ferramentas de IA', () => {
     expect(ensureProjectServer(worktree, '.cursor/mcp.json', entry, home)).toBe('added');
     // outro bridge no global não leva a este board
     expect(ensureProjectServer(project, '.cursor/mcp.json', { ...entry, args: ['/outro/bridge.js', project] }, home)).toBe('added');
+  });
+
+  it('tira só o registro do board do arquivo do projeto, em JSON e no TOML do Codex', async () => {
+    const { removeProjectServer, registerClients } = await import('../src/extension/mcp/clientConfig');
+    const project = path.join(dir, 'proj-remove');
+    fs.mkdirSync(path.join(project, '.cursor'), { recursive: true });
+    fs.writeFileSync(path.join(project, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
+    registerClients(['cursor', 'codex'], { bridgePath: '/b/bridge.js', workspaceDir: project, homeDir: path.join(dir, 'home-remove') });
+    fs.appendFileSync(path.join(project, '.codex', 'config.toml'), '\n[mcp_servers.outro]\ncommand = "y"\n');
+
+    expect(removeProjectServer(project, '.cursor/mcp.json')).toBe(true);
+    expect(JSON.parse(fs.readFileSync(path.join(project, '.cursor', 'mcp.json'), 'utf8'))).toEqual({
+      mcpServers: { outro: { command: 'x' } },
+    });
+    expect(removeProjectServer(project, '.codex/config.toml')).toBe(true);
+    const toml = fs.readFileSync(path.join(project, '.codex', 'config.toml'), 'utf8');
+    expect(toml).not.toContain('faz-ai');
+    expect(toml).toContain('[mcp_servers.outro]');
+    // nada a tirar: arquivo sem o registro, ou que não existe
+    expect(removeProjectServer(project, '.cursor/mcp.json')).toBe(false);
+    expect(removeProjectServer(project, '.mcp.json')).toBe(false);
   });
 
   it('sugere modelos do Copilot e o detecta pela CLI ou pela extensão do VS Code', async () => {
@@ -1321,6 +1339,67 @@ describe('ponte stdio', () => {
       fs.rmSync(home, { recursive: true, force: true });
     }
   }, 15000);
+});
+
+describe('ponte stdio: onde acha o projeto', () => {
+  // o registro global não fixa a pasta: o Cursor troca `${workspaceFolder}`, o Claude Code passa
+  // CLAUDE_PROJECT_DIR, e as outras abrem a ponte dentro do projeto
+  it.skipIf(process.platform === 'win32').each([
+    ['pela pasta nos argumentos', (d: string) => ({ args: [d], cwd: os.tmpdir(), env: {} })],
+    [
+      'pelo diretório atual, com a variável que a ferramenta não trocou',
+      (d: string) => ({ args: ['${workspaceFolder}'], cwd: d, env: {} }),
+    ],
+    ['pelo CLAUDE_PROJECT_DIR', (d: string) => ({ args: [], cwd: os.tmpdir(), env: { CLAUDE_PROJECT_DIR: d } })],
+    ['subindo de uma subpasta do projeto', (d: string) => ({ args: [], cwd: path.join(d, 'sub'), env: {} })],
+  ])(
+    '%s',
+    async (_name, how) => {
+      const bridge = path.resolve(__dirname, '../dist/mcp-bridge.js');
+      if (!fs.existsSync(bridge)) throw new Error('rode `npm run build:ext` antes deste teste');
+      const project = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fz-proj-')));
+      fs.mkdirSync(path.join(project, 'sub'));
+      const address = path.join(project, 'mcp.sock');
+      const stop = await startMcpServer(address, { getRouter: async () => router, workspaceDir: project, version: 'test' });
+      const { socketPath } = await import('../src/extension/mcp/socketPath');
+      const home = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-'));
+      const prev = process.env.HOME;
+      process.env.HOME = home;
+      const expected = socketPath(project);
+      process.env.HOME = prev;
+      fs.mkdirSync(path.dirname(expected), { recursive: true });
+      fs.symlinkSync(address, expected);
+      const { args, cwd, env } = how(project);
+      const clean = { ...process.env };
+      delete clean.CLAUDE_PROJECT_DIR;
+      delete clean.FAZAI_WORKSPACE;
+      const child = spawn(process.execPath, [bridge, ...args], {
+        cwd,
+        env: { ...clean, HOME: home, ...env },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      let out = '';
+      child.stdout.on('data', (d: Buffer) => (out += d.toString()));
+      try {
+        child.stdin.write(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'initialize',
+            params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'teste', version: '1' } },
+          }) + '\n',
+        );
+        for (let i = 0; i < 100 && !out.includes('\n'); i++) await new Promise((r) => setTimeout(r, 50));
+        expect(JSON.parse(out.split('\n')[0]!).result.serverInfo.name).toBe('faz-ai');
+      } finally {
+        child.kill();
+        stop();
+        fs.rmSync(home, { recursive: true, force: true });
+        fs.rmSync(project, { recursive: true, force: true });
+      }
+    },
+    15000,
+  );
 });
 
 describe('vínculos entre cards', () => {

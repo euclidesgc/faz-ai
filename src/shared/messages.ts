@@ -18,6 +18,12 @@ export type WebviewToHost =
   | { type: 'ui.showFilters' }
   /** instala o servidor MCP do board numa ferramenta (padrão: a do projeto), global (padrão) ou só no projeto */
   | { type: 'ui.connectAI'; tool?: AiTool; scope?: InstallScope }
+  /** tira o registro quebrado do board do arquivo do projeto (que vale sobre o global) e refaz o global */
+  | { type: 'ui.fixProjectMcp'; file: string }
+  /** recarrega a janela do editor, para o chat dele carregar o servidor recém-registrado */
+  | { type: 'ui.reloadWindow' }
+  /** abre a tela de MCPs do editor (no Cursor, Customize → MCPs) */
+  | { type: 'ui.openEditorMcp' }
   /** abre este board no navegador, fora do editor */
   | { type: 'ui.openInBrowser' }
   /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */

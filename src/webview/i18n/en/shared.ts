@@ -127,9 +127,10 @@ export const shared: Record<string, string> = {
   '.vscode/mcp.json e .mcp.json (projeto)': '.vscode/mcp.json and .mcp.json (project)',
   '~/.claude.json (claude mcp add --scope user)': '~/.claude.json (claude mcp add --scope user)',
   '~/.codex/config.toml': '~/.codex/config.toml',
-  '~/.cursor/mcp.json': '~/.cursor/mcp.json',
+  '.cursor/mcp.json (projeto; o global não funciona no Cursor)': '.cursor/mcp.json (project; the global scope does not work in Cursor)',
   '~/.kimi-code/mcp.json ou ~/.kimi/mcp.json': '~/.kimi-code/mcp.json or ~/.kimi/mcp.json',
-  '~/.copilot/mcp-config.json (Copilot CLI)': '~/.copilot/mcp-config.json (Copilot CLI)',
+  '~/.copilot/mcp-config.json (Copilot CLI) e o mcp.json do perfil do VS Code':
+    '~/.copilot/mcp-config.json (Copilot CLI) and the VS Code profile mcp.json',
   'Codex, Cursor, Kimi Code, GitHub Copilot e outros': 'Codex, Cursor, Kimi Code, GitHub Copilot and others',
   'Documentação e exemplos de código, lidos só quando a skill aponta para eles.':
     'Documentation and code examples, read only when the skill points to them.',

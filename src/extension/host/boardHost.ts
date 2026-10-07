@@ -9,7 +9,7 @@ import { Heartbeat } from '../heartbeat';
 import { createRunLog } from '../log/runLog';
 import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
-import { registerClients } from '../mcp/clientConfig';
+import { registerClients, removeProjectServer } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
@@ -43,6 +43,14 @@ export interface BoardHostOptions {
   version?: string;
   /** esta janela é a dona do board (serve o MCP), a única que roda o autopiloto; padrão: sempre */
   ownsBoard?: () => boolean;
+  /** o editor em que o board está aberto; ausente fora do editor (o `faz-ai` no terminal) */
+  editor?: {
+    name: 'vscode' | 'cursor';
+    /** quando a janela abriu: o registro gravado depois disso pede para recarregar */
+    startedAt: number;
+    /** pasta de configuração do usuário no VS Code (o `mcp.json` global do Copilot no editor); só no VS Code */
+    userDir?: string;
+  };
 }
 
 /** O board de uma pasta em funcionamento: banco, roteador, executor da IA e heartbeat. Não depende da API do VSCode. */
@@ -59,6 +67,11 @@ export interface BoardHost {
    * que foi feito. `user` (o padrão) instala na configuração global da ferramenta; `project`, só aqui.
    */
   connectAI(target?: { tool?: AiTool; scope?: InstallScope }): Promise<{ message: string; toIgnore: string[] }>;
+  /**
+   * Tira o registro quebrado do board do arquivo do projeto (que vale sobre o global na ferramenta) e
+   * refaz o global com os caminhos atuais. Devolve o resumo do que foi feito.
+   */
+  fixProjectServer(file: string): Promise<string>;
   addToGitignore(lines: string[]): void;
   dispose(): Promise<void>;
 }
@@ -223,6 +236,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       nodePath,
       resolve: (command) => resolveCommand(command, pathEnv, homeDir),
       signedIn: (tool, exe) => (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : Promise.resolve(null)),
+      editor: o.editor?.name,
+      windowStartedAt: o.editor?.startedAt,
+      editorUserDir: o.editor?.userDir,
     })
       .then((list) => {
         // a CLI do Cursor acabou de ficar pronta (instalada, com login): só agora dá para ler os modelos da conta
@@ -280,7 +296,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
 
   const gitignore = path.join(o.folderPath, '.gitignore');
-  return {
+  const api: BoardHost = {
     router,
     runner,
     heartbeat,
@@ -296,6 +312,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         homeDir,
         nodeCommand: nodePath,
         scope,
+        editorUserDir: o.editor?.userDir,
       });
       for (const step of done.flatMap((d) => d.run ?? [])) {
         const exe = resolveCommand(step.command, pathEnv, homeDir);
@@ -318,10 +335,19 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
             .split(/\r?\n/)
             .map((l) => l.trim())
         : [];
-      const toIgnore = [...new Set(done.flatMap((d) => (d.projectFile && !ignored.includes(d.projectFile) ? [d.projectFile] : [])))];
+      const toIgnore = [
+        ...new Set(done.flatMap((d) => (d.projectFile && !d.excluded && !ignored.includes(d.projectFile) ? [d.projectFile] : []))),
+      ];
       const files = done.map((d) => d.projectFile ?? d.file.replace(homeDir, '~')).join(', ');
       void checkNow();
       return { message: `Servidor "faz-ai" registrado em: ${files}. ${[...new Set(done.map((d) => d.next))].join(' ')}`, toIgnore };
+    },
+    async fixProjectServer(file) {
+      // só os arquivos do projeto que o próprio board grava; nada fora da pasta
+      if (path.isAbsolute(file) || file.split(/[\\/]/).includes('..')) throw new Error(`Arquivo inválido: ${file}`);
+      removeProjectServer(o.folderPath, file);
+      const { message } = await api.connectAI({ scope: 'user' });
+      return `Registro do board tirado de ${file}, que valia no lugar do global. ${message}`;
     },
     addToGitignore(lines) {
       const current = fs.existsSync(gitignore) ? fs.readFileSync(gitignore, 'utf8') : '';
@@ -336,4 +362,5 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       await handle.close();
     },
   };
+  return api;
 }

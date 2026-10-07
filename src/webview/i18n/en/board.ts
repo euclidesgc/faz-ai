@@ -326,19 +326,36 @@ export const board: Record<string, string> = {
   'A linha de comando do {tool} está sem login': "{tool}'s command line is not signed in",
   'Ela está instalada, mas não entrou na conta: as execuções pelo board falham antes de começar. Rode o comando abaixo no terminal, conclua o login no navegador e clique em Verificar de novo.':
     'It is installed but not signed in: runs from the board fail before starting. Run the command below in the terminal, finish signing in in the browser and click Check again.',
-  'O servidor do board não está registrado no {tool}': "The board's server is not registered in {tool}",
+  'O MCP do board (faz-ai) não está instalado no {tool}': 'The board MCP (faz-ai) is not installed in {tool}',
   'Nas conversas com o {tool} fora do board, a IA não enxerga os cards. As execuções pelo board não dependem disso. Conecte e aprove o servidor "faz-ai" quando a ferramenta pedir.':
     'In conversations with {tool} outside the board, the AI does not see the cards. Runs from the board do not depend on this. Connect and approve the "faz-ai" server when the tool asks.',
   'Nas conversas com o Cursor no editor, a IA não enxerga os cards. As execuções pelo board registram o servidor sozinhas, mas a conversa no editor não. Conecte e ative o servidor "faz-ai" em Cursor Settings → MCP.':
     'In conversations with Cursor in the editor, the AI does not see the cards. Runs from the board register the server on their own, but the editor conversation does not. Connect and enable the "faz-ai" server in Cursor Settings → MCP.',
   'Nas conversas com o {tool} fora do board, a IA não enxerga os cards, e as execuções pelo board também dependem disso. Conecte e aprove o servidor "faz-ai" quando a ferramenta pedir.':
     'In conversations with {tool} outside the board, the AI does not see the cards, and runs from the board depend on this too. Connect and approve the "faz-ai" server when the tool asks.',
-  'O servidor do board no {tool} está registrado para outra pasta': 'The board server in {tool} is registered for another folder',
+  'O MCP do board no {tool} está registrado para outra pasta': 'The board MCP in {tool} is registered for another folder',
   '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). A IA falaria com outro board, ou com nenhum. Conecte de novo para gravar a pasta atual.':
     '{file} ties the board server to the folder "{missing}", not to this project (the file came from another machine through git, or the project moved). The AI would talk to another board, or to none. Connect again to save the current folder.',
-  'O registro do servidor do board no {tool} está desatualizado': "The board's server registration in {tool} is out of date",
+  'O MCP do board no {tool} está desatualizado': 'The board MCP in {tool} is out of date',
   '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). A ferramenta não consegue iniciar o servidor. Conecte de novo para gravar o caminho atual.':
     '{file} points to "{missing}", which no longer exists on this machine (a node replaced by nvm, or the board installed elsewhere). The tool cannot start the server. Connect again to write the current path.',
   'O {tool} não roda com o nível de permissão escolhido': '{tool} does not run with the chosen permission level',
   'Instalar o MCP do board': 'Install the board MCP',
+  '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). O registro do projeto vale no lugar do global, então a ferramenta não consegue iniciar o servidor. Corrigir tira o registro deste arquivo e deixa valendo o global, com os caminhos atuais.':
+    '{file} points to "{missing}", which no longer exists on this machine (a node switched by nvm, or the board installed elsewhere). The project registration takes precedence over the global one, so the tool cannot start the server. Fix removes the registration from this file and leaves the global one in effect, with the current paths.',
+  '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). O registro do projeto vale no lugar do global, então a IA falaria com outro board, ou com nenhum. Corrigir tira o registro deste arquivo e deixa valendo o global.':
+    '{file} ties the board server to the folder "{missing}", not to this project (the file came from another machine through git, or the project moved). The project registration takes precedence over the global one, so the AI would talk to another board, or to none. Fix removes the registration from this file and leaves the global one in effect.',
+  'MCP do board instalado no {tool}: recarregue a janela': 'Board MCP installed in {tool}: reload the window',
+  'O MCP "faz-ai" é o canal pelo qual a IA do chat do Cursor lê e atualiza os cards deste board. Ele foi instalado em {file} depois que esta janela abriu, e o Cursor só lê os MCPs do projeto ao abrir a janela: recarregue para ele aparecer.':
+    'The "faz-ai" MCP is how the Cursor chat AI reads and updates this board\'s cards. It was installed in {file} after this window opened, and Cursor only reads project MCPs when the window opens: reload so it shows up.',
+  'Ative o MCP do board no {tool}': 'Turn on the board MCP in {tool}',
+  'O MCP "faz-ai" é o canal pelo qual a IA do chat do Cursor lê e atualiza os cards deste board. O Cursor deixa desativado todo MCP novo de um projeto, e só você pode ativá-lo: em Abrir MCPs do Cursor, clique em "faz-ai" e ligue a chave deste projeto.':
+    'The "faz-ai" MCP is how the Cursor chat AI reads and updates this board\'s cards. Cursor keeps every new project MCP off, and only you can turn it on: in Abrir MCPs do Cursor (open Cursor MCPs), click "faz-ai" and turn on the switch for this project.',
+  'Falta um passo para o chat do Cursor usar o board': 'One step left for the Cursor chat to use the board',
+  'Corrigir o registro': 'Fix the registration',
+  'O MCP do board no {tool} é de uma versão anterior': 'The board MCP in {tool} is from an earlier version',
+  '{file} usa a ponte em "{missing}", de uma versão anterior da extensão, que não é mais atualizada e pode não achar o projeto aberto. Instale de novo para gravar o registro atual.':
+    '{file} uses the bridge at "{missing}", from an earlier version of the extension, which is no longer updated and may not find the open project. Install again to write the current registration.',
+  'Recarregar a janela': 'Reload the window',
+  'Abrir MCPs do Cursor': 'Open Cursor MCPs',
 };

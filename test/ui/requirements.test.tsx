@@ -93,11 +93,25 @@ describe('faixa de requisitos do board', () => {
   it('no chat, compacto: sem as explicações dos itens que têm botão; com elas nos que não têm', () => {
     set([CLI, MCP, PERMISSION, { id: 'node', tool: 'cursor', action: null }]);
     renderThemed(<RequirementsBanner compact />);
-    expect(screen.getByText('O servidor do board não está registrado no Cursor')).toBeInTheDocument();
-    expect(screen.queryByText(/Nas conversas com o Cursor no editor/)).toBeNull();
+    expect(screen.getByText('O MCP do board (faz-ai) não está instalado no Cursor')).toBeInTheDocument();
+    // o recomendado (o MCP) fica com a explicação: é o motivo do aviso
+    expect(screen.getByText(/Nas conversas com o Cursor no editor/)).toBeInTheDocument();
+    expect(screen.queryByText(/Sem ela não rodam os botões de IA/)).toBeNull();
     // sem botão que resolva (Node.js, permissão sem o atalho das configurações): a explicação fica
     expect(screen.getByText(/roda com o Node.js 18 ou mais novo/)).toBeInTheDocument();
     expect(screen.getByText('Escolha "Sem restrições".')).toBeInTheDocument();
+  });
+});
+
+describe('MCP do board no Cursor', () => {
+  it('desativado: diz para que serve e leva à tela de MCPs do Cursor', async () => {
+    set([{ id: 'mcp-enable', tool: 'cursor', optional: true, action: { kind: 'openEditorMcp' } }]);
+    renderThemed(<RequirementsBanner />);
+    expect(screen.getByText('Falta um passo para o chat do Cursor usar o board')).toBeInTheDocument();
+    expect(screen.getByText('Ative o MCP do board no Cursor')).toBeInTheDocument();
+    expect(screen.getByText(/canal pelo qual a IA do chat do Cursor lê e atualiza os cards/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Abrir MCPs do Cursor/ }));
+    expect(sentOf('ui.openEditorMcp')).toHaveLength(1);
   });
 });
 

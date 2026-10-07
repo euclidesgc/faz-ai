@@ -249,8 +249,18 @@ buttons:
 | **Instalar (padrão da ferramenta)** (tool default) | global config: `~/.claude.json` (through `claude mcp add --scope user`), `~/.cursor/mcp.json`, `~/.codex/config.toml`, `~/.kimi-code/mcp.json`, `~/.copilot/mcp-config.json`; the skill in `~/.claude/skills`, `~/.cursor/skills` and equivalents | recommended: the board works in any repository opened with it, with no file in the project |
 | **Instalar neste projeto** (this project) | `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.kimi-code/mcp.json` or `.vscode/mcp.json`; the skill in `.claude/skills`, `.cursor/skills` and equivalents | pinning a version in a repository or a fork, or a skill tailored for the team |
 
-The global registration does not carry the project folder: the board's bridge finds the board by
-walking up from the folder the tool was opened in. The project one takes precedence over the global
+The global registration does not pin the project folder: Claude Code passes the folder in the
+`CLAUDE_PROJECT_DIR` variable, VS Code's `mcp.json` gets `${workspaceFolder}`, and in the others the
+board's bridge finds the board by walking up from the folder the tool was opened in. In GitHub
+Copilot, the global registration covers the Copilot CLI and, in VS Code, the editor profile's
+`mcp.json`.
+
+**In Cursor there is nothing to install.** Cursor's global scope is a single process for all windows
+and cannot tell which board to serve, so the board writes the project's `.cursor/mcp.json` on its own
+(outside git, through `.git/info/exclude`) as soon as the folder opens in Cursor. The first time in
+each project, the banner asks you to **reload the window** (Cursor only reads project servers when
+the window opens) and then to **turn on `faz-ai`** in Cursor Settings → MCP (Cursor keeps every new
+project server off). The project one takes precedence over the global
 one in that project, so installing in the project when a global one exists asks for confirmation,
 and so does replacing a flow skill that already exists at the destination (changes made to it are
 lost). The **Faz AI: Install the board MCP (global)** palette command does the default install on
@@ -265,9 +275,12 @@ the board, on every screen, and in the chat panel. It checks Node.js (the board'
 it), the tool's command line, its sign-in (for Cursor, through `cursor-agent status`), the board's
 server registration in the file the tool reads (for Claude, the registration for your user from
 `claude mcp add -s user` also counts), a registration pointing to a node or path that no longer
-exists or to another folder, and the permission level. Each item says what it affects and brings the action: the
-command to copy, **Instalar o MCP do board** (install the board MCP, which opens the tool's MCP
-servers section) or the shortcut to the AI harness. The bar has no close button: it goes away on its own when the last item is solved. The
+exists, to another folder or to the bridge of an earlier version, and the permission level. Each
+item says what it affects and brings the action: the command to copy, **Instalar o MCP do board**
+(install the board MCP, which opens the tool's MCP servers section), **Corrigir o registro** (fix the
+registration: a broken one in the project file takes precedence over the global one; fixing removes
+it from there and leaves the global one in effect), **Recarregar a janela** (reload the window) or
+the shortcut to the AI harness. The bar has no close button: it goes away on its own when the last item is solved. The
 check runs when the board opens, when the tool or permission changes, after connecting, every 5
 minutes and on **Verificar de novo** (check again), which also rereads the terminal PATH (a node
 installed with the board open is found without reloading the window), and says when nothing

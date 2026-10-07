@@ -5,7 +5,10 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { createBoardHost, type BoardHost } from './host/boardHost';
 import { startMcpServer } from './mcp/server';
-import { socketPath, workspaceKey } from './mcp/socketPath';
+import { socketPath, stableBridgePath, workspaceKey } from './mcp/socketPath';
+import { registerCursorProject } from './mcp/clientConfig';
+import { resolveCommand } from './cliResolve';
+import { loginShellPath } from './spawn';
 import { BoardPanel } from './panel/BoardPanel';
 import type { MessageRouter } from './panel/messageRouter';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
@@ -67,7 +70,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const wasmDir = path.join(context.extensionPath, 'dist');
   let routerPromise: Promise<MessageRouter> | undefined;
   const viewState = new ViewStateStore(context.workspaceState);
-  const bridgePath = path.join(storage, 'mcp', 'bridge.js');
+  const bridgePath = stableBridgePath();
+  const windowStartedAt = Date.now();
+  // o Cursor é um VS Code com outro nome: o chat dele lê o ~/.cursor/mcp.json e só carrega o que mudou ao recarregar
+  const editorName = /cursor/i.test(vscode.env.appName) ? 'cursor' : 'vscode';
   installLauncher(context.extensionPath, storage);
 
   const folder = () => vscode.workspace.workspaceFolders?.[0];
@@ -86,6 +92,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         log,
         version: String((context.extension.packageJSON as { version?: string }).version ?? '0'),
         ownsBoard: () => !!stopMcp,
+        editor: {
+          name: editorName,
+          startedAt: windowStartedAt,
+          // o mcp.json global do VS Code fica na pasta User do perfil padrão, a mãe do globalStorage
+          userDir: editorName === 'vscode' ? path.dirname(path.dirname(storage)) : undefined,
+        },
       });
       const router = host.router;
       // o que já estava com a pessoa ao abrir não gera aviso; só o que a IA passar daqui em diante
@@ -206,6 +218,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.`
               : message;
           },
+          fixProjectMcp: (file) => h.fixProjectServer(file),
           runAi: (cardId, mode) => h.runner.start(cardId, 'manual', mode),
           stopAi: (cardId) => h.runner.stop(cardId),
           pauseAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.pause'),
@@ -239,7 +252,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard(cardId)),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
     vscode.commands.registerCommand('fazai.openInBrowser', openInBrowser),
-    vscode.commands.registerCommand('fazai.connectAI', (target?: Parameters<BoardHost['connectAI']>[0]) => connectAI(getRouter, target)),
+    vscode.commands.registerCommand('fazai.connectAI', (target?: Parameters<BoardHost['connectAI']>[0], opts?: { fromBoard?: boolean }) =>
+      connectAI(getRouter, target, opts),
+    ),
+    // vindo do aviso de requisitos do board: o resultado e o erro voltam para a tela
+    vscode.commands.registerCommand('fazai.fixProjectMcp', async (file: string) => {
+      if (!(await getRouter()) || !host) throw new Error('Abra uma pasta para conectar uma IA ao board.');
+      return host.fixProjectServer(file);
+    }),
     output,
     vscode.commands.registerCommand('fazai.ai.run', aiCommand('start')),
     vscode.commands.registerCommand('fazai.ai.stop', aiCommand('stop')),
@@ -295,6 +315,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     try {
       fs.mkdirSync(path.dirname(bridgePath), { recursive: true });
       fs.copyFileSync(path.join(context.extensionPath, 'dist', 'mcp-bridge.js'), bridgePath);
+      // no Cursor, o servidor do board é registrado no projeto assim que a pasta abre, antes de o board
+      // ser aberto: o chat do editor enxerga o board sem a pessoa instalar nada (o global não funciona
+      // no Cursor; veja registerCursorProject)
+      if (editorName === 'cursor') void registerInCursor(f.uri.fsPath, bridgePath, output);
       stopMcp = await startMcpServer(socketPath(f.uri.fsPath), {
         getRouter,
         workspaceDir: f.uri.fsPath,
@@ -330,25 +354,46 @@ async function offerBoardUpgrade(context: vscode.ExtensionContext, router: Messa
   else await context.globalState.update(key, version);
 }
 
+/** O registro do board no `.cursor/mcp.json` do projeto, com o node achado no PATH do terminal. */
+async function registerInCursor(folderPath: string, bridgePath: string, output: vscode.OutputChannel): Promise<void> {
+  const homeDir = os.homedir();
+  try {
+    const node = resolveCommand('node', (await loginShellPath()) ?? process.env.PATH, homeDir) ?? undefined;
+    registerCursorProject({ bridgePath, workspaceDir: folderPath, homeDir, nodeCommand: node });
+  } catch (e) {
+    output.appendLine(`Não foi possível registrar o servidor do board no Cursor: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 /**
  * Registra o servidor MCP do board numa ferramenta de IA. Pela paleta de comandos, sem argumento, é a
- * instalação padrão: a ferramenta do projeto, no escopo global.
+ * instalação padrão: a ferramenta do projeto, no escopo global. Vindo do board (`fromBoard`), o
+ * resultado volta como texto e o erro é relançado, para virarem aviso na própria tela: o Cursor guarda
+ * as notificações do editor na central sem mostrá-las, e a instalação parecia não fazer nada.
  */
 async function connectAI(
   getRouter: () => Promise<MessageRouter | undefined>,
   target?: Parameters<BoardHost['connectAI']>[0],
-): Promise<void> {
+  opts?: { fromBoard?: boolean },
+): Promise<string | undefined> {
   if (!(await getRouter()) || !host) {
-    vscode.window.showWarningMessage('Abra uma pasta para conectar uma IA ao board.');
+    const message = 'Abra uma pasta para conectar uma IA ao board.';
+    if (opts?.fromBoard) throw new Error(message);
+    vscode.window.showWarningMessage(message);
     return;
   }
   let done: Awaited<ReturnType<BoardHost['connectAI']>>;
   try {
     done = await host.connectAI(target);
   } catch (e) {
+    if (opts?.fromBoard) throw e;
     vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
     return;
   }
+  if (opts?.fromBoard)
+    return done.toIgnore.length
+      ? `${done.message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${done.toIgnore.join(', ')}.`
+      : done.message;
   const choice = await vscode.window.showInformationMessage(done.message, ...(done.toIgnore.length ? ['Adicionar ao .gitignore'] : []));
   if (choice === 'Adicionar ao .gitignore') host.addToGitignore(done.toIgnore);
 }

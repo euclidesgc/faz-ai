@@ -90,6 +90,7 @@ beforeEach(async () => {
     tokenFile: path.join(dir, 'token'),
     env: {
       connectAI: () => 'Servidor registrado.',
+      fixProjectMcp: async () => 'Registro corrigido.',
       runAi: (cardId) => void calls.push(`run:${cardId}`),
       stopAi: (cardId) => void calls.push(`stop:${cardId}`),
       pauseAutopilot: () => {},

@@ -4,6 +4,28 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **Servidor do board no Cursor e nas outras ferramentas: instalação global que funciona e aviso que
+  some.**
+  - O botão de instalar mostra o resultado e o erro no próprio board. Antes iam para as notificações
+    do editor, que o Cursor guarda na central sem mostrar: a instalação parecia não fazer nada.
+  - **No Cursor, nada para instalar.** O global do Cursor é um processo só para todas as janelas,
+    que sobe sem saber qual projeto atender: o servidor ficava com erro, e ligado à mão atendia o
+    mesmo board em todas as janelas. Agora o board grava sozinho o `.cursor/mcp.json` do projeto
+    (fora do git) assim que a pasta abre no Cursor, e tira a entrada global antiga. Na primeira vez
+    em cada projeto, o aviso pede para recarregar a janela e depois para ligar o `faz-ai` em Cursor
+    Settings → MCP (o Cursor deixa desligado todo servidor novo do projeto), com o botão **Abrir
+    MCPs do Cursor**, que leva direto a Customize → MCPs, e some quando o servidor conecta.
+  - O registro global das outras ferramentas diz ao servidor onde está o projeto: no Claude Code
+    pela variável `CLAUDE_PROJECT_DIR`, no `mcp.json` do VS Code com `${workspaceFolder}`.
+  - Um registro quebrado no arquivo do projeto (`.cursor/mcp.json` de outra pasta, de um node que
+    sumiu) vale no lugar do global, e reinstalar o global não resolvia: o aviso agora traz
+    **Corrigir o registro**, que tira o registro dali e deixa o global valendo.
+  - A ponte (`bridge.js`) passa a morar em `~/.faz-ai/mcp/`, a mesma para o VS Code, o Cursor e o
+    `faz-ai`. Um registro com a ponte de antes pede para instalar de novo.
+  - GitHub Copilot: a instalação global grava também o `mcp.json` do perfil do VS Code.
+
 ## 0.33.0
 
 - **Imagens do README** de agentes, harness e modelos refeitas com a interface desta versão, em

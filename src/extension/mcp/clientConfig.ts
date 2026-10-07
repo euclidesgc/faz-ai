@@ -20,6 +20,11 @@ export interface RegisterOptions {
    * ferramenta foi aberta, e o mesmo registro serve a todos os projetos. Padrão: `project`.
    */
   scope?: InstallScope;
+  /**
+   * Pasta de configuração do usuário no VS Code (a do perfil, onde fica o `mcp.json` global do
+   * Copilot no editor). Sem ela, o registro global do Copilot fica só na Copilot CLI.
+   */
+  editorUserDir?: string;
 }
 
 export interface Registration {
@@ -30,6 +35,8 @@ export interface Registration {
   projectFile: string | null;
   /** o que a pessoa precisa fazer para a ferramenta carregar o servidor */
   next: string;
+  /** o arquivo do projeto já ficou fora do git pelo `.git/info/exclude`: não precisa ir para o `.gitignore` */
+  excluded?: true;
   /**
    * comandos que quem chama precisa rodar para concluir o registro, em ordem, quando o arquivo é da
    * própria ferramenta e não deve ser gravado por fora (o `~/.claude.json`). O primeiro de cada par
@@ -39,6 +46,15 @@ export interface Registration {
 }
 
 const SERVER = 'faz-ai';
+
+/**
+ * A pasta aberta no editor, que o Cursor e o VS Code trocam pelo caminho ao iniciar o servidor. Vai no
+ * registro global dessas ferramentas: sem ela, o servidor sobe fora do projeto e não acha o board.
+ */
+export const WORKSPACE_FOLDER = '${workspaceFolder}';
+
+/** A pasta fixa nos argumentos do registro; uma variável da ferramenta (`${workspaceFolder}`) não é pasta fixa. */
+export const fixedFolder = (arg: string | undefined): string | undefined => (arg && !/\$\{[^}]*\}/.test(arg) ? arg : undefined);
 
 function mergeJson(file: string, entry: Record<string, unknown>, key = 'mcpServers'): void {
   let config: Record<string, Record<string, unknown> | undefined> = {};
@@ -99,14 +115,16 @@ export function ensureProjectServer(
   relFile: string,
   entry: { command: string; args: string[]; env?: Record<string, string> },
   homeDir: string = os.homedir(),
+  opts: { useGlobal?: boolean } = {},
 ): ProjectServerResult {
   const current = readEntry(path.join(workspaceDir, relFile));
   if (current === 'invalid') return 'invalid';
+  const useGlobal = opts.useGlobal ?? true;
   // sem registro no projeto, o global instalado pela pessoa já leva a ferramenta a este board quando
   // aponta para o mesmo bridge e a pasta da execução fica dentro do board (sem pasta fixa, a ponte a
   // acha subindo a partir dela): o projeto fica sem arquivo nenhum. A worktree de uma história fica
   // fora da pasta do board, e ali o registro do projeto continua necessário.
-  if (!current && coveredByGlobal(path.join(homeDir, relFile), workspaceDir, entry.args)) return 'global';
+  if (!current && useGlobal && coveredByGlobal(path.join(homeDir, relFile), workspaceDir, entry.args)) return 'global';
   let command = entry.command;
   if (current) {
     const args = Array.isArray(current.args) ? current.args.map(String) : [];
@@ -129,7 +147,8 @@ export function ensureProjectServer(
 function coveredByGlobal(file: string, runDir: string, entryArgs: string[]): boolean {
   const global = readEntry(file);
   if (!global || global === 'invalid' || !usableCommand(global.command)) return false;
-  const [bridge, folder] = Array.isArray(global.args) ? global.args.map(String) : [];
+  const [bridge, arg] = Array.isArray(global.args) ? global.args.map(String) : [];
+  const folder = fixedFolder(arg);
   const [wantedBridge, board] = entryArgs;
   if (!bridge || !wantedBridge || !board || !samePath(bridge, wantedBridge)) return false;
   return folder ? samePath(folder, board) : within(runDir, board);
@@ -192,9 +211,7 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
         break;
       }
       case 'cursor': {
-        const file = path.join(o.workspaceDir, '.cursor', 'mcp.json');
-        mergeJson(file, { type: 'stdio', command: node, args });
-        out.push({ tool, file, projectFile: '.cursor/mcp.json', next: 'Cursor: ative o servidor em Settings → MCP.' });
+        out.push(registerCursorProject(o));
         break;
       }
       case 'codex': {
@@ -242,14 +259,16 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
 
 /**
  * Registro global (escopo do usuário), o padrão de cada ferramenta para um servidor que vale em
- * qualquer projeto. Sem a pasta nos argumentos: a ponte acha o board subindo a partir do diretório
- * em que a ferramenta foi aberta.
+ * qualquer projeto. Sem pasta fixa: cada ferramenta diz ao servidor onde está o projeto do jeito que
+ * tem, e a ponte, na falta disso, sobe a partir do diretório em que a ferramenta foi aberta.
  * - Claude Code: `claude mcp add-json --scope user` (o `~/.claude.json` é reescrito pela ferramenta o
- *   tempo todo; gravar nele por fora arrisca perder a mudança ou a dela)
- * - Cursor: `~/.cursor/mcp.json`
+ *   tempo todo; gravar nele por fora arrisca perder a mudança ou a dela). A pasta chega pela variável
+ *   `CLAUDE_PROJECT_DIR`, que o Claude Code passa ao servidor.
+ * - Cursor: nenhum; o registro dele é sempre o do projeto (veja `registerCursorProject`)
  * - Codex: `~/.codex/config.toml`
  * - Kimi Code: `~/.kimi-code/mcp.json` e/ou `~/.kimi/mcp.json` (a Kimi CLI), os que existirem
- * - GitHub Copilot: `~/.copilot/mcp-config.json` (Copilot CLI); o VS Code guarda o global no perfil do editor
+ * - GitHub Copilot: `~/.copilot/mcp-config.json` (Copilot CLI) e, no VS Code, o `mcp.json` do perfil
+ *   do editor, com `${workspaceFolder}`
  */
 function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
   const node = o.nodeCommand ?? 'node';
@@ -271,11 +290,10 @@ function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
         },
       ];
     }
-    case 'cursor': {
-      const file = home('.cursor', 'mcp.json');
-      mergeJson(file, { type: 'stdio', command: node, args });
-      return [{ tool, file, projectFile: null, next: 'Cursor: ative o servidor em Settings → MCP.' }];
-    }
+    // no Cursor o global não funciona: é um processo só para todas as janelas, que não sabe qual board
+    // atender. O registro do Cursor é sempre o do projeto.
+    case 'cursor':
+      return [registerCursorProject(o)];
     case 'codex': {
       const file = home('.codex', 'config.toml');
       fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -294,14 +312,100 @@ function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
     case 'copilot': {
       const file = home('.copilot', 'mcp-config.json');
       mergeJson(file, { type: 'stdio', command: node, args, tools: ['*'] });
-      return [
-        {
+      const out: Registration[] = [{ tool, file, projectFile: null, next: 'Copilot CLI: abra uma sessão nova.' }];
+      if (o.editorUserDir) {
+        const editorFile = path.join(o.editorUserDir, 'mcp.json');
+        mergeJson(editorFile, { type: 'stdio', command: node, args: [...args, WORKSPACE_FOLDER] }, 'servers');
+        out.push({
           tool,
-          file,
+          file: editorFile,
           projectFile: null,
-          next: 'Copilot CLI: abra uma sessão nova. No VS Code, o servidor global fica no perfil do editor (MCP: Open User Configuration).',
-        },
-      ];
+          next: 'GitHub Copilot no VS Code: confirme a confiança no servidor quando o editor pedir (MCP: List Servers mostra o estado).',
+        });
+      }
+      return out;
     }
   }
+}
+
+/**
+ * Tira o registro do board do arquivo de configuração do projeto, deixando o resto como está. O
+ * registro do projeto vale sobre o global na ferramenta: um registro velho ali (de outra pasta, de um
+ * node que sumiu) estraga o global, por mais que ele seja refeito. false quando não havia o que tirar.
+ */
+export function removeProjectServer(workspaceDir: string, relFile: string): boolean {
+  const file = path.join(workspaceDir, relFile);
+  if (!fs.existsSync(file)) return false;
+  if (relFile.endsWith('.toml')) {
+    const toml = fs.readFileSync(file, 'utf8');
+    const lines = toml.split(/\r?\n/);
+    const start = lines.findIndex((l) => l.trim() === `[mcp_servers.${SERVER}]`);
+    if (start < 0) return false;
+    let end = start + 1;
+    while (end < lines.length && !/^\s*\[/.test(lines[end]!)) end++;
+    lines.splice(start, end - start);
+    fs.writeFileSync(file, lines.join('\n').replace(/\n{3,}/g, '\n\n'));
+    return true;
+  }
+  let config: Record<string, Record<string, unknown> | undefined>;
+  try {
+    config = JSON.parse(fs.readFileSync(file, 'utf8')) as typeof config;
+  } catch {
+    throw new Error(`${file} não é um JSON válido; corrija-o e tente de novo.`);
+  }
+  let removed = false;
+  for (const key of ['mcpServers', 'servers']) {
+    const section = config[key];
+    if (section && SERVER in section) {
+      delete section[SERVER];
+      removed = true;
+    }
+  }
+  if (removed) fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n');
+  return removed;
+}
+
+/**
+ * O servidor do board no Cursor: no `.cursor/mcp.json` do projeto, com a pasta fixa, fora do git pelo
+ * `.git/info/exclude`. O Cursor roda os servidores globais num processo só para todas as janelas, que
+ * sobe sem saber de qual janela veio (o `${workspaceFolder}` só é trocado quando a pessoa liga o
+ * servidor à mão, e aí vale para todas): com dois projetos abertos, as duas IAs falariam com o mesmo
+ * board. Os servidores do projeto rodam um por janela, cada um com a sua pasta. A entrada global que
+ * uma versão anterior gravou sai, para não aparecer em dobro nem ligar a IA ao board errado.
+ */
+export function registerCursorProject(o: RegisterOptions): Registration {
+  const rel = '.cursor/mcp.json';
+  const file = path.join(o.workspaceDir, rel);
+  const result = ensureProjectServer(
+    o.workspaceDir,
+    rel,
+    { command: o.nodeCommand ?? 'node', args: [o.bridgePath, o.workspaceDir] },
+    o.homeDir,
+    { useGlobal: false },
+  );
+  if (result === 'invalid') throw new Error(`${file} não é um JSON válido; corrija-o e tente de novo.`);
+  removeUserCursorServer(o.homeDir);
+  return {
+    tool: 'cursor',
+    file,
+    projectFile: rel,
+    excluded: true,
+    next: 'Cursor: se o "faz-ai" aparecer desligado em Cursor Settings → MCP, ligue.',
+  };
+}
+
+/**
+ * Tira do `~/.cursor/mcp.json` o registro do board que uma versão anterior gravou no global (o que
+ * aponta para uma ponte do Faz AI). Um "faz-ai" que a pessoa gravou à mão para outra coisa fica.
+ */
+export function removeUserCursorServer(homeDir: string): boolean {
+  const file = path.join(homeDir, '.cursor', 'mcp.json');
+  const current = readEntry(file);
+  if (!current || current === 'invalid') return false;
+  const bridge = Array.isArray(current.args) ? String(current.args[0] ?? '') : '';
+  if (!/[\\/]mcp[\\/]bridge\.js$/.test(bridge)) return false;
+  const config = JSON.parse(fs.readFileSync(file, 'utf8')) as { mcpServers: Record<string, unknown> };
+  delete config.mcpServers[SERVER];
+  fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n');
+  return true;
 }

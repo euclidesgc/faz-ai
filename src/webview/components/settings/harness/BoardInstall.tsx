@@ -70,6 +70,31 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
     });
   };
 
+  // no Cursor o servidor do board é só do projeto: o global é um processo para todas as janelas, que
+  // não sabe qual board atender. O board grava o do projeto sozinho ao abrir no Cursor.
+  if (artifact === 'mcp' && tool === 'cursor')
+    return (
+      <Card className="draft-card board-install" aria-label={t('Servidor do board')}>
+        <div className="row">
+          <strong>{t('Servidor do board (faz-ai)')}</strong>
+          <Badge color={installedIn('project') ? 'green' : 'gray'} variant="soft">
+            {installedIn('project') ? t('neste projeto: instalado') : t('neste projeto: não instalado')}
+          </Badge>
+        </div>
+        <p className="muted small">
+          {rich(
+            'No Cursor, o servidor do board fica em <code>{project}</code>, fora do git. O global do Cursor é um processo só para todas as janelas e não sabe qual board atender. O board grava este registro sozinho ao abrir no Cursor; se o "faz-ai" aparecer desligado em Cursor Settings → MCP, ligue.',
+            { project: '.cursor/mcp.json' },
+          )}
+        </p>
+        <div className="row">
+          <Button onClick={() => run('project', false)}>
+            {installedIn('project') ? t('Reinstalar neste projeto') : t('Instalar neste projeto')}
+          </Button>
+        </div>
+      </Card>
+    );
+
   return (
     <Card className="draft-card board-install" aria-label={artifact === 'mcp' ? t('Servidor do board') : t('Skill do fluxo')}>
       <div className="row">

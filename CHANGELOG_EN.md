@@ -5,6 +5,31 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **Board server in Cursor and the other tools: a global install that works and a banner that goes
+  away.**
+  - The install button shows the result and the error on the board itself. They used to go to the
+    editor notifications, which Cursor keeps in its notification center without showing them: the
+    install seemed to do nothing.
+  - **In Cursor, nothing to install.** Cursor's global scope is a single process for all windows,
+    started without knowing which project to serve: the server showed an error, and when turned on by
+    hand it served the same board in every window. Now the board writes the project's
+    `.cursor/mcp.json` on its own (outside git) as soon as the folder opens in Cursor, and removes the
+    old global entry. The first time in each project, the banner asks you to reload the window and
+    then to turn on `faz-ai` in Cursor Settings → MCP (Cursor keeps every new project server off),
+    with the **Abrir MCPs do Cursor** (open Cursor MCPs) button, which goes straight to Customize →
+    MCPs, and goes away once the server connects.
+  - The other tools' global registration tells the server where the project is: in Claude Code
+    through the `CLAUDE_PROJECT_DIR` variable, in VS Code's `mcp.json` with `${workspaceFolder}`.
+  - A broken registration in the project file (a `.cursor/mcp.json` for another folder, or for a node
+    that is gone) takes precedence over the global one, and reinstalling the global one did not fix
+    it: the banner now has **Corrigir o registro** (fix the registration), which removes it from there
+    and leaves the global one in effect.
+  - The bridge (`bridge.js`) now lives in `~/.faz-ai/mcp/`, the same for VS Code, Cursor and
+    `faz-ai`. A registration with the old bridge asks you to install again.
+  - GitHub Copilot: the global install also writes the VS Code profile's `mcp.json`.
+
 ## 0.33.0
 
 - **README images** for agents, harness and models redone with this version's interface, in

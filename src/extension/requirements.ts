@@ -5,11 +5,16 @@ import type { BoardRequirement } from '../shared/requirements';
 import type { RunnerPermission } from '../shared/runner';
 import { byPath, samePath } from './samePath';
 import { headlessCommand, headlessUnsupported } from './headless';
+import { fixedFolder } from './mcp/clientConfig';
 
 /** Onde a ferramenta lê o servidor do board, e o que está registrado lá. */
 export interface Registered {
   /** o arquivo, como a pessoa o reconhece (relativo ao projeto ou com `~`) */
   file: string;
+  /** o arquivo, com o caminho completo */
+  path: string;
+  /** do projeto (vale sobre o global na ferramenta) ou do usuário */
+  scope: 'project' | 'user';
   command: string;
   args: string[];
 }
@@ -30,8 +35,17 @@ function fromJson(file: string, shown: string, key = 'mcpServers'): Registered |
   const section = readJson(file)?.[key] as Record<string, { command?: unknown; args?: unknown }> | undefined;
   const entry = section?.[SERVER];
   if (!entry || typeof entry.command !== 'string') return null;
-  return { file: shown, command: entry.command, args: Array.isArray(entry.args) ? entry.args.map(String) : [] };
+  return {
+    file: shown,
+    path: file,
+    scope: scopeOf(shown),
+    command: entry.command,
+    args: Array.isArray(entry.args) ? entry.args.map(String) : [],
+  };
 }
+
+/** O arquivo mostrado com `~` é do usuário; o relativo é do projeto. */
+const scopeOf = (shown: string): Registered['scope'] => (shown.startsWith('~') ? 'user' : 'project');
 
 /** O registro na tabela `[mcp_servers.faz-ai]` do TOML do Codex (só `command` e `args`, que é o que o board grava). */
 function fromToml(file: string, shown: string): Registered | null {
@@ -46,7 +60,13 @@ function fromToml(file: string, shown: string): Registered | null {
   const command = /^\s*command\s*=\s*("(?:[^"\\]|\\.)*")/m.exec(block)?.[1];
   const args = /^\s*args\s*=\s*(\[.*\])/m.exec(block)?.[1];
   try {
-    return { file: shown, command: JSON.parse(command ?? '""') as string, args: args ? (JSON.parse(args) as string[]) : [] };
+    return {
+      file: shown,
+      path: file,
+      scope: scopeOf(shown),
+      command: JSON.parse(command ?? '""') as string,
+      args: args ? (JSON.parse(args) as string[]) : [],
+    };
   } catch {
     return null;
   }
@@ -57,7 +77,7 @@ function fromToml(file: string, shown: string): Registered | null {
  * mesmos lugares em que a instalação do MCP grava: primeiro o do projeto, que vale sobre o global
  * nas ferramentas, e depois o global. null quando não está registrado.
  */
-export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: string): Registered | null {
+export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: string, editorUserDir?: string): Registered | null {
   const inProject = (rel: string) => path.join(workspaceDir, rel);
   const inHome = (rel: string) => path.join(homeDir, rel);
   switch (tool) {
@@ -71,12 +91,19 @@ export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: st
       for (const section of [local?.mcpServers, user?.mcpServers]) {
         const entry = (section as Record<string, { command?: unknown; args?: unknown }> | undefined)?.[SERVER];
         if (entry && typeof entry.command === 'string')
-          return { file: '~/.claude.json', command: entry.command, args: Array.isArray(entry.args) ? entry.args.map(String) : [] };
+          return {
+            file: '~/.claude.json',
+            path: inHome('.claude.json'),
+            scope: 'user',
+            command: entry.command,
+            args: Array.isArray(entry.args) ? entry.args.map(String) : [],
+          };
       }
       return null;
     }
+    // o global do Cursor é um processo só para todas as janelas e não sabe qual board atender: não conta
     case 'cursor':
-      return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json') ?? fromJson(inHome('.cursor/mcp.json'), '~/.cursor/mcp.json');
+      return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json');
     case 'codex':
       return (
         fromToml(inProject('.codex/config.toml'), '.codex/config.toml') ?? fromToml(inHome('.codex/config.toml'), '~/.codex/config.toml')
@@ -84,6 +111,7 @@ export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: st
     case 'copilot':
       return (
         fromJson(inProject('.vscode/mcp.json'), '.vscode/mcp.json', 'servers') ??
+        (editorUserDir ? fromJson(path.join(editorUserDir, 'mcp.json'), '~/…/User/mcp.json', 'servers') : null) ??
         fromJson(inHome('.copilot/mcp-config.json'), '~/.copilot/mcp-config.json')
       );
     case 'kimi': {
@@ -123,7 +151,37 @@ export interface RequirementProbe {
   resolve(command: string): string | null;
   /** se a CLI está autenticada; null quando a ferramenta não tem como dizer */
   signedIn(tool: AiTool, executable: string): Promise<boolean | null>;
+  /** o editor em que o board está aberto; ausente fora do editor (o `faz-ai` no terminal) */
+  editor?: 'vscode' | 'cursor';
+  /** quando a janela do editor abriu: um registro gravado depois disso só vale no chat do editor ao recarregar */
+  windowStartedAt?: number;
+  /** a pasta de configuração do usuário no VS Code, onde fica o `mcp.json` global do Copilot no editor */
+  editorUserDir?: string;
 }
+
+/**
+ * O chat do Cursor já conectou o servidor do board deste projeto alguma vez. O Cursor deixa desligado
+ * todo servidor novo do projeto, e o liga/desliga fica no banco interno dele; o que dá para ler de fora
+ * é a pasta que ele cria ao conectar: `~/.cursor/projects/<pasta do projeto>/mcps/project-<n>-<projeto>-faz-ai`,
+ * com o caminho do projeto virando um nome só de letras, números e hífens.
+ */
+export function cursorConnectedOnce(homeDir: string, workspaceDir: string): boolean {
+  const slug = workspaceDir.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  try {
+    return fs.readdirSync(path.join(homeDir, '.cursor', 'projects', slug, 'mcps')).some((n) => /^project-\d+-.*-faz-ai$/.test(n));
+  } catch {
+    return false;
+  }
+}
+
+/** Quando o arquivo foi gravado pela última vez, em ms; 0 quando não dá para saber. */
+const modifiedAt = (file: string): number => {
+  try {
+    return fs.statSync(file).mtimeMs;
+  } catch {
+    return 0;
+  }
+};
 
 /**
  * O que falta, agora, para o board trabalhar com a ferramenta do projeto. Lista vazia é tudo pronto.
@@ -155,10 +213,12 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
   // no Claude e no Cursor as execuções pelo board levam o servidor sozinhas: o registro só falta nas
   // conversas da pessoa fora do board, e o aviso diz isso sem contar como requisito
   const optional = tool === 'claude' || tool === 'cursor' ? { optional: true as const } : {};
-  const registered = registeredServer(tool, p.workspaceDir, p.homeDir);
+  const registered = registeredServer(tool, p.workspaceDir, p.homeDir, p.editorUserDir);
   if (!registered) out.push({ id: 'mcp', tool, ...optional, action: { kind: 'connect' } });
   else {
-    const [bridge, folder] = registered.args;
+    const [bridge, arg] = registered.args;
+    // `${workspaceFolder}` é a pasta aberta, que a ferramenta troca ao iniciar: não é pasta fixa
+    const folder = fixedFolder(arg);
     const commandMissing = path.isAbsolute(registered.command) ? !fs.existsSync(registered.command) : !p.resolve(registered.command);
     const bridgeMissing = !!bridge && !samePath(bridge, p.bridgePath) && !fs.existsSync(bridge);
     // o registro de outra pasta (veio de um colega pelo git, o projeto mudou de lugar) liga a IA a outro board
@@ -170,8 +230,31 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
         ...optional,
         file: registered.file,
         missing: commandMissing ? registered.command : bridgeMissing ? bridge : folder,
-        action: { kind: 'connect' },
+        // o do projeto vale sobre o global: refazer só o global deixaria o aviso para sempre
+        action: registered.scope === 'project' ? { kind: 'fixProject', file: registered.file } : { kind: 'connect' },
       });
+    // a ponte de antes ficava na pasta de dados de cada editor e não é mais atualizada: não acha o
+    // projeto aberto nos registros globais (nem a pasta que o Cursor e o Claude Code informam)
+    else if (bridge && !samePath(bridge, p.bridgePath))
+      out.push({
+        id: 'mcp-outdated',
+        tool,
+        ...optional,
+        file: registered.file,
+        missing: bridge,
+        action: registered.scope === 'project' ? { kind: 'fixProject', file: registered.file } : { kind: 'connect' },
+      });
+    // o chat do Cursor só carrega um servidor registrado depois que a janela abriu ao recarregá-la
+    else if (
+      tool === 'cursor' &&
+      p.editor === 'cursor' &&
+      p.windowStartedAt !== undefined &&
+      modifiedAt(registered.path) > p.windowStartedAt
+    )
+      out.push({ id: 'mcp-reload', tool, optional: true, file: registered.file, action: { kind: 'reload' } });
+    // carregado, mas o Cursor deixa desligado todo servidor novo do projeto: só a pessoa liga
+    else if (tool === 'cursor' && p.editor === 'cursor' && !cursorConnectedOnce(p.homeDir, p.workspaceDir))
+      out.push({ id: 'mcp-enable', tool, optional: true, action: { kind: 'openEditorMcp' } });
   }
 
   const unsupported = headlessUnsupported(tool, p.permission);
