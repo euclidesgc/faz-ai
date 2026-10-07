@@ -19,6 +19,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   autopilot resumes the pending queue and logs it. The pause is still yours: what you paused, or
   what stopped because the tool failed to start, only comes back when you resume; a queue made only
   of delivered stories does not turn it back on.
+- **Fix: a story waiting for a dependency stalled the whole autonomous queue.** The first story in
+  the queue (board order) that depended on another open story held the autopilot with "waits for
+  #N", even with #N itself ready further down the board. Now a story waiting for a dependency is
+  skipped and the turn goes to the next story that can run; only when none can does the queue stop,
+  with the first story's reason.
 - **"Como testar" (how to test) script in the card description and the pull request.** In
   Homologação the AI now writes the test script (what was built, the steps with the expected result
   and what was left out) in the story's description and in the PR body, not only in the

@@ -142,6 +142,36 @@ describe('autopilotStep', () => {
     expect(step.kind === 'paused' && step.reason).toContain('#1');
   });
 
+  it('história que espera outra da própria fila não a segura: a vez passa para a dependência, mais abaixo no board', () => {
+    create('Base', 'Implementação'); // #1, no fim do fluxo
+    create('Y', 'PRD'); // #2, coluna anterior: vem antes na ordem de execução
+    ai({ type: 'link.add', fromId: card(1).id, toId: card(2).id, kind: 'precedes' });
+    owns = false;
+    yolo(1);
+    yolo(2);
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 1 } });
+    owns = true;
+    autopilot.resume();
+    expect(runner.started).toEqual([card(1).id]);
+    // a dependência concluiu: a história que esperava ganha a vez
+    runner.finish(() => move(1, 'Concluído'));
+    flush();
+    expect(runner.started).toEqual([card(1).id, card(2).id]);
+  });
+
+  it('com todas as histórias esperando dependência, a fila para com o motivo da primeira', () => {
+    create('Base', 'PRD'); // #1, fora do modo autônomo
+    create('Y', 'PRD'); // #2
+    create('Z', 'PRD'); // #3
+    ai({ type: 'link.add', fromId: card(1).id, toId: card(2).id, kind: 'precedes' });
+    ai({ type: 'link.add', fromId: card(1).id, toId: card(3).id, kind: 'precedes' });
+    yolo(2);
+    yolo(3);
+    const step = autopilotStep(router.snapshot());
+    expect(step).toMatchObject({ kind: 'paused', story: { number: 2 } });
+    expect(step.kind === 'paused' && step.reason).toContain('#1');
+  });
+
   it('mover a história de baixo para o topo da coluna dá a vez a ela, mesmo com número maior', () => {
     create('A', 'PRD'); // #1, linha de cima
     create('B', 'PRD'); // #2, logo abaixo
