@@ -520,8 +520,10 @@ commits na branch da história.
 
 ### Pull request e merge na Homologação
 
-Na Homologação a IA envia a branch, abre o pull request da história, registra o endereço no card e
-pede a sua revisão. O card mostra o link do PR.
+Na Homologação a IA escreve o roteiro **"Como testar"** (o que foi construído, os passos para
+verificar com o resultado esperado e o que ficou de fora) na descrição da história, envia a branch,
+abre o pull request com o mesmo roteiro no corpo, registra o endereço no card e pede a sua revisão.
+O card mostra o link do PR.
 
 O merge automático é opcional e começa desligado (Configurações → Git). Com ele ligado, quando você
 aprova uma história que está na última coluna antes da conclusão:
@@ -585,7 +587,8 @@ arquivos em disco por história (com as dependências instaladas em cada uma) e 
 processador enquanto várias sessões de IA, testes e builds rodam juntos.
 
 - Sem pendência com a IA, nada é executado.
-- A fila da rodada segue a ordem do board: os bugs primeiro e, depois, de cima para baixo — o que
+- A fila da rodada segue a ordem do board: os bugs primeiro; depois a história mais à direita (a
+  mais adiantada termina antes de uma nova começar); na mesma coluna, de cima para baixo — o que
   decide é a posição do card, não o número dele nem o que já foi aprovado.
 - Cards que estão com você (aguardando revisão ou resposta, bloqueados) não são tocados, a menos
   que você tenha deixado uma mensagem sem resposta na conversa.
@@ -620,9 +623,11 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
 - **Sem restrições**: nas execuções do modo, a IA roda com a permissão "Sem restrições" (altera
   arquivos e roda comandos), porque precisa de git e do `gh`. Ligar o modo é aceitar isso para a história.
 - **Em fila e em pilha**: o **autopiloto** toca as histórias em modo autônomo uma de cada vez, na
-  ordem do board — bugs na frente, depois de cima para baixo —, e segue para a próxima história da
+  ordem do board — bugs na frente, depois a mais à direita, e na mesma coluna de cima para baixo —, e segue para a próxima história da
   fila assim que a atual é entregue (parada na última coluna da IA, com o pull request registrado),
-  sem esperar a sua revisão nem o intervalo do heartbeat. A branch de cada história parte da branch
+  sem esperar a sua revisão nem o intervalo do heartbeat. Uma história que espera outro card
+  terminar (dependência) não segura a fila: a vez passa para a próxima que pode rodar, em geral a
+  própria dependência, e ela volta à fila quando a dependência sai de aberto. A branch de cada história parte da branch
   criada mais recentemente entre as outras histórias do modo autônomo ainda abertas — a mesma ordem em
   que a fila roda, mesmo depois de arrastar cards —, e o pull request é aberto com `--base` nela,
   formando uma pilha de PRs; sem nenhuma outra história aberta antes dela, a branch parte da principal.
@@ -640,8 +645,8 @@ O **botão do modo autônomo** no topo do board aparece enquanto houver históri
 o clique faz: **Pausar modo autônomo** (aceso, com o autopiloto tocando; pausar interrompe a IA) ou
 **Retomar modo autônomo** (apagado, pausado). Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
 (YOLO)** e **Faz AI: Parar as execuções da IA e o modo autônomo**. Ao abrir o editor, o autopiloto
-não começa sozinho: ele liga quando você ativa o modo numa história ou retoma. O heartbeat não
-toca histórias em modo autônomo; elas são do autopiloto.
+retoma sozinho a fila que ficou pendente (a pausa é sua: o que você pausou só volta quando você
+retomar). O heartbeat não toca histórias em modo autônomo; elas são do autopiloto.
 
 
 ### Agentes

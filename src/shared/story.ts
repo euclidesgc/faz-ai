@@ -33,7 +33,7 @@ export function stackBaseOf(state: Pick<BoardState, 'cards'>, story: Card): Card
     .sort((a, b) => Number(b.branchCreatedAt) - Number(a.branchCreatedAt) || b.number - a.number)[0];
 }
 
-/** Histórias em modo autônomo ainda em aberto, na ordem de execução da fila: bug primeiro, depois de cima para baixo no board. */
+/** Histórias em modo autônomo ainda em aberto, na ordem de execução da fila: bug primeiro, depois a coluna mais à direita, e na mesma coluna de cima para baixo. */
 export const yoloStories = (state: BoardState): Card[] =>
   state.cards.filter((c) => c.yolo && !c.parentId && isLive(c) && columnOf(state, c)?.category === 'open').sort(byExecutionOrder(state));
 

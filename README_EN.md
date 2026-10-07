@@ -543,7 +543,9 @@ progress. Sub-tasks commit to the story's branch.
 
 ### Pull request and merge in Homologação
 
-In Homologação the AI pushes the branch, opens the story's pull request, records its address on the
+In Homologação the AI writes the **"Como testar"** (how to test) script — what was built, the steps
+to verify it with the expected result, and what was left out — in the story's description, pushes
+the branch, opens the pull request with the same script in its body, records its address on the
 card and asks for your review. The card shows the PR link.
 
 Automatic merge is optional and starts turned off (Configurações → Git). With it on, when you
@@ -610,7 +612,8 @@ cost of one more copy of the files on disk per story (with dependencies installe
 memory and CPU while several AI sessions, tests and builds run together.
 
 - With nothing pending for the AI, nothing runs.
-- The round follows the board order: bugs first, then top to bottom — what decides is the card's
+- The round follows the board order: bugs first; then the rightmost story (the most advanced one
+  finishes before a new one starts); within a column, top to bottom — what decides is the card's
   position, not its number nor what has already been approved.
 - Cards that are with you (waiting for review or an answer, blocked) are not touched, unless you
   left an unanswered message in the conversation.
@@ -645,9 +648,11 @@ story by itself, **without asking for authorization or confirmation on anything*
 - **No restrictions**: in the mode's runs the AI uses the "Sem restrições" permission (edits files
   and runs commands), because it needs git and `gh`. Turning the mode on accepts this for the story.
 - **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in board
-  order — bugs first, then top to bottom — and moves on to the next story in the queue as soon as
+  order — bugs first, then the rightmost, and within a column top to bottom — and moves on to the next story in the queue as soon as
   the current one is delivered (stopped at the AI's last column, with the pull request recorded),
-  without waiting for your review or the heartbeat interval. Each story's branch starts from the
+  without waiting for your review or the heartbeat interval. A story waiting for another card
+  to finish (a dependency) does not hold the queue: the turn goes to the next story that can run,
+  usually the dependency itself, and it returns to the queue once the dependency leaves open. Each story's branch starts from the
   most recently created branch among the other autonomous-mode stories still open — the same order
   the queue runs in, even after dragging cards — and its pull request is opened with `--base` on it,
   forming a stack of PRs; with no other open story ahead of it, the branch starts from the main
@@ -665,8 +670,8 @@ The **autonomous mode button** at the top of the board shows while there is a st
 and says what the click does: **Pausar modo autônomo** (pause; lit, with the autopilot driving;
 pausing interrupts the AI) or **Retomar modo autônomo** (resume; dimmed, paused). From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
 autônomo (YOLO)** and **Faz AI: Parar as execuções da IA e o modo autônomo**. When the editor
-opens the autopilot does not start by itself: it starts when you turn the mode on for a story or
-resume. The heartbeat does not drive autonomous stories; they belong to the autopilot.
+opens the autopilot resumes the pending queue by itself (the pause is yours: what you paused only
+comes back when you resume). The heartbeat does not drive autonomous stories; they belong to the autopilot.
 
 
 ### Agents

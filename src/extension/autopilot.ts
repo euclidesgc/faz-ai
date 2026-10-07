@@ -45,13 +45,25 @@ export type AutopilotStep =
 /**
  * Próximo passo. As histórias vão em fila, uma de cada vez e na ordem da posição do card no board
  * (bug sempre primeiro, `byExecutionOrder`): a branch de cada uma parte da anterior, então a seguinte
- * só começa quando a atual sai de aberto. Uma história com impedimento segura a fila, em vez de a
- * seguinte passar na frente.
+ * só começa quando a atual sai de aberto. Uma história com impedimento (bloqueio, espera de uma
+ * pessoa, ciclo emperrado) segura a fila, em vez de a seguinte passar na frente. Já a história que
+ * espera outro card terminar (`depends_on`) não segura: a vez passa para a próxima que pode rodar —
+ * muitas vezes a própria dependência, que está mais abaixo no board. Sem nenhuma que possa, a fila
+ * para dizendo de quem a primeira depende.
  */
 export function autopilotStep(s: BoardState): AutopilotStep {
+  let waitingDependency: AutopilotStep | undefined;
   // uma história entregue já passou para a pessoa: não segura a fila, a próxima assume
-  const story = yoloStories(s).find((c) => !isDelivered(s, c));
-  if (!story) return { kind: 'idle' };
+  for (const story of yoloStories(s).filter((c) => !isDelivered(s, c))) {
+    const step = storyStep(s, story);
+    if (step.kind !== 'paused' || !step.dependency) return step;
+    waitingDependency ??= step;
+  }
+  return waitingDependency ?? { kind: 'idle' };
+}
+
+/** O passo de uma história, olhando só para ela; `dependency` marca a pausa por outro card em aberto. */
+function storyStep(s: BoardState, story: Card): AutopilotStep & { dependency?: true } {
   const column = columnOf(s, story)!;
   if (isAiWorking(s, story) || childrenOf(s, story.id).some((c) => isAiWorking(s, c))) return { kind: 'wait', story };
 
@@ -76,7 +88,8 @@ export function autopilotStep(s: BoardState): AutopilotStep {
       [story, ...childrenOf(s, story.id).filter(isLive)].flatMap((c) => openPredecessors(s, c.id)).filter((p) => p.parentId !== story.id),
     ),
   ];
-  if (blockers.length) return { kind: 'paused', story, reason: `${cardRef(story)} espera ${blockers.map(cardRef).join(', ')} terminar.` };
+  if (blockers.length)
+    return { kind: 'paused', story, reason: `${cardRef(story)} espera ${blockers.map(cardRef).join(', ')} terminar.`, dependency: true };
   // nada com a IA e a história continua aberta: o ciclo emperrou
   return { kind: 'paused', story, reason: `${cardRef(story)} não tem nada pendente com a IA, mas ainda não foi concluído.` };
 }
@@ -107,16 +120,20 @@ export class Autopilot {
   private progress = new Map<string, { sig: string; stalls: number }>();
   /** histórias entregues já anunciadas no log, para não repetir a linha a cada mudança do board */
   private deliveredLogged = new Set<string>();
+  /** segurado pela pessoa (pausa) ou por uma falha ao iniciar a ferramenta: só retomar religa */
+  private held = false;
 
   constructor(
     private router: MessageRouter,
     private runner: AutopilotRunner,
     private deps: AutopilotDeps,
   ) {
-    // histórias que já estavam em modo autônomo ao abrir o editor não disparam nada sozinhas: é preciso retomar
     this.known = new Set(yoloStories(router.snapshot()).map((c) => c.id));
     router.onDidChange(() => this.onBoardChange());
     runner.onDidFinish((cardId, mode) => this.onRunFinished(cardId, mode));
+    // histórias que já estavam em modo autônomo ao abrir o editor continuam sozinhas: a pessoa ligou o
+    // modo para não precisar voltar ao board; só a pausa dela segura a fila (#240)
+    (deps.defer ?? queueMicrotask)(() => this.autoResume());
   }
 
   get isActive(): boolean {
@@ -125,6 +142,7 @@ export class Autopilot {
 
   /** Liga o autopiloto e trata a fila agora. */
   resume(): void {
+    this.held = false;
     this.active = true;
     this.progress.clear();
     this.evaluate();
@@ -132,6 +150,7 @@ export class Autopilot {
 
   /** Para o autopiloto e interrompe a execução em andamento nas histórias em modo autônomo. */
   pause(): void {
+    this.held = true;
     this.active = false;
     this.publish(null);
     const s = this.router.snapshot();
@@ -142,12 +161,25 @@ export class Autopilot {
     }
   }
 
-  /** Liga sozinho quando uma pessoa liga o modo numa história. */
+  /**
+   * Liga sozinho ao abrir o editor (ou quando esta janela passa a ser a dona do board) com história em
+   * modo autônomo ainda por fazer. Não religa o que a pessoa pausou nem uma fila só de histórias entregues.
+   */
+  private autoResume(): void {
+    if (this.active || this.held || !this.canRun()) return;
+    if (autopilotStep(this.router.snapshot()).kind === 'idle') return;
+    this.deps.log('Autopiloto: histórias em modo autônomo pendentes; retomando.');
+    this.resume();
+  }
+
+  /** Liga sozinho quando uma pessoa liga o modo numa história; ligar de novo também desfaz a pausa dela. */
   private onBoardChange(): void {
     const now = new Set(yoloStories(this.router.snapshot()).map((c) => c.id));
     const added = [...now].some((id) => !this.known.has(id));
     this.known = now;
     if (added && !this.active && this.canRun()) return this.resume();
+    if (!this.active) this.autoResume();
+    if (!this.active) return;
     if (this.scheduled) return;
     this.scheduled = true;
     (this.deps.defer ?? queueMicrotask)(() => {
@@ -246,6 +278,7 @@ export class Autopilot {
       const reason = e instanceof Error ? e.message : String(e);
       this.deps.log(`Autopiloto: ${reason}`);
       // sem como executar a ferramenta, insistir não adianta
+      this.held = true;
       this.active = false;
       this.publish(reason);
     }
@@ -261,9 +294,10 @@ export class Autopilot {
   /** Um "Em execução" sem execução de verdade (a sessão caiu): volta para a IA tentar de novo. */
   private recoverStale(): void {
     const s = this.router.snapshot();
-    // entregue não tem execução a recuperar: é a mesma primeira história não entregue do autopilotStep
-    const story = yoloStories(s).find((c) => !isDelivered(s, c));
-    if (!story) return;
+    // entregue não tem execução a recuperar; e a história parada por dependência não é a da vez
+    const step = autopilotStep(s);
+    if (step.kind === 'idle') return;
+    const story = step.story;
     const cards = [story, ...childrenOf(s, story.id).filter(isLive)];
     // só as execuções desta história contam: as do heartbeat em outras histórias não a seguram
     if (cards.some((c) => this.runner.running.includes(c.id))) return;

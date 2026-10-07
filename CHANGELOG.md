@@ -25,6 +25,35 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   houver, o erro do build; a saída inteira só aparece quando o empacotamento falha. O aviso
   `groups: cannot find name for group ID` sumiu: os grupos do computador (vídeo, render) passam a
   ser criados dentro do contêiner, no `start.sh`, a partir dos ids recebidos.
+- **Correção: o LED da sub-tarefa apagava segundos depois de acender.** Mover um card de coluna
+  zerava o status de trabalho dele, inclusive o "Em execução": como a IA chama `start_work` e em
+  seguida move a sub-tarefa para "Em andamento", o LED verde piscava por um instante e apagava, e a
+  história não mostrava que a IA estava trabalhando nela. Agora o card em execução que vai para
+  outra coluna em que a IA atua continua "Em execução"; os demais status seguem recomeçando ao
+  trocar de coluna, e na conclusão não há status de trabalho.
+- **O modo autônomo retoma sozinho ao abrir o editor.** Antes, as histórias que já estavam em modo
+  autônomo ficavam paradas até um clique em **Retomar modo autônomo**, o que parecia o modo
+  "não funcionar". Agora, ao abrir o editor (e sempre que a janela passa a ser a dona do board), o
+  autopiloto retoma a fila pendente e registra isso no log. A pausa continua sua: o que você pausou,
+  ou o que parou por falha ao iniciar a ferramenta, só volta quando você retomar; uma fila só de
+  histórias entregues não o religa.
+- **Correção: uma história que esperava dependência parava toda a fila do modo autônomo.** A
+  primeira história da fila (ordem do board) que dependia de outra ainda aberta segurava o
+  autopiloto com "espera #N terminar", mesmo com a própria #N pronta mais abaixo. Agora a história que
+  espera dependência é pulada e a vez passa para a próxima que pode rodar; só quando nenhuma pode a
+  fila para, com o motivo da primeira.
+- **Ordem da fila: a história mais adiantada termina antes de uma nova começar.** A ordem de
+  execução (heartbeat, modo autônomo e `get_pending_work`) era bug, linha do card e só então coluna,
+  o que fazia uma história recém-criada no topo do Discovery passar na frente de uma Implementação
+  pela metade. Agora é bug primeiro; depois a coluna mais à direita; na mesma coluna, de cima para
+  baixo. Um bug novo entra como o próximo da fila assim que a execução em andamento termina.
+- **Roteiro "Como testar" na descrição do card e no pull request.** Na Homologação, a IA passa a
+  gravar o roteiro de testes (o que foi construído, os passos com o resultado esperado e o que ficou
+  de fora) na descrição da história e no corpo do PR, e não só na conversa. A instrução padrão da
+  coluna e a skill do fluxo mudaram; o board com a instrução padrão anterior recebe a nova pela
+  atualização do padrão (versão 5), e a skill já instalada precisa ser reinstalada com
+  **Substituir** para trazer o texto novo.
+
 - **Anexos em Markdown abrem formatados.** Um anexo `.md`/`.markdown` (como o PRD, o Spec ou o Plan
   de uma história) agora abre com títulos, listas, tabelas e blocos de código já formatados, em vez
   do texto cru com `#`, `**` e `|---|`. Um seletor **Formatado** / **Código** no cabeçalho da janela

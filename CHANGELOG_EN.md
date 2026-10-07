@@ -27,6 +27,35 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   extension) and, if any, the build error; the full output appears only when packaging fails. The
   `groups: cannot find name for group ID` warning is gone: the computer's groups (video, render) are
   now created inside the container, in `start.sh`, from the ids received.
+- **Fix: the sub-task LED went dark seconds after lighting up.** Moving a card to another column
+  reset its work status, including "Running": since the AI calls `start_work` and then moves the
+  sub-task to "Em andamento", the green LED blinked for a moment and went off, and the story did
+  not show the AI working on it. Now a running card moved to another column where the AI works
+  stays "Running"; the other statuses still restart on a column change, and done columns have no
+  work status.
+- **Autonomous mode resumes by itself when the editor opens.** Stories already in autonomous mode
+  used to sit still until a click on **Retomar modo autônomo**, which looked like the mode "not
+  working". Now, when the editor opens (and whenever the window becomes the board's owner), the
+  autopilot resumes the pending queue and logs it. The pause is still yours: what you paused, or
+  what stopped because the tool failed to start, only comes back when you resume; a queue made only
+  of delivered stories does not turn it back on.
+- **Fix: a story waiting for a dependency stalled the whole autonomous queue.** The first story in
+  the queue (board order) that depended on another open story held the autopilot with "waits for
+  #N", even with #N itself ready further down the board. Now a story waiting for a dependency is
+  skipped and the turn goes to the next story that can run; only when none can does the queue stop,
+  with the first story's reason.
+- **Queue order: the most advanced story finishes before a new one starts.** The execution order
+  (heartbeat, autonomous mode and `get_pending_work`) was bug, card row and only then column, so a
+  story just created at the top of Discovery jumped ahead of a half-done Implementação. Now it is
+  bugs first; then the rightmost column; within a column, top to bottom. A new bug becomes next in
+  the queue as soon as the current run finishes.
+- **"Como testar" (how to test) script in the card description and the pull request.** In
+  Homologação the AI now writes the test script (what was built, the steps with the expected result
+  and what was left out) in the story's description and in the PR body, not only in the
+  conversation. The column's default instruction and the flow skill changed; a board with the
+  previous default instruction gets the new one through the template upgrade (version 5), and an
+  already installed skill needs to be reinstalled with **Replace** to get the new text.
+
 - **Markdown attachments open formatted.** A `.md`/`.markdown` attachment (such as a story's PRD,
   Spec or Plan document) now opens with headings, lists, tables and code blocks already formatted,
   instead of the raw text with `#`, `**` and `|---|`. A **Formatted** / **Code** selector in the

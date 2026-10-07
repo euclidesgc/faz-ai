@@ -2,14 +2,14 @@ import type { Database } from 'sql.js';
 import { norm } from '../../shared/filters';
 import type { ColumnCategory, WorkflowKind } from '../../shared/model';
 import { newId } from './ids';
-import { HOMOLOGATION_INSTRUCTION_V2, IMPLEMENTATION_INSTRUCTION_V2, PHASE_DEFAULTS } from '../../shared/phaseDefaults';
+import { HOMOLOGATION_INSTRUCTION_V2, HOMOLOGATION_INSTRUCTION_V4, IMPLEMENTATION_INSTRUCTION_V2, PHASE_DEFAULTS } from '../../shared/phaseDefaults';
 import { all, bool, num, one, run, str, transaction } from './query';
 
 /**
  * Board padrão. Cada mudança no padrão sobe a versão; boards criados antes são atualizados no
  * lugar (com confirmação), sem recriar nada: os cards continuam na coluna em que estavam.
  */
-export const BOARD_TEMPLATE_VERSION = 4;
+export const BOARD_TEMPLATE_VERSION = 5;
 
 export interface TemplateColumn {
   name: string;
@@ -173,6 +173,20 @@ function steps(db: Database, boardId: string): Step[] {
     for (const col of cols) {
       out.push({
         description: `Coluna "${str(col.name)}": a instrução passa a pedir o pull request da história antes da revisão.`,
+        apply: () =>
+          run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [PHASE_DEFAULTS['Homologação']!.instruction, str(col.id)]),
+      });
+    }
+  }
+  if (version < 5) {
+    const cols = all(
+      db,
+      'SELECT c.id, c.name FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? AND c.ai_instruction = ?',
+      [boardId, HOMOLOGATION_INSTRUCTION_V4],
+    );
+    for (const col of cols) {
+      out.push({
+        description: `Coluna "${str(col.name)}": a instrução passa a pedir o roteiro "Como testar" na descrição do card e no pull request.`,
         apply: () =>
           run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [PHASE_DEFAULTS['Homologação']!.instruction, str(col.id)]),
       });

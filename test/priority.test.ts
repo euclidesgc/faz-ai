@@ -55,22 +55,22 @@ describe('byExecutionOrder', () => {
     expect(ids([...movida.cards].sort(byExecutionOrder(movida)))).toEqual(['baixo', 'cima']);
   });
 
-  it('a linha vence a coluna; empatada a linha, vence a coluna mais à esquerda', () => {
+  it('a coluna mais à direita vence a linha; na mesma coluna, vence a linha de cima', () => {
     const s = boardState({
       cards: [
-        card('linha-0-doing', { columnId: 'doing', position: 0, number: 1 }),
-        card('linha-1-backlog', { columnId: 'backlog', position: 1, number: 2 }),
-        card('linha-0-backlog', { columnId: 'backlog', position: 0, number: 3 }),
+        card('linha-1-doing', { columnId: 'doing', position: 1, number: 1 }),
+        card('linha-0-backlog', { columnId: 'backlog', position: 0, number: 2 }),
+        card('linha-0-doing', { columnId: 'doing', position: 0, number: 3 }),
       ],
     });
-    expect(ids([...s.cards].sort(byExecutionOrder(s)))).toEqual(['linha-0-backlog', 'linha-0-doing', 'linha-1-backlog']);
+    expect(ids([...s.cards].sort(byExecutionOrder(s)))).toEqual(['linha-0-doing', 'linha-1-doing', 'linha-0-backlog']);
   });
 
-  it('números trocados não mudam a ordem quando grupo/linha/coluna já decidem', () => {
+  it('números trocados não mudam a ordem quando grupo/coluna/linha já decidem', () => {
     const s = boardState({
       cards: [
-        card('primeiro', { columnId: 'backlog', position: 0, number: 99 }),
-        card('segundo', { columnId: 'doing', position: 0, number: 1 }),
+        card('primeiro', { columnId: 'doing', position: 0, number: 99 }),
+        card('segundo', { columnId: 'backlog', position: 0, number: 1 }),
       ],
     });
     expect(ids([...s.cards].sort(byExecutionOrder(s)))).toEqual(['primeiro', 'segundo']);
@@ -86,12 +86,39 @@ describe('byExecutionOrder', () => {
     expect(ids([...s.cards].sort(byExecutionOrder(s)))).toEqual(['menor', 'maior']);
   });
 
+  it('a sub-tarefa vale a posição da história e vem logo depois dela, na ordem da própria coluna', () => {
+    const s = boardState({
+      cardTypes: types,
+      cards: [
+        card('h-doing', { typeId: 'story', columnId: 'doing', position: 1, number: 1 }),
+        card('h-backlog', { typeId: 'story', columnId: 'backlog', position: 0, number: 2 }),
+        // sub-tarefas numa coluna do workflow filho, com posição baixa: não passam na frente pela coluna
+        card('sub-b', { typeId: 'story', columnId: 'todo', position: 0, number: 3, parentId: 'h-backlog' }),
+        card('sub-d2', { typeId: 'story', columnId: 'todo', position: 1, number: 4, parentId: 'h-doing' }),
+        card('sub-d1', { typeId: 'story', columnId: 'todo', position: 0, number: 5, parentId: 'h-doing' }),
+      ],
+    });
+    expect(ids([...s.cards].sort(byExecutionOrder(s)))).toEqual(['h-doing', 'sub-d1', 'sub-d2', 'h-backlog', 'sub-b']);
+  });
+
+  it('a sub-tarefa de um bug fura a fila junto com ele', () => {
+    const s = boardState({
+      cardTypes: types,
+      cards: [
+        card('historia', { typeId: 'story', columnId: 'doing', position: 0, number: 1 }),
+        card('bug', { typeId: 'bug', columnId: 'backlog', position: 5, number: 2 }),
+        card('sub-bug', { typeId: 'story', columnId: 'todo', position: 0, number: 3, parentId: 'bug' }),
+      ],
+    });
+    expect(ids([...s.cards].sort(byExecutionOrder(s)))).toEqual(['bug', 'sub-bug', 'historia']);
+  });
+
   it('card sem tipo não é bug: não fura a fila de uma história', () => {
     const s = boardState({
       cardTypes: types,
       cards: [
-        card('sem-tipo', { typeId: 'sumiu', columnId: 'doing', position: 5, number: 1 }),
-        card('historia', { typeId: 'story', columnId: 'backlog', position: 0, number: 2 }),
+        card('sem-tipo', { typeId: 'sumiu', columnId: 'backlog', position: 5, number: 1 }),
+        card('historia', { typeId: 'story', columnId: 'doing', position: 0, number: 2 }),
       ],
     });
     expect(ids([...s.cards].sort(byExecutionOrder(s)))).toEqual(['historia', 'sem-tipo']);
