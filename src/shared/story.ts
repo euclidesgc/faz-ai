@@ -27,7 +27,8 @@ export function stackBaseOf(state: Pick<BoardState, 'cards'>, story: Card): Card
   if (!story.yolo || story.parentId) return undefined;
   return state.cards
     .filter(
-      (c) => c.yolo && !c.parentId && c.id !== story.id && c.branch && c.mergeCommit === '' && c.deletedAt === null && c.archivedAt === null,
+      (c) =>
+        c.yolo && !c.parentId && c.id !== story.id && c.branch && c.mergeCommit === '' && c.deletedAt === null && c.archivedAt === null,
     )
     .sort((a, b) => Number(b.branchCreatedAt) - Number(a.branchCreatedAt) || b.number - a.number)[0];
 }

@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { TextField } from '@radix-ui/themes';
 import { useBoardStore, type SettingsTab } from '../../store/boardStore';
 import { t } from '../../i18n';
-import { settings } from '../../commands';
+import { settings, ui } from '../../commands';
+import { isWeb } from '../../vscode';
 import { WorkflowsSettings } from './workflows/WorkflowsSettings';
 import { TypesSettings } from './TypesSettings';
 import { FieldsSettings } from './FieldsSettings';
@@ -21,6 +23,7 @@ import {
   IconBranch,
   IconColumns,
   IconDoctor,
+  IconExternal,
   IconFields,
   IconHarness,
   IconModels,
@@ -67,6 +70,13 @@ export function Settings() {
   const collapsed = useBoardStore((s) => s.settingsNavCollapsed);
   const setCollapsed = useBoardStore((s) => s.setSettingsNavCollapsed);
   const setView = useBoardStore((s) => s.setView);
+  const pendingSection = useBoardStore((s) => s.pendingSettingsSection);
+  // rola até a seção pedida pelo editor (`ui.openSettings { section }`) depois que a aba renderizou
+  useEffect(() => {
+    if (!pendingSection) return;
+    document.getElementById(pendingSection)?.scrollIntoView({ block: 'start' });
+    useBoardStore.getState().clearPendingSettingsSection();
+  }, [pendingSection, tab]);
 
   return (
     <div className="settings">
@@ -104,6 +114,14 @@ export function Settings() {
           ))}
         </nav>
         <div className="settings-side-actions">
+          {!isWeb && (
+            <Button
+              variant="ghost"
+              onClick={() => ui.openIdeSettings()}
+              {...navProps(collapsed, t('Abrir no Settings do editor'), IconExternal)}
+              title={t('Abre as configurações do Faz AI no Settings do editor (Ctrl+,)')}
+            />
+          )}
           <Button
             variant="ghost"
             onClick={() => setView('environment')}

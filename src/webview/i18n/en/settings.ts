@@ -44,6 +44,8 @@ export const settings: Record<string, string> = {
     "All {count} card(s), conversations, attachments and settings of this board will be deleted, and the board goes back to the default. This can't be undone. Project rules and skills are not affected.",
   'Apagar tudo e recriar': 'Delete everything and recreate',
   'Recriar board padrão': 'Recreate default board',
+  'Abrir no Settings do editor': 'Open in the editor Settings',
+  'Abre as configurações do Faz AI no Settings do editor (Ctrl+,)': 'Opens the Faz AI settings in the editor Settings (Ctrl+,)',
   'Apaga todos os cards e configurações e recria o board com o padrão atual':
     'Deletes all cards and settings and recreates the board with the current default',
   'Prévia do card do tipo {typeName}': 'Preview of the {typeName} card type',

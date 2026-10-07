@@ -797,6 +797,31 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Aparência | **Language** (automatic, Português (Brasil) or English), theme (system, light, dark), font and size of long texts; name and color of the statuses |
 | Backup | Export the board to a file and import a file in place of the current board (see [Board backup](#board-backup)) |
 
+### Settings in the editor Settings
+
+In `Ctrl+,` (the VS Code or Cursor Settings), searching **Faz AI** shows the Faz AI category, with
+four sections, in this order:
+
+| Section | What it has today |
+| --- | --- |
+| Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
+| Appearance | **Language** (`fazai.appearance.language`: automatic, Português (Brasil) or English). The other options arrive in the next versions; until then, a link leads to the board's Aparência tab |
+| Git | A note that the options arrive in the next versions, with a link to the board's Git tab |
+| Backup | A note that export and import become editor commands in the next versions, with a link to the board's Backup tab |
+
+Three new commands in the palette (`Ctrl+Shift+P`): **Faz AI: Open the Environment Diagnostics**,
+**Faz AI: Open the Faz AI settings in the editor Settings** (the Settings already filtered on Faz AI)
+and **Faz AI: Open the board settings** (the board's Configurações screen). In the board's
+Configurações, the **Abrir no Settings do editor** (open in the editor Settings) button goes the other
+way; in browser mode (`faz-ai` in the terminal) it does not appear, because there is no editor.
+
+Who wins: inside the editor, the Settings is the source and the board database (SQLite) is the copy,
+kept equal on every change so browser mode and the MCP server keep seeing the same value; outside
+the editor, SQLite is the only source, and a write made there (through MCP or the browser) is carried
+to the User Settings while the editor is open. On the first open, a board whose language differs from
+the default (`auto`) writes that language to the User Settings, so an empty Settings does not reset the
+board; if the Settings already has an explicit value, it wins.
+
 About models: **Detectar modelos** (detect models) reads the tool's list (for Kimi Code, from the
 local configuration; for Cursor, the models of your account, through the `cursor-agent models`
 command, read when the board opens with the CLI signed in, and the first list read replaces the built-in one

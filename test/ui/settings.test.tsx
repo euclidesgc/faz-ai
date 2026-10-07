@@ -1,12 +1,12 @@
 import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
-import { beforeAll, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { Settings } from '../../src/webview/components/settings/Settings';
 import { TypesSettings } from '../../src/webview/components/settings/TypesSettings';
-import { useBoardStore } from '../../src/webview/store/boardStore';
+import { useBoardStore, useHostSync } from '../../src/webview/store/boardStore';
 
 let board: SeededBoard;
 beforeAll(async () => {
@@ -244,5 +244,52 @@ describe('Settings: menu lateral', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Expandir o menu' }));
     expect(nav).toHaveTextContent('Tipos de card');
     useBoardStore.setState({ settingsNavCollapsed: false });
+  });
+});
+
+/** Liga o store às mensagens do host (como o App faz) junto com o conteúdo das Configurações. */
+function SettingsWithHostSync() {
+  useHostSync();
+  return <Settings />;
+}
+
+describe('Settings: ida e volta com o Settings do editor', () => {
+  it('o botão "Abrir no Settings do editor" manda ui.openIdeSettings', async () => {
+    render(
+      <Theme>
+        <Settings />
+      </Theme>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir no Settings do editor' }));
+    expect(lastSent('ui.openIdeSettings')).toEqual({ type: 'ui.openIdeSettings', key: undefined });
+  });
+
+  it('ui.openSettings troca a aba e rola até a seção', () => {
+    render(
+      <Theme>
+        <SettingsWithHostSync />
+      </Theme>,
+    );
+    const scroll = vi.fn();
+    const alvo = document.createElement('div');
+    alvo.id = 'secao-teste';
+    alvo.scrollIntoView = scroll;
+    document.body.append(alvo);
+    act(() =>
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'ui.openSettings', tab: 'harness', section: 'secao-teste' } })),
+    );
+    expect(useBoardStore.getState().settingsTab).toBe('harness');
+    expect(scroll).toHaveBeenCalledWith({ block: 'start' });
+    alvo.remove();
+  });
+
+  it('ui.openView mostra o Diagnóstico', () => {
+    render(
+      <Theme>
+        <SettingsWithHostSync />
+      </Theme>,
+    );
+    act(() => window.dispatchEvent(new MessageEvent('message', { data: { type: 'ui.openView', view: 'environment' } })));
+    expect(useBoardStore.getState().view).toBe('environment');
   });
 });

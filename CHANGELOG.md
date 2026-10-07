@@ -6,6 +6,25 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Configurações do Faz AI no Settings do editor.** Em `Ctrl+,`, buscar "Faz AI" mostra a categoria
+  do Faz AI com as seções Instalação, Aparência, Git e Backup, nessa ordem. Instalação tem o link
+  **Abrir o Diagnóstico do ambiente**; Aparência já traz o **Idioma** (`fazai.appearance.language`);
+  Git e Backup avisam que as opções chegam nas próximas versões, com link para a aba do board. Três
+  comandos novos na paleta: **Faz AI: Abrir o Diagnóstico do ambiente**, **Faz AI: Abrir as
+  configurações do Faz AI no Settings** e **Faz AI: Abrir as configurações do board**; em
+  Configurações do board, o botão **Abrir no Settings do editor** faz o caminho de volta (ele some no
+  modo navegador). Dentro do editor o Settings manda e o banco do board é a cópia, para o modo
+  navegador e o MCP verem o mesmo valor; fora do editor o banco é a única fonte, e o que for gravado
+  por ali é levado ao Settings do Usuário com o editor aberto. Na primeira abertura, um board com
+  idioma diferente do padrão grava esse idioma no Settings do Usuário, em vez de ser zerado.
+- **Script de instalação do Diagnóstico todo em inglês.** O script gerado por **Instalar o
+  necessário** / **Instalar os recomendados** misturava português ("Login da CLI", "instalação
+  concluída", "pulado, porque … falhou") com a interface em inglês. Agora os nomes dos passos e as
+  mensagens saem em inglês, e o teste varre o script contra texto em português.
+- **Teste e2e do Cursor mais limpo.** O `npm run e2e:cursor` mostra só "Gerando a extensão…" e, se
+  houver, o erro do build; a saída inteira só aparece quando o empacotamento falha. O aviso
+  `groups: cannot find name for group ID` sumiu: os grupos do computador (vídeo, render) passam a
+  ser criados dentro do contêiner, no `start.sh`, a partir dos ids recebidos.
 - **Correção: o LED da sub-tarefa apagava segundos depois de acender.** Mover um card de coluna
   zerava o status de trabalho dele, inclusive o "Em execução": como a IA chama `start_work` e em
   seguida move a sub-tarefa para "Em andamento", o LED verde piscava por um instante e apagava, e a
