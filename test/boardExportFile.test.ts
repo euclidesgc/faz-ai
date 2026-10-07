@@ -122,6 +122,21 @@ describe('chaves estrangeiras com o banco em arquivo', () => {
     expect(cleanOrphans(handle.db)).toBe(0);
   });
 
+  it('cleanOrphans apaga o workflow órfão que um tipo de card órfão segura, sem estourar', () => {
+    handle.db.run('PRAGMA foreign_keys = OFF;');
+    run(handle.db, "INSERT INTO boards (id, workspace_key, name) VALUES ('fantasma', 'ws-x', 'X')");
+    run(handle.db, "INSERT INTO workflows (id, board_id, name, position, kind) VALUES ('wf-orfao', 'fantasma', 'W', 0, 'parent')");
+    run(
+      handle.db,
+      "INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('tipo-orfao', 'fantasma', 'T', '#000', 'wf-orfao')",
+    );
+    run(handle.db, "DELETE FROM boards WHERE id = 'fantasma'");
+    handle.db.run('PRAGMA foreign_keys = ON;');
+    expect(() => cleanOrphans(handle.db)).not.toThrow();
+    expect(all(handle.db, 'PRAGMA foreign_key_check')).toEqual([]);
+    expect(all(handle.db, "SELECT COUNT(*) AS n FROM workflows WHERE id = 'wf-orfao'")[0]!.n).toBe(0);
+  });
+
   it('o banco que já tem órfãos é limpo uma vez ao abrir', async () => {
     const a = createStory('A');
     const b = createStory('B');

@@ -6,6 +6,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Correção: o board não abria com "FOREIGN KEY constraint failed".** A limpeza única de linhas
+  órfãs, que roda ao abrir o banco, parava no primeiro órfão ainda apontado por outro órfão (o
+  workflow de um board antigo usado pelos tipos de card dele). Agora ela tenta de novo depois que
+  quem segurava sai, e um órfão que não sai não impede o board de abrir.
 - **Diagnóstico do ambiente.** Uma lista, no estilo do `flutter doctor`, com o que o board precisa
   (Node.js, linha de comando da ferramenta, login, MCP do board, permissão) e o que ele aproveita
   (skill do fluxo, Git e repositório, GitHub CLI e login, Code Review Graph, grafo do projeto e

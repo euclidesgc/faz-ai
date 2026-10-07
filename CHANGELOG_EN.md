@@ -7,6 +7,10 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Fix: the board would not open, with "FOREIGN KEY constraint failed".** The one-time orphan
+  cleanup that runs when the database opens stopped at the first orphan still referenced by another
+  orphan (an old board's workflow used by its card types). It now retries once the referencing rows
+  are gone, and an orphan that cannot be removed no longer keeps the board from opening.
 - **Environment check.** A `flutter doctor`-style list of what the board needs (Node.js, the tool's
   command line, sign-in, board MCP, permission) and what it makes use of (flow skill, Git and
   repository, GitHub CLI and sign-in, Code Review Graph, project graph and semantic search). Each
