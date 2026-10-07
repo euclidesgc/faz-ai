@@ -97,6 +97,25 @@ describe('Diagnóstico do ambiente', () => {
     ]);
   });
 
+  it('depois de instalar a skill, mostra que está trabalhando e confere de novo sozinho', async () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(report(MISSING));
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 5000);
+    await userEvent.click(within(item('Skill do fluxo (faz-ai-fluxo)')).getByRole('button', { name: 'Instalar a skill' }));
+    expect(posted.mock.calls.map(([m]) => m.type).slice(-2)).toEqual(['harness.flowSkill.install', 'environment.check']);
+    const skill = item('Skill do fluxo (faz-ai-fluxo)');
+    expect(within(skill).getByText('Aplicando e conferindo de novo…')).toBeInTheDocument();
+    expect(within(skill).queryByRole('button', { name: 'Instalar a skill' })).toBeNull();
+    // a resposta chega com a skill instalada: o item vira "Pronto"
+    const done = MISSING.map((c) => (c.id === 'skill' ? { id: c.id, level: c.level, status: 'ok' as const } : c));
+    show({ ...report(done), checkedAt: Date.now() + 1 });
+    expect(within(item('Skill do fluxo (faz-ai-fluxo)')).getByText('Pronto')).toBeInTheDocument();
+    expect(screen.queryByText('Aplicando e conferindo de novo…')).toBeNull();
+    vi.useRealTimers();
+  });
+
   it('"Verificar de novo" roda outra vez e fica desligado até a resposta', async () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);

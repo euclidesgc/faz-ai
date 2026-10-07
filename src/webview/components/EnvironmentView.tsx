@@ -232,7 +232,7 @@ function Fix({ check, tool, installNote, onFixed }: { check: EnvCheck; tool: AiT
   return <div className="env-fix">{parts}</div>;
 }
 
-function CheckItem({ check, tool, onFixed }: { check: EnvCheck; tool: AiTool; onFixed: () => void }) {
+function CheckItem({ check, tool, busy, onFixed }: { check: EnvCheck; tool: AiTool; busy: boolean; onFixed: () => void }) {
   const x = texts(check.id, tool);
   const icon = check.status === 'ok' ? STATUS_ICON.ok : check.status === 'skipped' ? STATUS_ICON.skipped : STATUS_ICON[check.level];
   const docs = docsOf(check.id, tool);
@@ -256,7 +256,14 @@ function CheckItem({ check, tool, onFixed }: { check: EnvCheck; tool: AiTool; on
             </>
           )}
         </dl>
-        <Fix check={check} tool={tool} installNote={x.installNote} onFixed={onFixed} />
+        {/* o botão foi clicado: até a nova conferência chegar, o item mostra que está trabalhando */}
+        {busy ? (
+          <p role="status" className="env-busy">
+            <span className="spinner" aria-hidden /> {t('Aplicando e conferindo de novo…')}
+          </p>
+        ) : (
+          <Fix check={check} tool={tool} installNote={x.installNote} onFixed={onFixed} />
+        )}
         {docs && (
           <ExternalLink href={docs}>
             <span className="small">{t('Saiba mais')}</span>
@@ -286,6 +293,9 @@ export function EnvironmentView() {
     setAskedAt(Date.now());
     ui.checkEnvironment();
   };
+  // o item cujo botão foi clicado, até a conferência seguinte terminar
+  const [fixing, setFixing] = useState<EnvCheckId | null>(null);
+  const busyId = checking ? fixing : null;
 
   const checks = report?.checks ?? [];
   const required = checks.filter((c) => c.level === 'required');
@@ -313,7 +323,11 @@ export function EnvironmentView() {
         actions={
           <>
             <span role="status" className="small muted">
-              {checking && report ? t('Conferindo…') : ''}
+              {checking && report && (
+                <>
+                  <span className="spinner" aria-hidden /> {t('Conferindo…')}
+                </>
+              )}
             </span>
             <Button size="small" variant="ghost" disabled={checking} onClick={recheck}>
               {t('Verificar de novo')}
@@ -338,7 +352,16 @@ export function EnvironmentView() {
             <h3 id="env-required">{t('Necessário')}</h3>
             <ul className="env-list">
               {required.map((c) => (
-                <CheckItem key={c.id} check={c} tool={report.tool} onFixed={recheck} />
+                <CheckItem
+                  key={c.id}
+                  check={c}
+                  tool={report.tool}
+                  busy={busyId === c.id}
+                  onFixed={() => {
+                    setFixing(c.id);
+                    recheck();
+                  }}
+                />
               ))}
             </ul>
           </section>
@@ -346,7 +369,16 @@ export function EnvironmentView() {
             <h3 id="env-recommended">{t('Recomendado')}</h3>
             <ul className="env-list">
               {recommended.map((c) => (
-                <CheckItem key={c.id} check={c} tool={report.tool} onFixed={recheck} />
+                <CheckItem
+                  key={c.id}
+                  check={c}
+                  tool={report.tool}
+                  busy={busyId === c.id}
+                  onFixed={() => {
+                    setFixing(c.id);
+                    recheck();
+                  }}
+                />
               ))}
             </ul>
           </section>

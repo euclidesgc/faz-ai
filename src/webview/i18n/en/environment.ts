@@ -26,6 +26,7 @@ export const environment: Record<string, string> = {
   Privacidade: 'Privacy',
   'Saiba mais': 'Learn more',
   'Instalar a skill': 'Install the skill',
+  'Aplicando e conferindo de novo…': 'Applying and checking again…',
   'Baixar o instalador': 'Download the installer',
 
   'Node.js 18 ou mais novo': 'Node.js 18 or newer',
