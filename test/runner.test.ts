@@ -255,6 +255,13 @@ describe('executor da IA', () => {
     expect(runner.isRunning(storyId)).toBe(false);
   });
 
+  it('com o login da ferramenta vencido (requisito "signin"), não inicia e não gasta uma execução', () => {
+    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+    expect(() => runner.start(storyId)).toThrow(/login/i);
+    expect(procs).toHaveLength(0);
+    expect(card().status).not.toBe('running');
+  });
+
   it('se a IA só respondeu na conversa, a vez passa para a pessoa', () => {
     runner.start(storyId);
     ai({ type: 'comment.add', cardId: storyId, body: 'Entendi. Qual o provedor de login?' });

@@ -4,6 +4,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { checkRequirements, registeredServer, type RequirementProbe } from '../src/extension/requirements';
 import { registerClients } from '../src/extension/mcp/clientConfig';
+import { blocksExecution } from '../src/shared/requirements';
+import type { BoardRequirement } from '../src/shared/requirements';
 
 let project: string;
 let home: string;
@@ -60,6 +62,17 @@ describe('requisitos do board', () => {
   it('login que não dá para saber (outras ferramentas) não vira aviso', async () => {
     connect('claude');
     expect(await checkRequirements(probe({ tool: 'claude', signedIn: async () => null }))).toEqual([]);
+  });
+
+  it('CLI do Claude Code ou do Codex sem login: oferece o comando de login, igual ao Cursor', async () => {
+    connect('claude');
+    expect(await checkRequirements(probe({ tool: 'claude', signedIn: async () => false }))).toEqual([
+      { id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } },
+    ]);
+    connect('codex');
+    expect(await checkRequirements(probe({ tool: 'codex', signedIn: async () => false }))).toEqual([
+      { id: 'signin', tool: 'codex', cli: 'codex', action: { kind: 'command', command: 'codex login' } },
+    ]);
   });
 
   it('sem node no PATH, o primeiro aviso é o node', async () => {
@@ -237,5 +250,21 @@ describe('requisitos do board', () => {
     expect(await checkRequirements(probe({ tool: 'codex', permission: 'full' }))).toEqual([
       { id: 'mcp-outdated', tool: 'codex', file: '~/.codex/config.toml', missing: old, action: { kind: 'connect' } },
     ]);
+  });
+});
+
+describe('blocksExecution', () => {
+  const req = (id: BoardRequirement['id']): BoardRequirement => ({ id, tool: 'claude', action: null });
+
+  it('bloqueia quando falta login', () => {
+    expect(blocksExecution({ requirements: [req('signin')] })).toBe(true);
+  });
+
+  it('não bloqueia por outro requisito que falte (CLI, MCP…)', () => {
+    expect(blocksExecution({ requirements: [req('cli'), req('mcp')] })).toBe(false);
+  });
+
+  it('sem nenhum requisito pendente, não bloqueia', () => {
+    expect(blocksExecution({ requirements: [] })).toBe(false);
   });
 });

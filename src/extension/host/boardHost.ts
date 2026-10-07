@@ -17,7 +17,7 @@ import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
-import { cursorModels, cursorSignedIn, runCli } from '../cliProbe';
+import { claudeSignedIn, codexSignedIn, cursorModels, cursorSignedIn, runCli } from '../cliProbe';
 import type { AiTool, InstallScope } from '../../shared/harness';
 import { checkRequirements } from '../requirements';
 import { checkEnvironment } from '../environment';
@@ -236,6 +236,24 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let cursorBlocked = false;
   let enableTimer: NodeJS.Timeout | null = null;
   let checkAgain = false;
+  let forceSigninCheck = false;
+  const SIGNIN_CACHE_MS = 3 * 60_000;
+  const signinCache = new Map<AiTool, { at: number; value: boolean | null }>();
+  // dispatch por ferramenta; `cursor` já tinha probe, `claude` e `codex` passam a ter também (as outras
+  // seguem com `null`, "não sei", e dependem só do sinal reativo de falha na execução)
+  const probeSignedIn = async (tool: AiTool, exe: string, force: boolean): Promise<boolean | null> => {
+    const cached = !force && signinCache.get(tool);
+    if (cached && Date.now() - cached.at < SIGNIN_CACHE_MS) return cached.value;
+    const value = await (tool === 'cursor'
+      ? cursorSignedIn(exe, pathEnv)
+      : tool === 'claude'
+        ? claudeSignedIn(exe, pathEnv)
+        : tool === 'codex'
+          ? codexSignedIn(exe, pathEnv)
+          : Promise.resolve(null));
+    signinCache.set(tool, { at: Date.now(), value });
+    return value;
+  };
   const checkNow = (): Promise<void> => {
     if (checking) {
       checkAgain = true;
@@ -255,7 +273,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       bridgePath: o.bridgePath,
       nodePath,
       resolve: (command) => resolveCommand(command, pathEnv, homeDir),
-      signedIn: (tool, exe) => (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : Promise.resolve(null)),
+      signedIn: (tool, exe) => probeSignedIn(tool, exe, forceSigninCheck),
       editor: o.editor?.name,
       windowStartedAt: o.editor?.startedAt,
       editorUserDir: o.editor?.userDir,
@@ -269,8 +287,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         cursorBlocked = blocked;
         router.setRequirements(list);
         // ligar o MCP no Cursor é com a pessoa, fora do board: enquanto falta, confere a cada 10 s, para
-        // o aviso sumir logo depois que ela liga (a conferência lê só uma pasta)
-        if (list.some((r) => r.id === 'mcp-enable')) {
+        // o aviso sumir logo depois que ela liga (a conferência lê só uma pasta). O login (`signin`) entra
+        // no mesmo timer: a ferramenta com probe confiável (Claude, Codex) retoma em até 10 s, sem esperar
+        // os 5 minutos do ciclo normal
+        if (list.some((r) => r.id === 'mcp-enable' || r.id === 'signin')) {
           enableTimer ??= setInterval(() => void checkNow(), 10_000);
           enableTimer.unref?.();
         } else if (enableTimer) {
@@ -281,6 +301,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       .catch((e) => o.log(`Não foi possível conferir os requisitos do board: ${e instanceof Error ? e.message : String(e)}`))
       .finally(() => {
         checking = null;
+        forceSigninCheck = false;
         if (checkAgain) {
           checkAgain = false;
           void checkNow();
@@ -288,13 +309,14 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       });
     return checking;
   };
-  // o "Verificar de novo" relê também o PATH do terminal, para achar o que acabou de ser instalado
-  router.onRequirementsCheck(
-    () =>
-      void loginShellPath(true)
-        .then((fresh) => (pathEnv = fresh ?? pathEnv))
-        .finally(() => void checkNow()),
-  );
+  // o "Verificar de novo" relê também o PATH do terminal, para achar o que acabou de ser instalado, e
+  // pula o cache do login: é o clique da pessoa depois de entrar na conta, não pode esperar o TTL de 3 min
+  router.onRequirementsCheck(() => {
+    forceSigninCheck = true;
+    void loginShellPath(true)
+      .then((fresh) => (pathEnv = fresh ?? pathEnv))
+      .finally(() => void checkNow());
+  });
   // o Diagnóstico do ambiente: os requisitos acima e o que o board usa quando existe (skill do fluxo,
   // git, GitHub CLI, Code Review Graph). Roda só quando a tela pede: alguns comandos demoram
   const probeCommand = (command: string, args: string[], cwd?: string) =>

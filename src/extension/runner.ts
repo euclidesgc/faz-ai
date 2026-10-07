@@ -1,6 +1,7 @@
 import { cardRef } from '../shared/model';
 import { aiToolInfo } from '../shared/harness';
 import type { AiRunOrigin, AiRunOutcome, RunReport } from '../shared/log';
+import { blocksExecution } from '../shared/requirements';
 import { columnOf, isLive } from '../shared/selectors';
 import { isYolo } from '../shared/story';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
@@ -224,6 +225,8 @@ export class AiRunner {
     const card = state.cards.find((c) => c.id === cardId);
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
+    // ponto único para os 4 gatilhos (manual, Refinar com IA, heartbeat, autopiloto): sem login, nenhum gasta uma execução
+    if (blocksExecution(state)) throw new Error(`O login do ${aiToolInfo(state.board.aiTool).label} venceu: veja o aviso no topo do board.`);
     const tool = aiToolInfo(state.board.aiTool);
     // a linha do log abre ANTES do plano de execução, que pode lançar: a execução que nem começou
     // também é informação. E o contexto gravado é o do momento da chamada, congelado: a IA move o
