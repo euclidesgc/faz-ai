@@ -4,7 +4,7 @@ import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Attachment } from '../../src/shared/model';
 import type { HostToWebview } from '../../src/shared/messages';
-import { AttachmentModal } from '../../src/webview/components/attachment/AttachmentModal';
+import { AttachmentModal, isMarkdown, renderSafeMarkdown } from '../../src/webview/components/attachment/AttachmentModal';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 beforeAll(async () => {
@@ -36,6 +36,36 @@ function open(a: Attachment): void {
 function reply(msg: HostToWebview): void {
   act(() => window.dispatchEvent(new MessageEvent('message', { data: msg })));
 }
+
+describe('isMarkdown', () => {
+  it('reconhece pelo mime text/markdown', () => {
+    expect(isMarkdown(attachment({ filename: 'doc.txt', mime: 'text/markdown' }))).toBe(true);
+  });
+
+  it('reconhece pela extensão .md ou .markdown, mesmo com mime genérico', () => {
+    expect(isMarkdown(attachment({ filename: 'DOC.MD', mime: 'text/plain' }))).toBe(true);
+    expect(isMarkdown(attachment({ filename: 'doc.markdown', mime: 'text/plain' }))).toBe(true);
+  });
+
+  it('não reconhece .txt nem .json', () => {
+    expect(isMarkdown(attachment({ filename: 'doc.txt', mime: 'text/plain' }))).toBe(false);
+    expect(isMarkdown(attachment({ filename: 'doc.json', mime: 'application/json' }))).toBe(false);
+  });
+});
+
+describe('renderSafeMarkdown', () => {
+  it('renderiza títulos e tabelas em HTML', () => {
+    const html = renderSafeMarkdown('# título\n\n| a | b |\n| --- | --- |\n| 1 | 2 |');
+    expect(html).toContain('<h1>título</h1>');
+    expect(html).toContain('<table>');
+  });
+
+  it('remove script e handlers de evento de um Markdown malicioso', () => {
+    const html = renderSafeMarkdown('texto <script>alert(1)</script> e <img src="x" onerror="alert(2)">');
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('onerror');
+  });
+});
 
 describe('AttachmentModal', () => {
   it('não aparece sem anexo aberto na store', () => {

@@ -1,13 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
+import DOMPurify from 'dompurify';
 import type { Attachment } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { attachments } from '../../commands';
 import { onHostMessage, postToHost } from '../../vscode';
 import { Button, IconClose } from '../ui';
+import { renderMarkdown } from '../MarkdownEditor';
 import { t } from '../../i18n';
 
 /** Anexos cujo conteúdo a modal lê e deixa editar (texto e JSON); o resto é só visualização ou nem isso. */
 export const isTextual = (mime: string): boolean => /^(text\/|application\/json)/.test(mime);
+
+/** Markdown: pelo mime, ou pela extensão quando o mime vem genérico (ex.: anexo salvo como texto puro). */
+export const isMarkdown = (attachment: Attachment): boolean =>
+  attachment.mime === 'text/markdown' || /\.(md|markdown)$/i.test(attachment.filename);
+
+/**
+ * HTML do Markdown do anexo, sanitizado: o conteúdo pode vir de fora do controle de quem usa o board
+ * (arquivo solto no disco, gerado por IA), diferente da descrição/comentários do card.
+ */
+export const renderSafeMarkdown = (src: string): string => DOMPurify.sanitize(renderMarkdown(src));
 
 /**
  * Anexo aberto em modal, dentro do board: imagem renderizada, texto/JSON em visualização com edição
