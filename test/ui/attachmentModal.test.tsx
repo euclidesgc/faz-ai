@@ -73,16 +73,71 @@ describe('AttachmentModal', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('anexo de texto abre em visualização, com o conteúdo já pedido ao host', async () => {
+  it('anexo de texto puro abre em visualização com o código cru, com o conteúdo já pedido ao host', async () => {
+    renderThemed(<AttachmentModal />);
+    open(attachment({ filename: 'notas.txt', mime: 'text/plain' }));
+    expect(await screen.findByRole('dialog', { name: 'notas.txt' })).toBeInTheDocument();
+    const read = lastSent('attachment.read');
+    expect(read.attachmentId).toBe('att-1');
+    reply({ type: 'attachment.readResult', requestId: read.requestId, content: '# não é Markdown aqui' });
+    expect(await screen.findByText('# não é Markdown aqui')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('radiogroup')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Copiar conteúdo' })).toBeEnabled();
+  });
+
+  it('anexo Markdown abre formatado por padrão, sem os símbolos do Markdown à mostra', async () => {
     renderThemed(<AttachmentModal />);
     open(attachment({}));
     expect(await screen.findByRole('dialog', { name: 'notas.md' })).toBeInTheDocument();
     const read = lastSent('attachment.read');
-    expect(read.attachmentId).toBe('att-1');
     reply({ type: 'attachment.readResult', requestId: read.requestId, content: '# título' });
+    expect(await screen.findByRole('heading', { name: 'título' })).toBeInTheDocument();
+    expect(screen.queryByText('# título')).toBeNull();
+    expect(screen.getByRole('radiogroup', { name: 'Modo de visualização' })).toBeInTheDocument();
+  });
+
+  it('alternar para Código mostra o Markdown cru, e Formatado volta ao HTML', async () => {
+    renderThemed(<AttachmentModal />);
+    open(attachment({}));
+    const read = lastSent('attachment.read');
+    reply({ type: 'attachment.readResult', requestId: read.requestId, content: '# título' });
+    await screen.findByRole('heading', { name: 'título' });
+    await userEvent.click(screen.getByRole('radio', { name: 'Código' }));
     expect(await screen.findByText('# título')).toBeInTheDocument();
-    expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Copiar conteúdo' })).toBeEnabled();
+    expect(screen.queryByRole('heading', { name: 'título' })).toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: 'Formatado' }));
+    expect(await screen.findByRole('heading', { name: 'título' })).toBeInTheDocument();
+  });
+
+  it('editar e salvar um Markdown atualiza a visualização formatada já escolhida', async () => {
+    renderThemed(<AttachmentModal />);
+    open(attachment({}));
+    const read = lastSent('attachment.read');
+    reply({ type: 'attachment.readResult', requestId: read.requestId, content: '# antes' });
+    await screen.findByRole('heading', { name: 'antes' });
+    await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Conteúdo do anexo' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Conteúdo do anexo' }), '# depois');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    const write = lastSent('attachment.write');
+    reply({ type: 'attachment.writeResult', requestId: write.requestId, ok: true });
+    expect(await screen.findByRole('heading', { name: 'depois' })).toBeInTheDocument();
+  });
+
+  it('um Markdown com script ou onerror não executa nada ao ser renderizado', async () => {
+    renderThemed(<AttachmentModal />);
+    open(attachment({}));
+    const read = lastSent('attachment.read');
+    reply({
+      type: 'attachment.readResult',
+      requestId: read.requestId,
+      content: '# título\n\n<script>window.__xss = true</script> <img src="x" onerror="window.__xss = true">',
+    });
+    const dialog = await screen.findByRole('dialog');
+    await screen.findByRole('heading', { name: 'título' });
+    expect(dialog.querySelector('script')).toBeNull();
+    expect((window as unknown as { __xss?: boolean }).__xss).toBeUndefined();
   });
 
   it('o botão Editar troca para o textarea e Cancelar descarta a edição', async () => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
+import { SegmentedControl } from '@radix-ui/themes';
 import type { Attachment } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { attachments } from '../../commands';
@@ -37,6 +38,7 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
   const [content, setContent] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [editing, setEditing] = useState(false);
+  const [viewMode, setViewMode] = useState<'formatted' | 'raw'>('formatted');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -69,6 +71,7 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
     setContent(null);
     setDraft('');
     setEditing(false);
+    setViewMode('formatted');
     setError(null);
     setUnsavedNotice(false);
     if (!attachmentId || !textual) {
@@ -115,12 +118,25 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
   };
 
   const image = attachment && attachment.mime.startsWith('image/') && baseUri;
+  const markdown = attachment ? isMarkdown(attachment) : false;
+  const showViewToggle = textual && markdown && !editing;
 
   return (
     <div className="modal-backdrop" onMouseDown={requestClose}>
       <div className="modal attachment-modal" role="dialog" aria-label={attachment?.filename} onMouseDown={(e) => e.stopPropagation()}>
         <header className="attachment-modal-head">
           <h2 title={attachment?.filename}>{attachment?.filename ?? t('Anexos')}</h2>
+          {showViewToggle && (
+            <SegmentedControl.Root
+              size="1"
+              value={viewMode}
+              onValueChange={(v) => setViewMode(v as 'formatted' | 'raw')}
+              aria-label={t('Modo de visualização')}
+            >
+              <SegmentedControl.Item value="formatted">{t('Formatado')}</SegmentedControl.Item>
+              <SegmentedControl.Item value="raw">{t('Código')}</SegmentedControl.Item>
+            </SegmentedControl.Root>
+          )}
           <Button variant="icon" title={t('Fechar (Esc)')} aria-label={t('Fechar')} onClick={requestClose}>
             <IconClose />
           </Button>
@@ -151,6 +167,8 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
             <p className="muted">{t('Carregando…')}</p>
           ) : editing ? (
             <textarea aria-label={t('Conteúdo do anexo')} value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} />
+          ) : content !== null && markdown && viewMode === 'formatted' ? (
+            <div className="markdown plain" dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(content) }} />
           ) : (
             content !== null && <pre>{content}</pre>
           )}
