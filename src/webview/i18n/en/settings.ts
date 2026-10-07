@@ -371,6 +371,20 @@ export const settings: Record<string, string> = {
   'O custo depende do modelo escolhido a cada pedido; o board não estima o custo deste modelo.':
     'The cost depends on the model picked for each request; the board does not estimate the cost of this model.',
   'Preços do Cursor': 'Cursor pricing',
+  'Preços do Copilot': 'Copilot pricing',
+  'Preços de {tool}': '{tool} pricing',
+  'O GitHub Copilot cobra por pedido premium, não por token; o board não estima o custo deste modelo.':
+    'GitHub Copilot charges per premium request, not per token; the board does not estimate the cost of this model.',
+  embutido: 'built-in',
+  manual: 'manual',
+  'conferido em {date}': 'checked on {date}',
+  fonte: 'source',
+  'Voltar ao preço embutido': 'Back to the built-in price',
+  'Voltar ao preço embutido de {model}': 'Back to the built-in price of {model}',
+  'Preços conferidos em {date}': 'Prices checked on {date}',
+  'conferir agora': 'check now',
+  'As execuções deste modelo vão ficar sem custo até os quatro preços serem preenchidos.':
+    'Runs of this model will have no cost until all four prices are filled in.',
   'No Cursor, a estimativa usa a tarifa cadastrada: o modo rápido é um modelo à parte, com preço próprio, e o contexto longo (mais de 256 mil tokens, que pode custar 2x) não é separado, porque o Cursor só informa o total de tokens.':
     'In Cursor, the estimate uses the price entered here: fast mode is a separate model with its own price, and long context (over 256 thousand tokens, which may cost 2x) is not told apart, because Cursor only reports the token total.',
 };

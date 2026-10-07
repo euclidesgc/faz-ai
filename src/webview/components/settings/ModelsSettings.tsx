@@ -1,11 +1,13 @@
 import { useState, type KeyboardEvent } from 'react';
 import { AI_TOOLS, type AiTool } from '../../../shared/harness';
-import { hasVariablePrice, modelId, withPrice, type ModelOption, type ModelPrice } from '../../../shared/models';
+import { modelId, withPrice, type ModelOption, type ModelPrice } from '../../../shared/models';
+import { PRICE_URLS, restoreBuiltinPrice } from '../../../shared/prices';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { t } from '../../i18n';
 import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
 import { FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../ui';
+import { ModelPriceCell } from './ModelPriceCell';
 import { ModelRulesEditor } from './ModelRulesEditor';
 import { SettingsCard } from './SettingsCard';
 import { useSentList } from './useSentList';
@@ -26,24 +28,7 @@ const SOURCES: Record<AiTool, string> = {
   copilot: 'lista embutida na extensão (o GitHub Copilot não guarda a lista em arquivo)',
 };
 
-/** Os quatro campos do preço de um modelo, na ordem em que aparecem na tabela. */
-function priceFields(model: string): { key: keyof ModelPrice; caption: string; label: string }[] {
-  return [
-    { key: 'input', caption: t('entrada'), label: t('Preço de entrada de {model}', { model }) },
-    { key: 'output', caption: t('saída'), label: t('Preço de saída de {model}', { model }) },
-    { key: 'cacheRead', caption: t('leitura de cache'), label: t('Preço de leitura de cache de {model}', { model }) },
-    { key: 'cacheWrite', caption: t('criação de cache'), label: t('Preço de criação de cache de {model}', { model }) },
-  ];
-}
-
-/** O que está gravado no campo, ou '' quando vazio (vazio é ausência de preço, não zero). */
-const priceText = (o: ModelOption, key: keyof ModelPrice): string => {
-  const v = o.price?.[key];
-  return typeof v === 'number' ? String(v) : '';
-};
-
-/** A documentação de preços do Cursor: é a referência do que cadastrar e de como o `auto` cobra. */
-const CURSOR_PRICING_URL = 'https://cursor.com/docs/models-and-pricing';
+/** A tarifa extra do Cursor nos planos Teams e Enterprise. */
 const CURSOR_TOKEN_RATE_URL = 'https://cursor.com/help/models-and-usage/token-rate';
 
 const EMPTY_DRAFT = { model: '', label: '', efforts: '' };
@@ -139,6 +124,9 @@ export function ModelsSettings() {
     setCatalog(sent.current().map((x) => (x.id === o.id ? withPrice(x, { [key]: value }) : x)));
   const patchModel = (id: string, patch: Partial<ModelOption>) =>
     setCatalog(sent.current().map((o) => (o.id === id ? { ...o, ...patch } : o)));
+  const restorePrice = (o: ModelOption) => setCatalog(sent.current().map((x) => (x.id === o.id ? restoreBuiltinPrice(x) : x)));
+  // para o aviso de preço conferido há tempo demais
+  const today = new Date();
 
   // o projeto trabalha com uma ferramenta por vez: só os modelos dela aparecem
   const tools = AI_TOOLS.filter((tl) => tl.id === aiTool);
@@ -271,52 +259,14 @@ export function ModelsSettings() {
                       )}
                     </td>
                     <td>
-                      <div className="price-variable">
-                        <SwitchField
-                          label={<span className="small">{t('Preço variável')}</span>}
-                          title={t('Preço variável de {model}', { model: o.model })}
-                          checked={hasVariablePrice(o)}
-                          onChange={(variablePrice) => patchModel(o.id, { variablePrice })}
-                        />
-                      </div>
-                      {hasVariablePrice(o) ? (
-                        <Text as="p" size="1" color="gray" className="price-variable-note">
-                          {t('O custo depende do modelo escolhido a cada pedido; o board não estima o custo deste modelo.')}{' '}
-                          {o.tool === 'cursor' && (
-                            <a href={CURSOR_PRICING_URL} target="_blank" rel="noreferrer">
-                              {t('Preços do Cursor')}
-                            </a>
-                          )}
-                        </Text>
-                      ) : (
-                        <div className="price-grid">
-                          {priceFields(o.model).map((f) => (
-                            <div key={f.key} className="price-field">
-                              <span className="muted small" aria-hidden="true">
-                                {f.caption}
-                              </span>
-                              <TextField.Root
-                                type="number"
-                                min="0"
-                                step="any"
-                                aria-label={f.label}
-                                key={`${f.key}:${priceText(o, f.key)}`}
-                                defaultValue={priceText(o, f.key)}
-                                onBlur={(e) => {
-                                  const text = e.target.value.trim();
-                                  const value = text === '' ? null : Number(text);
-                                  if (value !== null && (!Number.isFinite(value) || value < 0)) {
-                                    e.target.value = priceText(o, f.key); // número inválido: volta ao que estava gravado
-                                    return;
-                                  }
-                                  if (value !== (o.price?.[f.key] ?? null)) setPrice(o, f.key, value);
-                                }}
-                                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <ModelPriceCell
+                        model={o}
+                        tool={tl.id}
+                        today={today}
+                        onPrice={(key, value) => setPrice(o, key, value)}
+                        onVariable={(variablePrice) => patchModel(o.id, { variablePrice })}
+                        onRestore={() => restorePrice(o)}
+                      />
                     </td>
                     {/* sem confirmação de propósito: a lista pode ser refeita com "Detectar modelos" */}
                     <td className="narrow">
@@ -350,12 +300,12 @@ export function ModelsSettings() {
                   {' '}
                   {t(
                     'No Cursor, a estimativa usa a tarifa cadastrada: o modo rápido é um modelo à parte, com preço próprio, e o contexto longo (mais de 256 mil tokens, que pode custar 2x) não é separado, porque o Cursor só informa o total de tokens.',
-                  )}{' '}
-                  <a href={CURSOR_PRICING_URL} target="_blank" rel="noreferrer">
-                    {t('Preços do Cursor')}
-                  </a>
+                  )}
                 </>
-              )}
+              )}{' '}
+              <a href={PRICE_URLS[tl.id]} target="_blank" rel="noreferrer">
+                {t('Preços de {tool}', { tool: tl.label })}
+              </a>
             </Text>
           </SettingsCard>
         );

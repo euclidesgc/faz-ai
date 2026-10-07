@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { ModelsSettings } from '../../src/webview/components/settings/ModelsSettings';
 import { modelPrice, type ModelOption } from '../../src/shared/models';
+import { PRICE_URLS } from '../../src/shared/prices';
+import { AI_TOOLS } from '../../src/shared/harness';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 let board: SeededBoard;
@@ -100,7 +102,16 @@ describe('ModelsSettings', () => {
   });
 
   describe('preço por milhão de tokens', () => {
-    const mine = () => state().board.modelCatalog.find((x) => x.tool === tool())!;
+    // um modelo fora da tabela embutida: os campos mostram o que está no catálogo, e vazio continua vazio
+    const semTabela = (): ModelOption => ({
+      id: `${tool()}:sem-tabela`,
+      tool: tool(),
+      model: 'sem-tabela',
+      label: 'Sem tabela',
+      efforts: [],
+      defaultEffort: null,
+    });
+    const mine = () => state().board.modelCatalog.find((x) => x.id === semTabela().id)!;
     const field = (kind: string) => screen.getByLabelText(`Preço de ${kind} de ${mine().model}`) as HTMLInputElement;
     const saved = (): ModelOption => lastSent('settings.models.set').catalog.find((x) => x.id === mine().id)!;
     /** O host aplica o que a tela mandou e devolve o estado novo, como no uso real. */
@@ -109,22 +120,54 @@ describe('ModelsSettings', () => {
       syncStore(board.router);
     };
     const setPrices = (price: ModelOption['price']) => {
-      const catalog = state().board.modelCatalog.map((o) => {
-        const { price: _antigo, ...rest } = o;
-        return o.id === mine().id && price ? { ...rest, price } : rest;
-      });
+      const others = state().board.modelCatalog.filter((o) => o.id !== semTabela().id);
+      const catalog = [...others, price ? { ...semTabela(), price } : semTabela()];
       board.router.handle({ type: 'settings.models.set', catalog });
       syncStore(board.router);
     };
     beforeEach(() => setPrices(undefined));
 
-    it('os quatro campos aparecem vazios: o board não embute tabela de preço', () => {
+    it('os quatro campos mostram o que está no catálogo: sem preço gravado, ficam vazios', () => {
       show();
       expect(screen.getByText('Preço (US$ por milhão de tokens)')).toBeInTheDocument();
       for (const kind of ['entrada', 'saída', 'leitura de cache', 'criação de cache']) {
         expect(field(kind)).toHaveValue(null);
       }
       expect(screen.getByText(/O custo informado pela ferramenta tem preferência/)).toBeInTheDocument();
+    });
+
+    it('os modelos embutidos já vêm com preço, origem embutida e o link da fonte', () => {
+      show();
+      const embutido = state().board.modelCatalog.find((x) => x.tool === tool() && x.priceSource === 'builtin')!;
+      expect(embutido.price).toBeDefined();
+      expect(screen.getByLabelText(`Preço de entrada de ${embutido.model}`)).toHaveValue(embutido.price!.input!);
+      expect(screen.getAllByRole('link', { name: 'fonte' })[0]).toHaveAttribute('href', embutido.priceUrl);
+    });
+
+    it('editar um campo de um modelo embutido grava o modelo como manual, sem data de conferência', async () => {
+      show();
+      const embutido = state().board.modelCatalog.find((x) => x.tool === tool() && x.priceSource === 'builtin')!;
+      const input = screen.getByLabelText(`Preço de saída de ${embutido.model}`);
+      await userEvent.clear(input);
+      await userEvent.type(input, '99');
+      await userEvent.tab();
+      const sent = lastSent('settings.models.set').catalog.find((x) => x.id === embutido.id)!;
+      expect(sent).toMatchObject({ priceSource: 'manual', price: { ...embutido.price, output: 99 } });
+      expect(sent.priceCheckedAt).toBeUndefined();
+      expect(sent.priceUrl).toBeUndefined();
+      // e o botão de voltar devolve o embutido
+      applyLast();
+      await userEvent.click(await screen.findByRole('button', { name: `Voltar ao preço embutido de ${embutido.model}` }));
+      expect(lastSent('settings.models.set').catalog.find((x) => x.id === embutido.id)).toMatchObject({
+        priceSource: 'builtin',
+        price: embutido.price,
+      });
+    });
+
+    it('o rodapé tem o link de preços da ferramenta do board', () => {
+      show();
+      const label = AI_TOOLS.find((tl) => tl.id === tool())!.label;
+      expect(screen.getByRole('link', { name: `Preços de ${label}` })).toHaveAttribute('href', PRICE_URLS[tool()]);
     });
 
     it('um número digitado grava ao sair do campo e reaparece quando a tela relê o catálogo', async () => {

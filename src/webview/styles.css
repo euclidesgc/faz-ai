@@ -1378,6 +1378,12 @@ button.ghost.on {
   margin: 0;
   max-width: 40ch;
 }
+/* origem do preço e avisos ficam embaixo da grade, no mesmo tamanho da nota */
+.price-source,
+.price-warning {
+  margin: var(--sp-2) 0 0;
+  max-width: 48ch;
+}
 
 /* regras de sugestão de modelo */
 .suggest-model {
