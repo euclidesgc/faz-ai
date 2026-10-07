@@ -20,6 +20,8 @@ export interface HostEnv {
   fixProjectMcp(file: string): Promise<string>;
   /** recarrega a janela do editor (só faz sentido dentro do editor) */
   reloadWindow?(): unknown;
+  /** abre a tela de MCPs do editor (só faz sentido dentro do editor) */
+  openEditorMcp?(): unknown;
   runAi(cardId: string, mode?: AiRunMode): unknown;
   stopAi(cardId: string): unknown;
   /** pausa o autopiloto das histórias em modo autônomo */
@@ -117,6 +119,9 @@ export class HostBridge {
           return;
         case 'ui.reloadWindow':
           await this.env.reloadWindow?.();
+          return;
+        case 'ui.openEditorMcp':
+          await this.env.openEditorMcp?.();
           return;
         case 'ui.showChat':
           await this.env.showChat?.();

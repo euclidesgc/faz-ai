@@ -15,8 +15,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
     mesmo board em todas as janelas. Agora o board grava sozinho o `.cursor/mcp.json` do projeto
     (fora do git) assim que a pasta abre no Cursor, e tira a entrada global antiga. Na primeira vez
     em cada projeto, o aviso pede para recarregar a janela e depois para ligar o `faz-ai` em Cursor
-    Settings → MCP (o Cursor deixa desligado todo servidor novo do projeto), e some quando o
-    servidor conecta.
+    Settings → MCP (o Cursor deixa desligado todo servidor novo do projeto), com o botão **Abrir
+    MCPs do Cursor**, que leva direto a Customize → MCPs, e some quando o servidor conecta.
   - O registro global das outras ferramentas diz ao servidor onde está o projeto: no Claude Code
     pela variável `CLAUDE_PROJECT_DIR`, no `mcp.json` do VS Code com `${workspaceFolder}`.
   - Um registro quebrado no arquivo do projeto (`.cursor/mcp.json` de outra pasta, de um node que

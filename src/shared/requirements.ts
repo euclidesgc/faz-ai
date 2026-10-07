@@ -15,6 +15,8 @@ export type RequirementAction =
   | { kind: 'fixProject'; file: string }
   /** recarregar a janela do editor, para o chat dele carregar o servidor recém-registrado */
   | { kind: 'reload' }
+  /** abrir a tela de MCPs do editor (no Cursor, Customize → MCPs), onde só a pessoa ativa o MCP */
+  | { kind: 'openEditorMcp' }
   /** um comando para rodar no terminal, com botão de copiar */
   | { kind: 'command'; command: string }
   /** a tela de Configurações → Harness de IA */

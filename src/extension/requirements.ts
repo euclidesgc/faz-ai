@@ -254,7 +254,7 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
       out.push({ id: 'mcp-reload', tool, optional: true, file: registered.file, action: { kind: 'reload' } });
     // carregado, mas o Cursor deixa desligado todo servidor novo do projeto: só a pessoa liga
     else if (tool === 'cursor' && p.editor === 'cursor' && !cursorConnectedOnce(p.homeDir, p.workspaceDir))
-      out.push({ id: 'mcp-enable', tool, optional: true, action: null });
+      out.push({ id: 'mcp-enable', tool, optional: true, action: { kind: 'openEditorMcp' } });
   }
 
   const unsupported = headlessUnsupported(tool, p.permission);

@@ -18,7 +18,8 @@ English; names of screens and buttons appear here as they are in the Portuguese 
     `.cursor/mcp.json` on its own (outside git) as soon as the folder opens in Cursor, and removes the
     old global entry. The first time in each project, the banner asks you to reload the window and
     then to turn on `faz-ai` in Cursor Settings → MCP (Cursor keeps every new project server off),
-    and goes away once the server connects.
+    with the **Abrir MCPs do Cursor** (open Cursor MCPs) button, which goes straight to Customize →
+    MCPs, and goes away once the server connects.
   - The other tools' global registration tells the server where the project is: in Claude Code
     through the `CLAUDE_PROJECT_DIR` variable, in VS Code's `mcp.json` with `${workspaceFolder}`.
   - A broken registration in the project file (a `.cursor/mcp.json` for another folder, or for a node

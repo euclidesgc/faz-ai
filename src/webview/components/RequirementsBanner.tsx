@@ -42,7 +42,7 @@ function texts(r: BoardRequirement): { title: string; detail: string } {
       };
     case 'mcp':
       return {
-        title: t('O servidor do board não está registrado no {tool}', { tool }),
+        title: t('O MCP do board (faz-ai) não está instalado no {tool}', { tool }),
         detail:
           r.tool === 'claude'
             ? t(
@@ -60,7 +60,7 @@ function texts(r: BoardRequirement): { title: string; detail: string } {
       };
     case 'mcp-stale':
       return {
-        title: t('O registro do servidor do board no {tool} está desatualizado', { tool }),
+        title: t('O MCP do board no {tool} está desatualizado', { tool }),
         detail:
           r.action?.kind === 'fixProject'
             ? t(
@@ -74,7 +74,7 @@ function texts(r: BoardRequirement): { title: string; detail: string } {
       };
     case 'mcp-elsewhere':
       return {
-        title: t('O servidor do board no {tool} está registrado para outra pasta', { tool }),
+        title: t('O MCP do board no {tool} está registrado para outra pasta', { tool }),
         detail:
           r.action?.kind === 'fixProject'
             ? t(
@@ -88,7 +88,7 @@ function texts(r: BoardRequirement): { title: string; detail: string } {
       };
     case 'mcp-outdated':
       return {
-        title: t('O registro do servidor do board no {tool} é de uma versão anterior', { tool }),
+        title: t('O MCP do board no {tool} é de uma versão anterior', { tool }),
         detail: t(
           '{file} usa a ponte em "{missing}", de uma versão anterior da extensão, que não é mais atualizada e pode não achar o projeto aberto. Instale de novo para gravar o registro atual.',
           { file: r.file ?? '', missing: r.missing ?? '' },
@@ -96,17 +96,17 @@ function texts(r: BoardRequirement): { title: string; detail: string } {
       };
     case 'mcp-reload':
       return {
-        title: t('Servidor do board instalado no {tool}: falta recarregar a janela', { tool }),
+        title: t('MCP do board instalado no {tool}: recarregue a janela', { tool }),
         detail: t(
-          'O registro em {file} foi gravado depois que esta janela abriu, e o Cursor só lê os servidores do projeto ao abrir a janela. Depois de recarregar, ligue o "faz-ai" em Cursor Settings → MCP.',
+          'O MCP "faz-ai" é o canal pelo qual a IA do chat do Cursor lê e atualiza os cards deste board. Ele foi instalado em {file} depois que esta janela abriu, e o Cursor só lê os MCPs do projeto ao abrir a janela: recarregue para ele aparecer.',
           { file: r.file ?? '' },
         ),
       };
     case 'mcp-enable':
       return {
-        title: t('Ligue o servidor do board no {tool}', { tool }),
+        title: t('Ative o MCP do board no {tool}', { tool }),
         detail: t(
-          'O Cursor deixa desligado todo servidor novo do projeto. Em Cursor Settings → MCP, clique em "faz-ai" e ligue a chave deste projeto. Depois, clique em Verificar de novo.',
+          'O MCP "faz-ai" é o canal pelo qual a IA do chat do Cursor lê e atualiza os cards deste board. O Cursor deixa desativado todo MCP novo de um projeto, e só você pode ativá-lo: em Abrir MCPs do Cursor, clique em "faz-ai" e ligue a chave deste projeto.',
         ),
       };
     case 'permission':
@@ -169,14 +169,17 @@ function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
   // na versão compacta (o painel de chat) a explicação só fica de fora quando há um botão que resolve
   // recarregar a janela só existe dentro do editor; no navegador, fica a explicação
   const reload = r.action?.kind === 'reload' && !isWeb;
-  const actionable = r.action?.kind === 'command' || r.action?.kind === 'connect' || r.action?.kind === 'fixProject' || reload || settings;
+  const openMcp = r.action?.kind === 'openEditorMcp' && !isWeb;
+  const actionable =
+    r.action?.kind === 'command' || r.action?.kind === 'connect' || r.action?.kind === 'fixProject' || reload || openMcp || settings;
   return (
     <li>
       <strong>
         {title}
         {r.optional && <span className="muted"> · {t('recomendado')}</span>}
       </strong>
-      {(!compact || !actionable) && <p>{detail}</p>}
+      {/* no recomendado, a explicação é o motivo do aviso: fica até na versão compacta */}
+      {(!compact || !actionable || r.optional) && <p>{detail}</p>}
       {r.action?.kind === 'command' && <CopyCommand command={r.action.command} />}
       {r.action?.kind === 'connect' && (
         // a instalação mora na seção Servidores MCP da ferramenta, onde se escolhe global ou projeto
@@ -187,6 +190,11 @@ function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
       {r.action?.kind === 'fixProject' && (
         <Button size="small" onClick={() => r.action?.kind === 'fixProject' && ui.fixProjectMcp(r.action.file)}>
           <IconConnect /> {t('Corrigir o registro')}
+        </Button>
+      )}
+      {openMcp && (
+        <Button size="small" onClick={() => ui.openEditorMcp()}>
+          <IconConnect /> {t('Abrir MCPs do Cursor')}
         </Button>
       )}
       {reload && (
@@ -232,7 +240,7 @@ function RecheckButton() {
  * O que falta para o board trabalhar com a ferramenta de IA. Fica visível em todas as telas enquanto
  * faltar alguma coisa, sem botão de fechar: some sozinho quando a última pendência é resolvida. O que
  * é só recomendado (não impede as execuções pelo board) não conta como pendência: sozinho, vira uma
- * linha discreta em vez da faixa de aviso.
+ * caixa discreta (com a explicação) em vez da faixa de aviso.
  */
 export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
   const requirements = useBoardStore((s) => s.state?.requirements ?? []);
@@ -252,7 +260,7 @@ export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
         <strong role="status">
           {missing === 0
             ? requirements.every((r) => r.id === 'mcp-reload' || r.id === 'mcp-enable')
-              ? t('Falta pouco para a IA do editor enxergar o board')
+              ? t('Falta um passo para o chat do Cursor usar o board')
               : t('Recomendado para a IA enxergar o board nas suas conversas')
             : missing === 1
               ? t('Falta 1 requisito para o board trabalhar com a IA')

@@ -181,7 +181,7 @@ describe('requisitos do board', () => {
     ]);
     // depois de recarregar, a janela é mais nova que o registro, mas o Cursor deixa o servidor novo desligado
     expect(await checkRequirements(probe({ editor: 'cursor', windowStartedAt: written + 1000 }))).toEqual([
-      { id: 'mcp-enable', tool: 'cursor', optional: true, action: null },
+      { id: 'mcp-enable', tool: 'cursor', optional: true, action: { kind: 'openEditorMcp' } },
     ]);
     // ligado, o Cursor cria a pasta do servidor do projeto, com o caminho virando um nome de hífens
     const slug = project.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '');

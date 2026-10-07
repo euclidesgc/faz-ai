@@ -33,6 +33,7 @@ export const ui = {
   checkRequirements: () => post({ type: 'requirements.check' }),
   fixProjectMcp: (file: string) => post({ type: 'ui.fixProjectMcp', file }),
   reloadWindow: () => post({ type: 'ui.reloadWindow' }),
+  openEditorMcp: () => post({ type: 'ui.openEditorMcp' }),
 };
 
 export const chat = {

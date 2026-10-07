@@ -47,6 +47,15 @@ function vscodeEnv(webview: vscode.Webview, router: MessageRouter): HostEnv {
     connectAI: (target) => vscode.commands.executeCommand('fazai.connectAI', target, { fromBoard: true }),
     fixProjectMcp: async (file) => String(await vscode.commands.executeCommand('fazai.fixProjectMcp', file)),
     reloadWindow: () => vscode.commands.executeCommand('workbench.action.reloadWindow'),
+    // Customize → MCPs, no Cursor; numa versão sem esse comando, as configurações do Cursor
+    openEditorMcp: async () => {
+      for (const command of ['workbench.action.customize.openMCPs', 'cursor.openCursorSettings'])
+        try {
+          return await vscode.commands.executeCommand(command);
+        } catch {
+          /* comando que esta versão do editor não tem: tenta o próximo */
+        }
+    },
     openInBrowser: () => vscode.commands.executeCommand('fazai.openInBrowser'),
     runAi: (cardId, mode) => vscode.commands.executeCommand('fazai.ai.run', cardId, { fromBoard: true, mode }),
     stopAi: (cardId) => vscode.commands.executeCommand('fazai.ai.stop', cardId, { fromBoard: true }),

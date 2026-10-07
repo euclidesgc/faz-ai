@@ -43,6 +43,7 @@ const bridgeOnly = {
   'ui.connectAI': viaBridge,
   'ui.fixProjectMcp': viaBridge,
   'ui.reloadWindow': viaBridge,
+  'ui.openEditorMcp': viaBridge,
   'ui.openInBrowser': viaBridge,
   'ai.run': viaBridge,
   'ai.stop': viaBridge,
