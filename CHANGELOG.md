@@ -6,6 +6,20 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Preços dos modelos já vêm com a extensão (#187).** O catálogo de modelos nasce com o preço por
+  milhão de tokens dos modelos conhecidos do Claude Code, do Codex, do Cursor e do Kimi, lido das
+  páginas oficiais, com a fonte e a data da conferência ("embutido · conferido em … · fonte" na aba
+  **Modelos de IA**). Qualquer preço digitado, pela aba ou pelo `upsert_model`, vira **manual** e
+  nunca é sobrescrito; ao abrir o board depois de atualizar a extensão, só os preços embutidos mudam
+  e os modelos sem preço que ganharam tabela são preenchidos. A aba avisa quando um preço embutido
+  foi conferido há mais de 60 dias (com o link "conferir agora") e quando um modelo vai ficar sem
+  custo por falta dos quatro preços (com o botão **Preencher**); cada cartão de ferramenta tem o link
+  **Preços de <ferramenta>**. Os modelos do GitHub Copilot nascem com **Preço variável** ligado
+  (cobrança por pedido premium, não por token). No MCP, `get_models` devolve `priceSource`,
+  `priceCheckedAt` e `priceUrl`, e `upsert_model` ganhou `reset_price`. **Mudança de
+  comportamento:** apagar os quatro campos de um modelo com preço embutido volta ao embutido, em vez
+  de deixar o modelo sem preço (o botão **Voltar ao preço embutido** faz o mesmo). A tabela é
+  conferida a cada versão publicada; o README explica a regra.
 - **Configurações do Faz AI no Settings do editor.** Em `Ctrl+,`, buscar "Faz AI" mostra a categoria
   do Faz AI com as seções Instalação, Aparência, Git e Backup, nessa ordem. Instalação tem o link
   **Abrir o Diagnóstico do ambiente**; Aparência já traz o **Idioma** (`fazai.appearance.language`);

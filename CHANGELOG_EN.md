@@ -7,6 +7,21 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Model prices now ship with the extension (#187).** The model catalog starts with the price per
+  million tokens of the known Claude Code, Codex, Cursor and Kimi models, read from the official
+  pages, with the source and the check date ("embutido · conferido em … · fonte", built-in · checked
+  on · source, on the **Modelos de IA** tab). Any price you type, on the tab or through
+  `upsert_model`, becomes **manual** and is never overwritten; when the board opens after an
+  extension update, only built-in prices change and models without a price that gained a table
+  entry are filled in. The tab warns when a built-in price was checked more than 60 days ago (with
+  the "conferir agora" link) and when a model will have no cost for lack of the four prices (with the
+  **Preencher** button); each tool card has the **Preços de <tool>** link. GitHub Copilot models
+  start with **Preço variável** (variable price) on (billing per premium request, not per token).
+  Through MCP, `get_models` returns `priceSource`, `priceCheckedAt` and `priceUrl`, and
+  `upsert_model` gained `reset_price`. **Behavior change:** clearing the four fields of a model with
+  a built-in price goes back to the built-in one instead of leaving the model without a price (the
+  **Voltar ao preço embutido** button does the same). The table is checked on every published
+  version; the README explains the rule.
 - **Faz AI settings in the editor Settings.** In `Ctrl+,`, searching "Faz AI" shows the Faz AI
   category with the sections Installation, Appearance, Git and Backup, in that order. Installation has
   the **Open the Environment Diagnostics** link; Appearance already brings **Language**

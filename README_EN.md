@@ -422,8 +422,9 @@ one), subagents and skills, with the number of calls.
 
 - **Cost comes from two sources.** When the tool reports the cost, the board stores that value.
   When it does not, the board estimates it: tokens multiplied by the model's **price per million
-  tokens**, which you fill in under Configurações → **Modelos de IA** (Settings → AI models; four
-  prices: input, output, cache read and cache creation) or through MCP with `upsert_model`. An
+  tokens** (four prices: input, output, cache read and cache creation). Known models come with the
+  price built into the extension; the rest you fill in under Configurações → **Modelos de IA**
+  (Settings → AI models) or through MCP with `upsert_model` (see [Model prices](#model-prices)). An
   estimated cost is always marked "(estimado)". A model without all four prices gets no calculated
   cost: the value stays blank, never 0.
 - **In the log channel** (**Output → Faz AI**), the tool's output appears as readable lines, and at
@@ -792,7 +793,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
 | Agentes | How the AI works on each card: skills, MCP servers, tools and model; there is always a default; per phase, changeable per card, with suggestions from intent |
 | Harness de IA | The project's tool, rules file, skills and agents; runs from the conversation and the heartbeat; everything each tool loads, by scope (see [AI harness](#ai-harness)) |
-| Modelos de IA | The tool's models and effort levels; each model's price per million tokens (input, output, cache read and cache creation), used to estimate cost; rules that suggest each card's model |
+| Modelos de IA | The tool's models and effort levels; each model's price per million tokens (input, output, cache read and cache creation), built in for known models and editable, used to estimate cost; rules that suggest each card's model |
 | Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
 | Aparência | **Language** (automatic, Português (Brasil) or English), theme (system, light, dark), font and size of long texts; name and color of the statuses |
 | Backup | Export the board to a file and import a file in place of the current board (see [Board backup](#board-backup)) |
@@ -844,11 +845,51 @@ update it (or use **Faz AI: Atualizar board para o padrão atual**). The update 
 missing: no card leaves its place and what you customized is kept. A copy of the database is saved
 first.
 
-### Cursor pricing
+### Model prices
 
-The reference is [Cursor's pricing table](https://cursor.com/docs/models-and-pricing). The board does
-not read it on its own: prices are kept by hand in **Modelos de IA** (AI models) or by the AI through
-`upsert_model`.
+Each model's price per million tokens is what the board uses to estimate the cost of runs (when the
+tool does not report the cost). The models in the built-in list already come with a price:
+
+- **Where they come from.** The extension ships a price table (`src/shared/prices.ts`) with the four
+  prices of each known model, the official page they came from and the date they were checked. On
+  the **Modelos de IA** tab, the price shows "embutido · conferido em YYYY-MM-DD · fonte" (built-in ·
+  checked on · source), and the link opens the official page. Each tool card has the **Preços de
+  <tool>** (tool pricing) link.
+- **Built-in and manual.** Any price you type, on the tab or through the AI with `upsert_model`,
+  becomes **manual**, even when it equals the built-in one. A manual price is never overwritten by
+  the extension. A catalog saved before this version, with a price and no origin, counts as manual.
+- **What an extension update changes.** On the first board open after the update, prices with
+  built-in origin move to the new table, and models that had no price and now have a table entry get
+  the built-in one. Manual prices and runs already recorded in Métricas do not change: the stored
+  cost is the one at the time of use.
+- **Stale price notice.** When a built-in price was checked more than 60 days ago, the tab shows
+  "Preços conferidos em … · conferir agora" (prices checked on · check now), with the source link.
+  A manual price has no check date and gets no notice.
+- **Model without a price.** A model without all four prices (for example, Cursor and Kimi models
+  detected that are not in the table) shows the notice "As execuções deste modelo vão ficar sem
+  custo até os quatro preços serem preenchidos" (runs of this model will have no cost until all four
+  prices are filled in), with the **Preencher** (fill in) button, which goes to the empty field.
+  Métricas leaves its cost blank.
+- **Variable price.** Cursor's `auto` and every GitHub Copilot model (which charges per premium
+  request, not per token) come with **Preço variável** (variable price) on: no price fields and no
+  estimated cost. Every model has the switch.
+- **Back to the built-in price.** On a model with a manual price that has a table entry, use the
+  **Voltar ao preço embutido** (back to the built-in price) button, clear the four fields, or call
+  `upsert_model` with `reset_price: true`. On a model without a table entry, clearing the four fields
+  leaves the model without a price.
+- **Asking the AI to update a price.** Ask it to read the official page (the link is on the tab) and
+  store the four values with `upsert_model` (`price_input`, `price_output`, `price_cache_read`,
+  `price_cache_write`). The price becomes manual. `get_models` returns, per model, `priceSource`
+  (`builtin`, `manual` or `null`), `priceCheckedAt` and `priceUrl`.
+- **Check rule on every release.** Before publishing a version, the built-in table is checked against
+  the official pages and, if anything changed, the numbers and the date (`checkedAt`) in
+  `src/shared/prices.ts` are updated. It is an item of the release checklist.
+
+#### Cursor pricing
+
+The reference is [Cursor's pricing table](https://cursor.com/docs/models-and-pricing). The
+`composer-2.5` model already comes with a built-in price; the other models of your account are kept
+by hand in **Modelos de IA** (AI models) or by the AI through `upsert_model`.
 
 - **Auto has a variable price.** Cursor charges the list price of the model each request is routed
   to, so there is no fixed rate to enter. The `auto` model comes with **Preço variável** (variable
