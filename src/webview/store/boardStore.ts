@@ -37,7 +37,8 @@ export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
   leadSort: null,
 };
 
-export type View = 'board' | 'trash' | 'settings' | 'metrics';
+/** `environment`: o Diagnóstico do ambiente, aberto pelas Configurações ou sozinho na primeira abertura */
+export type View = 'board' | 'trash' | 'settings' | 'metrics' | 'environment';
 /** Abas da tela de Harness de IA: a ferramenta e a execução, o que é do projeto, e tudo que a ferramenta carrega. */
 export type HarnessTab = 'tool' | 'project' | 'all';
 export type SettingsTab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'agents' | 'git' | 'appearance' | 'backup';
@@ -143,7 +144,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     attachmentModal: null,
     backupBusy: null,
     setBackupBusy: (backupBusy) => set({ backupBusy }),
-    view: persisted?.view ?? 'board',
+    // o Diagnóstico é de passagem: ao reabrir, volta para o board
+    view: persisted?.view === 'environment' ? 'board' : (persisted?.view ?? 'board'),
     settingsTab: persisted?.settingsTab ?? 'columns',
     harnessTab: persisted?.harnessTab ?? 'tool',
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,

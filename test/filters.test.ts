@@ -136,6 +136,8 @@ const state: BoardState = {
   aiRunUnsupported: null,
   requirements: [],
   requirementsCheckedAt: 0,
+  environment: null,
+  environmentFirstRun: false,
   harnessInstall: null,
 };
 

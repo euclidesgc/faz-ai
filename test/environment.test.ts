@@ -1,0 +1,152 @@
+import { describe, expect, it } from 'vitest';
+import { checkEnvironment, type EnvironmentProbe } from '../src/extension/environment';
+import type { EnvCheckId } from '../src/shared/environment';
+import type { BoardRequirement } from '../src/shared/requirements';
+
+/** Uma máquina de mentira: os comandos que existem, o que cada um responde e os arquivos. */
+function probe(o: {
+  commands?: Record<string, string>;
+  outputs?: Record<string, string | null>;
+  files?: Record<string, string>;
+  requirements?: BoardRequirement[];
+  skillInstalled?: boolean;
+  tool?: EnvironmentProbe['tool'];
+  platform?: NodeJS.Platform;
+}): EnvironmentProbe & { ran: string[] } {
+  const ran: string[] = [];
+  return {
+    ran,
+    tool: o.tool ?? 'cursor',
+    requirements: o.requirements ?? [],
+    workspaceDir: '/proj',
+    platform: o.platform ?? 'linux',
+    skillInstalled: o.skillInstalled ?? false,
+    resolve: (c) => o.commands?.[c] ?? null,
+    run: async (c, args) => {
+      const key = [c, ...args].join(' ');
+      ran.push(key);
+      return key in (o.outputs ?? {}) ? o.outputs![key]! : null;
+    },
+    firstLine: (f) => o.files?.[f]?.split('\n')[0] ?? null,
+    exists: (f) => f in (o.files ?? {}),
+  };
+}
+
+const byId = (checks: { id: EnvCheckId }[], id: EnvCheckId) => checks.find((c) => c.id === id) as never as Record<string, unknown>;
+
+const CRG = '/home/u/.local/bin/code-review-graph';
+const UV_PY = '/home/u/.local/share/uv/tools/code-review-graph/bin/python';
+const FIND_SPEC = `${UV_PY} -c import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('sentence_transformers') else 1)`;
+
+describe('Diagnóstico do ambiente', () => {
+  it('máquina vazia: os itens que dependem de outro ficam para depois, e cada falta tem como resolver', async () => {
+    const cli: BoardRequirement = { id: 'cli', tool: 'cursor', cli: 'cursor-agent', action: { kind: 'command', command: 'curl …' } };
+    const node: BoardRequirement = { id: 'node', tool: 'cursor', action: null };
+    const r = await checkEnvironment(probe({ requirements: [node, cli] }));
+    expect(r.checks.map((c) => [c.id, c.status])).toEqual([
+      ['node', 'missing'],
+      ['cli', 'missing'],
+      ['signin', 'skipped'],
+      ['mcp', 'ok'],
+      ['permission', 'ok'],
+      ['skill', 'missing'],
+      ['git', 'missing'],
+      ['repo', 'skipped'],
+      ['gh', 'missing'],
+      ['gh-auth', 'skipped'],
+      ['crg', 'missing'],
+      ['crg-graph', 'skipped'],
+      ['crg-embeddings', 'skipped'],
+    ]);
+    // o obrigatório leva o requisito do aviso, com o texto e a ação dele
+    expect(byId(r.checks, 'cli').requirement).toBe(cli);
+    expect(byId(r.checks, 'skill').fix).toEqual({ kind: 'installSkill' });
+    // sem uv, o primeiro passo é instalá-lo; o registro do MCP vai só para a ferramenta do projeto
+    expect(byId(r.checks, 'crg').fix).toEqual({
+      kind: 'commands',
+      commands: [
+        'curl -LsSf https://astral.sh/uv/install.sh | sh',
+        'uv tool install code-review-graph',
+        'code-review-graph install --platform cursor',
+      ],
+    });
+  });
+
+  it('no Claude e no Cursor o MCP é recomendado; nas outras ferramentas, obrigatório', async () => {
+    const mcp: BoardRequirement = { id: 'mcp-enable', tool: 'cursor', optional: true, action: { kind: 'openEditorMcp' } };
+    const cursor = await checkEnvironment(probe({ requirements: [mcp] }));
+    expect(byId(cursor.checks, 'mcp')).toMatchObject({ level: 'recommended', status: 'missing', requirement: mcp });
+    const codex = await checkEnvironment(probe({ tool: 'codex' }));
+    expect(byId(codex.checks, 'mcp')).toMatchObject({ level: 'required', status: 'ok' });
+  });
+
+  it('tudo instalado: mostra as versões e não sugere nada', async () => {
+    const p = probe({
+      skillInstalled: true,
+      commands: { node: '/usr/bin/node', git: '/usr/bin/git', gh: '/usr/bin/gh', 'code-review-graph': CRG, uv: '/usr/bin/uv' },
+      outputs: {
+        '/usr/bin/node --version': 'v22.3.0\n',
+        '/usr/bin/git --version': 'git version 2.43.0\n',
+        '/usr/bin/git rev-parse --is-inside-work-tree': 'true\n',
+        '/usr/bin/gh --version': 'gh version 2.92.0 (2026-04-28)\n',
+        '/usr/bin/gh auth status': '',
+        [`${CRG} --version`]: 'code-review-graph 2.3.6\n',
+        [FIND_SPEC]: '',
+      },
+      files: { [CRG]: `#!${UV_PY}\nimport sys`, '/proj/.code-review-graph': '' },
+    });
+    const r = await checkEnvironment(p);
+    expect(r.checks.filter((c) => c.status !== 'ok').map((c) => c.id)).toEqual([]);
+    expect(r.checks.filter((c) => c.version).map((c) => [c.id, c.version])).toEqual([
+      ['node', '22.3.0'],
+      ['git', '2.43.0'],
+      ['gh', '2.92.0'],
+      ['crg', '2.3.6'],
+    ]);
+  });
+
+  it('Code Review Graph sem grafo e sem a busca semântica: build e embed local, pelo instalador que ele usou', async () => {
+    const base = { commands: { 'code-review-graph': CRG }, outputs: { [`${CRG} --version`]: '2.3.6' } };
+    const uv = await checkEnvironment(probe({ ...base, files: { [CRG]: `#!${UV_PY}` } }));
+    expect(byId(uv.checks, 'crg-graph').fix).toEqual({ kind: 'commands', commands: ['code-review-graph build'] });
+    expect(byId(uv.checks, 'crg-embeddings').fix).toEqual({
+      kind: 'commands',
+      commands: ['uv tool install --reinstall "code-review-graph[embeddings]"', 'code-review-graph embed --provider local'],
+    });
+    const pipx = await checkEnvironment(probe({ ...base, files: { [CRG]: '#!/home/u/.local/pipx/venvs/code-review-graph/bin/python' } }));
+    expect((byId(pipx.checks, 'crg-embeddings').fix as { commands: string[] }).commands[0]).toBe(
+      'pipx inject code-review-graph "sentence-transformers>=3,<4"',
+    );
+  });
+
+  it('sem o #! (Windows), a busca semântica é lida da lista do uv', async () => {
+    const r = await checkEnvironment(
+      probe({
+        platform: 'win32',
+        commands: { 'code-review-graph': 'C:\\u\\.local\\bin\\code-review-graph.exe', uv: 'C:\\uv.exe' },
+        outputs: {
+          'uv tool list --show-with --show-extras': 'code-review-graph v2.3.6 [with: sentence-transformers]\n- code-review-graph\n',
+        },
+      }),
+    );
+    expect(byId(r.checks, 'crg-embeddings').status).toBe('ok');
+  });
+
+  it('o #! com env usa o Python que vem depois', async () => {
+    const p = probe({
+      commands: { 'code-review-graph': CRG },
+      files: { [CRG]: '#!/usr/bin/env python3\n' },
+      outputs: { "python3 -c import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('sentence_transformers') else 1)": '' },
+    });
+    const r = await checkEnvironment(p);
+    expect(byId(r.checks, 'crg-embeddings').status).toBe('ok');
+  });
+
+  it('git sem repositório e gh sem login: git init e gh auth login', async () => {
+    const r = await checkEnvironment(
+      probe({ commands: { git: '/usr/bin/git', gh: '/usr/bin/gh' }, outputs: { '/usr/bin/git rev-parse --is-inside-work-tree': null } }),
+    );
+    expect(byId(r.checks, 'repo')).toMatchObject({ status: 'missing', fix: { kind: 'commands', commands: ['git init'] } });
+    expect(byId(r.checks, 'gh-auth')).toMatchObject({ status: 'missing', fix: { kind: 'commands', commands: ['gh auth login'] } });
+  });
+});

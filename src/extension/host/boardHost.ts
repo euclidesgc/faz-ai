@@ -20,6 +20,8 @@ import { AiRunner } from '../runner';
 import { cursorModels, cursorSignedIn, runCli } from '../cliProbe';
 import type { AiTool, InstallScope } from '../../shared/harness';
 import { checkRequirements } from '../requirements';
+import { checkEnvironment } from '../environment';
+import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { resolveCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { cleanStaleTemp } from '../aiOutput/measured';
@@ -263,6 +265,66 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       void loginShellPath(true)
         .then((fresh) => (pathEnv = fresh ?? pathEnv))
         .finally(() => void checkNow()),
+  );
+  // o Diagnóstico do ambiente: os requisitos acima e o que o board usa quando existe (skill do fluxo,
+  // git, GitHub CLI, Code Review Graph). Roda só quando a tela pede: alguns comandos demoram
+  const probeCommand = (command: string, args: string[], cwd?: string) =>
+    new Promise<string | null>((resolve) =>
+      execFile(
+        command,
+        args,
+        { cwd: cwd ?? o.folderPath, timeout: 20_000, env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) } },
+        (err, stdout) => resolve(err ? null : stdout),
+      ),
+    );
+  let diagnosing: Promise<void> | null = null;
+  const diagnose = () => {
+    diagnosing ??= (async () => {
+      pathEnv = (await loginShellPath(true)) ?? pathEnv;
+      await checkNow();
+      const s = router.snapshot();
+      const tool = s.board.aiTool;
+      const skillInstalled = !!s.harness.inventory
+        .find((t) => t.tool === tool)
+        ?.items.some((i) => i.kind === 'skill' && i.name === FLOW_SKILL_NAME);
+      router.setEnvironment(
+        await checkEnvironment({
+          tool,
+          requirements: s.requirements,
+          workspaceDir: o.folderPath,
+          platform: process.platform,
+          skillInstalled,
+          resolve: (command) => resolveCommand(command, pathEnv, homeDir),
+          run: probeCommand,
+          firstLine: (file) => {
+            try {
+              return fs.readFileSync(file, 'utf8').slice(0, 300).split('\n')[0] ?? null;
+            } catch {
+              return null;
+            }
+          },
+          exists: (file) => fs.existsSync(file),
+        }),
+      );
+    })()
+      .catch((e) => o.log(`Não foi possível rodar o Diagnóstico do ambiente: ${e instanceof Error ? e.message : String(e)}`))
+      .finally(() => (diagnosing = null));
+  };
+  // a tela abre sozinha uma vez por máquina (a marca fica na pasta de dados da extensão, fora do board)
+  const seenFile = path.join(o.storageDir, 'environment-seen');
+  router.onEnvironment(
+    {
+      check: () => void diagnose(),
+      seen: () => {
+        try {
+          fs.mkdirSync(o.storageDir, { recursive: true });
+          fs.writeFileSync(seenFile, new Date().toISOString());
+        } catch (e) {
+          o.log(`Não foi possível gravar ${seenFile}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      },
+    },
+    !fs.existsSync(seenFile),
   );
   const requirementsTimer = setInterval(() => void checkNow(), 5 * 60_000);
   requirementsTimer.unref?.();

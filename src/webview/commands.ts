@@ -34,6 +34,8 @@ export const ui = {
   fixProjectMcp: (file: string) => post({ type: 'ui.fixProjectMcp', file }),
   reloadWindow: () => post({ type: 'ui.reloadWindow' }),
   openEditorMcp: () => post({ type: 'ui.openEditorMcp' }),
+  checkEnvironment: () => post({ type: 'environment.check' }),
+  environmentSeen: () => post({ type: 'environment.seen' }),
 };
 
 export const chat = {

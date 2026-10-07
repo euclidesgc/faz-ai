@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import type { BoardRequirement } from '../../shared/requirements';
+import type { EnvironmentReport } from '../../shared/environment';
 import type { DbHandle } from '../db/database';
 import { exportBoard, exportFileName, summarize, type BoardExportFile, type ImportResult } from '../db/boardExport';
 import { newId } from '../db/ids';
@@ -53,6 +54,8 @@ const bridgeOnly = {
   'chat.clear': viaBridge,
   'ui.showChat': viaBridge,
   'requirements.check': viaBridge,
+  'environment.check': viaBridge,
+  'environment.seen': viaBridge,
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
@@ -97,6 +100,9 @@ export class MessageRouter {
   private requirements: BoardRequirement[] = [];
   private requirementsCheckedAt = 0;
   private requirementsCheck: (() => void) | null = null;
+  private environment: EnvironmentReport | null = null;
+  private environmentFirstRun = false;
+  private environmentHooks: { check(): void; seen(): void } | null = null;
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
 
@@ -135,6 +141,8 @@ export class MessageRouter {
       aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission),
       requirements: this.requirements,
       requirementsCheckedAt: this.requirementsCheckedAt,
+      environment: this.environment,
+      environmentFirstRun: this.environmentFirstRun,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
     };
   }
@@ -189,6 +197,33 @@ export class MessageRouter {
 
   recheckRequirements(): void {
     this.requirementsCheck?.();
+  }
+
+  /** O resultado do Diagnóstico do ambiente (informado pelo host, que confere). */
+  setEnvironment(report: EnvironmentReport): void {
+    this.environment = report;
+    this.notify();
+  }
+
+  /**
+   * Quem roda o Diagnóstico e quem lembra que ele já foi mostrado nesta máquina; `firstRun` diz se a
+   * tela deve abrir sozinha (a primeira abertura do board depois de instalar a extensão).
+   */
+  onEnvironment(hooks: { check(): void; seen(): void }, firstRun: boolean): void {
+    this.environmentHooks = hooks;
+    this.environmentFirstRun = firstRun;
+  }
+
+  checkEnvironment(): void {
+    this.environmentHooks?.check();
+  }
+
+  /** A tela abriu sozinha uma vez: nas próximas aberturas, só pelo botão. */
+  markEnvironmentSeen(): void {
+    if (!this.environmentFirstRun) return;
+    this.environmentFirstRun = false;
+    this.environmentHooks?.seen();
+    this.notify();
   }
 
   /** Cards em que a extensão está executando a IA (informado pelo executor). */

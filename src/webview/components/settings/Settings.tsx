@@ -20,6 +20,7 @@ import {
   IconBackup,
   IconBranch,
   IconColumns,
+  IconDoctor,
   IconFields,
   IconHarness,
   IconModels,
@@ -65,6 +66,7 @@ export function Settings() {
   const setTab = useBoardStore((s) => s.openSettings);
   const collapsed = useBoardStore((s) => s.settingsNavCollapsed);
   const setCollapsed = useBoardStore((s) => s.setSettingsNavCollapsed);
+  const setView = useBoardStore((s) => s.setView);
 
   return (
     <div className="settings">
@@ -102,6 +104,12 @@ export function Settings() {
           ))}
         </nav>
         <div className="settings-side-actions">
+          <Button
+            variant="ghost"
+            onClick={() => setView('environment')}
+            {...navProps(collapsed, t('Verificar ambiente'), IconDoctor)}
+            title={t('Abre o Diagnóstico do ambiente: o que o board precisa e o que ele usa nesta máquina, com como resolver o que falta')}
+          />
           {state.pendingUpgrade.length > 0 && (
             <Button
               variant="primary"

@@ -6,6 +6,14 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Diagnóstico do ambiente.** Uma lista, no estilo do `flutter doctor`, com o que o board precisa
+  (Node.js, linha de comando da ferramenta, login, MCP do board, permissão) e o que ele aproveita
+  (skill do fluxo, Git e repositório, GitHub CLI e login, Code Review Graph, grafo do projeto e
+  busca semântica). Cada item tem para que serve, como o board o usa, a privacidade, a forma de
+  resolver (comando para copiar, botão ou download) e o **Saiba mais**. A lista abre sozinha na
+  primeira abertura do board na máquina e, depois, por **Verificar ambiente** nas Configurações ou
+  por **Ver o diagnóstico completo** na faixa amarela.
+
 - **Servidor do board no Cursor e nas outras ferramentas: instalação global que funciona e aviso que
   some.**
   - O botão de instalar mostra o resultado e o erro no próprio board. Antes iam para as notificações

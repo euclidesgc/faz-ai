@@ -213,6 +213,10 @@ export type WebviewToHost =
   | { type: 'ui.showChat' }
   /** confere de novo o que falta para o board trabalhar com a ferramenta de IA */
   | { type: 'requirements.check' }
+  /** roda o Diagnóstico do ambiente (o que o board precisa e o que ele usa, com como resolver cada item) */
+  | { type: 'environment.check' }
+  /** o Diagnóstico já abriu sozinho nesta máquina: não abre mais na abertura do board */
+  | { type: 'environment.seen' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
   /**
    * instala a skill do fluxo numa ferramenta (padrão: a do projeto), global (padrão) ou só no projeto;
