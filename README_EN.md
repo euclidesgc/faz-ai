@@ -303,8 +303,12 @@ CLI and its sign-in (`gh auth login`, for auto-merge and PR tracking) and
 instead of reading whole files. Once Code Review Graph is installed, the list suggests building the
 project graph and semantic search. Each item says what it is for, how the board uses it and what
 leaves your machine, and brings the commands to copy, a button or the download link, plus **Learn
-more**. Code Review Graph is installed with `uv`, which brings Python 3.10 along without touching the
-system one. Semantic search uses the `local` provider: the model is downloaded once from Hugging
+more**. The install commands follow the detected system: `winget` on Windows, Homebrew or
+`xcode-select` on macOS, and `apt`, `dnf` or `pacman` on Linux (Node through `nvm`); on an unknown
+distribution, the download link remains. When a program lands in a folder outside the PATH (the
+Cursor CLI and `uv`, in `~/.local/bin`), the commands include the step that adds it. Code Review
+Graph shows its prerequisites inside it, in install order: `uv` and Python 3.10 or newer, which `uv`
+downloads just for it without touching the system Python. Semantic search uses the `local` provider: the model is downloaded once from Hugging
 Face and runs on the machine. The screen warns that the cloud providers (`openai`, `google`,
 `minimax`, `voyage`) send code snippets to third parties, which many companies do not allow.
 

@@ -287,8 +287,12 @@ acompanhamento dos PRs) e o [Code Review Graph](https://github.com/tirth8205/cod
 grafo do código que a IA consulta em vez de ler arquivos inteiros. Com o Code Review Graph
 instalado, a lista sugere o build do grafo do projeto e a busca semântica. Cada item diz para que
 serve, como o board o usa e o que sai da sua máquina, e traz os comandos para copiar, um botão ou o
-link de download, além do **Saiba mais**. O Code Review Graph é instalado pelo `uv`, que traz o
-Python 3.10 junto sem mexer no do sistema. A busca semântica usa o provedor `local`: o modelo é
+link de download, além do **Saiba mais**. Os comandos de instalação saem do sistema detectado:
+`winget` no Windows, Homebrew ou `xcode-select` no macOS, e `apt`, `dnf` ou `pacman` no Linux (o Node
+pelo `nvm`); numa distribuição desconhecida, fica o link de download. Quando o programa cai numa
+pasta fora do PATH (a CLI do Cursor e o `uv`, em `~/.local/bin`), os comandos incluem o passo que a
+põe no PATH. O Code Review Graph mostra os pré-requisitos dentro dele, na ordem de instalar: o `uv` e
+o Python 3.10 ou mais novo, que o `uv` baixa só para ele, sem mexer no Python do sistema. A busca semântica usa o provedor `local`: o modelo é
 baixado uma vez do Hugging Face e roda na máquina. A tela avisa que os provedores de nuvem
 (`openai`, `google`, `minimax`, `voyage`) mandam trechos do código para terceiros, o que muitas
 empresas não permitem.

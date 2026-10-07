@@ -17,7 +17,12 @@ beforeEach(async () => {
   useBoardStore.setState({ view: 'board' });
 });
 
-const report = (checks: EnvCheck[]): EnvironmentReport => ({ tool: 'cursor', checks, checkedAt: Date.now() + 1000 });
+const report = (checks: EnvCheck[]): EnvironmentReport => ({
+  tool: 'cursor',
+  os: { platform: 'linux', family: 'debian', label: 'Ubuntu 24.04.3 LTS' },
+  checks,
+  checkedAt: Date.now() + 1000,
+});
 const show = (r: EnvironmentReport) =>
   act(() => {
     router.setEnvironment(r);
@@ -154,5 +159,51 @@ describe('Diagnóstico do ambiente', () => {
     router.markEnvironmentSeen();
     expect(seen).toHaveBeenCalledTimes(1);
     expect(router.snapshot().environmentFirstRun).toBe(false);
+  });
+
+  it('os pré-requisitos do Code Review Graph aparecem dentro dele, antes dos comandos dele', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(
+      report([
+        ...MISSING,
+        {
+          id: 'uv',
+          parent: 'crg',
+          level: 'recommended',
+          status: 'missing',
+          fix: { kind: 'commands', commands: ['curl -LsSf https://astral.sh/uv/install.sh | sh', 'source $HOME/.local/bin/env'] },
+        },
+        { id: 'python', parent: 'crg', level: 'recommended', status: 'skipped' },
+      ]),
+    );
+    expect(screen.getByText('Comandos de instalação para: Ubuntu 24.04.3 LTS')).toBeInTheDocument();
+    const prereqs = screen.getByRole('region', { name: 'Antes, os pré-requisitos' });
+    expect(prereqs.closest('li.env-item')?.querySelector('strong')?.textContent).toBe('Code Review Graph');
+    expect(within(prereqs).getByText('uv')).toBeInTheDocument();
+    expect(within(prereqs).getByText('source $HOME/.local/bin/env')).toBeInTheDocument();
+    expect(within(prereqs).getByText('Python 3.10 ou mais novo')).toBeInTheDocument();
+    // fora da lista principal: skill, Code Review Graph e busca semântica, sem o uv e o Python soltos
+    const top = screen.getByRole('region', { name: 'Recomendado' }).querySelectorAll(':scope > ul > li');
+    expect(top).toHaveLength(3);
+  });
+
+  it('com os comandos do sistema, o download vira alternativa e o Windows pede um terminal novo', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(
+      report([
+        {
+          id: 'gh',
+          level: 'recommended',
+          status: 'missing',
+          fix: { kind: 'commands', commands: ['winget install --id GitHub.cli -e'], reopenTerminal: true },
+        },
+      ]),
+    );
+    const gh = item('GitHub CLI (gh)');
+    expect(within(gh).getByText('winget install --id GitHub.cli -e')).toBeInTheDocument();
+    expect(within(gh).getByText(/abra um terminal novo/)).toBeInTheDocument();
+    expect(within(gh).getByRole('link', { name: /Ou baixe o instalador/ })).toHaveAttribute('href', 'https://cli.github.com');
   });
 });

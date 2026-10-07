@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import type { AiTool } from '../shared/harness';
-import type { EnvCheck, EnvCheckId, EnvironmentReport } from '../shared/environment';
+import type { EnvCheck, EnvCheckId, EnvironmentReport, EnvOs } from '../shared/environment';
+import { installFix } from './installers';
 import type { BoardRequirement, RequirementId } from '../shared/requirements';
 
 export interface EnvironmentProbe {
@@ -8,7 +9,11 @@ export interface EnvironmentProbe {
   /** o que `checkRequirements` acabou de achar: os itens obrigatórios vêm daí, com o texto e a ação do aviso */
   requirements: BoardRequirement[];
   workspaceDir: string;
-  platform: NodeJS.Platform;
+  /** o sistema da máquina: escolhe os comandos de instalação */
+  os: EnvOs;
+  /** as pastas do PATH do terminal: diz se `~/.local/bin` (onde a CLI do Cursor e o uv se instalam) já está nele */
+  pathDirs: string[];
+  homeDir: string;
   /** a skill do fluxo está instalada na ferramenta do projeto (global ou no projeto) */
   skillInstalled: boolean;
   /** caminho do executável de um comando, ou null */
@@ -39,11 +44,32 @@ const CRG_PLATFORM: Partial<Record<AiTool, string>> = {
 
 const version = (out: string | null): string | undefined => /\d+\.\d+(?:\.\d+)?/.exec(out ?? '')?.[0];
 
-/** Instala o `uv`, o instalador de ferramentas Python que o Code Review Graph recomenda. */
-const installUv = (platform: NodeJS.Platform) =>
-  platform === 'win32'
-    ? 'powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"'
-    : 'curl -LsSf https://astral.sh/uv/install.sh | sh';
+/** A versão do Python é 3.10 ou mais nova (o mínimo do Code Review Graph). */
+const python310 = (v: string | undefined): boolean => {
+  const [major = 0, minor = 0] = (v ?? '').split('.').map(Number);
+  return major > 3 || (major === 3 && minor >= 10);
+};
+
+/**
+ * Um Python 3.10 ou mais novo para o Code Review Graph: com o uv, o que ele acha (o dele ou o do
+ * sistema); sem o uv, o do sistema. Devolve a versão, ou undefined.
+ */
+async function findPython(p: EnvironmentProbe, uv: string | null): Promise<string | undefined> {
+  const candidates: string[] = [];
+  if (uv) {
+    const found = (await p.run(uv, ['python', 'find', '>=3.10']))?.trim();
+    if (found) candidates.push(found);
+  }
+  for (const name of p.os.family === 'windows' ? ['py', 'python'] : ['python3', 'python']) {
+    const exe = p.resolve(name);
+    if (exe) candidates.push(exe);
+  }
+  for (const exe of candidates) {
+    const v = version(await p.run(exe, ['--version']));
+    if (python310(v)) return v;
+  }
+  return undefined;
+}
 
 /** Por onde o Code Review Graph foi instalado, pelo Python do script dele. */
 function crgInstaller(p: EnvironmentProbe, exe: string): { python: string | null; via: 'uv' | 'pipx' | 'pip' } {
@@ -71,6 +97,21 @@ async function hasEmbeddings(p: EnvironmentProbe, python: string | null): Promis
 }
 
 /**
+ * A instalação da CLI, com o passo do PATH quando ela cai em `~/.local/bin` (o instalador do Cursor) e
+ * essa pasta ainda não está no PATH: sem ele, o terminal aberto não acha o comando logo depois.
+ */
+function cliFix(p: EnvironmentProbe, install: string): EnvCheck['fix'] {
+  const localBin = path.join(p.homeDir, '.local', 'bin');
+  const inPath = p.pathDirs.some((d) => d.replace(/\/+$/, '') === localBin);
+  if (inPath || p.os.family === 'windows' || !install.includes('cursor.com/install')) return undefined;
+  const rc = p.os.family === 'macos' ? '~/.zshrc' : '~/.bashrc';
+  return {
+    kind: 'commands',
+    commands: [install, `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ${rc}`, 'export PATH="$HOME/.local/bin:$PATH"'],
+  };
+}
+
+/**
  * O Diagnóstico do ambiente: tudo de que o board precisa ou que ele usa, com o estado de cada item e
  * como resolver. Os obrigatórios repetem o aviso de requisitos (mesma conferência, mesmas ações); os
  * recomendados são conferidos só aqui, porque rodam comandos que o aviso não precisa rodar a toda hora.
@@ -86,10 +127,17 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     level: 'required',
     status: node ? 'missing' : 'ok',
     requirement: node,
+    fix: node ? (installFix('node', p.os) ?? undefined) : undefined,
     version: !node && nodeExe ? version(await p.run(nodeExe, ['--version'])) : undefined,
   });
   const cli = req('cli');
-  checks.push({ id: 'cli', level: 'required', status: cli ? 'missing' : 'ok', requirement: cli });
+  checks.push({
+    id: 'cli',
+    level: 'required',
+    status: cli ? 'missing' : 'ok',
+    requirement: cli,
+    fix: cli?.action?.kind === 'command' ? cliFix(p, cli.action.command) : undefined,
+  });
   const signin = req('signin');
   checks.push({ id: 'signin', level: 'required', status: cli ? 'skipped' : signin ? 'missing' : 'ok', requirement: signin });
   const mcp = req('mcp');
@@ -108,7 +156,13 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
 
   const gitExe = p.resolve('git');
   const gitVersion = gitExe ? version(await p.run(gitExe, ['--version'])) : undefined;
-  checks.push({ id: 'git', level: 'recommended', status: gitExe ? 'ok' : 'missing', version: gitVersion });
+  checks.push({
+    id: 'git',
+    level: 'recommended',
+    status: gitExe ? 'ok' : 'missing',
+    version: gitVersion,
+    fix: gitExe ? undefined : (installFix('git', p.os) ?? undefined),
+  });
   const repo = gitExe ? (await p.run(gitExe, ['rev-parse', '--is-inside-work-tree'], p.workspaceDir))?.trim() === 'true' : false;
   checks.push({
     id: 'repo',
@@ -123,6 +177,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     level: 'recommended',
     status: ghExe ? 'ok' : 'missing',
     version: ghExe ? version(await p.run(ghExe, ['--version'])) : undefined,
+    fix: ghExe ? undefined : (installFix('gh', p.os) ?? undefined),
   });
   // `gh auth status` sai com erro sem login (ou com o token vencido)
   const ghAuth = ghExe ? (await p.run(ghExe, ['auth', 'status'])) !== null : false;
@@ -136,18 +191,36 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
   const crgExe = p.resolve('code-review-graph');
   const platform = CRG_PLATFORM[p.tool];
   const register = `code-review-graph install${platform ? ` --platform ${platform}` : ''}`;
+  // o Code Review Graph é um programa Python, instalado pelo uv (que traz um Python só para ele)
+  const uvExe = p.resolve('uv');
   checks.push({
     id: 'crg',
     level: 'recommended',
     status: crgExe ? 'ok' : 'missing',
     version: crgExe ? version(await p.run(crgExe, ['--version'])) : undefined,
-    fix: crgExe
-      ? undefined
-      : {
-          kind: 'commands',
-          commands: [...(p.resolve('uv') ? [] : [installUv(p.platform)]), 'uv tool install code-review-graph', register],
-        },
+    fix: crgExe ? undefined : { kind: 'commands', commands: ['uv tool install code-review-graph', register] },
   });
+  // os pré-requisitos só importam para instalar: com o Code Review Graph instalado, ficam de fora
+  if (!crgExe) {
+    checks.push({
+      id: 'uv',
+      parent: 'crg',
+      level: 'recommended',
+      status: uvExe ? 'ok' : 'missing',
+      version: uvExe ? version(await p.run(uvExe, ['--version'])) : undefined,
+      fix: uvExe ? undefined : (installFix('uv', p.os) ?? undefined),
+    });
+    const python = await findPython(p, uvExe);
+    checks.push({
+      id: 'python',
+      parent: 'crg',
+      level: 'recommended',
+      // sem Python e sem uv, o Python vem junto com o uv
+      status: python ? 'ok' : uvExe ? 'missing' : 'skipped',
+      version: python,
+      fix: !python && uvExe ? { kind: 'commands', commands: ['uv python install 3.12'] } : undefined,
+    });
+  }
   // o grafo de cada projeto fica na pasta .code-review-graph, criada pelo build
   const graph = !!crgExe && p.exists(path.join(p.workspaceDir, '.code-review-graph'));
   checks.push({
@@ -171,5 +244,5 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     fix: crgExe && !embeddings ? { kind: 'commands', commands: [addEmbeddings, 'code-review-graph embed --provider local'] } : undefined,
   });
 
-  return { tool: p.tool, checks, checkedAt: Date.now() };
+  return { tool: p.tool, os: p.os, checks, checkedAt: Date.now() };
 }

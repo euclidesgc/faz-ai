@@ -11,7 +11,8 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   command line, sign-in, board MCP, permission) and what it makes use of (flow skill, Git and
   repository, GitHub CLI and sign-in, Code Review Graph, project graph and semantic search). Each
   item has what it is for, how the board uses it, privacy, how to fix it (command to copy, button
-  or download) and **Learn more**. The list opens on its own the first time the board opens on a
+  or download) and **Learn more**. The commands follow the detected system (Windows, macOS and the
+  Linux families), and Code Review Graph shows its `uv` and Python prerequisites inside it. The list opens on its own the first time the board opens on a
   machine and, after that, from **Check environment** in Settings or **See the full environment
   check** in the yellow bar.
 

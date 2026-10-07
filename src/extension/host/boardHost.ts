@@ -21,6 +21,7 @@ import { cursorModels, cursorSignedIn, runCli } from '../cliProbe';
 import type { AiTool, InstallScope } from '../../shared/harness';
 import { checkRequirements } from '../requirements';
 import { checkEnvironment } from '../environment';
+import { detectOs } from '../installers';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { resolveCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
@@ -277,6 +278,13 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         (err, stdout) => resolve(err ? null : stdout),
       ),
     );
+  const readOsRelease = () => {
+    try {
+      return fs.readFileSync('/etc/os-release', 'utf8');
+    } catch {
+      return null;
+    }
+  };
   let diagnosing: Promise<void> | null = null;
   const diagnose = () => {
     diagnosing ??= (async () => {
@@ -292,7 +300,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           tool,
           requirements: s.requirements,
           workspaceDir: o.folderPath,
-          platform: process.platform,
+          os: detectOs(process.platform, readOsRelease()),
+          pathDirs: (pathEnv ?? process.env.PATH ?? '').split(path.delimiter),
+          homeDir,
           skillInstalled,
           resolve: (command) => resolveCommand(command, pathEnv, homeDir),
           run: probeCommand,

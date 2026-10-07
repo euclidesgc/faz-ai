@@ -126,12 +126,26 @@ function texts(id: EnvCheckId, tool: AiTool): Texts {
         usage: t(
           'Em vez de ler arquivos inteiros, a IA consulta o grafo para achar o trecho certo e medir o impacto de uma mudança: gasta menos tokens e erra menos nos cards.',
         ),
-        privacy: t(
-          'Roda na sua máquina: o grafo fica na pasta .code-review-graph do projeto e o código não sai dela. Precisa do Python 3.10 ou mais novo, que o uv instala junto, sem mexer no Python do sistema.',
-        ),
+        privacy: t('Roda na sua máquina: o grafo fica na pasta .code-review-graph do projeto e o código não sai dela.'),
         installNote: t(
           'O último comando registra o MCP do Code Review Graph no {tool} e, por padrão, acrescenta instruções de uso ao arquivo de regras do projeto (CLAUDE.md, AGENTS.md…). Rode-o na pasta do projeto.',
           { tool: label },
+        ),
+      };
+    case 'uv':
+      return {
+        title: t('uv'),
+        purpose: t('Instala e atualiza programas feitos em Python, cada um isolado na própria pasta.'),
+        usage: t(
+          'O Code Review Graph é instalado e atualizado pelo uv. Logo depois de instalar o uv, o terminal já aberto ainda não o encontra: o último comando recarrega o PATH (ou abra um terminal novo).',
+        ),
+      };
+    case 'python':
+      return {
+        title: t('Python 3.10 ou mais novo'),
+        purpose: t('O Code Review Graph é um programa em Python.'),
+        usage: t(
+          'Se não houver um Python 3.10 ou mais novo, o uv baixa um só para o Code Review Graph, na pasta dele, ao instalá-lo. Não é preciso instalar Python no sistema, e o que já existe não muda.',
         ),
       };
     case 'crg-graph':
@@ -194,7 +208,9 @@ function Fix({ check, tool, installNote, onFixed }: { check: EnvCheck; tool: AiT
         {requirementTexts(check.requirement).detail}
       </p>,
     );
-    parts.push(<RequirementFix key="action" r={check.requirement} onFixed={onFixed} />);
+    // o comando do aviso é o mesmo que abre a lista abaixo, que traz os passos seguintes (o PATH)
+    if (!(check.fix?.kind === 'commands' && check.requirement.action?.kind === 'command'))
+      parts.push(<RequirementFix key="action" r={check.requirement} onFixed={onFixed} />);
   }
   if (check.fix?.kind === 'commands') {
     if (installNote) parts.push(<p key="note">{installNote}</p>);
@@ -207,6 +223,18 @@ function Fix({ check, tool, installNote, onFixed }: { check: EnvCheck; tool: AiT
         ))}
       </ol>,
     );
+    if (check.fix.brew)
+      parts.push(
+        <p key="brew" className="small muted">
+          {t('Os comandos usam o Homebrew. Sem ele, instale antes pelo site brew.sh ou use o link de download.')}
+        </p>,
+      );
+    if (check.fix.reopenTerminal)
+      parts.push(
+        <p key="reopen" className="small muted">
+          {t('Depois, abra um terminal novo: o que já estava aberto não enxerga o programa recém-instalado.')}
+        </p>,
+      );
   }
   if (check.fix?.kind === 'installSkill')
     parts.push(
@@ -226,13 +254,23 @@ function Fix({ check, tool, installNote, onFixed }: { check: EnvCheck; tool: AiT
   if (download && !check.requirement?.action)
     parts.push(
       <ExternalLink key="download" href={download}>
-        {t('Baixar o instalador')}
+        {check.fix?.kind === 'commands' ? t('Ou baixe o instalador') : t('Baixar o instalador')}
       </ExternalLink>,
     );
   return <div className="env-fix">{parts}</div>;
 }
 
-function CheckItem({ check, tool, busy, onFixed }: { check: EnvCheck; tool: AiTool; busy: boolean; onFixed: () => void }) {
+interface ItemProps {
+  check: EnvCheck;
+  tool: AiTool;
+  /** os pré-requisitos do item (o uv e o Python do Code Review Graph), mostrados dentro dele */
+  prereqs?: EnvCheck[];
+  busyId: EnvCheckId | null;
+  onFixed: (id: EnvCheckId) => void;
+}
+
+function CheckItem({ check, tool, prereqs = [], busyId, onFixed }: ItemProps) {
+  const busy = busyId === check.id;
   const x = texts(check.id, tool);
   const icon = check.status === 'ok' ? STATUS_ICON.ok : check.status === 'skipped' ? STATUS_ICON.skipped : STATUS_ICON[check.level];
   const docs = docsOf(check.id, tool);
@@ -262,7 +300,25 @@ function CheckItem({ check, tool, busy, onFixed }: { check: EnvCheck; tool: AiTo
             <span className="spinner" aria-hidden /> {t('Aplicando e conferindo de novo…')}
           </p>
         ) : (
-          <Fix check={check} tool={tool} installNote={x.installNote} onFixed={onFixed} />
+          <>
+            {/* os pré-requisitos primeiro: são a ordem de instalar */}
+            {check.status === 'missing' && prereqs.length > 0 && (
+              <section className="env-prereqs" aria-label={t('Antes, os pré-requisitos')}>
+                <p>
+                  <strong>{t('Antes, os pré-requisitos')}</strong>
+                </p>
+                <ul className="env-list">
+                  {prereqs.map((c) => (
+                    <CheckItem key={c.id} check={c} tool={tool} busyId={busyId} onFixed={onFixed} />
+                  ))}
+                </ul>
+                <p>
+                  <strong>{t('Depois, o próprio item')}</strong>
+                </p>
+              </section>
+            )}
+            <Fix check={check} tool={tool} installNote={x.installNote} onFixed={() => onFixed(check.id)} />
+          </>
         )}
         {docs && (
           <ExternalLink href={docs}>
@@ -297,7 +353,13 @@ export function EnvironmentView() {
   const [fixing, setFixing] = useState<EnvCheckId | null>(null);
   const busyId = checking ? fixing : null;
 
-  const checks = report?.checks ?? [];
+  const all = report?.checks ?? [];
+  const checks = all.filter((c) => !c.parent);
+  const prereqsOf = (id: EnvCheckId) => all.filter((c) => c.parent === id);
+  const fix = (id: EnvCheckId) => {
+    setFixing(id);
+    recheck();
+  };
   const required = checks.filter((c) => c.level === 'required');
   const recommended = checks.filter((c) => c.level === 'recommended');
   const missing = required.filter((c) => c.status === 'missing').length;
@@ -346,22 +408,14 @@ export function EnvironmentView() {
       <p role="status" className="env-summary">
         <strong>{summary}</strong>
       </p>
+      {report && <p className="small muted env-os">{t('Comandos de instalação para: {os}', { os: report.os.label })}</p>}
       {report && (
         <>
           <section aria-labelledby="env-required">
             <h3 id="env-required">{t('Necessário')}</h3>
             <ul className="env-list">
               {required.map((c) => (
-                <CheckItem
-                  key={c.id}
-                  check={c}
-                  tool={report.tool}
-                  busy={busyId === c.id}
-                  onFixed={() => {
-                    setFixing(c.id);
-                    recheck();
-                  }}
-                />
+                <CheckItem key={c.id} check={c} tool={report.tool} prereqs={prereqsOf(c.id)} busyId={busyId} onFixed={fix} />
               ))}
             </ul>
           </section>
@@ -369,16 +423,7 @@ export function EnvironmentView() {
             <h3 id="env-recommended">{t('Recomendado')}</h3>
             <ul className="env-list">
               {recommended.map((c) => (
-                <CheckItem
-                  key={c.id}
-                  check={c}
-                  tool={report.tool}
-                  busy={busyId === c.id}
-                  onFixed={() => {
-                    setFixing(c.id);
-                    recheck();
-                  }}
-                />
+                <CheckItem key={c.id} check={c} tool={report.tool} prereqs={prereqsOf(c.id)} busyId={busyId} onFixed={fix} />
               ))}
             </ul>
           </section>

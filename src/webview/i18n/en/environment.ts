@@ -26,6 +26,23 @@ export const environment: Record<string, string> = {
   Privacidade: 'Privacy',
   'Saiba mais': 'Learn more',
   'Instalar a skill': 'Install the skill',
+  'Ou baixe o instalador': 'Or download the installer',
+  'Antes, os pré-requisitos': 'First, the prerequisites',
+  'Depois, o próprio item': 'Then, the item itself',
+  'Comandos de instalação para: {os}': 'Install commands for: {os}',
+  'Os comandos usam o Homebrew. Sem ele, instale antes pelo site brew.sh ou use o link de download.':
+    'The commands use Homebrew. Without it, install it first from brew.sh or use the download link.',
+  'Depois, abra um terminal novo: o que já estava aberto não enxerga o programa recém-instalado.':
+    'Then open a new terminal: the one already open does not see the newly installed program.',
+  uv: 'uv',
+  'Instala e atualiza programas feitos em Python, cada um isolado na própria pasta.':
+    'Installs and updates programs written in Python, each isolated in its own folder.',
+  'O Code Review Graph é instalado e atualizado pelo uv. Logo depois de instalar o uv, o terminal já aberto ainda não o encontra: o último comando recarrega o PATH (ou abra um terminal novo).':
+    'Code Review Graph is installed and updated by uv. Right after installing uv, the terminal already open does not find it yet: the last command reloads the PATH (or open a new terminal).',
+  'Python 3.10 ou mais novo': 'Python 3.10 or newer',
+  'O Code Review Graph é um programa em Python.': 'Code Review Graph is a Python program.',
+  'Se não houver um Python 3.10 ou mais novo, o uv baixa um só para o Code Review Graph, na pasta dele, ao instalá-lo. Não é preciso instalar Python no sistema, e o que já existe não muda.':
+    'If there is no Python 3.10 or newer, uv downloads one just for Code Review Graph, in its own folder, when installing it. There is no need to install Python on the system, and what is already there does not change.',
   'Aplicando e conferindo de novo…': 'Applying and checking again…',
   'Baixar o instalador': 'Download the installer',
 
@@ -80,8 +97,8 @@ export const environment: Record<string, string> = {
     'Builds a graph of the code (functions, classes, who calls whom) and hands it to the AI through its own MCP.',
   'Em vez de ler arquivos inteiros, a IA consulta o grafo para achar o trecho certo e medir o impacto de uma mudança: gasta menos tokens e erra menos nos cards.':
     'Instead of reading whole files, the AI queries the graph to find the right code and measure the impact of a change: it spends fewer tokens and makes fewer mistakes on cards.',
-  'Roda na sua máquina: o grafo fica na pasta .code-review-graph do projeto e o código não sai dela. Precisa do Python 3.10 ou mais novo, que o uv instala junto, sem mexer no Python do sistema.':
-    'Runs on your machine: the graph lives in the project’s .code-review-graph folder and the code never leaves it. It needs Python 3.10 or newer, which uv installs alongside it without touching the system Python.',
+  'Roda na sua máquina: o grafo fica na pasta .code-review-graph do projeto e o código não sai dela.':
+    'Runs on your machine: the graph lives in the project’s .code-review-graph folder and the code never leaves it.',
   'O último comando registra o MCP do Code Review Graph no {tool} e, por padrão, acrescenta instruções de uso ao arquivo de regras do projeto (CLAUDE.md, AGENTS.md…). Rode-o na pasta do projeto.':
     'The last command registers the Code Review Graph MCP in {tool} and, by default, adds usage instructions to the project rules file (CLAUDE.md, AGENTS.md…). Run it in the project folder.',
   'Grafo deste projeto': 'Graph for this project',

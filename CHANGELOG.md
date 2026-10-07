@@ -10,7 +10,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   (Node.js, linha de comando da ferramenta, login, MCP do board, permissão) e o que ele aproveita
   (skill do fluxo, Git e repositório, GitHub CLI e login, Code Review Graph, grafo do projeto e
   busca semântica). Cada item tem para que serve, como o board o usa, a privacidade, a forma de
-  resolver (comando para copiar, botão ou download) e o **Saiba mais**. A lista abre sozinha na
+  resolver (comando para copiar, botão ou download) e o **Saiba mais**. Os comandos saem do sistema
+  detectado (Windows, macOS e as famílias de Linux), e o Code Review Graph mostra dentro dele os
+  pré-requisitos `uv` e Python. A lista abre sozinha na
   primeira abertura do board na máquina e, depois, por **Verificar ambiente** nas Configurações ou
   por **Ver o diagnóstico completo** na faixa amarela.
 
