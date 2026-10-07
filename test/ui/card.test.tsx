@@ -21,7 +21,7 @@ beforeEach(() => syncStore(board.router));
 /** Abre o drawer da história como o App faz: `openCardId` na store e o componente com o id. */
 function openStory() {
   useBoardStore.getState().openCard(board.storyId);
-  render(
+  return render(
     <Theme>
       <CardDrawer cardId={board.storyId} />
     </Theme>,
@@ -315,6 +315,18 @@ describe('CardDrawer', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ver no board' }));
     expect(useBoardStore.getState().selectedParentId).toBe(board.storyId);
     expect(useBoardStore.getState().openCardId).toBeNull();
+  });
+
+  it('a lista de sub-tarefas mostra o LED de cada uma: aceso na que está em execução, vermelho na bloqueada, apagado nas demais', () => {
+    const sub = card(board.subId);
+    const running = board.router.createCard({ typeId: sub.typeId, columnId: sub.columnId, parentId: board.storyId, title: 'Rodando' });
+    const blocked = board.router.createCard({ typeId: sub.typeId, columnId: sub.columnId, parentId: board.storyId, title: 'Bloqueada' });
+    syncStore(board.router);
+    patchCard(running, { status: 'running', statusAt: Date.now() });
+    patchCard(blocked, { status: 'blocked', statusReason: 'Falta algo', statusAt: Date.now() });
+    const { container } = openStory();
+    const leds = Array.from(container.querySelectorAll('.children li .ai-led'));
+    expect(leds.map((l) => l.className)).toEqual(['ai-led off', 'ai-led working', 'ai-led error']);
   });
 
   it('sem branch, "Criar branch da história" envia card.workspace.prepare', async () => {

@@ -1,9 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Card } from '../../../shared/model';
+import { cardRef, type Card } from '../../../shared/model';
 import { branchName, slug } from '../../../shared/git';
 import { columnOf, isLive } from '../../../shared/selectors';
-import { isPullRequestUrl, lastAiColumn, stackBaseOf, storyOf } from '../../../shared/story';
+import { isPullRequestUrl, lastAiColumn, stackBaseChoice, storyOf } from '../../../shared/story';
 import { now } from '../../db/ids';
 import { prepareWorkspace } from '../../git';
 import type { BoardContext, HandlerMap } from './context';
@@ -54,17 +54,28 @@ function prepareStoryWorkspace(ctx: BoardContext, cardId: string): void {
   const worktreePath =
     story.worktreePath || path.join(worktreeRoot(ctx) ?? projectDir, `${story.number}-${slug(story.title) || 'historia'}`);
   // história em modo autônomo parte da branch da anterior; a base escolhida na primeira vez vale daí em diante
+  const choice = story.branch ? undefined : stackBaseChoice(s, story);
   const ws = prepareWorkspace({
     projectDir,
     mode: git.mode,
     branch,
     worktreePath,
-    base: story.branch ? story.baseBranch : (stackBaseOf(s, story)?.branch ?? ''),
+    base: story.branch ? story.baseBranch : (choice?.base?.branch ?? ''),
   });
   ctx.cards.setWorkspace(story.id, ws.branch, ws.path);
   if (!story.branch) {
     ctx.cards.setBaseBranch(story.id, ws.base);
     ctx.cards.setBranchCreatedAt(story.id, now());
+  }
+  // candidata bloqueada sem pull request não serve de base: registra na conversa quem foi pulada
+  if (choice && choice.skipped.length > 0) {
+    const refs = choice.skipped.map(cardRef).join(', ');
+    const plural = choice.skipped.length > 1;
+    const origem = ws.base ? `a partir de ${ws.base}` : 'da branch principal';
+    const texto = plural
+      ? `Branch criada ${origem}: ${refs} estão bloqueadas sem pull request e foram puladas na pilha.`
+      : `Branch criada ${origem}: ${refs} está bloqueada sem pull request e foi pulada na pilha.`;
+    ctx.comments.add(story.id, 'Faz AI', texto, 'ai');
   }
 }
 

@@ -22,6 +22,8 @@ export interface RunnerConfig {
   parallel: boolean;
   /** com `parallel` ligado, quantas histórias ao mesmo tempo (no mínimo duas) */
   parallelStories: number;
+  /** a pessoa pausou o autopiloto; vale até retomar, mesmo depois de reabrir o editor */
+  autopilotPaused: boolean;
 }
 
 export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint: string }[] = [
@@ -52,6 +54,7 @@ export const DEFAULT_RUNNER: RunnerConfig = {
   heartbeatMinutes: 60,
   parallel: false,
   parallelStories: 2,
+  autopilotPaused: false,
 };
 
 /**
@@ -74,6 +77,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
   const interval = Math.round(Number(raw.heartbeatMinutes));
   const parallel = Math.round(Number(raw.parallelStories));
   return {
+    autopilotPaused: raw.autopilotPaused === true,
     heartbeat: raw.heartbeat === true,
     heartbeatMinutes:
       Number.isFinite(interval) && interval > 0

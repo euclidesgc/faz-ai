@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDelivered, lastAiColumn, stackBaseOf } from '../src/shared/story';
+import { isDelivered, lastAiColumn, stackBaseChoice, stackBaseOf } from '../src/shared/story';
 import { boardState, card, column } from './fakes/board';
 
 describe('stackBaseOf', () => {
@@ -57,6 +57,81 @@ describe('stackBaseOf', () => {
     });
 
     expect(stackBaseOf(s, s.cards[1]!)).toBeUndefined();
+  });
+});
+
+describe('stackBaseChoice', () => {
+  it('ignora a mais recente bloqueada sem pull request, escolhe a anterior e devolve a bloqueada em skipped', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100' }),
+        card('h11', {
+          number: 11,
+          yolo: true,
+          branch: 'b11',
+          branchCreatedAt: '200',
+          status: 'blocked',
+          prUrl: '',
+        }),
+        card('h12', { number: 12, yolo: true }),
+      ],
+    });
+
+    const { base, skipped } = stackBaseChoice(s, s.cards[2]!);
+
+    expect(base?.id).toBe('h10');
+    expect(skipped.map((c) => c.id)).toEqual(['h11']);
+  });
+
+  it('bloqueada com pull request aberto continua valendo como base e skipped fica vazio', () => {
+    const s = boardState({
+      cards: [
+        card('h10', {
+          number: 10,
+          yolo: true,
+          branch: 'b10',
+          branchCreatedAt: '100',
+          status: 'blocked',
+          prUrl: 'https://example.com/pr/1',
+        }),
+        card('h11', { number: 11, yolo: true }),
+      ],
+    });
+
+    const { base, skipped } = stackBaseChoice(s, s.cards[1]!);
+
+    expect(base?.id).toBe('h10');
+    expect(skipped).toEqual([]);
+  });
+
+  it('todas bloqueadas sem pull request: base undefined e todas em skipped', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100', status: 'blocked', prUrl: '' }),
+        card('h11', { number: 11, yolo: true, branch: 'b11', branchCreatedAt: '200', status: 'blocked', prUrl: '' }),
+        card('h12', { number: 12, yolo: true }),
+      ],
+    });
+
+    const { base, skipped } = stackBaseChoice(s, s.cards[2]!);
+
+    expect(base).toBeUndefined();
+    expect(skipped.map((c) => c.id).sort()).toEqual(['h10', 'h11']);
+  });
+
+  it('bloqueada mais antiga que a base escolhida não entra em skipped', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100', status: 'blocked', prUrl: '' }),
+        card('h11', { number: 11, yolo: true, branch: 'b11', branchCreatedAt: '200' }),
+        card('h12', { number: 12, yolo: true }),
+      ],
+    });
+
+    const { base, skipped } = stackBaseChoice(s, s.cards[2]!);
+
+    expect(base?.id).toBe('h11');
+    expect(skipped).toEqual([]);
   });
 });
 

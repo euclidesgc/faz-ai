@@ -6,6 +6,18 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Correção: o modo autônomo não fazia os cards andarem sozinhos e a fila travava num card
+  bloqueado (#220).** Ao abrir o editor, o autopiloto liga sozinho quando há história pendente em
+  modo autônomo, a não ser que a pessoa tenha pausado: a pausa fica gravada no board, sobrevive a
+  reabrir o editor, e "Retomar" a limpa; fechar o editor não conta como pausa, mas "Parar as
+  execuções da IA e o modo autônomo" conta, e depois de uma falha ao iniciar a ferramenta o
+  autopiloto não religa sozinho até a pessoa retomar. A fila passa a pular a história bloqueada ou
+  esperando uma pessoa (resposta ou revisão) e segue para a próxima, só esperando quando todas as
+  pendentes estão com a pessoa; continua uma história por vez, com a história destravada voltando
+  para a posição que ocupa no board, e o disjuntor de 3 execuções sem progresso agora libera a fila
+  em vez de travá-la. A branch de uma história nova não parte mais de uma história bloqueada sem
+  pull request; a conversa da história registra a base escolhida e quem foi pulada. A lista de
+  sub-tarefas no painel da história passa a mostrar o LED de atividade de cada uma.
 - **Login vencido: aviso de erro no board, em vez de parar sem explicação.** O login da ferramenta
   passa a ser conferido de verdade para o Claude Code (`claude auth status`) e, de forma best-effort,
   para o Codex, além do Cursor já existente; antes de cada chamada da IA (botão do card, heartbeat,

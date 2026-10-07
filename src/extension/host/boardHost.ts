@@ -589,7 +589,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     async dispose() {
       clearInterval(requirementsTimer);
       if (enableTimer) clearInterval(enableTimer);
-      autopilot.pause();
+      autopilot.stop(); // fechar o editor não é uma pausa da pessoa: na reabertura a fila retoma
       heartbeat.stop();
       runner.dispose();
       chat.dispose();

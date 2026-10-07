@@ -175,6 +175,45 @@ describe('branch e worktree por história', () => {
     expect(() => git(repo, 'merge-base', '--is-ancestor', 'main', outside.branch)).not.toThrow();
   });
 
+  it('pular uma bloqueada sem PR registra na conversa a base escolhida e quem foi pulada', async () => {
+    const yolo = (n: number) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled: true });
+    await call('create_card', { title: 'Base', column: 'Implementação' });
+    await call('create_card', { title: 'Bloqueada', column: 'Implementação' });
+    await call('create_card', { title: 'Terceira', column: 'Implementação' });
+    yolo(1);
+    yolo(2);
+    yolo(3);
+
+    const first = (await call('prepare_workspace', { card: 1 })).data;
+    await call('prepare_workspace', { card: 2 });
+    // a segunda fica bloqueada sem pull request: não serve de base, e é pulada
+    router.handle({ type: 'card.status.set', cardId: card(2).id, status: 'blocked', note: 'esperando acesso' });
+
+    const third = (await call('prepare_workspace', { card: 3 })).data;
+    expect(third.baseBranch).toBe(first.branch);
+
+    const comments = router.snapshot().comments.filter((c) => c.cardId === card(3).id && c.source === 'ai');
+    expect(comments).toHaveLength(1);
+    expect(comments[0]).toMatchObject({
+      source: 'ai',
+      body: `Branch criada a partir de ${first.branch}: #2 está bloqueada sem pull request e foi pulada na pilha.`,
+    });
+  });
+
+  it('sem história pulada não registra nada na conversa', async () => {
+    const yolo = (n: number) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled: true });
+    await call('create_card', { title: 'Base', column: 'Implementação' });
+    await call('create_card', { title: 'Segunda', column: 'Implementação' });
+    yolo(1);
+    yolo(2);
+
+    await call('prepare_workspace', { card: 1 });
+    await call('prepare_workspace', { card: 2 });
+
+    expect(router.snapshot().comments.filter((c) => c.cardId === card(2).id && c.source === 'ai')).toHaveLength(0);
+    expect(router.snapshot().comments.filter((c) => c.cardId === card(1).id && c.source === 'ai')).toHaveLength(0);
+  });
+
   it('modo branch cria a branch sem trocar a atual; desligado recusa', async () => {
     await call('create_card', { title: 'Corrigir crash', type: 'Bug', column: 'Implementação' });
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch', branchPattern: 'fix/{numero}-{titulo}' } } });

@@ -12,6 +12,7 @@ import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { executionPlan } from '../src/extension/execution';
 import { monthOf, type RunReport } from '../src/shared/log';
+import { parseRunner } from '../src/shared/runner';
 import type { Database } from 'sql.js';
 
 it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
@@ -557,6 +558,7 @@ describe('executor da IA', () => {
       heartbeatMinutes: 60,
       parallel: false,
       parallelStories: 2,
+      autopilotPaused: false,
     });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'edits', timeoutMinutes: 999 } } });
     expect(router.snapshot().board.runner).toMatchObject({ permission: 'edits', timeoutMinutes: 240 });
@@ -936,6 +938,18 @@ describe('log das execuções de IA', () => {
       expect(line).toContain('não produz saída estruturada');
       expect(line).not.toMatch(/normalmente|rodou/);
     });
+  });
+});
+
+describe('parseRunner', () => {
+  it('autopilotPaused ausente ou inválido vira false', () => {
+    expect(parseRunner(null).autopilotPaused).toBe(false);
+    expect(parseRunner('{}').autopilotPaused).toBe(false);
+    expect(parseRunner(JSON.stringify({ autopilotPaused: 'sim' })).autopilotPaused).toBe(false);
+  });
+
+  it('autopilotPaused: true é lido', () => {
+    expect(parseRunner(JSON.stringify({ autopilotPaused: true })).autopilotPaused).toBe(true);
   });
 });
 
