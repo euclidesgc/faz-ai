@@ -112,6 +112,7 @@ export class MessageRouter {
   private requirements: BoardRequirement[] = [];
   private requirementsCheckedAt = 0;
   private requirementsCheck: (() => void) | null = null;
+  private authExpired: AiTool | null = null;
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
   private environmentHooks: EnvironmentHooks | null = null;
@@ -155,6 +156,7 @@ export class MessageRouter {
       aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission),
       requirements: this.requirements,
       requirementsCheckedAt: this.requirementsCheckedAt,
+      authExpired: this.authExpired,
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
       environmentInstall: this.environmentInstall,
@@ -213,6 +215,18 @@ export class MessageRouter {
 
   recheckRequirements(): void {
     this.requirementsCheck?.();
+  }
+
+  /**
+   * A ferramenta de IA falhou por login vencido nesta execução (RF6), ou o probe confirmou que voltou;
+   * null quando não há aviso reativo ativo. Devolve se mudou, para quem chama decidir se loga a transição
+   * (o log não é responsabilidade do `MessageRouter`, como nas outras operações).
+   */
+  setAuthExpired(tool: AiTool | null): boolean {
+    if (this.authExpired === tool) return false;
+    this.authExpired = tool;
+    this.notify();
+    return true;
   }
 
   /** O resultado do Diagnóstico do ambiente (informado pelo host, que confere). */

@@ -2,6 +2,7 @@ import type { AiRunOrigin } from '../shared/log';
 import { cardRef, type BoardState, type Card, type Column } from '../shared/model';
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
+import { blocksExecution } from '../shared/requirements';
 import { parallelLimit, type AiRunMode } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { statusInfo } from '../shared/status';
@@ -222,6 +223,8 @@ export class Autopilot {
           );
           continue;
         }
+        // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
+        if (step.kind === 'run' && blocksExecution(this.router.snapshot())) return;
         // o limite conta toda execução em andamento (heartbeat, chamadas à mão): o autopiloto usa uma vaga livre
         if (step.kind === 'run' && this.runner.running.length < this.limit()) this.start(step.story);
         return;

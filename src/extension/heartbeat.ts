@@ -2,6 +2,7 @@ import type { AiRunOrigin } from '../shared/log';
 import { cardRef, type BoardState, type Card } from '../shared/model';
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
+import { blocksExecution } from '../shared/requirements';
 import { childrenOf, isAiWorking, isLive } from '../shared/selectors';
 import { statusInfo } from '../shared/status';
 import { parallelLimit } from '../shared/runner';
@@ -137,6 +138,11 @@ export class Heartbeat {
    */
   private pump(): void {
     const s = this.deps.snapshot();
+    // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
+    if (blocksExecution(s)) {
+      this.queue = [];
+      return void this.changed();
+    }
     const reserved = this.yieldToAutopilot && s.autopilot.active && autopilotStep(s).kind === 'run' ? 1 : 0;
     const limit = parallelLimit(s.board.runner, s.board.git.mode) - reserved;
     while (this.queue.length && this.runner.running.length < limit) {

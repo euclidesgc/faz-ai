@@ -64,6 +64,6 @@ export interface BoardRequirement {
 }
 
 /** Sem login a execução pelo board nem começa: usado pelos 4 gatilhos (manual, Refinar com IA, heartbeat, autopiloto). */
-export function blocksExecution(state: { requirements: BoardRequirement[] }): boolean {
-  return state.requirements.some((r) => r.id === 'signin');
+export function blocksExecution(state: { requirements: BoardRequirement[]; authExpired: AiTool | null }): boolean {
+  return state.requirements.some((r) => r.id === 'signin') || state.authExpired !== null;
 }

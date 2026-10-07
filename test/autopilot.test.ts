@@ -374,6 +374,23 @@ describe('autopiloto', () => {
     expect(router.snapshot().autopilot).toEqual({ active: false, note: 'O Claude Code não está instalado.' });
   });
 
+  it('com o login vencido (preventivo ou reativo), não inicia a história e fica à espera, sem desligar', () => {
+    create('A', 'Backlog');
+    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+    yolo(1);
+    expect(runner.started).toEqual([]);
+    expect(autopilot.isActive).toBe(true); // diferente de uma falha real: não desliga, só espera
+
+    router.setRequirements([]);
+    router.setAuthExpired('claude');
+    flush();
+    expect(runner.started).toEqual([]);
+
+    router.setAuthExpired(null);
+    flush();
+    expect(runner.started).toEqual([card(1).id]);
+  });
+
   it('um "Em execução" sem execução de verdade volta para a IA', () => {
     create('A', 'PRD');
     status(1, 'running'); // a sessão caiu sem avisar

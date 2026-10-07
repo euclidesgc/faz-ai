@@ -318,6 +318,41 @@ describe('executor da IA', () => {
     });
   });
 
+  it('falha de autenticação não bloqueia o card: ele volta ao status anterior, avisa na conversa e liga o sinal reativo', () => {
+    const before = card().status;
+    runner.start(storyId);
+    procs[0]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[0]!.exit(1);
+    expect(card().status).toBe(before);
+    expect(card().status).not.toBe('blocked');
+    expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+    expect(lastMessage()!.body).toContain('login do Claude Code venceu');
+    expect(router.snapshot().authExpired).toBe('claude');
+    expect(log.some((l) => l.includes('Login do Claude Code vencido'))).toBe(true);
+
+    // uma segunda falha igual, com o sinal já ligado, não duplica o log de suspensão
+    const logCountBefore = log.filter((l) => l.includes('Login do Claude Code vencido')).length;
+    runner.start(storyId);
+    procs[1]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[1]!.exit(1);
+    expect(log.filter((l) => l.includes('Login do Claude Code vencido')).length).toBe(logCountBefore);
+
+    // uma execução que termina sem falha de autenticação limpa o sinal e avisa a retomada
+    runner.start(storyId);
+    ai({ type: 'comment.add', cardId: storyId, body: 'Entendi. Qual o provedor de login?' });
+    procs[2]!.exit(0);
+    expect(router.snapshot().authExpired).toBeNull();
+    expect(log.some((l) => l.includes('Login do Claude Code de volta'))).toBe(true);
+  });
+
+  it('falha sem nenhum padrão de autenticação continua bloqueando o card como antes (regressão)', () => {
+    runner.start(storyId);
+    procs[0]!.emit('algum outro erro qualquer\n', 'stderr');
+    procs[0]!.exit(1);
+    expect(card().status).toBe('blocked');
+    expect(router.snapshot().authExpired).toBeNull();
+  });
+
   it('falha, saída sem resposta e tempo limite bloqueiam o card com o motivo na conversa', () => {
     runner.start(storyId);
     procs[0]!.exit(2);

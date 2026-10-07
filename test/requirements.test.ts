@@ -257,14 +257,18 @@ describe('blocksExecution', () => {
   const req = (id: BoardRequirement['id']): BoardRequirement => ({ id, tool: 'claude', action: null });
 
   it('bloqueia quando falta login', () => {
-    expect(blocksExecution({ requirements: [req('signin')] })).toBe(true);
+    expect(blocksExecution({ requirements: [req('signin')], authExpired: null })).toBe(true);
   });
 
   it('não bloqueia por outro requisito que falte (CLI, MCP…)', () => {
-    expect(blocksExecution({ requirements: [req('cli'), req('mcp')] })).toBe(false);
+    expect(blocksExecution({ requirements: [req('cli'), req('mcp')], authExpired: null })).toBe(false);
   });
 
-  it('sem nenhum requisito pendente, não bloqueia', () => {
-    expect(blocksExecution({ requirements: [] })).toBe(false);
+  it('sem nenhum requisito pendente nem sinal reativo, não bloqueia', () => {
+    expect(blocksExecution({ requirements: [], authExpired: null })).toBe(false);
+  });
+
+  it('bloqueia pelo sinal reativo mesmo sem "signin" nos requisitos (Kimi/Copilot, sem probe)', () => {
+    expect(blocksExecution({ requirements: [], authExpired: 'kimi' })).toBe(true);
   });
 });
