@@ -759,6 +759,31 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Aparência | **Idioma** (automático, Português (Brasil) ou English), tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
 | Backup | Exportar o board num arquivo e importar um arquivo no lugar do board atual (ver [Backup do board](#backup-do-board)) |
 
+### Configurações no Settings do editor
+
+Em `Ctrl+,` (Settings do VS Code ou do Cursor), buscar **Faz AI** mostra a categoria do Faz AI, com
+quatro seções, nesta ordem:
+
+| Seção | O que tem hoje |
+| --- | --- |
+| Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
+| Aparência | **Idioma** (`fazai.appearance.language`: automático, Português (Brasil) ou English). As outras opções chegam nas próximas versões; até lá, um link leva à aba Aparência do board |
+| Git | Aviso de que as opções chegam nas próximas versões, com link para a aba Git do board |
+| Backup | Aviso de que exportar e importar viram comandos do editor nas próximas versões, com link para a aba Backup do board |
+
+Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,
+**Faz AI: Abrir as configurações do Faz AI no Settings** (o Settings já filtrado no Faz AI) e
+**Faz AI: Abrir as configurações do board** (a tela de Configurações do board). Em Configurações do
+board, o botão **Abrir no Settings do editor** faz o caminho de volta; no modo navegador
+(`faz-ai` no terminal) ele não aparece, porque não há editor.
+
+Quem manda: dentro do editor, o Settings é a fonte e o banco do board (SQLite) é a cópia, mantida
+igual a cada mudança, para o modo navegador e o servidor MCP continuarem enxergando o mesmo valor;
+fora do editor, o SQLite é a única fonte, e uma gravação feita por ali (pelo MCP ou pelo navegador)
+é levada ao Settings do Usuário quando o editor está aberto. Na primeira abertura, um board com idioma
+diferente do padrão (`auto`) grava esse idioma no Settings do Usuário, para o Settings vazio não zerar
+o board; se o Settings já tem um valor explícito, ele vence.
+
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração
 local; no Cursor, dos modelos da sua conta, pelo comando `cursor-agent models`, lido ao abrir o board
 com a CLI autenticada, e a primeira lista lida substitui a embutida uma vez só; nas outras, uma lista embutida que pode ser editada); os preços que você
