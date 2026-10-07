@@ -870,6 +870,26 @@ To try the interface without the editor, `node dist/cli.js <folder> --data <test
 serves the board in the browser. The tests cover the extension's activation (with a fake editor in
 `test/fakes/vscode.ts`) and the page server (`test/webServer.test.ts`).
 
+### End-to-end test on a freshly installed machine (Cursor)
+
+`npm run e2e:cursor` opens Cursor inside a Docker container with a clean Ubuntu 24.04: no Node, git,
+gh, uv, Code Review Graph or Cursor CLI. It is the computer's own Cursor, mounted read-only and
+without any of your settings, and it comes with the extension packaged from the current branch, in
+the `meu-app` test project. The window opens on your screen, and links (sign-in, **Learn more**)
+open in the computer's browser. Use it to see the environment check and each item's installation as
+on a new machine. Inside it, the `dev` user has passwordless `sudo`. Sign-ins are yours, done by
+you.
+
+| Command | What it does |
+|---|---|
+| `npm run e2e:cursor` | from scratch: a new container, with the extension from the current branch |
+| `npm run e2e:cursor -- continuar` | the same container (sign-ins and installs stay), with the updated extension |
+| `npm run e2e:cursor -- parar` | closes Cursor and stops the container |
+| `npm run e2e:cursor -- remover` | deletes the container, the image and the cache (`~/.cache/faz-ai-e2e`) |
+
+It needs Docker without `sudo`, a Wayland session and Cursor installed in `/usr/share/cursor` (`.deb`
+package). The files are in `scripts/e2e-cursor/`.
+
 ### Setting up the development environment
 
 The repository has all the code, but a few items live outside git. On a fresh clone (another

@@ -833,6 +833,26 @@ Para testar a interface sem o editor, `node dist/cli.js <pasta> --data <pasta de
 serve o board no navegador. Os testes cobrem a ativação da extensão (com um editor de mentira em
 `test/fakes/vscode.ts`) e o servidor da página (`test/webServer.test.ts`).
 
+### Teste e2e numa máquina recém-instalada (Cursor)
+
+`npm run e2e:cursor` abre o Cursor dentro de um contêiner Docker com Ubuntu 24.04 limpo: sem Node,
+git, gh, uv, Code Review Graph nem a CLI do Cursor. É o mesmo Cursor do computador, montado só para
+leitura e sem nenhuma configuração sua, e já vem com a extensão empacotada da branch atual, no
+projeto de teste `meu-app`. A janela abre na sua tela, e os links (login, **Saiba mais**) abrem no
+navegador do computador. Serve para ver o Diagnóstico do ambiente e a instalação de cada item como
+numa máquina nova. Dentro dele, o usuário `dev` tem `sudo` sem senha. Os logins são seus, feitos por
+você.
+
+| Comando | O que faz |
+|---|---|
+| `npm run e2e:cursor` | do zero: contêiner novo, com a extensão da branch atual |
+| `npm run e2e:cursor -- continuar` | o mesmo contêiner (logins e instalações ficam), com a extensão atualizada |
+| `npm run e2e:cursor -- parar` | fecha o Cursor e para o contêiner |
+| `npm run e2e:cursor -- remover` | apaga o contêiner, a imagem e o cache (`~/.cache/faz-ai-e2e`) |
+
+Precisa de Docker sem `sudo`, de uma sessão Wayland e do Cursor instalado em `/usr/share/cursor`
+(pacote `.deb`). Os arquivos ficam em `scripts/e2e-cursor/`.
+
 ### Preparar o ambiente de desenvolvimento
 
 O repositório tem todo o código, mas alguns itens ficam fora do git. Num clone novo (outra máquina,
