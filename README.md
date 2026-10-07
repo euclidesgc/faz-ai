@@ -159,7 +159,7 @@ Cada card tem uma barra na cor do tipo, com o ID, o tipo e os botões de abrir e
 vêm o título (inteiro no tooltip, se não couber), o status com um ícone de com quem está a
 pendência (robô para a IA, pessoa para você) e há quanto tempo ele está assim, os campos, o modelo
 de IA (ex.: "Sonnet 5.5 - baixo") e, no rodapé, os contadores, a branch e o PR. Cards com
-pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do card de relance: verde piscando devagar enquanto a IA trabalha nele (na história, também quando ela trabalha numa sub-tarefa), amarelo quando ele espera por você, vermelho quando está bloqueado e apagado quando não há nada acontecendo.
+pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do card de relance: verde piscando devagar enquanto a IA trabalha nele (na história, também quando ela trabalha numa sub-tarefa), amarelo quando ele espera por você, vermelho quando está bloqueado e apagado quando não há nada acontecendo. Na história, a lista de sub-tarefas mostra o mesmo LED em cada uma: verde piscando em execução, vermelho bloqueada, amarelo esperando a pessoa e apagado parada.
 
 ### Vínculos entre cards
 
@@ -635,26 +635,37 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
 - **Em fila e em pilha**: o **autopiloto** toca as histórias em modo autônomo uma de cada vez, na
   ordem do board — bugs na frente, depois de cima para baixo —, e segue para a próxima história da
   fila assim que a atual é entregue (parada na última coluna da IA, com o pull request registrado),
-  sem esperar a sua revisão nem o intervalo do heartbeat. A branch de cada história parte da branch
-  criada mais recentemente entre as outras histórias do modo autônomo ainda abertas — a mesma ordem em
+  sem esperar a sua revisão nem o intervalo do heartbeat. A fila pula a história bloqueada ou que
+  está esperando uma pessoa (resposta ou revisão) e segue para a próxima; só espera quando todas as
+  pendentes estão com a pessoa, e a nota do botão traz o motivo de cada uma. A branch de cada
+  história parte da branch criada mais recentemente entre as outras histórias do modo autônomo
+  ainda abertas — pulando a que estiver bloqueada sem pull request aberto —, na mesma ordem em
   que a fila roda, mesmo depois de arrastar cards —, e o pull request é aberto com `--base` nela,
   formando uma pilha de PRs; sem nenhuma outra história aberta antes dela, a branch parte da principal.
   Uma história cuja anterior na pilha já teve o pull request mesclado também parte da principal, já que
-  o código dela já está lá.
+  o código dela já está lá. A conversa da história registra a base escolhida e quem foi pulada; se a
+  pulada for entregue depois, o pull request seguinte pode precisar de rebase pela sua mão — a
+  pilha vira árvore nesse ponto.
 - **Dividir um pedido grande**: a IA pode criar as histórias seguintes a partir de uma história em
   modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo, entram na fila
   e ganham um vínculo **relativo** com a história de origem (pulado em silêncio se já existir
   qualquer vínculo entre as duas). Ela nunca liga o modo numa história que você não ligou.
-- **Freios**: o autopiloto para quando a IA bloqueia o card ou quando uma execução falha (o card
-  fica Bloqueado, com o motivo) e bloqueia a história depois de 3 execuções seguidas que não
-  avançaram nada. Ao destravar o card, ele continua sozinho.
+- **Freios**: o autopiloto continua **uma história por vez**: a história destravada volta para a
+  posição que ocupa no board e espera a que estiver em execução terminar. Uma execução que falha
+  deixa o card Bloqueado, com o motivo, e o disjuntor bloqueia a história depois de 3 execuções
+  seguidas sem avanço; bloquear uma história libera a fila para seguir com a próxima, em vez de
+  travá-la — histórias que emperram podem gastar até 3 execuções cada, em todas da fila. Ao
+  destravar o card, ele continua sozinho.
 
 O **botão do modo autônomo** no topo do board aparece enquanto houver história na fila e diz o que
 o clique faz: **Pausar modo autônomo** (aceso, com o autopiloto tocando; pausar interrompe a IA) ou
 **Retomar modo autônomo** (apagado, pausado). Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
 (YOLO)** e **Faz AI: Parar as execuções da IA e o modo autônomo**. Ao abrir o editor, o autopiloto
-não começa sozinho: ele liga quando você ativa o modo numa história ou retoma. O heartbeat não
-toca histórias em modo autônomo; elas são do autopiloto.
+liga sozinho quando há história pendente em modo autônomo, a não ser que você tenha pausado: a
+pausa fica gravada no board (sobrevive a reabrir o editor), e "Retomar" a limpa; fechar o editor não
+conta como pausa, mas "Faz AI: Parar as execuções da IA e o modo autônomo" conta. Depois de uma
+falha ao iniciar a ferramenta de IA, o autopiloto não religa sozinho até você retomar. O heartbeat
+não toca histórias em modo autônomo; elas são do autopiloto.
 
 
 ### Agentes

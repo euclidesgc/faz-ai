@@ -7,6 +7,19 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Fix: autonomous mode did not keep cards moving by themselves, and the queue got stuck on a
+  blocked card (#220).** When the editor opens, the autopilot now starts by itself whenever there
+  is a pending autonomous-mode story, unless the person paused it: the pause is recorded on the
+  board, survives reopening the editor, and "Retomar" (resume) clears it; closing the editor does
+  not count as a pause, but "Parar as execuções da IA e o modo autônomo" (stop AI runs and
+  autonomous mode) does, and after a failure to start the tool the autopilot no longer starts
+  itself again until the person resumes. The queue now skips a story that is blocked or waiting on
+  a person (an answer or a review) and moves on to the next one, only waiting when every pending
+  story is with a person; it still keeps to one story at a time, with an unblocked story going back
+  to its position on the board, and the circuit breaker for 3 runs with no progress now frees the
+  queue instead of locking it up. A new story's branch no longer starts from a story that is
+  blocked with no pull request; the story's conversation records the chosen base and which story
+  was skipped. The sub-task list in the story panel now shows each sub-task's activity LED.
 - **Expired tool login: an error warning on the board, instead of stopping without explanation.**
   The tool's sign-in is now actually checked for Claude Code (`claude auth status`) and, best-effort,
   for Codex, in addition to the existing Cursor check; before every AI call (the card's button, the

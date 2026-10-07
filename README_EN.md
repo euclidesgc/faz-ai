@@ -171,7 +171,7 @@ Below it come the title (in full in the tooltip when it doesn't fit), the status
 who the next step is waiting on (a robot for the AI, a person for you) and how long it has been
 like that, the fields, the AI model (e.g. "Sonnet 5.5 - baixo", with the effort in Portuguese) and,
 in the footer, the counters, the branch and the PR. Cards waiting on you get a border in the
-status color, and the LED on the bar tells the card's state at a glance: green and blinking slowly while the AI is working on it (on a story, also when it works on one of its sub-tasks), yellow when it is waiting on you, red when it is blocked, and off when nothing is happening.
+status color, and the LED on the bar tells the card's state at a glance: green and blinking slowly while the AI is working on it (on a story, also when it works on one of its sub-tasks), yellow when it is waiting on you, red when it is blocked, and off when nothing is happening. On a story, the sub-task list shows the same LED on each one: green and blinking while running, red when blocked, yellow when waiting on you, and off when stopped.
 
 ### Links between cards
 
@@ -661,26 +661,38 @@ story by itself, **without asking for authorization or confirmation on anything*
 - **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in board
   order — bugs first, then top to bottom — and moves on to the next story in the queue as soon as
   the current one is delivered (stopped at the AI's last column, with the pull request recorded),
-  without waiting for your review or the heartbeat interval. Each story's branch starts from the
-  most recently created branch among the other autonomous-mode stories still open — the same order
-  the queue runs in, even after dragging cards — and its pull request is opened with `--base` on it,
-  forming a stack of PRs; with no other open story ahead of it, the branch starts from the main
+  without waiting for your review or the heartbeat interval. The queue skips a story that is
+  blocked or waiting on a person (an answer or a review) and moves on to the next; it only waits
+  when every pending story is with a person, and the button's note gives the reason for each one.
+  Each story's branch starts from the most recently created branch among the other autonomous-mode
+  stories still open — skipping one that is blocked with no pull request open — in the same order
+  the queue runs in, even after dragging cards — and its pull request is opened with `--base` on
+  it, forming a stack of PRs; with no other open story ahead of it, the branch starts from the main
   branch. A story whose predecessor in the stack already had its pull request merged also starts
-  from the main branch, since its code is already there.
+  from the main branch, since its code is already there. The story's conversation records the base
+  it picked and which story was skipped; if the skipped story is delivered later, the next pull
+  request may need a rebase by your hand — the stack turns into a tree at that point.
 - **Splitting a large request**: the AI can create the following stories from an autonomous story
   (`create_card` with `autonomous_from`). They are born autonomous, join the queue, and get a
   **related** link to the origin story (skipped silently if any link already exists between the
   two). It never turns the mode on for a story you did not turn on.
-- **Brakes**: the autopilot stops when the AI blocks the card or when a run fails (the card is
-  Bloqueado, with the reason), and blocks the story after 3 consecutive runs that advanced nothing.
-  Once you unblock the card it carries on by itself.
+- **Brakes**: the autopilot keeps to **one story at a time**: an unblocked story goes back to its
+  position on the board and waits for the one currently running to finish. A run that fails leaves
+  the card Bloqueado, with the reason, and the circuit breaker blocks the story after 3 consecutive
+  runs with no progress; blocking a story frees the queue to move on to the next one, instead of
+  locking it up — a story that keeps getting stuck can spend up to 3 runs each, across the whole
+  queue. Once you unblock the card it carries on by itself.
 
 The **autonomous mode button** at the top of the board shows while there is a story in the queue
 and says what the click does: **Pausar modo autônomo** (pause; lit, with the autopilot driving;
 pausing interrupts the AI) or **Retomar modo autônomo** (resume; dimmed, paused). From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
 autônomo (YOLO)** and **Faz AI: Parar as execuções da IA e o modo autônomo**. When the editor
-opens the autopilot does not start by itself: it starts when you turn the mode on for a story or
-resume. The heartbeat does not drive autonomous stories; they belong to the autopilot.
+opens, the autopilot starts by itself whenever there is a pending autonomous-mode story, unless
+you paused it: the pause is recorded on the board (it survives reopening the editor), and
+"Retomar" clears it; closing the editor does not count as a pause, but "Faz AI: Parar as execuções
+da IA e o modo autônomo" does. After a failure to start the AI tool, the autopilot does not start
+itself again until you resume it. The heartbeat does not drive autonomous stories; they belong to
+the autopilot.
 
 
 ### Agents
