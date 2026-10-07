@@ -649,7 +649,9 @@ story by itself, **without asking for authorization or confirmation on anything*
 - **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in board
   order — bugs first, then top to bottom — and moves on to the next story in the queue as soon as
   the current one is delivered (stopped at the AI's last column, with the pull request recorded),
-  without waiting for your review or the heartbeat interval. Each story's branch starts from the
+  without waiting for your review or the heartbeat interval. A story waiting for another card
+  to finish (a dependency) does not hold the queue: the turn goes to the next story that can run,
+  usually the dependency itself, and it returns to the queue once the dependency leaves open. Each story's branch starts from the
   most recently created branch among the other autonomous-mode stories still open — the same order
   the queue runs in, even after dragging cards — and its pull request is opened with `--base` on it,
   forming a stack of PRs; with no other open story ahead of it, the branch starts from the main

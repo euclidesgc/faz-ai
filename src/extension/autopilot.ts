@@ -45,13 +45,25 @@ export type AutopilotStep =
 /**
  * Próximo passo. As histórias vão em fila, uma de cada vez e na ordem da posição do card no board
  * (bug sempre primeiro, `byExecutionOrder`): a branch de cada uma parte da anterior, então a seguinte
- * só começa quando a atual sai de aberto. Uma história com impedimento segura a fila, em vez de a
- * seguinte passar na frente.
+ * só começa quando a atual sai de aberto. Uma história com impedimento (bloqueio, espera de uma
+ * pessoa, ciclo emperrado) segura a fila, em vez de a seguinte passar na frente. Já a história que
+ * espera outro card terminar (`depends_on`) não segura: a vez passa para a próxima que pode rodar —
+ * muitas vezes a própria dependência, que está mais abaixo no board. Sem nenhuma que possa, a fila
+ * para dizendo de quem a primeira depende.
  */
 export function autopilotStep(s: BoardState): AutopilotStep {
+  let waitingDependency: AutopilotStep | undefined;
   // uma história entregue já passou para a pessoa: não segura a fila, a próxima assume
-  const story = yoloStories(s).find((c) => !isDelivered(s, c));
-  if (!story) return { kind: 'idle' };
+  for (const story of yoloStories(s).filter((c) => !isDelivered(s, c))) {
+    const step = storyStep(s, story);
+    if (step.kind !== 'paused' || !step.dependency) return step;
+    waitingDependency ??= step;
+  }
+  return waitingDependency ?? { kind: 'idle' };
+}
+
+/** O passo de uma história, olhando só para ela; `dependency` marca a pausa por outro card em aberto. */
+function storyStep(s: BoardState, story: Card): AutopilotStep & { dependency?: true } {
   const column = columnOf(s, story)!;
   if (isAiWorking(s, story) || childrenOf(s, story.id).some((c) => isAiWorking(s, c))) return { kind: 'wait', story };
 
@@ -76,7 +88,8 @@ export function autopilotStep(s: BoardState): AutopilotStep {
       [story, ...childrenOf(s, story.id).filter(isLive)].flatMap((c) => openPredecessors(s, c.id)).filter((p) => p.parentId !== story.id),
     ),
   ];
-  if (blockers.length) return { kind: 'paused', story, reason: `${cardRef(story)} espera ${blockers.map(cardRef).join(', ')} terminar.` };
+  if (blockers.length)
+    return { kind: 'paused', story, reason: `${cardRef(story)} espera ${blockers.map(cardRef).join(', ')} terminar.`, dependency: true };
   // nada com a IA e a história continua aberta: o ciclo emperrou
   return { kind: 'paused', story, reason: `${cardRef(story)} não tem nada pendente com a IA, mas ainda não foi concluído.` };
 }
@@ -281,9 +294,10 @@ export class Autopilot {
   /** Um "Em execução" sem execução de verdade (a sessão caiu): volta para a IA tentar de novo. */
   private recoverStale(): void {
     const s = this.router.snapshot();
-    // entregue não tem execução a recuperar: é a mesma primeira história não entregue do autopilotStep
-    const story = yoloStories(s).find((c) => !isDelivered(s, c));
-    if (!story) return;
+    // entregue não tem execução a recuperar; e a história parada por dependência não é a da vez
+    const step = autopilotStep(s);
+    if (step.kind === 'idle') return;
+    const story = step.story;
     const cards = [story, ...childrenOf(s, story.id).filter(isLive)];
     // só as execuções desta história contam: as do heartbeat em outras histórias não a seguram
     if (cards.some((c) => this.runner.running.includes(c.id))) return;

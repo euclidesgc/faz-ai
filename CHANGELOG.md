@@ -18,6 +18,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   autopiloto retoma a fila pendente e registra isso no log. A pausa continua sua: o que você pausou,
   ou o que parou por falha ao iniciar a ferramenta, só volta quando você retomar; uma fila só de
   histórias entregues não o religa.
+- **Correção: uma história que esperava dependência parava toda a fila do modo autônomo.** A
+  primeira história da fila (ordem do board) que dependia de outra ainda aberta segurava o
+  autopiloto com "espera #N terminar", mesmo com a própria #N pronta mais abaixo. Agora a história que
+  espera dependência é pulada e a vez passa para a próxima que pode rodar; só quando nenhuma pode a
+  fila para, com o motivo da primeira.
 - **Roteiro "Como testar" na descrição do card e no pull request.** Na Homologação, a IA passa a
   gravar o roteiro de testes (o que foi construído, os passos com o resultado esperado e o que ficou
   de fora) na descrição da história e no corpo do PR, e não só na conversa. A instrução padrão da
