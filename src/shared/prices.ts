@@ -6,7 +6,7 @@
 // `checkedAt` passa a ser a data da conferência (ver "Preços dos modelos" no README).
 
 import type { AiTool } from './harness';
-import type { ModelPrice } from './models';
+import type { ModelOption, ModelPrice } from './models';
 
 /** Preço embutido de um modelo: os quatro números, quando foram conferidos e de onde saíram. */
 export interface BuiltinPrice extends ModelPrice {
@@ -78,4 +78,50 @@ export function priceIsStale(checkedAt: string, today: Date): boolean {
   if (!Number.isFinite(checked)) return true;
   const now = utcDay(today.getUTCFullYear(), today.getUTCMonth() + 1, today.getUTCDate());
   return now - checked > PRICE_STALE_DAYS;
+}
+
+/** De onde veio o preço gravado: sem `price` é `null`; com `price` e sem origem é manual (catálogos anteriores). */
+export function priceSourceOf(o: ModelOption): 'builtin' | 'manual' | null {
+  if (!o.price) return null;
+  return o.priceSource ?? 'manual';
+}
+
+/** O modelo com o preço da tabela embutida (origem, data e URL); sem tabela, devolve o modelo como está. */
+export function restoreBuiltinPrice(o: ModelOption): ModelOption {
+  const b = builtinPrice(o.id);
+  if (!b) return o;
+  const { input, output, cacheRead, cacheWrite, checkedAt, url } = b;
+  return { ...o, price: { input, output, cacheRead, cacheWrite }, priceSource: 'builtin', priceCheckedAt: checkedAt, priceUrl: url };
+}
+
+const sameBuiltin = (o: ModelOption, b: BuiltinPrice): boolean =>
+  o.price?.input === b.input &&
+  o.price?.output === b.output &&
+  o.price?.cacheRead === b.cacheRead &&
+  o.price?.cacheWrite === b.cacheWrite &&
+  o.priceCheckedAt === b.checkedAt &&
+  o.priceUrl === b.url;
+
+const hasFourPrices = (o: ModelOption): boolean =>
+  ['input', 'output', 'cacheRead', 'cacheWrite'].every((k) => typeof o.price?.[k as keyof ModelPrice] === 'number');
+
+/**
+ * O catálogo com a tabela embutida aplicada: quem não tem preço recebe o embutido, quem tem origem
+ * `builtin` passa para os números da tabela atual, e `manual` (explícito ou deduzido de um preço
+ * sem origem) nunca é tocado. Modelos do Copilot sem os quatro preços nascem com preço variável.
+ * Pura e idempotente: ordem preservada, nada removido, e o item que não muda sai com a mesma
+ * referência. Rodar a cada abertura do board substitui um detector de versão da extensão.
+ */
+export function applyBuiltinPrices(catalog: ModelOption[]): ModelOption[] {
+  return catalog.map((o) => {
+    const source = priceSourceOf(o);
+    if (source === null) {
+      if (builtinPrice(o.id)) return restoreBuiltinPrice(o);
+    } else if (source === 'builtin') {
+      const b = builtinPrice(o.id);
+      if (b && !sameBuiltin(o, b)) return restoreBuiltinPrice(o);
+    }
+    if (o.tool === 'copilot' && o.variablePrice === undefined && !hasFourPrices(o)) return { ...o, variablePrice: true };
+    return o;
+  });
 }

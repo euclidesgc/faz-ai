@@ -1,6 +1,7 @@
 import { norm } from './filters';
 import { AI_TOOLS, type AiTool } from './harness';
 import type { BoardState, Card, FieldDef, FieldValue, Id } from './model';
+import { builtinPrice, restoreBuiltinPrice } from './prices';
 import { valueOf } from './selectors';
 
 /** Preço do modelo em dólar por milhão de tokens. Sem preço = o board não calcula custo. */
@@ -37,6 +38,12 @@ export interface ModelOption {
    * pedido foi roteado. Ausente = vale o padrão de `hasVariablePrice` (catálogos gravados antes do campo).
    */
   variablePrice?: boolean;
+  /** de onde veio `price`; ausente com `price` presente = manual (catálogos anteriores à origem) */
+  priceSource?: 'builtin' | 'manual';
+  /** AAAA-MM-DD em que o preço embutido foi conferido na página oficial; só com `builtin` */
+  priceCheckedAt?: string;
+  /** página oficial de onde o preço embutido saiu; só com `builtin` */
+  priceUrl?: string;
 }
 
 /** Ids que nascem com preço variável quando o catálogo ainda não diz nada (o campo é posterior a eles). */
@@ -71,9 +78,12 @@ export type PricePatch = { [K in keyof ModelPrice]?: number | null };
 
 /**
  * O modelo com o preço alterado campo a campo. Campo vazio é **ausência**, não zero: o campo
- * apagado some do objeto, e sem nenhum campo o modelo fica sem a chave `price`.
+ * apagado some do objeto. Qualquer campo gravado marca a origem como `manual` (mesmo que o valor
+ * seja igual ao embutido: a pessoa afirmou o preço). Apagar todos os campos de um modelo que tem
+ * preço embutido devolve o embutido; sem embutido, o modelo fica sem `price` e sem origem.
  */
 export function withPrice(o: ModelOption, patch: PricePatch): ModelOption {
+  if (!Object.values(patch).some((v) => v !== undefined)) return o;
   const price: Partial<ModelPrice> = { ...o.price };
   for (const key of Object.keys(patch) as (keyof ModelPrice)[]) {
     const v = patch[key];
@@ -81,8 +91,9 @@ export function withPrice(o: ModelOption, patch: PricePatch): ModelOption {
     if (v === null) delete price[key];
     else price[key] = v;
   }
-  const { price: _antigo, ...rest } = o;
-  return Object.keys(price).length ? { ...rest, price } : rest;
+  const { price: _antigo, priceSource: _origem, priceCheckedAt: _data, priceUrl: _url, ...rest } = o;
+  if (Object.keys(price).length) return { ...rest, price, priceSource: 'manual' };
+  return builtinPrice(o.id) ? restoreBuiltinPrice(rest) : rest;
 }
 
 /** Campo especial usado em condições: o tipo do card. */
