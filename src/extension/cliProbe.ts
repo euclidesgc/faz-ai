@@ -47,6 +47,30 @@ export async function cursorSignedIn(executable: string, pathEnv: string | undef
   }
 }
 
+/** Se o Claude Code está autenticado (`claude auth status`, JSON com `loggedIn`); null quando não deu para saber. */
+export async function claudeSignedIn(executable: string, pathEnv: string | undefined): Promise<boolean | null> {
+  const run = await runCli(executable, ['auth', 'status'], pathEnv);
+  try {
+    const v = JSON.parse(run.stdout) as { loggedIn?: unknown };
+    return typeof v.loggedIn === 'boolean' ? v.loggedIn : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Se o Codex está autenticado (`codex login status`); null quando não deu para saber. Parser
+ * tolerante, best-effort: sem CLI do Codex disponível para confirmar o formato real da saída, só
+ * reconhece os padrões textuais mais comuns de "logado"/"não logado". Qualquer saída fora desses
+ * padrões vira `null`, nunca `false`.
+ */
+export async function codexSignedIn(executable: string, pathEnv: string | undefined): Promise<boolean | null> {
+  const run = await runCli(executable, ['login', 'status'], pathEnv);
+  if (/not\s*logged\s*in/i.test(run.stdout)) return false;
+  if (/logged\s*in/i.test(run.stdout)) return true;
+  return null;
+}
+
 /** Os modelos da conta em uso no Cursor (`cursor-agent models`); vazio sem login ou com erro. */
 export async function cursorModels(executable: string, pathEnv: string | undefined): Promise<ModelOption[]> {
   const run = await runCli(executable, ['models'], pathEnv);
