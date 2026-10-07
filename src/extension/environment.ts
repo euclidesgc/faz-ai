@@ -38,6 +38,7 @@ const FROM: Partial<Record<EnvCheckId, RequirementId[]>> = {
   signin: ['signin'],
   mcp: ['mcp', 'mcp-stale', 'mcp-elsewhere', 'mcp-outdated', 'mcp-reload', 'mcp-enable'],
   permission: ['permission'],
+  skill: ['skill'],
 };
 
 /** O nome da ferramenta no `code-review-graph install --platform` (sem nome lá, ele registra em todas as que achar). */
@@ -154,15 +155,13 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     fix: cli?.cli && p.tool === 'cursor' ? { kind: 'commands', commands: [`${cli.cli} login`] } : undefined,
   });
   const mcp = req('mcp');
-  // no Claude e no Cursor as execuções pelo board levam o servidor sozinhas: o MCP só falta nas conversas da pessoa
-  const mcpLevel = p.tool === 'claude' || p.tool === 'cursor' ? 'recommended' : 'required';
-  checks.push({ id: 'mcp', level: mcpLevel, status: mcp ? 'missing' : 'ok', requirement: mcp });
+  checks.push({ id: 'mcp', level: 'required', status: mcp ? 'missing' : 'ok', requirement: mcp });
   const permission = req('permission');
   checks.push({ id: 'permission', level: 'required', status: permission ? 'missing' : 'ok', requirement: permission });
 
   checks.push({
     id: 'skill',
-    level: 'recommended',
+    level: 'required',
     status: p.skillInstalled ? 'ok' : 'missing',
     fix: p.skillInstalled ? undefined : { kind: 'installSkill' },
   });

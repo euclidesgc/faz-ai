@@ -163,6 +163,8 @@ export interface RequirementProbe {
    * instalado depois (o node pelo nvm) só entra nele quando o editor fecha e abre de novo
    */
   editorPath?: string;
+  /** a skill do fluxo está instalada na ferramenta; ausente quando não dá para saber (sem o inventário) */
+  skillInstalled?: boolean;
   /** o arquivo do projeto está no git (por padrão, `git ls-files`) */
   isTracked?: (workspaceDir: string, rel: string) => boolean;
 }
@@ -218,11 +220,10 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
   if (cli && executable && (await p.signedIn(tool, executable)) === false)
     out.push({ id: 'signin', tool, cli, action: { kind: 'command', command: `${cli} login` } });
 
-  // no Claude e no Cursor as execuções pelo board levam o servidor sozinhas: o registro só falta nas
-  // conversas da pessoa fora do board, e o aviso diz isso sem contar como requisito
-  const optional = tool === 'claude' || tool === 'cursor' ? { optional: true as const } : {};
+  // o MCP e a skill do fluxo são necessários em todas as ferramentas: mesmo onde as execuções pelo board
+  // levam o servidor sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele
   const registered = registeredServer(tool, p.workspaceDir, p.homeDir, p.editorUserDir);
-  if (!registered) out.push({ id: 'mcp', tool, ...optional, action: { kind: 'connect' } });
+  if (!registered) out.push({ id: 'mcp', tool, action: { kind: 'connect' } });
   else {
     const [bridge, arg] = registered.args;
     // `${workspaceFolder}` é a pasta aberta, que a ferramenta troca ao iniciar: não é pasta fixa
@@ -235,7 +236,6 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
       out.push({
         id: commandMissing || bridgeMissing ? 'mcp-stale' : 'mcp-elsewhere',
         tool,
-        ...optional,
         file: registered.file,
         missing: commandMissing ? registered.command : bridgeMissing ? bridge : folder,
         // o do projeto vale sobre o global: refazer só o global deixaria o aviso para sempre
@@ -247,7 +247,6 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
       out.push({
         id: 'mcp-outdated',
         tool,
-        ...optional,
         file: registered.file,
         missing: bridge,
         action: registered.scope === 'project' ? { kind: 'fixProject', file: registered.file } : { kind: 'connect' },
@@ -263,7 +262,6 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
       out.push({
         id: 'mcp-path',
         tool,
-        ...optional,
         file: registered.file,
         missing: registered.command,
         ...(tracked ? { tracked: true as const } : {}),
@@ -277,11 +275,14 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
       p.windowStartedAt !== undefined &&
       modifiedAt(registered.path) > p.windowStartedAt
     )
-      out.push({ id: 'mcp-reload', tool, optional: true, file: registered.file, action: { kind: 'reload' } });
+      out.push({ id: 'mcp-reload', tool, file: registered.file, action: { kind: 'reload' } });
     // carregado, mas o Cursor deixa desligado todo servidor novo do projeto: só a pessoa liga
     else if (tool === 'cursor' && p.editor === 'cursor' && !cursorConnectedOnce(p.homeDir, p.workspaceDir))
-      out.push({ id: 'mcp-enable', tool, optional: true, action: { kind: 'openEditorMcp' } });
+      out.push({ id: 'mcp-enable', tool, action: { kind: 'openEditorMcp' } });
   }
+
+  // a skill ensina a IA a conduzir o fluxo do board (fases, documentos, revisão)
+  if (p.skillInstalled === false) out.push({ id: 'skill', tool, action: { kind: 'installSkill' } });
 
   const unsupported = headlessUnsupported(tool, p.permission);
   if (unsupported) out.push({ id: 'permission', tool, reason: unsupported, action: { kind: 'settings' } });

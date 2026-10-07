@@ -270,18 +270,18 @@ ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Ve
 que relê também o PATH do terminal (um node instalado com o board aberto é encontrado sem recarregar
 a janela), e diz quando nada mudou.
 
-No Claude e no Cursor, o servidor do board não registrado aparece como **recomendado**, fora da
-contagem: as execuções pelo board levam o servidor sozinhas, e o registro só falta para a IA
-enxergar o board nas suas conversas fora dele. Sozinho, esse item vira uma linha discreta em vez da
-faixa. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
+O MCP do board e a skill do fluxo (`faz-ai-fluxo`) contam como requisito em todas as ferramentas:
+mesmo onde as execuções pelo board levam o MCP sozinhas (Claude, Cursor), a conversa no chat do
+editor ou no terminal depende dele, e a skill é o que faz a IA seguir o fluxo. A falta da skill tem o
+botão **Instalar a skill** na própria faixa. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
 desligados, com o motivo na dica.
 
 **Diagnóstico do ambiente.** Na primeira abertura do board na máquina, abre sozinha uma lista, no
 estilo do `flutter doctor`, com tudo de que o board precisa e o que ele aproveita. Depois, ela abre
 pelo botão **Verificar ambiente**, nas Configurações, ou por **Ver o diagnóstico completo**, na
 faixa amarela. **Necessário:** Node.js 18 ou mais novo, a linha de comando da ferramenta, o login
-dela, o MCP do board e o nível de permissão (os mesmos itens da faixa, com as mesmas ações).
-**Recomendado:** a skill do fluxo (botão **Instalar a skill**), o Git e um repositório na pasta
+dela, o MCP do board, a skill do fluxo e o nível de permissão (os mesmos itens da faixa, com as
+mesmas ações). **Recomendado:** o Git e um repositório na pasta
 (`git init`), o GitHub CLI e o login dele (`gh auth login`, para o merge automático e o
 acompanhamento dos PRs) e o [Code Review Graph](https://github.com/tirth8205/code-review-graph), um
 grafo do código que a IA consulta em vez de ler arquivos inteiros. Com o Code Review Graph

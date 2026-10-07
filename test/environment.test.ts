@@ -104,12 +104,14 @@ describe('Diagnóstico do ambiente', () => {
     expect(byId(r.checks, 'gh').fix).toEqual({ kind: 'commands', commands: ['sudo apt update', 'sudo apt install -y gh'] });
   });
 
-  it('no Claude e no Cursor o MCP é recomendado; nas outras ferramentas, obrigatório', async () => {
-    const mcp: BoardRequirement = { id: 'mcp-enable', tool: 'cursor', optional: true, action: { kind: 'openEditorMcp' } };
+  it('o MCP e a skill do fluxo são necessários em todas as ferramentas', async () => {
+    const mcp: BoardRequirement = { id: 'mcp-enable', tool: 'cursor', action: { kind: 'openEditorMcp' } };
     const cursor = await checkEnvironment(probe({ requirements: [mcp] }));
-    expect(byId(cursor.checks, 'mcp')).toMatchObject({ level: 'recommended', status: 'missing', requirement: mcp });
-    const codex = await checkEnvironment(probe({ tool: 'codex' }));
+    expect(byId(cursor.checks, 'mcp')).toMatchObject({ level: 'required', status: 'missing', requirement: mcp });
+    expect(byId(cursor.checks, 'skill')).toMatchObject({ level: 'required', status: 'missing', fix: { kind: 'installSkill' } });
+    const codex = await checkEnvironment(probe({ tool: 'codex', skillInstalled: true }));
     expect(byId(codex.checks, 'mcp')).toMatchObject({ level: 'required', status: 'ok' });
+    expect(byId(codex.checks, 'skill')).toMatchObject({ level: 'required', status: 'ok' });
   });
 
   it('tudo instalado: mostra as versões e não sugere nada', async () => {

@@ -4,7 +4,8 @@ import type { BoardState } from '../../shared/model';
 import type { BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
-import { ui } from '../commands';
+import { harness, ui } from '../commands';
+import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { isWeb } from '../vscode';
 import { Button, IconCheck, IconConnect, IconWarning } from './ui';
 
@@ -115,6 +116,13 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
               { file: r.file ?? '', missing: r.missing ?? '' },
             ),
       };
+    case 'skill':
+      return {
+        title: t('A skill do fluxo ({name}) não está instalada no {tool}', { name: FLOW_SKILL_NAME, tool }),
+        detail: t(
+          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. Sem ela, a IA mexe nos cards, mas não segue o fluxo. A instalação vai para a pasta global de skills da ferramenta.',
+        ),
+      };
     case 'mcp-enable':
       return {
         title: t('Ative o MCP do board no {tool}', { tool }),
@@ -176,7 +184,7 @@ function actionable(r: BoardRequirement, compact: boolean): boolean {
   // recarregar a janela e abrir os MCPs do editor só existem dentro do editor; no navegador, fica a explicação
   if (kind === 'reload' || kind === 'openEditorMcp') return !isWeb;
   if (kind === 'settings') return !compact;
-  return kind === 'command' || kind === 'connect' || kind === 'fixProject' || kind === 'pinMcp';
+  return kind === 'command' || kind === 'connect' || kind === 'fixProject' || kind === 'pinMcp' || kind === 'installSkill';
 }
 
 /**
@@ -211,6 +219,18 @@ export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequir
           }}
         >
           <IconConnect /> {t('Corrigir o registro')}
+        </Button>
+      );
+    case 'installSkill':
+      return (
+        <Button
+          size="small"
+          onClick={() => {
+            harness.installFlowSkill(r.tool, 'user');
+            onFixed?.();
+          }}
+        >
+          {t('Instalar a skill')}
         </Button>
       );
     case 'pinMcp':
@@ -311,12 +331,12 @@ export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
         {missing > 0 && <IconWarning />}
         <strong role="status">
           {missing === 0
-            ? requirements.every((r) => r.id === 'mcp-reload' || r.id === 'mcp-enable')
+            ? t('Recomendado para a IA enxergar o board nas suas conversas')
+            : requirements.every((r) => r.id === 'mcp-reload' || r.id === 'mcp-enable')
               ? t('Falta um passo para o chat do Cursor usar o board')
-              : t('Recomendado para a IA enxergar o board nas suas conversas')
-            : missing === 1
-              ? t('Falta 1 requisito para o board trabalhar com a IA')
-              : t('Faltam {n} requisitos para o board trabalhar com a IA', { n: missing })}
+              : missing === 1
+                ? t('Falta 1 requisito para o board trabalhar com a IA')
+                : t('Faltam {n} requisitos para o board trabalhar com a IA', { n: missing })}
         </strong>
         <span className="spacer" />
         {/* a lista completa, com o que é só recomendado (git, GitHub CLI, Code Review Graph); o chat não tem a tela */}

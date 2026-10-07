@@ -74,7 +74,6 @@ describe('requisitos do board', () => {
       {
         id: 'mcp-stale',
         tool: 'cursor',
-        optional: true,
         file: '.cursor/mcp.json',
         missing: path.join(home, '.nvm/versions/node/v20.0.0/bin/node'),
         // o registro do projeto vale sobre o global: corrigir é tirá-lo dali
@@ -83,12 +82,21 @@ describe('requisitos do board', () => {
     ]);
   });
 
-  it('no Claude e no Cursor o servidor não registrado é recomendado, não requisito; no Codex é requisito', async () => {
+  it('o MCP do board é requisito em todas as ferramentas (o chat do editor e o terminal dependem dele)', async () => {
     const ids = async (tool: RequirementProbe['tool']) =>
       (await checkRequirements(probe({ tool, permission: 'full' }))).map((r) => [r.id, r.optional ?? false]);
-    expect(await ids('claude')).toEqual([['mcp', true]]);
-    expect(await ids('cursor')).toEqual([['mcp', true]]);
+    expect(await ids('claude')).toEqual([['mcp', false]]);
+    expect(await ids('cursor')).toEqual([['mcp', false]]);
     expect(await ids('codex')).toEqual([['mcp', false]]);
+  });
+
+  it('sem a skill do fluxo, pede para instalar; sem o inventário lido, não diz nada', async () => {
+    connect('cursor');
+    expect(await checkRequirements(probe({ skillInstalled: false }))).toEqual([
+      { id: 'skill', tool: 'cursor', action: { kind: 'installSkill' } },
+    ]);
+    expect(await checkRequirements(probe({ skillInstalled: true }))).toEqual([]);
+    expect(await checkRequirements(probe())).toEqual([]);
   });
 
   it('o registro do Claude para o usuário inteiro ou só para esta pasta (~/.claude.json) também vale', async () => {
@@ -109,7 +117,6 @@ describe('requisitos do board', () => {
       {
         id: 'mcp-elsewhere',
         tool: 'cursor',
-        optional: true,
         file: '.cursor/mcp.json',
         missing: '/outro/projeto',
         action: { kind: 'fixProject', file: '.cursor/mcp.json' },
@@ -177,11 +184,11 @@ describe('requisitos do board', () => {
     registerClients(['cursor'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath });
     const written = fs.statSync(path.join(project, '.cursor', 'mcp.json')).mtimeMs;
     expect(await checkRequirements(probe({ editor: 'cursor', windowStartedAt: written - 1000 }))).toEqual([
-      { id: 'mcp-reload', tool: 'cursor', optional: true, file: '.cursor/mcp.json', action: { kind: 'reload' } },
+      { id: 'mcp-reload', tool: 'cursor', file: '.cursor/mcp.json', action: { kind: 'reload' } },
     ]);
     // depois de recarregar, a janela é mais nova que o registro, mas o Cursor deixa o servidor novo desligado
     expect(await checkRequirements(probe({ editor: 'cursor', windowStartedAt: written + 1000 }))).toEqual([
-      { id: 'mcp-enable', tool: 'cursor', optional: true, action: { kind: 'openEditorMcp' } },
+      { id: 'mcp-enable', tool: 'cursor', action: { kind: 'openEditorMcp' } },
     ]);
     // ligado, o Cursor cria a pasta do servidor do projeto, com o caminho virando um nome de hífens
     const slug = project.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -197,11 +204,11 @@ describe('requisitos do board', () => {
     const written = fs.statSync(path.join(project, '.cursor', 'mcp.json')).mtimeMs;
     const inCursor = { editor: 'cursor' as const, windowStartedAt: written + 1000, editorPath: '/usr/bin/nada' };
     expect(await checkRequirements(probe({ ...inCursor, isTracked: () => false }))).toEqual([
-      { id: 'mcp-path', tool: 'cursor', optional: true, file: '.cursor/mcp.json', missing: 'node', action: { kind: 'pinMcp' } },
+      { id: 'mcp-path', tool: 'cursor', file: '.cursor/mcp.json', missing: 'node', action: { kind: 'pinMcp' } },
     ]);
     // o arquivo no git: o board não grava nele o caminho desta máquina
     expect(await checkRequirements(probe({ ...inCursor, isTracked: () => true }))).toEqual([
-      { id: 'mcp-path', tool: 'cursor', optional: true, file: '.cursor/mcp.json', missing: 'node', tracked: true, action: null },
+      { id: 'mcp-path', tool: 'cursor', file: '.cursor/mcp.json', missing: 'node', tracked: true, action: null },
     ]);
     // o editor acha o node no PATH dele: segue para os passos de sempre
     const nodeDir = path.dirname(process.execPath);

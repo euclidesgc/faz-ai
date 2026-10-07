@@ -26,6 +26,9 @@ export const environment: Record<string, string> = {
   Privacidade: 'Privacy',
   'Saiba mais': 'Learn more',
   'Instalar a skill': 'Install the skill',
+  'A skill do fluxo ({name}) não está instalada no {tool}': 'The flow skill ({name}) is not installed in {tool}',
+  'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. Sem ela, a IA mexe nos cards, mas não segue o fluxo. A instalação vai para a pasta global de skills da ferramenta.':
+    'It is what teaches the AI to take cards through the board flow: phases, documents, review and pending items. Without it, the AI changes the cards but does not follow the flow. It is installed in the tool’s global skills folder.',
   'O {tool} não acha o comando do MCP do board': '{tool} cannot find the board MCP command',
   '{file} inicia o MCP com "{missing}", que não está no PATH com que o editor abriu (o programa foi instalado depois, ou fica numa pasta que o editor não lê). O arquivo está no git, então o board não grava nele o caminho desta máquina: feche e abra o editor de novo, ou tire o arquivo do git.':
     '{file} starts the MCP with "{missing}", which is not in the PATH the editor opened with (the program was installed later, or lives in a folder the editor does not read). The file is in git, so the board does not write this machine’s path into it: close and reopen the editor, or take the file out of git.',

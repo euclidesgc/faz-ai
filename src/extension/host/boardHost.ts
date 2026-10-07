@@ -226,8 +226,15 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // faixa de aviso da interface, que fica enquanto faltar alguma coisa. Confere ao abrir, quando a
   // ferramenta ou a permissão mudam, depois de conectar, a cada poucos minutos (a pessoa instala a
   // CLI ou entra na conta fora do board) e quando ela pede "Verificar de novo".
+  // a skill do fluxo na ferramenta do projeto; undefined enquanto o inventário do harness não foi lido
+  const flowSkillInstalled = (): boolean | undefined => {
+    const s = router.snapshot();
+    const tool = s.harness.inventory.find((t) => t.tool === s.board.aiTool);
+    return tool ? tool.items.some((i) => i.kind === 'skill' && i.name === FLOW_SKILL_NAME) : undefined;
+  };
   let checking: Promise<void> | null = null;
   let cursorBlocked = false;
+  let enableTimer: NodeJS.Timeout | null = null;
   let checkAgain = false;
   const checkNow = (): Promise<void> => {
     if (checking) {
@@ -253,6 +260,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       windowStartedAt: o.editor?.startedAt,
       editorUserDir: o.editor?.userDir,
       editorPath: o.editor ? (process.env.PATH ?? '') : undefined,
+      skillInstalled: flowSkillInstalled(),
     })
       .then((list) => {
         // a CLI do Cursor acabou de ficar pronta (instalada, com login): só agora dá para ler os modelos da conta
@@ -260,6 +268,15 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         if (cursorBlocked && !blocked && router.snapshot().board.aiTool === 'cursor') refreshCursorModels();
         cursorBlocked = blocked;
         router.setRequirements(list);
+        // ligar o MCP no Cursor é com a pessoa, fora do board: enquanto falta, confere a cada 10 s, para
+        // o aviso sumir logo depois que ela liga (a conferência lê só uma pasta)
+        if (list.some((r) => r.id === 'mcp-enable')) {
+          enableTimer ??= setInterval(() => void checkNow(), 10_000);
+          enableTimer.unref?.();
+        } else if (enableTimer) {
+          clearInterval(enableTimer);
+          enableTimer = null;
+        }
       })
       .catch((e) => o.log(`Não foi possível conferir os requisitos do board: ${e instanceof Error ? e.message : String(e)}`))
       .finally(() => {
@@ -437,7 +454,14 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let toolInUse = router.snapshot().board.aiTool;
   let permissionInUse = router.snapshot().board.runner.permission;
   if (toolInUse === 'cursor') refreshCursorModels();
+  // a skill do fluxo instalada ou apagada (pelo Diagnóstico, pelo Harness de IA, à mão) muda o aviso
+  let skillInUse = flowSkillInstalled();
   router.onDidChange(() => {
+    const skill = flowSkillInstalled();
+    if (skill !== skillInUse) {
+      skillInUse = skill;
+      void checkNow();
+    }
     const { board } = router.snapshot();
     if (board.aiTool === toolInUse && board.runner.permission === permissionInUse) return;
     const toolChanged = board.aiTool !== toolInUse;
@@ -521,6 +545,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     },
     async dispose() {
       clearInterval(requirementsTimer);
+      if (enableTimer) clearInterval(enableTimer);
       autopilot.pause();
       heartbeat.stop();
       runner.dispose();

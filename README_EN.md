@@ -286,18 +286,18 @@ minutes and on **Verificar de novo** (check again), which also rereads the termi
 installed with the board open is found without reloading the window), and says when nothing
 changed.
 
-For Claude and Cursor, an unregistered board server shows as **recommended**, out of the count:
-runs from the board carry the server on their own, and the registration is only missing for the AI
-to see the board in your conversations outside it. On its own, that item becomes a discreet line
-instead of the bar. While the command line is missing or not signed in, the card's AI buttons are
+The board MCP and the flow skill (`faz-ai-fluxo`) count as requirements for every tool: even where
+runs from the board carry the MCP on their own (Claude, Cursor), conversations in the editor chat or
+the terminal depend on it, and the skill is what makes the AI follow the flow. A missing skill has
+the **Install the skill** button right in the bar. While the command line is missing or not signed in, the card's AI buttons are
 disabled, with the reason in the tooltip.
 
 **Environment check.** The first time the board opens on a machine, a `flutter doctor`-style list
 opens on its own with everything the board needs and everything it makes use of. After that, it
 opens from **Check environment** in Settings or **See the full environment check** in the yellow
-bar. **Required:** Node.js 18 or newer, the tool's command line, its sign-in, the board MCP and the
-permission level (the same items as the bar, with the same actions). **Recommended:** the flow
-skill (**Install the skill** button), Git and a repository in the folder (`git init`), the GitHub
+bar. **Required:** Node.js 18 or newer, the tool's command line, its sign-in, the board MCP, the
+flow skill and the permission level (the same items as the bar, with the same actions).
+**Recommended:** Git and a repository in the folder (`git init`), the GitHub
 CLI and its sign-in (`gh auth login`, for auto-merge and PR tracking) and
 [Code Review Graph](https://github.com/tirth8205/code-review-graph), a code graph the AI queries
 instead of reading whole files. Once Code Review Graph is installed, the list suggests building the

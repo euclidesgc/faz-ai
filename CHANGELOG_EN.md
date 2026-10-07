@@ -17,6 +17,10 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   recommended** show the steps and the script, and run in an editor terminal (bash or PowerShell,
   depending on the system). A step that fails does not stop the others, and the screen shows each
   one's result, with the error of those that failed. In browser mode, the script is for copying.
+- **The board MCP and the flow skill become requirements** for every tool, in the yellow bar and the
+  environment check: the editor chat depends on the MCP, and the skill makes the AI follow the flow.
+  The bar gets an **Install the skill** button, and the Cursor "turn on the MCP" notice goes away
+  seconds after it is turned on.
 - **Full path for MCPs in the editor.** The editor chat cannot find what was installed after it opened
   (Node through `nvm`, `uvx`): the board writes the full path into the `faz-ai` and
   `code-review-graph` registrations, out of git, and the yellow bar warns when it is missing. The list opens on its own the first time the board opens on a

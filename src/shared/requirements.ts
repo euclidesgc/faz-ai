@@ -12,6 +12,7 @@ export type RequirementId =
   | 'mcp-reload'
   | 'mcp-enable'
   | 'mcp-path'
+  | 'skill'
   | 'permission';
 
 /** O que a pessoa pode fazer, pela própria faixa de aviso, para resolver. */
@@ -27,6 +28,8 @@ export type RequirementAction =
   | { kind: 'reload' }
   /** abrir a tela de MCPs do editor (no Cursor, Customize → MCPs), onde só a pessoa ativa o MCP */
   | { kind: 'openEditorMcp' }
+  /** instalar a skill do fluxo na ferramenta do projeto, no escopo global */
+  | { kind: 'installSkill' }
   /** gravar o caminho completo do comando nos registros que o editor não acha (o node instalado depois que ele abriu) */
   | { kind: 'pinMcp' }
   /** um comando para rodar no terminal, com botão de copiar */
