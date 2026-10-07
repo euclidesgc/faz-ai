@@ -102,6 +102,9 @@ interface BoardStore extends UiState, ViewState {
   setView(view: View): void;
   /** abre as configurações numa seção (fecha o card aberto) */
   openSettings(tab: SettingsTab): void;
+  /** id da seção até onde a tela de Configurações deve rolar ao abrir (vindo de `ui.openSettings`), ou null */
+  pendingSettingsSection: string | null;
+  clearPendingSettingsSection(): void;
   setSettingsNavCollapsed(collapsed: boolean): void;
   selectParent(id: Id | null): void;
   openCard(id: Id | null): void;
@@ -182,6 +185,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       set({ view: 'settings', settingsTab, openCardId: null, attachmentModal: null });
       persist(get());
     },
+    pendingSettingsSection: null,
+    clearPendingSettingsSection: () => set({ pendingSettingsSection: null }),
     setSettingsNavCollapsed(settingsNavCollapsed) {
       set({ settingsNavCollapsed });
       persist(get());
@@ -240,7 +245,10 @@ export function useHostSync(): void {
       } else if (msg.type === 'ui.openCard') {
         s.setView('board');
         s.openCard(msg.cardId);
-      }
+      } else if (msg.type === 'ui.openSettings') {
+        s.openSettings(msg.tab);
+        useBoardStore.setState({ pendingSettingsSection: msg.section ?? null });
+      } else if (msg.type === 'ui.openView') s.setView(msg.view);
     });
     postToHost({ type: 'ready' });
     return off;

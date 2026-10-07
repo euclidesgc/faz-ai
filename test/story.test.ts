@@ -5,10 +5,7 @@ import { boardState, card, column } from './fakes/board';
 describe('stackBaseOf', () => {
   it('ordem natural: a segunda história YOLO empilha sobre a primeira, que ainda não tem base', () => {
     const s = boardState({
-      cards: [
-        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100' }),
-        card('h11', { number: 11, yolo: true }),
-      ],
+      cards: [card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100' }), card('h11', { number: 11, yolo: true })],
     });
 
     expect(stackBaseOf(s, s.cards[1]!)?.id).toBe('h10');
