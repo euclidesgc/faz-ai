@@ -310,6 +310,8 @@ export const board: Record<string, string> = {
     "{tool}'s command line was not found: see the notice at the top of the board.",
   'A linha de comando do {tool} está sem login: veja o aviso no topo do board.':
     "{tool}'s command line is not signed in: see the notice at the top of the board.",
+  'O login do {tool} venceu: veja o aviso no topo do board.': "{tool}'s login expired: see the notice at the top of the board.",
+  'Abrir no terminal': 'Open in terminal',
   'Copiar comando': 'Copy command',
   Copiado: 'Copied',
   'Não foi possível copiar. Selecione o comando e copie com o teclado.':

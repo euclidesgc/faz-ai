@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { aiToolInfo } from '../../shared/harness';
+import { aiToolInfo, type AiTool } from '../../shared/harness';
 import type { BoardState } from '../../shared/model';
 import type { BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
@@ -171,6 +171,7 @@ export function CopyCommand({ command }: { command: string }) {
  */
 export function aiBlockedReason(state: BoardState): string | null {
   if (state.aiRunUnsupported) return t(state.aiRunUnsupported);
+  if (state.authExpired) return t('O login do {tool} venceu: veja o aviso no topo do board.', { tool: aiToolInfo(state.authExpired).label });
   const cli = state.requirements.find((r) => r.id === 'cli' || r.id === 'signin');
   if (!cli) return null;
   return cli.id === 'cli'
@@ -201,7 +202,16 @@ export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequir
   const action = r.action!;
   switch (action.kind) {
     case 'command':
-      return <CopyCommand command={action.command} />;
+      return (
+        <>
+          <CopyCommand command={action.command} />
+          {action.terminal && !isWeb && (
+            <Button size="small" onClick={() => ui.openTerminal(action.command)}>
+              {t('Abrir no terminal')}
+            </Button>
+          )}
+        </>
+      );
     case 'connect':
       // a instalação mora na seção Servidores MCP da ferramenta, onde se escolhe global ou projeto
       return (
@@ -314,16 +324,36 @@ function RecheckButton() {
  * é só recomendado (não impede as execuções pelo board) não conta como pendência: sozinho, vira uma
  * caixa discreta (com a explicação) em vez da faixa de aviso.
  */
+/** O comando da CLI de cada ferramenta, para montar o item sintético de login sem precisar de um probe. */
+const CLI_OF: Record<AiTool, string> = { claude: 'claude', codex: 'codex', cursor: 'cursor-agent', kimi: 'kimi', copilot: 'copilot' };
+
 export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
   const requirements = useBoardStore((s) => s.state?.requirements ?? []);
-  const missing = requirements.filter((r) => !r.optional).length;
+  const authExpired = useBoardStore((s) => s.state?.authExpired ?? null);
+  // o sinal reativo (RF6) sem probe confiável (Kimi, Copilot) não aparece em `requirements`: sem este
+  // item, a pessoa nunca veria o aviso para essas duas ferramentas
+  const items =
+    authExpired && !requirements.some((r) => r.id === 'signin')
+      ? [
+          ...requirements,
+          {
+            id: 'signin' as const,
+            tool: authExpired,
+            cli: CLI_OF[authExpired],
+            action: { kind: 'command' as const, command: `${CLI_OF[authExpired]} login`, terminal: true as const },
+          },
+        ]
+      : requirements;
+  const missing = items.filter((r) => !r.optional).length;
+  // login vencido é mais urgente que os outros requisitos (para o board inteiro, não só um card): destaque de erro
+  const authError = requirements.some((r) => r.id === 'signin' && !r.optional) || authExpired !== null;
   // a lista muda (algo foi resolvido): o "nada mudou" de antes não vale mais
-  const key = requirements.map((r) => r.id).join();
-  if (!requirements.length) return null;
+  const key = items.map((r) => r.id).join();
+  if (!items.length) return null;
   return (
     <section
       key={key}
-      className={`banner requirements ${missing ? 'warn' : 'recommended'} ${compact ? 'compact' : ''}`}
+      className={`banner requirements ${missing ? (authError ? 'error' : 'warn') : 'recommended'} ${compact ? 'compact' : ''}`}
       role="region"
       aria-label={t('Requisitos do board')}
     >
@@ -332,7 +362,7 @@ export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
         <strong role="status">
           {missing === 0
             ? t('Recomendado para a IA enxergar o board nas suas conversas')
-            : requirements.every((r) => r.id === 'mcp-reload' || r.id === 'mcp-enable')
+            : items.every((r) => r.id === 'mcp-reload' || r.id === 'mcp-enable')
               ? t('Falta um passo para o chat do Cursor usar o board')
               : missing === 1
                 ? t('Falta 1 requisito para o board trabalhar com a IA')
@@ -348,7 +378,7 @@ export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
         <RecheckButton />
       </div>
       <ul>
-        {requirements.map((r) => (
+        {items.map((r) => (
           <Item key={r.id} r={r} compact={compact} />
         ))}
       </ul>

@@ -326,6 +326,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       .then((fresh) => (pathEnv = fresh ?? pathEnv))
       .finally(() => void checkNow());
   });
+  // "Abrir no terminal" do aviso de login: o board só abre o terminal, a pessoa faz o login nele
+  router.onOpenTerminal((command) => o.runInTerminal?.('Faz AI: login', command, o.folderPath));
   // o Diagnóstico do ambiente: os requisitos acima e o que o board usa quando existe (skill do fluxo,
   // git, GitHub CLI, Code Review Graph). Roda só quando a tela pede: alguns comandos demoram
   const probeCommand = (command: string, args: string[], cwd?: string) =>
@@ -383,7 +385,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       const cliName = 'unsupported' in built ? null : built.command;
       const syntheticSignin: BoardRequirement | null =
         s.authExpired === tool && cliName && !s.requirements.some((r) => r.id === 'signin')
-          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: `${cliName} login` } }
+          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: `${cliName} login`, terminal: true } }
           : null;
       router.setEnvironment(
         await checkEnvironment({

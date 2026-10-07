@@ -496,4 +496,23 @@ describe('botões de IA do card', () => {
       expect(screen.getByRole('button', { name })).toHaveAttribute('title', expect.stringContaining('sem login'));
     }
   });
+
+  it('com o login vencido durante a execução (sinal reativo, sem o requisito "signin"), os dois também ficam desligados', async () => {
+    const { router, storyId } = await seedBoard();
+    act(() => {
+      router.setAuthExpired('claude');
+      syncStore(router);
+    });
+    renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
+    for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+      expect(screen.getByRole('button', { name })).toHaveAttribute('title', expect.stringContaining('login do Claude Code venceu'));
+    }
+
+    act(() => {
+      router.setAuthExpired(null);
+      syncStore(router);
+    });
+    for (const name of [/Trabalhar na fase/, /Refinar com IA/]) expect(screen.getByRole('button', { name })).toBeEnabled();
+  });
 });

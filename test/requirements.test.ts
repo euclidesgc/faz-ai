@@ -55,7 +55,7 @@ describe('requisitos do board', () => {
     connect('cursor');
     const list = await checkRequirements(probe({ signedIn: async () => false }));
     expect(list).toEqual([
-      { id: 'signin', tool: 'cursor', cli: 'cursor-agent', action: { kind: 'command', command: 'cursor-agent login' } },
+      { id: 'signin', tool: 'cursor', cli: 'cursor-agent', action: { kind: 'command', command: 'cursor-agent login', terminal: true } },
     ]);
   });
 
@@ -67,11 +67,11 @@ describe('requisitos do board', () => {
   it('CLI do Claude Code ou do Codex sem login: oferece o comando de login, igual ao Cursor', async () => {
     connect('claude');
     expect(await checkRequirements(probe({ tool: 'claude', signedIn: async () => false }))).toEqual([
-      { id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } },
+      { id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login', terminal: true } },
     ]);
     connect('codex');
     expect(await checkRequirements(probe({ tool: 'codex', signedIn: async () => false }))).toEqual([
-      { id: 'signin', tool: 'codex', cli: 'codex', action: { kind: 'command', command: 'codex login' } },
+      { id: 'signin', tool: 'codex', cli: 'codex', action: { kind: 'command', command: 'codex login', terminal: true } },
     ]);
   });
 

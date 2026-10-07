@@ -55,6 +55,7 @@ const bridgeOnly = {
   'ui.fixProjectMcp': viaBridge,
   'ui.reloadWindow': viaBridge,
   'ui.openEditorMcp': viaBridge,
+  'ui.openTerminal': viaBridge,
   'ui.openInBrowser': viaBridge,
   'ai.run': viaBridge,
   'ai.stop': viaBridge,
@@ -113,6 +114,7 @@ export class MessageRouter {
   private requirementsCheckedAt = 0;
   private requirementsCheck: (() => void) | null = null;
   private authExpired: AiTool | null = null;
+  private openTerminalHook: ((command: string) => void) | null = null;
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
   private environmentHooks: EnvironmentHooks | null = null;
@@ -215,6 +217,15 @@ export class MessageRouter {
 
   recheckRequirements(): void {
     this.requirementsCheck?.();
+  }
+
+  /** Quem abre um terminal do editor e roda o comando pedido (o login de uma CLI); a pessoa conclui o login. */
+  onOpenTerminal(fn: (command: string) => void): void {
+    this.openTerminalHook = fn;
+  }
+
+  openTerminal(command: string): void {
+    this.openTerminalHook?.(command);
   }
 
   /**
