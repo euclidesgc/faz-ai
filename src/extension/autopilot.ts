@@ -43,9 +43,10 @@ export type AutopilotStep =
   | { kind: 'paused'; story: Card; reason: string };
 
 /**
- * Próximo passo. As histórias vão em fila, uma de cada vez e na ordem do número: a branch de cada uma
- * parte da anterior, então a seguinte só começa quando a atual sai de aberto. Uma história com
- * impedimento segura a fila, em vez de a seguinte passar na frente.
+ * Próximo passo. As histórias vão em fila, uma de cada vez e na ordem da posição do card no board
+ * (bug sempre primeiro, `byExecutionOrder`): a branch de cada uma parte da anterior, então a seguinte
+ * só começa quando a atual sai de aberto. Uma história com impedimento segura a fila, em vez de a
+ * seguinte passar na frente.
  */
 export function autopilotStep(s: BoardState): AutopilotStep {
   // uma história entregue já passou para a pessoa: não segura a fila, a próxima assume

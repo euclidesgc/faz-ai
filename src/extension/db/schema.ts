@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 24;
+export const SCHEMA_VERSION = 25;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -329,6 +329,14 @@ const MIGRATIONS: Record<number, string> = {
     ALTER TABLE ai_runs ADD COLUMN session_id TEXT;          -- id da sessão na CLI, para reabrir
     ALTER TABLE ai_runs ADD COLUMN cost_estimated INTEGER;   -- 1 = calculado pelo preço; 0 = informado; NULL = sem custo
     ALTER TABLE ai_runs ADD COLUMN measure TEXT NOT NULL DEFAULT 'none';  -- 'none' | 'partial' | 'full'
+  `,
+  25: `
+    -- momento em que a branch da história foi criada (#185): stackBaseOf passa a empilhar pela branch
+    -- mais recente, não pelo número do card. Histórias já existentes com branch e sem essa data
+    -- recebem o próprio updated_at (dado real, sem inventar timestamp); empates são resolvidos em
+    -- memória por stackBaseOf, comparando o número do card.
+    ALTER TABLE cards ADD COLUMN branch_created_at TEXT NOT NULL DEFAULT '';
+    UPDATE cards SET branch_created_at = CAST(updated_at AS TEXT) WHERE branch != '' AND branch_created_at = '';
   `,
 };
 

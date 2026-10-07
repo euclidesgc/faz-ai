@@ -16,15 +16,20 @@ export const isPullRequestUrl = (url: string): boolean => /^https?:\/\/\S+$/.tes
 export const isYolo = (state: Pick<BoardState, 'cards'>, card: Card): boolean => storyOf(state, card)?.yolo === true;
 
 /**
- * Em que a branch de uma história em modo autônomo se apoia: a da história YOLO anterior (a de número
- * menor mais próxima que já tem branch), para os pull requests formarem uma pilha. Sem anterior, a branch principal.
- * Conta também a anterior já concluída: o pull request dela continua aberto até uma pessoa fazer o merge.
+ * Em que a branch de uma história em modo autônomo se apoia: a história YOLO aberta com a branch
+ * criada mais recentemente, para os pull requests formarem uma pilha na ordem real de execução (#185)
+ * — e não pelo número do card, que diverge da fila quando a pessoa reordena os cards por arrasto. Sem
+ * candidata, a branch principal. Conta também a anterior já concluída, mas não a que já teve o pull
+ * request mesclado (`mergeCommit` preenchido): o código dela já está na principal, então a nova não
+ * precisa (e não deve) empilhar sobre uma branch cujo conteúdo já foi incorporado.
  */
 export function stackBaseOf(state: Pick<BoardState, 'cards'>, story: Card): Card | undefined {
   if (!story.yolo || story.parentId) return undefined;
   return state.cards
-    .filter((c) => c.yolo && !c.parentId && c.number < story.number && c.branch && c.deletedAt === null && c.archivedAt === null)
-    .sort((a, b) => b.number - a.number)[0];
+    .filter(
+      (c) => c.yolo && !c.parentId && c.id !== story.id && c.branch && c.mergeCommit === '' && c.deletedAt === null && c.archivedAt === null,
+    )
+    .sort((a, b) => Number(b.branchCreatedAt) - Number(a.branchCreatedAt) || b.number - a.number)[0];
 }
 
 /** Histórias em modo autônomo ainda em aberto, na ordem de execução da fila: bug primeiro, depois de cima para baixo no board. */

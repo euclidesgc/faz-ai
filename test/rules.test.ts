@@ -57,7 +57,7 @@ describe('categoria de coluna', () => {
     old.run(`CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       INSERT INTO meta VALUES ('schema_version','2');
       CREATE TABLE boards (id TEXT PRIMARY KEY, workspace_key TEXT NOT NULL UNIQUE, name TEXT NOT NULL);
-      CREATE TABLE cards (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, created_at INTEGER NOT NULL);
+      CREATE TABLE cards (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE attachments (id TEXT PRIMARY KEY, card_id TEXT NOT NULL);
       CREATE TABLE comments (id TEXT PRIMARY KEY, card_id TEXT NOT NULL);
       CREATE TABLE field_defs (id TEXT PRIMARY KEY, board_id TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, options_json TEXT NOT NULL DEFAULT '[]', applies_to_types_json TEXT, display TEXT NOT NULL DEFAULT 'inline', position INTEGER NOT NULL);

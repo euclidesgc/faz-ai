@@ -119,6 +119,8 @@ export interface Card {
   worktreePath: string;
   /** branch de onde a da história partiu, quando não é a principal (histórias empilhadas); vazio = a principal */
   baseBranch: string;
+  /** quando a branch da história foi criada (epoch ms em texto); vazio enquanto a branch não existe */
+  branchCreatedAt: string;
   /** endereço do pull request da história; vazio enquanto não foi aberto */
   prUrl: string;
   /** commit do merge do pull request da história; vazio enquanto não foi mergeado */

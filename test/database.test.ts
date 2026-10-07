@@ -341,6 +341,51 @@ describe('migração 23 → 24 (consumo da execução)', () => {
   });
 });
 
+/** Esquema de um board na versão 24 (com o consumo medido, sem branch_created_at), para testar a migração 25. */
+const SCHEMA_V24 = SCHEMA_V23.replace(
+  `cache_read_tokens INTEGER, cache_write_tokens INTEGER,
+    cost_usd REAL
+  );`,
+  `cache_read_tokens INTEGER, cache_write_tokens INTEGER,
+    cost_usd REAL,
+    turns INTEGER,
+    session_id TEXT,
+    cost_estimated INTEGER,
+    measure TEXT NOT NULL DEFAULT 'none'
+  );`,
+);
+
+describe('migração 24 → 25 (branch_created_at)', () => {
+  it('preenche branch_created_at com updated_at só para quem já tem branch, sem perder dado', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    old.run(SCHEMA_V24);
+    old.run(`
+      INSERT INTO meta VALUES ('schema_version', '24');
+      INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto');
+      INSERT INTO workflows (id, board_id, name, position, kind) VALUES ('w', 'b', 'Histórias', 0, 'parent');
+      INSERT INTO columns (id, workflow_id, name, position) VALUES ('c', 'w', 'Backlog', 0);
+      INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t', 'b', 'História', '#fff', 'w');
+      INSERT INTO cards (id, board_id, workflow_id, column_id, type_id, parent_id, title, position, created_at, updated_at, number, branch)
+        VALUES ('k1', 'b', 'w', 'c', 't', NULL, 'Com branch', 0, 1, 1234, 1, 'bug/1-com-branch');
+      INSERT INTO cards (id, board_id, workflow_id, column_id, type_id, parent_id, title, position, created_at, updated_at, number)
+        VALUES ('k2', 'b', 'w', 'c', 't', NULL, 'Sem branch', 1, 2, 5678, 2);
+    `);
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(old.exec('SELECT id, title FROM cards ORDER BY id')[0]!.values).toEqual([
+      ['k1', 'Com branch'],
+      ['k2', 'Sem branch'],
+    ]);
+
+    const [withBranch, withoutBranch] = old.exec('SELECT branch_created_at FROM cards ORDER BY id')[0]!.values;
+    expect(withBranch![0]).toBe('1234');
+    expect(withoutBranch![0]).toBe('');
+  });
+});
+
 describe('banco novo', () => {
   it('chega na versão atual do esquema e já tem a coluna merge_commit', async () => {
     const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });

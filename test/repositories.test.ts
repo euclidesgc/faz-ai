@@ -121,6 +121,14 @@ describe('cards', () => {
     cards.setFieldValue(story, tags.id, []);
     expect(snap().fieldValues).toHaveLength(0);
   });
+
+  it('setBranchCreatedAt guarda quando a branch da história foi criada', () => {
+    const backlog = colsOf(parentWf().id)[0]!;
+    const story = cards.create(boardId, { typeId: typeNamed('História').id, columnId: backlog.id, parentId: null, title: 'a' });
+    expect(snap().cards[0]?.branchCreatedAt).toBe('');
+    cards.setBranchCreatedAt(story, 1700000000000);
+    expect(snap().cards.find((c) => c.id === story)?.branchCreatedAt).toBe('1700000000000');
+  });
 });
 
 describe('settings', () => {

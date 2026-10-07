@@ -1,6 +1,67 @@
 import { describe, expect, it } from 'vitest';
-import { isDelivered, lastAiColumn } from '../src/shared/story';
+import { isDelivered, lastAiColumn, stackBaseOf } from '../src/shared/story';
 import { boardState, card, column } from './fakes/board';
+
+describe('stackBaseOf', () => {
+  it('ordem natural: a segunda história YOLO empilha sobre a primeira, que ainda não tem base', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100' }),
+        card('h11', { number: 11, yolo: true }),
+      ],
+    });
+
+    expect(stackBaseOf(s, s.cards[1]!)?.id).toBe('h10');
+  });
+
+  it('ordem invertida: escolhe a branch criada mais recentemente, não o número menor', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '200' }),
+        card('h11', { number: 11, yolo: true, branch: 'b11', branchCreatedAt: '100' }),
+        card('h12', { number: 12, yolo: true }),
+      ],
+    });
+
+    // #11 criou a branch antes de #10 (reordenação por arrasto): #12 deve empilhar sobre #10, a mais recente
+    expect(stackBaseOf(s, s.cards[2]!)?.id).toBe('h10');
+  });
+
+  it('ignora a anterior na lixeira ou arquivada, mesmo sendo a mais recente', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100' }),
+        card('h11', { number: 11, yolo: true, branch: 'b11', branchCreatedAt: '200', deletedAt: 1 }),
+        card('h12', { number: 12, yolo: true, branch: 'b12', branchCreatedAt: '300', archivedAt: 1 }),
+        card('h13', { number: 13, yolo: true }),
+      ],
+    });
+
+    expect(stackBaseOf(s, s.cards[3]!)?.id).toBe('h10');
+  });
+
+  it('a anterior concluída mas não mesclada ainda conta como base (comportamento preservado)', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100', mergeCommit: '' }),
+        card('h11', { number: 11, yolo: true }),
+      ],
+    });
+
+    expect(stackBaseOf(s, s.cards[1]!)?.id).toBe('h10');
+  });
+
+  it('a anterior já mesclada não conta: a nova parte da principal', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100', mergeCommit: 'abc123' }),
+        card('h11', { number: 11, yolo: true }),
+      ],
+    });
+
+    expect(stackBaseOf(s, s.cards[1]!)).toBeUndefined();
+  });
+});
 
 describe('lastAiColumn', () => {
   it('é a última coluna aberta com aiActive, por posição, mesmo com colunas renomeadas e fora de ordem', () => {

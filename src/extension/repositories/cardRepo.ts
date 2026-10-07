@@ -266,6 +266,11 @@ export class CardRepo {
     run(this.db, 'UPDATE cards SET base_branch = ? WHERE id = ?', [base, cardId]);
   }
 
+  /** Guarda quando a branch da história foi criada, para empilhar pela ordem real de criação (#185). */
+  setBranchCreatedAt(cardId: string, at: number): void {
+    run(this.db, 'UPDATE cards SET branch_created_at = ? WHERE id = ?', [String(at), cardId]);
+  }
+
   setExecProfile(cardId: string, profileId: string | null): void {
     run(this.db, 'UPDATE cards SET exec_profile = ? WHERE id = ?', [profileId || null, cardId]);
   }
