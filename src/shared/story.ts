@@ -24,13 +24,38 @@ export const isYolo = (state: Pick<BoardState, 'cards'>, card: Card): boolean =>
  * precisa (e não deve) empilhar sobre uma branch cujo conteúdo já foi incorporado.
  */
 export function stackBaseOf(state: Pick<BoardState, 'cards'>, story: Card): Card | undefined {
-  if (!story.yolo || story.parentId) return undefined;
-  return state.cards
+  return stackBaseChoice(state, story).base;
+}
+
+/** Uma candidata está bloqueada sem pull request: o status é "blocked" e não há `prUrl` registrado. */
+const isBlockedWithoutPr = (c: Card): boolean => c.status === 'blocked' && !c.prUrl;
+
+/**
+ * Escolhe a base da pilha e lista quem foi pulado no caminho: história bloqueada sem pull request não
+ * serve de base, porque a entrega dela é incerta e o pull request seguinte ficaria preso a ela; com
+ * pull request aberto a branch é estável (a pessoa já decidiu seguir apesar do bloqueio) e volta a
+ * valer como base. `skipped` traz só as candidatas bloqueadas-sem-PR mais recentes que a base escolhida
+ * (ou todas, se nenhuma base foi encontrada) — a fila usa isso para saber quem pular.
+ */
+export function stackBaseChoice(state: Pick<BoardState, 'cards'>, story: Card): { base: Card | undefined; skipped: Card[] } {
+  if (!story.yolo || story.parentId) return { base: undefined, skipped: [] };
+
+  const candidates = state.cards
     .filter(
       (c) =>
         c.yolo && !c.parentId && c.id !== story.id && c.branch && c.mergeCommit === '' && c.deletedAt === null && c.archivedAt === null,
     )
-    .sort((a, b) => Number(b.branchCreatedAt) - Number(a.branchCreatedAt) || b.number - a.number)[0];
+    .sort((a, b) => Number(b.branchCreatedAt) - Number(a.branchCreatedAt) || b.number - a.number);
+
+  const skipped: Card[] = [];
+  for (const c of candidates) {
+    if (isBlockedWithoutPr(c)) {
+      skipped.push(c);
+      continue;
+    }
+    return { base: c, skipped };
+  }
+  return { base: undefined, skipped };
 }
 
 /** Histórias em modo autônomo ainda em aberto, na ordem de execução da fila: bug primeiro, depois de cima para baixo no board. */

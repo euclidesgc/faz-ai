@@ -43,16 +43,8 @@ export type AutopilotStep =
   /** a fila parou numa história que depende de uma pessoa (impedimento) */
   | { kind: 'paused'; story: Card; reason: string };
 
-/**
- * Próximo passo. As histórias vão em fila, uma de cada vez e na ordem da posição do card no board
- * (bug sempre primeiro, `byExecutionOrder`): a branch de cada uma parte da anterior, então a seguinte
- * só começa quando a atual sai de aberto. Uma história com impedimento segura a fila, em vez de a
- * seguinte passar na frente.
- */
-export function autopilotStep(s: BoardState): AutopilotStep {
-  // uma história entregue já passou para a pessoa: não segura a fila, a próxima assume
-  const story = yoloStories(s).find((c) => !isDelivered(s, c));
-  if (!story) return { kind: 'idle' };
+/** O passo de **uma** história pendente, como se ela estivesse sozinha na fila. */
+function storyStep(s: BoardState, story: Card): AutopilotStep {
   const column = columnOf(s, story)!;
   if (isAiWorking(s, story) || childrenOf(s, story.id).some((c) => isAiWorking(s, c))) return { kind: 'wait', story };
 
@@ -80,6 +72,38 @@ export function autopilotStep(s: BoardState): AutopilotStep {
   if (blockers.length) return { kind: 'paused', story, reason: `${cardRef(story)} espera ${blockers.map(cardRef).join(', ')} terminar.` };
   // nada com a IA e a história continua aberta: o ciclo emperrou
   return { kind: 'paused', story, reason: `${cardRef(story)} não tem nada pendente com a IA, mas ainda não foi concluído.` };
+}
+
+/** Histórias em modo autônomo ainda não entregues, na ordem da fila: uma entregue já passou para a pessoa e não ocupa a fila. */
+const pendingStories = (s: BoardState): Card[] => yoloStories(s).filter((c) => !isDelivered(s, c));
+
+/**
+ * Próximo passo. As histórias vão em fila, uma de cada vez e na ordem da posição do card no board
+ * (bug sempre primeiro, `byExecutionOrder`): a branch de cada uma parte da anterior, então a seguinte
+ * só começa quando a atual sai de aberto. Uma história com impedimento (bloqueada ou esperando uma
+ * pessoa) é pulada e a seguinte passa na frente; a fila só espera quando todas as pendentes estão com
+ * a pessoa. Destravada, a história volta a concorrer na posição que ocupa no board, e espera a que
+ * estiver em execução terminar.
+ */
+export function autopilotStep(s: BoardState): AutopilotStep {
+  const pending = pendingStories(s);
+  if (!pending.length) return { kind: 'idle' };
+  const steps = pending.map((story) => storyStep(s, story));
+  // uma história por vez: com uma em execução, nenhuma outra começa, pulada ou não
+  const running = steps.find((p) => p.kind === 'wait');
+  if (running) return running;
+  const next = steps.find((p) => p.kind === 'advance' || p.kind === 'run');
+  if (next) return next;
+  if (steps.every((p) => p.kind === 'idle')) return { kind: 'idle' };
+  // todas com a pessoa: a fila para na primeira, dizendo o motivo de cada uma
+  return {
+    kind: 'paused',
+    story: pending[0]!,
+    reason: steps
+      .map((p) => (p.kind === 'paused' ? p.reason : ''))
+      .filter(Boolean)
+      .join(' '),
+  };
 }
 
 /** O que muda quando a história avança: coluna, status, PR e o andamento das sub-tarefas. */
@@ -264,15 +288,15 @@ export class Autopilot {
   /** Um "Em execução" sem execução de verdade (a sessão caiu): volta para a IA tentar de novo. */
   private recoverStale(): void {
     const s = this.router.snapshot();
-    // entregue não tem execução a recuperar: é a mesma primeira história não entregue do autopilotStep
-    const story = yoloStories(s).find((c) => !isDelivered(s, c));
-    if (!story) return;
-    const cards = [story, ...childrenOf(s, story.id).filter(isLive)];
-    // só as execuções desta história contam: as do heartbeat em outras histórias não a seguram
-    if (cards.some((c) => this.runner.running.includes(c.id))) return;
-    for (const c of cards)
-      if (c.status === 'running' && !s.aiRuns.includes(c.id))
-        this.router.handle({ type: 'card.status.set', cardId: c.id, status: 'ready' }, { author: AUTHOR, source: 'ai' });
+    // entregue não tem execução a recuperar; a história da vez pode ser qualquer pendente, então todas são olhadas
+    for (const story of pendingStories(s)) {
+      const cards = [story, ...childrenOf(s, story.id).filter(isLive)];
+      // só as execuções desta história contam: as do heartbeat em outras histórias não a seguram
+      if (cards.some((c) => this.runner.running.includes(c.id))) continue;
+      for (const c of cards)
+        if (c.status === 'running' && !s.aiRuns.includes(c.id))
+          this.router.handle({ type: 'card.status.set', cardId: c.id, status: 'ready' }, { author: AUTHOR, source: 'ai' });
+    }
   }
 
   private publish(note: string | null): void {
