@@ -221,6 +221,13 @@ describe('Diagnóstico do ambiente', () => {
     const r = await checkEnvironment(probe({ requirements: [cli], pathDirs: ['/home/u/.local/bin/', '/usr/bin'] }));
     expect(byId(r.checks, 'cli').fix).toBeUndefined();
   });
+
+  it('"Instalar tudo" no Claude Code (fora do Cursor) também enfileira o login depois de instalar a CLI', async () => {
+    const cli: BoardRequirement = { id: 'cli', tool: 'claude', cli: 'claude', action: null };
+    const r = await checkEnvironment(probe({ tool: 'claude', requirements: [cli] }));
+    expect(byId(r.checks, 'signin')).toMatchObject({ status: 'skipped' });
+    expect(byId(r.checks, 'signin').fix).toEqual({ kind: 'commands', commands: ['claude login'] });
+  });
 });
 
 describe('instaladores por sistema', () => {

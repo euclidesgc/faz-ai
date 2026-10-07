@@ -18,8 +18,10 @@ import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { claudeSignedIn, codexSignedIn, cursorModels, cursorSignedIn, runCli } from '../cliProbe';
-import type { AiTool, InstallScope } from '../../shared/harness';
+import { aiToolInfo, type AiTool, type InstallScope } from '../../shared/harness';
 import { checkRequirements } from '../requirements';
+import { headlessCommand } from '../headless';
+import type { BoardRequirement } from '../../shared/requirements';
 import { checkEnvironment } from '../environment';
 import { detectOs } from '../installers';
 import { installPlan, installScript, parseInstallResult } from '../../shared/installPlan';
@@ -286,6 +288,13 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         if (cursorBlocked && !blocked && router.snapshot().board.aiTool === 'cursor') refreshCursorModels();
         cursorBlocked = blocked;
         router.setRequirements(list);
+        // o sinal reativo (RF6) limpa quando o probe da própria ferramenta volta a confirmar o login —
+        // a essa altura `signinCache` já tem o valor fresco desta conferência (lido pelo `signedIn` acima);
+        // cobre Claude/Codex, que têm probe confiável (Kimi/Copilot só se recuperam por uma execução
+        // manual que dá certo, em `runner.ts`). Ao trocar de ferramenta o sinal já foi limpo incondicionalmente
+        const expired = router.snapshot().authExpired;
+        if (expired && signinCache.get(expired)?.value === true && router.setAuthExpired(null))
+          o.log(`Login do ${aiToolInfo(expired).label} de volta: execuções retomadas.`);
         // ligar o MCP no Cursor é com a pessoa, fora do board: enquanto falta, confere a cada 10 s, para
         // o aviso sumir logo depois que ela liga (a conferência lê só uma pasta). O login (`signin`) entra
         // no mesmo timer: a ferramenta com probe confiável (Claude, Codex) retoma em até 10 s, sem esperar
@@ -368,10 +377,18 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       const skillInstalled = !!s.harness.inventory
         .find((t) => t.tool === tool)
         ?.items.some((i) => i.kind === 'skill' && i.name === FLOW_SKILL_NAME);
+      // o sinal reativo (RF6) também vira o item "signin" do Diagnóstico quando o probe não é confiável
+      // (Kimi, Copilot): sem isso, `s.requirements` nunca teria `signin` para essas duas ferramentas
+      const built = headlessCommand(tool, { prompt: '', permission: 'full' });
+      const cliName = 'unsupported' in built ? null : built.command;
+      const syntheticSignin: BoardRequirement | null =
+        s.authExpired === tool && cliName && !s.requirements.some((r) => r.id === 'signin')
+          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: `${cliName} login` } }
+          : null;
       router.setEnvironment(
         await checkEnvironment({
           tool,
-          requirements: s.requirements,
+          requirements: syntheticSignin ? [...s.requirements, syntheticSignin] : s.requirements,
           workspaceDir: o.folderPath,
           os: detectOs(process.platform, readOsRelease()),
           pathDirs: (pathEnv ?? process.env.PATH ?? '').split(path.delimiter),
@@ -489,6 +506,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     const toolChanged = board.aiTool !== toolInUse;
     toolInUse = board.aiTool;
     permissionInUse = board.runner.permission;
+    // o sinal reativo só vale para a ferramenta que falhou; trocando de ferramenta, ele não diz nada sobre a nova
+    if (toolChanged) router.setAuthExpired(null);
     void checkNow();
     if (toolChanged && board.aiTool === 'cursor') refreshCursorModels();
   });

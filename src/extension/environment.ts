@@ -151,8 +151,8 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     level: 'required',
     status: cli ? 'skipped' : signin ? 'missing' : 'ok',
     requirement: signin,
-    // sem a CLI ainda, o login vem logo depois dela no "Instalar tudo" (só o Cursor diz se há login)
-    fix: cli?.cli && p.tool === 'cursor' ? { kind: 'commands', commands: [`${cli.cli} login`] } : undefined,
+    // sem a CLI ainda, o login vem logo depois dela no "Instalar tudo"
+    fix: cli?.cli ? { kind: 'commands', commands: [`${cli.cli} login`] } : undefined,
   });
   const mcp = req('mcp');
   checks.push({ id: 'mcp', level: 'required', status: mcp ? 'missing' : 'ok', requirement: mcp });
