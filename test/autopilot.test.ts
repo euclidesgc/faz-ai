@@ -306,6 +306,10 @@ describe('autopiloto', () => {
     runner.finish(() => move(1, 'Concluído'));
     expect(autopilot.isActive).toBe(false);
     expect(log.at(-1)).toContain('nenhuma história em modo autônomo pendente');
+    // acabar a fila não religa em loop
+    flush();
+    expect(autopilot.isActive).toBe(false);
+    expect(log.filter((l) => l.includes('nenhuma história'))).toHaveLength(1);
 
     create('B', 'PRD');
     yolo(2);
@@ -414,21 +418,92 @@ describe('autopiloto', () => {
     expect(runner.started).toHaveLength(1);
     expect(router.snapshot().autopilot.active).toBe(false);
 
+    // uma mudança do board depois da pausa não religa: a pausa está gravada
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
+    flush();
+    expect(autopilot.isActive).toBe(false);
+    expect(runner.started).toHaveLength(1);
+
     autopilot.resume();
     expect(runner.started).toHaveLength(2);
   });
 
-  it('não liga sozinho ao abrir o editor com história em modo autônomo; precisa retomar', () => {
+  it('liga sozinho ao abrir o editor com história pendente em modo autônomo', () => {
     owns = false;
     create('A', 'PRD');
     yolo(1);
-    // o editor abre (a janela passa a ser a dona) com a história já em modo autônomo: nada começa
+    expect(runner.started).toEqual([]);
+    // o editor abre de novo: outro autopiloto, construído com a história já em modo autônomo
     owns = true;
+    autopilot = new Autopilot(router, runner, { log: (l) => log.push(l), canRun: () => owns, defer: (fn) => deferred.push(fn) });
+    expect(runner.started).toEqual([]); // a primeira avaliação espera o host terminar de montar
+    flush();
+    expect(autopilot.isActive).toBe(true);
+    expect(runner.started).toEqual([card(1).id]);
+  });
+
+  it('a janela que passa a ser a dona do board liga sozinha', () => {
+    owns = false;
+    create('A', 'PRD');
+    yolo(1);
+    owns = true;
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
+    flush();
+    expect(autopilot.isActive).toBe(true);
+    expect(runner.started).toEqual([card(1).id]);
+  });
+
+  it('fila vazia ao abrir: não liga nem registra nada no log', () => {
+    create('A', 'PRD'); // fora do modo autônomo
+    flush();
+    expect(autopilot.isActive).toBe(false);
+    expect(log).toEqual([]);
+  });
+
+  it('não liga ao abrir com a pausa gravada no board; retomar limpa a pausa e liga', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { autopilotPaused: true } } });
+    create('A', 'PRD');
+    yolo(1);
+    flush();
+    expect(autopilot.isActive).toBe(false);
+    expect(runner.started).toEqual([]);
+
+    autopilot.resume();
+    expect(runner.started).toEqual([card(1).id]);
+    expect(router.snapshot().board.runner.autopilotPaused).toBe(false);
+  });
+
+  it('pausar grava a pausa no board; stop() desliga sem gravar, e a fila retoma na próxima mudança do board', () => {
+    create('A', 'PRD');
+    yolo(1);
+    autopilot.pause();
+    expect(router.snapshot().board.runner.autopilotPaused).toBe(true);
+    expect(runner.running).toEqual([]);
+
+    autopilot.resume();
+    expect(runner.running).toEqual([card(1).id]);
+    autopilot.stop(); // fechar o editor: não é uma pausa da pessoa
+    expect(autopilot.isActive).toBe(false);
+    expect(runner.running).toEqual([]);
+    expect(router.snapshot().board.runner.autopilotPaused).toBe(false);
+
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
+    flush();
+    expect(autopilot.isActive).toBe(true);
+    expect(runner.started).toHaveLength(3);
+  });
+
+  it('falha ao iniciar a ferramenta não religa sozinho na próxima mudança do board; retomar tenta de novo', () => {
+    runner.failToStart = 'O Claude Code não está instalado.';
+    create('A', 'PRD');
+    yolo(1);
+    expect(autopilot.isActive).toBe(false);
     router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
     flush();
     expect(autopilot.isActive).toBe(false);
     expect(runner.started).toEqual([]);
 
+    runner.failToStart = null;
     autopilot.resume();
     expect(runner.started).toEqual([card(1).id]);
   });

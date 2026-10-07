@@ -205,7 +205,7 @@ export interface CardLink {
 
 /** Estado do autopiloto, que toca sozinho as histórias em modo autônomo, uma de cada vez. */
 export interface Autopilot {
-  /** está tocando as histórias; desligado depois de pausar, ou ao abrir o editor, até alguém ligar o modo numa história ou retomar */
+  /** está tocando as histórias; desligado depois de pausar ou quando a fila acaba; liga sozinho ao abrir o editor com história pendente */
   active: boolean;
   /** por que está parado esperando uma pessoa (impedimento numa história); null quando segue normalmente */
   note: string | null;
