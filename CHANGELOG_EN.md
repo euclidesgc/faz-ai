@@ -24,6 +24,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   #N", even with #N itself ready further down the board. Now a story waiting for a dependency is
   skipped and the turn goes to the next story that can run; only when none can does the queue stop,
   with the first story's reason.
+- **Queue order: the most advanced story finishes before a new one starts.** The execution order
+  (heartbeat, autonomous mode and `get_pending_work`) was bug, card row and only then column, so a
+  story just created at the top of Discovery jumped ahead of a half-done Implementação. Now it is
+  bugs first; then the rightmost column; within a column, top to bottom. A new bug becomes next in
+  the queue as soon as the current run finishes.
 - **"Como testar" (how to test) script in the card description and the pull request.** In
   Homologação the AI now writes the test script (what was built, the steps with the expected result
   and what was left out) in the story's description and in the PR body, not only in the

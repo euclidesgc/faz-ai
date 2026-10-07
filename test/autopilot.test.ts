@@ -124,11 +124,13 @@ describe('autopilotStep', () => {
     owns = false; // só olha o passo; quem decide não age
   });
 
-  it('trata uma história de cada vez, a de cima do board primeiro', () => {
-    create('A', 'Backlog'); // #1
-    create('B', 'PRD'); // #2
-    yolo(2);
+  it('trata uma história de cada vez, a mais à direita do board primeiro: a adiantada termina antes de a nova começar', () => {
+    create('A', 'Backlog'); // #1, no topo da primeira coluna
+    create('B', 'PRD'); // #2, mais adiante
     yolo(1);
+    yolo(2);
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 2 } });
+    move(2, 'Concluído');
     expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 1 }, column: { name: 'Discovery' } });
   });
 
@@ -142,21 +144,21 @@ describe('autopilotStep', () => {
     expect(step.kind === 'paused' && step.reason).toContain('#1');
   });
 
-  it('história que espera outra da própria fila não a segura: a vez passa para a dependência, mais abaixo no board', () => {
-    create('Base', 'Implementação'); // #1, no fim do fluxo
-    create('Y', 'PRD'); // #2, coluna anterior: vem antes na ordem de execução
-    ai({ type: 'link.add', fromId: card(1).id, toId: card(2).id, kind: 'precedes' });
+  it('história que espera outra da própria fila não a segura: a vez passa para a dependência, logo abaixo no board', () => {
+    create('Y', 'PRD'); // #1, depende da #2 e está no topo da própria coluna
+    create('Base', 'PRD'); // #2, logo abaixo
+    ai({ type: 'link.add', fromId: card(2).id, toId: card(1).id, kind: 'precedes' });
     owns = false;
     yolo(1);
     yolo(2);
-    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 1 } });
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 2 } });
     owns = true;
     autopilot.resume();
-    expect(runner.started).toEqual([card(1).id]);
+    expect(runner.started).toEqual([card(2).id]);
     // a dependência concluiu: a história que esperava ganha a vez
-    runner.finish(() => move(1, 'Concluído'));
+    runner.finish(() => move(2, 'Concluído'));
     flush();
-    expect(runner.started).toEqual([card(1).id, card(2).id]);
+    expect(runner.started).toEqual([card(2).id, card(1).id]);
   });
 
   it('com todas as histórias esperando dependência, a fila para com o motivo da primeira', () => {
@@ -199,8 +201,8 @@ describe('autopilotStep', () => {
   });
 
   it('o card bloqueado segura a fila, e a sub-tarefa vai junto da história', () => {
-    create('A', 'PRD'); // #1, acima da B no board
-    create('B', 'Implementação'); // #2
+    create('A', 'Implementação'); // #1, a mais à direita: a vez é dela
+    create('B', 'PRD'); // #2
     create('Passo', 'A fazer', 1); // #3
     yolo(1);
     yolo(2);
@@ -294,12 +296,11 @@ describe('autopiloto', () => {
       move(1, 'PRD'); // sem aprovação, porque a história é YOLO
     });
     expect(columnName(1)).toBe('PRD');
-    // a A saiu do Backlog e a B subiu para a linha de cima: pela ordem do board a vez é dela
-    expect(runner.started).toEqual([card(1).id, card(2).id]);
+    // a A avançou e agora é a mais à direita: continua com ela até concluir, a B espera
+    expect(runner.started).toEqual([card(1).id, card(1).id]);
 
-    runner.finish(() => move(2, 'Concluído'));
-    expect(runner.started).toEqual([card(1).id, card(2).id, card(1).id]); // sem a B na fila, a A retoma
-    expect(columnName(1)).toBe('PRD');
+    runner.finish(() => move(1, 'Concluído'));
+    expect(runner.started).toEqual([card(1).id, card(1).id, card(2).id]); // só então a B entra
   });
 
   it('acaba a fila e se desliga; uma nova história em modo autônomo o liga de novo', () => {

@@ -23,6 +23,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   autopiloto com "espera #N terminar", mesmo com a própria #N pronta mais abaixo. Agora a história que
   espera dependência é pulada e a vez passa para a próxima que pode rodar; só quando nenhuma pode a
   fila para, com o motivo da primeira.
+- **Ordem da fila: a história mais adiantada termina antes de uma nova começar.** A ordem de
+  execução (heartbeat, modo autônomo e `get_pending_work`) era bug, linha do card e só então coluna,
+  o que fazia uma história recém-criada no topo do Discovery passar na frente de uma Implementação
+  pela metade. Agora é bug primeiro; depois a coluna mais à direita; na mesma coluna, de cima para
+  baixo. Um bug novo entra como o próximo da fila assim que a execução em andamento termina.
 - **Roteiro "Como testar" na descrição do card e no pull request.** Na Homologação, a IA passa a
   gravar o roteiro de testes (o que foi construído, os passos com o resultado esperado e o que ficou
   de fora) na descrição da história e no corpo do PR, e não só na conversa. A instrução padrão da
