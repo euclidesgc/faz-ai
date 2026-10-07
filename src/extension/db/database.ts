@@ -48,6 +48,9 @@ export function exportBytes(db: Database): Uint8Array {
  * Apaga as linhas que violam chave estrangeira (deixadas pelas versões que gravavam com as chaves
  * desligadas) e devolve quantas apagou. Todas as FKs do schema são ON DELETE CASCADE ou sem ação: apagar a
  * linha órfã é o que teria acontecido com as chaves ligadas. Repete porque apagar um órfão pode cascatear.
+ * Um órfão ainda apontado por outra linha sem cascata (o workflow de um board apagado, que os tipos de
+ * card órfãos usam como padrão) é recusado pelo SQLite: fica para a rodada seguinte, depois que quem o
+ * segura sair. O que nunca sai (apontado por dados que não são órfãos) fica, e o board abre assim mesmo.
  */
 export function cleanOrphans(db: Database): number {
   let removed = 0;
@@ -56,13 +59,21 @@ export function cleanOrphans(db: Database): number {
     const rows = res[0]?.values ?? [];
     if (!rows.length) break;
     const seen = new Set<string>();
+    let progressed = false;
     for (const [table, rowid] of rows) {
       const key = `${String(table)}:${String(rowid)}`;
       if (rowid == null || seen.has(key)) continue;
       seen.add(key);
-      db.run(`DELETE FROM "${String(table)}" WHERE rowid = ?`, [rowid]);
-      removed += db.getRowsModified();
+      try {
+        db.run(`DELETE FROM "${String(table)}" WHERE rowid = ?`, [rowid]);
+      } catch {
+        continue;
+      }
+      const n = db.getRowsModified();
+      removed += n;
+      if (n) progressed = true;
     }
+    if (!progressed) break;
   }
   return removed;
 }
