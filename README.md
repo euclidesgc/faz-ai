@@ -619,10 +619,12 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
 - **Em fila e em pilha**: o **autopiloto** toca as histórias em modo autônomo uma de cada vez, na
   ordem do board — bugs na frente, depois de cima para baixo —, e segue para a próxima história da
   fila assim que a atual é entregue (parada na última coluna da IA, com o pull request registrado),
-  sem esperar a sua revisão nem o intervalo do heartbeat. A branch de cada história parte da branch da
-  história de número anterior que já tem branch, e o pull request é aberto com `--base` nela,
-  formando uma pilha de PRs; quando a ordem do board faz uma história rodar antes de outra de
-  número menor, a branch dela parte da principal e o pull request sai solto, fora da pilha.
+  sem esperar a sua revisão nem o intervalo do heartbeat. A branch de cada história parte da branch
+  criada mais recentemente entre as outras histórias do modo autônomo ainda abertas — a mesma ordem em
+  que a fila roda, mesmo depois de arrastar cards —, e o pull request é aberto com `--base` nela,
+  formando uma pilha de PRs; sem nenhuma outra história aberta antes dela, a branch parte da principal.
+  Uma história cuja anterior na pilha já teve o pull request mesclado também parte da principal, já que
+  o código dela já está lá.
 - **Dividir um pedido grande**: a IA pode criar as histórias seguintes a partir de uma história em
   modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo, entram na fila
   e ganham um vínculo **relativo** com a história de origem (pulado em silêncio se já existir

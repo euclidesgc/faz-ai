@@ -7,6 +7,12 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Fix: the autonomous-mode branch stack came out wrong after reordering the queue by drag.** A new
+  autonomous-mode story's branch now starts from the most recently created branch among the open YOLO
+  stories — the same order the execution queue runs in — instead of starting from the nearest
+  lower-numbered story. Before, dragging a card to the top of the queue left the pull request stack
+  branching off a base that did not match the real run order, requiring a manual rebase. A story whose
+  predecessor already had its pull request merged now starts directly from the main branch.
 - **Fix: the board would not open, with "FOREIGN KEY constraint failed".** The one-time orphan
   cleanup that runs when the database opens stopped at the first orphan still referenced by another
   orphan (an old board's workflow used by its card types). It now retries once the referencing rows

@@ -6,6 +6,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Correção: a pilha de branches do modo autônomo saía errada ao reordenar a fila por arrasto.** A
+  branch de uma história nova do modo autônomo agora parte da branch criada mais recentemente entre
+  as histórias YOLO abertas — a mesma ordem em que a fila de execução roda — em vez de partir da
+  história de número de card menor mais próximo. Antes, arrastar um card para cima da fila deixava
+  a pilha de pull requests com bases divergentes da ordem real, exigindo rebase manual. Histórias
+  cuja história anterior já teve o pull request mesclado passam a partir direto da branch principal.
 - **Correção: o board não abria com "FOREIGN KEY constraint failed".** A limpeza única de linhas
   órfãs, que roda ao abrir o banco, parava no primeiro órfão ainda apontado por outro órfão (o
   workflow de um board antigo usado pelos tipos de card dele). Agora ela tenta de novo depois que

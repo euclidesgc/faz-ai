@@ -644,10 +644,12 @@ story by itself, **without asking for authorization or confirmation on anything*
 - **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in board
   order — bugs first, then top to bottom — and moves on to the next story in the queue as soon as
   the current one is delivered (stopped at the AI's last column, with the pull request recorded),
-  without waiting for your review or the heartbeat interval. Each story's branch starts from the branch of the
-  closest lower-numbered story that already has one, and its pull request is opened with `--base`
-  on it, forming a stack of PRs; when the board order runs a story before a lower-numbered one, its
-  branch starts from the main branch and its pull request stands alone, outside the stack.
+  without waiting for your review or the heartbeat interval. Each story's branch starts from the
+  most recently created branch among the other autonomous-mode stories still open — the same order
+  the queue runs in, even after dragging cards — and its pull request is opened with `--base` on it,
+  forming a stack of PRs; with no other open story ahead of it, the branch starts from the main
+  branch. A story whose predecessor in the stack already had its pull request merged also starts
+  from the main branch, since its code is already there.
 - **Splitting a large request**: the AI can create the following stories from an autonomous story
   (`create_card` with `autonomous_from`). They are born autonomous, join the queue, and get a
   **related** link to the origin story (skipped silently if any link already exists between the

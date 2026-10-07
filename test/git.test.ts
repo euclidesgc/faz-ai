@@ -146,6 +146,7 @@ describe('branch e worktree por história', () => {
     // a primeira parte da principal
     const first = (await call('prepare_workspace', { card: 1 })).data;
     expect(first.baseBranch).toBeUndefined();
+    expect(card(1).branchCreatedAt).not.toBe('');
     const dir1 = first.path;
     fs.writeFileSync(path.join(dir1, 'base.txt'), 'da primeira');
     git(dir1, 'add', '.');
@@ -161,9 +162,12 @@ describe('branch e worktree por história', () => {
     git(second.path, 'config', 'user.name', 'Teste');
     git(second.path, 'commit', '-q', '--allow-empty', '-m', 'segunda');
 
-    // a terceira se apoia na segunda; chamar de novo mantém a base escolhida
+    // a terceira se apoia na segunda; chamar de novo mantém a base e o momento de criação da branch
+    const secondCreatedAt = card(2).branchCreatedAt;
+    expect(secondCreatedAt).not.toBe('');
     expect((await call('prepare_workspace', { card: 3 })).data.baseBranch).toBe(second.branch);
     expect((await call('prepare_workspace', { card: 2 })).data.baseBranch).toBe(first.branch);
+    expect(card(2).branchCreatedAt).toBe(secondCreatedAt);
 
     // quem não está em modo autônomo parte da principal
     const outside = (await call('prepare_workspace', { card: 4 })).data;

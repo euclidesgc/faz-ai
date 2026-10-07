@@ -30,6 +30,7 @@ export const card = (id: string, over: Partial<Card> = {}): Card => ({
   branch: '',
   worktreePath: '',
   baseBranch: '',
+  branchCreatedAt: '',
   prUrl: '',
   mergeCommit: '',
   execProfile: null,

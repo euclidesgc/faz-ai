@@ -4,6 +4,7 @@ import type { Card } from '../../../shared/model';
 import { branchName, slug } from '../../../shared/git';
 import { columnOf, isLive } from '../../../shared/selectors';
 import { isPullRequestUrl, lastAiColumn, stackBaseOf, storyOf } from '../../../shared/story';
+import { now } from '../../db/ids';
 import { prepareWorkspace } from '../../git';
 import type { BoardContext, HandlerMap } from './context';
 
@@ -61,7 +62,10 @@ function prepareStoryWorkspace(ctx: BoardContext, cardId: string): void {
     base: story.branch ? story.baseBranch : (stackBaseOf(s, story)?.branch ?? ''),
   });
   ctx.cards.setWorkspace(story.id, ws.branch, ws.path);
-  if (!story.branch) ctx.cards.setBaseBranch(story.id, ws.base);
+  if (!story.branch) {
+    ctx.cards.setBaseBranch(story.id, ws.base);
+    ctx.cards.setBranchCreatedAt(story.id, now());
+  }
 }
 
 /** Branch, worktree e pull request da história. */
