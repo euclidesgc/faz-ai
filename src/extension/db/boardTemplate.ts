@@ -2,7 +2,12 @@ import type { Database } from 'sql.js';
 import { norm } from '../../shared/filters';
 import type { ColumnCategory, WorkflowKind } from '../../shared/model';
 import { newId } from './ids';
-import { HOMOLOGATION_INSTRUCTION_V2, HOMOLOGATION_INSTRUCTION_V4, IMPLEMENTATION_INSTRUCTION_V2, PHASE_DEFAULTS } from '../../shared/phaseDefaults';
+import {
+  HOMOLOGATION_INSTRUCTION_V2,
+  HOMOLOGATION_INSTRUCTION_V4,
+  IMPLEMENTATION_INSTRUCTION_V2,
+  PHASE_DEFAULTS,
+} from '../../shared/phaseDefaults';
 import { all, bool, num, one, run, str, transaction } from './query';
 
 /**
