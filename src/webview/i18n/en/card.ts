@@ -53,6 +53,8 @@ export const card: Record<string, string> = {
   'Mostrar na pasta': 'Show in folder',
   'Pré-visualização não disponível.': 'Preview not available.',
   'Conteúdo do anexo': 'Attachment content',
+  'Modo de visualização': 'View mode',
+  Formatado: 'Formatted',
   'Copiar conteúdo': 'Copy content',
   'Só anexos de texto têm conteúdo para copiar.': 'Only text attachments have content to copy.',
   'Salvar como…': 'Save as…',

@@ -1059,6 +1059,10 @@ button.ghost.on {
   max-width: 100%;
 }
 .markdown table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
 }
 .markdown td,
