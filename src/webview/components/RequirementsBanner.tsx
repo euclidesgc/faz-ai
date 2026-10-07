@@ -171,7 +171,8 @@ export function CopyCommand({ command }: { command: string }) {
  */
 export function aiBlockedReason(state: BoardState): string | null {
   if (state.aiRunUnsupported) return t(state.aiRunUnsupported);
-  if (state.authExpired) return t('O login do {tool} venceu: veja o aviso no topo do board.', { tool: aiToolInfo(state.authExpired).label });
+  if (state.authExpired)
+    return t('O login do {tool} venceu: veja o aviso no topo do board.', { tool: aiToolInfo(state.authExpired).label });
   const cli = state.requirements.find((r) => r.id === 'cli' || r.id === 'signin');
   if (!cli) return null;
   return cli.id === 'cli'

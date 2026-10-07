@@ -6,6 +6,17 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Login vencido: aviso de erro no board, em vez de parar sem explicação.** O login da ferramenta
+  passa a ser conferido de verdade para o Claude Code (`claude auth status`) e, de forma best-effort,
+  para o Codex, além do Cursor já existente; antes de cada chamada da IA (botão do card, heartbeat,
+  modo autônomo), o board confere de novo, com um cache curto. Quando o motivo da faixa amarela é
+  login, ela ganha destaque de erro e o botão **Abrir no terminal**, que roda o comando ali, mas o
+  login em si continua sendo sempre feito por você. Quando o login vence no meio de uma execução, ou
+  numa ferramenta sem comando de status (Kimi, Copilot), a primeira falha com um padrão conhecido
+  ("OAuth session expired", "not logged in", "401" etc.) não bloqueia mais o card: ele volta ao status
+  anterior, com um comentário curto, e liga o mesmo aviso de erro — o heartbeat e o modo autônomo
+  param de tentar sozinhos enquanto ele estiver ligado, e retomam sozinhos quando o login é confirmado
+  de novo. O Diagnóstico do ambiente mostra o mesmo item para qualquer ferramenta, não só o Cursor.
 - **Correção: a pilha de branches do modo autônomo saía errada ao reordenar a fila por arrasto.** A
   branch de uma história nova do modo autônomo agora parte da branch criada mais recentemente entre
   as histórias YOLO abertas — a mesma ordem em que a fila de execução roda — em vez de partir da

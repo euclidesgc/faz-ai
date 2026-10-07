@@ -257,7 +257,9 @@ MCP do board (global)** da paleta faz a instalação padrão na ferramenta do pr
 
 Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, uma faixa amarela fica no topo
 do board, em todas as telas, e no painel de chat. Ela confere o Node.js (o servidor do board roda
-com ele), a linha de comando da ferramenta, o login dela (no Cursor, por `cursor-agent status`), o
+com ele), a linha de comando da ferramenta, o login dela (no Cursor por `cursor-agent status`, no
+Claude Code por `claude auth status` e, de forma best-effort, no Codex; Kimi e Copilot não têm
+comando de status e dependem só do aviso reativo abaixo), o
 registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
 para o seu usuário, de `claude mcp add -s user`), um registro apontando para um node ou um caminho
 que não existe mais, para outra pasta ou para a ponte de uma versão anterior, e o nível de
@@ -275,6 +277,20 @@ mesmo onde as execuções pelo board levam o MCP sozinhas (Claude, Cursor), a co
 editor ou no terminal depende dele, e a skill é o que faz a IA seguir o fluxo. A falta da skill tem o
 botão **Instalar a skill** na própria faixa. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
 desligados, com o motivo na dica.
+
+**Login vencido: aviso de erro e retomada sozinha.** Quando o motivo da faixa é login (faltando ou
+vencido no meio de uma execução), ela fica com destaque de erro, em vez do amarelo comum, e ganha o
+botão **Abrir no terminal** ao lado do comando para copiar: o board abre um terminal do editor e roda
+o comando ali, mas o login em si é sempre feito por você. Antes de cada chamada da IA (o botão do
+card, o heartbeat e o modo autônomo) o board confere o login de novo; se ele venceu, a execução nem
+começa. Quando a ferramenta não tem comando de status (Kimi, Copilot) ou o login vence no meio de uma
+execução, a primeira falha que bater um padrão conhecido ("OAuth session expired", "not logged in",
+"401" etc.) não bloqueia o card: ele volta ao status que tinha, com um comentário curto, e o mesmo
+aviso de erro liga no topo do board — o heartbeat e o modo autônomo não tentam de novo sozinhos
+enquanto ele estiver ligado. O aviso some e a fila volta a andar sozinha quando o login é confirmado
+de novo (pela conferência periódica, em até 10 segundos depois de ligar, ou por **Já entrei:
+verificar de novo**) ou, nas ferramentas sem comando de status, na primeira execução manual que der
+certo. O Diagnóstico do ambiente mostra o mesmo aviso no item **Login na linha de comando**.
 
 **Diagnóstico do ambiente.** Na primeira abertura do board na máquina, abre sozinha uma lista, no
 estilo do `flutter doctor`, com tudo de que o board precisa e o que ele aproveita. Depois, ela abre

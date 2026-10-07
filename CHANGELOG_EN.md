@@ -7,6 +7,18 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Expired tool login: an error warning on the board, instead of stopping without explanation.**
+  The tool's sign-in is now actually checked for Claude Code (`claude auth status`) and, best-effort,
+  for Codex, in addition to the existing Cursor check; before every AI call (the card's button, the
+  heartbeat, autonomous mode), the board checks again, with a short cache. When the yellow bar's
+  reason is sign-in, it switches to an error highlight and gains the **Abrir no terminal** (open in
+  terminal) button, which runs the command there, but the actual sign-in is still always done by you.
+  When the login expires mid-run, or on a tool with no status command (Kimi, Copilot), the first
+  failure matching a known pattern ("OAuth session expired", "not logged in", "401", etc.) no longer
+  blocks the card: it goes back to its previous status, with a short comment, and turns on the same
+  error warning — the heartbeat and autonomous mode stop retrying on their own while it is on, and
+  resume on their own once the sign-in is confirmed again. The environment check shows the same item
+  for any tool, not just Cursor.
 - **Fix: the autonomous-mode branch stack came out wrong after reordering the queue by drag.** A new
   autonomous-mode story's branch now starts from the most recently created branch among the open YOLO
   stories — the same order the execution queue runs in — instead of starting from the nearest
