@@ -104,6 +104,9 @@ is needed, at the right time:
   Claude Code and Cursor enforce by parameter is in the [Agents](#agents) table).
 - **Documents as attachments.** PRD, Spec and Plan stay attached to the story; the AI reads them
   when the card needs it, instead of getting them pasted into every message.
+- **Markdown attachments open formatted.** A `.md`/`.markdown` file opens like a page, with headings,
+  lists, tables and code blocks formatted; a **Formatted**/**Code** selector shows the raw text when
+  needed. Edit, Save and Copy content still operate on the Markdown.
 - **The right model for each task.** Suggestion rules and the model per card or per agent avoid
   using the most expensive model where a lighter one is enough.
 

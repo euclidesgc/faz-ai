@@ -7,6 +7,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Markdown attachments open formatted.** A `.md`/`.markdown` attachment (such as a story's PRD,
+  Spec or Plan document) now opens with headings, lists, tables and code blocks already formatted,
+  instead of the raw text with `#`, `**` and `|---|`. A **Formatted** / **Code** selector in the
+  window header switches to the raw text when needed; Edit, Save and Copy content still operate on
+  the Markdown, as before. Images, JSON, plain text and types without a preview are unchanged.
 - **Fix: the autonomous-mode branch stack came out wrong after reordering the queue by drag.** A new
   autonomous-mode story's branch now starts from the most recently created branch among the open YOLO
   stories — the same order the execution queue runs in — instead of starting from the nearest

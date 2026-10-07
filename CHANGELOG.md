@@ -6,6 +6,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Anexos em Markdown abrem formatados.** Um anexo `.md`/`.markdown` (como o PRD, o Spec ou o Plan
+  de uma história) agora abre com títulos, listas, tabelas e blocos de código já formatados, em vez
+  do texto cru com `#`, `**` e `|---|`. Um seletor **Formatado** / **Código** no cabeçalho da janela
+  alterna para o texto cru quando é preciso; Editar, Salvar e Copiar conteúdo continuam operando
+  sobre o Markdown, como antes. Imagens, JSON, texto puro e os tipos sem pré-visualização não mudam.
 - **Correção: a pilha de branches do modo autônomo saía errada ao reordenar a fila por arrasto.** A
   branch de uma história nova do modo autônomo agora parte da branch criada mais recentemente entre
   as histórias YOLO abertas — a mesma ordem em que a fila de execução roda — em vez de partir da
