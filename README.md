@@ -587,7 +587,8 @@ arquivos em disco por história (com as dependências instaladas em cada uma) e 
 processador enquanto várias sessões de IA, testes e builds rodam juntos.
 
 - Sem pendência com a IA, nada é executado.
-- A fila da rodada segue a ordem do board: os bugs primeiro e, depois, de cima para baixo — o que
+- A fila da rodada segue a ordem do board: os bugs primeiro; depois a história mais à direita (a
+  mais adiantada termina antes de uma nova começar); na mesma coluna, de cima para baixo — o que
   decide é a posição do card, não o número dele nem o que já foi aprovado.
 - Cards que estão com você (aguardando revisão ou resposta, bloqueados) não são tocados, a menos
   que você tenha deixado uma mensagem sem resposta na conversa.
@@ -622,7 +623,7 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
 - **Sem restrições**: nas execuções do modo, a IA roda com a permissão "Sem restrições" (altera
   arquivos e roda comandos), porque precisa de git e do `gh`. Ligar o modo é aceitar isso para a história.
 - **Em fila e em pilha**: o **autopiloto** toca as histórias em modo autônomo uma de cada vez, na
-  ordem do board — bugs na frente, depois de cima para baixo —, e segue para a próxima história da
+  ordem do board — bugs na frente, depois a mais à direita, e na mesma coluna de cima para baixo —, e segue para a próxima história da
   fila assim que a atual é entregue (parada na última coluna da IA, com o pull request registrado),
   sem esperar a sua revisão nem o intervalo do heartbeat. Uma história que espera outro card
   terminar (dependência) não segura a fila: a vez passa para a próxima que pode rodar, em geral a

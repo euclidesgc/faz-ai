@@ -420,7 +420,7 @@ export function pendingOverview(s: BoardState) {
     order: queue.map(cardRef),
     withPerson: humanQueue(s, p).map((c) => cardSummary(s, c)),
     next: queue.length
-      ? 'Siga a ordem de order (bug primeiro, depois de cima para baixo no board); approved, unanswered e ready dizem o que fazer com cada card dessa ordem. Não mexa no que está em withPerson.'
+      ? 'Siga a ordem de order (bug primeiro, depois a coluna mais à direita, e na mesma coluna de cima para baixo); approved, unanswered e ready dizem o que fazer com cada card dessa ordem. Não mexa no que está em withPerson.'
       : 'Nada pendente com você. Encerre sem alterar o board.',
   };
 }

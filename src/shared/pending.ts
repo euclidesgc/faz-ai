@@ -50,12 +50,12 @@ export function pendingWork(s: BoardState): PendingWork {
   };
 }
 
-/** Cards cuja pendência está com a pessoa, na ordem de execução: bug primeiro, depois de cima para baixo no board. */
+/** Cards cuja pendência está com a pessoa, na ordem de execução: bug primeiro, depois a coluna mais à direita, e na mesma coluna de cima para baixo. */
 export const humanQueue = (s: BoardState, p: PendingWork): Card[] =>
   [...p.human.waitingReview, ...p.human.waitingAnswer, ...p.human.blocked].sort(byExecutionOrder(s));
 /**
- * Cards cuja pendência está com a IA, na ordem de execução: bug primeiro, depois de cima para baixo no
- * board. A categoria (aprovado, sem resposta, pronto) não pesa na ordem, só o comparador.
+ * Cards cuja pendência está com a IA, na ordem de execução: bug primeiro, depois a coluna mais à
+ * direita, e na mesma coluna de cima para baixo. A categoria (aprovado, sem resposta, pronto) não pesa na ordem, só o comparador.
  * Vazio quando não há nada para ela fazer.
  */
 export const aiQueue = (s: BoardState, p: PendingWork): Card[] =>

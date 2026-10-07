@@ -612,7 +612,8 @@ cost of one more copy of the files on disk per story (with dependencies installe
 memory and CPU while several AI sessions, tests and builds run together.
 
 - With nothing pending for the AI, nothing runs.
-- The round follows the board order: bugs first, then top to bottom — what decides is the card's
+- The round follows the board order: bugs first; then the rightmost story (the most advanced one
+  finishes before a new one starts); within a column, top to bottom — what decides is the card's
   position, not its number nor what has already been approved.
 - Cards that are with you (waiting for review or an answer, blocked) are not touched, unless you
   left an unanswered message in the conversation.
@@ -647,7 +648,7 @@ story by itself, **without asking for authorization or confirmation on anything*
 - **No restrictions**: in the mode's runs the AI uses the "Sem restrições" permission (edits files
   and runs commands), because it needs git and `gh`. Turning the mode on accepts this for the story.
 - **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in board
-  order — bugs first, then top to bottom — and moves on to the next story in the queue as soon as
+  order — bugs first, then the rightmost, and within a column top to bottom — and moves on to the next story in the queue as soon as
   the current one is delivered (stopped at the AI's last column, with the pull request recorded),
   without waiting for your review or the heartbeat interval. A story waiting for another card
   to finish (a dependency) does not hold the queue: the turn goes to the next story that can run,
