@@ -1,6 +1,7 @@
 import type { AiTool } from '../../../shared/harness';
 import type { FieldDef } from '../../../shared/model';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelRule } from '../../../shared/models';
+import { applyBuiltinPrices } from '../../../shared/prices';
 import { valueOf } from '../../../shared/selectors';
 import { newId } from '../../db/ids';
 import { detectTools, effortTiers, fastBaseId, isFastVariant, modelsFor } from '../../models';
@@ -8,15 +9,28 @@ import type { BoardContext, HandlerMap } from './context';
 
 /**
  * Board sem catálogo (novo ou vindo de versão anterior): escolhe a ferramenta instalada nesta
- * máquina e preenche os modelos e as regras de esforço dela.
+ * máquina e preenche os modelos e as regras de esforço dela. Com catálogo, sincroniza os preços
+ * embutidos com a tabela desta versão.
  */
 export function initModels(ctx: BoardContext): void {
   const { board } = ctx.state();
-  if (board.modelCatalog.length) return;
+  if (board.modelCatalog.length) return syncBuiltinPrices(ctx);
   const installed = detectTools(ctx.home);
   const tool = installed.includes(board.aiTool) ? board.aiTool : (installed[0] ?? board.aiTool);
   if (tool !== board.aiTool) ctx.boards.updateBoard(ctx.boardId, { aiTool: tool });
   useTool(ctx, tool);
+}
+
+/**
+ * Aplica a tabela de preços embutida desta versão ao catálogo gravado: preenche quem não tem
+ * preço e troca os de origem `builtin`; `manual` nunca muda. Roda a cada abertura do board, e só
+ * grava quando algo mudou: idempotente, dispensa um detector de versão da extensão (a tabela nova
+ * entra na primeira abertura depois da atualização).
+ */
+export function syncBuiltinPrices(ctx: BoardContext): void {
+  const { board } = ctx.state();
+  const next = applyBuiltinPrices(board.modelCatalog);
+  if (JSON.stringify(next) !== JSON.stringify(board.modelCatalog)) ctx.boards.setModelCatalog(ctx.boardId, next);
 }
 
 /** Passa a trabalhar com a ferramenta: pasta de skills, modelos e regras de esforço dela. */
@@ -41,10 +55,14 @@ function detectModels(ctx: BoardContext, tool: AiTool): void {
     .filter((o) => board.rules.includeFastModels || !isFastVariant(o, all))
     .map((o) => {
       const before = saved.get(o.id);
-      // o "preço variável" também é escolha da pessoa: sem ele, o modelo voltaria a pedir tarifa fixa
+      // o "preço variável" também é escolha da pessoa: sem ele, o modelo voltaria a pedir tarifa fixa;
+      // a origem do preço acompanha o preço (sem ela, um manual passaria por embutido e vice-versa)
       return {
         ...o,
         ...(before?.price ? { price: before.price } : {}),
+        ...(before?.priceSource !== undefined ? { priceSource: before.priceSource } : {}),
+        ...(before?.priceCheckedAt !== undefined ? { priceCheckedAt: before.priceCheckedAt } : {}),
+        ...(before?.priceUrl !== undefined ? { priceUrl: before.priceUrl } : {}),
         ...(before?.variablePrice !== undefined ? { variablePrice: before.variablePrice } : {}),
       };
     });
@@ -52,7 +70,8 @@ function detectModels(ctx: BoardContext, tool: AiTool): void {
   const rest = board.modelCatalog.filter((o) => !ids.has(o.id));
   const at = rest.findIndex((o) => o.tool === tool);
   rest.splice(at < 0 ? rest.length : at, 0, ...found);
-  ctx.boards.setModelCatalog(ctx.boardId, rest);
+  // os recém-chegados sem preço recebem o embutido
+  ctx.boards.setModelCatalog(ctx.boardId, applyBuiltinPrices(rest));
 }
 
 /**
@@ -129,7 +148,8 @@ export function applySuggestion(ctx: BoardContext, cardId: string, previous: str
 /** Catálogo de modelos e regras de sugestão. */
 export const modelHandlers = {
   'settings.models.set': (msg, ctx) => {
-    ctx.boards.setModelCatalog(ctx.boardId, msg.catalog);
+    // a lista é a que a pessoa mandou; a tabela só preenche quem está sem preço (manual não muda)
+    ctx.boards.setModelCatalog(ctx.boardId, applyBuiltinPrices(msg.catalog));
     return true;
   },
   'settings.models.detect': (msg, ctx) => {
