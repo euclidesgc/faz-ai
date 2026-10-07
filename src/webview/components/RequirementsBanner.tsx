@@ -166,8 +166,11 @@ function actionable(r: BoardRequirement, compact: boolean): boolean {
   return kind === 'command' || kind === 'connect' || kind === 'fixProject';
 }
 
-/** A ação que resolve o requisito: o comando com copiar, ou o botão que faz. */
-export function RequirementFix({ r, compact = false }: { r: BoardRequirement; compact?: boolean }) {
+/**
+ * A ação que resolve o requisito: o comando com copiar, ou o botão que faz. `onFixed` roda depois de
+ * um botão que muda algo na máquina (o Diagnóstico confere de novo para o item mudar de estado).
+ */
+export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequirement; compact?: boolean; onFixed?: () => void }) {
   const openSettings = useBoardStore((s) => s.openSettings);
   const openMcpInstall = () => {
     useBoardStore.setState({ harnessTab: 'all' });
@@ -187,7 +190,13 @@ export function RequirementFix({ r, compact = false }: { r: BoardRequirement; co
       );
     case 'fixProject':
       return (
-        <Button size="small" onClick={() => ui.fixProjectMcp(action.file)}>
+        <Button
+          size="small"
+          onClick={() => {
+            ui.fixProjectMcp(action.file);
+            onFixed?.();
+          }}
+        >
           <IconConnect /> {t('Corrigir o registro')}
         </Button>
       );

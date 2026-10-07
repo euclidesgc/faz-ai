@@ -184,7 +184,7 @@ function ExternalLink({ href, children }: { href: string; children: ReactNode })
 }
 
 /** Como resolver o item: a ação do aviso de requisitos, os comandos, o botão que instala ou o link de download. */
-function Fix({ check, tool, installNote }: { check: EnvCheck; tool: AiTool; installNote?: string }) {
+function Fix({ check, tool, installNote, onFixed }: { check: EnvCheck; tool: AiTool; installNote?: string; onFixed: () => void }) {
   if (check.status !== 'missing') return null;
   const parts: ReactNode[] = [];
   if (check.requirement) {
@@ -194,7 +194,7 @@ function Fix({ check, tool, installNote }: { check: EnvCheck; tool: AiTool; inst
         {requirementTexts(check.requirement).detail}
       </p>,
     );
-    parts.push(<RequirementFix key="action" r={check.requirement} />);
+    parts.push(<RequirementFix key="action" r={check.requirement} onFixed={onFixed} />);
   }
   if (check.fix?.kind === 'commands') {
     if (installNote) parts.push(<p key="note">{installNote}</p>);
@@ -210,7 +210,15 @@ function Fix({ check, tool, installNote }: { check: EnvCheck; tool: AiTool; inst
   }
   if (check.fix?.kind === 'installSkill')
     parts.push(
-      <Button key="skill" size="small" onClick={() => harness.installFlowSkill(tool, 'user')}>
+      <Button
+        key="skill"
+        size="small"
+        onClick={() => {
+          harness.installFlowSkill(tool, 'user');
+          // a instalação muda o harness na hora: conferir de novo leva o item para "Pronto"
+          onFixed();
+        }}
+      >
         {t('Instalar a skill')}
       </Button>,
     );
@@ -224,7 +232,7 @@ function Fix({ check, tool, installNote }: { check: EnvCheck; tool: AiTool; inst
   return <div className="env-fix">{parts}</div>;
 }
 
-function CheckItem({ check, tool }: { check: EnvCheck; tool: AiTool }) {
+function CheckItem({ check, tool, onFixed }: { check: EnvCheck; tool: AiTool; onFixed: () => void }) {
   const x = texts(check.id, tool);
   const icon = check.status === 'ok' ? STATUS_ICON.ok : check.status === 'skipped' ? STATUS_ICON.skipped : STATUS_ICON[check.level];
   const docs = docsOf(check.id, tool);
@@ -248,7 +256,7 @@ function CheckItem({ check, tool }: { check: EnvCheck; tool: AiTool }) {
             </>
           )}
         </dl>
-        <Fix check={check} tool={tool} installNote={x.installNote} />
+        <Fix check={check} tool={tool} installNote={x.installNote} onFixed={onFixed} />
         {docs && (
           <ExternalLink href={docs}>
             <span className="small">{t('Saiba mais')}</span>
@@ -330,7 +338,7 @@ export function EnvironmentView() {
             <h3 id="env-required">{t('Necessário')}</h3>
             <ul className="env-list">
               {required.map((c) => (
-                <CheckItem key={c.id} check={c} tool={report.tool} />
+                <CheckItem key={c.id} check={c} tool={report.tool} onFixed={recheck} />
               ))}
             </ul>
           </section>
@@ -338,7 +346,7 @@ export function EnvironmentView() {
             <h3 id="env-recommended">{t('Recomendado')}</h3>
             <ul className="env-list">
               {recommended.map((c) => (
-                <CheckItem key={c.id} check={c} tool={report.tool} />
+                <CheckItem key={c.id} check={c} tool={report.tool} onFixed={recheck} />
               ))}
             </ul>
           </section>
