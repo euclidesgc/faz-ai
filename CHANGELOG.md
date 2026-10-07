@@ -6,6 +6,25 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Correção: o LED da sub-tarefa apagava segundos depois de acender.** Mover um card de coluna
+  zerava o status de trabalho dele, inclusive o "Em execução": como a IA chama `start_work` e em
+  seguida move a sub-tarefa para "Em andamento", o LED verde piscava por um instante e apagava, e a
+  história não mostrava que a IA estava trabalhando nela. Agora o card em execução que vai para
+  outra coluna em que a IA atua continua "Em execução"; os demais status seguem recomeçando ao
+  trocar de coluna, e na conclusão não há status de trabalho.
+- **O modo autônomo retoma sozinho ao abrir o editor.** Antes, as histórias que já estavam em modo
+  autônomo ficavam paradas até um clique em **Retomar modo autônomo**, o que parecia o modo
+  "não funcionar". Agora, ao abrir o editor (e sempre que a janela passa a ser a dona do board), o
+  autopiloto retoma a fila pendente e registra isso no log. A pausa continua sua: o que você pausou,
+  ou o que parou por falha ao iniciar a ferramenta, só volta quando você retomar; uma fila só de
+  histórias entregues não o religa.
+- **Roteiro "Como testar" na descrição do card e no pull request.** Na Homologação, a IA passa a
+  gravar o roteiro de testes (o que foi construído, os passos com o resultado esperado e o que ficou
+  de fora) na descrição da história e no corpo do PR, e não só na conversa. A instrução padrão da
+  coluna e a skill do fluxo mudaram; o board com a instrução padrão anterior recebe a nova pela
+  atualização do padrão (versão 5), e a skill já instalada precisa ser reinstalada com
+  **Substituir** para trazer o texto novo.
+
 - **Anexos em Markdown abrem formatados.** Um anexo `.md`/`.markdown` (como o PRD, o Spec ou o Plan
   de uma história) agora abre com títulos, listas, tabelas e blocos de código já formatados, em vez
   do texto cru com `#`, `**` e `|---|`. Um seletor **Formatado** / **Código** no cabeçalho da janela

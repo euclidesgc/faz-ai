@@ -107,16 +107,20 @@ export class Autopilot {
   private progress = new Map<string, { sig: string; stalls: number }>();
   /** histórias entregues já anunciadas no log, para não repetir a linha a cada mudança do board */
   private deliveredLogged = new Set<string>();
+  /** segurado pela pessoa (pausa) ou por uma falha ao iniciar a ferramenta: só retomar religa */
+  private held = false;
 
   constructor(
     private router: MessageRouter,
     private runner: AutopilotRunner,
     private deps: AutopilotDeps,
   ) {
-    // histórias que já estavam em modo autônomo ao abrir o editor não disparam nada sozinhas: é preciso retomar
     this.known = new Set(yoloStories(router.snapshot()).map((c) => c.id));
     router.onDidChange(() => this.onBoardChange());
     runner.onDidFinish((cardId, mode) => this.onRunFinished(cardId, mode));
+    // histórias que já estavam em modo autônomo ao abrir o editor continuam sozinhas: a pessoa ligou o
+    // modo para não precisar voltar ao board; só a pausa dela segura a fila (#240)
+    (deps.defer ?? queueMicrotask)(() => this.autoResume());
   }
 
   get isActive(): boolean {
@@ -125,6 +129,7 @@ export class Autopilot {
 
   /** Liga o autopiloto e trata a fila agora. */
   resume(): void {
+    this.held = false;
     this.active = true;
     this.progress.clear();
     this.evaluate();
@@ -132,6 +137,7 @@ export class Autopilot {
 
   /** Para o autopiloto e interrompe a execução em andamento nas histórias em modo autônomo. */
   pause(): void {
+    this.held = true;
     this.active = false;
     this.publish(null);
     const s = this.router.snapshot();
@@ -142,12 +148,25 @@ export class Autopilot {
     }
   }
 
-  /** Liga sozinho quando uma pessoa liga o modo numa história. */
+  /**
+   * Liga sozinho ao abrir o editor (ou quando esta janela passa a ser a dona do board) com história em
+   * modo autônomo ainda por fazer. Não religa o que a pessoa pausou nem uma fila só de histórias entregues.
+   */
+  private autoResume(): void {
+    if (this.active || this.held || !this.canRun()) return;
+    if (autopilotStep(this.router.snapshot()).kind === 'idle') return;
+    this.deps.log('Autopiloto: histórias em modo autônomo pendentes; retomando.');
+    this.resume();
+  }
+
+  /** Liga sozinho quando uma pessoa liga o modo numa história; ligar de novo também desfaz a pausa dela. */
   private onBoardChange(): void {
     const now = new Set(yoloStories(this.router.snapshot()).map((c) => c.id));
     const added = [...now].some((id) => !this.known.has(id));
     this.known = now;
     if (added && !this.active && this.canRun()) return this.resume();
+    if (!this.active) this.autoResume();
+    if (!this.active) return;
     if (this.scheduled) return;
     this.scheduled = true;
     (this.deps.defer ?? queueMicrotask)(() => {
@@ -246,6 +265,7 @@ export class Autopilot {
       const reason = e instanceof Error ? e.message : String(e);
       this.deps.log(`Autopiloto: ${reason}`);
       // sem como executar a ferramenta, insistir não adianta
+      this.held = true;
       this.active = false;
       this.publish(reason);
     }

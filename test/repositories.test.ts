@@ -92,6 +92,26 @@ describe('cards', () => {
     expect(() => cards.move(a, colsOf(childWf().id)[0]!.id, 0)).toThrow();
   });
 
+  it('mover um card em execução para outra coluna em que a IA atua mantém "running"; para as demais, o status recomeça', () => {
+    const [todo, doing, done] = colsOf(childWf().id);
+    const backlog = colsOf(parentWf().id)[0]!;
+    const story = cards.create(boardId, { typeId: typeNamed('História').id, columnId: backlog.id, parentId: null, title: 'h' });
+    const sub = cards.create(boardId, { typeId: typeNamed('Sub-tarefa').id, columnId: todo!.id, parentId: story, title: 's' });
+    const statusOf = () => snap().cards.find((c) => c.id === sub)?.status;
+    // start_work e depois "Em andamento": o LED da sub-tarefa continua aceso
+    cards.setStatus(sub, 'running', '', 'Claude Code');
+    cards.move(sub, doing!.id, 0);
+    expect(statusOf()).toBe('running');
+    // um status que não é execução recomeça ao trocar de coluna
+    cards.setStatus(sub, 'waiting_answer', '', 'Claude Code');
+    cards.move(sub, todo!.id, 0);
+    expect(statusOf()).toBe('ready');
+    // na conclusão não há status de trabalho, mesmo em execução
+    cards.setStatus(sub, 'running', '', 'Claude Code');
+    cards.move(sub, done!.id, 0);
+    expect(statusOf()).toBeNull();
+  });
+
   it('apagar pai apaga filhos, valores de campo e checklist (cascade)', () => {
     const backlog = colsOf(parentWf().id)[0]!;
     const story = cards.create(boardId, { typeId: typeNamed('História').id, columnId: backlog.id, parentId: null, title: 'a' });
