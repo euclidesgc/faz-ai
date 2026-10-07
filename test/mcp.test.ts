@@ -9,6 +9,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { createMcpServer, startMcpServer } from '../src/extension/mcp/server';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { forgetModels, parseCursorModels, rememberModels } from '../src/extension/models';
+import { builtinPrice } from '../src/shared/prices';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -477,7 +478,14 @@ describe('modelos de IA', () => {
 
   it('upsert_model grava o preço, get_models devolve, e uma chamada sem preço preserva o que havia', async () => {
     const entry = async (value: string) => (await call('get_models')).data.catalog.find((o: any) => o.value === value);
-    expect((await entry('claude:opus')).price).toBeNull(); // o board não embute preço
+    // num board novo o preço já vem da tabela embutida, com origem, data e fonte (RF-01, RF-14)
+    const b = builtinPrice('claude:opus')!;
+    expect(await entry('claude:opus')).toMatchObject({
+      price: { input: b.input, output: b.output, cacheRead: b.cacheRead, cacheWrite: b.cacheWrite },
+      priceSource: 'builtin',
+      priceCheckedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      priceUrl: expect.stringMatching(/^https:\/\//),
+    });
 
     const preco = { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 };
     const withPrice = await call('upsert_model', {
@@ -491,11 +499,14 @@ describe('modelos de IA', () => {
       price_cache_read: 1.5,
       price_cache_write: 18.75,
     });
-    expect(withPrice.data.catalog.find((o: any) => o.value === 'claude:opus')).toMatchObject({ label: 'Opus', price: preco });
+    const gravado = withPrice.data.catalog.find((o: any) => o.value === 'claude:opus');
+    expect(gravado).toMatchObject({ label: 'Opus', price: preco, priceSource: 'manual' });
+    expect(gravado.priceCheckedAt).toBeUndefined();
+    expect(gravado.priceUrl).toBeUndefined();
 
-    // sem preço na chamada: o resto é substituído como antes e o preço continua (RF-25)
+    // sem preço na chamada: o resto é substituído como antes e o preço e a origem continuam (RF-25)
     await call('upsert_model', { tool: 'claude', model: 'opus', label: 'Opus renomeado', efforts: ['low'] });
-    expect(await entry('claude:opus')).toMatchObject({ label: 'Opus renomeado', efforts: ['low'], price: preco });
+    expect(await entry('claude:opus')).toMatchObject({ label: 'Opus renomeado', efforts: ['low'], price: preco, priceSource: 'manual' });
 
     // preço novo de um campo só: troca esse campo e mantém os outros três
     await call('upsert_model', { tool: 'claude', model: 'opus', price_output: 80 });
@@ -505,9 +516,9 @@ describe('modelos de IA', () => {
     await call('upsert_model', { tool: 'claude', model: 'opus', price_input: 0, price_cache_read: 0 });
     expect((await entry('claude:opus')).price).toEqual({ ...preco, output: 80, input: 0, cacheRead: 0 });
 
-    // preço incompleto é modelo sem preço: get_models mostra null
+    // preço incompleto é modelo sem preço: get_models mostra null, e a origem é manual
     await call('upsert_model', { tool: 'claude', model: 'novo-sem-tudo', price_input: 2 });
-    expect((await entry('claude:novo-sem-tudo')).price).toBeNull();
+    expect(await entry('claude:novo-sem-tudo')).toMatchObject({ price: null, priceSource: 'manual' });
     expect(router.snapshot().board.modelCatalog.find((o) => o.id === 'claude:novo-sem-tudo')!.price).toEqual({ input: 2 });
 
     // preço negativo é recusado
@@ -520,6 +531,38 @@ describe('modelos de IA', () => {
     // e delete_model continua removendo o modelo
     const after = await call('delete_model', { model: 'claude:opus' });
     expect(after.data.catalog.some((o: any) => o.value === 'claude:opus')).toBe(false);
+  });
+
+  it('reset_price: volta ao embutido quando há tabela, deixa sem preço quando não há, e não aceita price_* junto', async () => {
+    const entry = async (value: string) => (await call('get_models')).data.catalog.find((o: any) => o.value === value);
+    const b = builtinPrice('claude:opus')!;
+    await call('upsert_model', { tool: 'claude', model: 'opus', price_input: 1 });
+    expect(await entry('claude:opus')).toMatchObject({ priceSource: 'manual' });
+    expect((await call('upsert_model', { tool: 'claude', model: 'opus', reset_price: true })).error).toBe(false);
+    expect(await entry('claude:opus')).toMatchObject({
+      price: { input: b.input, output: b.output, cacheRead: b.cacheRead, cacheWrite: b.cacheWrite },
+      priceSource: 'builtin',
+      priceCheckedAt: b.checkedAt,
+      priceUrl: b.url,
+    });
+    // uma mudança de origem embutida → manual também é registrada no catálogo gravado
+    expect(router.snapshot().board.modelCatalog.find((o) => o.id === 'claude:opus')!.priceSource).toBe('builtin');
+
+    await call('upsert_model', {
+      tool: 'claude',
+      model: 'sem-tabela',
+      price_input: 1,
+      price_output: 2,
+      price_cache_read: 3,
+      price_cache_write: 4,
+    });
+    expect(await entry('claude:sem-tabela')).toMatchObject({ priceSource: 'manual' });
+    await call('upsert_model', { tool: 'claude', model: 'sem-tabela', reset_price: true });
+    expect(await entry('claude:sem-tabela')).toMatchObject({ price: null, priceSource: null });
+
+    const res = await call('upsert_model', { tool: 'claude', model: 'opus', reset_price: true, price_output: 1 });
+    expect(res.error).toBe(true);
+    expect(res.text).toContain('reset_price');
   });
 
   it('preço variável: o `auto` do Cursor já nasce assim, upsert_model liga e desliga, e Detectar preserva', async () => {

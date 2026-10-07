@@ -13,7 +13,7 @@ const models = (router: MessageRouter) => modelsOverview(router.snapshot());
 export function registerModelTools(tool: DefineTool): void {
   tool(
     'get_models',
-    'Catálogo de modelos de LLM do board (por ferramenta, com os níveis de esforço que cada um aceita, o preço e se o preço é variável) e as regras que sugerem um modelo a partir dos campos do card. O `value` de cada modelo é `<ferramenta>:<model>`; no Cursor, `model` é o id de `cursor-agent models` e `label` é o nome da tabela de preços em https://cursor.com/docs/models-and-pricing.',
+    'Catálogo de modelos de LLM do board (por ferramenta, com os níveis de esforço que cada um aceita, o preço, a origem do preço e se o preço é variável) e as regras que sugerem um modelo a partir dos campos do card. O `value` de cada modelo é `<ferramenta>:<model>`; no Cursor, `model` é o id de `cursor-agent models` e `label` é o nome da tabela de preços em https://cursor.com/docs/models-and-pricing. `priceSource` de cada modelo: "builtin" = preço da tabela embutida na extensão, com `priceCheckedAt` (data da conferência) e `priceUrl` (página oficial); "manual" = digitado pela pessoa, nunca sobrescrito; null = sem preço.',
     {},
     (_a, router) => models(router),
     true,
@@ -31,7 +31,7 @@ export function registerModelTools(tool: DefineTool): void {
 
   tool(
     'upsert_model',
-    'Cria ou atualiza um modelo no catálogo. Use para registrar os modelos e níveis de esforço que você (a ferramenta de IA em uso) realmente tem disponíveis. Os quatro preços (dólar por milhão de tokens) são opcionais: o que não vier fica como estava, e o board só estima custo de um modelo com os quatro preenchidos e sem preço variável. No Cursor, `model` é o id que `cursor-agent models` lista (ex.: "claude-opus-5-5"), `label` é o nome do modelo na tabela de preços da documentação (https://cursor.com/docs/models-and-pricing, colunas input, cache write, cache read e output) e o modelo fica no board como `cursor:<model>`; as variantes rápidas (`-fast`) são modelos à parte, com id e preço próprios. O `auto` do Cursor tem preço variável: não informe preço para ele.',
+    'Cria ou atualiza um modelo no catálogo. Use para registrar os modelos e níveis de esforço que você (a ferramenta de IA em uso) realmente tem disponíveis. Os quatro preços (dólar por milhão de tokens) são opcionais: o que não vier fica como estava, e o board só estima custo de um modelo com os quatro preenchidos e sem preço variável. Gravar qualquer um dos preços marca o preço do modelo como `manual` (a extensão nunca o sobrescreve); `reset_price` apaga o preço digitado e, se o modelo tem preço embutido, volta a ele. No Cursor, `model` é o id que `cursor-agent models` lista (ex.: "claude-opus-5-5"), `label` é o nome do modelo na tabela de preços da documentação (https://cursor.com/docs/models-and-pricing, colunas input, cache write, cache read e output) e o modelo fica no board como `cursor:<model>`; as variantes rápidas (`-fast`) são modelos à parte, com id e preço próprios. O `auto` do Cursor tem preço variável: não informe preço para ele.',
     {
       tool: toolArg,
       model: z.string().min(1).describe('Identificador usado pela ferramenta para escolher o modelo, ex.: "opus", "k3", "gpt-6.1-sol"'),
@@ -45,6 +45,10 @@ export function registerModelTools(tool: DefineTool): void {
       price_output: z.number().min(0).optional().describe('Preço da saída, em US$ por milhão de tokens'),
       price_cache_read: z.number().min(0).optional().describe('Preço da leitura de cache, em US$ por milhão de tokens'),
       price_cache_write: z.number().min(0).optional().describe('Preço da criação de cache, em US$ por milhão de tokens'),
+      reset_price: z
+        .boolean()
+        .optional()
+        .describe('Apaga o preço digitado; um modelo com preço embutido volta a ele. Não pode vir junto com price_*'),
       variable_price: z
         .boolean()
         .optional()
@@ -57,7 +61,11 @@ export function registerModelTools(tool: DefineTool): void {
       const id = modelId(a.tool as AiTool, a.model);
       const efforts = a.efforts ?? [];
       if (a.default_effort && !efforts.includes(a.default_effort)) throw new Error('default_effort precisa ser um dos efforts.');
+      const prices = { input: a.price_input, output: a.price_output, cacheRead: a.price_cache_read, cacheWrite: a.price_cache_write };
+      if (a.reset_price && Object.values(prices).some((v) => v !== undefined))
+        throw new Error('reset_price não pode vir junto com price_*: ou apaga o preço, ou grava um novo.');
       const at = catalog.findIndex((o) => o.id === id);
+      const before = at >= 0 ? catalog[at]! : undefined;
       const entry = withPrice(
         {
           id,
@@ -66,15 +74,19 @@ export function registerModelTools(tool: DefineTool): void {
           label: a.label ?? a.model,
           efforts,
           defaultEffort: a.default_effort ?? null,
-          // o preço é do catálogo: chamada que não o menciona não o apaga (nem o "preço variável")
-          ...(at >= 0 && catalog[at]!.price ? { price: catalog[at]!.price } : {}),
+          // o preço, a origem dele e o "preço variável" são do catálogo: chamada que não os menciona não os apaga
+          ...(before?.price ? { price: before.price } : {}),
+          ...(before?.priceSource !== undefined ? { priceSource: before.priceSource } : {}),
+          ...(before?.priceCheckedAt !== undefined ? { priceCheckedAt: before.priceCheckedAt } : {}),
+          ...(before?.priceUrl !== undefined ? { priceUrl: before.priceUrl } : {}),
           ...(a.variable_price !== undefined
             ? { variablePrice: a.variable_price }
-            : at >= 0 && catalog[at]!.variablePrice !== undefined
-              ? { variablePrice: catalog[at]!.variablePrice }
+            : before?.variablePrice !== undefined
+              ? { variablePrice: before.variablePrice }
               : {}),
         },
-        { input: a.price_input, output: a.price_output, cacheRead: a.price_cache_read, cacheWrite: a.price_cache_write },
+        // apagar os quatro campos: `withPrice` devolve o embutido (quando há) ou o modelo sem preço
+        a.reset_price ? { input: null, output: null, cacheRead: null, cacheWrite: null } : prices,
       );
       if (at >= 0) catalog[at] = entry;
       else catalog.push(entry);

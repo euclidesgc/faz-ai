@@ -11,6 +11,7 @@ import {
   suggestModel,
   type ModelOption,
 } from '../../shared/models';
+import { priceSourceOf } from '../../shared/prices';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
 import { childProgress, linkedCards, openPredecessors, subtaskWaves } from '../../shared/links';
 import { childrenOf, columnOf, isArchived, isLive, valueOf } from '../../shared/selectors';
@@ -204,6 +205,11 @@ export function modelsOverview(s: BoardState) {
       price: modelPrice(o),
       // o efetivo: o `auto` do Cursor é variável mesmo num catálogo gravado antes do campo
       variablePrice: hasVariablePrice(o),
+      // de onde veio o preço gravado: tabela embutida na extensão (com data de conferência e página
+      // oficial) ou digitado pela pessoa (nunca sobrescrito); null = sem preço
+      priceSource: priceSourceOf(o),
+      ...(o.priceCheckedAt ? { priceCheckedAt: o.priceCheckedAt } : {}),
+      ...(o.priceUrl ? { priceUrl: o.priceUrl } : {}),
     })),
     rules: s.board.modelRules.map((r) => ({
       ...(r.name ? { name: r.name } : {}),
@@ -212,7 +218,7 @@ export function modelsOverview(s: BoardState) {
       value: r.model,
       enabled: r.enabled,
     })),
-    note: 'Num card, o campo de modelo aceita `<value>@<esforço>` (ex.: "claude:opus@high") ou o nome do modelo seguido do esforço.',
+    note: 'Num card, o campo de modelo aceita `<value>@<esforço>` (ex.: "claude:opus@high") ou o nome do modelo seguido do esforço. `priceSource` "builtin" = preço da tabela embutida na extensão (conferido em `priceCheckedAt` na página `priceUrl`); "manual" = digitado pela pessoa, nunca sobrescrito pela extensão.',
   };
 }
 
