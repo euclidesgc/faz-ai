@@ -97,6 +97,9 @@ necessário, na hora certa:
   tabela de [Agentes](#agentes)).
 - **Documentos como anexos.** PRD, Spec e Plan ficam anexados à história; a IA os lê quando o card
   precisa, em vez de recebê-los colados em cada mensagem.
+- **Anexos em Markdown abrem formatados.** Um `.md`/`.markdown` abre como uma página, com títulos,
+  listas, tabelas e blocos de código formatados; um seletor **Formatado**/**Código** mostra o texto
+  cru quando é preciso. Editar, Salvar e Copiar conteúdo continuam operando sobre o Markdown.
 - **Modelo certo para cada tarefa.** Regras de sugestão e o modelo por card ou por agente evitam usar
   o modelo mais caro onde o mais leve basta.
 
