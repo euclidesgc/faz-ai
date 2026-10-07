@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CURSOR_TOKEN_RATE, costOf, cursorTokenRateApplies, matchModel } from '../src/extension/aiOutput/price';
+import { applyBuiltinPrices, builtinPrice } from '../src/shared/prices';
 import { hasVariablePrice, modelPrice, withPrice, type ModelOption, type ModelPrice } from '../src/shared/models';
 import type { AiRunTokens } from '../src/shared/log';
 
@@ -139,6 +140,16 @@ describe('costOf', () => {
     ]);
     // conta à mão: (1000*2 + 500*4 + 2000*1 + 100*3) / 1e6 = (2000+2000+2000+300)/1e6
     expect(costOf(catalog, byModel)).toBeCloseTo(6300 / 1e6, 10);
+  });
+
+  it('um modelo do Codex sem preço digitado tem custo estimado só com a tabela embutida (critério 2 da #187)', () => {
+    const luna = option({ id: 'codex:gpt-6-luna', tool: 'codex', model: 'gpt-6-luna' });
+    const catalog = applyBuiltinPrices([luna]);
+    const b = builtinPrice('codex:gpt-6-luna')!;
+    const byModel = new Map([['gpt-6-luna', tokens({ inputTokens: 1_000_000, outputTokens: 1_000_000 })]]);
+    expect(costOf(catalog, byModel)).toBeCloseTo(b.input + b.output, 10);
+    // sem a tabela aplicada, o mesmo modelo fica sem custo
+    expect(costOf([luna], byModel)).toBeNull();
   });
 
   it('byModel vazio devolve null: sem modelo não há de onde estimar', () => {
