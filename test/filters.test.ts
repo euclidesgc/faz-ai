@@ -31,6 +31,7 @@ const card = (id: string, over: Partial<Card> = {}): Card => ({
   statusAt: null,
   statusBy: '',
   branch: '',
+  branchCreatedAt: '',
   worktreePath: '',
   baseBranch: '',
   prUrl: '',

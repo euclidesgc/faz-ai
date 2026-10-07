@@ -263,3 +263,19 @@ describe('HostBridge: metrics.query', () => {
     expect(saves).toBe(0);
   });
 });
+
+describe('HostBridge: Settings do editor', () => {
+  it('ui.openIdeSettings pede ao editor para abrir o Settings na chave', async () => {
+    const keys: (string | undefined)[] = [];
+    env.openIdeSettings = (key) => void keys.push(key);
+    await bridge.handle({ type: 'ui.openIdeSettings', key: 'fazai.appearance.language' });
+    await bridge.handle({ type: 'ui.openIdeSettings' });
+    expect(keys).toEqual(['fazai.appearance.language', undefined]);
+  });
+
+  it('sem openIdeSettings no ambiente (modo navegador), a mensagem é ignorada sem erro', async () => {
+    delete env.openIdeSettings;
+    await expect(bridge.handle({ type: 'ui.openIdeSettings' })).resolves.toBeUndefined();
+    expect(sent.filter((m) => m.type === 'error')).toEqual([]);
+  });
+});

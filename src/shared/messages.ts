@@ -10,6 +10,7 @@ import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { GitConfig } from './git';
+import type { SettingsTab } from './settingsTab';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
 
 export type WebviewToHost =
@@ -26,6 +27,8 @@ export type WebviewToHost =
   | { type: 'ui.openEditorMcp' }
   /** abre este board no navegador, fora do editor */
   | { type: 'ui.openInBrowser' }
+  /** pede ao editor para abrir o Settings nativo filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */
+  | { type: 'ui.openIdeSettings'; key?: string }
   /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */
   /** `mode`: trabalhar a fase (padrão) ou só refinar o card */
   | { type: 'ai.run'; cardId: Id; mode?: AiRunMode }
@@ -252,6 +255,10 @@ export type HostToWebview =
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */
   | { type: 'backup.import.summary'; token: string; summary: ImportSummary }
   /** a exportação ou a escolha do arquivo terminou (com sucesso ou porque a pessoa desistiu): a interface sai do estado "ocupado" */
-  | { type: 'backup.done' };
+  | { type: 'backup.done' }
+  /** o host pede à interface para trocar de aba das Configurações, opcionalmente rolando até uma seção */
+  | { type: 'ui.openSettings'; tab: SettingsTab; section?: string }
+  /** o host pede à interface para abrir uma tela fora das Configurações */
+  | { type: 'ui.openView'; view: 'environment' };
 
 export type { WorkflowKind };
