@@ -1,5 +1,6 @@
 import type { BoardRequirement } from './requirements';
 import type { EnvironmentReport } from './environment';
+import type { InstallStepResult } from './installPlan';
 import type { ExecProfile } from './execution';
 import type { ChatState } from './chat';
 import type { AiTool, Harness, InstallPreview } from './harness';
@@ -244,6 +245,10 @@ export interface BoardState {
   environment: EnvironmentReport | null;
   /** o Diagnóstico ainda não abriu sozinho nesta máquina: a interface abre a tela uma vez */
   environmentFirstRun: boolean;
+  /** o "Instalar tudo" rodando num terminal do editor; null fora disso */
+  environmentInstall: { level: 'required' | 'recommended'; startedAt: number } | null;
+  /** o resultado do último "Instalar tudo": o que deu certo, o que falhou (com o erro) e o que foi pulado */
+  environmentInstallResult: { level: 'required' | 'recommended'; steps: InstallStepResult[]; finishedAt: number } | null;
   /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */
   harnessInstall: InstallPreview | null;
 }

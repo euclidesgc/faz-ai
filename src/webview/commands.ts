@@ -36,6 +36,8 @@ export const ui = {
   openEditorMcp: () => post({ type: 'ui.openEditorMcp' }),
   checkEnvironment: () => post({ type: 'environment.check' }),
   environmentSeen: () => post({ type: 'environment.seen' }),
+  installEnvironment: (level: 'required' | 'recommended') => post({ type: 'environment.install', level }),
+  pinMcp: () => post({ type: 'environment.pinMcp' }),
 };
 
 export const chat = {

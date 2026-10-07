@@ -92,6 +92,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         log,
         version: String((context.extension.packageJSON as { version?: string }).version ?? '0'),
         ownsBoard: () => !!stopMcp,
+        runInTerminal: (name, command, cwd) => {
+          const terminal = vscode.window.createTerminal({ name, cwd });
+          terminal.show();
+          terminal.sendText(command);
+        },
         editor: {
           name: editorName,
           startedAt: windowStartedAt,

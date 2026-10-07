@@ -1,8 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { aiToolInfo, type AiTool } from '../../shared/harness';
-import { ENV_DOCS, type EnvCheck, type EnvCheckId } from '../../shared/environment';
+import { ENV_DOCS, type EnvCheck, type EnvCheckId, type EnvironmentReport } from '../../shared/environment';
+import { installPlan, installScript, type InstallPlan, type InstallStepResult } from '../../shared/installPlan';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { useBoardStore } from '../store/boardStore';
+import { isWeb } from '../vscode';
 import { t, tn } from '../i18n';
 import { harness, ui } from '../commands';
 import { PageHeader } from './settings/PageHeader';
@@ -154,6 +156,14 @@ function texts(id: EnvCheckId, tool: AiTool): Texts {
         purpose: t('O Code Review Graph precisa analisar o projeto uma vez antes de responder.'),
         usage: t('Depois do primeiro build, o grafo é atualizado a cada mudança, sem você pedir.'),
       };
+    case 'crg-mcp':
+      return {
+        title: t('MCP do Code Review Graph no {tool}', { tool: label }),
+        purpose: t('É por ele que a IA do chat do editor consulta o grafo.'),
+        usage: t(
+          'O editor inicia o MCP com o comando registrado, procurando-o no PATH de quando abriu. O que foi instalado depois (o uvx do uv) só é achado pelo caminho completo, que vale para esta máquina; o arquivo fica fora do git.',
+        ),
+      };
     case 'crg-embeddings':
       return {
         title: t('Busca semântica do Code Review Graph'),
@@ -236,6 +246,27 @@ function Fix({ check, tool, installNote, onFixed }: { check: EnvCheck; tool: AiT
         </p>,
       );
   }
+  if (check.fix?.kind === 'pinMcp')
+    parts.push(
+      <Button
+        key="pin"
+        size="small"
+        onClick={() => {
+          ui.pinMcp();
+          onFixed();
+        }}
+      >
+        {t('Corrigir o caminho')}
+      </Button>,
+    );
+  if (check.tracked)
+    parts.push(
+      <p key="tracked">
+        {t(
+          'O arquivo de MCPs do projeto está no git, então o board não grava nele o caminho desta máquina. Feche e abra o editor de novo, para ele ler o PATH atual, ou tire o arquivo do git.',
+        )}
+      </p>,
+    );
   if (check.fix?.kind === 'installSkill')
     parts.push(
       <Button
@@ -330,6 +361,160 @@ function CheckItem({ check, tool, prereqs = [], busyId, onFixed }: ItemProps) {
   );
 }
 
+/** Copia um texto longo (o script inteiro), com o retorno ao lado do botão. */
+function CopyScript({ text }: { text: string }) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  return (
+    <span className="requirement-command">
+      <Button
+        size="small"
+        variant="primary"
+        onClick={() => {
+          if (!navigator.clipboard?.writeText) return setState('failed');
+          navigator.clipboard.writeText(text).then(
+            () => setState('copied'),
+            () => setState('failed'),
+          );
+        }}
+      >
+        {t('Copiar o script')}
+      </Button>
+      <span role="status" className="small">
+        {state === 'copied' && t('Copiado')}
+        {state === 'failed' && t('Não foi possível copiar. Selecione o script abaixo e copie com o teclado.')}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * A confirmação do "Instalar tudo": o que vai rodar, em ordem, o script inteiro e o que fica com a
+ * pessoa. No editor, roda num terminal à vista; no navegador, não há terminal: o script é para copiar.
+ */
+function InstallPreview({
+  plan,
+  report,
+  tool,
+  onRun,
+  onCancel,
+}: {
+  plan: InstallPlan;
+  report: EnvironmentReport;
+  tool: AiTool;
+  onRun: () => void;
+  onCancel: () => void;
+}) {
+  const script = installScript(plan);
+  const title = (id: EnvCheckId) => texts(id, tool).title;
+  const label = plan.level === 'required' ? t('Instalar o necessário') : t('Instalar os recomendados');
+  return (
+    <section className="env-install" aria-label={label}>
+      <h3>{label}</h3>
+      <p>
+        {plan.shell === 'powershell'
+          ? t(
+              'Roda os passos abaixo em ordem, num terminal do PowerShell, e para no primeiro que falhar. O Windows pode pedir permissão de administrador, e os logins abrem o navegador: responda no terminal.',
+            )
+          : t(
+              'Roda os passos abaixo em ordem, num terminal, e para no primeiro que falhar. Pode pedir a sua senha (sudo), e os logins abrem o navegador: responda no terminal.',
+            )}
+      </p>
+      <ol>
+        {plan.steps.map((s) => (
+          <li key={s.id}>{title(s.id)}</li>
+        ))}
+        {plan.installSkill && <li>{title('skill')}</li>}
+      </ol>
+      {plan.steps.some((s) => s.id === 'crg-embeddings') && (
+        <p className="small">
+          {t('A busca semântica baixa o PyTorch e o modelo de linguagem: mais de 1 GB, alguns minutos na primeira vez.')}
+        </p>
+      )}
+      {plan.manual.length > 0 && (
+        <p className="small">{t('Fica com você, pelos itens da lista: {items}.', { items: plan.manual.map(title).join(', ') })}</p>
+      )}
+      <details>
+        <summary>{t('Ver o script ({os})', { os: report.os.label })}</summary>
+        <pre className="env-script">{script}</pre>
+      </details>
+      <div className="env-install-actions">
+        {isWeb ? (
+          <>
+            <CopyScript text={script} />
+            <span className="small muted">{t('No navegador não há terminal: cole o script num terminal aberto na pasta do projeto.')}</span>
+          </>
+        ) : (
+          <Button variant="primary" onClick={onRun}>
+            {t('Rodar no terminal')}
+          </Button>
+        )}
+        <Button variant="ghost" onClick={onCancel}>
+          {t('Cancelar')}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * O que o último "Instalar tudo" fez, passo a passo. O que falhou mostra o comando, o código de saída e
+ * o erro: daí em diante, é com a pessoa (o resto da instalação seguiu sem ele).
+ */
+function InstallResult({ steps, tool, onClose }: { steps: InstallStepResult[]; tool: AiTool; onClose: () => void }) {
+  const title = (id: EnvCheckId) => texts(id, tool).title;
+  const failed = steps.filter((s) => s.status === 'failed').length;
+  return (
+    <section className="env-install" aria-label={t('Resultado da instalação')}>
+      <h3>{t('Resultado da instalação')}</h3>
+      <p>
+        {failed
+          ? tn(
+              failed,
+              'Não foi possível instalar {n} item. O erro está abaixo; o resto da instalação seguiu sem ele.',
+              'Não foi possível instalar {n} itens. Os erros estão abaixo; o resto da instalação seguiu sem eles.',
+            )
+          : t('Tudo foi instalado.')}
+      </p>
+      <ul className="env-list">
+        {steps.map((s) => (
+          <li key={s.id} className={`env-item ${s.status === 'ok' ? 'ok' : s.status === 'skipped' ? 'skipped' : 'missing'}`}>
+            {s.status === 'ok' ? STATUS_ICON.ok : s.status === 'skipped' ? STATUS_ICON.skipped : STATUS_ICON.required}
+            <div className="env-body">
+              <div className="env-title">
+                <strong>{title(s.id)}</strong>
+                <span className="small muted">
+                  {s.status === 'ok'
+                    ? t('Instalado')
+                    : s.status === 'skipped'
+                      ? t('Pulado: depende de {item}, que falhou', { item: s.because ? title(s.because) : '' })
+                      : t('Não foi possível instalar')}
+                </span>
+              </div>
+              {s.status === 'failed' && (
+                <>
+                  <p className="small">
+                    {t('O comando "{command}" terminou com o código {code}.', { command: s.command ?? '', code: String(s.code ?? '') })}
+                  </p>
+                  {s.error ? (
+                    <pre className="env-script">{s.error}</pre>
+                  ) : (
+                    <p className="small muted">{t('A mensagem completa está no terminal "Faz AI: instalação".')}</p>
+                  )}
+                </>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="env-install-actions">
+        <Button variant="ghost" onClick={onClose}>
+          {t('Fechar o resultado')}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 /**
  * Diagnóstico do ambiente: tudo de que o board precisa para trabalhar com a IA e o que ele usa quando
  * existe, em forma de lista de tarefas. Abre sozinho na primeira abertura do board na máquina e,
@@ -351,6 +536,12 @@ export function EnvironmentView() {
   };
   // o item cujo botão foi clicado, até a conferência seguinte terminar
   const [fixing, setFixing] = useState<EnvCheckId | null>(null);
+  // o "Instalar tudo" aberto para confirmar, e o que já está rodando no terminal
+  const [preview, setPreview] = useState<InstallPlan['level'] | null>(null);
+  const installing = useBoardStore((s) => s.state?.environmentInstall ?? null);
+  const result = useBoardStore((s) => s.state?.environmentInstallResult ?? null);
+  // o resultado fica até a pessoa fechar (vale por instalação: a próxima mostra o dela)
+  const [closedAt, setClosedAt] = useState<number | null>(null);
   const busyId = checking ? fixing : null;
 
   const all = report?.checks ?? [];
@@ -409,6 +600,40 @@ export function EnvironmentView() {
         <strong>{summary}</strong>
       </p>
       {report && <p className="small muted env-os">{t('Comandos de instalação para: {os}', { os: report.os.label })}</p>}
+      {result && result.finishedAt !== closedAt && !installing && (
+        <InstallResult steps={result.steps} tool={tool} onClose={() => setClosedAt(result.finishedAt)} />
+      )}
+      {report &&
+        (installing ? (
+          <p role="status" className="env-busy">
+            <span className="spinner" aria-hidden />{' '}
+            {t('Instalando no terminal "Faz AI: instalação". Responda lá o que ele pedir; a tela confere de novo quando terminar.')}
+          </p>
+        ) : preview && installPlan(report, preview) ? (
+          <InstallPreview
+            plan={installPlan(report, preview)!}
+            report={report}
+            tool={report.tool}
+            onCancel={() => setPreview(null)}
+            onRun={() => {
+              ui.installEnvironment(preview);
+              setPreview(null);
+            }}
+          />
+        ) : (
+          <div className="env-install-actions">
+            {installPlan(report, 'required') && (
+              <Button variant="primary" disabled={checking} onClick={() => setPreview('required')}>
+                {t('Instalar o necessário')}
+              </Button>
+            )}
+            {installPlan(report, 'recommended') && (
+              <Button disabled={checking} onClick={() => setPreview('recommended')}>
+                {t('Instalar os recomendados')}
+              </Button>
+            )}
+          </div>
+        ))}
       {report && (
         <>
           <section aria-labelledby="env-required">

@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { samePath } from '../samePath';
 import type { AiTool, InstallScope } from '../../shared/harness';
+import { excludeLocally } from './pinCommands';
 
 export interface RegisterOptions {
   /** caminho estável do bridge.js */
@@ -152,20 +153,6 @@ function coveredByGlobal(file: string, runDir: string, entryArgs: string[]): boo
   const [wantedBridge, board] = entryArgs;
   if (!bridge || !wantedBridge || !board || !samePath(bridge, wantedBridge)) return false;
   return folder ? samePath(folder, board) : within(runDir, board);
-}
-
-/** Acrescenta o caminho ao `.git/info/exclude` do repositório, se houver um e ele ainda não estiver lá. */
-function excludeLocally(workspaceDir: string, relFile: string): void {
-  const exclude = path.join(workspaceDir, '.git', 'info', 'exclude');
-  if (!fs.existsSync(path.join(workspaceDir, '.git'))) return;
-  try {
-    const current = fs.existsSync(exclude) ? fs.readFileSync(exclude, 'utf8') : '';
-    if (current.split(/\r?\n/).some((l) => l.trim() === relFile)) return;
-    fs.mkdirSync(path.dirname(exclude), { recursive: true });
-    fs.writeFileSync(exclude, `${current}${current && !current.endsWith('\n') ? '\n' : ''}${relFile}\n`);
-  } catch {
-    /* `.git` pode ser um arquivo (worktree, submódulo): fica sem a exclusão local */
-  }
 }
 
 /** Substitui (ou acrescenta) a tabela [mcp_servers.faz-ai] sem tocar no resto do TOML. */

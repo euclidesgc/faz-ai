@@ -2,7 +2,18 @@ import type { AiTool } from './harness';
 
 /** O que falta para o board trabalhar com a ferramenta de IA do projeto. */
 export type RequirementId =
-  'node' | 'cli' | 'signin' | 'mcp' | 'mcp-stale' | 'mcp-elsewhere' | 'mcp-outdated' | 'mcp-reload' | 'mcp-enable' | 'permission';
+  | 'node'
+  | 'cli'
+  | 'signin'
+  | 'mcp'
+  | 'mcp-stale'
+  | 'mcp-elsewhere'
+  | 'mcp-outdated'
+  | 'mcp-reload'
+  | 'mcp-enable'
+  | 'mcp-path'
+  | 'skill'
+  | 'permission';
 
 /** O que a pessoa pode fazer, pela própria faixa de aviso, para resolver. */
 export type RequirementAction =
@@ -17,6 +28,10 @@ export type RequirementAction =
   | { kind: 'reload' }
   /** abrir a tela de MCPs do editor (no Cursor, Customize → MCPs), onde só a pessoa ativa o MCP */
   | { kind: 'openEditorMcp' }
+  /** instalar a skill do fluxo na ferramenta do projeto, no escopo global */
+  | { kind: 'installSkill' }
+  /** gravar o caminho completo do comando nos registros que o editor não acha (o node instalado depois que ele abriu) */
+  | { kind: 'pinMcp' }
   /** um comando para rodar no terminal, com botão de copiar */
   | { kind: 'command'; command: string }
   /** a tela de Configurações → Harness de IA */
@@ -36,6 +51,8 @@ export interface BoardRequirement {
   /** o arquivo de configuração e o caminho que não existe mais (`mcp-stale`) ou a outra pasta (`mcp-elsewhere`) */
   file?: string;
   missing?: string;
+  /** o arquivo do projeto está no git: o board não grava nele o caminho desta máquina (`mcp-path`) */
+  tracked?: true;
   /** a explicação da recusa, em `permission` (a mesma de `aiRunUnsupported`) */
   reason?: string;
   /**

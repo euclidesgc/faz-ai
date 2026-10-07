@@ -286,18 +286,18 @@ minutes and on **Verificar de novo** (check again), which also rereads the termi
 installed with the board open is found without reloading the window), and says when nothing
 changed.
 
-For Claude and Cursor, an unregistered board server shows as **recommended**, out of the count:
-runs from the board carry the server on their own, and the registration is only missing for the AI
-to see the board in your conversations outside it. On its own, that item becomes a discreet line
-instead of the bar. While the command line is missing or not signed in, the card's AI buttons are
+The board MCP and the flow skill (`faz-ai-fluxo`) count as requirements for every tool: even where
+runs from the board carry the MCP on their own (Claude, Cursor), conversations in the editor chat or
+the terminal depend on it, and the skill is what makes the AI follow the flow. A missing skill has
+the **Install the skill** button right in the bar. While the command line is missing or not signed in, the card's AI buttons are
 disabled, with the reason in the tooltip.
 
 **Environment check.** The first time the board opens on a machine, a `flutter doctor`-style list
 opens on its own with everything the board needs and everything it makes use of. After that, it
 opens from **Check environment** in Settings or **See the full environment check** in the yellow
-bar. **Required:** Node.js 18 or newer, the tool's command line, its sign-in, the board MCP and the
-permission level (the same items as the bar, with the same actions). **Recommended:** the flow
-skill (**Install the skill** button), Git and a repository in the folder (`git init`), the GitHub
+bar. **Required:** Node.js 18 or newer, the tool's command line, its sign-in, the board MCP, the
+flow skill and the permission level (the same items as the bar, with the same actions).
+**Recommended:** Git and a repository in the folder (`git init`), the GitHub
 CLI and its sign-in (`gh auth login`, for auto-merge and PR tracking) and
 [Code Review Graph](https://github.com/tirth8205/code-review-graph), a code graph the AI queries
 instead of reading whole files. Once Code Review Graph is installed, the list suggests building the
@@ -308,7 +308,26 @@ more**. The install commands follow the detected system: `winget` on Windows, Ho
 distribution, the download link remains. When a program lands in a folder outside the PATH (the
 Cursor CLI and `uv`, in `~/.local/bin`), the commands include the step that adds it. Code Review
 Graph shows its prerequisites inside it, in install order: `uv` and Python 3.10 or newer, which `uv`
-downloads just for it without touching the system Python. Semantic search uses the `local` provider: the model is downloaded once from Hugging
+downloads just for it without touching the system Python.
+
+**Install everything.** The **Install what is required** and **Install the recommended** buttons
+first show the steps, in order, and the whole script. They only run after **Run in the terminal**, in
+an editor terminal you can see: the `sudo` password and the sign-ins (`cursor-agent login`, `gh auth
+login`) stay with you, there. The script is built for the detected system (bash on Linux and macOS,
+PowerShell on Windows) and runs everything in one session, so the PATH a step adjusts applies to the
+following ones. A step that fails does not stop the others, it only skips the ones that depend on it,
+and at the end the screen shows each step's result: installed, skipped or not installed, with the
+command, the exit code and the last lines of the error. What has no command (turning on the MCP in
+Cursor, the permission) is listed as your task. In browser mode, instead of running, the screen gives
+you the script to copy.
+
+The editor chat starts MCPs with the PATH the editor opened with: what was installed later (Node
+through `nvm`, Code Review Graph's `uvx`) is not in it until the editor is closed and reopened. So, at
+the end of **Install everything**, when Node shows up, and through the **Fix the path** button, the
+board writes the command's full path into the `faz-ai` and `code-review-graph` registrations the
+editor cannot find. The path is found at that moment, on the machine where the extension runs, and the
+file stays out of git (`.git/info/exclude`). If the project MCP file is versioned, the board does not
+write to it and explains the options. Semantic search uses the `local` provider: the model is downloaded once from Hugging
 Face and runs on the machine. The screen warns that the cloud providers (`openai`, `google`,
 `minimax`, `voyage`) send code snippets to third parties, which many companies do not allow.
 

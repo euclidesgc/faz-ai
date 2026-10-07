@@ -105,13 +105,26 @@ describe('faixa de requisitos do board', () => {
 
 describe('MCP do board no Cursor', () => {
   it('desativado: diz para que serve e leva à tela de MCPs do Cursor', async () => {
-    set([{ id: 'mcp-enable', tool: 'cursor', optional: true, action: { kind: 'openEditorMcp' } }]);
+    set([{ id: 'mcp-enable', tool: 'cursor', action: { kind: 'openEditorMcp' } }]);
     renderThemed(<RequirementsBanner />);
     expect(screen.getByText('Falta um passo para o chat do Cursor usar o board')).toBeInTheDocument();
     expect(screen.getByText('Ative o MCP do board no Cursor')).toBeInTheDocument();
     expect(screen.getByText(/canal pelo qual a IA do chat do Cursor lê e atualiza os cards/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Abrir MCPs do Cursor/ }));
     expect(sentOf('ui.openEditorMcp')).toHaveLength(1);
+  });
+});
+
+describe('skill do fluxo', () => {
+  it('sem ela, a faixa conta como requisito e instala no escopo global', async () => {
+    set([{ id: 'skill', tool: 'cursor', action: { kind: 'installSkill' } }]);
+    renderThemed(<RequirementsBanner />);
+    expect(screen.getByText('Falta 1 requisito para o board trabalhar com a IA')).toBeInTheDocument();
+    expect(screen.getByText('A skill do fluxo (faz-ai-fluxo) não está instalada no Cursor')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Instalar a skill' }));
+    expect(sentOf('harness.flowSkill.install')).toEqual([
+      { type: 'harness.flowSkill.install', tool: 'cursor', scope: 'user', replace: false },
+    ]);
   });
 });
 

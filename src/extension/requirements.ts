@@ -6,6 +6,7 @@ import type { RunnerPermission } from '../shared/runner';
 import { byPath, samePath } from './samePath';
 import { headlessCommand, headlessUnsupported } from './headless';
 import { fixedFolder } from './mcp/clientConfig';
+import { editorFinds, trackedInGit } from './mcp/pinCommands';
 
 /** Onde a ferramenta lê o servidor do board, e o que está registrado lá. */
 export interface Registered {
@@ -157,6 +158,15 @@ export interface RequirementProbe {
   windowStartedAt?: number;
   /** a pasta de configuração do usuário no VS Code, onde fica o `mcp.json` global do Copilot no editor */
   editorUserDir?: string;
+  /**
+   * o PATH com que o editor abriu: é nele que o chat do editor procura o comando do MCP. Um programa
+   * instalado depois (o node pelo nvm) só entra nele quando o editor fecha e abre de novo
+   */
+  editorPath?: string;
+  /** a skill do fluxo está instalada na ferramenta; ausente quando não dá para saber (sem o inventário) */
+  skillInstalled?: boolean;
+  /** o arquivo do projeto está no git (por padrão, `git ls-files`) */
+  isTracked?: (workspaceDir: string, rel: string) => boolean;
 }
 
 /**
@@ -210,11 +220,10 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
   if (cli && executable && (await p.signedIn(tool, executable)) === false)
     out.push({ id: 'signin', tool, cli, action: { kind: 'command', command: `${cli} login` } });
 
-  // no Claude e no Cursor as execuções pelo board levam o servidor sozinhas: o registro só falta nas
-  // conversas da pessoa fora do board, e o aviso diz isso sem contar como requisito
-  const optional = tool === 'claude' || tool === 'cursor' ? { optional: true as const } : {};
+  // o MCP e a skill do fluxo são necessários em todas as ferramentas: mesmo onde as execuções pelo board
+  // levam o servidor sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele
   const registered = registeredServer(tool, p.workspaceDir, p.homeDir, p.editorUserDir);
-  if (!registered) out.push({ id: 'mcp', tool, ...optional, action: { kind: 'connect' } });
+  if (!registered) out.push({ id: 'mcp', tool, action: { kind: 'connect' } });
   else {
     const [bridge, arg] = registered.args;
     // `${workspaceFolder}` é a pasta aberta, que a ferramenta troca ao iniciar: não é pasta fixa
@@ -227,7 +236,6 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
       out.push({
         id: commandMissing || bridgeMissing ? 'mcp-stale' : 'mcp-elsewhere',
         tool,
-        ...optional,
         file: registered.file,
         missing: commandMissing ? registered.command : bridgeMissing ? bridge : folder,
         // o do projeto vale sobre o global: refazer só o global deixaria o aviso para sempre
@@ -239,11 +247,27 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
       out.push({
         id: 'mcp-outdated',
         tool,
-        ...optional,
         file: registered.file,
         missing: bridge,
         action: registered.scope === 'project' ? { kind: 'fixProject', file: registered.file } : { kind: 'connect' },
       });
+    // o chat do editor inicia o servidor com o PATH de quando ele abriu: um node instalado depois não
+    // está nele. O caminho completo resolve sem fechar o editor (o arquivo do projeto no git, não)
+    else if (
+      p.editorPath !== undefined &&
+      ((tool === 'cursor' && p.editor === 'cursor') || (tool === 'copilot' && p.editor === 'vscode')) &&
+      !editorFinds(registered.command, p.editorPath)
+    ) {
+      const tracked = registered.scope === 'project' && (p.isTracked ?? trackedInGit)(p.workspaceDir, registered.file);
+      out.push({
+        id: 'mcp-path',
+        tool,
+        file: registered.file,
+        missing: registered.command,
+        ...(tracked ? { tracked: true as const } : {}),
+        action: tracked ? null : { kind: 'pinMcp' },
+      });
+    }
     // o chat do Cursor só carrega um servidor registrado depois que a janela abriu ao recarregá-la
     else if (
       tool === 'cursor' &&
@@ -251,11 +275,14 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
       p.windowStartedAt !== undefined &&
       modifiedAt(registered.path) > p.windowStartedAt
     )
-      out.push({ id: 'mcp-reload', tool, optional: true, file: registered.file, action: { kind: 'reload' } });
+      out.push({ id: 'mcp-reload', tool, file: registered.file, action: { kind: 'reload' } });
     // carregado, mas o Cursor deixa desligado todo servidor novo do projeto: só a pessoa liga
     else if (tool === 'cursor' && p.editor === 'cursor' && !cursorConnectedOnce(p.homeDir, p.workspaceDir))
-      out.push({ id: 'mcp-enable', tool, optional: true, action: { kind: 'openEditorMcp' } });
+      out.push({ id: 'mcp-enable', tool, action: { kind: 'openEditorMcp' } });
   }
+
+  // a skill ensina a IA a conduzir o fluxo do board (fases, documentos, revisão)
+  if (p.skillInstalled === false) out.push({ id: 'skill', tool, action: { kind: 'installSkill' } });
 
   const unsupported = headlessUnsupported(tool, p.permission);
   if (unsupported) out.push({ id: 'permission', tool, reason: unsupported, action: { kind: 'settings' } });

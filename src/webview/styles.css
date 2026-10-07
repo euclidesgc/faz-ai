@@ -1985,6 +1985,37 @@ button.heartbeat.stopped:hover {
 .env-os {
   margin: 0;
 }
+.env-install-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.env-install {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding: var(--sp-12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.env-install h3,
+.env-install p,
+.env-install ol {
+  margin: 0;
+}
+.env-script {
+  margin: var(--sp-6) 0 0;
+  padding: var(--sp-8);
+  max-height: 320px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
 .env-busy {
   margin: 0;
   display: flex;

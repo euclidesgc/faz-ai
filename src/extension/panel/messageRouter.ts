@@ -32,6 +32,16 @@ export interface Origin {
   source?: 'human' | 'ai';
 }
 
+/** O que o host faz pelo Diagnóstico do ambiente. */
+export interface EnvironmentHooks {
+  check(): void;
+  seen(): void;
+  /** roda o "Instalar tudo" de um nível; ausente onde não há terminal para rodar (fica o script para copiar) */
+  install?(level: 'required' | 'recommended'): void;
+  /** grava o caminho completo dos MCPs que o editor não acha, e confere de novo */
+  pinMcp?(): void;
+}
+
 /** As mensagens do webview que o chat executa. */
 export type ChatMessageIn = Extract<WebviewToHost, { type: 'chat.send' | 'chat.stop' | 'chat.clear' }>;
 
@@ -56,6 +66,8 @@ const bridgeOnly = {
   'requirements.check': viaBridge,
   'environment.check': viaBridge,
   'environment.seen': viaBridge,
+  'environment.install': viaBridge,
+  'environment.pinMcp': viaBridge,
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
@@ -102,7 +114,9 @@ export class MessageRouter {
   private requirementsCheck: (() => void) | null = null;
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
-  private environmentHooks: { check(): void; seen(): void } | null = null;
+  private environmentHooks: EnvironmentHooks | null = null;
+  private environmentInstall: BoardState['environmentInstall'] = null;
+  private environmentInstallResult: BoardState['environmentInstallResult'] = null;
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
 
@@ -143,6 +157,8 @@ export class MessageRouter {
       requirementsCheckedAt: this.requirementsCheckedAt,
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
+      environmentInstall: this.environmentInstall,
+      environmentInstallResult: this.environmentInstallResult,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
     };
   }
@@ -209,13 +225,34 @@ export class MessageRouter {
    * Quem roda o Diagnóstico e quem lembra que ele já foi mostrado nesta máquina; `firstRun` diz se a
    * tela deve abrir sozinha (a primeira abertura do board depois de instalar a extensão).
    */
-  onEnvironment(hooks: { check(): void; seen(): void }, firstRun: boolean): void {
+  onEnvironment(hooks: EnvironmentHooks, firstRun: boolean): void {
     this.environmentHooks = hooks;
     this.environmentFirstRun = firstRun;
   }
 
   checkEnvironment(): void {
     this.environmentHooks?.check();
+  }
+
+  /** "Instalar tudo" de um nível: quem roda é o host (num terminal do editor). */
+  installEnvironment(level: 'required' | 'recommended'): void {
+    this.environmentHooks?.install?.(level);
+  }
+
+  pinEnvironmentMcp(): void {
+    this.environmentHooks?.pinMcp?.();
+  }
+
+  /** O "Instalar tudo" começou ou terminou (informado pelo host). */
+  setEnvironmentInstall(state: BoardState['environmentInstall']): void {
+    this.environmentInstall = state;
+    this.notify();
+  }
+
+  /** O resultado do último "Instalar tudo" (informado pelo host ao terminar). */
+  setEnvironmentInstallResult(result: BoardState['environmentInstallResult']): void {
+    this.environmentInstallResult = result;
+    this.notify();
   }
 
   /** A tela abriu sozinha uma vez: nas próximas aberturas, só pelo botão. */
