@@ -21,7 +21,40 @@ export const fake = {
     this.panels.length = 0;
     this.answer = undefined;
     this.folder = undefined;
+    fakeConfig.reset();
   },
+};
+
+export const ConfigurationTarget = { Global: 1, Workspace: 2, WorkspaceFolder: 3 };
+type Scope = 'default' | 'global' | 'workspace' | 'folder';
+type ConfigEvent = { affectsConfiguration(section: string): boolean };
+const configListeners = new Set<(e: ConfigEvent) => void>();
+/** Settings de mentira: um dicionário por escopo, com a chave completa (`fazai.appearance.language`). */
+export const fakeConfig = {
+  values: { default: {}, global: {}, workspace: {}, folder: {} } as Record<Scope, Record<string, unknown>>,
+  /** cada `update` chamado, com a chave completa */
+  updates: [] as { key: string; value: unknown; target: number }[],
+  reset(): void {
+    this.values = { default: {}, global: {}, workspace: {}, folder: {} };
+    this.updates.length = 0;
+    configListeners.clear();
+  },
+  /** simula uma edição no settings.json: grava no escopo e dispara onDidChangeConfiguration */
+  set(scope: Scope, key: string, value: unknown): void {
+    if (value === undefined) delete this.values[scope][key];
+    else this.values[scope][key] = value;
+    this.fire([key]);
+  },
+  fire(keys: string[]): void {
+    const e: ConfigEvent = { affectsConfiguration: (s) => keys.some((k) => k === s || k.startsWith(`${s}.`)) };
+    configListeners.forEach((fn) => fn(e));
+  },
+};
+const effective = (full: string): unknown => {
+  for (const scope of ['folder', 'workspace', 'global', 'default'] as Scope[]) {
+    if (full in fakeConfig.values[scope]) return fakeConfig.values[scope][full];
+  }
+  return undefined;
 };
 
 export class Uri {
@@ -106,9 +139,15 @@ export class FakePanel {
   webview = new FakeWebview();
   iconPath: unknown;
   constructor(public title: string) {}
+  private onDispose: (() => void) | undefined;
   reveal(): void {}
-  onDidDispose() {
+  onDidDispose(fn: () => void) {
+    this.onDispose = fn;
     return disposable;
+  }
+  /** como o editor ao fechar a aba: avisa quem registrou onDidDispose */
+  dispose(): void {
+    this.onDispose?.();
   }
 }
 
@@ -156,6 +195,28 @@ export const workspace = {
     onDidDelete: () => disposable,
     dispose() {},
   }),
+  getConfiguration(section: string) {
+    const full = (k: string) => `${section}.${k}`;
+    return {
+      get: <T>(k: string) => effective(full(k)) as T | undefined,
+      inspect: <T>(k: string) => ({
+        defaultValue: fakeConfig.values.default[full(k)] as T | undefined,
+        globalValue: fakeConfig.values.global[full(k)] as T | undefined,
+        workspaceValue: fakeConfig.values.workspace[full(k)] as T | undefined,
+        workspaceFolderValue: fakeConfig.values.folder[full(k)] as T | undefined,
+      }),
+      update: (k: string, value: unknown, target = 1) => {
+        const scope: Scope = target === 3 ? 'folder' : target === 2 ? 'workspace' : 'global';
+        fakeConfig.updates.push({ key: full(k), value, target });
+        fakeConfig.set(scope, full(k), value);
+        return Promise.resolve();
+      },
+    };
+  },
+  onDidChangeConfiguration(fn: (e: ConfigEvent) => void) {
+    configListeners.add(fn);
+    return { dispose: () => configListeners.delete(fn) };
+  },
 };
 
 export const env = {

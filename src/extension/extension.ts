@@ -11,6 +11,9 @@ import { resolveCommand } from './cliResolve';
 import { loginShellPath } from './spawn';
 import { BoardPanel } from './panel/BoardPanel';
 import type { MessageRouter } from './panel/messageRouter';
+import { IdeSettings } from './settings/ideSettings';
+import type { HostToWebview } from '../shared/messages';
+import { toSettingsTab } from '../shared/settingsTab';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
 import { ChatViewProvider } from './sidebar/ChatViewProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
@@ -117,11 +120,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           const label = state.board.appearance.statuses[card.status!].label;
           void vscode.window
             .showInformationMessage(`${cardRef(card)} ${card.title}: ${label}`, 'Abrir card')
-            .then((choice) => choice && openBoard(card.id));
+            .then((choice) => choice && openBoard({ type: 'ui.openCard', cardId: card.id }));
         }
       };
       router.onDidChange(onBoardChange);
       onBoardChange();
+      // Settings do editor (fazai.*) ↔ SQLite do board
+      context.subscriptions.push(new IdeSettings(vscode.workspace, f.uri, log).bind(router));
       runner = host.runner;
       heartbeat = host.heartbeat;
       mergeWatcher = host.mergeWatcher;
@@ -186,14 +191,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const tree = new BoardTreeProvider(getRouter);
   const treeView = vscode.window.createTreeView('fazai.sidebar', { treeDataProvider: tree, showCollapseAll: true });
 
-  const openBoard = async (cardId?: string) => {
+  const openBoard = async (pending?: HostToWebview) => {
     const f = folder();
     const router = await getRouter();
     if (!f || !router) {
       vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
       return;
     }
-    BoardPanel.show(context, router, viewState, f.name, cardId);
+    BoardPanel.show(context, router, viewState, f.name, pending);
     if (servedElsewhere) {
       servedElsewhere = false; // avisa uma vez
       void vscode.window.showWarningMessage(
@@ -254,7 +259,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (e.visible && folder()) void openBoard();
     }),
     vscode.commands.registerCommand('fazai.openBoard', () => openBoard()),
-    vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard(cardId)),
+    vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard({ type: 'ui.openCard', cardId })),
+    vscode.commands.registerCommand('fazai.openIdeSettings', (key?: string) =>
+      vscode.commands.executeCommand('workbench.action.openSettings', key ? `@id:${key}` : '@ext:euclidesgc.faz-ai'),
+    ),
+    vscode.commands.registerCommand('fazai.openBoardSettings', (args?: { tab?: unknown; section?: string }) =>
+      openBoard({ type: 'ui.openSettings', tab: toSettingsTab(args?.tab), section: args?.section }),
+    ),
+    vscode.commands.registerCommand('fazai.openEnvironment', () => openBoard({ type: 'ui.openView', view: 'environment' })),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
     vscode.commands.registerCommand('fazai.openInBrowser', openInBrowser),
     vscode.commands.registerCommand('fazai.connectAI', (target?: Parameters<BoardHost['connectAI']>[0], opts?: { fromBoard?: boolean }) =>
