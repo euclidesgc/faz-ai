@@ -88,9 +88,17 @@ mesma rodada precisarem do mesmo arquivo, não as rode juntas: registre a depend
 
 ## Homologação
 
-Envie a branch da história, abra o pull request (se ainda não existir) e registre o endereço com
-\`set_pull_request\`. Resuma na conversa o que foi feito e como testar, e chame \`request_review\`.
-Não faça o merge: ele depende da aprovação da pessoa e pode ser feito pelo próprio board.
+A entrega é para a pessoa testar, então o roteiro de testes é parte dela, em dois lugares:
+
+1. Escreva a seção **"Como testar"**: o que foi construído, os passos para verificar (comandos,
+   telas, dados de exemplo e o resultado esperado em cada passo) e o que ficou de fora. Acrescente-a
+   à descrição da história com \`update_card\`, sem apagar o que já está lá.
+2. Envie a branch da história, abra o pull request (se ainda não existir) com o resumo do que foi
+   feito e a mesma seção "Como testar" no corpo, e registre o endereço com \`set_pull_request\`.
+3. Resuma na conversa o que foi feito, aponte o roteiro e chame \`request_review\`.
+
+Não faça o merge: ele depende da aprovação da pessoa. Com o merge automático ligado (Configurações →
+Git), a aprovação dela faz o merge e leva a história a Concluído; desligado, a IA move o card aprovado.
 
 ## Modo autônomo (YOLO)
 
@@ -102,9 +110,10 @@ rodar sozinha: ninguém aprova nem responde. Então:
 - decida as dúvidas pela opção mais razoável e registre a decisão e o motivo na conversa;
 - \`block_card\` só para impedimento real (acesso, ambiente, falha que você não resolve);
 - na Implementação, execute todas as sub-tarefas até o fim; na última coluna em que a IA atua
-  (Homologação, no board padrão) não há aprovação nem próxima fase: abra o pull request, registre-o
-  com \`set_pull_request\` (é o registro que entrega a história e a passa para a pessoa), resuma na
-  conversa o que foi feito e como testar, e pare: não avance o card. Nunca faça o merge;
+  (Homologação, no board padrão) não há aprovação nem próxima fase: grave o "Como testar" na
+  descrição da história, abra o pull request com ele no corpo, registre-o com \`set_pull_request\`
+  (é o registro que entrega a história e a passa para a pessoa), resuma na conversa o que foi feito,
+  e pare: não avance o card. Nunca faça o merge: a aprovação da pessoa faz o merge pelo board;
 - histórias em modo autônomo formam uma fila e uma pilha de pull requests: cada uma parte da branch da
   anterior (\`workspace.baseBranch\` no \`get_card\`) e o PR é aberto com \`--base\` nela. Para dividir um
   pedido grande, crie as próximas histórias com \`create_card\` e \`autonomous_from\`, em ordem de dependência.

@@ -3,6 +3,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Database } from 'sql.js';
 import { BOARD_TEMPLATE_VERSION, pendingUpgrade, upgradeBoard } from '../src/extension/db/boardTemplate';
+import { run } from '../src/extension/db/query';
+import { HOMOLOGATION_INSTRUCTION_V4, PHASE_DEFAULTS } from '../src/shared/phaseDefaults';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
@@ -136,6 +138,23 @@ describe('atualização do board para o padrão atual', () => {
     const after = JSON.stringify(snap());
     upgradeBoard(db, boardId);
     expect(JSON.stringify(snap())).toBe(after);
+  });
+
+  it('versão 4: a Homologação com a instrução padrão antiga passa a pedir o roteiro "Como testar"; a personalizada fica', () => {
+    upgradeBoard(db, boardId);
+    const settings = new SettingsRepo(db);
+    settings.updateColumn(col('Homologação').id, { aiInstruction: HOMOLOGATION_INSTRUCTION_V4 });
+    run(db, 'UPDATE boards SET template_version = 4 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([
+      'Coluna "Homologação": a instrução passa a pedir o roteiro "Como testar" na descrição do card e no pull request.',
+    ]);
+    upgradeBoard(db, boardId);
+    expect(col('Homologação').aiInstruction).toBe(PHASE_DEFAULTS['Homologação']!.instruction);
+    expect(col('Homologação').aiInstruction).toContain('Como testar');
+
+    settings.updateColumn(col('Homologação').id, { aiInstruction: 'minha instrução' });
+    run(db, 'UPDATE boards SET template_version = 4 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 
   it('pelo roteador: o board antigo avisa o que muda e é atualizado por mensagem, com cópia de segurança', () => {

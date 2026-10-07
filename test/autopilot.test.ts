@@ -343,19 +343,57 @@ describe('autopiloto', () => {
     expect(runner.started).toHaveLength(2);
   });
 
-  it('não liga sozinho ao abrir o editor com história em modo autônomo; precisa retomar', () => {
+  it('liga sozinho ao abrir o editor com história em modo autônomo pendente', () => {
     owns = false;
     create('A', 'PRD');
     yolo(1);
-    // o editor abre (a janela passa a ser a dona) com a história já em modo autônomo: nada começa
+    expect(runner.started).toEqual([]);
+    // o editor abre (a janela passa a ser a dona) com a história já em modo autônomo: a fila segue sem clique
     owns = true;
     router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
     flush();
-    expect(autopilot.isActive).toBe(false);
-    expect(runner.started).toEqual([]);
-
-    autopilot.resume();
+    expect(autopilot.isActive).toBe(true);
     expect(runner.started).toEqual([card(1).id]);
+    expect(log).toContain('Autopiloto: histórias em modo autônomo pendentes; retomando.');
+  });
+
+  it('ao abrir o editor, a construção já retoma a fila pendente, sem esperar uma mudança no board', () => {
+    // a história entrou em modo autônomo numa janela que não é a dona: nada começou
+    owns = false;
+    create('A', 'PRD');
+    yolo(1);
+    flush();
+    expect(runner.started).toEqual([]);
+    // o editor reabre como dono: um autopiloto novo sobre o mesmo board, com a história pendente
+    owns = true;
+    const fresh = new Autopilot(router, runner, { log: (l) => log.push(l), canRun: () => owns, defer: (fn) => deferred.push(fn) });
+    expect(fresh.isActive).toBe(false);
+    flush();
+    expect(fresh.isActive).toBe(true);
+    expect(runner.started).toEqual([card(1).id]);
+  });
+
+  it('a pausa da pessoa segura a fila: uma mudança no board não religa, só retomar', () => {
+    create('A', 'PRD');
+    yolo(1);
+    autopilot.pause();
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
+    flush();
+    expect(autopilot.isActive).toBe(false);
+    expect(runner.started).toEqual([card(1).id]);
+    autopilot.resume();
+    expect(runner.started).toEqual([card(1).id, card(1).id]);
+  });
+
+  it('fila só de histórias entregues não religa o autopiloto ao abrir o editor', () => {
+    create('A', 'Homologação');
+    yolo(1);
+    runner.finish(() => deliver(1));
+    flush();
+    expect(autopilot.isActive).toBe(false);
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
+    flush();
+    expect(autopilot.isActive).toBe(false);
   });
 
   it('só a janela dona do board roda', () => {

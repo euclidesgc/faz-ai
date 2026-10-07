@@ -216,12 +216,16 @@ export class CardRepo {
         all(db, 'SELECT id FROM cards WHERE column_id = ? ORDER BY position', [fromCol]).forEach((r, i) =>
           run(db, 'UPDATE cards SET position = ? WHERE id = ?', [i, str(r.id)]),
         );
-        // o status vale para a coluna: ao entrar em outra, recomeça
-        run(db, "UPDATE cards SET status = ?, status_reason = '', status_at = ?, status_by = '' WHERE id = ?", [
-          entryStatus(col),
-          now(),
-          cardId,
-        ]);
+        // o status vale para a coluna: ao entrar em outra, recomeça. Exceção: a IA que está executando o card
+        // e o move para outra coluna em que ela atua (start_work e depois "Em andamento") continua executando;
+        // zerar aqui apagaria o LED da sub-tarefa segundos depois de acender.
+        const keepRunning = str(card.status) === 'running' && entryStatus(col) === 'ready';
+        if (!keepRunning)
+          run(db, "UPDATE cards SET status = ?, status_reason = '', status_at = ?, status_by = '' WHERE id = ?", [
+            entryStatus(col),
+            now(),
+            cardId,
+          ]);
       }
     }
   }

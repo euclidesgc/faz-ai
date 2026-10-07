@@ -520,8 +520,10 @@ commits na branch da história.
 
 ### Pull request e merge na Homologação
 
-Na Homologação a IA envia a branch, abre o pull request da história, registra o endereço no card e
-pede a sua revisão. O card mostra o link do PR.
+Na Homologação a IA escreve o roteiro **"Como testar"** (o que foi construído, os passos para
+verificar com o resultado esperado e o que ficou de fora) na descrição da história, envia a branch,
+abre o pull request com o mesmo roteiro no corpo, registra o endereço no card e pede a sua revisão.
+O card mostra o link do PR.
 
 O merge automático é opcional e começa desligado (Configurações → Git). Com ele ligado, quando você
 aprova uma história que está na última coluna antes da conclusão:
@@ -640,8 +642,8 @@ O **botão do modo autônomo** no topo do board aparece enquanto houver históri
 o clique faz: **Pausar modo autônomo** (aceso, com o autopiloto tocando; pausar interrompe a IA) ou
 **Retomar modo autônomo** (apagado, pausado). Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
 (YOLO)** e **Faz AI: Parar as execuções da IA e o modo autônomo**. Ao abrir o editor, o autopiloto
-não começa sozinho: ele liga quando você ativa o modo numa história ou retoma. O heartbeat não
-toca histórias em modo autônomo; elas são do autopiloto.
+retoma sozinho a fila que ficou pendente (a pausa é sua: o que você pausou só volta quando você
+retomar). O heartbeat não toca histórias em modo autônomo; elas são do autopiloto.
 
 
 ### Agentes

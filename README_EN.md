@@ -543,7 +543,9 @@ progress. Sub-tasks commit to the story's branch.
 
 ### Pull request and merge in Homologação
 
-In Homologação the AI pushes the branch, opens the story's pull request, records its address on the
+In Homologação the AI writes the **"Como testar"** (how to test) script — what was built, the steps
+to verify it with the expected result, and what was left out — in the story's description, pushes
+the branch, opens the pull request with the same script in its body, records its address on the
 card and asks for your review. The card shows the PR link.
 
 Automatic merge is optional and starts turned off (Configurações → Git). With it on, when you
@@ -665,8 +667,8 @@ The **autonomous mode button** at the top of the board shows while there is a st
 and says what the click does: **Pausar modo autônomo** (pause; lit, with the autopilot driving;
 pausing interrupts the AI) or **Retomar modo autônomo** (resume; dimmed, paused). From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
 autônomo (YOLO)** and **Faz AI: Parar as execuções da IA e o modo autônomo**. When the editor
-opens the autopilot does not start by itself: it starts when you turn the mode on for a story or
-resume. The heartbeat does not drive autonomous stories; they belong to the autopilot.
+opens the autopilot resumes the pending queue by itself (the pause is yours: what you paused only
+comes back when you resume). The heartbeat does not drive autonomous stories; they belong to the autopilot.
 
 
 ### Agents
