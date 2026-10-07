@@ -172,7 +172,7 @@ describe('Diagnóstico do ambiente', () => {
           parent: 'crg',
           level: 'recommended',
           status: 'missing',
-          fix: { kind: 'commands', commands: ['curl -LsSf https://astral.sh/uv/install.sh | sh', 'source $HOME/.local/bin/env'] },
+          fix: { kind: 'commands', commands: ['curl -LsSf https://astral.sh/uv/install.sh | sh', 'export PATH="$HOME/.local/bin:$PATH"'] },
         },
         { id: 'python', parent: 'crg', level: 'recommended', status: 'skipped' },
       ]),
@@ -181,7 +181,7 @@ describe('Diagnóstico do ambiente', () => {
     const prereqs = screen.getByRole('region', { name: 'Antes, os pré-requisitos' });
     expect(prereqs.closest('li.env-item')?.querySelector('strong')?.textContent).toBe('Code Review Graph');
     expect(within(prereqs).getByText('uv')).toBeInTheDocument();
-    expect(within(prereqs).getByText('source $HOME/.local/bin/env')).toBeInTheDocument();
+    expect(within(prereqs).getByText('export PATH="$HOME/.local/bin:$PATH"')).toBeInTheDocument();
     expect(within(prereqs).getByText('Python 3.10 ou mais novo')).toBeInTheDocument();
     // fora da lista principal: skill, Code Review Graph e busca semântica, sem o uv e o Python soltos
     const top = screen.getByRole('region', { name: 'Recomendado' }).querySelectorAll(':scope > ul > li');
@@ -205,5 +205,79 @@ describe('Diagnóstico do ambiente', () => {
     expect(within(gh).getByText('winget install --id GitHub.cli -e')).toBeInTheDocument();
     expect(within(gh).getByText(/abra um terminal novo/)).toBeInTheDocument();
     expect(within(gh).getByRole('link', { name: /Ou baixe o instalador/ })).toHaveAttribute('href', 'https://cli.github.com');
+  });
+
+  it('"Instalar o necessário" mostra os passos e o script antes de rodar; depois, o aviso de instalando', async () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(
+      report([
+        ...MISSING,
+        { id: 'signin', level: 'required', status: 'skipped', fix: { kind: 'commands', commands: ['cursor-agent login'] } },
+      ]),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Instalar o necessário' }));
+    const preview = screen.getByRole('region', { name: 'Instalar o necessário' });
+    expect(
+      within(preview)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Linha de comando do Cursor', 'Login na linha de comando do Cursor']);
+    expect(within(preview).getByText(/sua senha \(sudo\)/)).toBeInTheDocument();
+    expect(preview.querySelector('pre')?.textContent).toContain('cursor-agent login');
+    // nada roda antes da confirmação
+    expect(sentOf('environment.install')).toHaveLength(0);
+    await userEvent.click(within(preview).getByRole('button', { name: 'Rodar no terminal' }));
+    expect(sentOf('environment.install')).toEqual([{ type: 'environment.install', level: 'required' }]);
+
+    act(() => {
+      router.setEnvironmentInstall({ level: 'required', startedAt: Date.now() });
+      syncStore(router);
+    });
+    expect(screen.getByText(/Instalando no terminal "Faz AI: instalação"/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Instalar os recomendados' })).toBeNull();
+  });
+
+  it('"Cancelar" fecha a confirmação sem rodar nada', async () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(report(MISSING));
+    await userEvent.click(screen.getByRole('button', { name: 'Instalar os recomendados' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('region', { name: 'Instalar os recomendados' })).toBeNull();
+    expect(sentOf('environment.install')).toHaveLength(0);
+  });
+
+  it('o resultado da instalação mostra o que falhou, com o comando e o erro, e o que foi pulado', async () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(report(MISSING));
+    act(() => {
+      router.setEnvironmentInstallResult({
+        level: 'recommended',
+        finishedAt: 1,
+        steps: [
+          { id: 'git', status: 'ok' },
+          { id: 'gh', status: 'failed', code: 100, command: 'sudo apt install -y gh', error: 'E: Unable to locate package gh' },
+          { id: 'gh-auth', status: 'skipped', because: 'gh' },
+        ],
+      });
+      syncStore(router);
+    });
+    const panel = screen.getByRole('region', { name: 'Resultado da instalação' });
+    expect(within(panel).getByText(/Não foi possível instalar 1 item/)).toBeInTheDocument();
+    expect(within(panel).getByText('O comando "sudo apt install -y gh" terminou com o código 100.')).toBeInTheDocument();
+    expect(within(panel).getByText('E: Unable to locate package gh')).toBeInTheDocument();
+    expect(within(panel).getByText('Pulado: depende de GitHub CLI (gh), que falhou')).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole('button', { name: 'Fechar o resultado' }));
+    expect(screen.queryByRole('region', { name: 'Resultado da instalação' })).toBeNull();
+  });
+
+  it('"Corrigir o caminho" grava o caminho completo e confere de novo', async () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(report([{ id: 'crg-mcp', level: 'recommended', status: 'missing', fix: { kind: 'pinMcp' } }]));
+    await userEvent.click(screen.getByRole('button', { name: 'Corrigir o caminho' }));
+    expect(posted.mock.calls.map(([m]) => m.type).slice(-2)).toEqual(['environment.pinMcp', 'environment.check']);
   });
 });

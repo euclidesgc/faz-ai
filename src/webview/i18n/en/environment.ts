@@ -26,6 +26,48 @@ export const environment: Record<string, string> = {
   Privacidade: 'Privacy',
   'Saiba mais': 'Learn more',
   'Instalar a skill': 'Install the skill',
+  'O {tool} não acha o comando do MCP do board': '{tool} cannot find the board MCP command',
+  '{file} inicia o MCP com "{missing}", que não está no PATH com que o editor abriu (o programa foi instalado depois, ou fica numa pasta que o editor não lê). O arquivo está no git, então o board não grava nele o caminho desta máquina: feche e abra o editor de novo, ou tire o arquivo do git.':
+    '{file} starts the MCP with "{missing}", which is not in the PATH the editor opened with (the program was installed later, or lives in a folder the editor does not read). The file is in git, so the board does not write this machine’s path into it: close and reopen the editor, or take the file out of git.',
+  '{file} inicia o MCP com "{missing}", que não está no PATH com que o editor abriu (o programa foi instalado depois, ou fica numa pasta que o editor não lê). Corrigir grava o caminho completo dele nesta máquina, e o arquivo fica fora do git; depois, recarregue a janela.':
+    '{file} starts the MCP with "{missing}", which is not in the PATH the editor opened with (the program was installed later, or lives in a folder the editor does not read). Fixing writes its full path on this machine, and the file stays out of git; then reload the window.',
+  'Resultado da instalação': 'Installation result',
+  'Não foi possível instalar {n} item. O erro está abaixo; o resto da instalação seguiu sem ele.':
+    '{n} item could not be installed. The error is below; the rest of the installation went on without it.',
+  'Não foi possível instalar {n} itens. Os erros estão abaixo; o resto da instalação seguiu sem eles.':
+    '{n} items could not be installed. The errors are below; the rest of the installation went on without them.',
+  'Tudo foi instalado.': 'Everything was installed.',
+  Instalado: 'Installed',
+  'Pulado: depende de {item}, que falhou': 'Skipped: depends on {item}, which failed',
+  'Não foi possível instalar': 'Could not be installed',
+  'O comando "{command}" terminou com o código {code}.': 'The command "{command}" ended with code {code}.',
+  'A mensagem completa está no terminal "Faz AI: instalação".': 'The full message is in the "Faz AI: instalação" terminal.',
+  'Fechar o resultado': 'Close the result',
+  'Corrigir o caminho': 'Fix the path',
+  'MCP do Code Review Graph no {tool}': 'Code Review Graph MCP in {tool}',
+  'É por ele que a IA do chat do editor consulta o grafo.': 'It is how the AI in the editor chat queries the graph.',
+  'O editor inicia o MCP com o comando registrado, procurando-o no PATH de quando abriu. O que foi instalado depois (o uvx do uv) só é achado pelo caminho completo, que vale para esta máquina; o arquivo fica fora do git.':
+    'The editor starts the MCP with the registered command, looking for it in the PATH it opened with. What was installed later (uv’s uvx) is only found by its full path, which is valid for this machine; the file stays out of git.',
+  'O arquivo de MCPs do projeto está no git, então o board não grava nele o caminho desta máquina. Feche e abra o editor de novo, para ele ler o PATH atual, ou tire o arquivo do git.':
+    'The project MCP file is in git, so the board does not write this machine’s path into it. Close and reopen the editor so it reads the current PATH, or take the file out of git.',
+  'Instalar o necessário': 'Install what is required',
+  'Instalar os recomendados': 'Install the recommended',
+  'Copiar o script': 'Copy the script',
+  'Não foi possível copiar. Selecione o script abaixo e copie com o teclado.':
+    'Could not copy. Select the script below and copy it with the keyboard.',
+  'Roda os passos abaixo em ordem, num terminal do PowerShell, e para no primeiro que falhar. O Windows pode pedir permissão de administrador, e os logins abrem o navegador: responda no terminal.':
+    'Runs the steps below in order, in a PowerShell terminal, and stops at the first one that fails. Windows may ask for administrator permission, and sign-ins open the browser: answer in the terminal.',
+  'Roda os passos abaixo em ordem, num terminal, e para no primeiro que falhar. Pode pedir a sua senha (sudo), e os logins abrem o navegador: responda no terminal.':
+    'Runs the steps below in order, in a terminal, and stops at the first one that fails. It may ask for your password (sudo), and sign-ins open the browser: answer in the terminal.',
+  'A busca semântica baixa o PyTorch e o modelo de linguagem: mais de 1 GB, alguns minutos na primeira vez.':
+    'Semantic search downloads PyTorch and the language model: over 1 GB, a few minutes the first time.',
+  'Fica com você, pelos itens da lista: {items}.': 'Left for you, through the items in the list: {items}.',
+  'Ver o script ({os})': 'See the script ({os})',
+  'No navegador não há terminal: cole o script num terminal aberto na pasta do projeto.':
+    'There is no terminal in the browser: paste the script into a terminal open in the project folder.',
+  'Rodar no terminal': 'Run in the terminal',
+  'Instalando no terminal "Faz AI: instalação". Responda lá o que ele pedir; a tela confere de novo quando terminar.':
+    'Installing in the "Faz AI: instalação" terminal. Answer there whatever it asks; the screen checks again when it finishes.',
   'Ou baixe o instalador': 'Or download the installer',
   'Antes, os pré-requisitos': 'First, the prerequisites',
   'Depois, o próprio item': 'Then, the item itself',

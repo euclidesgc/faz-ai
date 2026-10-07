@@ -102,6 +102,19 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
           { file: r.file ?? '' },
         ),
       };
+    case 'mcp-path':
+      return {
+        title: t('O {tool} não acha o comando do MCP do board', { tool }),
+        detail: r.tracked
+          ? t(
+              '{file} inicia o MCP com "{missing}", que não está no PATH com que o editor abriu (o programa foi instalado depois, ou fica numa pasta que o editor não lê). O arquivo está no git, então o board não grava nele o caminho desta máquina: feche e abra o editor de novo, ou tire o arquivo do git.',
+              { file: r.file ?? '', missing: r.missing ?? '' },
+            )
+          : t(
+              '{file} inicia o MCP com "{missing}", que não está no PATH com que o editor abriu (o programa foi instalado depois, ou fica numa pasta que o editor não lê). Corrigir grava o caminho completo dele nesta máquina, e o arquivo fica fora do git; depois, recarregue a janela.',
+              { file: r.file ?? '', missing: r.missing ?? '' },
+            ),
+      };
     case 'mcp-enable':
       return {
         title: t('Ative o MCP do board no {tool}', { tool }),
@@ -163,7 +176,7 @@ function actionable(r: BoardRequirement, compact: boolean): boolean {
   // recarregar a janela e abrir os MCPs do editor só existem dentro do editor; no navegador, fica a explicação
   if (kind === 'reload' || kind === 'openEditorMcp') return !isWeb;
   if (kind === 'settings') return !compact;
-  return kind === 'command' || kind === 'connect' || kind === 'fixProject';
+  return kind === 'command' || kind === 'connect' || kind === 'fixProject' || kind === 'pinMcp';
 }
 
 /**
@@ -198,6 +211,18 @@ export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequir
           }}
         >
           <IconConnect /> {t('Corrigir o registro')}
+        </Button>
+      );
+    case 'pinMcp':
+      return (
+        <Button
+          size="small"
+          onClick={() => {
+            ui.pinMcp();
+            onFixed?.();
+          }}
+        >
+          <IconConnect /> {t('Corrigir o caminho')}
         </Button>
       );
     case 'openEditorMcp':

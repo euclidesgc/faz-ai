@@ -74,6 +74,12 @@ describe('Diagnóstico do ambiente', () => {
     // o obrigatório leva o requisito do aviso, com o texto e a ação dele
     expect(byId(r.checks, 'cli').requirement).toBe(cli);
     expect(byId(r.checks, 'skill').fix).toEqual({ kind: 'installSkill' });
+    // o que espera o item anterior já traz o comando, para o "Instalar tudo" rodar em sequência
+    expect(byId(r.checks, 'signin').fix).toEqual({ kind: 'commands', commands: ['cursor-agent login'] });
+    expect(byId(r.checks, 'repo').fix).toEqual({ kind: 'commands', commands: ['git init'] });
+    expect(byId(r.checks, 'gh-auth').fix).toEqual({ kind: 'commands', commands: ['gh auth login'] });
+    expect(byId(r.checks, 'crg-graph').fix).toEqual({ kind: 'commands', commands: ['code-review-graph build'] });
+    expect((byId(r.checks, 'crg-embeddings').fix as { commands: string[] }).commands[0]).toContain('uv tool install');
     // o registro do MCP vai só para a ferramenta do projeto; o uv é um pré-requisito à parte, com o PATH
     expect(byId(r.checks, 'crg').fix).toEqual({
       kind: 'commands',
@@ -81,7 +87,7 @@ describe('Diagnóstico do ambiente', () => {
     });
     expect(byId(r.checks, 'uv')).toMatchObject({
       parent: 'crg',
-      fix: { kind: 'commands', commands: ['curl -LsSf https://astral.sh/uv/install.sh | sh', 'source $HOME/.local/bin/env'] },
+      fix: { kind: 'commands', commands: ['curl -LsSf https://astral.sh/uv/install.sh | sh', 'export PATH="$HOME/.local/bin:$PATH"'] },
     });
     // a CLI do Cursor cai em ~/.local/bin, fora do PATH: os comandos incluem a pasta
     expect(byId(r.checks, 'cli').fix).toEqual({

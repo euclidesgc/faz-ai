@@ -54,9 +54,10 @@ export function installFix(what: Installable, os: EnvOs): EnvFix | null {
     };
     return commands([winget[what]], { reopenTerminal: true });
   }
-  // o instalador do uv põe o programa em ~/.local/bin, que o terminal já aberto ainda não enxerga:
-  // o env que ele grava recarrega o PATH (sem isso, o comando seguinte dá "uv: command not found")
-  if (what === 'uv') return commands(['curl -LsSf https://astral.sh/uv/install.sh | sh', 'source $HOME/.local/bin/env']);
+  // o instalador do uv põe o programa em ~/.local/bin, que o terminal já aberto ainda não enxerga (o
+  // comando seguinte daria "uv: command not found"). O `export` e não o `source ~/.local/bin/env`: esse
+  // arquivo só existe quando o instalador precisou mexer no PATH, e com a pasta já no PATH o source falha
+  if (what === 'uv') return commands(['curl -LsSf https://astral.sh/uv/install.sh | sh', 'export PATH="$HOME/.local/bin:$PATH"']);
   if (os.family === 'macos') {
     if (what === 'git') return commands(['xcode-select --install']);
     return commands([what === 'node' ? 'brew install node' : 'brew install gh'], { brew: true });

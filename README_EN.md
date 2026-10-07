@@ -308,7 +308,26 @@ more**. The install commands follow the detected system: `winget` on Windows, Ho
 distribution, the download link remains. When a program lands in a folder outside the PATH (the
 Cursor CLI and `uv`, in `~/.local/bin`), the commands include the step that adds it. Code Review
 Graph shows its prerequisites inside it, in install order: `uv` and Python 3.10 or newer, which `uv`
-downloads just for it without touching the system Python. Semantic search uses the `local` provider: the model is downloaded once from Hugging
+downloads just for it without touching the system Python.
+
+**Install everything.** The **Install what is required** and **Install the recommended** buttons
+first show the steps, in order, and the whole script. They only run after **Run in the terminal**, in
+an editor terminal you can see: the `sudo` password and the sign-ins (`cursor-agent login`, `gh auth
+login`) stay with you, there. The script is built for the detected system (bash on Linux and macOS,
+PowerShell on Windows) and runs everything in one session, so the PATH a step adjusts applies to the
+following ones. A step that fails does not stop the others, it only skips the ones that depend on it,
+and at the end the screen shows each step's result: installed, skipped or not installed, with the
+command, the exit code and the last lines of the error. What has no command (turning on the MCP in
+Cursor, the permission) is listed as your task. In browser mode, instead of running, the screen gives
+you the script to copy.
+
+The editor chat starts MCPs with the PATH the editor opened with: what was installed later (Node
+through `nvm`, Code Review Graph's `uvx`) is not in it until the editor is closed and reopened. So, at
+the end of **Install everything**, when Node shows up, and through the **Fix the path** button, the
+board writes the command's full path into the `faz-ai` and `code-review-graph` registrations the
+editor cannot find. The path is found at that moment, on the machine where the extension runs, and the
+file stays out of git (`.git/info/exclude`). If the project MCP file is versioned, the board does not
+write to it and explains the options. Semantic search uses the `local` provider: the model is downloaded once from Hugging
 Face and runs on the machine. The screen warns that the cloud providers (`openai`, `google`,
 `minimax`, `voyage`) send code snippets to third parties, which many companies do not allow.
 

@@ -12,7 +12,14 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   busca semântica). Cada item tem para que serve, como o board o usa, a privacidade, a forma de
   resolver (comando para copiar, botão ou download) e o **Saiba mais**. Os comandos saem do sistema
   detectado (Windows, macOS e as famílias de Linux), e o Code Review Graph mostra dentro dele os
-  pré-requisitos `uv` e Python. A lista abre sozinha na
+  pré-requisitos `uv` e Python.
+- **Instalar tudo, no Diagnóstico.** **Instalar o necessário** e **Instalar os recomendados** mostram
+  os passos e o script, e rodam num terminal do editor (bash ou PowerShell, conforme o sistema). Um
+  passo que falha não para os outros, e a tela mostra o resultado de cada um, com o erro dos que
+  falharam. No modo navegador, o script é para copiar.
+- **Caminho completo dos MCPs no editor.** O chat do editor não acha o que foi instalado depois que ele
+  abriu (o Node pelo `nvm`, o `uvx`): o board grava o caminho completo nos registros do `faz-ai` e do
+  `code-review-graph`, fora do git, e a faixa amarela avisa quando falta. A lista abre sozinha na
   primeira abertura do board na máquina e, depois, por **Verificar ambiente** nas Configurações ou
   por **Ver o diagnóstico completo** na faixa amarela.
 

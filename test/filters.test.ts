@@ -138,6 +138,8 @@ const state: BoardState = {
   requirementsCheckedAt: 0,
   environment: null,
   environmentFirstRun: false,
+  environmentInstall: null,
+  environmentInstallResult: null,
   harnessInstall: null,
 };
 

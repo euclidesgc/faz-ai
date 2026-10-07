@@ -6,6 +6,7 @@ import type { RunnerPermission } from '../shared/runner';
 import { byPath, samePath } from './samePath';
 import { headlessCommand, headlessUnsupported } from './headless';
 import { fixedFolder } from './mcp/clientConfig';
+import { editorFinds, trackedInGit } from './mcp/pinCommands';
 
 /** Onde a ferramenta lê o servidor do board, e o que está registrado lá. */
 export interface Registered {
@@ -157,6 +158,13 @@ export interface RequirementProbe {
   windowStartedAt?: number;
   /** a pasta de configuração do usuário no VS Code, onde fica o `mcp.json` global do Copilot no editor */
   editorUserDir?: string;
+  /**
+   * o PATH com que o editor abriu: é nele que o chat do editor procura o comando do MCP. Um programa
+   * instalado depois (o node pelo nvm) só entra nele quando o editor fecha e abre de novo
+   */
+  editorPath?: string;
+  /** o arquivo do projeto está no git (por padrão, `git ls-files`) */
+  isTracked?: (workspaceDir: string, rel: string) => boolean;
 }
 
 /**
@@ -244,6 +252,24 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
         missing: bridge,
         action: registered.scope === 'project' ? { kind: 'fixProject', file: registered.file } : { kind: 'connect' },
       });
+    // o chat do editor inicia o servidor com o PATH de quando ele abriu: um node instalado depois não
+    // está nele. O caminho completo resolve sem fechar o editor (o arquivo do projeto no git, não)
+    else if (
+      p.editorPath !== undefined &&
+      ((tool === 'cursor' && p.editor === 'cursor') || (tool === 'copilot' && p.editor === 'vscode')) &&
+      !editorFinds(registered.command, p.editorPath)
+    ) {
+      const tracked = registered.scope === 'project' && (p.isTracked ?? trackedInGit)(p.workspaceDir, registered.file);
+      out.push({
+        id: 'mcp-path',
+        tool,
+        ...optional,
+        file: registered.file,
+        missing: registered.command,
+        ...(tracked ? { tracked: true as const } : {}),
+        action: tracked ? null : { kind: 'pinMcp' },
+      });
+    }
     // o chat do Cursor só carrega um servidor registrado depois que a janela abriu ao recarregá-la
     else if (
       tool === 'cursor' &&

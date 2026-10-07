@@ -20,6 +20,7 @@ export type EnvCheckId =
   | 'uv'
   | 'python'
   | 'crg-graph'
+  | 'crg-mcp'
   | 'crg-embeddings';
 
 /**
@@ -36,7 +37,9 @@ export type EnvFix =
    */
   | { kind: 'commands'; commands: string[]; reopenTerminal?: true; brew?: true }
   /** instalar a skill do fluxo na ferramenta do projeto, no escopo global */
-  | { kind: 'installSkill' };
+  | { kind: 'installSkill' }
+  /** gravar o caminho completo do comando nos registros de MCP que o editor não acha */
+  | { kind: 'pinMcp' };
 
 export interface EnvCheck {
   id: EnvCheckId;
@@ -45,6 +48,8 @@ export interface EnvCheck {
   status: EnvStatus;
   /** o item de que este é pré-requisito: a tela o mostra dentro dele (o uv e o Python do Code Review Graph) */
   parent?: EnvCheckId;
+  /** o registro está num arquivo do projeto que vai para o git: o board não grava nele o caminho desta máquina */
+  tracked?: true;
   /** a versão encontrada, quando o comando diz */
   version?: string;
   /** o requisito do aviso no topo do board, com o texto e a ação dele (itens obrigatórios) */
@@ -82,5 +87,6 @@ export const ENV_DOCS: Partial<Record<EnvCheckId, string>> = {
   uv: 'https://docs.astral.sh/uv/getting-started/installation/',
   python: 'https://docs.astral.sh/uv/guides/install-python/',
   'crg-graph': 'https://github.com/tirth8205/code-review-graph#quick-start',
+  'crg-mcp': 'https://github.com/tirth8205/code-review-graph#quick-start',
   'crg-embeddings': 'https://github.com/tirth8205/code-review-graph#usage',
 };

@@ -14,6 +14,12 @@ export interface EnvironmentProbe {
   /** as pastas do PATH do terminal: diz se `~/.local/bin` (onde a CLI do Cursor e o uv se instalam) já está nele */
   pathDirs: string[];
   homeDir: string;
+  /**
+   * o MCP do Code Review Graph no editor (Cursor, ou VS Code com o Copilot): `unregistered` quando o
+   * editor não o tem, `unreachable` quando ele não acha o comando (instalado depois que o editor abriu),
+   * `tracked` quando o arquivo está no git e o board não pode gravar o caminho; ausente fora do editor
+   */
+  crgMcp?: 'ok' | 'unregistered' | 'unreachable' | 'tracked';
   /** a skill do fluxo está instalada na ferramenta do projeto (global ou no projeto) */
   skillInstalled: boolean;
   /** caminho do executável de um comando, ou null */
@@ -139,7 +145,14 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     fix: cli?.action?.kind === 'command' ? cliFix(p, cli.action.command) : undefined,
   });
   const signin = req('signin');
-  checks.push({ id: 'signin', level: 'required', status: cli ? 'skipped' : signin ? 'missing' : 'ok', requirement: signin });
+  checks.push({
+    id: 'signin',
+    level: 'required',
+    status: cli ? 'skipped' : signin ? 'missing' : 'ok',
+    requirement: signin,
+    // sem a CLI ainda, o login vem logo depois dela no "Instalar tudo" (só o Cursor diz se há login)
+    fix: cli?.cli && p.tool === 'cursor' ? { kind: 'commands', commands: [`${cli.cli} login`] } : undefined,
+  });
   const mcp = req('mcp');
   // no Claude e no Cursor as execuções pelo board levam o servidor sozinhas: o MCP só falta nas conversas da pessoa
   const mcpLevel = p.tool === 'claude' || p.tool === 'cursor' ? 'recommended' : 'required';
@@ -168,7 +181,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     id: 'repo',
     level: 'recommended',
     status: !gitExe ? 'skipped' : repo ? 'ok' : 'missing',
-    fix: gitExe && !repo ? { kind: 'commands', commands: ['git init'] } : undefined,
+    fix: !repo ? { kind: 'commands', commands: ['git init'] } : undefined,
   });
 
   const ghExe = p.resolve('gh');
@@ -185,7 +198,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     id: 'gh-auth',
     level: 'recommended',
     status: !ghExe ? 'skipped' : ghAuth ? 'ok' : 'missing',
-    fix: ghExe && !ghAuth ? { kind: 'commands', commands: ['gh auth login'] } : undefined,
+    fix: !ghAuth ? { kind: 'commands', commands: ['gh auth login'] } : undefined,
   });
 
   const crgExe = p.resolve('code-review-graph');
@@ -227,21 +240,35 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     id: 'crg-graph',
     level: 'recommended',
     status: !crgExe ? 'skipped' : graph ? 'ok' : 'missing',
-    fix: crgExe && !graph ? { kind: 'commands', commands: ['code-review-graph build'] } : undefined,
+    fix: !graph ? { kind: 'commands', commands: ['code-review-graph build'] } : undefined,
   });
+  if (crgExe && p.crgMcp)
+    checks.push({
+      id: 'crg-mcp',
+      level: 'recommended',
+      status: p.crgMcp === 'ok' ? 'ok' : 'missing',
+      ...(p.crgMcp === 'tracked' ? { tracked: true as const } : {}),
+      fix:
+        p.crgMcp === 'unregistered'
+          ? { kind: 'commands', commands: [register] }
+          : p.crgMcp === 'unreachable'
+            ? { kind: 'pinMcp' }
+            : undefined,
+    });
   const installer = crgExe ? crgInstaller(p, crgExe) : null;
   const embeddings = installer ? await hasEmbeddings(p, installer.python) : false;
+  // sem o Code Review Graph ainda, ele vem pelo uv (o caminho que o Diagnóstico ensina)
   const addEmbeddings =
-    installer?.via === 'uv'
-      ? 'uv tool install --reinstall "code-review-graph[embeddings]"'
-      : installer?.via === 'pipx'
-        ? 'pipx inject code-review-graph "sentence-transformers>=3,<4"'
-        : 'pip install "code-review-graph[embeddings]"';
+    installer?.via === 'pipx'
+      ? 'pipx inject code-review-graph "sentence-transformers>=3,<4"'
+      : installer?.via === 'pip'
+        ? 'pip install "code-review-graph[embeddings]"'
+        : 'uv tool install --reinstall "code-review-graph[embeddings]"';
   checks.push({
     id: 'crg-embeddings',
     level: 'recommended',
     status: !crgExe ? 'skipped' : embeddings ? 'ok' : 'missing',
-    fix: crgExe && !embeddings ? { kind: 'commands', commands: [addEmbeddings, 'code-review-graph embed --provider local'] } : undefined,
+    fix: !embeddings ? { kind: 'commands', commands: [addEmbeddings, 'code-review-graph embed --provider local'] } : undefined,
   });
 
   return { tool: p.tool, os: p.os, checks, checkedAt: Date.now() };

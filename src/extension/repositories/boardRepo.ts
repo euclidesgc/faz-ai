@@ -356,6 +356,8 @@ export class BoardRepo {
       requirementsCheckedAt: 0,
       environment: null,
       environmentFirstRun: false,
+      environmentInstall: null,
+      environmentInstallResult: null,
       harnessInstall: null,
     };
   }

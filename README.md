@@ -292,7 +292,25 @@ link de download, além do **Saiba mais**. Os comandos de instalação saem do s
 pelo `nvm`); numa distribuição desconhecida, fica o link de download. Quando o programa cai numa
 pasta fora do PATH (a CLI do Cursor e o `uv`, em `~/.local/bin`), os comandos incluem o passo que a
 põe no PATH. O Code Review Graph mostra os pré-requisitos dentro dele, na ordem de instalar: o `uv` e
-o Python 3.10 ou mais novo, que o `uv` baixa só para ele, sem mexer no Python do sistema. A busca semântica usa o provedor `local`: o modelo é
+o Python 3.10 ou mais novo, que o `uv` baixa só para ele, sem mexer no Python do sistema.
+
+**Instalar tudo.** Os botões **Instalar o necessário** e **Instalar os recomendados** mostram antes
+os passos, em ordem, e o script inteiro. Só depois de **Rodar no terminal** é que eles rodam, num
+terminal do editor à vista: a senha do `sudo` e os logins (`cursor-agent login`, `gh auth login`)
+ficam com você, ali. O script é montado para o sistema detectado (bash no Linux e no macOS,
+PowerShell no Windows) e roda tudo numa sessão só, para o PATH que um passo ajusta valer nos
+seguintes. Um passo que falha não para os outros, só pula os que dependem dele, e no fim a tela mostra
+o resultado de cada passo: instalado, pulado ou não instalado, com o comando, o código de saída e as
+últimas linhas do erro. O que não tem comando (ligar o MCP no Cursor, a permissão) fica listado como
+tarefa sua. No modo navegador, em vez de rodar, a tela dá o script para copiar.
+
+O chat do editor inicia os MCPs com o PATH de quando o editor abriu: o que foi instalado depois (o
+Node pelo `nvm`, o `uvx` do Code Review Graph) não está nele até o editor fechar e abrir de novo. Por
+isso, no fim do **Instalar tudo**, quando o Node aparece e pelo botão **Corrigir o caminho**, o board
+grava o caminho completo do comando nos registros do `faz-ai` e do `code-review-graph` que o editor
+não acha. O caminho é descoberto na hora, na máquina onde a extensão roda, e o arquivo fica fora do
+git (`.git/info/exclude`). Se o arquivo de MCPs do projeto estiver versionado, o board não grava nele e
+explica as saídas. A busca semântica usa o provedor `local`: o modelo é
 baixado uma vez do Hugging Face e roda na máquina. A tela avisa que os provedores de nuvem
 (`openai`, `google`, `minimax`, `voyage`) mandam trechos do código para terceiros, o que muitas
 empresas não permitem.

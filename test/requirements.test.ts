@@ -192,6 +192,22 @@ describe('requisitos do board', () => {
     expect(await checkRequirements(probe())).toEqual([]);
   });
 
+  it('o editor que não acha o node do registro (instalado depois que ele abriu) pede o caminho completo', async () => {
+    registerClients(['cursor'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: 'node' });
+    const written = fs.statSync(path.join(project, '.cursor', 'mcp.json')).mtimeMs;
+    const inCursor = { editor: 'cursor' as const, windowStartedAt: written + 1000, editorPath: '/usr/bin/nada' };
+    expect(await checkRequirements(probe({ ...inCursor, isTracked: () => false }))).toEqual([
+      { id: 'mcp-path', tool: 'cursor', optional: true, file: '.cursor/mcp.json', missing: 'node', action: { kind: 'pinMcp' } },
+    ]);
+    // o arquivo no git: o board não grava nele o caminho desta máquina
+    expect(await checkRequirements(probe({ ...inCursor, isTracked: () => true }))).toEqual([
+      { id: 'mcp-path', tool: 'cursor', optional: true, file: '.cursor/mcp.json', missing: 'node', tracked: true, action: null },
+    ]);
+    // o editor acha o node no PATH dele: segue para os passos de sempre
+    const nodeDir = path.dirname(process.execPath);
+    expect((await checkRequirements(probe({ ...inCursor, editorPath: nodeDir }))).map((r) => r.id)).toEqual(['mcp-enable']);
+  });
+
   it('o mcp.json global do VS Code conta para o Copilot', async () => {
     const userDir = path.join(home, 'Code', 'User');
     registerClients(['copilot'], {

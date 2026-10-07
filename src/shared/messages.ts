@@ -217,6 +217,10 @@ export type WebviewToHost =
   | { type: 'environment.check' }
   /** o Diagnóstico já abriu sozinho nesta máquina: não abre mais na abertura do board */
   | { type: 'environment.seen' }
+  /** "Instalar tudo" de um nível: o host roda o plano do último Diagnóstico num terminal do editor */
+  | { type: 'environment.install'; level: 'required' | 'recommended' }
+  /** grava o caminho completo dos MCPs (do board e do Code Review Graph) que o editor não acha */
+  | { type: 'environment.pinMcp' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
   /**
    * instala a skill do fluxo numa ferramenta (padrão: a do projeto), global (padrão) ou só no projeto;

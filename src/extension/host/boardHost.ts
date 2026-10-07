@@ -22,6 +22,8 @@ import type { AiTool, InstallScope } from '../../shared/harness';
 import { checkRequirements } from '../requirements';
 import { checkEnvironment } from '../environment';
 import { detectOs } from '../installers';
+import { installPlan, installScript, parseInstallResult } from '../../shared/installPlan';
+import { editorMcpFiles, pinEditorCommands, registeredIn, unreachableServers } from '../mcp/pinCommands';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { resolveCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
@@ -54,6 +56,11 @@ export interface BoardHostOptions {
     /** pasta de configuração do usuário no VS Code (o `mcp.json` global do Copilot no editor); só no VS Code */
     userDir?: string;
   };
+  /**
+   * roda um comando num terminal novo do editor, à vista da pessoa (o "Instalar tudo" do Diagnóstico);
+   * ausente fora do editor, onde a tela mostra o script para copiar
+   */
+  runInTerminal?: (name: string, command: string, cwd: string) => void;
 }
 
 /** O board de uma pasta em funcionamento: banco, roteador, executor da IA e heartbeat. Não depende da API do VSCode. */
@@ -228,8 +235,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return checking;
     }
     const { board } = router.snapshot();
-    // a pessoa pode ter instalado o node com o board aberto
+    // a pessoa pode ter instalado o node com o board aberto: o registro do MCP no editor, gravado sem
+    // ele, passa a ter o caminho completo (o editor não o acha no PATH de quando abriu)
+    const hadNode = !!nodePath;
     nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
+    if (!hadNode && nodePath) pinMcp();
     checking = checkRequirements({
       tool: board.aiTool,
       permission: board.runner.permission,
@@ -242,6 +252,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       editor: o.editor?.name,
       windowStartedAt: o.editor?.startedAt,
       editorUserDir: o.editor?.userDir,
+      editorPath: o.editor ? (process.env.PATH ?? '') : undefined,
     })
       .then((list) => {
         // a CLI do Cursor acabou de ficar pronta (instalada, com login): só agora dá para ler os modelos da conta
@@ -285,6 +296,29 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return null;
     }
   };
+  // os MCPs que o chat do editor inicia (o do board e o do Code Review Graph): o editor os procura no
+  // PATH de quando abriu, e o que foi instalado depois só aparece nele com o caminho completo
+  const editorFiles = o.editor ? editorMcpFiles(o.editor.name, o.folderPath, homeDir, o.editor.userDir) : null;
+  const editorPath = () => process.env.PATH ?? '';
+  const resolveHere = (command: string) => resolveCommand(command, pathEnv, homeDir);
+  const crgMcpState = (tool: AiTool) => {
+    const usesEditor =
+      o.editor && ((o.editor.name === 'cursor' && tool === 'cursor') || (o.editor.name === 'vscode' && tool === 'copilot'));
+    if (!editorFiles || !usesEditor) return undefined;
+    if (!registeredIn(editorFiles, 'code-review-graph')) return 'unregistered' as const;
+    const broken = unreachableServers(editorFiles, editorPath(), resolveHere).filter((u) => u.server === 'code-review-graph');
+    if (!broken.length) return 'ok' as const;
+    return broken.every((u) => u.tracked) ? ('tracked' as const) : ('unreachable' as const);
+  };
+  const pinMcp = () => {
+    if (!editorFiles) return;
+    try {
+      for (const u of pinEditorCommands(editorFiles, editorPath(), resolveHere))
+        o.log(`MCP "${u.server}" em ${u.file}: "${u.command}" virou "${u.fullPath}" (o editor não o achava no PATH dele).`);
+    } catch (e) {
+      o.log(`Não foi possível gravar o caminho completo dos MCPs: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
   let diagnosing: Promise<void> | null = null;
   const diagnose = () => {
     diagnosing ??= (async () => {
@@ -304,6 +338,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           pathDirs: (pathEnv ?? process.env.PATH ?? '').split(path.delimiter),
           homeDir,
           skillInstalled,
+          crgMcp: crgMcpState(tool),
           resolve: (command) => resolveCommand(command, pathEnv, homeDir),
           run: probeCommand,
           firstLine: (file) => {
@@ -322,9 +357,68 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   // a tela abre sozinha uma vez por máquina (a marca fica na pasta de dados da extensão, fora do board)
   const seenFile = path.join(o.storageDir, 'environment-seen');
+  // "Instalar tudo": o plano sai do último Diagnóstico, vira um script e roda num terminal do editor.
+  // O script cria um arquivo ao terminar; enquanto ele não aparece, a tela mostra que está instalando
+  const installDir = path.join(o.storageDir, 'install');
+  let installTimer: NodeJS.Timeout | null = null;
+  const install = (level: 'required' | 'recommended') => {
+    const s = router.snapshot();
+    const plan = s.environment && installPlan(s.environment, level);
+    if (!plan || !o.runInTerminal || installTimer) return;
+    if (plan.installSkill) router.handle({ type: 'harness.flowSkill.install', tool: s.board.aiTool, scope: 'user' });
+    if (!plan.steps.length) return void diagnose();
+    const stamp = Date.now();
+    const result = path.join(installDir, `${level}-${stamp}.result`);
+    const file = path.join(installDir, `${level}-${stamp}.${plan.shell === 'powershell' ? 'ps1' : 'sh'}`);
+    try {
+      fs.mkdirSync(installDir, { recursive: true });
+      fs.writeFileSync(file, installScript(plan, result), { mode: 0o700 });
+    } catch (e) {
+      o.log(`Não foi possível gravar o script de instalação: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
+    o.runInTerminal(
+      'Faz AI: instalação',
+      plan.shell === 'powershell'
+        ? `powershell -NoProfile -ExecutionPolicy Bypass -File "${file}"`
+        : `bash '${file.replace(/'/g, `'\\''`)}'`,
+      o.folderPath,
+    );
+    router.setEnvironmentInstall({ level, startedAt: stamp });
+    const read = (f: string) => {
+      try {
+        return fs.readFileSync(f, 'utf8');
+      } catch {
+        return null;
+      }
+    };
+    // o resultado de cada passo (e o erro dos que falharam) vira o relatório da tela
+    const finish = () => {
+      if (installTimer) clearInterval(installTimer);
+      installTimer = null;
+      const { steps } = parseInstallResult(read(result) ?? '', (id) => read(`${result}.${id}.err`));
+      router.setEnvironmentInstall(null);
+      router.setEnvironmentInstallResult({ level, steps, finishedAt: Date.now() });
+      // o que acabou de ser instalado não está no PATH do editor: os MCPs ficam com o caminho completo
+      pinMcp();
+      for (const f of fs.readdirSync(installDir))
+        if (f.startsWith(`${level}-${stamp}.`)) fs.rmSync(path.join(installDir, f), { force: true });
+      void diagnose();
+    };
+    // até 3 horas: depois disso, a pessoa confere pelo "Verificar de novo"
+    installTimer = setInterval(() => {
+      if (parseInstallResult(read(result) ?? '', () => null).done || Date.now() - stamp > 3 * 3600_000) finish();
+    }, 2000);
+    installTimer.unref?.();
+  };
   router.onEnvironment(
     {
       check: () => void diagnose(),
+      pinMcp: () => {
+        pinMcp();
+        void diagnose();
+      },
+      install: o.runInTerminal ? install : undefined,
       seen: () => {
         try {
           fs.mkdirSync(o.storageDir, { recursive: true });
