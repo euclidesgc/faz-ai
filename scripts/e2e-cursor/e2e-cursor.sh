@@ -21,9 +21,16 @@ WAYLAND="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/${WAYLAND_DISPLAY:-wayland-0}"
 rodando() { [ "$(docker inspect -f '{{.State.Running}}' "$NOME" 2>/dev/null)" = true ]; }
 
 pacote() {
-  echo "Empacotando a extensão da branch $(git -C "$REPO" branch --show-current)…"
+  echo "Gerando a extensão da branch $(git -C "$REPO" branch --show-current)…"
   mkdir -p "$CACHE/ext"
-  (cd "$REPO" && npm run build >/dev/null && npx vsce package -o "$CACHE/ext/faz-ai.vsix" >/dev/null)
+  local log; log=$(mktemp)
+  if ! (cd "$REPO" && npm run build && npx vsce package -o "$CACHE/ext/faz-ai.vsix") >"$log" 2>&1; then
+    cat "$log" >&2
+    rm -f "$log"
+    echo "Falhou ao gerar a extensão (saída acima)." >&2
+    exit 1
+  fi
+  rm -f "$log"
 }
 
 imagem() {
@@ -61,8 +68,10 @@ criar() {
   }
   docker rm -f "$NOME" >/dev/null 2>&1 || true
   mkdir -p "$CACHE/links"
+  local gids; gids="$(getent group render | cut -d: -f3) $(getent group video | cut -d: -f3)"
   docker run -d --name "$NOME" --network host --shm-size 1g --device /dev/dri \
     --group-add "$(getent group render | cut -d: -f3)" --group-add "$(getent group video | cut -d: -f3)" \
+    -e FAZAI_HOST_GIDS="$gids" \
     -v /usr/share/cursor:/usr/share/cursor:ro \
     -v "$WAYLAND":/tmp/runtime/wayland-0 \
     -v "$CACHE/ext":/opt/faz-ai:ro \

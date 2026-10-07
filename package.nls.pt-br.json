@@ -14,5 +14,19 @@
   "view.sidebar.name": "Board",
   "view.filters.name": "Filtros",
   "view.chat.name": "Chat com a IA",
-  "viewsWelcome.sidebar.contents": "Abra uma pasta para usar o board.\n[Abrir pasta](command:vscode.openFolder)"
+  "viewsWelcome.sidebar.contents": "Abra uma pasta para usar o board.\n[Abrir pasta](command:vscode.openFolder)",
+  "command.openEnvironment.title": "Faz AI: Abrir o Diagnóstico do ambiente",
+  "command.openIdeSettings.title": "Faz AI: Abrir as configurações do Faz AI no Settings",
+  "command.openBoardSettings.title": "Faz AI: Abrir as configurações do board",
+  "config.install.title": "Faz AI: Instalação",
+  "config.install.environment": "O Diagnóstico do ambiente mostra o que o board precisa nesta máquina, por quê, e como corrigir, com instalação em um clique. [Abrir o Diagnóstico do ambiente](command:fazai.openEnvironment)",
+  "config.appearance.title": "Faz AI: Aparência",
+  "config.appearance.language": "Idioma da interface do board. `auto` segue o idioma do editor. As demais opções de aparência (tema, fonte, nomes de status) chegam nas próximas versões; até então, use [Aparência no board](command:fazai.openBoardSettings?%5B%7B%22tab%22%3A%22appearance%22%7D%5D).",
+  "config.appearance.language.auto": "Seguir o idioma do editor",
+  "config.appearance.language.ptBR": "Português (Brasil)",
+  "config.appearance.language.en": "English",
+  "config.git.title": "Faz AI: Git",
+  "config.git.info": "As opções de branch e worktree chegam ao Settings nas próximas versões. Até então, use [Git nas configurações do board](command:fazai.openBoardSettings?%5B%7B%22tab%22%3A%22git%22%7D%5D).",
+  "config.backup.title": "Faz AI: Backup",
+  "config.backup.info": "Exportar e importar chegam como comandos do editor nas próximas versões. Até então, use [Backup nas configurações do board](command:fazai.openBoardSettings?%5B%7B%22tab%22%3A%22backup%22%7D%5D)."
 }

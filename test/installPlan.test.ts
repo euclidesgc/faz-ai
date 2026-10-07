@@ -165,6 +165,13 @@ describe('Instalar tudo: o script', () => {
     expect(script).not.toContain('export PATH');
   });
 
+  const PORTUGUES = [/instala[çc][ãa]o/i, /pulado/i, /falhou/i, /\bn[ãa]o\b/i, /Diagn[óo]stico confere/i, /Login da CLI/, /Permiss[ãa]o/];
+  it.each(['bash', 'powershell'] as const)('%s: o script gerado está todo em inglês', (kind) => {
+    const fullPlan = plan(installPlan(report(MACHINE), 'required')!.steps, kind);
+    const script = installScript(fullPlan, kind === 'bash' ? '/tmp/r' : 'C:\\r');
+    for (const re of PORTUGUES) expect(script, String(re)).not.toMatch(re);
+  });
+
   it('lê o resultado: sem a linha done, o script ainda não terminou', () => {
     expect(parseInstallResult('ok git\n', () => null)).toEqual({ done: false, steps: [{ id: 'git', status: 'ok' }] });
   });

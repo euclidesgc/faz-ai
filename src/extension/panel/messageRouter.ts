@@ -56,6 +56,7 @@ const bridgeOnly = {
   'ui.reloadWindow': viaBridge,
   'ui.openEditorMcp': viaBridge,
   'ui.openInBrowser': viaBridge,
+  'ui.openIdeSettings': viaBridge,
   'ai.run': viaBridge,
   'ai.stop': viaBridge,
   'ai.heartbeat.run': viaBridge,

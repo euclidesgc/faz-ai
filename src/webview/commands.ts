@@ -29,6 +29,7 @@ export const ui = {
   /** instala o servidor MCP do board: padrão é a ferramenta do projeto, no escopo global */
   connectAI: (tool?: AiTool, scope?: InstallScope) => post({ type: 'ui.connectAI', tool, scope }),
   openInBrowser: () => post({ type: 'ui.openInBrowser' }),
+  openIdeSettings: (key?: string) => post({ type: 'ui.openIdeSettings', key }),
   showChat: () => post({ type: 'ui.showChat' }),
   checkRequirements: () => post({ type: 'requirements.check' }),
   fixProjectMcp: (file: string) => post({ type: 'ui.fixProjectMcp', file }),
