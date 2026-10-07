@@ -80,6 +80,9 @@ const TIERS: Record<AiTool, [string, string | null][]> = {
   ],
 };
 
+/** Ferramentas cujos modelos nascem com preço variável: o Copilot cobra por pedido premium, não por token. */
+const VARIABLE_PRICE_TOOLS: AiTool[] = ['copilot'];
+
 const option = (tool: AiTool, [model, label, efforts, defaultEffort]: Seed): ModelOption => ({
   id: modelId(tool, model),
   tool,
@@ -87,7 +90,12 @@ const option = (tool: AiTool, [model, label, efforts, defaultEffort]: Seed): Mod
   label,
   efforts,
   defaultEffort,
+  ...(VARIABLE_PRICE_TOOLS.includes(tool) ? { variablePrice: true } : {}),
 });
+
+/** Todos os ids da lista embutida, de todas as ferramentas (a tabela de preços embutida só pode citar estes). */
+export const builtinIds = (): string[] =>
+  (Object.keys(BUILTIN) as AiTool[]).flatMap((tool) => BUILTIN[tool].map(([model]) => modelId(tool, model)));
 
 /** Lê as tabelas `[models."nome"]` do config.toml do Kimi, com display_name, support_efforts e default_effort. */
 export function parseKimiModels(toml: string): ModelOption[] {
