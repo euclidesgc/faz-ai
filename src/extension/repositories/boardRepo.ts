@@ -354,6 +354,8 @@ export class BoardRepo {
       aiRunUnsupported: null,
       requirements: [],
       requirementsCheckedAt: 0,
+      environment: null,
+      environmentFirstRun: false,
       harnessInstall: null,
     };
   }

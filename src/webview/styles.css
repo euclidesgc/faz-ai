@@ -1876,6 +1876,140 @@ button.heartbeat.stopped:hover {
   overflow-wrap: anywhere;
 }
 
+/* Diagnóstico do ambiente: lista de tarefas, um item por ferramenta, com o estado à esquerda */
+.environment {
+  max-width: 980px;
+  padding: var(--sp-12) var(--sp-20) var(--sp-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+.env-summary {
+  margin: 0;
+}
+.environment h3 {
+  margin: var(--sp-8) 0 var(--sp-6);
+}
+.env-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+.env-item {
+  display: flex;
+  gap: var(--sp-8);
+  align-items: flex-start;
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.env-item > svg {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+.env-ok {
+  color: var(--success);
+}
+.env-missing {
+  color: var(--error);
+}
+.env-recommend {
+  color: var(--warn-border);
+}
+.env-skipped {
+  color: var(--muted);
+}
+.env-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-6);
+}
+.env-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-8);
+}
+.env-body dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--sp-4) var(--sp-12);
+  max-width: 100ch;
+}
+.env-body dt {
+  color: var(--muted);
+}
+.env-body dd {
+  margin: 0;
+}
+/* em tela estreita, o rótulo fica em cima do texto */
+@media (max-width: 560px) {
+  .env-body dl {
+    grid-template-columns: 1fr;
+  }
+  .env-body dd {
+    margin-bottom: var(--sp-4);
+  }
+}
+.env-fix {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-6);
+}
+.env-fix p {
+  margin: 0;
+  max-width: 100ch;
+}
+.env-prereqs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  align-self: stretch;
+}
+.env-prereqs > p {
+  margin: 0;
+}
+.env-prereqs .env-item {
+  padding: var(--sp-6) var(--sp-8);
+}
+.env-os {
+  margin: 0;
+}
+.env-busy {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  color: var(--muted);
+}
+.environment .page-header-actions [role='status'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.env-commands {
+  margin: 0;
+  padding-left: var(--sp-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.env-body a svg {
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
+}
+
 /* avisos flutuantes: não empurram o board nem somem atrás do card aberto */
 .toasts {
   position: fixed;

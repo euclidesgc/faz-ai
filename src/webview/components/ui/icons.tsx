@@ -53,6 +53,11 @@ import {
   UserCog,
   Sparkles,
   TextCursorInput,
+  Stethoscope,
+  CircleCheck,
+  CircleX,
+  CircleAlert,
+  CircleDashed,
   Trash2,
   TriangleAlert,
   User,
@@ -150,3 +155,8 @@ export const IconConnect = icon(Plug, 'IconConnect');
 export const IconUpgrade = icon(CircleArrowUp, 'IconUpgrade');
 export const IconReset = icon(RotateCcw, 'IconReset');
 export const IconBackup = icon(DatabaseBackup, 'IconBackup');
+export const IconDoctor = icon(Stethoscope, 'IconDoctor');
+export const IconOk = icon(CircleCheck, 'IconOk');
+export const IconMissing = icon(CircleX, 'IconMissing');
+export const IconRecommend = icon(CircleAlert, 'IconRecommend');
+export const IconSkipped = icon(CircleDashed, 'IconSkipped');

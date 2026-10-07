@@ -1,4 +1,5 @@
 import type { BoardRequirement } from './requirements';
+import type { EnvironmentReport } from './environment';
 import type { ExecProfile } from './execution';
 import type { ChatState } from './chat';
 import type { AiTool, Harness, InstallPreview } from './harness';
@@ -239,6 +240,10 @@ export interface BoardState {
   requirements: BoardRequirement[];
   /** quando o host terminou a última conferência dos requisitos (ms), mesmo sem mudança; 0 antes da primeira */
   requirementsCheckedAt: number;
+  /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */
+  environment: EnvironmentReport | null;
+  /** o Diagnóstico ainda não abriu sozinho nesta máquina: a interface abre a tela uma vez */
+  environmentFirstRun: boolean;
   /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */
   harnessInstall: InstallPreview | null;
 }

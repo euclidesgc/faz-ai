@@ -292,6 +292,26 @@ to see the board in your conversations outside it. On its own, that item becomes
 instead of the bar. While the command line is missing or not signed in, the card's AI buttons are
 disabled, with the reason in the tooltip.
 
+**Environment check.** The first time the board opens on a machine, a `flutter doctor`-style list
+opens on its own with everything the board needs and everything it makes use of. After that, it
+opens from **Check environment** in Settings or **See the full environment check** in the yellow
+bar. **Required:** Node.js 18 or newer, the tool's command line, its sign-in, the board MCP and the
+permission level (the same items as the bar, with the same actions). **Recommended:** the flow
+skill (**Install the skill** button), Git and a repository in the folder (`git init`), the GitHub
+CLI and its sign-in (`gh auth login`, for auto-merge and PR tracking) and
+[Code Review Graph](https://github.com/tirth8205/code-review-graph), a code graph the AI queries
+instead of reading whole files. Once Code Review Graph is installed, the list suggests building the
+project graph and semantic search. Each item says what it is for, how the board uses it and what
+leaves your machine, and brings the commands to copy, a button or the download link, plus **Learn
+more**. The install commands follow the detected system: `winget` on Windows, Homebrew or
+`xcode-select` on macOS, and `apt`, `dnf` or `pacman` on Linux (Node through `nvm`); on an unknown
+distribution, the download link remains. When a program lands in a folder outside the PATH (the
+Cursor CLI and `uv`, in `~/.local/bin`), the commands include the step that adds it. Code Review
+Graph shows its prerequisites inside it, in install order: `uv` and Python 3.10 or newer, which `uv`
+downloads just for it without touching the system Python. Semantic search uses the `local` provider: the model is downloaded once from Hugging
+Face and runs on the machine. The screen warns that the cloud providers (`openai`, `google`,
+`minimax`, `voyage`) send code snippets to third parties, which many companies do not allow.
+
 Suggested flow: the AI reads the story and the phase instruction, creates a sub-task to build the
 phase document, attaches the document to the story and asks for review in the card's conversation.
 You answer on the card itself:

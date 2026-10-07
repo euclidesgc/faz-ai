@@ -129,6 +129,12 @@ export class HostBridge {
         case 'requirements.check':
           this.router.recheckRequirements();
           return;
+        case 'environment.check':
+          this.router.checkEnvironment();
+          return;
+        case 'environment.seen':
+          this.router.markEnvironmentSeen();
+          return;
         case 'chat.send':
         case 'chat.stop':
         case 'chat.clear':

@@ -9,7 +9,7 @@ import { isWeb } from '../vscode';
 import { Button, IconCheck, IconConnect, IconWarning } from './ui';
 
 /** Título e explicação de cada requisito, no idioma da interface. */
-function texts(r: BoardRequirement): { title: string; detail: string } {
+export function requirementTexts(r: BoardRequirement): { title: string; detail: string } {
   const tool = aiToolInfo(r.tool).label;
   switch (r.id) {
     case 'node':
@@ -115,7 +115,7 @@ function texts(r: BoardRequirement): { title: string; detail: string } {
 }
 
 /** Um comando com botão de copiar; sem área de transferência, o comando fica selecionável. */
-function CopyCommand({ command }: { command: string }) {
+export function CopyCommand({ command }: { command: string }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
   return (
     <span className="requirement-command">
@@ -157,56 +157,83 @@ export function aiBlockedReason(state: BoardState): string | null {
     : t('A linha de comando do {tool} está sem login: veja o aviso no topo do board.', { tool: aiToolInfo(cli.tool).label });
 }
 
-/** Um item do aviso: título, explicação e a ação que o resolve. */
-function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
+/** Se o requisito tem um botão ou comando que o resolve por aqui (na versão compacta, sem o atalho para as Configurações). */
+function actionable(r: BoardRequirement, compact: boolean): boolean {
+  const kind = r.action?.kind;
+  // recarregar a janela e abrir os MCPs do editor só existem dentro do editor; no navegador, fica a explicação
+  if (kind === 'reload' || kind === 'openEditorMcp') return !isWeb;
+  if (kind === 'settings') return !compact;
+  return kind === 'command' || kind === 'connect' || kind === 'fixProject';
+}
+
+/**
+ * A ação que resolve o requisito: o comando com copiar, ou o botão que faz. `onFixed` roda depois de
+ * um botão que muda algo na máquina (o Diagnóstico confere de novo para o item mudar de estado).
+ */
+export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequirement; compact?: boolean; onFixed?: () => void }) {
   const openSettings = useBoardStore((s) => s.openSettings);
   const openMcpInstall = () => {
     useBoardStore.setState({ harnessTab: 'all' });
     openSettings('harness');
   };
-  const { title, detail } = texts(r);
-  const settings = r.action?.kind === 'settings' && !compact;
-  // na versão compacta (o painel de chat) a explicação só fica de fora quando há um botão que resolve
-  // recarregar a janela só existe dentro do editor; no navegador, fica a explicação
-  const reload = r.action?.kind === 'reload' && !isWeb;
-  const openMcp = r.action?.kind === 'openEditorMcp' && !isWeb;
-  const actionable =
-    r.action?.kind === 'command' || r.action?.kind === 'connect' || r.action?.kind === 'fixProject' || reload || openMcp || settings;
+  if (!actionable(r, compact)) return null;
+  const action = r.action!;
+  switch (action.kind) {
+    case 'command':
+      return <CopyCommand command={action.command} />;
+    case 'connect':
+      // a instalação mora na seção Servidores MCP da ferramenta, onde se escolhe global ou projeto
+      return (
+        <Button size="small" onClick={() => openMcpInstall()}>
+          <IconConnect /> {t('Instalar o MCP do board')}
+        </Button>
+      );
+    case 'fixProject':
+      return (
+        <Button
+          size="small"
+          onClick={() => {
+            ui.fixProjectMcp(action.file);
+            onFixed?.();
+          }}
+        >
+          <IconConnect /> {t('Corrigir o registro')}
+        </Button>
+      );
+    case 'openEditorMcp':
+      return (
+        <Button size="small" onClick={() => ui.openEditorMcp()}>
+          <IconConnect /> {t('Abrir MCPs do Cursor')}
+        </Button>
+      );
+    case 'reload':
+      return (
+        <Button size="small" onClick={() => ui.reloadWindow()}>
+          {t('Recarregar a janela')}
+        </Button>
+      );
+    case 'settings':
+      return (
+        <Button size="small" onClick={() => openSettings('harness')}>
+          {t('Abrir Harness de IA')}
+        </Button>
+      );
+  }
+}
+
+/** Um item do aviso: título, explicação e a ação que o resolve. */
+function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
+  const { title, detail } = requirementTexts(r);
   return (
     <li>
       <strong>
         {title}
         {r.optional && <span className="muted"> · {t('recomendado')}</span>}
       </strong>
-      {/* no recomendado, a explicação é o motivo do aviso: fica até na versão compacta */}
-      {(!compact || !actionable || r.optional) && <p>{detail}</p>}
-      {r.action?.kind === 'command' && <CopyCommand command={r.action.command} />}
-      {r.action?.kind === 'connect' && (
-        // a instalação mora na seção Servidores MCP da ferramenta, onde se escolhe global ou projeto
-        <Button size="small" onClick={() => openMcpInstall()}>
-          <IconConnect /> {t('Instalar o MCP do board')}
-        </Button>
-      )}
-      {r.action?.kind === 'fixProject' && (
-        <Button size="small" onClick={() => r.action?.kind === 'fixProject' && ui.fixProjectMcp(r.action.file)}>
-          <IconConnect /> {t('Corrigir o registro')}
-        </Button>
-      )}
-      {openMcp && (
-        <Button size="small" onClick={() => ui.openEditorMcp()}>
-          <IconConnect /> {t('Abrir MCPs do Cursor')}
-        </Button>
-      )}
-      {reload && (
-        <Button size="small" onClick={() => ui.reloadWindow()}>
-          {t('Recarregar a janela')}
-        </Button>
-      )}
-      {settings && (
-        <Button size="small" onClick={() => openSettings('harness')}>
-          {t('Abrir Harness de IA')}
-        </Button>
-      )}
+      {/* na versão compacta (o painel de chat) a explicação só fica de fora quando há um botão que resolve;
+          no recomendado, a explicação é o motivo do aviso: fica até na versão compacta */}
+      {(!compact || !actionable(r, compact) || r.optional) && <p>{detail}</p>}
+      <RequirementFix r={r} compact={compact} />
     </li>
   );
 }
@@ -267,6 +294,12 @@ export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
               : t('Faltam {n} requisitos para o board trabalhar com a IA', { n: missing })}
         </strong>
         <span className="spacer" />
+        {/* a lista completa, com o que é só recomendado (git, GitHub CLI, Code Review Graph); o chat não tem a tela */}
+        {!compact && (
+          <Button size="small" variant="ghost" onClick={() => useBoardStore.getState().setView('environment')}>
+            {t('Ver o diagnóstico completo')}
+          </Button>
+        )}
         <RecheckButton />
       </div>
       <ul>

@@ -19,6 +19,7 @@ import { TrashView } from './components/TrashView';
 import { MetricsView } from './components/metrics/MetricsView';
 import { Settings } from './components/settings/Settings';
 import { RequirementsBanner } from './components/RequirementsBanner';
+import { EnvironmentView } from './components/EnvironmentView';
 import { Button, IconChat, IconClose, IconExternal } from './components/ui';
 import { isWeb, onConnectionChange } from './vscode';
 
@@ -56,6 +57,14 @@ export function App() {
   }, [notice, setNotice]);
 
   useEffect(() => onConnectionChange((online) => setOffline(!online)), []);
+
+  // a primeira abertura do board nesta máquina mostra o Diagnóstico do ambiente, uma vez
+  const firstRun = state?.environmentFirstRun ?? false;
+  useEffect(() => {
+    if (!firstRun) return;
+    setView('environment');
+    ui.environmentSeen();
+  }, [firstRun, setView]);
 
   if (!state)
     return (
@@ -135,7 +144,8 @@ export function App() {
           )}
         </div>
       )}
-      <RequirementsBanner />
+      {/* no Diagnóstico, os mesmos itens já estão na lista */}
+      {view !== 'environment' && <RequirementsBanner />}
       {/* a barra de filtros filtra cards, não o log: fica só no board (RF-01) */}
       {view === 'board' && <FilterBar />}
       <main className="content">
@@ -143,6 +153,7 @@ export function App() {
         {view === 'trash' && <TrashView />}
         {view === 'settings' && <Settings />}
         {view === 'metrics' && <MetricsView />}
+        {view === 'environment' && <EnvironmentView />}
       </main>
       {isWeb && chatOpen && (
         <aside className="chat-drawer">

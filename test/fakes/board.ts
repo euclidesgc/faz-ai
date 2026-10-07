@@ -103,6 +103,8 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     aiRunUnsupported: null,
     requirements: [],
     requirementsCheckedAt: 0,
+    environment: null,
+    environmentFirstRun: false,
     harnessInstall: null,
     ...over,
   };

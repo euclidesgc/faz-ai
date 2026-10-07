@@ -276,6 +276,27 @@ enxergar o board nas suas conversas fora dele. Sozinho, esse item vira uma linha
 faixa. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
 desligados, com o motivo na dica.
 
+**Diagnóstico do ambiente.** Na primeira abertura do board na máquina, abre sozinha uma lista, no
+estilo do `flutter doctor`, com tudo de que o board precisa e o que ele aproveita. Depois, ela abre
+pelo botão **Verificar ambiente**, nas Configurações, ou por **Ver o diagnóstico completo**, na
+faixa amarela. **Necessário:** Node.js 18 ou mais novo, a linha de comando da ferramenta, o login
+dela, o MCP do board e o nível de permissão (os mesmos itens da faixa, com as mesmas ações).
+**Recomendado:** a skill do fluxo (botão **Instalar a skill**), o Git e um repositório na pasta
+(`git init`), o GitHub CLI e o login dele (`gh auth login`, para o merge automático e o
+acompanhamento dos PRs) e o [Code Review Graph](https://github.com/tirth8205/code-review-graph), um
+grafo do código que a IA consulta em vez de ler arquivos inteiros. Com o Code Review Graph
+instalado, a lista sugere o build do grafo do projeto e a busca semântica. Cada item diz para que
+serve, como o board o usa e o que sai da sua máquina, e traz os comandos para copiar, um botão ou o
+link de download, além do **Saiba mais**. Os comandos de instalação saem do sistema detectado:
+`winget` no Windows, Homebrew ou `xcode-select` no macOS, e `apt`, `dnf` ou `pacman` no Linux (o Node
+pelo `nvm`); numa distribuição desconhecida, fica o link de download. Quando o programa cai numa
+pasta fora do PATH (a CLI do Cursor e o `uv`, em `~/.local/bin`), os comandos incluem o passo que a
+põe no PATH. O Code Review Graph mostra os pré-requisitos dentro dele, na ordem de instalar: o `uv` e
+o Python 3.10 ou mais novo, que o `uv` baixa só para ele, sem mexer no Python do sistema. A busca semântica usa o provedor `local`: o modelo é
+baixado uma vez do Hugging Face e roda na máquina. A tela avisa que os provedores de nuvem
+(`openai`, `google`, `minimax`, `voyage`) mandam trechos do código para terceiros, o que muitas
+empresas não permitem.
+
 Fluxo sugerido: a IA lê a história e a instrução da fase, cria uma sub-tarefa para construir o
 documento da fase, anexa o documento à história e pede a revisão pela conversa do card. Você
 responde no próprio card:
