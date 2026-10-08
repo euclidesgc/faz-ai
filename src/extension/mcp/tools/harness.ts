@@ -162,7 +162,12 @@ export function registerHarnessTools(tool: DefineTool): void {
       router.handle({ type: 'harness.flowSkill.install', tool, scope, replace: a.replace });
       return {
         installed: !had || !!a.replace,
-        note: had && !a.replace ? 'A skill já existia no destino e foi mantida como está.' : had ? 'Skill substituída.' : 'Skill criada.',
+        note:
+          had && !a.replace
+            ? 'A skill já existia no destino e foi mantida como está; marcada em todo contexto.'
+            : had
+              ? 'Skill substituída.'
+              : 'Skill criada.',
         skill: found()?.path,
       };
     },

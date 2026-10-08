@@ -14,6 +14,12 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   board's default), migrated names only lose their accents (`agente-padrao`), and when the agent
   chosen as default does not exist, the conductor is used, not the first in the list. If the cut
   file was already created, delete it under Configurações → Harness → Global → Agentes.
+- **Installing the flow skill checks it even when it already existed.** Since the empty context, the
+  `faz-ai-fluxo` skill only counts as ready when it exists **and** is checked "include in every
+  context". Anyone who already had the skill on disk saw the warning in the Diagnostics and on the
+  board, and the **Install** button did nothing, because it stopped on finding the file. Now the file
+  stays untouched (without `replace`), but the check mark goes in and the warning goes away. The MCP
+  `install_flow_skill` says in its reply that it checked the skill.
 - **Empty context by default and Harness with check marks.** Every run started by the board (Work
   on the phase, Refine with AI, heartbeat, board chat) now starts from an empty context: no rule,
   skill, agent, hook or plugin from your machine or the project gets in on its own. In Claude Code

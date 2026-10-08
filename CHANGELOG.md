@@ -13,6 +13,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   board), os nomes migrados perdem só o acento (`agente-padrao`), e, quando o agente escolhido como
   padrão não existe, vale o condutor, não o primeiro da lista. Se o arquivo truncado já foi criado,
   apague-o em Configurações → Harness → Global → Agentes.
+- **Instalar a skill do fluxo marca a skill mesmo quando ela já existia.** Desde o contexto vazio, a
+  skill `faz-ai-fluxo` só conta como pronta quando existe **e** está marcada em todo contexto. Quem já
+  tinha a skill no disco via o aviso no Diagnóstico e no board, e o botão **Instalar** não fazia nada,
+  porque parava ao encontrar o arquivo. Agora o arquivo continua intocado (sem `replace`), mas a
+  marcação entra, e o aviso some. O `install_flow_skill` do MCP diz na resposta que marcou.
 - **Contexto vazio por padrão e Harness com marcação.** Toda execução pelo board (Trabalhar na fase,
   Refinar com IA, heartbeat, chat do board) passa a partir de contexto vazio: nenhuma regra, skill,
   agente, hook ou plugin da sua máquina ou do projeto entra por conta própria. No Claude Code isso é
