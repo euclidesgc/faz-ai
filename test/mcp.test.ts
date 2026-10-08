@@ -654,7 +654,16 @@ describe('regras de modelo com E e OU', () => {
   it('converte regras salvas no formato antigo', async () => {
     const { parseModelRules } = await import('../src/shared/models');
     expect(parseModelRules(JSON.stringify([{ id: 'a', fieldId: 'f1', value: 'Alto', model: 'claude:opus@high' }, { nada: true }]))).toEqual(
-      [{ id: 'a', name: '', enabled: true, groups: [[{ fieldId: 'f1', op: 'is', value: 'Alto' }]], model: 'claude:opus@high' }],
+      [
+        {
+          id: 'a',
+          name: '',
+          enabled: true,
+          groups: [[{ fieldId: 'f1', op: 'is', value: 'Alto' }]],
+          model: 'claude:opus@high',
+          fallback: null,
+        },
+      ],
     );
   });
 });
