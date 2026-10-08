@@ -107,7 +107,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'set_card_profile',
-    'Escolhe o agente de execução de um card (skills, servidores MCP, ferramentas e modelo que a sessão deve usar); os agentes estão em execProfiles, em get_board. Sem `profile`, o card volta a usar o agente da coluna.',
+    'Escolhe o agente do card: o arquivo de agente (instruções, skills, servidores MCP, ferramentas e modelo) que a sessão do board usa para executá-lo; os disponíveis estão em `agents`, em get_board. Sem `profile`, o card volta a usar o agente da coluna (ou o padrão do board).',
     { card: cardArg, profile: z.string().optional().describe('Nome do agente; omita para voltar ao da coluna') },
     (a, router) => {
       const card = live(findCard(router.snapshot(), a.card));

@@ -36,17 +36,38 @@ export interface Skill {
   content: string;
 }
 
-/** Agente (subagente) do projeto: um arquivo com instruções próprias, para o qual a ferramenta delega trabalho. */
+/**
+ * Agente: um arquivo de agente da ferramenta em uso (no projeto ou na pasta do usuário) com instruções
+ * próprias. Para o board, agente e perfil de execução são a mesma coisa: o frontmatter diz o que a sessão
+ * recebe (modelo, ferramentas, skills, servidores MCP) e o corpo é o papel dela. Lido do disco a cada varredura.
+ */
 export interface Agent {
   /** nome do arquivo, sem a extensão */
   name: string;
   description: string;
-  /** modelo fixado no frontmatter, se houver */
+  /** modelo fixado no frontmatter, no nome que a ferramenta aceita, se houver */
   model: string;
-  /** caminho do arquivo, relativo à raiz do projeto */
+  /** valor do campo Modelo do board (`<id>@<esforço>`), guardado pelo board no arquivo; vazio quando só há `model` */
+  modelValue: string;
+  /** de onde o arquivo veio */
+  scope: 'project' | 'user';
+  /** caminho absoluto do arquivo */
   path: string;
+  /** caminho para mostrar: relativo ao projeto, ou a partir de `~` (identidade do agente na marcação) */
+  location: string;
   /** conteúdo completo do arquivo (com o frontmatter) */
   content: string;
+  /** as instruções (o conteúdo sem o frontmatter) */
+  body: string;
+  /** ferramentas embutidas liberadas; vazio = as da permissão */
+  tools: string[];
+  deniedTools: string[];
+  /** skills que toda execução com o agente lê */
+  skills: string[];
+  /** servidores MCP liberados além do do board */
+  mcp: string[];
+  /** criado pelo board como agente padrão de fábrica */
+  seed: boolean;
 }
 
 /** Tipos de componente do harness de uma ferramenta, na ordem em que a tela os mostra. */

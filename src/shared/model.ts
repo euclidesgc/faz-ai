@@ -4,6 +4,7 @@ import type { InstallStepResult } from './installPlan';
 import type { ExecProfile } from './execution';
 import type { ChatState } from './chat';
 import type { AiTool, Harness, InstallPreview } from './harness';
+import type { HarnessSelection } from './harnessSelection';
 import type { ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
@@ -38,7 +39,7 @@ export interface Board {
   runner: RunnerConfig;
   /** branch e worktree das histórias */
   git: GitConfig;
-  /** agentes de execução (guardados como perfis): o que a sessão de IA recebe para trabalhar num card */
+  /** agentes do board: os arquivos de agente marcados no Harness, derivados a cada snapshot (não ficam no banco) */
   execProfiles: ExecProfile[];
 }
 
@@ -229,6 +230,8 @@ export interface BoardState {
   currentUser: string;
   /** arquivos de regras e skills do projeto */
   harness: Harness;
+  /** o que as execuções do board podem usar do harness (rules, skills e agentes marcados), por projeto */
+  harnessSelection: HarnessSelection[];
   /** mudanças que a atualização para o board padrão atual faria; vazio quando não há o que atualizar */
   pendingUpgrade: string[];
   /** chat com a IA do projeto */

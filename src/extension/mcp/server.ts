@@ -38,8 +38,9 @@ export const MCP_INSTRUCTIONS =
   'se o modelo ou o esforço forem diferentes dos seus, delegue o trabalho a um subagente com esse modelo e esforço; ' +
   'se não for possível, avise a pessoa em vez de executar com outra configuração. ' +
   'O campo "Esforço da atividade" é o tamanho da tarefa (não é o esforço do modelo); as regras do board sugerem o modelo a partir dele (get_models). ' +
-  'O campo "Skills" lista as skills obrigatórias do card: get_card devolve `requiredSkills` com o caminho de cada SKILL.md, ' +
-  'e todas devem ser lidas nesse caminho antes de executar o card, mesmo que não apareçam na sua lista de skills (podem estar desligadas ou fora da invocação automática). ' +
+  'Toda execução pelo board parte de contexto vazio: o que a IA deve conhecer vem no pedido e no get_card, pelo caminho dos arquivos. ' +
+  'Os campos "Rules" e "Skills" listam o que o card exige: get_card devolve `requiredRules` e `requiredSkills` com o caminho de cada arquivo, ' +
+  'e todos devem ser lidos nesse caminho antes de executar o card, mesmo que não apareçam na sua lista de skills. As opções desses campos e os agentes de get_board são tudo o que o board marcou em Configurações → Harness; não indique nada fora deles. ' +
   'As colunas das histórias são as fases do fluxo; sua intenção é sempre levar a história até a conclusão, uma coluna por vez. ' +
   'get_card devolve em `phase` o que fazer na fase atual e o modelo do documento que ela produz. ' +
   'Sub-tarefas podem depender umas das outras (create_card com depends_on, ou link_cards com "depends_on"): declare a dependência quando uma usa o que a outra produz ou quando as duas alteram os mesmos arquivos. ' +

@@ -7,13 +7,45 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Empty context by default and Harness with check marks.** Every run started by the board (Work
+  on the phase, Refine with AI, heartbeat, board chat) now starts from an empty context: no rule,
+  skill, agent, hook or plugin from your machine or the project gets in on its own. In Claude Code
+  this is enforced by parameter (`--setting-sources ""`, `--disable-slash-commands` and an MCP
+  servers file with the board's server and the ones the agent allows only); in Cursor, guidance in
+  the prompt. What gets in is what you
+  check under Configurações → **Harness de IA**, now with the **Projeto** and **Global** tabs, each
+  with Rules, Agentes and Skills. Rules and skills have two check marks: **Incluir em todo contexto**
+  (include in every context: goes into every run, by path) and **Usar quando fizer sentido** (use
+  when it fits: becomes an option of the cards' Skills field and of the new **Rules** field, and
+  Refine with AI picks it when the request calls for it). What is not checked does not exist for the
+  run. Skills created or installed through the board are born checked; the flow skill is checked in
+  every context when installed, and the Diagnostics only reports it ready when it exists and is
+  checked. The `get_harness` (with `usage` and `onlySelected`) and `set_harness_selection` tools
+  expose the check marks through MCP, and `get_card` returns `requiredRules` next to
+  `requiredSkills`.
+- **Agents as tool files.** Execution profiles no longer live in the board database: an agent is an
+  agent file of the tool (`~/.claude/agents/<name>.md`, `~/.cursor/agents/<name>.md`), read from
+  disk; the instructions are the session role and the frontmatter holds model, tools, skills and MCP
+  servers (what belongs to the board only goes in `faz-ai-*` keys). The board stores, per project,
+  which ones are **available** and which is the **default** (under Ferramenta e execução). Profiles
+  already saved become files in the global folder on first opening, overwriting nothing; columns and
+  cards now point by name. A profile that allowed every MCP server now allows only the board's: the
+  others come back in the agent editor. The Agentes settings tab and the **Sessão limpa** (clean session) switch
+  are gone: the empty context is always on. In Claude Code the agent goes inline (`--agents` +
+  `--agent`), so it depends on no agents folder. On first opening, ten factory agents are created
+  globally and checked (condutor-do-board as the default, frontend-web, backend-node,
+  backend-python, mobile-flutter, documentacao-tecnica, qa-testes, revisor-de-codigo, devops-infra,
+  dados-sql), with minimal instructions; what you delete does not come back on its own, and
+  **Recriar os agentes padrão** recreates whatever is missing. **Sugerir agentes com IA** has the AI
+  read the project and create or adjust agents through MCP (`create_agent` and `update_agent` gain
+  `scope`, `model`, `tools`, `deniedTools`, `skills` and `mcp`; `get_board` lists the available ones
+  under `agents`). Refine with AI receives the checked catalog (agents, rules and skills) and only
+  picks from it, choosing the card's agent with `set_card_profile`.
 - **The board supports only Claude Code and Cursor.** Codex, Kimi Code and GitHub Copilot are gone
   from the **Harness de IA** (AI harness) screen, which now offers just those two tools, and from the
   rest of the extension: built-in models, MCP server registration, rules, skills and agents, hooks,
   chat runs and the Diagnostic. A board that was set to one of them goes back to Claude Code when it
   opens. What Cursor and Claude Code still load from `.codex/skills` or `AGENTS.md` stays listed.
-- **In Settings, Modelos de IA (AI models) comes before Agentes (agents).** The side menu now follows
-  the order Harness de IA, Modelos de IA, Agentes.
 - **A run's cost is what the tool reports; the price table is gone (#187).** A value computed from
   entered prices goes stale when the vendor changes its rates and makes the report wrong without any
   warning, so the board no longer calculates cost. Claude Code stores the `total_cost_usd` the CLI

@@ -10,7 +10,8 @@ import { MeasureBrokenError } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
 import { AiGateway, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
-import { needsTriage, requiredSkills } from './mcp/format';
+import { needsTriage } from './mcp/format';
+import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
 import type { MessageRouter } from './panel/messageRouter';
 
 /** Processo da ferramenta de IA em execução. */
@@ -114,30 +115,30 @@ export const AUTONOMOUS_ADVICE = [
 
 /** O que a IA recebe a mais quando os quatro campos de triagem do card (Tags, Esforço, Modelo, Skills) estão vazios. */
 export const TRIAGE_ADVICE =
-  'Os campos Tags, Esforço da atividade, Modelo e Skills deste card estão todos vazios: antes do trabalho da fase, leia a descrição do card e decida um valor para cada um. Use o catálogo de skills e as regras de modelo em `get_board`/`get_harness`/`get_models` como apoio, mas a decisão final é sua — diverja da sugestão quando a descrição pedir algo diferente. Aplique os quatro campos com `update_card` (fields) e crie com `add_checklist_item` os passos de trabalho que a descrição pede. Registre na conversa do card, com `add_comment`, os valores escolhidos e por quê.';
+  'Os campos Tags, Esforço da atividade, Modelo e Skills deste card estão todos vazios: antes do trabalho da fase, leia a descrição do card e decida um valor para cada um (e para Rules e para o agente, com set_card_profile, quando houver um que caiba). Use as regras de modelo em `get_models` e o que está marcado em `get_harness` como apoio, mas a decisão final é sua — diverja da sugestão quando a descrição pedir algo diferente. Só indique skills, rules e agentes que estejam nas opções dos campos e em get_board.agents. Aplique os campos com `update_card` (fields) e crie com `add_checklist_item` os passos de trabalho que a descrição pede. Registre na conversa do card, com `add_comment`, os valores escolhidos e por quê.';
 
-/** Linha das skills obrigatórias do card: vão pelo caminho e valem mesmo desligadas ou fora da invocação automática. */
-const skillsLine = (skills: { name: string; path?: string }[]): string[] =>
-  skills.some((k) => k.path)
-    ? [
-        `Antes de começar, leia estas skills, obrigatórias para este card: ${skills
-          .filter((k) => k.path)
-          .map((k) => `${k.name} (${k.path})`)
-          .join('; ')}.`,
-      ]
-    : [];
+/** O contexto que vai no pedido: o fixo do board e o do card, pelo caminho dos arquivos (ver promptContext). */
+export interface PromptContext {
+  always: string[];
+  card: string[];
+}
+
+const NO_CONTEXT: PromptContext = { always: [], card: [] };
 
 /**
  * O que a IA recebe no "Refinar com IA": deixar o card claro e completo para quem vai trabalhar nele,
- * sem fazer o trabalho da fase. O executor devolve o card ao status que tinha quando ela termina.
+ * sem fazer o trabalho da fase. O executor devolve o card ao status que tinha quando ela termina. O
+ * catálogo é tudo o que ela pode indicar: o que o Harness marcou como "usar quando fizer sentido" e os agentes disponíveis.
  */
-export const refinePrompt = (ref: string, skills: { name: string; path?: string }[] = []): string =>
+export const refinePrompt = (ref: string, context: PromptContext = NO_CONTEXT, catalog?: RefineCatalog): string =>
   [
     `Refine o card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Refinar é deixar o card claro e completo para quem vai trabalhar nele; NÃO é fazer o trabalho da fase.`,
-    ...skillsLine(skills),
-    'Leia o card com get_card (descrição, conversa, anexos e campos) e, como apoio, get_board, get_harness e get_models (tipos, campos, catálogos de skills e de modelos). Pode ler o projeto para entender o contexto.',
+    ...context.always,
+    ...context.card,
+    ...(catalog ? catalogLines(catalog) : []),
+    'Leia o card com get_card (descrição, conversa, anexos e campos) e, como apoio, get_board e get_models (tipos, campos, agentes e catálogo de modelos). Pode ler o projeto para entender o contexto.',
     '1. Título e descrição: reescreva com update_card para ficarem claros e objetivos, mantendo a intenção e tudo o que a pessoa escreveu. Não invente requisito: o que estiver ambíguo vira uma lista "Dúvidas em aberto" no fim da descrição. Se o texto já estiver bom, não mexa.',
-    '2. Campos: revise Tags, Esforço da atividade, Modelo e Skills e aplique com update_card (fields), mesmo que já tenham valor; mantenha o que fizer sentido.',
+    '2. Campos: revise Tags, Esforço da atividade, Modelo, Skills e Rules e aplique com update_card (fields), mesmo que já tenham valor; mantenha o que fizer sentido. Escolha o agente do card com set_card_profile quando um da lista couber melhor que o padrão. Skills, rules e agente só do catálogo acima: o que não está nele não existe para este board.',
     '3. Checklist: acrescente com add_checklist_item os passos que faltam para concluir o card, sem repetir os que já existem.',
     '4. Termine com add_comment na conversa do card, resumindo o que mudou e por quê. Se reescreveu a descrição, inclua o texto anterior, para a pessoa poder voltar a ele.',
     'Não faça o trabalho da fase: não crie sub-tarefas nem anexos, não mova o card e não mude o status (sem start_work, move_card, request_review, ask_question nem block_card). Não altere arquivos do projeto nem rode comandos.',
@@ -147,15 +148,15 @@ export const refinePrompt = (ref: string, skills: { name: string; path?: string 
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
 export const cardPrompt = (
   ref: string,
-  skills: { name: string; path?: string }[] = [],
+  context: PromptContext = NO_CONTEXT,
   advice: string[] = [],
   autonomous = false,
   triage = false,
 ): string =>
   [
     `Trabalhe no card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai".`,
-    ...skillsLine(skills),
-    'Se a skill "faz-ai-fluxo" existir no projeto, siga-a.',
+    ...context.always,
+    ...context.card,
     `Leia o card com get_card (descrição, conversa, anexos e a fase em \`phase\`). Se a última mensagem da conversa for da pessoa, responda a ela pela conversa do card.`,
     ...(triage ? [TRIAGE_ADVICE] : []),
     'Faça o trabalho da fase em que o card está e termine passando a vez: request_review quando houver algo para revisar, ask_question quando precisar de uma resposta, block_card se houver um impedimento, ou mova o card se a fase não exigir aprovação.',
@@ -231,7 +232,7 @@ export class AiRunner {
           const permissionAdvice = refine ? null : PERMISSION_ADVICE[permission];
           if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
-          if (plan.manifest.profile || plan.manifest.model) log(plan.summary.join(' | '));
+          log(plan.summary.join(' | '));
           return {
             // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
             config: {
@@ -240,16 +241,17 @@ export class AiRunner {
               profile: plan.manifest.profile,
               agent: plan.manifest.agent,
               autonomous,
-              clean: plan.manifest.clean,
+              // toda execução pelo board parte de contexto vazio
+              clean: true,
               skills: plan.manifest.skills,
               mcp: plan.manifest.mcpServers,
             },
             input: {
               prompt: refine
-                ? refinePrompt(cardRef(card), requiredSkills(state, card))
+                ? refinePrompt(cardRef(card), contextLines(state, card), refineCatalog(state))
                 : cardPrompt(
                     cardRef(card),
-                    requiredSkills(state, card),
+                    contextLines(state, card),
                     [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
                     autonomous,
                     needsTriage(state, card),

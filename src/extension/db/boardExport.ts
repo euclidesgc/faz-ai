@@ -47,6 +47,8 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'card_events', where: 'board_id = ?', hasId: true },
   { name: 'ai_runs', where: 'board_id = ?', hasId: true },
   { name: 'ai_run_usage', where: 'run_id IN (SELECT id FROM ai_runs WHERE board_id = ?)', hasId: false },
+  // a marcação do harness é deste board: vai junto (os caminhos relativos ao projeto e a `~` valem na outra máquina)
+  { name: 'harness_selection', where: 'board_id = ?', hasId: false },
 ];
 
 /** Tabelas que ficam fora do arquivo mesmo tendo `board_id` (o teste do `sqlite_master` as ignora). */

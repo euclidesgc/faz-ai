@@ -95,13 +95,17 @@ is needed, at the right time:
 - **Each card is a new, short session.** Instead of one long conversation that accumulates
   everything, the AI opens the card through the board (`get_card`), does that piece of work and
   stops. The history stays on the card, not in the context window.
-- **Skills only when indicated.** An automatic skill puts its description in every session; marked
-  **Só quando indicada** (only when indicated), it only enters the cards that ask for it. Under
-  **Harness de IA → Tudo que a ferramenta carrega**, the board shows how many skills are automatic
-  and how many characters of description they put into every session.
-- **Agents that restrict.** An agent can allow only some MCP servers and tools, and the **clean
-  session** drops your user-folder customizations: fewer tool definitions loaded for nothing (what
-  Claude Code and Cursor enforce by parameter is in the [Agents](#agents) table).
+- **Empty context by default.** Every run started by the board begins with no rule, skill, agent,
+  hook or plugin from your machine or the project: only what you checked under **Harness de IA**
+  gets in. In Claude Code this is enforced by parameter (`--setting-sources ""`,
+  `--disable-slash-commands` and an MCP servers file with the board's server only); in the other
+  tools, whatever the command line accepts (see the [Agents](#agents) table).
+- **Rules and skills checked, not discovered.** Each file has two check marks: **Incluir em todo
+  contexto** (include in every context: goes into every run, by path) or **Usar quando fizer
+  sentido** (use when it fits: becomes an option of the card's Rules and Skills fields, and Refine
+  with AI picks it when the request calls for it). What is not checked does not exist for the run.
+- **Agents with the minimum.** An agent allows only the MCP servers and tools it needs, carries its
+  own skills and has short instructions; everything else stays out.
 - **Documents as attachments.** PRD, Spec and Plan stay attached to the story; the AI reads them
   when the card needs it, instead of getting them pasted into every message.
 - **Markdown attachments open formatted.** A `.md`/`.markdown` file opens like a page, with headings,
@@ -682,48 +686,81 @@ comes back when you resume). The heartbeat does not drive autonomous stories; th
 
 ![Agent with intent, chosen skills and read-only tools](docs/images/agents_en.png)
 
-An agent (Configurações → **Agentes**) says how the AI works on a card: which skills it reads, which
-MCP servers and tools (available and denied) it can use, which model and effort, and whether the
-session is clean (without your user-folder customizations and without automatic skill invocation).
-Every run started by the board goes through an agent: the one chosen on the card; otherwise the
-phase's (Workflows e colunas → Fase); otherwise the board default. The board always has at least
-one, the **Agente padrão** (default agent), which restricts nothing.
+An agent is an **agent file of the AI tool** (`~/.claude/agents/<name>.md`,
+`~/.cursor/agents/<name>.md`): the instructions are the session
+role, and the frontmatter sets the model and effort, the tools (available and denied), the skills and
+the MCP servers it gets. For the board, agent and execution profile are the same thing. The files are
+read from disk; the board only stores, per project, which ones are **available** and which is the
+**default** (Harness de IA → Ferramenta e execução). Every run started by the board goes through an
+agent: the one chosen on the card; otherwise the phase's (Workflows e colunas → Fase); otherwise the
+default. With none checked, the built-in agent applies, with no instructions.
 
-To configure without knowing every skill or tool:
+Agents the board creates go to the tool's global folder (they apply in any project), and the ones
+already in the project show up under the **Projeto** tab. On the board's first opening, ten factory
+agents are created globally, checked as available, with **condutor-do-board** as the default: it
+drives cards through the flow and picks the right specialist for each subtask. The others
+(frontend-web, backend-node, backend-python, mobile-flutter, documentacao-tecnica, qa-testes,
+revisor-de-codigo, devops-infra, dados-sql) have minimal instructions, for you or the AI to adapt to
+the project. What you delete does not come back on its own; **Recriar os agentes padrão** (recreate
+the default agents) recreates whatever is missing.
 
-- **O que este agente faz** (what this agent does): one sentence of intent. With it, the **Sugerir
-  pela intenção** (suggest from intent) button selects the skills (and MCP servers) whose name or
-  description match. The suggestion is word-based, local and does not call an AI; you confirm what
-  stays.
-- **Skills**: the same picker window as the card, with search, origin tabs and checkboxes.
-- **Tools**: ready-made sets (**Só leitura** read-only, **Editar código** edit code) and an editable
-  list.
-- **Tool subagent**: optional, an agent file of the tool itself (for example
-  `.claude/agents/reviewer.md`) to drive the session.
+On the Agentes tab of each scope:
 
-Each run started by the board ("Trabalhar na fase", "Refinar com IA" and the heartbeat) is a new session, with only what is
-on the card. The agent becomes command-line parameters where the tool accepts them; the rest goes
-into the prompt, as instructions:
+- **Disponível no board** (available on the board): cards and phases can pick the agent. **Tornar
+  padrão** (make default) makes it run when none of them picks.
+- **Novo agente** (new agent): name, description (it is how Refine with AI picks), model and
+  instructions.
+- **Editar** (edit): each frontmatter field saves on blur; the instructions have Save. Skills come
+  from the same picker as the card (checked ones only); tools have ready-made sets (**Só leitura**
+  read-only, **Editar código** edit code).
+- **Sugerir agentes com IA** (suggest agents with AI): the AI reads the project (structure,
+  dependencies, README) and creates or adjusts 3 to 8 agents for it through MCP, leaving them
+  available. The result lands in the board chat.
+
+Each run started by the board ("Trabalhar na fase", "Refinar com IA" and the heartbeat) is a new,
+empty-context session, with only what is on the card. The agent becomes command-line parameters where
+the tool accepts them; the rest goes into the prompt, as instructions:
 
 | Tool | Enforced by parameter | Advised only |
 | --- | --- | --- |
-| Claude Code | subagent, MCP servers, tools, model and effort, clean session | skills |
+| Claude Code | agent (inline, in `--agents`), MCP servers, tools, model and effort, empty context | skills and rules |
 | Cursor | model | everything else |
 
-Skills are always passed by file path. In a conversation you open yourself, the agent reaches the
-AI through `get_card`, as guidance.
+Skills and rules are always passed by file path. In a conversation you open yourself, the agent
+reaches the AI through `get_card` (`execution`), as guidance. Through MCP, `get_board` lists the
+available agents, `set_card_profile` picks one for a card, and `create_agent`, `update_agent`,
+`get_agent` and `delete_agent` manage the files.
 
 ## AI harness
 
 ![Project and global skills, with the flow skill install, global or in the project](docs/images/harness_en.png)
 
-Configurações → **Harness de IA** holds everything the AI tools load, in three tabs: **Ferramenta e
-execução** (tool and run: the project's AI and how the board calls it), **Do projeto** (from the
-project: the rules file, skills and agents that are part of the repository, editable there) and
-**Tudo que a ferramenta carrega** (everything the tool loads). In the last one, under **Tudo que
-cada ferramenta carrega** (everything each tool loads), there is one tab per tool with eight sections (instructions
-and rules, skills, subagents, commands and prompts, hooks, MCP servers, plugins, settings and
-permissions), each split into three scopes:
+Every run started by the board starts from an **empty context**: no rule, skill or agent from your
+machine or the project gets in on its own. Under Configurações → **Harness de IA** you check what
+gets in, in four tabs: **Ferramenta e execução** (tool and run: the project's AI, the permission,
+the default agent and the heartbeat), **Projeto** and **Global** (the files of each folder, in three
+sub-tabs: **Rules**, **Agentes** and **Skills**, with the check marks on each row) and **Tudo que a
+ferramenta carrega** (everything the tool loads). Project and Global are only the folder the file
+comes from; what counts is the check mark, which belongs to this board.
+
+Under Rules and Skills, each row has two mutually exclusive boxes:
+
+- **Incluir em todo contexto** (include in every context): the file goes into every run (work the
+  phase, refine, board chat), by path. It is where the flow skill and the always-on rules go.
+- **Usar quando fizer sentido** (use when it fits): becomes an option of the cards' **Rules** and
+  **Skills** fields (and of the agents' skills), and **Refinar com IA** picks it when the request
+  calls for it. Unchecked, the run does not see it, even if the tool loads it in a conversation of
+  yours.
+
+A check mark whose file is gone shows as **não encontrada** (not found), to uncheck or recreate.
+Skills and agents created or installed through the board are born checked. What still gets in despite
+the empty context depends on the tool: in Claude Code 2.1 nothing from your folder or the project
+(verified against the CLI); in Cursor, everything the tool loads, and the board only advises.
+
+Under **Tudo que a ferramenta carrega**, in **Tudo que cada ferramenta carrega** (everything each tool
+loads), there is one tab per tool with eight sections (instructions and rules, skills, subagents,
+commands and prompts, hooks, MCP servers, plugins, settings and permissions), each split into three
+scopes:
 
 - **Projeto** (project): files in this folder; they apply only here and go into the repository.
   This group is always shown, highlighted, and says when the project has nothing of that kind.
@@ -756,14 +793,16 @@ Each skill has a mode:
   it.
 - **Só quando indicada** (only when named): the AI does not invoke it on its own; it applies when a
   card names it or when it is called by name.
-- **Desligada** (off, project only): the tool does not see it, but a card can still name it.
+- **Desligada** (off, project only): the tool does not see it, and it leaves the board's options.
 
-The card's "Skills" field shows a summary of what is selected and opens a window to choose: search
-by name or description, **Todas / Marcadas / Projeto / Globais / Plugins** tabs (all / selected /
-project / global / plugins) and one checkbox per skill, with its origin in view. It works with
-hundreds of skills. The card hands the AI the file
-path of each skill, so a skill does not need to be visible to the tool to be used. That lets you
-keep many skills available without filling the context of every session. The context saving is
+The mode says how the tool treats the skill in a conversation of yours; in board runs what counts is
+the check mark. The card's "Skills" field shows a summary of what is selected and opens a window to
+choose among the skills checked as **Usar quando fizer sentido**: search by name or description,
+**Todas / Marcadas / Projeto / Globais / Plugins** tabs (all / selected / project / global / plugins)
+and one checkbox per skill, with its origin in view. The "Rules" field does the same with the checked
+instruction files. The card hands the AI the path of each file, so it does not need to be visible to
+the tool to be used. That lets you keep many skills available without filling the context of every
+session. The context saving is
 documented for Claude Code and Cursor; for the other tools, the documentation only says the AI
 stops invoking the skill on its own.
 
@@ -791,8 +830,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
 | Campos | Custom fields (text, select, date, model…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo |
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
-| Agentes | How the AI works on each card: skills, MCP servers, tools and model; there is always a default; per phase, changeable per card, with suggestions from intent |
-| Harness de IA | The project's tool, rules file, skills and agents; runs from the conversation and the heartbeat; everything each tool loads, by scope (see [AI harness](#ai-harness)) |
+| Harness de IA | The project's tool, permission, default agent and heartbeat; project and global rules, agents and skills, with the check marks of what runs use; everything each tool loads, by scope (see [AI harness](#ai-harness) and [Agents](#agents)) |
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
 | Aparência | **Language** (automatic, Português (Brasil) or English), theme (system, light, dark), font and size of long texts; name and color of the statuses |

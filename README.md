@@ -87,14 +87,17 @@ necessário, na hora certa:
 - **Cada card é uma sessão nova e curta.** Em vez de uma conversa longa que acumula tudo, a IA abre o
   card pelo board (`get_card`), faz aquele trabalho e para. O histórico fica no card, e não na janela
   de contexto.
-- **Skills só quando indicadas.** Uma skill automática põe a descrição dela em toda sessão; marcada
-  como **Só quando indicada**, ela só entra nos cards que a pedem. Em **Harness de IA → Tudo que a
-  ferramenta carrega**, o board mostra quantas skills são automáticas e quantos caracteres de
-  descrição elas colocam em toda sessão.
-- **Agentes que restringem.** Um agente pode liberar só alguns servidores MCP e ferramentas, e a
-  **sessão limpa** dispensa as personalizações da sua pasta de usuário: menos definições de
-  ferramentas carregadas sem necessidade (o que o Claude Code e o Cursor impõem por parâmetro está na
-  tabela de [Agentes](#agentes)).
+- **Contexto vazio por padrão.** Toda execução pelo board começa sem nenhuma regra, skill, agente,
+  hook ou plugin da sua máquina ou do projeto: só entra o que você marcou em **Harness de IA**. No
+  Claude Code isso é imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um
+  arquivo de servidores MCP só com o do board); nas outras ferramentas, o que a linha de comando
+  aceita (ver a tabela de [Agentes](#agentes)).
+- **Rules e skills marcadas, não descobertas.** Cada arquivo tem duas marcações: **Incluir em todo
+  contexto** (entra em toda execução, pelo caminho) ou **Usar quando fizer sentido** (vira opção dos
+  campos Rules e Skills do card, e o Refinar com IA a indica quando o pedido pede). O que não está
+  marcado não existe para a execução.
+- **Agentes com o mínimo.** Um agente libera só os servidores MCP e as ferramentas de que precisa,
+  carrega as skills dele e tem instruções curtas; o resto fica de fora.
 - **Documentos como anexos.** PRD, Spec e Plan ficam anexados à história; a IA os lê quando o card
   precisa, em vez de recebê-los colados em cada mensagem.
 - **Anexos em Markdown abrem formatados.** Um `.md`/`.markdown` abre como uma página, com títulos,
@@ -659,45 +662,75 @@ retomar). O heartbeat não toca histórias em modo autônomo; elas são do autop
 
 ![Agente com intenção, skills escolhidas e ferramentas só de leitura](docs/images/agents.png)
 
-Um agente (Configurações → **Agentes**) diz como a IA trabalha num card: que skills ela lê, a que
-servidores MCP e ferramentas (disponíveis e negadas) tem acesso, que modelo e esforço usa e se a
-sessão é limpa (sem as personalizações da sua pasta de usuário e sem invocação automática de
-skills). Toda execução pelo board roda através de um agente: o escolhido no card; senão, o da fase
-(Workflows e colunas → Fase); senão, o padrão do board. O board sempre tem ao menos um, o **Agente
-padrão**, que não restringe nada.
+Um agente é um **arquivo de agente da ferramenta de IA** (`~/.claude/agents/<nome>.md`,
+`~/.cursor/agents/<nome>.md`): as instruções são o papel da
+sessão, e o frontmatter diz o modelo e o esforço, as ferramentas (disponíveis e negadas), as skills e
+os servidores MCP que ela recebe. Para o board, agente e perfil de execução são a mesma coisa. Os
+arquivos são lidos do disco; o board só guarda, por projeto, quais estão **disponíveis** e qual é o
+**padrão** (Harness de IA → Ferramenta e execução). Toda execução pelo board roda através de um
+agente: o escolhido no card; senão, o da fase (Workflows e colunas → Fase); senão, o padrão. Sem
+nenhum marcado, vale o agente embutido, sem instruções.
 
-Para configurar sem ter de conhecer cada skill ou ferramenta:
+Os agentes que o board cria vão para a pasta global da ferramenta (valem em qualquer projeto), e os
+que já existem no projeto aparecem na aba **Projeto**. Na primeira abertura do board, dez agentes de
+fábrica são criados no global, marcados como disponíveis, com o **condutor-do-board** como padrão:
+ele conduz os cards pelo fluxo e indica o especialista certo em cada sub-tarefa. Os outros
+(frontend-web, backend-node, backend-python, mobile-flutter, documentacao-tecnica, qa-testes,
+revisor-de-codigo, devops-infra, dados-sql) têm instruções mínimas, para você ou a IA adaptar ao
+projeto. O que você apagar não volta sozinho; **Recriar os agentes padrão** recria o que faltar.
 
-- **O que este agente faz**: uma frase de intenção. Com ela, o botão **Sugerir pela intenção** marca
-  as skills (e os servidores MCP) cujo nome ou descrição combinam. A sugestão é por palavras, local
-  e sem chamar IA; você confirma o que fica.
-- **Skills**: a mesma janela de escolha do card, com busca, abas por origem e caixa de seleção.
-- **Ferramentas**: conjuntos prontos (**Só leitura**, **Editar código**) e a lista editável.
-- **Subagente da ferramenta**: opcional, um arquivo de agente da própria ferramenta (por exemplo,
-  `.claude/agents/revisor.md`) para conduzir a sessão.
+Na aba Agentes de cada escopo:
 
-Cada execução pelo board ("Trabalhar na fase", "Refinar com IA" e heartbeat) é uma sessão nova, só com o que está no card. O
-agente vira parâmetros da linha de comando onde a ferramenta aceita; o resto segue no prompt, como
-instrução:
+- **Disponível no board**: os cards e as fases podem escolher o agente. **Tornar padrão** o faz
+  executar quando nenhum deles escolhe.
+- **Novo agente**: nome, descrição (é por ela que o Refinar com IA escolhe), modelo e instruções.
+- **Editar**: cada campo do frontmatter grava ao sair; as instruções têm Salvar. As skills vêm da
+  mesma janela do card (só as marcadas); as ferramentas têm conjuntos prontos (**Só leitura**,
+  **Editar código**).
+- **Sugerir agentes com IA**: a IA lê o projeto (estrutura, dependências, README) e cria ou ajusta
+  de 3 a 8 agentes para ele, pelo MCP, deixando-os disponíveis. O resultado fica no chat do board.
+
+Cada execução pelo board ("Trabalhar na fase", "Refinar com IA" e heartbeat) é uma sessão nova, de
+contexto vazio, só com o que está no card. O agente vira parâmetros da linha de comando onde a
+ferramenta aceita; o resto segue no prompt, como instrução:
 
 | Ferramenta | Imposto por parâmetro | Só orientado |
 | --- | --- | --- |
-| Claude Code | subagente, servidores MCP, ferramentas, modelo e esforço, sessão limpa | skills |
+| Claude Code | agente (inline, em `--agents`), servidores MCP, ferramentas, modelo e esforço, contexto vazio | skills e rules |
 | Cursor | modelo | todo o resto |
 
-As skills vão sempre pelo caminho do arquivo. Numa conversa aberta por você, o agente chega à IA
-pelo `get_card`, como orientação.
+As skills e as rules vão sempre pelo caminho do arquivo. Numa conversa aberta por você, o agente
+chega à IA pelo `get_card` (`execution`), como orientação. Pelo MCP, `get_board` lista os agentes
+disponíveis, `set_card_profile` escolhe o de um card e `create_agent`, `update_agent`, `get_agent` e
+`delete_agent` gerenciam os arquivos.
 
 ## Harness de IA
 
 ![Skills do projeto e globais, com a instalação da skill do fluxo no global ou no projeto](docs/images/harness.png)
 
-Em Configurações → **Harness de IA** fica tudo que as ferramentas de IA carregam, em três abas:
-**Ferramenta e execução** (a IA do projeto e como o board a chama), **Do projeto** (o arquivo de
-regras, as skills e os agentes que fazem parte do repositório, editáveis ali) e **Tudo que a
-ferramenta carrega**. Nesta última, em **Tudo que cada ferramenta carrega**, há uma aba por ferramenta com oito seções (instruções e regras, skills,
-subagentes, comandos e prompts, hooks, servidores MCP, plugins, configurações e permissões), cada uma
-dividida em três escopos:
+Toda execução pelo board parte de **contexto vazio**: nenhuma regra, skill ou agente da sua máquina
+ou do projeto entra por conta própria. Em Configurações → **Harness de IA** você marca o que entra,
+em quatro abas: **Ferramenta e execução** (a IA do projeto, a permissão, o agente padrão e o
+heartbeat), **Projeto** e **Global** (os arquivos de cada pasta, em três sub-abas: **Rules**,
+**Agentes** e **Skills**, com a marcação em cada linha) e **Tudo que a ferramenta carrega**. Projeto
+e Global são só a pasta de onde o arquivo vem; o que vale é a marcação, que é deste board.
+
+Em Rules e Skills, cada linha tem duas caixas que se excluem:
+
+- **Incluir em todo contexto**: o arquivo entra em toda execução (trabalhar a fase, refinar, chat do
+  board), pelo caminho. É o lugar da skill do fluxo e das regras que valem sempre.
+- **Usar quando fizer sentido**: vira opção dos campos **Rules** e **Skills** dos cards (e das skills
+  dos agentes), e o **Refinar com IA** a indica quando o pedido pede. Sem marcação, a execução não a
+  vê, mesmo que a ferramenta a carregue numa conversa sua.
+
+Uma marcação cujo arquivo sumiu aparece como **não encontrada**, para desmarcar ou recriar. Skills e
+agentes criados ou instalados pelo board já nascem marcados. O que ainda entra apesar do contexto
+vazio depende da ferramenta: no Claude Code 2.1 nada da sua pasta nem do projeto (verificado na
+CLI); no Cursor, tudo o que a ferramenta carregar, e o board só orienta.
+
+Na aba **Tudo que a ferramenta carrega**, em **Tudo que cada ferramenta carrega**, há uma aba por
+ferramenta com oito seções (instruções e regras, skills, subagentes, comandos e prompts, hooks,
+servidores MCP, plugins, configurações e permissões), cada uma dividida em três escopos:
 
 - **Projeto**: arquivos desta pasta; valem só aqui e vão no repositório. Esse grupo aparece sempre,
   em destaque, e diz quando o projeto não tem nada daquele tipo.
@@ -727,13 +760,15 @@ Cada skill tem um modo:
 - **Automática**: a IA vê a descrição em toda sessão e decide quando usar.
 - **Só quando indicada**: a IA não a invoca sozinha; vale quando um card a indica ou quando é
   chamada pelo nome.
-- **Desligada** (só no projeto): a ferramenta não a enxerga, mas um card ainda pode indicá-la.
+- **Desligada** (só no projeto): a ferramenta não a enxerga, e ela sai das opções do board.
 
-O campo "Skills" do card mostra um resumo do que está marcado e abre uma janela para escolher: busca
-por nome ou descrição, abas **Todas / Marcadas / Projeto / Globais / Plugins** e uma caixa de seleção
-por skill, com a origem à vista. Funciona com centenas de skills. O card entrega à IA o caminho do arquivo de cada skill, então ela não
-precisa estar à vista da ferramenta para ser usada. Assim dá para ter muitas skills disponíveis sem
-ocupar o contexto de toda sessão. A economia de contexto é documentada no Claude Code e no Cursor;
+O modo diz como a ferramenta trata a skill numa conversa sua; nas execuções do board o que vale é a
+marcação. O campo "Skills" do card mostra um resumo do que está marcado e abre uma janela para
+escolher entre as skills marcadas como **Usar quando fizer sentido**: busca por nome ou descrição,
+abas **Todas / Marcadas / Projeto / Globais / Plugins** e uma caixa de seleção por skill, com a
+origem à vista. O campo "Rules" faz o mesmo com os arquivos de instruções marcados. O card entrega à
+IA o caminho de cada arquivo, então ele não precisa estar à vista da ferramenta para ser usado. Assim
+dá para ter muitas skills disponíveis sem ocupar o contexto de toda sessão. A economia de contexto é documentada no Claude Code e no Cursor;
 nas outras ferramentas, a documentação diz só que a IA deixa de invocar a skill sozinha.
 
 Para não marcar skills card a card, escolha-as no tipo: em Configurações → **Tipos de card** →
@@ -760,8 +795,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos | Campos personalizados (texto, seleção, data, modelo…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
-| Agentes | Como a IA trabalha em cada card: skills, servidores MCP, ferramentas e modelo; sempre há um padrão; por fase, com troca por card e sugestão pela intenção |
-| Harness de IA | Ferramenta do projeto, arquivo de regras, skills e agentes; execução pela conversa e heartbeat; tudo que cada ferramenta carrega, por escopo (ver [Harness de IA](#harness-de-ia)) |
+| Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; rules, agentes e skills do projeto e do global, com a marcação do que as execuções usam; tudo que cada ferramenta carrega, por escopo (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English), tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |

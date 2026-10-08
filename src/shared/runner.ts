@@ -22,6 +22,8 @@ export interface RunnerConfig {
   parallel: boolean;
   /** com `parallel` ligado, quantas histórias ao mesmo tempo (no mínimo duas) */
   parallelStories: number;
+  /** nome do agente (arquivo marcado no Harness) usado quando nem o card nem a fase indicam um; vazio = o primeiro marcado, ou o embutido */
+  defaultAgent: string;
 }
 
 export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint: string }[] = [
@@ -52,6 +54,7 @@ export const DEFAULT_RUNNER: RunnerConfig = {
   heartbeatMinutes: 60,
   parallel: false,
   parallelStories: 2,
+  defaultAgent: '',
 };
 
 /**
@@ -74,6 +77,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
   const interval = Math.round(Number(raw.heartbeatMinutes));
   const parallel = Math.round(Number(raw.parallelStories));
   return {
+    defaultAgent: typeof raw.defaultAgent === 'string' ? raw.defaultAgent.trim() : '',
     heartbeat: raw.heartbeat === true,
     heartbeatMinutes:
       Number.isFinite(interval) && interval > 0

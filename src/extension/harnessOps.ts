@@ -2,14 +2,25 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SKILL_FILE_PATTERN, SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type HarnessItem, type SkillMode } from '../shared/harness';
 import { HARNESS_CATALOG, copyTarget, type HarnessSource } from '../shared/harnessCatalog';
-import { agentTemplate, skillTemplate } from './harness';
+import { renderAgentFile } from './agentFiles';
+import { skillTemplate } from './harness';
 import { setSkillMode } from './skillMode';
 
 /** Conteúdo inicial de um arquivo novo do harness, no formato que a ferramenta espera. */
-function template(src: HarnessSource, file: string, name: string, description: string): string {
+function template(tool: AiTool, src: HarnessSource, file: string, name: string, description: string): string {
   const oneLine = description.replace(/\r?\n/g, ' ').trim();
   if (src.layout === 'skills') return skillTemplate(name, oneLine, 'Instruções da skill.');
-  if (src.kind === 'agent') return agentTemplate(name, oneLine, 'Instruções do agente.');
+  if (src.kind === 'agent')
+    return renderAgentFile(aiToolInfo(tool).agents, {
+      name,
+      description: oneLine,
+      body: 'Instruções do agente.',
+      model: '',
+      tools: [],
+      deniedTools: [],
+      skills: [],
+      mcp: [],
+    });
   if (file.endsWith('.json')) return '{}\n';
   if (src.layout === 'file') return '';
   // regras por caminho e prompts: frontmatter com a descrição e o campo de aplicação de cada ferramenta
@@ -49,7 +60,7 @@ export class HarnessOps {
     }
     if (fs.existsSync(file)) throw new Error(`Já existe: ${file}`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, template(src, file, name, description));
+    fs.writeFileSync(file, template(tool, src, file, name, description));
     return file;
   }
 

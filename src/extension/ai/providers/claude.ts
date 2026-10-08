@@ -5,7 +5,7 @@
 import type { RunnerPermission } from '../../../shared/runner';
 import { claudeReader } from '../../aiOutput/claude';
 import { textReader } from '../../aiOutput/text';
-import { BOARD_SERVER } from '../../execution';
+import { BOARD_SERVER, boardOnlyMcpConfig } from '../../execution';
 import { tmpArg, type AiProvider } from '../provider';
 
 const SERVER = BOARD_SERVER;
@@ -27,20 +27,25 @@ export const claudeProvider: AiProvider = {
     const args = ['-p', ...(structured ? ['--output-format', 'stream-json', '--verbose'] : []), ...modes[permission]];
     // os servidores liberados no agente também rodam sem pedir aprovação
     // o Claude Code troca por `_` o que não for letra, número, `_` ou `-` no nome do servidor
-    if (exec?.mcpAllowed && permission !== 'full') args.push(...exec.mcpAllowed.map((n) => `mcp__${n.replace(/[^A-Za-z0-9_-]/g, '_')}__*`));
+    if (exec?.mcpAllowed.length && permission !== 'full')
+      args.push(...exec.mcpAllowed.map((n) => `mcp__${n.replace(/[^A-Za-z0-9_-]/g, '_')}__*`));
     args.push(...addDirs.flatMap((d) => ['--add-dir', d]));
     if (exec?.model) args.push('--model', exec.model.name, ...(exec.model.effort ? ['--effort', exec.model.effort] : []));
-    if (exec?.agent) args.push('--agent', exec.agent);
+    // o agente vai inline e é o da sessão: não depende de nenhuma pasta de agentes (verificado na CLI 2.1.278)
+    if (exec?.agentDefinition) {
+      const { name, ...def } = exec.agentDefinition;
+      args.push('--agents', JSON.stringify({ [name]: def }), '--agent', name);
+    } else if (exec?.agent) args.push('--agent', exec.agent);
     if (exec?.tools.length) args.push('--tools', exec.tools.join(','));
     if (exec?.deniedTools.length) args.push('--disallowedTools', ...exec.deniedTools);
-    // sem agente que restrinja os servidores, o do board vai junto dos já configurados: a execução não
-    // depende de "Conectar ao board" nem da aprovação do .mcp.json, que o modo -p não tem como pedir
-    const mcpConfig =
-      exec?.mcpConfig ?? (boardServer ? JSON.stringify({ mcpServers: { [SERVER]: { type: 'stdio', ...boardServer } } }) : null);
-    if (exec?.mcpConfig) args.push('--strict-mcp-config');
-    if (mcpConfig) args.push('--mcp-config', tmpArg(MCP_CONFIG));
-    // sessão limpa: sem as configurações da pasta do usuário e sem skills ou comandos invocáveis (as do card vão pelo caminho)
-    if (exec?.clean) args.push('--setting-sources', 'project,local', '--disable-slash-commands');
+    // contexto vazio: só o servidor do board e os liberados pelo agente (`--strict-mcp-config` deixa de
+    // fora os do usuário e do projeto; a execução não depende de "Conectar ao board" nem da aprovação do
+    // .mcp.json, que o modo -p não tem como pedir), nenhuma fonte de configuração (`--setting-sources ""`:
+    // sem CLAUDE.md, skills, agentes, hooks e plugins do usuário nem do projeto, verificado na CLI 2.1.278)
+    // e nenhuma skill invocável; o que o board marcou vai no pedido, pelo caminho do arquivo
+    const mcpConfig = exec?.mcpConfig ?? (boardServer ? boardOnlyMcpConfig(boardServer) : null);
+    if (mcpConfig) args.push('--strict-mcp-config', '--mcp-config', tmpArg(MCP_CONFIG));
+    args.push('--setting-sources', '', '--disable-slash-commands');
     return {
       command: 'claude',
       args,

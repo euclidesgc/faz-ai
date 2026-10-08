@@ -146,6 +146,7 @@ export class HostBridge {
         case 'chat.send':
         case 'chat.stop':
         case 'chat.clear':
+        case 'ai.suggestAgents':
           this.router.chatCommand(msg);
           return;
         case 'ui.openInBrowser':

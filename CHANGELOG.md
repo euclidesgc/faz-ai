@@ -6,13 +6,44 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Contexto vazio por padrão e Harness com marcação.** Toda execução pelo board (Trabalhar na fase,
+  Refinar com IA, heartbeat, chat do board) passa a partir de contexto vazio: nenhuma regra, skill,
+  agente, hook ou plugin da sua máquina ou do projeto entra por conta própria. No Claude Code isso é
+  imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um arquivo de
+  servidores MCP só com o do board e os liberados pelo agente); no Cursor, orientação no
+  prompt. O que entra é o que você marca em Configurações →
+  **Harness de IA**, agora com as abas **Projeto** e **Global**, cada uma com Rules, Agentes e
+  Skills. Rules e skills têm duas marcações: **Incluir em todo contexto** (entra em toda execução,
+  pelo caminho) e **Usar quando fizer sentido** (vira opção dos campos Skills e do novo campo
+  **Rules** dos cards, e o Refinar com IA a indica quando o pedido pede). O que não está marcado não
+  existe para a execução. Skills criadas ou instaladas pelo board já nascem marcadas; a skill do
+  fluxo é marcada em todo contexto ao ser instalada, e o Diagnóstico só a dá como pronta quando ela
+  existe e está marcada. As ferramentas `get_harness` (com `usage` e `onlySelected`) e
+  `set_harness_selection` expõem a marcação pelo MCP, e `get_card` devolve `requiredRules` ao lado
+  de `requiredSkills`.
+- **Agentes como arquivos da ferramenta.** Os perfis de execução deixam de ficar no banco do board:
+  um agente é um arquivo de agente da ferramenta (`~/.claude/agents/<nome>.md`,
+  `~/.cursor/agents/<nome>.md`), lido do disco; as instruções são o papel da sessão e o frontmatter
+  guarda modelo, ferramentas, skills e servidores MCP (o que é só do board vai em chaves `faz-ai-*`).
+  O board grava, por projeto, quais estão **disponíveis** e qual é o **padrão** (em Ferramenta e
+  execução). Os perfis já gravados viram arquivos na pasta global na primeira abertura, sem
+  sobrescrever nada; colunas e cards passam a apontar pelo nome. Um perfil que liberava todos os
+  servidores MCP passa a liberar só o do board: os demais voltam no editor do agente. A aba Agentes de Configurações e o
+  interruptor **Sessão limpa** saem: o contexto vazio é sempre. No Claude Code o agente vai inline
+  (`--agents` + `--agent`), então não depende de nenhuma pasta de agentes. Na primeira abertura, dez
+  agentes de fábrica são criados no global e marcados (condutor-do-board como padrão, frontend-web,
+  backend-node, backend-python, mobile-flutter, documentacao-tecnica, qa-testes, revisor-de-codigo,
+  devops-infra, dados-sql), com instruções mínimas; o que você apagar não volta sozinho, e **Recriar
+  os agentes padrão** recria o que faltar. **Sugerir agentes com IA** manda a IA ler o projeto e
+  criar ou ajustar agentes pelo MCP (`create_agent` e `update_agent` ganham `scope`, `model`,
+  `tools`, `deniedTools`, `skills` e `mcp`; `get_board` lista os disponíveis em `agents`). O Refinar
+  com IA recebe o catálogo marcado (agentes, rules e skills) e só indica o que está nele, escolhendo
+  o agente do card com `set_card_profile`.
 - **O board suporta só o Claude Code e o Cursor.** Codex, Kimi Code e GitHub Copilot saíram do
   **Harness de IA**, que agora oferece só essas duas ferramentas, e do restante da extensão: modelos
   embutidos, registro do servidor MCP, regras, skills e agentes, hooks, execução pela conversa e
   Diagnóstico. Um board que estava configurado com uma delas volta para o Claude Code ao abrir. O
   que o Cursor e o Claude Code ainda carregam de `.codex/skills` ou `AGENTS.md` continua listado.
-- **Em Configurações, Modelos de IA vem antes de Agentes.** O menu lateral passa a seguir a ordem
-  Harness de IA, Modelos de IA, Agentes.
 - **O custo das execuções é o que a ferramenta informa; a tabela de preços saiu (#187).** Um valor
   calculado a partir de preços cadastrados envelhece quando o fornecedor muda a tarifa e deixa o
   relatório errado sem avisar, então o board deixou de calcular custo. O Claude Code grava o

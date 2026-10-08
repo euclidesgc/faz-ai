@@ -1,4 +1,6 @@
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
+import type { HarnessItem } from '../../shared/harness';
+import { isSelectableKind, usageOf } from '../../shared/harnessSelection';
 import { norm } from '../../shared/filters';
 import {
   describeRule,
@@ -215,17 +217,17 @@ function executionOf(s: BoardState, c: Card) {
   const m = manifestOf(s, c);
   if (!m.profile) return {};
   const how = EXEC_ENFORCEMENT[s.board.aiTool];
-  const agent = m.agent ? toolItems(s).find((i) => i.kind === 'agent' && i.name === m.agent) : undefined;
+  const profile = s.board.execProfiles.find((p) => p.name === m.profile);
   return {
     execution: {
       profile: m.profile,
-      ...(m.agent ? { agent: { name: m.agent, ...(agent ? { path: agent.path } : {}) } } : {}),
-      ...(m.mcpServers ? { mcpServers: ['faz-ai', ...m.mcpServers] } : {}),
+      ...(profile && profile.scope !== 'builtin' ? { agentFile: profile.path } : {}),
+      ...(m.purpose ? { purpose: m.purpose } : {}),
+      mcpServers: ['faz-ai', ...m.mcpServers],
       ...(m.tools.length ? { tools: m.tools } : {}),
       ...(m.deniedTools.length ? { deniedTools: m.deniedTools } : {}),
-      ...(m.clean ? { clean: true } : {}),
       enforcedByBoardRun: EXEC_ASPECTS.filter((a) => how[a.id] === 'enforced').map((a) => a.id),
-      note: 'Agente de execução do card (`profile` é o nome dele; `agent` é o subagente da ferramenta, se houver). Numa sessão aberta pela pessoa nada disto é imposto: siga como instrução (use só o subagente, os servidores MCP e as ferramentas listados; com `clean`, só as skills de requiredSkills). Na execução pelo board, os itens de `enforcedByBoardRun` são impostos por parâmetro.',
+      note: 'Agente do board que executa o card (`profile` é o nome; `agentFile` é o arquivo com as instruções dele). Toda execução pelo board parte de contexto vazio: só o servidor do board, os servidores MCP listados e o que está em requiredRules e requiredSkills. Numa sessão aberta pela pessoa nada disto é imposto: siga como instrução (leia o arquivo do agente e atue como ele, use só os servidores e as ferramentas listados). Na execução pelo board, os itens de `enforcedByBoardRun` são impostos por parâmetro.',
     },
   };
 }
@@ -239,7 +241,15 @@ function supportFiles(skillMd: string, files: string[]) {
   return files.length ? { files: files.map((f) => `${dir}/${f}`) } : {};
 }
 
-/** Skills marcadas no campo "Skills" do card: obrigatórias na execução. */
+/** Rules marcadas no campo "Rules" do card (arquivos de instruções do Harness): obrigatórias na execução. */
+export function requiredRules(s: BoardState, c: Card) {
+  return manifestOf(s, c).rules.map((location) => {
+    const item = toolItems(s).find((i) => i.kind === 'instructions' && i.location === location);
+    return item ? { name: location, scope: item.scope, path: item.path } : { name: location, note: 'rule não encontrada' };
+  });
+}
+
+/** Skills marcadas no campo "Skills" do card e as do agente: obrigatórias na execução. */
 export function requiredSkills(s: BoardState, c: Card) {
   // as skills do card somam às do agente
   return manifestOf(s, c).skills.map((name) => {
@@ -326,6 +336,7 @@ function workspaceOf(s: BoardState, c: Card) {
 
 export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardState['attachments'][number]) => string) {
   const skills = requiredSkills(s, c);
+  const rules = requiredRules(s, c);
   const phase = isLive(c) ? phaseOf(s, c) : undefined;
   const attachment = (a: BoardState['attachments'][number]) => ({
     attachmentId: a.id,
@@ -342,6 +353,13 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...cardSummary(s, c),
     ...(chosen ? { model: { ...describeModel(s, chosen), note: 'Modelo e esforço que devem executar este card.' } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
+    ...(rules.length
+      ? {
+          requiredRules: rules,
+          requiredRulesNote:
+            'Leia cada arquivo em `path` antes de executar este card: são as instruções que o card exige, além do contexto fixo do board.',
+        }
+      : {}),
     ...(skills.length
       ? {
           requiredSkills: skills,
@@ -440,19 +458,17 @@ export function boardOverview(s: BoardState) {
           ...(profileName(s, c.execProfile) ? { execProfile: profileName(s, c.execProfile) } : {}),
         })),
     })),
-    ...(s.board.execProfiles.length
-      ? {
-          execProfiles: s.board.execProfiles.map((p) => ({
-            name: p.name,
-            ...(p.isDefault ? { default: true } : {}),
-            ...(p.agent ? { agent: p.agent } : {}),
-            ...(p.skills.length ? { skills: p.skills } : {}),
-            ...(p.mcpServers ? { mcpServers: p.mcpServers } : {}),
-            ...(p.model ? { model: p.model } : {}),
-            ...(p.clean ? { clean: true } : {}),
-          })),
-        }
-      : {}),
+    // os agentes do board: arquivos de agente marcados como disponíveis no Harness (ou o embutido, sem nenhum)
+    agents: s.board.execProfiles.map((p) => ({
+      name: p.id,
+      ...(p.isDefault ? { default: true } : {}),
+      ...(p.purpose ? { description: p.purpose } : {}),
+      ...(p.skills.length ? { skills: p.skills } : {}),
+      ...(p.mcpServers.length ? { mcpServers: p.mcpServers } : {}),
+      ...(p.tools.length ? { tools: p.tools } : {}),
+      ...(p.model ? { model: p.model } : {}),
+      ...(p.scope !== 'builtin' ? { scope: p.scope, path: p.path } : {}),
+    })),
     cardTypes: s.cardTypes.map((t) => {
       const defaults = Object.fromEntries(
         Object.entries(t.defaults).flatMap(([id, v]) => {
@@ -482,23 +498,42 @@ export function boardOverview(s: BoardState) {
   };
 }
 
-/** Arquivos de regras e skills do projeto, sem o conteúdo. */
-export function harnessOverview(s: BoardState) {
+/**
+ * O harness da ferramenta em uso, com a marcação do board. Por padrão só o que está marcado (é o que
+ * as execuções enxergam); com `onlySelected` falso, tudo que a ferramenta carrega, com `usage` em cada item.
+ */
+export function harnessOverview(s: BoardState, onlySelected = true) {
+  const usage = (i: HarnessItem) => (isSelectableKind(i.kind) ? usageOf(s.harnessSelection, i) : null);
+  const inventory = toolItems(s).filter((i) => !onlySelected || usage(i));
   return {
     aiTool: s.board.aiTool,
+    defaultAgent: s.board.execProfiles.find((p) => p.isDefault)?.id ?? null,
+    note: onlySelected
+      ? 'Só o que está marcado em Configurações → Harness: é tudo o que as execuções do board usam. `usage` "always" entra em toda execução; "contextual" só quando indicado no card (campos Rules e Skills) ou escolhido no refinar. Para ver tudo que a ferramenta carrega, chame get_harness com onlySelected = false.'
+      : 'Tudo que a ferramenta carrega nesta máquina; `usage` diz como o board marcou cada item (null = não marcado: invisível para as execuções do board).',
     ruleFiles: s.harness.rules.map((r) => ({ name: r.name, exists: r.exists, ...(r.exists ? { bytes: r.content.length } : {}) })),
-    skills: s.harness.skills.map((k) => ({ name: k.name, enabled: k.enabled, mode: k.mode, description: k.description, path: k.path })),
-    agents: s.harness.agents.map((a) => ({
-      name: a.name,
-      description: a.description,
-      ...(a.model ? { model: a.model } : {}),
-      path: a.path,
-    })),
-    // tudo que a ferramenta em uso carrega, com o escopo: project, user (global) ou plugin
-    inventory: toolItems(s).map((i) => ({
+    skills: s.harness.skills
+      .filter((k) => !onlySelected || toolItems(s).some((i) => i.kind === 'skill' && i.location === k.path && usage(i)))
+      .map((k) => ({ name: k.name, enabled: k.enabled, mode: k.mode, description: k.description, path: k.path })),
+    agents: s.harness.agents
+      .filter((a) => !onlySelected || usageOf(s.harnessSelection, { kind: 'agent', location: a.location }))
+      .map((a) => ({
+        name: a.name,
+        scope: a.scope,
+        description: a.description,
+        ...(a.modelValue ? { model: a.modelValue } : a.model ? { model: a.model } : {}),
+        ...(a.skills.length ? { skills: a.skills } : {}),
+        ...(a.tools.length ? { tools: a.tools } : {}),
+        ...(a.mcp.length ? { mcpServers: a.mcp } : {}),
+        usage: usageOf(s.harnessSelection, { kind: 'agent', location: a.location }),
+        path: a.location,
+      })),
+    // o que a ferramenta em uso carrega, com o escopo (project, user ou plugin) e a marcação do board
+    inventory: inventory.map((i) => ({
       kind: i.kind,
       scope: i.scope,
       name: i.name,
+      ...(isSelectableKind(i.kind) ? { usage: usage(i) } : {}),
       ...(i.mode ? { mode: i.mode } : {}),
       ...(i.files?.length ? { files: i.files } : {}),
       ...(i.description ? { description: i.description } : {}),

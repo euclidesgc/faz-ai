@@ -26,6 +26,7 @@ import { detectOs } from '../installers';
 import { installPlan, installScript, parseInstallResult } from '../../shared/installPlan';
 import { editorMcpFiles, pinEditorCommands, registeredIn, unreachableServers } from '../mcp/pinCommands';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
+import { selectedItems } from '../../shared/harnessSelection';
 import { resolveCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { cleanStaleTemp } from '../aiOutput/measured';
@@ -121,6 +122,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     homeDir,
     log: o.log,
     extensionVersion: o.version,
+    // os agentes de fábrica nascem na pasta global da ferramenta na primeira abertura
+    seedAgents: true,
   });
   const runLog = createRunLog(handle.db, o.log);
   // execuções que a sessão anterior não fechou (a janela caiu, a máquina desligou) viram 'unknown' em
@@ -229,11 +232,13 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // faixa de aviso da interface, que fica enquanto faltar alguma coisa. Confere ao abrir, quando a
   // ferramenta ou a permissão mudam, depois de conectar, a cada poucos minutos (a pessoa instala a
   // CLI ou entra na conta fora do board) e quando ela pede "Verificar de novo".
-  // a skill do fluxo na ferramenta do projeto; undefined enquanto o inventário do harness não foi lido
+  // a skill do fluxo pronta para as execuções do board: existe para a ferramenta do projeto E está
+  // marcada como "incluir em todo contexto" (as execuções partem de contexto vazio: instalada e não
+  // marcada, ela não entra); undefined enquanto o inventário do harness não foi lido
   const flowSkillInstalled = (): boolean | undefined => {
     const s = router.snapshot();
     const tool = s.harness.inventory.find((t) => t.tool === s.board.aiTool);
-    return tool ? tool.items.some((i) => i.kind === 'skill' && i.name === FLOW_SKILL_NAME) : undefined;
+    return tool ? selectedItems(s, 'skill', 'always').some((i) => i.name === FLOW_SKILL_NAME) : undefined;
   };
   let checking: Promise<void> | null = null;
   let cursorBlocked = false;
@@ -343,9 +348,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       await checkNow();
       const s = router.snapshot();
       const tool = s.board.aiTool;
-      const skillInstalled = !!s.harness.inventory
-        .find((t) => t.tool === tool)
-        ?.items.some((i) => i.kind === 'skill' && i.name === FLOW_SKILL_NAME);
+      const skillInstalled = selectedItems(s, 'skill', 'always').some((i) => i.name === FLOW_SKILL_NAME);
       router.setEnvironment(
         await checkEnvironment({
           tool,

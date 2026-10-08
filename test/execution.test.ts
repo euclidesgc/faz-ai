@@ -6,20 +6,20 @@ import { ALL_AI_TOOLS } from '../src/shared/harness';
 
 const exec: ExecInput = {
   agent: 'planejador',
+  agentDefinition: null,
   mcpAllowed: ['github'],
   mcpBlocked: ['slack', 'com.ponto'],
   mcpConfig: '{"mcpServers":{}}',
   tools: ['Read', 'Edit'],
   deniedTools: ['WebFetch'],
   model: { name: 'opus', effort: 'high' },
-  clean: true,
 };
 const args = (tool: (typeof ALL_AI_TOOLS)[number], permission: 'board' | 'full' = 'full') =>
   (headlessCommand(tool, { prompt: 'P', permission, exec }) as HeadlessCommand).args;
 const has = (list: string[], ...seq: string[]) => list.some((_, i) => seq.every((s, j) => list[i + j] === s));
 
 describe('perfil de execução na linha de comando de cada ferramenta', () => {
-  it('Claude Code: agente, modelo, ferramentas, servidores MCP e sessão limpa por parâmetro', () => {
+  it('Claude Code: agente, modelo, ferramentas, servidores MCP e contexto vazio por parâmetro', () => {
     const command = headlessCommand('claude', { prompt: 'P', permission: 'board', exec }) as HeadlessCommand;
     const a = command.args;
     expect(has(a, '--agent', 'planejador')).toBe(true);
@@ -27,7 +27,23 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
     expect(has(a, '--tools', 'Read,Edit')).toBe(true);
     expect(has(a, '--disallowedTools', 'WebFetch')).toBe(true);
     expect(has(a, '--strict-mcp-config', '--mcp-config', tmpArg('mcp.json'))).toBe(true);
-    expect(has(a, '--setting-sources', 'project,local', '--disable-slash-commands')).toBe(true);
+    // contexto vazio: nenhuma fonte de configuração (nem do usuário nem do projeto) e nenhuma skill invocável
+    expect(has(a, '--setting-sources', '', '--disable-slash-commands')).toBe(true);
+    // o agente inline vai em --agents e é escolhido por --agent
+    const inline = headlessCommand('claude', {
+      prompt: 'P',
+      permission: 'board',
+      exec: { ...exec, agentDefinition: { name: 'planejador', description: 'Planeja', prompt: 'Você planeja.' } },
+    }) as HeadlessCommand;
+    expect(
+      has(
+        inline.args,
+        '--agents',
+        JSON.stringify({ planejador: { description: 'Planeja', prompt: 'Você planeja.' } }),
+        '--agent',
+        'planejador',
+      ),
+    ).toBe(true);
     // os servidores liberados no perfil rodam sem pedir aprovação, junto do servidor do board
     expect(has(a, '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', 'mcp__github__*')).toBe(true);
     expect(command.tempFiles).toEqual({ 'mcp.json': '{"mcpServers":{}}' });
@@ -40,7 +56,7 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
     expect(args('cursor')).not.toContain('--agent');
   });
 
-  it('sem perfil, o comando é o mesmo de antes', () => {
+  it('sem perfil, o contexto continua vazio: o Claude Code sem fontes de configuração', () => {
     for (const tool of ALL_AI_TOOLS)
       expect(headlessCommand(tool, { prompt: 'P', permission: 'full' })).toEqual(
         headlessCommand(tool, { prompt: 'P', permission: 'full', exec: undefined }),
@@ -49,7 +65,20 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
       '-p',
       '--permission-mode',
       'bypassPermissions',
+      '--setting-sources',
+      '',
+      '--disable-slash-commands',
     ]);
+    // com o servidor do board, o arquivo de servidores é estrito: nada do usuário nem do projeto entra
+    const withBoard = headlessCommand('claude', {
+      prompt: 'P',
+      permission: 'full',
+      boardServer: { command: 'node', args: ['b.js'] },
+    }) as HeadlessCommand;
+    expect(has(withBoard.args, '--strict-mcp-config', '--mcp-config', tmpArg('mcp.json'))).toBe(true);
+    expect(JSON.parse(withBoard.tempFiles!['mcp.json']!)).toEqual({
+      mcpServers: { 'faz-ai': { type: 'stdio', command: 'node', args: ['b.js'] } },
+    });
   });
 
   it('a tabela do que é imposto cobre todas as ferramentas, e as skills vão sempre como orientação', () => {
@@ -59,11 +88,11 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
       mcp: 'enforced',
       tools: 'enforced',
       model: 'enforced',
-      clean: 'enforced',
+      context: 'enforced',
     });
   });
 
-  it('lê os perfis salvos, descartando o que for inválido e mantendo um só padrão', () => {
+  it('lê os perfis que o banco guardava (só para a migração), descartando o que for inválido', () => {
     const parsed = parseProfiles(
       JSON.stringify([
         { id: 'a', name: ' Plan ', skills: ['x', 'x', 3], mcpServers: [], isDefault: true },
@@ -83,7 +112,6 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
         tools: [],
         deniedTools: [],
         model: '',
-        clean: false,
         isDefault: true,
       },
       {
@@ -96,15 +124,14 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
         tools: [],
         deniedTools: [],
         model: '',
-        clean: false,
         isDefault: false,
       },
     ]);
-    // sem nada (ou com lixo), vale o agente padrão: toda execução passa por um agente
-    expect(parseProfiles('isto não é json')).toEqual([defaultAgent()]);
-    expect(parseProfiles('[]')).toEqual([defaultAgent()]);
-    // sem nenhum marcado como padrão, o primeiro assume
-    expect(parseProfiles(JSON.stringify([{ id: 'x' }, { id: 'y' }])).map((p) => p.isDefault)).toEqual([true, false]);
+    // sem nada (ou com lixo), não há o que migrar
+    expect(parseProfiles('isto não é json')).toEqual([]);
+    expect(parseProfiles('[]')).toEqual([]);
+    // o agente embutido é o que vale quando nenhum arquivo está marcado
+    expect(defaultAgent()).toMatchObject({ id: 'padrao', scope: 'builtin', isDefault: true, mcpServers: [] });
   });
 });
 

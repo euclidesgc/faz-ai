@@ -40,7 +40,7 @@ export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
 /** `environment`: o Diagnóstico do ambiente, aberto pelas Configurações ou sozinho na primeira abertura */
 export type View = 'board' | 'trash' | 'settings' | 'metrics' | 'environment';
 /** Abas da tela de Harness de IA: a ferramenta e a execução, o que é do projeto, e tudo que a ferramenta carrega. */
-export type HarnessTab = 'tool' | 'project' | 'all';
+export type HarnessTab = 'tool' | 'project' | 'user' | 'all';
 import { type SettingsTab } from '../../shared/settingsTab';
 export type { SettingsTab };
 

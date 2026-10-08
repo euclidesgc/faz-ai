@@ -179,6 +179,8 @@ describe('TypesSettings: skills por tipo', () => {
       state: {
         ...s0,
         board: { ...s0.board, aiTool: 'claude' },
+        // só uma skill marcada no Harness pode ser escolhida
+        harnessSelection: [{ kind: 'skill', location: '.claude/skills/revisar-spec/SKILL.md', usage: 'contextual' }],
         harness: {
           ...s0.harness,
           skills: [
@@ -189,6 +191,24 @@ describe('TypesSettings: skills por tipo', () => {
               mode: 'auto',
               path: '.claude/skills/revisar-spec/SKILL.md',
               content: '',
+            },
+          ],
+          inventory: [
+            {
+              tool: 'claude',
+              installed: true,
+              items: [
+                {
+                  kind: 'skill',
+                  scope: 'project',
+                  name: 'revisar-spec',
+                  description: 'Revisa a spec',
+                  path: '/abs/.claude/skills/revisar-spec/SKILL.md',
+                  location: '.claude/skills/revisar-spec/SKILL.md',
+                  layout: 'skills',
+                  mode: 'auto',
+                },
+              ],
             },
           ],
         },
@@ -223,7 +243,7 @@ describe('TypesSettings: skills por tipo', () => {
 });
 
 describe('Settings: menu lateral', () => {
-  it('Modelos de IA vem logo depois do Harness de IA, antes de Agentes', () => {
+  it('Modelos de IA vem logo depois do Harness de IA', () => {
     useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
     render(
       <Theme>
@@ -236,7 +256,6 @@ describe('Settings: menu lateral', () => {
       .map((x) => x.textContent);
     const at = (label: string) => labels.indexOf(label);
     expect(at('Modelos de IA')).toBe(at('Harness de IA') + 1);
-    expect(at('Agentes')).toBe(at('Modelos de IA') + 1);
   });
 
   it('recolhe numa faixa de ícones: rótulos somem, as seções seguem acessíveis pelo nome e o estado fica lembrado', async () => {

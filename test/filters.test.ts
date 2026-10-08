@@ -130,6 +130,7 @@ const state: BoardState = {
   attachments: [],
   currentUser: 'a',
   harness: EMPTY_HARNESS,
+  harnessSelection: [],
   pendingUpgrade: [],
   chat: EMPTY_CHAT,
   aiRuns: [],

@@ -362,15 +362,16 @@ describe('CardDrawer', () => {
     const profile = {
       id: 'p1',
       name: 'Revisor',
-      purpose: '',
-      agent: 'reviewer',
+      purpose: 'Revisa',
+      instructions: 'Revise.',
       skills: ['tdd'],
       mcpServers: [],
       tools: [],
       deniedTools: [],
       model: '',
-      clean: true,
       isDefault: false,
+      scope: 'user' as const,
+      path: '/home/u/.claude/agents/p1.md',
     };
     patchState((s) => ({ board: { ...s.board, execProfiles: [profile] } }));
     openStory();
@@ -378,7 +379,7 @@ describe('CardDrawer', () => {
     expect(lastSent('card.execProfile.set')).toEqual({ type: 'card.execProfile.set', cardId: board.storyId, profileId: 'p1' });
     // o host devolveria o card com o perfil escolhido
     act(() => patchCard(board.storyId, { execProfile: 'p1' }));
-    expect(screen.getByText('subagente reviewer · skills: tdd · MCP: board · sessão limpa')).toBeInTheDocument();
+    expect(screen.getByText('skills: tdd · MCP: board')).toBeInTheDocument();
     await choose(screen.getByRole('combobox', { name: 'Agente' }), /Da fase/);
     expect(lastSent('card.execProfile.set').profileId).toBeNull();
   });

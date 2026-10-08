@@ -20,7 +20,7 @@ export function AgentBar({ card }: { card: Card }) {
   return (
     <div
       className="drawer-workspace"
-      title={t('O que a sessão de IA usa para trabalhar neste card: skills, servidores MCP, ferramentas e modelo')}
+      title={t('O que a sessão de IA usa para trabalhar neste card: agente, skills, rules, servidores MCP, ferramentas e modelo')}
     >
       <span>{t('Agente')}</span>
       <SelectField
@@ -38,15 +38,13 @@ export function AgentBar({ card }: { card: Card }) {
       {manifest.profile && (
         <span className="muted small">
           {[
-            manifest.agent && t('subagente {name}', { name: manifest.agent }),
             manifest.skills.length && t('skills: {list}', { list: manifest.skills.join(', ') }),
-            manifest.mcpServers &&
-              (manifest.mcpServers.length ? t('MCP: board + {list}', { list: manifest.mcpServers.join(', ') }) : t('MCP: board')),
+            manifest.rules.length && t('rules: {list}', { list: manifest.rules.join(', ') }),
+            manifest.mcpServers.length ? t('MCP: board + {list}', { list: manifest.mcpServers.join(', ') }) : t('MCP: board'),
             manifest.model &&
               (manifest.model.effort
                 ? t('modelo {name} · {effort}', { name: manifest.model.name, effort: manifest.model.effort })
                 : t('modelo {name}', { name: manifest.model.name })),
-            manifest.clean && t('sessão limpa'),
           ]
             .filter(Boolean)
             .join(' · ')}

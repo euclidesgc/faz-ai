@@ -30,4 +30,5 @@ export const defaults: Record<string, string> = {
   Alto: 'High',
   // agente
   'Agente padrão': 'Default agent',
+  Rules: 'Rules',
 };

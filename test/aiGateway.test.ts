@@ -222,6 +222,12 @@ describe('as quatro origens passam pelo mesmo gateway', () => {
     expect(new Set(rows().map((r) => r.origin))).toEqual(new Set(Object.keys(ORIGINS)));
     for (const p of procs) p.exit(0);
     expect(rows().map((r) => r.outcome)).toEqual(['done', 'done', 'done', 'done']);
+
+    // "Sugerir agentes com IA" é uma execução do chat sem pergunta da pessoa: entra pela mesma porta, como origem `chat`
+    router.chatCommand({ type: 'ai.suggestAgents' });
+    expect(procs).toHaveLength(5);
+    procs[4]!.exit(0);
+    expect(rows()[4]).toMatchObject({ origin: 'chat', outcome: 'done', cardId: null });
   });
 });
 

@@ -1,4 +1,5 @@
 import type { BoardState } from './model';
+import { selectedSkillNames, type HarnessUsage } from './harnessSelection';
 
 /** Uma skill que o board pode indicar a um card ou a um agente. */
 export interface CatalogSkill {
@@ -57,13 +58,17 @@ export function suggestSkills(intent: string, skills: CatalogSkill[], limit = 8)
 }
 
 /**
- * Todas as skills que a ferramenta do projeto enxerga: as do projeto (ligadas ou não) e as da pasta
- * do usuário e dos plugins, sem repetir nome (a do projeto vale). Ordem: projeto, global, plugins.
+ * As skills que o board pode indicar: só as marcadas em Configurações → Harness (com `usage`, só as
+ * marcadas daquele jeito), sem repetir nome (a do projeto vale). Ordem: projeto, global, plugins.
  */
-export function skillCatalog(s: BoardState): CatalogSkill[] {
-  const items = (s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? []).filter((i) => i.kind === 'skill');
+export function skillCatalog(s: BoardState, usage?: HarnessUsage): CatalogSkill[] {
+  const allowed = new Set(selectedSkillNames(s, usage));
+  const items = (s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? []).filter(
+    (i) => i.kind === 'skill' && allowed.has(i.name),
+  );
   const byName = new Map<string, CatalogSkill>();
-  for (const k of s.harness.skills) byName.set(k.name, { name: k.name, description: k.description, scope: 'project' });
+  for (const k of s.harness.skills)
+    if (allowed.has(k.name)) byName.set(k.name, { name: k.name, description: k.description, scope: 'project' });
   for (const i of items) {
     const current = byName.get(i.name);
     const scope = i.scope;

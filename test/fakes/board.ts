@@ -97,6 +97,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     attachments: [],
     currentUser: 'a',
     harness: EMPTY_HARNESS,
+    harnessSelection: [],
     pendingUpgrade: [],
     chat: EMPTY_CHAT,
     aiRuns: [],

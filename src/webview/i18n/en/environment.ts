@@ -26,9 +26,9 @@ export const environment: Record<string, string> = {
   Privacidade: 'Privacy',
   'Saiba mais': 'Learn more',
   'Instalar a skill': 'Install the skill',
-  'A skill do fluxo ({name}) não está instalada no {tool}': 'The flow skill ({name}) is not installed in {tool}',
-  'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. Sem ela, a IA mexe nos cards, mas não segue o fluxo. A instalação vai para a pasta global de skills da ferramenta.':
-    'It is what teaches the AI to take cards through the board flow: phases, documents, review and pending items. Without it, the AI changes the cards but does not follow the flow. It is installed in the tool’s global skills folder.',
+  'A skill do fluxo ({name}) não está pronta para o {tool}': 'The flow skill ({name}) is not ready for {tool}',
+  'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem de contexto vazio: a skill precisa existir e estar marcada em "Incluir em todo contexto" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.':
+    'It teaches the AI to drive cards through the board flow: phases, documents, review and pending items. Board runs start from an empty context: the skill must exist and be checked as "Include in every context" in Settings → Harness. Installing from here writes to the tool\'s global skills folder and checks it.',
   'O {tool} não acha o comando do MCP do board': '{tool} cannot find the board MCP command',
   '{file} inicia o MCP com "{missing}", que não está no PATH com que o editor abriu (o programa foi instalado depois, ou fica numa pasta que o editor não lê). O arquivo está no git, então o board não grava nele o caminho desta máquina: feche e abra o editor de novo, ou tire o arquivo do git.':
     '{file} starts the MCP with "{missing}", which is not in the PATH the editor opened with (the program was installed later, or lives in a folder the editor does not read). The file is in git, so the board does not write this machine’s path into it: close and reopen the editor, or take the file out of git.',
@@ -119,8 +119,8 @@ export const environment: Record<string, string> = {
   'Skill do fluxo ({name})': 'Flow skill ({name})',
   'Ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências.':
     'Teaches the AI to take cards through the board flow: phases, documents, review and pending items.',
-  'O {tool} carrega a skill quando você pede para trabalhar num card, no chat do editor ou no terminal. Ela é instalada na pasta global de skills da ferramenta e vale para todos os projetos.':
-    '{tool} loads the skill when you ask it to work on a card, in the editor chat or the terminal. It is installed in the tool’s global skills folder and applies to every project.',
+  'As execuções do board partem de contexto vazio e só usam o que está marcado em Configurações → Harness: a skill precisa existir para o {tool} e estar marcada em "Incluir em todo contexto" neste board. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.':
+    'Board runs start from an empty context and only use what is checked in Settings → Harness: the skill must exist for {tool} and be checked as "Include in every context" on this board. Installing from here writes to the tool\'s global skills folder and checks it.',
   'O controle de versão do projeto.': 'The project’s version control.',
   'Com o modo do Git ligado, o board cria uma branch ou uma worktree para cada história. Ele também lê do Git o seu nome, que assina os comentários.':
     'With Git mode on, the board creates a branch or a worktree for each story. It also reads your name from Git to sign comments.',
