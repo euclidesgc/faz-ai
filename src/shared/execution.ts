@@ -183,7 +183,46 @@ export interface ExecManifest {
   deniedTools: string[];
   /** modelo (nome que a ferramenta entende) e esforço, quando são da ferramenta do projeto */
   model: { name: string; effort: string | null } | null;
+  /**
+   * Os outros agentes disponíveis no board, para a sessão da história delegar as sub-tarefas a eles
+   * como subagentes (é a sessão da história que executa as sub-tarefas; nenhuma roda sozinha). Vazio
+   * numa sub-tarefa: ela já roda com o agente dela.
+   */
+  delegates: ExecDelegate[];
 }
+
+/** Um agente do board como subagente de outra sessão: o que ele sabe, pode usar e com que modelo. */
+export interface ExecDelegate {
+  name: string;
+  purpose: string;
+  instructions: string;
+  tools: string[];
+  deniedTools: string[];
+  /** nome do modelo que a ferramenta entende; null = o da sessão */
+  model: string | null;
+}
+
+/** O modelo do catálogo da ferramenta em uso para um valor do campo Modelo (`<id>@<esforço>`). */
+const catalogModel = (s: BoardState, value: string | null | undefined): { option: ModelOption; effort: string | null } | undefined => {
+  const chosen = parseModelValue(value);
+  const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
+  return option ? { option, effort: chosen!.effort } : undefined;
+};
+
+/** Os agentes do board que a sessão de uma história recebe como subagentes: todos os de arquivo, menos o dela. */
+export const delegatesOf = (s: BoardState, c: Card, own: ExecProfile | undefined): ExecDelegate[] =>
+  c.parentId
+    ? []
+    : s.board.execProfiles
+        .filter((p) => p.scope !== 'builtin' && p.id !== own?.id)
+        .map((p) => ({
+          name: p.id,
+          purpose: p.purpose,
+          instructions: p.instructions,
+          tools: p.tools,
+          deniedTools: p.deniedTools,
+          model: catalogModel(s, p.model)?.option.model ?? null,
+        }));
 
 const listField = (s: BoardState, c: Card, name: string): string[] => {
   const field = s.fieldDefs.find((f) => f.kind === 'multiselect' && f.name.toLowerCase() === name);
@@ -197,6 +236,7 @@ export function manifestOf(s: BoardState, c: Card): ExecManifest {
   const chosen = parseModelValue(modelField ? valueOf(s, c.id, modelField.id) : undefined) ?? parseModelValue(profile?.model || null);
   const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
   return {
+    delegates: delegatesOf(s, c, profile),
     profile: profile?.name ?? null,
     agent: profile && profile.scope !== 'builtin' ? profile.id : '',
     purpose: profile?.purpose ?? '',

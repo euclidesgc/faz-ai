@@ -32,9 +32,10 @@ export const claudeProvider: AiProvider = {
     args.push(...addDirs.flatMap((d) => ['--add-dir', d]));
     if (exec?.model) args.push('--model', exec.model.name, ...(exec.model.effort ? ['--effort', exec.model.effort] : []));
     // o agente vai inline e é o da sessão: não depende de nenhuma pasta de agentes (verificado na CLI 2.1.278)
+    // os outros agentes do board vão junto, como subagentes da sessão da história
     if (exec?.agentDefinition) {
-      const { name, ...def } = exec.agentDefinition;
-      args.push('--agents', JSON.stringify({ [name]: def }), '--agent', name);
+      const agents = Object.fromEntries([exec.agentDefinition, ...exec.delegates].map(({ name, ...def }) => [name, def]));
+      args.push('--agents', JSON.stringify(agents), '--agent', exec.agentDefinition.name);
     } else if (exec?.agent) args.push('--agent', exec.agent);
     if (exec?.tools.length) args.push('--tools', exec.tools.join(','));
     if (exec?.deniedTools.length) args.push('--disallowedTools', ...exec.deniedTools);

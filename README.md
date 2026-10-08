@@ -674,7 +674,9 @@ nenhum marcado, vale o agente embutido, sem instruções.
 Os agentes que o board cria vão para a pasta global da ferramenta (valem em qualquer projeto), e os
 que já existem no projeto aparecem na aba **Projeto**. Na primeira abertura do board, dez agentes de
 fábrica são criados no global, marcados como disponíveis, com o **condutor-do-board** como padrão:
-ele conduz os cards pelo fluxo e indica o especialista certo em cada sub-tarefa. Os outros
+ele conduz os cards pelo fluxo, indica o especialista certo em cada sub-tarefa e, na Implementação,
+delega cada uma a esse especialista como subagente (a sessão da história recebe os outros agentes
+disponíveis do board como subagentes). Os outros
 (frontend-web, backend-node, backend-python, mobile-flutter, documentacao-tecnica, qa-testes,
 revisor-de-codigo, devops-infra, dados-sql) têm instruções mínimas, para você ou a IA adaptar ao
 projeto. O que você apagar não volta sozinho; **Recriar os agentes padrão** recria o que faltar.

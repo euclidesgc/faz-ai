@@ -6,6 +6,17 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **A Implementação em modo autônomo parava com o condutor.** A execução de uma história é quem
+  faz as sub-tarefas da Implementação, delegando cada uma a um subagente; mas o `condutor-do-board`
+  (padrão desde a migração dos perfis) roda só com leitura, e essa restrição ia para a linha de
+  comando do Claude Code (`--tools`), tirando da sessão a ferramenta de lançar subagentes e deixando
+  os especialistas de fora (o contexto vazio não carrega os agentes do usuário). O condutor repetia
+  que "a execução automática vai cuidar" até o board bloquear o card. Agora a sessão de uma história
+  recebe os outros agentes disponíveis do board como subagentes (com as ferramentas e o modelo de
+  cada um), o agente dela ganha a ferramenta `Agent`, e a restrição de ferramentas dele vai na
+  própria definição, não na sessão. O condutor de fábrica passa a dizer isso nas instruções; o
+  `condutor-do-board.md` que já existe na sua pasta não é sobrescrito, mas a correção não depende
+  dele.
 - **Agente padrão depois da migração dos perfis.** Ao abrir um board gravado por uma versão anterior, o
   "Agente padrão" embutido (sem instruções) virava o arquivo `~/.claude/agents/agente-padr-o.md`, com
   o nome truncado pelo acento e com Opus como modelo, e ficava como padrão do board no lugar do

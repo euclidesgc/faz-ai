@@ -7,6 +7,16 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Autonomous Implementação stalled with the conductor.** A story's run is what carries out the
+  Implementação subtasks, delegating each one to a subagent; but `condutor-do-board` (the default
+  since the profile migration) runs read-only, and that restriction went to the Claude Code command
+  line (`--tools`), removing the subagent tool from the session and leaving the specialists out (the
+  empty context does not load the user's agents). The conductor kept saying "the board's automatic
+  run will handle it" until the board blocked the card. Now a story's session receives the board's
+  other available agents as subagents (with each one's tools and model), its agent gets the `Agent`
+  tool, and its tool restriction goes in its own definition, not on the session. The factory
+  conductor now says so in its instructions; an existing `condutor-do-board.md` in your folder is
+  not overwritten, but the fix does not depend on it.
 - **Default agent after the profile migration.** Opening a board saved by an earlier version turned
   the built-in "Agente padrão" (no instructions) into the file `~/.claude/agents/agente-padr-o.md`,
   with the name cut by the accent and Opus as its model, and made it the board's default instead of
