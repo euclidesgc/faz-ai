@@ -421,6 +421,8 @@ export class BoardRepo {
       pendingUpgrade: pendingUpgrade(db, boardId),
       chat: EMPTY_CHAT,
       aiRuns: [],
+      aiActivity: [],
+      heartbeatNextAt: null,
       autopilot: { active: false, note: null },
       aiRunUnsupported: null,
       requirements: [],

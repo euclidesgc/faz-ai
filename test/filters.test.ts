@@ -134,6 +134,8 @@ const state: BoardState = {
   pendingUpgrade: [],
   chat: EMPTY_CHAT,
   aiRuns: [],
+  aiActivity: [],
+  heartbeatNextAt: null,
   autopilot: { active: false, note: null },
   aiRunUnsupported: null,
   requirements: [],

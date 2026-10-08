@@ -9,7 +9,8 @@ import type { ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
-import type { RunnerConfig } from './runner';
+import type { AiRunMode, RunnerConfig } from './runner';
+import type { AiRunOrigin } from './log';
 import type { GitConfig } from './git';
 
 export type Id = string;
@@ -207,6 +208,21 @@ export interface CardLink {
 }
 
 /** Estado do autopiloto, que toca sozinho as histórias em modo autônomo, uma de cada vez. */
+/** Uma execução de IA em curso num card, como o executor a vê (projeção do que o gateway gravou em ai_runs). */
+export interface AiActivity {
+  cardId: Id;
+  /** id da linha em ai_runs; '' quando o log não gravou */
+  runId: string;
+  mode: AiRunMode;
+  origin: AiRunOrigin;
+  /** nome da coluna de que a execução partiu (congelado no início, como no log) */
+  phase: string;
+  /** nome do modelo, ou null quando a ferramenta decide */
+  model: string | null;
+  /** ms, o mesmo startedAt da linha do log */
+  startedAt: number;
+}
+
 export interface Autopilot {
   /** está tocando as histórias; desligado depois de pausar, ou ao abrir o editor, até alguém ligar o modo numa história ou retomar */
   active: boolean;
@@ -238,8 +254,12 @@ export interface BoardState {
   pendingUpgrade: string[];
   /** chat com a IA do projeto */
   chat: ChatState;
-  /** cards em que a extensão está executando a IA agora */
+  /** cards em que a extensão está executando a IA agora; derivado de `aiActivity` */
   aiRuns: Id[];
+  /** execuções de IA em curso, uma por card, como o executor as vê */
+  aiActivity: AiActivity[];
+  /** ms até o próximo heartbeat agendado; null quando não há nenhum agendado */
+  heartbeatNextAt: number | null;
   /** autopiloto das histórias em modo autônomo (YOLO) */
   autopilot: Autopilot;
   /** por que a ferramenta do projeto não pode ser executada pelo board; null quando pode */
