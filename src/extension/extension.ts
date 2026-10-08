@@ -388,6 +388,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (editorName === 'cursor') void registerInCursor(f.uri.fsPath, bridgePath, output);
       stopMcp = await startMcpServer(socketPath(f.uri.fsPath), {
         getRouter,
+        getRunner: async () => {
+          await getRouter();
+          return runner ?? undefined;
+        },
         workspaceDir: f.uri.fsPath,
         version: String((context.extension.packageJSON as { version?: string }).version ?? '0'),
       });

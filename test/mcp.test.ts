@@ -42,7 +42,7 @@ beforeEach(async () => {
   });
   changes = 0;
   router.onDidChange(() => changes++);
-  const server = createMcpServer({ getRouter: async () => router, workspaceDir: dir, version: 'test' });
+  const server = createMcpServer({ getRouter: async () => router, getRunner: async () => undefined, workspaceDir: dir, version: 'test' });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(a);
   client = new Client({ name: 'claude-code', version: '1' });
@@ -1156,7 +1156,7 @@ describe('ponte stdio', () => {
     const bridge = path.resolve(__dirname, '../dist/mcp-bridge.js');
     if (!fs.existsSync(bridge)) throw new Error('rode `npm run build:ext` antes deste teste');
     const address = process.platform === 'win32' ? `\\\\.\\pipe\\fazai-test-${process.pid}` : path.join(dir, 'mcp.sock');
-    const stop = await startMcpServer(address, { getRouter: async () => router, workspaceDir: dir, version: 'test' });
+    const stop = await startMcpServer(address, { getRouter: async () => router, getRunner: async () => undefined, workspaceDir: dir, version: 'test' });
     // a ponte calcula o endereço a partir da pasta; aqui o HOME aponta para um diretório de teste
     const { socketPath } = await import('../src/extension/mcp/socketPath');
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-'));
@@ -1228,7 +1228,7 @@ describe('ponte stdio: onde acha o projeto', () => {
       const project = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fz-proj-')));
       fs.mkdirSync(path.join(project, 'sub'));
       const address = path.join(project, 'mcp.sock');
-      const stop = await startMcpServer(address, { getRouter: async () => router, workspaceDir: project, version: 'test' });
+      const stop = await startMcpServer(address, { getRouter: async () => router, getRunner: async () => undefined, workspaceDir: project, version: 'test' });
       const { socketPath } = await import('../src/extension/mcp/socketPath');
       const home = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-'));
       const prev = process.env.HOME;

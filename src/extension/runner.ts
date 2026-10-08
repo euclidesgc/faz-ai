@@ -355,9 +355,12 @@ export class AiRunner {
     });
   }
 
-  /** Avisa quando a execução de um card termina, seja como for. */
-  onDidFinish(listener: (cardId: string, mode: AiRunMode) => void): void {
+  /** Avisa quando a execução de um card termina, seja como for. Devolve uma função para cancelar o aviso. */
+  onDidFinish(listener: (cardId: string, mode: AiRunMode) => void): () => void {
     this.finishListeners.push(listener);
+    return () => {
+      this.finishListeners = this.finishListeners.filter((l) => l !== listener);
+    };
   }
 
   /** Interrompe a execução do card; o status volta ao que era. */

@@ -5,10 +5,13 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { MessageRouter } from '../panel/messageRouter';
+import type { AiRunner } from '../runner';
 import { registerTools } from './tools';
 
 export interface McpOptions {
   getRouter: () => Promise<MessageRouter | undefined>;
+  /** o runner da pasta, para ferramentas que disparam e aguardam uma execução de IA (ex.: generate_summary) */
+  getRunner: () => Promise<AiRunner | undefined>;
   /** pasta do projeto, base para caminhos relativos de anexos */
   workspaceDir: string;
   version: string;
@@ -64,6 +67,11 @@ export function createMcpServer(opts: McpOptions): McpServer {
       const router = await opts.getRouter();
       if (!router) throw new Error('Nenhuma pasta aberta no VSCode.');
       return router;
+    },
+    getRunner: async () => {
+      const runner = await opts.getRunner();
+      if (!runner) throw new Error('Nenhuma pasta aberta no VSCode.');
+      return runner;
     },
     workspaceDir: opts.workspaceDir,
     author: () => {

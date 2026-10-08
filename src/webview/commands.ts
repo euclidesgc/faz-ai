@@ -51,6 +51,7 @@ export const chat = {
 export const ai = {
   run: (cardId: Id) => post({ type: 'ai.run', cardId }),
   refine: (cardId: Id) => post({ type: 'ai.run', cardId, mode: 'refine' }),
+  summarize: (cardId: Id) => post({ type: 'ai.run', cardId, mode: 'summarize' }),
   stop: (cardId: Id) => post({ type: 'ai.stop', cardId }),
   runHeartbeat: () => post({ type: 'ai.heartbeat.run' }),
   /** a IA lê o projeto e propõe os agentes do board; o resultado vai para o chat do board */
@@ -88,6 +89,7 @@ export const comments = {
   add: (cardId: Id, body: string) => post({ type: 'comment.add', cardId, body }),
   update: (commentId: Id, body: string) => post({ type: 'comment.update', commentId, body }),
   delete: (commentId: Id) => post({ type: 'comment.delete', commentId }),
+  deleteMany: (ids: Id[]) => ids.forEach((id) => comments.delete(id)),
 };
 
 export const checklist = {
