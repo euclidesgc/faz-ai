@@ -9,8 +9,9 @@ import { t } from '../i18n';
 import { ai, cards } from '../commands';
 import { renderMarkdown } from './MarkdownEditor';
 import { TextArea } from '@radix-ui/themes';
-import { Button, IconAi, IconHuman, IconRun, IconSuggest, SelectField } from './ui';
+import { Button, Hint, IconAi, IconHuman, IconRun, IconSuggest, SelectField } from './ui';
 import { aiBlockedReason } from './RequirementsBanner';
+import { refineHint, workHint } from './aiHints';
 
 /** O Select do Radix não aceita valor vazio: "sem status" usa este. */
 const NO_STATUS = '__none';
@@ -99,33 +100,16 @@ export function StatusBar({ card }: { card: Card }) {
           </Button>
         ) : (
           <>
-            <Button
-              disabled={!!blocked}
-              title={
-                blocked ??
-                t(
-                  'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está (o que a coluna pede) e passar a vez: pedir revisão, perguntar ou mover. A resposta chega na conversa.',
-                  { tool: toolLabel },
-                )
-              }
-              onClick={() => ai.run(card.id)}
-            >
-              <IconRun /> {t('Trabalhar na fase')}
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={!!blocked}
-              title={
-                blocked ??
-                t(
-                  'O {tool} deixa o card claro e completo: reescreve título e descrição, preenche Tags, Esforço, Modelo e Skills e sugere o checklist. Não trabalha a fase, não move o card e não mexe em arquivos; o resumo do que mudou chega na conversa.',
-                  { tool: toolLabel },
-                )
-              }
-              onClick={() => ai.refine(card.id)}
-            >
-              <IconSuggest /> {t('Refinar com IA')}
-            </Button>
+            <Hint content={workHint(toolLabel)} disabledReason={blocked}>
+              <Button disabled={!!blocked} onClick={() => ai.run(card.id)}>
+                <IconRun /> {t('Trabalhar na fase')}
+              </Button>
+            </Hint>
+            <Hint content={refineHint(toolLabel)} disabledReason={blocked}>
+              <Button variant="ghost" disabled={!!blocked} onClick={() => ai.refine(card.id)}>
+                <IconSuggest /> {t('Refinar com IA')}
+              </Button>
+            </Hint>
           </>
         )}
         {card.status !== 'blocked' && (
