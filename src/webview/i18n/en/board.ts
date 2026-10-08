@@ -52,6 +52,8 @@ export const board: Record<string, string> = {
   'Excluir coluna': 'Delete column',
   'Mover cards para': 'Move cards to',
   'Colapsar a coluna': 'Collapse the column',
+  'Colapsar cards': 'Collapse cards',
+  'Expandir cards': 'Expand cards',
   'Duplo clique para renomear': 'Double-click to rename',
   'Exige aprovação: a IA só avança o card desta coluna depois que você aprova':
     'Requires approval: the AI only advances a card from this column after you approve',
@@ -247,6 +249,8 @@ export const board: Record<string, string> = {
   Desarquivar: 'Unarchive',
   Arquivar: 'Archive',
   'Mover para a lixeira': 'Move to trash',
+  'Colapsar card': 'Collapse card',
+  'Expandir card': 'Expand card',
 
   // Chat
   'Chat com a IA': 'AI chat',
@@ -317,6 +321,8 @@ export const board: Record<string, string> = {
   'Abrir filtros': 'Open filters',
   'Limpar filtros': 'Clear filters',
   'Limpar filtros ({n})': 'Clear filters ({n})',
+  'Expandir todos os cards do board': 'Expand all cards on the board',
+  'Colapsar todos os cards do board': 'Collapse all cards on the board',
 
   // Barra de seleção múltipla (card 326): modo autônomo em lote
   '{n} selecionados': '{n} selected',
@@ -325,6 +331,8 @@ export const board: Record<string, string> = {
   'Desligar modo autônomo': 'Turn off autonomous mode',
   'Ligar o modo autônomo em {n} história(s)?': 'Turn on autonomous mode for {n} story(ies)?',
   'Desligar o modo autônomo em {n} história(s)?': 'Turn off autonomous mode for {n} story(ies)?',
+  'Colapsar selecionados': 'Collapse selected',
+  'Expandir selecionados': 'Expand selected',
   'Limpar conversa': 'Clear conversation',
   '+ Nova coluna': '+ New column',
   'Criar sub-tarefa': 'Create sub-task',
