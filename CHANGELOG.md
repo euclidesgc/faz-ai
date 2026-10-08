@@ -16,7 +16,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   cada um), o agente dela ganha a ferramenta `Agent`, e a restrição de ferramentas dele vai na
   própria definição, não na sessão. O condutor de fábrica passa a dizer isso nas instruções; o
   `condutor-do-board.md` que já existe na sua pasta não é sobrescrito, mas a correção não depende
-  dele.
+  dele. E uma lista de ferramentas num agente é fechada: o Claude Code deixa de fora tudo o que não
+  está nela, inclusive os servidores MCP que carregou — o servidor do board conectava, mas a sessão
+  do condutor não tinha `get_card` nem `add_comment` e parava sem registrar nada (o Diagnóstico dizia
+  que estava tudo certo porque estava: o registro e a conexão nunca foram o problema). Agora toda lista
+  de ferramentas que o board monta para um agente, o da história ou um especialista, leva junto as
+  ferramentas do servidor do board (`mcp__faz-ai__*`).
 - **Agente padrão depois da migração dos perfis.** Ao abrir um board gravado por uma versão anterior, o
   "Agente padrão" embutido (sem instruções) virava o arquivo `~/.claude/agents/agente-padr-o.md`, com
   o nome truncado pelo acento e com Opus como modelo, e ficava como padrão do board no lugar do

@@ -31,6 +31,18 @@ export interface AgentDefinition {
 export const SUBAGENT_TOOL = 'Agent';
 
 /**
+ * As ferramentas do servidor do board, no nome que o Claude Code dá a elas (`mcp__<servidor>__<ferramenta>`),
+ * para a lista de ferramentas de um agente. Uma lista `tools` num agente é fechada: a sessão (ou o
+ * subagente) fica só com o que está nela, e os servidores MCP ficam de fora mesmo carregados — a
+ * ponte conecta, as instruções do servidor entram no contexto, mas nenhuma ferramenta dele existe
+ * (verificado na CLI 2.1.278). Por isso toda lista que o board monta leva o servidor do board junto.
+ */
+export const BOARD_TOOLS = `mcp__${BOARD_SERVER}__*`;
+
+/** A lista de ferramentas de um agente do board, sempre com as do servidor do board. */
+const withBoardTools = (tools: string[]): string[] => [...new Set([...tools, BOARD_TOOLS])];
+
+/**
  * Acima disto o JSON do agente não vai na linha de comando: no Windows a CLI é um `.cmd` e a linha
  * passa pelo cmd.exe, que corta em 8191 caracteres (o resto do comando também precisa caber).
  */
@@ -151,7 +163,7 @@ export function executionPlan(
     const def: AgentDefinition = { name: manifest.agent, description: manifest.purpose || manifest.agent, prompt: manifest.instructions };
     const size = (list: AgentDefinition[]) => JSON.stringify(Object.fromEntries(list.map(({ name, ...d }) => [name, d]))).length;
     if (manifest.delegates.length) {
-      const own = manifest.tools.length ? { tools: [...new Set([...manifest.tools, SUBAGENT_TOOL])] } : {};
+      const own = manifest.tools.length ? { tools: withBoardTools([...manifest.tools, SUBAGENT_TOOL]) } : {};
       const withDelegates: AgentDefinition = {
         ...def,
         ...own,
@@ -161,7 +173,7 @@ export function executionPlan(
         name: d.name,
         description: d.purpose || d.name,
         prompt: d.instructions,
-        ...(d.tools.length ? { tools: d.tools } : {}),
+        ...(d.tools.length ? { tools: withBoardTools(d.tools) } : {}),
         ...(d.deniedTools.length ? { disallowedTools: d.deniedTools } : {}),
         ...(d.model ? { model: d.model } : {}),
       }));

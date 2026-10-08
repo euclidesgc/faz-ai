@@ -193,19 +193,20 @@ it('a história leva os outros agentes do board como subagentes, e o agente dela
   // lançar subagentes, e o especialista vai inline com as ferramentas e o modelo do arquivo dele
   const story = of(storyId);
   expect(story.input.tools).toEqual([]);
-  expect(story.input.agentDefinition).toMatchObject({ name: 'condutor', tools: ['Read', 'Grep', 'Glob', 'Agent'] });
+  // toda lista de ferramentas num agente é fechada e deixaria o servidor do board de fora: ele vai junto
+  expect(story.input.agentDefinition).toMatchObject({ name: 'condutor', tools: ['Read', 'Grep', 'Glob', 'Agent', 'mcp__faz-ai__*'] });
   expect(story.input.delegates).toEqual([
     {
       name: 'backend-node',
       description: 'Agente backend-node',
       prompt: 'Instruções de backend-node.',
-      tools: ['Read', 'Edit', 'Bash'],
+      tools: ['Read', 'Edit', 'Bash', 'mcp__faz-ai__*'],
       model: option.model,
     },
   ]);
   expect(story.advice).toEqual([]);
   expect(story.summary.join(' | ')).toContain('Subagentes: backend-node (inline)');
-  expect(story.summary.join(' | ')).toContain('Ferramentas do agente: Read, Grep, Glob, Agent (no agente)');
+  expect(story.summary.join(' | ')).toContain('Ferramentas do agente: Read, Grep, Glob, Agent, mcp__faz-ai__* (no agente)');
   expect(story.summary.join(' | ')).not.toContain('Ferramentas: ');
 
   // a sub-tarefa roda com o agente dela, com as ferramentas impostas, e sem subagentes
