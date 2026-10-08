@@ -417,8 +417,8 @@ describe('executor da IA', () => {
     runner.start(storyId);
     expect(procs[0]!.command).toEqual({
       command: 'kimi',
-      args: ['-p', cardPrompt('#1', [], [], false, true), '--output-format', 'stream-json', '--add-dir', `${dir}.worktrees`],
-      format: 'stream-json',
+      args: ['-p', cardPrompt('#1', [], [], false, true), '--add-dir', `${dir}.worktrees`],
+      format: 'text',
       promptArg: { index: 1, addDirFlag: '--add-dir' },
     });
   });

@@ -19,7 +19,7 @@ import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
-import { streamReader } from '../src/extension/aiOutput/stream';
+import { cursorReader } from '../src/extension/aiOutput/cursor';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { cardAndChildrenFacts, cardFacts, cardFamilyFacts, newestCardFacts, trashedCardFacts } from '../src/extension/log/facts';
@@ -358,7 +358,7 @@ describe('AiRunRepo', () => {
 
     it('medição parcial sem consumo (Cursor/Kimi sem bloco de uso) grava o inventário, com tokens nulos', () => {
       // o caso central do leitor genérico: ferramentas lidas, nenhum `usage`
-      const reader = streamReader();
+      const reader = cursorReader();
       for (const e of [
         { type: 'system', session_id: 's' },
         { type: 'tool_call', name: 'Read' },

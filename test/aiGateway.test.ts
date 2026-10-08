@@ -16,6 +16,8 @@ import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiRunner } from '../src/extension/runner';
+import { providerFor } from '../src/extension/ai/providers';
+import { ALL_AI_TOOLS } from '../src/shared/harness';
 import { monthOf, type AiRunOrigin } from '../src/shared/log';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -165,6 +167,37 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     expect(rows()).toHaveLength(1);
     expect(rows()[0]).toMatchObject({ tool: 'kimi', outcome: 'unsupported' });
     expect(procs).toHaveLength(0);
+  });
+});
+
+describe('um provider por ferramenta', () => {
+  it('só o Claude Code (com custo) e o Cursor (só tokens) são medidos; as demais rodam sem medição', () => {
+    expect(Object.fromEntries(ALL_AI_TOOLS.map((t) => [t, providerFor(t).measure]))).toEqual({
+      claude: 'cost',
+      cursor: 'tokens',
+      codex: 'none',
+      copilot: 'none',
+      kimi: 'none',
+    });
+  });
+
+  it('o formato que o comando anuncia é o que o leitor do mesmo provider entende', () => {
+    for (const tool of ['claude', 'cursor'] as const) {
+      const command = providerFor(tool).command({ prompt: 'p', permission: 'full', structured: true })!;
+      expect(command.format, tool).not.toBe('text');
+      const reader = providerFor(tool).reader(command.format, { model: null });
+      reader.push(JSON.stringify({ type: 'system', subtype: 'init', session_id: 's' }), 'stdout');
+      expect(reader.sawEvent, tool).toBe(true);
+    }
+  });
+
+  it('a ferramenta sem medição também deixa a linha do log: roda em texto, "não medida", sem número inventado', () => {
+    gateway().run(call({ tool: 'codex' }));
+    procs[0]!.write('feito\n');
+    procs[0]!.exit(0);
+
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0]).toMatchObject({ tool: 'codex', outcome: 'done', measure: 'none', inputTokens: null, costUsd: null });
   });
 });
 

@@ -5,7 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { streamReader } from '../src/extension/aiOutput/stream';
+import { cursorReader } from '../src/extension/aiOutput/cursor';
 
 const SESSION = '8c1d1c7e-0000-4000-8000-000000000001';
 
@@ -60,7 +60,7 @@ const result = (usage?: Record<string, number>) =>
   });
 
 function read(lines: string[]) {
-  const reader = streamReader();
+  const reader = cursorReader();
   const shown = lines.flatMap((l) => reader.push(l, 'stdout'));
   return { reader, shown };
 }

@@ -1,14 +1,14 @@
-// Leitor genérico de `stream-json`, usado por Cursor e Kimi. Os eventos `system`, `assistant`,
-// `tool_call` e `result` seguem o espírito do formato do Claude Code. O do Cursor foi conferido
-// contra execuções reais da CLI 2026.10.01 (test/fixtures/cursor-stream-json.jsonl; a documentação
-// pública não descreve o consumo):
+// Leitor do `stream-json` do Cursor (`cursor-agent --output-format stream-json`). Os eventos `system`,
+// `assistant`, `tool_call` e `result` seguem o espírito do formato do Claude Code. Foi conferido contra
+// execuções reais da CLI 2026.10.01 (test/fixtures/cursor-stream-json.jsonl; a documentação pública não
+// descreve o consumo):
 // - `system`/`init` traz em `model` o nome de exibição do modelo que rodou ("Composer 2.5");
 // - `tool_call` sai duas vezes por chamada (`started` e `completed`), com a ferramenta como a chave de
 //   `tool_call` (`{"readToolCall": {...}}`; MCP é `{"mcpToolCall": {"args": {"providerIdentifier",
 //   "toolName"}}}`);
 // - `result` traz `usage` em camelCase (`inputTokens` já sem o cache, `outputTokens`,
 //   `cacheReadTokens`, `cacheWriteTokens`).
-// O Kimi continua só pela documentação, que não promete bloco de consumo: por isso a ausência de
+// A CLI não informa custo em dólar e o board não o calcula: só os tokens são medidos. A ausência de
 // `usage` é tratada como caso normal — ver o comentário em `report()`.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
@@ -25,7 +25,7 @@ function mcpSplit(name: string): string {
   return at < 0 ? rest : `${rest.slice(0, at)}/${rest.slice(at + 2)}`;
 }
 
-export function streamReader(): OutputReader {
+export function cursorReader(): OutputReader {
   let sawEvent = false;
   let sessionId: string | null = null;
   /** `kind\0name` → chamadas */

@@ -66,19 +66,22 @@ describe('o comando do modo estruturado, por ferramenta', () => {
     expect(started[0]!.command.format).toBe('claude-stream-json');
   });
 
-  it('o Codex vai com `exec --json`', () => {
-    run('codex');
-    expect(started[0]!.command.args.slice(0, 2)).toEqual(['exec', '--json']);
-    expect(started[0]!.command.format).toBe('codex-json');
+  it('o Cursor vai com `--output-format stream-json`', () => {
+    run('cursor');
+    expect(started[0]!.command.args).toContain('stream-json');
+    expect(started[0]!.command.format).toBe('cursor-stream-json');
   });
 
-  it('o Cursor e o Kimi vão com `--output-format stream-json`', () => {
-    run('cursor');
-    run('kimi');
-    expect(started[0]!.command.args).toContain('stream-json');
-    expect(started[1]!.command.args).toContain('stream-json');
-    expect(started[0]!.command.format).toBe('stream-json');
-    expect(started[1]!.command.format).toBe('stream-json');
+  it('Codex, Kimi e Copilot não são medidos: vão sempre em texto, sem pedir saída estruturada', () => {
+    for (const tool of ['codex', 'kimi', 'copilot'] as const) {
+      const input: HeadlessInput = { ...INPUT, permission: 'full' };
+      const { proc } = run(tool, input);
+      proc.onExit(() => {});
+      const command = started.at(-1)!.command;
+      expect(command.format, tool).toBe('text');
+      expect(command.args, tool).not.toContain('--output-format');
+      expect(command.args, tool).not.toContain('--json');
+    }
   });
 
   it('sem `structured`, nada muda: os mesmos argumentos de antes e `format: text`', () => {
