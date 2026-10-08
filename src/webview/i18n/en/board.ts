@@ -8,9 +8,6 @@ export const board: Record<string, string> = {
   Board: 'Board',
   Lixeira: 'Trash',
   Configurações: 'Settings',
-  'Execuções da IA em andamento': 'AI runs in progress',
-  'IA trabalhando em {n} card': 'AI working on {n} card',
-  'IA trabalhando em {n} cards': 'AI working on {n} cards',
   'Mostrando só o que espera por você. Clique para ver tudo.': 'Showing only what is waiting on you. Click to see everything.',
   'Cards esperando revisão, resposta ou desbloqueio. Clique para ver só eles.':
     'Cards waiting for review, an answer or unblocking. Click to see only those.',

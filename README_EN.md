@@ -645,7 +645,12 @@ the Settings; in the browser they stay as editable fields, as before.
 - **Rodar o heartbeat agora** (run the heartbeat now), in the settings or with the command **Faz AI: Rodar o heartbeat
   agora**, starts a round right away, even with the heartbeat off. **Faz AI: Parar as execuções da
   IA** stops everything.
-- The status bar shows the cards being run and the time of the next round.
+- The activity bar at the bottom of the board (visible on every view) shows what the AI is doing
+  right now: with one run, "IA em #12 (Discovery, há 3 min)", with the card reference clickable to
+  open it; with several, "IA em N cards: #12 Discovery · #15 refinando · …" and the full list in
+  the tooltip. With no run at all, it shows the reason: the autopilot's note (why the queue
+  stopped), the heartbeat's state ("Heartbeat desligado", "Heartbeat parado: motivo", "Próxima
+  rodada às HH:MM") or, finally, "IA parada".
 - The **heart** at the top right of the board shows the heartbeat: red and beating while it is
   running; grey and still when it is off or cannot run (no connection to Faz AI, or no tool).
   Clicking it turns the heartbeat on and off.

@@ -6,6 +6,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Barra de atividade no pé do board.** Uma linha sempre visível, em qualquer vista, mostra o que
+  a IA está fazendo agora: com uma execução, "IA em #12 (Discovery, há 3 min)"; com várias, "IA em
+  N cards: #12 Discovery · #15 refinando · …" (lista completa no tooltip). Clicar na referência do
+  card abre o card. Sem nenhuma execução, mostra o motivo: a nota do autopiloto (por que a fila
+  parou), o estado do heartbeat ("Heartbeat desligado", "Heartbeat parado: motivo", "Próxima
+  rodada às HH:MM") ou "IA parada". O contador "IA trabalhando em N cards" do topo saiu,
+  substituído por essa barra.
 - **Botão de criar card no topo da coluna.** O **+ Novo card** / **+ Nova sub-tarefa** passou do
   rodapé para o topo da coluna, logo abaixo do cabeçalho, para não precisar rolar a lista em
   colunas cheias. Mudou só a posição: nenhum comportamento ou dado muda. O print

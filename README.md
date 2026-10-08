@@ -619,7 +619,12 @@ navegador seguem como campos editáveis, como antes.
 - **Rodar o heartbeat agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
   uma rodada na hora, mesmo com o heartbeat desligado. **Faz AI: Parar as execuções da IA e o modo autônomo**
   interrompe tudo.
-- A barra de status mostra os cards em execução e a hora da próxima rodada.
+- A barra de atividade no pé do board (visível em qualquer vista) mostra o que a IA está fazendo
+  agora: com uma execução, "IA em #12 (Discovery, há 3 min)", com a referência do card clicável
+  para abri-lo; com várias, "IA em N cards: #12 Discovery · #15 refinando · …" e a lista completa
+  no tooltip. Sem nenhuma execução, mostra o motivo: a nota do autopiloto (por que a fila parou), o
+  estado do heartbeat ("Heartbeat desligado", "Heartbeat parado: motivo", "Próxima rodada às
+  HH:MM") ou, por fim, "IA parada".
 - O **coração** no topo direito do board mostra o heartbeat: vermelho e batendo quando ele está
   rodando; cinza e parado quando está desligado ou não consegue rodar (sem ligação com o Faz AI ou
   sem a ferramenta). Clicar nele liga e desliga o heartbeat.

@@ -1758,14 +1758,6 @@ body.host-web {
   outline: var(--focus-ring);
   outline-offset: 1px;
 }
-.topbar-info {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-6);
-  font-size: var(--fs-sm);
-  color: var(--muted);
-  white-space: nowrap;
-}
 .topbar-pending {
   background: transparent;
   color: var(--fg);
@@ -2559,6 +2551,38 @@ body.host-web .drawer {
 }
 .path-link:hover {
   text-decoration: underline;
+}
+.activity-bar {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding: var(--sp-4) var(--sp-12);
+  display: flex;
+  gap: var(--sp-8);
+  align-items: center;
+  min-height: 26px;
+}
+.activity-bar .list {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-ref {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--link);
+  font: inherit;
+  cursor: pointer;
+}
+.activity-ref:hover {
+  text-decoration: underline;
+}
+.activity-ref:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
 }
 .item-files {
   grid-column: 2 / -1;

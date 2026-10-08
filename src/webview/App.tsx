@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useAppearance } from './appearance';
-import { t, tn } from './i18n';
+import { t } from './i18n';
 import { rich } from './i18n/rich';
 import { humanQueue, pendingWork } from '../shared/pending';
 import { useBoardStore, useHostSync } from './store/boardStore';
 import { ui, attachments } from './commands';
 import { AttachmentModal } from './components/attachment/AttachmentModal';
 import type { Attachment } from '../shared/model';
+import { ActivityBar } from './components/ActivityBar';
 import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
 import { ChatPanel } from './components/chat/ChatPanel';
@@ -75,7 +76,6 @@ export function App() {
     );
   const trashCount = state.cards.filter((c) => c.deletedAt !== null).length;
   const withYou = humanQueue(state, pendingWork(state)).length;
-  const running = state.aiRuns.length;
   const onlyMine = filters.owner === 'human';
 
   return (
@@ -99,11 +99,6 @@ export function App() {
           </Button>
         </nav>
         <span className="spacer" />
-        {running > 0 && (
-          <span className="topbar-info" title={t('Execuções da IA em andamento')}>
-            <span className="spinner" /> {tn(running, 'IA trabalhando em {n} card', 'IA trabalhando em {n} cards')}
-          </span>
-        )}
         {withYou > 0 && (
           <Button
             className="topbar-pending"
@@ -157,6 +152,7 @@ export function App() {
         {view === 'metrics' && <MetricsView />}
         {view === 'environment' && <EnvironmentView />}
       </main>
+      <ActivityBar offline={offline} />
       {isWeb && chatOpen && (
         <aside className="chat-drawer">
           <Button
