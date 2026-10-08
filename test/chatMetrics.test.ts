@@ -6,7 +6,7 @@ import { ChatSession } from '../src/extension/chat';
 import { openInMemory } from '../src/extension/db/database';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { getMetrics, getPanelMetrics, NO_CARD_LABEL } from '../src/extension/log/metrics';
-import { createRunLog } from '../src/extension/log/runLog';
+import { gatewayFor } from './helpers/gateway';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { monthOf } from '../src/shared/log';
 import type { Database } from 'sql.js';
@@ -44,9 +44,8 @@ beforeEach(async () => {
   new ChatSession(router, {
     cwd: dir,
     log: () => {},
-    runLog: createRunLog(db),
     file: path.join(dir, 'chat.json'),
-    spawn: (_command, _cwd, out) => {
+    gateway: gatewayFor(router, db, (_command, _cwd, out) => {
       const entry = { write: (text: string) => out(text, 'stdout'), exit: (_c: number | null) => {} };
       procs.push(entry);
       return {
@@ -55,7 +54,7 @@ beforeEach(async () => {
           entry.exit = (code) => fn(code);
         },
       };
-    },
+    }),
   });
 });
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));

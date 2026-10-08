@@ -205,8 +205,8 @@ describe('branch e worktree por história', () => {
     expect(headlessCommand('claude', { prompt: 'P', permission: 'edits', addDirs: [root] })).toMatchObject({
       args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', '--add-dir', root],
     });
-    expect(headlessCommand('copilot', { prompt: 'P', permission: 'board', addDirs: [root] })).toMatchObject({
-      args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', `--add-dir=${root}`, '--no-ask-user'],
+    expect(headlessCommand('cursor', { prompt: 'P', permission: 'board', addDirs: [root] })).toMatchObject({
+      args: ['-p', '--force', '--approve-mcps', '--trust', '--allowed-tools', expect.any(String), '--add-dir', root],
     });
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
     expect(router.aiWorkDirs()).toEqual([]);

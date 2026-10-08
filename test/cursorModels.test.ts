@@ -74,17 +74,17 @@ describe('modelos do Cursor', () => {
   });
 
   it('o "Detectar" usa a última lista lida da CLI; sem ela, a embutida', () => {
-    expect(discoverModels('cursor', '/home')).toEqual([]);
-    expect(modelsFor('cursor', '/home').map((o) => o.model)).toEqual(['auto', 'composer-2.5']);
+    expect(discoverModels('cursor')).toEqual([]);
+    expect(modelsFor('cursor').map((o) => o.model)).toEqual(['auto', 'composer-2.5']);
     rememberModels('cursor', parseCursorModels(OUTPUT));
-    expect(modelsFor('cursor', '/home').map((o) => o.model)).toContain('claude-opus-5-5');
+    expect(modelsFor('cursor').map((o) => o.model)).toContain('claude-opus-5-5');
     // uma lista vazia (CLI sem login) não apaga a que já foi lida
     rememberModels('cursor', []);
-    expect(modelsFor('cursor', '/home')).toHaveLength(4);
+    expect(modelsFor('cursor')).toHaveLength(4);
   });
 
   it('sabe quando o catálogo ainda é só a lista embutida', () => {
-    const builtin = modelsFor('cursor', '');
+    const builtin = modelsFor('cursor');
     expect(onlyBuiltin('cursor', builtin)).toBe(true);
     // o catálogo de quem vem da versão anterior ainda tem o modelo que saiu da lista embutida
     expect(onlyBuiltin('cursor', [...builtin, { ...builtin[0]!, id: 'cursor:grok-4.7', model: 'grok-4.7', label: 'Grok 4.7' }])).toBe(true);

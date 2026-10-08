@@ -60,63 +60,45 @@ export function ProjectAgents({ tool, edit }: { tool: AiToolInfo; edit: ProjectE
       <SectionHeader
         title={t('Subagentes')}
         actions={
-          tool.agents && (
-            <Button onClick={() => edit.toggleNew('newAgent')}>
-              <IconPlus /> {t('Novo subagente')}
-            </Button>
-          )
+          <Button onClick={() => edit.toggleNew('newAgent')}>
+            <IconPlus /> {t('Novo subagente')}
+          </Button>
         }
       >
-        {tool.agents ? (
-          <>
-            {rich(
-              'Subagentes do {tool}: cada arquivo em <code>{dir}</code> define um ajudante com instruções próprias, e a ferramenta delega trabalho a ele pela descrição.',
-              { tool: tool.label, dir: tool.agents.dir },
-            )}
-            {tool.agents.modelField
-              ? ` ${t('Um subagente pode fixar o modelo que usa, o que serve para executar um card com o modelo indicado nele.')}`
-              : ''}
-          </>
-        ) : (
-          t('O {tool} não define subagentes em arquivos do projeto.', { tool: tool.label })
-        )}
+        {rich(
+          'Subagentes do {tool}: cada arquivo em <code>{dir}</code> define um ajudante com instruções próprias, e a ferramenta delega trabalho a ele pela descrição.',
+          { tool: tool.label, dir: tool.agents.dir },
+        )}{' '}
+        {t('Um subagente pode fixar o modelo que usa, o que serve para executar um card com o modelo indicado nele.')}
       </SectionHeader>
-      {tool.agents && (
-        <>
-          {edit.editing?.kind === 'newAgent' && (
-            <DraftForm
-              title={t('Subagente novo')}
-              draft={draft}
-              onChange={edit.patchDraft}
-              nameOk={isFreeName(draft.name, agents)}
-              namePlaceholder="revisor-de-spec"
-              descriptionLabel={t('Descrição (quando delegar)')}
-              descriptionPlaceholder={t('Revisa uma Spec e aponta lacunas antes do Plan')}
-              bodyPlaceholder={t('Instruções do subagente')}
-              submitLabel={t('Criar subagente')}
-              onSubmit={createAgent}
-              onCancel={edit.clearForm}
-            >
-              {tool.agents.modelField && (
-                <FormField label={t('Modelo (opcional)')}>
-                  {(id) => (
-                    <TextField.Root
-                      id={id}
-                      value={draft.model}
-                      onChange={(e) => edit.patchDraft({ model: e.target.value })}
-                      placeholder={t('vazio = o modelo da sessão')}
-                    />
-                  )}
-                </FormField>
-              )}
-            </DraftForm>
-          )}
-          {agents.map(agentRow)}
-          {agents.length === 0 && (
-            <p className="muted">{rich('Nenhum subagente em <code>{dir}</code> ainda.', { dir: tool.agents.dir })}</p>
-          )}
-        </>
+      {edit.editing?.kind === 'newAgent' && (
+        <DraftForm
+          title={t('Subagente novo')}
+          draft={draft}
+          onChange={edit.patchDraft}
+          nameOk={isFreeName(draft.name, agents)}
+          namePlaceholder="revisor-de-spec"
+          descriptionLabel={t('Descrição (quando delegar)')}
+          descriptionPlaceholder={t('Revisa uma Spec e aponta lacunas antes do Plan')}
+          bodyPlaceholder={t('Instruções do subagente')}
+          submitLabel={t('Criar subagente')}
+          onSubmit={createAgent}
+          onCancel={edit.clearForm}
+        >
+          <FormField label={t('Modelo (opcional)')}>
+            {(id) => (
+              <TextField.Root
+                id={id}
+                value={draft.model}
+                onChange={(e) => edit.patchDraft({ model: e.target.value })}
+                placeholder={t('vazio = o modelo da sessão')}
+              />
+            )}
+          </FormField>
+        </DraftForm>
       )}
+      {agents.map(agentRow)}
+      {agents.length === 0 && <p className="muted">{rich('Nenhum subagente em <code>{dir}</code> ainda.', { dir: tool.agents.dir })}</p>}
     </>
   );
 }

@@ -7,11 +7,14 @@ import { heartbeatTargets } from '../src/extension/heartbeat';
 import type { AiRunOrigin } from '../src/shared/log';
 import type { AiRunMode } from '../src/shared/runner';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { gatewayFor } from './helpers/gateway';
 import type { CardStatus } from '../src/shared/status';
+import type { Database } from 'sql.js';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
 let router: MessageRouter;
+let db: Database;
 let autopilot: Autopilot;
 let log: string[];
 let owns: boolean;
@@ -77,7 +80,7 @@ const create = (title: string, column: string, parent?: number) => {
 };
 
 beforeEach(async () => {
-  const db = await openInMemory(WASM_DIR);
+  db = await openInMemory(WASM_DIR);
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
     folderName: 'Projeto',
@@ -509,10 +512,10 @@ describe('autopiloto com o executor de verdade', () => {
     const real = new AiRunner(router, {
       cwd: os.tmpdir(),
       log: () => {},
-      spawn: () => ({
+      gateway: gatewayFor(router, db, () => ({
         onExit: (fn) => exits.push((code) => fn(code)),
         kill: () => {},
-      }),
+      })),
     });
     const ap = new Autopilot(router, real, { log: () => {} });
     create('A', 'PRD');

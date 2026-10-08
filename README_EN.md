@@ -67,7 +67,7 @@ In five minutes you have a task moving on the board, with the AI working on it.
    marketplace), open your project's folder and click the **Faz AI** icon in the sidebar. Each
    folder has its own board, already set up with the workflow phases.
 2. **Connect the AI to the board.** In **Configurações → Harness de IA** (Settings → AI harness),
-   pick the project's tool (Claude Code, Codex, Cursor, Kimi Code or GitHub Copilot). In the **Tudo
+   pick the project's tool (Claude Code or Cursor). In the **Tudo
    que a ferramenta carrega** (everything the tool loads) tab, on that tool, click **Instalar (padrão
    da ferramenta)** (install, tool default) in the **Servidores MCP** (MCP servers) section and again
    in the **Skills** section, for the flow skill, which teaches the AI to drive the phases.
@@ -125,7 +125,7 @@ promise a percentage: it shows, in the inventory, what is being loaded.
   Discovery the AI analyzes the problem and talks to you before any requirement is written; in
   Homologação the story is only completed with your approval.
 - **Work with the AI on the same board.** The extension exposes the board over MCP. Claude Code,
-  Codex, Cursor, Kimi Code, GitHub Copilot or any other MCP client can read and edit everything the
+  Cursor or any other MCP client can read and edit everything the
   interface allows, and the changes show up on the board right away.
 - **Know who has each card.** Every card the AI works on has a status: Pronto (ready), Em execução
   (running), Aguardando resposta (waiting for an answer), Aguardando revisão (waiting for review),
@@ -235,8 +235,8 @@ navegador**; the terminal `faz-ai` warns and does not start.
 
 ## Using it with AI
 
-1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code, Codex,
-   Cursor, Kimi Code or GitHub Copilot).
+1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code or
+   Cursor).
 2. In the **Tudo que a ferramenta carrega** (everything the tool loads) tab, pick the tool and, in
    the **Servidores MCP** (MCP servers) section, click **Instalar (padrão da ferramenta)** (install,
    tool default). The board registers the `faz-ai` server in the global file the tool reads.
@@ -249,14 +249,12 @@ buttons:
 
 | | Where it writes | When to use |
 |---|---|---|
-| **Instalar (padrão da ferramenta)** (tool default) | global config: `~/.claude.json` (through `claude mcp add --scope user`), `~/.cursor/mcp.json`, `~/.codex/config.toml`, `~/.kimi-code/mcp.json`, `~/.copilot/mcp-config.json`; the skill in `~/.claude/skills`, `~/.cursor/skills` and equivalents | recommended: the board works in any repository opened with it, with no file in the project |
-| **Instalar neste projeto** (this project) | `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.kimi-code/mcp.json` or `.vscode/mcp.json`; the skill in `.claude/skills`, `.cursor/skills` and equivalents | pinning a version in a repository or a fork, or a skill tailored for the team |
+| **Instalar (padrão da ferramenta)** (tool default) | global config: `~/.claude.json` (through `claude mcp add --scope user`), `~/.cursor/mcp.json`; the skill in `~/.claude/skills`, `~/.cursor/skills` and equivalents | recommended: the board works in any repository opened with it, with no file in the project |
+| **Instalar neste projeto** (this project) | `.mcp.json` or `.cursor/mcp.json`; the skill in `.claude/skills`, `.cursor/skills` and equivalents | pinning a version in a repository or a fork, or a skill tailored for the team |
 
 The global registration does not pin the project folder: Claude Code passes the folder in the
-`CLAUDE_PROJECT_DIR` variable, VS Code's `mcp.json` gets `${workspaceFolder}`, and in the others the
-board's bridge finds the board by walking up from the folder the tool was opened in. In GitHub
-Copilot, the global registration covers the Copilot CLI and, in VS Code, the editor profile's
-`mcp.json`.
+`CLAUDE_PROJECT_DIR` variable, and the board's bridge finds the board by walking up from the folder
+the tool was opened in.
 
 **In Cursor there is nothing to install.** Cursor's global scope is a single process for all windows
 and cannot tell which board to serve, so the board writes the project's `.cursor/mcp.json` on its own
@@ -378,8 +376,7 @@ execução" (with a **Parar** button to stop it).
   on it: rewrites the title and description (without inventing requirements; whatever is ambiguous
   becomes a "Dúvidas em aberto" list), reviews Tags, Esforço da atividade, Modelo and Skills even if
   they already have a value, and adds the missing steps to the checklist. It does not work on the
-  phase, create sub-tasks, move the card or touch files: it runs with the board only (in Kimi, which
-  lacks that level, the request forbids touching files). At the end it summarizes in the conversation
+  phase, create sub-tasks, move the card or touch files: it runs with the board only. At the end it summarizes in the conversation
   what changed (with the previous description, if it rewrote it) and the card returns to the status
   it had, also when the run fails: the failure goes to the conversation, without blocking the card. A
   refine does not count as a run without progress for the autonomous mode.
@@ -390,12 +387,11 @@ Images pasted into the message become card attachments and the AI receives them.
   conversa**: only the board (default), the board and project files, or no restrictions. The level
   in use is shown next to the button, with a shortcut to change it. The AI is told about the limit:
   if the work needs more than the level allows, it blocks the card saying which option to choose.
-- Kimi Code, when running in the background, only works at the "no restrictions" level. Cursor
-  accepts all three: at "only the board" and "board and files" its session gets only the tools of
+- Cursor accepts all three levels: at "only the board" and "board and files" its session gets only the tools of
   that level (reading and MCP; reading, MCP and editing), with no terminal.
 - The tool must be installed and signed in. Its CLI does not need to be on the PATH: the board also
   looks in the usual install folders and inside editor extensions (if you only use the Claude Code
-  or Codex extension, you already have the executable). Cursor's CLI is `cursor-agent` (the
+  extension, you already have the executable). Cursor's CLI is `cursor-agent` (the
   `curl https://cursor.com/install -fsS | bash` installer also creates the `agent` shortcut); sign in
   once with `cursor-agent login`.
 - With Claude Code, the board's server is passed on the command line of each run: it does not
@@ -420,21 +416,29 @@ creation tokens, the cost in dollars, the number of turns and the tool's session
 records the **inventory** of what the AI used: native tools, MCP tools (with the server of each
 one), subagents and skills, with the number of calls.
 
-- **Cost comes from two sources.** When the tool reports the cost, the board stores that value.
-  When it does not, the board estimates it: tokens multiplied by the model's **price per million
-  tokens**, which you fill in under Configurações → **Modelos de IA** (Settings → AI models; four
-  prices: input, output, cache read and cache creation) or through MCP with `upsert_model`. An
-  estimated cost is always marked "(estimado)". A model without all four prices gets no calculated
-  cost: the value stays blank, never 0.
+- **Cost is what the tool reports; the board calculates nothing.** There is no price table: a value
+  computed from a price list goes stale when the vendor changes its rates and produces a wrong
+  report that looks right. Today:
+
+  | Tool | Tokens | Cost in dollars |
+  | --- | --- | --- |
+  | Claude Code | measured (input, output, cache read and cache creation, per model, subagent included) | the `total_cost_usd` the CLI itself reports |
+  | Cursor | measured (the four counters) | the CLI does not report it: left blank |
+
+  Wherever you see "não medido" (not measured) or a blank cost, this is why: missing measurement,
+  never zero consumption. A run with tokens and no cost (the Cursor case) counts in the tokens and
+  stays out of the cost; the Métricas note says how many runs were left out.
+- **Every run goes through a single door.** The card runner (manual, heartbeat and autonomous mode)
+  and the board chat call the AI through the same point in the code (`AiGateway`), which opens the
+  log row before running, closes it with the outcome and stores the consumption. Each tool has its
+  own provider, which builds the command and reads the output. A third way to call the AI does not
+  exist without going through it, and a test fails if any file tries. What stays out of the record,
+  by nature, is whatever you run straight in the terminal or in the tool's own chat, without the board.
 - **In the log channel** (**Output → Faz AI**), the tool's output appears as readable lines, and at
   the end of each run a summary line follows with input, output, cache read and cache creation,
   turns and cost, for example `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100
-  criação de cache · 8 turnos · US$ 0,4210 (estimado)`. Turns and cost are left out when the tool
-  does not report them. The line is written in Portuguese, as the board's log channel is.
-- **Copilot has no measured consumption.** It has no structured output, so its runs are recorded,
-  but without tokens, cost or inventory. Wherever you see "não medido" (not measured), this is why:
-  missing measurement, not zero consumption. The same applies to runs that end before the tool
-  reports consumption.
+  criação de cache · 8 turnos · US$ 0,4210`. Turns and cost are left out when the tool does not
+  report them. The line is written in Portuguese, as the board's log channel is.
 - **Questions in the board chat** are recorded too, with no card attached.
 - **The detail of each run is kept for a window you configure**, from 1 to 24 months (the current
   month plus the earlier ones). The default is 6 months. After the window the detail is discarded,
@@ -482,8 +486,10 @@ and also in the board opened in the browser.
 - **What the AI used** ("O que a IA usou"). Tools, MCP tools (with the server in its own column),
   subagents and skills, with the number of runs and uses. "Not measured yet" (no run recorded an
   inventory) is different from "no records in the period".
-- **Tokens and cost.** Tokens count even when the model has no price configured; cost adds up only
-  the runs that have a price, and the note says how many were left out. Before the board measures
+- **Tokens and cost.** Cost adds up only the runs in which the tool reported the cost (Claude Code), and
+  the note says how many were left out; tokens count in every measured run. Older runs, from before the
+  board stopped calculating cost from a price table, stay marked "estimado por tabela de preços"
+  (estimated from a price table). Before the board measures
   consumption, cost and inventory show as "não medido" (not measured) and almost every lead time as
   unknown: that is the expected behavior, not a failure.
 - **Detail kept** ("Detalhe guardado"). Shows the retention window for the runs' detail and how much
@@ -508,7 +514,7 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 - The aggregation can group by phase (`phase`), card type (`card_type`), AI tool (`tool`), model
   (`model`), effort (`effort`), profile (`profile`), card (`card`), agent (`agent`), skill (`skill`),
   used tool (`used_tool`) or MCP tool (`mcp_tool`). Omit to get only the period's total.
-- `tool` and `used_tool` are not the same thing: `tool` is the AI tool that ran (claude, codex);
+- `tool` and `used_tool` are not the same thing: `tool` is the AI tool that ran (claude, cursor);
   `used_tool` and `mcp_tool` are what the run used (Read, Bash, `get_card`). In `mcp_tool` the server
   comes in its own column, or "servidor não registrado" (server not recorded) when the name did not
   carry it.
@@ -517,11 +523,9 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 - On the **agent**, **skill**, **used_tool** and **mcp_tool** dimensions the table shows only the
   count of runs and uses (no tokens or cost, which cannot be split among a run's components).
   `effort` and `profile` have tokens and cost.
-- Tokens count even when the model has no price configured; cost comes only from runs that have a
-  price.
+- Tokens count in every measured run; cost comes only from runs in which the tool reported it (Claude Code).
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`.
-- Unmeasured values appear as "-" (never 0), for example Copilot runs. A cost estimated from the
-  model's price is marked as estimated.
+- Unmeasured values appear as "-" (never 0), for example Cursor's cost.
 - Always tells you when the board's history started and which periods have only monthly totals
   (without per-run detail). Periods outside the retention window (6 months by default) have no detail and aggregate only
   the already-consolidated totals.
@@ -704,9 +708,6 @@ into the prompt, as instructions:
 | Tool | Enforced by parameter | Advised only |
 | --- | --- | --- |
 | Claude Code | subagent, MCP servers, tools, model and effort, clean session | skills |
-| GitHub Copilot | subagent, MCP servers, tools, model and effort | skills, clean session |
-| Kimi Code | subagent, model | skills, MCP servers, tools, clean session |
-| Codex | MCP servers, model and effort | subagent, skills, tools, clean session |
 | Cursor | model | everything else |
 
 Skills are always passed by file path. In a conversation you open yourself, the agent reaches the
@@ -726,7 +727,7 @@ permissions), each split into three scopes:
 
 - **Projeto** (project): files in this folder; they apply only here and go into the repository.
   This group is always shown, highlighted, and says when the project has nothing of that kind.
-- **Global**: files in your user folder (`~/.claude`, `~/.codex`, `~/.copilot`…); they apply to all
+- **Global**: files in your user folder (`~/.claude`, `~/.cursor`…); they apply to all
   your projects. Every change to them asks for confirmation.
 - **Plugins**: they come from installed packages; the board does not change them, but they can be
   copied.
@@ -792,7 +793,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
 | Agentes | How the AI works on each card: skills, MCP servers, tools and model; there is always a default; per phase, changeable per card, with suggestions from intent |
 | Harness de IA | The project's tool, rules file, skills and agents; runs from the conversation and the heartbeat; everything each tool loads, by scope (see [AI harness](#ai-harness)) |
-| Modelos de IA | The tool's models and effort levels; each model's price per million tokens (input, output, cache read and cache creation), used to estimate cost; rules that suggest each card's model |
+| Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
 | Aparência | **Language** (automatic, Português (Brasil) or English), theme (system, light, dark), font and size of long texts; name and color of the statuses |
 | Backup | Export the board to a file and import a file in place of the current board (see [Board backup](#board-backup)) |
@@ -822,16 +823,15 @@ to the User Settings while the editor is open. On the first open, a board whose 
 the default (`auto`) writes that language to the User Settings, so an empty Settings does not reset the
 board; if the Settings already has an explicit value, it wins.
 
-About models: **Detectar modelos** (detect models) reads the tool's list (for Kimi Code, from the
-local configuration; for Cursor, the models of your account, through the `cursor-agent models`
+About models: **Detectar modelos** (detect models) reads the tool's list (for Cursor, the models of your account, through the `cursor-agent models`
 command, read when the board opens with the CLI signed in, and the first list read replaces the built-in one
-only once; for the others, a built-in list you can
-edit); the prices you filled in stay there after detecting again. For Cursor, the list has one line per
+only once; for Claude Code, a built-in list you can
+edit). For Cursor, the list has one line per
 level of each model (`claude-opus-5-5-low`, `-medium`, `-high`…); the board groups the variants into
 one model with its levels. The fast versions (`-fast`, they answer sooner and charge more for the
 same tokens) stay out until you turn on **Incluir os modos rápidos** (include fast modes) on the
-Cursor card: then each one enters as a separate model ("Claude Opus 5.5 1M Fast"), with its own
-price, only for the models in the catalog; turning it off removes them from the catalog. Through MCP, it is the `includeFastModels` rule
+Cursor card: then each one enters as a separate model ("Claude Opus 5.5 1M Fast"), only for the
+models in the catalog; turning it off removes them from the catalog. Through MCP, it is the `includeFastModels` rule
 of `update_rules`. On Cursor's free plan only **Auto**
 runs: the other models are refused before starting (the blocked card explains how to pick Auto),
 which is why Cursor's suggestion rules all start
@@ -843,31 +843,6 @@ When a new version of the extension changes the default board, the board asks wh
 update it (or use **Faz AI: Atualizar board para o padrão atual**). The update only adds what is
 missing: no card leaves its place and what you customized is kept. A copy of the database is saved
 first.
-
-### Cursor pricing
-
-The reference is [Cursor's pricing table](https://cursor.com/docs/models-and-pricing). The board does
-not read it on its own: prices are kept by hand in **Modelos de IA** (AI models) or by the AI through
-`upsert_model`.
-
-- **Auto has a variable price.** Cursor charges the list price of the model each request is routed
-  to, so there is no fixed rate to enter. The `auto` model comes with **Preço variável** (variable
-  price) on: the price fields give way to a notice, and the run has no estimated cost (blank, never a
-  made-up number). Every model has the switch; through MCP, it is `variable_price` in
-  `upsert_model`.
-- **Cursor Token Rate.** On Teams and Enterprise plans, Cursor charges US$ 0.25 per million tokens
-  (input, output and cache) on top of the price of third-party models; Cursor's own models (Composer
-  and Grok) are exempt. Turn on **Somar a tarifa do Cursor** (add the Cursor fee) on the Cursor card
-  (through MCP, `cursorTokenRate` in `update_rules`) and the estimate adds it. It applies to the
-  next runs: the cost of runs already recorded does not change.
-- **Fast mode and long context.** Fast mode usually costs 2x and enters as a separate model with its
-  own price (see **Incluir os modos rápidos** above). Long context (over 256 thousand tokens) may cost
-  2x, and 3x together with fast mode, but it is not told apart: Cursor only reports the run's token
-  total, and the estimate uses the price entered.
-- **How names match.** The identifier in the tool is the id `cursor-agent models` lists
-  (`claude-opus-5-5`); the name is the row in the pricing table; on the board the model is
-  `cursor:claude-opus-5-5`, and each fast version has its own (`cursor:claude-opus-5-5-fast`). With
-  that, the AI can read the table and fill in the prices through `upsert_model`.
 
 ## Where the data lives
 

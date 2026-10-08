@@ -6,16 +6,6 @@
 /** Por que a execução não foi medida. O `message` é a frase que a pessoa lê no canal de log. */
 export abstract class MeasureError extends Error {}
 
-/** A ferramenta não produz saída estruturada quando roda em segundo plano (o Copilot, hoje). */
-export class MeasureUnsupportedError extends MeasureError {
-  constructor(toolLabel: string) {
-    super(
-      `A medição não foi possível nesta execução: o ${toolLabel} não produz saída estruturada quando roda em segundo plano, então o consumo não é registrado.`,
-    );
-    this.name = 'MeasureUnsupportedError';
-  }
-}
-
 /** A versão instalada da CLI recusou o argumento da saída estruturada. */
 export class MeasureRefusedError extends MeasureError {
   constructor(toolLabel: string) {
@@ -57,9 +47,4 @@ export class MeasureBrokenError extends MeasureError {
     );
     this.name = 'MeasureBrokenError';
   }
-}
-
-/** Type guard do erro de domínio: nunca comparar `e.name` nem `e.message` como string. */
-export function isMeasureError(e: unknown): e is MeasureError {
-  return e instanceof MeasureError;
 }

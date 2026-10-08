@@ -28,7 +28,12 @@ const CLI: BoardRequirement = {
   action: { kind: 'command', command: 'curl https://cursor.com/install -fsS | bash' },
 };
 const MCP: BoardRequirement = { id: 'mcp', tool: 'cursor', optional: true, action: { kind: 'connect' } };
-const PERMISSION: BoardRequirement = { id: 'permission', tool: 'kimi', reason: 'Escolha "Sem restrições".', action: { kind: 'settings' } };
+const PERMISSION: BoardRequirement = {
+  id: 'permission',
+  tool: 'claude',
+  reason: 'Escolha "Sem restrições".',
+  action: { kind: 'settings' },
+};
 
 const missing = () => set([CLI, MCP, PERMISSION]);
 const region = () => screen.queryByRole('region', { name: 'Requisitos do board' });

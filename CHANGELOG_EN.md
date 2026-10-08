@@ -7,6 +7,30 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **The board supports only Claude Code and Cursor.** Codex, Kimi Code and GitHub Copilot are gone
+  from the **Harness de IA** (AI harness) screen, which now offers just those two tools, and from the
+  rest of the extension: built-in models, MCP server registration, rules, skills and agents, hooks,
+  chat runs and the Diagnostic. A board that was set to one of them goes back to Claude Code when it
+  opens. What Cursor and Claude Code still load from `.codex/skills` or `AGENTS.md` stays listed.
+- **In Settings, Modelos de IA (AI models) comes before Agentes (agents).** The side menu now follows
+  the order Harness de IA, Modelos de IA, Agentes.
+- **A run's cost is what the tool reports; the price table is gone (#187).** A value computed from
+  entered prices goes stale when the vendor changes its rates and makes the report wrong without any
+  warning, so the board no longer calculates cost. Claude Code stores the `total_cost_usd` the CLI
+  itself reports, plus the four token counters; Cursor stores the tokens and has no cost (the CLI does
+  not report it). Gone are the
+  built-in table, the price column of the **Modelos de IA** tab, **Preço variável** (variable price),
+  the `price_*`, `reset_price` and `variable_price` fields of `upsert_model`, the price origin in
+  `get_models` and the **Cursor Token Rate** rule (`cursorTokenRate` in `update_rules`). Catalogs saved
+  before lose their price fields when the board opens. Older runs stay in Métricas, marked "estimado
+  por tabela de preços" (estimated from a price table). `get_metrics` now calls the column **cost**
+  (reported by the tool), without "estimated".
+- **Every call to the AI goes through a single door (#187).** The card runner (manual, heartbeat and
+  autonomous mode) and the chat each repeated the usage record, and the record was optional. Both now
+  ask an `AiGateway` for the run, which opens the `ai_runs` row before running, checks the permission,
+  handles stop and timeout and stores outcome and consumption; each tool has its own provider
+  (command and output reader). A test covers the four origins and fails if any file outside the
+  gateway calls the AI or writes to the log. As a result, the usage log is no longer optional.
 - **Faz AI settings in the editor Settings.** In `Ctrl+,`, searching "Faz AI" shows the Faz AI
   category with the sections Installation, Appearance, Git and Backup, in that order. Installation has
   the **Open the Environment Diagnostics** link; Appearance already brings **Language**

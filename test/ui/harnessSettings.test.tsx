@@ -100,7 +100,7 @@ describe('HarnessSettings: ferramenta e execução', () => {
     await userEvent.click(radios[0]!);
     expect(sentOf('settings.board.update')).toHaveLength(0);
     await userEvent.click(radios[1]!);
-    expect(lastSent('settings.board.update')).toEqual({ type: 'settings.board.update', patch: { aiTool: 'codex' } });
+    expect(lastSent('settings.board.update')).toEqual({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
   });
 
   it('a aba da ferramenta não instala o MCP: aponta para a seção da ferramenta', () => {
@@ -322,12 +322,10 @@ describe('HarnessSettings: agentes', () => {
     expect(lastSent('harness.agent.delete')).toEqual({ type: 'harness.agent.delete', name: 'revisor' });
   });
 
-  it('ferramenta sem modelo por agente esconde o campo; sem agentes mostra a pasta vazia', async () => {
-    setState((s) => ({ board: { ...s.board, aiTool: 'kimi' }, harness: { ...s.harness, agents: [] } }));
+  it('sem agentes mostra a pasta vazia', () => {
+    setState((s) => ({ harness: { ...s.harness, agents: [] } }));
     renderScreen();
     expect(screen.getByText(/Nenhum subagente em/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Novo subagente' }));
-    expect(screen.queryByPlaceholderText('vazio = o modelo da sessão')).toBeNull();
   });
 });
 

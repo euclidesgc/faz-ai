@@ -48,14 +48,6 @@ function bundledCandidates(command: string, homeDir: string): string[] {
     for (const e of entries) {
       if (command === 'claude' && e.startsWith('anthropic.claude-code-'))
         out.push(path.join(dir, e, 'resources', 'native-binary', isWindows ? 'claude.exe' : 'claude'));
-      if (command === 'codex' && e.startsWith('openai.chatgpt-')) {
-        try {
-          for (const platform of fs.readdirSync(path.join(dir, e, 'bin')))
-            out.push(path.join(dir, e, 'bin', platform, isWindows ? 'codex.exe' : 'codex'));
-        } catch {
-          /* extensão sem binário embutido */
-        }
-      }
     }
   }
   return out;
@@ -122,7 +114,7 @@ function commonDirs(command: string, homeDir: string): string[] {
 
 /**
  * Caminho do executável de uma ferramenta de IA: no PATH, nas pastas de instalação usuais ou embutido
- * numa extensão de editor (Claude Code, Codex). Devolve null quando não acha em lugar nenhum.
+ * numa extensão de editor (Claude Code). Devolve null quando não acha em lugar nenhum.
  */
 export function resolveCommand(command: string, pathEnv: string | undefined, homeDir: string): string | null {
   if (path.isAbsolute(command)) return isExecutable(command) ? command : null;
@@ -156,10 +148,7 @@ export function resolveCommand(command: string, pathEnv: string | undefined, hom
 export function commandNotFound(command: string): string {
   const install: Record<string, string> = {
     claude: 'Instale o Claude Code (https://claude.com/claude-code) ou a extensão dele no editor.',
-    codex: 'Instale a CLI do Codex (npm install -g @openai/codex).',
-    copilot: 'Instale a GitHub Copilot CLI (npm install -g @github/copilot).',
     'cursor-agent': 'Instale a CLI do Cursor (curl https://cursor.com/install -fsS | bash) e entre na conta com "cursor-agent login".',
-    kimi: 'Instale a CLI do Kimi Code.',
   };
   return `comando "${command}" não encontrado no PATH, nas pastas de instalação usuais nem nas extensões do editor. ${install[command] ?? 'Instale a ferramenta.'} Depois confira no terminal se "${command} --version" responde.`;
 }

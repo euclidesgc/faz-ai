@@ -121,10 +121,13 @@ export interface AiRunConsumption extends AiRunTokens {
   /** soma dos turnos de todos os segmentos; null = a ferramenta não informa */
   turns: number | null;
   sessionId: string | null;
-  /** null = não há custo: nem informado pela ferramenta, nem calculável pelo preço do catálogo */
+  /** null = não há custo: a ferramenta não o informou (o board nunca calcula por tabela de preços) */
   costUsd: number | null;
-  /** true = saiu da tabela de preços do catálogo; irrelevante quando `costUsd` é null */
-  costEstimated: boolean;
+  /**
+   * Só linhas antigas: true = o custo foi calculado pela tabela de preços que o board tinha. Nenhum leitor
+   * preenche isto mais; ausente = informado pela ferramenta.
+   */
+  costEstimated?: boolean;
 }
 
 /** O que uma linha do inventário da execução conta. */

@@ -44,7 +44,7 @@ import {
 } from '../../shared/metrics';
 
 /**
- * `tool` é a ferramenta de IA da execução (claude, codex), coluna de `ai_runs`. `used_tool` é outra coisa:
+ * `tool` é a ferramenta de IA da execução (claude, cursor), coluna de `ai_runs`. `used_tool` é outra coisa:
  * uma ferramenta que a execução USOU (Read, Bash), do inventário em `ai_run_usage`. Por isso o nome
  * não se repete — a mesma palavra significaria duas coisas em dois lugares.
  */

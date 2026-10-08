@@ -21,11 +21,6 @@ export interface RegisterOptions {
    * ferramenta foi aberta, e o mesmo registro serve a todos os projetos. Padrão: `project`.
    */
   scope?: InstallScope;
-  /**
-   * Pasta de configuração do usuário no VS Code (a do perfil, onde fica o `mcp.json` global do
-   * Copilot no editor). Sem ela, o registro global do Copilot fica só na Copilot CLI.
-   */
-  editorUserDir?: string;
 }
 
 export interface Registration {
@@ -47,12 +42,6 @@ export interface Registration {
 }
 
 const SERVER = 'faz-ai';
-
-/**
- * A pasta aberta no editor, que o Cursor e o VS Code trocam pelo caminho ao iniciar o servidor. Vai no
- * registro global dessas ferramentas: sem ela, o servidor sobe fora do projeto e não acha o board.
- */
-export const WORKSPACE_FOLDER = '${workspaceFolder}';
 
 /** A pasta fixa nos argumentos do registro; uma variável da ferramenta (`${workspaceFolder}`) não é pasta fixa. */
 export const fixedFolder = (arg: string | undefined): string | undefined => (arg && !/\$\{[^}]*\}/.test(arg) ? arg : undefined);
@@ -155,29 +144,10 @@ function coveredByGlobal(file: string, runDir: string, entryArgs: string[]): boo
   return folder ? samePath(folder, board) : within(runDir, board);
 }
 
-/** Substitui (ou acrescenta) a tabela [mcp_servers.faz-ai] sem tocar no resto do TOML. */
-export function upsertTomlServer(toml: string, command: string, args: string[]): string {
-  const header = `[mcp_servers.${SERVER}]`;
-  const lines = toml.split(/\r?\n/);
-  const start = lines.findIndex((l) => l.trim() === header);
-  if (start >= 0) {
-    let end = start + 1;
-    while (end < lines.length && !/^\s*\[/.test(lines[end]!)) end++;
-    lines.splice(start, end - start);
-  }
-  const rest = lines.join('\n').replace(/\n+$/, '');
-  // strings JSON são strings básicas válidas em TOML
-  const block = `${header}\ncommand = ${JSON.stringify(command)}\nargs = [${args.map((a) => JSON.stringify(a)).join(', ')}]\n`;
-  return `${rest}${rest ? '\n\n' : ''}${block}`;
-}
-
 /**
  * Registra o servidor MCP do board na configuração que cada ferramenta lê. No escopo do projeto:
  * - Claude Code: `.mcp.json` do projeto
  * - Cursor: `.cursor/mcp.json` do projeto
- * - Codex: `.codex/config.toml` do projeto (vale em projetos marcados como confiáveis)
- * - Kimi Code: configuração global, sem a pasta fixa (a ponte descobre o projeto pelo diretório atual)
- * - GitHub Copilot: `.vscode/mcp.json` (VS Code) e `.mcp.json` (Copilot CLI) do projeto
  */
 export function registerClients(tools: AiTool[], o: RegisterOptions): Registration[] {
   if (o.scope === 'user') return tools.flatMap((tool) => registerUser(tool, o));
@@ -201,44 +171,6 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
         out.push(registerCursorProject(o));
         break;
       }
-      case 'codex': {
-        const file = path.join(o.workspaceDir, '.codex', 'config.toml');
-        fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, upsertTomlServer(fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '', node, args));
-        out.push({
-          tool,
-          file,
-          projectFile: '.codex/config.toml',
-          next: 'Codex: o projeto precisa estar marcado como confiável; abra uma sessão nova (codex mcp list confere).',
-        });
-        break;
-      }
-      case 'kimi': {
-        const file = path.join(o.workspaceDir, '.kimi-code', 'mcp.json');
-        mergeJson(file, { transport: 'stdio', command: node, args });
-        out.push({ tool, file, projectFile: '.kimi-code/mcp.json', next: 'Kimi Code: abra uma sessão nova na pasta do projeto.' });
-        break;
-      }
-      case 'copilot': {
-        // o VS Code lê .vscode/mcp.json (chave `servers`); a Copilot CLI não lê esse arquivo, e sim o .mcp.json
-        const vscodeFile = path.join(o.workspaceDir, '.vscode', 'mcp.json');
-        mergeJson(vscodeFile, { type: 'stdio', command: node, args }, 'servers');
-        out.push({
-          tool,
-          file: vscodeFile,
-          projectFile: '.vscode/mcp.json',
-          next: 'GitHub Copilot no VS Code: confirme a confiança e inicie o servidor (MCP: List Servers).',
-        });
-        const cliFile = path.join(o.workspaceDir, '.mcp.json');
-        mergeJson(cliFile, { type: 'stdio', command: node, args, tools: ['*'] });
-        out.push({
-          tool,
-          file: cliFile,
-          projectFile: '.mcp.json',
-          next: 'Copilot CLI: abra uma sessão nova na pasta e confirme a confiança nela.',
-        });
-        break;
-      }
     }
   }
   return out;
@@ -252,10 +184,6 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
  *   tempo todo; gravar nele por fora arrisca perder a mudança ou a dela). A pasta chega pela variável
  *   `CLAUDE_PROJECT_DIR`, que o Claude Code passa ao servidor.
  * - Cursor: nenhum; o registro dele é sempre o do projeto (veja `registerCursorProject`)
- * - Codex: `~/.codex/config.toml`
- * - Kimi Code: `~/.kimi-code/mcp.json` e/ou `~/.kimi/mcp.json` (a Kimi CLI), os que existirem
- * - GitHub Copilot: `~/.copilot/mcp-config.json` (Copilot CLI) e, no VS Code, o `mcp.json` do perfil
- *   do editor, com `${workspaceFolder}`
  */
 function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
   const node = o.nodeCommand ?? 'node';
@@ -281,37 +209,6 @@ function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
     // atender. O registro do Cursor é sempre o do projeto.
     case 'cursor':
       return [registerCursorProject(o)];
-    case 'codex': {
-      const file = home('.codex', 'config.toml');
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, upsertTomlServer(fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '', node, args));
-      return [{ tool, file, projectFile: null, next: 'Codex: abra uma sessão nova (codex mcp list confere).' }];
-    }
-    case 'kimi': {
-      // Kimi Code usa ~/.kimi-code e a Kimi CLI usa ~/.kimi; grava nas que existirem
-      const dirs = ['.kimi-code', '.kimi'].map((d) => home(d)).filter((d) => fs.existsSync(d));
-      return (dirs.length ? dirs : [home('.kimi-code')]).map((dir) => {
-        const file = path.join(dir, 'mcp.json');
-        mergeJson(file, { transport: 'stdio', command: node, args });
-        return { tool, file, projectFile: null, next: 'Kimi Code: abra uma sessão nova a partir da pasta do projeto.' };
-      });
-    }
-    case 'copilot': {
-      const file = home('.copilot', 'mcp-config.json');
-      mergeJson(file, { type: 'stdio', command: node, args, tools: ['*'] });
-      const out: Registration[] = [{ tool, file, projectFile: null, next: 'Copilot CLI: abra uma sessão nova.' }];
-      if (o.editorUserDir) {
-        const editorFile = path.join(o.editorUserDir, 'mcp.json');
-        mergeJson(editorFile, { type: 'stdio', command: node, args: [...args, WORKSPACE_FOLDER] }, 'servers');
-        out.push({
-          tool,
-          file: editorFile,
-          projectFile: null,
-          next: 'GitHub Copilot no VS Code: confirme a confiança no servidor quando o editor pedir (MCP: List Servers mostra o estado).',
-        });
-      }
-      return out;
-    }
   }
 }
 
@@ -323,33 +220,17 @@ function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
 export function removeProjectServer(workspaceDir: string, relFile: string): boolean {
   const file = path.join(workspaceDir, relFile);
   if (!fs.existsSync(file)) return false;
-  if (relFile.endsWith('.toml')) {
-    const toml = fs.readFileSync(file, 'utf8');
-    const lines = toml.split(/\r?\n/);
-    const start = lines.findIndex((l) => l.trim() === `[mcp_servers.${SERVER}]`);
-    if (start < 0) return false;
-    let end = start + 1;
-    while (end < lines.length && !/^\s*\[/.test(lines[end]!)) end++;
-    lines.splice(start, end - start);
-    fs.writeFileSync(file, lines.join('\n').replace(/\n{3,}/g, '\n\n'));
-    return true;
-  }
   let config: Record<string, Record<string, unknown> | undefined>;
   try {
     config = JSON.parse(fs.readFileSync(file, 'utf8')) as typeof config;
   } catch {
     throw new Error(`${file} não é um JSON válido; corrija-o e tente de novo.`);
   }
-  let removed = false;
-  for (const key of ['mcpServers', 'servers']) {
-    const section = config[key];
-    if (section && SERVER in section) {
-      delete section[SERVER];
-      removed = true;
-    }
-  }
-  if (removed) fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n');
-  return removed;
+  const section = config.mcpServers;
+  if (!section || !(SERVER in section)) return false;
+  delete section[SERVER];
+  fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n');
+  return true;
 }
 
 /**

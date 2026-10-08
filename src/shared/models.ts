@@ -3,14 +3,6 @@ import { AI_TOOLS, type AiTool } from './harness';
 import type { BoardState, Card, FieldDef, FieldValue, Id } from './model';
 import { valueOf } from './selectors';
 
-/** Preço do modelo em dólar por milhão de tokens. Sem preço = o board não calcula custo. */
-export interface ModelPrice {
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheWrite: number;
-}
-
 /** Um modelo de LLM disponível em uma ferramenta, com os níveis de esforço que ele aceita. */
 export interface ModelOption {
   /** `<ferramenta>:<modelo>`, único no catálogo */
@@ -27,62 +19,6 @@ export interface ModelOption {
    * com ele já recebeu a lista real, mesmo que a pessoa o tenha reduzido aos mesmos ids da embutida
    */
   fromTool?: true;
-  /**
-   * ausente ou incompleto = modelo sem preço; nunca zero por omissão. Pode estar pela metade (a
-   * pessoa preencheu só alguns dos quatro campos): quem usa o preço lê por `modelPrice`.
-   */
-  price?: Partial<ModelPrice>;
-  /**
-   * o custo não tem tarifa fixa: o `auto` do Cursor cobra o preço de lista do modelo para o qual cada
-   * pedido foi roteado. Ausente = vale o padrão de `hasVariablePrice` (catálogos gravados antes do campo).
-   */
-  variablePrice?: boolean;
-}
-
-/** Ids que nascem com preço variável quando o catálogo ainda não diz nada (o campo é posterior a eles). */
-const VARIABLE_PRICE_IDS = ['cursor:auto'];
-
-/** Se o modelo cobra por pedido o preço de outro modelo; o campo explícito vence o padrão por id. */
-export const hasVariablePrice = (o: ModelOption): boolean => o.variablePrice ?? VARIABLE_PRICE_IDS.includes(o.id);
-
-/**
- * O preço de um modelo, ou `null` quando ele não está completo ou é variável. Exige os QUATRO números: tratar o
- * campo que falta como zero é o `catch` que devolve `[]` da skill `error-handling`, com dinheiro no
- * lugar da lista — um custo menor que o verdadeiro, somável com os outros, e com cara de completo.
- */
-export function modelPrice(o: ModelOption): ModelPrice | null {
-  // qualquer número fixo para quem tem preço variável seria um chute com cara de medida
-  if (hasVariablePrice(o)) return null;
-  // `price` chega de JSON.parse do banco: nada garante que os campos existem nem que são números.
-  const p: unknown = o.price;
-  if (!p || typeof p !== 'object') return null;
-  const r = p as Record<string, unknown>;
-  const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
-  const input = num(r.input);
-  const output = num(r.output);
-  const cacheRead = num(r.cacheRead);
-  const cacheWrite = num(r.cacheWrite);
-  if (input === null || output === null || cacheRead === null || cacheWrite === null) return null;
-  return { input, output, cacheRead, cacheWrite };
-}
-
-/** O que mudar no preço de um modelo: número grava, `null` apaga o campo, ausente deixa como está. */
-export type PricePatch = { [K in keyof ModelPrice]?: number | null };
-
-/**
- * O modelo com o preço alterado campo a campo. Campo vazio é **ausência**, não zero: o campo
- * apagado some do objeto, e sem nenhum campo o modelo fica sem a chave `price`.
- */
-export function withPrice(o: ModelOption, patch: PricePatch): ModelOption {
-  const price: Partial<ModelPrice> = { ...o.price };
-  for (const key of Object.keys(patch) as (keyof ModelPrice)[]) {
-    const v = patch[key];
-    if (v === undefined) continue;
-    if (v === null) delete price[key];
-    else price[key] = v;
-  }
-  const { price: _antigo, ...rest } = o;
-  return Object.keys(price).length ? { ...rest, price } : rest;
 }
 
 /** Campo especial usado em condições: o tipo do card. */

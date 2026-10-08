@@ -20,21 +20,14 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { aiToolInfo, type AiTool } from '../../shared/harness';
 import type { RunReport } from '../../shared/log';
-import type { ModelOption } from '../../shared/models';
 import { ensureProjectServer } from '../mcp/clientConfig';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunningProcess } from '../runner';
-import {
-  MeasureBrokenError,
-  MeasureEndedError,
-  MeasureIgnoredError,
-  MeasureRefusedError,
-  MeasureUnsupportedError,
-  type MeasureError,
-} from './errors';
+import { MeasureBrokenError, MeasureEndedError, MeasureIgnoredError, MeasureRefusedError, type MeasureError } from './errors';
 import { cut } from './json';
 import { lineSplitter } from './lines';
-import { readerFor, type OutputReader, type OutputStream } from './reader';
+import type { OutputReader, OutputStream } from './reader';
+import { providerFor } from '../ai/providers';
 import { textReader } from './text';
 
 /** Como o board inicia um processo da CLI. O `out` recebe de qual canal cada pedaço veio. */
@@ -48,10 +41,6 @@ export interface MeasuredDeps {
    * canal do editor e para o `tail` da falha; o chat guarda para a resposta e para o `tail` do erro.
    */
   log: (line: string) => void;
-  /** catálogo de modelos do board, para estimar o custo quando a ferramenta não informa */
-  catalog: ModelOption[];
-  /** a regra do board que soma a tarifa do Cursor (Cursor Token Rate) à estimativa dos modelos de terceiros */
-  cursorTokenRate?: boolean;
 }
 
 export interface Measured {
@@ -128,17 +117,15 @@ export function materialize(command: HeadlessCommand): { command: HeadlessComman
 
 export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, deps: MeasuredDeps): Measured {
   const label = aiToolInfo(tool).label;
-  // o custo estimado sai do preço dos modelos DESTA ferramenta: o mesmo nome curto pode existir em duas
-  const catalog = deps.catalog.filter((o) => o.tool === tool);
+  const provider = providerFor(tool);
   const model = input.exec?.model?.name ?? null;
-  const cursorTokenRate = deps.cursorTokenRate ?? false;
 
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
   let current: RunningProcess | null = null;
   let killed = false;
   let done = false;
   /** o leitor da tentativa em curso; o `report()` é sempre o da última */
-  let reader: OutputReader = readerFor('text', { catalog, model, cursorTokenRate });
+  let reader: OutputReader = textReader();
   /** por que a medição não aconteceu, quando não aconteceu */
   let failure: MeasureError | null = null;
 
@@ -150,7 +137,6 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
 
   const attempt = (structured: boolean): void => {
     const built = headlessCommand(tool, { ...input, structured });
-    if ('unsupported' in built) throw new Error(built.unsupported);
     // sem o servidor do board no arquivo que a ferramenta lê, a execução rodaria sem mover nem comentar nada
     if (built.projectMcp) {
       const { file } = built.projectMcp;
@@ -166,10 +152,8 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
     const { command, cleanup } = materialize(built);
     const format = command.format;
     // o leitor desta tentativa, preso nela: um pedaço atrasado da tentativa anterior não suja o seguinte
-    const read = readerFor(format, { catalog, model, cursorTokenRate });
+    const read = provider.reader(format, { model });
     reader = read;
-    // pediu estruturado e o builder devolveu texto: esta ferramenta não tem o modo (o Copilot)
-    if (structured && format === 'text') failure ??= new MeasureUnsupportedError(label);
 
     // um partidor por canal: os dois chegam entremeados, e um aviso no `stderr` no meio de uma linha
     // de evento partida emendaria texto de gente no JSON e quebraria os dois

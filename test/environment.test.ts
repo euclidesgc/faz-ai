@@ -109,9 +109,9 @@ describe('Diagnóstico do ambiente', () => {
     const cursor = await checkEnvironment(probe({ requirements: [mcp] }));
     expect(byId(cursor.checks, 'mcp')).toMatchObject({ level: 'required', status: 'missing', requirement: mcp });
     expect(byId(cursor.checks, 'skill')).toMatchObject({ level: 'required', status: 'missing', fix: { kind: 'installSkill' } });
-    const codex = await checkEnvironment(probe({ tool: 'codex', skillInstalled: true }));
-    expect(byId(codex.checks, 'mcp')).toMatchObject({ level: 'required', status: 'ok' });
-    expect(byId(codex.checks, 'skill')).toMatchObject({ level: 'required', status: 'ok' });
+    const claude = await checkEnvironment(probe({ tool: 'claude', skillInstalled: true }));
+    expect(byId(claude.checks, 'mcp')).toMatchObject({ level: 'required', status: 'ok' });
+    expect(byId(claude.checks, 'skill')).toMatchObject({ level: 'required', status: 'ok' });
   });
 
   it('tudo instalado: mostra as versões e não sugere nada', async () => {

@@ -191,7 +191,7 @@ describe('formatMetrics: tokens medidos, custo não medido', () => {
     run(at(2026, 6, 3), 1000, { tokens: 10 });
     run(at(2026, 6, 4), 1000);
     const text = formatMetrics(getMetrics(db, boardId, RANGE), undefined);
-    expect(text).toContain('custo estimado e parcial');
+    expect(text).toContain('custo parcial');
     expect(text).toContain('tokens parciais');
   });
 });

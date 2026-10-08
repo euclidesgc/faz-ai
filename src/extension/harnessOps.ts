@@ -6,19 +6,14 @@ import { agentTemplate, skillTemplate } from './harness';
 import { setSkillMode } from './skillMode';
 
 /** Conteúdo inicial de um arquivo novo do harness, no formato que a ferramenta espera. */
-function template(tool: AiTool, src: HarnessSource, file: string, name: string, description: string): string {
+function template(src: HarnessSource, file: string, name: string, description: string): string {
   const oneLine = description.replace(/\r?\n/g, ' ').trim();
   if (src.layout === 'skills') return skillTemplate(name, oneLine, 'Instruções da skill.');
-  if (src.kind === 'agent') {
-    const spec = aiToolInfo(tool).agents;
-    if (spec)
-      return agentTemplate({ ...spec, format: file.endsWith('.toml') ? 'toml' : 'markdown' }, name, oneLine, 'Instruções do agente.');
-  }
+  if (src.kind === 'agent') return agentTemplate(name, oneLine, 'Instruções do agente.');
   if (file.endsWith('.json')) return '{}\n';
-  if (file.endsWith('.toml') || file.endsWith('.rules')) return '';
   if (src.layout === 'file') return '';
   // regras por caminho e prompts: frontmatter com a descrição e o campo de aplicação de cada ferramenta
-  const extra = file.endsWith('.mdc') ? 'alwaysApply: false\n' : file.endsWith('.instructions.md') ? 'applyTo: "**"\n' : '';
+  const extra = file.endsWith('.mdc') ? 'alwaysApply: false\n' : '';
   return `---\ndescription: ${oneLine}\n${extra}---\n\n`;
 }
 
@@ -48,13 +43,13 @@ export class HarnessOps {
     let file = root;
     if (src.layout !== 'file') {
       this.checkName(name);
-      file = src.layout === 'skills' ? path.join(root, name, 'SKILL.md') : path.join(root, `${name}${src.createExt ?? src.ext}`);
+      file = src.layout === 'skills' ? path.join(root, name, 'SKILL.md') : path.join(root, `${name}${src.ext}`);
       if ((src.layout === 'skills' || src.kind === 'agent') && !description.trim())
         throw new Error('Informe a descrição: é por ela que a IA decide quando usar o item.');
     }
     if (fs.existsSync(file)) throw new Error(`Já existe: ${file}`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, template(tool, src, file, name, description));
+    fs.writeFileSync(file, template(src, file, name, description));
     return file;
   }
 
@@ -65,10 +60,10 @@ export class HarnessOps {
     if (!inside || item.layout === 'entry') throw new Error('Este item não pode ser alterado pelo board.');
   }
 
-  setSkillMode(tool: AiTool, item: HarnessItem, mode: SkillMode): void {
+  setSkillMode(item: HarnessItem, mode: SkillMode): void {
     this.own(item);
     if (item.layout !== 'skills') throw new Error('Só skills têm modo de invocação.');
-    setSkillMode(tool, item.path, mode);
+    setSkillMode(item.path, mode);
   }
 
   /** Caminho de um arquivo de apoio dentro da pasta da skill; recusa o que sairia dela. */
