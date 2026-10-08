@@ -945,7 +945,7 @@ describe('EventLog no MessageRouter', () => {
     expect(Object.keys(snap()).some((k) => /event|log/i.test(k))).toBe(false);
   });
 
-  it('orçamento: mover um card faz exatamente um scheduleSave e no máximo duas consultas a mais que antes', async () => {
+  it('orçamento: mover um card faz exatamente um scheduleSave e no máximo três consultas a mais que antes', async () => {
     // `db` instrumentado: conta `prepare` (consultas), `run` (gravações) e `exec` (transações)
     const counts = { prepare: 0, run: 0, exec: 0 };
     const raw = await openInMemory(WASM_DIR);
@@ -993,7 +993,9 @@ describe('EventLog no MessageRouter', () => {
     const withLog = measure(() => r.handle({ type: 'card.move', cardId: id, columnId: col('Discovery').id, position: 0 }));
 
     expect(scheduled).toBe(1);
-    expect(withLog.prepare - baseline.prepare).toBeLessThanOrEqual(2);
+    // 2 consultas do log, mais 1 do `yoloStoryIdOf` que o card.move usa para reavaliar a entrega
+    // da história em modo autônomo (#275) sem montar o snapshot inteiro do board
+    expect(withLog.prepare - baseline.prepare).toBeLessThanOrEqual(3);
     expect(withLog.exec).toBe(baseline.exec); // o log não abre transação própria
     // as gravações a mais são os INSERTs dos eventos (column_changed e status_changed: Discovery tem IA ativa)
     expect(withLog.run - baseline.run).toBe(2);

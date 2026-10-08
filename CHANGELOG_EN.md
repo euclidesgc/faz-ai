@@ -7,6 +7,12 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Autonomous story delivery was not detected when the PR arrived before the last column.**
+  When registering the pull request (`set_pull_request`), the board only marked `waiting_review`
+  and commented the delivery if the story was already in the last column the AI works on; registered
+  before that, the delivery was never detected and the autopilot kept trying to run a story that had
+  already been delivered. Now that check (`settleDelivery`) also runs when the card moves to the last
+  column, and inside the runner's `settle`, at the end of a run.
 - **Backup through the command palette.** In the editor, the commands `fazai.exportBoard` ("Faz AI:
   Export the board") and `fazai.importBoard` ("Faz AI: Import a board") in the command palette
   (`Ctrl+Shift+P`) open native save and file picker dialogs, work with the board closed (they open

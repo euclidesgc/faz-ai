@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDelivered, lastAiColumn, stackBaseOf } from '../src/shared/story';
+import { isDelivered, isDeliverableStory, lastAiColumn, stackBaseOf } from '../src/shared/story';
 import { boardState, card, column } from './fakes/board';
 
 describe('stackBaseOf', () => {
@@ -142,5 +142,34 @@ describe('isDelivered', () => {
     });
 
     expect(isDelivered(s, s.cards[1]!)).toBe(false);
+  });
+});
+
+describe('isDeliverableStory', () => {
+  const columns = [column('backlog', 'wp', 0, 'open'), column('homologacao', 'wp', 1, 'open'), column('done', 'wp', 2, 'done')].map((c) =>
+    c.id === 'homologacao' ? { ...c, aiActive: true } : c,
+  );
+
+  it('true mesmo quando o status ainda é da IA — é o que falta para `isDelivered`', () => {
+    const s = boardState({ columns, cards: [card('h1', { yolo: true, columnId: 'homologacao', prUrl: 'https://pr', status: 'running' })] });
+
+    expect(isDeliverableStory(s, s.cards[0]!)).toBe(true);
+    expect(isDelivered(s, s.cards[0]!)).toBe(false);
+  });
+
+  it('false sem prUrl, fora da última coluna, bloqueada, ou para sub-tarefa', () => {
+    const base = { yolo: true, columnId: 'homologacao', prUrl: 'https://pr', status: 'running' } as const;
+    expect(isDeliverableStory(boardState({ columns, cards: [card('h1', { ...base, prUrl: '' })] }), card('h1', { ...base, prUrl: '' }))).toBe(
+      false,
+    );
+    const s1 = boardState({ columns, cards: [card('h1', { ...base, columnId: 'backlog' })] });
+    expect(isDeliverableStory(s1, s1.cards[0]!)).toBe(false);
+    const s2 = boardState({ columns, cards: [card('h1', { ...base, status: 'blocked' })] });
+    expect(isDeliverableStory(s2, s2.cards[0]!)).toBe(false);
+    const s3 = boardState({
+      columns,
+      cards: [card('h1', { yolo: true, columnId: 'homologacao' }), card('t1', { ...base, parentId: 'h1' })],
+    });
+    expect(isDeliverableStory(s3, s3.cards[1]!)).toBe(false);
   });
 });

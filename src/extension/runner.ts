@@ -2,7 +2,7 @@ import { cardRef } from '../shared/model';
 import { aiToolInfo } from '../shared/harness';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { columnOf, isLive } from '../shared/selectors';
-import { isYolo } from '../shared/story';
+import { isYolo, storyOf } from '../shared/story';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
@@ -377,6 +377,11 @@ export class AiRunner {
       );
     }
     if (failure) return this.block(cardId, failure);
+    // o pull request pode ter sido registrado antes do card chegar na última coluna da IA (ex.: a
+    // mesma sessão fez a implementação e a homologação): reavalia a entrega agora, antes do fallback
+    // de modo autônomo devolver o card para "ready".
+    const story = storyOf(this.router.snapshot(), card);
+    if (story && this.router.settleDelivery(story.id, toolLabel)) return;
     // em modo autônomo não há pessoa para esperar: o card volta para a IA seguir (o autopiloto limita as voltas sem progresso)
     if (replied && isYolo(this.router.snapshot(), card)) return this.setStatus(cardId, 'ready', toolLabel);
     // respondeu na conversa e encerrou: a vez é da pessoa
