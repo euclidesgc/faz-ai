@@ -1,6 +1,6 @@
 import { FLOW_SKILL_NAME, toItemName } from '../shared/harnessProject';
 import type { AgentInput } from '../shared/messages';
-import { TOOL_PRESETS } from '../shared/execution';
+import { CONDUCTOR_AGENT, TOOL_PRESETS, defaultAgent } from '../shared/execution';
 import { EFFORT_FIELD } from '../shared/models';
 import type { BoardState } from '../shared/model';
 import type { HarnessStore } from './harness';
@@ -22,7 +22,7 @@ const READ = TOOL_PRESETS.find((p) => p.id === 'read')!.tools;
 const CODE = TOOL_PRESETS.find((p) => p.id === 'code')!.tools;
 
 /** Nome do agente padrão de fábrica: conduz os cards pelo fluxo e delega aos especialistas. */
-export const CONDUCTOR_AGENT = 'condutor-do-board';
+export { CONDUCTOR_AGENT };
 
 /**
  * A variedade mínima de agentes que o board oferece. Instruções curtas e genéricas de propósito: o
@@ -204,6 +204,12 @@ export function migrateExecProfiles(ctx: BoardContext, store: HarnessStore): Rec
   const names: Record<string, string> = {};
   let defaultName = '';
   for (const p of legacy) {
+    // o "Agente padrão" embutido das versões anteriores não era um perfil da pessoa: sem instruções nem
+    // restrições, não vira arquivo; quem apontava para ele passa a seguir o padrão do board
+    if (p.id === defaultAgent().id) {
+      names[p.id] = '';
+      continue;
+    }
     const name = toItemName(p.name) || p.id;
     names[p.id] = name;
     const found = agents.find((a) => a.name === name);

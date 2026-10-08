@@ -6,6 +6,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Agente padrão depois da migração dos perfis.** Ao abrir um board gravado por uma versão anterior, o
+  "Agente padrão" embutido (sem instruções) virava o arquivo `~/.claude/agents/agente-padr-o.md`, com
+  o nome truncado pelo acento e com Opus como modelo, e ficava como padrão do board no lugar do
+  `condutor-do-board`. Agora esse perfil não vira arquivo (quem apontava para ele segue o padrão do
+  board), os nomes migrados perdem só o acento (`agente-padrao`), e, quando o agente escolhido como
+  padrão não existe, vale o condutor, não o primeiro da lista. Se o arquivo truncado já foi criado,
+  apague-o em Configurações → Harness → Global → Agentes.
 - **Instalar a skill do fluxo marca a skill mesmo quando ela já existia.** Desde o contexto vazio, a
   skill `faz-ai-fluxo` só conta como pronta quando existe **e** está marcada em todo contexto. Quem já
   tinha a skill no disco via o aviso no Diagnóstico e no board, e o botão **Instalar** não fazia nada,

@@ -7,6 +7,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Default agent after the profile migration.** Opening a board saved by an earlier version turned
+  the built-in "Agente padrão" (no instructions) into the file `~/.claude/agents/agente-padr-o.md`,
+  with the name cut by the accent and Opus as its model, and made it the board's default instead of
+  `condutor-do-board`. Now that profile does not become a file (whatever pointed at it follows the
+  board's default), migrated names only lose their accents (`agente-padrao`), and when the agent
+  chosen as default does not exist, the conductor is used, not the first in the list. If the cut
+  file was already created, delete it under Configurações → Harness → Global → Agentes.
 - **Installing the flow skill checks it even when it already existed.** Since the empty context, the
   `faz-ai-fluxo` skill only counts as ready when it exists **and** is checked "include in every
   context". Anyone who already had the skill on disk saw the warning in the Diagnostics and on the

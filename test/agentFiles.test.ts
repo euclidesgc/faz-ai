@@ -194,4 +194,36 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
     // a migração não roda de novo
     expect(handle.db.exec('SELECT exec_profiles_json FROM boards')[0]?.values[0]?.[0]).toBe('[]');
   });
+
+  it('o "Agente padrão" embutido das versões anteriores não vira arquivo: quem apontava para ele segue o padrão do board, que passa a ser o condutor', async () => {
+    const handle = await handleOf();
+    const first = await open(handle, false);
+    const s0 = first.snapshot();
+    const cardId = first.createCard({ typeId: s0.cardTypes[0]!.id, columnId: s0.columns[0]!.id, parentId: null, title: 'x' });
+    handle.db.run('UPDATE boards SET exec_profiles_json = ? WHERE id = ?', [
+      JSON.stringify([
+        {
+          id: 'padrao',
+          name: 'Agente padrão',
+          purpose: '',
+          skills: [],
+          mcpServers: null,
+          tools: [],
+          deniedTools: [],
+          model: '',
+          isDefault: true,
+        },
+      ]),
+      s0.board.id,
+    ]);
+    handle.db.run('UPDATE cards SET exec_profile = ? WHERE id = ?', ['padrao', cardId]);
+
+    const router = await open(handle, true);
+    const s = router.snapshot();
+    expect(fs.existsSync(path.join(home, '.claude', 'agents', 'agente-padr-o.md'))).toBe(false);
+    expect(fs.existsSync(path.join(home, '.claude', 'agents', 'agente-padrao.md'))).toBe(false);
+    expect(s.cards.find((c) => c.id === cardId)?.execProfile ?? '').toBe('');
+    expect(s.board.runner.defaultAgent).toBe(CONDUCTOR_AGENT);
+    expect(s.board.execProfiles.find((p) => p.isDefault)?.id).toBe(CONDUCTOR_AGENT);
+  });
 });
