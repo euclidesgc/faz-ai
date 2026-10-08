@@ -25,11 +25,6 @@ export interface BoardRules {
   autoApplyModelSuggestion: boolean;
   /** o catálogo do Cursor inclui as variantes rápidas (`-fast`): respondem mais rápido e gastam mais */
   includeFastModels: boolean;
-  /**
-   * a estimativa de custo do Cursor soma a tarifa dele (Cursor Token Rate, planos Teams e
-   * Enterprise) aos modelos de terceiros; Composer, Grok e o `auto` são isentos
-   */
-  cursorTokenRate: boolean;
   /** meses completos de detalhe do log guardados além do mês corrente (de 1 a 24); os totais por mês nunca expiram */
   logRetentionMonths: number;
 }
@@ -43,7 +38,6 @@ export const DEFAULT_RULES: BoardRules = {
   confirmArchive: 'whenDependents',
   autoApplyModelSuggestion: true,
   includeFastModels: false,
-  cursorTokenRate: false,
   logRetentionMonths: DEFAULT_LOG_RETENTION_MONTHS,
 };
 
@@ -72,7 +66,6 @@ export function parseRules(json: string | null | undefined): BoardRules {
     autoApplyModelSuggestion:
       typeof raw.autoApplyModelSuggestion === 'boolean' ? raw.autoApplyModelSuggestion : DEFAULT_RULES.autoApplyModelSuggestion,
     includeFastModels: typeof raw.includeFastModels === 'boolean' ? raw.includeFastModels : DEFAULT_RULES.includeFastModels,
-    cursorTokenRate: typeof raw.cursorTokenRate === 'boolean' ? raw.cursorTokenRate : DEFAULT_RULES.cursorTokenRate,
     // só número inteiro dentro dos limites: "6" em texto, 2.5, 0 e 25 voltam ao padrão em vez de serem arredondados
     logRetentionMonths:
       typeof raw.logRetentionMonths === 'number' &&

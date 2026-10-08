@@ -250,23 +250,6 @@ describe('ModelsSettings: preços do Cursor', () => {
   };
   const back = () => board.router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude' } });
 
-  it('a tarifa do Cursor só aparece no Cursor, explica a cobrança e grava a regra', async () => {
-    show();
-    expect(screen.queryByRole('switch', { name: 'Somar a tarifa do Cursor (Cursor Token Rate)' })).toBeNull();
-    useCursor();
-    show();
-    const toggle = screen.getAllByRole('switch', { name: 'Somar a tarifa do Cursor (Cursor Token Rate)' }).at(-1)!;
-    expect(toggle).not.toBeChecked();
-    expect(screen.getAllByText(/US\$ 0,25 por milhão de tokens/).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: 'Sobre a tarifa' }).at(-1)).toHaveAttribute(
-      'href',
-      'https://cursor.com/help/models-and-usage/token-rate',
-    );
-    await userEvent.click(toggle);
-    expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { cursorTokenRate: true } });
-    back();
-  });
-
   it('o `auto` nasce com preço variável: sem os campos de preço, com o texto e o link da documentação', async () => {
     useCursor();
     show();

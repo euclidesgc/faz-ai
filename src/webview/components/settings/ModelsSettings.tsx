@@ -28,9 +28,6 @@ const SOURCES: Record<AiTool, string> = {
   copilot: 'lista embutida na extensão (o GitHub Copilot não guarda a lista em arquivo)',
 };
 
-/** A tarifa extra do Cursor nos planos Teams e Enterprise. */
-const CURSOR_TOKEN_RATE_URL = 'https://cursor.com/help/models-and-usage/token-rate';
-
 const EMPTY_DRAFT = { model: '', label: '', efforts: '' };
 
 /** Rascunho do modelo novo: nome, identificador na ferramenta e os esforços aceitos. */
@@ -177,21 +174,8 @@ export function ModelsSettings() {
                 />
                 <Text as="p" size="1" color="gray">
                   {t(
-                    'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"), com preço próprio para a estimativa de custo; desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.',
+                    'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"); desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.',
                   )}
-                </Text>
-                <SwitchField
-                  label={t('Somar a tarifa do Cursor (Cursor Token Rate)')}
-                  checked={state.board.rules.cursorTokenRate}
-                  onChange={(cursorTokenRate) => settings.updateRules({ cursorTokenRate })}
-                />
-                <Text as="p" size="1" color="gray">
-                  {t(
-                    'Nos planos Teams e Enterprise, o Cursor cobra US$ 0,25 por milhão de tokens (input, output e cache) por cima do preço dos modelos de terceiros. Ligado, a estimativa de custo soma essa tarifa; Composer, Grok e Auto são isentos. Execuções já registradas não mudam.',
-                  )}{' '}
-                  <a href={CURSOR_TOKEN_RATE_URL} target="_blank" rel="noreferrer">
-                    {t('Sobre a tarifa')}
-                  </a>
                 </Text>
               </div>
             )}

@@ -600,13 +600,6 @@ describe('modelos de IA', () => {
     expect(await entry('cursor:auto')).toMatchObject({ variablePrice: false });
   });
 
-  it('update_rules liga e desliga a tarifa do Cursor sem mexer nas outras regras', async () => {
-    const before = (await call('update_rules', {})).data;
-    expect(before.cursorTokenRate).toBe(false);
-    expect((await call('update_rules', { cursorTokenRate: true })).data).toEqual({ ...before, cursorTokenRate: true });
-    expect((await call('update_rules', { cursorTokenRate: false })).data.cursorTokenRate).toBe(false);
-  });
-
   it('sugere o modelo pelo esforço da tarefa sem trocar uma escolha manual', async () => {
     // regras iniciais: Esforço Baixo/Médio/Alto → modelo leve/intermediário/forte da primeira ferramenta
     const rules = (await call('get_models')).data.rules;

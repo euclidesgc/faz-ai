@@ -360,12 +360,8 @@ export const settings: Record<string, string> = {
   'Sem branches nem worktrees, o board trata uma história por vez: todas trabalham direto na pasta do projeto, e duas ao mesmo tempo misturariam as alterações. Para tocar histórias em paralelo, escolha "Worktree por história".':
     'With no branches or worktrees, the board handles one story at a time: they all work directly in the project folder, and two at once would mix their changes. To drive stories in parallel, choose "Worktree por história".',
   'Incluir os modos rápidos': 'Include fast modes',
-  'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"), com preço próprio para a estimativa de custo; desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.':
-    'Cursor has a fast version of many models: it answers sooner and charges more for the same tokens. When on, each one enters the catalog as a separate model (for example, "Claude Opus 5.5 1M Fast"), with its own price for the cost estimate; when off, they leave the catalog. The list comes from the cursor-agent models command, read with the CLI signed in.',
-  'Somar a tarifa do Cursor (Cursor Token Rate)': 'Add the Cursor fee (Cursor Token Rate)',
-  'Nos planos Teams e Enterprise, o Cursor cobra US$ 0,25 por milhão de tokens (input, output e cache) por cima do preço dos modelos de terceiros. Ligado, a estimativa de custo soma essa tarifa; Composer, Grok e Auto são isentos. Execuções já registradas não mudam.':
-    'On Teams and Enterprise plans, Cursor charges US$ 0.25 per million tokens (input, output and cache) on top of the price of third-party models. When on, the cost estimate adds this fee; Composer, Grok and Auto are exempt. Runs already recorded do not change.',
-  'Sobre a tarifa': 'About the fee',
+  'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"); desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.':
+    'Cursor has a fast version of many models: it answers sooner and charges more for the same tokens. When on, each one enters the catalog as a separate model (for example, "Claude Opus 5.5 1M Fast"); when off, they leave the catalog. The list comes from the cursor-agent models command, read with the CLI signed in.',
   'Preço variável': 'Variable price',
   'Preço variável de {model}': 'Variable price of {model}',
   'O custo depende do modelo escolhido a cada pedido; o board não estima o custo deste modelo.':
