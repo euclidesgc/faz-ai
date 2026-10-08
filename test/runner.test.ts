@@ -7,9 +7,11 @@ import { CURSOR_TOOLS, headlessCommand, headlessUnsupported } from '../src/exten
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt, consumptionLine } from '../src/extension/runner';
 import type { RunnerDeps } from '../src/extension/runner';
+import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
+import { gatewayFor } from './helpers/gateway';
 import { executionPlan } from '../src/extension/execution';
 import { monthOf, type RunReport } from '../src/shared/log';
 import type { Database } from 'sql.js';
@@ -72,7 +74,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     cwd: project,
     homeDir: home,
     log: () => {},
-    spawn: (command) => {
+    gateway: gatewayFor(router, db, (command) => {
       const file = command.args[command.args.indexOf('--mcp-config') + 1]!;
       seen = { file, mode: fs.statSync(file).mode & 0o777, content: fs.readFileSync(file, 'utf8') };
       return {
@@ -81,7 +83,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
           exit = (code) => fn(code);
         },
       };
-    },
+    }),
   });
   runner.start(cardId);
   expect(seen!.mode).toBe(0o600);
@@ -195,31 +197,28 @@ beforeEach(async () => {
   log = [];
   procs = [];
   speaks = true;
-  // sem `runLog`: o executor padrão dos testes é o de um board sem log, que tem de funcionar como antes
-  deps = {
-    cwd: dir,
-    log: (line) => log.push(line),
-    spawn: (command, cwd, out) => {
-      let listener: (code: number | null, error?: Error) => void = () => {};
-      const proc = {
-        command,
-        cwd,
-        killed: false,
-        emit: (text: string, stream: 'stdout' | 'stderr' = 'stdout') => out(text, stream),
-        exit: (code: number | null, error?: Error) => listener(code, error),
-      };
-      procs.push(proc);
-      // no modo estruturado a ferramenta escreve eventos; o texto vem dentro de um evento do assistente
-      if (speaks) out(command.format === 'text' ? 'saída da ferramenta\n' : `${assistant('saída da ferramenta')}\n`, 'stdout');
-      return {
-        onExit: (fn) => (listener = fn),
-        kill: () => {
-          proc.killed = true;
-          proc.exit(null);
-        },
-      };
-    },
+  // o log de uso é obrigatório: o executor dos testes grava no mesmo banco em memória do board
+  const spawn: SpawnFn = (command, cwd, out) => {
+    let listener: (code: number | null, error?: Error) => void = () => {};
+    const proc = {
+      command,
+      cwd,
+      killed: false,
+      emit: (text: string, stream: 'stdout' | 'stderr' = 'stdout') => out(text, stream),
+      exit: (code: number | null, error?: Error) => listener(code, error),
+    };
+    procs.push(proc);
+    // no modo estruturado a ferramenta escreve eventos; o texto vem dentro de um evento do assistente
+    if (speaks) out(command.format === 'text' ? 'saída da ferramenta\n' : `${assistant('saída da ferramenta')}\n`, 'stdout');
+    return {
+      onExit: (fn) => (listener = fn),
+      kill: () => {
+        proc.killed = true;
+        proc.exit(null);
+      },
+    };
   };
+  deps = { cwd: dir, log: (line) => log.push(line), gateway: gatewayFor(router, db, spawn, (line) => log.push(line)) };
   runner = new AiRunner(router, deps);
 });
 
@@ -540,7 +539,7 @@ describe('log das execuções de IA', () => {
 
   beforeEach(() => {
     runs = new AiRunRepo(db);
-    logged = new AiRunner(router, { ...deps, runLog: createRunLog(db, (line) => log.push(line)) });
+    logged = runner;
   });
 
   /** as execuções gravadas neste mês, da mais antiga para a mais recente */
@@ -742,11 +741,11 @@ describe('log das execuções de IA', () => {
     expect(log.join('\n')).toContain('[fazai] falha ao registrar a execução de IA:');
   });
 
-  it('sem runLog o executor não grava nada e funciona como antes', () => {
+  it('toda execução é registrada: não existe executor sem log', () => {
     runner.start(storyId);
+    expect(runner.runIdOf(storyId)).toBe(only().id);
     procs[0]!.exit(0);
-    expect(rows()).toEqual([]);
-    expect(runner.runIdOf(storyId)).toBeNull();
+    expect(only()).toMatchObject({ outcome: 'done', origin: 'manual', tool: 'claude' });
   });
 
   /** A medição de consumo pela porta do executor (#70): do processo ao banco, passando pelo canal e pela conversa do card. */

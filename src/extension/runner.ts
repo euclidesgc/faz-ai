@@ -1,6 +1,6 @@
 import { cardRef } from '../shared/model';
 import { aiToolInfo } from '../shared/harness';
-import type { AiRunOrigin, AiRunOutcome, RunReport } from '../shared/log';
+import type { AiRunOrigin, RunReport } from '../shared/log';
 import { columnOf, isLive } from '../shared/selectors';
 import { isYolo } from '../shared/story';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
@@ -8,11 +8,9 @@ import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
 import { MeasureBrokenError } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
-import { spawnMeasured, type SpawnFn } from './aiOutput/measured';
-import type { OutputFormat } from './aiOutput/reader';
+import { AiGateway, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
 import { headlessUnsupported } from './headless';
-import type { RunLog } from './log/runLog';
 import { needsTriage, requiredSkills } from './mcp/format';
 import type { MessageRouter } from './panel/messageRouter';
 
@@ -41,8 +39,8 @@ export interface BoardServer {
 }
 
 export interface RunnerDeps {
-  /** inicia o comando na pasta do projeto; cada pedaço de saída vai para `out`, com o canal de onde veio */
-  spawn: SpawnFn;
+  /** a única porta para chamar a ferramenta de IA: é ela que registra a execução no log */
+  gateway: AiGateway;
   log(line: string): void;
   cwd: string;
   /** home do usuário, de onde se lê a configuração de servidores MCP da ferramenta */
@@ -51,23 +49,12 @@ export interface RunnerDeps {
   bridgePath?: string;
   /** caminho do node que roda o bridge; sem ele, `node`, resolvido pelo PATH de quem inicia o servidor */
   nodePath?: string;
-  /**
-   * Log das execuções de IA. Opcional de propósito: sem ele o executor funciona exatamente como antes
-   * (é o que mantém os testes e um board sem log valendo). Não se chama `log` porque esse nome já é o
-   * canal de texto da extensão, logo acima.
-   */
-  runLog?: RunLog;
 }
 
 interface Run {
-  proc: RunningProcess;
-  timer: ReturnType<typeof setTimeout>;
+  exec: AiExecution;
   /** status que o card tinha antes de a execução começar */
   previous: CardStatus | null;
-  /** a linha desta execução em `ai_runs` (`''` quando não há log ou a gravação falhou) */
-  logId: string;
-  stopped: boolean;
-  timedOut: boolean;
   /** últimas linhas que a ferramenta escreveu, para explicar uma falha no próprio card */
   tail: string[];
   mode: AiRunMode;
@@ -85,17 +72,6 @@ export const PERMISSION_ADVICE: Record<RunnerPermission, string | null> = {
   edits: `Nesta execução você cria e altera arquivos do projeto, mas não roda comandos de terminal (testes, git, instalações). Implemente o que der e registre no card o que ficou sem rodar (testes, build, commit): isso fica para quem tem permissão. Só chame block_card se o trabalho não puder avançar sem comandos, explicando que a pessoa precisa escolher "Sem restrições" em ${WHERE}.`,
   full: null,
 };
-
-/**
- * Como a execução terminou, para o log (RF-17). A ordem importa: a pessoa que interrompe e o tempo
- * limite vencem o código de saída, porque matar o processo também produz código diferente de zero.
- */
-function outcomeOf(run: Run, code: number | null, error: Error | undefined): AiRunOutcome {
-  if (run.stopped) return 'stopped';
-  if (run.timedOut) return 'timeout';
-  if (error || code !== 0) return 'failed';
-  return 'done';
-}
 
 const COUNT = new Intl.NumberFormat('pt-BR');
 const USD = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
@@ -212,7 +188,7 @@ export class AiRunner {
 
   /** A execução em curso num card, para o log do board ligar os eventos a ela; `null` quando não há. */
   runIdOf(cardId: string): string | null {
-    return this.runs.get(cardId)?.logId || null;
+    return this.runs.get(cardId)?.exec.runId || null;
   }
 
   /**
@@ -225,16 +201,18 @@ export class AiRunner {
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
     const tool = aiToolInfo(state.board.aiTool);
-    // a linha do log abre ANTES do plano de execução, que pode lançar: a execução que nem começou
-    // também é informação. E o contexto gravado é o do momento da chamada, congelado: a IA move o
-    // card durante o trabalho, e o painel precisa saber de que coluna a execução partiu.
-    const logId = this.deps.runLog
-      ? this.deps.runLog.start({
-          boardId: this.router.boardId,
-          startedAt: Date.now(),
-          origin,
-          // o id da ferramenta, não o rótulo: o rótulo muda e levaria as séries antigas com ele
-          tool: state.board.aiTool,
+    const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
+    const refine = mode === 'refine';
+    const messagesBefore = this.aiMessages(cardId);
+    const tail: string[] = [];
+    let exec: AiExecution;
+    try {
+      exec = this.deps.gateway.run({
+        origin,
+        tool: state.board.aiTool,
+        // o contexto gravado é o do momento da chamada, congelado: a IA move o card durante o trabalho,
+        // e o painel precisa saber de que coluna a execução partiu
+        context: {
           cardId,
           cardNumber: card.number,
           cardTitle: card.title,
@@ -242,144 +220,108 @@ export class AiRunner {
           workflow: state.workflows.find((w) => w.id === card.workflowId)?.name ?? '',
           columnName: columnOf(state, card)?.name ?? '',
           phase: columnOf(state, card)?.name ?? '',
-        })
-      : '';
-    try {
-      const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '', boardServer(this.deps));
-      // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo
-      const refine = mode === 'refine';
-      const autonomous = !refine && isYolo(state, card);
-      // refinar não mexe em arquivos: roda só com o board, salvo na ferramenta que não tem esse nível (aí o pedido proíbe)
-      const permission = autonomous
-        ? 'full'
-        : refine && !headlessUnsupported(state.board.aiTool, 'board')
-          ? 'board'
-          : state.board.runner.permission;
-      const permissionAdvice = refine ? null : PERMISSION_ADVICE[permission];
-      // a ferramenta sem suporte para esta permissão nem começa: confere antes de gravar a configuração
-      const unsupported = headlessUnsupported(state.board.aiTool, permission);
-      if (unsupported) throw new Error(unsupported);
-      // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
-      this.deps.runLog?.describe(logId, {
-        model: plan.manifest.model?.name ?? null,
-        effort: plan.manifest.model?.effort ?? null,
-        profile: plan.manifest.profile,
-        agent: plan.manifest.agent,
-        permission,
-        autonomous,
-        clean: plan.manifest.clean,
-        skills: plan.manifest.skills,
-        mcp: plan.manifest.mcpServers,
-      });
-
-      const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
-      const messagesBefore = this.aiMessages(cardId);
-      if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
-      if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
-      if (plan.manifest.profile || plan.manifest.model) log(plan.summary.join(' | '));
-      const tail: string[] = [];
-      // quantos processos a execução abriu (2 = a CLI recusou a saída estruturada e o trabalho rodou
-      // em texto) e o formato do último: é o que explica, no fim, por que o consumo não foi medido
-      let attempts = 0;
-      let format: OutputFormat = 'text';
-      const spawn: SpawnFn = (command, cwd, out) => {
-        attempts++;
-        format = command.format;
+        },
+        cwd: this.deps.cwd,
+        timeoutMinutes: state.board.runner.timeoutMinutes,
+        prepare: () => {
+          const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '', boardServer(this.deps));
+          // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo
+          const autonomous = !refine && isYolo(state, card);
+          // refinar não mexe em arquivos: roda só com o board, salvo na ferramenta que não tem esse nível (aí o pedido proíbe)
+          const permission = autonomous
+            ? 'full'
+            : refine && !headlessUnsupported(state.board.aiTool, 'board')
+              ? 'board'
+              : state.board.runner.permission;
+          const permissionAdvice = refine ? null : PERMISSION_ADVICE[permission];
+          if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
+          if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
+          if (plan.manifest.profile || plan.manifest.model) log(plan.summary.join(' | '));
+          return {
+            // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
+            config: {
+              model: plan.manifest.model?.name ?? null,
+              effort: plan.manifest.model?.effort ?? null,
+              profile: plan.manifest.profile,
+              agent: plan.manifest.agent,
+              autonomous,
+              clean: plan.manifest.clean,
+              skills: plan.manifest.skills,
+              mcp: plan.manifest.mcpServers,
+            },
+            input: {
+              prompt: refine
+                ? refinePrompt(cardRef(card), requiredSkills(state, card))
+                : cardPrompt(
+                    cardRef(card),
+                    requiredSkills(state, card),
+                    [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+                    autonomous,
+                    needsTriage(state, card),
+                  ),
+              permission,
+              addDirs: this.router.aiWorkDirs(),
+              exec: plan.input,
+              boardServer: boardServer(this.deps),
+            },
+          };
+        },
+        log: (line) => {
+          log(line);
+          // os avisos de configuração da CLI ficam só no canal: não explicam a falha e empurrariam o motivo real para fora
+          if (isCliNoise(line)) return;
+          tail.push(cut(line, TAIL_CHARS));
+          if (tail.length > TAIL_LINES) tail.shift();
+        },
         // o que veio antes deste processo (a linha da chamada e, na volta para texto, a tentativa
         // recusada) não explica a falha dele: o `tail` recomeça aqui
-        tail.length = 0;
-        return this.deps.spawn(command, cwd, out);
-      };
-      // a medição entra sob a mesma porta: o `log` recebe as linhas legíveis, nunca a saída crua, e é
-      // delas que sai o `tail` que explica uma falha na conversa do card
-      const { proc, report } = spawnMeasured(
-        state.board.aiTool,
-        {
-          prompt: refine
-            ? refinePrompt(cardRef(card), requiredSkills(state, card))
-            : cardPrompt(
-                cardRef(card),
-                requiredSkills(state, card),
-                [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
-                autonomous,
-                needsTriage(state, card),
-              ),
-          permission,
-          addDirs: this.router.aiWorkDirs(),
-          exec: plan.input,
-          boardServer: boardServer(this.deps),
+        onAttempt: () => {
+          tail.length = 0;
         },
-        this.deps.cwd,
-        {
-          spawn,
-          log: (line) => {
-            log(line);
-            // os avisos de configuração da CLI ficam só no canal: não explicam a falha e empurrariam o motivo real para fora
-            if (isCliNoise(line)) return;
-            tail.push(cut(line, TAIL_CHARS));
-            if (tail.length > TAIL_LINES) tail.shift();
-          },
-        },
-      );
-      const run: Run = {
-        proc,
-        previous: card.status,
-        mode,
-        logId,
-        stopped: false,
-        timedOut: false,
-        tail,
-        timer: setTimeout(() => {
-          run.timedOut = true;
-          proc.kill();
-        }, state.board.runner.timeoutMinutes * 60_000),
-      };
-      this.runs.set(cardId, run);
-      this.setStatus(cardId, 'running', tool.label);
-      this.publish();
-
-      proc.onExit((code, error) => {
-        clearTimeout(run.timer);
-        log(
-          error
-            ? `Falhou: ${error.message}`
-            : run.stopped
-              ? 'Interrompida.'
-              : run.timedOut
-                ? 'Encerrada por tempo limite.'
-                : `Terminou (código ${code}).`,
-        );
-        this.deps.runLog?.finish(logId, outcomeOf(run, code, error), code);
-        const measured = report();
-        this.deps.runLog?.measure(logId, measured);
-        log(
-          consumptionLine(
-            // sem consumo e sem motivo (o fluxo trouxe ferramentas, mas nenhum número): a saída não trouxe o consumo
-            measured.consumption || measured.reason ? measured : { ...measured, reason: new MeasureBrokenError(tool.label).message },
-            attempts > 1
-              ? { explained: true }
-              : format !== 'text' && (run.stopped || run.timedOut || error || code !== 0)
-                ? { reason: 'a execução terminou antes de informar o consumo.' }
-                : {},
-          ),
-        );
-        try {
-          // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
-          // mudança de status que explicam o fim da execução ficam ligados a ela
-          this.settle(cardId, run, code, error, this.aiMessages(cardId) > messagesBefore, tool.label);
-        } finally {
-          this.runs.delete(cardId);
-        }
-        this.publish();
-        this.finishListeners.forEach((fn) => fn(cardId, run.mode));
       });
     } catch (e) {
       // nem chegou a existir processo (ferramenta sem suporte, plano impossível, spawn que falhou):
-      // a linha fecha aqui, antes de o erro subir para quem chamou, e o motivo fica também no canal
+      // o log já fechou a linha, e o motivo fica também no canal
       this.deps.log(`[${cardRef(card)}] Não foi possível executar: ${e instanceof Error ? e.message : String(e)}`);
-      this.deps.runLog?.finish(logId, 'unsupported');
       throw e;
     }
+    const run: Run = { exec, previous: card.status, mode, tail };
+    this.runs.set(cardId, run);
+    this.setStatus(cardId, 'running', tool.label);
+    this.publish();
+
+    exec.onExit((end) => {
+      log(
+        end.error
+          ? `Falhou: ${end.error.message}`
+          : end.stopped
+            ? 'Interrompida.'
+            : end.timedOut
+              ? 'Encerrada por tempo limite.'
+              : `Terminou (código ${end.code}).`,
+      );
+      const measured = end.report;
+      log(
+        consumptionLine(
+          // sem consumo e sem motivo (o fluxo trouxe ferramentas, mas nenhum número): a saída não trouxe o consumo
+          measured.consumption || measured.reason ? measured : { ...measured, reason: new MeasureBrokenError(tool.label).message },
+          end.attempts > 1
+            ? { explained: true }
+            : end.format !== 'text' && (end.stopped || end.timedOut || end.error || end.code !== 0)
+              ? { reason: 'a execução terminou antes de informar o consumo.' }
+              : {},
+        ),
+      );
+      try {
+        // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
+        // mudança de status que explicam o fim da execução ficam ligados a ela
+        this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
+      } finally {
+        this.runs.delete(cardId);
+      }
+      this.publish();
+      this.finishListeners.forEach((fn) => fn(cardId, run.mode));
+    });
   }
 
   /** Avisa quando a execução de um card termina, seja como for. */
@@ -391,8 +333,7 @@ export class AiRunner {
   stop(cardId: string): void {
     const run = this.runs.get(cardId);
     if (!run) return;
-    run.stopped = true;
-    run.proc.kill();
+    run.exec.stop();
   }
 
   dispose(): void {
@@ -400,12 +341,13 @@ export class AiRunner {
   }
 
   /** Deixa o card num status coerente quando a IA não passou a vez por conta própria. */
-  private settle(cardId: string, run: Run, code: number | null, error: Error | undefined, replied: boolean, toolLabel: string): void {
+  private settle(cardId: string, run: Run, end: AiRunEnd, replied: boolean, toolLabel: string): void {
+    const { code, error } = end;
     const card = this.router.snapshot().cards.find((c) => c.id === cardId);
     // a IA (ou a pessoa) já mudou o status durante a execução: é ele que vale
     if (!card || card.status !== 'running') return;
     // restaurar não passa pelas regras da IA (o status anterior pode ser "Aprovado")
-    if (run.stopped)
+    if (end.stopped)
       return void this.router.handle(
         { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
         { author: RUNNER_AUTHOR },
@@ -418,7 +360,7 @@ export class AiRunner {
     const output =
       freePlan +
       (run.tail.length ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${run.tail.join('\n').replace(/```/g, "'''")}\n\`\`\`` : '');
-    const failure = run.timedOut
+    const failure = end.timedOut
       ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness de IA.${output}`
       : error
         ? `Não foi possível executar o ${toolLabel}: ${error.message}`

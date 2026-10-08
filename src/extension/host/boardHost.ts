@@ -6,6 +6,7 @@ import { openFile, type DbHandle } from '../db/database';
 import { dayOf } from '../../shared/log';
 import { Autopilot } from '../autopilot';
 import { Heartbeat } from '../heartbeat';
+import { AiGateway } from '../ai/gateway';
 import { createRunLog } from '../log/runLog';
 import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
@@ -142,7 +143,14 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // o node do PATH do terminal, com caminho absoluto: é ele que a ferramenta usa para iniciar o servidor do board.
   // Procurado de novo a cada conferência dos requisitos: a pessoa pode instalar o node com o board aberto
   let nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
+  // a única porta para chamar a IA: o executor de cards e o chat passam por ela, e é ela que escreve o log de uso
+  const gateway = new AiGateway({
+    boardId: router.boardId,
+    runLog,
+    spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
+  });
   const runner = new AiRunner(router, {
+    gateway,
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
@@ -150,8 +158,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return nodePath;
     },
     log: o.log,
-    runLog,
-    spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
   });
   // o log do board liga cada evento à execução em curso no card (`run_id`); sem execução, fica nulo
   router.setRunResolver((cardId) => runner.runIdOf(cardId));
@@ -185,6 +191,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     removeWorktree,
   });
   const chat = new ChatSession(router, {
+    gateway,
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
@@ -192,8 +199,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return nodePath;
     },
     log: o.log,
-    runLog,
-    spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
     file: path.join(o.storageDir, 'chat', `${workspaceKey(o.folderPath)}.json`),
   });
   // os modelos do Cursor são os da conta, e só a CLI diz quais são: lidos ao abrir o board e ao passar
