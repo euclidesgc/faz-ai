@@ -16,7 +16,7 @@ import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
 import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
 import type { MessageRouter } from './panel/messageRouter';
-import type { BoardState } from '../shared/model';
+import type { AiActivity, BoardState } from '../shared/model';
 
 /** Processo da ferramenta de IA em execução. */
 export interface RunningProcess {
@@ -62,6 +62,8 @@ interface Run {
   /** últimas linhas que a ferramenta escreveu, para explicar uma falha no próprio card */
   tail: string[];
   mode: AiRunMode;
+  /** projeção publicada ao router (ver `publish`) */
+  info: AiActivity;
 }
 
 const RUNNER_AUTHOR = 'Faz AI';
@@ -234,6 +236,9 @@ export class AiRunner {
     const summarize = mode === 'summarize';
     const messagesBefore = this.aiMessages(cardId);
     const tail: string[] = [];
+    // conhecidos antes do gateway.run, para a projeção publicada depois (ver `info` abaixo)
+    const phase = columnOf(state, card)?.name ?? '';
+    let activityModel: string | null = null;
     let exec: AiExecution;
     try {
       exec = this.deps.gateway.run({
@@ -247,8 +252,8 @@ export class AiRunner {
           cardTitle: card.title,
           cardType: state.cardTypes.find((t) => t.id === card.typeId)?.name ?? '',
           workflow: state.workflows.find((w) => w.id === card.workflowId)?.name ?? '',
-          columnName: columnOf(state, card)?.name ?? '',
-          phase: columnOf(state, card)?.name ?? '',
+          columnName: phase,
+          phase,
         },
         cwd: this.deps.cwd,
         timeoutMinutes: state.board.runner.timeoutMinutes,
@@ -265,10 +270,11 @@ export class AiRunner {
           log(plan.summary.join(' | '));
           // resumir sempre usa a faixa "Alto" do catálogo ativo, independente do Esforço do card
           const summaryModel = summarize ? highTierModel(state) : null;
+          activityModel = summarize ? summaryModel?.name ?? null : plan.manifest.model?.name ?? null;
           return {
             // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
             config: {
-              model: summarize ? summaryModel?.name ?? null : plan.manifest.model?.name ?? null,
+              model: activityModel,
               effort: summarize ? summaryModel?.effort ?? null : plan.manifest.model?.effort ?? null,
               profile: plan.manifest.profile,
               agent: plan.manifest.agent,
@@ -316,7 +322,16 @@ export class AiRunner {
       this.deps.log(`[${cardRef(card)}] Não foi possível executar: ${e instanceof Error ? e.message : String(e)}`);
       throw e;
     }
-    const run: Run = { exec, previous: card.status, mode, tail };
+    const info: AiActivity = {
+      cardId,
+      runId: exec.runId,
+      mode,
+      origin,
+      phase,
+      model: activityModel,
+      startedAt: exec.startedAt,
+    };
+    const run: Run = { exec, previous: card.status, mode, tail, info };
     this.runs.set(cardId, run);
     this.setStatus(cardId, 'running', tool.label);
     this.publish();
@@ -450,6 +465,6 @@ export class AiRunner {
   }
 
   private publish(): void {
-    this.router.setAiRuns(this.running);
+    this.router.setAiRuns([...this.runs.values()].map((r) => r.info).sort((a, b) => a.startedAt - b.startedAt));
   }
 }

@@ -475,6 +475,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
   const heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: o.log });
+  // publica a próxima rodada agendada; a guarda em `setHeartbeat` (só notifica se mudou) evita o laço
+  // router.onDidChange → publishHeartbeat → setHeartbeat → notify
+  const publishHeartbeat = () => router.setHeartbeat({ nextRoundAt: heartbeat.nextRoundAt });
+  heartbeat.onDidChange(publishHeartbeat);
+  router.onDidChange(publishHeartbeat);
+  publishHeartbeat();
   // sem timer próprio: o arquivamento das histórias publicadas acontece no fim da rodada de merges,
   // com o mesmo liga/desliga, o mesmo intervalo e a mesma janela dona
   const releaseWatcher = new ReleaseWatcher(router, { cwd: o.folderPath, log: o.log, gh, git });

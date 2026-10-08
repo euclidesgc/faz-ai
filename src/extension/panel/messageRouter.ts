@@ -5,7 +5,7 @@ import type { DbHandle } from '../db/database';
 import { exportBoard, exportFileName, summarize, type BoardExportFile, type ImportResult } from '../db/boardExport';
 import { newId } from '../db/ids';
 import type { ImportSummary } from '../../shared/backup';
-import type { Attachment, Autopilot, BoardState } from '../../shared/model';
+import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
 import type { AiTool } from '../../shared/harness';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
@@ -110,6 +110,8 @@ export class MessageRouter {
   private listeners = new Set<() => void>();
   private approveListeners: ((cardId: string) => void)[] = [];
   private aiRuns: string[] = [];
+  private aiActivity: AiActivity[] = [];
+  private heartbeatNextAt: number | null = null;
   private chat: ChatState = EMPTY_CHAT;
   private chatHandler: ((msg: ChatMessageIn) => void) | null = null;
   private autopilot: Autopilot = { active: false, note: null };
@@ -168,6 +170,8 @@ export class MessageRouter {
       board: { ...s.board, execProfiles: agentProfiles(current.agents, s.harnessSelection, s.board.runner.defaultAgent) },
       harness: current,
       aiRuns: this.aiRuns,
+      aiActivity: this.aiActivity,
+      heartbeatNextAt: this.heartbeatNextAt,
       chat: this.chat,
       autopilot: this.autopilot,
       aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission),
@@ -292,10 +296,18 @@ export class MessageRouter {
     this.notify();
   }
 
-  /** Cards em que a extensão está executando a IA (informado pelo executor). */
-  setAiRuns(cardIds: string[]): void {
-    this.aiRuns = cardIds;
-    this.ctx.aiRuns = cardIds;
+  /** Execuções de IA em curso, uma por card (informado pelo executor); `aiRuns` é derivado delas. */
+  setAiRuns(runs: AiActivity[]): void {
+    this.aiActivity = runs;
+    this.aiRuns = runs.map((r) => r.cardId);
+    this.ctx.aiRuns = this.aiRuns;
+    this.notify();
+  }
+
+  /** Próxima rodada agendada do heartbeat (informado pelo host); só notifica quando o valor muda. */
+  setHeartbeat(state: { nextRoundAt: number | null }): void {
+    if (state.nextRoundAt === this.heartbeatNextAt) return;
+    this.heartbeatNextAt = state.nextRoundAt;
     this.notify();
   }
 
