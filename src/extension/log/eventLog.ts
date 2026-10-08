@@ -123,6 +123,10 @@ export class EventLog {
         const ids = [...before.keys()];
         return { before, after: () => cardFacts(db, ids), cardId: null, extra: {} };
       }
+      case 'card.yolo.setMany': {
+        const ids = msg.cardIds;
+        return { before: cardFacts(db, ids), after: () => cardFacts(db, ids), cardId: null, extra: {} };
+      }
       case 'field.setValue': {
         // o handler troca só o valor do campo: nenhum fato do card muda, e `after` reaproveita a leitura.
         // Limite aceito: mudar "Esforço da atividade" pode trocar "Modelo" em cascata na mesma mensagem,
