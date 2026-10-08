@@ -1,4 +1,5 @@
 import { activeFilterCount, dateRange } from '../../shared/filters';
+import { isCardCollapsed, isLive } from '../../shared/selectors';
 import { useState } from 'react';
 import { useBoardStore } from '../store/boardStore';
 import { t, dt } from '../i18n';
@@ -20,12 +21,16 @@ export function FilterBar() {
   const state = useBoardStore((s) => s.state)!;
   const filters = useBoardStore((s) => s.filters);
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
-  const { setFilters, clearFilters, selectParent } = useBoardStore();
+  const collapsed = useBoardStore((s) => s.collapsed);
+  const { setFilters, clearFilters, selectParent, setManyCollapsed } = useBoardStore();
 
   const [panelOpen, setPanelOpen] = useState(false);
 
   const count = activeFilterCount(filters);
   const parent = state.cards.find((c) => c.id === selectedParentId);
+
+  const liveCardIds = state.cards.filter(isLive).map((c) => c.id);
+  const allCollapsed = liveCardIds.length > 0 && liveCardIds.every((id) => isCardCollapsed(collapsed, id));
 
   const chips: { key: string; label: string; clear(): void }[] = [];
   for (const id of filters.typeIds) {
@@ -91,6 +96,13 @@ export function FilterBar() {
         >
           {isWeb ? (panelOpen ? t('Esconder filtros') : t('Mostrar filtros')) : t('Abrir filtros')}
           {count > 0 && ` (${count})`}
+        </button>
+        <button
+          disabled={liveCardIds.length === 0}
+          onClick={() => setManyCollapsed(liveCardIds, !allCollapsed)}
+          title={allCollapsed ? t('Expandir todos os cards do board') : t('Colapsar todos os cards do board')}
+        >
+          {allCollapsed ? t('Expandir cards') : t('Colapsar cards')}
         </button>
         {chips.map((c) => (
           <span key={c.key} className="filter-chip" onClick={c.clear} title={t('Remover este filtro')}>

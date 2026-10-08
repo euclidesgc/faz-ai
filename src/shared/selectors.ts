@@ -52,6 +52,9 @@ export const valueOf = (state: BoardState, cardId: Id, fieldId: Id) =>
 /** Tipos de card que nascem no workflow (o workflow padrão deles é este). */
 export const typesOf = (state: BoardState, workflowId: Id): CardType[] => state.cardTypes.filter((t) => t.defaultWorkflowId === workflowId);
 
+/** Card individualmente colapsado (chave `card:<id>`); sem marca, não está colapsado. */
+export const isCardCollapsed = (collapsed: Record<string, boolean>, cardId: Id): boolean => collapsed[`card:${cardId}`] ?? false;
+
 /** Itens do checklist do card, em ordem. */
 export const checklistOf = (state: BoardState, cardId: Id): ChecklistItem[] =>
   state.checklistItems.filter((i) => i.cardId === cardId).sort((a, b) => a.position - b.position);

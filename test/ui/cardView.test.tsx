@@ -153,4 +153,67 @@ describe('CardView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ações do card' }));
     expect(screen.getByRole('button', { name: 'Mover para a lixeira' })).toBeInTheDocument();
   });
+
+  describe('card colapsado', () => {
+    const collapse = (id: string) => useBoardStore.getState().setCollapsed(`card:${id}`, true);
+
+    it('mostra só o título, sem número, barra do tipo, pai, status, campos, modelo nem rodapé', () => {
+      patchCard(board.subId, { status: 'waiting_review', statusAt: Date.now(), parentId: board.storyId, title: 'Card colapsado' });
+      collapse(board.subId);
+      const { container } = show(board.subId);
+      expect(screen.getByText('Card colapsado')).toBeInTheDocument();
+      expect(container.querySelector('.card-bar')).toBeNull();
+      expect(container.querySelector('.card-id')).toBeNull();
+      expect(container.querySelector('.card-type')).toBeNull();
+      expect(container.querySelector('.card-parent')).toBeNull();
+      expect(container.querySelector('.status-badge')).toBeNull();
+      expect(container.querySelector('.card-fields')).toBeNull();
+      expect(container.querySelector('.card-model')).toBeNull();
+      expect(container.querySelector('.card-meta')).toBeNull();
+      expect(container.querySelector('article')).toHaveClass('card-collapsed');
+    });
+
+    it('mostra o AiLed quando há work, mesmo colapsado', () => {
+      collapse(board.subId);
+      patchState(() => ({ aiRuns: [board.subId] }));
+      const { container } = show(board.subId);
+      expect(ledOf(container)).toEqual({ on: true, label: 'IA trabalhando neste card' });
+    });
+
+    it('mantém a borda de status (mine) quando colapsado', () => {
+      patchCard(board.subId, { status: 'waiting_review', statusAt: Date.now() });
+      collapse(board.subId);
+      const { container } = show(board.subId);
+      expect(container.querySelector('article')).toHaveClass('mine');
+      expect(container.querySelector('article')).toHaveClass('card-collapsed');
+    });
+
+    it('clique no botão de colapso não dispara selectParent nem openCard', async () => {
+      collapse(board.storyId);
+      show(board.storyId);
+      const before = useBoardStore.getState().selectedParentId;
+      await userEvent.click(screen.getByRole('button', { name: 'Expandir card' }));
+      expect(useBoardStore.getState().selectedParentId).toBe(before);
+      expect(useBoardStore.getState().openCardId).toBeNull();
+      // e o colapso foi desfeito
+      expect(useBoardStore.getState().collapsed[`card:${board.storyId}`]).toBe(false);
+    });
+
+    it('duplo clique no card colapsado chama openCard', async () => {
+      collapse(board.storyId);
+      const { container } = show(board.storyId);
+      await userEvent.dblClick(container.querySelector('article')!);
+      expect(useBoardStore.getState().openCardId).toBe(board.storyId);
+    });
+
+    it('aria-expanded do botão reflete o estado', () => {
+      const expanded = show(board.subId);
+      expect(screen.getByRole('button', { name: 'Colapsar card' })).toHaveAttribute('aria-expanded', 'true');
+      expanded.unmount();
+
+      collapse(board.subId);
+      const collapsedRender = show(board.subId);
+      expect(collapsedRender.getByRole('button', { name: 'Expandir card' })).toHaveAttribute('aria-expanded', 'false');
+    });
+  });
 });

@@ -74,4 +74,23 @@ describe('FilterBar', () => {
     expect(filters().owner).toBe('any');
     expect(lastSent('view.set').patch).toMatchObject({ selectedParentId: null, filters: { owner: 'any', typeIds: [] } });
   });
+
+  it('Colapsar cards marca todos os cards ativos do board; clicar de novo expande todos', async () => {
+    renderThemed(<FilterBar />);
+    const button = screen.getByRole('button', { name: 'Colapsar cards' });
+    expect(button).toBeEnabled();
+
+    await userEvent.click(button);
+    expect(useBoardStore.getState().collapsed).toMatchObject({ [`card:${board.storyId}`]: true, [`card:${board.subId}`]: true });
+
+    const expandButton = screen.getByRole('button', { name: 'Expandir cards' });
+    await userEvent.click(expandButton);
+    expect(useBoardStore.getState().collapsed).toMatchObject({ [`card:${board.storyId}`]: false, [`card:${board.subId}`]: false });
+  });
+
+  it('board sem cards ativos deixa o botão desabilitado', () => {
+    useBoardStore.setState({ state: { ...useBoardStore.getState().state!, cards: [] } });
+    renderThemed(<FilterBar />);
+    expect(screen.getByRole('button', { name: 'Colapsar cards' })).toBeDisabled();
+  });
 });

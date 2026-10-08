@@ -130,6 +130,8 @@ interface BoardStore extends UiState, ViewState {
   setMetricsBlocks(patch: Partial<MetricsBlocksState>): void;
   /** abre/fecha uma linha ou coluna; `current` é o estado que está na tela */
   setCollapsed(key: string, collapsed: boolean): void;
+  /** abre/fecha vários cards (`card:<id>`) numa única escrita, em vez de uma por card */
+  setManyCollapsed(ids: Id[], collapsed: boolean): void;
   /** esquece a escolha manual, voltando ao padrão das configurações */
   resetCollapsed(key: string): void;
   ask(dialog: DialogSpec | null): void;
@@ -224,6 +226,11 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     metricsBlocks: DEFAULT_METRICS_BLOCKS,
     setMetricsBlocks: (patch) => set({ metricsBlocks: { ...get().metricsBlocks, ...patch } }),
     setCollapsed: (key, collapsed) => setShared({ collapsed: { ...get().collapsed, [key]: collapsed } }),
+    setManyCollapsed(ids, collapsed) {
+      const patch: Record<string, boolean> = {};
+      for (const id of ids) patch[`card:${id}`] = collapsed;
+      setShared({ collapsed: { ...get().collapsed, ...patch } });
+    },
     resetCollapsed(key) {
       const { [key]: _drop, ...rest } = get().collapsed;
       setShared({ collapsed: rest });
