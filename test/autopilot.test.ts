@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { Autopilot, MAX_RUNS_WITHOUT_PROGRESS, autopilotStep } from '../src/extension/autopilot';
 import { openInMemory } from '../src/extension/db/database';
 import { heartbeatTargets } from '../src/extension/heartbeat';
@@ -203,15 +205,15 @@ describe('autopilotStep', () => {
     expect(autopilotStep(router.snapshot()).kind).toBe('advance');
   });
 
-  it('o card bloqueado segura a fila, e a sub-tarefa vai junto da história', () => {
+  it('o card bloqueado não trava mais a fila: a sub-tarefa fica com a história, mas a próxima avança', () => {
     create('A', 'Implementação'); // #1, a mais à direita: a vez é dela
-    create('B', 'PRD'); // #2
+    create('B', 'PRD'); // #2, independente, sem relação com A
     create('Passo', 'A fazer', 1); // #3
     yolo(1);
     yolo(2);
     expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 1 } });
     status(1, 'blocked', 'Sem acesso ao repositório');
-    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'paused', reason: expect.stringContaining('Sem acesso') });
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 2 } });
   });
 
   it('a história concluída deixa a fila andar', () => {
@@ -232,46 +234,107 @@ describe('autopilotStep', () => {
     expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 2 } });
   });
 
-  it('história bloqueada segura a fila mesmo com pull request registrado na última coluna da IA', () => {
+  it('história bloqueada não trava mais a fila mesmo com pull request registrado na última coluna da IA: a próxima avança', () => {
     createTyped('Bug', 'A', 'Homologação'); // #1, bug: garante a vez dela na fila, qualquer que seja a coluna
-    create('B', 'Backlog'); // #2
+    create('B', 'Backlog'); // #2, independente, sem relação com A
     yolo(1);
     yolo(2);
     deliver(1); // bloqueio é exceção: entrega não vale enquanto houver impedimento
     status(1, 'blocked', 'Sem acesso ao repositório');
-    expect(autopilotStep(router.snapshot())).toMatchObject({
-      kind: 'paused',
-      story: { number: 1 },
-      reason: expect.stringContaining('Sem acesso'),
-    });
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 2 } });
   });
 
-  it('história aguardando resposta segura a fila', () => {
+  it('história aguardando resposta não trava mais a fila: a próxima avança', () => {
     createTyped('Bug', 'A', 'PRD'); // #1, bug: garante a vez dela na fila
-    create('B', 'Backlog'); // #2
+    create('B', 'Backlog'); // #2, independente, sem relação com A
     yolo(1);
     yolo(2);
     status(1, 'waiting_answer');
-    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'paused', story: { number: 1 } });
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 2 } });
   });
 
-  it('história aguardando revisão numa coluna antes da última da IA segura a fila: ainda não chegou à entrega', () => {
+  it('história aguardando revisão numa coluna antes da última da IA não trava mais a fila: ainda não chegou à entrega, mas a próxima avança', () => {
     createTyped('Bug', 'A', 'Implementação'); // #1, bug: garante a vez dela na fila
-    create('B', 'Backlog'); // #2
+    create('B', 'Backlog'); // #2, independente, sem relação com A
     yolo(1);
     yolo(2);
     // card.status.set direto, sem source 'ai': o autoaprovar do modo autônomo só vale para a IA
     router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'waiting_review' });
-    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'paused', story: { number: 1 } });
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 2 } });
   });
 
-  it('história na última coluna da IA aguardando revisão sem pull request segura a fila: falta a entrega', () => {
+  it('história na última coluna da IA aguardando revisão sem pull request não trava mais a fila: falta a entrega, mas a próxima avança', () => {
     createTyped('Bug', 'A', 'Homologação'); // #1, bug: garante a vez dela na fila
-    create('B', 'Backlog'); // #2
+    create('B', 'Backlog'); // #2, independente, sem relação com A
     yolo(1);
     yolo(2);
     router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'waiting_review' });
-    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'paused', story: { number: 1 } });
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 2 } });
+  });
+
+  it('todas as histórias pausadas por motivos diferentes: a fila para com a razão da primeira', () => {
+    create('A', 'Implementação'); // #1, mais adiantada: primeira na ordem de execução
+    create('B', 'PRD'); // #2, sem relação com A
+    yolo(1);
+    yolo(2);
+    status(1, 'blocked', 'Sem acesso ao repositório');
+    status(2, 'waiting_answer');
+    const step = autopilotStep(router.snapshot());
+    expect(step).toMatchObject({ kind: 'paused', story: { number: 1 }, reason: expect.stringContaining('Sem acesso') });
+  });
+
+  it('história dependente de um card bloqueado continua esperando mesmo com outra rodando na frente', () => {
+    create('A', 'PRD'); // #1, fora do modo autônomo: bloqueada, e C depende dela
+    create('B', 'PRD'); // #2, independente, sem relação com A
+    create('C', 'PRD'); // #3, depende de A
+    ai({ type: 'link.add', fromId: card(1).id, toId: card(3).id, kind: 'precedes' });
+    status(1, 'blocked', 'Sem acesso ao repositório');
+    yolo(2);
+    yolo(3);
+    // a vez é de B: a dependência de C com A não aparece enquanto B ainda está aberta e rodando
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 2 } });
+    // B conclui e sai da fila: só C sobra, e ela continua esperando A, que nunca terminou
+    move(2, 'Concluído');
+    const step = autopilotStep(router.snapshot());
+    expect(step).toMatchObject({ kind: 'paused', story: { number: 3 } });
+    expect(step.kind === 'paused' && step.reason).toContain('#1');
+  });
+
+  it('a branch de uma história nova parte da anterior mesmo que ela esteja bloqueada', async () => {
+    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-autopilot-git-')));
+    const repo = path.join(dir, 'projeto');
+    try {
+      fs.mkdirSync(repo);
+      const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
+      git('init', '-q', '-b', 'main');
+      git('config', 'user.email', 'teste@exemplo.com');
+      git('config', 'user.name', 'Teste');
+      fs.writeFileSync(path.join(repo, 'README.md'), 'oi');
+      git('add', '.');
+      git('commit', '-q', '-m', 'inicial');
+
+      const freshDb = await openInMemory(WASM_DIR);
+      router = new MessageRouter({ db: freshDb, scheduleSave: () => {}, close: async () => {} } as never, {
+        workspaceKey: 'ws',
+        folderName: 'projeto',
+        author: 'Pessoa',
+        attachmentsDir: path.join(dir, 'attachments'),
+        workspaceDir: repo,
+      });
+      router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
+
+      create('A', 'Implementação'); // #1, a anterior na fila
+      create('B', 'Implementação'); // #2, parte da branch de A
+      yolo(1);
+      yolo(2);
+      router.handle({ type: 'card.workspace.prepare', cardId: card(1).id });
+      status(1, 'blocked', 'Sem acesso ao repositório'); // bloqueada, mas a branch já existe
+      router.handle({ type: 'card.workspace.prepare', cardId: card(2).id });
+
+      expect(card(2).baseBranch).toBe(card(1).branch);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

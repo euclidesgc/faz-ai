@@ -6,6 +6,14 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **História bloqueada segurava a fila inteira do autopiloto.** Com a primeira história da
+  fila parada por um impedimento (bloqueio, pergunta sem resposta, dependência de outro card em
+  aberto ou um ciclo emperrado), o autopiloto ficava parado e nenhuma das outras histórias
+  autônomas independentes rodava, mesmo prontas. Agora qualquer impedimento é pulado na varredura
+  da fila: o autopiloto segue para a próxima história que puder avançar (rodar, ou mudar de coluna
+  quando a IA não atua nela). Uma história que depende de outra continua esperando essa outra
+  terminar. A fila só mostra o aviso de impedimento quando nenhuma história pode avançar, com a
+  razão da primeira que ficou parada.
 - **Entrega da história autônoma não era detectada quando o PR chegava antes da última coluna.**
   Ao registrar o pull request (`set_pull_request`), o board só marcava `waiting_review` e comentava a
   entrega se a história já estivesse na última coluna em que a IA atua; registrado antes disso, a

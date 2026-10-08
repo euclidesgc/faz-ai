@@ -7,6 +7,14 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **A blocked story held up the autopilot's whole queue.** With the first story in the queue
+  stuck on an impediment (a block, a question without an answer, a dependency on another open
+  card, or a stalled cycle), the autopilot stood still and none of the other independent
+  autonomous stories ran, even when ready. Now any impediment is skipped while scanning the
+  queue: the autopilot moves on to the next story that can advance (run, or move to another
+  column when the AI does not work in it). A story that depends on another keeps waiting for
+  that one to finish. The queue only shows the impediment warning when no story can advance,
+  with the reason of the first one that got stuck.
 - **Autonomous story delivery was not detected when the PR arrived before the last column.**
   When registering the pull request (`set_pull_request`), the board only marked `waiting_review`
   and commented the delivery if the story was already in the last column the AI works on; registered

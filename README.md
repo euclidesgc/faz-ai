@@ -636,9 +636,14 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
 - **Em fila e em pilha**: o **autopiloto** toca as histórias em modo autônomo uma de cada vez, na
   ordem do board — bugs na frente, depois a mais à direita, e na mesma coluna de cima para baixo —, e segue para a próxima história da
   fila assim que a atual é entregue (parada na última coluna da IA, com o pull request registrado),
-  sem esperar a sua revisão nem o intervalo do heartbeat. Uma história que espera outro card
-  terminar (dependência) não segura a fila: a vez passa para a próxima que pode rodar, em geral a
-  própria dependência, e ela volta à fila quando a dependência sai de aberto. A branch de cada história parte da branch
+  sem esperar a sua revisão nem o intervalo do heartbeat. Nenhum impedimento segura a fila: uma
+  história bloqueada, esperando a sua resposta, esperando outro card terminar (dependência) ou
+  travada num ciclo (aberta, mas sem nada pendente com a IA) é pulada, e a vez passa para a próxima
+  história da fila que puder avançar — rodar, ou mudar de coluna quando a IA não atua nela. Uma
+  história que depende de outra continua esperando essa outra terminar, mesmo com histórias mais
+  abaixo na fila passando na frente dela; ela volta a disputar a vez quando a dependência sai de
+  aberto. Só quando nenhuma história da fila pode avançar o autopiloto mostra o aviso de
+  impedimento, com a razão da primeira história parada. A branch de cada história parte da branch
   criada mais recentemente entre as outras histórias do modo autônomo ainda abertas — a mesma ordem em
   que a fila roda, mesmo depois de arrastar cards —, e o pull request é aberto com `--base` nela,
   formando uma pilha de PRs; sem nenhuma outra história aberta antes dela, a branch parte da principal.
