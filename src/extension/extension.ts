@@ -24,6 +24,7 @@ import type { Heartbeat } from './heartbeat';
 import type { MergeWatcher } from './merge';
 import { revealInSystem } from './web/osOpen';
 import { preferredPort, startWebServer, type WebServer } from './web/webServer';
+import { exportNotice } from './host/hostBridge';
 import { cardRef } from '../shared/model';
 import { humanQueueStatuses, turnsPassedToHuman } from '../shared/pending';
 
@@ -244,6 +245,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
 
+  /** Exporta o board da pasta atual para um arquivo, pela paleta de comandos (sem precisar abrir o board). */
+  const exportBoard = async () => {
+    const router = await getRouter();
+    if (!router) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
+    const { text, name, warnings } = router.exportBoardFile();
+    const uri = await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.file(path.join(os.homedir(), name)),
+      filters: { 'Export do Faz AI': ['json'] },
+      title: 'Exportar board',
+    });
+    if (!uri) return;
+    await fs.promises.writeFile(uri.fsPath, text, 'utf8');
+    const choice = await vscode.window.showInformationMessage(exportNotice(uri.fsPath, warnings), 'Abrir pasta');
+    if (choice === 'Abrir pasta') revealInSystem(uri.fsPath);
+  };
+
   context.subscriptions.push(
     treeView,
     vscode.window.registerWebviewViewProvider('fazai.filters', new FiltersViewProvider(context, getRouter, viewState), {
@@ -267,6 +284,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.openEnvironment', () => openBoard({ type: 'ui.openView', view: 'environment' })),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
     vscode.commands.registerCommand('fazai.openInBrowser', openInBrowser),
+    vscode.commands.registerCommand('fazai.exportBoard', exportBoard),
     vscode.commands.registerCommand('fazai.connectAI', (target?: Parameters<BoardHost['connectAI']>[0], opts?: { fromBoard?: boolean }) =>
       connectAI(getRouter, target, opts),
     ),

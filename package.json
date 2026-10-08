@@ -56,6 +56,10 @@
         "icon": "$(globe)"
       },
       {
+        "command": "fazai.exportBoard",
+        "title": "Faz AI: Exportar o board"
+      },
+      {
         "command": "fazai.refreshSidebar",
         "title": "%command.refreshSidebar.title%",
         "icon": "$(refresh)"

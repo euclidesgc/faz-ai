@@ -44,7 +44,9 @@ const TABS: [SettingsTab, string, Icon][] = [
   ['models', 'Modelos de IA', IconModels],
   ['git', 'Git', IconBranch],
   ['appearance', 'Aparência', IconAppearance],
-  ['backup', 'Backup', IconBackup],
+  // No editor (VS Code/Cursor), o backup passa a ser feito pelos comandos da paleta
+  // (fazai.exportBoard/fazai.importBoard) e pelo Settings nativo; a aba só existe no modo navegador.
+  ...(isWeb ? ([['backup', 'Backup', IconBackup]] as [SettingsTab, string, Icon][]) : []),
 ];
 
 /** Conteúdo de um botão do menu: ícone sempre; o rótulo só com o menu aberto (recolhido, ele vira o nome acessível). */
@@ -165,7 +167,7 @@ export function Settings() {
         {tab === 'appearance' && <AppearanceSettings />}
         {tab === 'harness' && <HarnessSettings />}
         {tab === 'git' && <GitSettings />}
-        {tab === 'backup' && <BackupSettings />}
+        {tab === 'backup' && isWeb && <BackupSettings />}
       </div>
     </div>
   );
