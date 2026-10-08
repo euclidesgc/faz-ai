@@ -120,7 +120,7 @@ describe('skill do fluxo', () => {
     set([{ id: 'skill', tool: 'cursor', action: { kind: 'installSkill' } }]);
     renderThemed(<RequirementsBanner />);
     expect(screen.getByText('Falta 1 requisito para o board trabalhar com a IA')).toBeInTheDocument();
-    expect(screen.getByText('A skill do fluxo (faz-ai-fluxo) não está instalada no Cursor')).toBeInTheDocument();
+    expect(screen.getByText('A skill do fluxo (faz-ai-fluxo) não está pronta para o Cursor')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Instalar a skill' }));
     expect(sentOf('harness.flowSkill.install')).toEqual([
       { type: 'harness.flowSkill.install', tool: 'cursor', scope: 'user', replace: false },

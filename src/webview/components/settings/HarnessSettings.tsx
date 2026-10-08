@@ -2,37 +2,33 @@ import { aiToolInfo } from '../../../shared/harness';
 import { Tabs } from '@radix-ui/themes';
 import { useBoardStore, type HarnessTab } from '../../store/boardStore';
 import { HarnessInventory } from './HarnessInventory';
-import { ProjectAgents } from './harness/ProjectAgents';
-import { ProjectRules } from './harness/ProjectRules';
-import { ProjectSkills } from './harness/ProjectSkills';
 import { ProjectTool } from './harness/ProjectTool';
 import { RunnerSettings } from './harness/RunnerSettings';
-import { useProjectEditing } from './harness/useProjectEditing';
+import { ScopeHarness } from './harness/ScopeHarness';
 import { PageHeader } from './PageHeader';
 import { t } from '../../i18n';
 import { rich } from '../../i18n/rich';
 
 /**
- * Tela do harness de IA, em três abas: a ferramenta e a execução pelo board; o que faz parte do
- * projeto (regras, skills e agentes, editáveis); e tudo que cada ferramenta carrega, com o que vem
- * da pasta do usuário e de plugins.
+ * Tela do harness de IA. Toda execução do board parte de contexto vazio: só o que estiver marcado aqui
+ * entra. <b>Projeto</b> e <b>Global</b> organizam de onde vem cada arquivo (rules, agentes e skills),
+ * com a marcação em cada um; <b>Tudo que a ferramenta carrega</b> é o inventário completo.
  */
 export function HarnessSettings() {
   const tool = aiToolInfo(useBoardStore((s) => s.state!.board.aiTool));
   const tab = useBoardStore((s) => s.harnessTab);
-  // um editor ou formulário aberto por vez, entre regras, skills e agentes
-  const edit = useProjectEditing();
   return (
     <div>
       <PageHeader title={t('Harness de IA')}>
         {rich(
-          'O que a IA lê e usa neste projeto. <b>Ferramenta e execução</b> escolhe com qual IA o board trabalha; <b>Do projeto</b> reúne o que faz parte do repositório e é editável aqui; <b>Tudo que a ferramenta carrega</b> mostra também o que vem da sua pasta de usuário e de plugins.',
+          'Toda execução pelo board parte de <b>contexto vazio</b>: nenhuma regra, skill ou agente da sua máquina ou do projeto entra por conta própria. Só entra o que você marcar aqui. <b>Projeto</b> e <b>Global</b> organizam os arquivos pela pasta de onde vêm; o que vale é a marcação. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; <b>Tudo que a ferramenta carrega</b> é o inventário completo, para criar, copiar e apagar arquivos.',
         )}
       </PageHeader>
       <Tabs.Root value={tab} onValueChange={(harnessTab) => useBoardStore.setState({ harnessTab: harnessTab as HarnessTab })}>
         <Tabs.List className="harness-tabs">
           <Tabs.Trigger value="tool">{t('Ferramenta e execução')}</Tabs.Trigger>
-          <Tabs.Trigger value="project">{t('Do projeto')}</Tabs.Trigger>
+          <Tabs.Trigger value="project">{t('Projeto')}</Tabs.Trigger>
+          <Tabs.Trigger value="user">{t('Global')}</Tabs.Trigger>
           <Tabs.Trigger value="all">{t('Tudo que a ferramenta carrega')}</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="tool">
@@ -40,12 +36,10 @@ export function HarnessSettings() {
           <RunnerSettings tool={tool} />
         </Tabs.Content>
         <Tabs.Content value="project">
-          <p className="muted small">
-            {t('Tudo aqui são arquivos da pasta do projeto: vão no repositório e valem para quem trabalha nele.')}
-          </p>
-          <ProjectRules tool={tool} edit={edit} />
-          <ProjectSkills tool={tool} edit={edit} />
-          <ProjectAgents tool={tool} edit={edit} />
+          <ScopeHarness key="project" tool={tool} scope="project" />
+        </Tabs.Content>
+        <Tabs.Content value="user">
+          <ScopeHarness key="user" tool={tool} scope="user" />
         </Tabs.Content>
         <Tabs.Content value="all">
           <HarnessInventory />

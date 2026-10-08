@@ -142,8 +142,14 @@ o status é `approved`. Voltar de coluna ou cancelar é livre. `update_column` l
 
 ### Agentes
 
-`get_harness` lista os agentes (subagentes) do projeto, e `get_agent`, `create_agent`, `update_agent`
-e `delete_agent` os gerenciam. Cada ferramenta guarda os seus numa pasta própria:
+Um agente do board é um arquivo de agente da ferramenta, do projeto ou da pasta do usuário.
+`get_harness` lista os marcados como disponíveis (com `onlySelected: false`, todos, com a marcação
+em `usage`), e `get_agent`, `create_agent`, `update_agent` e `delete_agent` os gerenciam: o padrão de
+criação é a pasta global (`scope: "user"`), e o agente criado já nasce disponível. `create_agent` e
+`update_agent` aceitam, além das instruções, `description`, `model` (valor do campo Modelo, ex.:
+`claude:sonnet@medium`), `tools`, `deniedTools`, `skills` e `mcp`; o board grava o que é só dele em
+chaves `faz-ai-*` do frontmatter (`faz_ai_*` no TOML do Codex). Cada ferramenta guarda os seus numa
+pasta própria (a global fica em `~/`):
 
 | Ferramenta | Pasta | Arquivo | Modelo por agente |
 | --- | --- | --- | --- |
@@ -151,7 +157,7 @@ e `delete_agent` os gerenciam. Cada ferramenta guarda os seus numa pasta própri
 | Codex | `.codex/agents` | `<nome>.toml` | `model` |
 | Cursor | `.cursor/agents` | `<nome>.md` | `model` |
 | Kimi Code | `.kimi-code/agents` | `<nome>.md` | não tem |
-| GitHub Copilot | `.github/agents` | `<nome>.agent.md` | `model` |
+| GitHub Copilot | `.github/agents` (global: `~/.copilot/agents`) | `<nome>.agent.md` | `model` |
 
 ### Projeto, global e plugins
 
@@ -161,11 +167,14 @@ em `inventory` tudo que a ferramenta do projeto carrega (instruções e regras, 
 comandos, hooks, servidores MCP, plugins e arquivos de configuração), com o escopo e o caminho de
 cada item. De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
 
-O campo "Skills" dos cards oferece as skills do projeto e também as globais e de plugins. Em
-`get_card`, cada item de `requiredSkills` traz `scope`; para skills fora do projeto, `path` é o
-caminho absoluto do `SKILL.md`. Quando uma skill existe no projeto e fora dele com o mesmo nome,
-vale a do projeto. As ferramentas de escrita (`create_skill`, `create_agent`…) continuam atuando só
-na pasta do projeto.
+Toda execução pelo board parte de contexto vazio: só entra o que está marcado em Configurações →
+Harness. `set_harness_selection` marca rules (`instructions`), skills e agentes: `always` entra em
+toda execução pelo caminho do arquivo; `contextual` vira opção dos campos "Rules" e "Skills" dos
+cards (e agente disponível); `null` desmarca. Os campos "Rules" e "Skills" dos cards só oferecem o
+marcado como `contextual`. Em `get_card`, `requiredRules` e `requiredSkills` trazem o caminho de cada
+arquivo que o card exige; para skills fora do projeto, `path` é o caminho absoluto do `SKILL.md`.
+Quando uma skill existe no projeto e fora dele com o mesmo nome, vale a do projeto. `create_skill` e
+`install_flow_skill` já marcam o que criam (`contextual` e `always`, respectivamente).
 
 ### Skills sob demanda
 
@@ -184,24 +193,25 @@ aponta para eles. `get_harness` lista os arquivos de cada skill em `files`, `wri
 um arquivo numa skill do projeto, e em `get_card` cada skill de `requiredSkills` traz em `files` os
 caminhos dos arquivos de apoio dela.
 
-### Perfis de execução
+### Agente de cada card
 
-Um perfil de execução define antes o que a sessão usa num card: agente, skills, servidores MCP,
-ferramentas, modelo e se a sessão é limpa (sem as personalizações da pasta do usuário). Os perfis
-são criados em Configurações → Perfis de execução; `get_board` os lista em `execProfiles`. O perfil
-de um card é o do próprio card (`set_card_profile`), senão o da coluna (`update_column` com
-`exec_profile`), senão o da coluna da história (numa sub-tarefa), senão o padrão do board.
+O agente do card define antes o que a sessão usa: instruções, skills, servidores MCP, ferramentas e
+modelo. `get_board` lista os disponíveis em `agents` (com `default`). O agente de um card é o do
+próprio card (`set_card_profile`, pelo nome), senão o da coluna (`update_column` com
+`exec_profile`), senão o da coluna da história (numa sub-tarefa), senão o padrão do board
+(Configurações → Harness de IA → Ferramenta e execução).
 
-`get_card` devolve o perfil resolvido em `execution`, e `requiredSkills` já soma as skills do perfil
-às do card. Numa sessão aberta pela pessoa, `execution` é orientação. Na execução pelo board, o que
-a linha de comando da ferramenta aceita é imposto por parâmetro (`enforcedByBoardRun`):
+`get_card` devolve o agente resolvido em `execution` (`profile`, `agentFile`, `mcpServers`,
+`tools`, `deniedTools`, `enforcedByBoardRun`), e `requiredSkills` já soma as skills do agente às do
+card. Numa sessão aberta pela pessoa, `execution` é orientação. Na execução pelo board, o que a
+linha de comando da ferramenta aceita é imposto por parâmetro:
 
 | Ferramenta | Imposto por parâmetro | Só orientado |
 | --- | --- | --- |
-| Claude Code | agente, servidores MCP, ferramentas, modelo e esforço, sessão limpa | skills (vão pelo caminho do arquivo) |
-| GitHub Copilot | agente, servidores MCP, ferramentas, modelo e esforço | skills, sessão limpa |
-| Kimi Code | agente, modelo | skills, servidores MCP, ferramentas, sessão limpa |
-| Codex | servidores MCP, modelo e esforço | agente, skills, ferramentas, sessão limpa |
+| Claude Code | agente (inline, `--agents` + `--agent`), servidores MCP (`--strict-mcp-config`), ferramentas, modelo e esforço, contexto vazio (`--setting-sources ""`, `--disable-slash-commands`) | skills e rules (vão pelo caminho do arquivo) |
+| GitHub Copilot | agente, servidores MCP, ferramentas, modelo e esforço, contexto vazio (`--no-custom-instructions`) | skills e rules |
+| Kimi Code | agente, modelo | skills e rules, servidores MCP, ferramentas, contexto vazio |
+| Codex | servidores MCP, modelo e esforço | agente, skills e rules, ferramentas, contexto vazio |
 | Cursor | modelo | todo o resto |
 
 ### Pendências

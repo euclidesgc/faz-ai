@@ -1,7 +1,7 @@
 import { aiToolInfo, type AiTool } from '../shared/harness';
 import type { RunnerPermission } from '../shared/runner';
 import type { OutputFormat } from './aiOutput/reader';
-import { BOARD_SERVER, type ExecInput } from './execution';
+import { BOARD_SERVER, boardOnlyMcpConfig, type ExecInput } from './execution';
 
 /** Comando que roda a CLI de uma ferramenta de IA sem interface, para um prompt, até terminar. */
 export interface HeadlessCommand {
@@ -33,7 +33,7 @@ export interface HeadlessInput {
   permission: RunnerPermission;
   /** pastas fora da pasta do projeto em que a IA também trabalha (as worktrees das histórias) */
   addDirs?: string[];
-  /** o que o agente do card pede: subagente, servidores MCP, ferramentas, modelo, sessão limpa */
+  /** o que o agente do card pede: agente, servidores MCP, ferramentas, modelo */
   exec?: ExecInput;
   /** como iniciar o servidor MCP do board; quando a ferramenta aceita, vai na linha de comando e dispensa o registro no projeto */
   boardServer?: { command: string; args: string[]; env?: Record<string, string> };
@@ -89,8 +89,9 @@ const MCP_CONFIG = 'mcp.json';
  * só roda "sem restrições". O Cursor tem, por `--allowed-tools` (ver CURSOR_TOOLS).
  *
  * Parâmetros do agente de execução (`exec`), das referências de linha de comando de cada ferramenta:
- * - Claude Code: --agent, --model, --effort, --tools, --disallowedTools, --mcp-config com
- *   --strict-mcp-config, --setting-sources e --disable-slash-commands (code.claude.com/docs/en/cli-reference)
+ * - Claude Code: --agents (o agente inline) com --agent, --model, --effort, --tools, --disallowedTools,
+ *   --mcp-config com --strict-mcp-config, --setting-sources "" e --disable-slash-commands
+ *   (code.claude.com/docs/en/cli-reference; o contexto vazio foi verificado na CLI 2.1.278 em 2026-10-07)
  * - Codex: --model e `-c` para model_reasoning_effort e mcp_servers.<id>.enabled
  * - Copilot: --agent, --model, --effort, --available-tools, --excluded-tools, --disable-mcp-server, --no-custom-instructions
  * - Cursor: --model, com o esforço como sufixo do id (`modelo-high`). Kimi: --model e --agent.
@@ -123,20 +124,24 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
     const args = ['-p', ...(structured ? ['--output-format', 'stream-json', '--verbose'] : []), ...modes[permission]];
     // os servidores liberados no agente também rodam sem pedir aprovação
     // o Claude Code troca por `_` o que não for letra, número, `_` ou `-` no nome do servidor
-    if (exec?.mcpAllowed && permission !== 'full') args.push(...exec.mcpAllowed.map((n) => `mcp__${n.replace(/[^A-Za-z0-9_-]/g, '_')}__*`));
+    if (exec?.mcpAllowed.length && permission !== 'full')
+      args.push(...exec.mcpAllowed.map((n) => `mcp__${n.replace(/[^A-Za-z0-9_-]/g, '_')}__*`));
     args.push(...addDirs.flatMap((d) => ['--add-dir', d]));
     if (exec?.model) args.push('--model', exec.model.name, ...(exec.model.effort ? ['--effort', exec.model.effort] : []));
-    if (exec?.agent) args.push('--agent', exec.agent);
+    // o agente vai inline e é o da sessão: não depende de nenhuma pasta de agentes (verificado na CLI 2.1.278)
+    if (exec?.agentDefinition) {
+      const { name, ...def } = exec.agentDefinition;
+      args.push('--agents', JSON.stringify({ [name]: def }), '--agent', name);
+    } else if (exec?.agent) args.push('--agent', exec.agent);
     if (exec?.tools.length) args.push('--tools', exec.tools.join(','));
     if (exec?.deniedTools.length) args.push('--disallowedTools', ...exec.deniedTools);
-    // sem agente que restrinja os servidores, o do board vai junto dos já configurados: a execução não
-    // depende de "Conectar ao board" nem da aprovação do .mcp.json, que o modo -p não tem como pedir
-    const mcpConfig =
-      exec?.mcpConfig ?? (boardServer ? JSON.stringify({ mcpServers: { [SERVER]: { type: 'stdio', ...boardServer } } }) : null);
-    if (exec?.mcpConfig) args.push('--strict-mcp-config');
-    if (mcpConfig) args.push('--mcp-config', tmpArg(MCP_CONFIG));
-    // sessão limpa: sem as configurações da pasta do usuário e sem skills ou comandos invocáveis (as do card vão pelo caminho)
-    if (exec?.clean) args.push('--setting-sources', 'project,local', '--disable-slash-commands');
+    // contexto vazio: só o servidor do board e os liberados pelo agente (`--strict-mcp-config` deixa de
+    // fora os do usuário e do projeto), nenhuma fonte de configuração (`--setting-sources ""`: sem
+    // CLAUDE.md, skills, agentes, hooks e plugins do usuário nem do projeto, verificado na CLI 2.1.278) e
+    // nenhuma skill invocável; o que o board marcou vai no pedido, pelo caminho do arquivo
+    const mcpConfig = exec?.mcpConfig ?? (boardServer ? boardOnlyMcpConfig(boardServer) : null);
+    if (mcpConfig) args.push('--strict-mcp-config', '--mcp-config', tmpArg(MCP_CONFIG));
+    args.push('--setting-sources', '', '--disable-slash-commands');
     return {
       command: 'claude',
       args,
@@ -189,7 +194,8 @@ const BUILDERS: Record<AiTool, (input: HeadlessInput) => HeadlessCommand | null>
       ...(exec?.tools.length ? [`--available-tools=${exec.tools.join(',')}`] : []),
       ...(exec?.deniedTools.length ? [`--excluded-tools=${exec.deniedTools.join(',')}`] : []),
       ...(exec?.mcpBlocked ?? []).map((n) => `--disable-mcp-server=${n}`),
-      ...(exec?.clean ? ['--no-custom-instructions'] : []),
+      // contexto vazio: sem as instruções do repositório nem do usuário; o que o board marcou vai no pedido
+      '--no-custom-instructions',
     ];
     return {
       command: 'copilot',

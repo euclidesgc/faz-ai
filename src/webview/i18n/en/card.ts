@@ -228,4 +228,7 @@ export const card: Record<string, string> = {
   'só começam depois deste card': 'only start after this card',
   'Copiar o nome da branch': 'Copy the branch name',
   'Nome copiado': 'Name copied',
+  'O que a sessão de IA usa para trabalhar neste card: agente, skills, rules, servidores MCP, ferramentas e modelo':
+    'What the AI session uses to work on this card: agent, skills, rules, MCP servers, tools and model',
+  'rules: {list}': 'rules: {list}',
 };

@@ -11,7 +11,6 @@ import { RulesSettings } from './RulesSettings';
 import { HarnessSettings } from './HarnessSettings';
 import { ModelsSettings } from './ModelsSettings';
 import { AppearanceSettings } from './AppearanceSettings';
-import { AgentsSettings } from './AgentsSettings';
 import { GitSettings } from './GitSettings';
 import { BackupSettings } from './BackupSettings';
 import {
@@ -29,7 +28,6 @@ import {
   IconModels,
   IconPanelClose,
   IconPanelOpen,
-  IconAgents,
   IconReset,
   IconRules,
   IconTypes,
@@ -43,7 +41,6 @@ const TABS: [SettingsTab, string, Icon][] = [
   ['fields', 'Campos', IconFields],
   ['rules', 'Regras do board', IconRules],
   ['harness', 'Harness de IA', IconHarness],
-  ['agents', 'Agentes', IconAgents],
   ['models', 'Modelos de IA', IconModels],
   ['git', 'Git', IconBranch],
   ['appearance', 'Aparência', IconAppearance],
@@ -168,7 +165,6 @@ export function Settings() {
         {tab === 'appearance' && <AppearanceSettings />}
         {tab === 'harness' && <HarnessSettings />}
         {tab === 'git' && <GitSettings />}
-        {tab === 'agents' && <AgentsSettings />}
         {tab === 'backup' && <BackupSettings />}
       </div>
     </div>

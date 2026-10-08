@@ -90,7 +90,7 @@ function texts(id: EnvCheckId, tool: AiTool): Texts {
         title: t('Skill do fluxo ({name})', { name: FLOW_SKILL_NAME }),
         purpose: t('Ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências.'),
         usage: t(
-          'O {tool} carrega a skill quando você pede para trabalhar num card, no chat do editor ou no terminal. Ela é instalada na pasta global de skills da ferramenta e vale para todos os projetos.',
+          'As execuções do board partem de contexto vazio e só usam o que está marcado em Configurações → Harness: a skill precisa existir para o {tool} e estar marcada em "Incluir em todo contexto" neste board. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.',
           { tool: label },
         ),
       };

@@ -1,51 +1,91 @@
-import type { AiTool } from './harness';
+import type { Agent, AiTool } from './harness';
+import type { HarnessSelection } from './harnessSelection';
 import type { BoardState, Card } from './model';
 import { parseModelValue, type ModelOption } from './models';
 import { columnOf, valueOf } from './selectors';
 
 /**
- * Agente do board (guardado como "perfil de execução" no banco e nas mensagens): o que uma sessão de
- * IA recebe para trabalhar num card, definido antes, em vez de descoberto pela ferramenta. Toda
- * execução pelo board roda através de um agente: o do card, o da fase ou o padrão. Não confundir com
- * `agent`, abaixo, que é o arquivo de subagente da própria ferramenta (ex.: `.claude/agents/x.md`).
+ * Agente do board: o que uma sessão de IA recebe para trabalhar num card, definido antes, em vez de
+ * descoberto pela ferramenta. É o arquivo de agente da ferramenta (`~/.claude/agents/<nome>.md`,
+ * `.codex/agents/<nome>.toml`...), lido do disco e marcado como disponível em Configurações → Harness.
+ * Toda execução pelo board roda através de um agente: o do card, o da fase ou o padrão do board.
+ * Sem nenhum arquivo marcado, vale o agente embutido (`defaultAgent`), sem instruções.
  */
 export interface ExecProfile {
+  /** nome do arquivo do agente (sem extensão); `padrao` no embutido */
   id: string;
   name: string;
-  /** o que o agente faz, em uma frase: base para sugerir skills e servidores MCP */
+  /** o que o agente faz, em uma frase: é a `description` do arquivo, base para o Refinar escolher o agente */
   purpose: string;
-  /** subagente da ferramenta que conduz a sessão; vazio = o agente padrão dela */
-  agent: string;
+  /** instruções do agente (o corpo do arquivo), que a sessão recebe como papel */
+  instructions: string;
   /** skills que toda execução com este agente deve ler, além das indicadas no card */
   skills: string[];
-  /** servidores MCP liberados além do servidor do board; null = todos os configurados */
-  mcpServers: string[] | null;
+  /** servidores MCP liberados além do servidor do board; vazio = só o do board */
+  mcpServers: string[];
   /** ferramentas embutidas disponíveis; vazio = as que o nível de permissão da execução libera */
   tools: string[];
   /** ferramentas retiradas da sessão */
   deniedTools: string[];
   /** modelo e esforço (valor do campo Modelo); o modelo indicado no card tem preferência */
   model: string;
-  /** sessão limpa: sem as personalizações da pasta do usuário e sem invocação automática de skills */
-  clean: boolean;
   /** agente usado quando nem o card nem a coluna indicam um */
   isDefault: boolean;
+  /** de onde o arquivo veio; `builtin` é o agente embutido, sem arquivo */
+  scope: 'project' | 'user' | 'builtin';
+  /** caminho absoluto do arquivo; vazio no embutido */
+  path: string;
 }
 
-/** O agente que existe quando o board ainda não tem nenhum: sem restrições, a sessão usa o que a ferramenta carregar. */
+/** O agente que existe quando o board não tem nenhum marcado: sem instruções nem restrições, só o contexto vazio do board. */
 export const defaultAgent = (): ExecProfile => ({
   id: 'padrao',
   name: 'Agente padrão',
   purpose: '',
-  agent: '',
+  instructions: '',
   skills: [],
-  mcpServers: null,
+  mcpServers: [],
   tools: [],
   deniedTools: [],
   model: '',
-  clean: false,
   isDefault: true,
+  scope: 'builtin',
+  path: '',
 });
+
+/** O agente lido de um arquivo, no formato do board. */
+export const profileOfAgent = (a: Agent, isDefault: boolean): ExecProfile => ({
+  id: a.name,
+  name: a.name,
+  purpose: a.description,
+  instructions: a.body,
+  skills: a.skills,
+  mcpServers: a.mcp,
+  tools: a.tools,
+  deniedTools: a.deniedTools,
+  model: a.modelValue,
+  isDefault,
+  scope: a.scope,
+  path: a.path,
+});
+
+/**
+ * Os agentes do board: os arquivos de agente da ferramenta em uso marcados como disponíveis, com o padrão
+ * (`defaultName`, de Configurações) à frente. Sem nenhum, o embutido. Um projeto e um global de mesmo nome
+ * são o mesmo agente para o card: vale o do projeto.
+ */
+export function agentProfiles(agents: readonly Agent[], selection: readonly HarnessSelection[], defaultName: string): ExecProfile[] {
+  const byName = new Map<string, Agent>();
+  for (const a of agents) {
+    if (!selection.some((x) => x.kind === 'agent' && x.location === a.location)) continue;
+    const current = byName.get(a.name);
+    if (!current || (current.scope === 'user' && a.scope === 'project')) byName.set(a.name, a);
+  }
+  const list = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  if (!list.length) return [defaultAgent()];
+  const chosen = list.some((a) => a.name === defaultName) ? defaultName : list[0]!.name;
+  return list.map((a) => profileOfAgent(a, a.name === chosen));
+}
 
 /** Conjuntos de ferramentas prontos, nos nomes do Claude Code; nas demais ferramentas valem como orientação. */
 export const TOOL_PRESETS: { id: string; label: string; hint: string; tools: string[] }[] = [
@@ -61,15 +101,22 @@ export const TOOL_PRESETS: { id: string; label: string; hint: string; tools: str
 const strings = (v: unknown): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()))] : [];
 
-/** Os agentes salvos, descartando o inválido. Nunca devolve vazio: sem nenhum, vale o agente padrão. */
-export function parseProfiles(json: string | null | undefined): ExecProfile[] {
-  const list = readProfiles(json);
-  if (!list.length) return [defaultAgent()];
-  // sempre há um padrão: na falta, o primeiro
-  return list.some((p) => p.isDefault) ? list : list.map((p, i) => ({ ...p, isDefault: i === 0 }));
+/** Agente como as versões anteriores o guardavam no banco (`boards.exec_profiles_json`); só serve à migração para arquivos. */
+export interface LegacyExecProfile {
+  id: string;
+  name: string;
+  purpose: string;
+  agent: string;
+  skills: string[];
+  mcpServers: string[] | null;
+  tools: string[];
+  deniedTools: string[];
+  model: string;
+  isDefault: boolean;
 }
 
-function readProfiles(json: string | null | undefined): ExecProfile[] {
+/** Os agentes guardados no banco pelas versões anteriores, descartando o inválido; vazio quando não há nenhum. */
+export function parseProfiles(json: string | null | undefined): LegacyExecProfile[] {
   let raw: unknown;
   try {
     raw = JSON.parse(json ?? '');
@@ -78,7 +125,7 @@ function readProfiles(json: string | null | undefined): ExecProfile[] {
   }
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
-  const out: ExecProfile[] = [];
+  const out: LegacyExecProfile[] = [];
   for (const v of raw as Record<string, unknown>[]) {
     if (!v || typeof v !== 'object' || typeof v.id !== 'string' || !v.id || seen.has(v.id)) continue;
     seen.add(v.id);
@@ -92,7 +139,6 @@ function readProfiles(json: string | null | undefined): ExecProfile[] {
       tools: strings(v.tools),
       deniedTools: strings(v.deniedTools),
       model: typeof v.model === 'string' ? v.model : '',
-      clean: v.clean === true,
       // só um agente é o padrão
       isDefault: v.isDefault === true && !out.some((p) => p.isDefault),
     });
@@ -115,32 +161,44 @@ export function profileOf(s: BoardState, c: Card): ExecProfile | undefined {
 
 /** O que a execução de um card deve usar, já resolvido entre o card e o agente. */
 export interface ExecManifest {
+  /** nome do agente do board */
   profile: string | null;
+  /** nome do arquivo de agente que a ferramenta recebe por parâmetro (`--agent`); vazio no agente embutido */
   agent: string;
+  /** o que o agente faz e as instruções dele, para a ferramenta que não o recebe por parâmetro */
+  purpose: string;
+  instructions: string;
   /** nomes das skills: as do agente e as indicadas no campo Skills do card */
   skills: string[];
-  mcpServers: string[] | null;
+  /** rules indicadas no campo Rules do card (locations do inventário) */
+  rules: string[];
+  /** servidores MCP além do do board */
+  mcpServers: string[];
   tools: string[];
   deniedTools: string[];
   /** modelo (nome que a ferramenta entende) e esforço, quando são da ferramenta do projeto */
   model: { name: string; effort: string | null } | null;
-  clean: boolean;
 }
+
+const listField = (s: BoardState, c: Card, name: string): string[] => {
+  const field = s.fieldDefs.find((f) => f.kind === 'multiselect' && f.name.toLowerCase() === name);
+  const v = field ? valueOf(s, c.id, field.id) : undefined;
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+};
 
 export function manifestOf(s: BoardState, c: Card): ExecManifest {
   const profile = profileOf(s, c);
-  const fieldValue = (match: (f: BoardState['fieldDefs'][number]) => boolean) => {
-    const field = s.fieldDefs.find(match);
-    return field ? valueOf(s, c.id, field.id) : undefined;
-  };
-  const cardSkills = fieldValue((f) => f.kind === 'multiselect' && f.name.toLowerCase() === 'skills');
-  const chosen = parseModelValue(fieldValue((f) => f.kind === 'model') ?? null) ?? parseModelValue(profile?.model || null);
+  const modelField = s.fieldDefs.find((f) => f.kind === 'model');
+  const chosen = parseModelValue(modelField ? valueOf(s, c.id, modelField.id) : undefined) ?? parseModelValue(profile?.model || null);
   const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
   return {
     profile: profile?.name ?? null,
-    agent: profile?.agent ?? '',
-    skills: [...new Set([...(profile?.skills ?? []), ...(Array.isArray(cardSkills) ? cardSkills : [])])],
-    mcpServers: profile?.mcpServers ?? null,
+    agent: profile && profile.scope !== 'builtin' ? profile.id : '',
+    purpose: profile?.purpose ?? '',
+    instructions: profile?.instructions ?? '',
+    skills: [...new Set([...(profile?.skills ?? []), ...listField(s, c, 'skills')])],
+    rules: listField(s, c, 'rules'),
+    mcpServers: profile?.mcpServers ?? [],
     tools: profile?.tools ?? [],
     deniedTools: profile?.deniedTools ?? [],
     model: option
@@ -149,7 +207,6 @@ export function manifestOf(s: BoardState, c: Card): ExecManifest {
           effort: effortToRun(option, chosen!.effort),
         }
       : null,
-    clean: profile?.clean ?? false,
   };
 }
 
@@ -162,26 +219,28 @@ export function effortToRun(option: ModelOption, effort: string | null): string 
   return option.tool === 'cursor' ? option.defaultEffort : null;
 }
 
-export type ExecAspect = 'agent' | 'skills' | 'mcp' | 'tools' | 'model' | 'clean';
+export type ExecAspect = 'agent' | 'skills' | 'mcp' | 'tools' | 'model' | 'context';
 
 export const EXEC_ASPECTS: { id: ExecAspect; label: string }[] = [
   { id: 'agent', label: 'Agente' },
-  { id: 'skills', label: 'Skills' },
+  { id: 'skills', label: 'Skills e rules' },
   { id: 'mcp', label: 'Servidores MCP' },
   { id: 'tools', label: 'Ferramentas' },
   { id: 'model', label: 'Modelo e esforço' },
-  { id: 'clean', label: 'Sessão limpa' },
+  { id: 'context', label: 'Contexto vazio' },
 ];
 
 /**
  * O que a execução pelo board consegue impor em cada ferramenta por parâmetro da linha de comando
  * (`enforced`) e o que só segue como orientação no prompt e no get_card (`advised`). Conforme a
- * documentação de cada CLI lida em 2026-10-02; as skills vão sempre pelo caminho do arquivo.
+ * documentação de cada CLI lida em 2026-10-02 e o Claude Code 2.1.278 testado em 2026-10-07: as skills e
+ * as rules vão sempre pelo caminho do arquivo; `context` é o contexto vazio (nada do usuário nem do
+ * projeto carregado por conta própria).
  */
 export const EXEC_ENFORCEMENT: Record<AiTool, Record<ExecAspect, 'enforced' | 'advised'>> = {
-  claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', clean: 'enforced' },
-  copilot: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', clean: 'advised' },
-  kimi: { agent: 'enforced', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', clean: 'advised' },
-  codex: { agent: 'advised', skills: 'advised', mcp: 'enforced', tools: 'advised', model: 'enforced', clean: 'advised' },
-  cursor: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', clean: 'advised' },
+  claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', context: 'enforced' },
+  copilot: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', context: 'enforced' },
+  kimi: { agent: 'enforced', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', context: 'advised' },
+  codex: { agent: 'advised', skills: 'advised', mcp: 'enforced', tools: 'advised', model: 'enforced', context: 'advised' },
+  cursor: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', context: 'advised' },
 };

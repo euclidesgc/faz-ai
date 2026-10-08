@@ -70,6 +70,23 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
               <Callout.Text>{t(permission.hint)}</Callout.Text>
             </Callout.Root>
           )}
+          <FormField
+            label={t('Agente padrão')}
+            hint={t('Executa os cards que não escolhem um agente, nem pela fase. Só os agentes marcados como disponíveis no Harness.')}
+          >
+            {(id) => (
+              <SelectField
+                id={id}
+                aria-label={t('Agente padrão')}
+                options={board.execProfiles.map((p) => ({
+                  value: p.id,
+                  label: p.scope === 'builtin' ? t('Agente embutido (sem instruções)') : p.id,
+                }))}
+                value={board.execProfiles.find((p) => p.isDefault)?.id ?? ''}
+                onChange={(defaultAgent) => settings.updateBoard({ runner: { defaultAgent } })}
+              />
+            )}
+          </FormField>
           <FormField label={t('Tempo limite por execução')}>
             {(id) => (
               <div className="unit-field">

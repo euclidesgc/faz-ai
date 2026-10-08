@@ -96,7 +96,8 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
       return <ModelEditor value={value} onChange={onChange} />;
     case 'multiselect': {
       const current = Array.isArray(value) ? value : [];
-      if (isSkillsField(field.name)) return <SkillPicker value={current} onChange={onChange} />;
+      // o card só indica o que o Harness marcou como "usar quando fizer sentido"
+      if (isSkillsField(field.name)) return <SkillPicker value={current} onChange={onChange} usage="contextual" />;
       return <ChipsEditor options={field.options.map(optionChip)} values={current} onChange={onChange} />;
     }
   }

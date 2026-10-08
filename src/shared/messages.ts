@@ -1,8 +1,8 @@
 import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
-import type { ExecProfile } from './execution';
 import type { AiTool, HarnessKind, InstallScope, SkillMode } from './harness';
+import type { HarnessUsage, SelectableKind } from './harnessSelection';
 import type { HookInput, McpServerInput } from './harnessCatalog';
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { ModelOption, ModelRule } from './models';
@@ -10,6 +10,21 @@ import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { GitConfig } from './git';
+
+/** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
+export interface AgentInput {
+  name: string;
+  description: string;
+  /** instruções (o corpo do arquivo, sem o frontmatter) */
+  body: string;
+  /** valor do campo Modelo do board (`<id>@<esforço>`); vazio = o modelo da sessão */
+  model: string;
+  tools: string[];
+  deniedTools: string[];
+  skills: string[];
+  /** servidores MCP além do do board */
+  mcp: string[];
+}
 import type { SettingsTab } from './settingsTab';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
 
@@ -70,9 +85,8 @@ export type WebviewToHost =
   | { type: 'card.yolo.set'; cardId: Id; enabled: boolean }
   /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */
   | { type: 'card.yolo.inherit'; cardId: Id; fromId: Id }
-  /** agente de execução do card; null volta ao da coluna */
+  /** agente de execução do card (nome do agente marcado no Harness); null volta ao da coluna */
   | { type: 'card.execProfile.set'; cardId: Id; profileId: Id | null }
-  | { type: 'settings.execProfiles.set'; profiles: ExecProfile[] }
   /** a pasta de trabalho da história foi removida (a branch continua registrada) */
   | { type: 'card.workspace.clear'; cardId: Id }
   /** abre a pasta de trabalho da história numa janela nova do editor */
@@ -205,9 +219,21 @@ export type WebviewToHost =
   | { type: 'harness.install.cancel' }
   /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
   | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
-  | { type: 'harness.agent.create'; name: string; description: string; content: string; model?: string }
-  | { type: 'harness.agent.write'; name: string; content: string }
-  | { type: 'harness.agent.delete'; name: string }
+  /**
+   * marca (ou desmarca, com `usage` null) itens do harness para as execuções do board: `location` como o
+   * inventário o mostra (relativo ao projeto ou a partir de `~`)
+   */
+  | { type: 'harness.selection.set'; items: { kind: SelectableKind; location: string }[]; usage: HarnessUsage | null }
+  /** cria um agente na pasta de agentes da ferramenta (global por padrão) e o marca como disponível no board */
+  | { type: 'harness.agent.create'; scope?: InstallScope; input: AgentInput }
+  /** reescreve o frontmatter (o que vier em `patch`) e, se vier, o corpo de um agente, preservando o resto */
+  | { type: 'harness.agent.update'; name: string; scope: InstallScope; patch: Partial<AgentInput>; body?: string }
+  | { type: 'harness.agent.write'; name: string; scope: InstallScope; content: string }
+  | { type: 'harness.agent.delete'; name: string; scope: InstallScope }
+  /** cria os agentes padrão de fábrica que ainda não existem (`force` recria também os que a pessoa apagou) */
+  | { type: 'harness.agents.seed'; force?: boolean }
+  /** a IA lê o projeto e propõe os agentes do board (cria, ajusta e marca); o resultado vai para o chat do board */
+  | { type: 'ai.suggestAgents' }
   /** chat com a IA do projeto: envia uma mensagem (com o modelo escolhido, ou null para o padrão), interrompe ou limpa a conversa */
   | { type: 'chat.send'; text: string; model: string | null }
   | { type: 'chat.stop' }

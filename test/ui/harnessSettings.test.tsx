@@ -4,6 +4,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { RUNNER_PERMISSIONS } from '../../src/shared/runner';
+import { profileOfAgent } from '../../src/shared/execution';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { HarnessSettings } from '../../src/webview/components/settings/HarnessSettings';
 import { useBoardStore, type HarnessTab } from '../../src/webview/store/boardStore';
@@ -24,8 +25,41 @@ const agent: Agent = {
   name: 'revisor',
   description: 'Revisa',
   model: 'opus',
-  path: '.claude/agents/revisor.md',
-  content: 'instruções',
+  modelValue: 'claude:opus@high',
+  scope: 'user',
+  path: '/abs/home/.claude/agents/revisor.md',
+  location: '~/.claude/agents/revisor.md',
+  content: '---\nname: revisor\n---\ninstruções',
+  body: 'instruções',
+  tools: ['Read'],
+  deniedTools: [],
+  skills: [],
+  mcp: [],
+  seed: false,
+};
+const projectAgent: Agent = {
+  ...agent,
+  name: 'local',
+  scope: 'project',
+  path: '/abs/.claude/agents/local.md',
+  location: '.claude/agents/local.md',
+  seed: true,
+};
+const ruleItem: HarnessItem = {
+  kind: 'instructions',
+  scope: 'project',
+  name: 'AGENTS.md',
+  description: '',
+  path: '/abs/AGENTS.md',
+  location: 'AGENTS.md',
+  layout: 'file',
+};
+const globalRule: HarnessItem = {
+  ...ruleItem,
+  scope: 'user',
+  name: 'CLAUDE.md',
+  path: '/abs/home/.claude/CLAUDE.md',
+  location: '~/.claude/CLAUDE.md',
 };
 
 // o inventário liga cada skill do projeto ao caminho absoluto que o host usa para gravar o modo
@@ -49,8 +83,8 @@ const HARNESS: Harness = {
     { name: 'AGENTS.md', exists: true, content: '# Regras' },
   ],
   skills: SKILLS,
-  agents: [agent],
-  inventory: [{ tool: 'claude', installed: true, items: SKILLS.filter((k) => k.enabled).map(inventoryItem) }],
+  agents: [agent, projectAgent],
+  inventory: [{ tool: 'claude', installed: true, items: [ruleItem, globalRule, ...SKILLS.filter((k) => k.enabled).map(inventoryItem)] }],
 };
 
 const setState = (patch: (s: BoardState) => Partial<BoardState>) => {
@@ -60,7 +94,17 @@ const setState = (patch: (s: BoardState) => Partial<BoardState>) => {
 
 beforeEach(async () => {
   await seedBoard();
-  setState((s) => ({ board: { ...s.board, aiTool: 'claude' }, harness: HARNESS, harnessInstall: null, aiRunUnsupported: null }));
+  setState((s) => ({
+    board: { ...s.board, aiTool: 'claude', execProfiles: [profileOfAgent(agent, true)] },
+    harness: HARNESS,
+    harnessSelection: [
+      { kind: 'skill', location: '.claude/skills/revisar-spec/SKILL.md', usage: 'always' },
+      { kind: 'skill', location: '.claude/skills/sumida/SKILL.md', usage: 'contextual' },
+      { kind: 'agent', location: '~/.claude/agents/revisor.md', usage: 'contextual' },
+    ],
+    harnessInstall: null,
+    aiRunUnsupported: null,
+  }));
   posted.mockClear();
 });
 
@@ -73,23 +117,232 @@ const renderScreen = (tab: HarnessTab = 'project') => {
     </Theme>,
   );
 };
-/** bloco de um item (regra, skill ou agente) pelo título dele */
-const block = (name: string) => within(screen.getByLabelText(name));
+/** a linha de um item na tabela, pelo nome dele (a primeira: com o editor aberto, a linha de edição também o cita) */
+const row = (name: string | RegExp) => within(screen.getAllByRole('row', { name })[0]!);
 const dialog = () => within(screen.getByRole('dialog'));
 
 describe('HarnessSettings: abas', () => {
-  it('três abas separam a ferramenta, o que é do projeto e tudo que a ferramenta carrega', async () => {
+  it('quatro abas: ferramenta, projeto, global e tudo que a ferramenta carrega', async () => {
     renderScreen('tool');
     expect(screen.getByText('Ferramenta deste projeto')).toBeInTheDocument();
-    expect(screen.queryByText('Regras do projeto')).toBeNull();
-    await userEvent.click(screen.getByRole('tab', { name: /Do projeto/ }));
-    expect(screen.getByText('Regras do projeto')).toBeInTheDocument();
-    expect(screen.queryByText('Ferramenta deste projeto')).toBeNull();
-    // a aba escolhida fica lembrada
+    expect(screen.queryByText('Harness do projeto')).toBeNull();
+    await userEvent.click(screen.getByRole('tab', { name: /^Projeto/ }));
+    expect(screen.getByText('Harness do projeto')).toBeInTheDocument();
     expect(useBoardStore.getState().harnessTab).toBe('project');
+    // abrir um escopo relê as pastas (a do usuário não é vigiada)
+    expect(sentOf('harness.refresh').length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('tab', { name: /^Global/ }));
+    expect(screen.getByText('Harness global')).toBeInTheDocument();
+    expect(useBoardStore.getState().harnessTab).toBe('user');
     await userEvent.click(screen.getByRole('tab', { name: /Tudo que a ferramenta carrega/ }));
     expect(screen.getByText('Tudo que cada ferramenta carrega')).toBeInTheDocument();
     expect(useBoardStore.getState().harnessTab).toBe('all');
+  });
+});
+
+describe('HarnessSettings: rules', () => {
+  it('marcar e desmarcar uma rule do projeto grava a marcação; o global mostra os arquivos da pasta do usuário', async () => {
+    renderScreen('project');
+    const r = row(/AGENTS\.md/);
+    await userEvent.click(r.getByRole('checkbox', { name: 'Incluir em todo contexto: AGENTS.md' }));
+    expect(lastSent('harness.selection.set')).toEqual({
+      type: 'harness.selection.set',
+      items: [{ kind: 'instructions', location: 'AGENTS.md' }],
+      usage: 'always',
+    });
+    act(() =>
+      setState((s) => ({ harnessSelection: [...s.harnessSelection, { kind: 'instructions', location: 'AGENTS.md', usage: 'always' }] })),
+    );
+    expect(row(/AGENTS\.md/).getByRole('checkbox', { name: 'Incluir em todo contexto: AGENTS.md' })).toBeChecked();
+    await userEvent.click(row(/AGENTS\.md/).getByRole('checkbox', { name: 'Incluir em todo contexto: AGENTS.md' }));
+    expect(lastSent('harness.selection.set').usage).toBeNull();
+    // o CLAUDE.md global não aparece na aba do projeto
+    expect(screen.queryByRole('row', { name: /~\/\.claude\/CLAUDE\.md/ })).toBeNull();
+    await userEvent.click(screen.getByRole('tab', { name: /^Global/ }));
+    expect(screen.getByRole('row', { name: /~\/\.claude\/CLAUDE\.md/ })).toBeInTheDocument();
+  });
+
+  it('editar um arquivo de regras da raiz do projeto grava pelo nome dele', async () => {
+    renderScreen('project');
+    await userEvent.click(row(/AGENTS\.md/).getByRole('button', { name: 'Editar' }));
+    await userEvent.type(screen.getByDisplayValue('# Regras'), '!');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(lastSent('harness.rule.write')).toEqual({ type: 'harness.rule.write', name: 'AGENTS.md', content: '# Regras!' });
+  });
+
+  it('uma marcação cujo arquivo sumiu aparece como não encontrada e pode ser desmarcada', async () => {
+    setState((s) => ({
+      harnessSelection: [...s.harnessSelection, { kind: 'instructions', location: '.claude/rules/velha.md', usage: 'contextual' }],
+    }));
+    renderScreen('project');
+    const missing = row(/velha\.md/);
+    expect(missing.getByText('não encontrada')).toBeInTheDocument();
+    await userEvent.click(missing.getByRole('checkbox', { name: 'Usar quando fizer sentido: .claude/rules/velha.md' }));
+    expect(lastSent('harness.selection.set')).toEqual({
+      type: 'harness.selection.set',
+      items: [{ kind: 'instructions', location: '.claude/rules/velha.md' }],
+      usage: null,
+    });
+  });
+});
+
+describe('HarnessSettings: skills', () => {
+  const openSkills = async (tab: HarnessTab = 'project') => {
+    renderScreen(tab);
+    await userEvent.click(screen.getByRole('tab', { name: /^Skills/ }));
+  };
+
+  it('as duas marcações excluem uma à outra e o total aparece no resumo', async () => {
+    await openSkills();
+    expect(screen.getByText('1 em todo contexto · 0 quando fizer sentido · 2 no total.')).toBeInTheDocument();
+    const k = row(/revisar-spec/);
+    expect(k.getByRole('checkbox', { name: 'Incluir em todo contexto: revisar-spec' })).toBeChecked();
+    expect(k.getByRole('checkbox', { name: 'Usar quando fizer sentido: revisar-spec' })).not.toBeChecked();
+    await userEvent.click(k.getByRole('checkbox', { name: 'Usar quando fizer sentido: revisar-spec' }));
+    expect(lastSent('harness.selection.set')).toEqual({
+      type: 'harness.selection.set',
+      items: [{ kind: 'skill', location: '.claude/skills/revisar-spec/SKILL.md' }],
+      usage: 'contextual',
+    });
+    // a desligada não está no inventário: não pode ser marcada
+    expect(screen.queryByRole('row', { name: /desligada/ })).toBeNull();
+  });
+
+  it('modo, editar e apagar uma skill do projeto', async () => {
+    await openSkills();
+    const k = row(/revisar-spec/);
+    await choose(k.getByRole('combobox', { name: 'Modo da skill revisar-spec' }), 'Só quando indicada');
+    expect(lastSent('harness.skill.setMode')).toEqual({
+      type: 'harness.skill.setMode',
+      tool: 'claude',
+      paths: ['/abs/.claude/skills/revisar-spec/SKILL.md'],
+      mode: 'manual',
+    });
+    await userEvent.click(k.getByRole('button', { name: 'Editar' }));
+    await userEvent.type(screen.getByDisplayValue('conteúdo de revisar-spec'), '!');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(lastSent('harness.skill.write')).toEqual({
+      type: 'harness.skill.write',
+      name: 'revisar-spec',
+      content: 'conteúdo de revisar-spec!',
+    });
+    await userEvent.click(row(/outra/).getByRole('button', { name: 'Apagar outra' }));
+    await userEvent.click(dialog().getByRole('button', { name: 'Apagar' }));
+    expect(lastSent('harness.item.delete')).toEqual({
+      type: 'harness.item.delete',
+      tool: 'claude',
+      kind: 'skill',
+      path: '/abs/.claude/skills/outra/SKILL.md',
+    });
+  });
+
+  it('nova skill abre o formulário de criação com o destino, e a skill do fluxo é instalada daqui', async () => {
+    await openSkills();
+    await userEvent.click(screen.getByRole('button', { name: 'Nova skill' }));
+    expect(screen.getByText('Onde')).toBeInTheDocument();
+    expect(screen.getByLabelText('Skill do fluxo')).toBeInTheDocument();
+  });
+});
+
+describe('HarnessSettings: agentes', () => {
+  const openAgents = async (tab: HarnessTab = 'user') => {
+    renderScreen(tab);
+    await userEvent.click(screen.getByRole('tab', { name: /^Agentes/ }));
+  };
+
+  it('o global lista os agentes da pasta do usuário, com o padrão e a marcação; o projeto lista os dele', async () => {
+    await openAgents();
+    const a = row(/revisor/);
+    expect(a.getByRole('checkbox', { name: 'Disponível no board: revisor' })).toBeChecked();
+    expect(a.getByText('padrão')).toBeInTheDocument();
+    expect(a.getByText('claude:opus@high')).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /local/ })).toBeNull();
+    await userEvent.click(a.getByRole('checkbox', { name: 'Disponível no board: revisor' }));
+    expect(lastSent('harness.selection.set')).toEqual({
+      type: 'harness.selection.set',
+      items: [{ kind: 'agent', location: '~/.claude/agents/revisor.md' }],
+      usage: null,
+    });
+    await userEvent.click(screen.getByRole('tab', { name: /^Projeto/ }));
+    await userEvent.click(screen.getByRole('tab', { name: /^Agentes/ }));
+    const local = row(/local/);
+    expect(local.getByText('de fábrica')).toBeInTheDocument();
+    expect(local.getByRole('checkbox', { name: 'Disponível no board: local' })).not.toBeChecked();
+    await userEvent.click(local.getByRole('checkbox', { name: 'Disponível no board: local' }));
+    expect(lastSent('harness.selection.set')).toEqual({
+      type: 'harness.selection.set',
+      items: [{ kind: 'agent', location: '.claude/agents/local.md' }],
+      usage: 'contextual',
+    });
+  });
+
+  it('novo agente: normaliza o nome, recusa nome usado e cria na pasta do escopo', async () => {
+    await openAgents();
+    await userEvent.click(screen.getByRole('button', { name: 'Novo agente' }));
+    const name = screen.getByPlaceholderText('revisor-de-spec');
+    const create = screen.getByRole('button', { name: 'Criar agente' });
+    await userEvent.type(name, 'revisor');
+    await userEvent.type(screen.getByPlaceholderText('Revisa uma Spec e aponta lacunas antes do Plan'), ' Revisa ');
+    expect(screen.getByText('Nome inválido ou já usado.')).toBeInTheDocument();
+    expect(create).toBeDisabled();
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Revisor Novo');
+    expect(name).toHaveValue('revisor-novo');
+    await userEvent.type(screen.getByPlaceholderText('Como este agente trabalha: padrões, comandos, o que nunca fazer'), 'Passos');
+    await userEvent.click(create);
+    expect(lastSent('harness.agent.create')).toEqual({
+      type: 'harness.agent.create',
+      scope: 'user',
+      input: { name: 'revisor-novo', description: 'Revisa', body: 'Passos', model: '', tools: [], deniedTools: [], skills: [], mcp: [] },
+    });
+    expect(screen.queryByRole('button', { name: 'Criar agente' })).toBeNull();
+  });
+
+  it('editar grava o frontmatter por campo e as instruções com Salvar; apagar pede confirmação', async () => {
+    await openAgents();
+    await userEvent.click(row(/revisor/).getByRole('button', { name: 'Editar' }));
+    const description = screen.getByDisplayValue('Revisa');
+    await userEvent.type(description, ' tudo{Enter}');
+    expect(lastSent('harness.agent.update')).toEqual({
+      type: 'harness.agent.update',
+      name: 'revisor',
+      scope: 'user',
+      patch: { description: 'Revisa tudo' },
+    });
+    await userEvent.type(screen.getByDisplayValue('instruções'), '.');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(lastSent('harness.agent.update')).toEqual({
+      type: 'harness.agent.update',
+      name: 'revisor',
+      scope: 'user',
+      patch: {},
+      body: 'instruções.',
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Só leitura' }));
+    expect(lastSent('harness.agent.update').patch).toEqual({ tools: ['Read', 'Grep', 'Glob'] });
+    await userEvent.click(row(/revisor/).getByTitle('Apagar o agente'));
+    expect(dialog().getByText(/vale para todos os seus projetos/)).toBeInTheDocument();
+    await userEvent.click(dialog().getByRole('button', { name: 'Apagar' }));
+    expect(lastSent('harness.agent.delete')).toEqual({ type: 'harness.agent.delete', name: 'revisor', scope: 'user' });
+  });
+
+  it('sugerir agentes com IA pede ao host, e fica desabilitado enquanto o chat responde; recriar os padrão só no global', async () => {
+    await openAgents();
+    await userEvent.click(screen.getByRole('button', { name: 'Sugerir agentes com IA' }));
+    expect(lastSent('ai.suggestAgents')).toEqual({ type: 'ai.suggestAgents' });
+    await userEvent.click(screen.getByRole('button', { name: 'Recriar os agentes padrão' }));
+    expect(lastSent('harness.agents.seed')).toEqual({ type: 'harness.agents.seed', force: true });
+    act(() => setState((s) => ({ chat: { ...s.chat, busy: true } })));
+    expect(screen.getByRole('button', { name: 'Sugerir agentes com IA' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('tab', { name: /^Projeto/ }));
+    await userEvent.click(screen.getByRole('tab', { name: /^Agentes/ }));
+    expect(screen.queryByRole('button', { name: 'Recriar os agentes padrão' })).toBeNull();
+  });
+
+  it('o agente padrão é escolhido em Ferramenta e execução entre os disponíveis', async () => {
+    renderScreen('tool');
+    const runner = document.querySelector<HTMLElement>('.runner-settings')!;
+    expect(within(runner).getByRole('combobox', { name: 'Agente padrão' })).toHaveTextContent('revisor');
   });
 });
 
@@ -148,186 +401,6 @@ describe('HarnessSettings: ferramenta e execução', () => {
     renderScreen('tool');
     expect(screen.getByText('Esta ferramenta não roda pelo board.')).toBeInTheDocument();
     expect(document.querySelector('.runner-settings')).toBeNull();
-  });
-});
-
-describe('HarnessSettings: regras', () => {
-  it('Usar o AGENTS.md cria o CLAUDE.md que só o importa', async () => {
-    renderScreen();
-    await userEvent.click(block('CLAUDE.md').getByRole('button', { name: 'Usar o AGENTS.md' }));
-    expect(lastSent('harness.rule.write')).toEqual({ type: 'harness.rule.write', name: 'CLAUDE.md', content: '@AGENTS.md\n' });
-  });
-
-  it('criar o arquivo: o editor abre vazio, Salvar grava e Descartar vira Fechar sem alterações', async () => {
-    renderScreen();
-    const rule = block('CLAUDE.md');
-    expect(rule.queryByTitle('Apagar o arquivo')).toBeNull();
-    await userEvent.click(rule.getByRole('button', { name: 'Criar' }));
-    const save = rule.getByRole('button', { name: 'Salvar' });
-    expect(save).toBeDisabled();
-    // o botão da linha e o do editor
-    expect(rule.getByRole('button', { name: 'Fechar edição' })).toBeInTheDocument();
-    expect(rule.getByRole('button', { name: 'Fechar' })).toBeInTheDocument();
-    await userEvent.type(rule.getAllByRole('textbox')[0]!, 'Regra nova');
-    expect(rule.getByText('Alterações não salvas')).toBeInTheDocument();
-    await userEvent.click(save);
-    expect(lastSent('harness.rule.write')).toEqual({ type: 'harness.rule.write', name: 'CLAUDE.md', content: 'Regra nova' });
-    await userEvent.click(rule.getByRole('button', { name: 'Descartar' }));
-    expect(rule.queryByRole('button', { name: 'Salvar' })).toBeNull();
-  });
-
-  it('apagar um arquivo de regras pede confirmação', async () => {
-    renderScreen();
-    await userEvent.click(block('AGENTS.md').getByTitle('Apagar o arquivo'));
-    expect(useBoardStore.getState().dialog).toMatchObject({ title: 'Apagar AGENTS.md?', danger: true });
-    await userEvent.click(dialog().getByRole('button', { name: 'Apagar' }));
-    expect(lastSent('harness.rule.delete')).toEqual({ type: 'harness.rule.delete', name: 'AGENTS.md' });
-  });
-
-  it('só um editor fica aberto por vez', async () => {
-    renderScreen();
-    await userEvent.click(block('AGENTS.md').getByRole('button', { name: 'Editar' }));
-    expect(block('AGENTS.md').getByRole('button', { name: 'Salvar' })).toBeInTheDocument();
-    await userEvent.click(block('revisar-spec').getByRole('button', { name: 'Editar' }));
-    expect(block('AGENTS.md').queryByRole('button', { name: 'Salvar' })).toBeNull();
-    expect(block('revisar-spec').getByDisplayValue('conteúdo de revisar-spec')).toBeInTheDocument();
-  });
-});
-
-describe('HarnessSettings: skills', () => {
-  it('ligar/desligar, modo e editar uma skill', async () => {
-    renderScreen();
-    const off = block('desligada');
-    expect(off.getByText('Desligada')).toBeInTheDocument();
-    expect(off.queryByRole('combobox')).toBeNull();
-    await userEvent.click(off.getByRole('switch'));
-    expect(lastSent('harness.skill.setEnabled')).toEqual({ type: 'harness.skill.setEnabled', name: 'desligada', enabled: true });
-
-    const k = block('revisar-spec');
-    await choose(k.getByRole('combobox'), 'Só quando indicada');
-    expect(lastSent('harness.skill.setMode')).toEqual({
-      type: 'harness.skill.setMode',
-      tool: 'claude',
-      paths: ['/abs/.claude/skills/revisar-spec/SKILL.md'],
-      mode: 'manual',
-    });
-    await userEvent.click(k.getByRole('button', { name: 'Editar' }));
-    await userEvent.type(k.getByDisplayValue('conteúdo de revisar-spec'), '!');
-    await userEvent.click(k.getByRole('button', { name: 'Salvar' }));
-    expect(lastSent('harness.skill.write')).toEqual({
-      type: 'harness.skill.write',
-      name: 'revisar-spec',
-      content: 'conteúdo de revisar-spec!',
-    });
-  });
-
-  it('apagar uma skill pede confirmação', async () => {
-    renderScreen();
-    await userEvent.click(block('outra').getByTitle('Apagar a skill'));
-    await userEvent.click(dialog().getByRole('button', { name: 'Apagar' }));
-    expect(lastSent('harness.skill.delete')).toEqual({ type: 'harness.skill.delete', name: 'outra' });
-  });
-
-  it('com várias automáticas, deixa todas só quando indicadas de uma vez', async () => {
-    renderScreen();
-    // o inventário no fim da página tem um botão de mesmo nome
-    const bulk = within(screen.getByText('2 skills automáticas no projeto.').closest<HTMLElement>('p')!);
-    await userEvent.click(bulk.getByRole('button', { name: 'Deixar todas só quando indicadas' }));
-    expect(lastSent('harness.skill.setMode')).toEqual({
-      type: 'harness.skill.setMode',
-      tool: 'claude',
-      paths: ['/abs/.claude/skills/revisar-spec/SKILL.md', '/abs/.claude/skills/outra/SKILL.md'],
-      mode: 'manual',
-    });
-  });
-
-  it('a skill do fluxo não é instalada aqui: o texto aponta para a seção Skills da ferramenta', () => {
-    renderScreen();
-    expect(screen.queryByRole('button', { name: /skill do fluxo/i })).toBeNull();
-    expect(screen.getByText(/A skill do fluxo do board é instalada em/)).toBeInTheDocument();
-  });
-
-  it('nova skill: normaliza o nome, recusa nome usado e cria', async () => {
-    renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'Nova skill' }));
-    const create = screen.getByRole('button', { name: 'Criar skill' });
-    const name = screen.getByPlaceholderText('revisar-spec');
-    await userEvent.type(name, 'outra');
-    await userEvent.type(screen.getByPlaceholderText('Use ao revisar uma Spec antes de passar para o Plan'), '  Quando usar  ');
-    expect(screen.getByText('Nome inválido ou já usado.')).toBeInTheDocument();
-    expect(create).toBeDisabled();
-    await userEvent.clear(name);
-    await userEvent.type(name, 'Minha Skill');
-    expect(name).toHaveValue('minha-skill');
-    await userEvent.type(screen.getByPlaceholderText('Instruções da skill, em markdown'), 'Passos');
-    await userEvent.click(create);
-    expect(lastSent('harness.skill.create')).toEqual({
-      type: 'harness.skill.create',
-      name: 'minha-skill',
-      description: 'Quando usar',
-      content: 'Passos',
-    });
-    expect(screen.queryByRole('button', { name: 'Criar skill' })).toBeNull();
-  });
-
-  it('sem skills, mostra a pasta vazia', () => {
-    setState((s) => ({ harness: { ...s.harness, skills: [] } }));
-    renderScreen();
-    expect(screen.getByText(/Nenhuma skill em/)).toBeInTheDocument();
-  });
-});
-
-describe('HarnessSettings: agentes', () => {
-  it('novo agente com modelo; Cancelar limpa o formulário', async () => {
-    renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'Novo subagente' }));
-    await userEvent.type(screen.getByPlaceholderText('revisor-de-spec'), 'rascunho');
-    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Novo subagente' }));
-    expect(screen.getByPlaceholderText('revisor-de-spec')).toHaveValue('');
-
-    await userEvent.type(screen.getByPlaceholderText('revisor-de-spec'), 'Revisor Novo');
-    await userEvent.type(screen.getByPlaceholderText('Revisa uma Spec e aponta lacunas antes do Plan'), ' Revisa ');
-    await userEvent.type(screen.getByPlaceholderText('vazio = o modelo da sessão'), '  ');
-    await userEvent.type(screen.getByPlaceholderText('Instruções do subagente'), 'Passos');
-    await userEvent.click(screen.getByRole('button', { name: 'Criar subagente' }));
-    expect(lastSent('harness.agent.create')).toEqual({
-      type: 'harness.agent.create',
-      name: 'revisor-novo',
-      description: 'Revisa',
-      content: 'Passos',
-      model: undefined,
-    });
-    expect(screen.queryByRole('button', { name: 'Criar subagente' })).toBeNull();
-  });
-
-  it('nome de agente já usado não pode ser criado', async () => {
-    renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'Novo subagente' }));
-    await userEvent.type(screen.getByPlaceholderText('revisor-de-spec'), 'revisor');
-    await userEvent.type(screen.getByPlaceholderText('Revisa uma Spec e aponta lacunas antes do Plan'), 'x');
-    expect(screen.getByRole('button', { name: 'Criar subagente' })).toBeDisabled();
-  });
-
-  it('editar e apagar um agente', async () => {
-    renderScreen();
-    const a = block('revisor');
-    expect(a.getByText('opus')).toBeInTheDocument();
-    await userEvent.click(a.getByRole('button', { name: 'Editar' }));
-    await userEvent.type(a.getByDisplayValue('instruções'), '.');
-    await userEvent.click(a.getByRole('button', { name: 'Salvar' }));
-    expect(lastSent('harness.agent.write')).toEqual({ type: 'harness.agent.write', name: 'revisor', content: 'instruções.' });
-    await userEvent.click(a.getByTitle('Apagar o subagente'));
-    await userEvent.click(dialog().getByRole('button', { name: 'Apagar' }));
-    expect(lastSent('harness.agent.delete')).toEqual({ type: 'harness.agent.delete', name: 'revisor' });
-  });
-
-  it('ferramenta sem modelo por agente esconde o campo; sem agentes mostra a pasta vazia', async () => {
-    setState((s) => ({ board: { ...s.board, aiTool: 'kimi' }, harness: { ...s.harness, agents: [] } }));
-    renderScreen();
-    expect(screen.getByText(/Nenhum subagente em/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Novo subagente' }));
-    expect(screen.queryByPlaceholderText('vazio = o modelo da sessão')).toBeNull();
   });
 });
 

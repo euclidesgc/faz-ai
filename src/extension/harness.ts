@@ -9,11 +9,15 @@ import {
   type AgentSpec,
   type AiTool,
   type Harness,
+  type InstallScope,
   type RuleFile,
   type Skill,
   type SkillMode,
   type ToolInventory,
 } from '../shared/harness';
+import type { AgentInput } from '../shared/messages';
+import { copyTarget } from '../shared/harnessCatalog';
+import { agentInputOf, parseAgentFile, renderAgentFile } from './agentFiles';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { scanInventory } from './harnessScan';
 import { detectTools } from './models';
@@ -46,16 +50,6 @@ export function agentTemplate(spec: AgentSpec, name: string, description: string
   }
   const lines = [`name: ${name}`, `description: ${oneLine}`, ...(withModel ? [`${spec.modelField}: ${withModel}`] : [])];
   return `---\n${lines.join('\n')}\n---\n\n${body.trim()}\n`;
-}
-
-/** `description` e modelo de um arquivo de agente, em qualquer dos dois formatos. */
-function agentMeta(spec: AgentSpec, content: string): { description: string; model: string } {
-  if (spec.format === 'markdown') {
-    const meta = parseFrontmatter(content);
-    return { description: meta.description ?? '', model: (spec.modelField && meta.model) || '' };
-  }
-  const get = (key: string) => new RegExp(`^${key}\\s*=\\s*"((?:[^"\\\\]|\\\\.)*)"`, 'm').exec(content)?.[1]?.replace(/\\(.)/g, '$1') ?? '';
-  return { description: get('description'), model: spec.modelField ? get(spec.modelField) : '' };
 }
 
 /**
@@ -102,59 +96,99 @@ export class HarnessStore {
     }));
   }
 
-  /** Onde a ferramenta em uso guarda os agentes do projeto; lança erro se ela não tem agentes em arquivo. */
-  private get agentSpec() {
+  /** Onde a ferramenta em uso guarda os agentes; lança erro se ela não tem agentes em arquivo. */
+  private get agentSpec(): AgentSpec {
     const info = aiToolInfo(this.tool);
-    if (!info.agents) throw new Error(`O ${info.label} não tem agentes definidos em arquivos do projeto.`);
+    if (!info.agents) throw new Error(`O ${info.label} não tem agentes definidos em arquivos.`);
     return info.agents;
   }
 
-  private agents(): Agent[] {
+  /** Pasta de agentes de um escopo (base absoluta e caminho relativo), ou null quando a ferramenta ou a máquina não a tem. */
+  private agentDir(scope: InstallScope): { base: string; rel: string } | null {
     const spec = aiToolInfo(this.tool).agents;
-    const base = spec && path.join(this.workspaceDir, spec.dir);
-    if (!spec || !base || !fs.existsSync(base)) return [];
-    return fs
-      .readdirSync(base)
-      .filter(
-        (f) => f.endsWith(spec.ext) && SKILL_NAME_PATTERN.test(f.slice(0, -spec.ext.length)) && fs.statSync(path.join(base, f)).isFile(),
-      )
-      .map((f) => {
-        const rel = `${spec.dir}/${f}`;
-        const content = this.read(path.join(this.workspaceDir, rel));
-        return { name: f.slice(0, -spec.ext.length), ...agentMeta(spec, content), path: rel, content };
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
+    if (!spec) return null;
+    if (scope === 'project') return { base: this.workspaceDir, rel: spec.dir };
+    const target = copyTarget(this.tool, 'agent', 'files', 'user');
+    return this.homeDir && target ? { base: this.homeDir, rel: target.path } : null;
   }
 
-  private agentFile(name: string): string {
+  /** Os agentes da ferramenta em uso, do projeto e da pasta do usuário, lidos do disco. */
+  agents(): Agent[] {
+    const spec = aiToolInfo(this.tool).agents;
+    if (!spec) return [];
+    const scopes: InstallScope[] = ['project', 'user'];
+    return scopes
+      .flatMap((scope) => {
+        const dir = this.agentDir(scope);
+        const base = dir && path.join(dir.base, dir.rel);
+        if (!dir || !base || !fs.existsSync(base)) return [];
+        return fs
+          .readdirSync(base)
+          .filter(
+            (f) =>
+              f.endsWith(spec.ext) && SKILL_NAME_PATTERN.test(f.slice(0, -spec.ext.length)) && fs.statSync(path.join(base, f)).isFile(),
+          )
+          .map((f) => {
+            const file = path.join(base, f);
+            const rel = `${dir.rel}/${f}`;
+            return parseAgentFile(
+              spec,
+              { name: f.slice(0, -spec.ext.length), scope, path: file, location: scope === 'project' ? rel : `~/${rel}` },
+              this.read(file),
+            );
+          });
+      })
+      .sort((a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope));
+  }
+
+  private agentFile(name: string, scope: InstallScope): string {
     if (!SKILL_NAME_PATTERN.test(name))
       throw new Error('Nome de agente inválido: use letras minúsculas, números e hífens (ex.: "revisor-de-spec").');
-    return path.join(this.workspaceDir, this.agentSpec.dir, `${name}${this.agentSpec.ext}`);
+    const dir = this.agentDir(scope);
+    if (!dir)
+      throw new Error(
+        scope === 'user' ? 'Sem pasta de usuário para guardar o agente.' : `O ${aiToolInfo(this.tool).label} não tem agentes em arquivos.`,
+      );
+    return path.join(dir.base, dir.rel, `${name}${this.agentSpec.ext}`);
   }
 
-  private existingAgent(name: string): string {
-    const file = this.agentFile(name);
-    if (!fs.existsSync(file)) throw new Error(`Agente "${name}" não encontrado.`);
+  private existingAgent(name: string, scope: InstallScope): string {
+    const file = this.agentFile(name, scope);
+    if (!fs.existsSync(file))
+      throw new Error(`Agente "${name}" não encontrado${scope === 'user' ? ' na pasta do usuário' : ' no projeto'}.`);
     return file;
   }
 
-  createAgent(name: string, description: string, body: string, model = ''): void {
-    const file = this.agentFile(name);
-    if (fs.existsSync(file)) throw new Error(`Já existe um agente "${name}".`);
-    if (!description.trim()) throw new Error('O agente precisa de uma descrição: é por ela que a IA decide quando delegar a ele.');
-    if (model.trim() && !this.agentSpec.modelField)
+  /** Cria o arquivo do agente; `seed` marca o de fábrica. Devolve o caminho. */
+  createAgent(input: AgentInput, scope: InstallScope = 'user', seed = false): string {
+    const file = this.agentFile(input.name, scope);
+    if (fs.existsSync(file))
+      throw new Error(`Já existe um agente "${input.name}"${scope === 'user' ? ' na pasta do usuário' : ' no projeto'}.`);
+    if (!input.description.trim()) throw new Error('O agente precisa de uma descrição: é por ela que a IA decide quando delegar a ele.');
+    if (input.model.trim() && !this.agentSpec.modelField)
       throw new Error(`O ${aiToolInfo(this.tool).label} não permite fixar o modelo de um agente.`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, agentTemplate(this.agentSpec, name, description, body, model));
+    fs.writeFileSync(file, renderAgentFile(this.agentSpec, input, seed));
+    return file;
+  }
+
+  /** Regrava o frontmatter com o que vier em `patch` e, se vier, o corpo; o resto fica como está. */
+  updateAgent(name: string, scope: InstallScope, patch: Partial<AgentInput>, body?: string): void {
+    const file = this.existingAgent(name, scope);
+    const current = this.agents().find((a) => a.name === name && a.scope === scope);
+    if (!current) throw new Error(`Agente "${name}" não encontrado.`);
+    const input: AgentInput = { ...agentInputOf(current), ...patch, name, ...(body !== undefined ? { body } : {}) };
+    if (!input.description.trim()) throw new Error('O agente precisa de uma descrição.');
+    fs.writeFileSync(file, renderAgentFile(this.agentSpec, input, current.seed));
   }
 
   /** Substitui o arquivo inteiro do agente (com o frontmatter). */
-  writeAgent(name: string, content: string): void {
-    fs.writeFileSync(this.existingAgent(name), content);
+  writeAgent(name: string, scope: InstallScope, content: string): void {
+    fs.writeFileSync(this.existingAgent(name, scope), content);
   }
 
-  deleteAgent(name: string): void {
-    fs.rmSync(this.existingAgent(name), { force: true });
+  deleteAgent(name: string, scope: InstallScope): void {
+    fs.rmSync(this.existingAgent(name, scope), { force: true });
   }
 
   writeRule(name: string, content: string): void {

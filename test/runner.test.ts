@@ -47,11 +47,21 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     workspaceDir: project,
     homeDir: home,
   });
-  const base = { purpose: '', agent: '', skills: [], tools: [], deniedTools: [], model: '', clean: false, isDefault: true };
+  // o agente é um arquivo na pasta global da ferramenta, marcado como disponível e padrão do board
   router.handle({
-    type: 'settings.execProfiles.set',
-    profiles: [{ ...base, id: 'p', name: 'Restrito', mcpServers: ['github'], deniedTools: ['WebFetch'] }],
+    type: 'harness.agent.create',
+    input: {
+      name: 'restrito',
+      description: 'Restrito',
+      body: 'Siga.',
+      model: '',
+      tools: [],
+      deniedTools: ['WebFetch'],
+      skills: [],
+      mcp: ['github'],
+    },
   });
+  router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'restrito' } } });
   const s0 = router.snapshot();
   const cardId = router.createCard({ typeId: s0.cardTypes[0]!.id, columnId: s0.columns[0]!.id, parentId: null, title: 'x' });
   const card = () => router.snapshot().cards.find((c) => c.id === cardId)!;
@@ -61,7 +71,8 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } },
   });
   expect(plan.input.mcpBlocked).toEqual(['slack']);
-  expect(plan.advice).toEqual([]); // no Claude Code tudo isso vai por parâmetro
+  expect(plan.advice).toEqual([]); // no Claude Code tudo isso vai por parâmetro, inclusive o agente (inline)
+  expect(plan.input.agentDefinition).toEqual({ name: 'restrito', description: 'Restrito', prompt: 'Siga.' });
   expect(plan.summary.join(' | ')).toContain('Servidores MCP: faz-ai, github (imposto)');
   expect(plan.summary.join(' | ')).not.toContain('segredo');
 
@@ -91,9 +102,10 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
 
   // noutra ferramenta, o que não vai por parâmetro vira instrução no prompt
   router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
+  // (o agente é um arquivo da pasta do Claude Code: para o Kimi não existe, e vale o embutido)
   expect(executionPlan(router.snapshot(), card(), project, home).advice).toEqual([
-    'De servidores MCP, use só o do board e: github.',
-    'Não use estas ferramentas: WebFetch.',
+    'De servidores MCP, use só o do board.',
+    'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
   ]);
 
   // sem o servidor do board registrado, a execução restrita não começa
@@ -119,19 +131,23 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-it('o prompt da execução leva as skills do card pelo caminho', () => {
-  expect(cardPrompt('#1')).not.toContain('skills, obrigatórias');
-  expect(cardPrompt('#1', [{ name: 'commit', path: '/home/.claude/skills/commit/SKILL.md' }, { name: 'sumida' }])).toContain(
-    'leia estas skills, obrigatórias para este card: commit (/home/.claude/skills/commit/SKILL.md).',
-  );
+it('o prompt da execução leva o contexto fixo do board e o do card pelo caminho, e não cita mais a skill do fluxo por nome', () => {
+  expect(cardPrompt('#1')).not.toContain('Contexto fixo');
+  expect(cardPrompt('#1')).not.toContain('faz-ai-fluxo');
+  const prompt = cardPrompt('#1', {
+    always: ['Contexto fixo deste board. Antes de começar, leia e siga: skill faz-ai-fluxo (/home/.claude/skills/faz-ai-fluxo/SKILL.md).'],
+    card: ['Este card exige também: rule CLAUDE.md (/p/CLAUDE.md); skill commit (/home/.claude/skills/commit/SKILL.md).'],
+  });
+  expect(prompt.indexOf('Contexto fixo')).toBeLessThan(prompt.indexOf('Este card exige também'));
+  expect(prompt.indexOf('Este card exige também')).toBeLessThan(prompt.indexOf('Leia o card com get_card'));
 });
 
 it('com triage=true, o bloco de triagem entra antes do trabalho da fase; sem triage, o prompt não muda', () => {
-  const semTriage = cardPrompt('#1', [], [], false);
+  const semTriage = cardPrompt('#1', undefined, [], false);
   expect(semTriage).toBe(cardPrompt('#1')); // default (omitido) é idêntico, byte a byte, ao atual
   expect(semTriage).not.toContain('Tags, Esforço da atividade, Modelo e Skills');
 
-  const comTriage = cardPrompt('#1', [], [], false, true);
+  const comTriage = cardPrompt('#1', undefined, [], false, true);
   expect(comTriage).toContain('Tags, Esforço da atividade, Modelo e Skills');
   expect(comTriage.indexOf('Tags, Esforço da atividade, Modelo e Skills')).toBeLessThan(comTriage.indexOf('Faça o trabalho da fase'));
 });
@@ -236,7 +252,7 @@ describe('executor da IA', () => {
     expect(procs[0]!.cwd).toBe(dir);
     expect(procs[0]!.command).toEqual(
       headlessCommand('claude', {
-        prompt: cardPrompt('#1', [], [PERMISSION_ADVICE.board!], false, true),
+        prompt: cardPrompt('#1', undefined, [PERMISSION_ADVICE.board!], false, true),
         permission: 'board',
         addDirs: [`${dir}.worktrees`],
         structured: true,
@@ -270,7 +286,7 @@ describe('executor da IA', () => {
       runner.start(storyId);
       expect(procs[0]!.command).toEqual(
         headlessCommand('claude', {
-          prompt: cardPrompt('#1', [], [], true, true),
+          prompt: cardPrompt('#1', undefined, [], true, true),
           permission: 'full',
           addDirs: [`${dir}.worktrees`],
           structured: true,
@@ -418,7 +434,23 @@ describe('executor da IA', () => {
     runner.start(storyId);
     expect(procs[0]!.command).toEqual({
       command: 'kimi',
-      args: ['-p', cardPrompt('#1', [], [], false, true), '--output-format', 'stream-json', '--add-dir', `${dir}.worktrees`],
+      args: [
+        '-p',
+        cardPrompt(
+          '#1',
+          undefined,
+          [
+            'De servidores MCP, use só o do board.',
+            'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
+          ],
+          false,
+          true,
+        ),
+        '--output-format',
+        'stream-json',
+        '--add-dir',
+        `${dir}.worktrees`,
+      ],
       format: 'stream-json',
       promptArg: { index: 1, addDirFlag: '--add-dir' },
     });
@@ -427,16 +459,18 @@ describe('executor da IA', () => {
   it('monta o comando de cada ferramenta conforme a permissão', () => {
     const cmd = (tool: Parameters<typeof headlessCommand>[0], permission: 'board' | 'edits' | 'full') =>
       headlessCommand(tool, { prompt: 'P', permission });
+    // o contexto vazio vai sempre: nenhuma fonte de configuração e nenhuma skill invocável
+    const empty = ['--setting-sources', '', '--disable-slash-commands'];
     expect(cmd('claude', 'board')).toEqual({
       command: 'claude',
-      args: ['-p', '--permission-mode', 'dontAsk', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep'],
+      args: ['-p', '--permission-mode', 'dontAsk', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', ...empty],
       stdin: 'P',
       format: 'text',
     });
     expect(cmd('claude', 'edits')).toMatchObject({
-      args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep'],
+      args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', ...empty],
     });
-    expect(cmd('claude', 'full')).toMatchObject({ args: ['-p', '--permission-mode', 'bypassPermissions'] });
+    expect(cmd('claude', 'full')).toMatchObject({ args: ['-p', '--permission-mode', 'bypassPermissions', ...empty] });
     expect(cmd('codex', 'edits')).toEqual({
       command: 'codex',
       args: [
@@ -453,7 +487,7 @@ describe('executor da IA', () => {
     });
     expect(cmd('copilot', 'board')).toEqual({
       command: 'copilot',
-      args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', '--no-ask-user'],
+      args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', '--no-custom-instructions', '--no-ask-user'],
       env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' },
       format: 'text',
       promptArg: { index: 1, addDirFlag: '--add-dir=' },
@@ -491,8 +525,15 @@ describe('executor da IA', () => {
   it('o Claude Code recebe o servidor do board na linha de comando, sem depender do registro no projeto', () => {
     const boardServer = { command: 'node', args: ['/dados/mcp/bridge.js', '/projeto'] };
     const built = headlessCommand('claude', { prompt: 'P', permission: 'board', boardServer }) as HeadlessCommand;
-    expect(built.args.slice(-2)).toEqual(['--mcp-config', '{tmp:mcp.json}']);
-    expect(built.args).not.toContain('--strict-mcp-config');
+    // estrito: nenhum outro servidor (do usuário ou do projeto) entra na sessão
+    expect(built.args.slice(-6)).toEqual([
+      '--strict-mcp-config',
+      '--mcp-config',
+      '{tmp:mcp.json}',
+      '--setting-sources',
+      '',
+      '--disable-slash-commands',
+    ]);
     expect(JSON.parse(built.tempFiles!['mcp.json']!)).toEqual({ mcpServers: { 'faz-ai': { type: 'stdio', ...boardServer } } });
     // as outras ferramentas continuam lendo o registro feito por "Conectar ao board"
     expect(headlessCommand('codex', { prompt: 'P', permission: 'board', boardServer })).not.toHaveProperty('tempFiles');
@@ -509,6 +550,7 @@ describe('executor da IA', () => {
 
   it('guarda permissão e tempo limite, recusando valores inválidos', () => {
     expect(router.snapshot().board.runner).toEqual({
+      defaultAgent: '',
       permission: 'board',
       timeoutMinutes: 30,
       heartbeat: false,
@@ -576,15 +618,24 @@ describe('log das execuções de IA', () => {
   });
 
   it('RF-15: a configuração gravada é a mesma que o resumo manda para o canal de log', () => {
-    // o perfil restringe os servidores MCP, e para isso o Claude Code precisa ver o do board na pasta
     fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: { 'faz-ai': { command: 'node' } } }));
     router.refreshHarness();
     const o = router.snapshot().board.modelCatalog.find((m) => m.tool === 'claude' && m.efforts.length > 0)!;
-    const base = { purpose: '', skills: ['sql-queries'], tools: [], deniedTools: ['WebFetch'], isDefault: true };
     router.handle({
-      type: 'settings.execProfiles.set',
-      profiles: [{ ...base, id: 'p', name: 'Restrito', agent: 'revisor', model: `${o.id}@${o.efforts[0]}`, clean: true, mcpServers: [] }],
+      type: 'harness.agent.create',
+      scope: 'project',
+      input: {
+        name: 'restrito',
+        description: 'Restrito',
+        body: 'Siga.',
+        model: `${o.id}@${o.efforts[0]}`,
+        tools: [],
+        deniedTools: ['WebFetch'],
+        skills: ['sql-queries'],
+        mcp: [],
+      },
     });
+    router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'restrito' } } });
     const summary = executionPlan(router.snapshot(), card(), dir, '').summary.join(' | ');
     logged.start(storyId);
 
@@ -592,8 +643,8 @@ describe('log das execuções de IA', () => {
     expect(row).toMatchObject({
       model: o.model,
       effort: o.efforts[0],
-      profile: 'Restrito',
-      agent: 'revisor',
+      profile: 'restrito',
+      agent: 'restrito',
       permission: 'board',
       autonomous: false,
       clean: true,
@@ -602,24 +653,24 @@ describe('log das execuções de IA', () => {
     });
     // o que foi gravado tem de aparecer no resumo que a pessoa lê no canal de log: uma verdade só
     expect(summary).toContain(`Agente do board: ${row.profile}`);
-    expect(summary).toContain(`Subagente da ferramenta: ${row.agent}`);
     expect(summary).toContain(`Skills: ${row.skills.join(', ')}`);
     expect(summary).toContain(`Modelo: ${row.model} · ${row.effort}`);
-    expect(summary).toContain('Sessão limpa');
+    expect(summary).toContain('Contexto vazio (imposto)');
     expect(log.join('\n')).toContain(summary);
   });
 
   it('RF-15: sem perfil e sem modelo, o não definido fica NULL — nunca string vazia nem zero', () => {
     logged.start(storyId);
     // sem modelo escolhido a execução usa o padrão da ferramenta, que o board não conhece: não definido
-    expect(only()).toMatchObject({ model: null, effort: null, skills: [], mcp: null });
-    // o subagente é dimensão desta execução e nenhum foi escolhido: definido e vazio, não "não se aplica"
+    expect(only()).toMatchObject({ model: null, effort: null, skills: [], mcp: [] });
+    // o agente embutido não tem arquivo: definido e vazio, não "não se aplica"
     expect(only().agent).toBe('');
-    // o perfil, ao contrário, existe sempre num card: o board tem um agente padrão
+    // o perfil, ao contrário, existe sempre num card: sem agente marcado vale o embutido
     expect(only().profile).toBe('Agente padrão');
     expect(raw('model')).toEqual([null]);
     expect(raw('effort')).toEqual([null]);
-    expect(raw('mcp_json')).toEqual([null]);
+    // toda execução parte de contexto vazio: só o servidor do board
+    expect(raw('mcp_json')).toEqual(['[]']);
   });
 
   it('RF-15: em modo autônomo grava permissão sem restrições e autonomous', () => {

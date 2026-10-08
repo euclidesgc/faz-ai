@@ -282,7 +282,7 @@ describe('ChatSession no log das execuções', () => {
   it('no chat não existem perfil nem subagente: as duas dimensões ficam NULL, e o modelo escolhido é gravado', () => {
     const o = router.snapshot().board.modelCatalog.find((m) => m.tool === 'claude' && m.efforts.length > 0)!;
     router.chatCommand({ type: 'chat.send', text: 'oi', model: `${o.id}@${o.efforts[0]}` });
-    expect(only()).toMatchObject({ model: o.model, effort: o.efforts[0], profile: null, agent: null, skills: [], mcp: null });
+    expect(only()).toMatchObject({ model: o.model, effort: o.efforts[0], profile: null, agent: null, skills: [], mcp: [] });
   });
 
   it('o desfecho do chat segue o mesmo vocabulário do executor de cards', () => {

@@ -373,4 +373,6 @@ export const settings: Record<string, string> = {
   'Preços do Cursor': 'Cursor pricing',
   'No Cursor, a estimativa usa a tarifa cadastrada: o modo rápido é um modelo à parte, com preço próprio, e o contexto longo (mais de 256 mil tokens, que pode custar 2x) não é separado, porque o Cursor só informa o total de tokens.':
     'In Cursor, the estimate uses the price entered here: fast mode is a separate model with its own price, and long context (over 256 thousand tokens, which may cost 2x) is not told apart, because Cursor only reports the token total.',
+  'A IA lê o arquivo de cada skill marcada ao executar. Só aparecem as skills marcadas em Configurações → Harness. Busque pelo nome ou pela descrição.':
+    'The AI reads the file of every checked skill when it runs. Only skills checked in Settings → Harness are listed. Search by name or description.',
 };

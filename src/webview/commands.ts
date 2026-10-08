@@ -1,8 +1,9 @@
 import type { WebviewToHost } from '../shared/messages';
 import type { AiTool, HarnessKind, InstallScope, SkillMode } from '../shared/harness';
+import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
+import type { AgentInput } from '../shared/messages';
 import type { HookInput, McpServerInput } from '../shared/harnessCatalog';
 import type { CardStatus } from '../shared/status';
-import type { ExecProfile } from '../shared/execution';
 import type { ModelOption, ModelRule } from '../shared/models';
 import type { BoardRules } from '../shared/rules';
 import type { FieldValue, Id, LinkKind, WorkflowKind } from '../shared/model';
@@ -52,6 +53,8 @@ export const ai = {
   refine: (cardId: Id) => post({ type: 'ai.run', cardId, mode: 'refine' }),
   stop: (cardId: Id) => post({ type: 'ai.stop', cardId }),
   runHeartbeat: () => post({ type: 'ai.heartbeat.run' }),
+  /** a IA lê o projeto e propõe os agentes do board; o resultado vai para o chat do board */
+  suggestAgents: () => post({ type: 'ai.suggestAgents' }),
   pauseAutopilot: () => post({ type: 'ai.autopilot.pause' }),
   resumeAutopilot: () => post({ type: 'ai.autopilot.resume' }),
 };
@@ -131,7 +134,6 @@ export const settings = {
   detectModels: (tool: AiTool) => post({ type: 'settings.models.detect', tool }),
   setModelRules: (rules: ModelRule[]) => post({ type: 'settings.modelRules.set', rules }),
   suggestModelRules: (tool: AiTool) => post({ type: 'settings.modelRules.suggest', tool }),
-  setExecProfiles: (profiles: ExecProfile[]) => post({ type: 'settings.execProfiles.set', profiles }),
 };
 
 export const backup = {
@@ -160,9 +162,15 @@ export const harness = {
     post({ type: 'harness.skill.file.create', tool, path, file, link }),
   openSkillFile: (tool: AiTool, path: string, file: string) => post({ type: 'harness.skill.file.open', tool, path, file }),
   deleteSkillFile: (tool: AiTool, path: string, file: string) => post({ type: 'harness.skill.file.delete', tool, path, file }),
-  createAgent: (input: Payload<'harness.agent.create'>) => post({ type: 'harness.agent.create', ...input }),
-  writeAgent: (name: string, content: string) => post({ type: 'harness.agent.write', name, content }),
-  deleteAgent: (name: string) => post({ type: 'harness.agent.delete', name }),
+  /** marca ou desmarca (usage null) itens para as execuções do board */
+  setSelection: (items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null) =>
+    post({ type: 'harness.selection.set', items, usage }),
+  createAgent: (scope: InstallScope, input: AgentInput) => post({ type: 'harness.agent.create', scope, input }),
+  updateAgent: (name: string, scope: InstallScope, patch: Partial<AgentInput>, body?: string) =>
+    post({ type: 'harness.agent.update', name, scope, patch, ...(body !== undefined ? { body } : {}) }),
+  writeAgent: (name: string, scope: InstallScope, content: string) => post({ type: 'harness.agent.write', name, scope, content }),
+  deleteAgent: (name: string, scope: InstallScope) => post({ type: 'harness.agent.delete', name, scope }),
+  seedAgents: (force = false) => post({ type: 'harness.agents.seed', force }),
   addMcp: (tool: AiTool, source: number, server: McpServerInput) => post({ type: 'harness.mcp.add', tool, source, server }),
   removeMcp: (tool: AiTool, path: string, name: string) => post({ type: 'harness.mcp.remove', tool, path, name }),
   addHook: (tool: AiTool, source: number, hook: HookInput) => post({ type: 'harness.hook.add', tool, source, hook }),

@@ -3,11 +3,13 @@ import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
 import { aiToolInfo } from '../shared/harness';
 import type { AiRunOutcome, RunReport } from '../shared/log';
+import type { RunnerPermission } from '../shared/runner';
 import { effortToRun } from '../shared/execution';
 import { parseModelValue } from '../shared/models';
 import type { BoardState } from '../shared/model';
 import { spawnMeasured, type SpawnFn } from './aiOutput/measured';
-import { BOARD_SERVER, type ExecInput } from './execution';
+import { BOARD_SERVER, bareExec, type ExecInput } from './execution';
+import { contextLines } from './promptContext';
 import { isCliNoise } from './cliNoise';
 import { headlessUnsupported } from './headless';
 import type { MessageRouter } from './panel/messageRouter';
@@ -22,8 +24,8 @@ const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
 
 const newId = (): string => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-/** O que a IA recebe a cada mensagem do chat: o papel dela, o limite da execução, a conversa até aqui e a pergunta nova. */
-export function chatPrompt(history: ChatMessage[], text: string, advice: string | null): string {
+/** O que a IA recebe a cada mensagem do chat: o papel dela, o contexto fixo do board, o limite da execução, a conversa até aqui e a pergunta nova. */
+export function chatPrompt(history: ChatMessage[], text: string, advice: string | null, always: string[] = []): string {
   const past = history
     .filter((m) => m.role !== 'error')
     .slice(-HISTORY)
@@ -31,26 +33,29 @@ export function chatPrompt(history: ChatMessage[], text: string, advice: string 
   return [
     `Você é o assistente do board Faz AI deste projeto e está conversando com a pessoa pelo chat do board. Use as ferramentas do servidor MCP "${BOARD_SERVER}" para consultar e alterar o board (por exemplo get_board, list_cards, get_card, create_card, update_card, move_card, link_cards).`,
     'Responda em português do Brasil, de forma curta e direta. Quando criar ou alterar cards, diga o que fez e cite os IDs (#n). Se o pedido for ambíguo, pergunte antes de agir. Não altere arquivos do projeto: seu trabalho aqui é o board.',
+    ...always,
     ...(advice ? [advice] : []),
     ...(past.length ? ['Conversa até agora:', ...past] : []),
     `Pessoa: ${text}`,
   ].join('\n');
 }
 
+/** O que a IA recebe no "Sugerir agentes com IA": ler o projeto e propor os agentes do board, criando e ajustando arquivos de agente pelo MCP. */
+export function suggestAgentsPrompt(): string {
+  return [
+    'Você vai propor os agentes de execução deste board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Um agente é um arquivo de agente da ferramenta de IA (instruções, modelo, ferramentas, skills) que o board usa para executar os cards.',
+    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, linguagens e frameworks) e o board: get_board (agentes atuais, campos, regras de modelo), get_harness com onlySelected = false (tudo que a ferramenta carrega, com a marcação do board) e get_models (catálogo de modelos).',
+    'Proponha de 3 a 8 agentes que façam sentido para ESTE projeto. Para cada um: se já existir um parecido, ajuste-o com update_agent (patch com description, body, model, tools, skills); senão, crie com create_agent (scope "user", available true). Descrição de uma frase que diga quando usá-lo; instruções curtas e específicas do projeto (padrões, comandos de teste, pastas); skills só entre as marcadas em get_harness; modelo pelo catálogo de get_models (valor como no campo Modelo, ex.: "claude:sonnet@medium"), seguindo as regras de esforço do board.',
+    'Mantenha um agente condutor (que conduz os cards pelo fluxo e delega aos especialistas) como padrão do board.',
+    'Não altere arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: nome → para quê, o que criou e o que ajustou.',
+  ].join('\n');
+}
+
 /** O modelo escolhido no chat, no formato que a linha de comando da ferramenta pede; null = o padrão dela. */
-function execFor(s: BoardState, model: string | null): ExecInput {
+function modelFor(s: BoardState, model: string | null): ExecInput['model'] {
   const chosen = parseModelValue(model);
   const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
-  return {
-    agent: '',
-    mcpAllowed: null,
-    mcpBlocked: [],
-    mcpConfig: null,
-    tools: [],
-    deniedTools: [],
-    model: option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null,
-    clean: false,
-  };
+  return option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null;
 }
 
 /**
@@ -70,6 +75,7 @@ export class ChatSession {
     this.messages = this.load();
     router.setChatHandler((msg) => {
       if (msg.type === 'chat.send') this.send(msg.text, msg.model);
+      else if (msg.type === 'ai.suggestAgents') this.suggestAgents();
       else if (msg.type === 'chat.stop') this.stop();
       else this.clear();
     });
@@ -83,11 +89,27 @@ export class ChatSession {
   send(text: string, model: string | null): void {
     const body = text.trim();
     if (!body) return;
+    const state = this.router.snapshot();
+    // o prompt sai da conversa ANTES de a pergunta entrar nela: senão ela iria duas vezes (no histórico e no fim)
+    const prompt = chatPrompt(this.messages, body, PERMISSION_ADVICE[state.board.runner.permission], contextLines(state).always);
+    this.run({ role: 'user', text: body, ...(model ? { model } : {}) }, prompt, state.board.runner.permission, model);
+  }
+
+  /** A IA lê o projeto e propõe os agentes do board; a conversa registra o pedido e o resultado. */
+  suggestAgents(): void {
+    const state = this.router.snapshot();
+    // criar e marcar agentes é trabalho do board: roda só com ele, salvo na ferramenta que não tem esse nível
+    const permission = headlessUnsupported(state.board.aiTool, 'board') ? state.board.runner.permission : 'board';
+    const prompt = [suggestAgentsPrompt(), ...contextLines(state).always].join('\n');
+    this.run({ role: 'user', text: 'Sugerir agentes com IA: leia o projeto e proponha os agentes deste board.' }, prompt, permission, null);
+  }
+
+  private run(message: Omit<ChatMessage, 'id' | 'at'>, prompt: string, permission: RunnerPermission, model: string | null): void {
     if (this.proc) throw new Error('A IA ainda está respondendo. Espere ou interrompa.');
     const state = this.router.snapshot();
     const tool = aiToolInfo(state.board.aiTool);
-    const permission = state.board.runner.permission;
-    const exec = execFor(state, model);
+    // sem card não há agente: contexto vazio, só o servidor do board e o modelo escolhido
+    const exec = bareExec(modelFor(state, model), boardServer(this.deps));
     // o chat é a quarta origem de execução, e a única sem card: nenhuma execução nasce da conversa de
     // um card (ela devolve o card para "pronto" e quem executa depois é o heartbeat ou o autopiloto)
     const logId = this.deps.runLog
@@ -119,14 +141,12 @@ export class ChatSession {
       agent: null,
       permission,
       autonomous: false,
-      clean: false,
+      clean: true,
       skills: [],
-      mcp: null,
+      mcp: [],
     });
 
-    // o prompt sai da conversa ANTES de a pergunta entrar nela: senão ela iria duas vezes (no histórico e no fim)
-    const prompt = chatPrompt(this.messages, body, PERMISSION_ADVICE[permission]);
-    this.add({ role: 'user', text: body, ...(model ? { model } : {}) });
+    this.add(message);
     // as últimas linhas legíveis, para explicar um erro; nunca a saída crua, que no modo estruturado é JSONL
     const tail: string[] = [];
     const spawn: SpawnFn = (command, cwd, out) => {

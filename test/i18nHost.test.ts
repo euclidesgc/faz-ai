@@ -133,7 +133,15 @@ describe('i18n do host: mensagens preenchidas', () => {
     expect(t(timeAgo(now - 3 * 3_600_000, now))).toBe('3 h ago');
     expect(t(timeAgo(now - 2 * 24 * 3_600_000, now))).toBe('2 d ago');
     const state = heartbeatState(
-      { permission: 'board', timeoutMinutes: 30, heartbeat: true, heartbeatMinutes: 60, parallel: false, parallelStories: 2 },
+      {
+        permission: 'board',
+        timeoutMinutes: 30,
+        heartbeat: true,
+        heartbeatMinutes: 60,
+        parallel: false,
+        parallelStories: 2,
+        defaultAgent: '',
+      },
       { offline: true, unsupported: null },
     );
     expect(state.kind === 'stopped' && t(state.reason)).toBe('No connection to Faz AI.');

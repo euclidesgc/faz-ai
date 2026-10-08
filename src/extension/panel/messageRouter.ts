@@ -9,6 +9,7 @@ import type { Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
 import type { AiTool } from '../../shared/harness';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
+import { agentProfiles } from '../../shared/execution';
 import type { AttachmentStore } from '../attachments';
 import type { HarnessStore } from '../harness';
 import { headlessUnsupported } from '../headless';
@@ -43,7 +44,7 @@ export interface EnvironmentHooks {
 }
 
 /** As mensagens do webview que o chat executa. */
-export type ChatMessageIn = Extract<WebviewToHost, { type: 'chat.send' | 'chat.stop' | 'chat.clear' }>;
+export type ChatMessageIn = Extract<WebviewToHost, { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' }>;
 
 /** Tratadas pela ponte do webview (dependem do VSCode): aqui não mudam o board. */
 const viaBridge = () => false;
@@ -63,6 +64,7 @@ const bridgeOnly = {
   'chat.send': viaBridge,
   'chat.stop': viaBridge,
   'chat.clear': viaBridge,
+  'ai.suggestAgents': viaBridge,
   'ui.showChat': viaBridge,
   'requirements.check': viaBridge,
   'environment.check': viaBridge,
@@ -127,6 +129,8 @@ export class MessageRouter {
     this.harnessStore = this.ctx.harness.store;
     this.ctx.harness.load();
     initModels(this.ctx);
+    // os agentes de fábrica usam as regras de modelo, que initModels acabou de criar
+    this.ctx.harness.bootstrap();
     dbHandle.scheduleSave();
   }
 
@@ -149,6 +153,8 @@ export class MessageRouter {
     const { current, install } = this.ctx.harness;
     return {
       ...s,
+      // os agentes do board são os arquivos marcados: derivados aqui, nunca gravados
+      board: { ...s.board, execProfiles: agentProfiles(current.agents, s.harnessSelection, s.board.runner.defaultAgent) },
       harness: current,
       aiRuns: this.aiRuns,
       chat: this.chat,

@@ -248,76 +248,72 @@ describe('modelos e referências nas skills', () => {
 });
 
 describe('perfis de execução', () => {
-  const profile = (over: Record<string, unknown>) => ({
-    id: 'p',
-    name: 'Perfil',
-    purpose: '',
-    agent: '',
-    skills: [],
-    mcpServers: null,
-    tools: [],
-    deniedTools: [],
-    model: '',
-    clean: false,
-    isDefault: false,
-    ...over,
-  });
-
-  it('resolve o perfil do card, da coluna e o padrão, e entrega em get_card', async () => {
+  it('resolve o agente do card, da coluna e o padrão, e entrega em get_card', async () => {
+    const home = path.join(dir, 'home-do-usuario');
     await call('create_skill', { name: 'planejar', description: 'Planeja', content: 'Passos' });
     await call('create_skill', { name: 'testar', description: 'Testa', content: 'Passos' });
-    await call('create_agent', { name: 'planejador', description: 'Planeja', content: 'Instruções' });
-    router.handle({
-      type: 'settings.execProfiles.set',
-      profiles: [
-        profile({ id: 'geral', name: 'Geral', isDefault: true, skills: ['testar'] }),
-        profile({
-          id: 'plan',
-          name: 'Planejamento',
-          agent: 'planejador',
-          skills: ['planejar'],
-          mcpServers: ['github'],
-          deniedTools: ['WebFetch'],
-          model: 'claude:opus@high',
-          clean: true,
-        }),
+    // as skills criadas pelo board já nascem marcadas; marcar de novo não muda nada
+    await call('set_harness_selection', {
+      items: [
+        { kind: 'skill', name: 'planejar' },
+        { kind: 'skill', name: 'testar' },
       ],
+      usage: 'contextual',
     });
+    // os agentes são arquivos na pasta global da ferramenta, e nascem disponíveis no board
+    await call('create_agent', { name: 'geral', description: 'Geral', content: 'Instruções gerais', skills: ['testar'] });
+    await call('create_agent', {
+      name: 'planejador',
+      description: 'Planeja',
+      content: 'Instruções',
+      skills: ['planejar'],
+      mcp: ['github'],
+      deniedTools: ['WebFetch'],
+      model: 'claude:opus@high',
+    });
+    expect(fs.existsSync(path.join(home, '.claude/agents/planejador.md'))).toBe(true);
+    router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'geral' } } });
     await call('create_card', { title: 'História', fields: { Skills: ['testar'] } });
-    // sem escolha no card nem na coluna: vale o padrão do board, e as skills do card somam às do perfil sem repetir
+    // sem escolha no card nem na coluna: vale o padrão do board, e as skills do card somam às do agente sem repetir
     let card = (await call('get_card', { card: 1 })).data;
-    expect(card.execution).toMatchObject({ profile: 'Geral' });
+    expect(card.execution).toMatchObject({ profile: 'geral' });
     expect(card.requiredSkills.map((k: any) => k.name)).toEqual(['testar']);
 
-    // o perfil da coluna vale para os cards dela, e também para as sub-tarefas da história
+    // o agente da coluna vale para os cards dela, e também para as sub-tarefas da história
     expect((await call('update_column', { column: 'Backlog', exec_profile: 'Não existe' })).error).toBe(true);
-    const board = (await call('update_column', { column: 'Backlog', exec_profile: 'Planejamento' })).data;
-    expect(board.execProfiles.map((p: any) => p.name)).toEqual(['Geral', 'Planejamento']);
-    expect(board.workflows[0].columns[0].execProfile).toBe('Planejamento');
+    const board = (await call('update_column', { column: 'Backlog', exec_profile: 'planejador' })).data;
+    expect(board.agents.map((p: any) => p.name)).toEqual(['geral', 'planejador']);
+    expect(board.agents.find((p: any) => p.name === 'geral').default).toBe(true);
+    expect(board.workflows[0].columns[0].execProfile).toBe('planejador');
     card = (await call('get_card', { card: 1 })).data;
     expect(card.execution).toMatchObject({
-      profile: 'Planejamento',
-      agent: { name: 'planejador', path: path.join(dir, '.claude/agents/planejador.md') },
+      profile: 'planejador',
+      agentFile: path.join(home, '.claude/agents/planejador.md'),
       mcpServers: ['faz-ai', 'github'],
       deniedTools: ['WebFetch'],
-      clean: true,
     });
-    expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model', 'clean']);
+    expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model', 'context']);
     expect(card.requiredSkills.map((k: any) => k.name)).toEqual(['planejar', 'testar']);
     await call('create_card', { title: 'Sub', type: 'Sub-tarefa', parent: 1 });
-    expect((await call('get_card', { card: 2 })).data.execution.profile).toBe('Planejamento');
+    expect((await call('get_card', { card: 2 })).data.execution.profile).toBe('planejador');
 
-    // o card pode trocar de perfil, e voltar ao da coluna
-    expect((await call('set_card_profile', { card: 1, profile: 'Geral' })).data.execution.profile).toBe('Geral');
-    expect((await call('set_card_profile', { card: 1 })).data.execution.profile).toBe('Planejamento');
+    // o card pode trocar de agente, e voltar ao da coluna
+    expect((await call('set_card_profile', { card: 1, profile: 'geral' })).data.execution.profile).toBe('geral');
+    expect((await call('set_card_profile', { card: 1 })).data.execution.profile).toBe('planejador');
 
-    // apagar um perfil solta as colunas e os cards que o usavam
-    await call('set_card_profile', { card: 1, profile: 'Planejamento' });
-    router.handle({ type: 'settings.execProfiles.set', profiles: [profile({ id: 'geral', name: 'Geral', isDefault: true })] });
+    // desmarcar um agente solta as colunas e os cards que o usavam
+    await call('set_card_profile', { card: 1, profile: 'planejador' });
+    await call('set_harness_selection', { items: [{ kind: 'agent', name: 'planejador' }], usage: null });
     const s = router.snapshot();
     expect(s.columns.every((c) => c.execProfile === null)).toBe(true);
     expect(s.cards.every((c) => c.execProfile === null)).toBe(true);
-    expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('Geral');
+    expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('geral');
+    // o arquivo continua no disco: só saiu da marcação
+    expect(fs.existsSync(path.join(home, '.claude/agents/planejador.md'))).toBe(true);
+    expect((await call('get_harness', { onlySelected: false })).data.agents.map((a: any) => [a.name, a.usage])).toEqual([
+      ['geral', 'contextual'],
+      ['planejador', null],
+    ]);
   });
 });
 
@@ -334,6 +330,15 @@ describe('harness e padrões pelo MCP', () => {
     put('.codex/skills/de-outra-ferramenta/SKILL.md', '---\nname: x\ndescription: x\n---\n');
     await call('create_skill', { name: 'revisar-spec', description: 'Revisa', content: 'Passos' });
     router.refreshHarness();
+    // a skill criada pelo board já nasce marcada; as que estão no disco por fora precisam ser marcadas
+    expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['revisar-spec']);
+    await call('set_harness_selection', {
+      items: [
+        { kind: 'skill', name: 'commit' },
+        { kind: 'skill', name: 'critica' },
+      ],
+      usage: 'contextual',
+    });
     const field = router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
     expect(field.options).toEqual(['revisar-spec', 'commit', 'critica']);
     const card = (await call('create_card', { title: 'História', fields: { Skills: ['commit', 'critica', 'revisar-spec'] } })).data;
@@ -365,6 +370,7 @@ describe('harness e padrões pelo MCP', () => {
     expect(inventory.find((i: any) => i.name === 'commit' && i.scope === 'user')).toEqual({
       kind: 'skill',
       scope: 'user',
+      usage: 'contextual',
       name: 'commit',
       mode: 'auto',
       description: 'Escreve o commit',
@@ -405,8 +411,8 @@ describe('harness e padrões pelo MCP', () => {
     await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
     expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'revisar-spec'))).toBe(false);
     expect(fs.existsSync(path.join(dir, '.claude', 'skills-disabled', 'revisar-spec', 'SKILL.md'))).toBe(true);
-    // desligada, a skill continua podendo ser indicada: o card entrega o caminho do arquivo
-    expect(skillsField().options).toEqual(['revisar-spec']);
+    // desligada, a skill sai do inventário (e das opções), mas o card que já a indicava ainda recebe o caminho
+    expect(skillsField().options).toEqual([]);
     expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({
       name: 'revisar-spec',
       scope: 'project',
@@ -985,69 +991,103 @@ describe('status do card e checkpoint de revisão', () => {
     expect(p.next).toContain('order');
   });
 
-  it('cria, edita e apaga agentes na pasta da ferramenta em uso', async () => {
+  it('cria, edita e apaga agentes na pasta da ferramenta em uso, global por padrão ou no projeto', async () => {
+    const home = path.join(dir, 'home-do-usuario');
     expect((await call('get_harness')).data.agents).toEqual([]);
     const h = (
       await call('create_agent', {
         name: 'revisor-de-spec',
         description: 'Revisa uma Spec antes do Plan',
         content: 'Leia a spec e aponte lacunas.',
-        model: 'opus',
+        model: 'claude:opus@high',
+        tools: ['Read', 'Grep'],
+        scope: 'project',
       })
     ).data;
     expect(h.agents).toEqual([
-      { name: 'revisor-de-spec', description: 'Revisa uma Spec antes do Plan', model: 'opus', path: '.claude/agents/revisor-de-spec.md' },
+      {
+        name: 'revisor-de-spec',
+        scope: 'project',
+        description: 'Revisa uma Spec antes do Plan',
+        model: 'claude:opus@high',
+        tools: ['Read', 'Grep'],
+        usage: 'contextual',
+        path: '.claude/agents/revisor-de-spec.md',
+      },
     ]);
     const file = path.join(dir, '.claude/agents/revisor-de-spec.md');
     expect(fs.readFileSync(file, 'utf8')).toBe(
-      '---\nname: revisor-de-spec\ndescription: Revisa uma Spec antes do Plan\nmodel: opus\n---\n\nLeia a spec e aponte lacunas.\n',
+      '---\nname: revisor-de-spec\ndescription: Revisa uma Spec antes do Plan\ntools: Read, Grep\nmodel: opus\nfaz-ai-model: claude:opus@high\n---\n\nLeia a spec e aponte lacunas.\n',
     );
     expect((await call('get_agent', { agent: 'revisor-de-spec' })).text).toContain('aponte lacunas');
-    expect((await call('create_agent', { name: 'revisor-de-spec', description: 'd', content: 'c' })).text).toContain('Já existe');
+    expect((await call('create_agent', { name: 'revisor-de-spec', description: 'd', content: 'c', scope: 'project' })).text).toContain(
+      'Já existe',
+    );
     expect((await call('create_agent', { name: 'Nome Inválido', description: 'd', content: 'c' })).error).toBe(true);
 
+    // o patch regrava só o que vier; o arquivo inteiro substitui tudo
+    await call('update_agent', { agent: 'revisor-de-spec', description: 'Nova descrição', skills: ['x'] });
+    expect(fs.readFileSync(file, 'utf8')).toContain('description: Nova descrição\ntools: Read, Grep\nmodel: opus\nskills: x\n');
     await call('update_agent', {
       agent: 'revisor-de-spec',
-      content: '---\nname: revisor-de-spec\ndescription: Nova descrição\n---\nNovo corpo',
+      content: '---\nname: revisor-de-spec\ndescription: Outra\n---\nNovo corpo',
     });
     expect((await call('get_harness')).data.agents[0]).toEqual({
       name: 'revisor-de-spec',
-      description: 'Nova descrição',
+      scope: 'project',
+      description: 'Outra',
+      usage: 'contextual',
       path: '.claude/agents/revisor-de-spec.md',
     });
 
-    // agente criado por fora aparece; cada ferramenta tem a sua pasta e extensão
+    // agente criado por fora aparece no inventário completo, mas só entra no board depois de marcado
     fs.writeFileSync(path.join(dir, '.claude/agents/planejador.md'), '---\nname: planejador\ndescription: Quebra a spec em passos\n---\nx');
     router.refreshHarness();
-    expect((await call('get_harness')).data.agents.map((a: any) => a.name)).toEqual(['planejador', 'revisor-de-spec']);
+    expect((await call('get_harness')).data.agents.map((a: any) => a.name)).toEqual(['revisor-de-spec']);
+    expect((await call('get_harness', { onlySelected: false })).data.agents.map((a: any) => a.name)).toEqual([
+      'planejador',
+      'revisor-de-spec',
+    ]);
+    // sem escopo, o padrão é a pasta global da ferramenta
+    await call('create_agent', { name: 'global', description: 'd', content: 'c' });
+    expect(fs.existsSync(path.join(home, '.claude/agents/global.md'))).toBe(true);
+
     await call('set_ai_tool', { tool: 'copilot' });
     expect((await call('get_harness')).data.agents).toEqual([]);
-    await call('create_agent', { name: 'do-copilot', description: 'd', content: 'c' });
+    await call('create_agent', { name: 'do-copilot', description: 'd', content: 'c', scope: 'project' });
     expect(fs.existsSync(path.join(dir, '.github/agents/do-copilot.agent.md'))).toBe(true);
-    // Codex guarda agentes em TOML; o Kimi não tem modelo por agente
+    // Codex guarda agentes em TOML, com as chaves do board; o Kimi não tem modelo por agente
     await call('set_ai_tool', { tool: 'codex' });
     const codex = (
       await call('create_agent', {
         name: 'explorador',
         description: 'Explora o código "antes" de mudar',
         content: 'Só leia.',
-        model: 'gpt-6-luna',
+        model: 'codex:gpt-6-luna@medium',
+        scope: 'project',
       })
     ).data;
     expect(codex.agents).toEqual([
-      { name: 'explorador', description: 'Explora o código "antes" de mudar', model: 'gpt-6-luna', path: '.codex/agents/explorador.toml' },
+      {
+        name: 'explorador',
+        scope: 'project',
+        description: 'Explora o código "antes" de mudar',
+        model: 'codex:gpt-6-luna@medium',
+        usage: 'contextual',
+        path: '.codex/agents/explorador.toml',
+      },
     ]);
     expect(fs.readFileSync(path.join(dir, '.codex/agents/explorador.toml'), 'utf8')).toBe(
-      'name = "explorador"\ndescription = "Explora o código \\"antes\\" de mudar"\nmodel = "gpt-6-luna"\ndeveloper_instructions = """\nSó leia.\n"""\n',
+      'name = "explorador"\ndescription = "Explora o código \\"antes\\" de mudar"\nmodel = "gpt-6-luna"\nfaz_ai_model = "codex:gpt-6-luna@medium"\ndeveloper_instructions = """\nSó leia.\n"""\n',
     );
     await call('set_ai_tool', { tool: 'kimi' });
-    expect((await call('create_agent', { name: 'revisor', description: 'd', content: 'c', model: 'k3' })).text).toContain(
+    expect((await call('create_agent', { name: 'revisor', description: 'd', content: 'c', model: 'kimi:k3@high' })).text).toContain(
       'não permite fixar o modelo',
     );
-    await call('create_agent', { name: 'revisor', description: 'd', content: 'c' });
+    await call('create_agent', { name: 'revisor', description: 'd', content: 'c', scope: 'project' });
     expect(fs.existsSync(path.join(dir, '.kimi-code/agents/revisor.md'))).toBe(true);
     await call('set_ai_tool', { tool: 'cursor' });
-    await call('create_agent', { name: 'verificador', description: 'd', content: 'c' });
+    await call('create_agent', { name: 'verificador', description: 'd', content: 'c', scope: 'project' });
     expect(fs.existsSync(path.join(dir, '.cursor/agents/verificador.md'))).toBe(true);
     await call('set_ai_tool', { tool: 'claude' });
 

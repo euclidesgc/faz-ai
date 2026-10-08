@@ -22,7 +22,8 @@ import { seedBoard } from '../db/seed';
 import { BOARD_TEMPLATE, insertColumn, pendingUpgrade } from '../db/boardTemplate';
 import { isCardStatus } from '../../shared/status';
 import { parseRunner, type RunnerConfig } from '../../shared/runner';
-import { parseProfiles, type ExecProfile } from '../../shared/execution';
+import { parseProfiles, type LegacyExecProfile } from '../../shared/execution';
+import type { HarnessSelection, HarnessUsage, SelectableKind } from '../../shared/harnessSelection';
 import { parseGit, type GitConfig } from '../../shared/git';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
@@ -52,7 +53,8 @@ export class BoardRepo {
       templateVersion: num(row.template_version),
       runner: parseRunner(str(row.runner_json)),
       git: parseGit(str(row.git_json)),
-      execProfiles: parseProfiles(str(row.exec_profiles_json)),
+      // os agentes vêm dos arquivos marcados no harness; o roteador os deriva a cada snapshot
+      execProfiles: [],
     };
   }
 
@@ -135,18 +137,73 @@ export class BoardRepo {
       run(this.db, 'UPDATE boards SET ai_tools_json = ? WHERE id = ?', [JSON.stringify(patch.aiTool), boardId]);
   }
 
-  /** Grava os agentes (perfis de execução) e solta as colunas e os cards que apontavam para um removido. */
-  setExecProfiles(boardId: string, profiles: ExecProfile[]): void {
-    const clean = parseProfiles(JSON.stringify(profiles));
-    run(this.db, 'UPDATE boards SET exec_profiles_json = ? WHERE id = ?', [JSON.stringify(clean), boardId]);
-    const ids = clean.map((p) => p.id);
-    const keep = ids.length ? `AND exec_profile NOT IN (${ids.map(() => '?').join(',')})` : '';
+  /** Os agentes que versões anteriores guardavam no banco, à espera da migração para arquivos; vazio depois dela. */
+  legacyExecProfiles(boardId: string): LegacyExecProfile[] {
+    return parseProfiles(str(one(this.db, 'SELECT exec_profiles_json FROM boards WHERE id = ?', [boardId])?.exec_profiles_json));
+  }
+
+  /** Marca a migração dos agentes do banco como feita e troca, em colunas e cards, o id antigo pelo nome do arquivo. */
+  finishExecProfilesMigration(boardId: string, names: Record<string, string>): void {
+    transaction(this.db, () => {
+      for (const [id, name] of Object.entries(names)) {
+        run(
+          this.db,
+          'UPDATE columns SET exec_profile = ? WHERE exec_profile = ? AND workflow_id IN (SELECT id FROM workflows WHERE board_id = ?)',
+          [name, id, boardId],
+        );
+        run(this.db, 'UPDATE cards SET exec_profile = ? WHERE exec_profile = ? AND board_id = ?', [name, id, boardId]);
+      }
+      run(this.db, "UPDATE boards SET exec_profiles_json = '[]' WHERE id = ?", [boardId]);
+    });
+  }
+
+  /** Solta as colunas e os cards que apontam para um agente que deixou de existir ou de estar marcado. */
+  releaseAgent(boardId: string, name: string): void {
     run(
       this.db,
-      `UPDATE columns SET exec_profile = NULL WHERE exec_profile IS NOT NULL ${keep} AND workflow_id IN (SELECT id FROM workflows WHERE board_id = ?)`,
-      [...ids, boardId],
+      'UPDATE columns SET exec_profile = NULL WHERE exec_profile = ? AND workflow_id IN (SELECT id FROM workflows WHERE board_id = ?)',
+      [name, boardId],
     );
-    run(this.db, `UPDATE cards SET exec_profile = NULL WHERE exec_profile IS NOT NULL ${keep} AND board_id = ?`, [...ids, boardId]);
+    run(this.db, 'UPDATE cards SET exec_profile = NULL WHERE exec_profile = ? AND board_id = ?', [name, boardId]);
+  }
+
+  /** A marcação do harness deste board: o que as execuções podem usar. */
+  selection(boardId: string): HarnessSelection[] {
+    return all(this.db, 'SELECT kind, location, usage FROM harness_selection WHERE board_id = ? ORDER BY kind, location', [boardId]).map(
+      (r) => ({
+        kind: str(r.kind) as SelectableKind,
+        location: str(r.location),
+        usage: str(r.usage) as HarnessUsage,
+      }),
+    );
+  }
+
+  /** Marca itens de um jeito, ou desmarca (`usage` null). */
+  setSelection(boardId: string, items: readonly { kind: SelectableKind; location: string }[], usage: HarnessUsage | null): void {
+    transaction(this.db, () => {
+      for (const i of items) {
+        run(this.db, 'DELETE FROM harness_selection WHERE board_id = ? AND kind = ? AND location = ?', [boardId, i.kind, i.location]);
+        if (usage)
+          run(this.db, 'INSERT INTO harness_selection(board_id, kind, location, usage) VALUES (?,?,?,?)', [
+            boardId,
+            i.kind,
+            i.location,
+            usage,
+          ]);
+      }
+    });
+  }
+
+  /** Nomes dos agentes de fábrica já criados para este board (o que a pessoa apagar não volta sozinho). */
+  seededAgents(boardId: string): string[] {
+    return parseJsonArray<string>(
+      str(one(this.db, 'SELECT seeded_agents_json FROM boards WHERE id = ?', [boardId])?.seeded_agents_json),
+    ).filter((n): n is string => typeof n === 'string');
+  }
+
+  addSeededAgents(boardId: string, names: string[]): void {
+    const next = [...new Set([...this.seededAgents(boardId), ...names])];
+    run(this.db, 'UPDATE boards SET seeded_agents_json = ? WHERE id = ?', [JSON.stringify(next), boardId]);
   }
 
   /** Cria um workflow no fim do board, com as colunas padrão do papel (para sub-tarefas: A fazer, Em andamento e Concluído). */
@@ -200,7 +257,7 @@ export class BoardRepo {
       templateVersion: num(b.template_version),
       runner: parseRunner(str(b.runner_json)),
       git: parseGit(str(b.git_json)),
-      execProfiles: parseProfiles(str(b.exec_profiles_json)),
+      execProfiles: [],
     };
 
     const workflows: Workflow[] = all(db, 'SELECT * FROM workflows WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
@@ -348,6 +405,7 @@ export class BoardRepo {
       attachments,
       currentUser,
       harness: EMPTY_HARNESS,
+      harnessSelection: this.selection(boardId),
       pendingUpgrade: pendingUpgrade(db, boardId),
       chat: EMPTY_CHAT,
       aiRuns: [],

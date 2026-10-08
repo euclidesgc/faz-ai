@@ -29,6 +29,8 @@ export interface RouterOptions {
   log?: (line: string) => void;
   /** versão da extensão, gravada no cabeçalho do arquivo exportado */
   extensionVersion?: string;
+  /** cria os agentes de fábrica na pasta global da ferramenta na abertura (o produto liga; os testes não) */
+  seedAgents?: boolean;
 }
 
 /** Repositórios, anexos e harness do board aberto, compartilhados pelo router e pelos handlers. */

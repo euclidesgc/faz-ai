@@ -17,7 +17,6 @@ import { ThemeToggle, nextTheme } from '../src/webview/components/ThemeToggle';
 import { TrashView } from '../src/webview/components/TrashView';
 import { WorkflowsSettings } from '../src/webview/components/settings/workflows/WorkflowsSettings';
 import { FieldsSettings } from '../src/webview/components/settings/FieldsSettings';
-import { AgentsSettings } from '../src/webview/components/settings/AgentsSettings';
 import { HarnessSettings } from '../src/webview/components/settings/HarnessSettings';
 import { RuleBuilder } from '../src/webview/components/settings/ModelRulesEditor';
 import { AppearanceSettings } from '../src/webview/components/settings/AppearanceSettings';
@@ -70,7 +69,20 @@ beforeAll(async () => {
   router.handle({ type: 'harness.skill.create', name: 'revisar-spec', description: 'Quando revisar', content: 'Passos' });
   router.handle({ type: 'harness.skill.create', name: 'desligada', description: 'x', content: 'y' });
   router.handle({ type: 'harness.skill.setEnabled', name: 'desligada', enabled: false });
-  router.handle({ type: 'harness.agent.create', name: 'revisor-de-spec', description: 'Revisa a spec', content: 'Passos', model: 'opus' });
+  router.handle({
+    type: 'harness.agent.create',
+    scope: 'project',
+    input: {
+      name: 'revisor-de-spec',
+      description: 'Revisa a spec',
+      body: 'Passos',
+      model: '',
+      tools: [],
+      deniedTools: [],
+      skills: [],
+      mcp: [],
+    },
+  });
   s = router.snapshot();
   const field = (n: string) => s.fieldDefs.find((f) => f.name === n)!;
   router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Skills').id, value: ['revisar-spec'] });
@@ -253,11 +265,8 @@ describe('telas montam sem erro', () => {
     const toggle = html(<ThemeToggle />);
     for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
-    const profiles = html(<AgentsSettings />);
-    for (const text of ['Agentes', 'aceita por parâmetro', 'imposto', 'orientado', 'Novo agente', 'Agente padrão'])
-      expect(profiles).toContain(text);
-    // cada aba do Harness é montada por vez: juntamos o texto das três
-    const harness = (['tool', 'project', 'all'] as const)
+    // cada aba do Harness é montada por vez: juntamos o texto das quatro
+    const harness = (['tool', 'project', 'user', 'all'] as const)
       .map((harnessTab) => {
         useBoardStore.setState({ harnessTab });
         return html(<HarnessSettings />);
@@ -272,9 +281,10 @@ describe('telas montam sem erro', () => {
       'Kimi Code',
       'GitHub Copilot',
       'AGENTS.md',
-      'Usar o AGENTS.md',
+      'Harness do projeto',
+      'Harness global',
+      'Incluir em todo contexto',
       'revisar-spec',
-      'Desligada',
       '.kimi-code/skills',
       'Tudo que cada ferramenta carrega',
       'Servidores MCP',
@@ -289,7 +299,7 @@ describe('telas montam sem erro', () => {
       'Heartbeat ligado',
       'Rodar o heartbeat agora',
       'Subagentes',
-      'Novo subagente',
+      'Agente padrão',
       'revisor-de-spec',
       '.claude/agents/revisor-de-spec.md',
     ])

@@ -61,10 +61,6 @@ export const boardSettingsHandlers = {
     if (ctx.state().board.rules.includeFastModels !== before) applyFastModels(ctx);
     return true;
   },
-  'settings.execProfiles.set': (msg, ctx) => {
-    ctx.boards.setExecProfiles(ctx.boardId, msg.profiles);
-    return true;
-  },
   'settings.board.update': (msg, ctx) => {
     ctx.boards.updateBoard(ctx.boardId, msg.patch);
     if (msg.patch.aiTool) useTool(ctx, ctx.state().board.aiTool);

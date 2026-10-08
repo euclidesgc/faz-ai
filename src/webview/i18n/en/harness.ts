@@ -388,4 +388,77 @@ export const harness: Record<string, string> = {
     'The project works with one AI tool at a time. It defines the rules file, the skills folder, where the MCP server is registered and the models offered on cards. Folders of other tools may exist in the project, but the board does not touch them. The board MCP server and the flow skill are installed in "Everything the tool loads", in each tool\'s MCP servers and Skills sections.',
   'No Cursor, o servidor do board fica em <code>{project}</code>, fora do git. O global do Cursor é um processo só para todas as janelas e não sabe qual board atender. O board grava este registro sozinho ao abrir no Cursor; se o "faz-ai" aparecer desligado em Cursor Settings → MCP, ligue.':
     'In Cursor, the board server lives in <code>{project}</code>, outside git. Cursor\'s global scope is a single process for all windows and cannot tell which board to serve. The board writes this registration on its own when it opens in Cursor; if "faz-ai" shows as off in Cursor Settings → MCP, turn it on.',
+  // --- HarnessSettings (contexto vazio)
+  'Toda execução pelo board parte de <b>contexto vazio</b>: nenhuma regra, skill ou agente da sua máquina ou do projeto entra por conta própria. Só entra o que você marcar aqui. <b>Projeto</b> e <b>Global</b> organizam os arquivos pela pasta de onde vêm; o que vale é a marcação. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; <b>Tudo que a ferramenta carrega</b> é o inventário completo, para criar, copiar e apagar arquivos.':
+    'Every board run starts from an <b>empty context</b>: no rule, skill or agent from your machine or the project gets in on its own. Only what you check here gets in. <b>Project</b> and <b>Global</b> organize the files by the folder they come from; what counts is the check mark. <b>Tool and execution</b> picks the AI, the permission and the default agent; <b>Everything the tool loads</b> is the full inventory, to create, copy and delete files.',
+  // --- ScopeHarness
+  'Harness do projeto': 'Project harness',
+  'Harness global': 'Global harness',
+  'Arquivos da pasta deste projeto, lidos pelo {tool}: vão no repositório. Marque o que as execuções do board podem usar; o que não está marcado não existe para elas.':
+    'Files in this project folder, read by {tool}: they go in the repository. Check what board runs may use; what is not checked does not exist for them.',
+  'Arquivos da sua pasta de usuário e dos plugins instalados, lidos pelo {tool}: valem na sua máquina, em qualquer projeto. A marcação é deste board. Os agentes que o board cria ficam aqui.':
+    'Files in your user folder and installed plugins, read by {tool}: they apply on your machine, in any project. The check marks belong to this board. Agents the board creates live here.',
+  Rules: 'Rules',
+  // --- SelectionTable
+  'Incluir em todo contexto': 'Include in every context',
+  'Entra em toda execução do board (trabalhar a fase, refinar, chat), pelo caminho do arquivo.':
+    'Goes into every board run (work the phase, refine, chat), by file path.',
+  'Usar quando fizer sentido': 'Use when it fits',
+  'Fica disponível para o card: a pessoa marca no card, ou o "Refinar com IA" marca quando o pedido pede.':
+    'Available to the card: the person checks it on the card, or "Refine with AI" checks it when the request calls for it.',
+  '<b>Incluir em todo contexto</b>: o arquivo entra em toda execução do board, pelo caminho. <b>Usar quando fizer sentido</b>: vira opção do campo Rules dos cards, e o "Refinar com IA" o indica quando o pedido pede. Sem marcação, a execução não o vê, mesmo que a ferramenta o carregue numa conversa sua.':
+    '<b>Include in every context</b>: the file goes into every board run, by path. <b>Use when it fits</b>: becomes an option of the Rules field on cards, and "Refine with AI" picks it when the request calls for it. Unchecked, the run does not see it, even if the tool loads it in a conversation of yours.',
+  '<b>Incluir em todo contexto</b>: a skill entra em toda execução do board, pelo caminho. <b>Usar quando fizer sentido</b>: vira opção do campo Skills dos cards e dos agentes, e o "Refinar com IA" a indica quando o pedido pede. Sem marcação, a execução não a vê.':
+    '<b>Include in every context</b>: the skill goes into every board run, by path. <b>Use when it fits</b>: becomes an option of the Skills field on cards and agents, and "Refine with AI" picks it when the request calls for it. Unchecked, the run does not see it.',
+  '{always} em todo contexto · {contextual} quando fizer sentido · {total} no total.':
+    '{always} in every context · {contextual} when it fits · {total} in total.',
+  'Nova rule': 'New rule',
+  'Skill de modelos de classe e exemplos de código, só quando indicada': 'Skill for class templates and code examples, only when indicated',
+  '{usage}: {name}': '{usage}: {name}',
+  'Apagar {name}': 'Delete {name}',
+  'O arquivo marcado não está mais no disco; desmarque ou recrie.': 'The checked file is no longer on disk; uncheck it or recreate it.',
+  'Nenhum arquivo de instruções do {tool} neste escopo.': 'No {tool} instruction file in this scope.',
+  'Nenhuma skill do {tool} neste escopo.': 'No {tool} skill in this scope.',
+  // --- AgentsTable
+  'O {tool} não define agentes em arquivos; o board executa os cards com o agente embutido.':
+    '{tool} does not define agents in files; the board runs cards with the built-in agent.',
+  'Um agente é um arquivo de agente do {tool} em <code>{dir}</code>: as instruções são o papel da sessão, e o frontmatter diz o modelo, as ferramentas, as skills e os servidores MCP que ela recebe. <b>Disponível no board</b> é o que os cards e as fases podem escolher; o <b>padrão</b> executa quando nenhum deles escolhe.':
+    'An agent is a {tool} agent file in <code>{dir}</code>: the instructions are the session role, and the frontmatter sets the model, tools, skills and MCP servers it gets. <b>Available on the board</b> is what cards and phases can pick; the <b>default</b> runs when none of them picks.',
+  'A IA ainda está respondendo no chat do board.': 'The AI is still answering in the board chat.',
+  'A IA lê o projeto e cria ou ajusta os agentes; acompanhe no chat do board.':
+    'The AI reads the project and creates or adjusts the agents; follow it in the board chat.',
+  'Sugerir agentes com IA': 'Suggest agents with AI',
+  'Cria de novo os agentes de fábrica que não existem mais; não mexe nos que existem.':
+    'Recreates the factory agents that no longer exist; leaves the existing ones alone.',
+  'Recriar os agentes padrão': 'Recreate the default agents',
+  'Agente novo': 'New agent',
+  'Como este agente trabalha: padrões, comandos, o que nunca fazer': 'How this agent works: patterns, commands, what never to do',
+  'Criar agente': 'Create agent',
+  'Os cards e as fases podem escolher este agente; o padrão precisa estar disponível':
+    'Cards and phases can pick this agent; the default must be available',
+  'Disponível no board': 'Available on the board',
+  'Disponível no board: {name}': 'Available on the board: {name}',
+  'Criado pelo board; pode ser editado ou apagado': 'Created by the board; it can be edited or deleted',
+  'de fábrica': 'factory',
+  'Tornar padrão': 'Make default',
+  'O arquivo é removido: {location}. Colunas e cards que usam este agente voltam ao padrão.':
+    'The file is removed: {location}. Columns and cards using this agent fall back to the default.',
+  'Nenhum agente do {tool} neste escopo.': 'No {tool} agent in this scope.',
+  // --- AgentEditor
+  'Uma frase: é por ela que o "Refinar com IA" escolhe o agente de um card.':
+    'One sentence: it is how "Refine with AI" picks the agent for a card.',
+  'O papel da sessão: como trabalha, padrões, comandos, o que nunca fazer. Vai inteiro para a IA.':
+    'The session role: how it works, patterns, commands, what never to do. Goes to the AI in full.',
+  'Lidas em toda execução com este agente, além das indicadas no card. Só as marcadas no Harness.':
+    'Read in every run with this agent, besides the ones on the card. Only those checked in the Harness.',
+  'Além do servidor do board, que vai sempre. Nada marcado = só o board.':
+    'Besides the board server, which always goes. Nothing checked = board only.',
+  // --- RunnerSettings (agente padrão)
+  'Executa os cards que não escolhem um agente, nem pela fase. Só os agentes marcados como disponíveis no Harness.':
+    'Runs the cards that pick no agent, not even through the phase. Only agents checked as available in the Harness.',
+  'Agente embutido (sem instruções)': 'Built-in agent (no instructions)',
+  'Agente padrão': 'Default agent',
+  // --- EXEC_ASPECTS
+  'Skills e rules': 'Skills and rules',
+  'Contexto vazio': 'Empty context',
 };
