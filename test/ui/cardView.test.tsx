@@ -180,6 +180,12 @@ describe('CardView', () => {
       expect(ledOf(container)).toEqual({ on: true, label: 'IA trabalhando neste card' });
     });
 
+    it('o AiLed continua presente, mas apagado, quando não há work', () => {
+      collapse(board.subId);
+      const { container } = show(board.subId);
+      expect(ledOf(container)).toEqual({ on: false, label: 'IA parada neste card' });
+    });
+
     it('mantém a borda de status (mine) quando colapsado', () => {
       patchCard(board.subId, { status: 'waiting_review', statusAt: Date.now() });
       collapse(board.subId);

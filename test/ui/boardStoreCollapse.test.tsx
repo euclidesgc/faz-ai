@@ -13,4 +13,12 @@ describe('setManyCollapsed', () => {
     useBoardStore.getState().setManyCollapsed(['a'], false);
     expect(useBoardStore.getState().collapsed).toMatchObject({ 'card:a': false, 'card:b': true });
   });
+
+  it('não mexe na chave de um card fora da lista', () => {
+    useBoardStore.getState().setCollapsed('card:c', true);
+    useBoardStore.getState().setManyCollapsed(['a', 'b'], true);
+    expect(useBoardStore.getState().collapsed['card:c']).toBe(true);
+    useBoardStore.getState().setManyCollapsed(['a', 'b'], false);
+    expect(useBoardStore.getState().collapsed['card:c']).toBe(true);
+  });
 });
