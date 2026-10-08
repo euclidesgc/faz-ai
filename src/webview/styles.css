@@ -267,6 +267,7 @@ button.active {
 }
 
 .card {
+  position: relative;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -412,6 +413,22 @@ button.active {
 .card.selected {
   outline: var(--focus-ring);
   outline-offset: -1px;
+}
+/* caixa de marcação da seleção múltipla (card 324): some por padrão, só aparece sob o mouse,
+   já marcada ou enquanto há alguma seleção ativa no board (classe .selecting) */
+.card-select {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  z-index: 1;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.card:hover .card-select,
+.card.selecting .card-select,
+.card-select:checked {
+  opacity: 1;
 }
 .card.overlay {
   box-shadow: var(--shadow-2);

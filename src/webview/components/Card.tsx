@@ -29,6 +29,8 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
   const selectParent = useBoardStore((s) => s.selectParent);
   const openCard = useBoardStore((s) => s.openCard);
+  const selectedIds = useBoardStore((s) => s.selectedIds);
+  const toggleSelected = useBoardStore((s) => s.toggleSelected);
 
   const type = state.cardTypes.find((t) => t.id === card.typeId);
   const isParent = state.workflows.find((w) => w.id === card.workflowId)?.kind === 'parent';
@@ -48,7 +50,16 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   // pendência com a pessoa: a borda ganha a cor do status para achar de relance o que espera por ela
   const mine = status !== null && statusInfo(status).owner === 'human';
   const style = mine ? ({ '--status-color': state.board.appearance.statuses[status].color } as CSSProperties) : undefined;
-  const classes = ['card', selected && 'selected', overlay && 'overlay', archived && 'archived', mine && 'mine'].filter(Boolean).join(' ');
+  const classes = [
+    'card',
+    selected && 'selected',
+    overlay && 'overlay',
+    archived && 'archived',
+    mine && 'mine',
+    selectedIds.size > 0 && 'selecting',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <article
@@ -70,6 +81,19 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       tabIndex={overlay ? undefined : 0}
       title={overlay ? undefined : t('Dois cliques (ou Enter) abrem o card')}
     >
+      {isParent && !archived && (
+        <input
+          type="checkbox"
+          className="card-select"
+          checked={selectedIds.has(card.id)}
+          aria-label={t('Selecionar {title}', { title: card.title })}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            e.stopPropagation();
+            toggleSelected(card.id);
+          }}
+        />
+      )}
       <TitleBar card={card} type={type} work={work} overlay={overlay} />
       <div className="card-body">
         <div className="card-title" title={card.title}>
