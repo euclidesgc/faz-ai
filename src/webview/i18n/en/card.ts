@@ -91,6 +91,16 @@ export const card: Record<string, string> = {
   Editar: 'Edit',
   Cancelar: 'Cancel',
   Salvar: 'Save',
+  'Resumir a conversa': 'Summarize conversation',
+  'A IA lê toda a conversa e escreve um resumo com decisões, observações e pendências.':
+    'The AI reads the whole conversation and writes a summary of decisions, notes, and open items.',
+  'Revise o resumo: concorde como está ou edite o que for preciso.':
+    'Review the summary: keep it as is, or edit anything that needs adjusting.',
+  'As mensagens anteriores a este resumo já estão refletidas nele. Você pode apagá-las para liberar contexto.':
+    'The messages before this summary are already reflected in it. You can delete them to free up context.',
+  'Apagar mensagens resumidas': 'Delete summarized messages',
+  'Apagar as {count} mensagens anteriores a este resumo?': 'Delete the {count} messages before this summary?',
+  'Apagar mensagens': 'Delete messages',
   // permissões do runner (shared/runner.ts)
   'Só o board': 'Board only',
   'Board e arquivos do projeto': 'Board and project files',
