@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { LANGUAGES } from '../src/shared/language';
+import { FONTS, FONT_SIZE_RANGE, THEMES } from '../src/shared/appearance';
 
 const read = (f: string) => JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8'));
 const pkg = read('package.json');
@@ -38,6 +39,41 @@ describe('contributes.configuration', () => {
     expect(p.default).toBe('auto');
     expect(p.scope).toBe('application');
   });
+  it('fazai.appearance.theme aceita os mesmos temas de THEMES, escopo application, com enumDescriptions nos dois nls', () => {
+    const p = sections[1]!.properties['fazai.appearance.theme']!;
+    expect(p.enum).toEqual(THEMES.map((th) => th.value));
+    expect(p.default).toBe('system');
+    expect(p.scope).toBe('application');
+    expect(p.markdownDescription).toBeTruthy();
+    nls(String(p.markdownDescription));
+    const descriptions = p.enumDescriptions as string[];
+    expect(descriptions).toHaveLength(THEMES.length);
+    descriptions.forEach((d) => nls(d));
+  });
+
+  it('fazai.appearance.font aceita as mesmas fontes de FONTS, escopo application, com enumDescriptions nos dois nls', () => {
+    const p = sections[1]!.properties['fazai.appearance.font']!;
+    expect(p.enum).toEqual(FONTS.map((f) => f.value));
+    expect(p.default).toBe('sans');
+    expect(p.scope).toBe('application');
+    expect(p.markdownDescription).toBeTruthy();
+    nls(String(p.markdownDescription));
+    const descriptions = p.enumDescriptions as string[];
+    expect(descriptions).toHaveLength(FONTS.length);
+    descriptions.forEach((d) => nls(d));
+  });
+
+  it('fazai.appearance.fontSize usa a mesma faixa de FONT_SIZE_RANGE, escopo application', () => {
+    const p = sections[1]!.properties['fazai.appearance.fontSize']!;
+    expect(p.type).toBe('number');
+    expect(p.minimum).toBe(FONT_SIZE_RANGE.min);
+    expect(p.maximum).toBe(FONT_SIZE_RANGE.max);
+    expect(p.default).toBe(14);
+    expect(p.scope).toBe('application');
+    expect(p.markdownDescription).toBeTruthy();
+    nls(String(p.markdownDescription));
+  });
+
   it('a seção Instalação aponta para o Diagnóstico e Git/Backup para a aba do board, com argumento válido', () => {
     expect(en['config.install.environment']).toContain('command:fazai.openEnvironment');
     for (const [key, tab] of [

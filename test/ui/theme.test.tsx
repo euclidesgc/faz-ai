@@ -1,4 +1,4 @@
-import { choose, lastSent, posted, seedBoard, syncStore, type SeededBoard } from './setup';
+import { lastSent, posted, seedBoard, syncStore, type SeededBoard } from './setup';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -33,57 +33,22 @@ describe('ThemeToggle', () => {
   });
 });
 
-describe('AppearanceSettings', () => {
-  it('trocar o tema no select envia só o campo alterado', async () => {
+describe('AppearanceSettings dentro do editor', () => {
+  it('não mostra os 4 campos nem a tabela de status; mostra o aviso e o botão para o Settings do editor', async () => {
     withTheme('system');
     render(
       <Theme>
         <AppearanceSettings />
       </Theme>,
     );
-    await choose(screen.getByRole('combobox', { name: 'Tema' }), 'Escuro');
-    expect(lastSent('settings.board.update').patch).toEqual({ appearance: { theme: 'dark' } });
-  });
-
-  it('trocar a fonte envia o patch da fonte', async () => {
-    withTheme('system');
-    render(
-      <Theme>
-        <AppearanceSettings />
-      </Theme>,
-    );
-    await choose(screen.getByRole('combobox', { name: 'Fonte dos textos' }), 'Serifada');
-    expect(lastSent('settings.board.update').patch).toEqual({ appearance: { font: 'serif' } });
-  });
-});
-
-describe('AppearanceSettings: tamanho da fonte e status', () => {
-  it('o controle deslizante muda o tamanho da fonte pelo teclado', async () => {
-    withTheme('system');
-    render(
-      <Theme>
-        <AppearanceSettings />
-      </Theme>,
-    );
-    const thumb = screen.getByRole('slider');
-    thumb.focus();
-    await userEvent.keyboard('{ArrowRight}');
-    const { fontSize } = lastSent('settings.board.update').patch.appearance!;
-    expect(fontSize).toBeGreaterThan(0);
-  });
-
-  it('o nome de um status é uma caixa de texto e grava ao sair', async () => {
-    withTheme('system');
-    render(
-      <Theme>
-        <AppearanceSettings />
-      </Theme>,
-    );
-    const name = screen.getByLabelText('Nome do status running');
-    await userEvent.clear(name);
-    await userEvent.type(name, 'Rodando');
-    await userEvent.tab();
-    expect(lastSent('settings.board.update').patch.appearance!.statuses!.running!.label).toBe('Rodando');
+    expect(screen.queryByRole('combobox', { name: 'Tema' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Fonte dos textos' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Idioma' })).toBeNull();
+    expect(screen.queryByRole('slider')).toBeNull();
+    expect(screen.queryByLabelText('Nome do status running')).toBeNull();
+    expect(screen.getByText('A aparência do board (idioma, tema, fonte e tamanho) agora fica no Settings do editor.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir no Settings do editor' }));
+    expect(lastSent('ui.openIdeSettings')).toEqual({ type: 'ui.openIdeSettings', key: 'fazai.appearance.theme' });
   });
 });
 

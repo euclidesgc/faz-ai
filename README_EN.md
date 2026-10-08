@@ -835,7 +835,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Harness de IA | The project's tool, permission, default agent and heartbeat; project and global rules, agents and skills, with the check marks of what runs use; everything each tool loads, by scope (see [AI harness](#ai-harness) and [Agents](#agents)) |
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
-| Aparência | **Language** (automatic, Português (Brasil) or English), theme (system, light, dark), font and size of long texts; name and color of the statuses |
+| Aparência | **Language** (automatic, Português (Brasil) or English; in the editor Settings along with theme, font and size); statuses (name and color, in the Workflows tab; here only in browser mode) |
 | Backup | Export the board to a file and import a file in place of the current board (see [Board backup](#board-backup)) |
 
 ### Settings in the editor Settings
@@ -846,7 +846,7 @@ four sections, in this order:
 | Section | What it has today |
 | --- | --- |
 | Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
-| Appearance | **Language** (`fazai.appearance.language`: automatic, Português (Brasil) or English). The other options arrive in the next versions; until then, a link leads to the board's Aparência tab |
+| Appearance | **Language** (`fazai.appearance.language`), **Theme** (`fazai.appearance.theme`), **Font** (`fazai.appearance.font`) and **Size** (`fazai.appearance.fontSize`), all with User scope — apply to all this person's projects. Statuses (name and color of each status) stay on the board, now in the Workflows tab |
 | Git | A note that the options arrive in the next versions, with a link to the board's Git tab |
 | Backup | A note that export and import become editor commands in the next versions, with a link to the board's Backup tab |
 
@@ -859,9 +859,13 @@ way; in browser mode (`faz-ai` in the terminal) it does not appear, because ther
 Who wins: inside the editor, the Settings is the source and the board database (SQLite) is the copy,
 kept equal on every change so browser mode and the MCP server keep seeing the same value; outside
 the editor, SQLite is the only source, and a write made there (through MCP or the browser) is carried
-to the User Settings while the editor is open. On the first open, a board whose language differs from
-the default (`auto`) writes that language to the User Settings, so an empty Settings does not reset the
-board; if the Settings already has an explicit value, it wins.
+to the User Settings while the editor is open. On the four Appearance keys (language, theme, font,
+size): on a board's first opening, if the editor Settings has no explicit value yet and the board
+has a non-default value, it is copied to the Settings (and then applies to all projects); if the
+Settings already has an explicit value, it wins and the board adopts that value. With multiple
+different boards opened for the first time after an update, the value from the first board to open
+is what goes to the Settings, and subsequent boards inherit that value — until the person changes
+the Settings, at which point everyone sees the new value.
 
 About models: **Detectar modelos** (detect models) reads the tool's list (for Cursor, the models of your account, through the `cursor-agent models`
 command, read when the board opens with the CLI signed in, and the first list read replaces the built-in one

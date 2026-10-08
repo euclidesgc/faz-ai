@@ -800,7 +800,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; rules, agentes e skills do projeto e do global, com a marcação do que as execuções usam; tudo que cada ferramenta carrega, por escopo (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
-| Aparência | **Idioma** (automático, Português (Brasil) ou English), tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
+| Aparência | **Idioma** (automático, Português (Brasil) ou English; fica no Settings do editor junto com tema, fonte e tamanho); status (nome e cor, na aba Fluxos; aqui só no modo navegador) |
 | Backup | Exportar o board num arquivo e importar um arquivo no lugar do board atual (ver [Backup do board](#backup-do-board)) |
 
 ### Configurações no Settings do editor
@@ -811,7 +811,7 @@ quatro seções, nesta ordem:
 | Seção | O que tem hoje |
 | --- | --- |
 | Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
-| Aparência | **Idioma** (`fazai.appearance.language`: automático, Português (Brasil) ou English). As outras opções chegam nas próximas versões; até lá, um link leva à aba Aparência do board |
+| Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
 | Git | Aviso de que as opções chegam nas próximas versões, com link para a aba Git do board |
 | Backup | Aviso de que exportar e importar viram comandos do editor nas próximas versões, com link para a aba Backup do board |
 
@@ -824,9 +824,13 @@ board, o botão **Abrir no Settings do editor** faz o caminho de volta; no modo 
 Quem manda: dentro do editor, o Settings é a fonte e o banco do board (SQLite) é a cópia, mantida
 igual a cada mudança, para o modo navegador e o servidor MCP continuarem enxergando o mesmo valor;
 fora do editor, o SQLite é a única fonte, e uma gravação feita por ali (pelo MCP ou pelo navegador)
-é levada ao Settings do Usuário quando o editor está aberto. Na primeira abertura, um board com idioma
-diferente do padrão (`auto`) grava esse idioma no Settings do Usuário, para o Settings vazio não zerar
-o board; se o Settings já tem um valor explícito, ele vence.
+é levada ao Settings do Usuário quando o editor está aberto. Nas quatro chaves de Aparência
+(idioma, tema, fonte, tamanho): na primeira abertura de um board, se o Settings do editor ainda não
+tem valor explícito e o board tem um valor não-padrão, ele é copiado para o Settings (e passa a valer
+em todos os projetos); se o Settings já tem um valor explícito, ele vence e o board adota aquele
+valor. Com múltiplos boards diferentes abertos pela primeira vez após uma atualização, o valor do
+primeiro board a abrir é o que passa para o Settings, e os demais boards subsequentes herdam esse
+valor — até a pessoa alterar o Settings, momento em que todos veem o novo valor.
 
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Cursor, dos modelos da sua conta, pelo comando `cursor-agent models`, lido ao abrir o board
 com a CLI autenticada, e a primeira lista lida substitui a embutida uma vez só; no Claude Code, uma lista embutida que pode ser editada). No Cursor, a lista traz uma linha por nível de cada modelo

@@ -148,6 +148,15 @@ describe('WorkflowsSettings', () => {
     expect(del).toBeDisabled();
   });
 
+  it('mostra a tabela de status, com o nome em caixa de texto que grava ao sair', async () => {
+    show();
+    const name = screen.getByLabelText('Nome do status running');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Rodando');
+    await userEvent.tab();
+    expect(lastSent('settings.board.update').patch.appearance!.statuses!.running!.label).toBe('Rodando');
+  });
+
   it('um workflow vazio, sem tipos, pode ser excluído depois de confirmar', async () => {
     board.router.handle({ type: 'settings.workflow.create', name: 'Vazio', kind: 'parent' });
     syncStore(board.router);

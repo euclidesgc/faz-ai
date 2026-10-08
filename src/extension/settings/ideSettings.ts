@@ -12,7 +12,7 @@
 
 import type { BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
-import { DEFAULT_APPEARANCE } from '../../shared/appearance';
+import { DEFAULT_APPEARANCE, FONT_SIZE_RANGE, FONTS, THEMES, type TextFont, type ThemeMode } from '../../shared/appearance';
 import { LANGUAGES, type Language } from '../../shared/language';
 
 export const SECTION = 'fazai';
@@ -42,8 +42,33 @@ const languageKey: SyncedKey<Language> = {
   defaultValue: DEFAULT_APPEARANCE.language,
 };
 
-/** Chaves ligadas ao board nesta versão: só o idioma. */
-export const SYNCED_KEYS: SyncedKey<unknown>[] = [languageKey as SyncedKey<unknown>];
+const themeKey: SyncedKey<ThemeMode> = {
+  key: 'appearance.theme',
+  fromBoard: (board) => board.appearance.theme,
+  toBoardPatch: (value) => ({ appearance: { theme: value } }),
+  isValid: (value): value is ThemeMode => THEMES.some((t) => t.value === value),
+  defaultValue: DEFAULT_APPEARANCE.theme,
+};
+
+const fontKey: SyncedKey<TextFont> = {
+  key: 'appearance.font',
+  fromBoard: (board) => board.appearance.font,
+  toBoardPatch: (value) => ({ appearance: { font: value } }),
+  isValid: (value): value is TextFont => FONTS.some((f) => f.value === value),
+  defaultValue: DEFAULT_APPEARANCE.font,
+};
+
+const fontSizeKey: SyncedKey<number> = {
+  key: 'appearance.fontSize',
+  fromBoard: (board) => board.appearance.fontSize,
+  toBoardPatch: (value) => ({ appearance: { fontSize: value } }),
+  isValid: (value): value is number =>
+    typeof value === 'number' && Number.isFinite(value) && value >= FONT_SIZE_RANGE.min && value <= FONT_SIZE_RANGE.max,
+  defaultValue: DEFAULT_APPEARANCE.fontSize,
+};
+
+/** Chaves ligadas ao board nesta versão: idioma, tema, fonte e tamanho da fonte. */
+export const SYNCED_KEYS: SyncedKey<unknown>[] = [languageKey, themeKey, fontKey, fontSizeKey] as SyncedKey<unknown>[];
 
 export interface ConfigurationLike {
   get<T>(key: string): T | undefined;

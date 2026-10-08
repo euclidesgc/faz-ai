@@ -136,6 +136,50 @@
             "default": "auto",
             "scope": "application",
             "markdownDescription": "%config.appearance.language%"
+          },
+          "fazai.appearance.theme": {
+            "type": "string",
+            "enum": [
+              "system",
+              "light",
+              "dark"
+            ],
+            "enumDescriptions": [
+              "%config.appearance.theme.system%",
+              "%config.appearance.theme.light%",
+              "%config.appearance.theme.dark%"
+            ],
+            "default": "system",
+            "scope": "application",
+            "markdownDescription": "%config.appearance.theme%"
+          },
+          "fazai.appearance.font": {
+            "type": "string",
+            "enum": [
+              "sans",
+              "ui",
+              "serif",
+              "mono",
+              "editor"
+            ],
+            "enumDescriptions": [
+              "%config.appearance.font.sans%",
+              "%config.appearance.font.ui%",
+              "%config.appearance.font.serif%",
+              "%config.appearance.font.mono%",
+              "%config.appearance.font.editor%"
+            ],
+            "default": "sans",
+            "scope": "application",
+            "markdownDescription": "%config.appearance.font%"
+          },
+          "fazai.appearance.fontSize": {
+            "type": "number",
+            "minimum": 11,
+            "maximum": 22,
+            "default": 14,
+            "scope": "application",
+            "markdownDescription": "%config.appearance.fontSize%"
           }
         }
       },
