@@ -420,22 +420,30 @@ creation tokens, the cost in dollars, the number of turns and the tool's session
 records the **inventory** of what the AI used: native tools, MCP tools (with the server of each
 one), subagents and skills, with the number of calls.
 
-- **Cost comes from two sources.** When the tool reports the cost, the board stores that value.
-  When it does not, the board estimates it: tokens multiplied by the model's **price per million
-  tokens** (four prices: input, output, cache read and cache creation). Known models come with the
-  price built into the extension; the rest you fill in under Configurações → **Modelos de IA**
-  (Settings → AI models) or through MCP with `upsert_model` (see [Model prices](#model-prices)). An
-  estimated cost is always marked "(estimado)". A model without all four prices gets no calculated
-  cost: the value stays blank, never 0.
+- **Cost is what the tool reports; the board calculates nothing.** There is no price table: a value
+  computed from a price list goes stale when the vendor changes its rates and produces a wrong
+  report that looks right. Today:
+
+  | Tool | Tokens | Cost in dollars |
+  | --- | --- | --- |
+  | Claude Code | measured (input, output, cache read and cache creation, per model, subagent included) | the `total_cost_usd` the CLI itself reports |
+  | Cursor | measured (the four counters) | the CLI does not report it: left blank |
+  | Codex, Kimi, GitHub Copilot | not measured for now | left blank |
+
+  Wherever you see "não medido" (not measured) or a blank cost, this is why: missing measurement,
+  never zero consumption. A run with tokens and no cost (the Cursor case) counts in the tokens and
+  stays out of the cost; the Métricas note says how many runs were left out.
+- **Every run goes through a single door.** The card runner (manual, heartbeat and autonomous mode)
+  and the board chat call the AI through the same point in the code (`AiGateway`), which opens the
+  log row before running, closes it with the outcome and stores the consumption. Each tool has its
+  own provider, which builds the command and reads the output. A third way to call the AI does not
+  exist without going through it, and a test fails if any file tries. What stays out of the record,
+  by nature, is whatever you run straight in the terminal or in the tool's own chat, without the board.
 - **In the log channel** (**Output → Faz AI**), the tool's output appears as readable lines, and at
   the end of each run a summary line follows with input, output, cache read and cache creation,
   turns and cost, for example `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100
-  criação de cache · 8 turnos · US$ 0,4210 (estimado)`. Turns and cost are left out when the tool
-  does not report them. The line is written in Portuguese, as the board's log channel is.
-- **Copilot has no measured consumption.** It has no structured output, so its runs are recorded,
-  but without tokens, cost or inventory. Wherever you see "não medido" (not measured), this is why:
-  missing measurement, not zero consumption. The same applies to runs that end before the tool
-  reports consumption.
+  criação de cache · 8 turnos · US$ 0,4210`. Turns and cost are left out when the tool does not
+  report them. The line is written in Portuguese, as the board's log channel is.
 - **Questions in the board chat** are recorded too, with no card attached.
 - **The detail of each run is kept for a window you configure**, from 1 to 24 months (the current
   month plus the earlier ones). The default is 6 months. After the window the detail is discarded,
@@ -483,8 +491,10 @@ and also in the board opened in the browser.
 - **What the AI used** ("O que a IA usou"). Tools, MCP tools (with the server in its own column),
   subagents and skills, with the number of runs and uses. "Not measured yet" (no run recorded an
   inventory) is different from "no records in the period".
-- **Tokens and cost.** Tokens count even when the model has no price configured; cost adds up only
-  the runs that have a price, and the note says how many were left out. Before the board measures
+- **Tokens and cost.** Cost adds up only the runs in which the tool reported the cost (Claude Code), and
+  the note says how many were left out; tokens count in every measured run. Older runs, from before the
+  board stopped calculating cost from a price table, stay marked "estimado por tabela de preços"
+  (estimated from a price table). Before the board measures
   consumption, cost and inventory show as "não medido" (not measured) and almost every lead time as
   unknown: that is the expected behavior, not a failure.
 - **Detail kept** ("Detalhe guardado"). Shows the retention window for the runs' detail and how much
@@ -518,11 +528,9 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 - On the **agent**, **skill**, **used_tool** and **mcp_tool** dimensions the table shows only the
   count of runs and uses (no tokens or cost, which cannot be split among a run's components).
   `effort` and `profile` have tokens and cost.
-- Tokens count even when the model has no price configured; cost comes only from runs that have a
-  price.
+- Tokens count in every measured run; cost comes only from runs in which the tool reported it (Claude Code).
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`.
-- Unmeasured values appear as "-" (never 0), for example Copilot runs. A cost estimated from the
-  model's price is marked as estimated.
+- Unmeasured values appear as "-" (never 0), for example Copilot runs and Cursor's cost.
 - Always tells you when the board's history started and which periods have only monthly totals
   (without per-run detail). Periods outside the retention window (6 months by default) have no detail and aggregate only
   the already-consolidated totals.
@@ -793,7 +801,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
 | Agentes | How the AI works on each card: skills, MCP servers, tools and model; there is always a default; per phase, changeable per card, with suggestions from intent |
 | Harness de IA | The project's tool, rules file, skills and agents; runs from the conversation and the heartbeat; everything each tool loads, by scope (see [AI harness](#ai-harness)) |
-| Modelos de IA | The tool's models and effort levels; each model's price per million tokens (input, output, cache read and cache creation), built in for known models and editable, used to estimate cost; rules that suggest each card's model |
+| Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
 | Aparência | **Language** (automatic, Português (Brasil) or English), theme (system, light, dark), font and size of long texts; name and color of the statuses |
 | Backup | Export the board to a file and import a file in place of the current board (see [Board backup](#board-backup)) |
@@ -827,12 +835,12 @@ About models: **Detectar modelos** (detect models) reads the tool's list (for Ki
 local configuration; for Cursor, the models of your account, through the `cursor-agent models`
 command, read when the board opens with the CLI signed in, and the first list read replaces the built-in one
 only once; for the others, a built-in list you can
-edit); the prices you filled in stay there after detecting again. For Cursor, the list has one line per
+edit). For Cursor, the list has one line per
 level of each model (`claude-opus-5-5-low`, `-medium`, `-high`…); the board groups the variants into
 one model with its levels. The fast versions (`-fast`, they answer sooner and charge more for the
 same tokens) stay out until you turn on **Incluir os modos rápidos** (include fast modes) on the
-Cursor card: then each one enters as a separate model ("Claude Opus 5.5 1M Fast"), with its own
-price, only for the models in the catalog; turning it off removes them from the catalog. Through MCP, it is the `includeFastModels` rule
+Cursor card: then each one enters as a separate model ("Claude Opus 5.5 1M Fast"), only for the
+models in the catalog; turning it off removes them from the catalog. Through MCP, it is the `includeFastModels` rule
 of `update_rules`. On Cursor's free plan only **Auto**
 runs: the other models are refused before starting (the blocked card explains how to pick Auto),
 which is why Cursor's suggestion rules all start
@@ -844,71 +852,6 @@ When a new version of the extension changes the default board, the board asks wh
 update it (or use **Faz AI: Atualizar board para o padrão atual**). The update only adds what is
 missing: no card leaves its place and what you customized is kept. A copy of the database is saved
 first.
-
-### Model prices
-
-Each model's price per million tokens is what the board uses to estimate the cost of runs (when the
-tool does not report the cost). The models in the built-in list already come with a price:
-
-- **Where they come from.** The extension ships a price table (`src/shared/prices.ts`) with the four
-  prices of each known model, the official page they came from and the date they were checked. On
-  the **Modelos de IA** tab, the price shows "embutido · conferido em YYYY-MM-DD · fonte" (built-in ·
-  checked on · source), and the link opens the official page. Each tool card has the **Preços de
-  <tool>** (tool pricing) link.
-- **Built-in and manual.** Any price you type, on the tab or through the AI with `upsert_model`,
-  becomes **manual**, even when it equals the built-in one. A manual price is never overwritten by
-  the extension. A catalog saved before this version, with a price and no origin, counts as manual.
-- **What an extension update changes.** On the first board open after the update, prices with
-  built-in origin move to the new table, and models that had no price and now have a table entry get
-  the built-in one. Manual prices and runs already recorded in Métricas do not change: the stored
-  cost is the one at the time of use.
-- **Stale price notice.** When a built-in price was checked more than 60 days ago, the tab shows
-  "Preços conferidos em … · conferir agora" (prices checked on · check now), with the source link.
-  A manual price has no check date and gets no notice.
-- **Model without a price.** A model without all four prices (for example, Cursor and Kimi models
-  detected that are not in the table) shows the notice "As execuções deste modelo vão ficar sem
-  custo até os quatro preços serem preenchidos" (runs of this model will have no cost until all four
-  prices are filled in), with the **Preencher** (fill in) button, which goes to the empty field.
-  Métricas leaves its cost blank.
-- **Variable price.** Cursor's `auto` and every GitHub Copilot model (which charges per premium
-  request, not per token) come with **Preço variável** (variable price) on: no price fields and no
-  estimated cost. Every model has the switch.
-- **Back to the built-in price.** On a model with a manual price that has a table entry, use the
-  **Voltar ao preço embutido** (back to the built-in price) button, clear the four fields, or call
-  `upsert_model` with `reset_price: true`. On a model without a table entry, clearing the four fields
-  leaves the model without a price.
-- **Asking the AI to update a price.** Ask it to read the official page (the link is on the tab) and
-  store the four values with `upsert_model` (`price_input`, `price_output`, `price_cache_read`,
-  `price_cache_write`). The price becomes manual. `get_models` returns, per model, `priceSource`
-  (`builtin`, `manual` or `null`), `priceCheckedAt` and `priceUrl`.
-- **Check rule on every release.** Before publishing a version, the built-in table is checked against
-  the official pages and, if anything changed, the numbers and the date (`checkedAt`) in
-  `src/shared/prices.ts` are updated. It is an item of the release checklist.
-
-#### Cursor pricing
-
-The reference is [Cursor's pricing table](https://cursor.com/docs/models-and-pricing). The
-`composer-2.5` model already comes with a built-in price; the other models of your account are kept
-by hand in **Modelos de IA** (AI models) or by the AI through `upsert_model`.
-
-- **Auto has a variable price.** Cursor charges the list price of the model each request is routed
-  to, so there is no fixed rate to enter. The `auto` model comes with **Preço variável** (variable
-  price) on: the price fields give way to a notice, and the run has no estimated cost (blank, never a
-  made-up number). Every model has the switch; through MCP, it is `variable_price` in
-  `upsert_model`.
-- **Cursor Token Rate.** On Teams and Enterprise plans, Cursor charges US$ 0.25 per million tokens
-  (input, output and cache) on top of the price of third-party models; Cursor's own models (Composer
-  and Grok) are exempt. Turn on **Somar a tarifa do Cursor** (add the Cursor fee) on the Cursor card
-  (through MCP, `cursorTokenRate` in `update_rules`) and the estimate adds it. It applies to the
-  next runs: the cost of runs already recorded does not change.
-- **Fast mode and long context.** Fast mode usually costs 2x and enters as a separate model with its
-  own price (see **Incluir os modos rápidos** above). Long context (over 256 thousand tokens) may cost
-  2x, and 3x together with fast mode, but it is not told apart: Cursor only reports the run's token
-  total, and the estimate uses the price entered.
-- **How names match.** The identifier in the tool is the id `cursor-agent models` lists
-  (`claude-opus-5-5`); the name is the row in the pricing table; on the board the model is
-  `cursor:claude-opus-5-5`, and each fast version has its own (`cursor:claude-opus-5-5-fast`). With
-  that, the AI can read the table and fill in the prices through `upsert_model`.
 
 ## Where the data lives
 

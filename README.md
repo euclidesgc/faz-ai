@@ -400,22 +400,29 @@ cache, o custo em dólar, o número de turnos e o id da sessão da ferramenta. R
 **inventário** do que a IA usou: ferramentas nativas, ferramentas de MCP (com o servidor de cada
 uma), subagentes e skills, com a contagem de chamadas.
 
-- **O custo vem de duas fontes.** Quando a ferramenta informa o custo, o board grava esse valor.
-  Quando não informa, ele estima: multiplica os tokens pelo **preço por milhão de tokens** do modelo
-  (os quatro preços: entrada, saída, leitura e criação de cache). Os modelos conhecidos já vêm com o
-  preço embutido na extensão; o resto você preenche em Configurações → **Modelos de IA** ou pelo MCP
-  com `upsert_model` (ver [Preços dos modelos](#preços-dos-modelos)). O custo estimado vem sempre
-  marcado como "(estimado)". Modelo sem os quatro preços não tem custo calculado: o valor fica em
-  branco, nunca 0.
+- **O custo é o que a ferramenta informa; o board não calcula nada.** Não existe tabela de preços: um
+  valor calculado a partir de uma lista de preços envelhece quando o fornecedor muda a tarifa e
+  produz relatório errado com cara de certo. Hoje:
+
+  | Ferramenta | Tokens | Custo em dólar |
+  | --- | --- | --- |
+  | Claude Code | medidos (entrada, saída, leitura e criação de cache, por modelo, subagente incluído) | o `total_cost_usd` que a própria CLI informa |
+  | Cursor | medidos (os quatro contadores) | a CLI não informa: fica em branco |
+  | Codex, Kimi, GitHub Copilot | não medidos por enquanto | em branco |
+
+  Onde aparecer "não medido" ou um custo em branco é isso, falta de medição, e nunca consumo zero.
+  Uma execução com tokens e sem custo (o caso do Cursor) conta nos tokens e fica de fora do custo;
+  o aviso das Métricas diz quantas execuções ficaram de fora.
+- **Toda execução passa por uma única porta.** O executor de cards (manual, heartbeat e modo
+  autônomo) e o chat do board chamam a IA pelo mesmo ponto do código (`AiGateway`), que abre a linha
+  no log antes de rodar, fecha com o desfecho e grava o consumo. Cada ferramenta tem um provider
+  próprio, que monta o comando e lê a saída. Uma terceira forma de chamar a IA não existe sem passar
+  por ali, e um teste falha se algum arquivo tentar. O que fica de fora do registro, por natureza, é
+  o que você roda direto no terminal ou no chat da própria ferramenta, sem o board.
 - **No canal de log** (**Saída → Faz AI**), a saída da ferramenta aparece em linhas legíveis, e no fim
   de cada execução vem uma linha de resumo com entrada, saída, leitura e criação de cache, turnos e
   custo, por exemplo `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação
-  de cache · 8 turnos · US$ 0,4210 (estimado)`. Turnos e custo ficam de fora quando a ferramenta não
-  os informa.
-- **O Copilot fica sem consumo medido.** Ele não tem saída estruturada, então as execuções dele são
-  registradas, mas sem tokens, custo nem inventário. Onde aparecer "não medido", é isso: falta de
-  medição, não consumo zero. O mesmo vale para execuções que terminam antes de a ferramenta informar
-  o consumo.
+  de cache · 8 turnos · US$ 0,4210`. Turnos e custo ficam de fora quando a ferramenta não os informa.
 - **Perguntas no chat do board** também entram no registro, sem card associado.
 - **O detalhe de cada execução é guardado por uma janela que você configura**, de 1 a 24 meses (o
   mês corrente mais os anteriores). O padrão é 6 meses. Depois da janela o detalhe é descartado, mas
@@ -461,8 +468,10 @@ pelo navegador.
 - **O que a IA usou.** Ferramentas, ferramentas de MCP (com o servidor em coluna própria), subagentes
   e skills, com o número de execuções e de usos. "Ainda não medido" (nenhuma execução gravou
   inventário) é diferente de "nenhum registro no período".
-- **Tokens e custo.** Tokens contam mesmo quando o modelo não tem preço configurado; o custo soma só
-  as execuções que têm preço, e o aviso diz quantas ficaram de fora. Antes de o board medir consumo,
+- **Tokens e custo.** O custo soma só as execuções em que a ferramenta informou o custo (o Claude Code),
+  e o aviso diz quantas ficaram de fora; os tokens contam em todas as execuções medidas. Execuções
+  antigas, de antes de o board deixar de calcular custo por tabela de preços, continuam marcadas como
+  "estimado por tabela de preços". Antes de o board medir consumo,
   custo e inventário aparecem como "não medido" e quase todo lead time como desconhecido: é o
   comportamento esperado, não falha.
 - **Detalhe guardado.** Mostra a janela de retenção do detalhe das execuções e quanto espaço ela
@@ -496,10 +505,9 @@ economizar tokens.
 - Nas dimensões **agent**, **skill**, **used_tool** e **mcp_tool** a tabela mostra só a contagem de
   execuções e de usos (sem tokens nem custo, que não é possível repartir entre componentes de uma
   execução). `effort` e `profile` têm tokens e custo.
-- Tokens contam mesmo sem preço configurado para o modelo; o custo vem só das execuções que têm preço.
+- Tokens contam em toda execução medida; o custo vem só das execuções em que a ferramenta o informou (o Claude Code).
 - Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`.
-- Valores não medidos aparecem como "-" (nunca 0), por exemplo as execuções do Copilot. Custo
-  estimado a partir do preço do modelo vem marcado como estimado.
+- Valores não medidos aparecem como "-" (nunca 0), por exemplo as execuções do Copilot e o custo do Cursor.
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm detalhe e só agregam os
   totais já consolidados.
@@ -751,7 +759,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 
 ## Configurações
 
-![Configurações: catálogo de modelos com preço por modelo e regras de sugestão](docs/images/settings.png)
+![Configurações: catálogo de modelos e regras de sugestão](docs/images/settings.png)
 
 | Seção | O que ajusta |
 | --- | --- |
@@ -761,7 +769,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
 | Agentes | Como a IA trabalha em cada card: skills, servidores MCP, ferramentas e modelo; sempre há um padrão; por fase, com troca por card e sugestão pela intenção |
 | Harness de IA | Ferramenta do projeto, arquivo de regras, skills e agentes; execução pela conversa e heartbeat; tudo que cada ferramenta carrega, por escopo (ver [Harness de IA](#harness-de-ia)) |
-| Modelos de IA | Modelos e níveis de esforço da ferramenta; o preço por milhão de tokens de cada modelo (entrada, saída, leitura e criação de cache), embutido para os modelos conhecidos e editável, usado para estimar o custo; regras que sugerem o modelo de cada card |
+| Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English), tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
 | Backup | Exportar o board num arquivo e importar um arquivo no lugar do board atual (ver [Backup do board](#backup-do-board)) |
@@ -793,12 +801,11 @@ o board; se o Settings já tem um valor explícito, ele vence.
 
 Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração
 local; no Cursor, dos modelos da sua conta, pelo comando `cursor-agent models`, lido ao abrir o board
-com a CLI autenticada, e a primeira lista lida substitui a embutida uma vez só; nas outras, uma lista embutida que pode ser editada); os preços que você
-preencheu continuam lá depois de detectar de novo. No Cursor, a lista traz uma linha por nível de cada modelo
+com a CLI autenticada, e a primeira lista lida substitui a embutida uma vez só; nas outras, uma lista embutida que pode ser editada). No Cursor, a lista traz uma linha por nível de cada modelo
 (`claude-opus-5-5-low`, `-medium`, `-high`…); o board junta as variantes num modelo com os níveis
 dele. As versões rápidas (`-fast`, respondem mais depressa e cobram mais pelos mesmos tokens) ficam
 de fora até você ligar **Incluir os modos rápidos** no cartão do Cursor: aí cada uma entra como um
-modelo à parte ("Claude Opus 5.5 1M Fast"), com preço próprio, só para os modelos que estão no
+modelo à parte ("Claude Opus 5.5 1M Fast"), só para os modelos que estão no
 catálogo; desligar a chave as tira do catálogo.
 Pelo MCP, é a regra `includeFastModels` do `update_rules`. No plano gratuito do Cursor só o **Auto** roda: os outros
 modelos são recusados antes de começar (o card bloqueado explica como escolher Auto), e por isso
@@ -809,68 +816,6 @@ sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualqu
 Quando uma versão nova da extensão muda o board padrão, o board pergunta se você quer atualizá-lo
 (ou use **Faz AI: Atualizar board para o padrão atual**). A atualização só acrescenta o que falta:
 nenhum card sai do lugar e o que você personalizou é mantido. Uma cópia do banco é gravada antes.
-
-### Preços dos modelos
-
-O preço por milhão de tokens de cada modelo é o que o board usa para estimar o custo das execuções
-(quando a ferramenta não informa o custo). Os modelos da lista embutida já chegam com preço:
-
-- **De onde vêm.** A extensão traz uma tabela de preços (`src/shared/prices.ts`) com os quatro
-  preços de cada modelo conhecido, a página oficial de onde saíram e a data em que foram conferidos.
-  Na aba **Modelos de IA**, o preço mostra "embutido · conferido em AAAA-MM-DD · fonte", e o link
-  abre a página oficial. Cada cartão de ferramenta tem o link **Preços de <ferramenta>**.
-- **Embutido e manual.** Qualquer preço que você digite, pela aba ou pela IA com `upsert_model`,
-  vira **manual**, mesmo que seja igual ao embutido. Um preço manual nunca é sobrescrito pela
-  extensão. Um catálogo gravado antes desta versão, com preço e sem origem, conta como manual.
-- **O que a atualização da extensão muda.** Na primeira abertura do board depois de atualizar, os
-  preços de origem embutida passam para os da tabela nova, e os modelos que estavam sem preço e
-  agora têm tabela recebem o embutido. Preços manuais e execuções já registradas nas Métricas não
-  mudam: o custo gravado é o do momento do uso.
-- **Aviso de preço velho.** Quando um preço embutido foi conferido há mais de 60 dias, a aba mostra
-  "Preços conferidos em … · conferir agora", com o link da fonte. Preço manual não tem data de
-  conferência e não recebe o aviso.
-- **Modelo sem preço.** Um modelo sem os quatro preços (os detectados do Cursor e do Kimi que não
-  estão na tabela, por exemplo) mostra o aviso "As execuções deste modelo vão ficar sem custo até os
-  quatro preços serem preenchidos", com o botão **Preencher**, que leva ao campo vazio. As Métricas
-  deixam o custo dele em branco.
-- **Preço variável.** O `auto` do Cursor e todos os modelos do GitHub Copilot (que cobra por pedido
-  premium, não por token) vêm com **Preço variável** ligado: sem campos de preço e sem custo
-  estimado. A chave existe em todo modelo.
-- **Voltar ao preço embutido.** Num modelo com preço manual que tem tabela, use o botão **Voltar ao
-  preço embutido**, apague os quatro campos, ou chame `upsert_model` com `reset_price: true`. Num
-  modelo sem tabela, apagar os quatro deixa o modelo sem preço.
-- **Pedir à IA que atualize um preço.** Peça que ela leia a página oficial (o link está na aba) e
-  grave os quatro valores com `upsert_model` (`price_input`, `price_output`, `price_cache_read`,
-  `price_cache_write`). O preço fica como manual. O `get_models` devolve, por modelo, `priceSource`
-  (`builtin`, `manual` ou `null`), `priceCheckedAt` e `priceUrl`.
-- **Regra de conferência a cada versão.** Antes de publicar uma versão, a tabela embutida é conferida
-  nas páginas oficiais e, se mudou, os números e a data (`checkedAt`) em `src/shared/prices.ts` são
-  atualizados. É um item do roteiro de publicação.
-
-#### Preços do Cursor
-
-A referência é a [tabela de preços do Cursor](https://cursor.com/docs/models-and-pricing). O
-`composer-2.5` já vem com preço embutido; os outros modelos da sua conta são mantidos à mão em
-**Modelos de IA** ou pela IA com `upsert_model`.
-
-- **Auto tem preço variável.** O Cursor cobra o preço de lista do modelo para o qual cada pedido foi
-  roteado, então não há tarifa fixa para cadastrar. O modelo `auto` já vem com **Preço variável**
-  ligado: os campos de preço dão lugar a um aviso, e a execução fica sem custo estimado (em branco,
-  nunca um número inventado). A chave existe em todo modelo; pelo MCP, é o `variable_price` do
-  `upsert_model`.
-- **Tarifa do Cursor (Cursor Token Rate).** Nos planos Teams e Enterprise, o Cursor cobra US$ 0,25
-  por milhão de tokens (entrada, saída e cache) por cima do preço dos modelos de terceiros; os
-  modelos do próprio Cursor (Composer e Grok) são isentos. Ligue **Somar a tarifa do Cursor** no
-  cartão do Cursor (pelo MCP, `cursorTokenRate` no `update_rules`) e a estimativa passa a somá-la.
-  Vale para as execuções seguintes: o custo das já registradas não muda.
-- **Modo rápido e contexto longo.** O modo rápido costuma custar 2x e entra como um modelo à parte,
-  com preço próprio (ver **Incluir os modos rápidos** acima). O contexto longo (mais de 256 mil
-  tokens) pode custar 2x, e 3x junto com o modo rápido, mas não é separado: o Cursor só informa o
-  total de tokens da execução, e a estimativa usa a tarifa cadastrada.
-- **Como os nomes se correspondem.** O identificador na ferramenta é o id que `cursor-agent models`
-  lista (`claude-opus-5-5`); o nome é o da linha na tabela de preços; no board o modelo fica como
-  `cursor:claude-opus-5-5`, e cada versão rápida tem o seu (`cursor:claude-opus-5-5-fast`). Com isso
-  a IA consegue ler a tabela e preencher os preços pelo `upsert_model`.
 
 ## Onde ficam os dados
 

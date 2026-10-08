@@ -6,20 +6,23 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
-- **Preços dos modelos já vêm com a extensão (#187).** O catálogo de modelos nasce com o preço por
-  milhão de tokens dos modelos conhecidos do Claude Code, do Codex, do Cursor e do Kimi, lido das
-  páginas oficiais, com a fonte e a data da conferência ("embutido · conferido em … · fonte" na aba
-  **Modelos de IA**). Qualquer preço digitado, pela aba ou pelo `upsert_model`, vira **manual** e
-  nunca é sobrescrito; ao abrir o board depois de atualizar a extensão, só os preços embutidos mudam
-  e os modelos sem preço que ganharam tabela são preenchidos. A aba avisa quando um preço embutido
-  foi conferido há mais de 60 dias (com o link "conferir agora") e quando um modelo vai ficar sem
-  custo por falta dos quatro preços (com o botão **Preencher**); cada cartão de ferramenta tem o link
-  **Preços de <ferramenta>**. Os modelos do GitHub Copilot nascem com **Preço variável** ligado
-  (cobrança por pedido premium, não por token). No MCP, `get_models` devolve `priceSource`,
-  `priceCheckedAt` e `priceUrl`, e `upsert_model` ganhou `reset_price`. **Mudança de
-  comportamento:** apagar os quatro campos de um modelo com preço embutido volta ao embutido, em vez
-  de deixar o modelo sem preço (o botão **Voltar ao preço embutido** faz o mesmo). A tabela é
-  conferida a cada versão publicada; o README explica a regra.
+- **O custo das execuções é o que a ferramenta informa; a tabela de preços saiu (#187).** Um valor
+  calculado a partir de preços cadastrados envelhece quando o fornecedor muda a tarifa e deixa o
+  relatório errado sem avisar, então o board deixou de calcular custo. O Claude Code grava o
+  `total_cost_usd` que a própria CLI informa, mais os quatro contadores de tokens; o Cursor grava os
+  tokens e fica sem custo (a CLI não informa); Codex, Kimi e GitHub Copilot rodam, mas ficam sem
+  medição por enquanto. Saem a tabela embutida, a coluna de preço da aba **Modelos de IA**, o
+  **Preço variável**, os campos `price_*`, `reset_price` e `variable_price` do `upsert_model`, a
+  origem do preço no `get_models` e a regra **Cursor Token Rate** (`cursorTokenRate` no
+  `update_rules`). Catálogos gravados antes perdem os campos de preço ao abrir o board. As execuções
+  antigas continuam nas Métricas, marcadas como "estimado por tabela de preços". O `get_metrics`
+  passa a chamar a coluna de **custo** (informado pela ferramenta), sem "estimado".
+- **Toda chamada à IA passa por uma única porta (#187).** O executor de cards (manual, heartbeat e
+  modo autônomo) e o chat repetiam o registro de uso, e o registro era opcional. Agora ambos pedem a
+  execução a um `AiGateway`, que abre a linha em `ai_runs` antes de rodar, confere a permissão, cuida
+  de interrupção e tempo limite e grava desfecho e consumo; cada ferramenta tem um provider próprio
+  (comando e leitor da saída). Um teste cobre as quatro origens e falha se algum arquivo fora do
+  gateway chamar a IA ou escrever no log. Em consequência, o log de uso não é mais opcional.
 - **Configurações do Faz AI no Settings do editor.** Em `Ctrl+,`, buscar "Faz AI" mostra a categoria
   do Faz AI com as seções Instalação, Aparência, Git e Backup, nessa ordem. Instalação tem o link
   **Abrir o Diagnóstico do ambiente**; Aparência já traz o **Idioma** (`fazai.appearance.language`);

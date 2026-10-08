@@ -7,21 +7,23 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
-- **Model prices now ship with the extension (#187).** The model catalog starts with the price per
-  million tokens of the known Claude Code, Codex, Cursor and Kimi models, read from the official
-  pages, with the source and the check date ("embutido · conferido em … · fonte", built-in · checked
-  on · source, on the **Modelos de IA** tab). Any price you type, on the tab or through
-  `upsert_model`, becomes **manual** and is never overwritten; when the board opens after an
-  extension update, only built-in prices change and models without a price that gained a table
-  entry are filled in. The tab warns when a built-in price was checked more than 60 days ago (with
-  the "conferir agora" link) and when a model will have no cost for lack of the four prices (with the
-  **Preencher** button); each tool card has the **Preços de <tool>** link. GitHub Copilot models
-  start with **Preço variável** (variable price) on (billing per premium request, not per token).
-  Through MCP, `get_models` returns `priceSource`, `priceCheckedAt` and `priceUrl`, and
-  `upsert_model` gained `reset_price`. **Behavior change:** clearing the four fields of a model with
-  a built-in price goes back to the built-in one instead of leaving the model without a price (the
-  **Voltar ao preço embutido** button does the same). The table is checked on every published
-  version; the README explains the rule.
+- **A run's cost is what the tool reports; the price table is gone (#187).** A value computed from
+  entered prices goes stale when the vendor changes its rates and makes the report wrong without any
+  warning, so the board no longer calculates cost. Claude Code stores the `total_cost_usd` the CLI
+  itself reports, plus the four token counters; Cursor stores the tokens and has no cost (the CLI does
+  not report it); Codex, Kimi and GitHub Copilot still run but are not measured for now. Gone are the
+  built-in table, the price column of the **Modelos de IA** tab, **Preço variável** (variable price),
+  the `price_*`, `reset_price` and `variable_price` fields of `upsert_model`, the price origin in
+  `get_models` and the **Cursor Token Rate** rule (`cursorTokenRate` in `update_rules`). Catalogs saved
+  before lose their price fields when the board opens. Older runs stay in Métricas, marked "estimado
+  por tabela de preços" (estimated from a price table). `get_metrics` now calls the column **cost**
+  (reported by the tool), without "estimated".
+- **Every call to the AI goes through a single door (#187).** The card runner (manual, heartbeat and
+  autonomous mode) and the chat each repeated the usage record, and the record was optional. Both now
+  ask an `AiGateway` for the run, which opens the `ai_runs` row before running, checks the permission,
+  handles stop and timeout and stores outcome and consumption; each tool has its own provider
+  (command and output reader). A test covers the four origins and fails if any file outside the
+  gateway calls the AI or writes to the log. As a result, the usage log is no longer optional.
 - **Faz AI settings in the editor Settings.** In `Ctrl+,`, searching "Faz AI" shows the Faz AI
   category with the sections Installation, Appearance, Git and Backup, in that order. Installation has
   the **Open the Environment Diagnostics** link; Appearance already brings **Language**
