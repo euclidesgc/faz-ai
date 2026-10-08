@@ -970,6 +970,25 @@ describe('status do card e checkpoint de revisão', () => {
     expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
   });
 
+  it('a skill do fluxo que já estava no disco, sem marcação, fica marcada em todo contexto ao "instalar" de novo', async () => {
+    // a skill foi instalada antes de a marcação existir (ou a pessoa a desmarcou): o Diagnóstico avisa, e o
+    // botão de instalar precisa resolver o aviso sem sobrescrever o arquivo
+    const dirOf = path.join(dir, 'home-do-usuario', '.claude', 'skills', 'faz-ai-fluxo');
+    fs.mkdirSync(dirOf, { recursive: true });
+    fs.writeFileSync(path.join(dirOf, 'SKILL.md'), '---\nname: faz-ai-fluxo\ndescription: minha versão\n---\nmeu texto');
+    router.refreshHarness();
+    const usage = async () =>
+      (await call('get_harness', { onlySelected: false })).data.inventory.find((i: any) => i.kind === 'skill' && i.name === 'faz-ai-fluxo')
+        ?.usage;
+    expect(await usage()).toBeNull();
+    expect((await call('install_flow_skill')).data).toMatchObject({
+      installed: false,
+      note: expect.stringContaining('marcada em todo contexto'),
+    });
+    expect(await usage()).toBe('always');
+    expect(fs.readFileSync(path.join(dirOf, 'SKILL.md'), 'utf8')).toContain('meu texto');
+  });
+
   it('pergunta, bloqueio e colunas configuráveis', async () => {
     await call('create_card', { title: 'Login', column: 'Implementação' });
     expect((await call('ask_question', { card: 1, question: 'Qual provedor de login?' })).data.card.work).toMatchObject({

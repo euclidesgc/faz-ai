@@ -341,22 +341,31 @@ export const harnessHandlers = {
     if (created.length) ctx.harness.markSeededPublic();
     return true;
   },
-  // sem `replace`, não sobrescreve: se a pessoa já ajustou a skill, a versão dela fica
+  // sem `replace`, não sobrescreve: se a pessoa já ajustou a skill, a versão dela fica. Mas a marcação
+  // entra de qualquer jeito: uma skill que já estava no disco antes da marcação existir (ou que a
+  // pessoa desmarcou) é "instalar" de novo que a põe em todo contexto
   'harness.flowSkill.install': (msg, ctx) => {
-    const file = flowSkillFile(ctx, msg.tool ?? ctx.state().board.aiTool, msg.scope ?? 'user');
-    if (fs.existsSync(file) && !msg.replace) return false;
-    const changed = ctx.harness.change(() => {
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, skillTemplate(FLOW_SKILL.name, FLOW_SKILL.description, FLOW_SKILL.body));
-    });
+    const tool = msg.tool ?? ctx.state().board.aiTool;
+    const scope = msg.scope ?? 'user';
+    const file = flowSkillFile(ctx, tool, scope);
+    const written =
+      fs.existsSync(file) && !msg.replace
+        ? false
+        : ctx.harness.change(() => {
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            fs.writeFileSync(file, skillTemplate(FLOW_SKILL.name, FLOW_SKILL.description, FLOW_SKILL.body));
+          });
     // a skill do fluxo só serve marcada em todo contexto: as execuções do board não carregam nada por conta própria
+    ctx.harness.load();
     const item = ctx.harness.current.inventory
-      .find((t) => t.tool === (msg.tool ?? ctx.state().board.aiTool))
-      ?.items.find((i) => i.kind === 'skill' && i.scope === (msg.scope ?? 'user') && i.name === FLOW_SKILL.name);
-    if (item) {
+      .find((t) => t.tool === tool)
+      ?.items.find((i) => i.kind === 'skill' && i.scope === scope && i.name === FLOW_SKILL.name);
+    const marked =
+      !!item && !ctx.state().harnessSelection.some((x) => x.kind === 'skill' && x.location === item.location && x.usage === 'always');
+    if (item && marked) {
       ctx.boards.setSelection(ctx.boardId, [{ kind: 'skill', location: item.location }], 'always');
       ctx.harness.load();
     }
-    return changed || !!item;
+    return written || marked;
   },
 } satisfies Partial<HandlerMap>;
