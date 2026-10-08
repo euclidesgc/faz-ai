@@ -14,7 +14,7 @@ import { createRunLog } from '../src/extension/log/runLog';
 import { gatewayFor } from './helpers/gateway';
 import { executionPlan } from '../src/extension/execution';
 import { monthOf, type RunReport } from '../src/shared/log';
-import { modelValue } from '../src/shared/models';
+import { TYPE_CONDITION, modelValue } from '../src/shared/models';
 import type { Database } from 'sql.js';
 
 it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
@@ -1067,6 +1067,114 @@ describe('log das execuções de IA', () => {
       expect(only()).toMatchObject({ outcome: 'timeout', measure: 'partial' });
       expect(card().statusReason).toContain('tempo limite');
     });
+  });
+});
+
+/**
+ * Retentativa com o modelo reserva da regra de sugestão quando o modelo principal esgota o limite de
+ * uso do plano (história #257). O leitor do Claude Code (`claude.ts`) só liga `usageLimitReached` com
+ * um `result` de erro cujo texto bate com os termos conhecidos de limite esgotado (ver
+ * `USAGE_LIMIT_TEXT`); é assim que estes testes simulam o esgotamento, sem depender de um exemplo real.
+ */
+describe('reserva de modelo quando o limite esgota (história #257)', () => {
+  const sonnet = () => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'sonnet')!;
+  const fable = () => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'fable')!;
+  const modeloField = () => router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
+  const setModelo = (value: string) => router.handle({ type: 'field.setValue', cardId: storyId, fieldId: modeloField().id, value });
+  const useSonnetMedium = () => setModelo(modelValue(sonnet().id, 'medium'));
+  const ruleWithFallback = (fallback: string | null) =>
+    router.handle({
+      type: 'settings.modelRules.set',
+      rules: [
+        {
+          id: 'r1',
+          name: 'Regra',
+          enabled: true,
+          groups: [[{ fieldId: TYPE_CONDITION, op: 'is', value: 'História' }]],
+          model: modelValue(sonnet().id, 'medium'),
+          fallback,
+        },
+      ],
+    });
+  // uma linha `result` que o leitor do Claude Code reconhece como limite de uso esgotado (RF-03: só este sinal estrutural liga a flag)
+  const usageLimitResult = () => JSON.stringify({ type: 'result', is_error: true, result: 'usage limit reached' });
+
+  it('regra com reserva + limite esgotado: segunda chamada ao gateway com o modelo reserva, comentário na conversa, sem bloqueio', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    runner.start(storyId);
+    expect(procs).toHaveLength(1);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+
+    expect(procs).toHaveLength(2);
+    const args = procs[1]!.command.args;
+    expect(args[args.indexOf('--model') + 1]).toBe('fable');
+    expect(args[args.indexOf('--effort') + 1]).toBe('low');
+    expect(card().status).toBe('running'); // não bloqueou nem esperou resposta: a reserva está em curso
+    expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+    expect(lastMessage()!.body).toBe('O `Sonnet 5.5 - médio` esgotou o limite; a execução segue com `Fable 5.1 - baixo`.');
+
+    // a retentativa termina bem: segue como qualquer execução normal (aqui, a IA só respondeu na conversa)
+    ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+    procs[1]!.exit(0);
+    expect(card().status).toBe('waiting_answer');
+  });
+
+  it('a reserva também esgota o limite (ou falha por qualquer motivo): bloqueio final, sem uma terceira tentativa', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(2);
+
+    procs[1]!.emit(usageLimitResult());
+    procs[1]!.exit(1);
+    expect(procs).toHaveLength(2); // nenhuma terceira chamada: a retentativa não recebe fallbackPending
+    expect(card().status).toBe('blocked');
+  });
+
+  it('card sem reserva (regra sem fallback) + limite esgotado: bloqueio imediato, sem segunda chamada', () => {
+    useSonnetMedium();
+    ruleWithFallback(null);
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('blocked');
+  });
+
+  it('modelo escolhido à mão sem bater com a regra + limite esgotado: bloqueio imediato, sem segunda chamada', () => {
+    // a regra sugeriria sonnet@medium, mas o campo Modelo do card foi trocado à mão para fable@high
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    setModelo(modelValue(fable().id, 'high'));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('blocked');
+  });
+
+  it('falha comum (sem limite esgotado), mesmo com reserva disponível: bloqueio imediato, sem segunda chamada', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    runner.start(storyId);
+    procs[0]!.exit(2); // erro comum, sem nenhum evento de limite esgotado: a reserva não mascara outros erros
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('blocked');
+  });
+
+  it('modo autônomo (YOLO): a retentativa não deixa o card "waiting_answer" nem "blocked" só por causa da troca — a fila segue', () => {
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+
+    expect(procs).toHaveLength(2);
+    expect(card().status).toBe('running');
   });
 });
 
