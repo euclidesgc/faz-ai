@@ -32,6 +32,17 @@ import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool } from '../../sha
 export class BoardRepo {
   constructor(private db: Database) {}
 
+  /** Lê um valor da tabela meta (chave/valor livre), ou undefined se não existir. */
+  getMeta(key: string): string | undefined {
+    const row = one(this.db, 'SELECT value FROM meta WHERE key = ?', [key]);
+    return row ? str(row.value) : undefined;
+  }
+
+  /** Grava um valor na tabela meta, substituindo o existente. */
+  setMeta(key: string, value: string): void {
+    run(this.db, 'INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', [key, value]);
+  }
+
   /** Devolve o board do workspace, criando com seed se não existir. */
   getOrCreate(workspaceKey: string, name: string): Board {
     let row = one(this.db, 'SELECT * FROM boards WHERE workspace_key = ?', [workspaceKey]);

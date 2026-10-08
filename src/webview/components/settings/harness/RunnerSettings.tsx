@@ -2,7 +2,8 @@ import { Button, Callout, Card, Text } from '@radix-ui/themes';
 import { HEARTBEAT_RANGE, PARALLEL_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE } from '../../../../shared/runner';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { useBoardStore } from '../../../store/boardStore';
-import { ai, settings } from '../../../commands';
+import { ai, settings, ui } from '../../../commands';
+import { isWeb } from '../../../vscode';
 import { FormField, IconWarning, NumberField, SelectField, SwitchField } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
 import { t } from '../../../i18n';
@@ -132,38 +133,52 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
             )}
           </FormField>
           <div className="form-divider" />
-          <SwitchField
-            label={t('Tocar histórias em paralelo')}
-            checked={worktree && runner.parallel}
-            disabled={!worktree}
-            onChange={(parallel) => settings.updateBoard({ runner: { parallel } })}
-          />
-          <Text as="p" size="1" color="gray">
-            {worktree
-              ? t(
-                  'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas. As sub-tarefas independentes de cada história já rodam em paralelo, sem limite, conforme o plano.',
-                )
-              : t(
-                  'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.',
-                )}
-          </Text>
-          {worktree && runner.parallel && (
-            <FormField label={t('Histórias ao mesmo tempo')}>
-              {(id) => (
-                <div className="unit-field">
-                  <NumberField
-                    id={id}
-                    min={PARALLEL_RANGE.min}
-                    max={PARALLEL_RANGE.max}
-                    value={runner.parallelStories}
-                    onCommit={(parallelStories) => settings.updateBoard({ runner: { parallelStories } })}
-                  />
-                  <Text size="2" color="gray">
-                    {t('histórias')}
-                  </Text>
-                </div>
+          {isWeb && (
+            <>
+              <SwitchField
+                label={t('Tocar histórias em paralelo')}
+                checked={worktree && runner.parallel}
+                disabled={!worktree}
+                onChange={(parallel) => settings.updateBoard({ runner: { parallel } })}
+              />
+              <Text as="p" size="1" color="gray">
+                {worktree
+                  ? t(
+                      'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas. As sub-tarefas independentes de cada história já rodam em paralelo, sem limite, conforme o plano.',
+                    )
+                  : t(
+                      'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.',
+                    )}
+              </Text>
+              {worktree && runner.parallel && (
+                <FormField label={t('Histórias ao mesmo tempo')}>
+                  {(id) => (
+                    <div className="unit-field">
+                      <NumberField
+                        id={id}
+                        min={PARALLEL_RANGE.min}
+                        max={PARALLEL_RANGE.max}
+                        value={runner.parallelStories}
+                        onCommit={(parallelStories) => settings.updateBoard({ runner: { parallelStories } })}
+                      />
+                      <Text size="2" color="gray">
+                        {t('histórias')}
+                      </Text>
+                    </div>
+                  )}
+                </FormField>
               )}
-            </FormField>
+            </>
+          )}
+          {!isWeb && (
+            <>
+              <Text as="p" size="1" color="gray">
+                {t('Tocar histórias em paralelo agora fica no Settings do editor, em Faz AI › Git.')}
+              </Text>
+              <Button variant="soft" onClick={() => ui.openIdeSettings('fazai.git.parallel')}>
+                {t('Abrir no Settings do editor')}
+              </Button>
+            </>
           )}
         </Card>
       )}

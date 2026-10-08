@@ -7,6 +7,18 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Git and parallel move from the board to the editor Settings.** The nine Git keys
+  (`fazai.git.mode`, `branchPattern`, `worktreeDir`, `parallel`, `parallelStories`, `autoMerge`,
+  `mergeMethod`, `watchMerges`, `watchMergeMinutes`) now live in `Ctrl+,` → **Faz AI: Git**, with
+  **Resource** scope: the User value is the default for every project, and Workspace or Folder
+  overrides it only for that project. In the editor, the Git tab and the "Tocar histórias em
+  paralelo" block in the AI harness become a link to these keys; in the browser they stay as
+  editable fields, as before. **Automatic migration:** the first time the board opens after this
+  version, each key that only exists on the board becomes the User default; if the User already had
+  another value, the board's is preserved by writing it to the Workspace (or the Workspace Folder,
+  with multiple folders open) — **this can create a `.vscode/settings.json` in the project**. The
+  board does not touch `.gitignore`: whether that file belongs in the repository is up to whoever
+  uses it.
 - **Summarize the card's conversation.** A new button in the Conversa tab, shown from 2 messages
   on, reads the whole conversation and writes a summary (decisions, notes, pending items) as a new
   AI message, without automatically deleting anything. The summary is reviewed like any other

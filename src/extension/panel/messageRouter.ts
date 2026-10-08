@@ -139,6 +139,16 @@ export class MessageRouter {
     return this.ctx.boardId;
   }
 
+  /** Lê um valor da tabela meta do board (ex.: config do Git da IDE); undefined se não existir. */
+  getMeta(key: string): string | undefined {
+    return this.ctx.boards.getMeta(key);
+  }
+
+  /** Grava um valor na tabela meta do board, substituindo o existente. */
+  setMeta(key: string, value: string): void {
+    this.ctx.boards.setMeta(key, value);
+  }
+
   onDidChange(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);

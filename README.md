@@ -532,10 +532,12 @@ commits na branch da história.
 - A branch é criada quando a IA começa a implementação (ela chama `prepare_workspace`) ou pelo
   botão **Criar branch da história** no card.
 - O card mostra a branch e abre a pasta de trabalho numa janela nova.
-- Em Configurações → **Git** ficam o modo (worktree, branch na própria pasta ou desligado), o
-  padrão do nome da branch, a pasta das worktrees, o merge automático do PR ao aprovar a homologação
-  e a detecção automática de merges, com o arquivamento das histórias já publicadas (ligada por
-  padrão).
+- O modo (worktree, branch na própria pasta ou desligado), o padrão do nome da branch, a pasta das
+  worktrees, **tocar histórias em paralelo**, o merge automático do PR ao aprovar a homologação e a
+  detecção automática de merges, com o arquivamento das histórias já publicadas (ligada por padrão),
+  ficam no Settings do editor, em **Faz AI › Git** (ver [Configurações no Settings do
+  editor](#configurações-no-settings-do-editor)); no navegador seguem na aba Git e no bloco de
+  paralelo do Harness, como antes.
 - Cada worktree é uma cópia de trabalho: as dependências precisam ser instaladas nela.
 
 ### Pull request e merge na Homologação
@@ -545,7 +547,7 @@ verificar com o resultado esperado e o que ficou de fora) na descrição da hist
 abre o pull request com o mesmo roteiro no corpo, registra o endereço no card e pede a sua revisão.
 O card mostra o link do PR.
 
-O merge automático é opcional e começa desligado (Configurações → Git). Com ele ligado, quando você
+O merge automático é opcional e começa desligado (Settings do editor, Faz AI › Git). Com ele ligado, quando você
 aprova uma história que está na última coluna antes da conclusão:
 
 1. o board faz o merge do PR pelo GitHub CLI (`gh`), no tipo configurado (squash, merge ou rebase);
@@ -559,8 +561,8 @@ o merge automático desligado, aprovar só marca o card, e a IA o move para Conc
 ### Detecção automática de merges
 
 O board pode observar o pull request de uma história entregue e detectar quando ele é mergeado,
-concluindo a história automaticamente. A opção nasce ligada (Configurações → Git, **Concluir a
-história quando o pull request for mergeado**). Uma rotina periódica verifica o estado do PR a cada
+concluindo a história automaticamente. A opção nasce ligada (Settings do editor, Faz AI › Git,
+**Concluir a história quando o pull request for mergeado**). Uma rotina periódica verifica o estado do PR a cada
 intervalo configurável (**Verificar a cada (minutos)**, padrão 15, faixa de 5 a 1440). Quando o
 merge é detectado:
 
@@ -596,15 +598,17 @@ não têm o commit do merge guardado, continuam sendo arquivadas por você, com 
 Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
 intervalo, enquanto o editor estiver aberto na pasta do projeto. Em cada rodada ela avança os cards
 aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. No modo
-"Worktree por história", **Tocar histórias em paralelo** (na mesma tela; nasce desligado) faz o heartbeat
+"Worktree por história", **Tocar histórias em paralelo** (Settings do editor, Faz AI › Git; nasce desligado) faz o heartbeat
 tocar várias histórias ao mesmo tempo, cada uma na sua pasta de trabalho: duas por padrão, até seis em
 **Histórias ao mesmo tempo**; o limite conta toda execução em
 andamento, inclusive as chamadas à mão. Fora desse modo, e no modo autônomo (cujas histórias são
-empilhadas), continua uma por vez, e o campo fica desligado. A tela de Git explica o motivo em cada
-modo: com branch na própria pasta, duas histórias ao mesmo tempo trocariam a branch uma debaixo da
-outra e misturariam alterações; com worktree elas ficam isoladas, ao custo de mais uma cópia dos
-arquivos em disco por história (com as dependências instaladas em cada uma) e de mais memória e
-processador enquanto várias sessões de IA, testes e builds rodam juntos.
+empilhadas), continua uma por vez, e o campo fica desligado. A descrição de cada chave de Git no
+Settings explica o motivo em cada modo: com branch na própria pasta, duas histórias ao mesmo tempo
+trocariam a branch uma debaixo da outra e misturariam alterações; com worktree elas ficam isoladas,
+ao custo de mais uma cópia dos arquivos em disco por história (com as dependências instaladas em
+cada uma) e de mais memória e processador enquanto várias sessões de IA, testes e builds rodam
+juntos. No editor a aba Git e o bloco de paralelo do Harness de IA viram um link para o Settings; no
+navegador seguem como campos editáveis, como antes.
 
 - Sem pendência com a IA, nada é executado.
 - A fila da rodada segue a ordem do board: os bugs primeiro; depois a história mais à direita (a
@@ -815,7 +819,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
 | Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; rules, agentes e skills do projeto e do global, com a marcação do que as execuções usam; tudo que cada ferramenta carrega, por escopo (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
-| Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
+| Git | Fica só na aba Git do modo navegador; no editor, aponta para o Settings (Faz AI › Git) |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English; fica no Settings do editor junto com tema, fonte e tamanho); status (nome e cor, na aba Fluxos; aqui só no modo navegador) |
 | Backup | No editor, exportar e importar pela paleta de comandos (`fazai.exportBoard`, `fazai.importBoard`); no modo navegador, pela aba Configurações (ver [Backup do board](#backup-do-board)) |
 
@@ -828,7 +832,7 @@ quatro seções, nesta ordem:
 | --- | --- |
 | Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
 | Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
-| Git | Aviso de que as opções chegam nas próximas versões, com link para a aba Git do board |
+| Git | As nove chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.watchMerges` e `fazai.git.watchMergeMinutes` (acompanhar merges fora do board, de 5 a 1440 minutos). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
 | Backup | Dois links de ação: **Exportar o board agora** e **Importar um board**, que disparam os comandos da paleta |
 
 Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,

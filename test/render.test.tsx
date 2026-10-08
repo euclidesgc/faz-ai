@@ -188,15 +188,8 @@ describe('telas montam sem erro', () => {
     expect(collapsed).toContain('settings-side collapsed');
     expect(collapsed).toContain('aria-label="Harness de IA"');
     useBoardStore.setState({ settingsNavCollapsed: false });
-    for (const text of [
-      'Cada história ganha uma branch e uma pasta de trabalho própria',
-      'Nome da branch',
-      'historia/12-login-com-google',
-      'Pasta das worktrees',
-      'Fazer o merge do PR ao aprovar a homologação',
-      'Tipo de merge',
-    ])
-      expect(html(<GitSettings />)).toContain(text);
+    // no editor (isWeb false em teste), a GitSettings mostra só o aviso e o link para o Settings do editor
+    expect(html(<GitSettings />)).toContain('O Git agora fica no Settings do editor.');
     const settingsHtml = html(<Settings />);
     // no editor (isWeb false em teste), a aba Backup não aparece no Settings do board: os comandos da paleta cuidam disso
     expect(settingsHtml).not.toContain('Backup');

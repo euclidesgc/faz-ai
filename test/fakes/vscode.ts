@@ -14,6 +14,8 @@ export const fake = {
   opened: [] as string[],
   panels: [] as FakePanel[],
   folder: undefined as string | undefined,
+  /** várias pastas (multi-root): quando definido, substitui `folder` no `workspace.workspaceFolders` */
+  folders: undefined as string[] | undefined,
   reset(): void {
     this.commands.clear();
     this.messages.length = 0;
@@ -21,6 +23,7 @@ export const fake = {
     this.panels.length = 0;
     this.answer = undefined;
     this.folder = undefined;
+    this.folders = undefined;
     fakeConfig.reset();
   },
 };
@@ -187,6 +190,7 @@ export const commands = {
 
 export const workspace = {
   get workspaceFolders() {
+    if (fake.folders) return fake.folders.map((f, index) => ({ uri: Uri.file(f), name: path.basename(f), index }));
     return fake.folder ? [{ uri: Uri.file(fake.folder), name: path.basename(fake.folder), index: 0 }] : undefined;
   },
   createFileSystemWatcher: () => ({
@@ -205,11 +209,12 @@ export const workspace = {
         workspaceValue: fakeConfig.values.workspace[full(k)] as T | undefined,
         workspaceFolderValue: fakeConfig.values.folder[full(k)] as T | undefined,
       }),
-      update: (k: string, value: unknown, target = 1) => {
+      // como no VS Code real, o valor só reflete em `get`/`inspect` depois que a promise resolve
+      update: async (k: string, value: unknown, target = 1) => {
         const scope: Scope = target === 3 ? 'folder' : target === 2 ? 'workspace' : 'global';
         fakeConfig.updates.push({ key: full(k), value, target });
+        await Promise.resolve();
         fakeConfig.set(scope, full(k), value);
-        return Promise.resolve();
       },
     };
   },

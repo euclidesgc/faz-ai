@@ -145,6 +145,7 @@ export const settings: Record<string, string> = {
   'Tema e fonte': 'Theme and font',
   'A aparência do board (idioma, tema, fonte e tamanho) agora fica no Settings do editor.':
     'The board appearance (language, theme, font and size) now lives in the editor Settings.',
+  'O Git agora fica no Settings do editor.': 'Git now lives in the editor Settings.',
   Idioma: 'Language',
   'O idioma da interface do board.': 'The language of the board interface.',
   Tema: 'Theme',

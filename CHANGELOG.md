@@ -6,6 +6,17 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Git e paralelo saem do board e vão para o Settings do editor.** As nove chaves de Git
+  (`fazai.git.mode`, `branchPattern`, `worktreeDir`, `parallel`, `parallelStories`, `autoMerge`,
+  `mergeMethod`, `watchMerges`, `watchMergeMinutes`) agora ficam em `Ctrl+,` → **Faz AI: Git**, com
+  escopo **Recurso**: o valor do Usuário é o padrão de todos os projetos, e Workspace ou Folder
+  sobrescreve só no projeto. No editor, a aba Git e o bloco "Tocar histórias em paralelo" do Harness
+  de IA viram um link para essas chaves; no navegador seguem como campos editáveis, como antes.
+  **Migração automática:** na primeira abertura depois desta versão, cada chave que só existe no
+  board vira o padrão do Usuário; se o Usuário já tinha outro valor, o do board é preservado gravando
+  no Workspace (ou no Workspace Folder, com múltiplas pastas abertas) — **isso pode criar um
+  `.vscode/settings.json` no projeto**. O board não altera o `.gitignore`: decidir se esse arquivo
+  entra no repositório fica com quem usa o projeto.
 - **Resumir a conversa do card.** Um botão novo na aba Conversa, a partir de 2 mensagens, lê a
   conversa inteira e grava um resumo (Decisões, Observações, Pendências) como uma mensagem nova da
   IA, sem apagar nada automaticamente. O resumo se revisa como qualquer mensagem: concorde deixando

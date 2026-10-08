@@ -1,8 +1,16 @@
-import { choose, lastSent, posted, seedBoard, sentOf } from './setup';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
+
+// liga o modo navegador antes de o setup montar o mock de `src/webview/vscode` (padrão de appearanceSettingsWeb.test.tsx):
+// no editor (!isWeb, padrão dos testes), "Tocar histórias em paralelo" vira link para o Settings do editor
+// (ver runnerSettingsEditor.test.tsx), igual ao GitSettings.
+vi.hoisted(() => {
+  (globalThis as { __fazaiTestWeb?: boolean }).__fazaiTestWeb = true;
+});
+
+import { choose, lastSent, posted, seedBoard, sentOf } from './setup';
 import { RUNNER_PERMISSIONS } from '../../src/shared/runner';
 import { profileOfAgent } from '../../src/shared/execution';
 import { Dialog } from '../../src/webview/components/Dialog';
