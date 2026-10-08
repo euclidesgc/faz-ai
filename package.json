@@ -338,6 +338,7 @@
     "zustand": "^4.5.4"
   },
   "dependencies": {
-    "dompurify": "^3.4.16"
+    "dompurify": "^3.4.16",
+    "radix-ui": "^1.1.3"
   }
 }
