@@ -349,7 +349,9 @@ Harness de IA → "O que a IA pode fazer" (por padrão, só o board) e o tempo l
 
 O card tem dois botões que chamam a ferramenta do projeto em segundo plano. Não é um chat ao vivo:
 a resposta chega como mensagem na conversa quando a execução termina, e enquanto isso o card fica
-"Em execução" (com um botão **Parar**).
+"Em execução" (com um botão **Parar**). Os botões mostram um hint explicativo (com negrito e tópicos)
+ao passar o mouse ou focar com o teclado; o hint abre por hover e por foco de teclado, fecha com Esc,
+e continua visível mesmo quando o botão está bloqueado.
 
 - **Trabalhar na fase** faz o trabalho da coluna em que o card está, o mesmo que o heartbeat faria:
   em Discovery analisa o problema, em PRD escreve o PRD, em Implementação escreve o código (se a
