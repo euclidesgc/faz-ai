@@ -7,6 +7,7 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Cards can be collapsed to show only the title.** In columns with many cards, you can collapse cards in any of four scopes: a single card (button on the card), all cards in the column (item in the action menu), all cards on the board (button in the filter bar) or just the selected cards (button in the multi-select bar). A collapsed card continues to show the AI's activity LED and the status border so you know what needs your attention without expanding it. The state is remembered between sessions.
 - **Activity bar at the bottom of the board.** An always-visible line, on every view, shows what
   the AI is doing right now: with one run, "IA em #12 (Discovery, há 3 min)"; with several, "IA em
   N cards: #12 Discovery · #15 refinando · …" (full list in the tooltip). Clicking the card
