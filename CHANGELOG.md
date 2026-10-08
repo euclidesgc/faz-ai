@@ -6,6 +6,14 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Backup pela paleta de comandos.** No editor, os comandos `fazai.exportBoard` ("Faz AI: Exportar
+  o board") e `fazai.importBoard` ("Faz AI: Importar um board") na paleta de comandos (`Ctrl+Shift+P`)
+  abrem diálogos nativos de salvamento e abertura de arquivo, funcionam com o board fechado (abrem o
+  banco sob demanda) e mostram notificações com o resultado. A aba "Backup" das Configurações do board
+  deixou de aparecer no editor — continua só no modo navegador. No Settings nativo (`Ctrl+,`), a
+  categoria "Faz AI: Backup" ganhou os links "Exportar o board agora" e "Importar um board" que
+  disparam os comandos. Com múltiplas pastas no workspace, os comandos usam a primeira pasta
+  (limitação conhecida).
 - **A Implementação em modo autônomo parava com o condutor.** A execução de uma história é quem
   faz as sub-tarefas da Implementação, delegando cada uma a um subagente; mas o `condutor-do-board`
   (padrão desde a migração dos perfis) roda só com leitura, e essa restrição ia para a linha de

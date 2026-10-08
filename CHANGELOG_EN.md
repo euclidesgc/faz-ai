@@ -7,6 +7,14 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Backup through the command palette.** In the editor, the commands `fazai.exportBoard` ("Faz AI:
+  Export the board") and `fazai.importBoard` ("Faz AI: Import a board") in the command palette
+  (`Ctrl+Shift+P`) open native save and file picker dialogs, work with the board closed (they open
+  the database on demand) and show notifications with the result. The "Backup" tab of the board's
+  Settings no longer appears in the editor — it stays only in browser mode. In the native Settings
+  (`Ctrl+,`), the "Faz AI: Backup" category now has the links "Export the board now" and "Import a
+  board" that trigger the palette commands. With multiple folders in the workspace, the commands use
+  the first folder (known limitation).
 - **Autonomous Implementação stalled with the conductor.** A story's run is what carries out the
   Implementação subtasks, delegating each one to a subagent; but `condutor-do-board` (the default
   since the profile migration) runs read-only, and that restriction went to the Claude Code command

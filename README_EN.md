@@ -836,7 +836,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
 | Aparência | **Language** (automatic, Português (Brasil) or English; in the editor Settings along with theme, font and size); statuses (name and color, in the Workflows tab; here only in browser mode) |
-| Backup | Export the board to a file and import a file in place of the current board (see [Board backup](#board-backup)) |
+| Backup | In the editor, export and import through the command palette (`fazai.exportBoard`, `fazai.importBoard`); in browser mode, through the Settings tab (see [Board backup](#board-backup)) |
 
 ### Settings in the editor Settings
 
@@ -848,7 +848,7 @@ four sections, in this order:
 | Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
 | Appearance | **Language** (`fazai.appearance.language`), **Theme** (`fazai.appearance.theme`), **Font** (`fazai.appearance.font`) and **Size** (`fazai.appearance.fontSize`), all with User scope — apply to all this person's projects. Statuses (name and color of each status) stay on the board, now in the Workflows tab |
 | Git | A note that the options arrive in the next versions, with a link to the board's Git tab |
-| Backup | A note that export and import become editor commands in the next versions, with a link to the board's Backup tab |
+| Backup | Two action links: **Export the board now** and **Import a board**, which trigger the palette commands |
 
 Three new commands in the palette (`Ctrl+Shift+P`): **Faz AI: Open the Environment Diagnostics**,
 **Faz AI: Open the Faz AI settings in the editor Settings** (the Settings already filtered on Faz AI)
@@ -899,28 +899,47 @@ time: the last one to save wins (the extension warns when that happens).
 
 ### Board backup
 
-To take the board to another machine or keep a copy, use **Configurações → Backup** (Settings →
-Backup):
+To take the board to another machine or keep a copy:
 
-- **Exportar board** (export board) creates a `<board name>-<date>.fazai.json` file with
-  everything on the board: columns, types, fields, rules, models, agents, cards (including archived
-  and trashed ones), conversations, checklists, links, history and the embedded attachments. Only
-  the current folder's board goes into the file. It contains the conversations and attachments:
-  keep it safe.
-- **Importar de um arquivo…** (import from a file) shows a summary (name, cards, attachments, size,
-  version) and, after confirmation, writes a copy of the database (`<file>.bak`, next to it),
-  moves the current board's attachments to a backup folder (`<attachments>.bak-<date>`), deletes the
-  current board and replaces it with the one from the file, keeping the card numbers. The imported
-  board becomes this folder's board. Nothing changes in the database if the file is invalid or
-  something fails midway. The confirmation says the attachments went to backup. An import file with a
-  card id or attachment name containing a path (`../`) is refused.
+**In the editor (VS Code or Cursor):** use the command palette (`Ctrl+Shift+P`):
 
-A file exported by an earlier version of the extension is upgraded on import; a file from a newer
-version is refused with the required version. Importing while the AI is running on a card is not
-allowed: wait for the run to finish. In the browser the flow is the same, with the download and the
-file picker handled by the page itself. Known limits: the monthly consolidated log history does not
-go into the file, and the stories' branches and working folders are imported as they were on the
-source machine (recreate the folder from the card's button).
+- **Faz AI: Export the board** opens the native save dialog with the suggested name in the pattern
+  `<board name>-<date>.fazai.json`. It creates a file with everything on the board: columns, types,
+  fields, rules, models, agents, cards (including archived and trashed ones), conversations,
+  checklists, links, history and the embedded attachments. Only the current folder's board goes into
+  the file. It contains the conversations and attachments: keep it safe. When done, the extension
+  shows the "Board exported in …" notification with an **Open folder** button.
+- **Faz AI: Import a board** opens the native file picker. Once you choose a file, it shows a summary
+  modal (board name, number of cards and attachments, size, version) with a warning that the current
+  board will be replaced and a backup copy (`.bak`) will be made first. On confirmation, it replaces
+  the board and shows a notification with the import result.
+
+The commands work with the board closed (without the panel open): they open the database for the
+current workspace folder on demand. In a workspace with multiple folders, the commands use the first
+folder (same limitation that already exists in the extension); there is no folder selector.
+
+**In browser mode** (running `~/.faz-ai/bin/faz-ai` in the terminal): use **Configurações →
+Backup** (Settings → Backup):
+
+- **Exportar board** (export board) creates a `.fazai.json` file on your computer (download).
+- **Importar de um arquivo…** (import from a file) opens the native file picker of the page.
+
+**In both modes,** the imported file:
+
+- Shows a summary (name, cards, attachments, size, version) and, after confirmation, writes a copy
+  of the database (`<file>.bak`, next to it or in the data folder), moves the current board's
+  attachments to a backup folder (`<attachments>.bak-<date>`), deletes the current board and
+  replaces it with the one from the file, keeping the card numbers. The imported board becomes this
+  folder's board. Nothing changes in the database if the file is invalid or something fails midway.
+  The confirmation says the attachments went to backup.
+- A file exported by an earlier version of the extension is upgraded on import; a file from a newer
+  version is refused with the required version. Importing while the AI is running on a card is not
+  allowed: wait for the run to finish. An import file with a card id or attachment name containing a
+  path (`../`) is refused.
+
+Known limits: the monthly consolidated log history does not go into the file, and the stories'
+branches and working folders are imported as they were on the source machine (recreate the folder
+from the card's button).
 
 ## Development
 
