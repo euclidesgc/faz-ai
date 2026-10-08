@@ -152,9 +152,18 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
 
       <FormField
         label={t('Reserva (opcional)')}
-        hint={rule.fallback ? modelDisplay(state.board.modelCatalog, rule.fallback, true) : t('Sem reserva: se o modelo principal esgotar o limite, a execução não é repetida.')}
+        hint={
+          rule.fallback
+            ? modelDisplay(state.board.modelCatalog, rule.fallback, true)
+            : t('Sem reserva: se o modelo principal esgotar o limite, a execução não é repetida.')
+        }
       >
-        {() => <ModelEditor value={rule.fallback ?? null} onChange={(v) => setRule({ ...rule, fallback: typeof v === 'string' && v ? v : null })} />}
+        {() => (
+          <ModelEditor
+            value={rule.fallback ?? null}
+            onChange={(v) => setRule({ ...rule, fallback: typeof v === 'string' && v ? v : null })}
+          />
+        )}
       </FormField>
 
       <div className="form-actions">
