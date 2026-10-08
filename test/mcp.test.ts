@@ -644,6 +644,31 @@ describe('regras de modelo com E e OU', () => {
     );
   });
 
+  it('aceita um modelo reserva por regra; sem reserva fica igual a antes da história', async () => {
+    const res = await call('set_model_rules', {
+      rules: [
+        { name: 'Com reserva', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku', fallback: 'opus high' },
+        { name: 'Sem reserva', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus low' },
+      ],
+    });
+    expect(res.data.rules[0]).toMatchObject({
+      name: 'Com reserva',
+      value: 'claude:haiku',
+      fallbackSuggest: expect.stringContaining('Opus'),
+      fallbackValue: 'claude:opus@high',
+    });
+    expect(res.data.rules[1]).not.toHaveProperty('fallbackValue');
+    expect(res.data.rules[1]).not.toHaveProperty('fallbackSuggest');
+
+    const rules = router.snapshot().board.modelRules;
+    expect(rules[0]?.fallback).toBe('claude:opus@high');
+    expect(rules[1]?.fallback).toBe(null);
+
+    const fromGet = (await call('get_models')).data.rules;
+    expect(fromGet[0]).toMatchObject({ fallbackValue: 'claude:opus@high' });
+    expect(fromGet[1]).not.toHaveProperty('fallbackValue');
+  });
+
   it('com o preenchimento automático desligado, só sugere', async () => {
     await call('update_rules', { autoApplyModelSuggestion: false });
     const card = (await call('create_card', { title: 'x', fields: { Esforço: 'Alto' } })).data;

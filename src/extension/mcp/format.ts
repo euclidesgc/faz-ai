@@ -206,6 +206,7 @@ export function modelsOverview(s: BoardState) {
       when: describeRule(s, r),
       suggest: modelLabel(s.board.modelCatalog, r.model, true),
       value: r.model,
+      ...(r.fallback ? { fallbackSuggest: modelLabel(s.board.modelCatalog, r.fallback, true), fallbackValue: r.fallback } : {}),
       enabled: r.enabled,
     })),
     note: 'Num card, o campo de modelo aceita `<value>@<esforço>` (ex.: "claude:opus@high") ou o nome do modelo seguido do esforço.',
