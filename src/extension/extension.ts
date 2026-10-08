@@ -103,8 +103,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         editor: {
           name: editorName,
           startedAt: windowStartedAt,
-          // o mcp.json global do VS Code fica na pasta User do perfil padrão, a mãe do globalStorage
-          userDir: editorName === 'vscode' ? path.dirname(path.dirname(storage)) : undefined,
         },
       });
       const router = host.router;
@@ -315,7 +313,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const watcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(
         wf,
-        '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.codex/**,.cursor/**,.kimi/**,.kimi-code/**,.github/{skills*,agents,instructions,prompts,hooks,copilot}/**,.github/copilot-instructions.md,.github/mcp.json}',
+        '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.cursor/**}',
       ),
     );
     let timer: NodeJS.Timeout | undefined;

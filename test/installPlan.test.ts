@@ -88,7 +88,12 @@ describe('Instalar tudo: o plano', () => {
     const plan = installPlan(
       report([
         { id: 'node', level: 'required', status: 'missing', fix: { kind: 'commands', commands: ['nvm install --lts'] } },
-        { id: 'cli', level: 'required', status: 'missing', fix: { kind: 'commands', commands: ['npm install -g @openai/codex'] } },
+        {
+          id: 'cli',
+          level: 'required',
+          status: 'missing',
+          fix: { kind: 'commands', commands: ['npm install -g @anthropic-ai/claude-code'] },
+        },
       ]),
       'required',
     )!;

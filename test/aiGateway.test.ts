@@ -152,32 +152,34 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
   });
 
   it('a ferramenta que não roda com a permissão pedida não abre processo e fica registrada', () => {
-    // o Kimi, em segundo plano, só roda "sem restrições"
-    expect(() =>
-      gateway().run(
-        call({
-          tool: 'kimi',
-          prepare: () => ({
-            input: { prompt: 'oi', permission: 'board' },
-            config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: false, skills: [], mcp: null },
+    // o Claude Code recusa "Sem restrições" quando roda como root (contêiner, WSL como root)
+    const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
+    try {
+      expect(() =>
+        gateway().run(
+          call({
+            tool: 'claude',
+            prepare: () => ({
+              input: { prompt: 'oi', permission: 'full' },
+              config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: false, skills: [], mcp: null },
+            }),
           }),
-        }),
-      ),
-    ).toThrow(/Kimi/);
+        ),
+      ).toThrow(/root/);
+    } finally {
+      getuid.mockRestore();
+    }
     expect(rows()).toHaveLength(1);
-    expect(rows()[0]).toMatchObject({ tool: 'kimi', outcome: 'unsupported' });
+    expect(rows()[0]).toMatchObject({ tool: 'claude', outcome: 'unsupported' });
     expect(procs).toHaveLength(0);
   });
 });
 
 describe('um provider por ferramenta', () => {
-  it('só o Claude Code (com custo) e o Cursor (só tokens) são medidos; as demais rodam sem medição', () => {
+  it('o Claude Code é medido com custo e o Cursor só com tokens', () => {
     expect(Object.fromEntries(ALL_AI_TOOLS.map((t) => [t, providerFor(t).measure]))).toEqual({
       claude: 'cost',
       cursor: 'tokens',
-      codex: 'none',
-      copilot: 'none',
-      kimi: 'none',
     });
   });
 
@@ -189,15 +191,6 @@ describe('um provider por ferramenta', () => {
       reader.push(JSON.stringify({ type: 'system', subtype: 'init', session_id: 's' }), 'stdout');
       expect(reader.sawEvent, tool).toBe(true);
     }
-  });
-
-  it('a ferramenta sem medição também deixa a linha do log: roda em texto, "não medida", sem número inventado', () => {
-    gateway().run(call({ tool: 'codex' }));
-    procs[0]!.write('feito\n');
-    procs[0]!.exit(0);
-
-    expect(rows()).toHaveLength(1);
-    expect(rows()[0]).toMatchObject({ tool: 'codex', outcome: 'done', measure: 'none', inputTokens: null, costUsd: null });
   });
 });
 

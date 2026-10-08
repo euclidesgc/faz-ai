@@ -54,7 +54,7 @@ export function useTool(ctx: BoardContext, tool: AiTool): void {
 /** Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. */
 function detectModels(ctx: BoardContext, tool: AiTool): void {
   const { board } = ctx.state();
-  const all = modelsFor(tool, ctx.home);
+  const all = modelsFor(tool);
   // as variantes rápidas do Cursor só entram com a regra ligada
   const found = all.filter((o) => board.rules.includeFastModels || !isFastVariant(o, all));
   const ids = new Set(found.map((o) => o.id));
@@ -83,7 +83,7 @@ export function applyFastModels(ctx: BoardContext): void {
  */
 function addFastModels(ctx: BoardContext): void {
   const catalog = [...ctx.state().board.modelCatalog];
-  const all = modelsFor('cursor', ctx.home);
+  const all = modelsFor('cursor');
   for (const o of all) {
     if (!isFastVariant(o, all) || catalog.some((x) => x.id === o.id)) continue;
     const at = catalog.findIndex((x) => x.id === fastBaseId(o));

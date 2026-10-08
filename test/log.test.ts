@@ -356,7 +356,7 @@ describe('AiRunRepo', () => {
       expect(runs.usage(id)).toHaveLength(2);
     });
 
-    it('medição parcial sem consumo (Cursor/Kimi sem bloco de uso) grava o inventário, com tokens nulos', () => {
+    it('medição parcial sem consumo (Cursor sem bloco de uso) grava o inventário, com tokens nulos', () => {
       // o caso central do leitor genérico: ferramentas lidas, nenhum `usage`
       const reader = cursorReader();
       for (const e of [

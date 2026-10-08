@@ -168,7 +168,7 @@ export function cursorReader(): OutputReader {
       const answer = resultTexts.at(-1) ?? saidText.join('\n');
 
       if (tokens) {
-        // nem Cursor nem Kimi informam custo, e o board não o calcula: só os tokens são medidos
+        // o Cursor não informa custo, e o board não o calcula: só os tokens são medidos
         return {
           measure: 'full',
           consumption: {
@@ -184,7 +184,7 @@ export function cursorReader(): OutputReader {
         };
       }
 
-      // O CASO CENTRAL deste leitor, e não a exceção: a documentação de Cursor e Kimi não promete
+      // O CASO CENTRAL deste leitor, e não a exceção: a documentação do Cursor não promete
       // bloco de uso, então ler eventos e montar inventário sem nenhum `usage` é o que normalmente
       // vai acontecer. `measure: 'none'` exigiria jogar fora um inventário verdadeiro só para caber
       // no rótulo mais simples — e a invariante do `RunReport` (em `src/shared/log.ts`) proíbe isso:

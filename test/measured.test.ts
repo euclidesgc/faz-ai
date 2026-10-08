@@ -72,20 +72,8 @@ describe('o comando do modo estruturado, por ferramenta', () => {
     expect(started[0]!.command.format).toBe('cursor-stream-json');
   });
 
-  it('Codex, Kimi e Copilot não são medidos: vão sempre em texto, sem pedir saída estruturada', () => {
-    for (const tool of ['codex', 'kimi', 'copilot'] as const) {
-      const input: HeadlessInput = { ...INPUT, permission: 'full' };
-      const { proc } = run(tool, input);
-      proc.onExit(() => {});
-      const command = started.at(-1)!.command;
-      expect(command.format, tool).toBe('text');
-      expect(command.args, tool).not.toContain('--output-format');
-      expect(command.args, tool).not.toContain('--json');
-    }
-  });
-
   it('sem `structured`, nada muda: os mesmos argumentos de antes e `format: text`', () => {
-    for (const tool of ['claude', 'codex', 'copilot', 'cursor', 'kimi'] as const) {
+    for (const tool of ['claude', 'cursor'] as const) {
       const plain = headlessCommand(tool, INPUT) as HeadlessCommand;
       expect(plain.format).toBe('text');
       expect(plain.args).not.toContain('--output-format');
@@ -93,27 +81,6 @@ describe('o comando do modo estruturado, por ferramenta', () => {
       expect(plain.args).not.toContain('--verbose');
       expect(headlessCommand(tool, { ...INPUT, structured: false })).toEqual(plain);
     }
-  });
-
-  it('o Copilot roda sempre em texto: o modo `-p` dele não tem saída estruturada', () => {
-    const { report } = run('copilot');
-    expect(started).toHaveLength(1);
-    expect(started[0]!.command.format).toBe('text');
-    // nenhum argumento novo: o comando é o mesmo de quem não pediu saída estruturada
-    expect(started[0]!.command.args).toEqual((headlessCommand('copilot', INPUT) as HeadlessCommand).args);
-    started[0]!.exit(0);
-    const r = report();
-    expect(r.measure).toBe('none');
-    expect(r.reason).toContain('não produz saída estruturada');
-    // nenhuma retentativa: não há para onde cair
-    expect(started).toHaveLength(1);
-  });
-
-  it('o motivo do Copilot não afirma que o trabalho deu certo: ele aparece também quando a execução falha', () => {
-    const { proc, report } = run('copilot');
-    proc.onExit(() => {});
-    started[0]!.exit(1);
-    expect(report().reason).not.toContain('normalmente');
   });
 
   it('a chamada aparece no canal com os argumentos, que é onde se confere o modo estruturado', () => {
@@ -168,7 +135,7 @@ describe('a volta para texto, que custa dinheiro se errar', () => {
   });
 
   it('a CLI ignora a saída estruturada e responde em texto, com código 0: a resposta não se perde', () => {
-    const { proc, report } = run('codex');
+    const { proc, report } = run('claude');
     const exits: (number | null)[] = [];
     proc.onExit((code) => exits.push(code));
 
@@ -340,7 +307,7 @@ describe('a leitura do fluxo, do byte ao relatório', () => {
   });
 
   it('no modo texto, o resto sem quebra de linha é o fim da resposta', () => {
-    const { proc, report } = run('copilot');
+    const { proc, report } = run('claude');
     proc.onExit(() => {});
 
     started[0]!.emit('primeira linha\núltima linha sem quebra');

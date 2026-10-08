@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -179,9 +179,15 @@ describe('ChatSession', () => {
   });
 
   it('sem ferramenta que rode em segundo plano nesta permissão, recusa com o motivo', () => {
-    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
-    expect(() => router.chatCommand({ type: 'chat.send', text: 'a', model: null })).toThrow(/Sem restrições/);
-    expect(spawned).toHaveLength(0);
+    // o Claude Code recusa "Sem restrições" quando roda como root (contêiner, WSL como root)
+    const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
+    try {
+      router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude', runner: { permission: 'full' } } });
+      expect(() => router.chatCommand({ type: 'chat.send', text: 'a', model: null })).toThrow(/root/);
+      expect(spawned).toHaveLength(0);
+    } finally {
+      getuid.mockRestore();
+    }
   });
 
   it('o histórico é limitado', () => {
@@ -293,10 +299,15 @@ describe('ChatSession no log das execuções', () => {
   });
 
   it('sem ferramenta que rode nesta permissão, a tentativa fica registrada como unsupported', () => {
-    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
-    expect(() => router.chatCommand({ type: 'chat.send', text: 'a', model: null })).toThrow(/Sem restrições/);
+    const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
+    try {
+      router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude', runner: { permission: 'full' } } });
+      expect(() => router.chatCommand({ type: 'chat.send', text: 'a', model: null })).toThrow(/root/);
+    } finally {
+      getuid.mockRestore();
+    }
     expect(spawned).toHaveLength(0);
-    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'kimi' });
+    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'claude' });
   });
 
   it('RF-15: a execução do chat grava o consumo e o inventário com origem "chat" e sem card', () => {

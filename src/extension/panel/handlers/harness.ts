@@ -224,7 +224,7 @@ export const harnessHandlers = {
   'harness.skill.delete': (msg, ctx) => ctx.harness.op((h) => h.deleteSkill(msg.name)),
   'harness.skill.setMode': (msg, { harness: h }) => {
     const items = msg.paths.map((p) => h.item(msg.tool, 'skill', p));
-    return h.changeEach(items, (item) => h.ops.setSkillMode(msg.tool, item, msg.mode));
+    return h.changeEach(items, (item) => h.ops.setSkillMode(item, msg.mode));
   },
   'harness.agent.create': (msg, ctx) => ctx.harness.op((h) => h.createAgent(msg.name, msg.description, msg.content, msg.model)),
   'harness.agent.write': (msg, ctx) => ctx.harness.op((h) => h.writeAgent(msg.name, msg.content)),

@@ -20,10 +20,7 @@ const splitList = (s: string): string[] =>
 /** De onde vem a lista de modelos de cada ferramenta ao clicar em "Detectar". */
 const SOURCES: Record<AiTool, string> = {
   claude: 'lista embutida na extensão (o Claude Code não guarda a lista em arquivo)',
-  codex: 'lista embutida na extensão (o Codex não guarda a lista em arquivo)',
   cursor: 'lida do comando cursor-agent models, com a conta em uso; sem a CLI autenticada, lista embutida na extensão',
-  kimi: 'lida do config.toml do Kimi nesta máquina, com os esforços de cada modelo',
-  copilot: 'lista embutida na extensão (o GitHub Copilot não guarda a lista em arquivo)',
 };
 
 const EMPTY_DRAFT = { model: '', label: '', efforts: '' };

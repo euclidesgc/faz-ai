@@ -111,9 +111,7 @@ export const harness: Record<string, string> = {
   'Plugins são instalados e removidos pela própria ferramenta, {where}:': 'Plugins are installed and removed by the tool itself, {where}:',
   'no terminal': 'in the terminal',
   'no Cursor (Customize → Plugins) ou numa sessão do agente': 'in Cursor (Customize → Plugins) or in an agent session',
-  'numa sessão do Kimi Code': 'in a Kimi Code session',
   'claude plugin marketplace add <dono/repositorio>': 'claude plugin marketplace add <owner/repository>',
-  'codex plugin marketplace add <dono/repositorio>': 'codex plugin marketplace add <owner/repository>',
   'gh skill search <termo>': 'gh skill search <term>',
   'agent plugin marketplace add <endereço git>': 'agent plugin marketplace add <git URL>',
   '/plugins install <pasta, zip ou endereço do GitHub>': '/plugins install <folder, zip or GitHub URL>',
@@ -121,8 +119,6 @@ export const harness: Record<string, string> = {
     'To use just one skill from a plugin or a repository, use "Find skills to install" in the Skills section, or "Copy to the project" on the plugin skill.',
   'Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.':
     'A hook is a command the tool runs on its own on your computer. Only add commands you know.',
-  'Os hooks do Kimi Code ficam no <code>~/.kimi-code/config.toml</code> (<code>[[hooks]]</code>): aparecem aqui e são editados no arquivo.':
-    'Kimi Code hooks live in <code>~/.kimi-code/config.toml</code> (<code>[[hooks]]</code>): they show up here and are edited in the file.',
   'Os servidores do <code>~/.claude.json</code> aparecem aqui, mas são alterados pelo Claude Code: <code>claude mcp add --scope user …</code> e <code>claude mcp remove …</code>.':
     'The servers in <code>~/.claude.json</code> show up here, but are changed by Claude Code: <code>claude mcp add --scope user …</code> and <code>claude mcp remove …</code>.',
   '{n} skills automáticas: as descrições delas, {chars} caracteres ao todo, entram em toda sessão do {tool}. As demais só são lidas quando indicadas.':
@@ -205,7 +201,6 @@ export const harness: Record<string, string> = {
     '{tool} subagents: each file in <code>{dir}</code> defines a helper with its own instructions, and the tool delegates work to it based on the description.',
   'Um subagente pode fixar o modelo que usa, o que serve para executar um card com o modelo indicado nele.':
     'A subagent can pin the model it uses, which is how a card is run with the model set on it.',
-  'O {tool} não define subagentes em arquivos do projeto.': '{tool} does not define subagents in project files.',
   'Subagente novo': 'New subagent',
   'Descrição (quando delegar)': 'Description (when to delegate)',
   'Revisa uma Spec e aponta lacunas antes do Plan': 'Reviews a Spec and points out gaps before the Plan',
@@ -219,7 +214,6 @@ export const harness: Record<string, string> = {
   Existe: 'Exists',
   'Não existe': 'Does not exist',
   'Lido por: {readBy}': 'Read by: {readBy}',
-  'Codex, Cursor, Kimi Code, GitHub Copilot e outros': 'Codex, Cursor, Kimi Code, GitHub Copilot and others',
   'Cria um CLAUDE.md que só importa o AGENTS.md, para as regras ficarem num arquivo só':
     'Creates a CLAUDE.md that only imports AGENTS.md, so the rules live in a single file',
   'Usar o AGENTS.md': 'Use AGENTS.md',
@@ -259,10 +253,8 @@ export const harness: Record<string, string> = {
   Ferramenta: 'Tool',
   Regras: 'Rules',
   '.mcp.json (projeto)': '.mcp.json (project)',
-  '.codex/config.toml (projeto confiável)': '.codex/config.toml (trusted project)',
-  '.kimi-code/mcp.json (projeto)': '.kimi-code/mcp.json (project)',
-  '.vscode/mcp.json e .mcp.json (projeto)': '.vscode/mcp.json and .mcp.json (project)',
   '.cursor/mcp.json (projeto)': '.cursor/mcp.json (project)',
+  'Cursor e outras ferramentas': 'Cursor and other tools',
 
   // --- RunnerSettings
   'Execução pela conversa e heartbeat': 'Run from chat and heartbeat',

@@ -61,7 +61,7 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    própria ferramenta), abra a pasta do seu projeto e clique no ícone **Faz AI** na barra lateral.
    Cada pasta tem o seu board, já com as fases do fluxo.
 2. **Conecte a IA ao board.** Em **Configurações → Harness de IA**, escolha a ferramenta do projeto
-   (Claude Code, Codex, Cursor, Kimi Code ou GitHub Copilot). Na aba **Tudo que a ferramenta
+   (Claude Code ou Cursor). Na aba **Tudo que a ferramenta
    carrega**, na ferramenta, clique em **Instalar (padrão da ferramenta)** na seção **Servidores
    MCP** e de novo na seção **Skills**, para a skill do fluxo, que ensina a IA a conduzir as fases.
 3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
@@ -116,8 +116,8 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
   gera um documento (Discovery, PRD, Spec, Plan), o modelo desse documento. No Discovery a IA
   analisa o problema e conversa com você antes de qualquer requisito; na Homologação a história só
   é concluída com a sua aprovação.
-- **Trabalhar com a IA no mesmo quadro.** A extensão expõe o board por MCP. Claude Code, Codex,
-  Cursor, Kimi Code, GitHub Copilot ou outro cliente MCP podem consultar e editar tudo o que a interface permite, e
+- **Trabalhar com a IA no mesmo quadro.** A extensão expõe o board por MCP. Claude Code,
+  Cursor ou outro cliente MCP podem consultar e editar tudo o que a interface permite, e
   as mudanças aparecem no board na hora.
 - **Saber com quem está cada card.** Todo card em que a IA atua tem um status (Pronto, Em execução,
   Aguardando resposta, Aguardando revisão, Aprovado, Bloqueado) que mostra se a pendência está com
@@ -223,8 +223,8 @@ o `faz-ai` do terminal avisa e não inicia.
 
 ## Usando com IA
 
-1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Codex,
-   Cursor, Kimi Code ou GitHub Copilot).
+1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code ou
+   Cursor).
 2. Na aba **Tudo que a ferramenta carrega**, escolha a ferramenta e, na seção **Servidores MCP**,
    clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
    global que a ferramenta lê.
@@ -237,13 +237,12 @@ com dois botões:
 
 | | Onde grava | Quando usar |
 |---|---|---|
-| **Instalar (padrão da ferramenta)** | configuração global: `~/.claude.json` (por `claude mcp add --scope user`), `~/.cursor/mcp.json`, `~/.codex/config.toml`, `~/.kimi-code/mcp.json`, `~/.copilot/mcp-config.json`; a skill em `~/.claude/skills`, `~/.cursor/skills` e equivalentes | o recomendado: o board funciona em qualquer repositório aberto com ele, sem nenhum arquivo no projeto |
-| **Instalar neste projeto** | `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.kimi-code/mcp.json` ou `.vscode/mcp.json`; a skill em `.claude/skills`, `.cursor/skills` e equivalentes | fixar uma versão num repositório ou num fork, ou uma skill ajustada para o time |
+| **Instalar (padrão da ferramenta)** | configuração global: `~/.claude.json` (por `claude mcp add --scope user`), `~/.cursor/mcp.json`; a skill em `~/.claude/skills`, `~/.cursor/skills` e equivalentes | o recomendado: o board funciona em qualquer repositório aberto com ele, sem nenhum arquivo no projeto |
+| **Instalar neste projeto** | `.mcp.json` ou `.cursor/mcp.json`; a skill em `.claude/skills`, `.cursor/skills` e equivalentes | fixar uma versão num repositório ou num fork, ou uma skill ajustada para o time |
 
 O registro global não fixa a pasta do projeto: o Claude Code informa a pasta pela variável
-`CLAUDE_PROJECT_DIR`, o `mcp.json` do VS Code recebe `${workspaceFolder}`, e nas outras a ponte do
-board acha o board subindo a partir da pasta em que a ferramenta foi aberta. No GitHub Copilot, o
-global vale para a Copilot CLI e, no VS Code, para o `mcp.json` do perfil do editor.
+`CLAUDE_PROJECT_DIR`, e a ponte do board acha o board subindo a partir da pasta em que a ferramenta
+foi aberta.
 
 **No Cursor não há o que instalar.** O global do Cursor é um processo só para todas as janelas e não
 sabe qual board atender, então o board grava sozinho o `.cursor/mcp.json` do projeto (fora do git,
@@ -359,8 +358,7 @@ a resposta chega como mensagem na conversa quando a execução termina, e enquan
   título e descrição (sem inventar requisito; o que estiver ambíguo vira uma lista "Dúvidas em
   aberto"), revisa Tags, Esforço da atividade, Modelo e Skills mesmo que já tenham valor e
   acrescenta ao checklist os passos que faltam. Não trabalha a fase, não cria sub-tarefas, não move
-  o card e não mexe em arquivos: roda só com o board (no Kimi, que não tem esse nível, o pedido
-  proíbe mexer em arquivos). No fim, resume na conversa o que mudou (com o texto anterior da
+  o card e não mexe em arquivos: roda só com o board. No fim, resume na conversa o que mudou (com o texto anterior da
   descrição, se a reescreveu) e o card volta ao status que tinha, também quando a execução falha:
   a falha fica na conversa, sem bloquear o card. Um refino não conta como execução sem progresso
   para o modo autônomo.
@@ -371,12 +369,11 @@ Imagens coladas na mensagem viram anexos do card e a IA as recebe.
   pela conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em
   uso aparece ao lado do botão, com um atalho para mudar. A IA é avisada do limite: se o trabalho
   pedir mais do que o nível permite, ela bloqueia o card dizendo qual opção escolher.
-- O Kimi Code, quando roda em segundo plano, só funciona no nível "sem restrições". O Cursor aceita
-  os três: em "só o board" e "board e arquivos" a sessão dele recebe só as ferramentas do nível
+- O Cursor aceita os três níveis: em "só o board" e "board e arquivos" a sessão dele recebe só as ferramentas do nível
   (leitura e MCP; leitura, MCP e edição), sem terminal.
 - A ferramenta precisa estar instalada e autenticada. A CLI não precisa estar no PATH: o board a
   procura também nas pastas de instalação usuais e dentro das extensões do editor (quem só usa a
-  extensão do Claude Code ou do Codex já tem o executável). A do Cursor é a `cursor-agent` (o
+  extensão do Claude Code já tem o executável). A do Cursor é a `cursor-agent` (o
   instalador de `curl https://cursor.com/install -fsS | bash` cria também o atalho `agent`); entre na
   conta uma vez com `cursor-agent login`.
 - Com o Claude Code, o servidor do board vai na linha de comando de cada execução: não depende de
@@ -408,7 +405,6 @@ uma), subagentes e skills, com a contagem de chamadas.
   | --- | --- | --- |
   | Claude Code | medidos (entrada, saída, leitura e criação de cache, por modelo, subagente incluído) | o `total_cost_usd` que a própria CLI informa |
   | Cursor | medidos (os quatro contadores) | a CLI não informa: fica em branco |
-  | Codex, Kimi, GitHub Copilot | não medidos por enquanto | em branco |
 
   Onde aparecer "não medido" ou um custo em branco é isso, falta de medição, e nunca consumo zero.
   Uma execução com tokens e sem custo (o caso do Cursor) conta nos tokens e fica de fora do custo;
@@ -497,7 +493,7 @@ economizar tokens.
   (`tool`), modelo (`model`), esforço (`effort`), perfil (`profile`), card (`card`), agente (`agent`),
   skill (`skill`), ferramenta usada (`used_tool`) ou ferramenta de MCP (`mcp_tool`). Omita para obter
   apenas o total do período.
-- `tool` e `used_tool` não são a mesma coisa: `tool` é a ferramenta de IA que rodou (claude, codex);
+- `tool` e `used_tool` não são a mesma coisa: `tool` é a ferramenta de IA que rodou (claude, cursor);
   `used_tool` e `mcp_tool` são o que a execução usou (Read, Bash, `get_card`). Em `mcp_tool` o
   servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe.
 - Filtros de período (data inicial e final, em `AAAA-MM-DD`), card (ex. `72` ou `#72`), e dimensões
@@ -507,7 +503,7 @@ economizar tokens.
   execução). `effort` e `profile` têm tokens e custo.
 - Tokens contam em toda execução medida; o custo vem só das execuções em que a ferramenta o informou (o Claude Code).
 - Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`.
-- Valores não medidos aparecem como "-" (nunca 0), por exemplo as execuções do Copilot e o custo do Cursor.
+- Valores não medidos aparecem como "-" (nunca 0), por exemplo o custo do Cursor.
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm detalhe e só agregam os
   totais já consolidados.
@@ -687,9 +683,6 @@ instrução:
 | Ferramenta | Imposto por parâmetro | Só orientado |
 | --- | --- | --- |
 | Claude Code | subagente, servidores MCP, ferramentas, modelo e esforço, sessão limpa | skills |
-| GitHub Copilot | subagente, servidores MCP, ferramentas, modelo e esforço | skills, sessão limpa |
-| Kimi Code | subagente, modelo | skills, servidores MCP, ferramentas, sessão limpa |
-| Codex | servidores MCP, modelo e esforço | subagente, skills, ferramentas, sessão limpa |
 | Cursor | modelo | todo o resto |
 
 As skills vão sempre pelo caminho do arquivo. Numa conversa aberta por você, o agente chega à IA
@@ -708,7 +701,7 @@ dividida em três escopos:
 
 - **Projeto**: arquivos desta pasta; valem só aqui e vão no repositório. Esse grupo aparece sempre,
   em destaque, e diz quando o projeto não tem nada daquele tipo.
-- **Global**: arquivos da sua pasta de usuário (`~/.claude`, `~/.codex`, `~/.copilot`…); valem em
+- **Global**: arquivos da sua pasta de usuário (`~/.claude`, `~/.cursor`…); valem em
   todos os seus projetos. Toda alteração neles pede confirmação.
 - **Plugins**: vêm de pacotes instalados; não são alterados pelo board, mas podem ser copiados.
 
@@ -799,9 +792,8 @@ fora do editor, o SQLite é a única fonte, e uma gravação feita por ali (pelo
 diferente do padrão (`auto`) grava esse idioma no Settings do Usuário, para o Settings vazio não zerar
 o board; se o Settings já tem um valor explícito, ele vence.
 
-Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração
-local; no Cursor, dos modelos da sua conta, pelo comando `cursor-agent models`, lido ao abrir o board
-com a CLI autenticada, e a primeira lista lida substitui a embutida uma vez só; nas outras, uma lista embutida que pode ser editada). No Cursor, a lista traz uma linha por nível de cada modelo
+Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Cursor, dos modelos da sua conta, pelo comando `cursor-agent models`, lido ao abrir o board
+com a CLI autenticada, e a primeira lista lida substitui a embutida uma vez só; no Claude Code, uma lista embutida que pode ser editada). No Cursor, a lista traz uma linha por nível de cada modelo
 (`claude-opus-5-5-low`, `-medium`, `-high`…); o board junta as variantes num modelo com os níveis
 dele. As versões rápidas (`-fast`, respondem mais depressa e cobram mais pelos mesmos tokens) ficam
 de fora até você ligar **Incluir os modos rápidos** no cartão do Cursor: aí cada uma entra como um

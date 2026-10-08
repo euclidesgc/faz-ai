@@ -6,7 +6,6 @@ import {
   SKILL_NAME_PATTERN,
   aiToolInfo,
   type Agent,
-  type AgentSpec,
   type AiTool,
   type Harness,
   type RuleFile,
@@ -31,31 +30,17 @@ export function skillTemplate(name: string, description: string, body: string): 
   return `---\nname: ${name}\ndescription: ${description.replace(/\r?\n/g, ' ').trim()}\n---\n\n${body.trim()}\n`;
 }
 
-/** Arquivo de um agente no formato da ferramenta: markdown com frontmatter, ou TOML no Codex. */
-export function agentTemplate(spec: AgentSpec, name: string, description: string, body: string, model = ''): string {
+/** Arquivo de um agente: markdown com frontmatter YAML. */
+export function agentTemplate(name: string, description: string, body: string, model = ''): string {
   const oneLine = description.replace(/\r?\n/g, ' ').trim();
-  const withModel = spec.modelField && model.trim() ? model.trim() : '';
-  if (spec.format === 'toml') {
-    // strings JSON são strings básicas válidas em TOML
-    const lines = [
-      `name = ${JSON.stringify(name)}`,
-      `description = ${JSON.stringify(oneLine)}`,
-      ...(withModel ? [`${spec.modelField} = ${JSON.stringify(withModel)}`] : []),
-    ];
-    return `${lines.join('\n')}\ndeveloper_instructions = """\n${body.trim().replace(/"""/g, "'''")}\n"""\n`;
-  }
-  const lines = [`name: ${name}`, `description: ${oneLine}`, ...(withModel ? [`${spec.modelField}: ${withModel}`] : [])];
+  const lines = [`name: ${name}`, `description: ${oneLine}`, ...(model.trim() ? [`model: ${model.trim()}`] : [])];
   return `---\n${lines.join('\n')}\n---\n\n${body.trim()}\n`;
 }
 
-/** `description` e modelo de um arquivo de agente, em qualquer dos dois formatos. */
-function agentMeta(spec: AgentSpec, content: string): { description: string; model: string } {
-  if (spec.format === 'markdown') {
-    const meta = parseFrontmatter(content);
-    return { description: meta.description ?? '', model: (spec.modelField && meta.model) || '' };
-  }
-  const get = (key: string) => new RegExp(`^${key}\\s*=\\s*"((?:[^"\\\\]|\\\\.)*)"`, 'm').exec(content)?.[1]?.replace(/\\(.)/g, '$1') ?? '';
-  return { description: get('description'), model: spec.modelField ? get(spec.modelField) : '' };
+/** `description` e modelo de um arquivo de agente. */
+function agentMeta(content: string): { description: string; model: string } {
+  const meta = parseFrontmatter(content);
+  return { description: meta.description ?? '', model: meta.model ?? '' };
 }
 
 /**
@@ -102,17 +87,15 @@ export class HarnessStore {
     }));
   }
 
-  /** Onde a ferramenta em uso guarda os agentes do projeto; lança erro se ela não tem agentes em arquivo. */
+  /** Onde a ferramenta em uso guarda os agentes do projeto. */
   private get agentSpec() {
-    const info = aiToolInfo(this.tool);
-    if (!info.agents) throw new Error(`O ${info.label} não tem agentes definidos em arquivos do projeto.`);
-    return info.agents;
+    return aiToolInfo(this.tool).agents;
   }
 
   private agents(): Agent[] {
-    const spec = aiToolInfo(this.tool).agents;
-    const base = spec && path.join(this.workspaceDir, spec.dir);
-    if (!spec || !base || !fs.existsSync(base)) return [];
+    const spec = this.agentSpec;
+    const base = path.join(this.workspaceDir, spec.dir);
+    if (!fs.existsSync(base)) return [];
     return fs
       .readdirSync(base)
       .filter(
@@ -121,7 +104,7 @@ export class HarnessStore {
       .map((f) => {
         const rel = `${spec.dir}/${f}`;
         const content = this.read(path.join(this.workspaceDir, rel));
-        return { name: f.slice(0, -spec.ext.length), ...agentMeta(spec, content), path: rel, content };
+        return { name: f.slice(0, -spec.ext.length), ...agentMeta(content), path: rel, content };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -142,10 +125,8 @@ export class HarnessStore {
     const file = this.agentFile(name);
     if (fs.existsSync(file)) throw new Error(`Já existe um agente "${name}".`);
     if (!description.trim()) throw new Error('O agente precisa de uma descrição: é por ela que a IA decide quando delegar a ele.');
-    if (model.trim() && !this.agentSpec.modelField)
-      throw new Error(`O ${aiToolInfo(this.tool).label} não permite fixar o modelo de um agente.`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, agentTemplate(this.agentSpec, name, description, body, model));
+    fs.writeFileSync(file, agentTemplate(name, description, body, model));
   }
 
   /** Substitui o arquivo inteiro do agente (com o frontmatter). */
@@ -190,7 +171,7 @@ export class HarnessStore {
 
   /** Invocação automática ou só quando indicada, gravado no formato da ferramenta em uso. */
   setSkillMode(name: string, mode: SkillMode): void {
-    setSkillMode(this.tool, path.join(this.dirOf(name).dir, 'SKILL.md'), mode);
+    setSkillMode(path.join(this.dirOf(name).dir, 'SKILL.md'), mode);
   }
 
   deleteSkill(name: string): void {

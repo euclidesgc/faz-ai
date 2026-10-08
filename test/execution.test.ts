@@ -34,29 +34,10 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
     expect(command.stdin).toBe('P');
   });
 
-  it('Codex, Copilot, Cursor e Kimi: só o que cada um aceita por parâmetro', () => {
-    const codex = args('codex');
-    expect(has(codex, '--model', 'opus', '-c', 'model_reasoning_effort="high"')).toBe(true);
-    expect(has(codex, '-c', 'mcp_servers.slack.enabled=false', '-c', 'mcp_servers."com.ponto".enabled=false')).toBe(true);
-    expect(codex).not.toContain('planejador');
-    expect(codex.at(-1)).toBe('-');
-
-    const copilot = args('copilot');
-    for (const flag of [
-      '--agent=planejador',
-      '--model=opus',
-      '--effort=high',
-      '--available-tools=Read,Edit',
-      '--excluded-tools=WebFetch',
-      '--disable-mcp-server=slack',
-      '--no-custom-instructions',
-    ])
-      expect(copilot).toContain(flag);
-
+  it('Cursor: só o que ele aceita por parâmetro', () => {
     // o Cursor recebe o esforço como sufixo do id, como `cursor-agent models` lista as variantes
     expect(has(args('cursor'), '--model', 'opus-high')).toBe(true);
     expect(args('cursor')).not.toContain('--agent');
-    expect(has(args('kimi'), '--model', 'opus', '--agent', 'planejador')).toBe(true);
   });
 
   it('sem perfil, o comando é o mesmo de antes', () => {

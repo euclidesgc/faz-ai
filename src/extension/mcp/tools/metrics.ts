@@ -113,7 +113,7 @@ export function registerMetricsTools(tool: DefineTool): void {
     'get_metrics',
     'Uso, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
       'com filtros de período e card. Resposta em tabela compacta; o custo é o que a própria ferramenta informou (só o Claude Code informa; o board não calcula custo por tabela de preços) e os tokens são os medidos; ambos vêm como "-" quando não medidos (nunca 0). ' +
-      '"tool" é a ferramenta de IA que rodou (claude, codex); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"). ' +
+      '"tool" é a ferramenta de IA que rodou (claude, cursor); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"). ' +
       'Nas dimensões "agent", "skill", "used_tool" e "mcp_tool" não há tokens/custo (não é possível repartir o custo de uma execução entre o que ela usou); "effort" e "profile" têm.',
     {
       group_by: z.enum(GROUP_BY).optional().describe('Dimensão de agrupamento; omitido = total do recorte'),
@@ -126,7 +126,7 @@ export function registerMetricsTools(tool: DefineTool): void {
       tool: z
         .string()
         .optional()
-        .describe('Ferramenta de IA (claude, codex...), não a ferramenta usada pela execução (essa é a dimensão used_tool/mcp_tool)'),
+        .describe('Ferramenta de IA (claude, cursor), não a ferramenta usada pela execução (essa é a dimensão used_tool/mcp_tool)'),
       limit: z.number().int().min(1).max(100).optional().describe('Linhas antes de somar o resto em "outros"; padrão 20'),
     },
     (a, router) => {

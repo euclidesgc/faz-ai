@@ -6,7 +6,7 @@ import type { MessageRouter } from '../../panel/messageRouter';
 import { findField, modelsOverview } from '../format';
 import type { DefineTool } from './registry';
 
-const toolArg = z.enum(ALL_AI_TOOLS as [string, ...string[]]).describe('Ferramenta de IA: claude, codex, cursor, kimi ou copilot');
+const toolArg = z.enum(ALL_AI_TOOLS as [string, ...string[]]).describe('Ferramenta de IA: claude ou cursor');
 const models = (router: MessageRouter) => modelsOverview(router.snapshot());
 
 /** Modelos de LLM: catálogo e regras de sugestão de modelo. */
@@ -21,7 +21,7 @@ export function registerModelTools(tool: DefineTool): void {
 
   tool(
     'detect_models',
-    'Relê os modelos de uma ferramenta e os junta ao catálogo. Para o Kimi, lê a lista real do config.toml local; para o Cursor, a última lista de `cursor-agent models` lida pelo board (com a CLI autenticada); para as demais, usa a lista embutida na extensão.',
+    'Relê os modelos de uma ferramenta e os junta ao catálogo. Para o Cursor, a última lista de `cursor-agent models` lida pelo board (com a CLI autenticada); para o Claude Code, usa a lista embutida na extensão.',
     { tool: toolArg.optional().describe('Por padrão, a ferramenta em uso no projeto') },
     (a, router) => {
       router.handle({ type: 'settings.models.detect', tool: (a.tool as AiTool | undefined) ?? router.snapshot().board.aiTool });

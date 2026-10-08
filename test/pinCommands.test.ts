@@ -39,7 +39,7 @@ afterEach(() => {
 
 // o programa existe nesta máquina (achado pelo PATH do terminal), mas não no PATH com que o editor abriu
 const resolve = (c: string) => (fs.existsSync(path.join(bin, c)) ? path.join(bin, c) : null);
-const files = () => editorMcpFiles('cursor', project, home);
+const files = () => editorMcpFiles(project, home);
 const read = () => JSON.parse(fs.readFileSync(path.join(project, '.cursor', 'mcp.json'), 'utf8')).mcpServers;
 
 describe('caminho completo dos MCPs no editor', () => {

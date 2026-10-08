@@ -189,7 +189,7 @@ export class AiRunRepo {
   measure(id: string, report: RunReport): void {
     const c = report.measure === 'none' ? null : report.consumption;
     // o inventário vale sempre que algo foi medido, com ou sem consumo: `partial` sem tokens é o caso
-    // normal de Cursor e Kimi, que não informam uso mas dizem quais ferramentas chamaram
+    // normal do Cursor, que não informa uso mas dizem quais ferramentas chamaram
     const inventory = report.measure === 'none' ? [] : report.inventory;
     transaction(this.db, () => {
       run(

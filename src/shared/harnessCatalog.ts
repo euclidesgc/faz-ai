@@ -4,10 +4,7 @@ import type { AiTool, HarnessKind } from './harness';
  * Onde cada ferramenta guarda o que carrega, no projeto e na pasta do usuário, conforme a
  * documentação de cada uma lida em 2026-10-02:
  * - Claude Code: code.claude.com/docs (memory, skills, sub-agents, hooks-guide, mcp, settings, plugins)
- * - Codex: learn.chatgpt.com/docs (build-skills, agent-configuration, hooks, extend/mcp, plugins, config-file)
  * - Cursor: cursor.com/docs (rules, skills, subagents, hooks, mcp, plugins, cli/reference/configuration)
- * - Kimi Code: kimi.com/code/docs/en/kimi-code-cli (customization/*, configuration/*)
- * - GitHub Copilot: docs.github.com/copilot e code.visualstudio.com/docs/copilot/customization
  *
  * A varredura e a tela são genéricas sobre esta tabela: mudar um caminho é mudar um dado aqui.
  */
@@ -16,7 +13,6 @@ export type HarnessSource = {
   scope: 'project' | 'user';
   path: string;
   /** rótulo de origem para itens que vêm com a ferramenta */ builtin?: string;
-  /** extensão dos arquivos novos, quando difere da que é listada */ createExt?: string;
 } & (
   | { layout: 'file' }
   /** todos os arquivos da pasta (e subpastas) com a extensão */
@@ -27,12 +23,6 @@ export type HarnessSource = {
   | { layout: 'json-keys'; key: string }
   /** servidores MCP no ~/.claude.json: os globais e os gravados para esta pasta de projeto */
   | { layout: 'claude-json' }
-  /** tabelas `[<table>.<nome>]` de um arquivo TOML */
-  | { layout: 'toml-tables'; table: string }
-  /** entradas `[[<table>]]` de um arquivo TOML */
-  | { layout: 'toml-array'; table: string }
-  /** pasta de arquivos JSON, cada um com um objeto `hooks` */
-  | { layout: 'hook-files' }
   /** regras de permissão: as listas (`allow`, `deny`…) do objeto `permissions` de um arquivo JSON */
   | { layout: 'json-permissions'; lists: string[] }
 );
@@ -84,25 +74,6 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
     file('settings', 'user', '.claude/settings.json'),
     files('settings', 'user', '.claude/output-styles', '.md'),
   ],
-  codex: [
-    file('instructions', 'project', 'AGENTS.md'),
-    file('instructions', 'project', 'AGENTS.override.md'),
-    file('instructions', 'user', '.codex/AGENTS.md'),
-    file('instructions', 'user', '.codex/AGENTS.override.md'),
-    ...both('skill', 'skills', [['.agents/skills'], ['.agents/skills', '.codex/skills']]),
-    { kind: 'skill', scope: 'user', layout: 'skills', path: '.codex/skills/.system', builtin: 'Codex (embutidas)' },
-    files('agent', 'project', '.codex/agents', '.toml'),
-    files('agent', 'user', '.codex/agents', '.toml'),
-    files('command', 'user', '.codex/prompts', '.md'),
-    { kind: 'hook', scope: 'project', layout: 'json-keys', path: '.codex/hooks.json', key: 'hooks' },
-    { kind: 'hook', scope: 'user', layout: 'json-keys', path: '.codex/hooks.json', key: 'hooks' },
-    { kind: 'mcp', scope: 'project', layout: 'toml-tables', path: '.codex/config.toml', table: 'mcp_servers' },
-    { kind: 'mcp', scope: 'user', layout: 'toml-tables', path: '.codex/config.toml', table: 'mcp_servers' },
-    file('settings', 'project', '.codex/config.toml'),
-    files('settings', 'project', '.codex/rules', '.rules'),
-    file('settings', 'user', '.codex/config.toml'),
-    files('settings', 'user', '.codex/rules', '.rules'),
-  ],
   cursor: [
     file('instructions', 'project', 'AGENTS.md'),
     files('instructions', 'project', '.cursor/rules', '.mdc'),
@@ -125,49 +96,6 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
     { kind: 'settings', scope: 'project', layout: 'json-permissions', path: '.cursor/cli.json', lists: ['allow', 'deny'] },
     { kind: 'settings', scope: 'user', layout: 'json-permissions', path: '.cursor/cli-config.json', lists: ['allow', 'deny'] },
   ],
-  kimi: [
-    file('instructions', 'project', 'AGENTS.md'),
-    file('instructions', 'project', '.kimi-code/AGENTS.md'),
-    file('instructions', 'user', '.kimi-code/AGENTS.md'),
-    file('instructions', 'user', '.agents/AGENTS.md'),
-    file('instructions', 'user', '.kimi-code/SYSTEM.md'),
-    // .kimi/skills é a pasta da Kimi CLI antiga; o Kimi Code atual lê .kimi-code/skills e .agents/skills
-    ...both('skill', 'skills', [
-      ['.kimi-code/skills', '.agents/skills', '.kimi/skills'],
-      ['.kimi-code/skills', '.agents/skills'],
-    ]),
-    files('agent', 'project', '.kimi-code/agents', '.md'),
-    files('agent', 'project', '.agents/agents', '.md'),
-    files('agent', 'user', '.kimi-code/agents', '.md'),
-    files('agent', 'user', '.agents/agents', '.md'),
-    { kind: 'hook', scope: 'user', layout: 'toml-array', path: '.kimi-code/config.toml', table: 'hooks' },
-    { kind: 'mcp', scope: 'project', layout: 'json-keys', path: '.kimi-code/mcp.json', key: 'mcpServers' },
-    { kind: 'mcp', scope: 'user', layout: 'json-keys', path: '.kimi-code/mcp.json', key: 'mcpServers' },
-    file('settings', 'project', '.kimi-code/local.toml'),
-    file('settings', 'user', '.kimi-code/config.toml'),
-  ],
-  copilot: [
-    file('instructions', 'project', 'AGENTS.md'),
-    file('instructions', 'project', '.github/copilot-instructions.md'),
-    files('instructions', 'project', '.github/instructions', '.instructions.md'),
-    file('instructions', 'user', '.copilot/copilot-instructions.md'),
-    files('instructions', 'user', '.copilot/instructions', '.instructions.md'),
-    ...both('skill', 'skills', [
-      ['.github/skills', '.claude/skills', '.agents/skills'],
-      ['.copilot/skills', '.agents/skills'],
-    ]),
-    { ...files('agent', 'project', '.github/agents', '.md'), createExt: '.agent.md' },
-    { ...files('agent', 'user', '.copilot/agents', '.md'), createExt: '.agent.md' },
-    files('command', 'project', '.github/prompts', '.prompt.md'),
-    { kind: 'hook', scope: 'project', layout: 'hook-files', path: '.github/hooks' },
-    { kind: 'hook', scope: 'user', layout: 'hook-files', path: '.copilot/hooks' },
-    { kind: 'mcp', scope: 'project', layout: 'json-keys', path: '.vscode/mcp.json', key: 'servers' },
-    { kind: 'mcp', scope: 'project', layout: 'json-keys', path: '.mcp.json', key: 'mcpServers' },
-    { kind: 'mcp', scope: 'project', layout: 'json-keys', path: '.github/mcp.json', key: 'mcpServers' },
-    { kind: 'mcp', scope: 'user', layout: 'json-keys', path: '.copilot/mcp-config.json', key: 'mcpServers' },
-    file('settings', 'project', '.github/copilot/settings.json'),
-    file('settings', 'user', '.copilot/settings.json'),
-  ],
 };
 
 /**
@@ -176,15 +104,7 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
  */
 export const PLUGIN_ROOTS: Record<AiTool, { path: string; manifests: string[] }[]> = {
   claude: [{ path: '.claude/plugins', manifests: ['.claude-plugin/plugin.json'] }],
-  codex: [{ path: '.codex/plugins/cache', manifests: ['plugin.json', '.codex-plugin/plugin.json'] }],
   cursor: [{ path: '.cursor/plugins/local', manifests: ['.cursor-plugin/plugin.json', 'plugin.json'] }],
-  kimi: [{ path: '.kimi-code/plugins/managed', manifests: ['kimi.plugin.json', '.kimi-plugin/plugin.json'] }],
-  copilot: [
-    {
-      path: '.copilot/installed-plugins',
-      manifests: ['plugin.json', '.plugin/plugin.json', '.claude-plugin/plugin.json', '.github/plugin/plugin.json'],
-    },
-  ],
 };
 
 /** Um lugar onde o board pode criar um item novo: arquivo fixo que ainda não existe, arquivo de uma pasta ou pasta de skill. */
@@ -202,8 +122,7 @@ export function createTargets(tool: AiTool): CreateTarget[] {
   return HARNESS_CATALOG[tool].flatMap((src, source): CreateTarget[] => {
     if (src.builtin || (src.layout !== 'file' && src.layout !== 'files' && src.layout !== 'skills')) return [];
     const base = `${src.scope === 'user' ? '~/' : ''}${src.path}`;
-    const label =
-      src.layout === 'file' ? base : src.layout === 'skills' ? `${base}/<nome>/SKILL.md` : `${base}/<nome>${src.createExt ?? src.ext}`;
+    const label = src.layout === 'file' ? base : src.layout === 'skills' ? `${base}/<nome>/SKILL.md` : `${base}/<nome>${src.ext}`;
     return [{ source, kind: src.kind, scope: src.scope, layout: src.layout, label }];
   });
 }
@@ -233,7 +152,7 @@ export interface McpTarget {
  */
 export function mcpTargets(tool: AiTool): McpTarget[] {
   return HARNESS_CATALOG[tool].flatMap((src, source): McpTarget[] =>
-    src.kind === 'mcp' && (src.layout === 'json-keys' || src.layout === 'toml-tables')
+    src.kind === 'mcp' && src.layout === 'json-keys'
       ? [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}` }]
       : [],
   );
@@ -254,22 +173,15 @@ export const MCP_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
 
 /**
  * Formato dos hooks em cada arquivo (páginas de hooks de cada ferramenta, lidas em 2026-10-02):
- * - `nested` (Claude Code e Codex): evento → grupos `{ matcher, hooks: [{ type: "command", command, timeout }] }`
+ * - `nested` (Claude Code): evento → grupos `{ matcher, hooks: [{ type: "command", command, timeout }] }`
  * - `flat` (Cursor): `{ version: 1, hooks: { evento: [{ command, matcher, timeout }] } }`
- * - `copilot` (Copilot CLI): `{ version: 1, hooks: { evento: [{ type: "command", bash, timeoutSec }] } }`, um arquivo por pasta de hooks
  */
-export type HookFormat = 'nested' | 'flat' | 'copilot';
+export type HookFormat = 'nested' | 'flat';
 
-const HOOK_FORMAT: Record<AiTool, HookFormat | null> = {
+const HOOK_FORMAT: Record<AiTool, HookFormat> = {
   claude: 'nested',
-  codex: 'nested',
   cursor: 'flat',
-  copilot: 'copilot',
-  kimi: null,
 };
-
-/** Arquivo que o board grava dentro de uma pasta de hooks (Copilot). */
-export const HOOK_FILE = 'faz-ai.json';
 
 export interface HookTarget {
   source: number;
@@ -278,14 +190,12 @@ export interface HookTarget {
   format: HookFormat;
 }
 
-/** Arquivos de hooks que o board edita. Os hooks do Kimi ficam no config.toml e são só listados. */
+/** Arquivos de hooks que o board edita. */
 export function hookTargets(tool: AiTool): HookTarget[] {
   const format = HOOK_FORMAT[tool];
-  if (!format) return [];
   return HARNESS_CATALOG[tool].flatMap((src, source): HookTarget[] => {
-    if (src.kind !== 'hook' || (src.layout !== 'json-keys' && src.layout !== 'hook-files')) return [];
-    const base = `${src.scope === 'user' ? '~/' : ''}${src.path}`;
-    return [{ source, scope: src.scope, label: src.layout === 'hook-files' ? `${base}/${HOOK_FILE}` : base, format }];
+    if (src.kind !== 'hook' || src.layout !== 'json-keys') return [];
+    return [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}`, format }];
   });
 }
 
@@ -308,20 +218,6 @@ export const HOOK_EVENTS: Record<AiTool, string[]> = {
     'InstructionsLoaded',
     'ConfigChange',
     'FileChanged',
-  ],
-  codex: [
-    'PreToolUse',
-    'PostToolUse',
-    'PermissionRequest',
-    'UserPromptSubmit',
-    'SessionStart',
-    'SessionEnd',
-    'Stop',
-    'Interrupt',
-    'SubagentStart',
-    'SubagentStop',
-    'PreCompact',
-    'PostCompact',
   ],
   cursor: [
     'preToolUse',
@@ -347,17 +243,6 @@ export const HOOK_EVENTS: Record<AiTool, string[]> = {
     'beforeTabFileRead',
     'afterTabFileEdit',
   ],
-  copilot: [
-    'preToolUse',
-    'postToolUse',
-    'postToolUseFailure',
-    'userPromptSubmitted',
-    'sessionStart',
-    'agentStop',
-    'subagentStart',
-    'errorOccurred',
-  ],
-  kimi: [],
 };
 
 export interface HookInput {
@@ -400,31 +285,8 @@ export const PLUGIN_COMMANDS: Record<AiTool, { where: string; commands: string[]
       'claude plugin uninstall <plugin>@<marketplace>',
     ],
   },
-  codex: {
-    where: 'no terminal',
-    commands: [
-      'codex plugin marketplace add <dono/repositorio>',
-      'codex plugin list --available',
-      'codex plugin add <plugin>@<marketplace>',
-      'codex plugin remove <plugin>@<marketplace>',
-    ],
-  },
-  copilot: {
-    where: 'no terminal',
-    commands: [
-      'copilot plugin marketplace browse <marketplace>',
-      'copilot plugin install <plugin>@<marketplace>',
-      'copilot plugin list',
-      'copilot plugin uninstall <plugin>',
-      'gh skill search <termo>',
-    ],
-  },
   cursor: {
     where: 'no Cursor (Customize → Plugins) ou numa sessão do agente',
     commands: ['/plugin', 'agent plugin marketplace add <endereço git>'],
-  },
-  kimi: {
-    where: 'numa sessão do Kimi Code',
-    commands: ['/plugins marketplace', '/plugins install <pasta, zip ou endereço do GitHub>', '/plugins list', '/plugins remove <id>'],
   },
 };

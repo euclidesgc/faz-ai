@@ -6,12 +6,18 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **O board suporta só o Claude Code e o Cursor.** Codex, Kimi Code e GitHub Copilot saíram do
+  **Harness de IA**, que agora oferece só essas duas ferramentas, e do restante da extensão: modelos
+  embutidos, registro do servidor MCP, regras, skills e agentes, hooks, execução pela conversa e
+  Diagnóstico. Um board que estava configurado com uma delas volta para o Claude Code ao abrir. O
+  que o Cursor e o Claude Code ainda carregam de `.codex/skills` ou `AGENTS.md` continua listado.
+- **Em Configurações, Modelos de IA vem antes de Agentes.** O menu lateral passa a seguir a ordem
+  Harness de IA, Modelos de IA, Agentes.
 - **O custo das execuções é o que a ferramenta informa; a tabela de preços saiu (#187).** Um valor
   calculado a partir de preços cadastrados envelhece quando o fornecedor muda a tarifa e deixa o
   relatório errado sem avisar, então o board deixou de calcular custo. O Claude Code grava o
   `total_cost_usd` que a própria CLI informa, mais os quatro contadores de tokens; o Cursor grava os
-  tokens e fica sem custo (a CLI não informa); Codex, Kimi e GitHub Copilot rodam, mas ficam sem
-  medição por enquanto. Saem a tabela embutida, a coluna de preço da aba **Modelos de IA**, o
+  tokens e fica sem custo (a CLI não informa). Saem a tabela embutida, a coluna de preço da aba **Modelos de IA**, o
   **Preço variável**, os campos `price_*`, `reset_price` e `variable_price` do `upsert_model`, a
   origem do preço no `get_models` e a regra **Cursor Token Rate** (`cursorTokenRate` no
   `update_rules`). Catálogos gravados antes perdem os campos de preço ao abrir o board. As execuções

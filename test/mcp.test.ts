@@ -331,7 +331,7 @@ describe('harness e padrões pelo MCP', () => {
     put('.claude/skills/commit/SKILL.md', '---\nname: commit\ndescription: Escreve o commit\n---\n');
     put('.claude/plugins/cache/loja/design/.claude-plugin/plugin.json', '{"name":"design"}');
     put('.claude/plugins/cache/loja/design/skills/critica/SKILL.md', '---\nname: critica\ndescription: Critica\n---\n');
-    put('.codex/skills/de-outra-ferramenta/SKILL.md', '---\nname: x\ndescription: x\n---\n');
+    put('.cursor/skills/de-outra-ferramenta/SKILL.md', '---\nname: x\ndescription: x\n---\n');
     await call('create_skill', { name: 'revisar-spec', description: 'Revisa', content: 'Passos' });
     router.refreshHarness();
     const field = router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
@@ -462,14 +462,14 @@ describe('modelos de IA', () => {
       label: 'Claude Code · Opus 5.5 · high',
     });
     expect((await set('opus')).data.model.effort).toBe('medium'); // sem esforço informado, vale o padrão do modelo
-    expect((await set('Kimi Code K3 max')).text).toContain('não está no catálogo'); // modelo de outra ferramenta
+    expect((await set('cursor:composer-2.5')).text).toContain('não está no catálogo'); // modelo de outra ferramenta
 
     // trocar de ferramenta traz os modelos e as regras de esforço dela
-    await call('set_ai_tool', { tool: 'kimi' });
-    const kimi = (await call('get_models')).data;
-    expect(kimi.catalog.some((o: any) => o.tool === 'kimi')).toBe(true);
-    expect(kimi.rules.map((r: any) => r.value)).toEqual(['kimi:kimi-code/k3@low', 'kimi:kimi-code/k3@high', 'kimi:kimi-code/k3@max']);
-    expect((await set('Kimi Code K3 max')).data.model).toMatchObject({ tool: 'kimi', effort: 'max' });
+    await call('set_ai_tool', { tool: 'cursor' });
+    const cursor = (await call('get_models')).data;
+    expect(cursor.catalog.some((o: any) => o.tool === 'cursor')).toBe(true);
+    expect(cursor.rules.map((r: any) => r.value)).toEqual(['cursor:auto', 'cursor:auto', 'cursor:auto']);
+    expect((await set('cursor:composer-2.5')).data.model).toMatchObject({ tool: 'cursor', model: 'composer-2.5' });
     await call('set_ai_tool', { tool: 'claude' });
     expect((await set('opus turbo')).text).toContain('não aceita o esforço');
     expect((await set('modelo-que-nao-existe')).text).toContain('não está no catálogo');
@@ -521,50 +521,13 @@ describe('modelos de IA', () => {
     expect((await call('create_card', { title: 'Doc', fields: { Tags: ['docs'], Esforço: 'Alto' } })).data.model.value).toBe(
       'claude:haiku',
     );
-    const kimi = (await call('suggest_model_rules', { tool: 'kimi' })).data.rules;
-    expect(kimi.filter((r: any) => r.when.startsWith('Esforço')).map((r: any) => r.value)).toEqual([
-      'kimi:kimi-code/k3@low',
-      'kimi:kimi-code/k3@high',
-      'kimi:kimi-code/k3@max',
+    const cursor = (await call('suggest_model_rules', { tool: 'cursor' })).data.rules;
+    expect(cursor.filter((r: any) => r.when.startsWith('Esforço')).map((r: any) => r.value)).toEqual([
+      'cursor:auto',
+      'cursor:auto',
+      'cursor:auto',
     ]);
-    expect(kimi[0].when).toBe('Tags = docs'); // regras de outros campos são preservadas
-  });
-
-  it('lê os modelos e esforços reais do config.toml do Kimi', async () => {
-    const { parseKimiModels, modelsFor, effortTiers } = await import('../src/extension/models');
-    const toml = `default_model = "kimi-code/k3"
-[providers."managed:kimi-code"]
-api_key = "segredo"
-
-[models."kimi-code/k3"]
-provider = "managed:kimi-code"
-model = "k3"
-display_name = "K3"
-support_efforts = [ "low", "high", "max" ]
-default_effort = "high"
-
-[models."kimi-code/rapido"]
-model = "rapido"
-display_name = "K2.7 Highspeed"
-
-[thinking]
-effort = "high"
-`;
-    expect(parseKimiModels(toml)).toEqual([
-      { id: 'kimi:kimi-code/k3', tool: 'kimi', model: 'kimi-code/k3', label: 'K3', efforts: ['low', 'high', 'max'], defaultEffort: 'high' },
-      { id: 'kimi:kimi-code/rapido', tool: 'kimi', model: 'kimi-code/rapido', label: 'K2.7 Highspeed', efforts: [], defaultEffort: null },
-    ]);
-    const home = path.join(dir, 'home');
-    fs.mkdirSync(path.join(home, '.kimi-code'), { recursive: true });
-    fs.writeFileSync(path.join(home, '.kimi-code', 'config.toml'), toml);
-    const found = modelsFor('kimi', home);
-    expect(found.map((o) => o.label)).toEqual(['K3', 'K2.7 Highspeed']);
-    expect(effortTiers('kimi', found).map(([, v]) => v)).toEqual([
-      'kimi:kimi-code/k3@low',
-      'kimi:kimi-code/k3@high',
-      'kimi:kimi-code/k3@max',
-    ]);
-    expect(modelsFor('kimi', path.join(dir, 'vazio')).length).toBeGreaterThan(0); // sem config local, lista embutida
+    expect(cursor[0].when).toBe('Tags = docs'); // regras de outros campos são preservadas
   });
 });
 
@@ -944,36 +907,10 @@ describe('status do card e checkpoint de revisão', () => {
       path: '.claude/agents/revisor-de-spec.md',
     });
 
-    // agente criado por fora aparece; cada ferramenta tem a sua pasta e extensão
+    // agente criado por fora aparece; cada ferramenta tem a sua pasta
     fs.writeFileSync(path.join(dir, '.claude/agents/planejador.md'), '---\nname: planejador\ndescription: Quebra a spec em passos\n---\nx');
     router.refreshHarness();
     expect((await call('get_harness')).data.agents.map((a: any) => a.name)).toEqual(['planejador', 'revisor-de-spec']);
-    await call('set_ai_tool', { tool: 'copilot' });
-    expect((await call('get_harness')).data.agents).toEqual([]);
-    await call('create_agent', { name: 'do-copilot', description: 'd', content: 'c' });
-    expect(fs.existsSync(path.join(dir, '.github/agents/do-copilot.agent.md'))).toBe(true);
-    // Codex guarda agentes em TOML; o Kimi não tem modelo por agente
-    await call('set_ai_tool', { tool: 'codex' });
-    const codex = (
-      await call('create_agent', {
-        name: 'explorador',
-        description: 'Explora o código "antes" de mudar',
-        content: 'Só leia.',
-        model: 'gpt-6-luna',
-      })
-    ).data;
-    expect(codex.agents).toEqual([
-      { name: 'explorador', description: 'Explora o código "antes" de mudar', model: 'gpt-6-luna', path: '.codex/agents/explorador.toml' },
-    ]);
-    expect(fs.readFileSync(path.join(dir, '.codex/agents/explorador.toml'), 'utf8')).toBe(
-      'name = "explorador"\ndescription = "Explora o código \\"antes\\" de mudar"\nmodel = "gpt-6-luna"\ndeveloper_instructions = """\nSó leia.\n"""\n',
-    );
-    await call('set_ai_tool', { tool: 'kimi' });
-    expect((await call('create_agent', { name: 'revisor', description: 'd', content: 'c', model: 'k3' })).text).toContain(
-      'não permite fixar o modelo',
-    );
-    await call('create_agent', { name: 'revisor', description: 'd', content: 'c' });
-    expect(fs.existsSync(path.join(dir, '.kimi-code/agents/revisor.md'))).toBe(true);
     await call('set_ai_tool', { tool: 'cursor' });
     await call('create_agent', { name: 'verificador', description: 'd', content: 'c' });
     expect(fs.existsSync(path.join(dir, '.cursor/agents/verificador.md'))).toBe(true);
@@ -1042,28 +979,19 @@ describe('ferramentas de IA', () => {
     expect(fs.existsSync(skillMd('.claude/skills'))).toBe(true);
     expect(fs.existsSync(path.join(dir, '.agents'))).toBe(false); // nada de cópia ou atalho em outra pasta
 
-    // Codex: a pasta do Claude continua no disco, mas fica fora do board
-    const h = (await call('set_ai_tool', { tool: 'codex' })).data;
-    expect(h.aiTool).toBe('codex');
+    // Cursor: a pasta do Claude continua no disco, mas fica fora do board
+    const h = (await call('set_ai_tool', { tool: 'cursor' })).data;
+    expect(h.aiTool).toBe('cursor');
     expect(h.skills).toEqual([]);
     expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual([]);
-    await call('create_skill', { name: 'do-codex', description: 'd', content: 'c' });
-    expect(fs.existsSync(path.join(dir, '.agents/skills/do-codex/SKILL.md'))).toBe(true);
+    await call('create_skill', { name: 'do-cursor', description: 'd', content: 'c' });
+    expect(fs.existsSync(path.join(dir, '.cursor/skills/do-cursor/SKILL.md'))).toBe(true);
     expect(fs.existsSync(skillMd('.claude/skills'))).toBe(true);
-    await call('set_skill_enabled', { skill: 'do-codex', enabled: false });
-    expect(fs.existsSync(path.join(dir, '.agents/skills-disabled/do-codex/SKILL.md'))).toBe(true);
+    expect(await names()).toEqual(['do-cursor']);
+    await call('set_skill_enabled', { skill: 'do-cursor', enabled: false });
+    expect(fs.existsSync(path.join(dir, '.cursor/skills-disabled/do-cursor/SKILL.md'))).toBe(true);
     expect((await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false })).error).toBe(true); // skill de outra ferramenta
 
-    for (const [tool, base] of [
-      ['cursor', '.cursor/skills'],
-      ['kimi', '.kimi-code/skills'],
-      ['copilot', '.github/skills'],
-    ] as const) {
-      await call('set_ai_tool', { tool });
-      await call('create_skill', { name: `do-${tool}`, description: 'd', content: 'c' });
-      expect(fs.existsSync(path.join(dir, base, `do-${tool}`, 'SKILL.md'))).toBe(true);
-      expect(await names()).toEqual([`do-${tool}`]);
-    }
     await call('set_ai_tool', { tool: 'claude' });
     expect(await names()).toEqual(['revisar-spec']);
     expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['revisar-spec']);
@@ -1072,53 +1000,27 @@ describe('ferramentas de IA', () => {
   it('registra o servidor MCP no formato de cada ferramenta', async () => {
     const { registerClients } = await import('../src/extension/mcp/clientConfig');
     const home = path.join(dir, 'home');
-    fs.mkdirSync(path.join(home, '.kimi-code'), { recursive: true });
-    fs.writeFileSync(path.join(home, '.kimi-code', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
-    fs.mkdirSync(path.join(dir, '.codex'));
-    fs.writeFileSync(
-      path.join(dir, '.codex', 'config.toml'),
-      'model = "x"\n\n[mcp_servers.faz-ai]\ncommand = "velho"\nargs = ["a"]\n\n[mcp_servers.outro]\ncommand = "y"\n',
-    );
+    fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
     const bridge = '/b/com espaço/bridge.js';
-    const done = registerClients(['claude', 'codex', 'cursor', 'kimi'], { bridgePath: bridge, workspaceDir: dir, homeDir: home });
-    expect(done.map((d) => d.projectFile)).toEqual(['.mcp.json', '.codex/config.toml', '.cursor/mcp.json', '.kimi-code/mcp.json']);
+    const done = registerClients(['claude', 'cursor'], { bridgePath: bridge, workspaceDir: dir, homeDir: home });
+    expect(done.map((d) => d.projectFile)).toEqual(['.mcp.json', '.cursor/mcp.json']);
 
     const json = (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')).mcpServers;
     expect(json(path.join(dir, '.mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir] });
     expect(json(path.join(dir, '.cursor', 'mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir] });
-    expect(json(path.join(dir, '.kimi-code', 'mcp.json'))['faz-ai']).toEqual({ transport: 'stdio', command: 'node', args: [bridge, dir] });
     // no escopo do projeto, nada vai para a pasta do usuário
-    expect(json(path.join(home, '.kimi-code', 'mcp.json'))['faz-ai']).toBeUndefined();
-
-    const toml = fs.readFileSync(path.join(dir, '.codex', 'config.toml'), 'utf8');
-    expect(toml).toContain('model = "x"');
-    expect(toml).toContain('[mcp_servers.outro]\ncommand = "y"');
-    expect(toml).not.toContain('velho');
-    expect(toml.match(/\[mcp_servers\.faz-ai\]/g)).toHaveLength(1);
-    expect(toml).toContain(`args = ["${bridge}", "${dir}"]`);
-
-    // Copilot: .vscode/mcp.json (chave `servers`) para o VS Code e .mcp.json para a Copilot CLI
-    fs.mkdirSync(path.join(dir, '.vscode'));
-    fs.writeFileSync(path.join(dir, '.vscode', 'mcp.json'), JSON.stringify({ servers: { outro: { command: 'x' } }, inputs: [] }));
-    const copilot = registerClients(['copilot'], { bridgePath: bridge, workspaceDir: dir, homeDir: home });
-    expect(copilot.map((d) => d.projectFile)).toEqual(['.vscode/mcp.json', '.mcp.json']);
-    const vscode = JSON.parse(fs.readFileSync(path.join(dir, '.vscode', 'mcp.json'), 'utf8'));
-    expect(vscode).toEqual({
-      servers: { outro: { command: 'x' }, 'faz-ai': { type: 'stdio', command: 'node', args: [bridge, dir] } },
-      inputs: [],
-    });
-    expect(json(path.join(dir, '.mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir], tools: ['*'] });
+    expect(json(path.join(home, '.cursor', 'mcp.json'))).toEqual({ outro: { command: 'x' } });
   });
 
-  it('registra o servidor no global de cada ferramenta, sem a pasta do projeto', async () => {
+  it('registra o servidor no global do Claude Code, sem a pasta do projeto', async () => {
     const { registerClients } = await import('../src/extension/mcp/clientConfig');
     const home = path.join(dir, 'home-global');
     const project = path.join(dir, 'projeto-global');
-    fs.mkdirSync(path.join(home, '.kimi-code'), { recursive: true });
     fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
     fs.writeFileSync(path.join(home, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
     const bridge = '/b/bridge.js';
-    const done = registerClients(['claude', 'codex', 'kimi', 'copilot'], {
+    const done = registerClients(['claude'], {
       bridgePath: bridge,
       workspaceDir: project,
       homeDir: home,
@@ -1141,15 +1043,6 @@ describe('ferramentas de IA', () => {
     const json = (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')).mcpServers;
     // o Cursor não tem global que funcione: fica como estava
     expect(json(path.join(home, '.cursor', 'mcp.json'))).toEqual({ outro: { command: 'x' } });
-    expect(fs.readFileSync(path.join(home, '.codex', 'config.toml'), 'utf8')).toContain(`args = ["${bridge}"]`);
-    expect(json(path.join(home, '.kimi-code', 'mcp.json'))['faz-ai']).toEqual({ transport: 'stdio', command: 'node', args: [bridge] });
-    expect(fs.existsSync(path.join(home, '.kimi'))).toBe(false);
-    expect(json(path.join(home, '.copilot', 'mcp-config.json'))['faz-ai']).toEqual({
-      type: 'stdio',
-      command: 'node',
-      args: [bridge],
-      tools: ['*'],
-    });
   });
 
   it('a execução do Cursor usa o registro global quando ele leva a este board', async () => {
@@ -1175,39 +1068,32 @@ describe('ferramentas de IA', () => {
     expect(ensureProjectServer(project, '.cursor/mcp.json', { ...entry, args: ['/outro/bridge.js', project] }, home)).toBe('added');
   });
 
-  it('tira só o registro do board do arquivo do projeto, em JSON e no TOML do Codex', async () => {
+  it('tira só o registro do board do arquivo do projeto, em JSON', async () => {
     const { removeProjectServer, registerClients } = await import('../src/extension/mcp/clientConfig');
     const project = path.join(dir, 'proj-remove');
     fs.mkdirSync(path.join(project, '.cursor'), { recursive: true });
     fs.writeFileSync(path.join(project, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
-    registerClients(['cursor', 'codex'], { bridgePath: '/b/bridge.js', workspaceDir: project, homeDir: path.join(dir, 'home-remove') });
-    fs.appendFileSync(path.join(project, '.codex', 'config.toml'), '\n[mcp_servers.outro]\ncommand = "y"\n');
+    registerClients(['cursor'], { bridgePath: '/b/bridge.js', workspaceDir: project, homeDir: path.join(dir, 'home-remove') });
 
     expect(removeProjectServer(project, '.cursor/mcp.json')).toBe(true);
     expect(JSON.parse(fs.readFileSync(path.join(project, '.cursor', 'mcp.json'), 'utf8'))).toEqual({
       mcpServers: { outro: { command: 'x' } },
     });
-    expect(removeProjectServer(project, '.codex/config.toml')).toBe(true);
-    const toml = fs.readFileSync(path.join(project, '.codex', 'config.toml'), 'utf8');
-    expect(toml).not.toContain('faz-ai');
-    expect(toml).toContain('[mcp_servers.outro]');
     // nada a tirar: arquivo sem o registro, ou que não existe
     expect(removeProjectServer(project, '.cursor/mcp.json')).toBe(false);
     expect(removeProjectServer(project, '.mcp.json')).toBe(false);
   });
 
-  it('sugere modelos do Copilot e o detecta pela CLI ou pela extensão do VS Code', async () => {
-    const { detectTools, modelsFor, effortTiers } = await import('../src/extension/models');
-    const home = path.join(dir, 'home-copilot');
-    expect(effortTiers('copilot', modelsFor('copilot', home)).map(([, v]) => v)).toEqual([
-      'copilot:gpt-5.6-luna@low',
-      'copilot:gpt-5.6-terra@medium',
-      'copilot:gpt-5.6-sol@high',
-    ]);
-    fs.mkdirSync(path.join(home, '.vscode', 'extensions', 'ms-python.python-1.0.0'), { recursive: true });
+  it('detecta as ferramentas instaladas pelas pastas de configuração na home', async () => {
+    const { detectTools } = await import('../src/extension/models');
+    const home = path.join(dir, 'home-detecta');
+    fs.mkdirSync(path.join(home, '.vscode', 'extensions'), { recursive: true });
     expect(detectTools(home)).toEqual([]);
-    fs.mkdirSync(path.join(home, '.vscode', 'extensions', 'github.copilot-chat-0.40.0'));
-    expect(detectTools(home)).toEqual(['copilot']);
+    expect(detectTools('')).toEqual([]);
+    fs.mkdirSync(path.join(home, '.cursor'));
+    expect(detectTools(home)).toEqual(['cursor']);
+    fs.mkdirSync(path.join(home, '.claude'));
+    expect(detectTools(home)).toEqual(['claude', 'cursor']);
   });
 });
 

@@ -92,7 +92,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   expect(fs.existsSync(seen!.file)).toBe(false);
 
   // noutra ferramenta, o que não vai por parâmetro vira instrução no prompt
-  router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
+  router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
   expect(executionPlan(router.snapshot(), card(), project, home).advice).toEqual([
     'De servidores MCP, use só o do board e: github.',
     'Não use estas ferramentas: WebFetch.',
@@ -390,13 +390,6 @@ describe('executor da IA', () => {
     ]);
   });
 
-  it('Refinar com IA numa ferramenta que só roda sem restrições usa a permissão do board', () => {
-    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi', runner: { permission: 'full' } } });
-    runner.start(storyId, 'manual', 'refine');
-    expect(procs[0]!.command.command).toBe('kimi');
-    expect(procs[0]!.command.args.join(' ')).toContain('Não altere arquivos do projeto');
-  });
-
   it('parar devolve o card ao status anterior', () => {
     router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_review' });
     runner.start(storyId);
@@ -407,20 +400,22 @@ describe('executor da IA', () => {
     expect(router.snapshot().comments).toHaveLength(0);
   });
 
-  it('ferramenta que só roda sem restrições: avisa em vez de rodar com permissão menor', () => {
-    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi', runner: { permission: 'edits' } } });
-    expect(router.snapshot().aiRunUnsupported).toContain('Sem restrições');
-    expect(() => runner.start(storyId)).toThrow('Sem restrições');
-    expect(procs).toHaveLength(0);
-    router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
-    expect(router.snapshot().aiRunUnsupported).toBeNull();
-    runner.start(storyId);
-    expect(procs[0]!.command).toEqual({
-      command: 'kimi',
-      args: ['-p', cardPrompt('#1', [], [], false, true), '--add-dir', `${dir}.worktrees`],
-      format: 'text',
-      promptArg: { index: 1, addDirFlag: '--add-dir' },
-    });
+  it('ferramenta que não roda com a permissão pedida: avisa em vez de rodar com permissão menor', () => {
+    // o Claude Code recusa "Sem restrições" quando roda como root (contêiner, WSL como root)
+    const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
+    try {
+      router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude', runner: { permission: 'full' } } });
+      expect(router.snapshot().aiRunUnsupported).toContain('root');
+      expect(() => runner.start(storyId)).toThrow('root');
+      expect(procs).toHaveLength(0);
+      router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'board' } } });
+      expect(router.snapshot().aiRunUnsupported).toBeNull();
+      runner.start(storyId);
+      expect(procs).toHaveLength(1);
+      expect(procs[0]!.command.command).toBe('claude');
+    } finally {
+      getuid.mockRestore();
+    }
   });
 
   it('monta o comando de cada ferramenta conforme a permissão', () => {
@@ -436,27 +431,6 @@ describe('executor da IA', () => {
       args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep'],
     });
     expect(cmd('claude', 'full')).toMatchObject({ args: ['-p', '--permission-mode', 'bypassPermissions'] });
-    expect(cmd('codex', 'edits')).toEqual({
-      command: 'codex',
-      args: [
-        'exec',
-        '--sandbox',
-        'workspace-write',
-        '--skip-git-repo-check',
-        '-c',
-        'mcp_servers.faz-ai.default_tools_approval_mode="approve"',
-        '-',
-      ],
-      stdin: 'P',
-      format: 'text',
-    });
-    expect(cmd('copilot', 'board')).toEqual({
-      command: 'copilot',
-      args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', '--no-ask-user'],
-      env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' },
-      format: 'text',
-      promptArg: { index: 1, addDirFlag: '--add-dir=' },
-    });
     // o pedido do Cursor vai pela entrada padrão, nunca na linha de comando
     expect(cmd('cursor', 'full')).toEqual({
       command: 'cursor-agent',
@@ -474,7 +448,6 @@ describe('executor da IA', () => {
     expect([...CURSOR_TOOLS.board, ...CURSOR_TOOLS.edits]).not.toContain('shell_tool_call');
     expect(headlessUnsupported('claude', 'board')).toBeNull();
     expect(headlessUnsupported('cursor', 'board')).toBeNull();
-    expect(headlessUnsupported('kimi', 'board')).toContain('Kimi');
     // o Claude Code recusa pular as permissões como root
     expect(headlessUnsupported('claude', 'full', 0)).toContain('root');
     expect(headlessUnsupported('claude', 'full', 1000)).toBeNull();
@@ -493,8 +466,8 @@ describe('executor da IA', () => {
     expect(built.args.slice(-2)).toEqual(['--mcp-config', '{tmp:mcp.json}']);
     expect(built.args).not.toContain('--strict-mcp-config');
     expect(JSON.parse(built.tempFiles!['mcp.json']!)).toEqual({ mcpServers: { 'faz-ai': { type: 'stdio', ...boardServer } } });
-    // as outras ferramentas continuam lendo o registro feito por "Conectar ao board"
-    expect(headlessCommand('codex', { prompt: 'P', permission: 'board', boardServer })).not.toHaveProperty('tempFiles');
+    // o Cursor não recebe o servidor pela linha de comando: ele lê o registro do projeto
+    expect(headlessCommand('cursor', { prompt: 'P', permission: 'board', boardServer })).not.toHaveProperty('tempFiles');
   });
 
   it('avisa a IA do limite da execução, para ela explicar à pessoa onde mudar', () => {
@@ -671,12 +644,17 @@ describe('log das execuções de IA', () => {
   });
 
   it('RF-17: a ferramenta sem suporte fecha a linha com unsupported antes de o erro subir', () => {
-    // o Kimi em segundo plano não aceita limite por linha de comando: com permissão menor, não roda
-    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi', runner: { permission: 'edits' } } });
-    expect(() => logged.start(storyId)).toThrow('Sem restrições');
+    // o Claude Code recusa "Sem restrições" como root: a execução não roda
+    const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
+    try {
+      router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude', runner: { permission: 'full' } } });
+      expect(() => logged.start(storyId)).toThrow('root');
+    } finally {
+      getuid.mockRestore();
+    }
     expect(procs).toHaveLength(0);
     // a tentativa também é informação: a linha existe, fechada, com a ferramenta que não deu
-    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'kimi' });
+    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'claude' });
     // a duração existe e é curta (o tempo até descobrir que não dá); só 'unknown' fica sem duração
     expect(only().durationMs).toBeGreaterThanOrEqual(0);
   });
@@ -871,27 +849,6 @@ describe('log das execuções de IA', () => {
       expect(procs).toHaveLength(1);
       expect(only()).toMatchObject({ outcome: 'timeout', measure: 'partial' });
       expect(card().statusReason).toContain('tempo limite');
-    });
-
-    it('a ferramenta sem saída estruturada (Copilot) roda igual e diz no canal por que não mediu', () => {
-      router.handle({ type: 'settings.board.update', patch: { aiTool: 'copilot' } });
-      logged.start(storyId);
-      procs[0]!.exit(0);
-
-      expect(procs).toHaveLength(1);
-      expect(only()).toMatchObject({ outcome: 'done', measure: 'none' });
-      expect(log.find((l) => l.startsWith('[#1] Consumo não medido'))).toContain('não produz saída estruturada');
-    });
-
-    it('a falha no Copilot não diz no canal que o trabalho rodou normalmente', () => {
-      router.handle({ type: 'settings.board.update', patch: { aiTool: 'copilot' } });
-      logged.start(storyId);
-      procs[0]!.exit(1);
-
-      expect(only()).toMatchObject({ outcome: 'failed', measure: 'none' });
-      const line = log.find((l) => l.startsWith('[#1] Consumo não medido'))!;
-      expect(line).toContain('não produz saída estruturada');
-      expect(line).not.toMatch(/normalmente|rodou/);
     });
   });
 });

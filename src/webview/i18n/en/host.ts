@@ -7,13 +7,10 @@ const INSTALL_HINTS: [pt: string, en: string][] = [
     'Instale o Claude Code (https://claude.com/claude-code) ou a extensão dele no editor.',
     'Install Claude Code (https://claude.com/claude-code) or its editor extension.',
   ],
-  ['Instale a CLI do Codex (npm install -g @openai/codex).', 'Install the Codex CLI (npm install -g @openai/codex).'],
-  ['Instale a GitHub Copilot CLI (npm install -g @github/copilot).', 'Install the GitHub Copilot CLI (npm install -g @github/copilot).'],
   [
     'Instale a CLI do Cursor (curl https://cursor.com/install -fsS | bash) e entre na conta com "cursor-agent login".',
     'Install the Cursor CLI (curl https://cursor.com/install -fsS | bash) and sign in with "cursor-agent login".',
   ],
-  ['Instale a CLI do Kimi Code.', 'Install the Kimi Code CLI.'],
   ['Instale a ferramenta.', 'Install the tool.'],
 ];
 
@@ -37,23 +34,8 @@ const NEXT_STEPS: [pt: string, en: string][] = [
   ],
   ['Cursor: ative o servidor em Settings → MCP.', 'Cursor: enable the server in Settings → MCP.'],
   [
-    'Codex: o projeto precisa estar marcado como confiável; abra uma sessão nova (codex mcp list confere).',
-    'Codex: the project must be marked as trusted; open a new session (codex mcp list checks it).',
-  ],
-  ['Kimi Code: abra uma sessão nova a partir da pasta do projeto.', 'Kimi Code: open a new session from the project folder.'],
-  ['Kimi Code: abra uma sessão nova na pasta do projeto.', 'Kimi Code: open a new session in the project folder.'],
-  [
     'Claude Code: abra uma sessão nova em qualquer projeto com o board aberto (/mcp mostra o estado).',
     'Claude Code: open a new session in any project with the board open (/mcp shows its state).',
-  ],
-  ['Codex: abra uma sessão nova (codex mcp list confere).', 'Codex: open a new session (codex mcp list checks it).'],
-  [
-    'Copilot CLI: abra uma sessão nova. No VS Code, o servidor global fica no perfil do editor (MCP: Open User Configuration).',
-    'Copilot CLI: open a new session. In VS Code, the global server lives in the editor profile (MCP: Open User Configuration).',
-  ],
-  [
-    'GitHub Copilot no VS Code: confirme a confiança e inicie o servidor (MCP: List Servers). Copilot CLI: abra uma sessão nova na pasta e confirme a confiança nela.',
-    'GitHub Copilot in VS Code: confirm trust and start the server (MCP: List Servers). Copilot CLI: open a new session in the folder and confirm trust in it.',
   ],
 ];
 const GITIGNORE_PT = ' Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: {ignored}.';
@@ -185,8 +167,6 @@ export const host: Record<string, string> = {
   'O {tool} terminou com erro (código {code}).': '{tool} finished with an error (code {code}).',
   'O {tool} terminou com erro (código {code}).\n\n{tail}': '{tool} finished with an error (code {code}).\n\n{tail}',
   'A IA terminou sem escrever uma resposta.': 'The AI finished without writing a reply.',
-  'O {tool}, quando roda em segundo plano, não pede aprovação de nada e não aceita limites por linha de comando. Para chamá-lo pelo board, escolha "Sem restrições" em Configurações → Harness de IA → Execução pela conversa.':
-    'When {tool} runs in the background, it asks for approval of nothing and does not accept command-line limits. To call it from the board, choose "No restrictions" in Settings → AI harness → Execution through the conversation.',
   'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Instale o servidor em Configurações → Harness de IA → Tudo que a ferramenta carrega → Claude Code → Servidores MCP.':
     'The agent restricts MCP servers, but the board server is not registered for Claude Code in this folder. Install the server in Settings → AI harness → Everything the tool loads → Claude Code → MCP servers.',
   'Servidores MCP do agente não encontrados na configuração do Claude Code: {servers}.':
@@ -246,8 +226,6 @@ export const host: Record<string, string> = {
   'Arquivos de configuração não são apagados pelo board.': 'Settings files are not deleted by the board.',
   'Só skills têm modo de invocação.': 'Only skills have an invocation mode.',
   'Só skills têm arquivos de apoio.': 'Only skills have supporting files.',
-  'O {tool} não tem agentes definidos em arquivos do projeto.': '{tool} has no agents defined in project files.',
-  'O {tool} não permite fixar o modelo de um agente.': "{tool} does not allow fixing an agent's model.",
   'O {tool} não tem uma pasta de projeto para este tipo de item.': '{tool} has no project folder for this kind of item.',
   'O {tool} não tem uma pasta de usuário para este tipo de item.': '{tool} has no user folder for this kind of item.',
   '{file} não é um JSON simples (pode ter comentários ou um erro de sintaxe). Abra o arquivo e edite-o à mão.':

@@ -149,13 +149,6 @@ export function KindSection({
       {creating === 'hook' && k.id === 'hook' && hookFiles.length > 0 && (
         <NewHook key={tool} tool={tool} targets={hookFiles} onClose={() => onCreating(null)} />
       )}
-      {k.id === 'hook' && tool === 'kimi' && (
-        <p className="muted small">
-          {rich(
-            'Os hooks do Kimi Code ficam no <code>~/.kimi-code/config.toml</code> (<code>[[hooks]]</code>): aparecem aqui e são editados no arquivo.',
-          )}
-        </p>
-      )}
       {k.id === 'settings' && addingRule && permissionFiles.length > 0 && (
         <NewPermission key={tool} tool={tool} targets={permissionFiles} onClose={() => onAddingRule(false)} />
       )}

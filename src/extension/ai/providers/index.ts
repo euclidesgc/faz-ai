@@ -4,14 +4,10 @@ import type { AiTool } from '../../../shared/harness';
 import type { AiProvider } from '../provider';
 import { claudeProvider } from './claude';
 import { cursorProvider } from './cursor';
-import { codexProvider, copilotProvider, kimiProvider } from './unmeasured';
 
 const PROVIDERS: Record<AiTool, AiProvider> = {
   claude: claudeProvider,
   cursor: cursorProvider,
-  codex: codexProvider,
-  copilot: copilotProvider,
-  kimi: kimiProvider,
 };
 
 export const providerFor = (tool: AiTool): AiProvider => PROVIDERS[tool];

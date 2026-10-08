@@ -180,8 +180,5 @@ export const EXEC_ASPECTS: { id: ExecAspect; label: string }[] = [
  */
 export const EXEC_ENFORCEMENT: Record<AiTool, Record<ExecAspect, 'enforced' | 'advised'>> = {
   claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', clean: 'enforced' },
-  copilot: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', clean: 'advised' },
-  kimi: { agent: 'enforced', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', clean: 'advised' },
-  codex: { agent: 'advised', skills: 'advised', mcp: 'enforced', tools: 'advised', model: 'enforced', clean: 'advised' },
   cursor: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', clean: 'advised' },
 };

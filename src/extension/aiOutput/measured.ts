@@ -23,14 +23,7 @@ import type { RunReport } from '../../shared/log';
 import { ensureProjectServer } from '../mcp/clientConfig';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunningProcess } from '../runner';
-import {
-  MeasureBrokenError,
-  MeasureEndedError,
-  MeasureIgnoredError,
-  MeasureRefusedError,
-  MeasureUnsupportedError,
-  type MeasureError,
-} from './errors';
+import { MeasureBrokenError, MeasureEndedError, MeasureIgnoredError, MeasureRefusedError, type MeasureError } from './errors';
 import { cut } from './json';
 import { lineSplitter } from './lines';
 import type { OutputReader, OutputStream } from './reader';
@@ -144,7 +137,6 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
 
   const attempt = (structured: boolean): void => {
     const built = headlessCommand(tool, { ...input, structured });
-    if ('unsupported' in built) throw new Error(built.unsupported);
     // sem o servidor do board no arquivo que a ferramenta lê, a execução rodaria sem mover nem comentar nada
     if (built.projectMcp) {
       const { file } = built.projectMcp;
@@ -162,8 +154,6 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
     // o leitor desta tentativa, preso nela: um pedaço atrasado da tentativa anterior não suja o seguinte
     const read = provider.reader(format, { model });
     reader = read;
-    // pediu estruturado e o builder devolveu texto: esta ferramenta não tem o modo (o Copilot)
-    if (structured && format === 'text') failure ??= new MeasureUnsupportedError(label);
 
     // um partidor por canal: os dois chegam entremeados, e um aviso no `stderr` no meio de uma linha
     // de evento partida emendaria texto de gente no JSON e quebraria os dois

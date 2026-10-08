@@ -76,7 +76,7 @@ beforeAll(async () => {
   router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Skills').id, value: ['revisar-spec'] });
   router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Modelo').id, value: 'claude:opus@high' });
   router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Esforço da atividade').id, value: 'Baixo' });
-  router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Modelo').id, value: 'kimi:kimi-code/k3@max' });
+  router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Modelo').id, value: 'cursor:auto' });
   router.handle({
     type: 'settings.type.update',
     typeId: typeOf(childWf.id).id,
@@ -267,15 +267,12 @@ describe('telas montam sem erro', () => {
       'Ferramenta deste projeto',
       'type="radio"',
       'Claude Code',
-      'Codex',
       'Cursor',
-      'Kimi Code',
-      'GitHub Copilot',
       'AGENTS.md',
       'Usar o AGENTS.md',
       'revisar-spec',
       'Desligada',
-      '.kimi-code/skills',
+      '.cursor/skills',
       'Tudo que cada ferramenta carrega',
       'Servidores MCP',
       'Hooks',

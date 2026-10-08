@@ -10,7 +10,6 @@ import { MeasureBrokenError } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
 import { AiGateway, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
-import { headlessUnsupported } from './headless';
 import { needsTriage, requiredSkills } from './mcp/format';
 import type { MessageRouter } from './panel/messageRouter';
 
@@ -227,12 +226,8 @@ export class AiRunner {
           const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '', boardServer(this.deps));
           // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo
           const autonomous = !refine && isYolo(state, card);
-          // refinar não mexe em arquivos: roda só com o board, salvo na ferramenta que não tem esse nível (aí o pedido proíbe)
-          const permission = autonomous
-            ? 'full'
-            : refine && !headlessUnsupported(state.board.aiTool, 'board')
-              ? 'board'
-              : state.board.runner.permission;
+          // refinar não mexe em arquivos: roda só com o board
+          const permission = autonomous ? 'full' : refine ? 'board' : state.board.runner.permission;
           const permissionAdvice = refine ? null : PERMISSION_ADVICE[permission];
           if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');

@@ -44,18 +44,16 @@ export function NewHook({ tool, targets, onClose }: { tool: AiTool; targets: Hoo
           />
         )}
       </FormField>
-      {target.format !== 'copilot' && (
-        <FormField label={t('Filtro (opcional)')}>
-          {(id) => (
-            <TextField.Root
-              id={id}
-              value={matcher}
-              onChange={(e) => setMatcher(e.target.value)}
-              placeholder={t('Ex.: Bash, ou Edit|Write; vazio = sempre')}
-            />
-          )}
-        </FormField>
-      )}
+      <FormField label={t('Filtro (opcional)')}>
+        {(id) => (
+          <TextField.Root
+            id={id}
+            value={matcher}
+            onChange={(e) => setMatcher(e.target.value)}
+            placeholder={t('Ex.: Bash, ou Edit|Write; vazio = sempre')}
+          />
+        )}
+      </FormField>
       <FormField label={t('Comando')}>
         {(id) => (
           <TextField.Root

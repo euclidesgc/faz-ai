@@ -54,8 +54,6 @@ export interface BoardHostOptions {
     name: 'vscode' | 'cursor';
     /** quando a janela abriu: o registro gravado depois disso pede para recarregar */
     startedAt: number;
-    /** pasta de configuração do usuário no VS Code (o `mcp.json` global do Copilot no editor); só no VS Code */
-    userDir?: string;
   };
   /**
    * roda um comando num terminal novo do editor, à vista da pessoa (o "Instalar tudo" do Diagnóstico);
@@ -263,7 +261,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       signedIn: (tool, exe) => (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : Promise.resolve(null)),
       editor: o.editor?.name,
       windowStartedAt: o.editor?.startedAt,
-      editorUserDir: o.editor?.userDir,
       editorPath: o.editor ? (process.env.PATH ?? '') : undefined,
       skillInstalled: flowSkillInstalled(),
     })
@@ -320,13 +317,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   // os MCPs que o chat do editor inicia (o do board e o do Code Review Graph): o editor os procura no
   // PATH de quando abriu, e o que foi instalado depois só aparece nele com o caminho completo
-  const editorFiles = o.editor ? editorMcpFiles(o.editor.name, o.folderPath, homeDir, o.editor.userDir) : null;
+  const editorFiles = o.editor?.name === 'cursor' ? editorMcpFiles(o.folderPath, homeDir) : null;
   const editorPath = () => process.env.PATH ?? '';
   const resolveHere = (command: string) => resolveCommand(command, pathEnv, homeDir);
   const crgMcpState = (tool: AiTool) => {
-    const usesEditor =
-      o.editor && ((o.editor.name === 'cursor' && tool === 'cursor') || (o.editor.name === 'vscode' && tool === 'copilot'));
-    if (!editorFiles || !usesEditor) return undefined;
+    if (!editorFiles || tool !== 'cursor') return undefined;
     if (!registeredIn(editorFiles, 'code-review-graph')) return 'unregistered' as const;
     const broken = unreachableServers(editorFiles, editorPath(), resolveHere).filter((u) => u.server === 'code-review-graph');
     if (!broken.length) return 'ok' as const;
@@ -507,7 +502,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         homeDir,
         nodeCommand: nodePath,
         scope,
-        editorUserDir: o.editor?.userDir,
       });
       for (const step of done.flatMap((d) => d.run ?? [])) {
         const exe = resolveCommand(step.command, pathEnv, homeDir);
