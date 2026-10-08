@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { ExecInput } from '../src/extension/execution';
 import { headlessCommand, tmpArg, type HeadlessCommand } from '../src/extension/headless';
-import { EXEC_ENFORCEMENT, defaultAgent, effortToRun, parseProfiles } from '../src/shared/execution';
+import { CONDUCTOR_AGENT, EXEC_ENFORCEMENT, agentProfiles, defaultAgent, effortToRun, parseProfiles } from '../src/shared/execution';
+import type { Agent } from '../src/shared/harness';
+import { toItemName } from '../src/shared/harnessProject';
 import { ALL_AI_TOOLS } from '../src/shared/harness';
 
 const exec: ExecInput = {
@@ -154,5 +156,43 @@ describe('effortToRun', () => {
     expect(effortToRun(option('cursor'), null)).toBe('high');
     expect(effortToRun(option('cursor'), 'max')).toBe('high');
     expect(effortToRun(option('claude'), null)).toBeNull();
+  });
+});
+
+describe('agentProfiles: o padrão do board', () => {
+  const agent = (name: string): Agent => ({
+    name,
+    scope: 'user',
+    path: `/h/.claude/agents/${name}.md`,
+    location: `~/.claude/agents/${name}.md`,
+    content: '',
+    description: name,
+    model: '',
+    modelValue: '',
+    body: '',
+    tools: [],
+    deniedTools: [],
+    skills: [],
+    mcp: [],
+    seed: false,
+  });
+  const marked = (names: string[]) =>
+    names.map((n) => ({ kind: 'agent' as const, location: `~/.claude/agents/${n}.md`, usage: 'contextual' as const }));
+
+  it('o escolhido em Configurações vale; sem ele (apagado, desmarcado), o condutor; sem o condutor, o primeiro', () => {
+    const agents = [agent('backend-node'), agent(CONDUCTOR_AGENT), agent('qa-testes')];
+    const defaults = (chosen: string, list = agents) =>
+      agentProfiles(list, marked(list.map((a) => a.name)), chosen).find((p) => p.isDefault)?.id;
+    expect(defaults('qa-testes')).toBe('qa-testes');
+    expect(defaults('agente-padr-o')).toBe(CONDUCTOR_AGENT);
+    expect(defaults('')).toBe(CONDUCTOR_AGENT);
+    expect(defaults('agente-padr-o', [agent('backend-node'), agent('qa-testes')])).toBe('backend-node');
+  });
+});
+
+describe('toItemName', () => {
+  it('tira acentos antes de trocar o resto por hífen: "Agente padrão" vira agente-padrao, não agente-padr-o', () => {
+    expect(toItemName('Agente padrão')).toBe('agente-padrao');
+    expect(toItemName('Revisão de Código')).toBe('revisao-de-codigo');
   });
 });

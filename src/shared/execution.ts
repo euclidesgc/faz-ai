@@ -37,6 +37,9 @@ export interface ExecProfile {
   path: string;
 }
 
+/** O agente de fábrica que conduz os cards pelo fluxo: é o padrão do board quando o escolhido não existe. */
+export const CONDUCTOR_AGENT = 'condutor-do-board';
+
 /** O agente que existe quando o board não tem nenhum marcado: sem instruções nem restrições, só o contexto vazio do board. */
 export const defaultAgent = (): ExecProfile => ({
   id: 'padrao',
@@ -71,8 +74,9 @@ export const profileOfAgent = (a: Agent, isDefault: boolean): ExecProfile => ({
 
 /**
  * Os agentes do board: os arquivos de agente da ferramenta em uso marcados como disponíveis, com o padrão
- * (`defaultName`, de Configurações) à frente. Sem nenhum, o embutido. Um projeto e um global de mesmo nome
- * são o mesmo agente para o card: vale o do projeto.
+ * (`defaultName`, de Configurações) à frente; se ele não existe (apagado, desmarcado, nome de outra
+ * versão), vale o condutor, e só sem o condutor o primeiro da lista. Sem nenhum, o embutido. Um projeto e
+ * um global de mesmo nome são o mesmo agente para o card: vale o do projeto.
  */
 export function agentProfiles(agents: readonly Agent[], selection: readonly HarnessSelection[], defaultName: string): ExecProfile[] {
   const byName = new Map<string, Agent>();
@@ -83,7 +87,8 @@ export function agentProfiles(agents: readonly Agent[], selection: readonly Harn
   }
   const list = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
   if (!list.length) return [defaultAgent()];
-  const chosen = list.some((a) => a.name === defaultName) ? defaultName : list[0]!.name;
+  const has = (name: string) => list.some((a) => a.name === name);
+  const chosen = has(defaultName) ? defaultName : has(CONDUCTOR_AGENT) ? CONDUCTOR_AGENT : list[0]!.name;
   return list.map((a) => profileOfAgent(a, a.name === chosen));
 }
 

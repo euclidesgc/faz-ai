@@ -7,8 +7,13 @@ export type AiToolInfo = ReturnType<typeof aiToolInfo>;
 /** Nome da skill que ensina a IA a conduzir os cards pelo fluxo do board. */
 export const FLOW_SKILL_NAME = 'faz-ai-fluxo';
 
-/** Normaliza o nome digitado de uma skill ou agente: minúsculas, e o que não é letra, número ou hífen vira hífen. */
-export const toItemName = (raw: string): string => raw.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+/** Normaliza o nome digitado de uma skill ou agente: minúsculas, sem acentos (`padrão` → `padrao`), e o que não é letra, número ou hífen vira hífen. */
+export const toItemName = (raw: string): string =>
+  raw
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-');
 
 /** Nome válido para uma skill ou agente e ainda não usado por nenhum de `taken`. */
 export const isFreeName = (name: string, taken: readonly { name: string }[]): boolean =>

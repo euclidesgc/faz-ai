@@ -6,6 +6,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Agente padrão depois da migração dos perfis.** Ao abrir um board gravado por uma versão anterior, o
+  "Agente padrão" embutido (sem instruções) virava o arquivo `~/.claude/agents/agente-padr-o.md`, com
+  o nome truncado pelo acento e com Opus como modelo, e ficava como padrão do board no lugar do
+  `condutor-do-board`. Agora esse perfil não vira arquivo (quem apontava para ele segue o padrão do
+  board), os nomes migrados perdem só o acento (`agente-padrao`), e, quando o agente escolhido como
+  padrão não existe, vale o condutor, não o primeiro da lista. Se o arquivo truncado já foi criado,
+  apague-o em Configurações → Harness → Global → Agentes.
 - **Contexto vazio por padrão e Harness com marcação.** Toda execução pelo board (Trabalhar na fase,
   Refinar com IA, heartbeat, chat do board) passa a partir de contexto vazio: nenhuma regra, skill,
   agente, hook ou plugin da sua máquina ou do projeto entra por conta própria. No Claude Code isso é

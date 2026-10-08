@@ -7,6 +7,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Default agent after the profile migration.** Opening a board saved by an earlier version turned
+  the built-in "Agente padrão" (no instructions) into the file `~/.claude/agents/agente-padr-o.md`,
+  with the name cut by the accent and Opus as its model, and made it the board's default instead of
+  `condutor-do-board`. Now that profile does not become a file (whatever pointed at it follows the
+  board's default), migrated names only lose their accents (`agente-padrao`), and when the agent
+  chosen as default does not exist, the conductor is used, not the first in the list. If the cut
+  file was already created, delete it under Configurações → Harness → Global → Agentes.
 - **Empty context by default and Harness with check marks.** Every run started by the board (Work
   on the phase, Refine with AI, heartbeat, board chat) now starts from an empty context: no rule,
   skill, agent, hook or plugin from your machine or the project gets in on its own. In Claude Code
