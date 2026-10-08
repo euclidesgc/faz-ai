@@ -24,18 +24,18 @@ const input: AgentInput = {
 
 describe('arquivos de agente', () => {
   it('markdown: grava as chaves da ferramenta e as do board, e lê de volta o mesmo agente', () => {
-    const spec = aiToolInfo('claude').agents!;
+    const spec = aiToolInfo('claude').agents;
     const text = renderAgentFile(spec, input, true);
     expect(text).toBe(
       [
         '---',
-        'name: frontend-web',
-        'description: Frontend web em React',
+        'name: "frontend-web"',
+        'description: "Frontend web em React"',
         'tools: Read, Edit',
         'disallowedTools: WebFetch',
         'model: sonnet',
         'skills: faz-ai-fluxo, modelos',
-        'faz-ai-model: claude:sonnet@medium',
+        'faz-ai-model: "claude:sonnet@medium"',
         'faz-ai-mcp: github',
         'faz-ai-seed: true',
         '---',
@@ -56,7 +56,7 @@ describe('arquivos de agente', () => {
   });
 
   it('markdown escrito por fora: lista em bloco YAML, sem as chaves do board', () => {
-    const spec = aiToolInfo('claude').agents!;
+    const spec = aiToolInfo('claude').agents;
     const text = '---\nname: x\ndescription: "Entre aspas"\ntools:\n  - Read\n  - Grep\nmodel: opus\n---\nCorpo\n';
     const agent = parseAgentFile(
       spec,
@@ -75,22 +75,20 @@ describe('arquivos de agente', () => {
     });
   });
 
-  it('TOML (Codex): as mesmas informações nas chaves faz_ai_*', () => {
-    const spec = aiToolInfo('codex').agents!;
-    const text = renderAgentFile(spec, { ...input, model: 'codex:gpt-6-luna@medium' });
-    expect(text).toContain('model = "gpt-6-luna"\nfaz_ai_model = "codex:gpt-6-luna@medium"\nfaz_ai_tools = "Read, Edit"');
-    expect(text).toContain('developer_instructions = """\nSiga os padrões.\n\nTeste tudo.\n"""');
-    const agent = parseAgentFile(
-      spec,
-      { name: 'frontend-web', scope: 'user', path: '/h/.codex/agents/frontend-web.toml', location: '~/.codex/agents/frontend-web.toml' },
-      text,
-    );
-    expect(agentInputOf(agent)).toEqual({ ...input, model: 'codex:gpt-6-luna@medium' });
+  it('o que o board grava é YAML válido para a ferramenta: descrição com dois-pontos vai entre aspas', () => {
+    const spec = aiToolInfo('claude').agents;
+    const seed = { ...input, description: 'Frontend web em React/TypeScript: componentes, estado e testes.' };
+    const text = renderAgentFile(spec, seed);
+    // sem aspas, um parser de YAML lê `React/TypeScript: componentes` como um mapa dentro do valor e recusa o arquivo
+    expect(text).toContain(`description: ${JSON.stringify(seed.description)}\n`);
+    expect(text).toContain('faz-ai-model: "claude:sonnet@medium"\n');
+    const agent = parseAgentFile(spec, { name: 'frontend-web', scope: 'user', path: '/h/x.md', location: '~/x.md' }, text);
+    expect(agentInputOf(agent)).toEqual(seed);
   });
 
   it('o modelo nativo é o id sem a ferramenta nem o esforço', () => {
     expect(nativeModelOf('claude:sonnet@medium')).toBe('sonnet');
-    expect(nativeModelOf('kimi:kimi-code/k3@high')).toBe('kimi-code/k3');
+    expect(nativeModelOf('cursor:gpt-6-luna@high')).toBe('gpt-6-luna');
     expect(nativeModelOf('')).toBe('');
   });
 });

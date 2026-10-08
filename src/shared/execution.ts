@@ -7,7 +7,7 @@ import { columnOf, valueOf } from './selectors';
 /**
  * Agente do board: o que uma sessão de IA recebe para trabalhar num card, definido antes, em vez de
  * descoberto pela ferramenta. É o arquivo de agente da ferramenta (`~/.claude/agents/<nome>.md`,
- * `.codex/agents/<nome>.toml`...), lido do disco e marcado como disponível em Configurações → Harness.
+ * `~/.cursor/agents/<nome>.md`), lido do disco e marcado como disponível em Configurações → Harness.
  * Toda execução pelo board roda através de um agente: o do card, o da fase ou o padrão do board.
  * Sem nenhum arquivo marcado, vale o agente embutido (`defaultAgent`), sem instruções.
  */
@@ -239,8 +239,5 @@ export const EXEC_ASPECTS: { id: ExecAspect; label: string }[] = [
  */
 export const EXEC_ENFORCEMENT: Record<AiTool, Record<ExecAspect, 'enforced' | 'advised'>> = {
   claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', context: 'enforced' },
-  copilot: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', context: 'enforced' },
-  kimi: { agent: 'enforced', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', context: 'advised' },
-  codex: { agent: 'advised', skills: 'advised', mcp: 'enforced', tools: 'advised', model: 'enforced', context: 'advised' },
   cursor: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', context: 'advised' },
 };

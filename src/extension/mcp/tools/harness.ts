@@ -85,7 +85,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'set_ai_tool',
-    'Define a ferramenta de IA com que o projeto trabalha (uma por vez). Isso troca a pasta de skills (.claude/skills, .agents/skills, .cursor/skills, .kimi-code/skills ou .github/skills), o arquivo de regras, os modelos e as regras de esforço.',
+    'Define a ferramenta de IA com que o projeto trabalha (uma por vez). Isso troca a pasta de skills (.claude/skills ou .cursor/skills), o arquivo de regras, os modelos e as regras de esforço.',
     { tool: z.enum(ALL_AI_TOOLS as [string, ...string[]]) },
     (a, router) => {
       router.handle({ type: 'settings.board.update', patch: { aiTool: a.tool as AiTool } });

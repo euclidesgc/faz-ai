@@ -45,7 +45,7 @@ function formatCost(usd: number): string {
 type TableVariant = 'normal' | 'inventory' | 'mcp';
 
 const HEADERS: Record<TableVariant, string[]> = {
-  normal: ['grupo', 'execuções', 'duração', 'tokens', 'custo(estimado)'],
+  normal: ['grupo', 'execuções', 'duração', 'tokens', 'custo'],
   inventory: ['grupo', 'execuções', 'usos'],
   mcp: ['grupo', 'servidor', 'execuções', 'usos'],
 };
@@ -85,16 +85,16 @@ function formatCoverage(result: MetricsResult): string {
   if (result.partialMonths.length)
     lines.push(`recorte parcial de mês consolidado (valor do mês inteiro): ${result.partialMonths.join(', ')}`);
   if (result.othersCount > 0) lines.push(`"outros" soma ${result.othersCount} grupo(s) fora do limite`);
-  // tokens e custo têm cada um a sua cobertura: execução medida sem preço no catálogo tem tokens e não tem custo
+  // tokens e custo têm cada um a sua cobertura: só o Claude Code informa o custo, então uma execução do Cursor tem tokens e não tem custo
   if (result.tokensPartial) lines.push('tokens parciais: parte das execuções do recorte não tem consumo medido');
   const hasCost = result.rows.some((r) => r.costUsd != null);
   if (result.costPartial)
     lines.push(
       hasCost
-        ? 'custo estimado e parcial: parte das execuções do recorte não tem custo medido'
-        : 'custo não medido: nenhuma execução do recorte tem custo (sem preço no catálogo ou sem medição)',
+        ? 'custo parcial: só o que a ferramenta informa (o Claude Code); parte das execuções do recorte não tem custo informado'
+        : 'custo não medido: nenhuma execução do recorte tem custo informado pela ferramenta (só o Claude Code informa)',
     );
-  else if (hasCost) lines.push('custo estimado');
+  else if (hasCost) lines.push('custo informado pela ferramenta');
   return lines.join('\n');
 }
 
@@ -112,8 +112,8 @@ export function registerMetricsTools(tool: DefineTool): void {
   tool(
     'get_metrics',
     'Uso, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
-      'com filtros de período e card. Resposta em tabela compacta; custo e tokens vêm marcados como estimados e "-" quando não medidos (nunca 0). ' +
-      '"tool" é a ferramenta de IA que rodou (claude, codex); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"). ' +
+      'com filtros de período e card. Resposta em tabela compacta; o custo é o que a própria ferramenta informou (só o Claude Code informa; o board não calcula custo por tabela de preços) e os tokens são os medidos; ambos vêm como "-" quando não medidos (nunca 0). ' +
+      '"tool" é a ferramenta de IA que rodou (claude, cursor); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"). ' +
       'Nas dimensões "agent", "skill", "used_tool" e "mcp_tool" não há tokens/custo (não é possível repartir o custo de uma execução entre o que ela usou); "effort" e "profile" têm.',
     {
       group_by: z.enum(GROUP_BY).optional().describe('Dimensão de agrupamento; omitido = total do recorte'),
@@ -126,7 +126,7 @@ export function registerMetricsTools(tool: DefineTool): void {
       tool: z
         .string()
         .optional()
-        .describe('Ferramenta de IA (claude, codex...), não a ferramenta usada pela execução (essa é a dimensão used_tool/mcp_tool)'),
+        .describe('Ferramenta de IA (claude, cursor), não a ferramenta usada pela execução (essa é a dimensão used_tool/mcp_tool)'),
       limit: z.number().int().min(1).max(100).optional().describe('Linhas antes de somar o resto em "outros"; padrão 20'),
     },
     (a, router) => {

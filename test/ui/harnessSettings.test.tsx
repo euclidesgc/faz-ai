@@ -353,7 +353,7 @@ describe('HarnessSettings: ferramenta e execução', () => {
     await userEvent.click(radios[0]!);
     expect(sentOf('settings.board.update')).toHaveLength(0);
     await userEvent.click(radios[1]!);
-    expect(lastSent('settings.board.update')).toEqual({ type: 'settings.board.update', patch: { aiTool: 'codex' } });
+    expect(lastSent('settings.board.update')).toEqual({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
   });
 
   it('a aba da ferramenta não instala o MCP: aponta para a seção da ferramenta', () => {

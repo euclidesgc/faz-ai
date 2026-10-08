@@ -35,23 +35,6 @@ export function skillTemplate(name: string, description: string, body: string): 
   return `---\nname: ${name}\ndescription: ${description.replace(/\r?\n/g, ' ').trim()}\n---\n\n${body.trim()}\n`;
 }
 
-/** Arquivo de um agente no formato da ferramenta: markdown com frontmatter, ou TOML no Codex. */
-export function agentTemplate(spec: AgentSpec, name: string, description: string, body: string, model = ''): string {
-  const oneLine = description.replace(/\r?\n/g, ' ').trim();
-  const withModel = spec.modelField && model.trim() ? model.trim() : '';
-  if (spec.format === 'toml') {
-    // strings JSON são strings básicas válidas em TOML
-    const lines = [
-      `name = ${JSON.stringify(name)}`,
-      `description = ${JSON.stringify(oneLine)}`,
-      ...(withModel ? [`${spec.modelField} = ${JSON.stringify(withModel)}`] : []),
-    ];
-    return `${lines.join('\n')}\ndeveloper_instructions = """\n${body.trim().replace(/"""/g, "'''")}\n"""\n`;
-  }
-  const lines = [`name: ${name}`, `description: ${oneLine}`, ...(withModel ? [`${spec.modelField}: ${withModel}`] : [])];
-  return `---\n${lines.join('\n')}\n---\n\n${body.trim()}\n`;
-}
-
 /**
  * Arquivos de regras e skills de uma pasta de projeto, vistos pela ferramenta de IA em uso: as skills
  * são as da pasta que essa ferramenta lê. Pastas de outras ferramentas podem existir, mas ficam de fora.
@@ -165,8 +148,6 @@ export class HarnessStore {
     if (fs.existsSync(file))
       throw new Error(`Já existe um agente "${input.name}"${scope === 'user' ? ' na pasta do usuário' : ' no projeto'}.`);
     if (!input.description.trim()) throw new Error('O agente precisa de uma descrição: é por ela que a IA decide quando delegar a ele.');
-    if (input.model.trim() && !this.agentSpec.modelField)
-      throw new Error(`O ${aiToolInfo(this.tool).label} não permite fixar o modelo de um agente.`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, renderAgentFile(this.agentSpec, input, seed));
     return file;
@@ -224,7 +205,7 @@ export class HarnessStore {
 
   /** Invocação automática ou só quando indicada, gravado no formato da ferramenta em uso. */
   setSkillMode(name: string, mode: SkillMode): void {
-    setSkillMode(this.tool, path.join(this.dirOf(name).dir, 'SKILL.md'), mode);
+    setSkillMode(path.join(this.dirOf(name).dir, 'SKILL.md'), mode);
   }
 
   deleteSkill(name: string): void {

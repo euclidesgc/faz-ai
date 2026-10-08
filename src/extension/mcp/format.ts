@@ -4,10 +4,8 @@ import { isSelectableKind, usageOf } from '../../shared/harnessSelection';
 import { norm } from '../../shared/filters';
 import {
   describeRule,
-  hasVariablePrice,
   modelFieldOf,
   modelLabel,
-  modelPrice,
   parseModelValue,
   resolveModelInput,
   suggestModel,
@@ -202,10 +200,6 @@ export function modelsOverview(s: BoardState) {
       label: o.label,
       efforts: o.efforts,
       defaultEffort: o.defaultEffort,
-      // null = sem preço completo ou com preço variável: o board não estima o custo desse modelo
-      price: modelPrice(o),
-      // o efetivo: o `auto` do Cursor é variável mesmo num catálogo gravado antes do campo
-      variablePrice: hasVariablePrice(o),
     })),
     rules: s.board.modelRules.map((r) => ({
       ...(r.name ? { name: r.name } : {}),

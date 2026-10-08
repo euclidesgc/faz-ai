@@ -302,7 +302,7 @@ export const harnessHandlers = {
   'harness.skill.delete': (msg, ctx) => ctx.harness.op((h) => h.deleteSkill(msg.name)),
   'harness.skill.setMode': (msg, { harness: h }) => {
     const items = msg.paths.map((p) => h.item(msg.tool, 'skill', p));
-    return h.changeEach(items, (item) => h.ops.setSkillMode(msg.tool, item, msg.mode));
+    return h.changeEach(items, (item) => h.ops.setSkillMode(item, msg.mode));
   },
   'harness.selection.set': (msg, ctx) => {
     ctx.boards.setSelection(ctx.boardId, msg.items, msg.usage);

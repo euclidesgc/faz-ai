@@ -5,9 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { streamReader } from '../src/extension/aiOutput/stream';
-import type { ReaderDeps } from '../src/extension/aiOutput/reader';
-import type { ModelOption } from '../src/shared/models';
+import { cursorReader } from '../src/extension/aiOutput/cursor';
 
 const SESSION = '8c1d1c7e-0000-4000-8000-000000000001';
 
@@ -61,18 +59,8 @@ const result = (usage?: Record<string, number>) =>
     ...(usage ? { usage } : {}),
   });
 
-const composer: ModelOption = {
-  id: 'cursor:composer-2.5',
-  tool: 'cursor',
-  model: 'composer-2.5',
-  label: 'Composer 2.5',
-  efforts: [],
-  defaultEffort: null,
-  price: { input: 1, output: 2, cacheRead: 0.5, cacheWrite: 1 },
-};
-
-function read(lines: string[], deps: Partial<ReaderDeps> = {}) {
-  const reader = streamReader({ catalog: [], model: null, ...deps });
+function read(lines: string[]) {
+  const reader = cursorReader();
   const shown = lines.flatMap((l) => reader.push(l, 'stdout'));
   return { reader, shown };
 }
@@ -141,33 +129,13 @@ describe('stream-json do Cursor', () => {
     expect(reader.report().consumption).toBeNull();
   });
 
-  it('estima o custo pelo modelo que rodou (o nome de exibição do init), mesmo com o board pedindo `auto`', () => {
-    const { reader } = read(
-      [init('Composer 2.5'), result({ inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 })],
-      {
-        catalog: [composer],
-        model: 'auto',
-      },
-    );
-    expect(reader.report().consumption).toMatchObject({ costUsd: 1, costEstimated: true });
-  });
-
-  it('com a regra da tarifa do Cursor, o modelo de terceiros que rodou custa o preço de lista mais US$ 0,25/M', () => {
-    const opus: ModelOption = { ...composer, id: 'cursor:claude-opus-5-5', model: 'claude-opus-5-5', label: 'Claude Opus 5.5' };
-    const lines = [init('Claude Opus 5.5'), result({ inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 })];
-    expect(read(lines, { catalog: [opus], model: 'auto', cursorTokenRate: true }).reader.report().consumption).toMatchObject({
-      costUsd: 1.25,
-      costEstimated: true,
-    });
-    expect(read(lines, { catalog: [opus], model: 'auto' }).reader.report().consumption).toMatchObject({ costUsd: 1 });
-  });
-
-  it('pelo `auto`, sem saber o modelo que rodou, não há estimativa: o preço dele é variável', () => {
-    const auto: ModelOption = { ...composer, id: 'cursor:auto', model: 'auto', label: 'Auto' };
-    const { reader } = read([result({ inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 })], {
-      catalog: [auto],
-      model: 'auto',
-    });
-    expect(reader.report().consumption).toMatchObject({ costUsd: null, costEstimated: false });
+  it('o Cursor só informa tokens: o custo fica sem número, qualquer que seja o modelo que rodou', () => {
+    const { reader } = read([
+      init('Composer 2.5'),
+      result({ inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }),
+    ]);
+    const c = reader.report().consumption!;
+    expect(c.inputTokens).toBe(1_000_000);
+    expect(c.costUsd).toBeNull();
   });
 });

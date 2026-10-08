@@ -58,7 +58,7 @@ export function AgentsTable({ tool, scope }: { tool: AiToolInfo; scope: InstallS
           'Um agente é um arquivo de agente do {tool} em <code>{dir}</code>: as instruções são o papel da sessão, e o frontmatter diz o modelo, as ferramentas, as skills e os servidores MCP que ela recebe. <b>Disponível no board</b> é o que os cards e as fases podem escolher; o <b>padrão</b> executa quando nenhum deles escolhe.',
           {
             tool: tool.label,
-            dir: scope === 'project' ? tool.agents.dir : `~/${tool.agents.dir === '.github/agents' ? '.copilot/agents' : tool.agents.dir}`,
+            dir: scope === 'project' ? tool.agents.dir : `~/${tool.agents.dir}`,
           },
         )}
       </p>
@@ -114,13 +114,11 @@ export function AgentsTable({ tool, scope }: { tool: AiToolInfo; scope: InstallS
               />
             )}
           </FormField>
-          {tool.agents.modelField && (
-            <FormField label={t('Modelo e esforço')} hint={t('O modelo indicado no card tem preferência.')}>
-              {() => (
-                <ModelEditor value={draft.model || null} onChange={(v) => setDraft({ ...draft, model: typeof v === 'string' ? v : '' })} />
-              )}
-            </FormField>
-          )}
+          <FormField label={t('Modelo e esforço')} hint={t('O modelo indicado no card tem preferência.')}>
+            {() => (
+              <ModelEditor value={draft.model || null} onChange={(v) => setDraft({ ...draft, model: typeof v === 'string' ? v : '' })} />
+            )}
+          </FormField>
           <FormField label={t('Instruções')}>
             {(id) => (
               <TextArea

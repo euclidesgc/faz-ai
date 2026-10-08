@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent } from 'react';
 import { AI_TOOLS, type AiTool } from '../../../shared/harness';
-import { hasVariablePrice, modelId, withPrice, type ModelOption, type ModelPrice } from '../../../shared/models';
+import { modelId, type ModelOption } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { t } from '../../i18n';
@@ -20,31 +20,8 @@ const splitList = (s: string): string[] =>
 /** De onde vem a lista de modelos de cada ferramenta ao clicar em "Detectar". */
 const SOURCES: Record<AiTool, string> = {
   claude: 'lista embutida na extensão (o Claude Code não guarda a lista em arquivo)',
-  codex: 'lista embutida na extensão (o Codex não guarda a lista em arquivo)',
   cursor: 'lida do comando cursor-agent models, com a conta em uso; sem a CLI autenticada, lista embutida na extensão',
-  kimi: 'lida do config.toml do Kimi nesta máquina, com os esforços de cada modelo',
-  copilot: 'lista embutida na extensão (o GitHub Copilot não guarda a lista em arquivo)',
 };
-
-/** Os quatro campos do preço de um modelo, na ordem em que aparecem na tabela. */
-function priceFields(model: string): { key: keyof ModelPrice; caption: string; label: string }[] {
-  return [
-    { key: 'input', caption: t('entrada'), label: t('Preço de entrada de {model}', { model }) },
-    { key: 'output', caption: t('saída'), label: t('Preço de saída de {model}', { model }) },
-    { key: 'cacheRead', caption: t('leitura de cache'), label: t('Preço de leitura de cache de {model}', { model }) },
-    { key: 'cacheWrite', caption: t('criação de cache'), label: t('Preço de criação de cache de {model}', { model }) },
-  ];
-}
-
-/** O que está gravado no campo, ou '' quando vazio (vazio é ausência de preço, não zero). */
-const priceText = (o: ModelOption, key: keyof ModelPrice): string => {
-  const v = o.price?.[key];
-  return typeof v === 'number' ? String(v) : '';
-};
-
-/** A documentação de preços do Cursor: é a referência do que cadastrar e de como o `auto` cobra. */
-const CURSOR_PRICING_URL = 'https://cursor.com/docs/models-and-pricing';
-const CURSOR_TOKEN_RATE_URL = 'https://cursor.com/help/models-and-usage/token-rate';
 
 const EMPTY_DRAFT = { model: '', label: '', efforts: '' };
 
@@ -135,8 +112,6 @@ export function ModelsSettings() {
   // as mudanças partem da última lista enviada (ver useSentList)
   const sent = useSentList(catalog, settings.setModels);
   const setCatalog = sent.save;
-  const setPrice = (o: ModelOption, key: keyof ModelPrice, value: number | null) =>
-    setCatalog(sent.current().map((x) => (x.id === o.id ? withPrice(x, { [key]: value }) : x)));
   const patchModel = (id: string, patch: Partial<ModelOption>) =>
     setCatalog(sent.current().map((o) => (o.id === id ? { ...o, ...patch } : o)));
 
@@ -189,21 +164,8 @@ export function ModelsSettings() {
                 />
                 <Text as="p" size="1" color="gray">
                   {t(
-                    'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"), com preço próprio para a estimativa de custo; desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.',
+                    'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"); desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.',
                   )}
-                </Text>
-                <SwitchField
-                  label={t('Somar a tarifa do Cursor (Cursor Token Rate)')}
-                  checked={state.board.rules.cursorTokenRate}
-                  onChange={(cursorTokenRate) => settings.updateRules({ cursorTokenRate })}
-                />
-                <Text as="p" size="1" color="gray">
-                  {t(
-                    'Nos planos Teams e Enterprise, o Cursor cobra US$ 0,25 por milhão de tokens (input, output e cache) por cima do preço dos modelos de terceiros. Ligado, a estimativa de custo soma essa tarifa; Composer, Grok e Auto são isentos. Execuções já registradas não mudam.',
-                  )}{' '}
-                  <a href={CURSOR_TOKEN_RATE_URL} target="_blank" rel="noreferrer">
-                    {t('Sobre a tarifa')}
-                  </a>
                 </Text>
               </div>
             )}
@@ -222,7 +184,6 @@ export function ModelsSettings() {
                   <th>{t('Identificador na ferramenta')}</th>
                   <th>{t('Esforços aceitos (separados por vírgula)')}</th>
                   <th>{t('Esforço padrão')}</th>
-                  <th>{t('Preço (US$ por milhão de tokens)')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -270,54 +231,6 @@ export function ModelsSettings() {
                         />
                       )}
                     </td>
-                    <td>
-                      <div className="price-variable">
-                        <SwitchField
-                          label={<span className="small">{t('Preço variável')}</span>}
-                          title={t('Preço variável de {model}', { model: o.model })}
-                          checked={hasVariablePrice(o)}
-                          onChange={(variablePrice) => patchModel(o.id, { variablePrice })}
-                        />
-                      </div>
-                      {hasVariablePrice(o) ? (
-                        <Text as="p" size="1" color="gray" className="price-variable-note">
-                          {t('O custo depende do modelo escolhido a cada pedido; o board não estima o custo deste modelo.')}{' '}
-                          {o.tool === 'cursor' && (
-                            <a href={CURSOR_PRICING_URL} target="_blank" rel="noreferrer">
-                              {t('Preços do Cursor')}
-                            </a>
-                          )}
-                        </Text>
-                      ) : (
-                        <div className="price-grid">
-                          {priceFields(o.model).map((f) => (
-                            <div key={f.key} className="price-field">
-                              <span className="muted small" aria-hidden="true">
-                                {f.caption}
-                              </span>
-                              <TextField.Root
-                                type="number"
-                                min="0"
-                                step="any"
-                                aria-label={f.label}
-                                key={`${f.key}:${priceText(o, f.key)}`}
-                                defaultValue={priceText(o, f.key)}
-                                onBlur={(e) => {
-                                  const text = e.target.value.trim();
-                                  const value = text === '' ? null : Number(text);
-                                  if (value !== null && (!Number.isFinite(value) || value < 0)) {
-                                    e.target.value = priceText(o, f.key); // número inválido: volta ao que estava gravado
-                                    return;
-                                  }
-                                  if (value !== (o.price?.[f.key] ?? null)) setPrice(o, f.key, value);
-                                }}
-                                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
                     {/* sem confirmação de propósito: a lista pode ser refeita com "Detectar modelos" */}
                     <td className="narrow">
                       <IconButton
@@ -334,29 +247,13 @@ export function ModelsSettings() {
                 ))}
                 {mine.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="muted">
+                    <td colSpan={5} className="muted">
                       {t('Nenhum modelo. Use "Detectar modelos" ou "Novo modelo".')}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-            <Text as="p" size="1" color="gray" className="price-hint">
-              {t(
-                'O custo informado pela ferramenta tem preferência; o preço aqui é usado para estimar o custo das ferramentas que não informam.',
-              )}
-              {tl.id === 'cursor' && (
-                <>
-                  {' '}
-                  {t(
-                    'No Cursor, a estimativa usa a tarifa cadastrada: o modo rápido é um modelo à parte, com preço próprio, e o contexto longo (mais de 256 mil tokens, que pode custar 2x) não é separado, porque o Cursor só informa o total de tokens.',
-                  )}{' '}
-                  <a href={CURSOR_PRICING_URL} target="_blank" rel="noreferrer">
-                    {t('Preços do Cursor')}
-                  </a>
-                </>
-              )}
-            </Text>
           </SettingsCard>
         );
       })}

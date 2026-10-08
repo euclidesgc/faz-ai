@@ -1,19 +1,18 @@
-// Leitor genérico de `stream-json`, usado por Cursor e Kimi. Os eventos `system`, `assistant`,
-// `tool_call` e `result` seguem o espírito do formato do Claude Code. O do Cursor foi conferido
-// contra execuções reais da CLI 2026.10.01 (test/fixtures/cursor-stream-json.jsonl; a documentação
-// pública não descreve o consumo):
+// Leitor do `stream-json` do Cursor (`cursor-agent --output-format stream-json`). Os eventos `system`,
+// `assistant`, `tool_call` e `result` seguem o espírito do formato do Claude Code. Foi conferido contra
+// execuções reais da CLI 2026.10.01 (test/fixtures/cursor-stream-json.jsonl; a documentação pública não
+// descreve o consumo):
 // - `system`/`init` traz em `model` o nome de exibição do modelo que rodou ("Composer 2.5");
 // - `tool_call` sai duas vezes por chamada (`started` e `completed`), com a ferramenta como a chave de
 //   `tool_call` (`{"readToolCall": {...}}`; MCP é `{"mcpToolCall": {"args": {"providerIdentifier",
 //   "toolName"}}}`);
 // - `result` traz `usage` em camelCase (`inputTokens` já sem o cache, `outputTokens`,
 //   `cacheReadTokens`, `cacheWriteTokens`).
-// O Kimi continua só pela documentação, que não promete bloco de consumo: por isso a ausência de
+// A CLI não informa custo em dólar e o board não o calcula: só os tokens são medidos. A ausência de
 // `usage` é tratada como caso normal — ver o comentário em `report()`.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
-import { costOf, matchModel } from './price';
-import type { OutputReader, OutputStream, ReaderDeps } from './reader';
+import type { OutputReader, OutputStream } from './reader';
 
 /** Tamanho de uma linha que não é JSON, como o modo texto já corta hoje. */
 const RAW_MAX = 300;
@@ -26,21 +25,7 @@ function mcpSplit(name: string): string {
   return at < 0 ? rest : `${rest.slice(0, at)}/${rest.slice(at + 2)}`;
 }
 
-/**
- * O identificador do modelo que rodou, para casar com o catálogo. O Cursor informa o nome de
- * exibição ("Composer 2.5"), não o id: vale o modelo do catálogo com esse rótulo. Com o modelo
- * `auto`, que não tem preço, o informado é o único que diz o que custou.
- */
-function effectiveModel(deps: ReaderDeps, reported: string | null): string | null {
-  if (reported) {
-    const byLabel = deps.catalog.find((o) => o.label.toLowerCase() === reported.toLowerCase());
-    if (byLabel) return byLabel.model;
-    if (matchModel(deps.catalog, reported)) return reported;
-  }
-  return deps.model;
-}
-
-export function streamReader(deps: ReaderDeps): OutputReader {
+export function cursorReader(): OutputReader {
   let sawEvent = false;
   let sessionId: string | null = null;
   /** `kind\0name` → chamadas */
@@ -51,8 +36,6 @@ export function streamReader(deps: ReaderDeps): OutputReader {
   const resultTexts: string[] = [];
   /** o consumo do último `result` que trouxe um bloco `usage`; `null` enquanto nenhum trouxe */
   let tokens: AiRunTokens | null = null;
-  /** o modelo que a ferramenta disse ter usado, no evento `system`/`init` */
-  let reportedModel: string | null = null;
 
   const count = (kind: InventoryKind, name: string): void => {
     const key = `${kind}\u0000${name}`;
@@ -168,9 +151,6 @@ export function streamReader(deps: ReaderDeps): OutputReader {
           return onToolCall(o);
         case 'result':
           return onResult(o);
-        case 'system':
-          if (asText(o.subtype) === 'init') reportedModel ??= asText(o.model);
-          return [];
         // `system`: não há como saber que campos cada CLI põe ali além do `session_id`, já
         // capturado acima; e qualquer tipo que a próxima versão trouxer
         default:
@@ -188,12 +168,7 @@ export function streamReader(deps: ReaderDeps): OutputReader {
       const answer = resultTexts.at(-1) ?? saidText.join('\n');
 
       if (tokens) {
-        // nem Cursor nem Kimi informam custo: a estimativa sai do preço do catálogo, pelo modelo que
-        // rodou quando a ferramenta diz (o Cursor, no `init`, pelo nome de exibição) e senão pelo
-        // que o board pediu; sem nenhum dos dois, não há de onde estimar
-        const model = effectiveModel(deps, reportedModel);
-        const byModel = model !== null ? new Map([[model, tokens]]) : null;
-        const estimated = byModel ? costOf(deps.catalog, byModel, { cursorTokenRate: deps.cursorTokenRate }) : null;
+        // o Cursor não informa custo, e o board não o calcula: só os tokens são medidos
         return {
           measure: 'full',
           consumption: {
@@ -201,8 +176,7 @@ export function streamReader(deps: ReaderDeps): OutputReader {
             // nenhum dos dois formatos promete contagem de turno
             turns: null,
             sessionId,
-            costUsd: estimated,
-            costEstimated: estimated !== null,
+            costUsd: null,
           },
           inventory: items,
           answer,
@@ -210,7 +184,7 @@ export function streamReader(deps: ReaderDeps): OutputReader {
         };
       }
 
-      // O CASO CENTRAL deste leitor, e não a exceção: a documentação de Cursor e Kimi não promete
+      // O CASO CENTRAL deste leitor, e não a exceção: a documentação do Cursor não promete
       // bloco de uso, então ler eventos e montar inventário sem nenhum `usage` é o que normalmente
       // vai acontecer. `measure: 'none'` exigiria jogar fora um inventário verdadeiro só para caber
       // no rótulo mais simples — e a invariante do `RunReport` (em `src/shared/log.ts`) proíbe isso:

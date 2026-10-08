@@ -6,14 +6,11 @@ import { EFFORT_LEVELS, modelId, modelValue, type ModelOption } from '../shared/
 type Seed = [model: string, label: string, efforts: string[], defaultEffort: string | null];
 
 const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
-const CODEX_EFFORTS = ['light', 'medium', 'high', 'xhigh', 'max', 'ultra'];
-// níveis comuns ao seletor do VS Code e à Copilot CLI
-const COPILOT_EFFORTS = ['low', 'medium', 'high'];
 
 /**
  * Modelos conhecidos de cada ferramenta, conforme a documentação delas quando isto foi escrito.
- * É só o ponto de partida: o catálogo é editável no board e, quando a ferramenta guarda a lista em
- * um arquivo local (Kimi), `discoverModels` usa a lista real.
+ * É só o ponto de partida: o catálogo é editável no board e, quando a ferramenta informa a lista
+ * (o Cursor), `discoverModels` usa a lista real.
  */
 const BUILTIN: Record<AiTool, Seed[]> = {
   claude: [
@@ -22,30 +19,10 @@ const BUILTIN: Record<AiTool, Seed[]> = {
     ['sonnet', 'Sonnet 5.5', CLAUDE_EFFORTS, 'medium'],
     ['haiku', 'Haiku 4.5', [], null],
   ],
-  codex: [
-    ['gpt-6.1-sol', 'GPT-6.1 Sol', CODEX_EFFORTS, 'medium'],
-    ['gpt-6-astra', 'Astra', CODEX_EFFORTS, 'medium'],
-    ['gpt-6-luna', 'GPT-6 Luna', CODEX_EFFORTS.filter((e) => e !== 'ultra'), 'light'],
-  ],
   // ids conferidos em `cursor-agent models` (2026-10-05); a lista real da conta vem desse comando
   cursor: [
     ['auto', 'Auto', [], null],
     ['composer-2.5', 'Composer 2.5', [], null],
-  ],
-  kimi: [
-    ['kimi-code/k3', 'K3', ['low', 'high', 'max'], 'high'],
-    ['kimi-code/kimi-for-coding', 'Kimi for Coding', ['low', 'high', 'max'], 'high'],
-  ],
-  copilot: [
-    ['gpt-5.6-luna', 'GPT-5.6 Luna', COPILOT_EFFORTS, 'medium'],
-    ['gpt-5.6-terra', 'GPT-5.6 Terra', COPILOT_EFFORTS, 'medium'],
-    ['gpt-5.6-sol', 'GPT-5.6 Sol', COPILOT_EFFORTS, 'medium'],
-    ['gpt-5-mini', 'GPT-5 mini', COPILOT_EFFORTS, 'medium'],
-    ['claude-haiku-4.5', 'Claude Haiku 4.5', [], null],
-    ['claude-sonnet-5.5', 'Claude Sonnet 5.5', COPILOT_EFFORTS, 'medium'],
-    ['claude-opus-5.5', 'Claude Opus 5.5', COPILOT_EFFORTS, 'medium'],
-    ['claude-fable-5.1', 'Claude Fable 5.1', COPILOT_EFFORTS, 'medium'],
-    ['gemini-3.8-flash', 'Gemini 3.8 Flash', [], null],
   ],
 };
 
@@ -56,27 +33,12 @@ const TIERS: Record<AiTool, [string, string | null][]> = {
     ['sonnet', 'medium'],
     ['opus', 'high'],
   ],
-  codex: [
-    ['gpt-6-luna', 'light'],
-    ['gpt-6.1-sol', 'medium'],
-    ['gpt-6-astra', 'high'],
-  ],
   // o Auto é o único modelo que todo plano do Cursor aceita (no gratuito, qualquer outro é recusado
   // antes de começar): fica nos três níveis, e quem tem plano pago troca as regras
   cursor: [
     ['auto', null],
     ['auto', null],
     ['auto', null],
-  ],
-  kimi: [
-    ['kimi-code/k3', 'low'],
-    ['kimi-code/k3', 'high'],
-    ['kimi-code/k3', 'max'],
-  ],
-  copilot: [
-    ['gpt-5.6-luna', 'low'],
-    ['gpt-5.6-terra', 'medium'],
-    ['gpt-5.6-sol', 'high'],
   ],
 };
 
@@ -88,34 +50,6 @@ const option = (tool: AiTool, [model, label, efforts, defaultEffort]: Seed): Mod
   efforts,
   defaultEffort,
 });
-
-/** Lê as tabelas `[models."nome"]` do config.toml do Kimi, com display_name, support_efforts e default_effort. */
-export function parseKimiModels(toml: string): ModelOption[] {
-  const out: ModelOption[] = [];
-  let current: { name: string; label?: string; efforts: string[]; def: string | null } | null = null;
-  const flush = () => {
-    if (current) out.push(option('kimi', [current.name, current.label ?? current.name, current.efforts, current.def]));
-    current = null;
-  };
-  for (const line of toml.split(/\r?\n/)) {
-    const table = /^\s*\[(.+)\]\s*$/.exec(line);
-    if (table) {
-      flush();
-      const m = /^models\.(?:"([^"]+)"|([\w-]+))$/.exec(table[1]!.trim());
-      if (m) current = { name: (m[1] ?? m[2])!, efforts: [], def: null };
-      continue;
-    }
-    if (!current) continue;
-    const kv = /^\s*(\w+)\s*=\s*(.+?)\s*$/.exec(line);
-    if (!kv) continue;
-    const str = (v: string) => /^"(.*)"$/.exec(v)?.[1];
-    if (kv[1] === 'display_name') current.label = str(kv[2]!) ?? current.label;
-    if (kv[1] === 'default_effort') current.def = str(kv[2]!) ?? null;
-    if (kv[1] === 'support_efforts') current.efforts = [...kv[2]!.matchAll(/"([^"]+)"/g)].map((x) => x[1]!);
-  }
-  flush();
-  return out;
-}
 
 // eslint-disable-next-line no-control-regex
 const ANSI = /\x1b\[[0-9;]*m/g;
@@ -217,20 +151,9 @@ export function forgetModels(tool: AiTool): void {
   fromCli.delete(tool);
 }
 
-/** Modelos lidos da ferramenta: do arquivo local (Kimi) ou do último comando de listagem (Cursor). */
-export function discoverModels(tool: AiTool, homeDir: string): ModelOption[] {
-  if (tool !== 'kimi') return fromCli.get(tool) ?? [];
-  if (!homeDir) return [];
-  for (const dir of ['.kimi-code', '.kimi']) {
-    const file = path.join(homeDir, dir, 'config.toml');
-    try {
-      const found = parseKimiModels(fs.readFileSync(file, 'utf8'));
-      if (found.length) return found;
-    } catch {
-      /* sem configuração nesta pasta */
-    }
-  }
-  return [];
+/** Modelos lidos da ferramenta: do último comando de listagem (Cursor). */
+export function discoverModels(tool: AiTool): ModelOption[] {
+  return fromCli.get(tool) ?? [];
 }
 
 /** Modelos que já fizeram parte da lista embutida: um catálogo vindo de versão anterior ainda os tem. */
@@ -243,8 +166,8 @@ export function onlyBuiltin(tool: AiTool, catalog: ModelOption[]): boolean {
 }
 
 /** Catálogo de uma ferramenta: a lista real quando dá para ler, senão a lista embutida. */
-export function modelsFor(tool: AiTool, homeDir: string): ModelOption[] {
-  const found = discoverModels(tool, homeDir);
+export function modelsFor(tool: AiTool): ModelOption[] {
+  const found = discoverModels(tool);
   return found.length ? found : BUILTIN[tool].map((s) => option(tool, s));
 }
 
@@ -253,25 +176,9 @@ export function detectTools(homeDir: string): AiTool[] {
   if (!homeDir) return [];
   const dirs: Record<AiTool, string[]> = {
     claude: ['.claude'],
-    codex: ['.codex'],
     cursor: ['.cursor'],
-    kimi: ['.kimi-code', '.kimi'],
-    copilot: ['.copilot'],
   };
-  return (Object.keys(dirs) as AiTool[]).filter(
-    (t) => dirs[t].some((d) => fs.existsSync(path.join(homeDir, d))) || (t === 'copilot' && hasCopilotExtension(homeDir)),
-  );
-}
-
-/** O Copilot no VS Code é uma extensão; a pasta ~/.copilot só existe para quem usa a Copilot CLI. */
-function hasCopilotExtension(homeDir: string): boolean {
-  return ['.vscode', '.vscode-insiders'].some((d) => {
-    try {
-      return fs.readdirSync(path.join(homeDir, d, 'extensions')).some((e) => e.startsWith('github.copilot-chat-'));
-    } catch {
-      return false;
-    }
-  });
+  return (Object.keys(dirs) as AiTool[]).filter((t) => dirs[t].some((d) => fs.existsSync(path.join(homeDir, d))));
 }
 
 /**

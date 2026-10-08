@@ -1,6 +1,6 @@
 # Faz AI Kanban: conexão com IA (MCP) em detalhe
 
-O board pode ser consultado e editado por uma IA (Claude Code, Codex, Cursor, Kimi Code, GitHub Copilot ou qualquer cliente
+O board pode ser consultado e editado por uma IA (Claude Code, Cursor ou qualquer cliente
 MCP). A extensão roda um servidor MCP local para a pasta aberta; tudo o que a IA faz aparece no
 board na hora, e as regras do board valem para ela também.
 
@@ -15,18 +15,11 @@ vale em qualquer projeto aberto com o board, sem arquivo nenhum no repositório:
 | --- | --- | --- | --- |
 | Claude Code | `~/.claude.json`, por `claude mcp add-json --scope user` | variável `CLAUDE_PROJECT_DIR`, que o Claude Code passa ao servidor | Abra uma sessão nova (`/mcp` mostra o estado) |
 | Cursor (chat do editor e `cursor-agent`) | **no projeto**, `.cursor/mcp.json` (fora do git), gravado sozinho ao abrir a pasta no Cursor | a pasta fixa no registro | Na primeira vez: recarregue a janela e ligue o `faz-ai` em Cursor Settings → MCP |
-| Codex | `~/.codex/config.toml` | a pasta em que a sessão foi aberta | Abra uma sessão nova (`codex mcp list` confere) |
-| Kimi Code | `~/.kimi-code/mcp.json` e/ou `~/.kimi/mcp.json` | a pasta em que a sessão foi aberta | Abra uma sessão nova a partir da pasta do projeto |
-| GitHub Copilot | `~/.copilot/mcp-config.json` (Copilot CLI) e o `mcp.json` do perfil do VS Code | no VS Code, `${workspaceFolder}`; na CLI, a pasta em que ela roda | No VS Code, confirme a confiança (**MCP: List Servers**); na CLI, abra uma sessão nova |
 
-**Instalar neste projeto** grava em `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`,
-`.kimi-code/mcp.json` ou `.vscode/mcp.json`, com a pasta fixa. Esses arquivos guardam caminhos desta
+**Instalar neste projeto** grava em `.mcp.json` ou `.cursor/mcp.json`, com a pasta fixa. Esses arquivos guardam caminhos desta
 máquina, e o registro do projeto vale no lugar do global naquele projeto. Por isso um registro
 quebrado ali (de outra pasta, de um node que sumiu) estraga o global. A faixa de requisitos mostra
 **Corrigir o registro**, que tira o registro do arquivo do projeto e deixa o global valendo.
-
-O agente do Copilot que roda no GitHub (cloud agent) não é atendido: ele executa fora desta máquina e
-não alcança o servidor local.
 
 ### Registro manual
 
@@ -49,9 +42,6 @@ Pelas CLIs:
 BRIDGE="$HOME/.faz-ai/mcp/bridge.js"
 
 claude mcp add --scope user faz-ai -- node "$BRIDGE"        # Claude Code, todos os projetos
-codex mcp add faz-ai -- node "$BRIDGE"                      # Codex, global (~/.codex/config.toml)
-kimi mcp add --transport stdio faz-ai -- node "$BRIDGE"     # Kimi, global
-copilot mcp add faz-ai -- node "$BRIDGE"                    # Copilot CLI, global (~/.copilot/mcp-config.json)
 ```
 
 No Cursor, o registro é sempre o do projeto: o global dele é um processo só para todas as janelas,
@@ -61,28 +51,6 @@ servidor à mão, e aí vale para todas as janelas). Os formatos gravados pelo b
 ```json
 // .cursor/mcp.json do projeto (Cursor)
 { "mcpServers": { "faz-ai": { "type": "stdio", "command": "node", "args": ["<bridge.js>", "<pasta do projeto>"] } } }
-```
-
-```toml
-# ~/.codex/config.toml (Codex)
-[mcp_servers.faz-ai]
-command = "node"
-args = ["<bridge.js>"]
-```
-
-```json
-// ~/.kimi-code/mcp.json (Kimi Code)
-{ "mcpServers": { "faz-ai": { "transport": "stdio", "command": "node", "args": ["<bridge.js>"] } } }
-```
-
-```json
-// mcp.json do perfil do VS Code (GitHub Copilot); a chave é `servers`
-{ "servers": { "faz-ai": { "type": "stdio", "command": "node", "args": ["<bridge.js>", "${workspaceFolder}"] } } }
-```
-
-```json
-// ~/.copilot/mcp-config.json (Copilot CLI)
-{ "mcpServers": { "faz-ai": { "type": "stdio", "command": "node", "args": ["<bridge.js>"], "tools": ["*"] } } }
 ```
 
 Outros clientes MCP com transporte stdio (Gemini CLI em `~/.gemini/settings.json`, por exemplo)
@@ -148,16 +116,13 @@ em `usage`), e `get_agent`, `create_agent`, `update_agent` e `delete_agent` os g
 criação é a pasta global (`scope: "user"`), e o agente criado já nasce disponível. `create_agent` e
 `update_agent` aceitam, além das instruções, `description`, `model` (valor do campo Modelo, ex.:
 `claude:sonnet@medium`), `tools`, `deniedTools`, `skills` e `mcp`; o board grava o que é só dele em
-chaves `faz-ai-*` do frontmatter (`faz_ai_*` no TOML do Codex). Cada ferramenta guarda os seus numa
+chaves `faz-ai-*` do frontmatter. Cada ferramenta guarda os seus numa
 pasta própria (a global fica em `~/`):
 
 | Ferramenta | Pasta | Arquivo | Modelo por agente |
 | --- | --- | --- | --- |
 | Claude Code | `.claude/agents` | `<nome>.md` (frontmatter YAML) | `model` |
-| Codex | `.codex/agents` | `<nome>.toml` | `model` |
 | Cursor | `.cursor/agents` | `<nome>.md` | `model` |
-| Kimi Code | `.kimi-code/agents` | `<nome>.md` | não tem |
-| GitHub Copilot | `.github/agents` (global: `~/.copilot/agents`) | `<nome>.agent.md` | `model` |
 
 ### Projeto, global e plugins
 
@@ -180,8 +145,7 @@ Quando uma skill existe no projeto e fora dele com o mesmo nome, vale a do proje
 
 Cada skill do projeto ou da pasta do usuário tem um modo: `auto` (a IA vê a descrição e decide quando
 usar) ou `manual` (só quando indicada num card ou chamada pelo nome). O modo é gravado no formato de
-cada ferramenta: `disable-model-invocation: true` no frontmatter (Claude Code, Cursor, Kimi Code,
-Copilot) ou `policy.allow_implicit_invocation: false` em `agents/openai.yaml` (Codex). Uma skill
+cada ferramenta: `disable-model-invocation: true` no frontmatter do `SKILL.md` (Claude Code e Cursor). Uma skill
 desligada ou em modo `manual` continua valendo nos cards que a indicam: `requiredSkills` traz o
 caminho do `SKILL.md`, e a execução pelo board passa esses caminhos no prompt.
 
@@ -209,9 +173,6 @@ linha de comando da ferramenta aceita é imposto por parâmetro:
 | Ferramenta | Imposto por parâmetro | Só orientado |
 | --- | --- | --- |
 | Claude Code | agente (inline, `--agents` + `--agent`), servidores MCP (`--strict-mcp-config`), ferramentas, modelo e esforço, contexto vazio (`--setting-sources ""`, `--disable-slash-commands`) | skills e rules (vão pelo caminho do arquivo) |
-| GitHub Copilot | agente, servidores MCP, ferramentas, modelo e esforço, contexto vazio (`--no-custom-instructions`) | skills e rules |
-| Kimi Code | agente, modelo | skills e rules, servidores MCP, ferramentas, contexto vazio |
-| Codex | servidores MCP, modelo e esforço | agente, skills e rules, ferramentas, contexto vazio |
 | Cursor | modelo | todo o resto |
 
 ### Pendências
@@ -235,18 +196,7 @@ manda trabalhar no card. Os comandos, conforme a documentação de cada ferramen
 | Ferramenta | Comando | Permissões |
 | --- | --- | --- |
 | Claude Code | `claude -p` (prompt pela entrada padrão) | `--permission-mode dontAsk` com `--allowedTools "mcp__faz-ai__*" Read Glob Grep`; `acceptEdits`; `bypassPermissions` |
-| Codex | `codex exec -` | `--sandbox read-only`; `workspace-write`; `--dangerously-bypass-approvals-and-sandbox` |
-| GitHub Copilot | `copilot -p "<prompt>" --no-ask-user` | `--allow-tool=faz-ai --allow-tool=read`; mais `--allow-tool=write`; `--allow-all` |
 | Cursor | `cursor-agent -p --output-format stream-json --force --approve-mcps --trust` (servidor do board gravado no `.cursor/mcp.json` antes de rodar) | `--allowed-tools` com as ferramentas de leitura e de MCP; mais as de edição; sem `--allowed-tools` |
-| Kimi Code | `kimi -p` | só "sem restrições" (o `-p` não aceita flags de permissão) |
-
-Cuidados por ferramenta:
-
-- **Codex** só lê o `.codex/config.toml` do projeto se o projeto estiver marcado como confiável.
-- **Copilot** só carrega o `.mcp.json` do projeto no modo `-p` com a variável
-  `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP=true`, que o board define.
-- **Kimi** precisa do servidor registrado no arquivo global (`~/.kimi-code/mcp.json`), que é onde
-  o board o registra.
 
 Uma imagem colada numa mensagem aparece no texto como `attachment:<nome>`; o arquivo é o anexo de
 mesmo nome em `attachments` de `get_card`.

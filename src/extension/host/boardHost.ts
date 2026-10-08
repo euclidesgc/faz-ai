@@ -6,6 +6,7 @@ import { openFile, type DbHandle } from '../db/database';
 import { dayOf } from '../../shared/log';
 import { Autopilot } from '../autopilot';
 import { Heartbeat } from '../heartbeat';
+import { AiGateway } from '../ai/gateway';
 import { createRunLog } from '../log/runLog';
 import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
@@ -54,8 +55,6 @@ export interface BoardHostOptions {
     name: 'vscode' | 'cursor';
     /** quando a janela abriu: o registro gravado depois disso pede para recarregar */
     startedAt: number;
-    /** pasta de configuração do usuário no VS Code (o `mcp.json` global do Copilot no editor); só no VS Code */
-    userDir?: string;
   };
   /**
    * roda um comando num terminal novo do editor, à vista da pessoa (o "Instalar tudo" do Diagnóstico);
@@ -145,7 +144,14 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // o node do PATH do terminal, com caminho absoluto: é ele que a ferramenta usa para iniciar o servidor do board.
   // Procurado de novo a cada conferência dos requisitos: a pessoa pode instalar o node com o board aberto
   let nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
+  // a única porta para chamar a IA: o executor de cards e o chat passam por ela, e é ela que escreve o log de uso
+  const gateway = new AiGateway({
+    boardId: router.boardId,
+    runLog,
+    spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
+  });
   const runner = new AiRunner(router, {
+    gateway,
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
@@ -153,8 +159,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return nodePath;
     },
     log: o.log,
-    runLog,
-    spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
   });
   // o log do board liga cada evento à execução em curso no card (`run_id`); sem execução, fica nulo
   router.setRunResolver((cardId) => runner.runIdOf(cardId));
@@ -188,6 +192,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     removeWorktree,
   });
   const chat = new ChatSession(router, {
+    gateway,
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
@@ -195,8 +200,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return nodePath;
     },
     log: o.log,
-    runLog,
-    spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
     file: path.join(o.storageDir, 'chat', `${workspaceKey(o.folderPath)}.json`),
   });
   // os modelos do Cursor são os da conta, e só a CLI diz quais são: lidos ao abrir o board e ao passar
@@ -263,7 +266,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       signedIn: (tool, exe) => (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : Promise.resolve(null)),
       editor: o.editor?.name,
       windowStartedAt: o.editor?.startedAt,
-      editorUserDir: o.editor?.userDir,
       editorPath: o.editor ? (process.env.PATH ?? '') : undefined,
       skillInstalled: flowSkillInstalled(),
     })
@@ -320,13 +322,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   // os MCPs que o chat do editor inicia (o do board e o do Code Review Graph): o editor os procura no
   // PATH de quando abriu, e o que foi instalado depois só aparece nele com o caminho completo
-  const editorFiles = o.editor ? editorMcpFiles(o.editor.name, o.folderPath, homeDir, o.editor.userDir) : null;
+  const editorFiles = o.editor?.name === 'cursor' ? editorMcpFiles(o.folderPath, homeDir) : null;
   const editorPath = () => process.env.PATH ?? '';
   const resolveHere = (command: string) => resolveCommand(command, pathEnv, homeDir);
   const crgMcpState = (tool: AiTool) => {
-    const usesEditor =
-      o.editor && ((o.editor.name === 'cursor' && tool === 'cursor') || (o.editor.name === 'vscode' && tool === 'copilot'));
-    if (!editorFiles || !usesEditor) return undefined;
+    if (!editorFiles || tool !== 'cursor') return undefined;
     if (!registeredIn(editorFiles, 'code-review-graph')) return 'unregistered' as const;
     const broken = unreachableServers(editorFiles, editorPath(), resolveHere).filter((u) => u.server === 'code-review-graph');
     if (!broken.length) return 'ok' as const;
@@ -505,7 +505,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         homeDir,
         nodeCommand: nodePath,
         scope,
-        editorUserDir: o.editor?.userDir,
       });
       for (const step of done.flatMap((d) => d.run ?? [])) {
         const exe = resolveCommand(step.command, pathEnv, homeDir);

@@ -243,6 +243,21 @@ describe('TypesSettings: skills por tipo', () => {
 });
 
 describe('Settings: menu lateral', () => {
+  it('Modelos de IA vem logo depois do Harness de IA', () => {
+    useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
+    render(
+      <Theme>
+        <Settings />
+      </Theme>,
+    );
+    const nav = screen.getByRole('navigation', { name: 'Seções das configurações' });
+    const labels = within(nav)
+      .getAllByRole('button')
+      .map((x) => x.textContent);
+    const at = (label: string) => labels.indexOf(label);
+    expect(at('Modelos de IA')).toBe(at('Harness de IA') + 1);
+  });
+
   it('recolhe numa faixa de ícones: rótulos somem, as seções seguem acessíveis pelo nome e o estado fica lembrado', async () => {
     useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
     render(

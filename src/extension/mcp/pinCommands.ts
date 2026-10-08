@@ -9,24 +9,18 @@ import * as path from 'node:path';
 export const PINNED_SERVERS = ['faz-ai', 'code-review-graph'] as const;
 export type PinnedServer = (typeof PINNED_SERVERS)[number];
 
-/** Um arquivo de MCPs que o editor lê, com a chave da lista (`mcpServers` no Cursor, `servers` no VS Code). */
+/** Um arquivo de MCPs que o editor lê (a lista fica na chave `mcpServers`). */
 export interface EditorMcpFile {
   file: string;
-  key: 'mcpServers' | 'servers';
   /** do projeto: pode estar no git, e aí o caminho desta máquina não pode ser gravado nele */
   project?: { workspaceDir: string; rel: string };
 }
 
-/** Os arquivos de MCP que o editor lê nesta pasta: o do projeto e o do usuário. */
-export function editorMcpFiles(editor: 'vscode' | 'cursor', workspaceDir: string, homeDir: string, userDir?: string): EditorMcpFile[] {
-  if (editor === 'cursor')
-    return [
-      { file: path.join(workspaceDir, '.cursor', 'mcp.json'), key: 'mcpServers', project: { workspaceDir, rel: '.cursor/mcp.json' } },
-      { file: path.join(homeDir, '.cursor', 'mcp.json'), key: 'mcpServers' },
-    ];
+/** Os arquivos de MCP que o Cursor lê nesta pasta: o do projeto e o do usuário. */
+export function editorMcpFiles(workspaceDir: string, homeDir: string): EditorMcpFile[] {
   return [
-    { file: path.join(workspaceDir, '.vscode', 'mcp.json'), key: 'servers', project: { workspaceDir, rel: '.vscode/mcp.json' } },
-    ...(userDir ? [{ file: path.join(userDir, 'mcp.json'), key: 'servers' as const }] : []),
+    { file: path.join(workspaceDir, '.cursor', 'mcp.json'), project: { workspaceDir, rel: '.cursor/mcp.json' } },
+    { file: path.join(homeDir, '.cursor', 'mcp.json') },
   ];
 }
 
@@ -76,7 +70,7 @@ export interface Unreachable {
 const readServers = (f: EditorMcpFile): Record<string, { command?: unknown }> | null => {
   try {
     const json = JSON.parse(fs.readFileSync(f.file, 'utf8')) as Record<string, unknown> | null;
-    const section = json?.[f.key];
+    const section = json?.mcpServers;
     return section && typeof section === 'object' ? (section as Record<string, { command?: unknown }>) : null;
   } catch {
     return null;
@@ -130,7 +124,7 @@ export function pinEditorCommands(
     if (u.tracked || !u.fullPath) continue;
     const f = files.find((x) => x.file === u.file)!;
     const json = JSON.parse(fs.readFileSync(f.file, 'utf8')) as Record<string, Record<string, Record<string, unknown>>>;
-    json[f.key]![u.server]!.command = u.fullPath;
+    json.mcpServers![u.server]!.command = u.fullPath;
     fs.writeFileSync(f.file, JSON.stringify(json, null, 2) + '\n');
     if (f.project) excludeLocally(f.project.workspaceDir, f.project.rel);
     pinned.push(u);

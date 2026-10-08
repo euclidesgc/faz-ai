@@ -27,7 +27,6 @@
 // erro de domínio. Não complete este campo neste arquivo.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
-import { costOf } from './price';
 import type { OutputReader, OutputStream, ReaderDeps } from './reader';
 
 /** Tamanho do argumento mostrado na linha de uma chamada de ferramenta. */
@@ -315,16 +314,16 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
 
       if (byModel) {
         const tokens = [...byModel.values()].reduce(addTokens, ZERO);
+        // o custo é sempre o que a CLI informou: `total_cost_usd` (cumulativo, o último vale). Sem ele a
+        // execução fica sem custo — o board não calcula nada por tabela de preços
         const informed = reversed.find((r) => r.costUsd !== null)?.costUsd ?? null;
-        const estimated = informed === null ? costOf(deps.catalog, byModel) : null;
         return {
           measure: 'full',
           consumption: {
             ...tokens,
             turns,
             sessionId,
-            costUsd: informed ?? estimated,
-            costEstimated: informed === null && estimated !== null,
+            costUsd: informed,
           },
           inventory: items,
           answer,
@@ -342,7 +341,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
         const tokens = [...perModel.values()].reduce(addTokens, ZERO);
         return {
           measure: 'partial',
-          consumption: { ...tokens, turns, sessionId, costUsd: null, costEstimated: false },
+          consumption: { ...tokens, turns, sessionId, costUsd: null },
           inventory: items,
           answer,
           reason: null,

@@ -85,18 +85,16 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
           </>
         )}
       </FormField>
-      {tool.agents?.modelField && (
-        <FormField
-          label={
-            <>
-              {t('Modelo e esforço')} {badge('model')}
-            </>
-          }
-          hint={t('O modelo indicado no card tem preferência.')}
-        >
-          {() => <ModelEditor value={a.modelValue || null} onChange={(v) => patch({ model: typeof v === 'string' ? v : '' })} />}
-        </FormField>
-      )}
+      <FormField
+        label={
+          <>
+            {t('Modelo e esforço')} {badge('model')}
+          </>
+        }
+        hint={t('O modelo indicado no card tem preferência.')}
+      >
+        {() => <ModelEditor value={a.modelValue || null} onChange={(v) => patch({ model: typeof v === 'string' ? v : '' })} />}
+      </FormField>
       <FormField
         label={
           <>

@@ -14,10 +14,7 @@ import { Button, IconExternal, IconMissing, IconOk, IconRecommend, IconSkipped }
 /** Onde cada ferramenta documenta a linha de comando (o "Saiba mais" da CLI e do login). */
 const CLI_DOCS: Record<AiTool, string> = {
   claude: 'https://claude.com/claude-code',
-  codex: 'https://developers.openai.com/codex',
   cursor: 'https://cursor.com/cli',
-  kimi: 'https://moonshotai.github.io/kimi-code',
-  copilot: 'https://github.com/features/copilot/cli',
 };
 const MCP_DOCS = 'https://github.com/euclidesgc/faz-ai/blob/main/docs/mcp.md';
 

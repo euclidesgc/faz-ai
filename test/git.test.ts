@@ -219,8 +219,8 @@ describe('branch e worktree por história', () => {
         '--disable-slash-commands',
       ],
     });
-    expect(headlessCommand('copilot', { prompt: 'P', permission: 'board', addDirs: [root] })).toMatchObject({
-      args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', `--add-dir=${root}`, '--no-custom-instructions', '--no-ask-user'],
+    expect(headlessCommand('cursor', { prompt: 'P', permission: 'board', addDirs: [root] })).toMatchObject({
+      args: ['-p', '--force', '--approve-mcps', '--trust', '--allowed-tools', expect.any(String), '--add-dir', root],
     });
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
     expect(router.aiWorkDirs()).toEqual([]);

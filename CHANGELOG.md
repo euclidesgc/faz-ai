@@ -10,8 +10,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   Refinar com IA, heartbeat, chat do board) passa a partir de contexto vazio: nenhuma regra, skill,
   agente, hook ou plugin da sua máquina ou do projeto entra por conta própria. No Claude Code isso é
   imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um arquivo de
-  servidores MCP só com o do board e os liberados pelo agente); no Copilot, `--no-custom-instructions`;
-  nas outras ferramentas, orientação no prompt. O que entra é o que você marca em Configurações →
+  servidores MCP só com o do board e os liberados pelo agente); no Cursor, orientação no
+  prompt. O que entra é o que você marca em Configurações →
   **Harness de IA**, agora com as abas **Projeto** e **Global**, cada uma com Rules, Agentes e
   Skills. Rules e skills têm duas marcações: **Incluir em todo contexto** (entra em toda execução,
   pelo caminho) e **Usar quando fizer sentido** (vira opção dos campos Skills e do novo campo
@@ -23,11 +23,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   de `requiredSkills`.
 - **Agentes como arquivos da ferramenta.** Os perfis de execução deixam de ficar no banco do board:
   um agente é um arquivo de agente da ferramenta (`~/.claude/agents/<nome>.md`,
-  `~/.codex/agents/<nome>.toml`…), lido do disco; as instruções são o papel da sessão e o frontmatter
+  `~/.cursor/agents/<nome>.md`), lido do disco; as instruções são o papel da sessão e o frontmatter
   guarda modelo, ferramentas, skills e servidores MCP (o que é só do board vai em chaves `faz-ai-*`).
   O board grava, por projeto, quais estão **disponíveis** e qual é o **padrão** (em Ferramenta e
   execução). Os perfis já gravados viram arquivos na pasta global na primeira abertura, sem
-  sobrescrever nada; colunas e cards passam a apontar pelo nome. A aba Agentes de Configurações e o
+  sobrescrever nada; colunas e cards passam a apontar pelo nome. Um perfil que liberava todos os
+  servidores MCP passa a liberar só o do board: os demais voltam no editor do agente. A aba Agentes de Configurações e o
   interruptor **Sessão limpa** saem: o contexto vazio é sempre. No Claude Code o agente vai inline
   (`--agents` + `--agent`), então não depende de nenhuma pasta de agentes. Na primeira abertura, dez
   agentes de fábrica são criados no global e marcados (condutor-do-board como padrão, frontend-web,
@@ -38,6 +39,27 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   `tools`, `deniedTools`, `skills` e `mcp`; `get_board` lista os disponíveis em `agents`). O Refinar
   com IA recebe o catálogo marcado (agentes, rules e skills) e só indica o que está nele, escolhendo
   o agente do card com `set_card_profile`.
+- **O board suporta só o Claude Code e o Cursor.** Codex, Kimi Code e GitHub Copilot saíram do
+  **Harness de IA**, que agora oferece só essas duas ferramentas, e do restante da extensão: modelos
+  embutidos, registro do servidor MCP, regras, skills e agentes, hooks, execução pela conversa e
+  Diagnóstico. Um board que estava configurado com uma delas volta para o Claude Code ao abrir. O
+  que o Cursor e o Claude Code ainda carregam de `.codex/skills` ou `AGENTS.md` continua listado.
+- **O custo das execuções é o que a ferramenta informa; a tabela de preços saiu (#187).** Um valor
+  calculado a partir de preços cadastrados envelhece quando o fornecedor muda a tarifa e deixa o
+  relatório errado sem avisar, então o board deixou de calcular custo. O Claude Code grava o
+  `total_cost_usd` que a própria CLI informa, mais os quatro contadores de tokens; o Cursor grava os
+  tokens e fica sem custo (a CLI não informa). Saem a tabela embutida, a coluna de preço da aba **Modelos de IA**, o
+  **Preço variável**, os campos `price_*`, `reset_price` e `variable_price` do `upsert_model`, a
+  origem do preço no `get_models` e a regra **Cursor Token Rate** (`cursorTokenRate` no
+  `update_rules`). Catálogos gravados antes perdem os campos de preço ao abrir o board. As execuções
+  antigas continuam nas Métricas, marcadas como "estimado por tabela de preços". O `get_metrics`
+  passa a chamar a coluna de **custo** (informado pela ferramenta), sem "estimado".
+- **Toda chamada à IA passa por uma única porta (#187).** O executor de cards (manual, heartbeat e
+  modo autônomo) e o chat repetiam o registro de uso, e o registro era opcional. Agora ambos pedem a
+  execução a um `AiGateway`, que abre a linha em `ai_runs` antes de rodar, confere a permissão, cuida
+  de interrupção e tempo limite e grava desfecho e consumo; cada ferramenta tem um provider próprio
+  (comando e leitor da saída). Um teste cobre as quatro origens e falha se algum arquivo fora do
+  gateway chamar a IA ou escrever no log. Em consequência, o log de uso não é mais opcional.
 - **Configurações do Faz AI no Settings do editor.** Em `Ctrl+,`, buscar "Faz AI" mostra a categoria
   do Faz AI com as seções Instalação, Aparência, Git e Backup, nessa ordem. Instalação tem o link
   **Abrir o Diagnóstico do ambiente**; Aparência já traz o **Idioma** (`fazai.appearance.language`);

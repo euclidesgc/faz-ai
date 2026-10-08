@@ -100,7 +100,7 @@ export function installPlan(report: EnvironmentReport, level: EnvCheck['level'])
     }
     const fresh = commands.filter((cmd) => !seen.has(cmd));
     fresh.forEach((cmd) => seen.add(cmd));
-    // a CLI instalada pelo npm (Codex, Copilot) precisa do Node do passo anterior
+    // uma CLI instalada pelo npm precisa do Node do passo anterior
     const after = [...(AFTER[c.id] ?? []), ...(c.id === 'cli' && fresh.some((cmd) => cmd.startsWith('npm ')) ? ['node' as const] : [])];
     if (fresh.length) steps.push({ id: c.id, commands: fresh, after });
   }

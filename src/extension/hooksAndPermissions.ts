@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool, HarnessItem } from '../shared/harness';
-import { HARNESS_CATALOG, HOOK_FILE, hookTargets, type HarnessSource, type HookInput } from '../shared/harnessCatalog';
+import { HARNESS_CATALOG, hookTargets, type HarnessSource, type HookInput } from '../shared/harnessCatalog';
 import { hookCommand } from './harnessScan';
 
 type Json = Record<string, unknown>;
@@ -42,12 +42,7 @@ export class HooksAndPermissions {
   private sourceOf(tool: AiTool, item: HarnessItem, match: (src: HarnessSource) => boolean): HarnessSource {
     if (item.scope === 'plugin') throw new Error('Itens de plugin não podem ser alterados pelo board.');
     const src = HARNESS_CATALOG[tool].find(
-      (x) =>
-        match(x) &&
-        x.scope === item.scope &&
-        (x.layout === 'hook-files'
-          ? item.path.startsWith(path.join(this.base(x.scope), x.path) + path.sep)
-          : path.join(this.base(x.scope), x.path) === item.path),
+      (x) => match(x) && x.scope === item.scope && path.join(this.base(x.scope), x.path) === item.path,
     );
     if (!src) throw new Error('Este item fica num arquivo que o board não edita. Abra o arquivo e edite-o à mão.');
     return src;
@@ -64,7 +59,7 @@ export class HooksAndPermissions {
     if (!/^[A-Za-z][A-Za-z0-9]*$/.test(event)) throw new Error('Informe o evento do hook.');
     if (!command) throw new Error('Informe o comando do hook.');
     const timeout = Number.isFinite(input.timeout) && input.timeout > 0 ? Math.round(input.timeout) : 0;
-    const file = path.join(this.base(src.scope), src.path, ...(src.layout === 'hook-files' ? [HOOK_FILE] : []));
+    const file = path.join(this.base(src.scope), src.path);
     const config = readForWrite(file);
     const hooks = { ...obj(config.hooks) };
     const list = Array.isArray(hooks[event]) ? [...(hooks[event] as unknown[])] : [];
@@ -76,10 +71,8 @@ export class HooksAndPermissions {
       );
       if (at >= 0) list[at] = { ...obj(list[at]), hooks: [...(obj(list[at]).hooks as unknown[]), handler] };
       else list.push({ ...(matcher ? { matcher } : {}), hooks: [handler] });
-    } else if (target.format === 'flat') {
-      list.push({ command, ...(matcher ? { matcher } : {}), ...(timeout ? { timeout } : {}) });
     } else {
-      list.push({ type: 'command', bash: command, ...(timeout ? { timeoutSec: timeout } : {}) });
+      list.push({ command, ...(matcher ? { matcher } : {}), ...(timeout ? { timeout } : {}) });
     }
     hooks[event] = list;
     write(file, { ...(target.format === 'nested' || config.version !== undefined ? {} : { version: 1 }), ...config, hooks });
@@ -88,7 +81,7 @@ export class HooksAndPermissions {
 
   /** Remove do arquivo o hook listado (o evento e o comando do item). */
   removeHook(tool: AiTool, item: HarnessItem): void {
-    this.sourceOf(tool, item, (x) => x.kind === 'hook' && (x.layout === 'json-keys' || x.layout === 'hook-files'));
+    this.sourceOf(tool, item, (x) => x.kind === 'hook' && x.layout === 'json-keys');
     const config = readForWrite(item.path);
     const hooks = { ...obj(config.hooks) };
     const command = item.detail ?? '';
