@@ -370,6 +370,15 @@ e continua visível mesmo quando o botão está bloqueado.
 
 Imagens coladas na mensagem viram anexos do card e a IA as recebe.
 
+- **Resumir a conversa**, na aba Conversa, aparece a partir de 2 mensagens: lê a conversa inteira e
+  grava um resumo (Decisões, Observações, Pendências) como uma mensagem nova da IA (`kind:
+  "summary"`), sem apagar nada automaticamente, sem trabalhar a fase, mover o card ou mudar o
+  status — roda só com o board, sempre na faixa de modelo "Alto" (independente do Esforço do card).
+  Você revisa o resumo como revisa qualquer mensagem: concorda deixando como está ou edita o texto.
+  Logo abaixo dele, uma recomendação com o botão **Apagar mensagens resumidas** apaga, com
+  confirmação, todas as mensagens anteriores ao resumo; resumir de novo cria um registro novo, sem
+  substituir o anterior. Está disponível também como ferramenta MCP (`generate_summary`), com o
+  mesmo resultado.
 - O que a IA pode fazer nessas execuções se define em Configurações → Harness de IA → **Execução
   pela conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em
   uso aparece ao lado do botão, com um atalho para mudar. A IA é avisada do limite: se o trabalho

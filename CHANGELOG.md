@@ -6,6 +6,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Resumir a conversa do card.** Um botão novo na aba Conversa, a partir de 2 mensagens, lê a
+  conversa inteira e grava um resumo (Decisões, Observações, Pendências) como uma mensagem nova da
+  IA, sem apagar nada automaticamente. O resumo se revisa como qualquer mensagem: concorde deixando
+  como está ou edite o texto. Depois dele aparece uma recomendação para apagar, com confirmação, as
+  mensagens anteriores ao resumo (não é automático); resumir de novo cria um registro novo, sem
+  substituir o anterior. Também disponível como ferramenta MCP (`generate_summary`).
 - **História bloqueada segurava a fila inteira do autopiloto.** Com a primeira história da
   fila parada por um impedimento (bloqueio, pergunta sem resposta, dependência de outro card em
   aberto ou um ciclo emperrado), o autopiloto ficava parado e nenhuma das outras histórias
