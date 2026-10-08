@@ -159,9 +159,9 @@ describe('isDeliverableStory', () => {
 
   it('false sem prUrl, fora da última coluna, bloqueada, ou para sub-tarefa', () => {
     const base = { yolo: true, columnId: 'homologacao', prUrl: 'https://pr', status: 'running' } as const;
-    expect(isDeliverableStory(boardState({ columns, cards: [card('h1', { ...base, prUrl: '' })] }), card('h1', { ...base, prUrl: '' }))).toBe(
-      false,
-    );
+    expect(
+      isDeliverableStory(boardState({ columns, cards: [card('h1', { ...base, prUrl: '' })] }), card('h1', { ...base, prUrl: '' })),
+    ).toBe(false);
     const s1 = boardState({ columns, cards: [card('h1', { ...base, columnId: 'backlog' })] });
     expect(isDeliverableStory(s1, s1.cards[0]!)).toBe(false);
     const s2 = boardState({ columns, cards: [card('h1', { ...base, status: 'blocked' })] });
