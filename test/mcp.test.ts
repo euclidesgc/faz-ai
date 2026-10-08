@@ -1550,6 +1550,69 @@ describe('modo autônomo (YOLO)', () => {
     expect(card(1).status).toBe('approved');
     expect(column('PRD').requiresApproval).toBe(true); // a coluna não muda: só o card deixa de depender dela
   });
+
+  describe('card.yolo.setMany', () => {
+    const setMany = (cardIds: string[], enabled: boolean) => router.handle({ type: 'card.yolo.setMany', cardIds, enabled });
+
+    it('liga só as histórias válidas da lista, ignora sub-tarefa e card arquivado sem lançar erro', async () => {
+      await call('create_card', { title: 'A', column: 'PRD' });
+      await call('create_card', { title: 'Sub', parent: 1 });
+      await call('create_card', { title: 'B', column: 'PRD' });
+      await call('create_card', { title: 'Arquivada', column: 'PRD' });
+      router.handle({ type: 'card.archive', cardId: card(4).id });
+
+      expect(() =>
+        setMany([card(1).id, card(2).id, card(3).id, card(4).id, 'id-inexistente'], true),
+      ).not.toThrow();
+
+      expect(card(1).yolo).toBe(true);
+      expect(card(2).yolo).toBe(false); // sub-tarefa ignorada
+      expect(card(3).yolo).toBe(true);
+      expect(card(4).yolo).toBe(false); // arquivada ignorada
+    });
+
+    it('chamar com { source: "ai" } lança o mesmo erro de permissão que card.yolo.set', async () => {
+      await call('create_card', { title: 'A', column: 'PRD' });
+      expect(() => router.handle({ type: 'card.yolo.setMany', cardIds: [card(1).id], enabled: true }, { source: 'ai' })).toThrow(
+        'Só uma pessoa liga o modo autônomo.',
+      );
+    });
+
+    it('ligar em lote libera waiting_review/waiting_answer pendente em cada história afetada', async () => {
+      await call('create_card', { title: 'A', column: 'PRD' });
+      await call('create_card', { title: 'B', column: 'PRD' });
+      await call('request_review', { card: 1, summary: 'PRD pronto' });
+      await call('ask_question', { card: 2, question: 'Qual provedor?' });
+      expect(card(1).status).toBe('waiting_review');
+      expect(card(2).status).toBe('waiting_answer');
+
+      setMany([card(1).id, card(2).id], true);
+
+      expect(card(1).status).toBe('approved');
+      expect(card(2).status).toBe('ready');
+    });
+
+    it('ligar em lote grava o comentário "Modo autônomo ligado..." em cada história afetada', async () => {
+      await call('create_card', { title: 'A', column: 'PRD' });
+      await call('create_card', { title: 'B', column: 'PRD' });
+
+      setMany([card(1).id, card(2).id], true);
+
+      expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('Modo autônomo ligado');
+      expect((await call('get_card', { card: 2 })).data.comments.at(-1).body).toContain('Modo autônomo ligado');
+    });
+
+    it('uma história já no estado pedido não gera comentário duplicado', async () => {
+      await call('create_card', { title: 'A', column: 'PRD' });
+      setYolo(1, true);
+      const before = (await call('get_card', { card: 1 })).data.comments.length;
+
+      setMany([card(1).id], true);
+
+      const after = (await call('get_card', { card: 1 })).data.comments.length;
+      expect(after).toBe(before);
+    });
+  });
 });
 
 /**
