@@ -1,13 +1,11 @@
 import { useState, type KeyboardEvent } from 'react';
 import { AI_TOOLS, type AiTool } from '../../../shared/harness';
-import { modelId, withPrice, type ModelOption, type ModelPrice } from '../../../shared/models';
-import { PRICE_URLS, restoreBuiltinPrice } from '../../../shared/prices';
+import { modelId, type ModelOption } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { t } from '../../i18n';
 import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
 import { FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../ui';
-import { ModelPriceCell } from './ModelPriceCell';
 import { ModelRulesEditor } from './ModelRulesEditor';
 import { SettingsCard } from './SettingsCard';
 import { useSentList } from './useSentList';
@@ -117,13 +115,8 @@ export function ModelsSettings() {
   // as mudanças partem da última lista enviada (ver useSentList)
   const sent = useSentList(catalog, settings.setModels);
   const setCatalog = sent.save;
-  const setPrice = (o: ModelOption, key: keyof ModelPrice, value: number | null) =>
-    setCatalog(sent.current().map((x) => (x.id === o.id ? withPrice(x, { [key]: value }) : x)));
   const patchModel = (id: string, patch: Partial<ModelOption>) =>
     setCatalog(sent.current().map((o) => (o.id === id ? { ...o, ...patch } : o)));
-  const restorePrice = (o: ModelOption) => setCatalog(sent.current().map((x) => (x.id === o.id ? restoreBuiltinPrice(x) : x)));
-  // para o aviso de preço conferido há tempo demais
-  const today = new Date();
 
   // o projeto trabalha com uma ferramenta por vez: só os modelos dela aparecem
   const tools = AI_TOOLS.filter((tl) => tl.id === aiTool);
@@ -194,7 +187,6 @@ export function ModelsSettings() {
                   <th>{t('Identificador na ferramenta')}</th>
                   <th>{t('Esforços aceitos (separados por vírgula)')}</th>
                   <th>{t('Esforço padrão')}</th>
-                  <th>{t('Preço (US$ por milhão de tokens)')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -242,16 +234,6 @@ export function ModelsSettings() {
                         />
                       )}
                     </td>
-                    <td>
-                      <ModelPriceCell
-                        model={o}
-                        tool={tl.id}
-                        today={today}
-                        onPrice={(key, value) => setPrice(o, key, value)}
-                        onVariable={(variablePrice) => patchModel(o.id, { variablePrice })}
-                        onRestore={() => restorePrice(o)}
-                      />
-                    </td>
                     {/* sem confirmação de propósito: a lista pode ser refeita com "Detectar modelos" */}
                     <td className="narrow">
                       <IconButton
@@ -268,29 +250,13 @@ export function ModelsSettings() {
                 ))}
                 {mine.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="muted">
+                    <td colSpan={5} className="muted">
                       {t('Nenhum modelo. Use "Detectar modelos" ou "Novo modelo".')}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-            <Text as="p" size="1" color="gray" className="price-hint">
-              {t(
-                'O custo informado pela ferramenta tem preferência; o preço aqui é usado para estimar o custo das ferramentas que não informam.',
-              )}
-              {tl.id === 'cursor' && (
-                <>
-                  {' '}
-                  {t(
-                    'No Cursor, a estimativa usa a tarifa cadastrada: o modo rápido é um modelo à parte, com preço próprio, e o contexto longo (mais de 256 mil tokens, que pode custar 2x) não é separado, porque o Cursor só informa o total de tokens.',
-                  )}
-                </>
-              )}{' '}
-              <a href={PRICE_URLS[tl.id]} target="_blank" rel="noreferrer">
-                {t('Preços de {tool}', { tool: tl.label })}
-              </a>
-            </Text>
           </SettingsCard>
         );
       })}

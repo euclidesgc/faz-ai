@@ -4,7 +4,6 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { builtinPrice } from '../src/shared/prices';
 import type { ModelOption } from '../src/shared/models';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -20,12 +19,11 @@ const opts = () => ({
   workspaceDir: dir,
   homeDir: path.join(dir, 'home-do-usuario'),
 });
-const opt = (id: string, extra: Partial<ModelOption> = {}): ModelOption => {
+/** `extra` aceita campos que o catálogo gravado por versões anteriores ainda traz (preço e origem). */
+const opt = (id: string, extra: Record<string, unknown> = {}): ModelOption => {
   const [tool, model] = id.split(':') as [ModelOption['tool'], string];
-  return { id, tool, model, label: model, efforts: [], defaultEffort: null, ...extra };
+  return { id, tool, model, label: model, efforts: [], defaultEffort: null, ...extra } as ModelOption;
 };
-const TABLE = builtinPrice('claude:opus')!;
-const quatro = { input: TABLE.input, output: TABLE.output, cacheRead: TABLE.cacheRead, cacheWrite: TABLE.cacheWrite };
 const catalogJson = () => (dbHandle.db.exec('SELECT model_catalog_json FROM boards')[0]?.values[0]?.[0] as string | undefined) ?? '[]';
 const seedCatalog = (catalog: ModelOption[]) => {
   // cria o board uma vez e grava o catálogo "antigo" direto no banco, como se fosse de uma versão anterior
@@ -40,76 +38,50 @@ beforeEach(async () => {
 });
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-describe('sincronização da tabela embutida ao abrir o board', () => {
-  it('atualiza o builtin antigo, preserva o manual e preenche o modelo sem preço (RF-06, RF-08, RF-09)', () => {
+const OLD_PRICE_FIELDS = {
+  price: { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 },
+  priceSource: 'manual',
+  priceCheckedAt: '2026-10-07',
+  priceUrl: 'https://old',
+  variablePrice: true,
+};
+
+describe('catálogo gravado quando o board guardava preços', () => {
+  it('abrir o board tira preço, origem e preço variável de cada modelo e mantém o resto', () => {
     seedCatalog([
-      opt('claude:opus', {
-        price: { ...quatro, input: quatro.input + 7 },
-        priceSource: 'builtin',
-        priceCheckedAt: '2020-01-01',
-        priceUrl: 'https://old',
-      }),
-      opt('claude:sonnet', { price: { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 }, priceSource: 'manual' }),
+      opt('claude:opus', { ...OLD_PRICE_FIELDS, label: 'Meu Opus', efforts: ['low', 'high'], defaultEffort: 'low' }),
       opt('claude:haiku'),
     ]);
     const router = new MessageRouter(dbHandle as never, opts());
-    const [opus, sonnet, haiku] = router.snapshot().board.modelCatalog;
-    expect(opus).toMatchObject({ price: quatro, priceSource: 'builtin', priceCheckedAt: TABLE.checkedAt, priceUrl: TABLE.url });
-    expect(sonnet).toEqual(opt('claude:sonnet', { price: { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 }, priceSource: 'manual' }));
-    const h = builtinPrice('claude:haiku')!;
-    expect(haiku).toMatchObject({ priceSource: 'builtin', priceCheckedAt: h.checkedAt, priceUrl: h.url });
-    expect(haiku!.price).toEqual({ input: h.input, output: h.output, cacheRead: h.cacheRead, cacheWrite: h.cacheWrite });
+    const [opus, haiku] = router.snapshot().board.modelCatalog;
+    expect(opus).toEqual(opt('claude:opus', { label: 'Meu Opus', efforts: ['low', 'high'], defaultEffort: 'low' }));
+    expect(haiku).toEqual(opt('claude:haiku'));
   });
 
-  it('catálogo já sincronizado: abrir de novo não altera o JSON gravado', () => {
-    seedCatalog([opt('claude:opus'), opt('claude:sonnet', { price: { input: 1 } })]);
+  it('já limpo: abrir de novo não altera o JSON gravado', () => {
+    seedCatalog([opt('claude:opus', OLD_PRICE_FIELDS)]);
     new MessageRouter(dbHandle as never, opts());
     const once = catalogJson();
-    expect(JSON.parse(once)[0].priceSource).toBe('builtin');
+    expect(once).not.toContain('price');
     new MessageRouter(dbHandle as never, opts());
     expect(catalogJson()).toBe(once);
-  });
-
-  it('catálogo antigo com price e sem priceSource continua sem priceSource (RF-07)', () => {
-    seedCatalog([opt('claude:opus', { price: quatro })]);
-    const router = new MessageRouter(dbHandle as never, opts());
-    const [opus] = router.snapshot().board.modelCatalog;
-    expect(opus!.price).toEqual(quatro);
-    expect(opus!.priceSource).toBeUndefined();
-    expect(opus!.priceCheckedAt).toBeUndefined();
   });
 });
 
 describe('detectar e gravar o catálogo', () => {
-  it('settings.models.detect preserva preço e origem manual e preenche os novos com embutido', () => {
-    seedCatalog([
-      opt('claude:opus', { price: { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 }, priceSource: 'manual', label: 'Meu Opus' }),
-    ]);
+  it('settings.models.detect junta os modelos da ferramenta e não traz preço nenhum', () => {
+    seedCatalog([opt('claude:opus', OLD_PRICE_FIELDS)]);
     const router = new MessageRouter(dbHandle as never, opts());
     router.handle({ type: 'settings.models.detect', tool: 'claude' });
     const cat = router.snapshot().board.modelCatalog;
-    expect(cat.find((o) => o.id === 'claude:opus')).toMatchObject({
-      price: { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 },
-      priceSource: 'manual',
-    });
-    expect(cat.find((o) => o.id === 'claude:opus')!.priceCheckedAt).toBeUndefined();
-    expect(cat.find((o) => o.id === 'claude:sonnet')).toMatchObject({ priceSource: 'builtin', priceUrl: TABLE.url });
-    // o detectar também mantém a origem embutida de quem já estava sincronizado
-    router.handle({ type: 'settings.models.detect', tool: 'claude' });
-    expect(router.snapshot().board.modelCatalog.find((o) => o.id === 'claude:sonnet')).toMatchObject({ priceSource: 'builtin' });
+    expect(cat.some((o) => o.id === 'claude:sonnet')).toBe(true);
+    expect(JSON.stringify(cat)).not.toContain('price');
   });
 
-  it('settings.models.set aplica a tabela a quem está sem preço e não toca no manual', () => {
+  it('settings.models.set grava a lista como a pessoa mandou', () => {
     const router = new MessageRouter(dbHandle as never, opts());
-    router.handle({
-      type: 'settings.models.set',
-      catalog: [
-        opt('claude:opus'),
-        opt('claude:haiku', { price: { input: 9, output: 9, cacheRead: 9, cacheWrite: 9 }, priceSource: 'manual' }),
-      ],
-    });
-    const [opus, haiku] = router.snapshot().board.modelCatalog;
-    expect(opus).toMatchObject({ price: quatro, priceSource: 'builtin' });
-    expect(haiku).toMatchObject({ price: { input: 9, output: 9, cacheRead: 9, cacheWrite: 9 }, priceSource: 'manual' });
+    const sent = [opt('claude:opus'), opt('claude:haiku', { label: 'Haiku meu' })];
+    router.handle({ type: 'settings.models.set', catalog: sent });
+    expect(router.snapshot().board.modelCatalog).toEqual(sent);
   });
 });
