@@ -1,10 +1,11 @@
 import { choose, lastSent, posted, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, vi, beforeEach, describe, expect, it } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Board } from '../../src/webview/components/Board';
 import { CardDrawer } from '../../src/webview/components/CardDrawer';
+import { CommentsTab } from '../../src/webview/components/card/CommentsTab';
 import { StatusBar } from '../../src/webview/components/StatusBar';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { BoardState, Card } from '../../src/shared/model';
@@ -493,8 +494,53 @@ describe('botões de IA do card', () => {
     syncStore(router);
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {
-      expect(screen.getByRole('button', { name })).toBeDisabled();
-      expect(screen.getByRole('button', { name })).toHaveAttribute('title', expect.stringContaining('sem login'));
+      const button = screen.getByRole('button', { name });
+      expect(button).toBeDisabled();
+      // o `title` nativo saiu; o motivo do bloqueio agora vem no hint, aberto pelo foco
+      fireEvent.focus(button);
+      expect(await screen.findByText(/sem login/)).toBeInTheDocument();
+      fireEvent.blur(button);
     }
+  });
+
+  it('o hint de Trabalhar na fase e Refinar com IA tem negrito e tópicos, e o texto é idêntico nos dois botões de "Trabalhar na fase"', async () => {
+    const { router, storyId } = await seedBoard();
+    syncStore(router);
+    const card = router.snapshot().cards.find((c) => c.id === storyId)!;
+
+    const statusBar = renderThemed(<StatusBar card={card} />);
+    const workButtonStatusBar = screen.getByRole('button', { name: /Trabalhar na fase/ });
+    fireEvent.focus(workButtonStatusBar);
+    const workTooltipStatusBar = await screen.findByRole('tooltip');
+    expect(workTooltipStatusBar.querySelector('b')).toBeTruthy();
+    expect(workTooltipStatusBar.querySelector('li')).toBeTruthy();
+    const workTextStatusBar = workTooltipStatusBar.textContent;
+    fireEvent.blur(workButtonStatusBar);
+
+    const refineButton = screen.getByRole('button', { name: /Refinar com IA/ });
+    fireEvent.focus(refineButton);
+    const refineTooltip = await screen.findByRole('tooltip');
+    expect(refineTooltip.querySelector('b')).toBeTruthy();
+    expect(refineTooltip.querySelector('li')).toBeTruthy();
+    fireEvent.blur(refineButton);
+    statusBar.unmount();
+
+    renderThemed(<CommentsTab cardId={storyId} />);
+    const workButtonComments = screen.getByRole('button', { name: /Trabalhar na fase/ });
+    fireEvent.focus(workButtonComments);
+    const workTooltipComments = await screen.findByRole('tooltip');
+    expect(workTooltipComments.textContent).toEqual(workTextStatusBar);
+  });
+
+  it('Esc fecha o hint sem disparar a mensagem ao host', async () => {
+    const { router, storyId } = await seedBoard();
+    syncStore(router);
+    renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
+    const button = screen.getByRole('button', { name: /Trabalhar na fase/ });
+    fireEvent.focus(button);
+    await screen.findByRole('tooltip');
+    fireEvent.keyDown(button, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    expect(sentOf('ai.run')).toHaveLength(0);
   });
 });
