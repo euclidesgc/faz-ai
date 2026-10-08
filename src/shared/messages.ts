@@ -93,7 +93,7 @@ export type WebviewToHost =
   | { type: 'card.workspace.open'; cardId: Id }
   /** muda o status de trabalho do card; `note` é o motivo do bloqueio ou o texto que vai junto para a conversa */
   | { type: 'card.status.set'; cardId: Id; status: CardStatus | null; note?: string }
-  | { type: 'comment.add'; cardId: Id; body: string }
+  | { type: 'comment.add'; cardId: Id; body: string; kind?: 'summary' }
   | { type: 'comment.update'; commentId: Id; body: string }
   | { type: 'comment.delete'; commentId: Id }
   | { type: 'attachment.pick'; cardId: Id }

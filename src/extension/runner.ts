@@ -6,6 +6,9 @@ import { isYolo, storyOf } from '../shared/story';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
+import { effortToRun } from '../shared/execution';
+import { parseModelValue } from '../shared/models';
+import { effortTiers } from './models';
 import { MeasureBrokenError } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
 import { AiGateway, type AiExecution, type AiRunEnd } from './ai/gateway';
@@ -13,6 +16,7 @@ import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
 import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
 import type { MessageRouter } from './panel/messageRouter';
+import type { BoardState } from '../shared/model';
 
 /** Processo da ferramenta de IA em execução. */
 export interface RunningProcess {
@@ -145,6 +149,30 @@ export const refinePrompt = (ref: string, context: PromptContext = NO_CONTEXT, c
     'Trabalhe só neste card. Ninguém está acompanhando esta sessão.',
   ].join('\n');
 
+/**
+ * O que a IA recebe no botão "Resumir a conversa": ler as mensagens do card e gravar um resumo
+ * (Decisões/Observações/Pendências) como uma mensagem nova, sem trabalhar a fase, mover o card nem
+ * mudar o status.
+ */
+export const summarizePrompt = (ref: string, context: PromptContext = NO_CONTEXT): string =>
+  [
+    `Leia toda a conversa do card ${ref} do board Faz AI (get_card, campo comments). Escreva um resumo organizado em três seções — Decisões, Observações e Pendências — cobrindo só o que foi discutido nesta conversa (nada de outros cards ou do board). Onde não houver nada para uma seção, escreva "Nada identificado" em vez de omiti-la. Grave o resumo com add_comment(card: "${ref}", body: <resumo>, kind: "summary"); não escreva nenhuma outra mensagem, não mova o card, não mude o status, não altere arquivos nem rode comandos. Não faça comentário sobre o processo (nada de "segue o resumo:" como texto fora do próprio resumo).`,
+    ...context.always,
+    ...context.card,
+  ].join('\n');
+
+/**
+ * O modelo/esforço da faixa "Alto" do catálogo ativo, no formato que a chamada da ferramenta
+ * entende (nome do modelo e esforço). Usado pelo modo `summarize`, que força sempre essa faixa,
+ * independente do Esforço do card.
+ */
+function highTierModel(state: BoardState): { name: string; effort: string | null } | null {
+  const tier = effortTiers(state.board.aiTool, state.board.modelCatalog).find(([level]) => level === 'Alto');
+  const chosen = tier ? parseModelValue(tier[1]) : null;
+  const option = chosen ? state.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === state.board.aiTool) : undefined;
+  return option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null;
+}
+
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
 export const cardPrompt = (
   ref: string,
@@ -203,6 +231,7 @@ export class AiRunner {
     const tool = aiToolInfo(state.board.aiTool);
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const refine = mode === 'refine';
+    const summarize = mode === 'summarize';
     const messagesBefore = this.aiMessages(cardId);
     const tail: string[] = [];
     let exec: AiExecution;
@@ -226,18 +255,21 @@ export class AiRunner {
         prepare: () => {
           const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '', boardServer(this.deps));
           // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo
-          const autonomous = !refine && isYolo(state, card);
-          // refinar não mexe em arquivos: roda só com o board
-          const permission = autonomous ? 'full' : refine ? 'board' : state.board.runner.permission;
-          const permissionAdvice = refine ? null : PERMISSION_ADVICE[permission];
+          const autonomous = !refine && !summarize && isYolo(state, card);
+          // refinar e resumir não mexem em arquivos: rodam só com o board
+          const permission = autonomous ? 'full' : refine || summarize ? 'board' : state.board.runner.permission;
+          const permissionAdvice = refine || summarize ? null : PERMISSION_ADVICE[permission];
           if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
+          if (summarize) log('Resumir a conversa: lê as mensagens e grava um resumo, sem mover o card nem mudar o status.');
           log(plan.summary.join(' | '));
+          // resumir sempre usa a faixa "Alto" do catálogo ativo, independente do Esforço do card
+          const summaryModel = summarize ? highTierModel(state) : null;
           return {
             // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
             config: {
-              model: plan.manifest.model?.name ?? null,
-              effort: plan.manifest.model?.effort ?? null,
+              model: summarize ? summaryModel?.name ?? null : plan.manifest.model?.name ?? null,
+              effort: summarize ? summaryModel?.effort ?? null : plan.manifest.model?.effort ?? null,
               profile: plan.manifest.profile,
               agent: plan.manifest.agent,
               autonomous,
@@ -249,13 +281,15 @@ export class AiRunner {
             input: {
               prompt: refine
                 ? refinePrompt(cardRef(card), contextLines(state, card), refineCatalog(state))
-                : cardPrompt(
-                    cardRef(card),
-                    contextLines(state, card),
-                    [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
-                    autonomous,
-                    needsTriage(state, card),
-                  ),
+                : summarize
+                  ? summarizePrompt(cardRef(card), contextLines(state, card))
+                  : cardPrompt(
+                      cardRef(card),
+                      contextLines(state, card),
+                      [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+                      autonomous,
+                      needsTriage(state, card),
+                    ),
               permission,
               addDirs: this.router.aiWorkDirs(),
               exec: plan.input,
@@ -364,11 +398,22 @@ export class AiRunner {
         : code !== 0
           ? `O ${toolLabel} terminou com erro (código ${code}).${output}`
           : null;
-    // refinar não passa a vez, nem quando falha: o card volta ao status que tinha, e a falha fica na conversa
-    if (run.mode === 'refine') {
+    // refinar e resumir não passam a vez, nem quando falham: o card volta ao status que tinha, e a falha fica na conversa
+    if (run.mode === 'refine' || run.mode === 'summarize') {
+      const summarize = run.mode === 'summarize';
       if (failure)
         this.router.handle(
-          { type: 'comment.add', cardId, body: `O refinamento do card não terminou. ${failure}` },
+          {
+            type: 'comment.add',
+            cardId,
+            body: summarize ? `O resumo da conversa não foi gerado. ${failure}` : `O refinamento do card não terminou. ${failure}`,
+          },
+          { author: RUNNER_AUTHOR, source: 'ai' },
+        );
+      // sem falha de processo, mas sem a mensagem que o resumo deveria gravar: a IA entendeu mal o pedido
+      else if (summarize && !replied)
+        this.router.handle(
+          { type: 'comment.add', cardId, body: 'O resumo não foi gerado: a execução terminou sem escrever a mensagem.' },
           { author: RUNNER_AUTHOR, source: 'ai' },
         );
       return void this.router.handle(

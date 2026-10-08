@@ -374,6 +374,7 @@ export class BoardRepo {
       body: str(r.body),
       createdAt: num(r.created_at),
       updatedAt: num(r.updated_at),
+      kind: r.kind === 'summary' ? 'summary' : undefined,
     }));
 
     const attachments: Attachment[] = all(
