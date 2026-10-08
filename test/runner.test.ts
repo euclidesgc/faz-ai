@@ -132,6 +132,95 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+it('a história leva os outros agentes do board como subagentes, e o agente dela ganha a ferramenta de delegar; a sub-tarefa roda só com o dela', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { executionPlan } = await import('../src/extension/execution');
+  const { openInMemory } = await import('../src/extension/db/database');
+  const { MessageRouter } = await import('../src/extension/panel/messageRouter');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-deleg-')));
+  const project = path.join(root, 'p');
+  const home = path.join(root, 'h');
+  fs.mkdirSync(project);
+  fs.mkdirSync(home);
+  const db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
+  const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+    workspaceKey: 'ws',
+    folderName: 'P',
+    author: 'Pessoa',
+    attachmentsDir: path.join(root, 'a'),
+    workspaceDir: project,
+    homeDir: home,
+  });
+  const option = router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude')!;
+  const agent = (name: string, tools: string[], model = '') =>
+    router.handle({
+      type: 'harness.agent.create',
+      input: { name, description: `Agente ${name}`, body: `Instruções de ${name}.`, model, tools, deniedTools: [], skills: [], mcp: [] },
+    });
+  agent('condutor', ['Read', 'Grep', 'Glob']);
+  agent('backend-node', ['Read', 'Edit', 'Bash'], `${option.id}@${option.efforts[0]}`);
+  router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'condutor' } } });
+  const s0 = router.snapshot();
+  const parent = s0.workflows.find((w) => w.kind === 'parent')!;
+  const child = s0.workflows.find((w) => w.kind === 'child')!;
+  const storyId = router.createCard({
+    typeId: s0.cardTypes.find((t) => t.defaultWorkflowId === parent.id)!.id,
+    columnId: s0.columns.find((c) => c.workflowId === parent.id)!.id,
+    parentId: null,
+    title: 'História',
+  });
+  const taskId = router.createCard({
+    typeId: s0.cardTypes.find((t) => t.defaultWorkflowId === child.id)!.id,
+    columnId: s0.columns.find((c) => c.workflowId === child.id)!.id,
+    parentId: storyId,
+    title: 'Passo',
+  });
+  const backend = router.snapshot().board.execProfiles.find((p) => p.id === 'backend-node')!;
+  router.handle({ type: 'card.execProfile.set', cardId: taskId, profileId: backend.id });
+  const server = { command: 'node', args: ['b.js'] };
+  const of = (id: string) =>
+    executionPlan(
+      router.snapshot(),
+      router.snapshot().cards.find((c) => c.id === id)!,
+      project,
+      home,
+      server,
+    );
+
+  // a história: a sessão fica com todas as ferramentas (sem `--tools`), o condutor leva as dele mais a de
+  // lançar subagentes, e o especialista vai inline com as ferramentas e o modelo do arquivo dele
+  const story = of(storyId);
+  expect(story.input.tools).toEqual([]);
+  // toda lista de ferramentas num agente é fechada e deixaria o servidor do board de fora: ele vai junto
+  expect(story.input.agentDefinition).toMatchObject({ name: 'condutor', tools: ['Read', 'Grep', 'Glob', 'Agent', 'mcp__faz-ai__*'] });
+  expect(story.input.delegates).toEqual([
+    {
+      name: 'backend-node',
+      description: 'Agente backend-node',
+      prompt: 'Instruções de backend-node.',
+      tools: ['Read', 'Edit', 'Bash', 'mcp__faz-ai__*'],
+      model: option.model,
+    },
+  ]);
+  expect(story.advice).toEqual([]);
+  expect(story.summary.join(' | ')).toContain('Subagentes: backend-node (inline)');
+  expect(story.summary.join(' | ')).toContain('Ferramentas do agente: Read, Grep, Glob, Agent, mcp__faz-ai__* (no agente)');
+  expect(story.summary.join(' | ')).not.toContain('Ferramentas: ');
+
+  // a sub-tarefa roda com o agente dela, com as ferramentas impostas, e sem subagentes
+  const task = of(taskId);
+  expect(task.input.agentDefinition).toEqual({
+    name: 'backend-node',
+    description: 'Agente backend-node',
+    prompt: 'Instruções de backend-node.',
+  });
+  expect(task.input.delegates).toEqual([]);
+  expect(task.input.tools).toEqual(['Read', 'Edit', 'Bash']);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 it('o prompt da execução leva o contexto fixo do board e o do card pelo caminho, e não cita mais a skill do fluxo por nome', () => {
   expect(cardPrompt('#1')).not.toContain('Contexto fixo');
   expect(cardPrompt('#1')).not.toContain('faz-ai-fluxo');

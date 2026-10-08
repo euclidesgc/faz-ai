@@ -9,6 +9,7 @@ import { ALL_AI_TOOLS } from '../src/shared/harness';
 const exec: ExecInput = {
   agent: 'planejador',
   agentDefinition: null,
+  delegates: [],
   mcpAllowed: ['github'],
   mcpBlocked: ['slack', 'com.ponto'],
   mcpConfig: '{"mcpServers":{}}',
@@ -46,6 +47,32 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
         'planejador',
       ),
     ).toBe(true);
+    // os outros agentes do board vão no mesmo JSON, como subagentes, com as ferramentas e o modelo de cada um
+    const delegated = headlessCommand('claude', {
+      prompt: 'P',
+      permission: 'full',
+      exec: {
+        ...exec,
+        tools: [],
+        agentDefinition: { name: 'condutor', description: 'Conduz', prompt: 'Delegue.', tools: ['Read', 'Agent'] },
+        delegates: [
+          { name: 'backend-node', description: 'Backend', prompt: 'Codifique.', tools: ['Read', 'Edit', 'Bash'], model: 'sonnet' },
+        ],
+      },
+    }) as HeadlessCommand;
+    expect(
+      has(
+        delegated.args,
+        '--agents',
+        JSON.stringify({
+          condutor: { description: 'Conduz', prompt: 'Delegue.', tools: ['Read', 'Agent'] },
+          'backend-node': { description: 'Backend', prompt: 'Codifique.', tools: ['Read', 'Edit', 'Bash'], model: 'sonnet' },
+        }),
+        '--agent',
+        'condutor',
+      ),
+    ).toBe(true);
+    expect(delegated.args).not.toContain('--tools');
     // os servidores liberados no perfil rodam sem pedir aprovação, junto do servidor do board
     expect(has(a, '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', 'mcp__github__*')).toBe(true);
     expect(command.tempFiles).toEqual({ 'mcp.json': '{"mcpServers":{}}' });

@@ -6,6 +6,25 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **A Implementação em modo autônomo parava com o condutor.** A execução de uma história é quem
+  faz as sub-tarefas da Implementação, delegando cada uma a um subagente; mas o `condutor-do-board`
+  (padrão desde a migração dos perfis) roda só com leitura, e essa restrição ia para a linha de
+  comando do Claude Code (`--tools`), tirando da sessão a ferramenta de lançar subagentes e deixando
+  os especialistas de fora (o contexto vazio não carrega os agentes do usuário). O condutor repetia
+  que "a execução automática vai cuidar" até o board bloquear o card. Agora a sessão de uma história
+  recebe os outros agentes disponíveis do board como subagentes (com as ferramentas e o modelo de
+  cada um), o agente dela ganha a ferramenta `Agent`, e a restrição de ferramentas dele vai na
+  própria definição, não na sessão. O condutor de fábrica passa a dizer isso nas instruções; o
+  `condutor-do-board.md` que já existe na sua pasta não é sobrescrito, mas a correção não depende
+  dele. E uma lista de ferramentas num agente é fechada: o Claude Code deixa de fora tudo o que não
+  está nela, inclusive os servidores MCP que carregou — o servidor do board conectava, mas a sessão
+  do condutor não tinha `get_card` nem `add_comment` e parava sem registrar nada (o Diagnóstico dizia
+  que estava tudo certo porque estava: o registro e a conexão nunca foram o problema). Agora toda lista
+  de ferramentas que o board monta para um agente, o da história ou um especialista, leva junto as
+  ferramentas do servidor do board (`mcp__faz-ai__*`): na linha de comando e também no arquivo do
+  agente, para ele falar com o board quando é chamado como subagente no chat do editor. Os arquivos
+  que o board já tinha gravado (os de fábrica, como o condutor) são completados uma vez na abertura;
+  a interface não mostra esse nome, só a lista que você escolheu.
 - **Agente padrão depois da migração dos perfis.** Ao abrir um board gravado por uma versão anterior, o
   "Agente padrão" embutido (sem instruções) virava o arquivo `~/.claude/agents/agente-padr-o.md`, com
   o nome truncado pelo acento e com Opus como modelo, e ficava como padrão do board no lugar do

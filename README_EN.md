@@ -698,7 +698,9 @@ default. With none checked, the built-in agent applies, with no instructions.
 Agents the board creates go to the tool's global folder (they apply in any project), and the ones
 already in the project show up under the **Projeto** tab. On the board's first opening, ten factory
 agents are created globally, checked as available, with **condutor-do-board** as the default: it
-drives cards through the flow and picks the right specialist for each subtask. The others
+drives cards through the flow, picks the right specialist for each subtask and, in Implementação,
+delegates each one to that specialist as a subagent (a story's session receives the board's other
+available agents as subagents). The others
 (frontend-web, backend-node, backend-python, mobile-flutter, documentacao-tecnica, qa-testes,
 revisor-de-codigo, devops-infra, dados-sql) have minimal instructions, for you or the AI to adapt to
 the project. What you delete does not come back on its own; **Recriar os agentes padrão** (recreate

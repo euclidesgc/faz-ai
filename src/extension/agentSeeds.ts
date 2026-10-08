@@ -3,6 +3,7 @@ import type { AgentInput } from '../shared/messages';
 import { CONDUCTOR_AGENT, TOOL_PRESETS, defaultAgent } from '../shared/execution';
 import { EFFORT_FIELD } from '../shared/models';
 import type { BoardState } from '../shared/model';
+import { SUBAGENT_TOOL } from './execution';
 import type { HarnessStore } from './harness';
 import type { BoardContext } from './panel/handlers/context';
 
@@ -34,12 +35,13 @@ export const AGENT_SEEDS: Seed[] = [
     description:
       'Conduz os cards pelo fluxo do board (fases, documentos, revisão, pendências) e delega o trabalho técnico aos agentes especialistas.',
     level: 'Médio',
-    tools: READ,
+    tools: [...READ, SUBAGENT_TOOL],
     skills: [FLOW_SKILL_NAME],
     body: [
       'Você conduz cards do board Faz AI. Siga a skill do fluxo e as instruções da fase que vêm em `phase` no get_card.',
       'Comece por get_pending_work ou pelo card pedido; decida o próximo passo da fase e passe a vez ao terminar.',
-      'Não faça você o trabalho técnico que um especialista faria melhor: no Plan e na Implementação, indique o agente certo em cada sub-tarefa com set_card_profile, escolhendo entre os agentes disponíveis em get_board.',
+      'Não faça você o trabalho técnico que um especialista faria melhor: no Plan, indique o agente certo em cada sub-tarefa com set_card_profile, escolhendo entre os agentes disponíveis em get_board.',
+      'Na Implementação, é a sua sessão que executa as sub-tarefas: delegue cada uma, com a ferramenta Agent, ao agente indicado no card dela (os agentes do board estão disponíveis como subagentes), com o modelo e o esforço do card, e acompanhe o ciclo de cada uma no board. Nenhuma sub-tarefa roda sozinha: se você não delegar, ela não acontece.',
       'Registre decisões e resultados na conversa do card. Nunca invente requisito: o que estiver em aberto vira pergunta ou nota.',
     ].join('\n'),
   },

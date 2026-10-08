@@ -7,6 +7,24 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Autonomous Implementação stalled with the conductor.** A story's run is what carries out the
+  Implementação subtasks, delegating each one to a subagent; but `condutor-do-board` (the default
+  since the profile migration) runs read-only, and that restriction went to the Claude Code command
+  line (`--tools`), removing the subagent tool from the session and leaving the specialists out (the
+  empty context does not load the user's agents). The conductor kept saying "the board's automatic
+  run will handle it" until the board blocked the card. Now a story's session receives the board's
+  other available agents as subagents (with each one's tools and model), its agent gets the `Agent`
+  tool, and its tool restriction goes in its own definition, not on the session. The factory
+  conductor now says so in its instructions; an existing `condutor-do-board.md` in your folder is
+  not overwritten, but the fix does not depend on it. And an agent's tool list is closed: Claude Code
+  leaves out everything not in it, including the MCP servers it loaded — the board server connected,
+  but the conductor's session had no `get_card` or `add_comment` and stopped without recording
+  anything (the Diagnóstico said all was fine because it was: registration and connection were never
+  the problem). Now every tool list the board builds for an agent, the story's or a specialist's,
+  carries the board server's tools along (`mcp__faz-ai__*`): on the command line and also in the
+  agent file, so it talks to the board when called as a subagent from the editor chat. Files the
+  board had already written (the factory ones, such as the conductor) are completed once on opening;
+  the interface does not show that name, only the list you chose.
 - **Default agent after the profile migration.** Opening a board saved by an earlier version turned
   the built-in "Agente padrão" (no instructions) into the file `~/.claude/agents/agente-padr-o.md`,
   with the name cut by the accent and Opus as its model, and made it the board's default instead of

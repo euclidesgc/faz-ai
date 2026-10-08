@@ -1,5 +1,6 @@
 import type { Agent, AgentSpec } from '../shared/harness';
 import type { AgentInput } from '../shared/messages';
+import { BOARD_TOOLS, withBoardTools } from '../shared/execution';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 
 /**
@@ -33,8 +34,19 @@ function frontmatterList(fm: string, key: string): string[] {
   return out;
 }
 
+/**
+ * A pasta de agentes é a do Claude Code: só ele lê `mcp__<servidor>__*` na lista de ferramentas. No
+ * arquivo, a lista vai sempre com as do servidor do board (uma lista fechada deixaria o board de fora
+ * quando o agente roda no chat do editor); na leitura ela sai, e a pessoa só vê e edita o resto.
+ */
+const readsBoardTools = (spec: AgentSpec): boolean => spec.dir.startsWith('.claude/');
+
 /** O `model` nativo que vai no frontmatter: o id do modelo, sem a ferramenta nem o esforço (`claude:sonnet@medium` → `sonnet`). */
 export const nativeModelOf = (modelValue: string): string => modelValue.replace(/@.*$/, '').replace(/^[^:]+:/, '');
+
+/** O arquivo de agente tem lista de ferramentas sem as do servidor do board: foi gravado antes desta regra. */
+export const lacksBoardTools = (spec: AgentSpec, a: Agent): boolean =>
+  readsBoardTools(spec) && a.tools.length > 0 && !frontmatterList(frontmatterOf(a.content), 'tools').includes(BOARD_TOOLS);
 
 /** Lê um arquivo de agente. `scope`, `path` e `location` vêm de quem o encontrou. */
 export function parseAgentFile(
@@ -51,7 +63,7 @@ export function parseAgentFile(
     model: frontmatterValue(fm, 'model') ?? '',
     modelValue: frontmatterValue(fm, 'faz-ai-model') ?? '',
     body: body.trim(),
-    tools: frontmatterList(fm, 'tools'),
+    tools: frontmatterList(fm, 'tools').filter((t) => t !== BOARD_TOOLS),
     deniedTools: frontmatterList(fm, 'disallowedTools'),
     skills: frontmatterList(fm, 'skills'),
     mcp: frontmatterList(fm, 'faz-ai-mcp'),
@@ -64,14 +76,15 @@ export function parseAgentFile(
  * (uma string JSON é YAML válido): a ferramenta lê o arquivo com um parser de YAML, e uma descrição
  * com `:` sem aspas o derruba.
  */
-export function renderAgentFile(_spec: AgentSpec, input: AgentInput, seed = false): string {
+export function renderAgentFile(spec: AgentSpec, input: AgentInput, seed = false): string {
   const oneLine = input.description.replace(/\r?\n/g, ' ').trim();
+  const tools = readsBoardTools(spec) ? withBoardTools(input.tools) : input.tools;
   const native = input.model.trim() ? nativeModelOf(input.model.trim()) : '';
   const body = input.body.trim();
   const lines = [
     `name: ${JSON.stringify(input.name)}`,
     `description: ${JSON.stringify(oneLine)}`,
-    ...(input.tools.length ? [`tools: ${input.tools.join(', ')}`] : []),
+    ...(tools.length ? [`tools: ${tools.join(', ')}`] : []),
     ...(input.deniedTools.length ? [`disallowedTools: ${input.deniedTools.join(', ')}`] : []),
     ...(native ? [`model: ${native}`] : []),
     ...(input.skills.length ? [`skills: ${input.skills.join(', ')}`] : []),
