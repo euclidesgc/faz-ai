@@ -67,9 +67,7 @@ function setYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.set'>, author: str
  */
 function setYoloMany(ctx: BoardContext, msg: MessageOf<'card.yolo.setMany'>, author: string, byAi: boolean): void {
   if (byAi) throw new Error('Só uma pessoa liga o modo autônomo.');
-  const stories = ctx
-    .state()
-    .cards.filter((c) => msg.cardIds.includes(c.id) && !c.parentId && isLive(c));
+  const stories = ctx.state().cards.filter((c) => msg.cardIds.includes(c.id) && !c.parentId && isLive(c));
   for (const story of stories) {
     if (story.yolo === msg.enabled) continue;
     applyYolo(ctx, story, msg.enabled, author);

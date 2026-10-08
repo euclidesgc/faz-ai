@@ -445,7 +445,12 @@ describe('eventsFor: pull request, workspace e modo autônomo', () => {
     const events = eventsFor(msg, actor, mapOf(story, h2), mapOf(story, h2), extra);
 
     expect(kinds(events)).toEqual(['comment', 'comment', 'yolo_changed', 'yolo_changed']);
-    expect(events.filter((e) => e.kind === 'yolo_changed').map((e) => e.cardId).sort()).toEqual(['h', 'h2']);
+    expect(
+      events
+        .filter((e) => e.kind === 'yolo_changed')
+        .map((e) => e.cardId)
+        .sort(),
+    ).toEqual(['h', 'h2']);
     expect(events.filter((e) => e.kind === 'yolo_changed').every((e) => e.fromValue === 'off' && e.toValue === 'on')).toBe(true);
   });
 
