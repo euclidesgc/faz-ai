@@ -198,7 +198,8 @@ describe('telas montam sem erro', () => {
     ])
       expect(html(<GitSettings />)).toContain(text);
     const settingsHtml = html(<Settings />);
-    expect(settingsHtml).toContain('Backup');
+    // no editor (isWeb false em teste), a aba Backup não aparece no Settings do board: os comandos da paleta cuidam disso
+    expect(settingsHtml).not.toContain('Backup');
     const backup = html(<BackupSettings />);
     for (const text of ['Exportar board', 'Importar de um arquivo…', 'guarde-o com cuidado']) expect(backup).toContain(text);
     expect(backup).not.toContain('Espere a execução da IA terminar');
