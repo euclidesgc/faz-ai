@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { agentInputOf, nativeModelOf, parseAgentFile, renderAgentFile } from '../src/extension/agentFiles';
+import { agentInputOf, lacksBoardTools, nativeModelOf, parseAgentFile, renderAgentFile } from '../src/extension/agentFiles';
 import { AGENT_SEEDS, CONDUCTOR_AGENT } from '../src/extension/agentSeeds';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
@@ -31,7 +31,7 @@ describe('arquivos de agente', () => {
         '---',
         'name: "frontend-web"',
         'description: "Frontend web em React"',
-        'tools: Read, Edit',
+        'tools: Read, Edit, mcp__faz-ai__*',
         'disallowedTools: WebFetch',
         'model: sonnet',
         'skills: faz-ai-fluxo, modelos',
@@ -86,6 +86,22 @@ describe('arquivos de agente', () => {
     expect(agentInputOf(agent)).toEqual(seed);
   });
 
+  it('a lista de ferramentas vai ao arquivo com as do servidor do board e volta sem elas; vazia fica vazia; no Cursor nada muda', () => {
+    const claude = aiToolInfo('claude').agents;
+    const found = { name: 'x', scope: 'user' as const, path: '/h/x.md', location: '~/x.md' };
+    // uma lista fechada deixaria o board de fora quando o agente roda no chat do editor
+    expect(renderAgentFile(claude, { ...input, tools: ['Read', 'mcp__faz-ai__*'] })).toContain('tools: Read, mcp__faz-ai__*\n');
+    expect(renderAgentFile(claude, { ...input, tools: [] })).not.toContain('tools:');
+    expect(parseAgentFile(claude, found, renderAgentFile(claude, input)).tools).toEqual(['Read', 'Edit']);
+    expect(lacksBoardTools(claude, parseAgentFile(claude, found, renderAgentFile(claude, input)))).toBe(false);
+    const old = parseAgentFile(claude, found, '---\nname: x\ndescription: "d"\ntools: Read, Grep\nfaz-ai-seed: true\n---\nCorpo\n');
+    expect(old.tools).toEqual(['Read', 'Grep']);
+    expect(lacksBoardTools(claude, old)).toBe(true);
+    const cursor = aiToolInfo('cursor').agents;
+    expect(renderAgentFile(cursor, input)).toContain('tools: Read, Edit\n');
+    expect(lacksBoardTools(cursor, parseAgentFile(cursor, found, renderAgentFile(cursor, input)))).toBe(false);
+  });
+
   it('o modelo nativo é o id sem a ferramenta nem o esforço', () => {
     expect(nativeModelOf('claude:sonnet@medium')).toBe('sonnet');
     expect(nativeModelOf('cursor:gpt-6-luna@high')).toBe('gpt-6-luna');
@@ -130,6 +146,8 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
     // o modelo vem das regras de esforço do board
     expect(s.board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.model).toMatch(/^claude:/);
     expect(fs.readFileSync(path.join(dir, `${CONDUCTOR_AGENT}.md`), 'utf8')).toContain('faz-ai-seed: true');
+    // o condutor de fábrica leva as ferramentas do board: como subagente no chat do editor ele também fala com o board
+    expect(fs.readFileSync(path.join(dir, `${CONDUCTOR_AGENT}.md`), 'utf8')).toContain('tools: Read, Grep, Glob, Agent, mcp__faz-ai__*\n');
 
     fs.rmSync(path.join(dir, 'dados-sql.md'));
     router.refreshHarness();
@@ -137,6 +155,22 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
     expect(fs.existsSync(path.join(dir, 'dados-sql.md'))).toBe(false);
     router.handle({ type: 'harness.agents.seed', force: true });
     expect(fs.existsSync(path.join(dir, 'dados-sql.md'))).toBe(true);
+  });
+
+  it('na abertura, um agente do board gravado sem as ferramentas do servidor é regravado com elas; o escrito à mão fica', async () => {
+    const dir = path.join(home, '.claude', 'agents');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'condutor-do-board.md'),
+      '---\nname: "condutor-do-board"\ndescription: "Conduz"\ntools: Read, Grep, Glob, Agent\nmodel: sonnet\nfaz-ai-model: "claude:sonnet@medium"\nfaz-ai-seed: true\n---\n\nConduza.\n',
+    );
+    fs.writeFileSync(path.join(dir, 'meu.md'), '---\nname: meu\ndescription: "Meu"\ntools: Read\n---\nMeu corpo.\n');
+    const router = await open(await handleOf(), true);
+    expect(fs.readFileSync(path.join(dir, 'condutor-do-board.md'), 'utf8')).toContain('tools: Read, Grep, Glob, Agent, mcp__faz-ai__*\n');
+    expect(fs.readFileSync(path.join(dir, 'condutor-do-board.md'), 'utf8')).toContain('\n\nConduza.\n');
+    expect(fs.readFileSync(path.join(dir, 'meu.md'), 'utf8')).toContain('tools: Read\n');
+    // a interface segue mostrando só a lista da pessoa
+    expect(router.snapshot().board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.tools).toEqual(['Read', 'Grep', 'Glob', 'Agent']);
   });
 
   it('um segundo board na mesma máquina encontra os agentes de fábrica prontos: ficam disponíveis e o condutor é o padrão', async () => {

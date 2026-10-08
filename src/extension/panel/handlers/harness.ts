@@ -65,6 +65,8 @@ export class BoardHarness {
       if (this.ctx.boards.seededAgents(this.ctx.boardId).length === 0) changed = true;
       if (seedAgents(this.ctx, this.store).length) changed = true;
     }
+    // agentes gravados antes de a lista de ferramentas levar o servidor do board: regravados uma vez
+    this.store.repairAgentTools();
     this.load();
     if (changed) this.markSeeded();
   }

@@ -21,7 +21,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   do condutor não tinha `get_card` nem `add_comment` e parava sem registrar nada (o Diagnóstico dizia
   que estava tudo certo porque estava: o registro e a conexão nunca foram o problema). Agora toda lista
   de ferramentas que o board monta para um agente, o da história ou um especialista, leva junto as
-  ferramentas do servidor do board (`mcp__faz-ai__*`).
+  ferramentas do servidor do board (`mcp__faz-ai__*`): na linha de comando e também no arquivo do
+  agente, para ele falar com o board quando é chamado como subagente no chat do editor. Os arquivos
+  que o board já tinha gravado (os de fábrica, como o condutor) são completados uma vez na abertura;
+  a interface não mostra esse nome, só a lista que você escolheu.
 - **Agente padrão depois da migração dos perfis.** Ao abrir um board gravado por uma versão anterior, o
   "Agente padrão" embutido (sem instruções) virava o arquivo `~/.claude/agents/agente-padr-o.md`, com
   o nome truncado pelo acento e com Opus como modelo, e ficava como padrão do board no lugar do

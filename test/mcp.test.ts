@@ -908,7 +908,7 @@ describe('status do card e checkpoint de revisão', () => {
     ]);
     const file = path.join(dir, '.claude/agents/revisor-de-spec.md');
     expect(fs.readFileSync(file, 'utf8')).toBe(
-      '---\nname: "revisor-de-spec"\ndescription: "Revisa uma Spec antes do Plan"\ntools: Read, Grep\nmodel: opus\nfaz-ai-model: "claude:opus@high"\n---\n\nLeia a spec e aponte lacunas.\n',
+      '---\nname: "revisor-de-spec"\ndescription: "Revisa uma Spec antes do Plan"\ntools: Read, Grep, mcp__faz-ai__*\nmodel: opus\nfaz-ai-model: "claude:opus@high"\n---\n\nLeia a spec e aponte lacunas.\n',
     );
     expect((await call('get_agent', { agent: 'revisor-de-spec' })).text).toContain('aponte lacunas');
     expect((await call('create_agent', { name: 'revisor-de-spec', description: 'd', content: 'c', scope: 'project' })).text).toContain(
@@ -918,7 +918,9 @@ describe('status do card e checkpoint de revisão', () => {
 
     // o patch regrava só o que vier; o arquivo inteiro substitui tudo
     await call('update_agent', { agent: 'revisor-de-spec', description: 'Nova descrição', skills: ['x'] });
-    expect(fs.readFileSync(file, 'utf8')).toContain('description: "Nova descrição"\ntools: Read, Grep\nmodel: opus\nskills: x\n');
+    expect(fs.readFileSync(file, 'utf8')).toContain(
+      'description: "Nova descrição"\ntools: Read, Grep, mcp__faz-ai__*\nmodel: opus\nskills: x\n',
+    );
     await call('update_agent', {
       agent: 'revisor-de-spec',
       content: '---\nname: revisor-de-spec\ndescription: Outra\n---\nNovo corpo',

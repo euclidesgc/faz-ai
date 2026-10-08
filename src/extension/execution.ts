@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { EXEC_ENFORCEMENT, manifestOf, type ExecManifest } from '../shared/execution';
+import { EXEC_ENFORCEMENT, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
 import type { AiTool } from '../shared/harness';
 import { byPath } from './samePath';
 import type { BoardState, Card } from '../shared/model';
@@ -29,18 +29,6 @@ export interface AgentDefinition {
 
 /** A ferramenta do Claude Code que lança subagentes: é por ela que a sessão da história delega as sub-tarefas. */
 export const SUBAGENT_TOOL = 'Agent';
-
-/**
- * As ferramentas do servidor do board, no nome que o Claude Code dá a elas (`mcp__<servidor>__<ferramenta>`),
- * para a lista de ferramentas de um agente. Uma lista `tools` num agente é fechada: a sessão (ou o
- * subagente) fica só com o que está nela, e os servidores MCP ficam de fora mesmo carregados — a
- * ponte conecta, as instruções do servidor entram no contexto, mas nenhuma ferramenta dele existe
- * (verificado na CLI 2.1.278). Por isso toda lista que o board monta leva o servidor do board junto.
- */
-export const BOARD_TOOLS = `mcp__${BOARD_SERVER}__*`;
-
-/** A lista de ferramentas de um agente do board, sempre com as do servidor do board. */
-const withBoardTools = (tools: string[]): string[] => [...new Set([...tools, BOARD_TOOLS])];
 
 /**
  * Acima disto o JSON do agente não vai na linha de comando: no Windows a CLI é um `.cmd` e a linha

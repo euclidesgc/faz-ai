@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -15,9 +15,12 @@ let shown: string[];
 let bridge: HostBridge;
 let saves: number;
 let rawDb: Awaited<ReturnType<typeof openInMemory>>;
+let dir: string;
+
+afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 beforeEach(async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-bridge-'));
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-bridge-'));
   const db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
   rawDb = db;
   saves = 0;

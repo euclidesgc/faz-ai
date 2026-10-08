@@ -37,6 +37,19 @@ export interface ExecProfile {
   path: string;
 }
 
+/**
+ * As ferramentas do servidor MCP do board, no nome que o Claude Code dá a elas (`mcp__<servidor>__*`),
+ * para a lista `tools` de um agente. Essa lista é fechada: o agente (a sessão, quando ele é o da
+ * execução; o subagente, quando é lançado) fica só com o que está nela, e os servidores MCP carregados
+ * ficam de fora — a ponte conecta, as instruções do servidor entram no contexto, mas nenhuma
+ * ferramenta dele existe (verificado na CLI 2.1.278). Por isso toda lista de ferramentas de um agente
+ * do board leva este nome junto, no arquivo e na linha de comando, e a interface nunca o mostra.
+ */
+export const BOARD_TOOLS = 'mcp__faz-ai__*';
+
+/** A lista de ferramentas de um agente, sempre com as do servidor do board; vazia continua vazia (todas). */
+export const withBoardTools = (tools: string[]): string[] => (tools.length ? [...new Set([...tools, BOARD_TOOLS])] : []);
+
 /** O agente de fábrica que conduz os cards pelo fluxo: é o padrão do board quando o escolhido não existe. */
 export const CONDUCTOR_AGENT = 'condutor-do-board';
 

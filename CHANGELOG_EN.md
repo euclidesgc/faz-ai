@@ -21,7 +21,10 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   but the conductor's session had no `get_card` or `add_comment` and stopped without recording
   anything (the Diagnóstico said all was fine because it was: registration and connection were never
   the problem). Now every tool list the board builds for an agent, the story's or a specialist's,
-  carries the board server's tools along (`mcp__faz-ai__*`).
+  carries the board server's tools along (`mcp__faz-ai__*`): on the command line and also in the
+  agent file, so it talks to the board when called as a subagent from the editor chat. Files the
+  board had already written (the factory ones, such as the conductor) are completed once on opening;
+  the interface does not show that name, only the list you chose.
 - **Default agent after the profile migration.** Opening a board saved by an earlier version turned
   the built-in "Agente padrão" (no instructions) into the file `~/.claude/agents/agente-padr-o.md`,
   with the name cut by the accent and Opus as its model, and made it the board's default instead of

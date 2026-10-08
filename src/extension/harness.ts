@@ -17,7 +17,7 @@ import {
 } from '../shared/harness';
 import type { AgentInput } from '../shared/messages';
 import { copyTarget } from '../shared/harnessCatalog';
-import { agentInputOf, parseAgentFile, renderAgentFile } from './agentFiles';
+import { agentInputOf, lacksBoardTools, parseAgentFile, renderAgentFile } from './agentFiles';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { scanInventory } from './harnessScan';
 import { detectTools } from './models';
@@ -161,6 +161,25 @@ export class HarnessStore {
     const input: AgentInput = { ...agentInputOf(current), ...patch, name, ...(body !== undefined ? { body } : {}) };
     if (!input.description.trim()) throw new Error('O agente precisa de uma descrição.');
     fs.writeFileSync(file, renderAgentFile(this.agentSpec, input, current.seed));
+  }
+
+  /**
+   * Regrava os agentes do board (os que têm chave `faz-ai-*`: criados ou editados por ele) cuja lista de
+   * ferramentas ainda não leva as do servidor do board. Arquivos que a pessoa escreveu à mão ficam como
+   * estão. Devolve os nomes regravados.
+   */
+  repairAgentTools(): string[] {
+    const fixed: string[] = [];
+    for (const a of this.agents()) {
+      if (!/^faz-ai-/m.test(a.content) || !lacksBoardTools(this.agentSpec, a)) continue;
+      try {
+        this.updateAgent(a.name, a.scope, {});
+        fixed.push(a.name);
+      } catch {
+        /* sem permissão ou sem pasta: fica para a próxima */
+      }
+    }
+    return fixed;
   }
 
   /** Substitui o arquivo inteiro do agente (com o frontmatter). */
