@@ -1086,6 +1086,7 @@ describe('consumptionLine', () => {
     inventory: [],
     answer: '',
     reason: null,
+    usageLimitReached: false,
     ...patch,
   });
 

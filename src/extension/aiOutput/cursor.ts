@@ -181,6 +181,8 @@ export function cursorReader(): OutputReader {
           inventory: items,
           answer,
           reason: null,
+          // este leitor não interpreta eventos de limite de uso: a reserva é só do leitor do Claude
+          usageLimitReached: false,
         };
       }
 
@@ -192,8 +194,8 @@ export function cursorReader(): OutputReader {
       // não vazio e consumo nulo, o rótulo correto é `partial`: ele diz exatamente o que houve
       // (inventário sim, consumo não) sem inventar nem apagar fato. Resista à tentação de "simplificar"
       // isto para `none` — perderia informação real de graça.
-      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null };
-      return { measure: 'none', consumption: null, inventory: [], answer, reason: null };
+      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached: false };
+      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached: false };
     },
 
     get sawEvent(): boolean {
