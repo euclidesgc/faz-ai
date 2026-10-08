@@ -18,8 +18,7 @@ export interface ActivityItem {
 }
 
 export type ActivityMessage =
-  | { kind: 'running'; count: number; items: ActivityItem[]; title: string }
-  | { kind: 'idle'; text: string; title?: string };
+  { kind: 'running'; count: number; items: ActivityItem[]; title: string } | { kind: 'idle'; text: string; title?: string };
 
 /** "agora" / "há N min" / "há N h", a partir do início da execução (ms) e da hora atual (ms). */
 export function elapsedLabel(startedAt: number, now: number): string {

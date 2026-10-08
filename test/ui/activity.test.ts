@@ -140,10 +140,7 @@ describe('activityMessage: uma execução', () => {
 
   it('sub-tarefa: ref da sub-tarefa e storyRef da história', () => {
     const state = boardState({
-      cards: [
-        card('p1', { number: 5, title: 'História', workflowId: 'wp' }),
-        sub('c1', 'p1', 'todo', { number: 12, title: 'Sub-tarefa' }),
-      ],
+      cards: [card('p1', { number: 5, title: 'História', workflowId: 'wp' }), sub('c1', 'p1', 'todo', { number: 12, title: 'Sub-tarefa' })],
       aiActivity: [activity({ cardId: 'c1', origin: 'manual' })],
     });
     const msg = activityMessage(state, { offline: false, now: NOW });

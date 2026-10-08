@@ -63,8 +63,8 @@ export function ActivityBar({ offline }: { offline: boolean }) {
             {t('IA em {n} cards: ', { n: msg.count })}
             {msg.items.map((item, i) => (
               <span key={item.cardId}>
-                {i > 0 && ', '}
-                <RefButton item={item} onOpen={openCard} />
+                {i > 0 && ' · '}
+                <RefButton item={item} onOpen={openCard} /> {item.what}
               </span>
             ))}
           </>
