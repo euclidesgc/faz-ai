@@ -12,6 +12,7 @@ import { CardDrawer } from './components/CardDrawer';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { Dialog } from './components/Dialog';
 import { FilterBar } from './components/FilterBar';
+import { SelectionBar } from './components/SelectionBar';
 import { AutopilotButton } from './components/AutopilotButton';
 import { HeartbeatButton } from './components/HeartbeatButton';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -148,6 +149,7 @@ export function App() {
       {view !== 'environment' && <RequirementsBanner />}
       {/* a barra de filtros filtra cards, não o log: fica só no board (RF-01) */}
       {view === 'board' && <FilterBar />}
+      {view === 'board' && <SelectionBar />}
       <main className="content">
         {view === 'board' && <Board />}
         {view === 'trash' && <TrashView />}

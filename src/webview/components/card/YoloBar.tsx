@@ -6,6 +6,16 @@ import { t } from '../../i18n';
 import { ai, cards } from '../../commands';
 import { Button, IconYolo } from '../ui';
 
+/**
+ * O aviso sobre o que o modo autônomo faz, mostrado na confirmação de ligar (aqui e na ação em lote de
+ * `SelectionBar`). Função (não constante) porque `t()` precisa ser chamada em tempo de render, para pegar
+ * o idioma certo.
+ */
+export const yoloWarning = (): string =>
+  t(
+    'A IA toca esta história sozinha, do Backlog até o pull request: cria os documentos de cada fase, o plano e as sub-tarefas, implementa uma por uma e abre o PR. Nada é pedido a você: não há aprovação, pergunta nem confirmação. A IA roda com a permissão "Sem restrições" (altera arquivos e roda comandos) e não faz o merge. As próximas histórias em modo autônomo entram na fila e viram uma pilha de pull requests. Pare a qualquer hora pelo botão do topo do board.',
+  );
+
 /** Modo autônomo (YOLO) da história: liga e desliga e mostra o andamento do autopiloto. A sub-tarefa mostra o da história. */
 export function YoloBar({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
@@ -23,9 +33,7 @@ export function YoloBar({ card }: { card: Card }) {
       </div>
     ) : null;
 
-  const warning = t(
-    'A IA toca esta história sozinha, do Backlog até o pull request: cria os documentos de cada fase, o plano e as sub-tarefas, implementa uma por uma e abre o PR. Nada é pedido a você: não há aprovação, pergunta nem confirmação. A IA roda com a permissão "Sem restrições" (altera arquivos e roda comandos) e não faz o merge. As próximas histórias em modo autônomo entram na fila e viram uma pilha de pull requests. Pare a qualquer hora pelo botão do topo do board.',
-  );
+  const warning = yoloWarning();
   const toggle = (enabled: boolean) => {
     if (!enabled) return cards.setYolo(card.id, false);
     ask({
