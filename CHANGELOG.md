@@ -6,6 +6,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Botão de criar card no topo da coluna.** O **+ Novo card** / **+ Nova sub-tarefa** passou do
+  rodapé para o topo da coluna, logo abaixo do cabeçalho, para não precisar rolar a lista em
+  colunas cheias. Mudou só a posição: nenhum comportamento ou dado muda. O print
+  `docs/images/board.png` ainda mostra o botão no rodapé e não foi atualizado nesta entrega.
 - **Git e paralelo saem do board e vão para o Settings do editor.** As nove chaves de Git
   (`fazai.git.mode`, `branchPattern`, `worktreeDir`, `parallel`, `parallelStories`, `autoMerge`,
   `mergeMethod`, `watchMerges`, `watchMergeMinutes`) agora ficam em `Ctrl+,` → **Faz AI: Git**, com

@@ -256,6 +256,9 @@ button.active {
 .column-footer {
   padding: var(--sp-6) var(--sp-8);
 }
+.column-footer--top {
+  border-bottom: 1px solid var(--border);
+}
 .column-footer .ghost {
   width: 100%;
   text-align: left;

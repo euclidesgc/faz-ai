@@ -7,6 +7,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Create-card button moved to the top of the column.** **+ Novo card** / **+ Nova sub-tarefa**
+  moved from the column footer to the top, right below the header, so you don't have to scroll a
+  full column to find it. Only the position changed: no behavior or data changes. The
+  `docs/images/board.png` screenshot still shows the button at the bottom and was not updated in
+  this change.
 - **Git and parallel move from the board to the editor Settings.** The nine Git keys
   (`fazai.git.mode`, `branchPattern`, `worktreeDir`, `parallel`, `parallelStories`, `autoMerge`,
   `mergeMethod`, `watchMerges`, `watchMergeMinutes`) now live in `Ctrl+,` → **Faz AI: Git**, with

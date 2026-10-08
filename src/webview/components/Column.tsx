@@ -196,14 +196,7 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
           ]}
         />
       </header>
-      <SortableContext items={visibleCards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-        <div className="column-body">
-          {visibleCards.map((card) => (
-            <SortableCard key={card.id} card={card} />
-          ))}
-        </div>
-      </SortableContext>
-      <footer className="column-footer">
+      <div className="column-footer column-footer--top">
         {adding ? (
           <div className="add-form">
             <TextField.Root
@@ -242,7 +235,14 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
             {workflow.kind === 'child' ? t('+ Nova sub-tarefa') : t('+ Novo card')}
           </Button>
         )}
-      </footer>
+      </div>
+      <SortableContext items={visibleCards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+        <div className="column-body">
+          {visibleCards.map((card) => (
+            <SortableCard key={card.id} card={card} />
+          ))}
+        </div>
+      </SortableContext>
     </div>
   );
 }
