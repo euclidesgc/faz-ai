@@ -143,6 +143,8 @@ export const settings: Record<string, string> = {
   'Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.':
     'Board theme and typography of long texts: the card description and the conversation, both when writing and when reading.',
   'Tema e fonte': 'Theme and font',
+  'A aparência do board (idioma, tema, fonte e tamanho) agora fica no Settings do editor.':
+    'The board appearance (language, theme, font and size) now lives in the editor Settings.',
   Idioma: 'Language',
   'O idioma da interface do board.': 'The language of the board interface.',
   Tema: 'Theme',

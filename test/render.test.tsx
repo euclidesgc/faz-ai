@@ -214,7 +214,19 @@ describe('telas montam sem erro', () => {
     expect(html(<BackupSettings />)).toContain('Lendo o arquivo…');
     useBoardStore.setState({ backupBusy: null });
     const cols = html(<WorkflowsSettings />);
-    for (const text of ['PRD', 'Novo workflow', 'Nova coluna', 'IA atua', 'Exige aprovação', 'Fase', 'PRD.md', 'Discovery', 'Homologação'])
+    for (const text of [
+      'PRD',
+      'Novo workflow',
+      'Nova coluna',
+      'IA atua',
+      'Exige aprovação',
+      'Fase',
+      'PRD.md',
+      'Discovery',
+      'Homologação',
+      'Status dos cards',
+      'Aguardando resposta',
+    ])
       expect(cols).toContain(text);
     // a opção de começar colapsada saiu: vale o estado em que a pessoa deixou o board
     for (const text of ['Começa colapsada', 'começa colapsada', 'linha de cima', 'linha de baixo']) expect(cols).not.toContain(text);
@@ -260,8 +272,8 @@ describe('telas montam sem erro', () => {
     for (const text of ['OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
 
     const look = html(<AppearanceSettings />);
-    for (const text of ['Tema', 'Fonte dos textos', 'Tamanho da fonte: 14px', 'Prévia', 'Status dos cards', 'Aguardando resposta'])
-      expect(look).toContain(text);
+    for (const text of ['Abrir no Settings do editor', 'Prévia']) expect(look).toContain(text);
+    for (const text of ['Tamanho da fonte: 14px', 'Status dos cards']) expect(look).not.toContain(text);
     const toggle = html(<ThemeToggle />);
     for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
