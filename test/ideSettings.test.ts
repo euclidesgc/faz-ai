@@ -9,10 +9,16 @@ import type { WebviewToHost } from '../src/shared/messages';
 import { ConfigurationTarget, IdeSettings, type IdeSettingsApi } from '../src/extension/settings/ideSettings';
 
 const KEY = 'fazai.appearance.language';
+const THEME_KEY = 'fazai.appearance.theme';
+const FONT_KEY = 'fazai.appearance.font';
+const FONT_SIZE_KEY = 'fazai.appearance.fontSize';
 
 beforeEach(() => {
   fakeConfig.reset();
   fakeConfig.values.default[KEY] = 'auto';
+  fakeConfig.values.default[THEME_KEY] = 'system';
+  fakeConfig.values.default[FONT_KEY] = 'sans';
+  fakeConfig.values.default[FONT_SIZE_KEY] = 14;
 });
 
 describe('IdeSettings: ler', () => {
@@ -24,6 +30,36 @@ describe('IdeSettings: ler', () => {
 
   it('sem valor em nenhum escopo devolve o default', () => {
     expect(new IdeSettings(workspace).read('appearance.language')).toBe('auto');
+  });
+
+  it('tema: devolve o valor do Workspace quando Usuário e Workspace divergem', () => {
+    fakeConfig.values.global[THEME_KEY] = 'dark';
+    fakeConfig.values.workspace[THEME_KEY] = 'light';
+    expect(new IdeSettings(workspace).read('appearance.theme')).toBe('light');
+  });
+
+  it('tema: sem valor em nenhum escopo devolve o default', () => {
+    expect(new IdeSettings(workspace).read('appearance.theme')).toBe('system');
+  });
+
+  it('fonte: devolve o valor do Workspace quando Usuário e Workspace divergem', () => {
+    fakeConfig.values.global[FONT_KEY] = 'serif';
+    fakeConfig.values.workspace[FONT_KEY] = 'mono';
+    expect(new IdeSettings(workspace).read('appearance.font')).toBe('mono');
+  });
+
+  it('fonte: sem valor em nenhum escopo devolve o default', () => {
+    expect(new IdeSettings(workspace).read('appearance.font')).toBe('sans');
+  });
+
+  it('tamanho da fonte: devolve o valor do Workspace quando Usuário e Workspace divergem', () => {
+    fakeConfig.values.global[FONT_SIZE_KEY] = 16;
+    fakeConfig.values.workspace[FONT_SIZE_KEY] = 18;
+    expect(new IdeSettings(workspace).read('appearance.fontSize')).toBe(18);
+  });
+
+  it('tamanho da fonte: sem valor em nenhum escopo devolve o default', () => {
+    expect(new IdeSettings(workspace).read('appearance.fontSize')).toBe(14);
   });
 });
 
@@ -55,6 +91,48 @@ describe('IdeSettings: gravar', () => {
     await expect(new IdeSettings(api, undefined, (l) => lines.push(l)).write('appearance.language', 'en')).resolves.toBeUndefined();
     expect(lines).toEqual(['Faz AI: não foi possível gravar fazai.appearance.language no Settings: Error: somente leitura']);
   });
+
+  it('tema: sem alvo grava no Usuário', async () => {
+    await new IdeSettings(workspace).write('appearance.theme', 'dark');
+    expect(fakeConfig.updates).toEqual([{ key: THEME_KEY, value: 'dark', target: ConfigurationTarget.Global }]);
+    expect(fakeConfig.values.global[THEME_KEY]).toBe('dark');
+    expect(fakeConfig.values.workspace[THEME_KEY]).toBeUndefined();
+  });
+
+  it('tema: com ConfigurationTarget.Workspace grava no Workspace e não no Usuário', async () => {
+    await new IdeSettings(workspace).write('appearance.theme', 'dark', ConfigurationTarget.Workspace);
+    expect(fakeConfig.updates[0]?.target).toBe(ConfigurationTarget.Workspace);
+    expect(fakeConfig.values.workspace[THEME_KEY]).toBe('dark');
+    expect(fakeConfig.values.global[THEME_KEY]).toBeUndefined();
+  });
+
+  it('fonte: sem alvo grava no Usuário', async () => {
+    await new IdeSettings(workspace).write('appearance.font', 'mono');
+    expect(fakeConfig.updates).toEqual([{ key: FONT_KEY, value: 'mono', target: ConfigurationTarget.Global }]);
+    expect(fakeConfig.values.global[FONT_KEY]).toBe('mono');
+    expect(fakeConfig.values.workspace[FONT_KEY]).toBeUndefined();
+  });
+
+  it('fonte: com ConfigurationTarget.Workspace grava no Workspace e não no Usuário', async () => {
+    await new IdeSettings(workspace).write('appearance.font', 'mono', ConfigurationTarget.Workspace);
+    expect(fakeConfig.updates[0]?.target).toBe(ConfigurationTarget.Workspace);
+    expect(fakeConfig.values.workspace[FONT_KEY]).toBe('mono');
+    expect(fakeConfig.values.global[FONT_KEY]).toBeUndefined();
+  });
+
+  it('tamanho da fonte: sem alvo grava no Usuário', async () => {
+    await new IdeSettings(workspace).write('appearance.fontSize', 18);
+    expect(fakeConfig.updates).toEqual([{ key: FONT_SIZE_KEY, value: 18, target: ConfigurationTarget.Global }]);
+    expect(fakeConfig.values.global[FONT_SIZE_KEY]).toBe(18);
+    expect(fakeConfig.values.workspace[FONT_SIZE_KEY]).toBeUndefined();
+  });
+
+  it('tamanho da fonte: com ConfigurationTarget.Workspace grava no Workspace e não no Usuário', async () => {
+    await new IdeSettings(workspace).write('appearance.fontSize', 18, ConfigurationTarget.Workspace);
+    expect(fakeConfig.updates[0]?.target).toBe(ConfigurationTarget.Workspace);
+    expect(fakeConfig.values.workspace[FONT_SIZE_KEY]).toBe(18);
+    expect(fakeConfig.values.global[FONT_SIZE_KEY]).toBeUndefined();
+  });
 });
 
 describe('IdeSettings: observar', () => {
@@ -70,6 +148,27 @@ describe('IdeSettings: observar', () => {
     new IdeSettings(workspace).watch((keys) => calls.push(keys));
     fakeConfig.set('global', 'editor.fontSize', 12);
     expect(calls).toEqual([]);
+  });
+
+  it('mudança em fazai.appearance.theme chama o callback só com essa chave', () => {
+    const calls: string[][] = [];
+    new IdeSettings(workspace).watch((keys) => calls.push(keys));
+    fakeConfig.set('global', THEME_KEY, 'dark');
+    expect(calls).toEqual([['appearance.theme']]);
+  });
+
+  it('mudança em fazai.appearance.font chama o callback só com essa chave', () => {
+    const calls: string[][] = [];
+    new IdeSettings(workspace).watch((keys) => calls.push(keys));
+    fakeConfig.set('global', FONT_KEY, 'mono');
+    expect(calls).toEqual([['appearance.font']]);
+  });
+
+  it('mudança em fazai.appearance.fontSize chama o callback só com essa chave', () => {
+    const calls: string[][] = [];
+    new IdeSettings(workspace).watch((keys) => calls.push(keys));
+    fakeConfig.set('global', FONT_SIZE_KEY, 18);
+    expect(calls).toEqual([['appearance.fontSize']]);
   });
 });
 
@@ -113,6 +212,61 @@ describe('IdeSettings: bind', () => {
     link.router.handle({ type: 'settings.board.update', patch: { appearance: { language: 'pt-BR' } } });
     expect(fakeConfig.updates).toEqual([{ key: KEY, value: 'pt-BR', target: ConfigurationTarget.Global }]);
   });
+
+  it('tema: Settings → SQLite: editar o Settings grava no board uma vez', async () => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    fakeConfig.set('global', THEME_KEY, 'dark');
+    expect(link.updates).toEqual([{ appearance: { theme: 'dark' } }]);
+    expect(link.router.snapshot().board.appearance.theme).toBe('dark');
+  });
+
+  it('tema: SQLite → Settings: gravar pelo MCP escreve no Usuário uma vez', async () => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    link.router.handle({ type: 'settings.board.update', patch: { appearance: { theme: 'dark' } } });
+    expect(fakeConfig.updates).toEqual([{ key: THEME_KEY, value: 'dark', target: ConfigurationTarget.Global }]);
+  });
+
+  it('fonte: Settings → SQLite: editar o Settings grava no board uma vez', async () => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    fakeConfig.set('global', FONT_KEY, 'mono');
+    expect(link.updates).toEqual([{ appearance: { font: 'mono' } }]);
+    expect(link.router.snapshot().board.appearance.font).toBe('mono');
+  });
+
+  it('fonte: SQLite → Settings: gravar pelo MCP escreve no Usuário uma vez', async () => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    link.router.handle({ type: 'settings.board.update', patch: { appearance: { font: 'mono' } } });
+    expect(fakeConfig.updates).toEqual([{ key: FONT_KEY, value: 'mono', target: ConfigurationTarget.Global }]);
+  });
+
+  it('tamanho da fonte: Settings → SQLite: editar o Settings grava no board uma vez', async () => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    fakeConfig.set('global', FONT_SIZE_KEY, 18);
+    expect(link.updates).toEqual([{ appearance: { fontSize: 18 } }]);
+    expect(link.router.snapshot().board.appearance.fontSize).toBe(18);
+  });
+
+  it('tamanho da fonte: SQLite → Settings: gravar pelo MCP escreve no Usuário uma vez', async () => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    link.router.handle({ type: 'settings.board.update', patch: { appearance: { fontSize: 18 } } });
+    expect(fakeConfig.updates).toEqual([{ key: FONT_SIZE_KEY, value: 18, target: ConfigurationTarget.Global }]);
+  });
+
+  it('mudar o tema não dispara gravação para idioma, fonte ou tamanho', async () => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    fakeConfig.set('global', THEME_KEY, 'dark');
+    expect(link.updates).toEqual([{ appearance: { theme: 'dark' } }]);
+    expect(link.router.snapshot().board.appearance.language).toBe('auto');
+    expect(link.router.snapshot().board.appearance.font).toBe('sans');
+    expect(link.router.snapshot().board.appearance.fontSize).toBe(14);
+  });
 });
 
 describe('IdeSettings: bind na abertura', () => {
@@ -140,6 +294,95 @@ describe('IdeSettings: bind na abertura', () => {
     expect(fakeConfig.updates).toEqual([]);
     expect(link.updates).toEqual([]);
   });
+
+  it('tema: Settings explícito manda: o board recebe o valor e o Settings não é tocado', async () => {
+    const link = await makeLink();
+    fakeConfig.values.global[THEME_KEY] = 'dark';
+    new IdeSettings(workspace).bind(link);
+    expect(link.router.snapshot().board.appearance.theme).toBe('dark');
+    expect(link.updates).toEqual([{ appearance: { theme: 'dark' } }]);
+    expect(fakeConfig.updates).toEqual([]);
+  });
+
+  it('tema: Settings vazio e board com valor: o Settings recebe o valor do board, uma gravação', async () => {
+    const link = await makeLink();
+    link.router.handle({ type: 'settings.board.update', patch: { appearance: { theme: 'dark' } } });
+    new IdeSettings(workspace).bind(link);
+    expect(fakeConfig.values.global[THEME_KEY]).toBe('dark');
+    expect(fakeConfig.updates).toHaveLength(1);
+    expect(link.updates).toEqual([]);
+  });
+
+  it('tema: iguais: nenhuma gravação nos dois lados', async () => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    expect(fakeConfig.updates).toEqual([]);
+    expect(link.updates).toEqual([]);
+  });
+
+  it('fonte: Settings explícito manda: o board recebe o valor e o Settings não é tocado', async () => {
+    const link = await makeLink();
+    fakeConfig.values.global[FONT_KEY] = 'mono';
+    new IdeSettings(workspace).bind(link);
+    expect(link.router.snapshot().board.appearance.font).toBe('mono');
+    expect(link.updates).toEqual([{ appearance: { font: 'mono' } }]);
+    expect(fakeConfig.updates).toEqual([]);
+  });
+
+  it('fonte: Settings vazio e board com valor: o Settings recebe o valor do board, uma gravação', async () => {
+    const link = await makeLink();
+    link.router.handle({ type: 'settings.board.update', patch: { appearance: { font: 'mono' } } });
+    new IdeSettings(workspace).bind(link);
+    expect(fakeConfig.values.global[FONT_KEY]).toBe('mono');
+    expect(fakeConfig.updates).toHaveLength(1);
+    expect(link.updates).toEqual([]);
+  });
+
+  it('fonte: iguais: nenhuma gravação nos dois lados', async () => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    expect(fakeConfig.updates).toEqual([]);
+    expect(link.updates).toEqual([]);
+  });
+
+  it('tamanho da fonte: Settings explícito manda: o board recebe o valor e o Settings não é tocado', async () => {
+    const link = await makeLink();
+    fakeConfig.values.global[FONT_SIZE_KEY] = 18;
+    new IdeSettings(workspace).bind(link);
+    expect(link.router.snapshot().board.appearance.fontSize).toBe(18);
+    expect(link.updates).toEqual([{ appearance: { fontSize: 18 } }]);
+    expect(fakeConfig.updates).toEqual([]);
+  });
+
+  it('tamanho da fonte: Settings vazio e board com valor: o Settings recebe o valor do board, uma gravação', async () => {
+    const link = await makeLink();
+    link.router.handle({ type: 'settings.board.update', patch: { appearance: { fontSize: 18 } } });
+    new IdeSettings(workspace).bind(link);
+    expect(fakeConfig.values.global[FONT_SIZE_KEY]).toBe(18);
+    expect(fakeConfig.updates).toHaveLength(1);
+    expect(link.updates).toEqual([]);
+  });
+
+  it('tamanho da fonte: iguais: nenhuma gravação nos dois lados', async () => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    expect(fakeConfig.updates).toEqual([]);
+    expect(link.updates).toEqual([]);
+  });
+
+  it('RF7: dois boards em sequência — o primeiro grava no Settings, o segundo adota o valor do Settings', async () => {
+    const linkA = await makeLink();
+    linkA.router.handle({ type: 'settings.board.update', patch: { appearance: { theme: 'dark' } } });
+    new IdeSettings(workspace).bind(linkA);
+    expect(fakeConfig.values.global[THEME_KEY]).toBe('dark');
+    expect(linkA.updates).toEqual([]);
+
+    const linkB = await makeLink();
+    linkB.router.handle({ type: 'settings.board.update', patch: { appearance: { theme: 'light' } } });
+    new IdeSettings(workspace).bind(linkB);
+    expect(linkB.router.snapshot().board.appearance.theme).toBe('dark');
+    expect(linkB.updates).toEqual([{ appearance: { theme: 'dark' } }]);
+  });
 });
 
 describe('IdeSettings: valor inválido', () => {
@@ -152,6 +395,39 @@ describe('IdeSettings: valor inválido', () => {
     expect(link.router.snapshot().board.appearance.language).toBe('auto');
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('fr');
+  });
+
+  it('tema fora do enum não muda o board e vai para o log', async () => {
+    const link = await makeLink();
+    const lines: string[] = [];
+    new IdeSettings(workspace, undefined, (l) => lines.push(l)).bind(link);
+    fakeConfig.set('global', THEME_KEY, 'blue');
+    expect(link.updates).toEqual([]);
+    expect(link.router.snapshot().board.appearance.theme).toBe('system');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('blue');
+  });
+
+  it('fonte fora do enum não muda o board e vai para o log', async () => {
+    const link = await makeLink();
+    const lines: string[] = [];
+    new IdeSettings(workspace, undefined, (l) => lines.push(l)).bind(link);
+    fakeConfig.set('global', FONT_KEY, 'comic-sans');
+    expect(link.updates).toEqual([]);
+    expect(link.router.snapshot().board.appearance.font).toBe('sans');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('comic-sans');
+  });
+
+  it.each([30, 5, '14'])('tamanho da fonte fora da faixa (%s) não muda o board e vai para o log', async (value) => {
+    const link = await makeLink();
+    const lines: string[] = [];
+    new IdeSettings(workspace, undefined, (l) => lines.push(l)).bind(link);
+    fakeConfig.set('global', FONT_SIZE_KEY, value);
+    expect(link.updates).toEqual([]);
+    expect(link.router.snapshot().board.appearance.fontSize).toBe(14);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain(JSON.stringify(value));
   });
 });
 
