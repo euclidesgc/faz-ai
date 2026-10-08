@@ -118,7 +118,7 @@ export function consumptionLine(report: RunReport, why: { reason?: string | null
       `${COUNT.format(c.cacheReadTokens)} leitura de cache`,
       `${COUNT.format(c.cacheWriteTokens)} criação de cache`,
       ...(c.turns !== null ? [`${COUNT.format(c.turns)} ${c.turns === 1 ? 'turno' : 'turnos'}`] : []),
-      ...(c.costUsd !== null ? [`US$ ${USD.format(c.costUsd)}${c.costEstimated ? ' (estimado)' : ''}`] : []),
+      ...(c.costUsd !== null ? [`US$ ${USD.format(c.costUsd)}`] : []),
     ];
     return `${report.measure === 'partial' ? 'Consumo parcial' : 'Consumo'}: ${parts.join(' · ')}`;
   }
@@ -319,8 +319,6 @@ export class AiRunner {
             tail.push(cut(line, TAIL_CHARS));
             if (tail.length > TAIL_LINES) tail.shift();
           },
-          catalog: state.board.modelCatalog,
-          cursorTokenRate: state.board.rules.cursorTokenRate,
         },
       );
       const run: Run = {

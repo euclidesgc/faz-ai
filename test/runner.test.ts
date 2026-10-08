@@ -908,7 +908,6 @@ describe('consumptionLine', () => {
       turns: 1,
       sessionId: null,
       costUsd: 1.5,
-      costEstimated: true,
       ...consumption,
     },
     inventory: [],
@@ -917,9 +916,9 @@ describe('consumptionLine', () => {
     ...patch,
   });
 
-  it('números em português, "turno" no singular, custo com duas a quatro casas e marcado quando estimado', () => {
+  it('números em português, "turno" no singular, custo com duas a quatro casas', () => {
     expect(consumptionLine(report())).toBe(
-      'Consumo: 1.234 entrada · 5 saída · 0 leitura de cache · 1.000.000 criação de cache · 1 turno · US$ 1,50 (estimado)',
+      'Consumo: 1.234 entrada · 5 saída · 0 leitura de cache · 1.000.000 criação de cache · 1 turno · US$ 1,50',
     );
   });
 

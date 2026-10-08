@@ -11,24 +11,13 @@ import { describe, expect, it } from 'vitest';
 import { claudeReader } from '../src/extension/aiOutput/claude';
 import { lineSplitter } from '../src/extension/aiOutput/lines';
 import type { OutputReader } from '../src/extension/aiOutput/reader';
-import type { ModelOption } from '../src/shared/models';
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'claude-stream-json.jsonl');
 const EVENTS = fs.readFileSync(FIXTURE, 'utf8').split('\n').filter(Boolean);
 
-const haiku = (price?: ModelOption['price']): ModelOption => ({
-  id: 'claude:haiku',
-  tool: 'claude',
-  model: 'haiku',
-  label: 'Haiku 4.5',
-  efforts: [],
-  defaultEffort: null,
-  ...(price ? { price } : {}),
-});
-
 /** Passa linhas pelo leitor e devolve o leitor e as linhas legíveis que saíram. */
-function read(lines: string[], catalog: ModelOption[] = []): { reader: OutputReader; shown: string[] } {
-  const reader = claudeReader({ catalog, model: 'haiku' });
+function read(lines: string[]): { reader: OutputReader; shown: string[] } {
+  const reader = claudeReader({ model: 'haiku' });
   const shown = lines.flatMap((line) => reader.push(line, 'stdout'));
   return { reader, shown };
 }
@@ -55,21 +44,15 @@ describe('leitor do stream-json do Claude Code, contra a saída real', () => {
     expect(read(EVENTS).reader.report().consumption!.sessionId).toBe('11111111-2222-3333-4444-555555555555');
   });
 
-  it('o custo informado pela ferramenta vale e não vai marcado como estimado', () => {
+  it('o custo é o que a ferramenta informou (`total_cost_usd`), sem marca de estimado', () => {
     const c = read(EVENTS).reader.report().consumption!;
     expect(c.costUsd).toBeCloseTo(0.06478465, 8);
-    expect(c.costEstimated).toBe(false);
+    expect(c.costEstimated).toBeUndefined();
   });
 
   it('o custo informado é tomado uma vez, não somado: ele é igual nos dois eventos `result`', () => {
     // somar os dois daria o dobro; é o erro que mais parece certo quando há dois eventos finais
     expect(read(EVENTS).reader.report().consumption!.costUsd).not.toBeCloseTo(0.1295693, 6);
-  });
-
-  it('com custo informado, o preço do catálogo não é usado nem muda o número', () => {
-    const comPreco = read(EVENTS, [haiku({ input: 999, output: 999, cacheRead: 999, cacheWrite: 999 })]);
-    expect(comPreco.reader.report().consumption!.costUsd).toBeCloseTo(0.06478465, 8);
-    expect(comPreco.reader.report().consumption!.costEstimated).toBe(false);
   });
 
   it('a medição é completa: o evento final foi lido', () => {
@@ -194,9 +177,8 @@ describe('fluxo que não chegou ao fim', () => {
   });
 
   it('medição parcial não tem custo: um custo parcial seria somável com os completos no painel', () => {
-    const { reader } = read(semResultado, [haiku({ input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 })]);
+    const { reader } = read(semResultado);
     expect(reader.report().consumption!.costUsd).toBeNull();
-    expect(reader.report().consumption!.costEstimated).toBe(false);
   });
 
   it('truncado antes do `result`: a resposta cai para o texto que o assistente escreveu', () => {
@@ -209,7 +191,7 @@ describe('fluxo que não chegou ao fim', () => {
     // o último `result` não chegou e o primeiro veio pela metade, como num processo morto no meio
     const cortado = `${semResultado.join('\n')}\n${EVENTS.at(-2)!.slice(0, 500)}`;
     const splitter = lineSplitter();
-    const reader = claudeReader({ catalog: [], model: 'haiku' });
+    const reader = claudeReader({ model: 'haiku' });
     const shown = [...splitter.push(cortado), ...splitter.flush()].flatMap((l) => reader.push(l, 'stdout'));
 
     expect(() => reader.report()).not.toThrow();
@@ -241,29 +223,19 @@ describe('fluxo que não chegou ao fim', () => {
   });
 });
 
-describe('stderr e custo estimado', () => {
+describe('stderr e custo', () => {
   it('a linha de stderr aparece no canal mas não passa pelo interpretador', () => {
-    const reader = claudeReader({ catalog: [], model: 'haiku' });
+    const reader = claudeReader({ model: 'haiku' });
     expect(reader.push('aviso: a pasta de cache não existe', 'stderr')).toEqual(['aviso: a pasta de cache não existe']);
     expect(reader.sawEvent).toBe(false);
     expect(reader.report().measure).toBe('none');
   });
 
-  it('sem custo informado, o preço do catálogo estima e o número vai marcado como estimado', () => {
+  it('sem custo informado pela CLI não há custo — nunca calculado por tabela e nunca zero', () => {
     const semCusto = EVENTS.map((l) => (l.includes('"total_cost_usd"') ? l.replace(/"total_cost_usd":[^,]+,/, '') : l));
-    const { reader } = read(semCusto, [haiku({ input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 })]);
-    const c = reader.report().consumption!;
-    const esperado = (54 * 1 + 1221 * 5 + 106009 * 0.1 + 28908 * 1.25) / 1e6;
-    expect(c.costUsd).toBeCloseTo(esperado, 10);
-    expect(c.costEstimated).toBe(true);
-  });
-
-  it('sem custo informado e sem preço no catálogo, não há custo — e nunca custo zero', () => {
-    const semCusto = EVENTS.map((l) => (l.includes('"total_cost_usd"') ? l.replace(/"total_cost_usd":[^,]+,/, '') : l));
-    const { reader } = read(semCusto, [haiku()]);
+    const { reader } = read(semCusto);
     const c = reader.report().consumption!;
     expect(c.costUsd).toBeNull();
-    expect(c.costEstimated).toBe(false);
     // os tokens continuam gravados: a ferramenta mediu token e não mediu dinheiro
     expect(c.outputTokens).toBe(1221);
   });

@@ -50,7 +50,7 @@ export interface AiRun {
   cacheReadTokens: number | null;
   cacheWriteTokens: number | null;
   costUsd: number | null;
-  /** true = custo calculado pela tabela de preços; false = informado pela ferramenta; null = sem custo */
+  /** true = custo calculado por uma tabela de preços (só execuções antigas); false = informado pela ferramenta; null = sem custo */
   costEstimated: boolean | null;
   turns: number | null;
   sessionId: string | null;

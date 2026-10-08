@@ -1,5 +1,4 @@
 import type { RunReport } from '../../shared/log';
-import type { ModelOption } from '../../shared/models';
 import { claudeReader } from './claude';
 import { codexReader } from './codex';
 import { streamReader } from './stream';
@@ -11,14 +10,10 @@ export type OutputFormat = 'text' | 'claude-stream-json' | 'codex-json' | 'strea
 /** De qual canal do processo a linha veio. O `stderr` é texto de gente e nunca é interpretado. */
 export type OutputStream = 'stdout' | 'stderr';
 
-/** O que o leitor precisa para resolver o custo quando a ferramenta não informa. */
+/** O que o leitor precisa saber da execução. */
 export interface ReaderDeps {
-  /** catálogo de modelos da ferramenta em uso (já filtrado por quem chama) */
-  catalog: ModelOption[];
   /** o modelo que o board pediu nesta execução, quando pediu; é o nome a usar quando o fluxo não diz qual foi */
   model: string | null;
-  /** a regra do board que soma a tarifa do Cursor aos modelos de terceiros na estimativa */
-  cursorTokenRate?: boolean;
 }
 
 export interface OutputReader {
@@ -41,9 +36,9 @@ export function readerFor(format: OutputFormat, deps: ReaderDeps): OutputReader 
     case 'claude-stream-json':
       return claudeReader(deps);
     case 'codex-json':
-      return codexReader(deps);
+      return codexReader();
     case 'stream-json':
-      return streamReader(deps);
+      return streamReader();
     default:
       return textReader();
   }

@@ -157,8 +157,6 @@ export class ChatSession {
             tail.push(line);
             if (tail.length > TAIL_LINES) tail.shift();
           },
-          catalog: state.board.modelCatalog,
-          cursorTokenRate: state.board.rules.cursorTokenRate,
         },
       ));
     } catch (e) {

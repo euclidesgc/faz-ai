@@ -13,8 +13,7 @@
 // leitor por formato, em vez de um leitor genérico "que entende todos".
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
-import { costOf } from './price';
-import type { OutputReader, OutputStream, ReaderDeps } from './reader';
+import type { OutputReader, OutputStream } from './reader';
 
 /** Tamanho do comando mostrado na linha de uma execução de shell. */
 const ARG_MAX = 80;
@@ -105,7 +104,7 @@ function lineOf(item: Json): string | null {
   }
 }
 
-export function codexReader(deps: ReaderDeps): OutputReader {
+export function codexReader(): OutputReader {
   let sawEvent = false;
   let sessionId: string | null = null;
   /** quantidade de eventos `turn.completed`; é o único campo do turno que se soma (ao contrário do Claude) */
@@ -183,19 +182,14 @@ export function codexReader(deps: ReaderDeps): OutputReader {
       });
 
       if (sawUsage) {
-        // o Codex não informa custo: a estimativa sai do preço do catálogo, pelo modelo que o board
-        // pediu na linha de comando (o fluxo não diz qual modelo rodou). Sem `deps.model`, não há de
-        // onde estimar — os tokens continuam gravados, só o dinheiro fica sem número.
-        const byModel = deps.model !== null ? new Map([[deps.model, tokens]]) : null;
-        const estimated = byModel ? costOf(deps.catalog, byModel) : null;
+        // o Codex não informa custo e o board não o calcula: só os tokens são medidos
         return {
           measure: 'full',
           consumption: {
             ...tokens,
             turns,
             sessionId,
-            costUsd: estimated,
-            costEstimated: estimated !== null,
+            costUsd: null,
           },
           inventory: items,
           answer: lastAnswer,

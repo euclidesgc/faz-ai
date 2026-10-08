@@ -7,32 +7,21 @@
 import { describe, expect, it } from 'vitest';
 import { codexReader } from '../src/extension/aiOutput/codex';
 import { streamReader } from '../src/extension/aiOutput/stream';
-import type { OutputReader, ReaderDeps } from '../src/extension/aiOutput/reader';
-import type { ModelOption } from '../src/shared/models';
+import type { OutputReader } from '../src/extension/aiOutput/reader';
 
 /** Passa linhas pelo leitor do Codex e devolve o leitor e as linhas legíveis que saíram. */
-function readCodex(lines: string[], deps: Partial<ReaderDeps> = {}): { reader: OutputReader; shown: string[] } {
-  const reader = codexReader({ catalog: [], model: null, ...deps });
+function readCodex(lines: string[]): { reader: OutputReader; shown: string[] } {
+  const reader = codexReader();
   const shown = lines.flatMap((line) => reader.push(line, 'stdout'));
   return { reader, shown };
 }
 
 /** Passa linhas pelo leitor genérico e devolve o leitor e as linhas legíveis que saíram. */
-function readStream(lines: string[], deps: Partial<ReaderDeps> = {}): { reader: OutputReader; shown: string[] } {
-  const reader = streamReader({ catalog: [], model: null, ...deps });
+function readStream(lines: string[]): { reader: OutputReader; shown: string[] } {
+  const reader = streamReader();
   const shown = lines.flatMap((line) => reader.push(line, 'stdout'));
   return { reader, shown };
 }
-
-const codexModel = (price?: ModelOption['price']): ModelOption => ({
-  id: 'codex:gpt-5-codex',
-  tool: 'codex',
-  model: 'codex',
-  label: 'GPT-5 Codex',
-  efforts: [],
-  defaultEffort: null,
-  ...(price ? { price } : {}),
-});
 
 describe('leitor do codex exec --json, pela documentação (sem CLI instalada para conferir)', () => {
   // dois turnos: o primeiro soma raciocínio ao `output_tokens` real se o leitor errar por simetria
@@ -121,21 +110,9 @@ describe('leitor do codex exec --json, pela documentação (sem CLI instalada pa
     expect(readCodex(EVENTS).reader.report().consumption!.sessionId).toBe('abcdefgh-1111-2222-3333-444444444444');
   });
 
-  it('sem custo informado e com preço no catálogo, o custo é estimado e marcado como tal', () => {
-    const preco = { input: 2, output: 10, cacheRead: 0.5, cacheWrite: 1 };
-    const { reader } = readCodex(EVENTS, { model: 'codex', catalog: [codexModel(preco)] });
-    const c = reader.report().consumption!;
-    const esperado = (105 * preco.input + 65 * preco.output + 15 * preco.cacheRead + 0 * preco.cacheWrite) / 1e6;
-    expect(c.costUsd).toBeCloseTo(esperado, 10);
-    expect(c.costEstimated).toBe(true);
-  });
-
-  it('com `deps.model` nulo, não há de onde estimar: `costUsd` fica nulo e os tokens continuam gravados', () => {
-    const preco = { input: 2, output: 10, cacheRead: 0.5, cacheWrite: 1 };
-    const { reader } = readCodex(EVENTS, { model: null, catalog: [codexModel(preco)] });
-    const c = reader.report().consumption!;
+  it('o Codex não informa custo: os tokens ficam gravados e o dinheiro fica sem número', () => {
+    const c = readCodex(EVENTS).reader.report().consumption!;
     expect(c.costUsd).toBeNull();
-    expect(c.costEstimated).toBe(false);
     expect(c.inputTokens).toBe(105);
     expect(c.outputTokens).toBe(65);
   });
@@ -202,7 +179,6 @@ describe('leitor genérico de stream-json (Cursor/Kimi), pela documentação, se
       turns: null,
       sessionId: 'sess-1',
       costUsd: null,
-      costEstimated: false,
     });
     expect(report.answer).toBe('Tudo certo.');
   });

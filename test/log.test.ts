@@ -358,7 +358,7 @@ describe('AiRunRepo', () => {
 
     it('medição parcial sem consumo (Cursor/Kimi sem bloco de uso) grava o inventário, com tokens nulos', () => {
       // o caso central do leitor genérico: ferramentas lidas, nenhum `usage`
-      const reader = streamReader({ catalog: [], model: null });
+      const reader = streamReader();
       for (const e of [
         { type: 'system', session_id: 's' },
         { type: 'tool_call', name: 'Read' },

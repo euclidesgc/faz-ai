@@ -12,7 +12,6 @@ import { spawnMeasured, cleanStaleTemp } from '../src/extension/aiOutput/measure
 import type { OutputStream } from '../src/extension/aiOutput/reader';
 import { headlessCommand, type HeadlessCommand, type HeadlessInput } from '../src/extension/headless';
 import type { RunningProcess } from '../src/extension/runner';
-import type { ModelOption } from '../src/shared/models';
 
 const FIXTURE = fs.readFileSync(path.join(__dirname, 'fixtures', 'claude-stream-json.jsonl'), 'utf8');
 
@@ -48,18 +47,8 @@ const spawn = (command: HeadlessCommand, _cwd: string, out: (text: string, strea
   };
 };
 
-const haiku: ModelOption = {
-  id: 'claude:haiku',
-  tool: 'claude',
-  model: 'haiku',
-  label: 'Haiku 4.5',
-  efforts: [],
-  defaultEffort: null,
-  price: { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
-};
-
-const run = (tool: Parameters<typeof spawnMeasured>[0] = 'claude', input: HeadlessInput = INPUT, catalog: ModelOption[] = []) =>
-  spawnMeasured(tool, input, '/projeto', { spawn, log: (l) => lines.push(l), catalog });
+const run = (tool: Parameters<typeof spawnMeasured>[0] = 'claude', input: HeadlessInput = INPUT) =>
+  spawnMeasured(tool, input, '/projeto', { spawn, log: (l) => lines.push(l) });
 
 beforeEach(() => {
   started = [];
@@ -255,7 +244,7 @@ describe('a volta para texto, que custa dinheiro se errar', () => {
 
 describe('a leitura do fluxo, do byte ao relatório', () => {
   it('a saída real do probe, entregue em pedaços, produz o consumo medido e o inventário', () => {
-    const { proc, report } = run('claude', INPUT, [haiku]);
+    const { proc, report } = run('claude', INPUT);
     proc.onExit(() => {});
 
     // em pedaços de 1 KB, cortando linhas no meio como um pipe de verdade faz
@@ -286,7 +275,7 @@ describe('a leitura do fluxo, do byte ao relatório', () => {
   });
 
   it('o `stderr` não passa pelo interpretador, mas aparece no canal', () => {
-    const { proc, report } = run('claude', INPUT, [haiku]);
+    const { proc, report } = run('claude', INPUT);
     proc.onExit(() => {});
 
     started[0]!.emit(FIXTURE);
@@ -301,7 +290,7 @@ describe('a leitura do fluxo, do byte ao relatório', () => {
   });
 
   it('o `stderr` chegando no meio de uma linha de evento partida não emenda nos dois', () => {
-    const { proc, report } = run('claude', INPUT, [haiku]);
+    const { proc, report } = run('claude', INPUT);
     proc.onExit(() => {});
 
     // corta o fluxo no meio da última linha (o `result`) e põe um aviso entre as duas metades
@@ -333,7 +322,7 @@ describe('a leitura do fluxo, do byte ao relatório', () => {
   });
 
   it('a última linha de evento sem quebra de linha no fim é interpretada, não descartada', () => {
-    const { proc, report } = run('claude', INPUT, [haiku]);
+    const { proc, report } = run('claude', INPUT);
     proc.onExit(() => {});
 
     // o processo saiu bem, só não escreveu o `\n` depois do `result`
@@ -358,15 +347,13 @@ describe('a leitura do fluxo, do byte ao relatório', () => {
     expect(lines).toContain('última linha sem quebra');
   });
 
-  it('o custo é estimado pelo preço do catálogo da ferramenta em uso, e não de outra', () => {
-    const outraFerramenta: ModelOption = { ...haiku, id: 'codex:haiku', tool: 'codex' };
+  it('sem custo informado pela CLI não há custo: o board não calcula por preço', () => {
     const semCusto = FIXTURE.replace(/"total_cost_usd":[^,]+,/g, '');
-    const { proc, report } = run('claude', INPUT, [outraFerramenta]);
+    const { proc, report } = run('claude');
     proc.onExit(() => {});
     started[0]!.emit(semCusto);
     started[0]!.exit(0);
 
-    // o preço existe no catálogo, mas é de outra ferramenta: não serve, e não há custo
     expect(report().consumption!.costUsd).toBeNull();
     expect(report().consumption!.outputTokens).toBe(1221);
   });
@@ -379,7 +366,7 @@ describe('o servidor do board para o Cursor em segundo plano', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-cursor-'));
     try {
       fs.mkdirSync(path.join(dir, '.git', 'info'), { recursive: true });
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l), catalog: [] });
+      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
       const config = JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'));
       expect(config.mcpServers['faz-ai']).toEqual({ type: 'stdio', ...server });
       expect(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8')).toContain('.cursor/mcp.json');
@@ -390,7 +377,7 @@ describe('o servidor do board para o Cursor em segundo plano', () => {
       config.mcpServers.github = { command: 'gh-mcp' };
       fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), JSON.stringify(config));
       lines.length = 0;
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l), catalog: [] });
+      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
       expect(JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'))).toEqual(config);
       expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(false);
 
@@ -398,7 +385,7 @@ describe('o servidor do board para o Cursor em segundo plano', () => {
       config.mcpServers['faz-ai'].args = ['/dados/bridge.js', '/outro/projeto'];
       fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), JSON.stringify(config));
       lines.length = 0;
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l), catalog: [] });
+      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
       const repaired = JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'));
       expect(repaired.mcpServers['faz-ai']).toEqual({ type: 'stdio', command: process.execPath, args: server.args });
       expect(repaired.mcpServers.github).toEqual({ command: 'gh-mcp' });
@@ -407,7 +394,7 @@ describe('o servidor do board para o Cursor em segundo plano', () => {
       // um arquivo que não é JSON (com comentário) não impede a execução: fica como está, com aviso no log
       fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), '// meu\n{}');
       lines.length = 0;
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l), catalog: [] });
+      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
       expect(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8')).toBe('// meu\n{}');
       expect(lines.some((l) => l.includes('não é um JSON válido'))).toBe(true);
       expect(started.length).toBeGreaterThan(0);
