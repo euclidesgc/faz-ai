@@ -16,6 +16,7 @@ import type { BoardState, Card, Column, Workflow } from '../shared/model';
 import { archivedIn, cardsIn } from '../shared/selectors';
 import { cards as cardCommands } from './commands';
 import { requestArchive, requestMove } from './store/actions';
+import { useBoardStore } from './store/boardStore';
 
 /** Quanto tempo a soltura otimista fica na tela sem o `boardState` equivalente nem erro. */
 export const SETTLE_TIMEOUT_MS = 1500;
@@ -162,11 +163,12 @@ export function useDragLanes({ workflow, state, columns, visible, error }: DragL
       const overId = String(e.over.id);
 
       // faixas finais: muda de faixa se preciso; na mesma faixa, reordena pelo `over`.
-      // Se a prévia já trocou de faixa, a posição do card está decidida: reordenar de novo o jogaria para antes do `over`.
+      // Vale também para o card que a prévia já trocou de faixa: o `SortableContext` desenha o card no lugar do `over`
+      // (antes dele se estava depois, depois dele se estava antes), e a soltura tem de repetir o que a pessoa vê.
       let final = moveToLane(cur, id, overId, isBelow(e), archive);
       if (final === cur && overId !== id && !(overId in cur)) {
         const lane = laneOf(cur, id);
-        if (lane !== undefined && laneOf(cur, overId) === lane && laneOf(derived, id) === lane) {
+        if (lane !== undefined && laneOf(cur, overId) === lane) {
           const ids = cur[lane]!;
           final = { ...cur, [lane]: arrayMove(ids, ids.indexOf(id), ids.indexOf(overId)) };
         }
@@ -181,24 +183,26 @@ export function useDragLanes({ workflow, state, columns, visible, error }: DragL
         from !== archiveId &&
         (overId === archiveId || laneOf(cur, overId) === archiveId)
       ) {
-        final = { ...cur, [from]: cur[from]!.filter((x) => x !== id), [archiveId]: [...(cur[archiveId] ?? []), id] };
+        final = { ...cur, [from]: cur[from]!.filter((x) => x !== id), [archiveId]: [id, ...(cur[archiveId] ?? [])] };
       }
 
       const drop = resolveDrop(state, final, id, workflow.id);
       if (drop.kind === 'none') return;
-      if (drop.kind === 'archive') {
-        requestArchive(id);
-        return;
-      }
       errorAtDrop.current = error;
       setSettled(final);
+      if (drop.kind === 'archive') {
+        // sem o `settled` o card volta por um instante ao lugar antigo até o `boardState` chegar (arquivado mais novo vai no topo)
+        requestArchive(id);
+        if (useBoardStore.getState().dialog) setSettled(null);
+        return;
+      }
       if (drop.kind === 'move') {
         if (requestMove(id, drop.columnId, drop.position) === 'asked') setSettled(null);
         return;
       }
       cardCommands.unarchive(id, { columnId: drop.columnId, position: drop.position });
     },
-    [discard, archive, archiveId, archivedIds, derived, state, workflow.id, error],
+    [discard, archive, archiveId, archivedIds, state, workflow.id, error],
   );
 
   const collisionDetection = useCallback<CollisionDetection>(

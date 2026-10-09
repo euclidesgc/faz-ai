@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, screen } from '@testing-library/react';
 import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core';
 import { archiveKey } from '../../src/shared/filters';
+import { laneOf } from '../../src/shared/dragLanes';
 import type { BoardState, Card, Workflow } from '../../src/shared/model';
 import { archivedIn, cardsIn, columnsOf } from '../../src/shared/selectors';
 import { WorkflowRow } from '../../src/webview/components/WorkflowRow';
@@ -58,11 +59,14 @@ type Hook = ReturnType<typeof mount>;
 /** Arrasta `id` até `overId` e solta. */
 function drag(h: Hook, id: string, overId: string | null, rect: Rect = ABOVE) {
   act(() => h.result.current.handlers.onDragStart(start(id)));
+  const from = laneOf(h.result.current.lanes!, id);
   act(() => h.result.current.handlers.onDragOver(over(id, overId, rect)));
   act(() => {
     vi.advanceTimersByTime(20); // libera a guarda de um quadro do onDragOver
   });
-  act(() => h.result.current.handlers.onDragEnd(over(id, overId, rect)));
+  // Quando a prévia troca de faixa, o card abre espaço sob o ponteiro e o `over` passa a ser ele mesmo (no navegador, verificado).
+  const moved = laneOf(h.result.current.lanes!, id) !== from;
+  act(() => h.result.current.handlers.onDragEnd(over(id, moved ? id : overId, rect)));
 }
 const shownIds = (h: Hook, lane: string) => h.result.current.shown[lane]!.map((c) => c.id);
 
@@ -149,6 +153,20 @@ describe('arraste: entre colunas', () => {
     }
   });
 
+  it('o `over` antigo depois da troca de faixa: a soltura repete o que o SortableContext mostra', () => {
+    const [, c1] = cols(parentWf());
+    const h = mount(parentWf());
+    act(() => h.result.current.handlers.onDragStart(start(ids.a)));
+    act(() => h.result.current.handlers.onDragOver(over(ids.a, ids.d, BELOW))); // prévia: [D, A, E]
+    act(() => {
+      vi.advanceTimersByTime(20);
+    });
+    // o ponteiro segue sobre D (retângulos ainda não remedidos): o card aparece antes de D, e é aí que ele cai
+    act(() => h.result.current.handlers.onDragEnd(over(ids.a, ids.d, BELOW)));
+    const m = lastSent('card.move');
+    expect(m).toMatchObject({ cardId: ids.a, columnId: c1!.id, position: 0 });
+  });
+
   it('para uma coluna vazia', () => {
     const empty = cols(parentWf())[2]!;
     expect(order(empty.id)).toEqual([]);
@@ -199,6 +217,20 @@ describe('arraste: arquivar e desarquivar', () => {
     const h = mount(parentWf());
     drag(h, ids.a, ids.e);
     expect(lastSent('card.archive')).toEqual({ type: 'card.archive', cardId: ids.a });
+  });
+
+  it('ao arquivar, o card some do lugar antigo na hora e fica no topo dos arquivados até o state chegar', () => {
+    const [c0] = cols(parentWf());
+    const h = mount(parentWf());
+    drag(h, ids.a, archiveKey(parentWf().id));
+    expect(h.result.current.settled).not.toBeNull();
+    expect(shownIds(h, c0!.id)).not.toContain(ids.a);
+    expect(shownIds(h, archiveKey(parentWf().id))[0]).toBe(ids.a);
+    board.router.handle(lastSent('card.archive'));
+    syncStore(board.router);
+    h.rerender({ state: st(), error: null });
+    expect(h.result.current.settled).toBeNull();
+    expect(shownIds(h, archiveKey(parentWf().id))).toEqual([ids.a]);
   });
 
   it('arrastar um arquivado para uma coluna envia card.unarchive com coluna e posição', () => {
