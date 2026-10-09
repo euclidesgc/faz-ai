@@ -9,6 +9,7 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ### Fixes
 
+- The autonomous-mode bar inside a card no longer shows another story's full block reason (the autopilot note is board-wide): about another card it shows a short line pointing to it; the full text stays in the activity bar.
 - Claude Code's `allowed_warning` (close to the plan's cap) is no longer treated as an exhausted limit: the switch to the fallback model only happens on `rejected` or a window at 100%.
 - The switch to the fallback model only happens when the run failed; a run that finished fine is no longer redone with the fallback.
 - If the retry with the fallback model cannot start (card archived, tool refused), the card is blocked with the reason instead of staying "running" with no run.

@@ -89,6 +89,11 @@ describe('modo autônomo no painel do card', () => {
 
     act(() => autopilot({ active: false, note: '#1 está bloqueado: Sem acesso' }));
     expect(screen.getByText('#1 está bloqueado: Sem acesso')).toBeInTheDocument();
+
+    // a nota sobre OUTRA história não entra inteira no card: só uma linha que aponta para ela
+    act(() => autopilot({ active: false, note: '#298 está bloqueado: Entrega já concluída e verificada 6x nesta coluna...' }));
+    expect(screen.queryByText(/Entrega já concluída/)).toBeNull();
+    expect(screen.getByText('A fila está parada em #298: veja a barra de atividade.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Retomar modo autônomo' }));
     expect(lastSent('ai.autopilot.resume')).toEqual({ type: 'ai.autopilot.resume' });
   });
