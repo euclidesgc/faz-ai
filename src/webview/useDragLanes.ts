@@ -161,14 +161,27 @@ export function useDragLanes({ workflow, state, columns, visible, error }: DragL
       const id = String(e.active.id);
       const overId = String(e.over.id);
 
-      // faixas finais: muda de faixa se preciso; na mesma faixa, reordena pelo `over`
+      // faixas finais: muda de faixa se preciso; na mesma faixa, reordena pelo `over`.
+      // Se a prévia já trocou de faixa, a posição do card está decidida: reordenar de novo o jogaria para antes do `over`.
       let final = moveToLane(cur, id, overId, isBelow(e), archive);
       if (final === cur && overId !== id && !(overId in cur)) {
         const lane = laneOf(cur, id);
-        if (lane !== undefined && laneOf(cur, overId) === lane) {
+        if (lane !== undefined && laneOf(cur, overId) === lane && laneOf(derived, id) === lane) {
           const ids = cur[lane]!;
           final = { ...cur, [lane]: arrayMove(ids, ids.indexOf(id), ids.indexOf(overId)) };
         }
+      }
+
+      // card vivo solto sobre o arquivo (ou sobre um card dele): a prévia não o move, mas a soltura o arquiva
+      const from = laneOf(final, id);
+      if (
+        final === cur &&
+        !archivedIds.has(id) &&
+        from !== undefined &&
+        from !== archiveId &&
+        (overId === archiveId || laneOf(cur, overId) === archiveId)
+      ) {
+        final = { ...cur, [from]: cur[from]!.filter((x) => x !== id), [archiveId]: [...(cur[archiveId] ?? []), id] };
       }
 
       const drop = resolveDrop(state, final, id, workflow.id);
@@ -185,7 +198,7 @@ export function useDragLanes({ workflow, state, columns, visible, error }: DragL
       }
       cardCommands.unarchive(id, { columnId: drop.columnId, position: drop.position });
     },
-    [discard, archive, state, workflow.id, error],
+    [discard, archive, archiveId, archivedIds, derived, state, workflow.id, error],
   );
 
   const collisionDetection = useCallback<CollisionDetection>(
