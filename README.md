@@ -601,12 +601,21 @@ não têm o commit do merge guardado, continuam sendo arquivadas por você, com 
 
 Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
 intervalo, enquanto o editor estiver aberto na pasta do projeto. Em cada rodada ela avança os cards
-aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. No modo
+aprovados, responde às mensagens pendentes e trabalha nos cards prontos, com uma execução por história.
+As atividades **sem branch** (refinar, resumir e as fases que só produzem documento, como Discovery,
+PRD, Spec e Plan no board padrão; vale a coluna que tem artefato antes da fase de código) rodam ao
+mesmo tempo em qualquer modo de workspace, até **Histórias ao mesmo tempo** (duas por padrão, até
+seis), mesmo com **Tocar histórias em paralelo** desligado. As atividades **com branch**
+(Implementação e Homologação) seguem o limite de antes: uma por vez fora do worktree. No modo
 "Worktree por história", **Tocar histórias em paralelo** (Settings do editor, Faz AI › Git; nasce desligado) faz o heartbeat
-tocar várias histórias ao mesmo tempo, cada uma na sua pasta de trabalho: duas por padrão, até seis em
-**Histórias ao mesmo tempo**; o limite conta toda execução em
-andamento, inclusive as chamadas à mão. Fora desse modo, e no modo autônomo (cujas histórias são
-empilhadas), continua uma por vez, e o campo fica desligado. A descrição de cada chave de Git no
+tocar várias histórias com branch ao mesmo tempo, cada uma na sua pasta de trabalho, até o mesmo
+**Histórias ao mesmo tempo**. Os dois tetos (texto e branch) contam separados; cada um conta toda
+execução em andamento, inclusive as chamadas à mão. No modo autônomo (cujas histórias são
+empilhadas), a ordem da fila vale para as histórias que precisam de branch; uma história em fase de
+texto começa assim que há vaga, mesmo com a anterior ainda aberta. Fora do worktree, o
+`prepare_workspace` chamado numa fase de texto enquanto outra história tem execução em andamento é
+recusado (pasta em uso): a branch nasce na fase de código. Em permissão "Sem restrições" a IA ainda
+pode trocar de branch à mão; a guarda cobre só o caminho do board. A descrição de cada chave de Git no
 Settings explica o motivo em cada modo: com branch na própria pasta, duas histórias ao mesmo tempo
 trocariam a branch uma debaixo da outra e misturariam alterações; com worktree elas ficam isoladas,
 ao custo de mais uma cópia dos arquivos em disco por história (com as dependências instaladas em
@@ -841,7 +850,7 @@ quatro seções, nesta ordem:
 | --- | --- |
 | Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
 | Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
-| Git | As nove chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.watchMerges` e `fazai.git.watchMergeMinutes` (acompanhar merges fora do board, de 5 a 1440 minutos). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
+| Git | As nove chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.watchMerges` e `fazai.git.watchMergeMinutes` (acompanhar merges fora do board, de 5 a 1440 minutos). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
 | Backup | Dois links de ação: **Exportar o board agora** e **Importar um board**, que disparam os comandos da paleta |
 
 Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,
