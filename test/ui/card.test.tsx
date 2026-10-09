@@ -453,13 +453,86 @@ describe('Board / Column', () => {
     expect(lastSent('card.create')).toMatchObject({ columnId: firstCol.id, parentId: null, title: 'Nova história' });
   });
 
-  it('sem história selecionada, "+ Nova sub-tarefa" fica desligado', () => {
+  it('sem história selecionada, "+ Nova sub-tarefa" fica desligado, com a dica', () => {
     render(
       <Theme>
         <Board />
       </Theme>,
     );
-    for (const b of screen.getAllByRole('button', { name: '+ Nova sub-tarefa' })) expect(b).toBeDisabled();
+    for (const b of screen.getAllByRole('button', { name: '+ Nova sub-tarefa' })) {
+      expect(b).toBeDisabled();
+      expect(b).toHaveAttribute('title', 'Clique numa história para criar sub-tarefas dela');
+    }
+  });
+
+  it('com uma história selecionada, "+ Nova sub-tarefa" cria a sub-tarefa na coluna', async () => {
+    useBoardStore.getState().selectParent(board.storyId);
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    const s = board.router.snapshot();
+    const childWf = s.workflows.find((w) => w.kind === 'child')!;
+    const firstCol = s.columns.filter((c) => c.workflowId === childWf.id).sort((a, b) => a.position - b.position)[0]!;
+    const btn = screen.getAllByRole('button', { name: '+ Nova sub-tarefa' })[0]!;
+    expect(btn).not.toBeDisabled();
+    await userEvent.click(btn);
+    await userEvent.type(screen.getByPlaceholderText('Título (Enter adiciona)'), 'Sub nova{Enter}');
+    expect(lastSent('card.create')).toMatchObject({ columnId: firstCol.id, parentId: board.storyId, title: 'Sub nova' });
+  });
+
+  it('botão "Criar" também confirma o formulário', async () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    const s = board.router.snapshot();
+    const parentWf = s.workflows.find((w) => w.kind === 'parent')!;
+    const firstCol = s.columns.filter((c) => c.workflowId === parentWf.id).sort((a, b) => a.position - b.position)[0]!;
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    await userEvent.type(screen.getByPlaceholderText('Título (Enter adiciona)'), 'Outra história');
+    await userEvent.click(screen.getByRole('button', { name: 'Criar card' }));
+    expect(lastSent('card.create')).toMatchObject({ columnId: firstCol.id, parentId: null, title: 'Outra história' });
+  });
+
+  it('Esc fecha o formulário sem criar nada', async () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    const input = screen.getByPlaceholderText('Título (Enter adiciona)');
+    await userEvent.type(input, 'não vai{Escape}');
+    expect(screen.queryByPlaceholderText('Título (Enter adiciona)')).toBeNull();
+    expect(sentOf('card.create')).toHaveLength(0);
+  });
+
+  it('botão "Cancelar" fecha o formulário sem criar nada', async () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    await userEvent.type(screen.getByPlaceholderText('Título (Enter adiciona)'), 'não vai');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByPlaceholderText('Título (Enter adiciona)')).toBeNull();
+    expect(sentOf('card.create')).toHaveLength(0);
+  });
+
+  it('o botão de criar fica no topo da coluna, antes dos cards existentes', () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    const column = screen.getByText('Login com Google').closest('.column')!;
+    const footer = column.querySelector('.column-footer')!;
+    const body = column.querySelector('.column-body')!;
+    expect(footer.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('clicar no cabeçalho da linha colapsa a linha e compartilha com o host', async () => {
