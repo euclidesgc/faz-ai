@@ -356,6 +356,16 @@ export const settings: Record<string, string> = {
   'Incluir os modos rápidos': 'Include fast modes',
   'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"); desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.':
     'Cursor has a fast version of many models: it answers sooner and charges more for the same tokens. When on, each one enters the catalog as a separate model (for example, "Claude Opus 5.5 1M Fast"); when off, they leave the catalog. The list comes from the cursor-agent models command, read with the CLI signed in.',
+  'a ferramenta Cursor': 'the Cursor tool',
+  'em Harness de IA': 'in AI harness',
+  'Mostrando os modelos do {tool}': 'Showing the {tool} models',
+  'trocar ferramenta': 'switch tool',
+  'Trocar a ferramenta de IA, em Harness de IA': 'Switch the AI tool, in AI harness',
+  'Preencher o modelo sugerido automaticamente': 'Fill in the suggested model automatically',
+  'Ao criar ou mudar um card, preenche o campo "Modelo" com a sugestão das regras abaixo, se ele estiver vazio ou com a sugestão anterior. Um modelo escolhido à mão nunca é trocado.':
+    'When a card is created or changed, fills in the "Model" field with the rules\' suggestion below, if it is empty or still has the previous suggestion. A hand-picked model is never replaced.',
+  'uma regra de sugestão de modelo': 'a model suggestion rule',
+  'mais abaixo, nesta mesma aba': 'further down, in this same tab',
   'A IA lê o arquivo de cada skill marcada ao executar. Só aparecem as skills marcadas em Configurações → Harness. Busque pelo nome ou pela descrição.':
     'The AI reads the file of every checked skill when it runs. Only skills checked in Settings → Harness are listed. Search by name or description.',
 };
