@@ -173,12 +173,12 @@ describe('heartbeat', () => {
     expect(runner.origins).toEqual(['heartbeat']);
   });
 
-  it('executa uma história por vez e não sobrepõe rodadas', () => {
-    create('A', 'PRD');
-    create('B', 'Spec');
-    create('C', 'Plan');
+  it('executa uma história com branch por vez e não sobrepõe rodadas', () => {
+    create('A', 'Implementação'); // #1: no topo da coluna
+    create('B', 'Implementação'); // #2
+    create('C', 'Implementação'); // #3
     expect(heartbeat.runNow()).toBe(3);
-    expect(runner.started.map(number)).toEqual([3]); // a mais à direita (Plan) primeiro
+    expect(runner.started.map(number)).toEqual([1]); // mexem em código: uma por vez
     expect(heartbeat.queued).toBe(2);
 
     now += 120 * MIN;
@@ -187,7 +187,7 @@ describe('heartbeat', () => {
 
     setStatus(2, 'blocked', 'a pessoa travou este'); // mudou enquanto esperava na fila: é pulado
     runner.finish();
-    expect(runner.started.map(number)).toEqual([3, 1]);
+    expect(runner.started.map(number)).toEqual([1, 3]);
     runner.finish();
     expect(heartbeat.busy).toBe(false);
 
@@ -196,33 +196,90 @@ describe('heartbeat', () => {
     expect(log.at(-1)).toBe('Heartbeat: nada pendente com a IA.');
   });
 
-  it('no modo worktree toca até o limite de histórias ao mesmo tempo e preenche a vaga quando uma termina', () => {
+  it('no modo worktree toca até o limite de histórias com branch ao mesmo tempo e preenche a vaga quando uma termina', () => {
     router.handle({ type: 'settings.board.update', patch: { runner: { parallel: true }, git: { mode: 'worktree' } } });
-    create('A', 'PRD');
-    create('B', 'Spec');
-    create('C', 'Plan');
+    create('A', 'Implementação'); // #1
+    create('B', 'Implementação'); // #2
+    create('C', 'Implementação'); // #3
     expect(heartbeat.runNow()).toBe(3);
-    expect(runner.started.map(number)).toEqual([3, 2]); // da direita para a esquerda: Plan, Spec
+    expect(runner.started.map(number)).toEqual([1, 2]); // limite padrão: duas
     expect(heartbeat.queued).toBe(1);
     runner.finish(); // a primeira termina: a vaga vai para a terceira, com a segunda ainda rodando
-    expect(runner.started.map(number)).toEqual([3, 2, 1]);
+    expect(runner.started.map(number)).toEqual([1, 2, 3]);
     expect(runner.running).toHaveLength(2);
   });
 
-  it('com o paralelo desligado (o padrão), mesmo no modo worktree é uma história por vez', () => {
+  it('com o paralelo desligado (o padrão), mesmo no modo worktree é uma história com branch por vez', () => {
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree' } } });
-    create('A', 'PRD');
-    create('B', 'Spec');
+    create('A', 'Implementação');
+    create('B', 'Implementação');
     heartbeat.runNow();
-    expect(runner.started.map(number)).toEqual([2]);
+    expect(runner.started.map(number)).toEqual([1]);
   });
 
-  it('fora do modo worktree o limite não vale: uma história por vez', () => {
+  it('fora do modo worktree o limite não vale para histórias com branch: uma por vez', () => {
     router.handle({ type: 'settings.board.update', patch: { runner: { parallel: true, parallelStories: 3 }, git: { mode: 'branch' } } });
-    create('A', 'PRD');
-    create('B', 'Spec');
+    create('A', 'Implementação');
+    create('B', 'Implementação');
     heartbeat.runNow();
-    expect(runner.started.map(number)).toEqual([2]);
+    expect(runner.started.map(number)).toEqual([1]);
+    expect(log.at(-1)).toBe('Heartbeat: 1 história(s) com branch esperando vaga.');
+  });
+
+  it('RF2: histórias em fase de texto rodam juntas até parallelStories, mesmo no modo branch e com o paralelo desligado', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallel: false, parallelStories: 2 }, git: { mode: 'branch' } } });
+    create('A', 'Discovery'); // #1
+    create('B', 'Discovery'); // #2
+    create('C', 'Discovery'); // #3
+    expect(heartbeat.runNow()).toBe(3);
+    expect(runner.started.map(number)).toEqual([1, 2]); // só produzem documento: duas de uma vez
+    expect(heartbeat.queued).toBe(1);
+    expect(log.at(-1)).toBe('Heartbeat: 1 história(s) em fase de texto esperando vaga.');
+    runner.finish(); // a terceira entra na vaga que abriu
+    expect(runner.started.map(number)).toEqual([1, 2, 3]);
+    expect(runner.running).toHaveLength(2);
+  });
+
+  /** Marca a história como em execução no board e no executor, como uma chamada à mão. */
+  const running = (n: number) => {
+    runner.running.push(card(n).id);
+    router.handle({ type: 'card.status.set', cardId: card(n).id, status: 'running' }, { source: 'ai' });
+  };
+
+  it('RF4: uma história com branch em execução não segura a de texto', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallelStories: 2 }, git: { mode: 'branch' } } });
+    create('A', 'Implementação'); // #1
+    create('B', 'PRD'); // #2
+    running(1);
+    expect(heartbeat.runNow()).toBe(1);
+    expect(runner.started.map(number)).toEqual([2]); // a vaga com branch está ocupada, mas a de texto não
+  });
+
+  it('RF4: o teto de texto cheio não segura a história com branch', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallelStories: 2 }, git: { mode: 'branch' } } });
+    create('A', 'PRD'); // #1
+    create('B', 'PRD'); // #2
+    create('C', 'Implementação'); // #3
+    create('D', 'PRD'); // #4
+    running(1);
+    running(2);
+    expect(heartbeat.runNow()).toBe(2);
+    expect(runner.started.map(number)).toEqual([3]); // a de código entra; a de texto espera a vaga do tipo dela
+    expect(heartbeat.queued).toBe(1);
+  });
+
+  it('RF6: fila mista: a história com branch sem vaga espera, as de texto passam, e ela entra quando a vaga abre', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallelStories: 2 }, git: { mode: 'branch' } } });
+    create('A', 'Implementação'); // #1
+    create('B', 'Discovery'); // #2
+    create('C', 'Discovery'); // #3
+    create('D', 'Implementação'); // #4
+    expect(heartbeat.runNow()).toBe(4);
+    expect(runner.started.map(number)).toEqual([1, 2, 3]); // D fica na fila, sem travar B e C
+    expect(heartbeat.queued).toBe(1);
+    runner.finish(); // A termina: a vaga com branch vai para D
+    expect(runner.started.map(number)).toEqual([1, 2, 3, 4]);
+    expect(heartbeat.queued).toBe(0);
   });
 
   it('história que depende de outra ainda em aberto não entra na rodada', () => {
@@ -246,12 +303,12 @@ describe('heartbeat', () => {
 
   it('com execução em andamento, a rodada usa as vagas livres e "rodar agora" conta as histórias', () => {
     router.handle({ type: 'settings.board.update', patch: { runner: { parallel: true, parallelStories: 3 }, git: { mode: 'worktree' } } });
-    runner.running.push('chamada-a-mao'); // uma execução que o heartbeat não iniciou
-    create('A', 'PRD');
-    create('B', 'Spec');
-    create('C', 'Plan');
+    runner.running.push('chamada-a-mao'); // uma execução que o heartbeat não iniciou (conta como branch)
+    create('A', 'Implementação');
+    create('B', 'Implementação');
+    create('C', 'Implementação');
     expect(heartbeat.runNow()).toBe(3);
-    expect(runner.started.map(number)).toEqual([3, 2]); // três vagas, uma já ocupada
+    expect(runner.started.map(number)).toEqual([1, 2]); // três vagas, uma já ocupada
     expect(heartbeat.queued).toBe(1);
   });
 
@@ -265,8 +322,8 @@ describe('heartbeat', () => {
   });
 
   it('desligado não roda sozinho; parar esvazia a fila; falha ao iniciar encerra a rodada', () => {
-    create('A', 'PRD');
-    create('B', 'Spec');
+    create('A', 'Implementação');
+    create('B', 'Implementação');
     router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false } } });
     now += 600 * MIN;
     heartbeat.tick();
