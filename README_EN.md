@@ -660,9 +660,14 @@ story by itself, **without asking for authorization or confirmation on anything*
 - **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in board
   order — bugs first, then the rightmost, and within a column top to bottom — and moves on to the next story in the queue as soon as
   the current one is delivered (stopped at the AI's last column, with the pull request recorded),
-  without waiting for your review or the heartbeat interval. A story waiting for another card
-  to finish (a dependency) does not hold the queue: the turn goes to the next story that can run,
-  usually the dependency itself, and it returns to the queue once the dependency leaves open. Each story's branch starts from the
+  without waiting for your review or the heartbeat interval. No impediment holds up the queue: a
+  story that is blocked, waiting for your answer, waiting for another card to finish (a
+  dependency), or stuck in a cycle (open, but with nothing pending with the AI) is skipped, and the
+  turn goes to the next story in the queue that can advance — run, or move to another column when
+  the AI does not work in it. A story that depends on another keeps waiting for that one to finish,
+  even while stories further down the queue run ahead of it; it goes back into contention once the
+  dependency leaves open. Only when no story in the queue can advance does the autopilot show the
+  impediment warning, with the reason of the first story that is stuck. Each story's branch starts from the
   most recently created branch among the other autonomous-mode stories still open — the same order
   the queue runs in, even after dragging cards — and its pull request is opened with `--base` on it,
   forming a stack of PRs; with no other open story ahead of it, the branch starts from the main

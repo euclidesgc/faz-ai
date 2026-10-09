@@ -39,31 +39,31 @@ export type AutopilotStep =
   | { kind: 'advance'; story: Card; column: Column }
   | { kind: 'run'; story: Card }
   | { kind: 'wait'; story: Card }
-  /** a fila parou numa história que depende de uma pessoa (impedimento) */
+  /** a história está parada por um impedimento (bloqueio, pergunta, dependência ou ciclo emperrado) */
   | { kind: 'paused'; story: Card; reason: string };
 
 /**
  * Próximo passo. As histórias vão em fila, uma de cada vez e na ordem da posição do card no board
  * (bug sempre primeiro, `byExecutionOrder`): a branch de cada uma parte da anterior, então a seguinte
- * só começa quando a atual sai de aberto. Uma história com impedimento (bloqueio, espera de uma
- * pessoa, ciclo emperrado) segura a fila, em vez de a seguinte passar na frente. Já a história que
- * espera outro card terminar (`depends_on`) não segura: a vez passa para a próxima que pode rodar —
- * muitas vezes a própria dependência, que está mais abaixo no board. Sem nenhuma que possa, a fila
- * para dizendo de quem a primeira depende.
+ * só começa quando a atual sai de aberto. Nenhum impedimento (bloqueio, pergunta sem resposta,
+ * dependência de outro card em aberto, ciclo emperrado) segura a fila: a vez passa para a próxima
+ * história que pode rodar — muitas vezes a própria dependência, que está mais abaixo no board. Só
+ * quando nenhuma história da fila pode avançar é que a fila para de fato, mostrando a razão da
+ * primeira que ficou parada.
  */
 export function autopilotStep(s: BoardState): AutopilotStep {
-  let waitingDependency: AutopilotStep | undefined;
+  let firstPaused: AutopilotStep | undefined;
   // uma história entregue já passou para a pessoa: não segura a fila, a próxima assume
   for (const story of yoloStories(s).filter((c) => !isDelivered(s, c))) {
     const step = storyStep(s, story);
-    if (step.kind !== 'paused' || !step.dependency) return step;
-    waitingDependency ??= step;
+    if (step.kind !== 'paused') return step;
+    firstPaused ??= step;
   }
-  return waitingDependency ?? { kind: 'idle' };
+  return firstPaused ?? { kind: 'idle' };
 }
 
-/** O passo de uma história, olhando só para ela; `dependency` marca a pausa por outro card em aberto. */
-function storyStep(s: BoardState, story: Card): AutopilotStep & { dependency?: true } {
+/** O passo de uma história, olhando só para ela. */
+function storyStep(s: BoardState, story: Card): AutopilotStep {
   const column = columnOf(s, story)!;
   if (isAiWorking(s, story) || childrenOf(s, story.id).some((c) => isAiWorking(s, c))) return { kind: 'wait', story };
 
@@ -88,8 +88,7 @@ function storyStep(s: BoardState, story: Card): AutopilotStep & { dependency?: t
       [story, ...childrenOf(s, story.id).filter(isLive)].flatMap((c) => openPredecessors(s, c.id)).filter((p) => p.parentId !== story.id),
     ),
   ];
-  if (blockers.length)
-    return { kind: 'paused', story, reason: `${cardRef(story)} espera ${blockers.map(cardRef).join(', ')} terminar.`, dependency: true };
+  if (blockers.length) return { kind: 'paused', story, reason: `${cardRef(story)} espera ${blockers.map(cardRef).join(', ')} terminar.` };
   // nada com a IA e a história continua aberta: o ciclo emperrou
   return { kind: 'paused', story, reason: `${cardRef(story)} não tem nada pendente com a IA, mas ainda não foi concluído.` };
 }
