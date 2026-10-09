@@ -177,7 +177,8 @@ export function ModelsSettings() {
               </div>
             )}
             <Text as="p" size="1" color="gray">
-              {t('Mostrando os modelos do {tool}', { tool: tl.label })}{' · '}
+              {t('Mostrando os modelos do {tool}', { tool: tl.label })}
+              {' · '}
               <Button
                 variant="ghost"
                 size="1"
