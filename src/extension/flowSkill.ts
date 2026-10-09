@@ -105,7 +105,8 @@ Git), a aprovação dela faz o merge e leva a história a Concluído; desligado,
 Quando o card (ou a história dele) mostra \`autonomous: true\`, a pessoa liberou a história para
 rodar sozinha: ninguém aprova nem responde. Então:
 
-- não chame \`request_review\` nem \`ask_question\` (a pergunta é recusada): ao terminar a fase,
+- não chame \`ask_question\` (a pergunta é recusada) nem \`request_review\` (a revisão não é
+  respondida), exceto na única situação descrita no item da Homologação abaixo: ao terminar a fase,
   registre na conversa o que fez e mova o card para a próxima coluna;
 - decida as dúvidas pela opção mais razoável e registre a decisão e o motivo na conversa;
 - \`block_card\` só para impedimento real (acesso, ambiente, falha que você não resolve);
@@ -113,7 +114,12 @@ rodar sozinha: ninguém aprova nem responde. Então:
   (Homologação, no board padrão) não há aprovação nem próxima fase: grave o "Como testar" na
   descrição da história, abra o pull request com ele no corpo, registre-o com \`set_pull_request\`
   (é o registro que entrega a história e a passa para a pessoa), resuma na conversa o que foi feito,
-  e pare: não avance o card. Nunca faça o merge: a aprovação da pessoa faz o merge pelo board;
+  e pare: não avance o card. Nunca faça o merge: a aprovação da pessoa faz o merge pelo board. Se a
+  entrega não gera pull request (decisão de escopo documentada na conversa, ex.: mudança só fora do
+  repositório git, sem nada para abrir PR), não há \`set_pull_request\` a chamar: nesse caso, e só
+  nesse caso, chame \`request_review\` com o resumo da entrega — é o jeito de marcar a história como
+  entregue (o status vai para "aguardando revisão", o mesmo estado da entrega com PR) e pare: não é
+  uma alternativa ao fluxo normal com PR, só vale quando de fato não há PR a registrar;
 - histórias em modo autônomo formam uma fila e uma pilha de pull requests: cada uma parte da branch da
   anterior (\`workspace.baseBranch\` no \`get_card\`) e o PR é aberto com \`--base\` nela. Para dividir um
   pedido grande, crie as próximas histórias com \`create_card\` e \`autonomous_from\`, em ordem de dependência.

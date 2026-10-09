@@ -3,9 +3,9 @@ import { cardRef, type BoardState, type Card } from '../shared/model';
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { childrenOf, isAiWorking, isLive } from '../shared/selectors';
-import { statusInfo } from '../shared/status';
 import { limitOf } from '../shared/runner';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
+import { isWithHuman } from '../shared/story';
 import { autopilotStep } from './autopilot';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
@@ -37,7 +37,7 @@ export function heartbeatTargets(s: BoardState): Card[] {
     const story = card.parentId ? byId.get(card.parentId) : card;
     // as histórias em modo autônomo são do autopiloto, que não espera o intervalo
     if (!story || !isLive(story) || story.yolo || out.includes(story)) continue;
-    const withHuman = !!story.status && statusInfo(story.status).owner === 'human';
+    const withHuman = isWithHuman(story);
     if (withHuman && !unanswered.has(story.id)) continue;
     // já há uma execução tocando a história: outra em paralelo pisaria nas mesmas sub-tarefas
     if (isAiWorking(s, story) || childrenOf(s, story.id).some((k) => isLive(k) && isAiWorking(s, k))) continue;

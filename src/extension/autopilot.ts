@@ -5,8 +5,7 @@ import { aiQueue, pendingWork } from '../shared/pending';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
 import { limitOf, type AiRunMode } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
-import { statusInfo } from '../shared/status';
-import { isDelivered, yoloStories } from '../shared/story';
+import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
 import type { MessageRouter } from './panel/messageRouter';
 
 const AUTHOR = 'Faz AI';
@@ -95,7 +94,7 @@ function storyStep(s: BoardState, story: Card): AutopilotStep {
   const column = columnOf(s, story)!;
   if (isAiWorking(s, story) || childrenOf(s, story.id).some((c) => isAiWorking(s, c))) return { kind: 'wait', story };
 
-  if (story.status && statusInfo(story.status).owner === 'human')
+  if (isWithHuman(story))
     return {
       kind: 'paused',
       story,
@@ -231,6 +230,9 @@ export class Autopilot {
   private checkProgress(s: BoardState, story: Card): void {
     const before = this.progress.get(story.id);
     if (!before) return;
+    const current = s.cards.find((c) => c.id === story.id) ?? story;
+    // já está com a pessoa (entregue, aguardando resposta ou bloqueada): não é tentativa falha da IA.
+    if (isWithHuman(current)) return;
     const stalls = before.sig === progressOf(s, story) ? before.stalls + 1 : 0;
     this.progress.set(story.id, { ...before, stalls });
     if (stalls < MAX_RUNS_WITHOUT_PROGRESS || story.status === 'blocked') return;
