@@ -47,14 +47,13 @@ const AGENT_TOOLS = ['Agent', 'Task'];
 const USAGE_LIMIT_TEXT = /usage limit|rate limit|limite de uso|limite esgotado/i;
 
 /**
- * Um `rate_limit_event` indica indisponibilidade real (não só monitoramento) quando `status` diz
- * algo diferente de `"allowed"` (o único valor que o fixture real traz, e que é só informativo), ou
- * quando algum item de `unifiedWindows` chegou a 100% de utilização. É "ou": qualquer um dos dois
- * sinais basta.
+ * Um `rate_limit_event` indica indisponibilidade real (não só monitoramento) quando `status` é
+ * `"rejected"`, ou quando algum item de `unifiedWindows` chegou a 100% de utilização. É "ou":
+ * qualquer um dos dois sinais basta. `"allowed"` e `"allowed_warning"` (perto do teto) são só
+ * informativos: a CLI continua respondendo.
  */
 function rateLimitExhausted(info: Json): boolean {
-  const status = asText(info.status);
-  if (status && status !== 'allowed') return true;
+  if (asText(info.status) === 'rejected') return true;
   const windows = asObject(info.unifiedWindows);
   if (!windows) return false;
   for (const raw of Object.values(windows)) {

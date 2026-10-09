@@ -51,6 +51,19 @@ describe('modo autônomo no painel do card', () => {
     expect(lastSent('card.yolo.set')).toEqual({ type: 'card.yolo.set', cardId: board.storyId, enabled: true });
   });
 
+  it('depois de confirmar, a caixa já aparece marcada e travada até o boardState confirmar', async () => {
+    openDrawer(board.storyId);
+    await userEvent.click(screen.getByRole('checkbox', { name: /Modo autônomo/ }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Ligar o modo autônomo' }));
+    const toggle = screen.getByRole('checkbox', { name: /Modo autônomo/ });
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+
+    act(() => patchCard(board.storyId, { yolo: true }));
+    expect(screen.getByRole('checkbox', { name: /Modo autônomo/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Modo autônomo/ })).toBeEnabled();
+  });
+
   it('cancelar a confirmação não liga nada', async () => {
     openDrawer(board.storyId);
     await userEvent.click(screen.getByRole('checkbox', { name: /Modo autônomo/ }));

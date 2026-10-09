@@ -10,6 +10,8 @@
   "command.autopilot.pause.title": "Faz AI: Pause autonomous mode (YOLO)",
   "command.autopilot.resume.title": "Faz AI: Resume autonomous mode (YOLO)",
   "command.showLog.title": "Faz AI: Show the run log",
+  "command.exportBoard.title": "Faz AI: Export the board",
+  "command.importBoard.title": "Faz AI: Import a board",
   "viewsContainer.fazai.title": "Faz AI",
   "view.sidebar.name": "Board",
   "view.filters.name": "Filters",

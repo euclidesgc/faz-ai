@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react';
 import { useBoardStore } from '../store/boardStore';
+import { usePending } from '../usePending';
 import { isCardCollapsed } from '../../shared/selectors';
 import { t } from '../i18n';
 import { cards } from '../commands';
@@ -20,9 +22,16 @@ export function SelectionBar() {
 
   // defesa extra: a caixa de marcação (card 324) só existe em histórias vivas, mas confere de novo aqui
   const selectedStories = state.cards.filter((c) => selectedIds.has(c.id));
+  const allYolo = selectedStories.every((c) => c.yolo);
+  // em lote, a barra mostra "Aplicando…" até os cards mudarem (ou o tempo esgotar) e só então limpa a seleção
+  const [target, applying, markYolo] = usePending(allYolo);
+  const targetRef = useRef(target);
+  targetRef.current = target;
+  useEffect(() => {
+    if (applying && allYolo === targetRef.current) clearSelected();
+  }, [allYolo, applying, clearSelected]);
   if (selectedStories.length < 2) return null;
 
-  const allYolo = selectedStories.every((c) => c.yolo);
   const allCollapsed = selectedStories.every((c) => isCardCollapsed(collapsed, c.id));
   const n = selectedStories.length;
 
@@ -42,11 +51,11 @@ export function SelectionBar() {
       // direto): desligar várias histórias de uma vez para o autopiloto de todas, maior impacto.
       danger: true,
       onConfirm: () => {
+        markYolo(!allYolo);
         cards.setYoloMany(
           selectedStories.map((c) => c.id),
           !allYolo,
         );
-        clearSelected();
       },
     });
   };
@@ -57,8 +66,8 @@ export function SelectionBar() {
       <Button variant="ghost" size="small" onClick={clearSelected}>
         {t('Limpar')}
       </Button>
-      <Button size="small" danger onClick={toggle}>
-        <IconYolo /> {allYolo ? t('Desligar modo autônomo') : t('Ligar modo autônomo')}
+      <Button size="small" danger disabled={applying} onClick={toggle}>
+        <IconYolo /> {applying ? t('Aplicando…') : allYolo ? t('Desligar modo autônomo') : t('Ligar modo autônomo')}
       </Button>
       <Button size="small" onClick={toggleCollapse}>
         {allCollapsed ? t('Expandir selecionados') : t('Colapsar selecionados')}

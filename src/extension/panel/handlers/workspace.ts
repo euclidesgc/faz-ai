@@ -79,7 +79,7 @@ export const workspaceHandlers = {
     ctx.cards.setWorkspace(story.id, story.branch, '');
     return true;
   },
-  'card.pr.set': (msg, ctx, { author }) => {
+  'card.pr.set': (msg, ctx) => {
     const url = msg.url.trim();
     if (url && !isPullRequestUrl(url)) throw new Error('Informe o endereço (URL) do pull request.');
     const storyId = storyOfCard(ctx, msg.cardId).id;
@@ -90,7 +90,7 @@ export const workspaceHandlers = {
     // do meio); aqui a entrega é para a pessoa revisar, não para a IA seguir, e o merge continua só
     // dela (ctx.approved). Bloqueio é a exceção: é impedimento aberto, e registrar o pull request não
     // o resolve (ver `isDeliverableStory`).
-    settleDelivery(ctx, storyId, author);
+    settleDelivery(ctx, storyId);
     return true;
   },
   // Sem efeito colateral de propósito: ao contrário do card.pr.set (que fecha a entrega e avisa a

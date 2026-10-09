@@ -90,6 +90,23 @@ export function autopilotStep(s: BoardState): AutopilotStep {
   return autopilotRuns(s)[0] ?? firstWait ?? firstPaused ?? { kind: 'idle' };
 }
 
+/** Teto da nota do autopiloto na barra de atividade, em caracteres. */
+const NOTE_MAX = 160;
+
+/**
+ * O motivo de um bloqueio reduzido a uma linha para a barra de atividade: o `statusReason` pode ser
+ * markdown inteiro (cercas de código, várias linhas), e a barra mostra tudo cru numa linha só.
+ */
+export function noteOf(reason: string): string {
+  const line =
+    reason
+      .replace(/```[^\n]*\n?/g, '')
+      .split('\n')
+      .map((l) => l.trim())
+      .find((l) => l !== '') ?? '';
+  return line.length > NOTE_MAX ? `${line.slice(0, NOTE_MAX - 1).trimEnd()}…` : line;
+}
+
 /** O passo de uma história, olhando só para ela. */
 function storyStep(s: BoardState, story: Card): AutopilotStep {
   const column = columnOf(s, story)!;
@@ -100,7 +117,7 @@ function storyStep(s: BoardState, story: Card): AutopilotStep {
       kind: 'paused',
       story,
       reason: story.statusReason
-        ? `${cardRef(story)} está bloqueado: ${story.statusReason}`
+        ? `${cardRef(story)} está bloqueado: ${noteOf(story.statusReason)}`
         : `${cardRef(story)} está esperando uma pessoa.`,
     };
 

@@ -121,13 +121,15 @@ export function useDragLanes({ workflow, state, columns, visible, error }: DragL
       const id = String(e.active.id);
       setActiveId(id);
       activeRef.current = id;
+      // parte da ordem que está na tela: a soltura anterior ainda pendente (`settled`), se houver
+      const base = settled ?? derived;
       setSettled(null);
-      setLanes(derived);
-      lanesRef.current = derived;
+      setLanes(base);
+      lanesRef.current = base;
       lastOver.current = [];
       recentlyMoved.current = false;
     },
-    [derived],
+    [derived, settled],
   );
 
   const onDragOver = useCallback(

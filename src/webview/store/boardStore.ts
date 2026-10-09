@@ -123,6 +123,9 @@ interface BoardStore extends UiState, ViewState {
   selectedIds: Set<Id>;
   toggleSelected(id: Id): void;
   clearSelected(): void;
+  /** coluna com o formulário "+ Novo card" aberto: só um por vez no board (abrir um fecha o outro) */
+  addingColumnId: Id | null;
+  setAddingColumn(id: Id | null): void;
   openCard(id: Id | null): void;
   setFilters(patch: Partial<Filters>): void;
   clearFilters(): void;
@@ -235,6 +238,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       set({ selectedIds: next });
     },
     clearSelected: () => set({ selectedIds: new Set() }),
+    addingColumnId: null,
+    setAddingColumn: (id) => set({ addingColumnId: id }),
     openCard(id) {
       // trocar (ou fechar) o card deixa a modal de anexo sem contexto: fecha junto
       set({ openCardId: id, attachmentModal: null });

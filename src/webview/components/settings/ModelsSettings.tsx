@@ -280,7 +280,7 @@ export function ModelsSettings() {
       <Card className="form-card" aria-label={t('Preencher o modelo sugerido')}>
         <SwitchField
           label={t('Preencher o modelo sugerido automaticamente')}
-          checked={rules.autoApplyModelSuggestion}
+          checked={modelRules.length > 0 && rules.autoApplyModelSuggestion}
           disabled={modelRules.length === 0}
           onChange={(autoApplyModelSuggestion) => settings.updateRules({ autoApplyModelSuggestion })}
         />

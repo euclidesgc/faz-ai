@@ -1165,6 +1165,32 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     expect(card().status).toBe('blocked');
   });
 
+  it('execução que terminou bem (código 0) com a flag ligada: não repete a fase com a reserva', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+    procs[0]!.exit(0);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('waiting_answer');
+  });
+
+  it('a retentativa não consegue começar (card arquivado no meio): o card é bloqueado com o motivo e o fim é avisado', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    const finished: string[] = [];
+    runner.onDidFinish((id) => finished.push(id));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    router.handle({ type: 'card.archive', cardId: storyId });
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(finished).toEqual([storyId]);
+    expect(runner.running).not.toContain(storyId);
+    expect(router.snapshot().aiActivity.some((a) => a.cardId === storyId)).toBe(false);
+  });
+
   it('modo autônomo (YOLO): a retentativa não deixa o card "waiting_answer" nem "blocked" só por causa da troca — a fila segue', () => {
     router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
     useSonnetMedium();

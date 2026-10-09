@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Card, Column as ColumnModel, ColumnCategory, Workflow } from '../../shared/model';
@@ -92,7 +92,18 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
   const collapsedMap = useBoardStore((s) => s.collapsed);
   const setManyCollapsed = useBoardStore((s) => s.setManyCollapsed);
   const ask = useBoardStore((s) => s.ask);
-  const [adding, setAdding] = useState(false);
+  // o formulário de novo card é um só no board (abrir numa coluna fecha o da outra) e Esc fecha mesmo sem foco no campo
+  const adding = useBoardStore((s) => s.addingColumnId === column.id);
+  const setAddingColumn = useBoardStore((s) => s.setAddingColumn);
+  const setAdding = (open: boolean) => setAddingColumn(open ? column.id : null);
+  useEffect(() => {
+    if (!adding) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAddingColumn(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [adding, setAddingColumn]);
   const [title, setTitle] = useState('');
   const [typeId, setTypeId] = useState<string>('');
   const [renaming, setRenaming] = useState<string | null>(null);

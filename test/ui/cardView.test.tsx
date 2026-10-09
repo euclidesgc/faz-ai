@@ -205,6 +205,20 @@ describe('CardView', () => {
       expect(useBoardStore.getState().collapsed[`card:${board.storyId}`]).toBe(false);
     });
 
+    it('Enter no botão de colapso mantém o foco nele: Enter de novo reverte', async () => {
+      show(board.storyId);
+      const collapse = screen.getByRole('button', { name: 'Colapsar card' });
+      collapse.focus();
+      await userEvent.keyboard('{Enter}');
+      expect(useBoardStore.getState().collapsed[`card:${board.storyId}`]).toBe(true);
+      const expand = screen.getByRole('button', { name: 'Expandir card' });
+      expect(document.activeElement).toBe(expand);
+      await userEvent.keyboard('{Enter}');
+      expect(useBoardStore.getState().collapsed[`card:${board.storyId}`]).toBe(false);
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Colapsar card' }));
+      expect(useBoardStore.getState().openCardId).toBeNull();
+    });
+
     it('duplo clique no card colapsado chama openCard', async () => {
       collapse(board.storyId);
       const { container } = show(board.storyId);
