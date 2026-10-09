@@ -47,6 +47,7 @@ export const board: Record<string, string> = {
   '{n} card': '{n} card',
   '{n} cards': '{n} cards',
   'Dois cliques (ou Enter) abrem o card': 'Double-click (or Enter) opens the card',
+  'Selecionar {title}': 'Select {title}',
   'Expandir "{name}"': 'Expand "{name}"',
   'Excluir a coluna "{name}"?': 'Delete the column "{name}"?',
   '{n} card(s) desta coluna serão movidos para a coluna escolhida.': '{n} card(s) in this column will be moved to the chosen column.',
@@ -301,6 +302,14 @@ export const board: Record<string, string> = {
   'Abrir filtros': 'Open filters',
   'Limpar filtros': 'Clear filters',
   'Limpar filtros ({n})': 'Clear filters ({n})',
+
+  // Barra de seleção múltipla (card 326): modo autônomo em lote
+  '{n} selecionados': '{n} selected',
+  Limpar: 'Clear',
+  'Ligar modo autônomo': 'Turn on autonomous mode',
+  'Desligar modo autônomo': 'Turn off autonomous mode',
+  'Ligar o modo autônomo em {n} história(s)?': 'Turn on autonomous mode for {n} story(ies)?',
+  'Desligar o modo autônomo em {n} história(s)?': 'Turn off autonomous mode for {n} story(ies)?',
   'Limpar conversa': 'Clear conversation',
   '+ Nova coluna': '+ New column',
   'Criar sub-tarefa': 'Create sub-task',

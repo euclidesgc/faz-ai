@@ -107,6 +107,14 @@ interface BoardStore extends UiState, ViewState {
   clearPendingSettingsSection(): void;
   setSettingsNavCollapsed(collapsed: boolean): void;
   selectParent(id: Id | null): void;
+  /**
+   * Seleção múltipla de cards no board (card 324): conceito novo e separado de `selectedParentId`
+   * (que é single-select e filtra sub-tarefas). Só local a este webview: não vai para `ViewState`
+   * nem é persistida.
+   */
+  selectedIds: Set<Id>;
+  toggleSelected(id: Id): void;
+  clearSelected(): void;
   openCard(id: Id | null): void;
   setFilters(patch: Partial<Filters>): void;
   clearFilters(): void;
@@ -163,14 +171,18 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     },
     filters: EMPTY_FILTERS,
     selectedParentId: null,
+    selectedIds: new Set(),
     collapsed: {},
 
     setState(state, attachmentsBaseUri) {
       const ids = new Set(state.cards.map((c) => c.id));
-      const { selectedParentId, openCardId } = get();
+      const { selectedParentId, selectedIds, openCardId } = get();
       set({ state, attachmentsBaseUri, openCardId: openCardId && ids.has(openCardId) ? openCardId : null });
       // a história selecionada saiu do board (lixeira, arquivo ou apagada): limpa o filtro
       if (selectedParentId && !state.cards.some((c) => c.id === selectedParentId && isLive(c))) setShared({ selectedParentId: null });
+      // o mesmo, mas para a seleção múltipla: tira da seleção quem saiu do board ou não está mais vivo
+      const prunedIds = new Set([...selectedIds].filter((id) => state.cards.some((c) => c.id === id && isLive(c))));
+      if (prunedIds.size !== selectedIds.size) set({ selectedIds: prunedIds });
       persist(get());
     },
     setViewState: (view) =>
@@ -192,6 +204,13 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       persist(get());
     },
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
+    toggleSelected(id) {
+      const next = new Set(get().selectedIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      set({ selectedIds: next });
+    },
+    clearSelected: () => set({ selectedIds: new Set() }),
     openCard(id) {
       // trocar (ou fechar) o card deixa a modal de anexo sem contexto: fecha junto
       set({ openCardId: id, attachmentModal: null });

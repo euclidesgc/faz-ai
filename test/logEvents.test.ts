@@ -437,6 +437,38 @@ describe('eventsFor: pull request, workspace e modo autônomo', () => {
     expect(events.every((e) => e.cardId === 'n')).toBe(true);
     expect(only(events, 'yolo_changed')).toMatchObject({ toValue: 'on', subject: '#1' });
   });
+
+  it('card.yolo.setMany ligando gera yolo_changed e comment por história afetada', () => {
+    const msg: WebviewToHost = { type: 'card.yolo.setMany', cardIds: ['h', 'h2'], enabled: true };
+    const h2 = facts({ id: 'h2', number: 2 });
+
+    const events = eventsFor(msg, actor, mapOf(story, h2), mapOf(story, h2), extra);
+
+    expect(kinds(events)).toEqual(['comment', 'comment', 'yolo_changed', 'yolo_changed']);
+    expect(events.filter((e) => e.kind === 'yolo_changed').map((e) => e.cardId).sort()).toEqual(['h', 'h2']);
+    expect(events.filter((e) => e.kind === 'yolo_changed').every((e) => e.fromValue === 'off' && e.toValue === 'on')).toBe(true);
+  });
+
+  it('card.yolo.setMany desligando gera só yolo_changed por história afetada (sem comment)', () => {
+    const msg: WebviewToHost = { type: 'card.yolo.setMany', cardIds: ['h', 'h2'], enabled: false };
+    const h2 = facts({ id: 'h2', number: 2 });
+
+    const events = eventsFor(msg, actor, mapOf(story, h2), mapOf(story, h2), extra);
+
+    expect(kinds(events)).toEqual(['yolo_changed', 'yolo_changed']);
+    expect(events.every((e) => e.fromValue === 'on' && e.toValue === 'off')).toBe(true);
+  });
+
+  it('card.yolo.setMany ignora sub-tarefa e card arquivado da lista, sem afetar os demais ids', () => {
+    const msg: WebviewToHost = { type: 'card.yolo.setMany', cardIds: ['h', 's1', 'h3'], enabled: true };
+    const s1 = sub('s1', 3);
+    const h3 = facts({ id: 'h3', number: 4, archived: true });
+
+    const events = eventsFor(msg, actor, mapOf(story, s1, h3), mapOf(story, s1, h3), extra);
+
+    expect(kinds(events)).toEqual(['comment', 'yolo_changed']);
+    expect(events.every((e) => e.cardId === 'h')).toBe(true);
+  });
 });
 
 describe('eventsFor: arquivo, lixeira e exclusão', () => {
