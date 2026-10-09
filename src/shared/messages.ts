@@ -73,6 +73,12 @@ export type WebviewToHost =
   | { type: 'card.restore'; cardId: Id }
   | { type: 'card.archive'; cardId: Id }
   | { type: 'card.unarchive'; cardId: Id; columnId?: Id; position?: number }
+  /**
+   * restaura um card arquivado pela aba Arquivados: uma história volta com as sub-tarefas arquivadas dela; uma
+   * sub-tarefa de história arquivada restaura a história. Cada card vai para o fim da primeira coluna do próprio
+   * workflow, inativo, e a história sai do modo autônomo
+   */
+  | { type: 'card.restoreArchived'; cardId: Id }
   | { type: 'card.deletePermanent'; cardId: Id }
   | { type: 'trash.empty' }
   /** cria (ou reaproveita) a branch e a worktree da história do card */

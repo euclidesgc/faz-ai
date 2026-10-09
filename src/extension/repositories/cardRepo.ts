@@ -251,6 +251,42 @@ export class CardRepo {
     });
   }
 
+  /**
+   * Restaura um card arquivado pela aba Arquivados. O alvo é o próprio card ou, numa sub-tarefa cuja história
+   * também está arquivada, a história: ela volta com todas as sub-tarefas arquivadas dela (as da lixeira ficam).
+   * Cada card vai para o fim da primeira coluna do próprio workflow, inativo (sem status de trabalho), e a
+   * história sai do modo autônomo. Devolve o id do alvo restaurado.
+   */
+  restoreArchived(cardId: string): string {
+    const db = this.db;
+    return transaction(db, () => {
+      const card = one(db, 'SELECT id, parent_id, archived_at FROM cards WHERE id = ?', [cardId]);
+      if (!card) throw new Error('Card não encontrado');
+      if (card.archived_at == null) return cardId;
+      let targetId = cardId;
+      if (card.parent_id != null) {
+        const parent = one(db, 'SELECT archived_at, deleted_at FROM cards WHERE id = ?', [str(card.parent_id)]);
+        if (parent && parent.archived_at != null && parent.deleted_at == null) targetId = str(card.parent_id);
+      }
+      const ids = all(
+        db,
+        'SELECT id FROM cards WHERE (id = ? OR parent_id = ?) AND archived_at IS NOT NULL AND deleted_at IS NULL ORDER BY (id = ?) DESC, archived_at',
+        [targetId, targetId, targetId],
+      ).map((r) => str(r.id));
+      for (const id of ids) {
+        const row = one(db, 'SELECT workflow_id FROM cards WHERE id = ?', [id]);
+        const first = one(db, 'SELECT id FROM columns WHERE workflow_id = ? ORDER BY position LIMIT 1', [str(row?.workflow_id)]);
+        if (!first) throw new Error('Workflow sem colunas');
+        const t = now();
+        run(db, 'UPDATE cards SET archived_at = NULL, yolo = 0, updated_at = ? WHERE id = ?', [t, id]);
+        this.moveInner(id, str(first.id), Number.MAX_SAFE_INTEGER);
+        // a primeira coluna pode ter a IA ativa (entrada "Pronto"): restaurado volta inativo, como a pessoa espera
+        run(db, "UPDATE cards SET status = NULL, status_reason = '', status_at = ?, status_by = '' WHERE id = ?", [t, id]);
+      }
+      return targetId;
+    });
+  }
+
   setStatus(cardId: string, status: CardStatus | null, reason: string, by: string): void {
     run(this.db, 'UPDATE cards SET status = ?, status_reason = ?, status_at = ?, status_by = ? WHERE id = ?', [
       status,

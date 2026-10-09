@@ -80,7 +80,15 @@ export const board: Record<string, string> = {
   'Nova coluna': 'New column',
   'Nome da coluna': 'Column name',
   Arquivados: 'Archived',
-  'Arraste um card para cá para arquivar.': 'Drag a card here to archive it.',
+  // Aba Arquivados
+  'Nenhum card arquivado neste workflow.': 'No archived cards in this workflow.',
+  'Cards arquivados ficam aqui, por workflow, do mais recente ao mais antigo. Restaurar leva o card para a primeira coluna do workflow dele.':
+    'Archived cards stay here, by workflow, newest first. Restore sends the card to the first column of its workflow.',
+  'Restaurar a história junto?': 'Restore the story along?',
+  'A sub-tarefa {sub} pertence à história {story}, que está arquivada. Restaurar traz a história e todas as sub-tarefas arquivadas dela para o Backlog.':
+    'Sub-task {sub} belongs to story {story}, which is archived. Restoring brings the story and all its archived sub-tasks back to the Backlog.',
+  'Restaurar história': 'Restore story',
+  'Restaurar {title}': 'Restore {title}',
 
   // Lixeira
   'Esvaziar a lixeira?': 'Empty the trash?',
@@ -246,7 +254,6 @@ export const board: Record<string, string> = {
   'Abrir o card': 'Open the card',
   'Ações do card': 'Card actions',
   'Abrir detalhes': 'Open details',
-  Desarquivar: 'Unarchive',
   Arquivar: 'Archive',
   'Mover para a lixeira': 'Move to trash',
   'Colapsar card': 'Collapse card',

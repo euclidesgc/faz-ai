@@ -2,10 +2,9 @@ import { renderThemed, lastSent, posted, seedBoard, sentOf, syncStore, type Seed
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, screen } from '@testing-library/react';
 import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core';
-import { archiveKey } from '../../src/shared/filters';
 import { laneOf } from '../../src/shared/dragLanes';
 import type { BoardState, Card, Workflow } from '../../src/shared/model';
-import { archivedIn, cardsIn, columnsOf } from '../../src/shared/selectors';
+import { cardsIn, columnsOf } from '../../src/shared/selectors';
 import { WorkflowRow } from '../../src/webview/components/WorkflowRow';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import { SETTLE_TIMEOUT_MS, useDragLanes } from '../../src/webview/useDragLanes';
@@ -49,7 +48,7 @@ function mount(wf: Workflow, filter: Set<string> | null = null, error: string | 
   return renderHook(
     (p: Props) => {
       const columns = columnsOf(p.state, wf.id);
-      return useDragLanes({ workflow: wf, state: p.state, columns, visible, error: p.error });
+      return useDragLanes({ state: p.state, columns, visible, error: p.error });
     },
     { initialProps: { state: st(), error } as Props },
   );
@@ -203,55 +202,32 @@ describe('arraste: filtro ativo', () => {
   });
 });
 
-describe('arraste: arquivar e desarquivar', () => {
-  it('soltar na faixa de arquivados envia card.archive', () => {
+describe('arraste: a linha não tem mais a coluna de arquivados', () => {
+  it('as faixas são só as colunas do workflow; um card arquivado não entra em nenhuma', () => {
+    board.router.handle({ type: 'card.archive', cardId: ids.e });
+    syncStore(board.router);
     const h = mount(parentWf());
-    drag(h, ids.a, archiveKey(parentWf().id));
-    expect(lastSent('card.archive')).toEqual({ type: 'card.archive', cardId: ids.a });
-    expect(sentOf('card.move')).toHaveLength(0);
+    expect(Object.keys(h.result.current.shown).sort()).toEqual(
+      cols(parentWf())
+        .map((c) => c.id)
+        .sort(),
+    );
+    expect(laneOf(h.result.current.shown as never, ids.e)).toBeUndefined();
   });
 
-  it('soltar sobre um card já arquivado também arquiva', () => {
+  it('a linha renderizada não mostra a coluna Arquivados nem a dica de arrastar para arquivar', () => {
+    renderThemed(<WorkflowRow workflow={parentWf()} />);
+    expect(screen.queryByText('Arquivados')).toBeNull();
+    expect(screen.queryByText('Arraste um card para cá para arquivar.')).toBeNull();
+  });
+
+  it('soltar sobre um card arquivado (fora das faixas) não envia nada', () => {
     board.router.handle({ type: 'card.archive', cardId: ids.e });
     syncStore(board.router);
     const h = mount(parentWf());
     drag(h, ids.a, ids.e);
-    expect(lastSent('card.archive')).toEqual({ type: 'card.archive', cardId: ids.a });
-  });
-
-  it('ao arquivar, o card some do lugar antigo na hora e fica no topo dos arquivados até o state chegar', () => {
-    const [c0] = cols(parentWf());
-    const h = mount(parentWf());
-    drag(h, ids.a, archiveKey(parentWf().id));
-    expect(h.result.current.settled).not.toBeNull();
-    expect(shownIds(h, c0!.id)).not.toContain(ids.a);
-    expect(shownIds(h, archiveKey(parentWf().id))[0]).toBe(ids.a);
-    board.router.handle(lastSent('card.archive'));
-    syncStore(board.router);
-    h.rerender({ state: st(), error: null });
-    expect(h.result.current.settled).toBeNull();
-    expect(shownIds(h, archiveKey(parentWf().id))).toEqual([ids.a]);
-  });
-
-  it('arrastar um arquivado para uma coluna envia card.unarchive com coluna e posição', () => {
-    board.router.handle({ type: 'card.archive', cardId: ids.a });
-    syncStore(board.router);
-    expect(archivedIn(st(), parentWf().id).map((c) => c.id)).toEqual([ids.a]);
-    const [, c1] = cols(parentWf());
-    const h = mount(parentWf());
-    drag(h, ids.a, ids.d, BELOW);
-    const m = lastSent('card.unarchive');
-    expect(m).toMatchObject({ cardId: ids.a, columnId: c1!.id });
-    expect(m.position).toBe(1);
-  });
-
-  it('um card vivo não entra na faixa de arquivados só passando por cima de um arquivado', () => {
-    board.router.handle({ type: 'card.archive', cardId: ids.e });
-    syncStore(board.router);
-    const h = mount(parentWf());
-    act(() => h.result.current.handlers.onDragStart(start(ids.a)));
-    act(() => h.result.current.handlers.onDragOver(over(ids.a, ids.e)));
-    expect(shownIds(h, archiveKey(parentWf().id))).not.toContain(ids.a);
+    expect(sentOf('card.archive')).toHaveLength(0);
+    expect(sentOf('card.move')).toHaveLength(0);
   });
 });
 

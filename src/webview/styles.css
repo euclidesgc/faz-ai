@@ -1074,10 +1074,6 @@ button.ghost.on {
 .column-add input {
   width: 180px;
 }
-.column.archive {
-  border-style: dashed;
-  opacity: 0.9;
-}
 .column .empty {
   font-size: var(--fs-xs);
   padding: var(--sp-8) var(--sp-4);
@@ -1324,6 +1320,48 @@ button.ghost.on {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* arquivados: uma linha por workflow, cards em fluxo que quebra linha */
+.archived {
+  padding: var(--sp-12) var(--sp-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+.archived-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+.archived-row > header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.archived-row > header h2 {
+  margin: 0;
+  font-size: var(--fs-h);
+}
+.archived-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: flex-start;
+}
+.archived-cards > .archived-item {
+  flex: 0 1 260px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.archived-item .archived-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-xs);
+  color: var(--muted);
 }
 
 /* lixeira */

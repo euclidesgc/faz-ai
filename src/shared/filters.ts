@@ -41,14 +41,11 @@ export interface ViewState {
   filters: Filters;
   selectedParentId: Id | null;
   /**
-   * Linhas e colunas abertas ou fechadas à mão, por id (linha, coluna ou `archive:<id da linha>`).
+   * Linhas e colunas abertas ou fechadas à mão, por id (linha ou coluna).
    * O que não está aqui segue o padrão definido nas configurações.
    */
   collapsed: Record<string, boolean>;
 }
-
-/** Chave da coluna de arquivados de uma linha em `ViewState.collapsed`. */
-export const archiveKey = (workflowId: Id): string => `archive:${workflowId}`;
 
 export const EMPTY_VIEW_STATE: ViewState = { filters: EMPTY_FILTERS, selectedParentId: null, collapsed: {} };
 

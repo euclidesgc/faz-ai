@@ -165,8 +165,14 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    the story; in sub-tasks they appear as links.
 4. Search by text or by ID (`#12`). The **Filtros** (filters) section of the sidebar filters by
    type, fields, dates and relationships.
-5. Cards can be archived (the "Arquivados" column at the end of each row) or sent to the **Lixeira**
-   (trash), from where they can be restored.
+5. Cards can be archived (card actions menu → **Arquivar**) or sent to the **Lixeira** (trash), from
+   where they can be restored. Archived cards leave the board rows and live in the **Arquivados**
+   (archived) tab, between Métricas and Lixeira, which preserves the history: one row per workflow,
+   in board order, newest first. **Restaurar** (restore) sends the card back to the end of the first
+   column of its workflow (Backlog / A fazer on the default board), inactive. Restoring a story also
+   brings back all its archived sub-tasks and turns autonomous mode off; restoring a sub-task whose
+   story is archived asks for confirmation and restores the whole story (a sub-task of an active
+   story comes back on its own, with no confirmation).
 
 ![Open card: status, approval, fields, description and checklist](docs/images/card_en.png)
 
@@ -609,7 +615,7 @@ In the same round, after looking at the pull requests, the board takes the last 
 **when the version containing a concluded story is published, it records in the conversation which
 version carried it (tag and release link) and archives the card**. That way the Concluído column
 holds only what is merged and has not reached your users yet; what was already delivered goes to the
-workflow's archived area, from which you can unarchive it at any time. There is nothing to turn on:
+Arquivados tab, from which you can restore the story (with its archived sub-tasks) at any time. There is nothing to turn on:
 the step comes along with merge detection, on the same interval and the same switch, and it is on by
 default with it.
 

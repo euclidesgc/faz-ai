@@ -278,7 +278,6 @@ export class BoardRepo {
       position: num(r.position),
       kind: str(r.kind) as Workflow['kind'],
       collapsed: bool(r.collapsed),
-      archiveCollapsed: bool(r.archive_collapsed),
     }));
 
     const columns: Column[] = all(

@@ -13,7 +13,6 @@ export const card: Record<string, string> = {
   Restaurar: 'Restore',
   'Ações do card': 'Card actions',
   Ações: 'Actions',
-  Desarquivar: 'Unarchive',
   Arquivar: 'Archive',
   'Mover para a lixeira': 'Move to trash',
   'Fechar (Esc)': 'Close (Esc)',

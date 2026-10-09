@@ -1,36 +1,19 @@
 import type { BoardState, Id } from './model';
-import { archiveKey } from './filters';
 import { cardsIn } from './selectors';
 
 // Lógica pura das faixas de arraste do board (sem React nem dnd-kit).
-// Faixa = coluna (id da coluna) ou a coluna de Arquivados (`archiveKey(workflowId)`).
+// Faixa = coluna (id da coluna). Arquivar e restaurar não passam pelo arraste: ficam no menu do card e na aba Arquivados.
 
 /** Faixas: id da faixa -> ids dos cards visíveis, na ordem exibida. */
 export type Lanes = Record<string, string[]>;
 
 /** O que fazer ao soltar o card. */
-export type DropResult =
-  | { kind: 'none' }
-  | { kind: 'archive' }
-  | { kind: 'move'; columnId: Id; position: number }
-  | { kind: 'unarchive'; columnId: Id; position: number };
+export type DropResult = { kind: 'none' } | { kind: 'move'; columnId: Id; position: number };
 
-/** Identifica a faixa de arquivados e quais cards são arquivados (só eles trocam de faixa com ela). */
-export interface ArchiveLane {
-  laneId: string;
-  archivedIds: ReadonlySet<string>;
-}
-
-/** Monta as faixas: uma por coluna (na ordem dada) mais a de arquivados. */
-export function buildLanes(
-  columnIds: string[],
-  visibleIdsByColumn: Record<string, string[]>,
-  archiveId: string,
-  archivedVisibleIds: string[],
-): Lanes {
+/** Monta as faixas: uma por coluna (na ordem dada). */
+export function buildLanes(columnIds: string[], visibleIdsByColumn: Record<string, string[]>): Lanes {
   const lanes: Lanes = {};
   for (const id of columnIds) lanes[id] = [...(visibleIdsByColumn[id] ?? [])];
-  lanes[archiveId] = [...archivedVisibleIds];
   return lanes;
 }
 
@@ -44,14 +27,12 @@ export function laneOf(lanes: Lanes, cardId: string): string | undefined {
 /**
  * Prévia do arraste: tira `activeId` da faixa de origem e o põe na do `overId` (um card ou uma faixa).
  * Posição: a do card `over`, +1 se `below`; faixa vazia ou `overId` = faixa -> fim.
- * Mesma faixa, `overId` desconhecido ou card vivo sobre a faixa de arquivados -> devolve o mesmo objeto.
- * `archive` só é preciso para aplicar a regra dos arquivados.
+ * Mesma faixa ou `overId` desconhecido -> devolve o mesmo objeto.
  */
-export function moveToLane(lanes: Lanes, activeId: string, overId: string, below: boolean, archive?: ArchiveLane): Lanes {
+export function moveToLane(lanes: Lanes, activeId: string, overId: string, below: boolean): Lanes {
   const from = laneOf(lanes, activeId);
   const to = overId in lanes ? overId : laneOf(lanes, overId);
   if (from === undefined || to === undefined || from === to) return lanes;
-  if (archive && to === archive.laneId && !archive.archivedIds.has(activeId)) return lanes;
 
   const target = at(lanes, to);
   const overIndex = overId in lanes ? -1 : target.indexOf(overId);
@@ -66,16 +47,12 @@ export function moveToLane(lanes: Lanes, activeId: string, overId: string, below
 /**
  * Traduz as faixas finais no que enviar ao host.
  * `position` é contado em `cardsIn(coluna)` sem o ativo: antes do próximo vizinho visível; senão logo depois
- * do anterior; senão no fim. Mesma coluna e mesmo índice -> `none`. Vivo na faixa de arquivados -> `archive`;
- * arquivado de volta ao arquivo -> `none`; arquivado numa coluna -> `unarchive`.
+ * do anterior; senão no fim. Mesma coluna e mesmo índice -> `none`.
  */
-export function resolveDrop(state: BoardState, lanes: Lanes, activeId: string, workflowId: Id): DropResult {
+export function resolveDrop(state: BoardState, lanes: Lanes, activeId: string): DropResult {
   const lane = laneOf(lanes, activeId);
   const active = state.cards.find((c) => c.id === activeId);
   if (lane === undefined || !active) return { kind: 'none' };
-  const archived = active.archivedAt !== null;
-
-  if (lane === archiveKey(workflowId)) return archived ? { kind: 'none' } : { kind: 'archive' };
 
   const full = cardsIn(state, lane)
     .map((c) => c.id)
@@ -90,7 +67,6 @@ export function resolveDrop(state: BoardState, lanes: Lanes, activeId: string, w
     .find((id) => full.includes(id));
   const position = next !== undefined ? full.indexOf(next) : prev !== undefined ? full.indexOf(prev) + 1 : full.length;
 
-  if (archived) return { kind: 'unarchive', columnId: lane, position };
   if (active.columnId === lane && cardsIn(state, lane).findIndex((c) => c.id === activeId) === position) return { kind: 'none' };
   return { kind: 'move', columnId: lane, position };
 }

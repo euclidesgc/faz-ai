@@ -57,8 +57,8 @@ const state: BoardState = {
     execProfiles: [],
   },
   workflows: [
-    { id: 'wp', boardId: 'b', name: 'H', position: 0, kind: 'parent', collapsed: false, archiveCollapsed: true },
-    { id: 'wc', boardId: 'b', name: 'S', position: 1, kind: 'child', collapsed: false, archiveCollapsed: true },
+    { id: 'wp', boardId: 'b', name: 'H', position: 0, kind: 'parent', collapsed: false },
+    { id: 'wc', boardId: 'b', name: 'S', position: 1, kind: 'child', collapsed: false },
   ],
   columns: [
     {
