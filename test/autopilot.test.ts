@@ -492,6 +492,38 @@ describe('autopiloto', () => {
     expect(runner.started).toHaveLength(MAX_RUNS_WITHOUT_PROGRESS);
   });
 
+  it('reconstrução do #298: sem PR, sem status humano, execuções seguidas sem nenhuma mudança continuam bloqueando', () => {
+    create('A', 'PRD');
+    yolo(1);
+    for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS; i++) {
+      expect(runner.running).toHaveLength(1);
+      runner.finish(() => status(1, 'ready')); // a IA só responde: nem coluna, nem PR, nem status além de "ready"
+    }
+    expect(card(1).status).toBe('blocked');
+    expect(card(1).statusReason).toContain('autopiloto parou');
+    expect(card(1).prUrl).toBe('');
+    expect(runner.running).toEqual([]);
+    expect(runner.started).toHaveLength(MAX_RUNS_WITHOUT_PROGRESS);
+  });
+
+  it('execução sobre história já com a pessoa (entregue, bloqueada ou aguardando resposta) não conta para o disjuntor nem bloqueia', () => {
+    create('A', 'Homologação'); // #1
+    yolo(1);
+    flush();
+    expect(runner.running).toHaveLength(1); // a execução começou com a história ainda sem PR
+    runner.finish(() => deliver(1)); // termina entregando: pull request registrado e status passa para a pessoa
+    flush();
+    expect(card(1).status).toBe('waiting_review');
+    // mesmo repetindo execuções sem nenhuma mudança a partir daqui, a história já está com a pessoa:
+    // não é uma tentativa falha da IA, então não conta para o disjuntor nem bloqueia.
+    for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS; i++) {
+      runner.running.push(card(1).id);
+      runner.finish(() => {});
+    }
+    expect(card(1).status).toBe('waiting_review');
+    expect(card(1).statusReason ?? '').not.toContain('autopiloto parou');
+  });
+
   it('refinar não conta como execução sem progresso para o disjuntor', () => {
     create('A', 'PRD');
     yolo(1);

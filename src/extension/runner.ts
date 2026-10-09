@@ -2,7 +2,7 @@ import { cardRef } from '../shared/model';
 import { aiToolInfo } from '../shared/harness';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { columnOf, isLive } from '../shared/selectors';
-import { isYolo, storyOf } from '../shared/story';
+import { isWithHuman, isYolo, storyOf } from '../shared/story';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
@@ -552,6 +552,13 @@ export class AiRunner {
     if (replied && isYolo(this.router.snapshot(), card)) return void this.setStatus(cardId, 'ready', toolLabel);
     // respondeu na conversa e encerrou: a vez é da pessoa
     if (replied) return void this.setStatus(cardId, 'waiting_answer', toolLabel);
+    // história YOLO já entregue (status com a pessoa) no momento atual: o card já está certo, não é
+    // falha de fato — reconsulta o snapshot porque settleDelivery (acima) pode ter mudado o status
+    // desde o início deste método (#407: autopiloto re-executava e se autobloqueava)
+    const current = this.router.snapshot();
+    const currentCard = current.cards.find((c) => c.id === cardId);
+    const currentStory = currentCard && storyOf(current, currentCard);
+    if (currentStory && isYolo(current, currentCard) && isWithHuman(currentStory)) return;
     this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);
   }
 
