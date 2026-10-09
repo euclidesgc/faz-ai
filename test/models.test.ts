@@ -143,6 +143,7 @@ describe('suggestModelRule e suggestModel', () => {
     environmentInstall: null,
     environmentInstallResult: null,
     harnessInstall: null,
+    authExpired: null,
   });
 
   const rule = (over: Partial<ModelRule> = {}): ModelRule => ({

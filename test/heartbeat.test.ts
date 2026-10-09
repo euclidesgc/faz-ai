@@ -341,4 +341,22 @@ describe('heartbeat', () => {
     expect(log.at(-1)).toBe('Heartbeat: ferramenta indisponível');
     expect(heartbeat.busy).toBe(false);
   });
+
+  it('com o login vencido (preventivo ou reativo), não inicia nenhuma história e esvazia a rodada', () => {
+    create('A', 'PRD');
+    create('B', 'Spec');
+    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+    heartbeat.runNow();
+    expect(runner.started).toEqual([]);
+
+    router.setRequirements([]);
+    router.setAuthExpired('claude');
+    heartbeat.runNow();
+    expect(runner.started).toEqual([]);
+
+    router.setAuthExpired(null);
+    heartbeat.runNow();
+    // as duas estão em fase de texto e cabem no teto de texto (2): o login de volta libera as duas
+    expect(runner.started).toHaveLength(2);
+  });
 });

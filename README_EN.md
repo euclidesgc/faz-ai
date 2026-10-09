@@ -188,7 +188,7 @@ Below it come the title (in full in the tooltip when it doesn't fit), the status
 who the next step is waiting on (a robot for the AI, a person for you) and how long it has been
 like that, the fields, the AI model (e.g. "Sonnet 5.5 - baixo", with the effort in Portuguese) and,
 in the footer, the counters, the branch and the PR. Cards waiting on you get a border in the
-status color, and the LED on the bar tells the card's state at a glance: green and blinking slowly while the AI is working on it (on a story, also when it works on one of its sub-tasks), yellow when it is waiting on you, red when it is blocked, and off when nothing is happening.
+status color, and the LED on the bar tells the card's state at a glance: green and blinking slowly while the AI is working on it (on a story, also when it works on one of its sub-tasks), yellow when it is waiting on you, red when it is blocked, and off when nothing is happening. On a story, the sub-task list shows the same LED on each one: green and blinking while running, red when blocked, yellow when waiting on you, and off when stopped.
 
 **Collapsed cards.** You can collapse cards to fit more rows of a column in the same screen. A collapsed card keeps the type's colored strip (with the AI LED, the number, the type and the buttons) and shows the title in up to two lines, hiding the rest; the status border stays (if the card is waiting on you), so you can sweep the board at a glance and know what needs your attention. Collapse can be applied in four scopes: a single card (button on the card itself), all cards in a column (item in the column's action menu), all cards on the board (button in the filter bar) or just the selected cards (button in the multi-select bar). The state is remembered between sessions.
 
@@ -289,7 +289,8 @@ the project's tool, and the MCP tool `install_flow_skill` takes `scope` (`user`,
 
 While something is missing for the board to work with the tool, a yellow bar stays at the top of
 the board, on every screen, and in the chat panel. It checks Node.js (the board's server runs on
-it), the tool's command line, its sign-in (for Cursor, through `cursor-agent status`), the board's
+it), the tool's command line, its sign-in (for Cursor, through `cursor-agent status`; for Claude
+Code, through `claude auth status`), the board's
 server registration in the file the tool reads (for Claude, the registration for your user from
 `claude mcp add -s user` also counts), a registration pointing to a node or path that no longer
 exists, to another folder or to the bridge of an earlier version, and the permission level. Each
@@ -308,6 +309,20 @@ runs from the board carry the MCP on their own (Claude, Cursor), conversations i
 the terminal depend on it, and the skill is what makes the AI follow the flow. A missing skill has
 the **Install the skill** button right in the bar. While the command line is missing or not signed in, the card's AI buttons are
 disabled, with the reason in the tooltip.
+
+**Expired login: error warning and automatic resume.** When the bar's reason is sign-in (missing, or
+expired mid-run), it switches to an error highlight instead of the usual yellow, and gains an **Abrir
+no terminal** (open in terminal) button next to the command to copy: the board opens an editor
+terminal and runs the command there, but you always do the actual sign-in. Before every AI call (the
+card's button, the heartbeat and autonomous mode), the board checks the sign-in again; if it expired,
+the run does not even start. When the login expires mid-run, the first failure that matches a known pattern ("OAuth session expired", "not
+logged in", "401", etc.) does not block the card: it goes back to the status it had, with a short
+comment, and the same error warning turns on at the top of the board — the heartbeat and autonomous
+mode do not retry on their own while it is on. The warning goes away and the queue resumes on its
+own once the sign-in is confirmed again (by the periodic check, within 10 seconds of signing in, or
+via **Já entrei: verificar de novo** — I signed in, check again) or, when the check cannot tell, on
+the first manual run that succeeds. The environment check shows the same warning in the
+**Login na linha de comando** (command line sign-in) item.
 
 **Environment check.** The first time the board opens on a machine, a `flutter doctor`-style list
 opens on its own with everything the board needs and everything it makes use of. After that, it
@@ -719,16 +734,24 @@ story by itself, **without asking for authorization or confirmation on anything*
   (`create_card` with `autonomous_from`). They are born autonomous, join the queue, and get a
   **related** link to the origin story (skipped silently if any link already exists between the
   two). It never turns the mode on for a story you did not turn on.
-- **Brakes**: the autopilot stops when the AI blocks the card or when a run fails (the card is
-  Bloqueado, with the reason), and blocks the story after 3 consecutive runs that advanced nothing.
-  Once you unblock the card it carries on by itself.
+- **Brakes**: the autopilot keeps to **one story at a time**: an unblocked story goes back to its
+  position on the board and waits for the one currently running to finish. A run that fails leaves
+  the card Bloqueado, with the reason, and the circuit breaker blocks the story after 3 consecutive
+  runs with no progress; blocking a story frees the queue to move on to the next one, instead of
+  locking it up — a story that keeps getting stuck can spend up to 3 runs each, across the whole
+  queue. Once you unblock the card it carries on by itself.
 
 The **autonomous mode button** at the top of the board shows while there is a story in the queue
 and says what the click does: **Pausar modo autônomo** (pause; lit, with the autopilot driving;
 pausing interrupts the AI) or **Retomar modo autônomo** (resume; dimmed, paused). From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
 autônomo (YOLO)** and **Faz AI: Parar as execuções da IA e o modo autônomo**. When the editor
-opens the autopilot resumes the pending queue by itself (the pause is yours: what you paused only
-comes back when you resume). The heartbeat does not drive autonomous stories; they belong to the autopilot.
+opens, the autopilot starts by itself whenever there is a pending autonomous-mode story, unless
+you paused it: the pause is recorded on the board (it survives reopening the editor), and
+"Retomar" (resume), or turning the mode on for a story, clears it; closing the editor does not count
+as a pause. After a failure to start the AI tool, the autopilot does not start itself again until
+you resume it. With the tool's login expired, the autopilot and the heartbeat wait for the sign-in
+to come back, without spending runs. The heartbeat does not drive autonomous stories; they belong
+to the autopilot.
 
 
 ### Agents

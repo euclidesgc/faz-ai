@@ -32,8 +32,8 @@ export type RequirementAction =
   | { kind: 'installSkill' }
   /** gravar o caminho completo do comando nos registros que o editor não acha (o node instalado depois que ele abriu) */
   | { kind: 'pinMcp' }
-  /** um comando para rodar no terminal, com botão de copiar */
-  | { kind: 'command'; command: string }
+  /** um comando para rodar no terminal, com botão de copiar; `terminal` soma o botão "Abrir no terminal" (só o login usa) */
+  | { kind: 'command'; command: string; terminal?: true }
   /** a tela de Configurações → Harness de IA */
   | { kind: 'settings' };
 
@@ -61,4 +61,9 @@ export interface BoardRequirement {
    */
   optional?: true;
   action: RequirementAction | null;
+}
+
+/** Sem login a execução pelo board nem começa: usado pelos 4 gatilhos (manual, Refinar com IA, heartbeat, autopiloto). */
+export function blocksExecution(state: { requirements: BoardRequirement[]; authExpired: AiTool | null }): boolean {
+  return state.requirements.some((r) => r.id === 'signin') || state.authExpired !== null;
 }

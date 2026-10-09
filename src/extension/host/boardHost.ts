@@ -18,9 +18,11 @@ import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
-import { cursorModels, cursorSignedIn, runCli } from '../cliProbe';
-import type { AiTool, InstallScope } from '../../shared/harness';
+import { claudeSignedIn, cursorModels, cursorSignedIn, runCli } from '../cliProbe';
+import { aiToolInfo, type AiTool, type InstallScope } from '../../shared/harness';
 import { checkRequirements } from '../requirements';
+import { headlessCommand } from '../headless';
+import type { BoardRequirement } from '../../shared/requirements';
 import { checkEnvironment } from '../environment';
 import { detectOs } from '../installers';
 import { installPlan, installScript, parseInstallResult } from '../../shared/installPlan';
@@ -244,6 +246,18 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let cursorBlocked = false;
   let enableTimer: NodeJS.Timeout | null = null;
   let checkAgain = false;
+  let forceSigninCheck = false;
+  const SIGNIN_CACHE_MS = 3 * 60_000;
+  const signinCache = new Map<AiTool, { at: number; value: boolean | null }>();
+  // dispatch por ferramenta: `cursor` e `claude` têm probe; quando o probe não sabe dizer (`null`), vale
+  // só o sinal reativo de falha na execução
+  const probeSignedIn = async (tool: AiTool, exe: string, force: boolean): Promise<boolean | null> => {
+    const cached = !force && signinCache.get(tool);
+    if (cached && Date.now() - cached.at < SIGNIN_CACHE_MS) return cached.value;
+    const value = await (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : claudeSignedIn(exe, pathEnv));
+    signinCache.set(tool, { at: Date.now(), value });
+    return value;
+  };
   const checkNow = (): Promise<void> => {
     if (checking) {
       checkAgain = true;
@@ -263,7 +277,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       bridgePath: o.bridgePath,
       nodePath,
       resolve: (command) => resolveCommand(command, pathEnv, homeDir),
-      signedIn: (tool, exe) => (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : Promise.resolve(null)),
+      signedIn: (tool, exe) => probeSignedIn(tool, exe, forceSigninCheck),
       editor: o.editor?.name,
       windowStartedAt: o.editor?.startedAt,
       editorPath: o.editor ? (process.env.PATH ?? '') : undefined,
@@ -275,9 +289,18 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         if (cursorBlocked && !blocked && router.snapshot().board.aiTool === 'cursor') refreshCursorModels();
         cursorBlocked = blocked;
         router.setRequirements(list);
+        // o sinal reativo (RF6) limpa quando o probe da própria ferramenta volta a confirmar o login —
+        // a essa altura `signinCache` já tem o valor fresco desta conferência (lido pelo `signedIn` acima);
+        // cobre Claude e Cursor, que têm probe (quando o probe não sabe dizer, só se recupera por uma execução
+        // manual que dá certo, em `runner.ts`). Ao trocar de ferramenta o sinal já foi limpo incondicionalmente
+        const expired = router.snapshot().authExpired;
+        if (expired && signinCache.get(expired)?.value === true && router.setAuthExpired(null))
+          o.log(`Login do ${aiToolInfo(expired).label} de volta: execuções retomadas.`);
         // ligar o MCP no Cursor é com a pessoa, fora do board: enquanto falta, confere a cada 10 s, para
-        // o aviso sumir logo depois que ela liga (a conferência lê só uma pasta)
-        if (list.some((r) => r.id === 'mcp-enable')) {
+        // o aviso sumir logo depois que ela liga (a conferência lê só uma pasta). O login (`signin`) entra
+        // no mesmo timer: a ferramenta com probe (Claude, Cursor) retoma em até 10 s, sem esperar
+        // os 5 minutos do ciclo normal
+        if (list.some((r) => r.id === 'mcp-enable' || r.id === 'signin')) {
           enableTimer ??= setInterval(() => void checkNow(), 10_000);
           enableTimer.unref?.();
         } else if (enableTimer) {
@@ -288,6 +311,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       .catch((e) => o.log(`Não foi possível conferir os requisitos do board: ${e instanceof Error ? e.message : String(e)}`))
       .finally(() => {
         checking = null;
+        forceSigninCheck = false;
         if (checkAgain) {
           checkAgain = false;
           void checkNow();
@@ -295,13 +319,16 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       });
     return checking;
   };
-  // o "Verificar de novo" relê também o PATH do terminal, para achar o que acabou de ser instalado
-  router.onRequirementsCheck(
-    () =>
-      void loginShellPath(true)
-        .then((fresh) => (pathEnv = fresh ?? pathEnv))
-        .finally(() => void checkNow()),
-  );
+  // o "Verificar de novo" relê também o PATH do terminal, para achar o que acabou de ser instalado, e
+  // pula o cache do login: é o clique da pessoa depois de entrar na conta, não pode esperar o TTL de 3 min
+  router.onRequirementsCheck(() => {
+    forceSigninCheck = true;
+    void loginShellPath(true)
+      .then((fresh) => (pathEnv = fresh ?? pathEnv))
+      .finally(() => void checkNow());
+  });
+  // "Abrir no terminal" do aviso de login: o board só abre o terminal, a pessoa faz o login nele
+  router.onOpenTerminal((command) => o.runInTerminal?.('Faz AI: login', command, o.folderPath));
   // o Diagnóstico do ambiente: os requisitos acima e o que o board usa quando existe (skill do fluxo,
   // git, GitHub CLI, Code Review Graph). Roda só quando a tela pede: alguns comandos demoram
   const probeCommand = (command: string, args: string[], cwd?: string) =>
@@ -349,10 +376,18 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       const s = router.snapshot();
       const tool = s.board.aiTool;
       const skillInstalled = selectedItems(s, 'skill', 'always').some((i) => i.name === FLOW_SKILL_NAME);
+      // o sinal reativo (RF6) também vira o item "signin" do Diagnóstico quando o probe não soube dizer
+      // (`null`): sem isso, `s.requirements` não teria `signin` para um login que venceu no meio da execução
+      const built = headlessCommand(tool, { prompt: '', permission: 'full' });
+      const cliName = 'unsupported' in built ? null : built.command;
+      const syntheticSignin: BoardRequirement | null =
+        s.authExpired === tool && cliName && !s.requirements.some((r) => r.id === 'signin')
+          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: `${cliName} login`, terminal: true } }
+          : null;
       router.setEnvironment(
         await checkEnvironment({
           tool,
-          requirements: s.requirements,
+          requirements: syntheticSignin ? [...s.requirements, syntheticSignin] : s.requirements,
           workspaceDir: o.folderPath,
           os: detectOs(process.platform, readOsRelease()),
           pathDirs: (pathEnv ?? process.env.PATH ?? '').split(path.delimiter),
@@ -470,6 +505,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     const toolChanged = board.aiTool !== toolInUse;
     toolInUse = board.aiTool;
     permissionInUse = board.runner.permission;
+    // o sinal reativo só vale para a ferramenta que falhou; trocando de ferramenta, ele não diz nada sobre a nova
+    if (toolChanged) router.setAuthExpired(null);
     void checkNow();
     if (toolChanged && board.aiTool === 'cursor') refreshCursorModels();
   });
@@ -554,7 +591,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     async dispose() {
       clearInterval(requirementsTimer);
       if (enableTimer) clearInterval(enableTimer);
-      autopilot.pause();
+      autopilot.stop(); // fechar o editor não é uma pausa da pessoa: na reabertura a fila retoma
       heartbeat.stop();
       runner.dispose();
       chat.dispose();

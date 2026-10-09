@@ -7,6 +7,22 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## 0.34.0
 
+- **Expired tool login: an error warning on the board, instead of stopping without explanation (#189).**
+  The Claude Code sign-in is now actually checked (`claude auth status`), in addition to the existing
+  Cursor check; before every AI call (the card's button, the heartbeat, autonomous mode), the board
+  checks again, with a short cache. When the yellow bar's reason is sign-in, it switches to an error
+  highlight and gains the **Abrir no terminal** (open in terminal) button, which runs the command
+  there, but the actual sign-in is still always done by you. When the login expires mid-run, the
+  first failure matching a known pattern ("OAuth session expired", "not logged in", "401", etc.) no
+  longer blocks the card: it goes back to its previous status, with a short comment, and turns on the
+  same error warning. The heartbeat and autonomous mode stop retrying on their own while it is on,
+  without turning off, and resume once the sign-in is confirmed again. The environment check shows
+  the same item.
+- **The autonomous mode pause is recorded on the board (#220).** Pausing now lasts until you resume,
+  even after closing and reopening the editor; before, reopening the editor started the queue
+  again. Closing the editor still does not count as a pause, and turning the mode on for a story (or
+  **Retomar**, resume) clears the pause. After a failure to start the tool, the autopilot does not
+  start itself again until you resume. The sub-task list in the story panel now shows each sub-task's activity LED.
 - **Arquivados tab replaces the archived column.** The "Arquivados" column is gone from the end of each board row (along with drag-to-archive and collapsing/expanding that column): rows are now narrow enough to see Histórias and Sub-tarefas at the same time with collapsed cards. Archived cards live in the new **Arquivados** (archived) tab, between Métricas and Lixeira, which preserves the history: one row per workflow, in board order, with only that workflow's archived cards, newest first. Archiving still happens from the card actions menu (with the usual confirmation) and through the automatic paths. Instead of "Desarquivar", the menu and the tab offer **Restaurar** (restore): the card goes back to the end of the first column of its workflow (Backlog / A fazer), inactive. Restoring a story also brings back all its archived sub-tasks and turns autonomous mode off; restoring a sub-task whose story is archived asks for confirmation ("Restaurar a história junto?") and restores the whole story; a sub-task of an active story comes back on its own. The `unarchive_card` MCP tool is unchanged.
 - **Turn autonomous mode on and off right from the card, without opening it (#416).** The icon at the bottom of the card that already indicated "autonomous mode on" is now also a button: one click turns autonomous mode on or off without opening the story's detail view. The warning shown when turning it on is now shorter — it used to be a long paragraph with several operational details, now it's just the essentials: the AI runs the story on its own through the pull request, with no approval, question or confirmation, and how to stop it. This same text and dialog are used in the three places that turn autonomous mode on (the new card button, the toggle in the card detail, and the multi-select batch action), with the confirmation logic unified across them. The dialog gained a "Don't warn me again" checkbox: whoever checks it and confirms stops seeing this specific warning the next times, in all three places, as a personal preference stored in the browser or editor of whoever uses it (not on the board). Turning autonomous mode off in batch still always asks for confirmation, without the checkbox, since it's the riskier action.
 - **Fix: autonomous mode no longer re-runs or blocks a story that was already delivered (#413).** An autonomous story that reached Homologação and was waiting on you (awaiting review or an answer, blocked, or approved and waiting for the next column) was treated as "no progress": the autopilot ran it again and ended up blocking it by itself. Now it leaves the queue while it is with you, and on a delivery without a pull request the AI calls `request_review` to mark the story as delivered.

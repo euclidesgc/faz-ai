@@ -4,6 +4,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { checkRequirements, registeredServer, type RequirementProbe } from '../src/extension/requirements';
 import { registerClients } from '../src/extension/mcp/clientConfig';
+import { blocksExecution } from '../src/shared/requirements';
+import type { BoardRequirement } from '../src/shared/requirements';
 
 let project: string;
 let home: string;
@@ -53,13 +55,20 @@ describe('requisitos do board', () => {
     connect('cursor');
     const list = await checkRequirements(probe({ signedIn: async () => false }));
     expect(list).toEqual([
-      { id: 'signin', tool: 'cursor', cli: 'cursor-agent', action: { kind: 'command', command: 'cursor-agent login' } },
+      { id: 'signin', tool: 'cursor', cli: 'cursor-agent', action: { kind: 'command', command: 'cursor-agent login', terminal: true } },
     ]);
   });
 
   it('login que não dá para saber (outras ferramentas) não vira aviso', async () => {
     connect('claude');
     expect(await checkRequirements(probe({ tool: 'claude', signedIn: async () => null }))).toEqual([]);
+  });
+
+  it('CLI do Claude Code sem login: oferece o comando de login, igual ao Cursor', async () => {
+    connect('claude');
+    expect(await checkRequirements(probe({ tool: 'claude', signedIn: async () => false }))).toEqual([
+      { id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login', terminal: true } },
+    ]);
   });
 
   it('sem node no PATH, o primeiro aviso é o node', async () => {
@@ -205,5 +214,25 @@ describe('requisitos do board', () => {
     expect(await checkRequirements(probe({ tool: 'claude' }))).toEqual([
       { id: 'mcp-outdated', tool: 'claude', file: '~/.claude.json', missing: old, action: { kind: 'connect' } },
     ]);
+  });
+});
+
+describe('blocksExecution', () => {
+  const req = (id: BoardRequirement['id']): BoardRequirement => ({ id, tool: 'claude', action: null });
+
+  it('bloqueia quando falta login', () => {
+    expect(blocksExecution({ requirements: [req('signin')], authExpired: null })).toBe(true);
+  });
+
+  it('não bloqueia por outro requisito que falte (CLI, MCP…)', () => {
+    expect(blocksExecution({ requirements: [req('cli'), req('mcp')], authExpired: null })).toBe(false);
+  });
+
+  it('sem nenhum requisito pendente nem sinal reativo, não bloqueia', () => {
+    expect(blocksExecution({ requirements: [], authExpired: null })).toBe(false);
+  });
+
+  it('bloqueia pelo sinal reativo mesmo sem "signin" nos requisitos (o probe não soube dizer)', () => {
+    expect(blocksExecution({ requirements: [], authExpired: 'cursor' })).toBe(true);
   });
 });

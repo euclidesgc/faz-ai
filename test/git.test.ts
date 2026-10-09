@@ -175,6 +175,20 @@ describe('branch e worktree por história', () => {
     expect(() => git(repo, 'merge-base', '--is-ancestor', 'main', outside.branch)).not.toThrow();
   });
 
+  it('sem história pulada não registra nada na conversa', async () => {
+    const yolo = (n: number) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled: true });
+    await call('create_card', { title: 'Base', column: 'Implementação' });
+    await call('create_card', { title: 'Segunda', column: 'Implementação' });
+    yolo(1);
+    yolo(2);
+
+    await call('prepare_workspace', { card: 1 });
+    await call('prepare_workspace', { card: 2 });
+
+    expect(router.snapshot().comments.filter((c) => c.cardId === card(2).id && c.source === 'ai')).toHaveLength(0);
+    expect(router.snapshot().comments.filter((c) => c.cardId === card(1).id && c.source === 'ai')).toHaveLength(0);
+  });
+
   it('modo branch cria a branch sem trocar a atual; desligado recusa', async () => {
     await call('create_card', { title: 'Corrigir crash', type: 'Bug', column: 'Implementação' });
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch', branchPattern: 'fix/{numero}-{titulo}' } } });

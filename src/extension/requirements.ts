@@ -169,7 +169,7 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
   }
 
   if (cli && executable && (await p.signedIn(tool, executable)) === false)
-    out.push({ id: 'signin', tool, cli, action: { kind: 'command', command: `${cli} login` } });
+    out.push({ id: 'signin', tool, cli, action: { kind: 'command', command: `${cli} login`, terminal: true } });
 
   // o MCP e a skill do fluxo são necessários em todas as ferramentas: mesmo onde as execuções pelo board
   // levam o servidor sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele

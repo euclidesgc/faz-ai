@@ -22,7 +22,7 @@ beforeEach(() => syncStore(board.router));
 /** Abre o drawer da história como o App faz: `openCardId` na store e o componente com o id. */
 function openStory() {
   useBoardStore.getState().openCard(board.storyId);
-  render(
+  return render(
     <Theme>
       <CardDrawer cardId={board.storyId} />
     </Theme>,
@@ -324,6 +324,18 @@ describe('CardDrawer', () => {
     expect(useBoardStore.getState().openCardId).toBeNull();
   });
 
+  it('a lista de sub-tarefas mostra o LED de cada uma: aceso na que está em execução, vermelho na bloqueada, apagado nas demais', () => {
+    const sub = card(board.subId);
+    const running = board.router.createCard({ typeId: sub.typeId, columnId: sub.columnId, parentId: board.storyId, title: 'Rodando' });
+    const blocked = board.router.createCard({ typeId: sub.typeId, columnId: sub.columnId, parentId: board.storyId, title: 'Bloqueada' });
+    syncStore(board.router);
+    patchCard(running, { status: 'running', statusAt: Date.now() });
+    patchCard(blocked, { status: 'blocked', statusReason: 'Falta algo', statusAt: Date.now() });
+    const { container } = openStory();
+    const leds = Array.from(container.querySelectorAll('.children li .ai-led'));
+    expect(leds.map((l) => l.className)).toEqual(['ai-led off', 'ai-led working', 'ai-led error']);
+  });
+
   it('sem branch, "Criar branch da história" envia card.workspace.prepare', async () => {
     openCardDrawer(board.subId);
     await userEvent.click(screen.getByRole('button', { name: 'Criar branch da história' }));
@@ -607,6 +619,29 @@ describe('botões de IA do card', () => {
       expect(await screen.findByText(/sem login/)).toBeInTheDocument();
       fireEvent.blur(button);
     }
+  });
+
+  it('com o login vencido durante a execução (sinal reativo, sem o requisito "signin"), os dois também ficam desligados', async () => {
+    const { router, storyId } = await seedBoard();
+    act(() => {
+      router.setAuthExpired('claude');
+      syncStore(router);
+    });
+    renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
+    for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toBeDisabled();
+      // o motivo do bloqueio vem no hint, aberto pelo foco
+      fireEvent.focus(button);
+      expect(await screen.findByText(/login do Claude Code venceu/)).toBeInTheDocument();
+      fireEvent.blur(button);
+    }
+
+    act(() => {
+      router.setAuthExpired(null);
+      syncStore(router);
+    });
+    for (const name of [/Trabalhar na fase/, /Refinar com IA/]) expect(screen.getByRole('button', { name })).toBeEnabled();
   });
 
   it('o hint de Trabalhar na fase e Refinar com IA tem negrito e tópicos, e o texto é idêntico nos dois botões de "Trabalhar na fase"', async () => {

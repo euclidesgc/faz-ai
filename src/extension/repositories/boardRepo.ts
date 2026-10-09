@@ -426,6 +426,7 @@ export class BoardRepo {
       aiRunUnsupported: null,
       requirements: [],
       requirementsCheckedAt: 0,
+      authExpired: null,
       environment: null,
       environmentFirstRun: false,
       environmentInstall: null,

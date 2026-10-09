@@ -40,6 +40,8 @@ export type WebviewToHost =
   | { type: 'ui.reloadWindow' }
   /** abre a tela de MCPs do editor (no Cursor, Customize → MCPs) */
   | { type: 'ui.openEditorMcp' }
+  /** abre um terminal do editor e roda o comando (ex.: o login de uma CLI); a pessoa conclui o login */
+  | { type: 'ui.openTerminal'; command: string }
   /** abre este board no navegador, fora do editor */
   | { type: 'ui.openInBrowser' }
   /** pede ao editor para abrir o Settings nativo filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */

@@ -20,6 +20,12 @@ const set = (list: BoardRequirement[]) =>
     syncStore(router);
   });
 
+const setAuthExpired = (tool: BoardRequirement['tool'] | null) =>
+  act(() => {
+    router.setAuthExpired(tool);
+    syncStore(router);
+  });
+
 const CLI: BoardRequirement = {
   id: 'cli',
   tool: 'cursor',
@@ -143,5 +149,43 @@ describe('botões de IA com a CLI que falta', () => {
     // o recomendado não bloqueia nada
     set([MCP]);
     expect(aiBlockedReason(useBoardStore.getState().state!)).toBeNull();
+  });
+
+  it('o login vencido durante a execução (sinal reativo) também bloqueia, mesmo sem o requisito "signin"', () => {
+    setAuthExpired('claude');
+    expect(aiBlockedReason(useBoardStore.getState().state!)).toContain('login do Claude Code venceu');
+    setAuthExpired(null);
+    expect(aiBlockedReason(useBoardStore.getState().state!)).toBeNull();
+  });
+});
+
+describe('login vencido: aviso de erro, item sintético e "Abrir no terminal"', () => {
+  const SIGNIN: BoardRequirement = {
+    id: 'signin',
+    tool: 'claude',
+    cli: 'claude',
+    action: { kind: 'command', command: 'claude login', terminal: true },
+  };
+
+  it('com o requisito "signin", a faixa fica com destaque de erro, não de aviso comum', () => {
+    set([SIGNIN]);
+    renderThemed(<RequirementsBanner />);
+    expect(region()).toHaveClass('error');
+    expect(region()).not.toHaveClass('warn');
+  });
+
+  it('o sinal reativo sem "signin" nos requisitos (o probe não soube dizer) monta o item sozinho', () => {
+    setAuthExpired('cursor');
+    renderThemed(<RequirementsBanner />);
+    expect(region()).toBeInTheDocument();
+    expect(region()).toHaveClass('error');
+    expect(screen.getByText('A linha de comando do Cursor está sem login')).toBeInTheDocument();
+  });
+
+  it('"Abrir no terminal" roda o comando pelo host; some no modo navegador', async () => {
+    set([SIGNIN]);
+    renderThemed(<RequirementsBanner />);
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir no terminal' }));
+    expect(sentOf('ui.openTerminal')).toEqual([{ type: 'ui.openTerminal', command: 'claude login' }]);
   });
 });

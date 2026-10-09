@@ -26,6 +26,8 @@ export interface RunnerConfig {
   parallel: boolean;
   /** com `parallel` ligado, quantas histórias com branch ao mesmo tempo (no mínimo duas); é também o teto das atividades sem branch (só texto), em qualquer modo, mesmo com `parallel` desligado */
   parallelStories: number;
+  /** a pessoa pausou o autopiloto; vale até retomar, mesmo depois de reabrir o editor */
+  autopilotPaused: boolean;
   /** nome do agente (arquivo marcado no Harness) usado quando nem o card nem a fase indicam um; vazio = o primeiro marcado, ou o embutido */
   defaultAgent: string;
 }
@@ -58,6 +60,7 @@ export const DEFAULT_RUNNER: RunnerConfig = {
   heartbeatMinutes: 60,
   parallel: false,
   parallelStories: 2,
+  autopilotPaused: false,
   defaultAgent: '',
 };
 
@@ -88,6 +91,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
   const interval = Math.round(Number(raw.heartbeatMinutes));
   const parallel = Math.round(Number(raw.parallelStories));
   return {
+    autopilotPaused: raw.autopilotPaused === true,
     defaultAgent: typeof raw.defaultAgent === 'string' ? raw.defaultAgent.trim() : '',
     heartbeat: raw.heartbeat === true,
     heartbeatMinutes:

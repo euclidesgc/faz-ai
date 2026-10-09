@@ -222,7 +222,7 @@ export interface AiActivity {
 }
 
 export interface Autopilot {
-  /** está tocando as histórias; desligado depois de pausar, ou ao abrir o editor, até alguém ligar o modo numa história ou retomar */
+  /** está tocando as histórias; desligado depois de pausar ou quando a fila acaba; liga sozinho ao abrir o editor com história pendente */
   active: boolean;
   /** por que está parado esperando uma pessoa (impedimento numa história); null quando segue normalmente */
   note: string | null;
@@ -266,6 +266,8 @@ export interface BoardState {
   requirements: BoardRequirement[];
   /** quando o host terminou a última conferência dos requisitos (ms), mesmo sem mudança; 0 antes da primeira */
   requirementsCheckedAt: number;
+  /** a ferramenta ativa falhou por login vencido numa execução; null quando não há aviso reativo ativo */
+  authExpired: AiTool | null;
   /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */
   environment: EnvironmentReport | null;
   /** o Diagnóstico ainda não abriu sozinho nesta máquina: a interface abre a tela uma vez */

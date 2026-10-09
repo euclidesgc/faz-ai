@@ -3,6 +3,7 @@ import { cardRef, type BoardState, type Card, type Column } from '../shared/mode
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
+import { blocksExecution } from '../shared/requirements';
 import { limitOf, type AiRunMode } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
@@ -164,8 +165,10 @@ export class Autopilot {
   private progress = new Map<string, { sig: string; stalls: number }>();
   /** histórias entregues já anunciadas no log, para não repetir a linha a cada mudança do board */
   private deliveredLogged = new Set<string>();
-  /** segurado pela pessoa (pausa) ou por uma falha ao iniciar a ferramenta: só retomar religa */
+  /** segurado por uma falha ao iniciar a ferramenta: só retomar religa. A pausa da pessoa fica gravada no board (`autopilotPaused`). */
   private held = false;
+  /** `stop()` em andamento: as mudanças do board que a interrupção provoca não religam o autopiloto */
+  private stopping = false;
 
   constructor(
     private router: MessageRouter,
@@ -184,25 +187,49 @@ export class Autopilot {
     return this.active;
   }
 
-  /** Liga o autopiloto e trata a fila agora. */
+  /** Liga o autopiloto (limpando a pausa gravada no board e a última falha) e trata a fila agora. */
   resume(): void {
     this.held = false;
     this.active = true;
     this.progress.clear();
+    if (this.paused()) this.setPaused(false);
     this.evaluate();
   }
 
-  /** Para o autopiloto e interrompe a execução em andamento nas histórias em modo autônomo. */
+  /**
+   * Para o autopiloto por decisão da pessoa: grava a pausa no board, para ela valer até retomar mesmo
+   * depois de reabrir o editor (#220), e interrompe a execução em andamento nas histórias em modo autônomo.
+   */
   pause(): void {
-    this.held = true;
-    this.active = false;
-    this.publish(null);
-    const s = this.router.snapshot();
-    for (const id of this.runner.running) {
-      const card = s.cards.find((c) => c.id === id);
-      const story = card?.parentId ? s.cards.find((c) => c.id === card.parentId) : card;
-      if (story?.yolo) this.runner.stop(id);
+    // a pausa é gravada antes de interromper: a mudança do board que a interrupção provoca já a enxerga
+    this.setPaused(true);
+    this.stop();
+  }
+
+  /** Desliga e interrompe as execuções sem gravar pausa: fechar o editor não é uma pausa da pessoa. */
+  stop(): void {
+    this.stopping = true;
+    try {
+      this.active = false;
+      this.publish(null);
+      const s = this.router.snapshot();
+      for (const id of this.runner.running) {
+        const card = s.cards.find((c) => c.id === id);
+        const story = card?.parentId ? s.cards.find((c) => c.id === card.parentId) : card;
+        if (story?.yolo) this.runner.stop(id);
+      }
+    } finally {
+      this.stopping = false;
     }
+  }
+
+  /** A pessoa pausou o autopiloto (gravado no board). */
+  private paused(): boolean {
+    return this.router.snapshot().board.runner.autopilotPaused;
+  }
+
+  private setPaused(autopilotPaused: boolean): void {
+    this.router.handle({ type: 'settings.board.update', patch: { runner: { autopilotPaused } } }, { author: AUTHOR, source: 'ai' });
   }
 
   /**
@@ -210,7 +237,7 @@ export class Autopilot {
    * modo autônomo ainda por fazer. Não religa o que a pessoa pausou nem uma fila só de histórias entregues.
    */
   private autoResume(): void {
-    if (this.active || this.held || !this.canRun()) return;
+    if (this.active || this.held || this.stopping || this.paused() || !this.canRun()) return;
     if (autopilotStep(this.router.snapshot()).kind === 'idle') return;
     this.deps.log('Autopiloto: histórias em modo autônomo pendentes; retomando.');
     this.resume();
@@ -221,7 +248,7 @@ export class Autopilot {
     const now = new Set(yoloStories(this.router.snapshot()).map((c) => c.id));
     const added = [...now].some((id) => !this.known.has(id));
     this.known = now;
-    if (added && !this.active && this.canRun()) return this.resume();
+    if (added && !this.active && !this.stopping && this.canRun()) return this.resume();
     if (!this.active) this.autoResume();
     if (!this.active) return;
     if (this.scheduled) return;
@@ -302,6 +329,8 @@ export class Autopilot {
           continue;
         }
         if (step.kind !== 'run') return;
+        // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
+        if (blocksExecution(this.router.snapshot())) return;
         // o teto é por tipo de atividade e conta toda execução em andamento (heartbeat, chamadas à mão):
         // o autopiloto usa as vagas livres de cada tipo, na ordem da fila
         const s = this.router.snapshot();

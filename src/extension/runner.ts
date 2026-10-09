@@ -1,5 +1,5 @@
 import { cardRef } from '../shared/model';
-import { aiToolInfo } from '../shared/harness';
+import { aiToolInfo, type AiTool } from '../shared/harness';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { columnOf, isLive } from '../shared/selectors';
 import { isWithHuman, isYolo, storyOf } from '../shared/story';
@@ -81,6 +81,17 @@ interface Run {
 }
 
 const RUNNER_AUTHOR = 'Faz AI';
+
+/**
+ * Padrões de saída que indicam login vencido, por ferramenta: a falha vira o aviso global (RF6), não
+ * um bloqueio do card. Risco já documentado na Spec: a lista pode ficar desatualizada se a CLI mudar o
+ * texto de erro; qualquer saída que não bata nenhum padrão segue o caminho atual (RF7).
+ */
+const AUTH_FAILURE_PATTERNS: Record<AiTool, RegExp[]> = {
+  claude: [/oauth session expired/i, /failed to authenticate/i, /not logged in/i, /invalid api key/i],
+  cursor: [/not authenticated/i, /please (log|sign) in/i],
+};
+
 const TAIL_LINES = 12;
 /** Tamanho de cada linha do `tail`: a explicação da falha no card não vira despejo de saída. */
 const TAIL_CHARS = 300;
@@ -267,6 +278,12 @@ export class AiRunner {
     const card = state.cards.find((c) => c.id === cardId);
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
+    // sem login confirmado pelo probe (preventivo, RF1), nenhum gatilho gasta uma execução — diferente do sinal
+    // reativo (`authExpired`), que heartbeat.ts/autopilot.ts recusam por conta própria (RF8): aqui ele não
+    // bloqueia, para o login que o probe não soube confirmar poder se recuperar com uma execução
+    // manual que dá certo (RF9, limpa em settle()) — sem essa válvula, authExpired nunca mais sairia de `true`
+    if (state.requirements.some((r) => r.id === 'signin'))
+      throw new Error(`O login do ${aiToolInfo(state.board.aiTool).label} venceu: veja o aviso no topo do board.`);
     const tool = aiToolInfo(state.board.aiTool);
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const refine = mode === 'refine';
@@ -490,6 +507,30 @@ export class AiRunner {
         { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
         { author: RUNNER_AUTHOR },
       );
+    const toolId = this.router.snapshot().board.aiTool;
+    const authFailed = AUTH_FAILURE_PATTERNS[toolId]?.some((re) => run.tail.some((l) => re.test(l))) ?? false;
+    // falha de autenticação vale para o board inteiro, não só para este card: não bloqueia, e o aviso
+    // global (RF3) é quem explica à pessoa o que fazer. Entra antes do caminho de "refinar" porque RF6
+    // vale para os dois modos, e antes do `failure` genérico, que continua tratando qualquer outra falha
+    if (authFailed) {
+      if (this.router.setAuthExpired(toolId)) this.deps.log(`Login do ${toolLabel} vencido: execuções suspensas.`);
+      this.router.handle(
+        {
+          type: 'comment.add',
+          cardId,
+          body: `Não rodou: o login do ${toolLabel} venceu. Faça login de novo; a execução pode ser repetida depois.`,
+        },
+        { author: RUNNER_AUTHOR, source: 'ai' },
+      );
+      return void this.router.handle(
+        { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
+        { author: RUNNER_AUTHOR },
+      );
+    }
+    // a execução não falhou por autenticação: se o sinal estava ligado para esta ferramenta, ela voltou
+    // a funcionar (RF9) — cobre o login que o probe não soube confirmar, que só tem este caminho
+    if (this.router.snapshot().authExpired === toolId && this.router.setAuthExpired(null))
+      this.deps.log(`Login do ${toolLabel} de volta: execuções retomadas.`);
     // o fim do que a ferramenta escreveu vai junto: a pessoa entende a falha sem sair do card
     // o plano gratuito do Cursor só roda o Auto: a recusa diz pouco, e a saída é o modelo do card
     const freePlan = run.tail.some((l) => /free plans can only use auto/i.test(l))

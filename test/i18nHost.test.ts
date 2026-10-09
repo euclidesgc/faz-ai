@@ -139,6 +139,7 @@ describe('i18n do host: mensagens preenchidas', () => {
         heartbeatMinutes: 60,
         parallel: false,
         parallelStories: 2,
+        autopilotPaused: false,
         defaultAgent: '',
       },
       { offline: true, unsupported: null },

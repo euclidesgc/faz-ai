@@ -14,6 +14,7 @@ import { createRunLog } from '../src/extension/log/runLog';
 import { gatewayFor } from './helpers/gateway';
 import { executionPlan } from '../src/extension/execution';
 import { monthOf, type RunReport } from '../src/shared/log';
+import { parseRunner } from '../src/shared/runner';
 import { TYPE_CONDITION, modelValue } from '../src/shared/models';
 import type { Database } from 'sql.js';
 
@@ -375,6 +376,13 @@ describe('executor da IA', () => {
     expect(runner.isRunning(storyId)).toBe(false);
   });
 
+  it('com o login da ferramenta vencido (requisito "signin"), não inicia e não gasta uma execução', () => {
+    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+    expect(() => runner.start(storyId)).toThrow(/login/i);
+    expect(procs).toHaveLength(0);
+    expect(card().status).not.toBe('running');
+  });
+
   it('se a IA só respondeu na conversa, a vez passa para a pessoa', () => {
     runner.start(storyId);
     ai({ type: 'comment.add', cardId: storyId, body: 'Entendi. Qual o provedor de login?' });
@@ -510,6 +518,41 @@ describe('executor da IA', () => {
       expect(sub.status).toBe('blocked');
       expect(sub.statusReason).toContain('sem responder');
     });
+  });
+
+  it('falha de autenticação não bloqueia o card: ele volta ao status anterior, avisa na conversa e liga o sinal reativo', () => {
+    const before = card().status;
+    runner.start(storyId);
+    procs[0]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[0]!.exit(1);
+    expect(card().status).toBe(before);
+    expect(card().status).not.toBe('blocked');
+    expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+    expect(lastMessage()!.body).toContain('login do Claude Code venceu');
+    expect(router.snapshot().authExpired).toBe('claude');
+    expect(log.some((l) => l.includes('Login do Claude Code vencido'))).toBe(true);
+
+    // uma segunda falha igual, com o sinal já ligado, não duplica o log de suspensão
+    const logCountBefore = log.filter((l) => l.includes('Login do Claude Code vencido')).length;
+    runner.start(storyId);
+    procs[1]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[1]!.exit(1);
+    expect(log.filter((l) => l.includes('Login do Claude Code vencido')).length).toBe(logCountBefore);
+
+    // uma execução que termina sem falha de autenticação limpa o sinal e avisa a retomada
+    runner.start(storyId);
+    ai({ type: 'comment.add', cardId: storyId, body: 'Entendi. Qual o provedor de login?' });
+    procs[2]!.exit(0);
+    expect(router.snapshot().authExpired).toBeNull();
+    expect(log.some((l) => l.includes('Login do Claude Code de volta'))).toBe(true);
+  });
+
+  it('falha sem nenhum padrão de autenticação continua bloqueando o card como antes (regressão)', () => {
+    runner.start(storyId);
+    procs[0]!.emit('algum outro erro qualquer\n', 'stderr');
+    procs[0]!.exit(1);
+    expect(card().status).toBe('blocked');
+    expect(router.snapshot().authExpired).toBeNull();
   });
 
   it('falha, saída sem resposta e tempo limite bloqueiam o card com o motivo na conversa', () => {
@@ -749,6 +792,7 @@ describe('executor da IA', () => {
       heartbeatMinutes: 60,
       parallel: false,
       parallelStories: 2,
+      autopilotPaused: false,
     });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'edits', timeoutMinutes: 999 } } });
     expect(router.snapshot().board.runner).toMatchObject({ permission: 'edits', timeoutMinutes: 240 });
@@ -1269,6 +1313,18 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
 
     expect(procs).toHaveLength(2);
     expect(card().status).toBe('running');
+  });
+});
+
+describe('parseRunner', () => {
+  it('autopilotPaused ausente ou inválido vira false', () => {
+    expect(parseRunner(null).autopilotPaused).toBe(false);
+    expect(parseRunner('{}').autopilotPaused).toBe(false);
+    expect(parseRunner(JSON.stringify({ autopilotPaused: 'sim' })).autopilotPaused).toBe(false);
+  });
+
+  it('autopilotPaused: true é lido', () => {
+    expect(parseRunner(JSON.stringify({ autopilotPaused: true })).autopilotPaused).toBe(true);
   });
 });
 

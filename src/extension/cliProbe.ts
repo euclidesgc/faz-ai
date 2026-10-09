@@ -49,6 +49,17 @@ export async function cursorSignedIn(executable: string, pathEnv: string | undef
   }
 }
 
+/** Se o Claude Code está autenticado (`claude auth status`, JSON com `loggedIn`); null quando não deu para saber. */
+export async function claudeSignedIn(executable: string, pathEnv: string | undefined): Promise<boolean | null> {
+  const run = await runCli(executable, ['auth', 'status'], pathEnv);
+  try {
+    const v = JSON.parse(run.stdout) as { loggedIn?: unknown };
+    return typeof v.loggedIn === 'boolean' ? v.loggedIn : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Os modelos da conta em uso no Cursor (`cursor-agent models`); vazio sem login ou com erro. */
 export async function cursorModels(executable: string, pathEnv: string | undefined): Promise<ModelOption[]> {
   const run = await runCli(executable, ['models'], pathEnv);

@@ -706,9 +706,15 @@ button.chip.on:hover:where(:not(:disabled)) {
 }
 .children li {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: var(--sp-6);
   padding: var(--sp-4) var(--sp-6);
   border-radius: var(--radius-sm);
+}
+/* LED de atividade de cada sub-tarefa: alinhado com o texto, com respiro até o título */
+.children li .ai-led {
+  margin-right: var(--sp-4);
 }
 .children li:hover {
   background: var(--hover);

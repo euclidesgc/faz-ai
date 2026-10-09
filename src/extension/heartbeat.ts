@@ -2,6 +2,7 @@ import type { AiRunOrigin } from '../shared/log';
 import { cardRef, type BoardState, type Card } from '../shared/model';
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
+import { blocksExecution } from '../shared/requirements';
 import { childrenOf, isAiWorking, isLive } from '../shared/selectors';
 import { limitOf } from '../shared/runner';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
@@ -141,6 +142,11 @@ export class Heartbeat {
    */
   private pump(): void {
     const s = this.deps.snapshot();
+    // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
+    if (blocksExecution(s)) {
+      this.queue = [];
+      return void this.changed();
+    }
     const counts = runningByKind(s, this.runner.running);
     const wants = autopilotStep(s);
     const reservedKind: ActivityKind | null = this.yieldToAutopilot && s.autopilot.active && wants.kind === 'run' ? wants.activity : null;

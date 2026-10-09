@@ -125,6 +125,9 @@ export class HostBridge {
         case 'ui.openEditorMcp':
           await this.env.openEditorMcp?.();
           return;
+        case 'ui.openTerminal':
+          this.router.openTerminal(msg.command);
+          return;
         case 'ui.showChat':
           await this.env.showChat?.();
           return;

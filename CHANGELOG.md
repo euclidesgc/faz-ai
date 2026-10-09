@@ -6,6 +6,22 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## 0.34.0
 
+- **Login vencido: aviso de erro no board, em vez de parar sem explicação (#189).** O login do
+  Claude Code passa a ser conferido de verdade (`claude auth status`), além do Cursor já existente;
+  antes de cada chamada da IA (botão do card, heartbeat, modo autônomo), o board confere de novo, com
+  um cache curto. Quando o motivo da faixa amarela é login, ela ganha destaque de erro e o botão
+  **Abrir no terminal**, que roda o comando ali, mas o login em si continua sendo sempre feito por
+  você. Quando o login vence no meio de uma execução, a primeira falha com um padrão conhecido
+  ("OAuth session expired", "not logged in", "401" etc.) não bloqueia mais o card: ele volta ao
+  status anterior, com um comentário curto, e liga o mesmo aviso de erro. O heartbeat e o modo
+  autônomo param de tentar sozinhos enquanto ele estiver ligado, sem desligar, e retomam quando o
+  login é confirmado de novo. O Diagnóstico do ambiente mostra o mesmo item.
+- **A pausa do modo autônomo fica gravada no board (#220).** Pausar agora vale até você retomar,
+  mesmo depois de fechar e reabrir o editor; antes, reabrir o editor religava a fila. Fechar o
+  editor continua não contando como pausa, e ligar o modo numa história (ou **Retomar**) limpa a
+  pausa. Depois de uma falha ao iniciar a ferramenta, o autopiloto não religa sozinho até você
+  retomar. A lista de
+  sub-tarefas no painel da história passa a mostrar o LED de atividade de cada uma.
 - **Aba Arquivados no lugar da coluna de arquivados.** A coluna "Arquivados" saiu do fim de cada linha do board (e com ela o arquivar por arraste e o colapsar/expandir dessa coluna): as linhas ficam estreitas o bastante para ver Histórias e Sub-tarefas ao mesmo tempo com os cards colapsados. Os cards arquivados ficam na nova aba **Arquivados**, entre Métricas e Lixeira, que preserva o histórico: uma linha por workflow, na ordem do board, só com os arquivados daquele workflow, do mais recente ao mais antigo. Arquivar continua pelo menu de ações do card (com a confirmação de sempre) e pelos caminhos automáticos. No lugar de "Desarquivar", o menu e a aba têm **Restaurar**: o card volta ao fim da primeira coluna do workflow dele (Backlog / A fazer), inativo. Restaurar uma história traz também todas as sub-tarefas arquivadas dela e desliga o modo autônomo; restaurar uma sub-tarefa cuja história está arquivada pede confirmação ("Restaurar a história junto?") e restaura a história inteira; uma sub-tarefa de história ativa volta sozinha. A ferramenta MCP `unarchive_card` segue como antes.
 - **Ligar e desligar o modo autônomo direto do cartão, sem abrir o card (#416).** O ícone no rodapé do cartão que já indicava "modo autônomo ligado" agora é também um botão: um clique liga ou desliga o modo autônomo sem precisar abrir o detalhe da história. O aviso mostrado ao ligar ficou mais curto — era um parágrafo longo com vários detalhes operacionais, agora é só o essencial: a IA toca a história sozinha até o pull request, sem aprovação, pergunta ou confirmação, e como parar. Esse mesmo texto e diálogo são usados nos três pontos que ligam o modo autônomo (o botão novo do cartão, o toggle do detalhe do card e a ação em lote de seleção múltipla), com a lógica de confirmação unificada entre eles. O diálogo ganhou um checkbox "Não avisar novamente": quem marcar e confirmar deixa de ver esse aviso nas próximas vezes, nos três pontos, como preferência pessoal guardada no navegador ou editor de quem usa (não no board). Desligar o modo autônomo em lote continua sempre pedindo confirmação, sem o checkbox, por ser a ação mais arriscada.
 - **Correção: o modo autônomo não reexecuta nem bloqueia uma história já entregue (#413).** Uma história em modo autônomo que chegou à Homologação e ficou com a pessoa (aguardando revisão ou resposta, bloqueada, ou aprovada à espera da próxima coluna) era tratada como "sem avanço": o autopiloto a rodava de novo e acabava bloqueando-a sozinho. Agora ela sai da fila enquanto estiver com a pessoa, e a IA, numa entrega sem pull request, chama `request_review` para marcar a história como entregue.

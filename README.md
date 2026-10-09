@@ -175,7 +175,7 @@ Cada card tem uma barra na cor do tipo, com o ID, o tipo e os botões de abrir e
 vêm o título (inteiro no tooltip, se não couber), o status com um ícone de com quem está a
 pendência (robô para a IA, pessoa para você) e há quanto tempo ele está assim, os campos, o modelo
 de IA (ex.: "Sonnet 5.5 - baixo") e, no rodapé, os contadores, a branch e o PR. Cards com
-pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do card de relance: verde piscando devagar enquanto a IA trabalha nele (na história, também quando ela trabalha numa sub-tarefa), amarelo quando ele espera por você, vermelho quando está bloqueado e apagado quando não há nada acontecendo.
+pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do card de relance: verde piscando devagar enquanto a IA trabalha nele (na história, também quando ela trabalha numa sub-tarefa), amarelo quando ele espera por você, vermelho quando está bloqueado e apagado quando não há nada acontecendo. Na história, a lista de sub-tarefas mostra o mesmo LED em cada uma: verde piscando em execução, vermelho bloqueada, amarelo esperando a pessoa e apagado parada.
 
 **Cards colapsados.** Você pode colapsar cards para enxergar mais linhas de uma coluna na mesma tela. Um card colapsado mantém a faixa colorida do tipo (com o LED da IA, o número, o tipo e os botões) e mostra o título em até duas linhas, escondendo o resto; a borda de status continua (se o card espera por você), para você varrer o board de relance e saber o que precisa de atenção. O colapso pode ser aplicado em quatro escopos: um card isolado (botão no próprio card), todos os cards de uma coluna (item no menu de ações da coluna), todos os cards do board (botão na barra de filtros) ou só os cards selecionados (botão na barra de seleção múltipla). O estado fica lembrado entre sessões.
 
@@ -274,7 +274,8 @@ MCP do board (global)** da paleta faz a instalação padrão na ferramenta do pr
 
 Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, uma faixa amarela fica no topo
 do board, em todas as telas, e no painel de chat. Ela confere o Node.js (o servidor do board roda
-com ele), a linha de comando da ferramenta, o login dela (no Cursor, por `cursor-agent status`), o
+com ele), a linha de comando da ferramenta, o login dela (no Cursor por `cursor-agent status`, no
+Claude Code por `claude auth status`), o
 registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
 para o seu usuário, de `claude mcp add -s user`), um registro apontando para um node ou um caminho
 que não existe mais, para outra pasta ou para a ponte de uma versão anterior, e o nível de
@@ -292,6 +293,19 @@ mesmo onde as execuções pelo board levam o MCP sozinhas (Claude, Cursor), a co
 editor ou no terminal depende dele, e a skill é o que faz a IA seguir o fluxo. A falta da skill tem o
 botão **Instalar a skill** na própria faixa. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
 desligados, com o motivo na dica.
+
+**Login vencido: aviso de erro e retomada sozinha.** Quando o motivo da faixa é login (faltando ou
+vencido no meio de uma execução), ela fica com destaque de erro, em vez do amarelo comum, e ganha o
+botão **Abrir no terminal** ao lado do comando para copiar: o board abre um terminal do editor e roda
+o comando ali, mas o login em si é sempre feito por você. Antes de cada chamada da IA (o botão do
+card, o heartbeat e o modo autônomo) o board confere o login de novo; se ele venceu, a execução nem
+começa. Quando o login vence no meio de uma execução, a primeira falha que bater um padrão conhecido ("OAuth session expired", "not logged in",
+"401" etc.) não bloqueia o card: ele volta ao status que tinha, com um comentário curto, e o mesmo
+aviso de erro liga no topo do board — o heartbeat e o modo autônomo não tentam de novo sozinhos
+enquanto ele estiver ligado. O aviso some e a fila volta a andar sozinha quando o login é confirmado
+de novo (pela conferência periódica, em até 10 segundos depois de ligar, ou por **Já entrei:
+verificar de novo**) ou, quando a conferência não sabe dizer, na primeira execução manual que der
+certo. O Diagnóstico do ambiente mostra o mesmo aviso no item **Login na linha de comando**.
 
 **Diagnóstico do ambiente.** Na primeira abertura do board na máquina, abre sozinha uma lista, no
 estilo do `flutter doctor`, com tudo de que o board precisa e o que ele aproveita. Depois, ela abre
@@ -692,16 +706,23 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo, entram na fila
   e ganham um vínculo **relativo** com a história de origem (pulado em silêncio se já existir
   qualquer vínculo entre as duas). Ela nunca liga o modo numa história que você não ligou.
-- **Freios**: o autopiloto para quando a IA bloqueia o card ou quando uma execução falha (o card
-  fica Bloqueado, com o motivo) e bloqueia a história depois de 3 execuções seguidas que não
-  avançaram nada. Ao destravar o card, ele continua sozinho.
+- **Freios**: o autopiloto continua **uma história por vez**: a história destravada volta para a
+  posição que ocupa no board e espera a que estiver em execução terminar. Uma execução que falha
+  deixa o card Bloqueado, com o motivo, e o disjuntor bloqueia a história depois de 3 execuções
+  seguidas sem avanço; bloquear uma história libera a fila para seguir com a próxima, em vez de
+  travá-la — histórias que emperram podem gastar até 3 execuções cada, em todas da fila. Ao
+  destravar o card, ele continua sozinho.
 
 O **botão do modo autônomo** no topo do board aparece enquanto houver história na fila e diz o que
 o clique faz: **Pausar modo autônomo** (aceso, com o autopiloto tocando; pausar interrompe a IA) ou
 **Retomar modo autônomo** (apagado, pausado). Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
 (YOLO)** e **Faz AI: Parar as execuções da IA e o modo autônomo**. Ao abrir o editor, o autopiloto
-retoma sozinho a fila que ficou pendente (a pausa é sua: o que você pausou só volta quando você
-retomar). O heartbeat não toca histórias em modo autônomo; elas são do autopiloto.
+liga sozinho quando há história pendente em modo autônomo, a não ser que você tenha pausado: a
+pausa fica gravada no board (sobrevive a reabrir o editor), e "Retomar", ou ligar o modo numa
+história, a limpa; fechar o editor não conta como pausa. Depois de uma falha ao iniciar a ferramenta
+de IA, o autopiloto não religa sozinho até você retomar. Com o login da ferramenta vencido, o
+autopiloto e o heartbeat esperam o login voltar, sem gastar execuções. O heartbeat não toca
+histórias em modo autônomo; elas são do autopiloto.
 
 
 ### Agentes
