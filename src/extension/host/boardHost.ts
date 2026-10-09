@@ -247,6 +247,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let enableTimer: NodeJS.Timeout | null = null;
   let checkAgain = false;
   let forceSigninCheck = false;
+  /** o host encerrou: nenhuma conferência nova começa e a que estava em andamento não mexe mais no board */
+  let disposed = false;
   const SIGNIN_CACHE_MS = 3 * 60_000;
   const signinCache = new Map<AiTool, { at: number; value: boolean | null }>();
   // dispatch por ferramenta: `cursor` e `claude` têm probe; quando o probe não sabe dizer (`null`), vale
@@ -259,6 +261,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     return value;
   };
   const checkNow = (): Promise<void> => {
+    if (disposed) return Promise.resolve();
     if (checking) {
       checkAgain = true;
       return checking;
@@ -284,6 +287,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       skillInstalled: flowSkillInstalled(),
     })
       .then((list) => {
+        // a conferência (com o probe de login, que chama a CLI) pode terminar depois do encerramento
+        if (disposed) return;
         // a CLI do Cursor acabou de ficar pronta (instalada, com login): só agora dá para ler os modelos da conta
         const blocked = board.aiTool === 'cursor' && list.some((r) => r.id === 'cli' || r.id === 'signin');
         if (cursorBlocked && !blocked && router.snapshot().board.aiTool === 'cursor') refreshCursorModels();
@@ -589,8 +594,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       fs.writeFileSync(gitignore, `${current}${current && !current.endsWith('\n') ? '\n' : ''}${lines.join('\n')}\n`);
     },
     async dispose() {
+      disposed = true;
       clearInterval(requirementsTimer);
       if (enableTimer) clearInterval(enableTimer);
+      // espera a conferência em andamento: sem isso ela pode gravar o board depois de o banco fechar
+      await checking;
       autopilot.stop(); // fechar o editor não é uma pausa da pessoa: na reabertura a fila retoma
       heartbeat.stop();
       runner.dispose();
