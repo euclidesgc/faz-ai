@@ -1,4 +1,4 @@
-import type { Card } from '../../../shared/model';
+import type { Autopilot, Card } from '../../../shared/model';
 import { cardRef } from '../../../shared/model';
 import { storyOf } from '../../../shared/story';
 import { useBoardStore } from '../../store/boardStore';
@@ -18,6 +18,21 @@ export const yoloWarning = (): string =>
   );
 
 /** Modo autônomo (YOLO) da história: liga e desliga e mostra o andamento do autopiloto. A sub-tarefa mostra o da história. */
+/**
+ * O que a barra diz sobre a fila. A nota do autopiloto é do board inteiro e costuma falar de outra
+ * história ("#298 está bloqueado: ..."): aqui só entra inteira quando é sobre este card; sobre outro,
+ * fica uma linha curta que aponta para ele (o texto completo está na barra de atividade).
+ */
+function queueNote(t: (s: string, v?: Record<string, string>) => string, card: Card, autopilot: Autopilot): string {
+  const note = autopilot.note?.trim();
+  if (note) {
+    if (note.startsWith(`${cardRef(card)} `)) return t(note);
+    const other = /^#\d+/.exec(note)?.[0];
+    if (other) return t('A fila está parada em {ref}: veja a barra de atividade.', { ref: other });
+  }
+  return autopilot.active ? t('O modo autônomo está tocando a fila.') : t('O modo autônomo está pausado.');
+}
+
 export function YoloBar({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const ask = useBoardStore((s) => s.ask);
@@ -62,13 +77,7 @@ export function YoloBar({ card }: { card: Card }) {
       </label>
       {card.yolo && (
         <>
-          <span className="muted small">
-            {autopilot.note
-              ? t(autopilot.note)
-              : autopilot.active
-                ? t('O modo autônomo está tocando a fila.')
-                : t('O modo autônomo está pausado.')}
-          </span>
+          <span className="muted small">{queueNote(t, card, autopilot)}</span>
           {autopilot.active ? (
             <Button variant="ghost" size="small" onClick={() => ai.pauseAutopilot()}>
               {t('Pausar modo autônomo')}

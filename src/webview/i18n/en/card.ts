@@ -223,6 +223,7 @@ export const card: Record<string, string> = {
   'Ligar o modo autônomo': 'Turn on autonomous mode',
   'O modo autônomo está tocando a fila.': 'Autonomous mode is driving the queue.',
   'O modo autônomo está pausado.': 'Autonomous mode is paused.',
+  'A fila está parada em {ref}: veja a barra de atividade.': 'The queue is stopped at {ref}: see the activity bar.',
   'Modo autônomo': 'Autonomous mode',
   'Modo autônomo: a IA toca esta história sozinha, sem aprovação': 'Autonomous mode: the AI drives this story by itself, without approval',
   'Salvar descrição': 'Save description',
