@@ -13,7 +13,7 @@ const PICTOGRAPH = new RegExp(
   'gu',
 );
 // setas em frases ("Workflows e colunas → Fase", "use ↑ e ↓") são texto, não ícone
-const PROSE = new Set(['→', '↑', '↓']);
+const PROSE = new Set(['→', '↑', '↓', '›']);
 
 describe('ícones do board', () => {
   it('a interface usa os ícones de components/ui/icons.tsx, não emojis nem símbolos soltos', () => {

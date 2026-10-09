@@ -241,3 +241,20 @@ describe('número do card', () => {
     expect(boards.snapshot(other).cards.find((c) => c.id === id)?.number).toBe(1);
   });
 });
+
+describe('meta', () => {
+  it('getMeta devolve undefined quando a chave não existe', () => {
+    expect(boards.getMeta('git.user')).toBeUndefined();
+  });
+
+  it('setMeta grava e getMeta lê o valor', () => {
+    boards.setMeta('git.user', 'alice');
+    expect(boards.getMeta('git.user')).toBe('alice');
+  });
+
+  it('setMeta chamado duas vezes substitui o valor', () => {
+    boards.setMeta('git.user', 'alice');
+    boards.setMeta('git.user', 'bob');
+    expect(boards.getMeta('git.user')).toBe('bob');
+  });
+});

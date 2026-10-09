@@ -556,9 +556,12 @@ progress. Sub-tasks commit to the story's branch.
 - The branch is created when the AI starts the implementation (it calls `prepare_workspace`) or with
   the **Criar branch da história** (create the story's branch) button on the card.
 - The card shows the branch and opens the working folder in a new window.
-- Configurações → **Git** holds the mode (worktree, branch in the same folder, or off), the branch
-  name pattern, the worktrees folder, automatic PR merge when approving acceptance, and automatic
-  merge detection, with the archiving of already published stories (on by default).
+- The mode (worktree, branch in the same folder, or off), the branch name pattern, the worktrees
+  folder, **drive stories in parallel**, automatic PR merge when approving acceptance and automatic
+  merge detection, with the archiving of already published stories (on by default), live in the
+  editor Settings, under **Faz AI › Git** (see [Settings in the editor
+  Settings](#settings-in-the-editor-settings)); in the browser they stay on the Git tab and the
+  parallel block in the Harness, as before.
 - Each worktree is a working copy: dependencies have to be installed in it.
 
 ### Pull request and merge in Homologação
@@ -568,7 +571,7 @@ to verify it with the expected result, and what was left out — in the story's 
 the branch, opens the pull request with the same script in its body, records its address on the
 card and asks for your review. The card shows the PR link.
 
-Automatic merge is optional and starts turned off (Configurações → Git). With it on, when you
+Automatic merge is optional and starts turned off (editor Settings, Faz AI › Git). With it on, when you
 approve a story that is in the last column before completion:
 
 1. the board merges the PR through the GitHub CLI (`gh`), with the configured method (squash, merge
@@ -583,8 +586,8 @@ automatic merge off, approving only marks the card, and the AI moves it to Concl
 ### Automatic merge detection
 
 The board can watch a delivered story's pull request and detect when it is merged, concluding the
-story automatically. The feature starts on (Configurações → Git, **Concluir a história quando o
-pull request for mergeado**). A periodic routine checks the PR state at a configurable interval
+story automatically. The feature starts on (editor Settings, Faz AI › Git, **Concluir a história
+quando o pull request for mergeado**). A periodic routine checks the PR state at a configurable interval
 (**Verificar a cada (minutos)**, default 15, range 5 to 1440). When the merge is detected:
 
 1. the board records the merge commit on the card;
@@ -621,15 +624,17 @@ version, which have no merge commit recorded, stay yours to archive with one cli
 With the heartbeat on (Configurações → Harness de IA), the board calls the AI on its own at every
 interval, while the editor is open in the project folder. In each round it advances approved cards,
 answers pending messages and works on ready cards, one story at a time. In "Worktree por
-história" mode, **Tocar histórias em paralelo** (drive stories in parallel; on the same screen, off by
-default) makes the heartbeat drive several stories at once, each in its own working folder: two by
-default, up to six in **Histórias ao mesmo tempo**; the limit
+história" mode, **Tocar histórias em paralelo** (drive stories in parallel; editor Settings, Faz AI
+› Git; off by default) makes the heartbeat drive several stories at once, each in its own working
+folder: two by default, up to six in **Histórias ao mesmo tempo**; the limit
 counts every run in progress, including the ones called by hand. Outside that mode, and in
 autonomous mode (whose stories are stacked), it stays one at a time, and the field is disabled. The
-Git screen explains why in each mode: with a branch in the project folder, two stories at once would
-switch the branch under each other and mix their changes; with worktrees they are isolated, at the
-cost of one more copy of the files on disk per story (with dependencies installed in each) and more
-memory and CPU while several AI sessions, tests and builds run together.
+description of each Git key in the Settings explains why in each mode: with a branch in the project
+folder, two stories at once would switch the branch under each other and mix their changes; with
+worktrees they are isolated, at the cost of one more copy of the files on disk per story (with
+dependencies installed in each) and more memory and CPU while several AI sessions, tests and builds
+run together. In the editor the Git tab and the parallel block in the AI harness become a link to
+the Settings; in the browser they stay as editable fields, as before.
 
 - With nothing pending for the AI, nothing runs.
 - The round follows the board order: bugs first; then the rightmost story (the most advanced one
@@ -851,7 +856,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
 | Harness de IA | The project's tool, permission, default agent and heartbeat; project and global rules, agents and skills, with the check marks of what runs use; everything each tool loads, by scope (see [AI harness](#ai-harness) and [Agents](#agents)) |
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
-| Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
+| Git | Only the Git tab in browser mode; in the editor, points to the Settings (Faz AI › Git) |
 | Aparência | **Language** (automatic, Português (Brasil) or English; in the editor Settings along with theme, font and size); statuses (name and color, in the Workflows tab; here only in browser mode) |
 | Backup | In the editor, export and import through the command palette (`fazai.exportBoard`, `fazai.importBoard`); in browser mode, through the Settings tab (see [Board backup](#board-backup)) |
 
@@ -864,7 +869,7 @@ four sections, in this order:
 | --- | --- |
 | Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
 | Appearance | **Language** (`fazai.appearance.language`), **Theme** (`fazai.appearance.theme`), **Font** (`fazai.appearance.font`) and **Size** (`fazai.appearance.fontSize`), all with User scope — apply to all this person's projects. Statuses (name and color of each status) stay on the board, now in the Workflows tab |
-| Git | A note that the options arrive in the next versions, with a link to the board's Git tab |
+| Git | The nine `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.watchMerges` and `fazai.git.watchMergeMinutes` (watch for merges outside the board, 5 to 1440 minutes). In the editor, the Git tab and the parallel block in the AI harness become a link to these keys; in the browser they stay as editable fields |
 | Backup | Two action links: **Export the board now** and **Import a board**, which trigger the palette commands |
 
 Three new commands in the palette (`Ctrl+Shift+P`): **Faz AI: Open the Environment Diagnostics**,

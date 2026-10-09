@@ -195,9 +195,92 @@
         "title": "%config.git.title%",
         "order": 3,
         "properties": {
-          "fazai.git.info": {
-            "type": "null",
-            "markdownDescription": "%config.git.info%"
+          "fazai.git.mode": {
+            "type": "string",
+            "enum": [
+              "worktree",
+              "branch",
+              "off"
+            ],
+            "enumDescriptions": [
+              "%config.git.mode.worktree%",
+              "%config.git.mode.branch%",
+              "%config.git.mode.off%"
+            ],
+            "default": "worktree",
+            "scope": "resource",
+            "order": 1,
+            "markdownDescription": "%config.git.mode%"
+          },
+          "fazai.git.branchPattern": {
+            "type": "string",
+            "default": "{tipo}/{numero}-{titulo}",
+            "scope": "resource",
+            "order": 2,
+            "markdownDescription": "%config.git.branchPattern%"
+          },
+          "fazai.git.worktreeDir": {
+            "type": "string",
+            "default": "../{repo}.worktrees",
+            "scope": "resource",
+            "order": 3,
+            "markdownDescription": "%config.git.worktreeDir%"
+          },
+          "fazai.git.parallel": {
+            "type": "boolean",
+            "default": false,
+            "scope": "resource",
+            "order": 4,
+            "markdownDescription": "%config.git.parallel%"
+          },
+          "fazai.git.parallelStories": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 6,
+            "default": 2,
+            "scope": "resource",
+            "order": 5,
+            "markdownDescription": "%config.git.parallelStories%"
+          },
+          "fazai.git.autoMerge": {
+            "type": "boolean",
+            "default": false,
+            "scope": "resource",
+            "order": 6,
+            "markdownDescription": "%config.git.autoMerge%"
+          },
+          "fazai.git.mergeMethod": {
+            "type": "string",
+            "enum": [
+              "squash",
+              "merge",
+              "rebase"
+            ],
+            "enumDescriptions": [
+              "%config.git.mergeMethod.squash%",
+              "%config.git.mergeMethod.merge%",
+              "%config.git.mergeMethod.rebase%"
+            ],
+            "default": "squash",
+            "scope": "resource",
+            "order": 7,
+            "markdownDescription": "%config.git.mergeMethod%"
+          },
+          "fazai.git.watchMerges": {
+            "type": "boolean",
+            "default": true,
+            "scope": "resource",
+            "order": 8,
+            "markdownDescription": "%config.git.watchMerges%"
+          },
+          "fazai.git.watchMergeMinutes": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 1440,
+            "default": 15,
+            "scope": "resource",
+            "order": 9,
+            "markdownDescription": "%config.git.watchMergeMinutes%"
           }
         }
       },
