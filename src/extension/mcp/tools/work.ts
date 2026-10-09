@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { openPredecessors } from '../../../shared/links';
 import { cardRef } from '../../../shared/model';
+import { activityKindOf } from '../../../shared/activity';
+import { columnOf } from '../../../shared/selectors';
 import { isDelivered, isYolo, storyOf } from '../../../shared/story';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { cardSummary, findCard } from '../format';
@@ -96,10 +98,21 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'prepare_workspace',
-    'Cria (ou reaproveita) a branch da história e a pasta em que o código dela deve ser alterado. Chame antes de mexer em código do projeto; pode ser chamada de uma sub-tarefa. O nome da branch e a pasta são definidos pelo board: não crie branches por conta própria.',
+    'Cria (ou reaproveita) a branch da história e a pasta em que o código dela deve ser alterado. Chame antes de mexer em código do projeto; pode ser chamada de uma sub-tarefa. Fora do modo worktree, só chame na fase de código (fase que só produz documento não precisa de branch). O nome da branch e a pasta são definidos pelo board: não crie branches por conta própria.',
     { card: cardArg },
     (a, router) => {
-      const card = live(findCard(router.snapshot(), a.card));
+      const s = router.snapshot();
+      const card = live(findCard(s, a.card));
+      if (s.board.git.mode !== 'worktree' && activityKindOf(s, card, 'phase') === 'text') {
+        const story = storyOf(s, card);
+        const holder = s.cards.find((c) => s.aiRuns.includes(c.id) && storyOf(s, c)?.id !== story?.id);
+        if (holder) {
+          const holderStory = storyOf(s, holder) ?? holder;
+          throw new Error(
+            `A pasta do projeto está em uso pela execução de ${cardRef(holderStory)}. ${cardRef(story ?? card)} está em ${columnOf(s, story ?? card)?.name}, fase que só produz documento e não precisa de branch: não chame prepare_workspace agora. A branch é criada na fase de código, quando a pasta estiver livre.`,
+          );
+        }
+      }
       router.handle({ type: 'card.workspace.prepare', cardId: card.id }, aiOrigin(ctx));
       return detail(router, card.id).workspace;
     },

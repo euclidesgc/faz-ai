@@ -192,6 +192,38 @@ describe('branch e worktree por história', () => {
     expect((await call('get_card', { card: 2 })).data.workspaceNote).toBeUndefined();
   });
 
+  it('fora do worktree, recusa a fase de texto enquanto outra história usa a pasta', async () => {
+    await call('create_card', { title: 'Um', column: 'Implementação' });
+    await call('create_card', { title: 'Dois', column: 'Discovery' });
+    await call('create_card', { title: 'Tres', column: 'Implementação' });
+    const run = [
+      {
+        cardId: card(1).id,
+        runId: '',
+        mode: 'phase' as const,
+        origin: 'manual' as const,
+        phase: 'Implementação',
+        model: null,
+        startedAt: 0,
+      },
+    ];
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
+    router.setAiRuns(run);
+    const blocked = await call('prepare_workspace', { card: 2 });
+    expect(blocked.error).toBe(true);
+    expect(blocked.text).toContain('#1');
+    expect(blocked.text).toContain('#2 está em Discovery');
+    // fase de código não é barrada
+    expect((await call('prepare_workspace', { card: 3 })).error).toBe(false);
+    // pasta livre
+    router.setAiRuns([]);
+    expect((await call('prepare_workspace', { card: 2 })).error).toBe(false);
+    // modo worktree não tem a guarda
+    router.setAiRuns(run);
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree' } } });
+    expect((await call('prepare_workspace', { card: 2 })).error).toBe(false);
+  });
+
   it('explica quando a pasta não é um repositório git', async () => {
     fs.rmSync(path.join(repo, '.git'), { recursive: true, force: true });
     await call('create_card', { title: 'X', column: 'Implementação' });
