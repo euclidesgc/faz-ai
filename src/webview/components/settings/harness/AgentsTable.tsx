@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Badge, Button, Card, Checkbox, TextArea, TextField } from '@radix-ui/themes';
+import { Badge, Button, Card, Checkbox, Text, TextArea, TextField } from '@radix-ui/themes';
 import type { Agent, InstallScope } from '../../../../shared/harness';
 import { isFreeName, toItemName, type AiToolInfo } from '../../../../shared/harnessProject';
 import { usageOf } from '../../../../shared/harnessSelection';
@@ -62,6 +62,17 @@ export function AgentsTable({ tool, scope }: { tool: AiToolInfo; scope: InstallS
           },
         )}
       </p>
+      <Text as="p" size="1" color="gray">
+        {t('Mostrando os agentes do {tool}', { tool: tool.label })}{' · '}
+        <Button
+          variant="ghost"
+          size="1"
+          aria-label={t('Trocar a ferramenta de IA, em Harness de IA')}
+          onClick={() => useBoardStore.getState().goToSection('harness-tool')}
+        >
+          {t('trocar ferramenta')}
+        </Button>
+      </Text>
       <div className="row selection-actions">
         <Button onClick={() => setCreating(!creating)}>
           <IconPlus /> {t('Novo agente')}
