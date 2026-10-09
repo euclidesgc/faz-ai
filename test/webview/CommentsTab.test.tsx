@@ -96,7 +96,7 @@ describe('CommentsTab', () => {
       .comments.filter((c) => c.cardId === cardId)
       .sort((a, b) => a.createdAt - b.createdAt);
     const priorIds = before.slice(0, 2).map((c) => c.id);
-    const afterId = before[3].id;
+    const afterId = before[3]!.id;
 
     await userEvent.click(screen.getByRole('button', { name: 'Apagar mensagens resumidas' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Apagar mensagens' }));

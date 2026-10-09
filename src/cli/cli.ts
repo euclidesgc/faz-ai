@@ -117,7 +117,12 @@ async function main(): Promise<void> {
     version: FAZAI_VERSION,
   });
   const { router, runner, heartbeat, mergeWatcher } = host;
-  const stopMcp = await startMcpServer(address, { getRouter: async () => router, workspaceDir: folderPath, version: FAZAI_VERSION });
+  const stopMcp = await startMcpServer(address, {
+    getRouter: async () => router,
+    getRunner: async () => runner,
+    workspaceDir: folderPath,
+    version: FAZAI_VERSION,
+  });
   const key = workspaceKey(folderPath);
   const viewState = new ViewStateStore(fileMemento(path.join(dataDir, 'view', `${key}.json`)));
 

@@ -52,7 +52,7 @@ beforeEach(async () => {
     attachmentsDir: path.join(base, 'attachments'),
     workspaceDir: repo,
   });
-  const server = createMcpServer({ getRouter: async () => router, workspaceDir: repo, version: 'test' });
+  const server = createMcpServer({ getRouter: async () => router, getRunner: async () => undefined, workspaceDir: repo, version: 'test' });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(a);
   client = new Client({ name: 'claude-code', version: '1' });

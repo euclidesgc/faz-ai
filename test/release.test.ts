@@ -43,7 +43,12 @@ beforeEach(async () => {
     author: 'Pessoa',
     attachmentsDir: path.join(os.tmpdir(), 'fazai-release'),
   });
-  const server = createMcpServer({ getRouter: async () => router, workspaceDir: os.tmpdir(), version: 'test' });
+  const server = createMcpServer({
+    getRouter: async () => router,
+    getRunner: async () => undefined,
+    workspaceDir: os.tmpdir(),
+    version: 'test',
+  });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(a);
   client = new Client({ name: 'claude-code', version: '1' });

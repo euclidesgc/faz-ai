@@ -355,7 +355,7 @@ export class AiRunner {
               permission,
               addDirs: this.router.aiWorkDirs(),
               // a retentativa força o modelo/esforço da reserva no que vai para a ferramenta, sem voltar a resolver o plano
-              exec: forceModel ? { ...plan.input, model: { name: activityModel, effort: activityEffort } } : plan.input,
+              exec: forceModel ? { ...plan.input, model: { name: forceModel.model, effort: forceModel.effort } } : plan.input,
               boardServer: boardServer(this.deps),
             },
           };
@@ -468,7 +468,7 @@ export class AiRunner {
    * chama (`onExit`) inicia a retentativa com ele, depois de liberar `this.runs`; nenhum outro caso
    * devolve valor.
    */
-  private settle(cardId: string, run: Run, end: AiRunEnd, replied: boolean, toolLabel: string): ToolModel | void {
+  private settle(cardId: string, run: Run, end: AiRunEnd, replied: boolean, toolLabel: string): ToolModel | undefined {
     const { code, error } = end;
     const card = this.router.snapshot().cards.find((c) => c.id === cardId);
     // a IA (ou a pessoa) já mudou o status durante a execução: é ele que vale
@@ -530,16 +530,16 @@ export class AiRunner {
       );
       return run.fallbackPending;
     }
-    if (failure) return this.block(cardId, failure);
+    if (failure) return void this.block(cardId, failure);
     // o pull request pode ter sido registrado antes do card chegar na última coluna da IA (ex.: a
     // mesma sessão fez a implementação e a homologação): reavalia a entrega agora, antes do fallback
     // de modo autônomo devolver o card para "ready".
     const story = storyOf(this.router.snapshot(), card);
     if (story && this.router.settleDelivery(story.id, toolLabel)) return;
     // em modo autônomo não há pessoa para esperar: o card volta para a IA seguir (o autopiloto limita as voltas sem progresso)
-    if (replied && isYolo(this.router.snapshot(), card)) return this.setStatus(cardId, 'ready', toolLabel);
+    if (replied && isYolo(this.router.snapshot(), card)) return void this.setStatus(cardId, 'ready', toolLabel);
     // respondeu na conversa e encerrou: a vez é da pessoa
-    if (replied) return this.setStatus(cardId, 'waiting_answer', toolLabel);
+    if (replied) return void this.setStatus(cardId, 'waiting_answer', toolLabel);
     this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);
   }
 

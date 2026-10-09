@@ -93,6 +93,7 @@ function run(startedAt: number, durationMs: number, opts: RunOpts = {}): string 
       inventory: [],
       answer: '',
       reason: null,
+      usageLimitReached: false,
     });
   vi.setSystemTime(TODAY);
   return id;

@@ -97,6 +97,7 @@ function runWith(startedAt: number, inventory: { kind: InventoryKind; name: stri
     inventory,
     answer: '',
     reason: null,
+    usageLimitReached: false,
   });
   vi.setSystemTime(TODAY);
 }
