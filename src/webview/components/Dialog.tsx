@@ -8,8 +8,12 @@ export function Dialog() {
   const dialog = useBoardStore((s) => s.dialog);
   const ask = useBoardStore((s) => s.ask);
   const [choice, setChoice] = useState('');
+  const [checkboxChecked, setCheckboxChecked] = useState(false);
 
-  useEffect(() => setChoice(dialog?.choices?.options[0]?.value ?? ''), [dialog]);
+  useEffect(() => {
+    setChoice(dialog?.choices?.options[0]?.value ?? '');
+    setCheckboxChecked(false);
+  }, [dialog]);
 
   useEffect(() => {
     if (!dialog) return;
@@ -33,7 +37,7 @@ export function Dialog() {
   };
   const confirm = () => {
     ask(null);
-    dialog.onConfirm(dialog.choices ? choice : undefined);
+    dialog.onConfirm(dialog.choices ? choice : undefined, checkboxChecked);
   };
 
   return (
@@ -45,6 +49,12 @@ export function Dialog() {
           <label className="field-row">
             <span>{dialog.choices.label}</span>
             <SelectField aria-label={dialog.choices.label} options={dialog.choices.options} value={choice} onChange={setChoice} />
+          </label>
+        )}
+        {dialog.checkbox && (
+          <label className="dialog-checkbox">
+            <input type="checkbox" checked={checkboxChecked} onChange={(e) => setCheckboxChecked(e.target.checked)} />
+            <span>{dialog.checkbox.label}</span>
           </label>
         )}
         <div className="row end wrap">
