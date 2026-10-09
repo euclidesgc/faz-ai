@@ -294,8 +294,12 @@ export function useHostSync(): void {
         s.setView('board');
         s.openCard(msg.cardId);
       } else if (msg.type === 'ui.openSettings') {
+        const info = msg.section ? SETTINGS_SECTIONS[msg.section] : undefined;
         s.openSettings(msg.tab);
-        useBoardStore.setState({ pendingSettingsSection: msg.section ?? null });
+        useBoardStore.setState({
+          pendingSettingsSection: msg.section ?? null,
+          ...(info?.harnessTab && { harnessTab: info.harnessTab as HarnessTab }),
+        });
       } else if (msg.type === 'ui.openView') s.setView(msg.view);
     });
     postToHost({ type: 'ready' });

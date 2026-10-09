@@ -13,6 +13,7 @@ import { ModelsSettings } from './ModelsSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { GitSettings } from './GitSettings';
 import { BackupSettings } from './BackupSettings';
+import { scrollToAndHighlight } from './highlight';
 import {
   Button,
   DeleteButton,
@@ -70,12 +71,14 @@ export function Settings() {
   const setCollapsed = useBoardStore((s) => s.setSettingsNavCollapsed);
   const setView = useBoardStore((s) => s.setView);
   const pendingSection = useBoardStore((s) => s.pendingSettingsSection);
-  // rola até a seção pedida pelo editor (`ui.openSettings { section }`) depois que a aba renderizou
+  const harnessTab = useBoardStore((s) => s.harnessTab);
+  // rola e destaca a seção pedida pelo editor (`ui.openSettings { section }`) ou por `goToSection`,
+  // depois que a aba (e a sub-aba de Harness, quando a seção mora lá) renderizou
   useEffect(() => {
     if (!pendingSection) return;
-    document.getElementById(pendingSection)?.scrollIntoView({ block: 'start' });
+    scrollToAndHighlight(pendingSection);
     useBoardStore.getState().clearPendingSettingsSection();
-  }, [pendingSection, tab]);
+  }, [pendingSection, tab, harnessTab]);
 
   return (
     <div className="settings">
