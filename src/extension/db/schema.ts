@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 26;
+export const SCHEMA_VERSION = 27;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -358,6 +358,10 @@ const MIGRATIONS: Record<number, string> = {
            (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
     FROM boards b
     WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'rules');
+  `,
+  27: `
+    -- #191: marca o comentário que é o resumo da conversa do card; NULL = mensagem comum.
+    ALTER TABLE comments ADD COLUMN kind TEXT;
   `,
 };
 

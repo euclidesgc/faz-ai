@@ -389,6 +389,16 @@ and stays visible even when the button is blocked.
 
 Images pasted into the message become card attachments and the AI receives them.
 
+- **Resumir a conversa** (summarize the conversation), in the Conversa tab, shows up from 2
+  messages on: it reads the whole conversation and writes a summary (Decisões, Observações,
+  Pendências — decisions, notes, pending items) as a new AI message (`kind: "summary"`), without
+  automatically deleting anything, without working on the phase, moving the card or changing its
+  status — it runs with the board only, always at the "Alto" model tier (regardless of the card's
+  Esforço). You review the summary the same way you review any message: agree by leaving it as is,
+  or edit the text. Right below it, a recommendation with the **Apagar mensagens resumidas** (delete
+  summarized messages) button deletes, with confirmation, every message before the summary;
+  summarizing again creates a new record, it does not replace the previous one. It is also
+  available as the MCP tool `generate_summary`, with the same result.
 - What the AI may do in these runs is set in Configurações → Harness de IA → **Execução pela
   conversa**: only the board (default), the board and project files, or no restrictions. The level
   in use is shown next to the button, with a shortcut to change it. The AI is told about the limit:

@@ -50,7 +50,7 @@ export const cardContentHandlers = {
   },
   'comment.add': (msg, ctx, { author, byAi }) => {
     if (!msg.body.trim()) return true;
-    ctx.comments.add(msg.cardId, author, msg.body.trim(), byAi ? 'ai' : 'human');
+    ctx.comments.add(msg.cardId, author, msg.body.trim(), byAi ? 'ai' : 'human', msg.kind);
     // a pessoa respondeu à pergunta da IA: a vez volta para a IA
     if (!byAi && ctx.cards.status(msg.cardId) === 'waiting_answer') ctx.cards.setStatus(msg.cardId, 'ready', '', author);
     return true;

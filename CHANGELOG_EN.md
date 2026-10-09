@@ -7,6 +7,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Summarize the card's conversation.** A new button in the Conversa tab, shown from 2 messages
+  on, reads the whole conversation and writes a summary (decisions, notes, pending items) as a new
+  AI message, without automatically deleting anything. The summary is reviewed like any other
+  message: agree by leaving it as is, or edit the text. Below it, a recommendation lets you delete,
+  with confirmation, the messages before the summary (not automatic); summarizing again creates a
+  new record instead of replacing the previous one. Also available as the `generate_summary` MCP
+  tool.
 - **A blocked story held up the autopilot's whole queue.** With the first story in the queue
   stuck on an impediment (a block, a question without an answer, a dependency on another open
   card, or a stalled cycle), the autopilot stood still and none of the other independent

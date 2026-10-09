@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { CURSOR_TOOLS, headlessCommand, headlessUnsupported } from '../src/extension/headless';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt, consumptionLine } from '../src/extension/runner';
+import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt, consumptionLine, summarizePrompt } from '../src/extension/runner';
 import type { RunnerDeps } from '../src/extension/runner';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
@@ -14,6 +14,7 @@ import { createRunLog } from '../src/extension/log/runLog';
 import { gatewayFor } from './helpers/gateway';
 import { executionPlan } from '../src/extension/execution';
 import { monthOf, type RunReport } from '../src/shared/log';
+import { modelValue } from '../src/shared/models';
 import type { Database } from 'sql.js';
 
 it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
@@ -240,6 +241,22 @@ it('com triage=true, o bloco de triagem entra antes do trabalho da fase; sem tri
   const comTriage = cardPrompt('#1', undefined, [], false, true);
   expect(comTriage).toContain('Tags, Esforço da atividade, Modelo e Skills');
   expect(comTriage.indexOf('Tags, Esforço da atividade, Modelo e Skills')).toBeLessThan(comTriage.indexOf('Faça o trabalho da fase'));
+});
+
+it('summarizePrompt pede um resumo nas três seções e leva o contexto fixo e o do card', () => {
+  expect(summarizePrompt('#1')).toContain('Decisões');
+  expect(summarizePrompt('#1')).toContain('Observações');
+  expect(summarizePrompt('#1')).toContain('Pendências');
+  expect(summarizePrompt('#1')).toContain('add_comment');
+  expect(summarizePrompt('#1')).toContain('kind: "summary"');
+  const prompt = summarizePrompt('#1', {
+    always: ['Contexto fixo deste board. Antes de começar, leia e siga: skill faz-ai-fluxo (/home/.claude/skills/faz-ai-fluxo/SKILL.md).'],
+    card: ['Este card exige também: rule CLAUDE.md (/p/CLAUDE.md).'],
+  });
+  expect(prompt).toContain('Contexto fixo deste board');
+  expect(prompt).toContain('Este card exige também');
+  expect(prompt.indexOf('Pendências')).toBeLessThan(prompt.indexOf('Contexto fixo deste board'));
+  expect(prompt.indexOf('Contexto fixo deste board')).toBeLessThan(prompt.indexOf('Este card exige também'));
 });
 import type { HeadlessCommand } from '../src/extension/headless';
 
@@ -470,6 +487,53 @@ describe('executor da IA', () => {
     expect(card().status).toBe('waiting_review');
   });
 
+  describe('Resumir a conversa', () => {
+    it('permissão sempre "board" e nunca autônomo, mesmo com o board em "Sem restrições" e o card em YOLO', () => {
+      router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      runner.start(storyId, 'manual', 'summarize');
+      const command = procs[0]!.command;
+      expect(command.args).toContain('dontAsk');
+      expect(command.args).not.toContain('bypassPermissions');
+      expect(command.stdin).not.toContain('MODO AUTÔNOMO');
+      expect(command.stdin).toContain('Leia toda a conversa do card #1');
+    });
+
+    it('sucesso não muda o status do card, mesmo quando a IA gravou o resumo na conversa', () => {
+      router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_review' });
+      runner.start(storyId, 'manual', 'summarize');
+      ai({ type: 'comment.add', cardId: storyId, body: 'Resumo da conversa.', kind: 'summary' });
+      procs[0]!.exit(0);
+      expect(card().status).toBe('waiting_review');
+      expect(lastMessage()).toMatchObject({ body: 'Resumo da conversa.', kind: 'summary' });
+    });
+
+    it('falha de processo grava o comentário de falha específico do resumo, e o status volta ao anterior', () => {
+      router.handle({ type: 'card.status.set', cardId: storyId, status: 'approved' });
+      runner.start(storyId, 'manual', 'summarize');
+      procs[0]!.exit(1);
+      expect(card().status).toBe('approved');
+      expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+      expect(lastMessage()!.body).toContain('O resumo da conversa não foi gerado.');
+      expect(lastMessage()!.body).toContain('código 1');
+
+      runner.start(storyId, 'manual', 'summarize');
+      procs[1]!.exit(null, new Error('comando "claude" não encontrado.'));
+      expect(card().status).toBe('approved');
+      expect(lastMessage()!.body).toContain('O resumo da conversa não foi gerado.');
+      expect(lastMessage()!.body).toContain('não encontrado');
+    });
+
+    it('sem falha de processo e sem nova mensagem de IA, grava o aviso de "terminou sem escrever a mensagem"', () => {
+      router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_review' });
+      runner.start(storyId, 'manual', 'summarize');
+      procs[0]!.exit(0); // a IA não chamou add_comment
+      expect(card().status).toBe('waiting_review');
+      expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+      expect(lastMessage()!.body).toBe('O resumo não foi gerado: a execução terminou sem escrever a mensagem.');
+    });
+  });
+
   it('a recusa do plano gratuito do Cursor vem com a saída: escolher Auto', () => {
     router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor', runner: { permission: 'board' } } });
     runner.start(storyId);
@@ -494,15 +558,18 @@ describe('executor da IA', () => {
     expect(lastMessage()!.body).toContain('não encontrado');
   });
 
-  it('o fim da execução diz aos ouvintes se era refinar ou trabalhar na fase', () => {
+  it('o fim da execução diz aos ouvintes se era refinar, resumir ou trabalhar na fase', () => {
     const finished: [string, string][] = [];
     runner.onDidFinish((id, mode) => finished.push([id, mode]));
     runner.start(storyId, 'manual', 'refine');
     procs[0]!.exit(0);
-    runner.start(storyId);
+    runner.start(storyId, 'manual', 'summarize');
     procs[1]!.exit(0);
+    runner.start(storyId);
+    procs[2]!.exit(0);
     expect(finished).toEqual([
       [storyId, 'refine'],
+      [storyId, 'summarize'],
       [storyId, 'phase'],
     ]);
   });
@@ -734,6 +801,20 @@ describe('log das execuções de IA', () => {
     router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
     logged.start(storyId);
     expect(only()).toMatchObject({ permission: 'full', autonomous: true });
+  });
+
+  it('Resumir a conversa: usa sempre o modelo da faixa "Alto" do catálogo, mesmo com o card no Modelo da faixa Média, e nunca autônomo', () => {
+    // o card está com o modelo da faixa "Média" (sonnet, esforço medium): é o que a fase comum usaria
+    const sonnet = router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'sonnet')!;
+    const modeloField = router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
+    router.handle({ type: 'field.setValue', cardId: storyId, fieldId: modeloField.id, value: modelValue(sonnet.id, 'medium') });
+    router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    expect(executionPlan(router.snapshot(), card(), dir, '').manifest.model).toMatchObject({ name: 'sonnet', effort: 'medium' });
+
+    logged.start(storyId, 'manual', 'summarize');
+    // a faixa "Alto" do catálogo embutido do Claude Code é opus/high, independente do Modelo do card
+    expect(only()).toMatchObject({ model: 'opus', effort: 'high', permission: 'board', autonomous: false });
   });
 
   it('RF-16: a origem é "manual" por padrão e a informada quando o heartbeat ou o autopiloto chamam', () => {

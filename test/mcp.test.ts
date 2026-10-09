@@ -42,7 +42,7 @@ beforeEach(async () => {
   });
   changes = 0;
   router.onDidChange(() => changes++);
-  const server = createMcpServer({ getRouter: async () => router, workspaceDir: dir, version: 'test' });
+  const server = createMcpServer({ getRouter: async () => router, getRunner: async () => undefined, workspaceDir: dir, version: 'test' });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(a);
   client = new Client({ name: 'claude-code', version: '1' });
@@ -146,6 +146,21 @@ describe('servidor MCP', () => {
     expect((await call('empty_trash')).text).toContain('1 card(s)');
     await call('delete_card_permanently', { card: 1 });
     expect(router.snapshot().cards).toHaveLength(0);
+  });
+
+  it('add_comment grava `kind` quando informado; sem ele, o comportamento é o de hoje', async () => {
+    await call('create_card', { title: 'Card' });
+    await call('add_comment', { card: 1, body: 'Resumo da conversa.', kind: 'summary' });
+    expect(router.snapshot().comments.at(-1)).toMatchObject({ body: 'Resumo da conversa.', kind: 'summary' });
+
+    await call('add_comment', { card: 1, body: 'Mensagem comum.' });
+    const last = router.snapshot().comments.at(-1)!;
+    expect(last.body).toBe('Mensagem comum.');
+    expect(last.kind).toBeUndefined();
+
+    // o schema só aceita "summary": outro valor é rejeitado antes de gravar
+    const invalid = await call('add_comment', { card: 1, body: 'x', kind: 'nota' });
+    expect(invalid.error).toBe(true);
   });
 
   it('grava e lê anexos de texto e de arquivo', async () => {
@@ -1156,7 +1171,7 @@ describe('ponte stdio', () => {
     const bridge = path.resolve(__dirname, '../dist/mcp-bridge.js');
     if (!fs.existsSync(bridge)) throw new Error('rode `npm run build:ext` antes deste teste');
     const address = process.platform === 'win32' ? `\\\\.\\pipe\\fazai-test-${process.pid}` : path.join(dir, 'mcp.sock');
-    const stop = await startMcpServer(address, { getRouter: async () => router, workspaceDir: dir, version: 'test' });
+    const stop = await startMcpServer(address, { getRouter: async () => router, getRunner: async () => undefined, workspaceDir: dir, version: 'test' });
     // a ponte calcula o endereço a partir da pasta; aqui o HOME aponta para um diretório de teste
     const { socketPath } = await import('../src/extension/mcp/socketPath');
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-'));
@@ -1228,7 +1243,7 @@ describe('ponte stdio: onde acha o projeto', () => {
       const project = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fz-proj-')));
       fs.mkdirSync(path.join(project, 'sub'));
       const address = path.join(project, 'mcp.sock');
-      const stop = await startMcpServer(address, { getRouter: async () => router, workspaceDir: project, version: 'test' });
+      const stop = await startMcpServer(address, { getRouter: async () => router, getRunner: async () => undefined, workspaceDir: project, version: 'test' });
       const { socketPath } = await import('../src/extension/mcp/socketPath');
       const home = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-'));
       const prev = process.env.HOME;
@@ -1534,5 +1549,132 @@ describe('modo autônomo (YOLO)', () => {
     setYolo(1, true);
     expect(card(1).status).toBe('approved');
     expect(column('PRD').requiresApproval).toBe(true); // a coluna não muda: só o card deixa de depender dela
+  });
+});
+
+/**
+ * `generate_summary` precisa de um `AiRunner` que de fato dispare e termine uma execução: aqui um
+ * executor falso (sem CLI real) substitui o `getRunner` do servidor, para testar só o contrato da
+ * ferramenta (quando chama `start`, com que `mode`, e como propaga o erro) sem subir um processo.
+ */
+describe('generate_summary (ferramenta MCP)', () => {
+  /** o que a ferramenta vê do AiRunner: start/onDidFinish, com o que o teste decidir fazer */
+  function fakeRunner(opts: { onStart?: (cardId: string) => void; throws?: Error } = {}) {
+    let listeners: ((cardId: string, mode: string) => void)[] = [];
+    const calls: { cardId: string; origin: string; mode: string }[] = [];
+    const runner = {
+      calls,
+      start(cardId: string, origin: string, mode: string) {
+        calls.push({ cardId, origin, mode });
+        if (opts.throws) throw opts.throws;
+        opts.onStart?.(cardId);
+      },
+      onDidFinish(listener: (cardId: string, mode: string) => void) {
+        listeners.push(listener);
+        return () => {
+          listeners = listeners.filter((l) => l !== listener);
+        };
+      },
+      finish(cardId: string, mode = 'summarize') {
+        listeners.forEach((l) => l(cardId, mode));
+      },
+    };
+    return runner;
+  }
+
+  /** um router novo, isolado, numa pasta própria (devolvida para limpar depois) */
+  async function makeRouter() {
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-mcp-summary-'));
+    const db = await openInMemory(WASM_DIR);
+    const r = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+      workspaceKey: 'ws',
+      folderName: 'Projeto',
+      author: 'Pessoa',
+      attachmentsDir: path.join(d, 'attachments'),
+      workspaceDir: d,
+    });
+    return { router: r, dir: d };
+  }
+
+  /** conecta um client MCP novo ao router, com o runner falso no lugar do de verdade */
+  async function connect(r: MessageRouter, runner: unknown, dir: string) {
+    const server = createMcpServer({ getRouter: async () => r, getRunner: async () => runner as never, workspaceDir: dir, version: 'test' });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await server.connect(a);
+    const c = new Client({ name: 'claude-code', version: '1' });
+    await c.connect(b);
+    return c;
+  }
+
+  const callOn = async (c: Client, name: string, args: Record<string, unknown> = {}) => {
+    const res = await c.callTool({ name, arguments: args });
+    const text = (res.content as { text: string }[])[0]!.text;
+    let data: any = text;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      /* resposta em texto simples */
+    }
+    return { error: res.isError === true, text, data };
+  };
+
+  it('com 0 ou 1 mensagem na conversa, lança erro sem chamar AiRunner.start', async () => {
+    const runner = fakeRunner();
+    const { router: r, dir: d } = await makeRouter();
+    const c = await connect(r, runner, d);
+    try {
+      await callOn(c, 'create_card', { title: 'Card' });
+      const zero = await callOn(c, 'generate_summary', { card: 1 });
+      expect(zero.error).toBe(true);
+      expect(zero.text).toContain('menos de 2 mensagens');
+      expect(runner.calls).toHaveLength(0);
+
+      await callOn(c, 'add_comment', { card: 1, body: 'Só uma mensagem.' });
+      const one = await callOn(c, 'generate_summary', { card: 1 });
+      expect(one.error).toBe(true);
+      expect(one.text).toContain('menos de 2 mensagens');
+      expect(runner.calls).toHaveLength(0);
+    } finally {
+      fs.rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it('com 2 ou mais mensagens, chama AiRunner.start com mode "summarize", espera o término e devolve o último comentário', async () => {
+    const { router: r, dir: d } = await makeRouter();
+    const runner = fakeRunner({
+      onStart: (cardId) => {
+        // o que a IA faria: grava o resumo e só então a execução termina
+        r.handle({ type: 'comment.add', cardId, body: 'Resumo gerado.', kind: 'summary' }, { author: 'Claude Code', source: 'ai' });
+        setImmediate(() => runner.finish(cardId));
+      },
+    });
+    const c = await connect(r, runner, d);
+    try {
+      await callOn(c, 'create_card', { title: 'Card' });
+      await callOn(c, 'add_comment', { card: 1, body: 'Mensagem 1.' });
+      await callOn(c, 'add_comment', { card: 1, body: 'Mensagem 2.' });
+      const res = await callOn(c, 'generate_summary', { card: 1 });
+      expect(res.error).toBeFalsy();
+      expect(res.data).toMatchObject({ body: 'Resumo gerado.' });
+      expect(runner.calls).toEqual([{ cardId: expect.any(String), origin: 'manual', mode: 'summarize' }]);
+    } finally {
+      fs.rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it('com o card já em execução, propaga o erro de AiRunner.start', async () => {
+    const { router: r, dir: d } = await makeRouter();
+    const runner = fakeRunner({ throws: new Error('A IA já está trabalhando em #1.') });
+    const c = await connect(r, runner, d);
+    try {
+      await callOn(c, 'create_card', { title: 'Card' });
+      await callOn(c, 'add_comment', { card: 1, body: 'Mensagem 1.' });
+      await callOn(c, 'add_comment', { card: 1, body: 'Mensagem 2.' });
+      const res = await callOn(c, 'generate_summary', { card: 1 });
+      expect(res.error).toBe(true);
+      expect(res.text).toContain('A IA já está trabalhando em #1.');
+    } finally {
+      fs.rmSync(d, { recursive: true, force: true });
+    }
   });
 });

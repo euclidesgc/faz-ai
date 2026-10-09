@@ -39,3 +39,7 @@ export const refineHint = (tool: string): ReactNode =>
     ],
     { tool },
   );
+
+export const summarizeHint = (): ReactNode => (
+  <p>{rich('A IA lê toda a conversa e escreve um resumo com decisões, observações e pendências.')}</p>
+);

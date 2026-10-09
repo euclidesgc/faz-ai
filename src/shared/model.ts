@@ -144,6 +144,8 @@ export interface Comment {
   body: string;
   createdAt: number;
   updatedAt: number;
+  /** marca esta mensagem como o resumo da conversa; ausente nas mensagens comuns */
+  kind?: 'summary';
 }
 
 export interface Attachment {

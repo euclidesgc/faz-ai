@@ -61,10 +61,36 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
   tool(
     'add_comment',
     'Escreve na conversa do card (markdown). Use para registrar decisões e o resultado do trabalho e para responder à pessoa. A mensagem é assinada com o nome do cliente de IA. Para pedir revisão use request_review; para perguntar, ask_question.',
-    { card: cardArg, body: z.string().min(1) },
+    { card: cardArg, body: z.string().min(1), kind: z.literal('summary').optional() },
     (a, router) => {
       const card = findCard(router.snapshot(), a.card);
-      router.handle({ type: 'comment.add', cardId: card.id, body: a.body }, aiOrigin(ctx));
+      router.handle({ type: 'comment.add', cardId: card.id, body: a.body, kind: a.kind }, aiOrigin(ctx));
+      return detail(router, card.id).comments.at(-1);
+    },
+  );
+
+  tool(
+    'generate_summary',
+    'Lê a conversa do card e grava um resumo (Decisões, Observações, Pendências) como um comentário novo, igual ao botão "Resumir a conversa" do board. Exige 2 ou mais mensagens na conversa. Pode levar alguns minutos: a ferramenta só responde depois que a IA terminar de escrever o resumo (aguarda a CLI terminar); clientes MCP com timeout curto podem interromper a chamada antes disso, mesmo que o resumo apareça na conversa normalmente.',
+    { card: cardArg },
+    async (a, router) => {
+      const card = findCard(router.snapshot(), a.card);
+      const messageCount = router.snapshot().comments.filter((c) => c.cardId === card.id).length;
+      if (messageCount < 2) throw new Error('Conversa com menos de 2 mensagens; nada para resumir.');
+      const runner = await ctx.getRunner();
+      await new Promise<void>((resolve, reject) => {
+        const off = runner.onDidFinish((finishedCardId) => {
+          if (finishedCardId !== card.id) return;
+          off();
+          resolve();
+        });
+        try {
+          runner.start(card.id, 'manual', 'summarize');
+        } catch (e) {
+          off();
+          reject(e instanceof Error ? e : new Error(String(e)));
+        }
+      });
       return detail(router, card.id).comments.at(-1);
     },
   );

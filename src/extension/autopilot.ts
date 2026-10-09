@@ -191,8 +191,8 @@ export class Autopilot {
     const s = this.router.snapshot();
     const card = s.cards.find((c) => c.id === cardId);
     const story = card && (card.parentId ? s.cards.find((c) => c.id === card.parentId) : card);
-    // refinar não move a história de propósito: não conta como execução sem progresso
-    if (story?.yolo && this.active && mode !== 'refine') this.checkProgress(s, story);
+    // refinar e resumir não movem a história de propósito: não contam como execução sem progresso
+    if (story?.yolo && this.active && mode !== 'refine' && mode !== 'summarize') this.checkProgress(s, story);
     // decide depois dos demais ouvintes do fim da execução: o heartbeat guarda a vaga para o autopiloto
     // quando a execução que terminou era dele, e a toma quando era do autopiloto (as filas se intercalam)
     (this.deps.defer ?? queueMicrotask)(() => this.evaluate());

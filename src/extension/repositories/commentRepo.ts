@@ -5,18 +5,14 @@ import { run } from '../db/query';
 export class CommentRepo {
   constructor(private db: Database) {}
 
-  add(cardId: string, author: string, body: string, source: 'human' | 'ai'): string {
+  add(cardId: string, author: string, body: string, source: 'human' | 'ai', kind?: 'summary'): string {
     const id = newId();
     const t = now();
-    run(this.db, 'INSERT INTO comments(id, card_id, author, body, created_at, updated_at, source) VALUES (?,?,?,?,?,?,?)', [
-      id,
-      cardId,
-      author,
-      body,
-      t,
-      t,
-      source,
-    ]);
+    run(
+      this.db,
+      'INSERT INTO comments(id, card_id, author, body, created_at, updated_at, source, kind) VALUES (?,?,?,?,?,?,?,?)',
+      [id, cardId, author, body, t, t, source, kind ?? null],
+    );
     return id;
   }
 
