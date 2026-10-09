@@ -16,28 +16,29 @@ export function DescriptionSection({ draft }: { draft: DescriptionDraft }) {
             {t('Editar')}
           </Button>
         )}
-        {editing && (
-          <Button
-            variant="ghost"
-            size="small"
-            onClick={() => {
-              save();
-              setEditing(false);
-            }}
-          >
-            {t('Salvar descrição')}
-          </Button>
-        )}
       </div>
       {editing ? (
-        <MarkdownEditor
-          autoFocus
-          minRows={12}
-          value={desc}
-          onChange={setDesc}
-          onCommit={save}
-          placeholder={t('Descreva o problema, o contexto e o critério de aceite. Markdown suportado.')}
-        />
+        <>
+          <MarkdownEditor
+            autoFocus
+            minRows={12}
+            value={desc}
+            onChange={setDesc}
+            onCommit={save}
+            placeholder={t('Descreva o problema, o contexto e o critério de aceite. Markdown suportado.')}
+          />
+          <div className="row end">
+            <Button
+              variant="primary"
+              onClick={() => {
+                save();
+                setEditing(false);
+              }}
+            >
+              {t('Salvar descrição')}
+            </Button>
+          </div>
+        </>
       ) : (
         <div
           className="markdown clickable"
