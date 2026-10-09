@@ -284,6 +284,20 @@ export class CardRepo {
     run(this.db, 'UPDATE cards SET yolo = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, now(), storyId]);
   }
 
+  /**
+   * O id da história do card (ele mesmo, ou o pai quando é uma sub-tarefa) quando ela está em modo
+   * autônomo; `null` senão. Uma consulta só, para decidir rápido se vale a pena montar o snapshot
+   * inteiro do board (ex.: `settleDelivery`, chamado a cada movimento de qualquer card).
+   */
+  yoloStoryIdOf(cardId: string): string | null {
+    const row = one(
+      this.db,
+      'SELECT COALESCE(p.id, c.id) AS story_id, COALESCE(p.yolo, c.yolo) AS yolo FROM cards c LEFT JOIN cards p ON p.id = c.parent_id WHERE c.id = ?',
+      [cardId],
+    );
+    return row && num(row.yolo) === 1 ? str(row.story_id) : null;
+  }
+
   /** O card (ou a história dele, no caso de uma sub-tarefa) está em modo autônomo. */
   isYolo(cardId: string): boolean {
     const row = one(

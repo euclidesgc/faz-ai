@@ -412,6 +412,19 @@ describe('executor da IA', () => {
       procs[0]!.exit(0);
       expect(card().status).toBe('ready');
     });
+
+    it('RF4: PR registrado antes da história chegar na última coluna entrega ao fim da execução, em vez de voltar para "ready"', () => {
+      yolo();
+      const ctx = (router as any).ctx;
+      const homologacao = router.snapshot().columns.find((c) => c.name === 'Homologação')!.id;
+      runner.start(storyId);
+      // registra o PR e move a história direto no repositório, como se a sessão tivesse feito os dois
+      // sem passar pelos handlers (que já reavaliariam a entrega): é a ordem que o bug deixava escapar
+      ctx.cards.move(storyId, homologacao, 0, { byAi: true });
+      ctx.cards.setPullRequest(storyId, 'https://github.com/acme/app/pull/7');
+      procs[0]!.exit(0);
+      expect(card().status).toBe('waiting_review');
+    });
   });
 
   it('falha, saída sem resposta e tempo limite bloqueiam o card com o motivo na conversa', () => {

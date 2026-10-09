@@ -1,4 +1,5 @@
 import { linkProblem } from '../../../shared/links';
+import { settleDelivery } from '../../delivery';
 
 import type { BoardContext, HandlerMap, MessageOf } from './context';
 import { applySuggestion, suggestionFor } from './models';
@@ -69,12 +70,18 @@ export const cardHandlers = {
     ctx.cards.update(msg.cardId, msg.patch);
     return true;
   },
-  'card.move': (msg, ctx, { byAi }) => {
+  'card.move': (msg, ctx, { author, byAi }) => {
     ctx.cards.move(msg.cardId, msg.columnId, msg.position, {
       cancelChildren: msg.cancelChildren,
       byAi,
       allowOpenChildren: msg.allowOpenChildren,
     });
+    // a história pode ter acabado de chegar na última coluna da IA já com o pull request registrado
+    // (ex.: quando o registro aconteceu antes do movimento, na mesma sessão): reavalia a entrega.
+    // yoloStoryIdOf é uma consulta direta (sem montar o snapshot inteiro do board), undefined no caso
+    // comum de um board (ou card) fora do modo autônomo, onde não há entrega a reavaliar.
+    const storyId = ctx.cards.yoloStoryIdOf(msg.cardId);
+    if (storyId) settleDelivery(ctx, storyId, author);
     return true;
   },
   'card.trash': (msg, ctx) => {

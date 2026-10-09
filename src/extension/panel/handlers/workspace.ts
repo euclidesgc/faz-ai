@@ -2,8 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Card } from '../../../shared/model';
 import { branchName, slug } from '../../../shared/git';
-import { columnOf, isLive } from '../../../shared/selectors';
-import { isPullRequestUrl, lastAiColumn, stackBaseOf, storyOf } from '../../../shared/story';
+import { isPullRequestUrl, stackBaseOf, storyOf } from '../../../shared/story';
+import { settleDelivery } from '../../delivery';
 import { now } from '../../db/ids';
 import { prepareWorkspace } from '../../git';
 import type { BoardContext, HandlerMap } from './context';
@@ -84,26 +84,13 @@ export const workspaceHandlers = {
     if (url && !isPullRequestUrl(url)) throw new Error('Informe o endereço (URL) do pull request.');
     const storyId = storyOfCard(ctx, msg.cardId).id;
     ctx.cards.setPullRequest(storyId, url);
-    const s = ctx.state();
-    const story = s.cards.find((c) => c.id === storyId)!;
-    const column = columnOf(s, story);
     // história YOLO parada na última coluna da IA, com o pull request recém-gravado: já está entregue.
-    // Grava waiting_review direto pelo repositório, sem passar pelo card.status.set de cards.ts — lá, em
-    // modo autônomo, waiting_review vira approved na hora (é o que destrava as fases do meio); aqui a
-    // entrega é para a pessoa revisar, não para a IA seguir, e o merge continua só dela (ctx.approved).
-    // Bloqueio é a exceção: é impedimento aberto, e registrar o pull request não o resolve.
-    if (
-      story.yolo &&
-      !story.parentId &&
-      isLive(story) &&
-      column?.category === 'open' &&
-      column.id === lastAiColumn(s, story.workflowId)?.id &&
-      story.prUrl &&
-      story.status !== 'blocked'
-    ) {
-      ctx.cards.setStatus(story.id, 'waiting_review', '', author);
-      ctx.comments.add(story.id, author, `História entregue com o pull request ${story.prUrl}; aguardando a revisão da pessoa.`, 'ai');
-    }
+    // settleDelivery grava waiting_review direto pelo repositório, sem passar pelo card.status.set de
+    // cards.ts — lá, em modo autônomo, waiting_review vira approved na hora (é o que destrava as fases
+    // do meio); aqui a entrega é para a pessoa revisar, não para a IA seguir, e o merge continua só
+    // dela (ctx.approved). Bloqueio é a exceção: é impedimento aberto, e registrar o pull request não
+    // o resolve (ver `isDeliverableStory`).
+    settleDelivery(ctx, storyId, author);
     return true;
   },
   // Sem efeito colateral de propósito: ao contrário do card.pr.set (que fecha a entrega e avisa a

@@ -6,6 +6,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Entrega da história autônoma não era detectada quando o PR chegava antes da última coluna.**
+  Ao registrar o pull request (`set_pull_request`), o board só marcava `waiting_review` e comentava a
+  entrega se a história já estivesse na última coluna em que a IA atua; registrado antes disso, a
+  entrega nunca era detectada e o autopiloto ficava tentando executar de novo uma história que já
+  tinha sido entregue. Agora essa verificação (`settleDelivery`) também roda ao mover o card para a
+  última coluna e no `settle` do runner, ao fim de uma execução.
 - **Backup pela paleta de comandos.** No editor, os comandos `fazai.exportBoard` ("Faz AI: Exportar
   o board") e `fazai.importBoard` ("Faz AI: Importar um board") na paleta de comandos (`Ctrl+Shift+P`)
   abrem diálogos nativos de salvamento e abertura de arquivo, funcionam com o board fechado (abrem o

@@ -53,10 +53,21 @@ export const lastAiColumn = (state: BoardState, workflowId: Id): Column | undefi
  * impedimento, não entrega.
  */
 export function isDelivered(state: BoardState, card: Card): boolean {
+  if (!isDeliverableStory(state, card)) return false;
+  return card.status !== null && statusInfo(card.status).owner === 'human';
+}
+
+/**
+ * A história (não a sub-tarefa) pode ser entregue: modo autônomo, parada na última coluna em que a
+ * IA atua, com pull request registrado e sem bloqueio — mas sem exigir que o status já tenha passado
+ * para a pessoa (isso é o que falta para `isDelivered`). Serve para decidir, em qualquer gatilho
+ * (registro do pull request, mudança de coluna, fim de uma execução), se a entrega deve ser feita agora.
+ */
+export function isDeliverableStory(state: BoardState, card: Card): boolean {
   if (!card.yolo || card.parentId) return false;
   const column = columnOf(state, card);
   if (!isLive(card) || column?.category !== 'open') return false;
   if (column.id !== lastAiColumn(state, card.workflowId)?.id) return false;
   if (!card.prUrl) return false;
-  return card.status !== null && card.status !== 'blocked' && statusInfo(card.status).owner === 'human';
+  return card.status !== 'blocked';
 }

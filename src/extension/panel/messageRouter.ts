@@ -24,6 +24,7 @@ import { cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers } from './handlers/models';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
+import { settleDelivery } from '../delivery';
 
 export type { RouterOptions };
 
@@ -194,6 +195,17 @@ export class MessageRouter {
     this.ctx.log.record(msg, actor, probe);
     this.changed();
     return id;
+  }
+
+  /**
+   * Reavalia se a história pode ser entregue (ver `settleDelivery`) e, se sim, grava a entrega e
+   * avisa os webviews. Chamado pelo runner ao fim de uma execução, quando o pull request já estava
+   * registrado antes do card chegar na última coluna da IA.
+   */
+  settleDelivery(storyId: string, author: string): boolean {
+    const delivered = settleDelivery(this.ctx, storyId, author);
+    if (delivered) this.changed();
+    return delivered;
   }
 
   /** Quem diz qual execução de IA está em curso num card (o executor), para o `run_id` dos eventos. */
