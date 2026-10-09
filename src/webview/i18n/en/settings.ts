@@ -109,7 +109,8 @@ export const settings: Record<string, string> = {
   'deixar a história onde está.': 'leave the story where it is.',
   'Ao concluir a última sub-tarefa': 'When finishing the last sub-task',
   'Preencher o modelo sugerido': 'Fill in the suggested model',
-  '"Preencher o modelo sugerido automaticamente" mudou para a aba Modelos.': '"Fill in the suggested model automatically" moved to the Models tab.',
+  '"Preencher o modelo sugerido automaticamente" mudou para a aba Modelos.':
+    '"Fill in the suggested model automatically" moved to the Models tab.',
   'Abrir em Modelos': 'Open in Models',
   'um card é criado ou um atributo dele muda, e o campo de modelo está vazio ou ainda tem a sugestão anterior':
     'a card is created or one of its attributes changes, and the model field is empty or still has the previous suggestion',

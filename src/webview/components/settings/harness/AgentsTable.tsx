@@ -63,7 +63,8 @@ export function AgentsTable({ tool, scope }: { tool: AiToolInfo; scope: InstallS
         )}
       </p>
       <Text as="p" size="1" color="gray">
-        {t('Mostrando os agentes do {tool}', { tool: tool.label })}{' · '}
+        {t('Mostrando os agentes do {tool}', { tool: tool.label })}
+        {' · '}
         <Button
           variant="ghost"
           size="1"

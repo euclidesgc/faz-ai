@@ -627,12 +627,22 @@ version, which have no merge commit recorded, stay yours to archive with one cli
 
 With the heartbeat on (Configurações → Harness de IA), the board calls the AI on its own at every
 interval, while the editor is open in the project folder. In each round it advances approved cards,
-answers pending messages and works on ready cards, one story at a time. In "Worktree por
+answers pending messages and works on ready cards, with one run per story. Activities **without a
+branch** (refine, summarize and the phases that only produce a document, such as Discovery, PRD,
+Spec and Plan on the default board; the rule is any column with an artifact before the code phase)
+run at the same time in any workspace mode, up to **Histórias ao mesmo tempo** (two by default, up to
+six), even with **Tocar histórias em paralelo** off. Activities **with a branch** (Implementation
+and Homologation) keep the previous limit: one at a time outside the worktree. In "Worktree por
 história" mode, **Tocar histórias em paralelo** (drive stories in parallel; editor Settings, Faz AI
-› Git; off by default) makes the heartbeat drive several stories at once, each in its own working
-folder: two by default, up to six in **Histórias ao mesmo tempo**; the limit
-counts every run in progress, including the ones called by hand. Outside that mode, and in
-autonomous mode (whose stories are stacked), it stays one at a time, and the field is disabled. The
+› Git; off by default) makes the heartbeat drive several branch stories at once, each in its own
+working folder, up to the same **Histórias ao mesmo tempo**. The two caps (text and branch) are
+counted separately; each counts every run in progress, including the ones called by hand. In
+autonomous mode (whose stories are stacked), the queue order applies to stories that need a branch;
+a story in a text phase starts as soon as there is a free slot, even with the previous one still
+open. Outside the worktree, `prepare_workspace` called in a text phase while another story has a run
+in progress is refused (folder in use): the branch is created in the code phase. With the "Sem
+restrições" permission the AI can still switch branches by hand; the guard covers only the board's
+path. The
 description of each Git key in the Settings explains why in each mode: with a branch in the project
 folder, two stories at once would switch the branch under each other and mix their changes; with
 worktrees they are isolated, at the cost of one more copy of the files on disk per story (with
@@ -878,7 +888,7 @@ four sections, in this order:
 | --- | --- |
 | Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
 | Appearance | **Language** (`fazai.appearance.language`), **Theme** (`fazai.appearance.theme`), **Font** (`fazai.appearance.font`) and **Size** (`fazai.appearance.fontSize`), all with User scope — apply to all this person's projects. Statuses (name and color of each status) stay on the board, now in the Workflows tab |
-| Git | The nine `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.watchMerges` and `fazai.git.watchMergeMinutes` (watch for merges outside the board, 5 to 1440 minutes). In the editor, the Git tab and the parallel block in the AI harness become a link to these keys; in the browser they stay as editable fields |
+| Git | The nine `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.watchMerges` and `fazai.git.watchMergeMinutes` (watch for merges outside the board, 5 to 1440 minutes). In the editor, the Git tab and the parallel block in the AI harness become a link to these keys; in the browser they stay as editable fields |
 | Backup | Two action links: **Export the board now** and **Import a board**, which trigger the palette commands |
 
 Three new commands in the palette (`Ctrl+Shift+P`): **Faz AI: Open the Environment Diagnostics**,

@@ -331,9 +331,7 @@ describe('Settings: ida e volta com o Settings do editor', () => {
       alvo.scrollIntoView = vi.fn();
       document.body.append(alvo);
       act(() =>
-        window.dispatchEvent(
-          new MessageEvent('message', { data: { type: 'ui.openSettings', tab: 'harness', section: 'secao-destaque' } }),
-        ),
+        window.dispatchEvent(new MessageEvent('message', { data: { type: 'ui.openSettings', tab: 'harness', section: 'secao-destaque' } })),
       );
       expect(alvo).toHaveClass('fazai-highlight');
       act(() => vi.advanceTimersByTime(2200));

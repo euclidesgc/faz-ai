@@ -1,5 +1,7 @@
 /** Execução da IA pelo board: a extensão roda a ferramenta do projeto em segundo plano para trabalhar num card. */
 
+import type { ActivityKind } from './activity';
+
 /** O que a IA pode fazer sem ninguém aprovando cada passo. */
 export type RunnerPermission = 'board' | 'edits' | 'full';
 
@@ -20,9 +22,9 @@ export interface RunnerConfig {
   heartbeat: boolean;
   /** intervalo entre as rodadas do heartbeat, em minutos */
   heartbeatMinutes: number;
-  /** o heartbeat toca várias histórias ao mesmo tempo; só vale no modo worktree, em que cada história tem a sua pasta */
+  /** o heartbeat toca várias histórias ao mesmo tempo com branch; só vale no modo worktree, em que cada história tem a sua pasta */
   parallel: boolean;
-  /** com `parallel` ligado, quantas histórias ao mesmo tempo (no mínimo duas) */
+  /** com `parallel` ligado, quantas histórias com branch ao mesmo tempo (no mínimo duas); é também o teto das atividades sem branch (só texto), em qualquer modo, mesmo com `parallel` desligado */
   parallelStories: number;
   /** nome do agente (arquivo marcado no Harness) usado quando nem o card nem a fase indicam um; vazio = o primeiro marcado, ou o embutido */
   defaultAgent: string;
@@ -65,6 +67,13 @@ export const DEFAULT_RUNNER: RunnerConfig = {
  */
 export const parallelLimit = (runner: RunnerConfig, workspaceMode: string): number =>
   workspaceMode === 'worktree' && runner.parallel ? runner.parallelStories : 1;
+
+/** Teto das atividades sem branch (só texto): `parallelStories`, em qualquer modo e com `parallel` desligado. */
+export const textLimit = (runner: RunnerConfig): number => runner.parallelStories;
+
+/** Teto de execuções simultâneas para o tipo de atividade. */
+export const limitOf = (runner: RunnerConfig, workspaceMode: string, kind: ActivityKind): number =>
+  kind === 'text' ? textLimit(runner) : parallelLimit(runner, workspaceMode);
 
 /** Lê a configuração salva, completando com os padrões o que faltar ou for inválido. */
 export function parseRunner(json: string | null | undefined): RunnerConfig {

@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { Autopilot, MAX_RUNS_WITHOUT_PROGRESS, autopilotStep } from '../src/extension/autopilot';
+import { Autopilot, MAX_RUNS_WITHOUT_PROGRESS, autopilotRuns, autopilotStep } from '../src/extension/autopilot';
 import { openInMemory } from '../src/extension/db/database';
 import { heartbeatTargets } from '../src/extension/heartbeat';
 import type { AiRunOrigin } from '../src/shared/log';
@@ -129,14 +129,27 @@ describe('autopilotStep', () => {
     owns = false; // só olha o passo; quem decide não age
   });
 
-  it('trata uma história de cada vez, a mais à direita do board primeiro: a adiantada termina antes de a nova começar', () => {
+  it('em Implementação trata uma história de cada vez, na ordem da fila: a de cima termina antes de a seguinte começar', () => {
+    create('A', 'Implementação'); // #1, no topo da coluna
+    create('B', 'Implementação'); // #2, logo abaixo
+    yolo(1);
+    yolo(2);
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 1 }, activity: 'branch' });
+    expect(autopilotRuns(router.snapshot()).map((r) => r.story.number)).toEqual([1]);
+    move(1, 'Concluído');
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 2 }, activity: 'branch' });
+  });
+
+  it('avançar uma história de coluna vem antes de iniciar outra: a do Backlog entra na fila antes de a IA ser chamada', () => {
     create('A', 'Backlog'); // #1, no topo da primeira coluna
     create('B', 'PRD'); // #2, mais adiante
     yolo(1);
     yolo(2);
-    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 2 } });
-    move(2, 'Concluído');
     expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 1 }, column: { name: 'Discovery' } });
+    move(1, 'Discovery');
+    // as duas estão em fase de texto: nenhuma segura a outra
+    expect(autopilotRuns(router.snapshot()).map((r) => r.story.number)).toEqual([2, 1]);
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 2 }, activity: 'text' });
   });
 
   it('história que depende de outro card em aberto não roda: a fila para dizendo de quem ela depende', () => {
@@ -351,22 +364,92 @@ describe('autopiloto', () => {
   });
 
   it('segue de execução em execução e passa para a próxima história quando a atual conclui', () => {
-    create('A', 'Backlog'); // #1
-    create('B', 'Backlog'); // #2
+    create('A', 'Implementação'); // #1
+    create('B', 'Implementação'); // #2
     yolo(1);
     yolo(2);
     expect(runner.started).toEqual([card(1).id]);
 
     runner.finish(() => {
       status(1, 'ready');
-      move(1, 'PRD'); // sem aprovação, porque a história é YOLO
+      move(1, 'Homologação'); // sem aprovação, porque a história é YOLO
     });
-    expect(columnName(1)).toBe('PRD');
-    // a A avançou e agora é a mais à direita: continua com ela até concluir, a B espera
+    expect(columnName(1)).toBe('Homologação');
+    // a A avançou e continua à frente na fila: continua com ela até concluir, a B (branch) espera
     expect(runner.started).toEqual([card(1).id, card(1).id]);
 
     runner.finish(() => move(1, 'Concluído'));
     expect(runner.started).toEqual([card(1).id, card(1).id, card(2).id]); // só então a B entra
+  });
+
+  describe('atividades de texto em paralelo com a branch (RF7, RF8, RF11)', () => {
+    beforeEach(() => {
+      router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' }, runner: { parallelStories: 2 } } });
+    });
+
+    it('RF7: histórias em fase de texto começam atrás de uma em Implementação, até o teto de texto', () => {
+      create('A', 'Implementação'); // #1, em execução
+      yolo(1);
+      expect(runner.running).toEqual([card(1).id]);
+      create('B', 'Discovery'); // #2
+      create('C', 'PRD'); // #3
+      owns = false;
+      yolo(2);
+      yolo(3);
+      expect(autopilotRuns(router.snapshot()).map((r) => [r.story.number, r.activity])).toEqual([
+        [3, 'text'],
+        [2, 'text'],
+      ]);
+      owns = true;
+      autopilot.evaluate();
+      expect(runner.running).toEqual([card(1).id, card(3).id, card(2).id]);
+      // uma terceira em fase de texto espera: o teto de texto (parallelStories) está cheio
+      create('D', 'Spec'); // #4
+      yolo(4);
+      flush();
+      expect(runner.running).not.toContain(card(4).id);
+      expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'run', story: { number: 4 }, activity: 'text' });
+    });
+
+    it('RF8: história em Implementação não começa enquanto outra em execução vier antes dela na fila', () => {
+      create('A', 'Implementação'); // #1, em execução
+      create('B', 'Implementação'); // #2, pronta
+      yolo(1);
+      yolo(2);
+      expect(runner.running).toEqual([card(1).id]);
+      expect(autopilotRuns(router.snapshot())).toEqual([]);
+    });
+
+    it('RF8: a história entregue não segura a seguinte em Implementação', () => {
+      create('A', 'Homologação'); // #1
+      status(1, 'blocked', 'Preparando');
+      create('B', 'Implementação'); // #2, pronta
+      yolo(1);
+      deliver(1);
+      yolo(2);
+      flush();
+      expect(runner.running).toEqual([card(2).id]);
+    });
+
+    it('RF8: uma história em fase de texto rodando à frente na fila segura a de Implementação', () => {
+      createTyped('Bug', 'A', 'Discovery'); // #1, bug: primeira da fila, em fase de texto
+      create('B', 'Implementação'); // #2, pronta
+      yolo(1);
+      yolo(2);
+      expect(runner.running).toEqual([card(1).id]);
+      expect(autopilotRuns(router.snapshot())).toEqual([]);
+      expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'wait', story: { number: 1 } });
+    });
+
+    it('RF11: um "Em execução" sem execução de verdade volta para a IA mesmo não sendo a história da vez', () => {
+      create('A', 'Implementação'); // #1, a da vez, em execução
+      yolo(1);
+      create('B', 'PRD'); // #2
+      status(2, 'running'); // a sessão caiu sem avisar
+      yolo(2);
+      flush();
+      expect(runner.started).toEqual([card(1).id, card(2).id]);
+    });
   });
 
   it('acaba a fila e se desliga; uma nova história em modo autônomo o liga de novo', () => {
