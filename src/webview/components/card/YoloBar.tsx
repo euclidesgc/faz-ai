@@ -3,7 +3,7 @@ import { cardRef } from '../../../shared/model';
 import { storyOf } from '../../../shared/story';
 import { useBoardStore } from '../../store/boardStore';
 import { t } from '../../i18n';
-import { ai, cards } from '../../commands';
+import { ai } from '../../commands';
 import { Button, IconYolo } from '../ui';
 
 /**
@@ -20,9 +20,12 @@ export const yoloWarning = (): string =>
 export function YoloBar({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const ask = useBoardStore((s) => s.ask);
+  const yoloOverrides = useBoardStore((s) => s.yoloOverrides);
+  const setYoloOptimistic = useBoardStore((s) => s.setYoloOptimistic);
   if (card.deletedAt !== null || card.archivedAt !== null) return null;
   const story = storyOf(state, card) ?? card;
   const { autopilot } = state;
+  const effectiveYolo = yoloOverrides.get(card.id) ?? card.yolo;
 
   if (card.parentId)
     return story.yolo ? (
@@ -35,22 +38,22 @@ export function YoloBar({ card }: { card: Card }) {
 
   const warning = yoloWarning();
   const toggle = (enabled: boolean) => {
-    if (!enabled) return cards.setYolo(card.id, false);
+    if (!enabled) return setYoloOptimistic(card.id, false);
     ask({
       title: t('Ligar o modo autônomo em {ref}?', { ref: cardRef(card) }),
       message: warning,
       confirmLabel: t('Ligar o modo autônomo'),
       danger: true,
-      onConfirm: () => cards.setYolo(card.id, true),
+      onConfirm: () => setYoloOptimistic(card.id, true),
     });
   };
 
   return (
     <div className="drawer-workspace yolo-bar">
       <label title={warning}>
-        <input type="checkbox" checked={card.yolo} onChange={(e) => toggle(e.target.checked)} /> <IconYolo /> {t('Modo autônomo')}
+        <input type="checkbox" checked={effectiveYolo} onChange={(e) => toggle(e.target.checked)} /> <IconYolo /> {t('Modo autônomo')}
       </label>
-      {card.yolo && (
+      {effectiveYolo && (
         <>
           <span className="muted small">
             {autopilot.note

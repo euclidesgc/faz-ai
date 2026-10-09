@@ -7,7 +7,7 @@ import { EMPTY_METRICS_FILTERS, type MetricsBreakdownDim, type MetricsFilters, t
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 import { formatBytes, type ImportSummary } from '../../shared/backup';
 import { formatDateTime, t } from '../i18n';
-import { backup } from '../commands';
+import { backup, cards } from '../commands';
 
 /** Ordenação de uma tabela do painel: `key` é o id da coluna; `null` em `MetricsBlocksState` = o padrão do bloco. */
 export interface MetricsSort {
@@ -97,6 +97,10 @@ interface BoardStore extends UiState, ViewState {
   backupBusy: 'export' | 'import' | null;
   setBackupBusy(busy: 'export' | 'import' | null): void;
   setState(state: BoardState, attachmentsBaseUri: string): void;
+  /** sobreposições otimistas do toggle de modo autônomo, por id de card, pendentes de confirmação do host */
+  yoloOverrides: Map<Id, boolean>;
+  /** aplica o toggle na hora (otimista) e manda a mudança para o host */
+  setYoloOptimistic(cardId: Id, enabled: boolean): void;
   setViewState(view: ViewState): void;
   setError(msg: string | null): void;
   setNotice(msg: string | null): void;
@@ -183,16 +187,34 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     selectedParentId: null,
     selectedIds: new Set(),
     collapsed: {},
+    yoloOverrides: new Map(),
+    setYoloOptimistic(cardId, enabled) {
+      const next = new Map(get().yoloOverrides);
+      next.set(cardId, enabled);
+      set({ yoloOverrides: next });
+      cards.setYolo(cardId, enabled);
+    },
 
     setState(state, attachmentsBaseUri) {
       const ids = new Set(state.cards.map((c) => c.id));
-      const { selectedParentId, selectedIds, openCardId } = get();
+      const { selectedParentId, selectedIds, openCardId, yoloOverrides } = get();
       set({ state, attachmentsBaseUri, openCardId: openCardId && ids.has(openCardId) ? openCardId : null });
       // a história selecionada saiu do board (lixeira, arquivo ou apagada): limpa o filtro
       if (selectedParentId && !state.cards.some((c) => c.id === selectedParentId && isLive(c))) setShared({ selectedParentId: null });
       // o mesmo, mas para a seleção múltipla: tira da seleção quem saiu do board ou não está mais vivo
       const prunedIds = new Set([...selectedIds].filter((id) => state.cards.some((c) => c.id === id && isLive(c))));
       if (prunedIds.size !== selectedIds.size) set({ selectedIds: prunedIds });
+      // toggle de modo autônomo otimista: tira a sobreposição quando o host confirma (card já com o valor) ou o card saiu do board
+      let changed = false;
+      const nextOverrides = new Map(yoloOverrides);
+      for (const [id, pendingValue] of yoloOverrides) {
+        const current = state.cards.find((c) => c.id === id);
+        if (!current || current.yolo === pendingValue) {
+          nextOverrides.delete(id);
+          changed = true;
+        }
+      }
+      if (changed) set({ yoloOverrides: nextOverrides });
       persist(get());
     },
     setViewState: (view) =>
@@ -285,6 +307,8 @@ export function useHostSync(): void {
       else if (msg.type === 'error') {
         s.setError(msg.message);
         s.setBackupBusy(null);
+        // a mensagem de erro não identifica o card: descarta todas as sobreposições otimistas pendentes
+        useBoardStore.setState({ yoloOverrides: new Map() });
       } else if (msg.type === 'notice') s.setNotice(msg.message);
       else if (msg.type === 'backup.done') s.setBackupBusy(null);
       else if (msg.type === 'backup.import.summary') {
