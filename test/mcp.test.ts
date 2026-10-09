@@ -1468,6 +1468,24 @@ describe('modo autônomo (YOLO)', () => {
     expect(approvals).toEqual([]);
   });
 
+  it('request_review com pending fica em waiting_review mesmo em YOLO: a pendência é da pessoa e o status mostra isso', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD' });
+    setYolo(1, true);
+    const approvals: string[] = [];
+    router.onDidApprove((id) => approvals.push(id));
+
+    const res = (await call('request_review', { card: 1, summary: 'PRD pronto', pending: 'Decidir se o limite fica em 5 ou 10' })).data;
+    expect(res.card.work).toMatchObject({ status: 'waiting_review', with: 'human' });
+    expect(res.next).toContain('pendência está com a pessoa');
+    expect(card(1).status).toBe('waiting_review');
+    const last = (await call('get_card', { card: 1 })).data.comments.at(-1).body;
+    expect(last).toContain('PRD pronto');
+    expect(last).toContain('**Travado em mim**');
+    expect(last).toContain('Decidir se o limite fica em 5 ou 10');
+    expect(approvals).toEqual([]);
+    expect((await call('get_pending_work', {})).data.withPerson.map((c: any) => c.id)).toContain('#1');
+  });
+
   it('set_pull_request na última coluna da IA entrega a história YOLO: waiting_review (não approved) e aviso na conversa', async () => {
     await call('create_card', { title: 'Login', column: 'Backlog' });
     setYolo(1, true);

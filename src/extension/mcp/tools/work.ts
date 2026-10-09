@@ -18,9 +18,10 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
     status: 'running' | 'waiting_review' | 'waiting_answer' | 'blocked',
     note: string | undefined,
     next: string,
+    pending = false,
   ) => {
     const card = live(findCard(router.snapshot(), ref));
-    const after = router.handle({ type: 'card.status.set', cardId: card.id, status, note }, aiOrigin(ctx));
+    const after = router.handle({ type: 'card.status.set', cardId: card.id, status, note, pending }, aiOrigin(ctx));
     return {
       card: cardSummary(
         after,
@@ -54,18 +55,34 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'request_review',
-    'Entrega o trabalho da fase para revisão de uma pessoa (status "waiting_review") e registra o resumo na conversa do card. Depois de chamar, PARE: só uma pessoa aprova. Se ela pedir ajustes, o card volta para "ready" com o pedido na conversa; quando aprovar, o status vira "approved" e você move o card.',
-    { card: cardArg, summary: z.string().min(1).describe('O que foi feito e o que a pessoa deve revisar (markdown)') },
+    'Entrega o trabalho da fase para revisão de uma pessoa (status "waiting_review") e registra o resumo na conversa do card. Depois de chamar, PARE: só uma pessoa aprova. Se ela pedir ajustes, o card volta para "ready" com o pedido na conversa; quando aprovar, o status vira "approved" e você move o card. ' +
+      'Use `pending` sempre que algo ficou dependendo da pessoa (decisão, dado, acesso, ponto em aberto que ela precisa avaliar): a pendência vai para a conversa e o card fica com ela mesmo em modo autônomo. Nunca registre uma pendência só num comentário e siga adiante.',
+    {
+      card: cardArg,
+      summary: z.string().min(1).describe('O que foi feito e o que a pessoa deve revisar (markdown)'),
+      pending: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          'O que depende da pessoa (markdown): decisão, dado, acesso ou ponto em aberto. Com isso o card fica com ela, mesmo em modo autônomo.',
+        ),
+    },
     (a, router) => {
       const yolo = isYolo(router.snapshot(), live(findCard(router.snapshot(), a.card)));
+      const pending = a.pending?.trim();
+      const note = pending ? `${a.summary.trim()}\n\n**Travado em mim**\n${pending}` : a.summary;
       return setStatus(
         router,
         a.card,
         'waiting_review',
-        a.summary,
-        yolo
+        note,
+        yolo && !pending
           ? 'Modo autônomo (YOLO): o card foi aprovado automaticamente. Mova-o para a próxima coluna e siga o trabalho.'
-          : 'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.',
+          : pending
+            ? 'Pare aqui. A pendência está com a pessoa: não mova o card nem continue o trabalho dele até ela resolver e aprovar ou pedir ajustes.'
+            : 'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.',
+        Boolean(pending),
       );
     },
   );

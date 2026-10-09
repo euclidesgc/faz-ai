@@ -31,8 +31,24 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
 2. Chame \`start_work\` antes de começar.
 3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história).
 4. Ao terminar:
+   - se ficou algo dependendo da pessoa (veja "Pendências com a pessoa"), entregue com \`request_review\` e \`pending\`, e **pare**;
    - se \`phase.requiresApproval\` for verdadeiro, chame \`request_review\` na história, com um resumo do que fez e do que a pessoa deve olhar, e **pare**;
    - senão, mova o card para a próxima coluna.
+
+## Pendências com a pessoa
+
+Uma pendência é tudo o que depende de alguém que não é você: uma decisão, um dado, um acesso, um
+ponto que ficou em aberto para ela avaliar, algo que ficou de fora da entrega e precisa do aval dela.
+O status do card tem de mostrar quem está com a vez, então uma pendência **nunca fica só num
+comentário**: ela entrega o card para a pessoa.
+
+- Precisa da resposta para continuar: \`ask_question\`.
+- Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\`.
+- Decidiu ou deixou algo em aberto que ela precisa avaliar: \`request_review\` com \`pending\`
+  dizendo o que depende dela. Vale mesmo em coluna sem aprovação e mesmo em modo autônomo: com
+  \`pending\` o card fica em "Aguardando revisão" em vez de ser aprovado automaticamente.
+
+Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela.
 
 ## Fases que produzem documento
 
@@ -86,6 +102,24 @@ sub-tarefa só na rodada, execute uma por vez, na ordem das dependências. Se du
 mesma rodada precisarem do mesmo arquivo, não as rode juntas: registre a dependência com
 \`link_cards\` e deixe uma para a rodada seguinte.
 
+## Ao fechar uma fase ou sub-tarefa
+
+Ao registrar o resultado de uma fase ou sub-tarefa na conversa, resuma em três blocos (omita o que
+não houver):
+
+- **Travado em mim**: o que dependeu de uma decisão, acesso ou dado que só a pessoa tem.
+- **O que mudou**: o resultado concreto (documento anexado, arquivo alterado, card movido).
+- **O que encontrei**: achados relevantes, inclusive suposições ou dados externos que não puderam
+  ser validados (marque-os explicitamente como não validados).
+
+Se "Travado em mim" tiver qualquer item, o resumo vai no \`request_review\` com esse item em
+\`pending\` (ou em \`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`:
+o card precisa ficar com a pessoa.
+
+Ao revisar código (Implementação ou Homologação), concentre-se no diff da branch da história e no
+contexto necessário dos arquivos tocados; releia o projeto inteiro só quando o pedido pedir
+expressamente uma auditoria geral.
+
 ## Homologação
 
 A entrega é para a pessoa testar, então o roteiro de testes é parte dela, em dois lugares:
@@ -105,9 +139,13 @@ Git), a aprovação dela faz o merge e leva a história a Concluído; desligado,
 Quando o card (ou a história dele) mostra \`autonomous: true\`, a pessoa liberou a história para
 rodar sozinha: ninguém aprova nem responde. Então:
 
-- não chame \`request_review\` nem \`ask_question\` (a pergunta é recusada): ao terminar a fase,
-  registre na conversa o que fez e mova o card para a próxima coluna;
+- não chame \`ask_question\` (a pergunta é recusada) nem \`request_review\` sem \`pending\`: ao terminar a
+  fase, registre na conversa o que fez e mova o card para a próxima coluna;
 - decida as dúvidas pela opção mais razoável e registre a decisão e o motivo na conversa;
+- ficou algo que a pessoa precisa avaliar (ponto em aberto, escopo que ficou de fora, decisão que
+  você tomou no lugar dela e que muda o resultado)? Não siga adiante: \`request_review\` com
+  \`pending\`. Nesse caso o card fica em "Aguardando revisão" mesmo em modo autônomo, e a fila
+  continua com as outras histórias;
 - \`block_card\` só para impedimento real (acesso, ambiente, falha que você não resolve);
 - na Implementação, execute todas as sub-tarefas até o fim; na última coluna em que a IA atua
   (Homologação, no board padrão) não há aprovação nem próxima fase: grave o "Como testar" na
@@ -122,6 +160,7 @@ rodar sozinha: ninguém aprova nem responde. Então:
 
 - Faltou uma informação ou decisão: \`ask_question\` no card, e pare de trabalhar nele.
 - Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\` com o motivo.
+- Ficou algo para a pessoa avaliar: \`request_review\` com \`pending\`, e pare.
 - Depois de \`request_review\`: pare. Só uma pessoa aprova.
 
 ## O que não fazer
@@ -129,5 +168,6 @@ rodar sozinha: ninguém aprova nem responde. Então:
 - Não mova um card para a frente a partir de uma coluna que exige aprovação se o status não for \`approved\`.
 - Não continue o trabalho de um card que está com a pessoa.
 - Não decida pela pessoa: na dúvida, pergunte na conversa do card.
+- Não deixe uma pendência da pessoa só num comentário: o status do card tem de passar a vez para ela.
 `,
 };
