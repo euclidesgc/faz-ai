@@ -1,25 +1,16 @@
-import { useMemo, useState } from 'react';
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  closestCorners,
-  useDroppable,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-} from '@dnd-kit/core';
+import { useCallback, useMemo, useState } from 'react';
+import { DndContext, DragOverlay, PointerSensor, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { archiveKey } from '../../shared/filters';
 import type { Card as CardModel, Workflow } from '../../shared/model';
 import { archivedIn, cardsIn, columnsOf } from '../../shared/selectors';
 import { useBoardStore, useFilteredIds } from '../store/boardStore';
 import { t } from '../i18n';
-import { cards, settings } from '../commands';
-import { requestArchive, requestMove } from '../store/actions';
+import { settings } from '../commands';
+import { useDragLanes } from '../useDragLanes';
+import { useReducedMotion } from '../useReducedMotion';
 import { CollapsedColumn, Column } from './Column';
-import { CardView, SortableCard } from './Card';
+import { CardView, DRAG_ANIMATION, SortableCard } from './Card';
 import { TextField } from '@radix-ui/themes';
 import { Button, IconChevronLeft } from './ui';
 
@@ -27,55 +18,26 @@ const archiveId = archiveKey;
 
 export function WorkflowRow({ workflow }: { workflow: Workflow }) {
   const state = useBoardStore((s) => s.state)!;
+  const error = useBoardStore((s) => s.error);
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
   const overrides = useBoardStore((s) => s.collapsed);
   const setCollapsed = useBoardStore((s) => s.setCollapsed);
   const filtered = useFilteredIds();
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const reduced = useReducedMotion();
   const [newColumn, setNewColumn] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const columns = useMemo(() => columnsOf(state, workflow.id), [state, workflow.id]);
 
-  const visible = (cards: CardModel[]): CardModel[] =>
-    cards.filter(
-      (c) => (!filtered || filtered.has(c.id)) && (workflow.kind !== 'child' || !selectedParentId || c.parentId === selectedParentId),
-    );
+  const visible = useCallback(
+    (cards: CardModel[]): CardModel[] =>
+      cards.filter(
+        (c) => (!filtered || filtered.has(c.id)) && (workflow.kind !== 'child' || !selectedParentId || c.parentId === selectedParentId),
+      ),
+    [filtered, workflow.kind, selectedParentId],
+  );
 
-  const onDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
-
-  const onDragEnd = (e: DragEndEvent) => {
-    setActiveId(null);
-    const { active, over } = e;
-    if (!over) return;
-    const cardId = String(active.id);
-    const overId = String(over.id);
-    const current = state.cards.find((c) => c.id === cardId);
-    if (!current) return;
-    const overCard = state.cards.find((c) => c.id === overId);
-
-    // soltar na coluna de arquivados (ou sobre um card arquivado) = arquivar
-    if (overId === archiveId(workflow.id) || overCard?.archivedAt) {
-      if (!current.archivedAt) requestArchive(cardId);
-      return;
-    }
-
-    const targetColumnId = overCard ? overCard.columnId : overId;
-    if (!columns.some((c) => c.id === targetColumnId)) return;
-
-    const ordered = cardsIn(state, targetColumnId).filter((c) => c.id !== cardId);
-    let position = ordered.length;
-    if (overCard && overCard.id !== cardId) {
-      const idx = ordered.findIndex((c) => c.id === overCard.id);
-      position = idx < 0 ? ordered.length : idx;
-    }
-    if (current.archivedAt) {
-      cards.unarchive(cardId, { columnId: targetColumnId, position });
-      return;
-    }
-    if (current.columnId === targetColumnId && current.position === position) return;
-    requestMove(cardId, targetColumnId, position);
-  };
+  const { shown, activeId, handlers, collisionDetection } = useDragLanes({ workflow, state, columns, visible, error });
 
   const addColumn = () => {
     if (newColumn?.trim()) settings.createColumn(workflow.id, newColumn.trim());
@@ -85,13 +47,7 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
   const activeCard = activeId ? state.cards.find((c) => c.id === activeId) : undefined;
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragCancel={() => setActiveId(null)}
-    >
+    <DndContext sensors={sensors} collisionDetection={collisionDetection} {...handlers}>
       <div className="columns">
         {columns.map((col, i) => {
           const all = cardsIn(state, col.id);
@@ -102,6 +58,7 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
               column={col}
               workflow={workflow}
               cards={visible(all)}
+              shown={shown[col.id] ?? []}
               total={all.length}
               index={i}
               siblings={columns}
@@ -113,6 +70,7 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
         <ArchiveColumn
           workflowId={workflow.id}
           cards={visible(archivedIn(state, workflow.id))}
+          shown={shown[archiveId(workflow.id)] ?? []}
           collapsed={overrides[archiveKey(workflow.id)] ?? workflow.archiveCollapsed}
           onToggle={(now) => setCollapsed(archiveKey(workflow.id), !now)}
         />
@@ -137,7 +95,9 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
           )}
         </div>
       </div>
-      <DragOverlay>{activeCard ? <CardView card={activeCard} overlay /> : null}</DragOverlay>
+      <DragOverlay dropAnimation={reduced ? null : { ...DRAG_ANIMATION }}>
+        {activeCard ? <CardView card={activeCard} overlay /> : null}
+      </DragOverlay>
     </DndContext>
   );
 }
@@ -145,11 +105,15 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
 function ArchiveColumn({
   workflowId,
   cards,
+  shown,
   collapsed,
   onToggle,
 }: {
   workflowId: string;
+  /** arquivados visíveis (contagem do cabeçalho) */
   cards: CardModel[];
+  /** cards da lista renderizada (faixas do arraste) */
+  shown: CardModel[];
   collapsed: boolean;
   onToggle: (collapsed: boolean) => void;
 }) {
@@ -174,12 +138,12 @@ function ArchiveColumn({
         <span className="column-name">{t('Arquivados')}</span>
         <span className="column-count">{cards.length}</span>
       </header>
-      <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={shown.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div className="column-body">
-          {cards.map((card) => (
+          {shown.map((card) => (
             <SortableCard key={card.id} card={card} />
           ))}
-          {cards.length === 0 && <p className="muted empty">{t('Arraste um card para cá para arquivar.')}</p>}
+          {shown.length === 0 && <p className="muted empty">{t('Arraste um card para cá para arquivar.')}</p>}
         </div>
       </SortableContext>
     </div>

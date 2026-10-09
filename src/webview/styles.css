@@ -215,6 +215,20 @@ button.active {
 }
 .column.over {
   border-color: var(--accent);
+  background: var(--hover);
+}
+.card-ghost {
+  opacity: 0.45;
+}
+.card-ghost > .card {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .column {
+    transition: none;
+  }
 }
 .column.terminal .column-name {
   opacity: 0.75;

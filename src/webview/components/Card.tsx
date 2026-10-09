@@ -6,6 +6,7 @@ import { statusInfo } from '../../shared/status';
 import { aiWorkingChildren, fieldsForType, isAiWorking, isCardCollapsed, valueOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
+import { useReducedMotion } from '../useReducedMotion';
 import { FieldBadge, hasValue } from './FieldRenderer';
 import { IconParent } from './ui';
 import { AiLed, type AiWork } from './cardView/AiLed';
@@ -13,11 +14,18 @@ import { CardFooter } from './cardView/CardFooter';
 import { StatusLine } from './cardView/StatusLine';
 import { CollapseToggle, TitleBar } from './cardView/TitleBar';
 
+/** Duração e curva da animação de arrastar (reutilizadas no dropAnimation do DragOverlay). */
+export const DRAG_ANIMATION = { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' } as const;
+
 export function SortableCard({ card }: { card: Card }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  const reduced = useReducedMotion();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: card.id,
+    transition: reduced ? null : { ...DRAG_ANIMATION },
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} className={isDragging ? 'card-ghost' : undefined} {...attributes} {...listeners}>
       <CardView card={card} />
     </div>
   );

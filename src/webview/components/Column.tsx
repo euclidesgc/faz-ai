@@ -24,8 +24,10 @@ const CATEGORIES: { value: ColumnCategory; label: string; hint: string }[] = [
 interface Props {
   column: ColumnModel;
   workflow: Workflow;
-  /** cards visíveis (após filtros) */
+  /** cards visíveis (após filtros); base da contagem do cabeçalho */
   cards: Card[];
+  /** cards da lista renderizada (faixas do arraste); padrão `cards` */
+  shown?: Card[];
   /** total de cards ativos na coluna */
   total: number;
   index: number;
@@ -82,7 +84,8 @@ export function CollapsedColumn({
   );
 }
 
-export function Column({ column, workflow, cards: visibleCards, total, index, siblings, collapsed, onToggle }: Props) {
+export function Column({ column, workflow, cards: visibleCards, shown, total, index, siblings, collapsed, onToggle }: Props) {
+  const listed = shown ?? visibleCards;
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const state = useBoardStore((s) => s.state)!;
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
@@ -246,9 +249,9 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
           </Button>
         )}
       </div>
-      <SortableContext items={visibleCards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={listed.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div className="column-body">
-          {visibleCards.map((card) => (
+          {listed.map((card) => (
             <SortableCard key={card.id} card={card} />
           ))}
         </div>
