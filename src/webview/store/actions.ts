@@ -18,15 +18,19 @@ function alongWith(children: number, attachments: number): string {
  * Move um card. Levar uma história com sub-tarefas em aberto para uma coluna de cancelamento
  * pergunta antes se as sub-tarefas devem ser canceladas junto.
  * (Levar para uma coluna de conclusão com sub-tarefas em aberto é recusado pelo host.)
+ * Devolve 'sent' quando o `card.move` foi enviado e 'asked' quando só abriu o diálogo (nada enviado ainda).
  */
-export function requestMove(cardId: Id, columnId: Id, position: number): void {
+export function requestMove(cardId: Id, columnId: Id, position: number): 'sent' | 'asked' {
   const { state, ask } = useBoardStore.getState();
   const card = state!.cards.find((c) => c.id === cardId);
   const target = state!.columns.find((c) => c.id === columnId);
-  if (!card || !target) return;
+  if (!card || !target) return 'asked';
 
   const open = childrenToCancel(state!, card, target);
-  if (open.length && state!.board.rules.onCancelParent === 'cascade') return cards.move(cardId, columnId, position, true);
+  if (open.length && state!.board.rules.onCancelParent === 'cascade') {
+    cards.move(cardId, columnId, position, true);
+    return 'sent';
+  }
   if (open.length) {
     ask({
       title: t('Cancelar "{title}"?', { title: card.title }),
@@ -39,10 +43,11 @@ export function requestMove(cardId: Id, columnId: Id, position: number): void {
       danger: true,
       onConfirm: () => cards.move(cardId, columnId, position, true),
     });
-    return;
+    return 'asked';
   }
   cards.move(cardId, columnId, position);
   offerToCompleteParent(card, target);
+  return 'sent';
 }
 
 /**
