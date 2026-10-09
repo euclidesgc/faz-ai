@@ -39,5 +39,5 @@
   "config.git.title": "Faz AI: Git",
   "config.git.info": "As opções de branch e worktree chegam ao Settings nas próximas versões. Até então, use [Git nas configurações do board](command:fazai.openBoardSettings?%5B%7B%22tab%22%3A%22git%22%7D%5D).",
   "config.backup.title": "Faz AI: Backup",
-  "config.backup.info": "Exportar e importar chegam como comandos do editor nas próximas versões. Até então, use [Backup nas configurações do board](command:fazai.openBoardSettings?%5B%7B%22tab%22%3A%22backup%22%7D%5D)."
+  "config.backup.info": "Guarda ou restaura o board inteiro: cards, conversas, anexos e configurações. [Exportar o board agora](command:fazai.exportBoard) | [Importar um board](command:fazai.importBoard)."
 }

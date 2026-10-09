@@ -24,6 +24,8 @@ import type { Heartbeat } from './heartbeat';
 import type { MergeWatcher } from './merge';
 import { revealInSystem } from './web/osOpen';
 import { preferredPort, startWebServer, type WebServer } from './web/webServer';
+import { exportNotice, importNotice } from './host/hostBridge';
+import { parseExportFile } from './db/boardExport';
 import { cardRef } from '../shared/model';
 import { humanQueueStatuses, turnsPassedToHuman } from '../shared/pending';
 
@@ -244,6 +246,54 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
 
+  /** Exporta o board da pasta atual para um arquivo, pela paleta de comandos (sem precisar abrir o board). */
+  const exportBoard = async () => {
+    const router = await getRouter();
+    if (!router) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
+    const { text, name, warnings } = router.exportBoardFile();
+    const uri = await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.file(path.join(os.homedir(), name)),
+      filters: { 'Export do Faz AI': ['json'] },
+      title: 'Exportar board',
+    });
+    if (!uri) return;
+    await fs.promises.writeFile(uri.fsPath, text, 'utf8');
+    const choice = await vscode.window.showInformationMessage(exportNotice(uri.fsPath, warnings), 'Abrir pasta');
+    if (choice === 'Abrir pasta') revealInSystem(uri.fsPath);
+  };
+
+  /** Importa um arquivo de export para o board da pasta atual, pela paleta de comandos (sem precisar abrir o board). */
+  const importBoard = async () => {
+    const router = await getRouter();
+    if (!router) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
+    const uris = await vscode.window.showOpenDialog({
+      canSelectMany: false,
+      filters: { 'Export do Faz AI': ['json'] },
+      title: 'Importar board',
+    });
+    const uri = uris?.[0];
+    if (!uri) return;
+    try {
+      const text = await fs.promises.readFile(uri.fsPath, 'utf8');
+      const parsed = parseExportFile(text);
+      const { token, summary } = router.parkImport(parsed, Buffer.byteLength(text));
+      const boardName = folder()?.name ?? 'atual';
+      const choice = await vscode.window.showWarningMessage(
+        `Importar "${summary.boardName}" vai substituir o board "${boardName}" por ${summary.cards} card(s) e ${summary.attachments} anexo(s). Uma cópia de segurança (.bak) do board atual é feita antes.`,
+        { modal: true },
+        'Importar',
+      );
+      if (choice !== 'Importar') {
+        router.discardImport(token);
+        return;
+      }
+      const result = router.applyImport(token);
+      vscode.window.showInformationMessage(importNotice(result));
+    } catch (e) {
+      vscode.window.showErrorMessage(`Faz AI: não foi possível importar o board: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
   context.subscriptions.push(
     treeView,
     vscode.window.registerWebviewViewProvider('fazai.filters', new FiltersViewProvider(context, getRouter, viewState), {
@@ -267,6 +317,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.openEnvironment', () => openBoard({ type: 'ui.openView', view: 'environment' })),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
     vscode.commands.registerCommand('fazai.openInBrowser', openInBrowser),
+    vscode.commands.registerCommand('fazai.exportBoard', exportBoard),
+    vscode.commands.registerCommand('fazai.importBoard', importBoard),
     vscode.commands.registerCommand('fazai.connectAI', (target?: Parameters<BoardHost['connectAI']>[0], opts?: { fromBoard?: boolean }) =>
       connectAI(getRouter, target, opts),
     ),

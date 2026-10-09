@@ -801,7 +801,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English; fica no Settings do editor junto com tema, fonte e tamanho); status (nome e cor, na aba Fluxos; aqui só no modo navegador) |
-| Backup | Exportar o board num arquivo e importar um arquivo no lugar do board atual (ver [Backup do board](#backup-do-board)) |
+| Backup | No editor, exportar e importar pela paleta de comandos (`fazai.exportBoard`, `fazai.importBoard`); no modo navegador, pela aba Configurações (ver [Backup do board](#backup-do-board)) |
 
 ### Configurações no Settings do editor
 
@@ -813,7 +813,7 @@ quatro seções, nesta ordem:
 | Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
 | Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
 | Git | Aviso de que as opções chegam nas próximas versões, com link para a aba Git do board |
-| Backup | Aviso de que exportar e importar viram comandos do editor nas próximas versões, com link para a aba Backup do board |
+| Backup | Dois links de ação: **Exportar o board agora** e **Importar um board**, que disparam os comandos da paleta |
 
 Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,
 **Faz AI: Abrir as configurações do Faz AI no Settings** (o Settings já filtrado no Faz AI) e
@@ -860,26 +860,45 @@ entram no git normalmente. Evite abrir a mesma pasta em duas janelas do editor a
 
 ### Backup do board
 
-Para levar o board a outra máquina ou guardar uma cópia, use **Configurações → Backup**:
+Para levar o board a outra máquina ou guardar uma cópia:
 
-- **Exportar board** gera um arquivo `<nome do board>-<data>.fazai.json` com tudo o que está no
-  board: colunas, tipos, campos, regras, modelos, agentes, cards (inclusive arquivados e na
-  lixeira), conversas, checklists, vínculos, histórico e os anexos embutidos. Só o board da pasta
-  atual sai no arquivo. Ele contém as conversas e os anexos: guarde-o com cuidado.
-- **Importar de um arquivo…** mostra um resumo (nome, cards, anexos, tamanho, versão) e, depois da
-  confirmação, grava uma cópia do banco (`<arquivo>.bak`, ao lado dele), move os anexos do board
-  atual para uma pasta de backup (`<anexos>.bak-<data>`), apaga o board atual e o substitui pelo do
-  arquivo, com os mesmos números de card. O board importado passa a ser o desta pasta. Nada muda no
-  banco se o arquivo for inválido ou se algo falhar no meio. A confirmação diz que os anexos foram
-  para backup. Arquivo de importação com id de card ou nome de anexo contendo caminho (`../`) é
-  recusado.
+**No editor (VS Code ou Cursor):** use a paleta de comandos (`Ctrl+Shift+P`):
 
-Um arquivo exportado por uma versão anterior da extensão é atualizado ao ser importado; um arquivo
-de versão mais nova é recusado com a versão necessária. Importar com a IA executando um card não é
-permitido: espere a execução terminar. No navegador o fluxo é o mesmo, com o download e a escolha
-do arquivo feitos pela própria página. Limites conhecidos: o histórico mensal consolidado do log
-não vai no arquivo, e as branches e pastas de trabalho das histórias são importadas como estavam na
-máquina de origem (recrie a pasta pelo botão do card).
+- **Faz AI: Exportar o board** abre o diálogo nativo de salvamento com o nome sugerido no padrão
+  `<nome do board>-<data>.fazai.json`. Gera um arquivo com tudo o que está no board: colunas, tipos,
+  campos, regras, modelos, agentes, cards (inclusive arquivados e na lixeira), conversas, checklists,
+  vínculos, histórico e os anexos embutidos. Só o board da pasta atual sai no arquivo. Ele contém as
+  conversas e os anexos: guarde-o com cuidado. Ao terminar, a extensão mostra a notificação "Board
+  exportado em …" com o botão **Abrir pasta**.
+- **Faz AI: Importar um board** abre o diálogo nativo de abertura de arquivo. Ao escolher um arquivo,
+  mostra um resumo modal (nome do board, quantidade de cards e anexos, tamanho, versão) com aviso de
+  que o board atual será substituído e que uma cópia de segurança (`.bak`) é feita antes. Ao
+  confirmar, substitui o board e mostra a notificação com o resultado da importação.
+
+Os comandos funcionam com o board fechado (sem o painel aberto): eles abrem o banco da pasta atual
+do workspace sob demanda. Em um workspace com várias pastas, os comandos usam a primeira pasta
+(mesma limitação já existente na extensão); não há seletor de pasta.
+
+**No modo navegador** (rodando `~/.faz-ai/bin/faz-ai` no terminal): use **Configurações → Backup**:
+
+- **Exportar board** gera um arquivo `.fazai.json` no seu computador (download).
+- **Importar de um arquivo…** abre o seletor nativo da página.
+
+**Em ambos os modos,** o arquivo importado:
+
+- Mostra um resumo (nome, cards, anexos, tamanho, versão) e, depois da confirmação, grava uma cópia
+  do banco (`<arquivo>.bak`, ao lado dele ou na pasta de dados), move os anexos do board atual para
+  uma pasta de backup (`<anexos>.bak-<data>`), apaga o board atual e o substitui pelo do arquivo, com
+  os mesmos números de card. O board importado passa a ser o desta pasta. Nada muda no banco se o
+  arquivo for inválido ou se algo falhar no meio. A confirmação diz que os anexos foram para backup.
+- Um arquivo exportado por uma versão anterior da extensão é atualizado ao ser importado; um arquivo
+  de versão mais nova é recusado com a versão necessária. Importar com a IA executando um card não é
+  permitido: espere a execução terminar. Arquivo de importação com id de card ou nome de anexo
+  contendo caminho (`../`) é recusado.
+
+Limites conhecidos: o histórico mensal consolidado do log não vai no arquivo, e as branches e pastas
+de trabalho das histórias são importadas como estavam na máquina de origem (recrie a pasta pelo botão
+do card).
 
 ## Desenvolvimento
 

@@ -74,15 +74,16 @@ describe('contributes.configuration', () => {
     nls(String(p.markdownDescription));
   });
 
-  it('a seção Instalação aponta para o Diagnóstico e Git/Backup para a aba do board, com argumento válido', () => {
+  it('a seção Instalação aponta para o Diagnóstico e Git para a aba do board, com argumento válido', () => {
     expect(en['config.install.environment']).toContain('command:fazai.openEnvironment');
-    for (const [key, tab] of [
-      ['config.git.info', 'git'],
-      ['config.backup.info', 'backup'],
-    ] as const) {
-      const m = /command:fazai\.openBoardSettings\?([^)\s]+)/.exec(en[key]!)!;
-      expect(JSON.parse(decodeURIComponent(m[1]!))).toEqual([{ tab }]);
-    }
+    const m = /command:fazai\.openBoardSettings\?([^)\s]+)/.exec(en['config.git.info']!)!;
+    expect(JSON.parse(decodeURIComponent(m[1]!))).toEqual([{ tab: 'git' }]);
+  });
+  it('a seção Backup aponta direto para os comandos exportBoard e importBoard', () => {
+    expect(en['config.backup.info']).toContain('command:fazai.exportBoard');
+    expect(en['config.backup.info']).toContain('command:fazai.importBoard');
+    expect(pt['config.backup.info']).toContain('command:fazai.exportBoard');
+    expect(pt['config.backup.info']).toContain('command:fazai.importBoard');
   });
 });
 
