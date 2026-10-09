@@ -129,6 +129,67 @@ describe('arquivo', () => {
   });
 });
 
+describe('restaurar pela aba Arquivados (restoreArchived)', () => {
+  const firstColumnOf = (workflowId: string) =>
+    snap()
+      .columns.filter((c) => c.workflowId === workflowId)
+      .sort((a, b) => a.position - b.position)[0]!;
+
+  it('história: ela e todas as sub-tarefas arquivadas voltam ao fim da primeira coluna, inativas e sem modo autônomo', () => {
+    const doing = snap().columns.find((c) => c.name === 'PRD' && c.workflowId === card(story).workflowId)!;
+    cards.move(story, doing.id, 0);
+    cards.setYolo(story, true);
+    cards.setStatus(sub1, 'ready', '', 'ia');
+    // outra história viva no Backlog, para o restaurado entrar depois dela
+    const backlog = firstColumnOf(card(story).workflowId);
+    const other = cards.create(boardId, { typeId: card(story).typeId, columnId: backlog.id, parentId: null, title: 'outra' });
+    cards.archive(story);
+    expect(card(sub2).archivedAt).not.toBeNull();
+
+    expect(cards.restoreArchived(story)).toBe(story);
+    for (const id of [story, sub1, sub2]) {
+      const c = card(id);
+      expect(c.archivedAt).toBeNull();
+      expect(c.columnId).toBe(firstColumnOf(c.workflowId).id);
+      expect(c.status).toBeNull();
+      expect(c.statusReason).toBe('');
+    }
+    expect(card(story).yolo).toBe(false);
+    expect(card(story).position).toBeGreaterThan(card(other).position);
+  });
+
+  it('sub-tarefa de história arquivada: o alvo é a história, que volta com as irmãs arquivadas', () => {
+    cards.archive(story);
+    expect(cards.restoreArchived(sub1)).toBe(story);
+    expect(card(story).archivedAt).toBeNull();
+    expect(card(sub1).archivedAt).toBeNull();
+    expect(card(sub2).archivedAt).toBeNull();
+  });
+
+  it('sub-tarefa de história ativa: restaura só ela, para a primeira coluna do workflow dela', () => {
+    const cw = card(sub1).workflowId;
+    const later = snap()
+      .columns.filter((c) => c.workflowId === cw)
+      .sort((a, b) => a.position - b.position)[1]!;
+    cards.move(sub1, later.id, 0);
+    cards.archive(sub1);
+    cards.archive(sub2);
+    expect(cards.restoreArchived(sub1)).toBe(sub1);
+    expect(card(sub1).archivedAt).toBeNull();
+    expect(card(sub1).columnId).toBe(firstColumnOf(cw).id);
+    expect(card(sub2).archivedAt).not.toBeNull();
+    expect(card(story).archivedAt).toBeNull();
+  });
+
+  it('sub-tarefa na lixeira não volta com a história', () => {
+    cards.trash(sub2);
+    cards.archive(story);
+    cards.restoreArchived(story);
+    expect(card(story).archivedAt).toBeNull();
+    expect(card(sub2).deletedAt).not.toBeNull();
+  });
+});
+
 describe('comentários e anexos', () => {
   it('comentários entram no snapshot e somem com o card', () => {
     const comments = new CommentRepo(db);
@@ -192,6 +253,6 @@ describe('migração v1 → v2', () => {
     expect(new BoardRepo(old).snapshot('b').cards.find((c) => c.id === novo)?.number).toBe(3);
     expect(s.comments).toEqual([]);
     // boards existentes ganham o campo padrão "Modelo"
-    expect(s.fieldDefs.map((f) => f.name)).toEqual(['Esforço da atividade', 'Modelo', 'Skills']); // o esforço vem antes do modelo
+    expect(s.fieldDefs.map((f) => f.name)).toEqual(['Esforço da atividade', 'Modelo', 'Skills', 'Rules']); // o esforço vem antes do modelo
   });
 });

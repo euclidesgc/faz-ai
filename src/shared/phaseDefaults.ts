@@ -26,6 +26,14 @@ export const HOMOLOGATION_INSTRUCTION_V2 = [
   'A conclusão depende da aprovação: depois de aprovado, mova a história para a coluna de conclusão.',
 ].join('\n');
 
+/** Instrução da Homologação com o pull request, mas sem o roteiro de testes na descrição do card e do PR (versão 4 do padrão). */
+export const HOMOLOGATION_INSTRUCTION_V4 = [
+  'Prepare a entrega para a validação da pessoa.',
+  'Envie a branch da história (git push) e abra o pull request dela, se ainda não existir (ex.: gh pr create), com um resumo do que foi feito. Registre o endereço com set_pull_request.',
+  'Resuma na conversa o que foi construído, como testar passo a passo e o que ficou de fora, e peça a revisão.',
+  'Não faça o merge: a conclusão depende da aprovação da pessoa. Depois de aprovado, se o card continuar nesta coluna, mova a história para a coluna de conclusão.',
+].join('\n');
+
 export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   Discovery: {
     instruction: [
@@ -144,8 +152,9 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   Homologação: {
     instruction: [
       'Prepare a entrega para a validação da pessoa.',
-      'Envie a branch da história (git push) e abra o pull request dela, se ainda não existir (ex.: gh pr create), com um resumo do que foi feito. Registre o endereço com set_pull_request.',
-      'Resuma na conversa o que foi construído, como testar passo a passo e o que ficou de fora, e peça a revisão.',
+      'Escreva o roteiro de testes: o que foi construído, como testar passo a passo (comandos, telas, dados de exemplo, resultado esperado em cada passo) e o que ficou de fora. Acrescente-o à descrição do card com update_card, numa seção "Como testar", sem apagar o que já está lá.',
+      'Envie a branch da história (git push) e abra o pull request dela, se ainda não existir (ex.: gh pr create), com o resumo do que foi feito e o mesmo roteiro "Como testar" no corpo. Registre o endereço com set_pull_request.',
+      'Resuma na conversa o que foi feito, aponte o roteiro e peça a revisão.',
       'Não faça o merge: a conclusão depende da aprovação da pessoa. Depois de aprovado, se o card continuar nesta coluna, mova a história para a coluna de conclusão.',
     ].join('\n'),
     ...NO_ARTIFACT,

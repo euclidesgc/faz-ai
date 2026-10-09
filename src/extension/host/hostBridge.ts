@@ -47,6 +47,8 @@ export interface HostEnv {
   pickBackupFile?(): Promise<string | undefined>;
   /** abre o board no navegador (só faz sentido dentro do editor) */
   openInBrowser?(): unknown;
+  /** abre o Settings do editor filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */
+  openIdeSettings?(key?: string): unknown;
   /** mostra o chat na barra lateral (só faz sentido dentro do editor) */
   showChat?(): unknown;
 }
@@ -147,10 +149,14 @@ export class HostBridge {
         case 'chat.send':
         case 'chat.stop':
         case 'chat.clear':
+        case 'ai.suggestAgents':
           this.router.chatCommand(msg);
           return;
         case 'ui.openInBrowser':
           await this.env.openInBrowser?.();
+          return;
+        case 'ui.openIdeSettings':
+          await this.env.openIdeSettings?.(msg.key);
           return;
         case 'ai.run':
           await this.env.runAi(msg.cardId, msg.mode);

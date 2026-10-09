@@ -36,17 +36,38 @@ export interface Skill {
   content: string;
 }
 
-/** Agente (subagente) do projeto: um arquivo com instruções próprias, para o qual a ferramenta delega trabalho. */
+/**
+ * Agente: um arquivo de agente da ferramenta em uso (no projeto ou na pasta do usuário) com instruções
+ * próprias. Para o board, agente e perfil de execução são a mesma coisa: o frontmatter diz o que a sessão
+ * recebe (modelo, ferramentas, skills, servidores MCP) e o corpo é o papel dela. Lido do disco a cada varredura.
+ */
 export interface Agent {
   /** nome do arquivo, sem a extensão */
   name: string;
   description: string;
-  /** modelo fixado no frontmatter, se houver */
+  /** modelo fixado no frontmatter, no nome que a ferramenta aceita, se houver */
   model: string;
-  /** caminho do arquivo, relativo à raiz do projeto */
+  /** valor do campo Modelo do board (`<id>@<esforço>`), guardado pelo board no arquivo; vazio quando só há `model` */
+  modelValue: string;
+  /** de onde o arquivo veio */
+  scope: 'project' | 'user';
+  /** caminho absoluto do arquivo */
   path: string;
+  /** caminho para mostrar: relativo ao projeto, ou a partir de `~` (identidade do agente na marcação) */
+  location: string;
   /** conteúdo completo do arquivo (com o frontmatter) */
   content: string;
+  /** as instruções (o conteúdo sem o frontmatter) */
+  body: string;
+  /** ferramentas embutidas liberadas; vazio = as da permissão */
+  tools: string[];
+  deniedTools: string[];
+  /** skills que toda execução com o agente lê */
+  skills: string[];
+  /** servidores MCP liberados além do do board */
+  mcp: string[];
+  /** criado pelo board como agente padrão de fábrica */
+  seed: boolean;
 }
 
 /** Tipos de componente do harness de uma ferramenta, na ordem em que a tela os mostra. */
@@ -153,16 +174,12 @@ export interface Harness {
 }
 
 /** Ferramentas de IA que o board sabe configurar. O projeto trabalha com uma por vez. */
-export type AiTool = 'claude' | 'codex' | 'cursor' | 'kimi' | 'copilot';
+export type AiTool = 'claude' | 'cursor';
 
 /** Onde e como uma ferramenta guarda os agentes do projeto (conforme a documentação de cada uma em 2026-10-02). */
 export interface AgentSpec {
   dir: string;
   ext: string;
-  /** markdown com frontmatter YAML, ou TOML (Codex) */
-  format: 'markdown' | 'toml';
-  /** nome do campo que fixa o modelo do agente; null se a ferramenta não tem */
-  modelField: string | null;
 }
 
 /** O que cada ferramenta lê no projeto (conforme a documentação de cada uma). */
@@ -175,7 +192,7 @@ export const AI_TOOLS: {
   mcp: string;
   /** onde a instalação padrão (global) registra o servidor do board */
   mcpUser: string;
-  /** pasta e extensão dos agentes do projeto; null se a ferramenta não os define em arquivos */ agents: AgentSpec | null;
+  /** pasta e extensão dos agentes do projeto */ agents: AgentSpec;
 }[] = [
   {
     id: 'claude',
@@ -184,16 +201,7 @@ export const AI_TOOLS: {
     skills: '.claude/skills',
     mcp: '.mcp.json (projeto)',
     mcpUser: '~/.claude.json (claude mcp add --scope user)',
-    agents: { dir: '.claude/agents', ext: '.md', format: 'markdown', modelField: 'model' },
-  },
-  {
-    id: 'codex',
-    label: 'Codex',
-    rules: 'AGENTS.md',
-    skills: '.agents/skills',
-    mcp: '.codex/config.toml (projeto confiável)',
-    mcpUser: '~/.codex/config.toml',
-    agents: { dir: '.codex/agents', ext: '.toml', format: 'toml', modelField: 'model' },
+    agents: { dir: '.claude/agents', ext: '.md' },
   },
   {
     id: 'cursor',
@@ -202,25 +210,7 @@ export const AI_TOOLS: {
     skills: '.cursor/skills',
     mcp: '.cursor/mcp.json (projeto)',
     mcpUser: '.cursor/mcp.json (projeto; o global não funciona no Cursor)',
-    agents: { dir: '.cursor/agents', ext: '.md', format: 'markdown', modelField: 'model' },
-  },
-  {
-    id: 'kimi',
-    label: 'Kimi Code',
-    rules: 'AGENTS.md',
-    skills: '.kimi-code/skills',
-    mcp: '.kimi-code/mcp.json (projeto)',
-    mcpUser: '~/.kimi-code/mcp.json ou ~/.kimi/mcp.json',
-    agents: { dir: '.kimi-code/agents', ext: '.md', format: 'markdown', modelField: null },
-  },
-  {
-    id: 'copilot',
-    label: 'GitHub Copilot',
-    rules: 'AGENTS.md',
-    skills: '.github/skills',
-    mcp: '.vscode/mcp.json e .mcp.json (projeto)',
-    mcpUser: '~/.copilot/mcp-config.json (Copilot CLI) e o mcp.json do perfil do VS Code',
-    agents: { dir: '.github/agents', ext: '.agent.md', format: 'markdown', modelField: 'model' },
+    agents: { dir: '.cursor/agents', ext: '.md' },
   },
 ];
 
@@ -244,7 +234,7 @@ export const EMPTY_HARNESS: Harness = { rules: [], skills: [], agents: [], inven
 /** Arquivos de regras reconhecidos, com a ferramenta que os lê. */
 export const RULE_FILES: { name: string; readBy: string }[] = [
   { name: 'CLAUDE.md', readBy: 'Claude Code' },
-  { name: 'AGENTS.md', readBy: 'Codex, Cursor, Kimi Code, GitHub Copilot e outros' },
+  { name: 'AGENTS.md', readBy: 'Cursor e outras ferramentas' },
 ];
 
 export const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;

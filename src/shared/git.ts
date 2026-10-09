@@ -26,6 +26,7 @@ export const MERGE_METHODS: { value: MergeMethod; label: string }[] = [
 
 export const MERGE_WATCH_RANGE = { min: 5, max: 1440 };
 
+/** `package.nls.json` e `package.nls.pt-br.json` repetem estas `hint`s nas chaves `config.git.mode.*`: mantenha em sincronia. */
 export const WORKSPACE_MODES: { value: WorkspaceMode; label: string; hint: string }[] = [
   {
     value: 'worktree',

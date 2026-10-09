@@ -29,8 +29,8 @@ it.skipIf(process.platform === 'win32')('acha a CLI no PATH, nas pastas usuais e
   expect(resolveCommand('claude', `/nao-existe${path.delimiter}${path.join(home, 'tools')}`, home)).toBe(onPath);
 
   // arquivo sem permissão de execução não serve
-  fs.writeFileSync(path.join(home, 'tools/codex'), '', { mode: 0o644 });
-  expect(resolveCommand('codex', path.join(home, 'tools'), home)).toBeNull();
+  fs.writeFileSync(path.join(home, 'tools/cursor-agent'), '', { mode: 0o644 });
+  expect(resolveCommand('cursor-agent', path.join(home, 'tools'), home)).toBeNull();
   expect(commandNotFound('claude')).toContain('Claude Code');
 });
 

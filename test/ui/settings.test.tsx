@@ -1,12 +1,12 @@
 import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
-import { beforeAll, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { Settings } from '../../src/webview/components/settings/Settings';
 import { TypesSettings } from '../../src/webview/components/settings/TypesSettings';
-import { useBoardStore } from '../../src/webview/store/boardStore';
+import { useBoardStore, useHostSync } from '../../src/webview/store/boardStore';
 
 let board: SeededBoard;
 beforeAll(async () => {
@@ -179,6 +179,8 @@ describe('TypesSettings: skills por tipo', () => {
       state: {
         ...s0,
         board: { ...s0.board, aiTool: 'claude' },
+        // só uma skill marcada no Harness pode ser escolhida
+        harnessSelection: [{ kind: 'skill', location: '.claude/skills/revisar-spec/SKILL.md', usage: 'contextual' }],
         harness: {
           ...s0.harness,
           skills: [
@@ -189,6 +191,24 @@ describe('TypesSettings: skills por tipo', () => {
               mode: 'auto',
               path: '.claude/skills/revisar-spec/SKILL.md',
               content: '',
+            },
+          ],
+          inventory: [
+            {
+              tool: 'claude',
+              installed: true,
+              items: [
+                {
+                  kind: 'skill',
+                  scope: 'project',
+                  name: 'revisar-spec',
+                  description: 'Revisa a spec',
+                  path: '/abs/.claude/skills/revisar-spec/SKILL.md',
+                  location: '.claude/skills/revisar-spec/SKILL.md',
+                  layout: 'skills',
+                  mode: 'auto',
+                },
+              ],
             },
           ],
         },
@@ -223,6 +243,21 @@ describe('TypesSettings: skills por tipo', () => {
 });
 
 describe('Settings: menu lateral', () => {
+  it('Modelos de IA vem logo depois do Harness de IA', () => {
+    useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
+    render(
+      <Theme>
+        <Settings />
+      </Theme>,
+    );
+    const nav = screen.getByRole('navigation', { name: 'Seções das configurações' });
+    const labels = within(nav)
+      .getAllByRole('button')
+      .map((x) => x.textContent);
+    const at = (label: string) => labels.indexOf(label);
+    expect(at('Modelos de IA')).toBe(at('Harness de IA') + 1);
+  });
+
   it('recolhe numa faixa de ícones: rótulos somem, as seções seguem acessíveis pelo nome e o estado fica lembrado', async () => {
     useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
     render(
@@ -244,5 +279,111 @@ describe('Settings: menu lateral', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Expandir o menu' }));
     expect(nav).toHaveTextContent('Tipos de card');
     useBoardStore.setState({ settingsNavCollapsed: false });
+  });
+});
+
+/** Liga o store às mensagens do host (como o App faz) junto com o conteúdo das Configurações. */
+function SettingsWithHostSync() {
+  useHostSync();
+  return <Settings />;
+}
+
+describe('Settings: ida e volta com o Settings do editor', () => {
+  it('o botão "Abrir no Settings do editor" manda ui.openIdeSettings', async () => {
+    render(
+      <Theme>
+        <Settings />
+      </Theme>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir no Settings do editor' }));
+    expect(lastSent('ui.openIdeSettings')).toEqual({ type: 'ui.openIdeSettings', key: undefined });
+  });
+
+  it('ui.openSettings troca a aba e rola até a seção', () => {
+    render(
+      <Theme>
+        <SettingsWithHostSync />
+      </Theme>,
+    );
+    const scroll = vi.fn();
+    const alvo = document.createElement('div');
+    alvo.id = 'secao-teste';
+    alvo.scrollIntoView = scroll;
+    document.body.append(alvo);
+    act(() =>
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'ui.openSettings', tab: 'harness', section: 'secao-teste' } })),
+    );
+    expect(useBoardStore.getState().settingsTab).toBe('harness');
+    expect(scroll).toHaveBeenCalledWith({ block: 'start' });
+    alvo.remove();
+  });
+
+  it('ui.openSettings destaca a seção por ~2s e depois tira a classe', () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Theme>
+          <SettingsWithHostSync />
+        </Theme>,
+      );
+      const alvo = document.createElement('div');
+      alvo.id = 'secao-destaque';
+      alvo.scrollIntoView = vi.fn();
+      document.body.append(alvo);
+      act(() =>
+        window.dispatchEvent(new MessageEvent('message', { data: { type: 'ui.openSettings', tab: 'harness', section: 'secao-destaque' } })),
+      );
+      expect(alvo).toHaveClass('fazai-highlight');
+      act(() => vi.advanceTimersByTime(2200));
+      expect(alvo).not.toHaveClass('fazai-highlight');
+      alvo.remove();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('goToSection também destaca a seção, com a aba e a sub-aba de Harness certas', () => {
+    vi.useFakeTimers();
+    try {
+      useBoardStore.setState({ settingsTab: 'columns', harnessTab: 'tool', pendingSettingsSection: null });
+      render(
+        <Theme>
+          <SettingsWithHostSync />
+        </Theme>,
+      );
+      const alvo = document.createElement('div');
+      alvo.id = 'secao-goto';
+      alvo.scrollIntoView = vi.fn();
+      document.body.append(alvo);
+      // 'secao-goto' não está em SETTINGS_SECTIONS: só marca a pendência, sem trocar de aba
+      act(() => useBoardStore.getState().goToSection('secao-goto'));
+      expect(alvo).toHaveClass('fazai-highlight');
+      act(() => vi.advanceTimersByTime(2200));
+      expect(alvo).not.toHaveClass('fazai-highlight');
+      alvo.remove();
+
+      // com uma seção registrada que mora numa sub-aba de Harness, goToSection troca a aba e a sub-aba
+      const heartbeat = document.createElement('div');
+      heartbeat.id = 'heartbeat';
+      heartbeat.scrollIntoView = vi.fn();
+      document.body.append(heartbeat);
+      act(() => useBoardStore.getState().goToSection('heartbeat'));
+      const s = useBoardStore.getState();
+      expect(s.settingsTab).toBe('harness');
+      expect(s.harnessTab).toBe('tool');
+      heartbeat.remove();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ui.openView mostra o Diagnóstico', () => {
+    render(
+      <Theme>
+        <SettingsWithHostSync />
+      </Theme>,
+    );
+    act(() => window.dispatchEvent(new MessageEvent('message', { data: { type: 'ui.openView', view: 'environment' } })));
+    expect(useBoardStore.getState().view).toBe('environment');
   });
 });

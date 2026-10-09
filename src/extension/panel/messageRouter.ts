@@ -5,10 +5,11 @@ import type { DbHandle } from '../db/database';
 import { exportBoard, exportFileName, summarize, type BoardExportFile, type ImportResult } from '../db/boardExport';
 import { newId } from '../db/ids';
 import type { ImportSummary } from '../../shared/backup';
-import type { Attachment, Autopilot, BoardState } from '../../shared/model';
+import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
 import type { AiTool } from '../../shared/harness';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
+import { agentProfiles } from '../../shared/execution';
 import type { AttachmentStore } from '../attachments';
 import type { HarnessStore } from '../harness';
 import { headlessUnsupported } from '../headless';
@@ -23,6 +24,7 @@ import { cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers } from './handlers/models';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
+import { settleDelivery } from '../delivery';
 
 export type { RouterOptions };
 
@@ -43,7 +45,7 @@ export interface EnvironmentHooks {
 }
 
 /** As mensagens do webview que o chat executa. */
-export type ChatMessageIn = Extract<WebviewToHost, { type: 'chat.send' | 'chat.stop' | 'chat.clear' }>;
+export type ChatMessageIn = Extract<WebviewToHost, { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' }>;
 
 /** Tratadas pela ponte do webview (dependem do VSCode): aqui não mudam o board. */
 const viaBridge = () => false;
@@ -57,12 +59,14 @@ const bridgeOnly = {
   'ui.openEditorMcp': viaBridge,
   'ui.openTerminal': viaBridge,
   'ui.openInBrowser': viaBridge,
+  'ui.openIdeSettings': viaBridge,
   'ai.run': viaBridge,
   'ai.stop': viaBridge,
   'ai.heartbeat.run': viaBridge,
   'chat.send': viaBridge,
   'chat.stop': viaBridge,
   'chat.clear': viaBridge,
+  'ai.suggestAgents': viaBridge,
   'ui.showChat': viaBridge,
   'requirements.check': viaBridge,
   'environment.check': viaBridge,
@@ -107,6 +111,8 @@ export class MessageRouter {
   private listeners = new Set<() => void>();
   private approveListeners: ((cardId: string) => void)[] = [];
   private aiRuns: string[] = [];
+  private aiActivity: AiActivity[] = [];
+  private heartbeatNextAt: number | null = null;
   private chat: ChatState = EMPTY_CHAT;
   private chatHandler: ((msg: ChatMessageIn) => void) | null = null;
   private autopilot: Autopilot = { active: false, note: null };
@@ -129,11 +135,23 @@ export class MessageRouter {
     this.harnessStore = this.ctx.harness.store;
     this.ctx.harness.load();
     initModels(this.ctx);
+    // os agentes de fábrica usam as regras de modelo, que initModels acabou de criar
+    this.ctx.harness.bootstrap();
     dbHandle.scheduleSave();
   }
 
   get boardId(): string {
     return this.ctx.boardId;
+  }
+
+  /** Lê um valor da tabela meta do board (ex.: config do Git da IDE); undefined se não existir. */
+  getMeta(key: string): string | undefined {
+    return this.ctx.boards.getMeta(key);
+  }
+
+  /** Grava um valor na tabela meta do board, substituindo o existente. */
+  setMeta(key: string, value: string): void {
+    this.ctx.boards.setMeta(key, value);
   }
 
   onDidChange(fn: () => void): () => void {
@@ -151,8 +169,12 @@ export class MessageRouter {
     const { current, install } = this.ctx.harness;
     return {
       ...s,
+      // os agentes do board são os arquivos marcados: derivados aqui, nunca gravados
+      board: { ...s.board, execProfiles: agentProfiles(current.agents, s.harnessSelection, s.board.runner.defaultAgent) },
       harness: current,
       aiRuns: this.aiRuns,
+      aiActivity: this.aiActivity,
+      heartbeatNextAt: this.heartbeatNextAt,
       chat: this.chat,
       autopilot: this.autopilot,
       aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission),
@@ -191,6 +213,17 @@ export class MessageRouter {
     this.ctx.log.record(msg, actor, probe);
     this.changed();
     return id;
+  }
+
+  /**
+   * Reavalia se a história pode ser entregue (ver `settleDelivery`) e, se sim, grava a entrega e
+   * avisa os webviews. Chamado pelo runner ao fim de uma execução, quando o pull request já estava
+   * registrado antes do card chegar na última coluna da IA.
+   */
+  settleDelivery(storyId: string): boolean {
+    const delivered = settleDelivery(this.ctx, storyId);
+    if (delivered) this.changed();
+    return delivered;
   }
 
   /** Quem diz qual execução de IA está em curso num card (o executor), para o `run_id` dos eventos. */
@@ -288,10 +321,18 @@ export class MessageRouter {
     this.notify();
   }
 
-  /** Cards em que a extensão está executando a IA (informado pelo executor). */
-  setAiRuns(cardIds: string[]): void {
-    this.aiRuns = cardIds;
-    this.ctx.aiRuns = cardIds;
+  /** Execuções de IA em curso, uma por card (informado pelo executor); `aiRuns` é derivado delas. */
+  setAiRuns(runs: AiActivity[]): void {
+    this.aiActivity = runs;
+    this.aiRuns = runs.map((r) => r.cardId);
+    this.ctx.aiRuns = this.aiRuns;
+    this.notify();
+  }
+
+  /** Próxima rodada agendada do heartbeat (informado pelo host); só notifica quando o valor muda. */
+  setHeartbeat(state: { nextRoundAt: number | null }): void {
+    if (state.nextRoundAt === this.heartbeatNextAt) return;
+    this.heartbeatNextAt = state.nextRoundAt;
     this.notify();
   }
 

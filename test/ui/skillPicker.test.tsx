@@ -27,6 +27,12 @@ beforeEach(async () => {
     state: {
       ...s,
       board: { ...s.board, aiTool: 'claude' },
+      // só o que está marcado no Harness pode ser escolhido
+      harnessSelection: [
+        { kind: 'skill', location: 'revisar-spec/SKILL.md', usage: 'contextual' },
+        { kind: 'skill', location: 'humanizer/SKILL.md', usage: 'contextual' },
+        { kind: 'skill', location: 'pdf/SKILL.md', usage: 'contextual' },
+      ],
       harness: {
         ...s.harness,
         skills: [],

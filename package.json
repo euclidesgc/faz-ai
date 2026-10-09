@@ -2,7 +2,7 @@
   "name": "faz-ai",
   "displayName": "Faz AI Kanban",
   "description": "Board kanban para Spec-Driven Development com IA, no editor ou no navegador: histórias, sub-tarefas e um servidor MCP para a IA ler e atualizar o board",
-  "version": "0.33.0",
+  "version": "0.34.0",
   "publisher": "euclidesgc",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -41,8 +41,7 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onStartupFinished",
-    "onView:fazai.chat"
+    "onStartupFinished"
   ],
   "contributes": {
     "commands": [
@@ -55,6 +54,14 @@
         "command": "fazai.openInBrowser",
         "title": "%command.openInBrowser.title%",
         "icon": "$(globe)"
+      },
+      {
+        "command": "fazai.exportBoard",
+        "title": "%command.exportBoard.title%"
+      },
+      {
+        "command": "fazai.importBoard",
+        "title": "%command.importBoard.title%"
       },
       {
         "command": "fazai.refreshSidebar",
@@ -93,6 +100,199 @@
       {
         "command": "fazai.showLog",
         "title": "%command.showLog.title%"
+      },
+      {
+        "command": "fazai.openEnvironment",
+        "title": "%command.openEnvironment.title%"
+      },
+      {
+        "command": "fazai.openIdeSettings",
+        "title": "%command.openIdeSettings.title%"
+      },
+      {
+        "command": "fazai.openBoardSettings",
+        "title": "%command.openBoardSettings.title%"
+      }
+    ],
+    "configuration": [
+      {
+        "title": "%config.install.title%",
+        "order": 1,
+        "properties": {
+          "fazai.install.environment": {
+            "type": "null",
+            "markdownDescription": "%config.install.environment%"
+          }
+        }
+      },
+      {
+        "title": "%config.appearance.title%",
+        "order": 2,
+        "properties": {
+          "fazai.appearance.language": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "pt-BR",
+              "en"
+            ],
+            "enumDescriptions": [
+              "%config.appearance.language.auto%",
+              "%config.appearance.language.ptBR%",
+              "%config.appearance.language.en%"
+            ],
+            "default": "auto",
+            "scope": "application",
+            "markdownDescription": "%config.appearance.language%"
+          },
+          "fazai.appearance.theme": {
+            "type": "string",
+            "enum": [
+              "system",
+              "light",
+              "dark"
+            ],
+            "enumDescriptions": [
+              "%config.appearance.theme.system%",
+              "%config.appearance.theme.light%",
+              "%config.appearance.theme.dark%"
+            ],
+            "default": "system",
+            "scope": "application",
+            "markdownDescription": "%config.appearance.theme%"
+          },
+          "fazai.appearance.font": {
+            "type": "string",
+            "enum": [
+              "sans",
+              "ui",
+              "serif",
+              "mono",
+              "editor"
+            ],
+            "enumDescriptions": [
+              "%config.appearance.font.sans%",
+              "%config.appearance.font.ui%",
+              "%config.appearance.font.serif%",
+              "%config.appearance.font.mono%",
+              "%config.appearance.font.editor%"
+            ],
+            "default": "sans",
+            "scope": "application",
+            "markdownDescription": "%config.appearance.font%"
+          },
+          "fazai.appearance.fontSize": {
+            "type": "number",
+            "minimum": 11,
+            "maximum": 22,
+            "default": 14,
+            "scope": "application",
+            "markdownDescription": "%config.appearance.fontSize%"
+          }
+        }
+      },
+      {
+        "title": "%config.git.title%",
+        "order": 3,
+        "properties": {
+          "fazai.git.mode": {
+            "type": "string",
+            "enum": [
+              "worktree",
+              "branch",
+              "off"
+            ],
+            "enumDescriptions": [
+              "%config.git.mode.worktree%",
+              "%config.git.mode.branch%",
+              "%config.git.mode.off%"
+            ],
+            "default": "worktree",
+            "scope": "resource",
+            "order": 1,
+            "markdownDescription": "%config.git.mode%"
+          },
+          "fazai.git.branchPattern": {
+            "type": "string",
+            "default": "{tipo}/{numero}-{titulo}",
+            "scope": "resource",
+            "order": 2,
+            "markdownDescription": "%config.git.branchPattern%"
+          },
+          "fazai.git.worktreeDir": {
+            "type": "string",
+            "default": "../{repo}.worktrees",
+            "scope": "resource",
+            "order": 3,
+            "markdownDescription": "%config.git.worktreeDir%"
+          },
+          "fazai.git.parallel": {
+            "type": "boolean",
+            "default": false,
+            "scope": "resource",
+            "order": 4,
+            "markdownDescription": "%config.git.parallel%"
+          },
+          "fazai.git.parallelStories": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 6,
+            "default": 2,
+            "scope": "resource",
+            "order": 5,
+            "markdownDescription": "%config.git.parallelStories%"
+          },
+          "fazai.git.autoMerge": {
+            "type": "boolean",
+            "default": false,
+            "scope": "resource",
+            "order": 6,
+            "markdownDescription": "%config.git.autoMerge%"
+          },
+          "fazai.git.mergeMethod": {
+            "type": "string",
+            "enum": [
+              "squash",
+              "merge",
+              "rebase"
+            ],
+            "enumDescriptions": [
+              "%config.git.mergeMethod.squash%",
+              "%config.git.mergeMethod.merge%",
+              "%config.git.mergeMethod.rebase%"
+            ],
+            "default": "squash",
+            "scope": "resource",
+            "order": 7,
+            "markdownDescription": "%config.git.mergeMethod%"
+          },
+          "fazai.git.watchMerges": {
+            "type": "boolean",
+            "default": true,
+            "scope": "resource",
+            "order": 8,
+            "markdownDescription": "%config.git.watchMerges%"
+          },
+          "fazai.git.watchMergeMinutes": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 1440,
+            "default": 15,
+            "scope": "resource",
+            "order": 9,
+            "markdownDescription": "%config.git.watchMergeMinutes%"
+          }
+        }
+      },
+      {
+        "title": "%config.backup.title%",
+        "order": 4,
+        "properties": {
+          "fazai.backup.info": {
+            "type": "null",
+            "markdownDescription": "%config.backup.info%"
+          }
+        }
       }
     ],
     "viewsContainers": {
@@ -190,6 +390,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
+    "@types/dompurify": "^3.0.5",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -218,5 +419,9 @@
     "yauzl-promise": "^4.0.0",
     "zod": "^4.6.5",
     "zustand": "^4.5.4"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.16",
+    "radix-ui": "^1.1.3"
   }
 }

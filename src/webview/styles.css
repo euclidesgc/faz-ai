@@ -215,6 +215,20 @@ button.active {
 }
 .column.over {
   border-color: var(--accent);
+  background: var(--hover);
+}
+.card-ghost {
+  opacity: 0.45;
+}
+.card-ghost > .card {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .column {
+    transition: none;
+  }
 }
 .column.terminal .column-name {
   opacity: 0.75;
@@ -256,6 +270,9 @@ button.active {
 .column-footer {
   padding: var(--sp-6) var(--sp-8);
 }
+.column-footer--top {
+  border-bottom: 1px solid var(--border);
+}
 .column-footer .ghost {
   width: 100%;
   text-align: left;
@@ -267,6 +284,7 @@ button.active {
 }
 
 .card {
+  position: relative;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -413,6 +431,25 @@ button.active {
   outline: var(--focus-ring);
   outline-offset: -1px;
 }
+/* caixa de marcação da seleção múltipla (card 324): tem lugar fixo na faixa do card, antes do LED,
+   para nunca cobrir o ID nem o tipo; some por padrão (o lugar fica reservado, nada se mexe) e aparece
+   sob o mouse, já marcada ou enquanto há alguma seleção ativa no board (classe .selecting) */
+.card-select {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+  opacity: 0;
+  cursor: pointer;
+}
+.card:hover .card-select,
+.card.selecting .card-select,
+.card:focus-within .card-select,
+.card-select:focus-visible,
+.card-select:checked {
+  opacity: 1;
+}
 .card.overlay {
   box-shadow: var(--shadow-2);
   transform: rotate(1.5deg);
@@ -476,6 +513,19 @@ button.active {
   margin-top: var(--sp-6);
   font-size: var(--fs-xs);
   color: var(--muted);
+}
+/* card colapsado (escopo "um card"/coluna/board/selecionados): a faixa colorida fica (LED, ID, tipo e
+   botões) e o corpo guarda só o título, em até duas linhas */
+.card.card-collapsed .card-body {
+  padding-top: var(--sp-4);
+  padding-bottom: var(--sp-4);
+}
+.card.card-collapsed .card-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .badge {
   font-size: var(--fs-xs);
@@ -595,6 +645,11 @@ button.chip.on:hover:where(:not(:disabled)) {
 .field-row > span {
   color: var(--muted);
   font-size: var(--fs-sm);
+}
+.dialog-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
 }
 .markdown {
   border: 1px solid var(--border);
@@ -873,6 +928,36 @@ button.ghost.on {
   width: 100%;
 }
 
+/* hint (tooltip rico) */
+.hint-content {
+  z-index: 70;
+  max-width: 320px;
+  padding: var(--sp-8) var(--sp-12);
+  background: var(--card-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2);
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+.hint-content p {
+  margin: 0 0 var(--sp-4);
+}
+.hint-content ul {
+  margin: 0;
+  padding-left: 1.1em;
+}
+.hint-content li + li {
+  margin-top: var(--sp-4);
+}
+.hint-arrow {
+  fill: var(--card-bg);
+}
+.hint-disabled-wrap {
+  display: inline-flex;
+}
+
 /* diálogo */
 .modal-backdrop {
   position: fixed;
@@ -953,6 +1038,18 @@ button.ghost.on {
   flex-direction: column;
   gap: var(--sp-8);
 }
+/* barra de seleção múltipla (card 326): mesma faixa da barra de filtros, só visível com 2+ cards marcados */
+.selectionbar {
+  border-bottom: 1px solid var(--border);
+  padding: var(--sp-8) var(--sp-12);
+  display: flex;
+  gap: var(--sp-8);
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+  color: var(--fg);
+  background: var(--col-bg);
+}
 .filterbar-main {
   display: flex;
   gap: var(--sp-6);
@@ -987,10 +1084,6 @@ button.ghost.on {
 }
 .column-add input {
   width: 180px;
-}
-.column.archive {
-  border-style: dashed;
-  opacity: 0.9;
 }
 .column .empty {
   font-size: var(--fs-xs);
@@ -1065,6 +1158,10 @@ button.ghost.on {
   max-width: 100%;
 }
 .markdown table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
 }
 .markdown td,
@@ -1236,6 +1333,48 @@ button.ghost.on {
   white-space: nowrap;
 }
 
+/* arquivados: uma linha por workflow, cards em fluxo que quebra linha */
+.archived {
+  padding: var(--sp-12) var(--sp-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+.archived-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+.archived-row > header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.archived-row > header h2 {
+  margin: 0;
+  font-size: var(--fs-h);
+}
+.archived-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: flex-start;
+}
+.archived-cards > .archived-item {
+  flex: 0 1 260px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.archived-item .archived-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
 /* lixeira */
 .trash {
   padding: var(--sp-12) var(--sp-20);
@@ -1356,29 +1495,6 @@ button.ghost.on {
 .table td.narrow {
   width: 1%;
   white-space: nowrap;
-}
-
-/* preço do modelo: quatro campos estreitos, cada um com a legenda em cima */
-.price-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(5rem, 1fr));
-  gap: var(--sp-4);
-}
-.price-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-.price-hint {
-  margin-top: var(--sp-6);
-}
-/* "preço variável" fica em cima dos campos; ligado, troca os campos por um texto do mesmo tamanho */
-.price-variable {
-  margin-bottom: var(--sp-4);
-}
-.price-variable-note {
-  margin: 0;
-  max-width: 40ch;
 }
 
 /* regras de sugestão de modelo */
@@ -1732,14 +1848,6 @@ body.host-web {
 .theme-toggle:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 1px;
-}
-.topbar-info {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-6);
-  font-size: var(--fs-sm);
-  color: var(--muted);
-  white-space: nowrap;
 }
 .topbar-pending {
   background: transparent;
@@ -2409,6 +2517,37 @@ body.host-web .drawer {
   margin-top: var(--sp-8);
 }
 
+/* DependsOn: linha discreta sob um campo que depende de outro (história 183) */
+.depends-on {
+  margin: 0;
+}
+.depends-on-unmet {
+  color: var(--warn-border);
+}
+
+/* destaque temporário (~2s) do elemento alvo de um link cruzado entre configurações (história 183) */
+@keyframes fazai-highlight {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  15%,
+  85% {
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+}
+.fazai-highlight {
+  animation: fazai-highlight 2s ease-in-out;
+  border-radius: var(--radius-lg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fazai-highlight {
+    animation: none;
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
 /* formulários dos cartões das configurações */
 .draft-card,
 .form-card {
@@ -2534,6 +2673,38 @@ body.host-web .drawer {
 }
 .path-link:hover {
   text-decoration: underline;
+}
+.activity-bar {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding: var(--sp-4) var(--sp-12);
+  display: flex;
+  gap: var(--sp-8);
+  align-items: center;
+  min-height: 26px;
+}
+.activity-bar .list {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-ref {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--link);
+  font: inherit;
+  cursor: pointer;
+}
+.activity-ref:hover {
+  text-decoration: underline;
+}
+.activity-ref:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
 }
 .item-files {
   grid-column: 2 / -1;
@@ -2776,8 +2947,27 @@ body.host-web .drawer {
 .chat-drawer .chat-head {
   padding-right: var(--sp-24);
 }
-/* modo autônomo (YOLO): selo no card, barra no painel e botão do autopiloto no topo */
+/* modo autônomo (YOLO): botão no rodapé do card, barra no painel e botão do autopiloto no topo */
 .yolo-mark {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  padding: 0 var(--sp-2);
+  margin: calc(var(--sp-2) * -1) calc(var(--sp-2) * -1);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+.yolo-mark:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.yolo-mark.on {
+  color: var(--warn-border);
+}
+.yolo-mark.on:hover {
   color: var(--warn-border);
 }
 .yolo-bar label {

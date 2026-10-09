@@ -103,9 +103,17 @@ const measured = (over: Partial<NonNullable<RunReport['consumption']>> = {}, inv
   inventory,
   answer: '',
   reason: null,
+  usageLimitReached: false,
 });
 
-const notMeasured = (): RunReport => ({ measure: 'none', consumption: null, inventory: [], answer: '', reason: 'sem medida' });
+const notMeasured = (): RunReport => ({
+  measure: 'none',
+  consumption: null,
+  inventory: [],
+  answer: '',
+  reason: 'sem medida',
+  usageLimitReached: false,
+});
 
 const of = (totals: LogMetric[], metric: string, dim = '', value = '') =>
   totals.find((t) => t.metric === metric && t.dim === dim && t.value === value);

@@ -2,16 +2,16 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
 import { aiToolInfo } from '../shared/harness';
-import type { AiRunOutcome, RunReport } from '../shared/log';
+import type { RunnerPermission } from '../shared/runner';
 import { effortToRun } from '../shared/execution';
 import { parseModelValue } from '../shared/models';
 import type { BoardState } from '../shared/model';
-import { spawnMeasured, type SpawnFn } from './aiOutput/measured';
-import { BOARD_SERVER, type ExecInput } from './execution';
+import { NO_CARD, type AiExecution } from './ai/gateway';
+import { BOARD_SERVER, bareExec, type ExecInput } from './execution';
+import { contextLines } from './promptContext';
 import { isCliNoise } from './cliNoise';
-import { headlessUnsupported } from './headless';
 import type { MessageRouter } from './panel/messageRouter';
-import { boardServer, PERMISSION_ADVICE, type RunnerDeps, type RunningProcess } from './runner';
+import { boardServer, PERMISSION_ADVICE, type RunnerDeps } from './runner';
 
 /** Quantas mensagens anteriores entram no prompt, e o tamanho máximo de cada uma. */
 const HISTORY = 12;
@@ -22,8 +22,8 @@ const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
 
 const newId = (): string => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-/** O que a IA recebe a cada mensagem do chat: o papel dela, o limite da execução, a conversa até aqui e a pergunta nova. */
-export function chatPrompt(history: ChatMessage[], text: string, advice: string | null): string {
+/** O que a IA recebe a cada mensagem do chat: o papel dela, o contexto fixo do board, o limite da execução, a conversa até aqui e a pergunta nova. */
+export function chatPrompt(history: ChatMessage[], text: string, advice: string | null, always: string[] = []): string {
   const past = history
     .filter((m) => m.role !== 'error')
     .slice(-HISTORY)
@@ -31,26 +31,29 @@ export function chatPrompt(history: ChatMessage[], text: string, advice: string 
   return [
     `Você é o assistente do board Faz AI deste projeto e está conversando com a pessoa pelo chat do board. Use as ferramentas do servidor MCP "${BOARD_SERVER}" para consultar e alterar o board (por exemplo get_board, list_cards, get_card, create_card, update_card, move_card, link_cards).`,
     'Responda em português do Brasil, de forma curta e direta. Quando criar ou alterar cards, diga o que fez e cite os IDs (#n). Se o pedido for ambíguo, pergunte antes de agir. Não altere arquivos do projeto: seu trabalho aqui é o board.',
+    ...always,
     ...(advice ? [advice] : []),
     ...(past.length ? ['Conversa até agora:', ...past] : []),
     `Pessoa: ${text}`,
   ].join('\n');
 }
 
+/** O que a IA recebe no "Sugerir agentes com IA": ler o projeto e propor os agentes do board, criando e ajustando arquivos de agente pelo MCP. */
+export function suggestAgentsPrompt(): string {
+  return [
+    'Você vai propor os agentes de execução deste board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Um agente é um arquivo de agente da ferramenta de IA (instruções, modelo, ferramentas, skills) que o board usa para executar os cards.',
+    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, linguagens e frameworks) e o board: get_board (agentes atuais, campos, regras de modelo), get_harness com onlySelected = false (tudo que a ferramenta carrega, com a marcação do board) e get_models (catálogo de modelos).',
+    'Proponha de 3 a 8 agentes que façam sentido para ESTE projeto. Para cada um: se já existir um parecido, ajuste-o com update_agent (patch com description, body, model, tools, skills); senão, crie com create_agent (scope "user", available true). Descrição de uma frase que diga quando usá-lo; instruções curtas e específicas do projeto (padrões, comandos de teste, pastas); skills só entre as marcadas em get_harness; modelo pelo catálogo de get_models (valor como no campo Modelo, ex.: "claude:sonnet@medium"), seguindo as regras de esforço do board.',
+    'Mantenha um agente condutor (que conduz os cards pelo fluxo e delega aos especialistas) como padrão do board.',
+    'Não altere arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: nome → para quê, o que criou e o que ajustou.',
+  ].join('\n');
+}
+
 /** O modelo escolhido no chat, no formato que a linha de comando da ferramenta pede; null = o padrão dela. */
-function execFor(s: BoardState, model: string | null): ExecInput {
+function modelFor(s: BoardState, model: string | null): ExecInput['model'] {
   const chosen = parseModelValue(model);
   const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
-  return {
-    agent: '',
-    mcpAllowed: null,
-    mcpBlocked: [],
-    mcpConfig: null,
-    tools: [],
-    deniedTools: [],
-    model: option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null,
-    clean: false,
-  };
+  return option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null;
 }
 
 /**
@@ -60,8 +63,7 @@ function execFor(s: BoardState, model: string | null): ExecInput {
  */
 export class ChatSession {
   private messages: ChatMessage[];
-  private proc: RunningProcess | null = null;
-  private stopped = false;
+  private running: AiExecution | null = null;
 
   constructor(
     private router: MessageRouter,
@@ -70,6 +72,7 @@ export class ChatSession {
     this.messages = this.load();
     router.setChatHandler((msg) => {
       if (msg.type === 'chat.send') this.send(msg.text, msg.model);
+      else if (msg.type === 'ai.suggestAgents') this.suggestAgents();
       else if (msg.type === 'chat.stop') this.stop();
       else this.clear();
     });
@@ -77,129 +80,111 @@ export class ChatSession {
   }
 
   get busy(): boolean {
-    return this.proc !== null;
+    return this.running !== null;
   }
 
   send(text: string, model: string | null): void {
     const body = text.trim();
     if (!body) return;
-    if (this.proc) throw new Error('A IA ainda está respondendo. Espere ou interrompa.');
+    const state = this.router.snapshot();
+    // o prompt sai da conversa ANTES de a pergunta entrar nela: senão ela iria duas vezes (no histórico e no fim)
+    const prompt = chatPrompt(this.messages, body, PERMISSION_ADVICE[state.board.runner.permission], contextLines(state).always);
+    this.run({ role: 'user', text: body, ...(model ? { model } : {}) }, prompt, state.board.runner.permission, model);
+  }
+
+  /** A IA lê o projeto e propõe os agentes do board; a conversa registra o pedido e o resultado. */
+  suggestAgents(): void {
+    const state = this.router.snapshot();
+    const prompt = [suggestAgentsPrompt(), ...contextLines(state).always].join('\n');
+    // criar e marcar agentes é trabalho do board: roda só com ele
+    this.run({ role: 'user', text: 'Sugerir agentes com IA: leia o projeto e proponha os agentes deste board.' }, prompt, 'board', null);
+  }
+
+  /** Uma execução do chat pelo gateway: a mensagem entra na conversa quando o processo começa, e a resposta (ou o erro) no fim. */
+  private run(message: Omit<ChatMessage, 'id' | 'at'>, prompt: string, permission: RunnerPermission, model: string | null): void {
+    if (this.running) throw new Error('A IA ainda está respondendo. Espere ou interrompa.');
     const state = this.router.snapshot();
     const tool = aiToolInfo(state.board.aiTool);
-    const permission = state.board.runner.permission;
-    const exec = execFor(state, model);
-    // o chat é a quarta origem de execução, e a única sem card: nenhuma execução nasce da conversa de
-    // um card (ela devolve o card para "pronto" e quem executa depois é o heartbeat ou o autopiloto)
-    const logId = this.deps.runLog
-      ? this.deps.runLog.start({
-          boardId: this.router.boardId,
-          startedAt: Date.now(),
-          origin: 'chat',
-          tool: state.board.aiTool,
-          cardId: null,
-          cardNumber: null,
-          cardTitle: '',
-          cardType: '',
-          workflow: '',
-          columnName: '',
-          phase: '',
-        })
-      : '';
-    // a ferramenta sem suporte para esta permissão nem começa: confere antes de gravar a configuração
-    const unsupported = headlessUnsupported(state.board.aiTool, permission);
-    if (unsupported) {
-      this.deps.runLog?.finish(logId, 'unsupported');
-      throw new Error(unsupported);
-    }
-    // no chat não há agente do board nem subagente escolhido: `null` é "não definido", não "vazio"
-    this.deps.runLog?.describe(logId, {
-      model: exec.model?.name ?? null,
-      effort: exec.model?.effort ?? null,
-      profile: null,
-      agent: null,
-      permission,
-      autonomous: false,
-      clean: false,
-      skills: [],
-      mcp: null,
-    });
-
-    // o prompt sai da conversa ANTES de a pergunta entrar nela: senão ela iria duas vezes (no histórico e no fim)
-    const prompt = chatPrompt(this.messages, body, PERMISSION_ADVICE[permission]);
-    this.add({ role: 'user', text: body, ...(model ? { model } : {}) });
+    // sem card não há agente: contexto vazio, só o servidor do board e o modelo escolhido
+    const plan = bareExec(modelFor(state, model), boardServer(this.deps));
     // as últimas linhas legíveis, para explicar um erro; nunca a saída crua, que no modo estruturado é JSONL
     const tail: string[] = [];
-    const spawn: SpawnFn = (command, cwd, out) => {
-      // a linha da chamada e, na volta para texto, a tentativa recusada não explicam o erro do processo
-      tail.length = 0;
-      return this.deps.spawn(command, cwd, out);
-    };
-    let proc: RunningProcess;
-    let report: () => RunReport;
+    let started = false;
+    let execution: AiExecution;
     try {
-      ({ proc, report } = spawnMeasured(
-        state.board.aiTool,
-        {
-          prompt,
-          permission,
-          addDirs: this.router.aiWorkDirs(),
-          exec,
-          boardServer: boardServer(this.deps),
-        },
-        this.deps.cwd,
-        {
-          spawn,
-          log: (raw) => {
-            const line = raw.replace(ANSI, '');
-            this.deps.log(`[chat] ${line}`);
-            // os avisos de configuração da CLI ficam só no canal: não explicam o erro e empurrariam o motivo real para fora
-            if (isCliNoise(line)) return;
-            tail.push(line);
-            if (tail.length > TAIL_LINES) tail.shift();
+      // o chat é a quarta origem de execução, e a única sem card: nenhuma execução nasce da conversa de
+      // um card (ela devolve o card para "pronto" e quem executa depois é o heartbeat ou o autopiloto)
+      execution = this.deps.gateway.run({
+        origin: 'chat',
+        tool: state.board.aiTool,
+        context: NO_CARD,
+        cwd: this.deps.cwd,
+        timeoutMinutes: state.board.runner.timeoutMinutes,
+        // no chat não há agente do board nem subagente escolhido: `null` é "não definido", não "vazio"
+        prepare: () => ({
+          config: {
+            model: plan.model?.name ?? null,
+            effort: plan.model?.effort ?? null,
+            profile: null,
+            agent: null,
+            autonomous: false,
+            // toda execução pelo board parte de contexto vazio
+            clean: true,
+            skills: [],
+            mcp: [],
           },
-          catalog: state.board.modelCatalog,
-          cursorTokenRate: state.board.rules.cursorTokenRate,
+          input: {
+            prompt,
+            permission,
+            addDirs: this.router.aiWorkDirs(),
+            exec: plan,
+            boardServer: boardServer(this.deps),
+          },
+        }),
+        beforeSpawn: () => {
+          started = true;
+          this.add(message);
         },
-      ));
+        log: (raw) => {
+          const line = raw.replace(ANSI, '');
+          this.deps.log(`[chat] ${line}`);
+          // os avisos de configuração da CLI ficam só no canal: não explicam o erro e empurrariam o motivo real para fora
+          if (isCliNoise(line)) return;
+          tail.push(line);
+          if (tail.length > TAIL_LINES) tail.shift();
+        },
+        // a linha da chamada e, na volta para texto, a tentativa recusada não explicam o erro do processo
+        onAttempt: () => {
+          tail.length = 0;
+        },
+      });
     } catch (e) {
-      // sem processo não há desfecho a medir: o mesmo `unsupported` do executor de cards
-      this.deps.runLog?.finish(logId, 'unsupported');
+      // antes da pergunta entrar na conversa (ferramenta sem suporte para a permissão): quem enviou fica sabendo
+      if (!started) throw e;
+      // sem processo não há desfecho a medir: o log já fechou a linha como `unsupported`
       this.add({ role: 'error', text: e instanceof Error ? e.message : String(e) });
       return;
     }
-    this.proc = proc;
-    this.stopped = false;
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      proc.kill();
-    }, state.board.runner.timeoutMinutes * 60_000);
+    this.running = execution;
     this.publish();
 
-    proc.onExit((code, error) => {
-      clearTimeout(timer);
-      this.proc = null;
-      const outcome: AiRunOutcome = this.stopped ? 'stopped' : timedOut ? 'timeout' : error || code !== 0 ? 'failed' : 'done';
-      this.deps.runLog?.finish(logId, outcome, code);
-      const measured = report();
-      this.deps.runLog?.measure(logId, measured);
+    execution.onExit((end) => {
+      this.running = null;
       // a resposta é o texto final que a ferramenta deu, nunca o fluxo de eventos
-      const text = measured.answer.replace(ANSI, '').trim();
-      if (this.stopped) this.add({ role: 'error', text: 'Interrompido.' });
-      else if (timedOut)
+      const text = end.report.answer.replace(ANSI, '').trim();
+      if (end.stopped) this.add({ role: 'error', text: 'Interrompido.' });
+      else if (end.timedOut)
         this.add({ role: 'error', text: `A resposta passou do tempo limite (${state.board.runner.timeoutMinutes} min) e foi encerrada.` });
-      else if (error) this.add({ role: 'error', text: `Não foi possível executar o ${tool.label}: ${error.message}` });
-      else if (code !== 0) {
+      else if (end.error) this.add({ role: 'error', text: `Não foi possível executar o ${tool.label}: ${end.error.message}` });
+      else if (end.code !== 0) {
         const lines = tail.join('\n');
-        this.add({ role: 'error', text: `O ${tool.label} terminou com erro (código ${code}).${lines ? `\n\n${lines}` : ''}` });
+        this.add({ role: 'error', text: `O ${tool.label} terminou com erro (código ${end.code}).${lines ? `\n\n${lines}` : ''}` });
       } else this.add({ role: 'assistant', text: text || 'A IA terminou sem escrever uma resposta.' });
     });
   }
 
   stop(): void {
-    if (!this.proc) return;
-    this.stopped = true;
-    this.proc.kill();
+    this.running?.stop();
   }
 
   clear(): void {
@@ -220,7 +205,7 @@ export class ChatSession {
   }
 
   private publish(): void {
-    this.router.setChat({ messages: this.messages, busy: this.proc !== null });
+    this.router.setChat({ messages: this.messages, busy: this.running !== null });
   }
 
   private load(): ChatMessage[] {

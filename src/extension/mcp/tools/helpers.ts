@@ -41,9 +41,10 @@ export const live = (c: Card): Card => {
 
 export const overview = (router: MessageRouter) => boardOverview(router.snapshot());
 
-/** Agente de execução (perfil) pelo nome, sem diferenciar maiúsculas. */
+/** Agente do board pelo nome, sem diferenciar maiúsculas. */
 export function findProfile(s: BoardState, name: string) {
-  const profile = s.board.execProfiles.find((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const wanted = name.trim().toLowerCase();
+  const profile = s.board.execProfiles.find((p) => p.id.toLowerCase() === wanted || p.name.trim().toLowerCase() === wanted);
   if (!profile)
     throw new Error(`Agente "${name}" não encontrado. Agentes: ${s.board.execProfiles.map((p) => p.name).join(', ') || 'nenhum'}.`);
   return profile;

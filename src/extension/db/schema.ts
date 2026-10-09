@@ -1,10 +1,12 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 25;
+export const SCHEMA_VERSION = 27;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
 export const SKILLS_FIELD = 'Skills';
+/** Campo padrão "Rules": arquivos de instruções marcados no Harness que a execução do card deve ler. */
+export const RULES_FIELD = 'Rules';
 export const MODEL_FIELD = 'Modelo';
 
 const MIGRATIONS: Record<number, string> = {
@@ -337,6 +339,29 @@ const MIGRATIONS: Record<number, string> = {
     -- memória por stackBaseOf, comparando o número do card.
     ALTER TABLE cards ADD COLUMN branch_created_at TEXT NOT NULL DEFAULT '';
     UPDATE cards SET branch_created_at = CAST(updated_at AS TEXT) WHERE branch != '' AND branch_created_at = '';
+  `,
+  26: `
+    -- marcação do harness por board: o que as execuções do board podem usar (rules, skills e agentes),
+    -- identificado pelo caminho como o inventário o mostra. O que não está aqui é invisível para elas.
+    CREATE TABLE IF NOT EXISTS harness_selection (
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL CHECK (kind IN ('instructions','skill','agent')),
+      location TEXT NOT NULL,
+      usage TEXT NOT NULL CHECK (usage IN ('always','contextual')),
+      PRIMARY KEY (board_id, kind, location)
+    );
+    -- agentes de fábrica já oferecidos (nomes): o que a pessoa apagar não volta sozinho
+    ALTER TABLE boards ADD COLUMN seeded_agents_json TEXT NOT NULL DEFAULT '[]';
+    -- os agentes guardados no banco (exec_profiles_json) viram arquivos na abertura do board; a coluna fica para a migração
+    INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position)
+    SELECT lower(hex(randomblob(16))), b.id, '${RULES_FIELD}', 'multiselect', '[]', NULL, 'chip',
+           (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
+    FROM boards b
+    WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'rules');
+  `,
+  27: `
+    -- #191: marca o comentário que é o resumo da conversa do card; NULL = mensagem comum.
+    ALTER TABLE comments ADD COLUMN kind TEXT;
   `,
 };
 

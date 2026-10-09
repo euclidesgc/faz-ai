@@ -12,6 +12,7 @@ import {
   fieldsForType,
   isAiWorking,
   isArchived,
+  isCardCollapsed,
   isLive,
   openChildren,
   subtaskSlot,
@@ -195,5 +196,16 @@ describe('aiWorkingChildren', () => {
     expect(aiWorkingChildren(s, story)).toBe(2);
     expect(aiWorkingChildren(boardState({ cards: [story, ...subs] }), story)).toBe(1);
     expect(aiWorkingChildren(s, subs[0]!)).toBe(0);
+  });
+});
+
+describe('isCardCollapsed', () => {
+  it('sem entrada no mapa devolve false', () => {
+    expect(isCardCollapsed({}, 'a')).toBe(false);
+  });
+
+  it('respeita o valor explícito, true ou false', () => {
+    expect(isCardCollapsed({ 'card:a': true }, 'a')).toBe(true);
+    expect(isCardCollapsed({ 'card:a': false }, 'a')).toBe(false);
   });
 });

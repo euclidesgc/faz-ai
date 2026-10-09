@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { openPredecessors } from '../../../shared/links';
 import { cardRef } from '../../../shared/model';
+import { activityKindOf } from '../../../shared/activity';
+import { columnOf } from '../../../shared/selectors';
 import { isDelivered, isYolo, storyOf } from '../../../shared/story';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { cardSummary, findCard } from '../format';
@@ -16,9 +18,10 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
     status: 'running' | 'waiting_review' | 'waiting_answer' | 'blocked',
     note: string | undefined,
     next: string,
+    pending = false,
   ) => {
     const card = live(findCard(router.snapshot(), ref));
-    const after = router.handle({ type: 'card.status.set', cardId: card.id, status, note }, aiOrigin(ctx));
+    const after = router.handle({ type: 'card.status.set', cardId: card.id, status, note, pending }, aiOrigin(ctx));
     return {
       card: cardSummary(
         after,
@@ -52,18 +55,34 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'request_review',
-    'Entrega o trabalho da fase para revisão de uma pessoa (status "waiting_review") e registra o resumo na conversa do card. Depois de chamar, PARE: só uma pessoa aprova. Se ela pedir ajustes, o card volta para "ready" com o pedido na conversa; quando aprovar, o status vira "approved" e você move o card.',
-    { card: cardArg, summary: z.string().min(1).describe('O que foi feito e o que a pessoa deve revisar (markdown)') },
+    'Entrega o trabalho da fase para revisão de uma pessoa (status "waiting_review") e registra o resumo na conversa do card. Depois de chamar, PARE: só uma pessoa aprova. Se ela pedir ajustes, o card volta para "ready" com o pedido na conversa; quando aprovar, o status vira "approved" e você move o card. ' +
+      'Use `pending` sempre que algo ficou dependendo da pessoa (decisão, dado, acesso, ponto em aberto que ela precisa avaliar): a pendência vai para a conversa e o card fica com ela mesmo em modo autônomo. Nunca registre uma pendência só num comentário e siga adiante.',
+    {
+      card: cardArg,
+      summary: z.string().min(1).describe('O que foi feito e o que a pessoa deve revisar (markdown)'),
+      pending: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          'O que depende da pessoa (markdown): decisão, dado, acesso ou ponto em aberto. Com isso o card fica com ela, mesmo em modo autônomo.',
+        ),
+    },
     (a, router) => {
       const yolo = isYolo(router.snapshot(), live(findCard(router.snapshot(), a.card)));
+      const pending = a.pending?.trim();
+      const note = pending ? `${a.summary.trim()}\n\n**Travado em mim**\n${pending}` : a.summary;
       return setStatus(
         router,
         a.card,
         'waiting_review',
-        a.summary,
-        yolo
+        note,
+        yolo && !pending
           ? 'Modo autônomo (YOLO): o card foi aprovado automaticamente. Mova-o para a próxima coluna e siga o trabalho.'
-          : 'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.',
+          : pending
+            ? 'Pare aqui. A pendência está com a pessoa: não mova o card nem continue o trabalho dele até ela resolver e aprovar ou pedir ajustes.'
+            : 'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.',
+        Boolean(pending),
       );
     },
   );
@@ -96,10 +115,21 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'prepare_workspace',
-    'Cria (ou reaproveita) a branch da história e a pasta em que o código dela deve ser alterado. Chame antes de mexer em código do projeto; pode ser chamada de uma sub-tarefa. O nome da branch e a pasta são definidos pelo board: não crie branches por conta própria.',
+    'Cria (ou reaproveita) a branch da história e a pasta em que o código dela deve ser alterado. Chame antes de mexer em código do projeto; pode ser chamada de uma sub-tarefa. Fora do modo worktree, só chame na fase de código (fase que só produz documento não precisa de branch). O nome da branch e a pasta são definidos pelo board: não crie branches por conta própria.',
     { card: cardArg },
     (a, router) => {
-      const card = live(findCard(router.snapshot(), a.card));
+      const s = router.snapshot();
+      const card = live(findCard(s, a.card));
+      if (s.board.git.mode !== 'worktree' && activityKindOf(s, card, 'phase') === 'text') {
+        const story = storyOf(s, card);
+        const holder = s.cards.find((c) => s.aiRuns.includes(c.id) && storyOf(s, c)?.id !== story?.id);
+        if (holder) {
+          const holderStory = storyOf(s, holder) ?? holder;
+          throw new Error(
+            `A pasta do projeto está em uso pela execução de ${cardRef(holderStory)}. ${cardRef(story ?? card)} está em ${columnOf(s, story ?? card)?.name}, fase que só produz documento e não precisa de branch: não chame prepare_workspace agora. A branch é criada na fase de código, quando a pasta estiver livre.`,
+          );
+        }
+      }
       router.handle({ type: 'card.workspace.prepare', cardId: card.id }, aiOrigin(ctx));
       return detail(router, card.id).workspace;
     },
@@ -107,7 +137,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'set_card_profile',
-    'Escolhe o agente de execução de um card (skills, servidores MCP, ferramentas e modelo que a sessão deve usar); os agentes estão em execProfiles, em get_board. Sem `profile`, o card volta a usar o agente da coluna.',
+    'Escolhe o agente do card: o arquivo de agente (instruções, skills, servidores MCP, ferramentas e modelo) que a sessão do board usa para executá-lo; os disponíveis estão em `agents`, em get_board. Sem `profile`, o card volta a usar o agente da coluna (ou o padrão do board).',
     { card: cardArg, profile: z.string().optional().describe('Nome do agente; omita para voltar ao da coluna') },
     (a, router) => {
       const card = live(findCard(router.snapshot(), a.card));

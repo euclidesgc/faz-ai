@@ -44,6 +44,12 @@ export const settings: Record<string, string> = {
     "All {count} card(s), conversations, attachments and settings of this board will be deleted, and the board goes back to the default. This can't be undone. Project rules and skills are not affected.",
   'Apagar tudo e recriar': 'Delete everything and recreate',
   'Recriar board padrão': 'Recreate default board',
+  'Abrir no Settings do editor': 'Open in the editor Settings',
+  'Depende de <b>{label}</b> (agora: {state})': 'Depends on <b>{label}</b> (now: {state})',
+  'Depende de <b>{label}</b>': 'Depends on <b>{label}</b>',
+  'Abrir {label}, {hint}': 'Open {label}, {hint}',
+  abrir: 'open',
+  'Abre as configurações do Faz AI no Settings do editor (Ctrl+,)': 'Opens the Faz AI settings in the editor Settings (Ctrl+,)',
   'Apaga todos os cards e configurações e recria o board com o padrão atual':
     'Deletes all cards and settings and recreates the board with the current default',
   'Prévia do card do tipo {typeName}': 'Preview of the {typeName} card type',
@@ -103,6 +109,9 @@ export const settings: Record<string, string> = {
   'deixar a história onde está.': 'leave the story where it is.',
   'Ao concluir a última sub-tarefa': 'When finishing the last sub-task',
   'Preencher o modelo sugerido': 'Fill in the suggested model',
+  '"Preencher o modelo sugerido automaticamente" mudou para a aba Modelos.':
+    '"Fill in the suggested model automatically" moved to the Models tab.',
+  'Abrir em Modelos': 'Open in Models',
   'um card é criado ou um atributo dele muda, e o campo de modelo está vazio ou ainda tem a sugestão anterior':
     'a card is created or one of its attributes changes, and the model field is empty or still has the previous suggestion',
   'preencher o modelo com a sugestão das regras. Um modelo escolhido à mão nunca é trocado.':
@@ -141,6 +150,9 @@ export const settings: Record<string, string> = {
   'Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.':
     'Board theme and typography of long texts: the card description and the conversation, both when writing and when reading.',
   'Tema e fonte': 'Theme and font',
+  'A aparência do board (idioma, tema, fonte e tamanho) agora fica no Settings do editor.':
+    'The board appearance (language, theme, font and size) now lives in the editor Settings.',
+  'O Git agora fica no Settings do editor.': 'Git now lives in the editor Settings.',
   Idioma: 'Language',
   'O idioma da interface do board.': 'The language of the board interface.',
   Tema: 'Theme',
@@ -214,14 +226,8 @@ export const settings: Record<string, string> = {
   'Fonte: {source}': 'Source: {source}',
   'lista embutida na extensão (o Claude Code não guarda a lista em arquivo)':
     'list built into the extension (Claude Code does not keep the list in a file)',
-  'lista embutida na extensão (o Codex não guarda a lista em arquivo)':
-    'list built into the extension (Codex does not keep the list in a file)',
   'lida do comando cursor-agent models, com a conta em uso; sem a CLI autenticada, lista embutida na extensão':
     'read from the cursor-agent models command, with the account in use; without the CLI signed in, the list built into the extension',
-  'lida do config.toml do Kimi nesta máquina, com os esforços de cada modelo':
-    "read from Kimi's config.toml on this machine, with each model's efforts",
-  'lista embutida na extensão (o GitHub Copilot não guarda a lista em arquivo)':
-    'list built into the extension (GitHub Copilot does not keep the list in a file)',
   'Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness de IA.':
     'Models of the tool in use in the project, with the effort levels of each. This is where the options of the cards\' "Model" field come from. The tool is chosen in AI harness.',
   '{count} modelo(s)': '{count} model(s)',
@@ -232,17 +238,6 @@ export const settings: Record<string, string> = {
   'Esforços de {model}': 'Efforts of {model}',
   'sem ajuste de esforço': 'no effort setting',
   'Esforço padrão de {model}': 'Default effort of {model}',
-  'Preço (US$ por milhão de tokens)': 'Price (US$ per million tokens)',
-  entrada: 'input',
-  saída: 'output',
-  'leitura de cache': 'cache read',
-  'criação de cache': 'cache write',
-  'Preço de entrada de {model}': 'Input price of {model}',
-  'Preço de saída de {model}': 'Output price of {model}',
-  'Preço de leitura de cache de {model}': 'Cache read price of {model}',
-  'Preço de criação de cache de {model}': 'Cache write price of {model}',
-  'O custo informado pela ferramenta tem preferência; o preço aqui é usado para estimar o custo das ferramentas que não informam.':
-    'The cost reported by the tool takes precedence; the price here is used to estimate the cost of tools that do not report it.',
   'Remover do catálogo': 'Remove from the catalog',
   'Remover {model} do catálogo': 'Remove {model} from the catalog',
   'Nenhum modelo. Use "Detectar modelos" ou "Novo modelo".': 'No models. Use "Detect models" or "New model".',
@@ -286,6 +281,10 @@ export const settings: Record<string, string> = {
   Editar: 'Edit',
   'Remover da lista': 'Remove from the list',
   'Nenhuma regra na lista: o board não sugere modelo.': 'No rules in the list: the board does not suggest a model.',
+  'Reserva (opcional)': 'Fallback (optional)',
+  'Sem reserva: se o modelo principal esgotar o limite, a execução não é repetida.':
+    'No fallback: if the main model hits the usage limit, the run is not retried.',
+  'reserva: {model}': 'fallback: {model}',
   'Campos personalizados': 'Custom fields',
   'Novo campo': 'New field',
   'Campos guardam informações extras do card, como prazo, pontos ou tags. Todos aparecem no card aberto; em "No board" você escolhe se e como cada um aparece também no card do board.':
@@ -358,17 +357,21 @@ export const settings: Record<string, string> = {
   'Sem branches nem worktrees, o board trata uma história por vez: todas trabalham direto na pasta do projeto, e duas ao mesmo tempo misturariam as alterações. Para tocar histórias em paralelo, escolha "Worktree por história".':
     'With no branches or worktrees, the board handles one story at a time: they all work directly in the project folder, and two at once would mix their changes. To drive stories in parallel, choose "Worktree por história".',
   'Incluir os modos rápidos': 'Include fast modes',
-  'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"), com preço próprio para a estimativa de custo; desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.':
-    'Cursor has a fast version of many models: it answers sooner and charges more for the same tokens. When on, each one enters the catalog as a separate model (for example, "Claude Opus 5.5 1M Fast"), with its own price for the cost estimate; when off, they leave the catalog. The list comes from the cursor-agent models command, read with the CLI signed in.',
-  'Somar a tarifa do Cursor (Cursor Token Rate)': 'Add the Cursor fee (Cursor Token Rate)',
-  'Nos planos Teams e Enterprise, o Cursor cobra US$ 0,25 por milhão de tokens (input, output e cache) por cima do preço dos modelos de terceiros. Ligado, a estimativa de custo soma essa tarifa; Composer, Grok e Auto são isentos. Execuções já registradas não mudam.':
-    'On Teams and Enterprise plans, Cursor charges US$ 0.25 per million tokens (input, output and cache) on top of the price of third-party models. When on, the cost estimate adds this fee; Composer, Grok and Auto are exempt. Runs already recorded do not change.',
-  'Sobre a tarifa': 'About the fee',
-  'Preço variável': 'Variable price',
-  'Preço variável de {model}': 'Variable price of {model}',
-  'O custo depende do modelo escolhido a cada pedido; o board não estima o custo deste modelo.':
-    'The cost depends on the model picked for each request; the board does not estimate the cost of this model.',
-  'Preços do Cursor': 'Cursor pricing',
-  'No Cursor, a estimativa usa a tarifa cadastrada: o modo rápido é um modelo à parte, com preço próprio, e o contexto longo (mais de 256 mil tokens, que pode custar 2x) não é separado, porque o Cursor só informa o total de tokens.':
-    'In Cursor, the estimate uses the price entered here: fast mode is a separate model with its own price, and long context (over 256 thousand tokens, which may cost 2x) is not told apart, because Cursor only reports the token total.',
+  'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"); desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.':
+    'Cursor has a fast version of many models: it answers sooner and charges more for the same tokens. When on, each one enters the catalog as a separate model (for example, "Claude Opus 5.5 1M Fast"); when off, they leave the catalog. The list comes from the cursor-agent models command, read with the CLI signed in.',
+  'ferramenta Cursor': 'Cursor tool',
+  'em Harness de IA': 'in AI harness',
+  'Mostrando os modelos do {tool}': 'Showing the {tool} models',
+  'Mostrando os agentes do {tool}': 'Showing the {tool} agents',
+  'Mostrando as rules do {tool}': 'Showing the {tool} rules',
+  'Mostrando as skills do {tool}': 'Showing the {tool} skills',
+  'trocar ferramenta': 'switch tool',
+  'Trocar a ferramenta de IA, em Harness de IA': 'Switch the AI tool, in AI harness',
+  'Preencher o modelo sugerido automaticamente': 'Fill in the suggested model automatically',
+  'Ao criar ou mudar um card, preenche o campo "Modelo" com a sugestão das regras abaixo, se ele estiver vazio ou com a sugestão anterior. Um modelo escolhido à mão nunca é trocado.':
+    'When a card is created or changed, fills in the "Model" field with the rules\' suggestion below, if it is empty or still has the previous suggestion. A hand-picked model is never replaced.',
+  'uma regra de sugestão de modelo': 'a model suggestion rule',
+  'mais abaixo, nesta mesma aba': 'further down, in this same tab',
+  'A IA lê o arquivo de cada skill marcada ao executar. Só aparecem as skills marcadas em Configurações → Harness. Busque pelo nome ou pela descrição.':
+    'The AI reads the file of every checked skill when it runs. Only skills checked in Settings → Harness are listed. Search by name or description.',
 };

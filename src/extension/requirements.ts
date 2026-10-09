@@ -31,9 +31,9 @@ const readJson = (file: string): Record<string, unknown> | null => {
   }
 };
 
-/** O registro do servidor do board num JSON (`mcpServers` ou, no VS Code, `servers`). */
-function fromJson(file: string, shown: string, key = 'mcpServers'): Registered | null {
-  const section = readJson(file)?.[key] as Record<string, { command?: unknown; args?: unknown }> | undefined;
+/** O registro do servidor do board num JSON (`mcpServers`). */
+function fromJson(file: string, shown: string): Registered | null {
+  const section = readJson(file)?.mcpServers as Record<string, { command?: unknown; args?: unknown }> | undefined;
   const entry = section?.[SERVER];
   if (!entry || typeof entry.command !== 'string') return null;
   return {
@@ -48,37 +48,12 @@ function fromJson(file: string, shown: string, key = 'mcpServers'): Registered |
 /** O arquivo mostrado com `~` é do usuário; o relativo é do projeto. */
 const scopeOf = (shown: string): Registered['scope'] => (shown.startsWith('~') ? 'user' : 'project');
 
-/** O registro na tabela `[mcp_servers.faz-ai]` do TOML do Codex (só `command` e `args`, que é o que o board grava). */
-function fromToml(file: string, shown: string): Registered | null {
-  let text: string;
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch {
-    return null;
-  }
-  const block = new RegExp(`^\\[mcp_servers\\.${SERVER}\\]\\s*$([\\s\\S]*?)(?=^\\s*\\[|$(?![\\s\\S]))`, 'm').exec(text)?.[1];
-  if (block === undefined) return null;
-  const command = /^\s*command\s*=\s*("(?:[^"\\]|\\.)*")/m.exec(block)?.[1];
-  const args = /^\s*args\s*=\s*(\[.*\])/m.exec(block)?.[1];
-  try {
-    return {
-      file: shown,
-      path: file,
-      scope: scopeOf(shown),
-      command: JSON.parse(command ?? '""') as string,
-      args: args ? (JSON.parse(args) as string[]) : [],
-    };
-  } catch {
-    return null;
-  }
-}
-
 /**
  * O servidor do board no arquivo que a ferramenta lê nas conversas da pessoa (fora do board), nos
  * mesmos lugares em que a instalação do MCP grava: primeiro o do projeto, que vale sobre o global
  * nas ferramentas, e depois o global. null quando não está registrado.
  */
-export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: string, editorUserDir?: string): Registered | null {
+export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: string): Registered | null {
   const inProject = (rel: string) => path.join(workspaceDir, rel);
   const inHome = (rel: string) => path.join(homeDir, rel);
   switch (tool) {
@@ -105,38 +80,16 @@ export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: st
     // o global do Cursor é um processo só para todas as janelas e não sabe qual board atender: não conta
     case 'cursor':
       return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json');
-    case 'codex':
-      return (
-        fromToml(inProject('.codex/config.toml'), '.codex/config.toml') ?? fromToml(inHome('.codex/config.toml'), '~/.codex/config.toml')
-      );
-    case 'copilot':
-      return (
-        fromJson(inProject('.vscode/mcp.json'), '.vscode/mcp.json', 'servers') ??
-        (editorUserDir ? fromJson(path.join(editorUserDir, 'mcp.json'), '~/…/User/mcp.json', 'servers') : null) ??
-        fromJson(inHome('.copilot/mcp-config.json'), '~/.copilot/mcp-config.json')
-      );
-    case 'kimi': {
-      const found = fromJson(inProject('.kimi-code/mcp.json'), '.kimi-code/mcp.json');
-      if (found) return found;
-      for (const dir of ['.kimi-code', '.kimi']) {
-        const global = fromJson(inHome(`${dir}/mcp.json`), `~/${dir}/mcp.json`);
-        if (global) return global;
-      }
-      return null;
-    }
   }
 }
 
 /** Como instalar a CLI de cada ferramenta, quando há um comando de uma linha para isso. */
 const INSTALL: Record<AiTool, { command: string | null; where: string }> = {
   claude: { command: null, where: 'https://claude.com/claude-code' },
-  codex: { command: 'npm install -g @openai/codex', where: 'https://developers.openai.com/codex' },
   cursor: {
     command: process.platform === 'win32' ? null : 'curl https://cursor.com/install -fsS | bash',
     where: 'https://cursor.com/cli',
   },
-  kimi: { command: null, where: 'https://moonshotai.github.io/kimi-code' },
-  copilot: { command: 'npm install -g @github/copilot', where: 'https://github.com/features/copilot/cli' },
 };
 
 export interface RequirementProbe {
@@ -156,8 +109,6 @@ export interface RequirementProbe {
   editor?: 'vscode' | 'cursor';
   /** quando a janela do editor abriu: um registro gravado depois disso só vale no chat do editor ao recarregar */
   windowStartedAt?: number;
-  /** a pasta de configuração do usuário no VS Code, onde fica o `mcp.json` global do Copilot no editor */
-  editorUserDir?: string;
   /**
    * o PATH com que o editor abriu: é nele que o chat do editor procura o comando do MCP. Um programa
    * instalado depois (o node pelo nvm) só entra nele quando o editor fecha e abre de novo
@@ -204,9 +155,9 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
   if (!p.nodePath) out.push({ id: 'node', tool, action: null });
 
   const built = headlessCommand(tool, { prompt: '', permission: 'full' });
-  const cli = 'unsupported' in built ? null : built.command;
-  const executable = cli ? p.resolve(cli) : null;
-  if (cli && !executable) {
+  const cli = built.command;
+  const executable = p.resolve(cli);
+  if (!executable) {
     const install = INSTALL[tool];
     out.push({
       id: 'cli',
@@ -222,7 +173,7 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
 
   // o MCP e a skill do fluxo são necessários em todas as ferramentas: mesmo onde as execuções pelo board
   // levam o servidor sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele
-  const registered = registeredServer(tool, p.workspaceDir, p.homeDir, p.editorUserDir);
+  const registered = registeredServer(tool, p.workspaceDir, p.homeDir);
   if (!registered) out.push({ id: 'mcp', tool, action: { kind: 'connect' } });
   else {
     const [bridge, arg] = registered.args;
@@ -253,11 +204,7 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
       });
     // o chat do editor inicia o servidor com o PATH de quando ele abriu: um node instalado depois não
     // está nele. O caminho completo resolve sem fechar o editor (o arquivo do projeto no git, não)
-    else if (
-      p.editorPath !== undefined &&
-      ((tool === 'cursor' && p.editor === 'cursor') || (tool === 'copilot' && p.editor === 'vscode')) &&
-      !editorFinds(registered.command, p.editorPath)
-    ) {
+    else if (p.editorPath !== undefined && tool === 'cursor' && p.editor === 'cursor' && !editorFinds(registered.command, p.editorPath)) {
       const tracked = registered.scope === 'project' && (p.isTracked ?? trackedInGit)(p.workspaceDir, registered.file);
       out.push({
         id: 'mcp-path',

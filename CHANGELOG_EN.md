@@ -5,33 +5,231 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+## 0.34.0
 
-- **Fix: autonomous mode did not keep cards moving by themselves, and the queue got stuck on a
-  blocked card (#220).** When the editor opens, the autopilot now starts by itself whenever there
-  is a pending autonomous-mode story, unless the person paused it: the pause is recorded on the
-  board, survives reopening the editor, and "Retomar" (resume) clears it; closing the editor does
-  not count as a pause, but "Parar as execuções da IA e o modo autônomo" (stop AI runs and
-  autonomous mode) does, and after a failure to start the tool the autopilot no longer starts
-  itself again until the person resumes. The queue now skips a story that is blocked or waiting on
-  a person (an answer or a review) and moves on to the next one, only waiting when every pending
-  story is with a person; it still keeps to one story at a time, with an unblocked story going back
-  to its position on the board, and the circuit breaker for 3 runs with no progress now frees the
-  queue instead of locking it up. A new story's branch no longer starts from a story that is
-  blocked with no pull request; the story's conversation records the chosen base and which story
-  was skipped. The sub-task list in the story panel now shows each sub-task's activity LED.
-- **Expired tool login: an error warning on the board, instead of stopping without explanation.**
-  The tool's sign-in is now actually checked for Claude Code (`claude auth status`) and, best-effort,
-  for Codex, in addition to the existing Cursor check; before every AI call (the card's button, the
-  heartbeat, autonomous mode), the board checks again, with a short cache. When the yellow bar's
-  reason is sign-in, it switches to an error highlight and gains the **Abrir no terminal** (open in
-  terminal) button, which runs the command there, but the actual sign-in is still always done by you.
-  When the login expires mid-run, or on a tool with no status command (Kimi, Copilot), the first
-  failure matching a known pattern ("OAuth session expired", "not logged in", "401", etc.) no longer
-  blocks the card: it goes back to its previous status, with a short comment, and turns on the same
-  error warning — the heartbeat and autonomous mode stop retrying on their own while it is on, and
-  resume on their own once the sign-in is confirmed again. The environment check shows the same item
-  for any tool, not just Cursor.
+- **Expired tool login: an error warning on the board, instead of stopping without explanation (#189).**
+  The Claude Code sign-in is now actually checked (`claude auth status`), in addition to the existing
+  Cursor check; before every AI call (the card's button, the heartbeat, autonomous mode), the board
+  checks again, with a short cache. When the yellow bar's reason is sign-in, it switches to an error
+  highlight and gains the **Abrir no terminal** (open in terminal) button, which runs the command
+  there, but the actual sign-in is still always done by you. When the login expires mid-run, the
+  first failure matching a known pattern ("OAuth session expired", "not logged in", "401", etc.) no
+  longer blocks the card: it goes back to its previous status, with a short comment, and turns on the
+  same error warning. The heartbeat and autonomous mode stop retrying on their own while it is on,
+  without turning off, and resume once the sign-in is confirmed again. The environment check shows
+  the same item.
+- **The autonomous mode pause is recorded on the board (#220).** Pausing now lasts until you resume,
+  even after closing and reopening the editor; before, reopening the editor started the queue
+  again. Closing the editor still does not count as a pause, and turning the mode on for a story (or
+  **Retomar**, resume) clears the pause. After a failure to start the tool, the autopilot does not
+  start itself again until you resume. The sub-task list in the story panel now shows each sub-task's activity LED.
+- **Arquivados tab replaces the archived column.** The "Arquivados" column is gone from the end of each board row (along with drag-to-archive and collapsing/expanding that column): rows are now narrow enough to see Histórias and Sub-tarefas at the same time with collapsed cards. Archived cards live in the new **Arquivados** (archived) tab, between Métricas and Lixeira, which preserves the history: one row per workflow, in board order, with only that workflow's archived cards, newest first. Archiving still happens from the card actions menu (with the usual confirmation) and through the automatic paths. Instead of "Desarquivar", the menu and the tab offer **Restaurar** (restore): the card goes back to the end of the first column of its workflow (Backlog / A fazer), inactive. Restoring a story also brings back all its archived sub-tasks and turns autonomous mode off; restoring a sub-task whose story is archived asks for confirmation ("Restaurar a história junto?") and restores the whole story; a sub-task of an active story comes back on its own. The `unarchive_card` MCP tool is unchanged.
+- **Turn autonomous mode on and off right from the card, without opening it (#416).** The icon at the bottom of the card that already indicated "autonomous mode on" is now also a button: one click turns autonomous mode on or off without opening the story's detail view. The warning shown when turning it on is now shorter — it used to be a long paragraph with several operational details, now it's just the essentials: the AI runs the story on its own through the pull request, with no approval, question or confirmation, and how to stop it. This same text and dialog are used in the three places that turn autonomous mode on (the new card button, the toggle in the card detail, and the multi-select batch action), with the confirmation logic unified across them. The dialog gained a "Don't warn me again" checkbox: whoever checks it and confirms stops seeing this specific warning the next times, in all three places, as a personal preference stored in the browser or editor of whoever uses it (not on the board). Turning autonomous mode off in batch still always asks for confirmation, without the checkbox, since it's the riskier action.
+- **Fix: autonomous mode no longer re-runs or blocks a story that was already delivered (#413).** An autonomous story that reached Homologação and was waiting on you (awaiting review or an answer, blocked, or approved and waiting for the next column) was treated as "no progress": the autopilot ran it again and ended up blocking it by itself. Now it leaves the queue while it is with you, and on a delivery without a pull request the AI calls `request_review` to mark the story as delivered.
+- **Text-only phases run in parallel in any workspace mode (#331).** Refine, summarize and the phases that only produce a document (Discovery, PRD, Spec and Plan on the default board) now run at the same time, up to **Histórias ao mesmo tempo** (default 2), even with **Tocar histórias em paralelo** off. Implementation and Homologation work as before: one at a time outside the worktree, and parallel only in the worktree with the option on; the two caps are counted separately and there is still one run per story. In autonomous mode, the queue order applies to stories that need a branch; those in a text phase start when there is a free slot. Outside the worktree, `prepare_workspace` in a text phase while another story has a run in progress is refused (folder in use) and the branch is created in the code phase; with the "Sem restrições" permission the AI can still switch branches by hand, since the guard covers only the board's path.
+- **Dragging cards is now smooth (#286).** When you drag a card, within the same column or to another column (empty or collapsed), the other cards slide aside with a ~200 ms transition and a dashed gap marks where it will land. The destination column makes room and the source column closes the gap. On drop, the card settles straight into its final position, without jumping back to the origin or flickering while the board updates; if the move is refused, the screen returns to the real state. It applies to stories and sub-tasks (any workflow) and respects `prefers-reduced-motion` (no transitions). **Fix:** moving a card down within the same column and dropping it on another card now saves it after that card, where the preview showed it (it used to be saved before it).
+- **"Save description" is more prominent (#287).** When editing a card description, the button is now primary (solid indigo) and sits below the editor on the right, instead of a subtle button in the header. The button hierarchy rule is recorded in `DESIGN.md`; the other board buttons already followed the pattern.
+- **Fallback model in a suggestion rule: execution retries automatically when the primary hits the limit.** Each model suggestion rule (Settings → AI Models) now has a **Fallback (optional)** field. When a card's execution fails because the primary model of a rule hit the plan's usage limit, the system automatically retries the execution with the fallback model, once only. If the fallback also fails, or if no fallback is configured, the card is blocked as before. The automatic switch records a comment in the card's conversation ("The `<primary model>` hit the usage limit; execution continues with `<fallback model>`"), without changing the card's Model field — the next execution will try the primary again. In autonomous mode (YOLO), the queue moves on without stalling when the primary hits the limit and a fallback is configured.
+- **Cards can be collapsed to show only the strip and the title.** In columns with many cards, you can collapse cards in any of four scopes: a single card (button on the card), all cards in the column (item in the action menu), all cards on the board (button in the filter bar) or just the selected cards (button in the multi-select bar). A collapsed card continues to show the AI's activity LED and the status border so you know what needs your attention without expanding it. The state is remembered between sessions.
+- **Activity bar at the bottom of the board.** An always-visible line, on every view, shows what
+  the AI is doing right now: with one run, "IA em #12 (Discovery, há 3 min)"; with several, "IA em
+  N cards: #12 Discovery · #15 refinando · …" (full list in the tooltip). Clicking the card
+  reference opens the card. With no run at all, it shows the reason: the autopilot's note (why the
+  queue stopped), the heartbeat's state ("Heartbeat desligado", "Heartbeat parado: motivo",
+  "Próxima rodada às HH:MM") or "IA parada". The "IA trabalhando em N cards" counter at the top is
+  gone, replaced by this bar.
+- **Create-card button moved to the top of the column.** **+ Novo card** / **+ Nova sub-tarefa**
+  moved from the column footer to the top, right below the header, so you don't have to scroll a
+  full column to find it. Only the position changed: no behavior or data changes. The
+  `docs/images/board.png` screenshot still shows the button at the bottom and was not updated in
+  this change.
+- **Git and parallel move from the board to the editor Settings.** The nine Git keys
+  (`fazai.git.mode`, `branchPattern`, `worktreeDir`, `parallel`, `parallelStories`, `autoMerge`,
+  `mergeMethod`, `watchMerges`, `watchMergeMinutes`) now live in `Ctrl+,` → **Faz AI: Git**, with
+  **Resource** scope: the User value is the default for every project, and Workspace or Folder
+  overrides it only for that project. In the editor, the Git tab and the "Tocar histórias em
+  paralelo" block in the AI harness become a link to these keys; in the browser they stay as
+  editable fields, as before. **Automatic migration:** the first time the board opens after this
+  version, each key that only exists on the board becomes the User default; if the User already had
+  another value, the board's is preserved by writing it to the Workspace (or the Workspace Folder,
+  with multiple folders open) — **this can create a `.vscode/settings.json` in the project**. The
+  board does not touch `.gitignore`: whether that file belongs in the repository is up to whoever
+  uses it.
+- **Summarize the card's conversation.** A new button in the Conversa tab, shown from 2 messages
+  on, reads the whole conversation and writes a summary (decisions, notes, pending items) as a new
+  AI message, without automatically deleting anything. The summary is reviewed like any other
+  message: agree by leaving it as is, or edit the text. Below it, a recommendation lets you delete,
+  with confirmation, the messages before the summary (not automatic); summarizing again creates a
+  new record instead of replacing the previous one. Also available as the `generate_summary` MCP
+  tool.
+- **A blocked story held up the autopilot's whole queue.** With the first story in the queue
+  stuck on an impediment (a block, a question without an answer, a dependency on another open
+  card, or a stalled cycle), the autopilot stood still and none of the other independent
+  autonomous stories ran, even when ready. Now any impediment is skipped while scanning the
+  queue: the autopilot moves on to the next story that can advance (run, or move to another
+  column when the AI does not work in it). A story that depends on another keeps waiting for
+  that one to finish. The queue only shows the impediment warning when no story can advance,
+  with the reason of the first one that got stuck.
+- **Autonomous story delivery was not detected when the PR arrived before the last column.**
+  When registering the pull request (`set_pull_request`), the board only marked `waiting_review`
+  and commented the delivery if the story was already in the last column the AI works on; registered
+  before that, the delivery was never detected and the autopilot kept trying to run a story that had
+  already been delivered. Now that check (`settleDelivery`) also runs when the card moves to the last
+  column, and inside the runner's `settle`, at the end of a run.
+- **Backup through the command palette.** In the editor, the commands `fazai.exportBoard` ("Faz AI:
+  Export the board") and `fazai.importBoard` ("Faz AI: Import a board") in the command palette
+  (`Ctrl+Shift+P`) open native save and file picker dialogs, work with the board closed (they open
+  the database on demand) and show notifications with the result. The "Backup" tab of the board's
+  Settings no longer appears in the editor — it stays only in browser mode. In the native Settings
+  (`Ctrl+,`), the "Faz AI: Backup" category now has the links "Export the board now" and "Import a
+  board" that trigger the palette commands. With multiple folders in the workspace, the commands use
+  the first folder (known limitation).
+- **Formatted hint on the "Trabalhar na fase" and "Refinar com IA" buttons.** The buttons that run
+  these actions (on the card's status bar and in the comments tab) now show a rich tooltip with the
+  explanation formatted in bold and bullet points, instead of the native HTML `title`. The hint opens
+  on hover or keyboard focus, closes with Esc, and stays visible when the button is blocked, so you
+  know the reason even when you cannot click.
+- **Autonomous Implementação stalled with the conductor.** A story's run is what carries out the
+  Implementação subtasks, delegating each one to a subagent; but `condutor-do-board` (the default
+  since the profile migration) runs read-only, and that restriction went to the Claude Code command
+  line (`--tools`), removing the subagent tool from the session and leaving the specialists out (the
+  empty context does not load the user's agents). The conductor kept saying "the board's automatic
+  run will handle it" until the board blocked the card. Now a story's session receives the board's
+  other available agents as subagents (with each one's tools and model), its agent gets the `Agent`
+  tool, and its tool restriction goes in its own definition, not on the session. The factory
+  conductor now says so in its instructions; an existing `condutor-do-board.md` in your folder is
+  not overwritten, but the fix does not depend on it. And an agent's tool list is closed: Claude Code
+  leaves out everything not in it, including the MCP servers it loaded — the board server connected,
+  but the conductor's session had no `get_card` or `add_comment` and stopped without recording
+  anything (the Diagnóstico said all was fine because it was: registration and connection were never
+  the problem). Now every tool list the board builds for an agent, the story's or a specialist's,
+  carries the board server's tools along (`mcp__faz-ai__*`): on the command line and also in the
+  agent file, so it talks to the board when called as a subagent from the editor chat. Files the
+  board had already written (the factory ones, such as the conductor) are completed once on opening;
+  the interface does not show that name, only the list you chose.
+- **Default agent after the profile migration.** Opening a board saved by an earlier version turned
+  the built-in "Agente padrão" (no instructions) into the file `~/.claude/agents/agente-padr-o.md`,
+  with the name cut by the accent and Opus as its model, and made it the board's default instead of
+  `condutor-do-board`. Now that profile does not become a file (whatever pointed at it follows the
+  board's default), migrated names only lose their accents (`agente-padrao`), and when the agent
+  chosen as default does not exist, the conductor is used, not the first in the list. If the cut
+  file was already created, delete it under Configurações → Harness → Global → Agentes.
+- **Installing the flow skill checks it even when it already existed.** Since the empty context, the
+  `faz-ai-fluxo` skill only counts as ready when it exists **and** is checked "include in every
+  context". Anyone who already had the skill on disk saw the warning in the Diagnostics and on the
+  board, and the **Install** button did nothing, because it stopped on finding the file. Now the file
+  stays untouched (without `replace`), but the check mark goes in and the warning goes away. The MCP
+  `install_flow_skill` says in its reply that it checked the skill.
+- **Empty context by default and Harness with check marks.** Every run started by the board (Work
+  on the phase, Refine with AI, heartbeat, board chat) now starts from an empty context: no rule,
+  skill, agent, hook or plugin from your machine or the project gets in on its own. In Claude Code
+  this is enforced by parameter (`--setting-sources ""`, `--disable-slash-commands` and an MCP
+  servers file with the board's server and the ones the agent allows only); in Cursor, guidance in
+  the prompt. What gets in is what you
+  check under Configurações → **Harness de IA**, now with the **Projeto** and **Global** tabs, each
+  with Rules, Agentes and Skills. Rules and skills have two check marks: **Incluir em todo contexto**
+  (include in every context: goes into every run, by path) and **Usar quando fizer sentido** (use
+  when it fits: becomes an option of the cards' Skills field and of the new **Rules** field, and
+  Refine with AI picks it when the request calls for it). What is not checked does not exist for the
+  run. Skills created or installed through the board are born checked; the flow skill is checked in
+  every context when installed, and the Diagnostics only reports it ready when it exists and is
+  checked. The `get_harness` (with `usage` and `onlySelected`) and `set_harness_selection` tools
+  expose the check marks through MCP, and `get_card` returns `requiredRules` next to
+  `requiredSkills`.
+- **Agents as tool files.** Execution profiles no longer live in the board database: an agent is an
+  agent file of the tool (`~/.claude/agents/<name>.md`, `~/.cursor/agents/<name>.md`), read from
+  disk; the instructions are the session role and the frontmatter holds model, tools, skills and MCP
+  servers (what belongs to the board only goes in `faz-ai-*` keys). The board stores, per project,
+  which ones are **available** and which is the **default** (under Ferramenta e execução). Profiles
+  already saved become files in the global folder on first opening, overwriting nothing; columns and
+  cards now point by name. A profile that allowed every MCP server now allows only the board's: the
+  others come back in the agent editor. The Agentes settings tab and the **Sessão limpa** (clean session) switch
+  are gone: the empty context is always on. In Claude Code the agent goes inline (`--agents` +
+  `--agent`), so it depends on no agents folder. On first opening, ten factory agents are created
+  globally and checked (condutor-do-board as the default, frontend-web, backend-node,
+  backend-python, mobile-flutter, documentacao-tecnica, qa-testes, revisor-de-codigo, devops-infra,
+  dados-sql), with minimal instructions; what you delete does not come back on its own, and
+  **Recriar os agentes padrão** recreates whatever is missing. **Sugerir agentes com IA** has the AI
+  read the project and create or adjust agents through MCP (`create_agent` and `update_agent` gain
+  `scope`, `model`, `tools`, `deniedTools`, `skills` and `mcp`; `get_board` lists the available ones
+  under `agents`). Refine with AI receives the checked catalog (agents, rules and skills) and only
+  picks from it, choosing the card's agent with `set_card_profile`.
+- **The board supports only Claude Code and Cursor.** Codex, Kimi Code and GitHub Copilot are gone
+  from the **Harness de IA** (AI harness) screen, which now offers just those two tools, and from the
+  rest of the extension: built-in models, MCP server registration, rules, skills and agents, hooks,
+  chat runs and the Diagnostic. A board that was set to one of them goes back to Claude Code when it
+  opens. What Cursor and Claude Code still load from `.codex/skills` or `AGENTS.md` stays listed.
+- **A run's cost is what the tool reports; the price table is gone (#187).** A value computed from
+  entered prices goes stale when the vendor changes its rates and makes the report wrong without any
+  warning, so the board no longer calculates cost. Claude Code stores the `total_cost_usd` the CLI
+  itself reports, plus the four token counters; Cursor stores the tokens and has no cost (the CLI does
+  not report it). Gone are the
+  built-in table, the price column of the **Modelos de IA** tab, **Preço variável** (variable price),
+  the `price_*`, `reset_price` and `variable_price` fields of `upsert_model`, the price origin in
+  `get_models` and the **Cursor Token Rate** rule (`cursorTokenRate` in `update_rules`). Catalogs saved
+  before lose their price fields when the board opens. Older runs stay in Métricas, marked "estimado
+  por tabela de preços" (estimated from a price table). `get_metrics` now calls the column **cost**
+  (reported by the tool), without "estimated".
+- **Every call to the AI goes through a single door (#187).** The card runner (manual, heartbeat and
+  autonomous mode) and the chat each repeated the usage record, and the record was optional. Both now
+  ask an `AiGateway` for the run, which opens the `ai_runs` row before running, checks the permission,
+  handles stop and timeout and stores outcome and consumption; each tool has its own provider
+  (command and output reader). A test covers the four origins and fails if any file outside the
+  gateway calls the AI or writes to the log. As a result, the usage log is no longer optional.
+- **Faz AI settings in the editor Settings.** In `Ctrl+,`, searching "Faz AI" shows the Faz AI
+  category with the sections Installation, Appearance, Git and Backup, in that order. Installation has
+  the **Open the Environment Diagnostics** link; Appearance already brings **Language**
+  (`fazai.appearance.language`); Git and Backup say their options arrive in the next versions, with a
+  link to the board tab. Three new palette commands: **Faz AI: Open the Environment Diagnostics**,
+  **Faz AI: Open the Faz AI settings in the editor Settings** and **Faz AI: Open the board settings**;
+  in the board's Configurações, the **Abrir no Settings do editor** (open in the editor Settings)
+  button goes the other way (it disappears in browser mode). Inside the editor the Settings wins and
+  the board database is the copy, so browser mode and MCP see the same value; outside the editor the
+  database is the only source, and whatever is written there is carried to the User Settings while the
+  editor is open. On the first open, a board whose language differs from the default writes that
+  language to the User Settings instead of being reset.
+- **Environment check install script fully in English.** The script generated by **Install what is
+  required** / **Install the recommended** mixed Portuguese ("Login da CLI", "instalação concluída",
+  "pulado, porque … falhou") with the English interface. Step names and messages are now in English,
+  and the test scans the script for Portuguese text.
+- **Cleaner Cursor e2e test.** `npm run e2e:cursor` shows only "Gerando a extensão…" (packaging the
+  extension) and, if any, the build error; the full output appears only when packaging fails. The
+  `groups: cannot find name for group ID` warning is gone: the computer's groups (video, render) are
+  now created inside the container, in `start.sh`, from the ids received.
+- **Fix: the sub-task LED went dark seconds after lighting up.** Moving a card to another column
+  reset its work status, including "Running": since the AI calls `start_work` and then moves the
+  sub-task to "Em andamento", the green LED blinked for a moment and went off, and the story did
+  not show the AI working on it. Now a running card moved to another column where the AI works
+  stays "Running"; the other statuses still restart on a column change, and done columns have no
+  work status.
+- **Autonomous mode resumes by itself when the editor opens.** Stories already in autonomous mode
+  used to sit still until a click on **Retomar modo autônomo**, which looked like the mode "not
+  working". Now, when the editor opens (and whenever the window becomes the board's owner), the
+  autopilot resumes the pending queue and logs it. The pause is still yours: what you paused, or
+  what stopped because the tool failed to start, only comes back when you resume; a queue made only
+  of delivered stories does not turn it back on.
+- **Fix: a story waiting for a dependency stalled the whole autonomous queue.** The first story in
+  the queue (board order) that depended on another open story held the autopilot with "waits for
+  #N", even with #N itself ready further down the board. Now a story waiting for a dependency is
+  skipped and the turn goes to the next story that can run; only when none can does the queue stop,
+  with the first story's reason.
+- **Queue order: the most advanced story finishes before a new one starts.** The execution order
+  (heartbeat, autonomous mode and `get_pending_work`) was bug, card row and only then column, so a
+  story just created at the top of Discovery jumped ahead of a half-done Implementação. Now it is
+  bugs first; then the rightmost column; within a column, top to bottom. A new bug becomes next in
+  the queue as soon as the current run finishes.
+- **"Como testar" (how to test) script in the card description and the pull request.** In
+  Homologação the AI now writes the test script (what was built, the steps with the expected result
+  and what was left out) in the story's description and in the PR body, not only in the
+  conversation. The column's default instruction and the flow skill changed; a board with the
+  previous default instruction gets the new one through the template upgrade (version 5), and an
+  already installed skill needs to be reinstalled with **Replace** to get the new text.
+
+- **Markdown attachments open formatted.** A `.md`/`.markdown` attachment (such as a story's PRD,
+  Spec or Plan document) now opens with headings, lists, tables and code blocks already formatted,
+  instead of the raw text with `#`, `**` and `|---|`. A **Formatted** / **Code** selector in the
+  window header switches to the raw text when needed; Edit, Save and Copy content still operate on
+  the Markdown, as before. Images, JSON, plain text and types without a preview are unchanged.
 - **Fix: the autonomous-mode branch stack came out wrong after reordering the queue by drag.** A new
   autonomous-mode story's branch now starts from the most recently created branch among the open YOLO
   stories — the same order the execution queue runs in — instead of starting from the nearest
@@ -84,6 +282,33 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   - The bridge (`bridge.js`) now lives in `~/.faz-ai/mcp/`, the same for VS Code, Cursor and
     `faz-ai`. A registration with the old bridge asks you to install again.
   - GitHub Copilot: the global install also writes the VS Code profile's `mcp.json`.
+
+- **Theme, font and font size moved to the editor's native Settings.** The three keys `fazai.appearance.theme/font/fontSize` now exist in VS Code's and Cursor's Settings (User scope), alongside `fazai.appearance.language` which already lived there since #179. Inside the editor, the Appearance tab of the board's Settings shows a link to open the native Settings; in browser mode (`faz-ai` in the terminal), the tab stays as before, with all 4 fields, because there is no editor Settings in that mode. Syncing is automatic: if the Settings has no explicit value yet and the board has a non-default value, the board's gets copied to the Settings and applies to all projects; if the Settings already has an explicit value, it wins (sync requirement from #179 extended to the three new keys). With multiple different boards opened for the first time after the update, the value from the first board to open applies — the others follow the Settings from then on.
+- **The status table moved from the Appearance tab to the Workflows tab.** Name and color of each status stay editable on the board, but now in Settings → Workflows, not in Appearance; the interface (the fields and colors) stays identical, no existing customization is lost.
+- **Dependency warnings between settings and cross-linked navigation.** Some configuration options only work because of another, but there is no notice. A new component shows a discreet line under the dependent option (for example, "Depends on **a model suggestion rule** (now: none)") that stays disabled when the dependency is not met. The cross-linked navigation lets you click a link to go to the matching board section (which scrolls and highlights for 2 s), or to open the editor Settings at the matching option; in browser mode, links to the Settings appear as text only. **"Fill in the suggested model automatically"** moved from Rules to Models, where it makes more sense — Rules shows a simple notice about the move. The Heartbeat interval field stays disabled when the heartbeat is off, with no additional dependency component. New headers in Models, Agents, Rules and Skills show "Showing the X of Cursor · switch tool" (or of the configured tool), allowing you to switch tools from any of these screens. A link in Settings (`fazai.git.parallel`) opens the board again, at the Harness heartbeat section.
+
+### Fixes
+
+- The autonomous-mode bar inside a card no longer shows another story's full block reason (the autopilot note is board-wide): about another card it shows a short line pointing to it; the full text stays in the activity bar.
+- **A pending item for the person now hands over the card status.** When the AI left something depending on you (a decision, an open point, something left out of the delivery), it wrote that in a comment and moved on, and the card did not show it was your turn. `request_review` now takes a `pending` parameter: the item goes to the conversation under **Blocked on you** and the card stays in **Waiting for review**, even in autonomous mode (the request is no longer auto-approved and the queue moves on with the other stories). The flow skill and the MCP server instructions now require this path and gained the "Pending with the person" section and the three-block phase wrap-up (Blocked on you, What changed, What I found). Reinstall the flow skill in Settings → Harness to update its text.
+- Claude Code's `allowed_warning` (close to the plan's cap) is no longer treated as an exhausted limit: the switch to the fallback model only happens on `rejected` or a window at 100%.
+- The switch to the fallback model only happens when the run failed; a run that finished fine is no longer redone with the fallback.
+- If the retry with the fallback model cannot start (card archived, tool refused), the card is blocked with the reason instead of staying "running" with no run.
+- On a sub-task, the run now counts as text or branch by the story's phase, as the queue does, and the activity bar shows that phase.
+- The **Export the board** and **Import a board** palette commands now have English titles when the editor is in English.
+- The "História entregue com o pull request…" comment is always authored by the AI tool, even when the person moved the card.
+- The autopilot note in the activity bar shows only the first line of the block reason, without code fences and capped at 160 characters.
+- On Windows, runs and CLI probes no longer open a `cmd.exe` window.
+- On Windows, the MCP server's named pipe carries the user name: two users with the same folder no longer compete for the same pipe.
+- The multi-select bar now has a background, border and padding, like the filter bar, in both themes.
+- The card's **Modo autônomo** checkbox and the batch button in the selection bar reflect the click right away and stay locked (the bar shows "Aplicando…") until the board confirms; with no reply in 3 s they revert.
+- Collapsing or expanding a card with the keyboard keeps focus on the collapse button: Enter again reverts.
+- The card's selection checkbox shows up when it receives keyboard focus (and while focus is inside the card).
+- The activity bar no longer announces the whole line to screen readers every minute: only the card reference and phase are announced; the "N min ago" sits outside the live region. The autopilot note stays on one line, with the full text in the tooltip.
+- Dragging a card right after dropping another starts from the order on screen, not the old one.
+- In AI Models, **Preencher o modelo sugerido automaticamente** shows as off when there is no suggestion rule (it used to stay on and locked after deleting the last rule).
+- **Resumir a conversa** locks right after the click: two quick clicks no longer start two runs.
+- Only one **+ Novo card** form is open at a time on the board, and Esc closes it even when focus is outside the field.
 
 ## 0.33.0
 

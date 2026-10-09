@@ -4,7 +4,8 @@ import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fake, Uri } from './fakes/vscode';
+import { fake, fakeConfig, Uri } from './fakes/vscode';
+import type { BoardState } from '../src/shared/model';
 
 /**
  * Ponta a ponta da extensão com um editor de mentira: ativa, abre o board, cria um card pela
@@ -46,11 +47,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // fecha os painéis como o editor faria: o BoardPanel é estático e sobreviveria ao próximo teste
+  for (const panel of fake.panels) panel.dispose();
   vi.unstubAllEnvs();
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serve no navegador e grava ao encerrar', async () => {
+/** Ativa a extensão com um `context` de mentira apontando para as pastas temporárias do teste. */
+const activateExtension = async () => {
   const { activate, deactivate } = await import('../src/extension/extension');
   const memory = new Map<string, unknown>();
   const memento = { get: (k: string) => memory.get(k), update: (k: string, v: unknown) => Promise.resolve(void memory.set(k, v)) };
@@ -64,6 +68,11 @@ it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serv
     subscriptions: [] as unknown[],
   };
   await activate(context as never);
+  return { deactivate };
+};
+
+it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serve no navegador e grava ao encerrar', async () => {
+  const { deactivate } = await activateExtension();
 
   for (const id of [
     'fazai.openBoard',
@@ -127,4 +136,43 @@ it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serv
   expect(boards).toHaveLength(1);
   expect(fs.statSync(path.join(storage, 'boards', boards[0]!)).size).toBeGreaterThan(1000);
   expect(fs.existsSync(path.join(storage, 'fazai.db'))).toBe(false);
+});
+
+it.skipIf(process.platform === 'win32')('comandos de ida e volta entre o board e o Settings do editor', async () => {
+  const { deactivate } = await activateExtension();
+  const opened: unknown[][] = [];
+  fake.commands.set('workbench.action.openSettings', (...args) => void opened.push(args));
+
+  await fake.commands.get('fazai.openIdeSettings')!();
+  await fake.commands.get('fazai.openIdeSettings')!('fazai.appearance.language');
+  expect(opened).toEqual([['@ext:euclidesgc.faz-ai'], ['@id:fazai.appearance.language']]);
+
+  // sem painel: o comando abre o board e a mensagem espera o ready
+  await fake.commands.get('fazai.openBoardSettings')!({ tab: 'harness' });
+  const { webview } = fake.panels[0]!;
+  expect(webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings')).toBe(false);
+  webview.receive({ type: 'ready' });
+  await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings'), 'aba enviada ao painel');
+  expect(webview.posted.find((m) => (m as { type: string }).type === 'ui.openSettings')).toEqual({
+    type: 'ui.openSettings',
+    tab: 'harness',
+    section: undefined,
+  });
+
+  // painel aberto: posta na hora; aba inválida cai na padrão
+  await fake.commands.get('fazai.openBoardSettings')!({ tab: 'nada' });
+  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
+  await fake.commands.get('fazai.openBoardSettings')!();
+  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
+
+  await fake.commands.get('fazai.openEnvironment')!();
+  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openView', view: 'environment' });
+
+  // Settings → board: mudar o idioma no Settings chega ao SQLite e à webview
+  fakeConfig.set('global', 'fazai.appearance.language', 'en');
+  await wait(() => {
+    const last = webview.posted.filter((m) => (m as { type: string }).type === 'boardState').at(-1) as { state: BoardState } | undefined;
+    return last?.state.board.appearance.language === 'en';
+  }, 'idioma do Settings refletido no board');
+  await deactivate();
 });

@@ -46,7 +46,7 @@ const INVENTORY: ToolInventory[] = [
       },
     ],
   },
-  { tool: 'codex', installed: false, items: [] },
+  { tool: 'cursor', installed: false, items: [] },
 ];
 
 beforeEach(async () => {

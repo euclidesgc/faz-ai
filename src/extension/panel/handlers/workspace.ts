@@ -1,9 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { cardRef, type Card } from '../../../shared/model';
+import type { Card } from '../../../shared/model';
 import { branchName, slug } from '../../../shared/git';
-import { columnOf, isLive } from '../../../shared/selectors';
-import { isPullRequestUrl, lastAiColumn, stackBaseChoice, storyOf } from '../../../shared/story';
+import { isPullRequestUrl, stackBaseOf, storyOf } from '../../../shared/story';
+import { settleDelivery } from '../../delivery';
 import { now } from '../../db/ids';
 import { prepareWorkspace } from '../../git';
 import type { BoardContext, HandlerMap } from './context';
@@ -54,28 +54,17 @@ function prepareStoryWorkspace(ctx: BoardContext, cardId: string): void {
   const worktreePath =
     story.worktreePath || path.join(worktreeRoot(ctx) ?? projectDir, `${story.number}-${slug(story.title) || 'historia'}`);
   // história em modo autônomo parte da branch da anterior; a base escolhida na primeira vez vale daí em diante
-  const choice = story.branch ? undefined : stackBaseChoice(s, story);
   const ws = prepareWorkspace({
     projectDir,
     mode: git.mode,
     branch,
     worktreePath,
-    base: story.branch ? story.baseBranch : (choice?.base?.branch ?? ''),
+    base: story.branch ? story.baseBranch : (stackBaseOf(s, story)?.branch ?? ''),
   });
   ctx.cards.setWorkspace(story.id, ws.branch, ws.path);
   if (!story.branch) {
     ctx.cards.setBaseBranch(story.id, ws.base);
     ctx.cards.setBranchCreatedAt(story.id, now());
-  }
-  // candidata bloqueada sem pull request não serve de base: registra na conversa quem foi pulada
-  if (choice && choice.skipped.length > 0) {
-    const refs = choice.skipped.map(cardRef).join(', ');
-    const plural = choice.skipped.length > 1;
-    const origem = ws.base ? `a partir de ${ws.base}` : 'da branch principal';
-    const texto = plural
-      ? `Branch criada ${origem}: ${refs} estão bloqueadas sem pull request e foram puladas na pilha.`
-      : `Branch criada ${origem}: ${refs} está bloqueada sem pull request e foi pulada na pilha.`;
-    ctx.comments.add(story.id, 'Faz AI', texto, 'ai');
   }
 }
 
@@ -90,31 +79,18 @@ export const workspaceHandlers = {
     ctx.cards.setWorkspace(story.id, story.branch, '');
     return true;
   },
-  'card.pr.set': (msg, ctx, { author }) => {
+  'card.pr.set': (msg, ctx) => {
     const url = msg.url.trim();
     if (url && !isPullRequestUrl(url)) throw new Error('Informe o endereço (URL) do pull request.');
     const storyId = storyOfCard(ctx, msg.cardId).id;
     ctx.cards.setPullRequest(storyId, url);
-    const s = ctx.state();
-    const story = s.cards.find((c) => c.id === storyId)!;
-    const column = columnOf(s, story);
     // história YOLO parada na última coluna da IA, com o pull request recém-gravado: já está entregue.
-    // Grava waiting_review direto pelo repositório, sem passar pelo card.status.set de cards.ts — lá, em
-    // modo autônomo, waiting_review vira approved na hora (é o que destrava as fases do meio); aqui a
-    // entrega é para a pessoa revisar, não para a IA seguir, e o merge continua só dela (ctx.approved).
-    // Bloqueio é a exceção: é impedimento aberto, e registrar o pull request não o resolve.
-    if (
-      story.yolo &&
-      !story.parentId &&
-      isLive(story) &&
-      column?.category === 'open' &&
-      column.id === lastAiColumn(s, story.workflowId)?.id &&
-      story.prUrl &&
-      story.status !== 'blocked'
-    ) {
-      ctx.cards.setStatus(story.id, 'waiting_review', '', author);
-      ctx.comments.add(story.id, author, `História entregue com o pull request ${story.prUrl}; aguardando a revisão da pessoa.`, 'ai');
-    }
+    // settleDelivery grava waiting_review direto pelo repositório, sem passar pelo card.status.set de
+    // cards.ts — lá, em modo autônomo, waiting_review vira approved na hora (é o que destrava as fases
+    // do meio); aqui a entrega é para a pessoa revisar, não para a IA seguir, e o merge continua só
+    // dela (ctx.approved). Bloqueio é a exceção: é impedimento aberto, e registrar o pull request não
+    // o resolve (ver `isDeliverableStory`).
+    settleDelivery(ctx, storyId);
     return true;
   },
   // Sem efeito colateral de propósito: ao contrário do card.pr.set (que fecha a entrega e avisa a

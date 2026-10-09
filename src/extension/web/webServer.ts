@@ -15,7 +15,7 @@ export interface WebServerOptions {
   router: MessageRouter;
   viewState: ViewStateStore;
   /** o que a página pede ao sistema; anexos, filtros e escolha de arquivos são resolvidos na própria página */
-  env: Omit<HostEnv, 'attachmentsBaseUri' | 'showFilters' | 'pickFiles' | 'openInBrowser'>;
+  env: Omit<HostEnv, 'attachmentsBaseUri' | 'showFilters' | 'pickFiles' | 'openInBrowser' | 'openIdeSettings'>;
   /** porta preferida; ocupada, o sistema escolhe outra */
   port?: number;
   /** arquivo que guarda o segredo de acesso, para o endereço continuar valendo entre reinícios */

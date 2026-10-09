@@ -58,10 +58,9 @@ const obj = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 const short = (s: string, max = 160) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
 
-/** `description` de um arquivo markdown (frontmatter YAML) ou TOML. */
+/** `description` do frontmatter YAML de um arquivo markdown. */
 function descriptionOf(file: string): string {
   const text = head(file);
-  if (file.endsWith('.toml')) return /^description\s*=\s*"((?:[^"\\]|\\.)*)"/m.exec(text)?.[1]?.replace(/\\(.)/g, '$1') ?? '';
   return frontmatterValue(frontmatterOf(text), 'description') ?? '';
 }
 
@@ -89,9 +88,8 @@ function skillFiles(dir: string, rel = '', depth = 0): string[] {
     .slice(0, MAX_SKILL_FILES);
 }
 
-/** O comando de um hook, em qualquer dos formatos das ferramentas (command, bash, powershell). */
-export const hookCommand = (h: Record<string, unknown>): string =>
-  [h.command, h.bash, h.powershell].find((x): x is string => typeof x === 'string') ?? '';
+/** O comando de um hook. */
+export const hookCommand = (h: Record<string, unknown>): string => (typeof h.command === 'string' ? h.command : '');
 
 /** Hooks de um evento, um por comando, com o filtro do grupo ou da própria entrada. */
 function hookEntries(value: unknown): { matcher: string; command: string; type: string }[] {
@@ -99,7 +97,7 @@ function hookEntries(value: unknown): { matcher: string; command: string; type: 
   return value.flatMap((raw) => {
     const e = obj(raw);
     const matcher = typeof e.matcher === 'string' ? e.matcher : '';
-    // Claude Code e Codex agrupam por filtro; Cursor e Copilot põem o comando direto na entrada
+    // Claude Code agrupa por filtro; Cursor põe o comando direto na entrada
     const handlers = Array.isArray(e.hooks) ? e.hooks.map(obj) : [e];
     return handlers.map((h) => ({ matcher, command: hookCommand(h), type: typeof h.type === 'string' ? h.type : 'command' }));
   });
@@ -112,9 +110,6 @@ function mcpSummary(server: unknown): string {
   if (typeof s.url === 'string') return s.url.split('?')[0]!;
   return '';
 }
-
-/** Valor de uma chave de texto dentro de um trecho de TOML. */
-const tomlString = (block: string, key: string) => new RegExp(`^${key}\\s*=\\s*"((?:[^"\\\\]|\\\\.)*)"`, 'm').exec(block)?.[1] ?? '';
 
 interface Ctx {
   projectDir: string;
@@ -157,16 +152,7 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
     case 'file':
       return isFile(target) ? [item(path.basename(target), src.kind === 'settings' ? '' : descriptionOf(target), target)] : [];
     case 'files':
-      return walk(target, src.ext).map((f) =>
-        item(
-          path
-            .relative(target, f)
-            .slice(0, -src.ext.length)
-            .replace(/\.agent$/, ''),
-          descriptionOf(f),
-          f,
-        ),
-      );
+      return walk(target, src.ext).map((f) => item(path.relative(target, f).slice(0, -src.ext.length), descriptionOf(f), f));
     case 'skills':
       return entries(target)
         .filter((n) => !n.startsWith('.') && isFile(path.join(target, n, 'SKILL.md')))
@@ -190,31 +176,6 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
         ...Object.entries(local).map(([name, v]) => item(name, `${mcpSummary(v)} (só nesta pasta de projeto)`, target)),
       ];
     }
-    case 'toml-tables': {
-      const text = readConfig(target);
-      if (text === null) return [];
-      const re = new RegExp(`^\\[${src.table}\\.(?:"([^"]+)"|([\\w-]+))\\]\\s*$`, 'gm');
-      return [...text.matchAll(re)].map((m) => {
-        const block = text.slice(m.index! + m[0].length).split(/^\[/m)[0]!;
-        return item((m[1] ?? m[2])!, tomlString(block, 'command') || tomlString(block, 'url').split('?')[0]!, target);
-      });
-    }
-    case 'toml-array': {
-      const text = readConfig(target);
-      if (text === null) return [];
-      return text
-        .split(new RegExp(`^\\[\\[${src.table}\\]\\]\\s*$`, 'm'))
-        .slice(1)
-        .map((raw) => raw.split(/^\[/m)[0]!)
-        .map((block) => ({
-          ...item(tomlString(block, 'event') || 'hook', short(tomlString(block, 'command')), target),
-          detail: tomlString(block, 'command'),
-        }));
-    }
-    case 'hook-files':
-      return walk(target, '.json').flatMap((f) =>
-        Object.entries(obj(readJson(f)?.hooks)).flatMap(([event, v]) => hookEntries(v).map((h) => hookItem(event, h, f))),
-      );
     case 'json-permissions': {
       const permissions = obj(readJson(target)?.permissions);
       return src.lists.flatMap((list) =>

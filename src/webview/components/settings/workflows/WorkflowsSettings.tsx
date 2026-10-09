@@ -8,6 +8,7 @@ import { IconPlus } from '../../ui';
 import { PageHeader } from '../PageHeader';
 import { NewWorkflowCard } from './NewWorkflowCard';
 import { WorkflowCard } from './WorkflowCard';
+import { StatusesSettings } from './StatusesSettings';
 import { t } from '../../../i18n';
 
 export function WorkflowsSettings() {
@@ -49,6 +50,8 @@ export function WorkflowsSettings() {
           </SortableContext>
         </DndContext>
       </div>
+
+      <StatusesSettings />
     </div>
   );
 }

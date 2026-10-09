@@ -1,10 +1,11 @@
 import { choose, lastSent, posted, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, vi, beforeEach, describe, expect, it } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Board } from '../../src/webview/components/Board';
 import { CardDrawer } from '../../src/webview/components/CardDrawer';
+import { CommentsTab } from '../../src/webview/components/card/CommentsTab';
 import { StatusBar } from '../../src/webview/components/StatusBar';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { BoardState, Card } from '../../src/shared/model';
@@ -146,9 +147,15 @@ describe('CardDrawer', () => {
 
   it('descrição: Editar, escrever e Concluir envia card.update com a descrição', async () => {
     openStory();
+    expect(screen.queryByRole('button', { name: 'Salvar descrição' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await userEvent.type(screen.getByPlaceholderText(/Descreva o problema/), 'Contexto');
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar descrição' }));
+    const save = screen.getByRole('button', { name: 'Salvar descrição' });
+    expect(save).toHaveClass('primary');
+    expect(
+      screen.getByPlaceholderText(/Descreva o problema/).compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await userEvent.click(save);
     expect(lastSent('card.update')).toEqual({ type: 'card.update', cardId: board.storyId, patch: { description: 'Contexto' } });
     expect(screen.queryByPlaceholderText(/Descreva o problema/)).toBeNull();
     expect(screen.getByText('Contexto')).toBeInTheDocument();
@@ -374,15 +381,16 @@ describe('CardDrawer', () => {
     const profile = {
       id: 'p1',
       name: 'Revisor',
-      purpose: '',
-      agent: 'reviewer',
+      purpose: 'Revisa',
+      instructions: 'Revise.',
       skills: ['tdd'],
       mcpServers: [],
       tools: [],
       deniedTools: [],
       model: '',
-      clean: true,
       isDefault: false,
+      scope: 'user' as const,
+      path: '/home/u/.claude/agents/p1.md',
     };
     patchState((s) => ({ board: { ...s.board, execProfiles: [profile] } }));
     openStory();
@@ -390,7 +398,7 @@ describe('CardDrawer', () => {
     expect(lastSent('card.execProfile.set')).toEqual({ type: 'card.execProfile.set', cardId: board.storyId, profileId: 'p1' });
     // o host devolveria o card com o perfil escolhido
     act(() => patchCard(board.storyId, { execProfile: 'p1' }));
-    expect(screen.getByText('subagente reviewer · skills: tdd · MCP: board · sessão limpa')).toBeInTheDocument();
+    expect(screen.getByText('skills: tdd · MCP: board')).toBeInTheDocument();
     await choose(screen.getByRole('combobox', { name: 'Agente' }), /Da fase/);
     expect(lastSent('card.execProfile.set').profileId).toBeNull();
   });
@@ -411,14 +419,15 @@ describe('CardDrawer', () => {
     expect(sentOf('card.trash')).toHaveLength(0);
   });
 
-  it('card arquivado: aviso, coluna travada, sem status e "Desarquivar" no menu', async () => {
+  it('card arquivado: aviso, coluna travada, sem status e "Restaurar" no menu (história ativa: restaura só ele)', async () => {
     patchCard(board.subId, { archivedAt: 1 });
     openCardDrawer(board.subId);
     expect(screen.getByText('Este card está arquivado.')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Coluna' })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Desarquivar' }));
-    expect(lastSent('card.unarchive')).toEqual({ type: 'card.unarchive', cardId: board.subId });
+    await userEvent.click(screen.getByRole('button', { name: 'Restaurar' }));
+    expect(useBoardStore.getState().dialog).toBeNull();
+    expect(lastSent('card.restoreArchived')).toEqual({ type: 'card.restoreArchived', cardId: board.subId });
   });
 
   it('card na lixeira: aviso, sem menu de ações e "Restaurar" envia card.restore', async () => {
@@ -463,13 +472,112 @@ describe('Board / Column', () => {
     expect(lastSent('card.create')).toMatchObject({ columnId: firstCol.id, parentId: null, title: 'Nova história' });
   });
 
-  it('sem história selecionada, "+ Nova sub-tarefa" fica desligado', () => {
+  it('só um formulário de novo card fica aberto por vez: abrir noutra coluna fecha o primeiro', async () => {
     render(
       <Theme>
         <Board />
       </Theme>,
     );
-    for (const b of screen.getAllByRole('button', { name: '+ Nova sub-tarefa' })) expect(b).toBeDisabled();
+    const buttons = screen.getAllByRole('button', { name: '+ Novo card' });
+    await userEvent.click(buttons[0]!);
+    expect(screen.getAllByPlaceholderText('Título (Enter adiciona)')).toHaveLength(1);
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    expect(screen.getAllByPlaceholderText('Título (Enter adiciona)')).toHaveLength(1);
+  });
+
+  it('Esc fecha o formulário de novo card mesmo com o foco fora do campo', async () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    expect(screen.getByPlaceholderText('Título (Enter adiciona)')).toBeInTheDocument();
+    screen.getByRole('button', { name: 'Criar card' }).focus();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByPlaceholderText('Título (Enter adiciona)')).toBeNull();
+  });
+
+  it('sem história selecionada, "+ Nova sub-tarefa" fica desligado, com a dica', () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    for (const b of screen.getAllByRole('button', { name: '+ Nova sub-tarefa' })) {
+      expect(b).toBeDisabled();
+      expect(b).toHaveAttribute('title', 'Clique numa história para criar sub-tarefas dela');
+    }
+  });
+
+  it('com uma história selecionada, "+ Nova sub-tarefa" cria a sub-tarefa na coluna', async () => {
+    useBoardStore.getState().selectParent(board.storyId);
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    const s = board.router.snapshot();
+    const childWf = s.workflows.find((w) => w.kind === 'child')!;
+    const firstCol = s.columns.filter((c) => c.workflowId === childWf.id).sort((a, b) => a.position - b.position)[0]!;
+    const btn = screen.getAllByRole('button', { name: '+ Nova sub-tarefa' })[0]!;
+    expect(btn).not.toBeDisabled();
+    await userEvent.click(btn);
+    await userEvent.type(screen.getByPlaceholderText('Título (Enter adiciona)'), 'Sub nova{Enter}');
+    expect(lastSent('card.create')).toMatchObject({ columnId: firstCol.id, parentId: board.storyId, title: 'Sub nova' });
+  });
+
+  it('botão "Criar" também confirma o formulário', async () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    const s = board.router.snapshot();
+    const parentWf = s.workflows.find((w) => w.kind === 'parent')!;
+    const firstCol = s.columns.filter((c) => c.workflowId === parentWf.id).sort((a, b) => a.position - b.position)[0]!;
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    await userEvent.type(screen.getByPlaceholderText('Título (Enter adiciona)'), 'Outra história');
+    await userEvent.click(screen.getByRole('button', { name: 'Criar card' }));
+    expect(lastSent('card.create')).toMatchObject({ columnId: firstCol.id, parentId: null, title: 'Outra história' });
+  });
+
+  it('Esc fecha o formulário sem criar nada', async () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    const input = screen.getByPlaceholderText('Título (Enter adiciona)');
+    await userEvent.type(input, 'não vai{Escape}');
+    expect(screen.queryByPlaceholderText('Título (Enter adiciona)')).toBeNull();
+    expect(sentOf('card.create')).toHaveLength(0);
+  });
+
+  it('botão "Cancelar" fecha o formulário sem criar nada', async () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    await userEvent.type(screen.getByPlaceholderText('Título (Enter adiciona)'), 'não vai');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByPlaceholderText('Título (Enter adiciona)')).toBeNull();
+    expect(sentOf('card.create')).toHaveLength(0);
+  });
+
+  it('o botão de criar fica no topo da coluna, antes dos cards existentes', () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    const column = screen.getByText('Login com Google').closest('.column')!;
+    const footer = column.querySelector('.column-footer')!;
+    const body = column.querySelector('.column-body')!;
+    expect(footer.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('clicar no cabeçalho da linha colapsa a linha e compartilha com o host', async () => {
@@ -504,8 +612,12 @@ describe('botões de IA do card', () => {
     syncStore(router);
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {
-      expect(screen.getByRole('button', { name })).toBeDisabled();
-      expect(screen.getByRole('button', { name })).toHaveAttribute('title', expect.stringContaining('sem login'));
+      const button = screen.getByRole('button', { name });
+      expect(button).toBeDisabled();
+      // o `title` nativo saiu; o motivo do bloqueio agora vem no hint, aberto pelo foco
+      fireEvent.focus(button);
+      expect(await screen.findByText(/sem login/)).toBeInTheDocument();
+      fireEvent.blur(button);
     }
   });
 
@@ -517,8 +629,12 @@ describe('botões de IA do card', () => {
     });
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {
-      expect(screen.getByRole('button', { name })).toBeDisabled();
-      expect(screen.getByRole('button', { name })).toHaveAttribute('title', expect.stringContaining('login do Claude Code venceu'));
+      const button = screen.getByRole('button', { name });
+      expect(button).toBeDisabled();
+      // o motivo do bloqueio vem no hint, aberto pelo foco
+      fireEvent.focus(button);
+      expect(await screen.findByText(/login do Claude Code venceu/)).toBeInTheDocument();
+      fireEvent.blur(button);
     }
 
     act(() => {
@@ -526,5 +642,62 @@ describe('botões de IA do card', () => {
       syncStore(router);
     });
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) expect(screen.getByRole('button', { name })).toBeEnabled();
+  });
+
+  it('o hint de Trabalhar na fase e Refinar com IA tem negrito e tópicos, e o texto é idêntico nos dois botões de "Trabalhar na fase"', async () => {
+    const { router, storyId } = await seedBoard();
+    syncStore(router);
+    const card = router.snapshot().cards.find((c) => c.id === storyId)!;
+
+    const statusBar = renderThemed(<StatusBar card={card} />);
+    const workButtonStatusBar = screen.getByRole('button', { name: /Trabalhar na fase/ });
+    fireEvent.focus(workButtonStatusBar);
+    const workTooltipStatusBar = await screen.findByRole('tooltip');
+    expect(workTooltipStatusBar.querySelector('b')).toBeTruthy();
+    expect(workTooltipStatusBar.querySelector('li')).toBeTruthy();
+    const workTextStatusBar = workTooltipStatusBar.textContent;
+    fireEvent.blur(workButtonStatusBar);
+
+    const refineButton = screen.getByRole('button', { name: /Refinar com IA/ });
+    fireEvent.focus(refineButton);
+    const refineTooltip = await screen.findByRole('tooltip');
+    expect(refineTooltip.querySelector('b')).toBeTruthy();
+    expect(refineTooltip.querySelector('li')).toBeTruthy();
+    fireEvent.blur(refineButton);
+    statusBar.unmount();
+
+    renderThemed(<CommentsTab cardId={storyId} />);
+    const workButtonComments = screen.getByRole('button', { name: /Trabalhar na fase/ });
+    fireEvent.focus(workButtonComments);
+    const workTooltipComments = await screen.findByRole('tooltip');
+    expect(workTooltipComments.textContent).toEqual(workTextStatusBar);
+  });
+
+  it('"Resumir a conversa" trava logo após o clique: um segundo clique não dispara outro ai.run', async () => {
+    const { router, storyId } = await seedBoard();
+    router.handle({ type: 'comment.add', cardId: storyId, body: 'primeira' });
+    router.handle({ type: 'comment.add', cardId: storyId, body: 'segunda' });
+    syncStore(router);
+    posted.mockClear();
+
+    renderThemed(<CommentsTab cardId={storyId} />);
+    const button = screen.getByRole('button', { name: /Resumir a conversa/ });
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(sentOf('ai.run').filter((m) => m.mode === 'summarize')).toHaveLength(1);
+  });
+
+  it('Esc fecha o hint sem disparar a mensagem ao host', async () => {
+    const { router, storyId } = await seedBoard();
+    syncStore(router);
+    renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
+    const button = screen.getByRole('button', { name: /Trabalhar na fase/ });
+    fireEvent.focus(button);
+    await screen.findByRole('tooltip');
+    fireEvent.keyDown(button, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    expect(sentOf('ai.run')).toHaveLength(0);
   });
 });

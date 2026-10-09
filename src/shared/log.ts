@@ -121,10 +121,13 @@ export interface AiRunConsumption extends AiRunTokens {
   /** soma dos turnos de todos os segmentos; null = a ferramenta não informa */
   turns: number | null;
   sessionId: string | null;
-  /** null = não há custo: nem informado pela ferramenta, nem calculável pelo preço do catálogo */
+  /** null = não há custo: a ferramenta não o informou (o board nunca calcula por tabela de preços) */
   costUsd: number | null;
-  /** true = saiu da tabela de preços do catálogo; irrelevante quando `costUsd` é null */
-  costEstimated: boolean;
+  /**
+   * Só linhas antigas: true = o custo foi calculado pela tabela de preços que o board tinha. Nenhum leitor
+   * preenche isto mais; ausente = informado pela ferramenta.
+   */
+  costEstimated?: boolean;
 }
 
 /** O que uma linha do inventário da execução conta. */
@@ -179,6 +182,13 @@ export interface RunReport {
   answer: string;
   /** por que não houve medição, em português, para o canal de log — nunca para o banco */
   reason: string | null;
+  /**
+   * true = o leitor detectou, na própria saída da CLI, que o modelo esgotou o limite de uso do
+   * plano (não confundir com `reason`, que é do transporte e nunca é preenchido pelo leitor). Sinal
+   * estrutural, específico: nenhuma outra condição de erro (código de saída, timeout, erro genérico)
+   * liga esta flag — o runner decide a retentativa com o modelo reserva a partir dela.
+   */
+  usageLimitReached: boolean;
 }
 
 /** Uma linha de `log_months`: o total de uma métrica (e, opcionalmente, um corte dela) num mês já arquivado. */

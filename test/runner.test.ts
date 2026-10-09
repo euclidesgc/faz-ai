@@ -5,14 +5,17 @@ import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { CURSOR_TOOLS, headlessCommand, headlessUnsupported } from '../src/extension/headless';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt, consumptionLine } from '../src/extension/runner';
+import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt, consumptionLine, summarizePrompt } from '../src/extension/runner';
 import type { RunnerDeps } from '../src/extension/runner';
+import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
+import { gatewayFor } from './helpers/gateway';
 import { executionPlan } from '../src/extension/execution';
 import { monthOf, type RunReport } from '../src/shared/log';
 import { parseRunner } from '../src/shared/runner';
+import { TYPE_CONDITION, modelValue } from '../src/shared/models';
 import type { Database } from 'sql.js';
 
 it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
@@ -48,11 +51,21 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     workspaceDir: project,
     homeDir: home,
   });
-  const base = { purpose: '', agent: '', skills: [], tools: [], deniedTools: [], model: '', clean: false, isDefault: true };
+  // o agente é um arquivo na pasta global da ferramenta, marcado como disponível e padrão do board
   router.handle({
-    type: 'settings.execProfiles.set',
-    profiles: [{ ...base, id: 'p', name: 'Restrito', mcpServers: ['github'], deniedTools: ['WebFetch'] }],
+    type: 'harness.agent.create',
+    input: {
+      name: 'restrito',
+      description: 'Restrito',
+      body: 'Siga.',
+      model: '',
+      tools: [],
+      deniedTools: ['WebFetch'],
+      skills: [],
+      mcp: ['github'],
+    },
   });
+  router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'restrito' } } });
   const s0 = router.snapshot();
   const cardId = router.createCard({ typeId: s0.cardTypes[0]!.id, columnId: s0.columns[0]!.id, parentId: null, title: 'x' });
   const card = () => router.snapshot().cards.find((c) => c.id === cardId)!;
@@ -62,7 +75,8 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } },
   });
   expect(plan.input.mcpBlocked).toEqual(['slack']);
-  expect(plan.advice).toEqual([]); // no Claude Code tudo isso vai por parâmetro
+  expect(plan.advice).toEqual([]); // no Claude Code tudo isso vai por parâmetro, inclusive o agente (inline)
+  expect(plan.input.agentDefinition).toEqual({ name: 'restrito', description: 'Restrito', prompt: 'Siga.' });
   expect(plan.summary.join(' | ')).toContain('Servidores MCP: faz-ai, github (imposto)');
   expect(plan.summary.join(' | ')).not.toContain('segredo');
 
@@ -73,7 +87,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     cwd: project,
     homeDir: home,
     log: () => {},
-    spawn: (command) => {
+    gateway: gatewayFor(router, db, (command) => {
       const file = command.args[command.args.indexOf('--mcp-config') + 1]!;
       seen = { file, mode: fs.statSync(file).mode & 0o777, content: fs.readFileSync(file, 'utf8') };
       return {
@@ -82,7 +96,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
           exit = (code) => fn(code);
         },
       };
-    },
+    }),
   });
   runner.start(cardId);
   expect(seen!.mode).toBe(0o600);
@@ -91,10 +105,10 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   expect(fs.existsSync(seen!.file)).toBe(false);
 
   // noutra ferramenta, o que não vai por parâmetro vira instrução no prompt
-  router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
+  router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
   expect(executionPlan(router.snapshot(), card(), project, home).advice).toEqual([
-    'De servidores MCP, use só o do board e: github.',
-    'Não use estas ferramentas: WebFetch.',
+    'De servidores MCP, use só o do board.',
+    'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
   ]);
 
   // sem o servidor do board registrado, a execução restrita não começa
@@ -120,21 +134,130 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-it('o prompt da execução leva as skills do card pelo caminho', () => {
-  expect(cardPrompt('#1')).not.toContain('skills, obrigatórias');
-  expect(cardPrompt('#1', [{ name: 'commit', path: '/home/.claude/skills/commit/SKILL.md' }, { name: 'sumida' }])).toContain(
-    'leia estas skills, obrigatórias para este card: commit (/home/.claude/skills/commit/SKILL.md).',
-  );
+it('a história leva os outros agentes do board como subagentes, e o agente dela ganha a ferramenta de delegar; a sub-tarefa roda só com o dela', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { executionPlan } = await import('../src/extension/execution');
+  const { openInMemory } = await import('../src/extension/db/database');
+  const { MessageRouter } = await import('../src/extension/panel/messageRouter');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-deleg-')));
+  const project = path.join(root, 'p');
+  const home = path.join(root, 'h');
+  fs.mkdirSync(project);
+  fs.mkdirSync(home);
+  const db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
+  const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+    workspaceKey: 'ws',
+    folderName: 'P',
+    author: 'Pessoa',
+    attachmentsDir: path.join(root, 'a'),
+    workspaceDir: project,
+    homeDir: home,
+  });
+  const option = router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude')!;
+  const agent = (name: string, tools: string[], model = '') =>
+    router.handle({
+      type: 'harness.agent.create',
+      input: { name, description: `Agente ${name}`, body: `Instruções de ${name}.`, model, tools, deniedTools: [], skills: [], mcp: [] },
+    });
+  agent('condutor', ['Read', 'Grep', 'Glob']);
+  agent('backend-node', ['Read', 'Edit', 'Bash'], `${option.id}@${option.efforts[0]}`);
+  router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'condutor' } } });
+  const s0 = router.snapshot();
+  const parent = s0.workflows.find((w) => w.kind === 'parent')!;
+  const child = s0.workflows.find((w) => w.kind === 'child')!;
+  const storyId = router.createCard({
+    typeId: s0.cardTypes.find((t) => t.defaultWorkflowId === parent.id)!.id,
+    columnId: s0.columns.find((c) => c.workflowId === parent.id)!.id,
+    parentId: null,
+    title: 'História',
+  });
+  const taskId = router.createCard({
+    typeId: s0.cardTypes.find((t) => t.defaultWorkflowId === child.id)!.id,
+    columnId: s0.columns.find((c) => c.workflowId === child.id)!.id,
+    parentId: storyId,
+    title: 'Passo',
+  });
+  const backend = router.snapshot().board.execProfiles.find((p) => p.id === 'backend-node')!;
+  router.handle({ type: 'card.execProfile.set', cardId: taskId, profileId: backend.id });
+  const server = { command: 'node', args: ['b.js'] };
+  const of = (id: string) =>
+    executionPlan(
+      router.snapshot(),
+      router.snapshot().cards.find((c) => c.id === id)!,
+      project,
+      home,
+      server,
+    );
+
+  // a história: a sessão fica com todas as ferramentas (sem `--tools`), o condutor leva as dele mais a de
+  // lançar subagentes, e o especialista vai inline com as ferramentas e o modelo do arquivo dele
+  const story = of(storyId);
+  expect(story.input.tools).toEqual([]);
+  // toda lista de ferramentas num agente é fechada e deixaria o servidor do board de fora: ele vai junto
+  expect(story.input.agentDefinition).toMatchObject({ name: 'condutor', tools: ['Read', 'Grep', 'Glob', 'Agent', 'mcp__faz-ai__*'] });
+  expect(story.input.delegates).toEqual([
+    {
+      name: 'backend-node',
+      description: 'Agente backend-node',
+      prompt: 'Instruções de backend-node.',
+      tools: ['Read', 'Edit', 'Bash', 'mcp__faz-ai__*'],
+      model: option.model,
+    },
+  ]);
+  expect(story.advice).toEqual([]);
+  expect(story.summary.join(' | ')).toContain('Subagentes: backend-node (inline)');
+  expect(story.summary.join(' | ')).toContain('Ferramentas do agente: Read, Grep, Glob, Agent, mcp__faz-ai__* (no agente)');
+  expect(story.summary.join(' | ')).not.toContain('Ferramentas: ');
+
+  // a sub-tarefa roda com o agente dela, com as ferramentas impostas, e sem subagentes
+  const task = of(taskId);
+  expect(task.input.agentDefinition).toEqual({
+    name: 'backend-node',
+    description: 'Agente backend-node',
+    prompt: 'Instruções de backend-node.',
+  });
+  expect(task.input.delegates).toEqual([]);
+  expect(task.input.tools).toEqual(['Read', 'Edit', 'Bash']);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+it('o prompt da execução leva o contexto fixo do board e o do card pelo caminho, e não cita mais a skill do fluxo por nome', () => {
+  expect(cardPrompt('#1')).not.toContain('Contexto fixo');
+  expect(cardPrompt('#1')).not.toContain('faz-ai-fluxo');
+  const prompt = cardPrompt('#1', {
+    always: ['Contexto fixo deste board. Antes de começar, leia e siga: skill faz-ai-fluxo (/home/.claude/skills/faz-ai-fluxo/SKILL.md).'],
+    card: ['Este card exige também: rule CLAUDE.md (/p/CLAUDE.md); skill commit (/home/.claude/skills/commit/SKILL.md).'],
+  });
+  expect(prompt.indexOf('Contexto fixo')).toBeLessThan(prompt.indexOf('Este card exige também'));
+  expect(prompt.indexOf('Este card exige também')).toBeLessThan(prompt.indexOf('Leia o card com get_card'));
 });
 
 it('com triage=true, o bloco de triagem entra antes do trabalho da fase; sem triage, o prompt não muda', () => {
-  const semTriage = cardPrompt('#1', [], [], false);
+  const semTriage = cardPrompt('#1', undefined, [], false);
   expect(semTriage).toBe(cardPrompt('#1')); // default (omitido) é idêntico, byte a byte, ao atual
   expect(semTriage).not.toContain('Tags, Esforço da atividade, Modelo e Skills');
 
-  const comTriage = cardPrompt('#1', [], [], false, true);
+  const comTriage = cardPrompt('#1', undefined, [], false, true);
   expect(comTriage).toContain('Tags, Esforço da atividade, Modelo e Skills');
   expect(comTriage.indexOf('Tags, Esforço da atividade, Modelo e Skills')).toBeLessThan(comTriage.indexOf('Faça o trabalho da fase'));
+});
+
+it('summarizePrompt pede um resumo nas três seções e leva o contexto fixo e o do card', () => {
+  expect(summarizePrompt('#1')).toContain('Decisões');
+  expect(summarizePrompt('#1')).toContain('Observações');
+  expect(summarizePrompt('#1')).toContain('Pendências');
+  expect(summarizePrompt('#1')).toContain('add_comment');
+  expect(summarizePrompt('#1')).toContain('kind: "summary"');
+  const prompt = summarizePrompt('#1', {
+    always: ['Contexto fixo deste board. Antes de começar, leia e siga: skill faz-ai-fluxo (/home/.claude/skills/faz-ai-fluxo/SKILL.md).'],
+    card: ['Este card exige também: rule CLAUDE.md (/p/CLAUDE.md).'],
+  });
+  expect(prompt).toContain('Contexto fixo deste board');
+  expect(prompt).toContain('Este card exige também');
+  expect(prompt.indexOf('Pendências')).toBeLessThan(prompt.indexOf('Contexto fixo deste board'));
+  expect(prompt.indexOf('Contexto fixo deste board')).toBeLessThan(prompt.indexOf('Este card exige também'));
 });
 import type { HeadlessCommand } from '../src/extension/headless';
 
@@ -196,31 +319,28 @@ beforeEach(async () => {
   log = [];
   procs = [];
   speaks = true;
-  // sem `runLog`: o executor padrão dos testes é o de um board sem log, que tem de funcionar como antes
-  deps = {
-    cwd: dir,
-    log: (line) => log.push(line),
-    spawn: (command, cwd, out) => {
-      let listener: (code: number | null, error?: Error) => void = () => {};
-      const proc = {
-        command,
-        cwd,
-        killed: false,
-        emit: (text: string, stream: 'stdout' | 'stderr' = 'stdout') => out(text, stream),
-        exit: (code: number | null, error?: Error) => listener(code, error),
-      };
-      procs.push(proc);
-      // no modo estruturado a ferramenta escreve eventos; o texto vem dentro de um evento do assistente
-      if (speaks) out(command.format === 'text' ? 'saída da ferramenta\n' : `${assistant('saída da ferramenta')}\n`, 'stdout');
-      return {
-        onExit: (fn) => (listener = fn),
-        kill: () => {
-          proc.killed = true;
-          proc.exit(null);
-        },
-      };
-    },
+  // o log de uso é obrigatório: o executor dos testes grava no mesmo banco em memória do board
+  const spawn: SpawnFn = (command, cwd, out) => {
+    let listener: (code: number | null, error?: Error) => void = () => {};
+    const proc = {
+      command,
+      cwd,
+      killed: false,
+      emit: (text: string, stream: 'stdout' | 'stderr' = 'stdout') => out(text, stream),
+      exit: (code: number | null, error?: Error) => listener(code, error),
+    };
+    procs.push(proc);
+    // no modo estruturado a ferramenta escreve eventos; o texto vem dentro de um evento do assistente
+    if (speaks) out(command.format === 'text' ? 'saída da ferramenta\n' : `${assistant('saída da ferramenta')}\n`, 'stdout');
+    return {
+      onExit: (fn) => (listener = fn),
+      kill: () => {
+        proc.killed = true;
+        proc.exit(null);
+      },
+    };
   };
+  deps = { cwd: dir, log: (line) => log.push(line), gateway: gatewayFor(router, db, spawn, (line) => log.push(line)) };
   runner = new AiRunner(router, deps);
 });
 
@@ -237,7 +357,7 @@ describe('executor da IA', () => {
     expect(procs[0]!.cwd).toBe(dir);
     expect(procs[0]!.command).toEqual(
       headlessCommand('claude', {
-        prompt: cardPrompt('#1', [], [PERMISSION_ADVICE.board!], false, true),
+        prompt: cardPrompt('#1', undefined, [PERMISSION_ADVICE.board!], false, true),
         permission: 'board',
         addDirs: [`${dir}.worktrees`],
         structured: true,
@@ -278,7 +398,7 @@ describe('executor da IA', () => {
       runner.start(storyId);
       expect(procs[0]!.command).toEqual(
         headlessCommand('claude', {
-          prompt: cardPrompt('#1', [], [], true, true),
+          prompt: cardPrompt('#1', undefined, [], true, true),
           permission: 'full',
           addDirs: [`${dir}.worktrees`],
           structured: true,
@@ -316,6 +436,87 @@ describe('executor da IA', () => {
       ai({ type: 'comment.add', cardId: storyId, body: 'Decidi usar Google.' });
       procs[0]!.exit(0);
       expect(card().status).toBe('ready');
+    });
+
+    it('RF4: PR registrado antes da história chegar na última coluna entrega ao fim da execução, em vez de voltar para "ready"', () => {
+      yolo();
+      const ctx = (router as any).ctx;
+      const homologacao = router.snapshot().columns.find((c) => c.name === 'Homologação')!.id;
+      runner.start(storyId);
+      // registra o PR e move a história direto no repositório, como se a sessão tivesse feito os dois
+      // sem passar pelos handlers (que já reavaliariam a entrega): é a ordem que o bug deixava escapar
+      ctx.cards.move(storyId, homologacao, 0, { byAi: true });
+      ctx.cards.setPullRequest(storyId, 'https://github.com/acme/app/pull/7');
+      procs[0]!.exit(0);
+      expect(card().status).toBe('waiting_review');
+    });
+  });
+
+  describe('história #407: re-execução de uma história YOLO já entregue', () => {
+    const PR = 'https://github.com/acme/app/pull/7';
+
+    const deliver = () => {
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      const homologacao = router.snapshot().columns.find((c) => c.name === 'Homologação')!.id;
+      router.handle({ type: 'card.pr.set', cardId: storyId, url: PR });
+      router.handle({ type: 'card.move', cardId: storyId, columnId: homologacao, position: 0 });
+      expect(card().status).toBe('waiting_review'); // já entregue, a vez é da pessoa
+    };
+
+    it('a sub-tarefa que termina sem responder nem mudar status não bloqueia: a história já está com a pessoa', () => {
+      deliver();
+      const s = router.snapshot();
+      const wf = s.workflows.find((w) => w.kind === 'child')!;
+      const subId = router.createCard({
+        typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+        columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+        parentId: storyId,
+        title: 'Passo',
+      });
+      runner.start(subId);
+      procs[0]!.exit(0); // sem comentário, sem mudar o status: exatamente o caso que o bug autobloqueava
+      const sub = router.snapshot().cards.find((c) => c.id === subId)!;
+      expect(sub.status).not.toBe('blocked');
+      expect(card().status).toBe('waiting_review'); // a história continua entregue, intocada
+    });
+
+    it('regressão: sem modo autônomo, continua bloqueando com "encerrou sem responder" mesmo com a história já entregue', () => {
+      // entrega "manual" (sem YOLO): fixa o status diretamente, já que settleDelivery exige YOLO
+      const ctx = (router as any).ctx;
+      const homologacao = router.snapshot().columns.find((c) => c.name === 'Homologação')!.id;
+      ctx.cards.move(storyId, homologacao, 0);
+      ctx.cards.setPullRequest(storyId, PR);
+      ctx.cards.setStatus(storyId, 'waiting_review', '', 'Pessoa');
+      const s = router.snapshot();
+      const wf = s.workflows.find((w) => w.kind === 'child')!;
+      const subId = router.createCard({
+        typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+        columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+        parentId: storyId,
+        title: 'Passo',
+      });
+      runner.start(subId);
+      procs[0]!.exit(0);
+      const sub = router.snapshot().cards.find((c) => c.id === subId)!;
+      expect(sub.status).toBe('blocked');
+      expect(sub.statusReason).toContain('sem responder');
+    });
+
+    it('regressão: história YOLO ainda não entregue continua bloqueando', () => {
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      const s = router.snapshot();
+      const wf = s.workflows.find((w) => w.kind === 'child')!;
+      const subId = router.createCard({
+        typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+        columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+        parentId: storyId,
+        title: 'Passo',
+      });
+      runner.start(subId);
+      procs[0]!.exit(0);
+      const sub = router.snapshot().cards.find((c) => c.id === subId)!;
+      expect(sub.status).toBe('blocked');
+      expect(sub.statusReason).toContain('sem responder');
     });
   });
 
@@ -397,6 +598,53 @@ describe('executor da IA', () => {
     expect(card().status).toBe('waiting_review');
   });
 
+  describe('Resumir a conversa', () => {
+    it('permissão sempre "board" e nunca autônomo, mesmo com o board em "Sem restrições" e o card em YOLO', () => {
+      router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      runner.start(storyId, 'manual', 'summarize');
+      const command = procs[0]!.command;
+      expect(command.args).toContain('dontAsk');
+      expect(command.args).not.toContain('bypassPermissions');
+      expect(command.stdin).not.toContain('MODO AUTÔNOMO');
+      expect(command.stdin).toContain('Leia toda a conversa do card #1');
+    });
+
+    it('sucesso não muda o status do card, mesmo quando a IA gravou o resumo na conversa', () => {
+      router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_review' });
+      runner.start(storyId, 'manual', 'summarize');
+      ai({ type: 'comment.add', cardId: storyId, body: 'Resumo da conversa.', kind: 'summary' });
+      procs[0]!.exit(0);
+      expect(card().status).toBe('waiting_review');
+      expect(lastMessage()).toMatchObject({ body: 'Resumo da conversa.', kind: 'summary' });
+    });
+
+    it('falha de processo grava o comentário de falha específico do resumo, e o status volta ao anterior', () => {
+      router.handle({ type: 'card.status.set', cardId: storyId, status: 'approved' });
+      runner.start(storyId, 'manual', 'summarize');
+      procs[0]!.exit(1);
+      expect(card().status).toBe('approved');
+      expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+      expect(lastMessage()!.body).toContain('O resumo da conversa não foi gerado.');
+      expect(lastMessage()!.body).toContain('código 1');
+
+      runner.start(storyId, 'manual', 'summarize');
+      procs[1]!.exit(null, new Error('comando "claude" não encontrado.'));
+      expect(card().status).toBe('approved');
+      expect(lastMessage()!.body).toContain('O resumo da conversa não foi gerado.');
+      expect(lastMessage()!.body).toContain('não encontrado');
+    });
+
+    it('sem falha de processo e sem nova mensagem de IA, grava o aviso de "terminou sem escrever a mensagem"', () => {
+      router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_review' });
+      runner.start(storyId, 'manual', 'summarize');
+      procs[0]!.exit(0); // a IA não chamou add_comment
+      expect(card().status).toBe('waiting_review');
+      expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+      expect(lastMessage()!.body).toBe('O resumo não foi gerado: a execução terminou sem escrever a mensagem.');
+    });
+  });
+
   it('a recusa do plano gratuito do Cursor vem com a saída: escolher Auto', () => {
     router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor', runner: { permission: 'board' } } });
     runner.start(storyId);
@@ -421,24 +669,20 @@ describe('executor da IA', () => {
     expect(lastMessage()!.body).toContain('não encontrado');
   });
 
-  it('o fim da execução diz aos ouvintes se era refinar ou trabalhar na fase', () => {
+  it('o fim da execução diz aos ouvintes se era refinar, resumir ou trabalhar na fase', () => {
     const finished: [string, string][] = [];
     runner.onDidFinish((id, mode) => finished.push([id, mode]));
     runner.start(storyId, 'manual', 'refine');
     procs[0]!.exit(0);
-    runner.start(storyId);
+    runner.start(storyId, 'manual', 'summarize');
     procs[1]!.exit(0);
+    runner.start(storyId);
+    procs[2]!.exit(0);
     expect(finished).toEqual([
       [storyId, 'refine'],
+      [storyId, 'summarize'],
       [storyId, 'phase'],
     ]);
-  });
-
-  it('Refinar com IA numa ferramenta que só roda sem restrições usa a permissão do board', () => {
-    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi', runner: { permission: 'full' } } });
-    runner.start(storyId, 'manual', 'refine');
-    expect(procs[0]!.command.command).toBe('kimi');
-    expect(procs[0]!.command.args.join(' ')).toContain('Não altere arquivos do projeto');
   });
 
   it('parar devolve o card ao status anterior', () => {
@@ -451,56 +695,39 @@ describe('executor da IA', () => {
     expect(router.snapshot().comments).toHaveLength(0);
   });
 
-  it('ferramenta que só roda sem restrições: avisa em vez de rodar com permissão menor', () => {
-    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi', runner: { permission: 'edits' } } });
-    expect(router.snapshot().aiRunUnsupported).toContain('Sem restrições');
-    expect(() => runner.start(storyId)).toThrow('Sem restrições');
-    expect(procs).toHaveLength(0);
-    router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
-    expect(router.snapshot().aiRunUnsupported).toBeNull();
-    runner.start(storyId);
-    expect(procs[0]!.command).toEqual({
-      command: 'kimi',
-      args: ['-p', cardPrompt('#1', [], [], false, true), '--output-format', 'stream-json', '--add-dir', `${dir}.worktrees`],
-      format: 'stream-json',
-      promptArg: { index: 1, addDirFlag: '--add-dir' },
-    });
+  it('ferramenta que não roda com a permissão pedida: avisa em vez de rodar com permissão menor', () => {
+    // o Claude Code recusa "Sem restrições" quando roda como root (contêiner, WSL como root)
+    const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
+    try {
+      router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude', runner: { permission: 'full' } } });
+      expect(router.snapshot().aiRunUnsupported).toContain('root');
+      expect(() => runner.start(storyId)).toThrow('root');
+      expect(procs).toHaveLength(0);
+      router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'board' } } });
+      expect(router.snapshot().aiRunUnsupported).toBeNull();
+      runner.start(storyId);
+      expect(procs).toHaveLength(1);
+      expect(procs[0]!.command.command).toBe('claude');
+    } finally {
+      getuid.mockRestore();
+    }
   });
 
   it('monta o comando de cada ferramenta conforme a permissão', () => {
     const cmd = (tool: Parameters<typeof headlessCommand>[0], permission: 'board' | 'edits' | 'full') =>
       headlessCommand(tool, { prompt: 'P', permission });
+    // o contexto vazio vai sempre: nenhuma fonte de configuração e nenhuma skill invocável
+    const empty = ['--setting-sources', '', '--disable-slash-commands'];
     expect(cmd('claude', 'board')).toEqual({
       command: 'claude',
-      args: ['-p', '--permission-mode', 'dontAsk', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep'],
+      args: ['-p', '--permission-mode', 'dontAsk', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', ...empty],
       stdin: 'P',
       format: 'text',
     });
     expect(cmd('claude', 'edits')).toMatchObject({
-      args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep'],
+      args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', ...empty],
     });
-    expect(cmd('claude', 'full')).toMatchObject({ args: ['-p', '--permission-mode', 'bypassPermissions'] });
-    expect(cmd('codex', 'edits')).toEqual({
-      command: 'codex',
-      args: [
-        'exec',
-        '--sandbox',
-        'workspace-write',
-        '--skip-git-repo-check',
-        '-c',
-        'mcp_servers.faz-ai.default_tools_approval_mode="approve"',
-        '-',
-      ],
-      stdin: 'P',
-      format: 'text',
-    });
-    expect(cmd('copilot', 'board')).toEqual({
-      command: 'copilot',
-      args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', '--no-ask-user'],
-      env: { GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP: 'true' },
-      format: 'text',
-      promptArg: { index: 1, addDirFlag: '--add-dir=' },
-    });
+    expect(cmd('claude', 'full')).toMatchObject({ args: ['-p', '--permission-mode', 'bypassPermissions', ...empty] });
     // o pedido do Cursor vai pela entrada padrão, nunca na linha de comando
     expect(cmd('cursor', 'full')).toEqual({
       command: 'cursor-agent',
@@ -518,7 +745,6 @@ describe('executor da IA', () => {
     expect([...CURSOR_TOOLS.board, ...CURSOR_TOOLS.edits]).not.toContain('shell_tool_call');
     expect(headlessUnsupported('claude', 'board')).toBeNull();
     expect(headlessUnsupported('cursor', 'board')).toBeNull();
-    expect(headlessUnsupported('kimi', 'board')).toContain('Kimi');
     // o Claude Code recusa pular as permissões como root
     expect(headlessUnsupported('claude', 'full', 0)).toContain('root');
     expect(headlessUnsupported('claude', 'full', 1000)).toBeNull();
@@ -534,11 +760,18 @@ describe('executor da IA', () => {
   it('o Claude Code recebe o servidor do board na linha de comando, sem depender do registro no projeto', () => {
     const boardServer = { command: 'node', args: ['/dados/mcp/bridge.js', '/projeto'] };
     const built = headlessCommand('claude', { prompt: 'P', permission: 'board', boardServer }) as HeadlessCommand;
-    expect(built.args.slice(-2)).toEqual(['--mcp-config', '{tmp:mcp.json}']);
-    expect(built.args).not.toContain('--strict-mcp-config');
+    // estrito: nenhum outro servidor (do usuário ou do projeto) entra na sessão
+    expect(built.args.slice(-6)).toEqual([
+      '--strict-mcp-config',
+      '--mcp-config',
+      '{tmp:mcp.json}',
+      '--setting-sources',
+      '',
+      '--disable-slash-commands',
+    ]);
     expect(JSON.parse(built.tempFiles!['mcp.json']!)).toEqual({ mcpServers: { 'faz-ai': { type: 'stdio', ...boardServer } } });
-    // as outras ferramentas continuam lendo o registro feito por "Conectar ao board"
-    expect(headlessCommand('codex', { prompt: 'P', permission: 'board', boardServer })).not.toHaveProperty('tempFiles');
+    // o Cursor não recebe o servidor pela linha de comando: ele lê o registro do projeto
+    expect(headlessCommand('cursor', { prompt: 'P', permission: 'board', boardServer })).not.toHaveProperty('tempFiles');
   });
 
   it('avisa a IA do limite da execução, para ela explicar à pessoa onde mudar', () => {
@@ -552,6 +785,7 @@ describe('executor da IA', () => {
 
   it('guarda permissão e tempo limite, recusando valores inválidos', () => {
     expect(router.snapshot().board.runner).toEqual({
+      defaultAgent: '',
       permission: 'board',
       timeoutMinutes: 30,
       heartbeat: false,
@@ -584,7 +818,7 @@ describe('log das execuções de IA', () => {
 
   beforeEach(() => {
     runs = new AiRunRepo(db);
-    logged = new AiRunner(router, { ...deps, runLog: createRunLog(db, (line) => log.push(line)) });
+    logged = runner;
   });
 
   /** as execuções gravadas neste mês, da mais antiga para a mais recente */
@@ -620,15 +854,24 @@ describe('log das execuções de IA', () => {
   });
 
   it('RF-15: a configuração gravada é a mesma que o resumo manda para o canal de log', () => {
-    // o perfil restringe os servidores MCP, e para isso o Claude Code precisa ver o do board na pasta
     fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: { 'faz-ai': { command: 'node' } } }));
     router.refreshHarness();
     const o = router.snapshot().board.modelCatalog.find((m) => m.tool === 'claude' && m.efforts.length > 0)!;
-    const base = { purpose: '', skills: ['sql-queries'], tools: [], deniedTools: ['WebFetch'], isDefault: true };
     router.handle({
-      type: 'settings.execProfiles.set',
-      profiles: [{ ...base, id: 'p', name: 'Restrito', agent: 'revisor', model: `${o.id}@${o.efforts[0]}`, clean: true, mcpServers: [] }],
+      type: 'harness.agent.create',
+      scope: 'project',
+      input: {
+        name: 'restrito',
+        description: 'Restrito',
+        body: 'Siga.',
+        model: `${o.id}@${o.efforts[0]}`,
+        tools: [],
+        deniedTools: ['WebFetch'],
+        skills: ['sql-queries'],
+        mcp: [],
+      },
     });
+    router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'restrito' } } });
     const summary = executionPlan(router.snapshot(), card(), dir, '').summary.join(' | ');
     logged.start(storyId);
 
@@ -636,8 +879,8 @@ describe('log das execuções de IA', () => {
     expect(row).toMatchObject({
       model: o.model,
       effort: o.efforts[0],
-      profile: 'Restrito',
-      agent: 'revisor',
+      profile: 'restrito',
+      agent: 'restrito',
       permission: 'board',
       autonomous: false,
       clean: true,
@@ -646,30 +889,44 @@ describe('log das execuções de IA', () => {
     });
     // o que foi gravado tem de aparecer no resumo que a pessoa lê no canal de log: uma verdade só
     expect(summary).toContain(`Agente do board: ${row.profile}`);
-    expect(summary).toContain(`Subagente da ferramenta: ${row.agent}`);
     expect(summary).toContain(`Skills: ${row.skills.join(', ')}`);
     expect(summary).toContain(`Modelo: ${row.model} · ${row.effort}`);
-    expect(summary).toContain('Sessão limpa');
+    expect(summary).toContain('Contexto vazio (imposto)');
     expect(log.join('\n')).toContain(summary);
   });
 
   it('RF-15: sem perfil e sem modelo, o não definido fica NULL — nunca string vazia nem zero', () => {
     logged.start(storyId);
     // sem modelo escolhido a execução usa o padrão da ferramenta, que o board não conhece: não definido
-    expect(only()).toMatchObject({ model: null, effort: null, skills: [], mcp: null });
-    // o subagente é dimensão desta execução e nenhum foi escolhido: definido e vazio, não "não se aplica"
+    expect(only()).toMatchObject({ model: null, effort: null, skills: [], mcp: [] });
+    // o agente embutido não tem arquivo: definido e vazio, não "não se aplica"
     expect(only().agent).toBe('');
-    // o perfil, ao contrário, existe sempre num card: o board tem um agente padrão
+    // o perfil, ao contrário, existe sempre num card: sem agente marcado vale o embutido
     expect(only().profile).toBe('Agente padrão');
     expect(raw('model')).toEqual([null]);
     expect(raw('effort')).toEqual([null]);
-    expect(raw('mcp_json')).toEqual([null]);
+    // toda execução parte de contexto vazio: só o servidor do board
+    expect(raw('mcp_json')).toEqual(['[]']);
   });
 
   it('RF-15: em modo autônomo grava permissão sem restrições e autonomous', () => {
     router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
     logged.start(storyId);
     expect(only()).toMatchObject({ permission: 'full', autonomous: true });
+  });
+
+  it('Resumir a conversa: usa sempre o modelo da faixa "Alto" do catálogo, mesmo com o card no Modelo da faixa Média, e nunca autônomo', () => {
+    // o card está com o modelo da faixa "Média" (sonnet, esforço medium): é o que a fase comum usaria
+    const sonnet = router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'sonnet')!;
+    const modeloField = router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
+    router.handle({ type: 'field.setValue', cardId: storyId, fieldId: modeloField.id, value: modelValue(sonnet.id, 'medium') });
+    router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    expect(executionPlan(router.snapshot(), card(), dir, '').manifest.model).toMatchObject({ name: 'sonnet', effort: 'medium' });
+
+    logged.start(storyId, 'manual', 'summarize');
+    // a faixa "Alto" do catálogo embutido do Claude Code é opus/high, independente do Modelo do card
+    expect(only()).toMatchObject({ model: 'opus', effort: 'high', permission: 'board', autonomous: false });
   });
 
   it('RF-16: a origem é "manual" por padrão e a informada quando o heartbeat ou o autopiloto chamam', () => {
@@ -716,12 +973,17 @@ describe('log das execuções de IA', () => {
   });
 
   it('RF-17: a ferramenta sem suporte fecha a linha com unsupported antes de o erro subir', () => {
-    // o Kimi em segundo plano não aceita limite por linha de comando: com permissão menor, não roda
-    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi', runner: { permission: 'edits' } } });
-    expect(() => logged.start(storyId)).toThrow('Sem restrições');
+    // o Claude Code recusa "Sem restrições" como root: a execução não roda
+    const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
+    try {
+      router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude', runner: { permission: 'full' } } });
+      expect(() => logged.start(storyId)).toThrow('root');
+    } finally {
+      getuid.mockRestore();
+    }
     expect(procs).toHaveLength(0);
     // a tentativa também é informação: a linha existe, fechada, com a ferramenta que não deu
-    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'kimi' });
+    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'claude' });
     // a duração existe e é curta (o tempo até descobrir que não dá); só 'unknown' fica sem duração
     expect(only().durationMs).toBeGreaterThanOrEqual(0);
   });
@@ -786,11 +1048,11 @@ describe('log das execuções de IA', () => {
     expect(log.join('\n')).toContain('[fazai] falha ao registrar a execução de IA:');
   });
 
-  it('sem runLog o executor não grava nada e funciona como antes', () => {
+  it('toda execução é registrada: não existe executor sem log', () => {
     runner.start(storyId);
+    expect(runner.runIdOf(storyId)).toBe(only().id);
     procs[0]!.exit(0);
-    expect(rows()).toEqual([]);
-    expect(runner.runIdOf(storyId)).toBeNull();
+    expect(only()).toMatchObject({ outcome: 'done', origin: 'manual', tool: 'claude' });
   });
 
   /** A medição de consumo pela porta do executor (#70): do processo ao banco, passando pelo canal e pela conversa do card. */
@@ -917,27 +1179,140 @@ describe('log das execuções de IA', () => {
       expect(only()).toMatchObject({ outcome: 'timeout', measure: 'partial' });
       expect(card().statusReason).toContain('tempo limite');
     });
+  });
+});
 
-    it('a ferramenta sem saída estruturada (Copilot) roda igual e diz no canal por que não mediu', () => {
-      router.handle({ type: 'settings.board.update', patch: { aiTool: 'copilot' } });
-      logged.start(storyId);
-      procs[0]!.exit(0);
-
-      expect(procs).toHaveLength(1);
-      expect(only()).toMatchObject({ outcome: 'done', measure: 'none' });
-      expect(log.find((l) => l.startsWith('[#1] Consumo não medido'))).toContain('não produz saída estruturada');
+/**
+ * Retentativa com o modelo reserva da regra de sugestão quando o modelo principal esgota o limite de
+ * uso do plano (história #257). O leitor do Claude Code (`claude.ts`) só liga `usageLimitReached` com
+ * um `result` de erro cujo texto bate com os termos conhecidos de limite esgotado (ver
+ * `USAGE_LIMIT_TEXT`); é assim que estes testes simulam o esgotamento, sem depender de um exemplo real.
+ */
+describe('reserva de modelo quando o limite esgota (história #257)', () => {
+  const sonnet = () => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'sonnet')!;
+  const fable = () => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'fable')!;
+  const modeloField = () => router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
+  const setModelo = (value: string) => router.handle({ type: 'field.setValue', cardId: storyId, fieldId: modeloField().id, value });
+  const useSonnetMedium = () => setModelo(modelValue(sonnet().id, 'medium'));
+  const ruleWithFallback = (fallback: string | null) =>
+    router.handle({
+      type: 'settings.modelRules.set',
+      rules: [
+        {
+          id: 'r1',
+          name: 'Regra',
+          enabled: true,
+          groups: [[{ fieldId: TYPE_CONDITION, op: 'is', value: 'História' }]],
+          model: modelValue(sonnet().id, 'medium'),
+          fallback,
+        },
+      ],
     });
+  // uma linha `result` que o leitor do Claude Code reconhece como limite de uso esgotado (RF-03: só este sinal estrutural liga a flag)
+  const usageLimitResult = () => JSON.stringify({ type: 'result', is_error: true, result: 'usage limit reached' });
 
-    it('a falha no Copilot não diz no canal que o trabalho rodou normalmente', () => {
-      router.handle({ type: 'settings.board.update', patch: { aiTool: 'copilot' } });
-      logged.start(storyId);
-      procs[0]!.exit(1);
+  it('regra com reserva + limite esgotado: segunda chamada ao gateway com o modelo reserva, comentário na conversa, sem bloqueio', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    runner.start(storyId);
+    expect(procs).toHaveLength(1);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
 
-      expect(only()).toMatchObject({ outcome: 'failed', measure: 'none' });
-      const line = log.find((l) => l.startsWith('[#1] Consumo não medido'))!;
-      expect(line).toContain('não produz saída estruturada');
-      expect(line).not.toMatch(/normalmente|rodou/);
-    });
+    expect(procs).toHaveLength(2);
+    const args = procs[1]!.command.args;
+    expect(args[args.indexOf('--model') + 1]).toBe('fable');
+    expect(args[args.indexOf('--effort') + 1]).toBe('low');
+    expect(card().status).toBe('running'); // não bloqueou nem esperou resposta: a reserva está em curso
+    expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+    expect(lastMessage()!.body).toBe('O `Sonnet 5.5 - médio` esgotou o limite; a execução segue com `Fable 5.1 - baixo`.');
+
+    // a retentativa termina bem: segue como qualquer execução normal (aqui, a IA só respondeu na conversa)
+    ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+    procs[1]!.exit(0);
+    expect(card().status).toBe('waiting_answer');
+  });
+
+  it('a reserva também esgota o limite (ou falha por qualquer motivo): bloqueio final, sem uma terceira tentativa', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(2);
+
+    procs[1]!.emit(usageLimitResult());
+    procs[1]!.exit(1);
+    expect(procs).toHaveLength(2); // nenhuma terceira chamada: a retentativa não recebe fallbackPending
+    expect(card().status).toBe('blocked');
+  });
+
+  it('card sem reserva (regra sem fallback) + limite esgotado: bloqueio imediato, sem segunda chamada', () => {
+    useSonnetMedium();
+    ruleWithFallback(null);
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('blocked');
+  });
+
+  it('modelo escolhido à mão sem bater com a regra + limite esgotado: bloqueio imediato, sem segunda chamada', () => {
+    // a regra sugeriria sonnet@medium, mas o campo Modelo do card foi trocado à mão para fable@high
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    setModelo(modelValue(fable().id, 'high'));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('blocked');
+  });
+
+  it('falha comum (sem limite esgotado), mesmo com reserva disponível: bloqueio imediato, sem segunda chamada', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    runner.start(storyId);
+    procs[0]!.exit(2); // erro comum, sem nenhum evento de limite esgotado: a reserva não mascara outros erros
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('blocked');
+  });
+
+  it('execução que terminou bem (código 0) com a flag ligada: não repete a fase com a reserva', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+    procs[0]!.exit(0);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('waiting_answer');
+  });
+
+  it('a retentativa não consegue começar (card arquivado no meio): o card é bloqueado com o motivo e o fim é avisado', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    const finished: string[] = [];
+    runner.onDidFinish((id) => finished.push(id));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    router.handle({ type: 'card.archive', cardId: storyId });
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(finished).toEqual([storyId]);
+    expect(runner.running).not.toContain(storyId);
+    expect(router.snapshot().aiActivity.some((a) => a.cardId === storyId)).toBe(false);
+  });
+
+  it('modo autônomo (YOLO): a retentativa não deixa o card "waiting_answer" nem "blocked" só por causa da troca — a fila segue', () => {
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+
+    expect(procs).toHaveLength(2);
+    expect(card().status).toBe('running');
   });
 });
 
@@ -964,18 +1339,18 @@ describe('consumptionLine', () => {
       turns: 1,
       sessionId: null,
       costUsd: 1.5,
-      costEstimated: true,
       ...consumption,
     },
     inventory: [],
     answer: '',
     reason: null,
+    usageLimitReached: false,
     ...patch,
   });
 
-  it('números em português, "turno" no singular, custo com duas a quatro casas e marcado quando estimado', () => {
+  it('números em português, "turno" no singular, custo com duas a quatro casas', () => {
     expect(consumptionLine(report())).toBe(
-      'Consumo: 1.234 entrada · 5 saída · 0 leitura de cache · 1.000.000 criação de cache · 1 turno · US$ 1,50 (estimado)',
+      'Consumo: 1.234 entrada · 5 saída · 0 leitura de cache · 1.000.000 criação de cache · 1 turno · US$ 1,50',
     );
   });
 

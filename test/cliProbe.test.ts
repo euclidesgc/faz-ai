@@ -46,33 +46,3 @@ describe('claudeSignedIn', () => {
     expect(await claudeSignedIn('claude', undefined)).toBeNull();
   });
 });
-
-describe('codexSignedIn', () => {
-  it('should return false when stdout mentions not logged in', async () => {
-    const { codexSignedIn } = await import('../src/extension/cliProbe');
-    mockOutput(0, 'Not logged in. Run `codex login`.');
-
-    expect(await codexSignedIn('codex', undefined)).toBe(false);
-  });
-
-  it('should return true when stdout mentions logged in', async () => {
-    const { codexSignedIn } = await import('../src/extension/cliProbe');
-    mockOutput(0, 'Logged in as someone@example.com');
-
-    expect(await codexSignedIn('codex', undefined)).toBe(true);
-  });
-
-  it('should return null when exit code is non-zero and stderr is empty', async () => {
-    const { codexSignedIn } = await import('../src/extension/cliProbe');
-    mockOutput(1, '', '');
-
-    expect(await codexSignedIn('codex', undefined)).toBeNull();
-  });
-
-  it('should return null for unrecognized output', async () => {
-    const { codexSignedIn } = await import('../src/extension/cliProbe');
-    mockOutput(0, 'something unexpected');
-
-    expect(await codexSignedIn('codex', undefined)).toBeNull();
-  });
-});

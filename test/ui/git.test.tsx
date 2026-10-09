@@ -1,8 +1,15 @@
-import { choose, lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
+
+// liga o modo navegador antes de o setup montar o mock de `src/webview/vscode` (padrão de appearanceSettingsWeb.test.tsx):
+// no editor (!isWeb, padrão dos testes), o GitSettings mostra só o link para o Settings (ver gitSettingsEditor.test.tsx)
+vi.hoisted(() => {
+  (globalThis as { __fazaiTestWeb?: boolean }).__fazaiTestWeb = true;
+});
+
+import { choose, lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { GitSettings } from '../../src/webview/components/settings/GitSettings';
 import { WORKSPACE_MODES } from '../../src/shared/git';
 

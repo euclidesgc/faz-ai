@@ -11,6 +11,9 @@ import { resolveCommand } from './cliResolve';
 import { loginShellPath } from './spawn';
 import { BoardPanel } from './panel/BoardPanel';
 import type { MessageRouter } from './panel/messageRouter';
+import { IdeSettings } from './settings/ideSettings';
+import type { HostToWebview } from '../shared/messages';
+import { toSettingsTab } from '../shared/settingsTab';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
 import { ChatViewProvider } from './sidebar/ChatViewProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
@@ -21,6 +24,8 @@ import type { Heartbeat } from './heartbeat';
 import type { MergeWatcher } from './merge';
 import { revealInSystem } from './web/osOpen';
 import { preferredPort, startWebServer, type WebServer } from './web/webServer';
+import { exportNotice, importNotice } from './host/hostBridge';
+import { parseExportFile } from './db/boardExport';
 import { cardRef } from '../shared/model';
 import { humanQueueStatuses, turnsPassedToHuman } from '../shared/pending';
 
@@ -100,8 +105,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         editor: {
           name: editorName,
           startedAt: windowStartedAt,
-          // o mcp.json global do VS Code fica na pasta User do perfil padrão, a mãe do globalStorage
-          userDir: editorName === 'vscode' ? path.dirname(path.dirname(storage)) : undefined,
         },
       });
       const router = host.router;
@@ -117,11 +120,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           const label = state.board.appearance.statuses[card.status!].label;
           void vscode.window
             .showInformationMessage(`${cardRef(card)} ${card.title}: ${label}`, 'Abrir card')
-            .then((choice) => choice && openBoard(card.id));
+            .then((choice) => choice && openBoard({ type: 'ui.openCard', cardId: card.id }));
         }
       };
       router.onDidChange(onBoardChange);
       onBoardChange();
+      // Settings do editor (fazai.*) ↔ SQLite do board
+      context.subscriptions.push(new IdeSettings(vscode.workspace, f.uri, log).bind(router));
       runner = host.runner;
       heartbeat = host.heartbeat;
       mergeWatcher = host.mergeWatcher;
@@ -186,14 +191,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const tree = new BoardTreeProvider(getRouter);
   const treeView = vscode.window.createTreeView('fazai.sidebar', { treeDataProvider: tree, showCollapseAll: true });
 
-  const openBoard = async (cardId?: string) => {
+  const openBoard = async (pending?: HostToWebview) => {
     const f = folder();
     const router = await getRouter();
     if (!f || !router) {
       vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
       return;
     }
-    BoardPanel.show(context, router, viewState, f.name, cardId);
+    BoardPanel.show(context, router, viewState, f.name, pending);
     if (servedElsewhere) {
       servedElsewhere = false; // avisa uma vez
       void vscode.window.showWarningMessage(
@@ -241,6 +246,54 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
 
+  /** Exporta o board da pasta atual para um arquivo, pela paleta de comandos (sem precisar abrir o board). */
+  const exportBoard = async () => {
+    const router = await getRouter();
+    if (!router) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
+    const { text, name, warnings } = router.exportBoardFile();
+    const uri = await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.file(path.join(os.homedir(), name)),
+      filters: { 'Export do Faz AI': ['json'] },
+      title: 'Exportar board',
+    });
+    if (!uri) return;
+    await fs.promises.writeFile(uri.fsPath, text, 'utf8');
+    const choice = await vscode.window.showInformationMessage(exportNotice(uri.fsPath, warnings), 'Abrir pasta');
+    if (choice === 'Abrir pasta') revealInSystem(uri.fsPath);
+  };
+
+  /** Importa um arquivo de export para o board da pasta atual, pela paleta de comandos (sem precisar abrir o board). */
+  const importBoard = async () => {
+    const router = await getRouter();
+    if (!router) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
+    const uris = await vscode.window.showOpenDialog({
+      canSelectMany: false,
+      filters: { 'Export do Faz AI': ['json'] },
+      title: 'Importar board',
+    });
+    const uri = uris?.[0];
+    if (!uri) return;
+    try {
+      const text = await fs.promises.readFile(uri.fsPath, 'utf8');
+      const parsed = parseExportFile(text);
+      const { token, summary } = router.parkImport(parsed, Buffer.byteLength(text));
+      const boardName = folder()?.name ?? 'atual';
+      const choice = await vscode.window.showWarningMessage(
+        `Importar "${summary.boardName}" vai substituir o board "${boardName}" por ${summary.cards} card(s) e ${summary.attachments} anexo(s). Uma cópia de segurança (.bak) do board atual é feita antes.`,
+        { modal: true },
+        'Importar',
+      );
+      if (choice !== 'Importar') {
+        router.discardImport(token);
+        return;
+      }
+      const result = router.applyImport(token);
+      vscode.window.showInformationMessage(importNotice(result));
+    } catch (e) {
+      vscode.window.showErrorMessage(`Faz AI: não foi possível importar o board: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
   context.subscriptions.push(
     treeView,
     vscode.window.registerWebviewViewProvider('fazai.filters', new FiltersViewProvider(context, getRouter, viewState), {
@@ -254,9 +307,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (e.visible && folder()) void openBoard();
     }),
     vscode.commands.registerCommand('fazai.openBoard', () => openBoard()),
-    vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard(cardId)),
+    vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard({ type: 'ui.openCard', cardId })),
+    vscode.commands.registerCommand('fazai.openIdeSettings', (key?: string) =>
+      vscode.commands.executeCommand('workbench.action.openSettings', key ? `@id:${key}` : '@ext:euclidesgc.faz-ai'),
+    ),
+    vscode.commands.registerCommand('fazai.openBoardSettings', (args?: { tab?: unknown; section?: string }) =>
+      openBoard({ type: 'ui.openSettings', tab: toSettingsTab(args?.tab), section: args?.section }),
+    ),
+    vscode.commands.registerCommand('fazai.openEnvironment', () => openBoard({ type: 'ui.openView', view: 'environment' })),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
     vscode.commands.registerCommand('fazai.openInBrowser', openInBrowser),
+    vscode.commands.registerCommand('fazai.exportBoard', exportBoard),
+    vscode.commands.registerCommand('fazai.importBoard', importBoard),
     vscode.commands.registerCommand('fazai.connectAI', (target?: Parameters<BoardHost['connectAI']>[0], opts?: { fromBoard?: boolean }) =>
       connectAI(getRouter, target, opts),
     ),
@@ -303,7 +365,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const watcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(
         wf,
-        '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.codex/**,.cursor/**,.kimi/**,.kimi-code/**,.github/{skills*,agents,instructions,prompts,hooks,copilot}/**,.github/copilot-instructions.md,.github/mcp.json}',
+        '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.cursor/**}',
       ),
     );
     let timer: NodeJS.Timeout | undefined;
@@ -326,6 +388,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (editorName === 'cursor') void registerInCursor(f.uri.fsPath, bridgePath, output);
       stopMcp = await startMcpServer(socketPath(f.uri.fsPath), {
         getRouter,
+        getRunner: async () => {
+          await getRouter();
+          return runner ?? undefined;
+        },
         workspaceDir: f.uri.fsPath,
         version: String((context.extension.packageJSON as { version?: string }).version ?? '0'),
       });

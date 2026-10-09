@@ -19,7 +19,7 @@ import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
-import { streamReader } from '../src/extension/aiOutput/stream';
+import { cursorReader } from '../src/extension/aiOutput/cursor';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { cardAndChildrenFacts, cardFacts, cardFamilyFacts, newestCardFacts, trashedCardFacts } from '../src/extension/log/facts';
@@ -310,9 +310,17 @@ describe('AiRunRepo', () => {
       ],
       answer: '',
       reason: null,
+      usageLimitReached: false,
       ...over,
     });
-    const none = (): RunReport => ({ measure: 'none', consumption: null, inventory: [], answer: '', reason: 'texto' });
+    const none = (): RunReport => ({
+      measure: 'none',
+      consumption: null,
+      inventory: [],
+      answer: '',
+      reason: 'texto',
+      usageLimitReached: false,
+    });
     const rows = (id: string) => db.exec(`SELECT COUNT(*) FROM ai_run_usage WHERE run_id = '${id}'`)[0]!.values[0]![0];
     const read = (id: string) => runs.byMonth('2026-01').find((r) => r.id === id)!;
 
@@ -356,9 +364,9 @@ describe('AiRunRepo', () => {
       expect(runs.usage(id)).toHaveLength(2);
     });
 
-    it('medição parcial sem consumo (Cursor/Kimi sem bloco de uso) grava o inventário, com tokens nulos', () => {
+    it('medição parcial sem consumo (Cursor sem bloco de uso) grava o inventário, com tokens nulos', () => {
       // o caso central do leitor genérico: ferramentas lidas, nenhum `usage`
-      const reader = streamReader({ catalog: [], model: null });
+      const reader = cursorReader();
       for (const e of [
         { type: 'system', session_id: 's' },
         { type: 'tool_call', name: 'Read' },
@@ -945,7 +953,7 @@ describe('EventLog no MessageRouter', () => {
     expect(Object.keys(snap()).some((k) => /event|log/i.test(k))).toBe(false);
   });
 
-  it('orçamento: mover um card faz exatamente um scheduleSave e no máximo duas consultas a mais que antes', async () => {
+  it('orçamento: mover um card faz exatamente um scheduleSave e no máximo três consultas a mais que antes', async () => {
     // `db` instrumentado: conta `prepare` (consultas), `run` (gravações) e `exec` (transações)
     const counts = { prepare: 0, run: 0, exec: 0 };
     const raw = await openInMemory(WASM_DIR);
@@ -993,7 +1001,9 @@ describe('EventLog no MessageRouter', () => {
     const withLog = measure(() => r.handle({ type: 'card.move', cardId: id, columnId: col('Discovery').id, position: 0 }));
 
     expect(scheduled).toBe(1);
-    expect(withLog.prepare - baseline.prepare).toBeLessThanOrEqual(2);
+    // 2 consultas do log, mais 1 do `yoloStoryIdOf` que o card.move usa para reavaliar a entrega
+    // da história em modo autônomo (#275) sem montar o snapshot inteiro do board
+    expect(withLog.prepare - baseline.prepare).toBeLessThanOrEqual(3);
     expect(withLog.exec).toBe(baseline.exec); // o log não abre transação própria
     // as gravações a mais são os INSERTs dos eventos (column_changed e status_changed: Discovery tem IA ativa)
     expect(withLog.run - baseline.run).toBe(2);

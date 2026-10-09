@@ -162,6 +162,15 @@ export function eventsFor(
       if (msg.enabled) add(card, 'comment');
       break;
     }
+    case 'card.yolo.setMany': {
+      for (const id of msg.cardIds) {
+        const card = factsOf(id);
+        if (!card || card.parentId || card.archived || card.trashed) continue;
+        add(card, 'yolo_changed', { fromValue: msg.enabled ? 'off' : 'on', toValue: msg.enabled ? 'on' : 'off' });
+        if (msg.enabled) add(card, 'comment');
+      }
+      break;
+    }
     case 'card.yolo.inherit': {
       const card = factsOf(msg.cardId);
       const from = factsOf(msg.fromId);

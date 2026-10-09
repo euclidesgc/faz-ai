@@ -27,7 +27,6 @@
 // erro de domínio. Não complete este campo neste arquivo.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
-import { costOf } from './price';
 import type { OutputReader, OutputStream, ReaderDeps } from './reader';
 
 /** Tamanho do argumento mostrado na linha de uma chamada de ferramenta. */
@@ -39,6 +38,30 @@ const RAW_MAX = 300;
 
 /** Os nomes da ferramenta de subagente: `Agent` nesta versão da CLI, `Task` na anterior. */
 const AGENT_TOOLS = ['Agent', 'Task'];
+
+/**
+ * Termos que aparecem no texto de um `result` de erro quando o motivo é o limite de uso do plano
+ * esgotado. Heurística, documentada como tal: não há exemplo real da CLI 2.1.x com esse texto (ver
+ * Riscos do SPEC da história #257); cobre inglês e português para não depender do idioma da CLI.
+ */
+const USAGE_LIMIT_TEXT = /usage limit|rate limit|limite de uso|limite esgotado/i;
+
+/**
+ * Um `rate_limit_event` indica indisponibilidade real (não só monitoramento) quando `status` é
+ * `"rejected"`, ou quando algum item de `unifiedWindows` chegou a 100% de utilização. É "ou":
+ * qualquer um dos dois sinais basta. `"allowed"` e `"allowed_warning"` (perto do teto) são só
+ * informativos: a CLI continua respondendo.
+ */
+function rateLimitExhausted(info: Json): boolean {
+  if (asText(info.status) === 'rejected') return true;
+  const windows = asObject(info.unifiedWindows);
+  if (!windows) return false;
+  for (const raw of Object.values(windows)) {
+    const utilization = asNumber(asObject(raw)?.utilization);
+    if (utilization !== null && utilization >= 1) return true;
+  }
+  return false;
+}
 
 /**
  * O argumento que identifica a chamada, na ordem em que vale a pena mostrar. `file_path` aparece
@@ -135,6 +158,9 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
   let sawEvent = false;
   let sessionId: string | null = null;
   let introduced = false;
+  // sinal estrutural de limite de uso esgotado: só `rate_limit_event` indisponível ou `result` de
+  // erro com texto conhecido ligam isto — nenhuma outra condição de erro (ver comentário no topo)
+  let usageLimitReached = false;
   const results: ResultEvent[] = [];
   /** `tool_use_id` → nome da ferramenta, para a linha que explica o erro dela */
   const calledTools = new Map<string, string>();
@@ -255,7 +281,11 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
       turns: asNumber(o.num_turns),
       text: asText(o.result) ?? '',
     });
-    return [o.is_error === true || asText(o.subtype) === 'error' ? 'Terminou com erro' : 'Pronto'];
+    const failed = o.is_error === true || asText(o.subtype) === 'error';
+    // só `is_error`/erro com texto que bate com os termos conhecidos de limite esgotado liga a flag:
+    // um erro genérico (qualquer outro texto) nunca a liga, por design (RF-03 da história #257)
+    if (failed && USAGE_LIMIT_TEXT.test(asText(o.result) ?? '')) usageLimitReached = true;
+    return [failed ? 'Terminou com erro' : 'Pronto'];
   };
 
   return {
@@ -285,7 +315,13 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
           return onUser(o);
         case 'result':
           return onResult(o);
-        // `rate_limit_event` e o que a próxima versão trouxer: evento entendido que não vira linha
+        case 'rate_limit_event': {
+          const info = asObject(o.rate_limit_info);
+          if (info && rateLimitExhausted(info)) usageLimitReached = true;
+          // o monitoramento de rotina (`status: "allowed"`) não vira linha, só o sinal estrutural
+          return [];
+        }
+        // o que a próxima versão trouxer: evento entendido que não vira linha
         default:
           return [];
       }
@@ -315,20 +351,21 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
 
       if (byModel) {
         const tokens = [...byModel.values()].reduce(addTokens, ZERO);
+        // o custo é sempre o que a CLI informou: `total_cost_usd` (cumulativo, o último vale). Sem ele a
+        // execução fica sem custo — o board não calcula nada por tabela de preços
         const informed = reversed.find((r) => r.costUsd !== null)?.costUsd ?? null;
-        const estimated = informed === null ? costOf(deps.catalog, byModel) : null;
         return {
           measure: 'full',
           consumption: {
             ...tokens,
             turns,
             sessionId,
-            costUsd: informed ?? estimated,
-            costEstimated: informed === null && estimated !== null,
+            costUsd: informed,
           },
           inventory: items,
           answer,
           reason: null,
+          usageLimitReached,
         };
       }
 
@@ -342,18 +379,19 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
         const tokens = [...perModel.values()].reduce(addTokens, ZERO);
         return {
           measure: 'partial',
-          consumption: { ...tokens, turns, sessionId, costUsd: null, costEstimated: false },
+          consumption: { ...tokens, turns, sessionId, costUsd: null },
           inventory: items,
           answer,
           reason: null,
+          usageLimitReached,
         };
       }
 
       // leu eventos e chamadas de ferramenta, mas nenhum número: o inventário vale, o consumo não
       // existe. `none` só quando não há nem uma coisa nem a outra — é a invariante que impede "não
       // medido" de parecer "medido e zero".
-      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null };
-      return { measure: 'none', consumption: null, inventory: [], answer, reason: null };
+      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached };
+      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached };
     },
 
     get sawEvent(): boolean {

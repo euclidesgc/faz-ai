@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { isDelivered, lastAiColumn, stackBaseChoice, stackBaseOf } from '../src/shared/story';
+import { isDelivered, isDeliverableStory, isWithHuman, lastAiColumn, stackBaseOf } from '../src/shared/story';
 import { boardState, card, column } from './fakes/board';
+
+describe('isWithHuman', () => {
+  it.each(['waiting_review', 'waiting_answer', 'blocked'] as const)('true quando o status é %s (dono humano)', (status) => {
+    expect(isWithHuman({ status })).toBe(true);
+  });
+
+  it.each(['ready', 'running', 'approved'] as const)('false quando o status é %s (dono IA)', (status) => {
+    expect(isWithHuman({ status })).toBe(false);
+  });
+
+  it('false quando o status é null', () => {
+    expect(isWithHuman({ status: null })).toBe(false);
+  });
+});
 
 describe('stackBaseOf', () => {
   it('ordem natural: a segunda história YOLO empilha sobre a primeira, que ainda não tem base', () => {
@@ -57,81 +71,6 @@ describe('stackBaseOf', () => {
     });
 
     expect(stackBaseOf(s, s.cards[1]!)).toBeUndefined();
-  });
-});
-
-describe('stackBaseChoice', () => {
-  it('ignora a mais recente bloqueada sem pull request, escolhe a anterior e devolve a bloqueada em skipped', () => {
-    const s = boardState({
-      cards: [
-        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100' }),
-        card('h11', {
-          number: 11,
-          yolo: true,
-          branch: 'b11',
-          branchCreatedAt: '200',
-          status: 'blocked',
-          prUrl: '',
-        }),
-        card('h12', { number: 12, yolo: true }),
-      ],
-    });
-
-    const { base, skipped } = stackBaseChoice(s, s.cards[2]!);
-
-    expect(base?.id).toBe('h10');
-    expect(skipped.map((c) => c.id)).toEqual(['h11']);
-  });
-
-  it('bloqueada com pull request aberto continua valendo como base e skipped fica vazio', () => {
-    const s = boardState({
-      cards: [
-        card('h10', {
-          number: 10,
-          yolo: true,
-          branch: 'b10',
-          branchCreatedAt: '100',
-          status: 'blocked',
-          prUrl: 'https://example.com/pr/1',
-        }),
-        card('h11', { number: 11, yolo: true }),
-      ],
-    });
-
-    const { base, skipped } = stackBaseChoice(s, s.cards[1]!);
-
-    expect(base?.id).toBe('h10');
-    expect(skipped).toEqual([]);
-  });
-
-  it('todas bloqueadas sem pull request: base undefined e todas em skipped', () => {
-    const s = boardState({
-      cards: [
-        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100', status: 'blocked', prUrl: '' }),
-        card('h11', { number: 11, yolo: true, branch: 'b11', branchCreatedAt: '200', status: 'blocked', prUrl: '' }),
-        card('h12', { number: 12, yolo: true }),
-      ],
-    });
-
-    const { base, skipped } = stackBaseChoice(s, s.cards[2]!);
-
-    expect(base).toBeUndefined();
-    expect(skipped.map((c) => c.id).sort()).toEqual(['h10', 'h11']);
-  });
-
-  it('bloqueada mais antiga que a base escolhida não entra em skipped', () => {
-    const s = boardState({
-      cards: [
-        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100', status: 'blocked', prUrl: '' }),
-        card('h11', { number: 11, yolo: true, branch: 'b11', branchCreatedAt: '200' }),
-        card('h12', { number: 12, yolo: true }),
-      ],
-    });
-
-    const { base, skipped } = stackBaseChoice(s, s.cards[2]!);
-
-    expect(base?.id).toBe('h11');
-    expect(skipped).toEqual([]);
   });
 });
 
@@ -217,5 +156,34 @@ describe('isDelivered', () => {
     });
 
     expect(isDelivered(s, s.cards[1]!)).toBe(false);
+  });
+});
+
+describe('isDeliverableStory', () => {
+  const columns = [column('backlog', 'wp', 0, 'open'), column('homologacao', 'wp', 1, 'open'), column('done', 'wp', 2, 'done')].map((c) =>
+    c.id === 'homologacao' ? { ...c, aiActive: true } : c,
+  );
+
+  it('true mesmo quando o status ainda é da IA — é o que falta para `isDelivered`', () => {
+    const s = boardState({ columns, cards: [card('h1', { yolo: true, columnId: 'homologacao', prUrl: 'https://pr', status: 'running' })] });
+
+    expect(isDeliverableStory(s, s.cards[0]!)).toBe(true);
+    expect(isDelivered(s, s.cards[0]!)).toBe(false);
+  });
+
+  it('false sem prUrl, fora da última coluna, bloqueada, ou para sub-tarefa', () => {
+    const base = { yolo: true, columnId: 'homologacao', prUrl: 'https://pr', status: 'running' } as const;
+    expect(
+      isDeliverableStory(boardState({ columns, cards: [card('h1', { ...base, prUrl: '' })] }), card('h1', { ...base, prUrl: '' })),
+    ).toBe(false);
+    const s1 = boardState({ columns, cards: [card('h1', { ...base, columnId: 'backlog' })] });
+    expect(isDeliverableStory(s1, s1.cards[0]!)).toBe(false);
+    const s2 = boardState({ columns, cards: [card('h1', { ...base, status: 'blocked' })] });
+    expect(isDeliverableStory(s2, s2.cards[0]!)).toBe(false);
+    const s3 = boardState({
+      columns,
+      cards: [card('h1', { yolo: true, columnId: 'homologacao' }), card('t1', { ...base, parentId: 'h1' })],
+    });
+    expect(isDeliverableStory(s3, s3.cards[1]!)).toBe(false);
   });
 });

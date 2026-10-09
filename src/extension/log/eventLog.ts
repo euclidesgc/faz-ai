@@ -106,6 +106,7 @@ export class EventLog {
       case 'card.restore':
       case 'card.archive':
       case 'card.unarchive':
+      case 'card.restoreArchived':
       case 'card.deletePermanent':
       case 'card.status.set':
       case 'attachment.addData':
@@ -122,6 +123,10 @@ export class EventLog {
         const before = trashedCardFacts(db, this.deps.boardId());
         const ids = [...before.keys()];
         return { before, after: () => cardFacts(db, ids), cardId: null, extra: {} };
+      }
+      case 'card.yolo.setMany': {
+        const ids = msg.cardIds;
+        return { before: cardFacts(db, ids), after: () => cardFacts(db, ids), cardId: null, extra: {} };
       }
       case 'field.setValue': {
         // o handler troca só o valor do campo: nenhum fato do card muda, e `after` reaproveita a leitura.

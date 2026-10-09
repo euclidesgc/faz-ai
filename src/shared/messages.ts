@@ -1,8 +1,8 @@
 import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
-import type { ExecProfile } from './execution';
 import type { AiTool, HarnessKind, InstallScope, SkillMode } from './harness';
+import type { HarnessUsage, SelectableKind } from './harnessSelection';
 import type { HookInput, McpServerInput } from './harnessCatalog';
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { ModelOption, ModelRule } from './models';
@@ -10,6 +10,22 @@ import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { GitConfig } from './git';
+
+/** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
+export interface AgentInput {
+  name: string;
+  description: string;
+  /** instruções (o corpo do arquivo, sem o frontmatter) */
+  body: string;
+  /** valor do campo Modelo do board (`<id>@<esforço>`); vazio = o modelo da sessão */
+  model: string;
+  tools: string[];
+  deniedTools: string[];
+  skills: string[];
+  /** servidores MCP além do do board */
+  mcp: string[];
+}
+import type { SettingsTab } from './settingsTab';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
 
 export type WebviewToHost =
@@ -28,6 +44,8 @@ export type WebviewToHost =
   | { type: 'ui.openTerminal'; command: string }
   /** abre este board no navegador, fora do editor */
   | { type: 'ui.openInBrowser' }
+  /** pede ao editor para abrir o Settings nativo filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */
+  | { type: 'ui.openIdeSettings'; key?: string }
   /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */
   /** `mode`: trabalhar a fase (padrão) ou só refinar o card */
   | { type: 'ai.run'; cardId: Id; mode?: AiRunMode }
@@ -57,6 +75,12 @@ export type WebviewToHost =
   | { type: 'card.restore'; cardId: Id }
   | { type: 'card.archive'; cardId: Id }
   | { type: 'card.unarchive'; cardId: Id; columnId?: Id; position?: number }
+  /**
+   * restaura um card arquivado pela aba Arquivados: uma história volta com as sub-tarefas arquivadas dela; uma
+   * sub-tarefa de história arquivada restaura a história. Cada card vai para o fim da primeira coluna do próprio
+   * workflow, inativo, e a história sai do modo autônomo
+   */
+  | { type: 'card.restoreArchived'; cardId: Id }
   | { type: 'card.deletePermanent'; cardId: Id }
   | { type: 'trash.empty' }
   /** cria (ou reaproveita) a branch e a worktree da história do card */
@@ -67,18 +91,20 @@ export type WebviewToHost =
   | { type: 'card.merge.set'; cardId: Id; commit: string }
   /** liga ou desliga o modo autônomo (YOLO) da história do card */
   | { type: 'card.yolo.set'; cardId: Id; enabled: boolean }
+  /** liga ou desliga o modo autônomo (YOLO) de várias histórias de uma vez; ignora quem não for história viva */
+  | { type: 'card.yolo.setMany'; cardIds: Id[]; enabled: boolean }
   /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */
   | { type: 'card.yolo.inherit'; cardId: Id; fromId: Id }
-  /** agente de execução do card; null volta ao da coluna */
+  /** agente de execução do card (nome do agente marcado no Harness); null volta ao da coluna */
   | { type: 'card.execProfile.set'; cardId: Id; profileId: Id | null }
-  | { type: 'settings.execProfiles.set'; profiles: ExecProfile[] }
   /** a pasta de trabalho da história foi removida (a branch continua registrada) */
   | { type: 'card.workspace.clear'; cardId: Id }
   /** abre a pasta de trabalho da história numa janela nova do editor */
   | { type: 'card.workspace.open'; cardId: Id }
   /** muda o status de trabalho do card; `note` é o motivo do bloqueio ou o texto que vai junto para a conversa */
-  | { type: 'card.status.set'; cardId: Id; status: CardStatus | null; note?: string }
-  | { type: 'comment.add'; cardId: Id; body: string }
+  /** `pending`: há algo que depende da pessoa; em modo autônomo o pedido de revisão não vira aprovação automática */
+  | { type: 'card.status.set'; cardId: Id; status: CardStatus | null; note?: string; pending?: boolean }
+  | { type: 'comment.add'; cardId: Id; body: string; kind?: 'summary' }
   | { type: 'comment.update'; commentId: Id; body: string }
   | { type: 'comment.delete'; commentId: Id }
   | { type: 'attachment.pick'; cardId: Id }
@@ -204,9 +230,21 @@ export type WebviewToHost =
   | { type: 'harness.install.cancel' }
   /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
   | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
-  | { type: 'harness.agent.create'; name: string; description: string; content: string; model?: string }
-  | { type: 'harness.agent.write'; name: string; content: string }
-  | { type: 'harness.agent.delete'; name: string }
+  /**
+   * marca (ou desmarca, com `usage` null) itens do harness para as execuções do board: `location` como o
+   * inventário o mostra (relativo ao projeto ou a partir de `~`)
+   */
+  | { type: 'harness.selection.set'; items: { kind: SelectableKind; location: string }[]; usage: HarnessUsage | null }
+  /** cria um agente na pasta de agentes da ferramenta (global por padrão) e o marca como disponível no board */
+  | { type: 'harness.agent.create'; scope?: InstallScope; input: AgentInput }
+  /** reescreve o frontmatter (o que vier em `patch`) e, se vier, o corpo de um agente, preservando o resto */
+  | { type: 'harness.agent.update'; name: string; scope: InstallScope; patch: Partial<AgentInput>; body?: string }
+  | { type: 'harness.agent.write'; name: string; scope: InstallScope; content: string }
+  | { type: 'harness.agent.delete'; name: string; scope: InstallScope }
+  /** cria os agentes padrão de fábrica que ainda não existem (`force` recria também os que a pessoa apagou) */
+  | { type: 'harness.agents.seed'; force?: boolean }
+  /** a IA lê o projeto e propõe os agentes do board (cria, ajusta e marca); o resultado vai para o chat do board */
+  | { type: 'ai.suggestAgents' }
   /** chat com a IA do projeto: envia uma mensagem (com o modelo escolhido, ou null para o padrão), interrompe ou limpa a conversa */
   | { type: 'chat.send'; text: string; model: string | null }
   | { type: 'chat.stop' }
@@ -254,6 +292,10 @@ export type HostToWebview =
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */
   | { type: 'backup.import.summary'; token: string; summary: ImportSummary }
   /** a exportação ou a escolha do arquivo terminou (com sucesso ou porque a pessoa desistiu): a interface sai do estado "ocupado" */
-  | { type: 'backup.done' };
+  | { type: 'backup.done' }
+  /** o host pede à interface para trocar de aba das Configurações, opcionalmente rolando até uma seção */
+  | { type: 'ui.openSettings'; tab: SettingsTab; section?: string }
+  /** o host pede à interface para abrir uma tela fora das Configurações */
+  | { type: 'ui.openView'; view: 'environment' };
 
 export type { WorkflowKind };

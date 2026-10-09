@@ -4,8 +4,9 @@ import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { blocksExecution } from '../shared/requirements';
 import { childrenOf, isAiWorking, isLive } from '../shared/selectors';
-import { statusInfo } from '../shared/status';
-import { parallelLimit } from '../shared/runner';
+import { limitOf } from '../shared/runner';
+import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
+import { isWithHuman } from '../shared/story';
 import { autopilotStep } from './autopilot';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
@@ -37,7 +38,7 @@ export function heartbeatTargets(s: BoardState): Card[] {
     const story = card.parentId ? byId.get(card.parentId) : card;
     // as histórias em modo autônomo são do autopiloto, que não espera o intervalo
     if (!story || !isLive(story) || story.yolo || out.includes(story)) continue;
-    const withHuman = !!story.status && statusInfo(story.status).owner === 'human';
+    const withHuman = isWithHuman(story);
     if (withHuman && !unanswered.has(story.id)) continue;
     // já há uma execução tocando a história: outra em paralelo pisaria nas mesmas sub-tarefas
     if (isAiWorking(s, story) || childrenOf(s, story.id).some((k) => isLive(k) && isAiWorking(s, k))) continue;
@@ -50,8 +51,10 @@ export function heartbeatTargets(s: BoardState): Card[] {
 
 /**
  * Rotina periódica: quando há pendência com a IA, executa a ferramenta do projeto para cada
- * história da fila, uma por vez ou, no modo worktree, até o limite configurado ao mesmo tempo. O limite
- * conta as execuções já em andamento: a rodada ocupa só as vagas livres. Sem pendência, não executa nada.
+ * história da fila. As vagas são por tipo de atividade (`limitOf`): histórias em fase de texto (só
+ * produzem documento) vão até `parallelStories` em qualquer modo; as que mexem em código vão uma por vez
+ * ou, no modo worktree com o paralelo ligado, até o limite configurado. Cada teto conta as execuções já
+ * em andamento daquele tipo: a rodada ocupa só as vagas livres. Sem pendência, não executa nada.
  * Não depende da API do VSCode.
  */
 export class Heartbeat {
@@ -132,9 +135,10 @@ export class Heartbeat {
   }
 
   /**
-   * Inicia as próximas histórias da fila enquanto houver vaga. O limite conta toda execução em andamento
-   * (também as chamadas à mão e o modo autônomo), para o board nunca passar do que a pessoa configurou.
-   * Quando o autopiloto está esperando vaga, uma fica guardada para ele (ver `yieldToAutopilot`).
+   * Inicia as histórias da fila que têm vaga no tipo de atividade delas. Cada teto conta toda execução em
+   * andamento daquele tipo (também as chamadas à mão e o modo autônomo), para o board nunca passar do que
+   * a pessoa configurou. Uma história sem vaga fica na fila sem travar as dos outros tipos. Quando o
+   * autopiloto está esperando vaga, uma do tipo que ele quer fica guardada para ele (ver `yieldToAutopilot`).
    */
   private pump(): void {
     const s = this.deps.snapshot();
@@ -143,20 +147,37 @@ export class Heartbeat {
       this.queue = [];
       return void this.changed();
     }
-    const reserved = this.yieldToAutopilot && s.autopilot.active && autopilotStep(s).kind === 'run' ? 1 : 0;
-    const limit = parallelLimit(s.board.runner, s.board.git.mode) - reserved;
-    while (this.queue.length && this.runner.running.length < limit) {
-      const id = this.queue.shift()!;
+    const counts = runningByKind(s, this.runner.running);
+    const wants = autopilotStep(s);
+    const reservedKind: ActivityKind | null = this.yieldToAutopilot && s.autopilot.active && wants.kind === 'run' ? wants.activity : null;
+    const limit = (kind: ActivityKind) => limitOf(s.board.runner, s.board.git.mode, kind) - (kind === reservedKind ? 1 : 0);
+    const rest: string[] = [];
+    const waiting: Record<ActivityKind, number> = { text: 0, branch: 0 };
+    for (const id of this.queue) {
       // a situação pode ter mudado desde que a fila foi montada (a pessoa agiu, outra execução resolveu)
-      if (!heartbeatTargets(this.deps.snapshot()).some((c) => c.id === id)) continue;
+      const current = this.deps.snapshot();
+      const card = heartbeatTargets(current).find((c) => c.id === id);
+      if (!card) continue;
+      const kind = activityKindOf(current, card, 'phase');
+      if (counts[kind] >= limit(kind)) {
+        rest.push(id);
+        waiting[kind]++;
+        continue;
+      }
       try {
         this.runner.start(id, 'heartbeat');
+        counts[kind]++;
       } catch (e) {
         this.deps.log(`Heartbeat: ${e instanceof Error ? e.message : String(e)}`);
         // sem como executar a ferramenta, não adianta tentar as demais
         this.queue = [];
+        this.changed();
+        return;
       }
     }
+    this.queue = rest;
+    if (waiting.branch) this.deps.log(`Heartbeat: ${waiting.branch} história(s) com branch esperando vaga.`);
+    if (waiting.text) this.deps.log(`Heartbeat: ${waiting.text} história(s) em fase de texto esperando vaga.`);
     this.changed();
   }
 

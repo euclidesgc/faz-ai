@@ -44,7 +44,7 @@ export function registerBoardTools(tool: DefineTool): void {
       exec_profile: z
         .string()
         .optional()
-        .describe('Nome do agente de execução dos cards desta coluna (ver execProfiles em get_board); vazio volta ao padrão do board'),
+        .describe('Nome do agente de execução dos cards desta coluna (ver agents em get_board); vazio volta ao padrão do board'),
     },
     (a, router) => {
       const s = router.snapshot();
@@ -173,12 +173,6 @@ export function registerBoardRulesTools(tool: DefineTool): void {
         .optional()
         .describe(
           'Incluir no catálogo do Cursor as variantes rápidas dos modelos (respondem mais rápido e cobram mais pelos mesmos tokens). Ligar acrescenta as da última lista lida do Cursor; desligar as tira do catálogo.',
-        ),
-      cursorTokenRate: z
-        .boolean()
-        .optional()
-        .describe(
-          'Somar a tarifa do Cursor (Cursor Token Rate: US$ 0,25 por milhão de tokens de input, output e cache, cobrada nos planos Teams e Enterprise) ao custo estimado dos modelos de terceiros rodados pelo Cursor. Composer, Grok e o auto são isentos. Execuções já gravadas não são recalculadas.',
         ),
     },
     (a, router) => {

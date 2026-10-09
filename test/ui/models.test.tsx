@@ -1,10 +1,9 @@
 import { choose, lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { ModelsSettings } from '../../src/webview/components/settings/ModelsSettings';
-import { modelPrice, type ModelOption } from '../../src/shared/models';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 let board: SeededBoard;
@@ -87,6 +86,56 @@ describe('ModelsSettings', () => {
     expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({ name: 'Backend pesado', enabled: true });
   });
 
+  it('Montar nova regra: a reserva começa vazia e a regra salva vai sem reserva', async () => {
+    show();
+    await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
+    const builder = within(screen.getByLabelText('Regra de sugestão'));
+    await userEvent.type(builder.getByLabelText('Nome da regra'), 'Sem reserva');
+    const modelTriggers = builder.getAllByRole('combobox', { name: 'Modelo' });
+    expect(modelTriggers[1]).toHaveTextContent('—');
+    await userEvent.click(builder.getByRole('button', { name: 'Adicionar à lista' }));
+    expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({ name: 'Sem reserva', fallback: null });
+  });
+
+  it('Montar nova regra: escolher uma reserva grava o modelo nela', async () => {
+    show();
+    await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
+    const builder = within(screen.getByLabelText('Regra de sugestão'));
+    await userEvent.type(builder.getByLabelText('Nome da regra'), 'Com reserva');
+    const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
+    const modelTriggers = builder.getAllByRole('combobox', { name: 'Modelo' });
+    await choose(modelTriggers[1]!, m.label);
+    await userEvent.click(builder.getByRole('button', { name: 'Adicionar à lista' }));
+    expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({
+      name: 'Com reserva',
+      fallback: `${m.id}@${m.defaultEffort}`,
+    });
+  });
+
+  it('editar uma regra existente preserva a reserva já configurada', async () => {
+    const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
+    board.router.handle({
+      type: 'settings.modelRules.set',
+      rules: [
+        {
+          id: 'r2',
+          name: 'Teste reserva',
+          enabled: true,
+          groups: [[{ fieldId: '@type', op: 'is', value: 'História' }]],
+          model: m.id,
+          fallback: `${m.id}@${m.defaultEffort}`,
+        },
+      ],
+    });
+    syncStore(board.router);
+    show();
+    expect(screen.getByText(new RegExp(`reserva: .*${m.label}`))).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    const builder = within(screen.getByLabelText('Regra de sugestão'));
+    await userEvent.click(builder.getByRole('button', { name: 'Salvar regra' }));
+    expect(lastSent('settings.modelRules.set').rules[0]).toMatchObject({ fallback: `${m.id}@${m.defaultEffort}` });
+  });
+
   it('o interruptor liga e desliga uma regra', async () => {
     const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
     board.router.handle({
@@ -99,88 +148,10 @@ describe('ModelsSettings', () => {
     expect(lastSent('settings.modelRules.set').rules[0]!.enabled).toBe(false);
   });
 
-  describe('preço por milhão de tokens', () => {
-    const mine = () => state().board.modelCatalog.find((x) => x.tool === tool())!;
-    const field = (kind: string) => screen.getByLabelText(`Preço de ${kind} de ${mine().model}`) as HTMLInputElement;
-    const saved = (): ModelOption => lastSent('settings.models.set').catalog.find((x) => x.id === mine().id)!;
-    /** O host aplica o que a tela mandou e devolve o estado novo, como no uso real. */
-    const applyLast = () => {
-      board.router.handle(lastSent('settings.models.set'));
-      syncStore(board.router);
-    };
-    const setPrices = (price: ModelOption['price']) => {
-      const catalog = state().board.modelCatalog.map((o) => {
-        const { price: _antigo, ...rest } = o;
-        return o.id === mine().id && price ? { ...rest, price } : rest;
-      });
-      board.router.handle({ type: 'settings.models.set', catalog });
-      syncStore(board.router);
-    };
-    beforeEach(() => setPrices(undefined));
-
-    it('os quatro campos aparecem vazios: o board não embute tabela de preço', () => {
-      show();
-      expect(screen.getByText('Preço (US$ por milhão de tokens)')).toBeInTheDocument();
-      for (const kind of ['entrada', 'saída', 'leitura de cache', 'criação de cache']) {
-        expect(field(kind)).toHaveValue(null);
-      }
-      expect(screen.getByText(/O custo informado pela ferramenta tem preferência/)).toBeInTheDocument();
-    });
-
-    it('um número digitado grava ao sair do campo e reaparece quando a tela relê o catálogo', async () => {
-      show();
-      await userEvent.type(field('entrada'), '15.5');
-      expect(sentOf('settings.models.set')).toHaveLength(0);
-      await userEvent.tab();
-      expect(saved().price).toEqual({ input: 15.5 });
-      applyLast();
-      expect(field('entrada')).toHaveValue(15.5);
-    });
-
-    it('preencher só um campo não vira preço válido; os quatro viram, e zero é preço', async () => {
-      show();
-      await userEvent.type(field('entrada'), '3');
-      await userEvent.tab();
-      expect(modelPrice(saved())).toBeNull();
-
-      for (const [kind, value] of [
-        ['saída', '15'],
-        ['leitura de cache', '0.3'],
-        ['criação de cache', '0'],
-      ] as const) {
-        applyLast();
-        await userEvent.type(field(kind), value);
-        await userEvent.tab();
-      }
-      expect(modelPrice(saved())).toEqual({ input: 3, output: 15, cacheRead: 0.3, cacheWrite: 0 });
-    });
-
-    it('esvaziar um campo apaga só aquele preço (ausência, não zero)', async () => {
-      setPrices({ input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 });
-      show();
-      await userEvent.clear(field('saída'));
-      await userEvent.tab();
-      expect(saved().price).toEqual({ input: 3, cacheRead: 0.3, cacheWrite: 3.75 });
-      expect(modelPrice(saved())).toBeNull();
-    });
-
-    it('sair de um campo sem mudar o valor não grava nada', async () => {
-      setPrices({ input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 });
-      show();
-      await userEvent.click(field('entrada'));
-      await userEvent.tab();
-      expect(sentOf('settings.models.set')).toHaveLength(0);
-    });
-
-    it('Detectar modelos não apaga o preço que já estava no catálogo (RF-24, RF-30)', async () => {
-      const price = { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 };
-      setPrices(price);
-      show();
-      await userEvent.click(screen.getByRole('button', { name: 'Detectar modelos' }));
-      board.router.handle(lastSent('settings.models.detect'));
-      syncStore(board.router);
-      expect(mine().price).toEqual(price);
-    });
+  it('a tabela de modelos não tem coluna nem campo de preço', () => {
+    show();
+    expect(screen.queryByText(/Preço/)).toBeNull();
+    expect(screen.queryByLabelText(/^Preço de /)).toBeNull();
   });
 });
 
@@ -199,64 +170,49 @@ describe('ModelsSettings: modos rápidos do Cursor', () => {
   });
 });
 
-describe('ModelsSettings: preços do Cursor', () => {
-  const useCursor = () => {
-    board.router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
-    board.router.handle({ type: 'settings.models.detect', tool: 'cursor' });
+describe('ModelsSettings: preencher o modelo sugerido (RF01/RF07)', () => {
+  it('sem regra de sugestão, o interruptor fica desabilitado e o aviso de dependência aparece', () => {
+    board.router.handle({ type: 'settings.modelRules.set', rules: [] });
     syncStore(board.router);
-  };
-  const back = () => board.router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude' } });
+    show();
+    const toggle = screen.getByRole('switch', { name: 'Preencher o modelo sugerido automaticamente' });
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText(/Depende de/)).toBeInTheDocument();
+  });
 
-  it('a tarifa do Cursor só aparece no Cursor, explica a cobrança e grava a regra', async () => {
+  it('sem regra, o interruptor aparece desligado mesmo com a preferência gravada como ligada', () => {
+    board.router.handle({ type: 'settings.rules.update', patch: { autoApplyModelSuggestion: true } });
+    board.router.handle({ type: 'settings.modelRules.set', rules: [] });
+    syncStore(board.router);
     show();
-    expect(screen.queryByRole('switch', { name: 'Somar a tarifa do Cursor (Cursor Token Rate)' })).toBeNull();
-    useCursor();
-    show();
-    const toggle = screen.getAllByRole('switch', { name: 'Somar a tarifa do Cursor (Cursor Token Rate)' }).at(-1)!;
+    const toggle = screen.getByRole('switch', { name: 'Preencher o modelo sugerido automaticamente' });
+    expect(toggle).toBeDisabled();
     expect(toggle).not.toBeChecked();
-    expect(screen.getAllByText(/US\$ 0,25 por milhão de tokens/).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: 'Sobre a tarifa' }).at(-1)).toHaveAttribute(
-      'href',
-      'https://cursor.com/help/models-and-usage/token-rate',
-    );
+  });
+
+  it('com uma regra cadastrada, o interruptor fica habilitado e grava a mudança', async () => {
+    const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
+    board.router.handle({
+      type: 'settings.modelRules.set',
+      rules: [{ id: 'r3', name: 'Teste', enabled: true, groups: [[{ fieldId: '@type', op: 'is', value: 'História' }]], model: m.id }],
+    });
+    syncStore(board.router);
+    show();
+    const toggle = screen.getByRole('switch', { name: 'Preencher o modelo sugerido automaticamente' });
+    expect(toggle).toBeEnabled();
     await userEvent.click(toggle);
-    expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { cursorTokenRate: true } });
-    back();
+    expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { autoApplyModelSuggestion: false } });
   });
+});
 
-  it('o `auto` nasce com preço variável: sem os campos de preço, com o texto e o link da documentação', async () => {
-    useCursor();
+describe('ModelsSettings: cabeçalho da ferramenta (RF09)', () => {
+  it('mostra a ferramenta atual e troca para a seção de ferramenta em Harness ao clicar', async () => {
     show();
-    const auto = screen.getByRole('switch', { name: 'Preço variável de auto' });
-    expect(auto).toBeChecked();
-    expect(screen.queryByLabelText('Preço de entrada de auto')).toBeNull();
-    expect(screen.getAllByText(/O custo depende do modelo escolhido a cada pedido/)).toHaveLength(1);
-    expect(screen.getAllByRole('link', { name: 'Preços do Cursor' })[0]).toHaveAttribute(
-      'href',
-      'https://cursor.com/docs/models-and-pricing',
-    );
-    // os outros modelos continuam com os campos
-    expect(screen.getByRole('switch', { name: 'Preço variável de composer-2.5' })).not.toBeChecked();
-    expect(screen.getByLabelText('Preço de entrada de composer-2.5')).toBeInTheDocument();
-    back();
-  });
-
-  it('desligar o preço variável grava o flag e volta os campos; ligar num modelo comum os esconde', async () => {
-    useCursor();
-    show();
-    await userEvent.click(screen.getByRole('switch', { name: 'Preço variável de auto' }));
-    const sentAuto = lastSent('settings.models.set').catalog.find((m) => m.id === 'cursor:auto')!;
-    expect(sentAuto.variablePrice).toBe(false);
-    board.router.handle(lastSent('settings.models.set'));
-    syncStore(board.router);
-    expect(await screen.findByLabelText('Preço de entrada de auto')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('switch', { name: 'Preço variável de composer-2.5' }));
-    expect(lastSent('settings.models.set').catalog.find((m) => m.id === 'cursor:composer-2.5')!.variablePrice).toBe(true);
-    board.router.handle(lastSent('settings.models.set'));
-    syncStore(board.router);
-    await waitFor(() => expect(screen.queryByLabelText('Preço de entrada de composer-2.5')).toBeNull());
-    back();
+    const link = screen.getByRole('button', { name: 'Trocar a ferramenta de IA, em Harness de IA' });
+    await userEvent.click(link);
+    const s = useBoardStore.getState();
+    expect(s.settingsTab).toBe('harness');
+    expect(s.pendingSettingsSection).toBe('harness-tool');
   });
 });
 

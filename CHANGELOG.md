@@ -4,31 +4,225 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+## 0.34.0
 
-- **Correção: o modo autônomo não fazia os cards andarem sozinhos e a fila travava num card
-  bloqueado (#220).** Ao abrir o editor, o autopiloto liga sozinho quando há história pendente em
-  modo autônomo, a não ser que a pessoa tenha pausado: a pausa fica gravada no board, sobrevive a
-  reabrir o editor, e "Retomar" a limpa; fechar o editor não conta como pausa, mas "Parar as
-  execuções da IA e o modo autônomo" conta, e depois de uma falha ao iniciar a ferramenta o
-  autopiloto não religa sozinho até a pessoa retomar. A fila passa a pular a história bloqueada ou
-  esperando uma pessoa (resposta ou revisão) e segue para a próxima, só esperando quando todas as
-  pendentes estão com a pessoa; continua uma história por vez, com a história destravada voltando
-  para a posição que ocupa no board, e o disjuntor de 3 execuções sem progresso agora libera a fila
-  em vez de travá-la. A branch de uma história nova não parte mais de uma história bloqueada sem
-  pull request; a conversa da história registra a base escolhida e quem foi pulada. A lista de
+- **Login vencido: aviso de erro no board, em vez de parar sem explicação (#189).** O login do
+  Claude Code passa a ser conferido de verdade (`claude auth status`), além do Cursor já existente;
+  antes de cada chamada da IA (botão do card, heartbeat, modo autônomo), o board confere de novo, com
+  um cache curto. Quando o motivo da faixa amarela é login, ela ganha destaque de erro e o botão
+  **Abrir no terminal**, que roda o comando ali, mas o login em si continua sendo sempre feito por
+  você. Quando o login vence no meio de uma execução, a primeira falha com um padrão conhecido
+  ("OAuth session expired", "not logged in", "401" etc.) não bloqueia mais o card: ele volta ao
+  status anterior, com um comentário curto, e liga o mesmo aviso de erro. O heartbeat e o modo
+  autônomo param de tentar sozinhos enquanto ele estiver ligado, sem desligar, e retomam quando o
+  login é confirmado de novo. O Diagnóstico do ambiente mostra o mesmo item.
+- **A pausa do modo autônomo fica gravada no board (#220).** Pausar agora vale até você retomar,
+  mesmo depois de fechar e reabrir o editor; antes, reabrir o editor religava a fila. Fechar o
+  editor continua não contando como pausa, e ligar o modo numa história (ou **Retomar**) limpa a
+  pausa. Depois de uma falha ao iniciar a ferramenta, o autopiloto não religa sozinho até você
+  retomar. A lista de
   sub-tarefas no painel da história passa a mostrar o LED de atividade de cada uma.
-- **Login vencido: aviso de erro no board, em vez de parar sem explicação.** O login da ferramenta
-  passa a ser conferido de verdade para o Claude Code (`claude auth status`) e, de forma best-effort,
-  para o Codex, além do Cursor já existente; antes de cada chamada da IA (botão do card, heartbeat,
-  modo autônomo), o board confere de novo, com um cache curto. Quando o motivo da faixa amarela é
-  login, ela ganha destaque de erro e o botão **Abrir no terminal**, que roda o comando ali, mas o
-  login em si continua sendo sempre feito por você. Quando o login vence no meio de uma execução, ou
-  numa ferramenta sem comando de status (Kimi, Copilot), a primeira falha com um padrão conhecido
-  ("OAuth session expired", "not logged in", "401" etc.) não bloqueia mais o card: ele volta ao status
-  anterior, com um comentário curto, e liga o mesmo aviso de erro — o heartbeat e o modo autônomo
-  param de tentar sozinhos enquanto ele estiver ligado, e retomam sozinhos quando o login é confirmado
-  de novo. O Diagnóstico do ambiente mostra o mesmo item para qualquer ferramenta, não só o Cursor.
+- **Aba Arquivados no lugar da coluna de arquivados.** A coluna "Arquivados" saiu do fim de cada linha do board (e com ela o arquivar por arraste e o colapsar/expandir dessa coluna): as linhas ficam estreitas o bastante para ver Histórias e Sub-tarefas ao mesmo tempo com os cards colapsados. Os cards arquivados ficam na nova aba **Arquivados**, entre Métricas e Lixeira, que preserva o histórico: uma linha por workflow, na ordem do board, só com os arquivados daquele workflow, do mais recente ao mais antigo. Arquivar continua pelo menu de ações do card (com a confirmação de sempre) e pelos caminhos automáticos. No lugar de "Desarquivar", o menu e a aba têm **Restaurar**: o card volta ao fim da primeira coluna do workflow dele (Backlog / A fazer), inativo. Restaurar uma história traz também todas as sub-tarefas arquivadas dela e desliga o modo autônomo; restaurar uma sub-tarefa cuja história está arquivada pede confirmação ("Restaurar a história junto?") e restaura a história inteira; uma sub-tarefa de história ativa volta sozinha. A ferramenta MCP `unarchive_card` segue como antes.
+- **Ligar e desligar o modo autônomo direto do cartão, sem abrir o card (#416).** O ícone no rodapé do cartão que já indicava "modo autônomo ligado" agora é também um botão: um clique liga ou desliga o modo autônomo sem precisar abrir o detalhe da história. O aviso mostrado ao ligar ficou mais curto — era um parágrafo longo com vários detalhes operacionais, agora é só o essencial: a IA toca a história sozinha até o pull request, sem aprovação, pergunta ou confirmação, e como parar. Esse mesmo texto e diálogo são usados nos três pontos que ligam o modo autônomo (o botão novo do cartão, o toggle do detalhe do card e a ação em lote de seleção múltipla), com a lógica de confirmação unificada entre eles. O diálogo ganhou um checkbox "Não avisar novamente": quem marcar e confirmar deixa de ver esse aviso nas próximas vezes, nos três pontos, como preferência pessoal guardada no navegador ou editor de quem usa (não no board). Desligar o modo autônomo em lote continua sempre pedindo confirmação, sem o checkbox, por ser a ação mais arriscada.
+- **Correção: o modo autônomo não reexecuta nem bloqueia uma história já entregue (#413).** Uma história em modo autônomo que chegou à Homologação e ficou com a pessoa (aguardando revisão ou resposta, bloqueada, ou aprovada à espera da próxima coluna) era tratada como "sem avanço": o autopiloto a rodava de novo e acabava bloqueando-a sozinho. Agora ela sai da fila enquanto estiver com a pessoa, e a IA, numa entrega sem pull request, chama `request_review` para marcar a história como entregue.
+- **Fases só de texto rodam em paralelo em qualquer modo de workspace (#331).** Refinar, resumir e as fases que só produzem documento (Discovery, PRD, Spec e Plan no board padrão) agora rodam ao mesmo tempo, até **Histórias ao mesmo tempo** (padrão 2), mesmo com **Tocar histórias em paralelo** desligado. Implementação e Homologação seguem como antes: uma por vez fora do worktree, e o paralelo só no worktree com a opção ligada; os dois tetos contam separados e continua uma execução por história. No modo autônomo, a ordem da fila vale para histórias que precisam de branch; as em fase de texto começam quando há vaga. Fora do worktree, `prepare_workspace` numa fase de texto com outra história em execução é recusado (pasta em uso) e a branch nasce na fase de código; com permissão "Sem restrições" a IA ainda pode trocar de branch à mão, pois a guarda cobre só o caminho do board.
+- **Arrastar cards ficou suave (#286).** Ao arrastar um card, na mesma coluna ou para outra coluna (vazia ou recolhida), os outros cards se afastam com uma transição de ~200 ms e um espaço tracejado marca onde ele vai ficar. A coluna de destino abre espaço e a de origem fecha o vazio. Ao soltar, o card assenta direto na posição final, sem voltar à origem nem piscar enquanto o board atualiza; se o movimento for recusado, a tela volta ao estado real. Vale para histórias e sub-tarefas (qualquer workflow) e respeita `prefers-reduced-motion` (sem transições). **Correção:** descer um card na mesma coluna e soltá-lo sobre outro agora o salva depois dele, onde a prévia mostrava (antes era salvo antes dele).
+- **"Salvar descrição" ganhou destaque (#287).** Ao editar a descrição de um card, o botão agora é primário (indigo sólido) e fica abaixo do editor, à direita, em vez de um botão discreto no cabeçalho. A regra de hierarquia de botões foi registrada no `DESIGN.md`; os demais botões do board já seguiam o padrão.
+- **Modelo reserva numa regra de sugestão: a execução repete automaticamente quando o principal esgota o limite.** Cada regra de sugestão de modelo (Configurações → Modelos de IA) agora tem um campo **Reserva (opcional)**. Quando a execução de um card falha porque o modelo principal de uma regra esgotou o limite de uso do plano, o sistema repete automaticamente a execução com o modelo reserva, uma única vez. Se o reserva também falhar, ou se não houver reserva configurada, o card é bloqueado como antes. A troca automática registra um comentário na conversa do card ("O `<modelo principal>` esgotou o limite; a execução segue com `<modelo reserva>`"), sem alterar o campo Modelo do card — a próxima execução tenta o principal de novo. Em modo autônomo (YOLO), a fila segue adiante sem travar quando o principal esgota o limite e há reserva configurada.
+- **Cards podem ser colapsados para mostrar só a faixa e o título.** Em colunas com muitos cards, você pode colapsar cards em qualquer um de quatro escopos: um card isolado (botão no card), todos os cards da coluna (item no menu de ações), todos os cards do board (botão na barra de filtros) ou só os cards selecionados (botão na barra de seleção múltipla). Um card colapsado continua mostrando o LED de atividade da IA e a borda de status para você saber o que precisa de atenção sem expandir. O estado fica lembrado entre sessões.
+- **Barra de atividade no pé do board.** Uma linha sempre visível, em qualquer vista, mostra o que
+  a IA está fazendo agora: com uma execução, "IA em #12 (Discovery, há 3 min)"; com várias, "IA em
+  N cards: #12 Discovery · #15 refinando · …" (lista completa no tooltip). Clicar na referência do
+  card abre o card. Sem nenhuma execução, mostra o motivo: a nota do autopiloto (por que a fila
+  parou), o estado do heartbeat ("Heartbeat desligado", "Heartbeat parado: motivo", "Próxima
+  rodada às HH:MM") ou "IA parada". O contador "IA trabalhando em N cards" do topo saiu,
+  substituído por essa barra.
+- **Botão de criar card no topo da coluna.** O **+ Novo card** / **+ Nova sub-tarefa** passou do
+  rodapé para o topo da coluna, logo abaixo do cabeçalho, para não precisar rolar a lista em
+  colunas cheias. Mudou só a posição: nenhum comportamento ou dado muda. O print
+  `docs/images/board.png` ainda mostra o botão no rodapé e não foi atualizado nesta entrega.
+- **Git e paralelo saem do board e vão para o Settings do editor.** As nove chaves de Git
+  (`fazai.git.mode`, `branchPattern`, `worktreeDir`, `parallel`, `parallelStories`, `autoMerge`,
+  `mergeMethod`, `watchMerges`, `watchMergeMinutes`) agora ficam em `Ctrl+,` → **Faz AI: Git**, com
+  escopo **Recurso**: o valor do Usuário é o padrão de todos os projetos, e Workspace ou Folder
+  sobrescreve só no projeto. No editor, a aba Git e o bloco "Tocar histórias em paralelo" do Harness
+  de IA viram um link para essas chaves; no navegador seguem como campos editáveis, como antes.
+  **Migração automática:** na primeira abertura depois desta versão, cada chave que só existe no
+  board vira o padrão do Usuário; se o Usuário já tinha outro valor, o do board é preservado gravando
+  no Workspace (ou no Workspace Folder, com múltiplas pastas abertas) — **isso pode criar um
+  `.vscode/settings.json` no projeto**. O board não altera o `.gitignore`: decidir se esse arquivo
+  entra no repositório fica com quem usa o projeto.
+- **Resumir a conversa do card.** Um botão novo na aba Conversa, a partir de 2 mensagens, lê a
+  conversa inteira e grava um resumo (Decisões, Observações, Pendências) como uma mensagem nova da
+  IA, sem apagar nada automaticamente. O resumo se revisa como qualquer mensagem: concorde deixando
+  como está ou edite o texto. Depois dele aparece uma recomendação para apagar, com confirmação, as
+  mensagens anteriores ao resumo (não é automático); resumir de novo cria um registro novo, sem
+  substituir o anterior. Também disponível como ferramenta MCP (`generate_summary`).
+- **História bloqueada segurava a fila inteira do autopiloto.** Com a primeira história da
+  fila parada por um impedimento (bloqueio, pergunta sem resposta, dependência de outro card em
+  aberto ou um ciclo emperrado), o autopiloto ficava parado e nenhuma das outras histórias
+  autônomas independentes rodava, mesmo prontas. Agora qualquer impedimento é pulado na varredura
+  da fila: o autopiloto segue para a próxima história que puder avançar (rodar, ou mudar de coluna
+  quando a IA não atua nela). Uma história que depende de outra continua esperando essa outra
+  terminar. A fila só mostra o aviso de impedimento quando nenhuma história pode avançar, com a
+  razão da primeira que ficou parada.
+- **Entrega da história autônoma não era detectada quando o PR chegava antes da última coluna.**
+  Ao registrar o pull request (`set_pull_request`), o board só marcava `waiting_review` e comentava a
+  entrega se a história já estivesse na última coluna em que a IA atua; registrado antes disso, a
+  entrega nunca era detectada e o autopiloto ficava tentando executar de novo uma história que já
+  tinha sido entregue. Agora essa verificação (`settleDelivery`) também roda ao mover o card para a
+  última coluna e no `settle` do runner, ao fim de uma execução.
+- **Backup pela paleta de comandos.** No editor, os comandos `fazai.exportBoard` ("Faz AI: Exportar
+  o board") e `fazai.importBoard` ("Faz AI: Importar um board") na paleta de comandos (`Ctrl+Shift+P`)
+  abrem diálogos nativos de salvamento e abertura de arquivo, funcionam com o board fechado (abrem o
+  banco sob demanda) e mostram notificações com o resultado. A aba "Backup" das Configurações do board
+  deixou de aparecer no editor — continua só no modo navegador. No Settings nativo (`Ctrl+,`), a
+  categoria "Faz AI: Backup" ganhou os links "Exportar o board agora" e "Importar um board" que
+  disparam os comandos. Com múltiplas pastas no workspace, os comandos usam a primeira pasta
+  (limitação conhecida).
+- **Hint formatado nos botões "Trabalhar na fase" e "Refinar com IA".** Os botões que executam essas
+  ações (na barra de status do card e na aba de comentários) mostram um tooltip rico com a explicação
+  formatada em negrito e tópicos, em lugar do `title` HTML nativo. O hint abre ao passar o mouse ou
+  focar com o teclado, fecha com Esc, e continua visível quando o botão está bloqueado, para que você
+  saiba o motivo mesmo sem poder clicar.
+- **A Implementação em modo autônomo parava com o condutor.** A execução de uma história é quem
+  faz as sub-tarefas da Implementação, delegando cada uma a um subagente; mas o `condutor-do-board`
+  (padrão desde a migração dos perfis) roda só com leitura, e essa restrição ia para a linha de
+  comando do Claude Code (`--tools`), tirando da sessão a ferramenta de lançar subagentes e deixando
+  os especialistas de fora (o contexto vazio não carrega os agentes do usuário). O condutor repetia
+  que "a execução automática vai cuidar" até o board bloquear o card. Agora a sessão de uma história
+  recebe os outros agentes disponíveis do board como subagentes (com as ferramentas e o modelo de
+  cada um), o agente dela ganha a ferramenta `Agent`, e a restrição de ferramentas dele vai na
+  própria definição, não na sessão. O condutor de fábrica passa a dizer isso nas instruções; o
+  `condutor-do-board.md` que já existe na sua pasta não é sobrescrito, mas a correção não depende
+  dele. E uma lista de ferramentas num agente é fechada: o Claude Code deixa de fora tudo o que não
+  está nela, inclusive os servidores MCP que carregou — o servidor do board conectava, mas a sessão
+  do condutor não tinha `get_card` nem `add_comment` e parava sem registrar nada (o Diagnóstico dizia
+  que estava tudo certo porque estava: o registro e a conexão nunca foram o problema). Agora toda lista
+  de ferramentas que o board monta para um agente, o da história ou um especialista, leva junto as
+  ferramentas do servidor do board (`mcp__faz-ai__*`): na linha de comando e também no arquivo do
+  agente, para ele falar com o board quando é chamado como subagente no chat do editor. Os arquivos
+  que o board já tinha gravado (os de fábrica, como o condutor) são completados uma vez na abertura;
+  a interface não mostra esse nome, só a lista que você escolheu.
+- **Agente padrão depois da migração dos perfis.** Ao abrir um board gravado por uma versão anterior, o
+  "Agente padrão" embutido (sem instruções) virava o arquivo `~/.claude/agents/agente-padr-o.md`, com
+  o nome truncado pelo acento e com Opus como modelo, e ficava como padrão do board no lugar do
+  `condutor-do-board`. Agora esse perfil não vira arquivo (quem apontava para ele segue o padrão do
+  board), os nomes migrados perdem só o acento (`agente-padrao`), e, quando o agente escolhido como
+  padrão não existe, vale o condutor, não o primeiro da lista. Se o arquivo truncado já foi criado,
+  apague-o em Configurações → Harness → Global → Agentes.
+- **Instalar a skill do fluxo marca a skill mesmo quando ela já existia.** Desde o contexto vazio, a
+  skill `faz-ai-fluxo` só conta como pronta quando existe **e** está marcada em todo contexto. Quem já
+  tinha a skill no disco via o aviso no Diagnóstico e no board, e o botão **Instalar** não fazia nada,
+  porque parava ao encontrar o arquivo. Agora o arquivo continua intocado (sem `replace`), mas a
+  marcação entra, e o aviso some. O `install_flow_skill` do MCP diz na resposta que marcou.
+- **Contexto vazio por padrão e Harness com marcação.** Toda execução pelo board (Trabalhar na fase,
+  Refinar com IA, heartbeat, chat do board) passa a partir de contexto vazio: nenhuma regra, skill,
+  agente, hook ou plugin da sua máquina ou do projeto entra por conta própria. No Claude Code isso é
+  imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um arquivo de
+  servidores MCP só com o do board e os liberados pelo agente); no Cursor, orientação no
+  prompt. O que entra é o que você marca em Configurações →
+  **Harness de IA**, agora com as abas **Projeto** e **Global**, cada uma com Rules, Agentes e
+  Skills. Rules e skills têm duas marcações: **Incluir em todo contexto** (entra em toda execução,
+  pelo caminho) e **Usar quando fizer sentido** (vira opção dos campos Skills e do novo campo
+  **Rules** dos cards, e o Refinar com IA a indica quando o pedido pede). O que não está marcado não
+  existe para a execução. Skills criadas ou instaladas pelo board já nascem marcadas; a skill do
+  fluxo é marcada em todo contexto ao ser instalada, e o Diagnóstico só a dá como pronta quando ela
+  existe e está marcada. As ferramentas `get_harness` (com `usage` e `onlySelected`) e
+  `set_harness_selection` expõem a marcação pelo MCP, e `get_card` devolve `requiredRules` ao lado
+  de `requiredSkills`.
+- **Agentes como arquivos da ferramenta.** Os perfis de execução deixam de ficar no banco do board:
+  um agente é um arquivo de agente da ferramenta (`~/.claude/agents/<nome>.md`,
+  `~/.cursor/agents/<nome>.md`), lido do disco; as instruções são o papel da sessão e o frontmatter
+  guarda modelo, ferramentas, skills e servidores MCP (o que é só do board vai em chaves `faz-ai-*`).
+  O board grava, por projeto, quais estão **disponíveis** e qual é o **padrão** (em Ferramenta e
+  execução). Os perfis já gravados viram arquivos na pasta global na primeira abertura, sem
+  sobrescrever nada; colunas e cards passam a apontar pelo nome. Um perfil que liberava todos os
+  servidores MCP passa a liberar só o do board: os demais voltam no editor do agente. A aba Agentes de Configurações e o
+  interruptor **Sessão limpa** saem: o contexto vazio é sempre. No Claude Code o agente vai inline
+  (`--agents` + `--agent`), então não depende de nenhuma pasta de agentes. Na primeira abertura, dez
+  agentes de fábrica são criados no global e marcados (condutor-do-board como padrão, frontend-web,
+  backend-node, backend-python, mobile-flutter, documentacao-tecnica, qa-testes, revisor-de-codigo,
+  devops-infra, dados-sql), com instruções mínimas; o que você apagar não volta sozinho, e **Recriar
+  os agentes padrão** recria o que faltar. **Sugerir agentes com IA** manda a IA ler o projeto e
+  criar ou ajustar agentes pelo MCP (`create_agent` e `update_agent` ganham `scope`, `model`,
+  `tools`, `deniedTools`, `skills` e `mcp`; `get_board` lista os disponíveis em `agents`). O Refinar
+  com IA recebe o catálogo marcado (agentes, rules e skills) e só indica o que está nele, escolhendo
+  o agente do card com `set_card_profile`.
+- **O board suporta só o Claude Code e o Cursor.** Codex, Kimi Code e GitHub Copilot saíram do
+  **Harness de IA**, que agora oferece só essas duas ferramentas, e do restante da extensão: modelos
+  embutidos, registro do servidor MCP, regras, skills e agentes, hooks, execução pela conversa e
+  Diagnóstico. Um board que estava configurado com uma delas volta para o Claude Code ao abrir. O
+  que o Cursor e o Claude Code ainda carregam de `.codex/skills` ou `AGENTS.md` continua listado.
+- **O custo das execuções é o que a ferramenta informa; a tabela de preços saiu (#187).** Um valor
+  calculado a partir de preços cadastrados envelhece quando o fornecedor muda a tarifa e deixa o
+  relatório errado sem avisar, então o board deixou de calcular custo. O Claude Code grava o
+  `total_cost_usd` que a própria CLI informa, mais os quatro contadores de tokens; o Cursor grava os
+  tokens e fica sem custo (a CLI não informa). Saem a tabela embutida, a coluna de preço da aba **Modelos de IA**, o
+  **Preço variável**, os campos `price_*`, `reset_price` e `variable_price` do `upsert_model`, a
+  origem do preço no `get_models` e a regra **Cursor Token Rate** (`cursorTokenRate` no
+  `update_rules`). Catálogos gravados antes perdem os campos de preço ao abrir o board. As execuções
+  antigas continuam nas Métricas, marcadas como "estimado por tabela de preços". O `get_metrics`
+  passa a chamar a coluna de **custo** (informado pela ferramenta), sem "estimado".
+- **Toda chamada à IA passa por uma única porta (#187).** O executor de cards (manual, heartbeat e
+  modo autônomo) e o chat repetiam o registro de uso, e o registro era opcional. Agora ambos pedem a
+  execução a um `AiGateway`, que abre a linha em `ai_runs` antes de rodar, confere a permissão, cuida
+  de interrupção e tempo limite e grava desfecho e consumo; cada ferramenta tem um provider próprio
+  (comando e leitor da saída). Um teste cobre as quatro origens e falha se algum arquivo fora do
+  gateway chamar a IA ou escrever no log. Em consequência, o log de uso não é mais opcional.
+- **Configurações do Faz AI no Settings do editor.** Em `Ctrl+,`, buscar "Faz AI" mostra a categoria
+  do Faz AI com as seções Instalação, Aparência, Git e Backup, nessa ordem. Instalação tem o link
+  **Abrir o Diagnóstico do ambiente**; Aparência já traz o **Idioma** (`fazai.appearance.language`);
+  Git e Backup avisam que as opções chegam nas próximas versões, com link para a aba do board. Três
+  comandos novos na paleta: **Faz AI: Abrir o Diagnóstico do ambiente**, **Faz AI: Abrir as
+  configurações do Faz AI no Settings** e **Faz AI: Abrir as configurações do board**; em
+  Configurações do board, o botão **Abrir no Settings do editor** faz o caminho de volta (ele some no
+  modo navegador). Dentro do editor o Settings manda e o banco do board é a cópia, para o modo
+  navegador e o MCP verem o mesmo valor; fora do editor o banco é a única fonte, e o que for gravado
+  por ali é levado ao Settings do Usuário com o editor aberto. Na primeira abertura, um board com
+  idioma diferente do padrão grava esse idioma no Settings do Usuário, em vez de ser zerado.
+- **Script de instalação do Diagnóstico todo em inglês.** O script gerado por **Instalar o
+  necessário** / **Instalar os recomendados** misturava português ("Login da CLI", "instalação
+  concluída", "pulado, porque … falhou") com a interface em inglês. Agora os nomes dos passos e as
+  mensagens saem em inglês, e o teste varre o script contra texto em português.
+- **Teste e2e do Cursor mais limpo.** O `npm run e2e:cursor` mostra só "Gerando a extensão…" e, se
+  houver, o erro do build; a saída inteira só aparece quando o empacotamento falha. O aviso
+  `groups: cannot find name for group ID` sumiu: os grupos do computador (vídeo, render) passam a
+  ser criados dentro do contêiner, no `start.sh`, a partir dos ids recebidos.
+- **Correção: o LED da sub-tarefa apagava segundos depois de acender.** Mover um card de coluna
+  zerava o status de trabalho dele, inclusive o "Em execução": como a IA chama `start_work` e em
+  seguida move a sub-tarefa para "Em andamento", o LED verde piscava por um instante e apagava, e a
+  história não mostrava que a IA estava trabalhando nela. Agora o card em execução que vai para
+  outra coluna em que a IA atua continua "Em execução"; os demais status seguem recomeçando ao
+  trocar de coluna, e na conclusão não há status de trabalho.
+- **O modo autônomo retoma sozinho ao abrir o editor.** Antes, as histórias que já estavam em modo
+  autônomo ficavam paradas até um clique em **Retomar modo autônomo**, o que parecia o modo
+  "não funcionar". Agora, ao abrir o editor (e sempre que a janela passa a ser a dona do board), o
+  autopiloto retoma a fila pendente e registra isso no log. A pausa continua sua: o que você pausou,
+  ou o que parou por falha ao iniciar a ferramenta, só volta quando você retomar; uma fila só de
+  histórias entregues não o religa.
+- **Correção: uma história que esperava dependência parava toda a fila do modo autônomo.** A
+  primeira história da fila (ordem do board) que dependia de outra ainda aberta segurava o
+  autopiloto com "espera #N terminar", mesmo com a própria #N pronta mais abaixo. Agora a história que
+  espera dependência é pulada e a vez passa para a próxima que pode rodar; só quando nenhuma pode a
+  fila para, com o motivo da primeira.
+- **Ordem da fila: a história mais adiantada termina antes de uma nova começar.** A ordem de
+  execução (heartbeat, modo autônomo e `get_pending_work`) era bug, linha do card e só então coluna,
+  o que fazia uma história recém-criada no topo do Discovery passar na frente de uma Implementação
+  pela metade. Agora é bug primeiro; depois a coluna mais à direita; na mesma coluna, de cima para
+  baixo. Um bug novo entra como o próximo da fila assim que a execução em andamento termina.
+- **Roteiro "Como testar" na descrição do card e no pull request.** Na Homologação, a IA passa a
+  gravar o roteiro de testes (o que foi construído, os passos com o resultado esperado e o que ficou
+  de fora) na descrição da história e no corpo do PR, e não só na conversa. A instrução padrão da
+  coluna e a skill do fluxo mudaram; o board com a instrução padrão anterior recebe a nova pela
+  atualização do padrão (versão 5), e a skill já instalada precisa ser reinstalada com
+  **Substituir** para trazer o texto novo.
+
+- **Anexos em Markdown abrem formatados.** Um anexo `.md`/`.markdown` (como o PRD, o Spec ou o Plan
+  de uma história) agora abre com títulos, listas, tabelas e blocos de código já formatados, em vez
+  do texto cru com `#`, `**` e `|---|`. Um seletor **Formatado** / **Código** no cabeçalho da janela
+  alterna para o texto cru quando é preciso; Editar, Salvar e Copiar conteúdo continuam operando
+  sobre o Markdown, como antes. Imagens, JSON, texto puro e os tipos sem pré-visualização não mudam.
 - **Correção: a pilha de branches do modo autônomo saía errada ao reordenar a fila por arrasto.** A
   branch de uma história nova do modo autônomo agora parte da branch criada mais recentemente entre
   as histórias YOLO abertas — a mesma ordem em que a fila de execução roda — em vez de partir da
@@ -78,6 +272,33 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   - A ponte (`bridge.js`) passa a morar em `~/.faz-ai/mcp/`, a mesma para o VS Code, o Cursor e o
     `faz-ai`. Um registro com a ponte de antes pede para instalar de novo.
   - GitHub Copilot: a instalação global grava também o `mcp.json` do perfil do VS Code.
+
+- **Tema, fonte e tamanho da fonte migraram para o Settings nativo do editor.** As três chaves `fazai.appearance.theme/font/fontSize` agora existem no Settings do VS Code e do Cursor (escopo Usuário), ao lado de `fazai.appearance.language` que já estava lá desde a #179. Dentro do editor, a aba Aparência das Configurações do board mostra um link para abrir o Settings nativo; no modo navegador (`faz-ai` no terminal), a aba continua como antes, com os 4 campos, porque lá não há Settings de editor. A sincronização é automática: se o Settings ainda não tem valor explícito e o board tem valor não-padrão, o do board é copiado para o Settings e passa a valer em todos os projetos; se o Settings já tem valor explícito, ele vence (RF de sincronização #179 estendido para as três chaves novas). Com múltiplos boards diferentes abertos pela primeira vez após a atualização, vale o valor do primeiro board a abrir — os demais seguem o Settings a partir de então.
+- **A tabela de status migrou da aba Aparência para a aba Fluxos.** Rótulo e cor de cada status continuam editáveis pelo board, mas agora em Configurações → Fluxos, não mais em Aparência; a interface (os campos e cores) permanece idêntica, nenhuma personalização anterior é perdida.
+- **Avisos de dependência entre configurações e links cruzados.** Várias opções de Configurações só fazem efeito por causa de outra, mas nada avisa isso. Um novo componente mostra uma linha discreta sob a opção dependente (por exemplo, "Depende de **uma regra de sugestão de modelo** (agora: nenhuma)") que fica desabilitada quando a dependência não está satisfeita. Os links cruzados permitem navegar: clique em um para ir até a seção correspondente do board (que rola e destaca por 2 s), ou para abrir o Settings do editor na opção correspondente; em modo navegador, os links para o Settings aparecem só como texto. **"Preencher o modelo sugerido automaticamente"** saiu de Regras e foi para Modelos, onde faz mais sentido — em Regras fica um aviso simples avisando a mudança de lugar. O campo Intervalo do heartbeat fica desabilitado quando o heartbeat está desligado, sem um componente de dependência adicional. Cabeçalhos novos em Modelos, Agentes, Rules e Skills mostram "Mostrando os X do Cursor · trocar ferramenta" (ou da ferramenta configurada), permitindo trocar a ferramenta de qualquer uma dessas telas. Um link em Settings (`fazai.git.parallel`) abre de volta o board, na seção do heartbeat do Harness.
+
+### Correções
+
+- A barra de modo autônomo dentro do card não mostra mais o motivo inteiro do bloqueio de outra história (a nota do autopiloto é do board todo): sobre outro card, fica uma linha curta apontando para ele; o texto completo continua na barra de atividade.
+- **Pendência com a pessoa passa a vez no status do card.** Quando a IA deixava algo dependendo de você (uma decisão, um ponto em aberto, algo que ficou de fora da entrega), ela registrava isso num comentário e seguia adiante, e o card não mostrava que a vez era sua. Agora `request_review` tem o parâmetro `pending`: a pendência vai para a conversa no bloco **Travado em mim** e o card fica em **Aguardando revisão**, mesmo em modo autônomo (nesse caso o pedido deixa de ser aprovado automaticamente e a fila segue com as outras histórias). A skill do fluxo e as instruções do servidor MCP passaram a exigir esse caminho e ganharam a seção "Pendências com a pessoa" e o fechamento de fase em três blocos (Travado em mim, O que mudou, O que encontrei). Reinstale a skill do fluxo em Configurações → Harness para atualizar o texto.
+- O aviso `allowed_warning` do Claude Code (perto do teto do plano) não é mais tratado como limite esgotado: a troca para o modelo reserva só acontece com `rejected` ou janela a 100%.
+- A troca para o modelo reserva só acontece quando a execução falhou; uma execução que terminou bem não é mais refeita com a reserva.
+- Se a retentativa com o modelo reserva não conseguir começar (card arquivado, ferramenta recusou), o card é bloqueado com o motivo em vez de ficar "em execução" sem execução.
+- Numa sub-tarefa, a execução passa a contar como texto ou branch pela fase da história, como no cálculo da fila, e a barra de atividade mostra essa fase.
+- Os comandos **Exportar o board** e **Importar um board** da paleta agora têm título em inglês quando o editor está em inglês.
+- O comentário "História entregue com o pull request…" sai sempre com o nome da ferramenta de IA como autor, mesmo quando foi a pessoa que moveu o card.
+- A nota do autopiloto na barra de atividade mostra só a primeira linha do motivo do bloqueio, sem cercas de código e limitada a 160 caracteres.
+- No Windows, as execuções e as consultas às CLIs não abrem mais uma janela do `cmd.exe`.
+- No Windows, o named pipe do servidor MCP leva o nome do usuário: dois usuários com a mesma pasta não disputam mais o mesmo pipe.
+- A barra de seleção múltipla ganhou fundo, borda e espaçamento, como a barra de filtros, nos dois temas.
+- A caixa **Modo autônomo** do card e o botão em lote da barra de seleção refletem o clique na hora e ficam travados (a barra mostra "Aplicando…") até o board confirmar; sem resposta em 3 s, voltam ao valor anterior.
+- Colapsar ou expandir um card pelo teclado mantém o foco no botão de colapso: Enter de novo reverte.
+- A caixa de marcação do card aparece quando recebe foco pelo teclado (e quando o foco está dentro do card).
+- A barra de atividade não anuncia mais a linha toda ao leitor de tela a cada minuto: só a referência e a fase são anunciadas; o "há N min" fica fora da região viva. A nota do autopiloto fica numa linha, com o texto inteiro no tooltip.
+- Arrastar um card logo depois de soltar outro parte da ordem que está na tela, não da ordem antiga.
+- Em Modelos de IA, **Preencher o modelo sugerido automaticamente** aparece desligado quando não há regra de sugestão (antes ficava ligado e travado ao apagar a última regra).
+- **Resumir a conversa** trava logo após o clique: dois cliques seguidos não disparam duas execuções.
+- Só um formulário **+ Novo card** fica aberto por vez no board, e Esc o fecha mesmo com o foco fora do campo.
 
 ## 0.33.0
 

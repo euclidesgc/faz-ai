@@ -1,4 +1,4 @@
-import type { Card, Column, Id } from '../../shared/model';
+import { cardRef, type Card, type Column, type Id } from '../../shared/model';
 import { childrenToCancel, dependents, parentToComplete } from '../../shared/cascade';
 import { linkedParentsToComplete } from '../../shared/links';
 import { cards } from '../commands';
@@ -18,15 +18,19 @@ function alongWith(children: number, attachments: number): string {
  * Move um card. Levar uma história com sub-tarefas em aberto para uma coluna de cancelamento
  * pergunta antes se as sub-tarefas devem ser canceladas junto.
  * (Levar para uma coluna de conclusão com sub-tarefas em aberto é recusado pelo host.)
+ * Devolve 'sent' quando o `card.move` foi enviado e 'asked' quando só abriu o diálogo (nada enviado ainda).
  */
-export function requestMove(cardId: Id, columnId: Id, position: number): void {
+export function requestMove(cardId: Id, columnId: Id, position: number): 'sent' | 'asked' {
   const { state, ask } = useBoardStore.getState();
   const card = state!.cards.find((c) => c.id === cardId);
   const target = state!.columns.find((c) => c.id === columnId);
-  if (!card || !target) return;
+  if (!card || !target) return 'asked';
 
   const open = childrenToCancel(state!, card, target);
-  if (open.length && state!.board.rules.onCancelParent === 'cascade') return cards.move(cardId, columnId, position, true);
+  if (open.length && state!.board.rules.onCancelParent === 'cascade') {
+    cards.move(cardId, columnId, position, true);
+    return 'sent';
+  }
   if (open.length) {
     ask({
       title: t('Cancelar "{title}"?', { title: card.title }),
@@ -39,10 +43,11 @@ export function requestMove(cardId: Id, columnId: Id, position: number): void {
       danger: true,
       onConfirm: () => cards.move(cardId, columnId, position, true),
     });
-    return;
+    return 'asked';
   }
   cards.move(cardId, columnId, position);
   offerToCompleteParent(card, target);
+  return 'sent';
 }
 
 /**
@@ -136,3 +141,30 @@ export const requestTrash = (cardId: Id, after?: () => void): void => requestRem
 
 /** Arquiva; avisa antes quando o card leva sub-tarefas ou anexos junto. */
 export const requestArchive = (cardId: Id, after?: () => void): void => requestRemoval('archive', cardId, after);
+
+/**
+ * Restaura um card arquivado para a primeira coluna do workflow dele. Uma sub-tarefa cuja história também está
+ * arquivada não volta sozinha: pede confirmação para restaurar a história (com todas as sub-tarefas arquivadas).
+ */
+export function requestRestoreArchived(cardId: Id, after?: () => void): void {
+  const { state, ask } = useBoardStore.getState();
+  const card = state!.cards.find((c) => c.id === cardId);
+  if (!card || card.archivedAt === null) return;
+  const parent = card.parentId ? state!.cards.find((c) => c.id === card.parentId) : undefined;
+  const go = () => {
+    cards.restoreArchived(cardId);
+    after?.();
+  };
+  if (!parent || parent.archivedAt === null || parent.deletedAt !== null) return go();
+  ask({
+    title: t('Restaurar a história junto?'),
+    message: t(
+      'A sub-tarefa {sub} pertence à história {story}, que está arquivada. Restaurar traz a história e todas as sub-tarefas arquivadas dela para o Backlog.',
+      { sub: cardRef(card), story: cardRef(parent) },
+    ),
+    cancelLabel: t('Voltar'),
+    confirmLabel: t('Restaurar história'),
+    danger: false,
+    onConfirm: go,
+  });
+}

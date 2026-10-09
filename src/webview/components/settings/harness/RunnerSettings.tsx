@@ -2,9 +2,11 @@ import { Button, Callout, Card, Text } from '@radix-ui/themes';
 import { HEARTBEAT_RANGE, PARALLEL_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE } from '../../../../shared/runner';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { useBoardStore } from '../../../store/boardStore';
-import { ai, settings } from '../../../commands';
+import { ai, settings, ui } from '../../../commands';
+import { isWeb } from '../../../vscode';
 import { FormField, IconWarning, NumberField, SelectField, SwitchField } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
+import { DependsOn } from '../DependsOn';
 import { t } from '../../../i18n';
 
 /** O que a IA pode fazer quando o board a executa (pela conversa ou pelo heartbeat), o tempo limite e o heartbeat. */
@@ -14,6 +16,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
   const runner = board.runner;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === runner.permission)!;
   const worktree = board.git.mode === 'worktree';
+  const hasAvailableAgent = board.execProfiles.some((p) => p.scope !== 'builtin');
   return (
     <>
       <SectionHeader
@@ -70,6 +73,33 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
               <Callout.Text>{t(permission.hint)}</Callout.Text>
             </Callout.Root>
           )}
+          <FormField
+            label={t('Agente padrão')}
+            hint={t('Executa os cards que não escolhem um agente, nem pela fase. Só os agentes marcados como disponíveis no Harness.')}
+          >
+            {(id) => (
+              <>
+                <SelectField
+                  id={id}
+                  aria-label={t('Agente padrão')}
+                  options={board.execProfiles.map((p) => ({
+                    value: p.id,
+                    label: p.scope === 'builtin' ? t('Agente embutido (sem instruções)') : p.id,
+                  }))}
+                  value={board.execProfiles.find((p) => p.isDefault)?.id ?? ''}
+                  onChange={(defaultAgent) => settings.updateBoard({ runner: { defaultAgent } })}
+                />
+                {!hasAvailableAgent && (
+                  <DependsOn
+                    label={t('agentes marcados como disponíveis')}
+                    satisfied={hasAvailableAgent}
+                    target={{ kind: 'board', section: 'harness-project' }}
+                    targetHint={t('em Harness › Projeto ou Global')}
+                  />
+                )}
+              </>
+            )}
+          </FormField>
           <FormField label={t('Tempo limite por execução')}>
             {(id) => (
               <div className="unit-field">
@@ -87,66 +117,83 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
             )}
           </FormField>
           <div className="form-divider" />
-          <SwitchField
-            label={t('Heartbeat ligado')}
-            checked={runner.heartbeat}
-            onChange={(heartbeat) => settings.updateBoard({ runner: { heartbeat } })}
-          />
-          <Text as="p" size="1" color="gray">
-            {t(
-              'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
-              { tool: tool.label },
-            )}
-          </Text>
-          <FormField label={t('Intervalo')}>
-            {(id) => (
-              <div className="unit-field">
-                <NumberField
-                  id={id}
-                  min={HEARTBEAT_RANGE.min}
-                  max={HEARTBEAT_RANGE.max}
-                  value={runner.heartbeatMinutes}
-                  onCommit={(heartbeatMinutes) => settings.updateBoard({ runner: { heartbeatMinutes } })}
-                />
-                <Text size="2" color="gray">
-                  {t('minutos')}
-                </Text>
-              </div>
-            )}
-          </FormField>
-          <div className="form-divider" />
-          <SwitchField
-            label={t('Tocar histórias em paralelo')}
-            checked={worktree && runner.parallel}
-            disabled={!worktree}
-            onChange={(parallel) => settings.updateBoard({ runner: { parallel } })}
-          />
-          <Text as="p" size="1" color="gray">
-            {worktree
-              ? t(
-                  'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas. As sub-tarefas independentes de cada história já rodam em paralelo, sem limite, conforme o plano.',
-                )
-              : t(
-                  'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.',
-                )}
-          </Text>
-          {worktree && runner.parallel && (
-            <FormField label={t('Histórias ao mesmo tempo')}>
+          <div id="heartbeat">
+            <SwitchField
+              label={t('Heartbeat ligado')}
+              checked={runner.heartbeat}
+              onChange={(heartbeat) => settings.updateBoard({ runner: { heartbeat } })}
+            />
+            <Text as="p" size="1" color="gray">
+              {t(
+                'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
+                { tool: tool.label },
+              )}
+            </Text>
+            <FormField label={t('Intervalo')}>
               {(id) => (
                 <div className="unit-field">
                   <NumberField
                     id={id}
-                    min={PARALLEL_RANGE.min}
-                    max={PARALLEL_RANGE.max}
-                    value={runner.parallelStories}
-                    onCommit={(parallelStories) => settings.updateBoard({ runner: { parallelStories } })}
+                    min={HEARTBEAT_RANGE.min}
+                    max={HEARTBEAT_RANGE.max}
+                    value={runner.heartbeatMinutes}
+                    disabled={!runner.heartbeat}
+                    onCommit={(heartbeatMinutes) => settings.updateBoard({ runner: { heartbeatMinutes } })}
                   />
                   <Text size="2" color="gray">
-                    {t('histórias')}
+                    {t('minutos')}
                   </Text>
                 </div>
               )}
             </FormField>
+          </div>
+          <div className="form-divider" />
+          {isWeb && (
+            <>
+              <SwitchField
+                label={t('Tocar histórias em paralelo')}
+                checked={worktree && runner.parallel}
+                disabled={!worktree}
+                onChange={(parallel) => settings.updateBoard({ runner: { parallel } })}
+              />
+              <Text as="p" size="1" color="gray">
+                {worktree
+                  ? t(
+                      'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas. As sub-tarefas independentes de cada história já rodam em paralelo, sem limite, conforme o plano.',
+                    )
+                  : t(
+                      'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.',
+                    )}
+              </Text>
+              {worktree && runner.parallel && (
+                <FormField label={t('Histórias ao mesmo tempo')}>
+                  {(id) => (
+                    <div className="unit-field">
+                      <NumberField
+                        id={id}
+                        min={PARALLEL_RANGE.min}
+                        max={PARALLEL_RANGE.max}
+                        value={runner.parallelStories}
+                        onCommit={(parallelStories) => settings.updateBoard({ runner: { parallelStories } })}
+                      />
+                      <Text size="2" color="gray">
+                        {t('histórias')}
+                      </Text>
+                    </div>
+                  )}
+                </FormField>
+              )}
+            </>
+          )}
+          {!isWeb && (
+            <>
+              <Text as="p" size="1" color="gray">
+                {t('Tocar histórias em paralelo agora fica no Settings do editor, em Faz AI › Git.')}
+              </Text>
+              <Button variant="soft" onClick={() => ui.openIdeSettings('fazai.git.parallel')}>
+                {t('Abrir no Settings do editor')}
+              </Button>
+            </>
           )}
         </Card>
       )}

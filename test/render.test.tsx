@@ -17,7 +17,6 @@ import { ThemeToggle, nextTheme } from '../src/webview/components/ThemeToggle';
 import { TrashView } from '../src/webview/components/TrashView';
 import { WorkflowsSettings } from '../src/webview/components/settings/workflows/WorkflowsSettings';
 import { FieldsSettings } from '../src/webview/components/settings/FieldsSettings';
-import { AgentsSettings } from '../src/webview/components/settings/AgentsSettings';
 import { HarnessSettings } from '../src/webview/components/settings/HarnessSettings';
 import { RuleBuilder } from '../src/webview/components/settings/ModelRulesEditor';
 import { AppearanceSettings } from '../src/webview/components/settings/AppearanceSettings';
@@ -70,13 +69,26 @@ beforeAll(async () => {
   router.handle({ type: 'harness.skill.create', name: 'revisar-spec', description: 'Quando revisar', content: 'Passos' });
   router.handle({ type: 'harness.skill.create', name: 'desligada', description: 'x', content: 'y' });
   router.handle({ type: 'harness.skill.setEnabled', name: 'desligada', enabled: false });
-  router.handle({ type: 'harness.agent.create', name: 'revisor-de-spec', description: 'Revisa a spec', content: 'Passos', model: 'opus' });
+  router.handle({
+    type: 'harness.agent.create',
+    scope: 'project',
+    input: {
+      name: 'revisor-de-spec',
+      description: 'Revisa a spec',
+      body: 'Passos',
+      model: '',
+      tools: [],
+      deniedTools: [],
+      skills: [],
+      mcp: [],
+    },
+  });
   s = router.snapshot();
   const field = (n: string) => s.fieldDefs.find((f) => f.name === n)!;
   router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Skills').id, value: ['revisar-spec'] });
   router.handle({ type: 'field.setValue', cardId: sub, fieldId: field('Modelo').id, value: 'claude:opus@high' });
   router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Esforço da atividade').id, value: 'Baixo' });
-  router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Modelo').id, value: 'kimi:kimi-code/k3@max' });
+  router.handle({ type: 'field.setValue', cardId: storyId, fieldId: field('Modelo').id, value: 'cursor:auto' });
   router.handle({
     type: 'settings.type.update',
     typeId: typeOf(childWf.id).id,
@@ -101,16 +113,15 @@ describe('telas montam sem erro', () => {
     expect(board).toContain('revisar-spec');
     expect(board).toContain('Opus 5.5 - alto');
     expect(board).toContain('suggest-model');
-    // a coluna de arquivados está sempre no board, colapsada por padrão; as demais abertas
-    expect(board.match(/column collapsed archive/g)).toHaveLength(2);
+    // a linha não tem mais a coluna de arquivados: eles ficam na aba Arquivados
+    expect(board).not.toContain('column collapsed archive');
     expect(board).not.toContain('Arraste um card para cá para arquivar');
     const s = useBoardStore.getState().state!;
     const prd = s.columns.find((c) => c.name === 'PRD')!;
     const child = s.workflows.find((w) => w.kind === 'child')!;
-    useBoardStore.setState({ collapsed: { [prd.id]: true, [`archive:${s.workflows[0]!.id}`]: false, [child.id]: true } });
+    useBoardStore.setState({ collapsed: { [prd.id]: true, [child.id]: true } });
     const custom = html(<Board />);
     expect(custom).toContain('Expandir &quot;PRD&quot;');
-    expect(custom).toContain('Arraste um card para cá para arquivar'); // arquivados da linha de cima aberto
     expect(custom).toContain('workflow workflow-child collapsed');
     expect(custom).not.toContain('A fazer'); // linha de baixo fechada não mostra as colunas
     useBoardStore.setState({ collapsed: {} }); // a história tem modelo manual diferente da sugestão
@@ -176,17 +187,11 @@ describe('telas montam sem erro', () => {
     expect(collapsed).toContain('settings-side collapsed');
     expect(collapsed).toContain('aria-label="Harness de IA"');
     useBoardStore.setState({ settingsNavCollapsed: false });
-    for (const text of [
-      'Cada história ganha uma branch e uma pasta de trabalho própria',
-      'Nome da branch',
-      'historia/12-login-com-google',
-      'Pasta das worktrees',
-      'Fazer o merge do PR ao aprovar a homologação',
-      'Tipo de merge',
-    ])
-      expect(html(<GitSettings />)).toContain(text);
+    // no editor (isWeb false em teste), a GitSettings mostra só o aviso e o link para o Settings do editor
+    expect(html(<GitSettings />)).toContain('O Git agora fica no Settings do editor.');
     const settingsHtml = html(<Settings />);
-    expect(settingsHtml).toContain('Backup');
+    // no editor (isWeb false em teste), a aba Backup não aparece no Settings do board: os comandos da paleta cuidam disso
+    expect(settingsHtml).not.toContain('Backup');
     const backup = html(<BackupSettings />);
     for (const text of ['Exportar board', 'Importar de um arquivo…', 'guarde-o com cuidado']) expect(backup).toContain(text);
     expect(backup).not.toContain('Espere a execução da IA terminar');
@@ -202,7 +207,19 @@ describe('telas montam sem erro', () => {
     expect(html(<BackupSettings />)).toContain('Lendo o arquivo…');
     useBoardStore.setState({ backupBusy: null });
     const cols = html(<WorkflowsSettings />);
-    for (const text of ['PRD', 'Novo workflow', 'Nova coluna', 'IA atua', 'Exige aprovação', 'Fase', 'PRD.md', 'Discovery', 'Homologação'])
+    for (const text of [
+      'PRD',
+      'Novo workflow',
+      'Nova coluna',
+      'IA atua',
+      'Exige aprovação',
+      'Fase',
+      'PRD.md',
+      'Discovery',
+      'Homologação',
+      'Status dos cards',
+      'Aguardando resposta',
+    ])
       expect(cols).toContain(text);
     // a opção de começar colapsada saiu: vale o estado em que a pessoa deixou o board
     for (const text of ['Começa colapsada', 'começa colapsada', 'linha de cima', 'linha de baixo']) expect(cols).not.toContain(text);
@@ -248,16 +265,13 @@ describe('telas montam sem erro', () => {
     for (const text of ['OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
 
     const look = html(<AppearanceSettings />);
-    for (const text of ['Tema', 'Fonte dos textos', 'Tamanho da fonte: 14px', 'Prévia', 'Status dos cards', 'Aguardando resposta'])
-      expect(look).toContain(text);
+    for (const text of ['Abrir no Settings do editor', 'Prévia']) expect(look).toContain(text);
+    for (const text of ['Tamanho da fonte: 14px', 'Status dos cards']) expect(look).not.toContain(text);
     const toggle = html(<ThemeToggle />);
     for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
-    const profiles = html(<AgentsSettings />);
-    for (const text of ['Agentes', 'aceita por parâmetro', 'imposto', 'orientado', 'Novo agente', 'Agente padrão'])
-      expect(profiles).toContain(text);
-    // cada aba do Harness é montada por vez: juntamos o texto das três
-    const harness = (['tool', 'project', 'all'] as const)
+    // cada aba do Harness é montada por vez: juntamos o texto das quatro
+    const harness = (['tool', 'project', 'user', 'all'] as const)
       .map((harnessTab) => {
         useBoardStore.setState({ harnessTab });
         return html(<HarnessSettings />);
@@ -267,15 +281,13 @@ describe('telas montam sem erro', () => {
       'Ferramenta deste projeto',
       'type="radio"',
       'Claude Code',
-      'Codex',
       'Cursor',
-      'Kimi Code',
-      'GitHub Copilot',
       'AGENTS.md',
-      'Usar o AGENTS.md',
+      'Harness do projeto',
+      'Harness global',
+      'Incluir em todo contexto',
       'revisar-spec',
-      'Desligada',
-      '.kimi-code/skills',
+      '.cursor/skills',
       'Tudo que cada ferramenta carrega',
       'Servidores MCP',
       'Hooks',
@@ -289,7 +301,7 @@ describe('telas montam sem erro', () => {
       'Heartbeat ligado',
       'Rodar o heartbeat agora',
       'Subagentes',
-      'Novo subagente',
+      'Agente padrão',
       'revisor-de-spec',
       '.claude/agents/revisor-de-spec.md',
     ])

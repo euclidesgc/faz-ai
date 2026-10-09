@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { HarnessUsage } from '../../../shared/harnessSelection';
 import { suggestSkills, skillCatalog, type CatalogSkill } from '../../../shared/skillCatalog';
 import { useBoardStore } from '../../store/boardStore';
 import { Badge, Button, Checkbox, Dialog, SegmentedControl, TextField } from '@radix-ui/themes';
@@ -20,15 +21,17 @@ interface Props {
   intent?: string;
   /** título da janela de escolha */
   title?: string;
+  /** só as skills marcadas deste jeito no Harness; sem isso, todas as marcadas */
+  usage?: HarnessUsage;
 }
 
 /**
  * Escolha de skills para muitas opções: um resumo do que está marcado e uma janela com busca, abas
  * por origem e caixas de seleção. Substitui a parede de chips, que não escala com centenas de skills.
  */
-export function SkillPicker({ value, onChange, intent = '', title }: Props) {
+export function SkillPicker({ value, onChange, intent = '', title, usage }: Props) {
   const state = useBoardStore((s) => s.state)!;
-  const catalog = useMemo(() => skillCatalog(state), [state]);
+  const catalog = useMemo(() => skillCatalog(state, usage), [state, usage]);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('all');
   const [query, setQuery] = useState('');
@@ -101,7 +104,9 @@ export function SkillPicker({ value, onChange, intent = '', title }: Props) {
         <Dialog.Content className="skill-dialog">
           <Dialog.Title>{title ?? t('Escolher skills')}</Dialog.Title>
           <Dialog.Description size="2" color="gray">
-            {t('A IA lê o arquivo de cada skill marcada ao executar. Busque pelo nome ou pela descrição.')}
+            {t(
+              'A IA lê o arquivo de cada skill marcada ao executar. Só aparecem as skills marcadas em Configurações → Harness. Busque pelo nome ou pela descrição.',
+            )}
           </Dialog.Description>
           <TextField.Root
             autoFocus

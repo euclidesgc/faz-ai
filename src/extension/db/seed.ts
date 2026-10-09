@@ -3,7 +3,7 @@ import type { WorkflowKind } from '../../shared/model';
 import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION, STORY_PHASES, insertColumn } from './boardTemplate';
 import { newId } from './ids';
 import { EFFORT_FIELD, EFFORT_LEVELS } from '../../shared/models';
-import { MODEL_FIELD, SKILLS_FIELD } from './schema';
+import { MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from './schema';
 
 /** Cria o board padrão para um workspace e devolve seu id. */
 export function seedBoard(db: Database, workspaceKey: string, name: string): string {
@@ -55,6 +55,11 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
       [newId(), boardId, SKILLS_FIELD, 'multiselect', '[]', null, 'chip', 4],
+    );
+    // as opções vêm das rules marcadas no Harness e são sincronizadas pelo roteador
+    db.run(
+      'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
+      [newId(), boardId, RULES_FIELD, 'multiselect', '[]', null, 'chip', 5],
     );
     // esforço da tarefa: as regras de modelo sugerem um modelo a partir dele
     db.run(

@@ -26,6 +26,8 @@ export function runCli(file: string, args: string[], pathEnv: string | undefined
         timeout: timeoutMs,
         shell: launch.shell,
         windowsVerbatimArguments: launch.shell,
+        // no Windows, o shell abriria uma janela do cmd.exe a cada consulta
+        windowsHide: true,
         env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), NO_COLOR: '1', NO_OPEN_BROWSER: '1' },
       },
       (err, stdout, stderr) => {
@@ -56,19 +58,6 @@ export async function claudeSignedIn(executable: string, pathEnv: string | undef
   } catch {
     return null;
   }
-}
-
-/**
- * Se o Codex está autenticado (`codex login status`); null quando não deu para saber. Parser
- * tolerante, best-effort: sem CLI do Codex disponível para confirmar o formato real da saída, só
- * reconhece os padrões textuais mais comuns de "logado"/"não logado". Qualquer saída fora desses
- * padrões vira `null`, nunca `false`.
- */
-export async function codexSignedIn(executable: string, pathEnv: string | undefined): Promise<boolean | null> {
-  const run = await runCli(executable, ['login', 'status'], pathEnv);
-  if (/not\s*logged\s*in/i.test(run.stdout)) return false;
-  if (/logged\s*in/i.test(run.stdout)) return true;
-  return null;
 }
 
 /** Os modelos da conta em uso no Cursor (`cursor-agent models`); vazio sem login ou com erro. */

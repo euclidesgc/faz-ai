@@ -52,7 +52,7 @@ beforeEach(async () => {
     attachmentsDir: path.join(base, 'attachments'),
     workspaceDir: repo,
   });
-  const server = createMcpServer({ getRouter: async () => router, workspaceDir: repo, version: 'test' });
+  const server = createMcpServer({ getRouter: async () => router, getRunner: async () => undefined, workspaceDir: repo, version: 'test' });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(a);
   client = new Client({ name: 'claude-code', version: '1' });
@@ -175,31 +175,6 @@ describe('branch e worktree por história', () => {
     expect(() => git(repo, 'merge-base', '--is-ancestor', 'main', outside.branch)).not.toThrow();
   });
 
-  it('pular uma bloqueada sem PR registra na conversa a base escolhida e quem foi pulada', async () => {
-    const yolo = (n: number) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled: true });
-    await call('create_card', { title: 'Base', column: 'Implementação' });
-    await call('create_card', { title: 'Bloqueada', column: 'Implementação' });
-    await call('create_card', { title: 'Terceira', column: 'Implementação' });
-    yolo(1);
-    yolo(2);
-    yolo(3);
-
-    const first = (await call('prepare_workspace', { card: 1 })).data;
-    await call('prepare_workspace', { card: 2 });
-    // a segunda fica bloqueada sem pull request: não serve de base, e é pulada
-    router.handle({ type: 'card.status.set', cardId: card(2).id, status: 'blocked', note: 'esperando acesso' });
-
-    const third = (await call('prepare_workspace', { card: 3 })).data;
-    expect(third.baseBranch).toBe(first.branch);
-
-    const comments = router.snapshot().comments.filter((c) => c.cardId === card(3).id && c.source === 'ai');
-    expect(comments).toHaveLength(1);
-    expect(comments[0]).toMatchObject({
-      source: 'ai',
-      body: `Branch criada a partir de ${first.branch}: #2 está bloqueada sem pull request e foi pulada na pilha.`,
-    });
-  });
-
   it('sem história pulada não registra nada na conversa', async () => {
     const yolo = (n: number) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled: true });
     await call('create_card', { title: 'Base', column: 'Implementação' });
@@ -231,6 +206,38 @@ describe('branch e worktree por história', () => {
     expect((await call('get_card', { card: 2 })).data.workspaceNote).toBeUndefined();
   });
 
+  it('fora do worktree, recusa a fase de texto enquanto outra história usa a pasta', async () => {
+    await call('create_card', { title: 'Um', column: 'Implementação' });
+    await call('create_card', { title: 'Dois', column: 'Discovery' });
+    await call('create_card', { title: 'Tres', column: 'Implementação' });
+    const run = [
+      {
+        cardId: card(1).id,
+        runId: '',
+        mode: 'phase' as const,
+        origin: 'manual' as const,
+        phase: 'Implementação',
+        model: null,
+        startedAt: 0,
+      },
+    ];
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
+    router.setAiRuns(run);
+    const blocked = await call('prepare_workspace', { card: 2 });
+    expect(blocked.error).toBe(true);
+    expect(blocked.text).toContain('#1');
+    expect(blocked.text).toContain('#2 está em Discovery');
+    // fase de código não é barrada
+    expect((await call('prepare_workspace', { card: 3 })).error).toBe(false);
+    // pasta livre
+    router.setAiRuns([]);
+    expect((await call('prepare_workspace', { card: 2 })).error).toBe(false);
+    // modo worktree não tem a guarda
+    router.setAiRuns(run);
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree' } } });
+    expect((await call('prepare_workspace', { card: 2 })).error).toBe(false);
+  });
+
   it('explica quando a pasta não é um repositório git', async () => {
     fs.rmSync(path.join(repo, '.git'), { recursive: true, force: true });
     await call('create_card', { title: 'X', column: 'Implementação' });
@@ -242,10 +249,24 @@ describe('branch e worktree por história', () => {
     expect(router.aiWorkDirs()).toEqual([root]);
     expect(fs.existsSync(root)).toBe(true);
     expect(headlessCommand('claude', { prompt: 'P', permission: 'edits', addDirs: [root] })).toMatchObject({
-      args: ['-p', '--permission-mode', 'acceptEdits', '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', '--add-dir', root],
+      args: [
+        '-p',
+        '--permission-mode',
+        'acceptEdits',
+        '--allowedTools',
+        'mcp__faz-ai__*',
+        'Read',
+        'Glob',
+        'Grep',
+        '--add-dir',
+        root,
+        '--setting-sources',
+        '',
+        '--disable-slash-commands',
+      ],
     });
-    expect(headlessCommand('copilot', { prompt: 'P', permission: 'board', addDirs: [root] })).toMatchObject({
-      args: ['-p', 'P', '--allow-tool=faz-ai', '--allow-tool=read', `--add-dir=${root}`, '--no-ask-user'],
+    expect(headlessCommand('cursor', { prompt: 'P', permission: 'board', addDirs: [root] })).toMatchObject({
+      args: ['-p', '--force', '--approve-mcps', '--trust', '--allowed-tools', expect.any(String), '--add-dir', root],
     });
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
     expect(router.aiWorkDirs()).toEqual([]);

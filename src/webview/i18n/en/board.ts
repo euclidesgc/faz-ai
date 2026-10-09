@@ -8,9 +8,6 @@ export const board: Record<string, string> = {
   Board: 'Board',
   Lixeira: 'Trash',
   Configurações: 'Settings',
-  'Execuções da IA em andamento': 'AI runs in progress',
-  'IA trabalhando em {n} card': 'AI working on {n} card',
-  'IA trabalhando em {n} cards': 'AI working on {n} cards',
   'Mostrando só o que espera por você. Clique para ver tudo.': 'Showing only what is waiting on you. Click to see everything.',
   'Cards esperando revisão, resposta ou desbloqueio. Clique para ver só eles.':
     'Cards waiting for review, an answer or unblocking. Click to see only those.',
@@ -47,6 +44,7 @@ export const board: Record<string, string> = {
   '{n} card': '{n} card',
   '{n} cards': '{n} cards',
   'Dois cliques (ou Enter) abrem o card': 'Double-click (or Enter) opens the card',
+  'Selecionar {title}': 'Select {title}',
   'Expandir "{name}"': 'Expand "{name}"',
   'Excluir a coluna "{name}"?': 'Delete the column "{name}"?',
   '{n} card(s) desta coluna serão movidos para a coluna escolhida.': '{n} card(s) in this column will be moved to the chosen column.',
@@ -54,6 +52,8 @@ export const board: Record<string, string> = {
   'Excluir coluna': 'Delete column',
   'Mover cards para': 'Move cards to',
   'Colapsar a coluna': 'Collapse the column',
+  'Colapsar cards': 'Collapse cards',
+  'Expandir cards': 'Expand cards',
   'Duplo clique para renomear': 'Double-click to rename',
   'Exige aprovação: a IA só avança o card desta coluna depois que você aprova':
     'Requires approval: the AI only advances a card from this column after you approve',
@@ -80,7 +80,15 @@ export const board: Record<string, string> = {
   'Nova coluna': 'New column',
   'Nome da coluna': 'Column name',
   Arquivados: 'Archived',
-  'Arraste um card para cá para arquivar.': 'Drag a card here to archive it.',
+  // Aba Arquivados
+  'Nenhum card arquivado neste workflow.': 'No archived cards in this workflow.',
+  'Cards arquivados ficam aqui, por workflow, do mais recente ao mais antigo. Restaurar leva o card para a primeira coluna do workflow dele.':
+    'Archived cards stay here, by workflow, newest first. Restore sends the card to the first column of its workflow.',
+  'Restaurar a história junto?': 'Restore the story along?',
+  'A sub-tarefa {sub} pertence à história {story}, que está arquivada. Restaurar traz a história e todas as sub-tarefas arquivadas dela para o Backlog.':
+    'Sub-task {sub} belongs to story {story}, which is archived. Restoring brings the story and all its archived sub-tasks back to the Backlog.',
+  'Restaurar história': 'Restore story',
+  'Restaurar {title}': 'Restore {title}',
 
   // Lixeira
   'Esvaziar a lixeira?': 'Empty the trash?',
@@ -155,6 +163,24 @@ export const board: Record<string, string> = {
   // Heartbeat e tema
   'a cada {n} min': 'every {n} min',
   'Heartbeat parado: {reason}': 'Heartbeat stopped: {reason}',
+  'Heartbeat desligado': 'Heartbeat off',
+  'Próxima rodada às {time}': 'Next round at {time}',
+
+  // Barra de status (pé do board): o que a IA está fazendo agora
+  'IA em {ref} ({what}, {since})': 'AI on {ref} ({what}, {since})',
+  'IA em {n} cards: ': 'AI on {n} cards: ',
+  refinando: 'refining',
+  resumindo: 'summarizing',
+  agora: 'now',
+  'há {n} min': '{n} min ago',
+  'há {n} h': '{n} h ago',
+  'IA parada': 'AI idle',
+  'história {ref}': 'story {ref}',
+  'Abrir o card {ref}': 'Open card {ref}',
+  manual: 'manual',
+  heartbeat: 'heartbeat',
+  'modo autônomo': 'autonomous mode',
+  chat: 'chat',
   'Tema: {current}. Clique para mudar para {next}.': 'Theme: {current}. Click to switch to {next}.',
   Sistema: 'System',
   Claro: 'Light',
@@ -185,10 +211,19 @@ export const board: Record<string, string> = {
   Desbloquear: 'Unblock',
   'Interrompe o {tool}; o status volta ao que era': 'Stops {tool}; the status goes back to what it was',
   'Parar a IA': 'Stop the AI',
-  'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está (o que a coluna pede) e passar a vez: pedir revisão, perguntar ou mover. A resposta chega na conversa.':
-    'Runs {tool} in the background to do the work of the phase the card is in (what the column asks for) and hand over: ask for review, ask a question or move. The answer arrives in the conversation.',
-  'O {tool} deixa o card claro e completo: reescreve título e descrição, preenche Tags, Esforço, Modelo e Skills e sugere o checklist. Não trabalha a fase, não move o card e não mexe em arquivos; o resumo do que mudou chega na conversa.':
-    '{tool} makes the card clear and complete: rewrites the title and description, fills Tags, Effort, Model and Skills and suggests the checklist. It does not work on the phase, does not move the card and does not touch files; the summary of what changed arrives in the conversation.',
+  'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está.':
+    'Runs {tool} in the background to do the work the phase asks for.',
+  'Parte de <b>contexto vazio</b>: só entram as rules e skills marcadas no Harness e o agente do card (ou o padrão do board).':
+    "Starts from <b>empty context</b>: only the rules and skills marked in the Harness, and the card's agent (or the board's default), come in.",
+  'Ao terminar, passa a vez — pede revisão, pergunta ou move o card — sem acompanhamento ao vivo; a resposta chega na conversa.':
+    "When it's done, it hands off — asks for review, asks a question, or moves the card — with no live follow-along; the reply shows up in the conversation.",
+  'O consumo fica registrado em Métricas.': 'Usage is logged in Metrics.',
+  'O {tool} deixa o card claro e completo, sem tocar em código nem mover o card.':
+    '{tool} makes the card clear and complete, without touching code or moving the card.',
+  'Reescreve título e descrição.': 'Rewrites the title and description.',
+  'Preenche Tags, Esforço, Modelo, Skills, <b>Rules</b> e o <b>agente</b> — só o que está marcado no Harness.':
+    "Fills in Tags, Effort, Model, Skills, <b>Rules</b> and the <b>agent</b> — only what's marked in the Harness.",
+  'Sugere o checklist.': 'Suggests the checklist.',
   'Refinar com IA': 'Refine with AI',
   'O que está impedindo o trabalho?': 'What is blocking the work?',
   Bloquear: 'Block',
@@ -219,9 +254,10 @@ export const board: Record<string, string> = {
   'Abrir o card': 'Open the card',
   'Ações do card': 'Card actions',
   'Abrir detalhes': 'Open details',
-  Desarquivar: 'Unarchive',
   Arquivar: 'Archive',
   'Mover para a lixeira': 'Move to trash',
+  'Colapsar card': 'Collapse card',
+  'Expandir card': 'Expand card',
 
   // Chat
   'Chat com a IA': 'AI chat',
@@ -292,6 +328,19 @@ export const board: Record<string, string> = {
   'Abrir filtros': 'Open filters',
   'Limpar filtros': 'Clear filters',
   'Limpar filtros ({n})': 'Clear filters ({n})',
+  'Expandir todos os cards do board': 'Expand all cards on the board',
+  'Colapsar todos os cards do board': 'Collapse all cards on the board',
+
+  // Barra de seleção múltipla (card 326): modo autônomo em lote
+  '{n} selecionados': '{n} selected',
+  Limpar: 'Clear',
+  'Ligar modo autônomo': 'Turn on autonomous mode',
+  'Desligar modo autônomo': 'Turn off autonomous mode',
+  'Aplicando…': 'Applying…',
+  'Ligar o modo autônomo em {n} história(s)?': 'Turn on autonomous mode for {n} story(ies)?',
+  'Desligar o modo autônomo em {n} história(s)?': 'Turn off autonomous mode for {n} story(ies)?',
+  'Colapsar selecionados': 'Collapse selected',
+  'Expandir selecionados': 'Expand selected',
   'Limpar conversa': 'Clear conversation',
   '+ Nova coluna': '+ New column',
   'Criar sub-tarefa': 'Create sub-task',

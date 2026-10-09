@@ -75,8 +75,8 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
       execProfiles: [],
     },
     workflows: [
-      { id: 'wp', boardId: 'b', name: 'Histórias', position: 0, kind: 'parent', collapsed: false, archiveCollapsed: true },
-      { id: 'wc', boardId: 'b', name: 'Sub-tarefas', position: 1, kind: 'child', collapsed: false, archiveCollapsed: true },
+      { id: 'wp', boardId: 'b', name: 'Histórias', position: 0, kind: 'parent', collapsed: false },
+      { id: 'wc', boardId: 'b', name: 'Sub-tarefas', position: 1, kind: 'child', collapsed: false },
     ],
     columns: [
       column('done', 'wp', 2, 'done'),
@@ -97,9 +97,12 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     attachments: [],
     currentUser: 'a',
     harness: EMPTY_HARNESS,
+    harnessSelection: [],
     pendingUpgrade: [],
     chat: EMPTY_CHAT,
     aiRuns: [],
+    aiActivity: [],
+    heartbeatNextAt: null,
     autopilot: { active: false, note: null },
     aiRunUnsupported: null,
     requirements: [],

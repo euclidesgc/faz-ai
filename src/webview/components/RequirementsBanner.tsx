@@ -118,9 +118,9 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
       };
     case 'skill':
       return {
-        title: t('A skill do fluxo ({name}) não está instalada no {tool}', { name: FLOW_SKILL_NAME, tool }),
+        title: t('A skill do fluxo ({name}) não está pronta para o {tool}', { name: FLOW_SKILL_NAME, tool }),
         detail: t(
-          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. Sem ela, a IA mexe nos cards, mas não segue o fluxo. A instalação vai para a pasta global de skills da ferramenta.',
+          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem de contexto vazio: a skill precisa existir e estar marcada em "Incluir em todo contexto" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.',
         ),
       };
     case 'mcp-enable':
@@ -326,13 +326,13 @@ function RecheckButton() {
  * caixa discreta (com a explicação) em vez da faixa de aviso.
  */
 /** O comando da CLI de cada ferramenta, para montar o item sintético de login sem precisar de um probe. */
-const CLI_OF: Record<AiTool, string> = { claude: 'claude', codex: 'codex', cursor: 'cursor-agent', kimi: 'kimi', copilot: 'copilot' };
+const CLI_OF: Record<AiTool, string> = { claude: 'claude', cursor: 'cursor-agent' };
 
 export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
   const requirements = useBoardStore((s) => s.state?.requirements ?? []);
   const authExpired = useBoardStore((s) => s.state?.authExpired ?? null);
-  // o sinal reativo (RF6) sem probe confiável (Kimi, Copilot) não aparece em `requirements`: sem este
-  // item, a pessoa nunca veria o aviso para essas duas ferramentas
+  // o sinal reativo (RF6) de um login que venceu no meio da execução pode não estar em `requirements`
+  // (o probe não soube dizer): sem este item, a pessoa não veria o aviso
   const items =
     authExpired && !requirements.some((r) => r.id === 'signin')
       ? [

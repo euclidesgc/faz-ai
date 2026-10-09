@@ -150,6 +150,22 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
         {() => <ModelEditor value={rule.model} onChange={(v) => setRule({ ...rule, model: typeof v === 'string' ? v : '' })} />}
       </FormField>
 
+      <FormField
+        label={t('Reserva (opcional)')}
+        hint={
+          rule.fallback
+            ? modelDisplay(state.board.modelCatalog, rule.fallback, true)
+            : t('Sem reserva: se o modelo principal esgotar o limite, a execução não é repetida.')
+        }
+      >
+        {() => (
+          <ModelEditor
+            value={rule.fallback ?? null}
+            onChange={(v) => setRule({ ...rule, fallback: typeof v === 'string' && v ? v : null })}
+          />
+        )}
+      </FormField>
+
       <div className="form-actions">
         <Button variant="soft" color="gray" onClick={onCancel}>
           {t('Cancelar')}
@@ -193,6 +209,7 @@ export function ModelRulesEditor() {
       enabled: true,
       groups: [[{ fieldId: first.id, op: 'is', value: first.values[0] ?? '' }]],
       model: o ? modelValue(o.id, o.defaultEffort) : '',
+      fallback: null,
     });
   };
   const tool = aiToolInfo(aiTool);
@@ -201,6 +218,7 @@ export function ModelRulesEditor() {
   return (
     <div>
       <SectionHeader
+        id="model-rules"
         title={t('Sugestão de modelo')}
         actions={
           <>
@@ -250,7 +268,12 @@ export function ModelRulesEditor() {
               </td>
               <td>{r.name ? dt(r.name) : <span className="muted">{t('(sem nome)')}</span>}</td>
               <td>{describeRule(state, r, { word: t, name: dt })}</td>
-              <td>{modelDisplay(allModels, r.model, true)}</td>
+              <td>
+                {modelDisplay(allModels, r.model, true)}
+                {r.fallback && (
+                  <div className="muted small">{t('reserva: {model}', { model: modelDisplay(allModels, r.fallback, true) })}</div>
+                )}
+              </td>
               <td className="narrow">
                 <IconButton
                   variant="ghost"

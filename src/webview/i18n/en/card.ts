@@ -13,7 +13,6 @@ export const card: Record<string, string> = {
   Restaurar: 'Restore',
   'Ações do card': 'Card actions',
   Ações: 'Actions',
-  Desarquivar: 'Unarchive',
   Arquivar: 'Archive',
   'Mover para a lixeira': 'Move to trash',
   'Fechar (Esc)': 'Close (Esc)',
@@ -53,6 +52,8 @@ export const card: Record<string, string> = {
   'Mostrar na pasta': 'Show in folder',
   'Pré-visualização não disponível.': 'Preview not available.',
   'Conteúdo do anexo': 'Attachment content',
+  'Modo de visualização': 'View mode',
+  Formatado: 'Formatted',
   'Copiar conteúdo': 'Copy content',
   'Só anexos de texto têm conteúdo para copiar.': 'Only text attachments have content to copy.',
   'Salvar como…': 'Save as…',
@@ -80,8 +81,6 @@ export const card: Record<string, string> = {
   'Permissão do {tool} ao ser chamado: {permission}.': '{tool} permission when called: {permission}.',
   Mudar: 'Change',
   Enviar: 'Send',
-  'Roda o {tool} em segundo plano para ler a conversa e fazer o trabalho da fase em que o card está. A resposta chega aqui, sem acompanhamento ao vivo.':
-    'Runs {tool} in the background to read the conversation and do the work of the phase the card is in. The reply arrives here, with no live tracking.',
   'Enviar e trabalhar na fase': 'Send and work on the phase',
   'Trabalhar na fase': 'Work on the phase',
   editado: 'edited',
@@ -91,6 +90,16 @@ export const card: Record<string, string> = {
   Editar: 'Edit',
   Cancelar: 'Cancel',
   Salvar: 'Save',
+  'Resumir a conversa': 'Summarize conversation',
+  'A IA lê toda a conversa e escreve um resumo com decisões, observações e pendências.':
+    'The AI reads the whole conversation and writes a summary of decisions, notes, and open items.',
+  'Revise o resumo: concorde como está ou edite o que for preciso.':
+    'Review the summary: keep it as is, or edit anything that needs adjusting.',
+  'As mensagens anteriores a este resumo já estão refletidas nele. Você pode apagá-las para liberar contexto.':
+    'The messages before this summary are already reflected in it. You can delete them to free up context.',
+  'Apagar mensagens resumidas': 'Delete summarized messages',
+  'Apagar as {count} mensagens anteriores a este resumo?': 'Delete the {count} messages before this summary?',
+  'Apagar mensagens': 'Delete messages',
   // permissões do runner (shared/runner.ts)
   'Só o board': 'Board only',
   'Board e arquivos do projeto': 'Board and project files',
@@ -207,14 +216,15 @@ export const card: Record<string, string> = {
   'A IA trabalha nesta sub-tarefa sem pedir aprovação, como na história':
     'The AI works on this sub-task without asking for approval, as in the story',
   'Modo autônomo, da história {ref}': 'Autonomous mode, from story {ref}',
-  'A IA toca esta história sozinha, do Backlog até o pull request: cria os documentos de cada fase, o plano e as sub-tarefas, implementa uma por uma e abre o PR. Nada é pedido a você: não há aprovação, pergunta nem confirmação. A IA roda com a permissão "Sem restrições" (altera arquivos e roda comandos) e não faz o merge. As próximas histórias em modo autônomo entram na fila e viram uma pilha de pull requests. Pare a qualquer hora pelo botão do topo do board.':
-    'The AI drives this story by itself, from Backlog to the pull request: it writes the document of each phase, the plan and the sub-tasks, implements them one by one and opens the PR. Nothing is asked of you: there is no approval, question or confirmation. The AI runs with the "Sem restrições" (no restrictions) permission (it edits files and runs commands) and does not merge. The next autonomous stories join the queue and become a stack of pull requests. Stop at any time with the button at the top of the board.',
+  'A IA toca esta história sozinha, do Backlog ao pull request — sem aprovação, pergunta ou confirmação. Pare a qualquer hora pelo botão do topo do board.':
+    'The AI drives this story by itself, from Backlog to the pull request — with no approval, question or confirmation. Stop at any time with the button at the top of the board.',
   'Ligar o modo autônomo em {ref}?': 'Turn on autonomous mode for {ref}?',
   'Ligar o modo autônomo': 'Turn on autonomous mode',
+  'Não avisar novamente': "Don't warn me again",
   'O modo autônomo está tocando a fila.': 'Autonomous mode is driving the queue.',
   'O modo autônomo está pausado.': 'Autonomous mode is paused.',
+  'A fila está parada em {ref}: veja a barra de atividade.': 'The queue is stopped at {ref}: see the activity bar.',
   'Modo autônomo': 'Autonomous mode',
-  'Modo autônomo: a IA toca esta história sozinha, sem aprovação': 'Autonomous mode: the AI drives this story by itself, without approval',
   'Salvar descrição': 'Save description',
   'Aplicar seleção': 'Apply selection',
   'precisa terminar antes deste card': 'must finish before this card',
@@ -226,4 +236,7 @@ export const card: Record<string, string> = {
   'só começam depois deste card': 'only start after this card',
   'Copiar o nome da branch': 'Copy the branch name',
   'Nome copiado': 'Name copied',
+  'O que a sessão de IA usa para trabalhar neste card: agente, skills, rules, servidores MCP, ferramentas e modelo':
+    'What the AI session uses to work on this card: agent, skills, rules, MCP servers, tools and model',
+  'rules: {list}': 'rules: {list}',
 };

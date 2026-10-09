@@ -1,25 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import type { ExecInput } from '../src/extension/execution';
 import { headlessCommand, tmpArg, type HeadlessCommand } from '../src/extension/headless';
-import { EXEC_ENFORCEMENT, defaultAgent, effortToRun, parseProfiles } from '../src/shared/execution';
+import { CONDUCTOR_AGENT, EXEC_ENFORCEMENT, agentProfiles, defaultAgent, effortToRun, parseProfiles } from '../src/shared/execution';
+import type { Agent } from '../src/shared/harness';
+import { toItemName } from '../src/shared/harnessProject';
 import { ALL_AI_TOOLS } from '../src/shared/harness';
 
 const exec: ExecInput = {
   agent: 'planejador',
+  agentDefinition: null,
+  delegates: [],
   mcpAllowed: ['github'],
   mcpBlocked: ['slack', 'com.ponto'],
   mcpConfig: '{"mcpServers":{}}',
   tools: ['Read', 'Edit'],
   deniedTools: ['WebFetch'],
   model: { name: 'opus', effort: 'high' },
-  clean: true,
 };
 const args = (tool: (typeof ALL_AI_TOOLS)[number], permission: 'board' | 'full' = 'full') =>
   (headlessCommand(tool, { prompt: 'P', permission, exec }) as HeadlessCommand).args;
 const has = (list: string[], ...seq: string[]) => list.some((_, i) => seq.every((s, j) => list[i + j] === s));
 
 describe('perfil de execução na linha de comando de cada ferramenta', () => {
-  it('Claude Code: agente, modelo, ferramentas, servidores MCP e sessão limpa por parâmetro', () => {
+  it('Claude Code: agente, modelo, ferramentas, servidores MCP e contexto vazio por parâmetro', () => {
     const command = headlessCommand('claude', { prompt: 'P', permission: 'board', exec }) as HeadlessCommand;
     const a = command.args;
     expect(has(a, '--agent', 'planejador')).toBe(true);
@@ -27,39 +30,62 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
     expect(has(a, '--tools', 'Read,Edit')).toBe(true);
     expect(has(a, '--disallowedTools', 'WebFetch')).toBe(true);
     expect(has(a, '--strict-mcp-config', '--mcp-config', tmpArg('mcp.json'))).toBe(true);
-    expect(has(a, '--setting-sources', 'project,local', '--disable-slash-commands')).toBe(true);
+    // contexto vazio: nenhuma fonte de configuração (nem do usuário nem do projeto) e nenhuma skill invocável
+    expect(has(a, '--setting-sources', '', '--disable-slash-commands')).toBe(true);
+    // o agente inline vai em --agents e é escolhido por --agent
+    const inline = headlessCommand('claude', {
+      prompt: 'P',
+      permission: 'board',
+      exec: { ...exec, agentDefinition: { name: 'planejador', description: 'Planeja', prompt: 'Você planeja.' } },
+    }) as HeadlessCommand;
+    expect(
+      has(
+        inline.args,
+        '--agents',
+        JSON.stringify({ planejador: { description: 'Planeja', prompt: 'Você planeja.' } }),
+        '--agent',
+        'planejador',
+      ),
+    ).toBe(true);
+    // os outros agentes do board vão no mesmo JSON, como subagentes, com as ferramentas e o modelo de cada um
+    const delegated = headlessCommand('claude', {
+      prompt: 'P',
+      permission: 'full',
+      exec: {
+        ...exec,
+        tools: [],
+        agentDefinition: { name: 'condutor', description: 'Conduz', prompt: 'Delegue.', tools: ['Read', 'Agent'] },
+        delegates: [
+          { name: 'backend-node', description: 'Backend', prompt: 'Codifique.', tools: ['Read', 'Edit', 'Bash'], model: 'sonnet' },
+        ],
+      },
+    }) as HeadlessCommand;
+    expect(
+      has(
+        delegated.args,
+        '--agents',
+        JSON.stringify({
+          condutor: { description: 'Conduz', prompt: 'Delegue.', tools: ['Read', 'Agent'] },
+          'backend-node': { description: 'Backend', prompt: 'Codifique.', tools: ['Read', 'Edit', 'Bash'], model: 'sonnet' },
+        }),
+        '--agent',
+        'condutor',
+      ),
+    ).toBe(true);
+    expect(delegated.args).not.toContain('--tools');
     // os servidores liberados no perfil rodam sem pedir aprovação, junto do servidor do board
     expect(has(a, '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', 'mcp__github__*')).toBe(true);
     expect(command.tempFiles).toEqual({ 'mcp.json': '{"mcpServers":{}}' });
     expect(command.stdin).toBe('P');
   });
 
-  it('Codex, Copilot, Cursor e Kimi: só o que cada um aceita por parâmetro', () => {
-    const codex = args('codex');
-    expect(has(codex, '--model', 'opus', '-c', 'model_reasoning_effort="high"')).toBe(true);
-    expect(has(codex, '-c', 'mcp_servers.slack.enabled=false', '-c', 'mcp_servers."com.ponto".enabled=false')).toBe(true);
-    expect(codex).not.toContain('planejador');
-    expect(codex.at(-1)).toBe('-');
-
-    const copilot = args('copilot');
-    for (const flag of [
-      '--agent=planejador',
-      '--model=opus',
-      '--effort=high',
-      '--available-tools=Read,Edit',
-      '--excluded-tools=WebFetch',
-      '--disable-mcp-server=slack',
-      '--no-custom-instructions',
-    ])
-      expect(copilot).toContain(flag);
-
+  it('Cursor: só o que ele aceita por parâmetro', () => {
     // o Cursor recebe o esforço como sufixo do id, como `cursor-agent models` lista as variantes
     expect(has(args('cursor'), '--model', 'opus-high')).toBe(true);
     expect(args('cursor')).not.toContain('--agent');
-    expect(has(args('kimi'), '--model', 'opus', '--agent', 'planejador')).toBe(true);
   });
 
-  it('sem perfil, o comando é o mesmo de antes', () => {
+  it('sem perfil, o contexto continua vazio: o Claude Code sem fontes de configuração', () => {
     for (const tool of ALL_AI_TOOLS)
       expect(headlessCommand(tool, { prompt: 'P', permission: 'full' })).toEqual(
         headlessCommand(tool, { prompt: 'P', permission: 'full', exec: undefined }),
@@ -68,7 +94,20 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
       '-p',
       '--permission-mode',
       'bypassPermissions',
+      '--setting-sources',
+      '',
+      '--disable-slash-commands',
     ]);
+    // com o servidor do board, o arquivo de servidores é estrito: nada do usuário nem do projeto entra
+    const withBoard = headlessCommand('claude', {
+      prompt: 'P',
+      permission: 'full',
+      boardServer: { command: 'node', args: ['b.js'] },
+    }) as HeadlessCommand;
+    expect(has(withBoard.args, '--strict-mcp-config', '--mcp-config', tmpArg('mcp.json'))).toBe(true);
+    expect(JSON.parse(withBoard.tempFiles!['mcp.json']!)).toEqual({
+      mcpServers: { 'faz-ai': { type: 'stdio', command: 'node', args: ['b.js'] } },
+    });
   });
 
   it('a tabela do que é imposto cobre todas as ferramentas, e as skills vão sempre como orientação', () => {
@@ -78,11 +117,11 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
       mcp: 'enforced',
       tools: 'enforced',
       model: 'enforced',
-      clean: 'enforced',
+      context: 'enforced',
     });
   });
 
-  it('lê os perfis salvos, descartando o que for inválido e mantendo um só padrão', () => {
+  it('lê os perfis que o banco guardava (só para a migração), descartando o que for inválido', () => {
     const parsed = parseProfiles(
       JSON.stringify([
         { id: 'a', name: ' Plan ', skills: ['x', 'x', 3], mcpServers: [], isDefault: true },
@@ -102,7 +141,6 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
         tools: [],
         deniedTools: [],
         model: '',
-        clean: false,
         isDefault: true,
       },
       {
@@ -115,15 +153,14 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
         tools: [],
         deniedTools: [],
         model: '',
-        clean: false,
         isDefault: false,
       },
     ]);
-    // sem nada (ou com lixo), vale o agente padrão: toda execução passa por um agente
-    expect(parseProfiles('isto não é json')).toEqual([defaultAgent()]);
-    expect(parseProfiles('[]')).toEqual([defaultAgent()]);
-    // sem nenhum marcado como padrão, o primeiro assume
-    expect(parseProfiles(JSON.stringify([{ id: 'x' }, { id: 'y' }])).map((p) => p.isDefault)).toEqual([true, false]);
+    // sem nada (ou com lixo), não há o que migrar
+    expect(parseProfiles('isto não é json')).toEqual([]);
+    expect(parseProfiles('[]')).toEqual([]);
+    // o agente embutido é o que vale quando nenhum arquivo está marcado
+    expect(defaultAgent()).toMatchObject({ id: 'padrao', scope: 'builtin', isDefault: true, mcpServers: [] });
   });
 });
 
@@ -146,5 +183,43 @@ describe('effortToRun', () => {
     expect(effortToRun(option('cursor'), null)).toBe('high');
     expect(effortToRun(option('cursor'), 'max')).toBe('high');
     expect(effortToRun(option('claude'), null)).toBeNull();
+  });
+});
+
+describe('agentProfiles: o padrão do board', () => {
+  const agent = (name: string): Agent => ({
+    name,
+    scope: 'user',
+    path: `/h/.claude/agents/${name}.md`,
+    location: `~/.claude/agents/${name}.md`,
+    content: '',
+    description: name,
+    model: '',
+    modelValue: '',
+    body: '',
+    tools: [],
+    deniedTools: [],
+    skills: [],
+    mcp: [],
+    seed: false,
+  });
+  const marked = (names: string[]) =>
+    names.map((n) => ({ kind: 'agent' as const, location: `~/.claude/agents/${n}.md`, usage: 'contextual' as const }));
+
+  it('o escolhido em Configurações vale; sem ele (apagado, desmarcado), o condutor; sem o condutor, o primeiro', () => {
+    const agents = [agent('backend-node'), agent(CONDUCTOR_AGENT), agent('qa-testes')];
+    const defaults = (chosen: string, list = agents) =>
+      agentProfiles(list, marked(list.map((a) => a.name)), chosen).find((p) => p.isDefault)?.id;
+    expect(defaults('qa-testes')).toBe('qa-testes');
+    expect(defaults('agente-padr-o')).toBe(CONDUCTOR_AGENT);
+    expect(defaults('')).toBe(CONDUCTOR_AGENT);
+    expect(defaults('agente-padr-o', [agent('backend-node'), agent('qa-testes')])).toBe('backend-node');
+  });
+});
+
+describe('toItemName', () => {
+  it('tira acentos antes de trocar o resto por hífen: "Agente padrão" vira agente-padrao, não agente-padr-o', () => {
+    expect(toItemName('Agente padrão')).toBe('agente-padrao');
+    expect(toItemName('Revisão de Código')).toBe('revisao-de-codigo');
   });
 });

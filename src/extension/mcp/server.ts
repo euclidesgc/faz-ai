@@ -5,10 +5,13 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { MessageRouter } from '../panel/messageRouter';
+import type { AiRunner } from '../runner';
 import { registerTools } from './tools';
 
 export interface McpOptions {
   getRouter: () => Promise<MessageRouter | undefined>;
+  /** o runner da pasta, para ferramentas que disparam e aguardam uma execução de IA (ex.: generate_summary) */
+  getRunner: () => Promise<AiRunner | undefined>;
   /** pasta do projeto, base para caminhos relativos de anexos */
   workspaceDir: string;
   version: string;
@@ -32,14 +35,16 @@ export const MCP_INSTRUCTIONS =
   'Ao começar um card chame start_work. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
   'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
   'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +
+  'Ficou algo dependendo da pessoa (decisão, dado, ponto em aberto que ela precisa avaliar)? Não registre só num comentário: entregue com request_review e `pending`, e o card fica com ela (status "waiting_review"), mesmo em modo autônomo. ' +
   'Sem um pedido específico, comece por get_pending_work: ele lista o que está com você (aprovados para avançar, mensagens sem resposta, cards prontos). ' +
   'Para perguntas de uso, custo e tempo (quanto custou, qual fase/modelo consome mais, quanto tempo levou), use get_metrics em vez de abrir o painel. ' +
   'get_card devolve em `model` a ferramenta, o modelo e o nível de esforço que devem executar o card: antes de trabalhar nele, ' +
   'se o modelo ou o esforço forem diferentes dos seus, delegue o trabalho a um subagente com esse modelo e esforço; ' +
   'se não for possível, avise a pessoa em vez de executar com outra configuração. ' +
   'O campo "Esforço da atividade" é o tamanho da tarefa (não é o esforço do modelo); as regras do board sugerem o modelo a partir dele (get_models). ' +
-  'O campo "Skills" lista as skills obrigatórias do card: get_card devolve `requiredSkills` com o caminho de cada SKILL.md, ' +
-  'e todas devem ser lidas nesse caminho antes de executar o card, mesmo que não apareçam na sua lista de skills (podem estar desligadas ou fora da invocação automática). ' +
+  'Toda execução pelo board parte de contexto vazio: o que a IA deve conhecer vem no pedido e no get_card, pelo caminho dos arquivos. ' +
+  'Os campos "Rules" e "Skills" listam o que o card exige: get_card devolve `requiredRules` e `requiredSkills` com o caminho de cada arquivo, ' +
+  'e todos devem ser lidos nesse caminho antes de executar o card, mesmo que não apareçam na sua lista de skills. As opções desses campos e os agentes de get_board são tudo o que o board marcou em Configurações → Harness; não indique nada fora deles. ' +
   'As colunas das histórias são as fases do fluxo; sua intenção é sempre levar a história até a conclusão, uma coluna por vez. ' +
   'get_card devolve em `phase` o que fazer na fase atual e o modelo do documento que ela produz. ' +
   'Sub-tarefas podem depender umas das outras (create_card com depends_on, ou link_cards com "depends_on"): declare a dependência quando uma usa o que a outra produz ou quando as duas alteram os mesmos arquivos. ' +
@@ -64,11 +69,16 @@ export function createMcpServer(opts: McpOptions): McpServer {
       if (!router) throw new Error('Nenhuma pasta aberta no VSCode.');
       return router;
     },
+    getRunner: async () => {
+      const runner = await opts.getRunner();
+      if (!runner) throw new Error('Nenhuma pasta aberta no VSCode.');
+      return runner;
+    },
     workspaceDir: opts.workspaceDir,
     author: () => {
       const client = server.server.getClientVersion();
-      // o VS Code se apresenta pelo nome do produto ("Visual Studio Code", "Visual Studio Code - Insiders"); quem fala por ele é o Copilot
-      if (client?.name.startsWith('Visual Studio Code')) return 'GitHub Copilot';
+      // o VS Code se apresenta pelo nome do produto ("Visual Studio Code", "Visual Studio Code - Insiders")
+      if (client?.name.startsWith('Visual Studio Code')) return 'VS Code';
       return (client && (CLIENT_NAMES[client.name] ?? client.title ?? client.name)) || 'IA';
     },
   });

@@ -15,7 +15,7 @@ export interface EnvironmentProbe {
   pathDirs: string[];
   homeDir: string;
   /**
-   * o MCP do Code Review Graph no editor (Cursor, ou VS Code com o Copilot): `unregistered` quando o
+   * o MCP do Code Review Graph no editor (o Cursor): `unregistered` quando o
    * editor não o tem, `unreachable` quando ele não acha o comando (instalado depois que o editor abriu),
    * `tracked` quando o arquivo está no git e o board não pode gravar o caminho; ausente fora do editor
    */
@@ -44,9 +44,7 @@ const FROM: Partial<Record<EnvCheckId, RequirementId[]>> = {
 /** O nome da ferramenta no `code-review-graph install --platform` (sem nome lá, ele registra em todas as que achar). */
 const CRG_PLATFORM: Partial<Record<AiTool, string>> = {
   claude: 'claude-code',
-  codex: 'codex',
   cursor: 'cursor',
-  copilot: 'copilot-cli',
 };
 
 const version = (out: string | null): string | undefined => /\d+\.\d+(?:\.\d+)?/.exec(out ?? '')?.[0];

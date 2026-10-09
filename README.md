@@ -61,7 +61,7 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    própria ferramenta), abra a pasta do seu projeto e clique no ícone **Faz AI** na barra lateral.
    Cada pasta tem o seu board, já com as fases do fluxo.
 2. **Conecte a IA ao board.** Em **Configurações → Harness de IA**, escolha a ferramenta do projeto
-   (Claude Code, Codex, Cursor, Kimi Code ou GitHub Copilot). Na aba **Tudo que a ferramenta
+   (Claude Code ou Cursor). Na aba **Tudo que a ferramenta
    carrega**, na ferramenta, clique em **Instalar (padrão da ferramenta)** na seção **Servidores
    MCP** e de novo na seção **Skills**, para a skill do fluxo, que ensina a IA a conduzir as fases.
 3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
@@ -69,7 +69,9 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    Markdown, e, se quiser, escolha o modelo da IA e as skills que ela deve ler.
 4. **Deixe a IA começar.** Arraste o card para **Discovery** e clique em **Trabalhar na fase** no card. A IA
    lê o card pelo board, analisa o problema e conversa com você na aba **Conversa**. Quando termina,
-   o status muda para **Aguardando revisão**: é a sua vez.
+   o status muda para **Aguardando revisão**: é a sua vez. O mesmo acontece quando a IA deixa
+   algo dependendo de você (uma decisão, um ponto em aberto): a pendência aparece na conversa como
+   **Travado em mim** e o card fica com você, mesmo em modo autônomo.
 5. **Revise e siga.** Leia o documento da fase, responda ou clique em **Aprovar** (ou **Pedir
    ajustes**). Com a aprovação, a história avança para **PRD**, **Spec**, **Plan** e
    **Implementação**, sempre com a IA produzindo e você aprovando. As sub-tarefas da implementação
@@ -87,16 +89,22 @@ necessário, na hora certa:
 - **Cada card é uma sessão nova e curta.** Em vez de uma conversa longa que acumula tudo, a IA abre o
   card pelo board (`get_card`), faz aquele trabalho e para. O histórico fica no card, e não na janela
   de contexto.
-- **Skills só quando indicadas.** Uma skill automática põe a descrição dela em toda sessão; marcada
-  como **Só quando indicada**, ela só entra nos cards que a pedem. Em **Harness de IA → Tudo que a
-  ferramenta carrega**, o board mostra quantas skills são automáticas e quantos caracteres de
-  descrição elas colocam em toda sessão.
-- **Agentes que restringem.** Um agente pode liberar só alguns servidores MCP e ferramentas, e a
-  **sessão limpa** dispensa as personalizações da sua pasta de usuário: menos definições de
-  ferramentas carregadas sem necessidade (o que o Claude Code e o Cursor impõem por parâmetro está na
-  tabela de [Agentes](#agentes)).
+- **Contexto vazio por padrão.** Toda execução pelo board começa sem nenhuma regra, skill, agente,
+  hook ou plugin da sua máquina ou do projeto: só entra o que você marcou em **Harness de IA**. No
+  Claude Code isso é imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um
+  arquivo de servidores MCP só com o do board); nas outras ferramentas, o que a linha de comando
+  aceita (ver a tabela de [Agentes](#agentes)).
+- **Rules e skills marcadas, não descobertas.** Cada arquivo tem duas marcações: **Incluir em todo
+  contexto** (entra em toda execução, pelo caminho) ou **Usar quando fizer sentido** (vira opção dos
+  campos Rules e Skills do card, e o Refinar com IA a indica quando o pedido pede). O que não está
+  marcado não existe para a execução.
+- **Agentes com o mínimo.** Um agente libera só os servidores MCP e as ferramentas de que precisa,
+  carrega as skills dele e tem instruções curtas; o resto fica de fora.
 - **Documentos como anexos.** PRD, Spec e Plan ficam anexados à história; a IA os lê quando o card
   precisa, em vez de recebê-los colados em cada mensagem.
+- **Anexos em Markdown abrem formatados.** Um `.md`/`.markdown` abre como uma página, com títulos,
+  listas, tabelas e blocos de código formatados; um seletor **Formatado**/**Código** mostra o texto
+  cru quando é preciso. Editar, Salvar e Copiar conteúdo continuam operando sobre o Markdown.
 - **Modelo certo para cada tarefa.** Regras de sugestão e o modelo por card ou por agente evitam usar
   o modelo mais caro onde o mais leve basta.
 
@@ -113,8 +121,8 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
   gera um documento (Discovery, PRD, Spec, Plan), o modelo desse documento. No Discovery a IA
   analisa o problema e conversa com você antes de qualquer requisito; na Homologação a história só
   é concluída com a sua aprovação.
-- **Trabalhar com a IA no mesmo quadro.** A extensão expõe o board por MCP. Claude Code, Codex,
-  Cursor, Kimi Code, GitHub Copilot ou outro cliente MCP podem consultar e editar tudo o que a interface permite, e
+- **Trabalhar com a IA no mesmo quadro.** A extensão expõe o board por MCP. Claude Code,
+  Cursor ou outro cliente MCP podem consultar e editar tudo o que a interface permite, e
   as mudanças aparecem no board na hora.
 - **Saber com quem está cada card.** Todo card em que a IA atua tem um status (Pronto, Em execução,
   Aguardando resposta, Aguardando revisão, Aprovado, Bloqueado) que mostra se a pendência está com
@@ -136,16 +144,24 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 ## Como usar
 
 1. Abra uma pasta no editor e clique no ícone **Faz AI** na barra lateral. Cada pasta tem o seu board.
-2. Crie histórias com **+ Novo card** e arraste-as entre as colunas. Clicar numa história mostra só
-   as sub-tarefas dela; duplo clique abre o detalhe.
+2. Crie histórias com **+ Novo card** e arraste-as entre as colunas. Ao arrastar, os outros cards se
+   afastam com uma animação suave e um espaço tracejado mostra onde o card vai ficar; ao soltar, ele
+   assenta direto no lugar, sem piscar. Clicar numa história mostra só as sub-tarefas dela; duplo
+   clique abre o detalhe.
 3. No detalhe do card ficam o status, a descrição em Markdown, os campos, o checklist, as
    sub-tarefas, a conversa e os anexos. A conversa é o lugar em que você e a IA falam sobre o card.
    Os documentos das fases (PRD, Spec, Plan…) são construídos nas sub-tarefas, mas ficam anexados à
    história; nas sub-tarefas eles aparecem como links.
 4. Busque por texto ou pelo ID (`#12`). A seção **Filtros** da barra lateral filtra por tipo,
    campos, datas e relacionamentos.
-5. Cards podem ser arquivados (coluna "Arquivados" no fim de cada linha) ou enviados para a
-   **Lixeira**, de onde podem ser restaurados.
+5. Cards podem ser arquivados (menu de ações do card → **Arquivar**) ou enviados para a
+   **Lixeira**, de onde podem ser restaurados. Os arquivados saem das linhas do board e ficam na aba
+   **Arquivados** (entre Métricas e Lixeira), que preserva o histórico: uma linha por workflow, na
+   ordem do board, do mais recente ao mais antigo. **Restaurar** devolve o card ao fim da primeira
+   coluna do workflow dele (Backlog / A fazer no board padrão), inativo. Restaurar uma história traz
+   também todas as sub-tarefas arquivadas dela e desliga o modo autônomo; restaurar uma sub-tarefa
+   cuja história está arquivada pede confirmação e restaura a história inteira (uma sub-tarefa de
+   história ativa volta sozinha, sem confirmação).
 
 ![Card aberto: status, aprovação, campos, descrição e checklist](docs/images/card.png)
 
@@ -160,6 +176,8 @@ vêm o título (inteiro no tooltip, se não couber), o status com um ícone de c
 pendência (robô para a IA, pessoa para você) e há quanto tempo ele está assim, os campos, o modelo
 de IA (ex.: "Sonnet 5.5 - baixo") e, no rodapé, os contadores, a branch e o PR. Cards com
 pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do card de relance: verde piscando devagar enquanto a IA trabalha nele (na história, também quando ela trabalha numa sub-tarefa), amarelo quando ele espera por você, vermelho quando está bloqueado e apagado quando não há nada acontecendo. Na história, a lista de sub-tarefas mostra o mesmo LED em cada uma: verde piscando em execução, vermelho bloqueada, amarelo esperando a pessoa e apagado parada.
+
+**Cards colapsados.** Você pode colapsar cards para enxergar mais linhas de uma coluna na mesma tela. Um card colapsado mantém a faixa colorida do tipo (com o LED da IA, o número, o tipo e os botões) e mostra o título em até duas linhas, escondendo o resto; a borda de status continua (se o card espera por você), para você varrer o board de relance e saber o que precisa de atenção. O colapso pode ser aplicado em quatro escopos: um card isolado (botão no próprio card), todos os cards de uma coluna (item no menu de ações da coluna), todos os cards do board (botão na barra de filtros) ou só os cards selecionados (botão na barra de seleção múltipla). O estado fica lembrado entre sessões.
 
 ### Vínculos entre cards
 
@@ -220,8 +238,8 @@ o `faz-ai` do terminal avisa e não inicia.
 
 ## Usando com IA
 
-1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Codex,
-   Cursor, Kimi Code ou GitHub Copilot).
+1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code ou
+   Cursor).
 2. Na aba **Tudo que a ferramenta carrega**, escolha a ferramenta e, na seção **Servidores MCP**,
    clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
    global que a ferramenta lê.
@@ -234,13 +252,12 @@ com dois botões:
 
 | | Onde grava | Quando usar |
 |---|---|---|
-| **Instalar (padrão da ferramenta)** | configuração global: `~/.claude.json` (por `claude mcp add --scope user`), `~/.cursor/mcp.json`, `~/.codex/config.toml`, `~/.kimi-code/mcp.json`, `~/.copilot/mcp-config.json`; a skill em `~/.claude/skills`, `~/.cursor/skills` e equivalentes | o recomendado: o board funciona em qualquer repositório aberto com ele, sem nenhum arquivo no projeto |
-| **Instalar neste projeto** | `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.kimi-code/mcp.json` ou `.vscode/mcp.json`; a skill em `.claude/skills`, `.cursor/skills` e equivalentes | fixar uma versão num repositório ou num fork, ou uma skill ajustada para o time |
+| **Instalar (padrão da ferramenta)** | configuração global: `~/.claude.json` (por `claude mcp add --scope user`), `~/.cursor/mcp.json`; a skill em `~/.claude/skills`, `~/.cursor/skills` e equivalentes | o recomendado: o board funciona em qualquer repositório aberto com ele, sem nenhum arquivo no projeto |
+| **Instalar neste projeto** | `.mcp.json` ou `.cursor/mcp.json`; a skill em `.claude/skills`, `.cursor/skills` e equivalentes | fixar uma versão num repositório ou num fork, ou uma skill ajustada para o time |
 
 O registro global não fixa a pasta do projeto: o Claude Code informa a pasta pela variável
-`CLAUDE_PROJECT_DIR`, o `mcp.json` do VS Code recebe `${workspaceFolder}`, e nas outras a ponte do
-board acha o board subindo a partir da pasta em que a ferramenta foi aberta. No GitHub Copilot, o
-global vale para a Copilot CLI e, no VS Code, para o `mcp.json` do perfil do editor.
+`CLAUDE_PROJECT_DIR`, e a ponte do board acha o board subindo a partir da pasta em que a ferramenta
+foi aberta.
 
 **No Cursor não há o que instalar.** O global do Cursor é um processo só para todas as janelas e não
 sabe qual board atender, então o board grava sozinho o `.cursor/mcp.json` do projeto (fora do git,
@@ -258,8 +275,7 @@ MCP do board (global)** da paleta faz a instalação padrão na ferramenta do pr
 Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, uma faixa amarela fica no topo
 do board, em todas as telas, e no painel de chat. Ela confere o Node.js (o servidor do board roda
 com ele), a linha de comando da ferramenta, o login dela (no Cursor por `cursor-agent status`, no
-Claude Code por `claude auth status` e, de forma best-effort, no Codex; Kimi e Copilot não têm
-comando de status e dependem só do aviso reativo abaixo), o
+Claude Code por `claude auth status`), o
 registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
 para o seu usuário, de `claude mcp add -s user`), um registro apontando para um node ou um caminho
 que não existe mais, para outra pasta ou para a ponte de uma versão anterior, e o nível de
@@ -283,13 +299,12 @@ vencido no meio de uma execução), ela fica com destaque de erro, em vez do ama
 botão **Abrir no terminal** ao lado do comando para copiar: o board abre um terminal do editor e roda
 o comando ali, mas o login em si é sempre feito por você. Antes de cada chamada da IA (o botão do
 card, o heartbeat e o modo autônomo) o board confere o login de novo; se ele venceu, a execução nem
-começa. Quando a ferramenta não tem comando de status (Kimi, Copilot) ou o login vence no meio de uma
-execução, a primeira falha que bater um padrão conhecido ("OAuth session expired", "not logged in",
+começa. Quando o login vence no meio de uma execução, a primeira falha que bater um padrão conhecido ("OAuth session expired", "not logged in",
 "401" etc.) não bloqueia o card: ele volta ao status que tinha, com um comentário curto, e o mesmo
 aviso de erro liga no topo do board — o heartbeat e o modo autônomo não tentam de novo sozinhos
 enquanto ele estiver ligado. O aviso some e a fila volta a andar sozinha quando o login é confirmado
 de novo (pela conferência periódica, em até 10 segundos depois de ligar, ou por **Já entrei:
-verificar de novo**) ou, nas ferramentas sem comando de status, na primeira execução manual que der
+verificar de novo**) ou, quando a conferência não sabe dizer, na primeira execução manual que der
 certo. O Diagnóstico do ambiente mostra o mesmo aviso no item **Login na linha de comando**.
 
 **Diagnóstico do ambiente.** Na primeira abertura do board na máquina, abre sozinha uma lista, no
@@ -360,7 +375,9 @@ Harness de IA → "O que a IA pode fazer" (por padrão, só o board) e o tempo l
 
 O card tem dois botões que chamam a ferramenta do projeto em segundo plano. Não é um chat ao vivo:
 a resposta chega como mensagem na conversa quando a execução termina, e enquanto isso o card fica
-"Em execução" (com um botão **Parar**).
+"Em execução" (com um botão **Parar**). Os botões mostram um hint explicativo (com negrito e tópicos)
+ao passar o mouse ou focar com o teclado; o hint abre por hover e por foco de teclado, fecha com Esc,
+e continua visível mesmo quando o botão está bloqueado.
 
 - **Trabalhar na fase** faz o trabalho da coluna em que o card está, o mesmo que o heartbeat faria:
   em Discovery analisa o problema, em PRD escreve o PRD, em Implementação escreve o código (se a
@@ -372,24 +389,31 @@ a resposta chega como mensagem na conversa quando a execução termina, e enquan
   título e descrição (sem inventar requisito; o que estiver ambíguo vira uma lista "Dúvidas em
   aberto"), revisa Tags, Esforço da atividade, Modelo e Skills mesmo que já tenham valor e
   acrescenta ao checklist os passos que faltam. Não trabalha a fase, não cria sub-tarefas, não move
-  o card e não mexe em arquivos: roda só com o board (no Kimi, que não tem esse nível, o pedido
-  proíbe mexer em arquivos). No fim, resume na conversa o que mudou (com o texto anterior da
+  o card e não mexe em arquivos: roda só com o board. No fim, resume na conversa o que mudou (com o texto anterior da
   descrição, se a reescreveu) e o card volta ao status que tinha, também quando a execução falha:
   a falha fica na conversa, sem bloquear o card. Um refino não conta como execução sem progresso
   para o modo autônomo.
 
 Imagens coladas na mensagem viram anexos do card e a IA as recebe.
 
+- **Resumir a conversa**, na aba Conversa, aparece a partir de 2 mensagens: lê a conversa inteira e
+  grava um resumo (Decisões, Observações, Pendências) como uma mensagem nova da IA (`kind:
+  "summary"`), sem apagar nada automaticamente, sem trabalhar a fase, mover o card ou mudar o
+  status — roda só com o board, sempre na faixa de modelo "Alto" (independente do Esforço do card).
+  Você revisa o resumo como revisa qualquer mensagem: concorda deixando como está ou edita o texto.
+  Logo abaixo dele, uma recomendação com o botão **Apagar mensagens resumidas** apaga, com
+  confirmação, todas as mensagens anteriores ao resumo; resumir de novo cria um registro novo, sem
+  substituir o anterior. Está disponível também como ferramenta MCP (`generate_summary`), com o
+  mesmo resultado.
 - O que a IA pode fazer nessas execuções se define em Configurações → Harness de IA → **Execução
   pela conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em
   uso aparece ao lado do botão, com um atalho para mudar. A IA é avisada do limite: se o trabalho
   pedir mais do que o nível permite, ela bloqueia o card dizendo qual opção escolher.
-- O Kimi Code, quando roda em segundo plano, só funciona no nível "sem restrições". O Cursor aceita
-  os três: em "só o board" e "board e arquivos" a sessão dele recebe só as ferramentas do nível
+- O Cursor aceita os três níveis: em "só o board" e "board e arquivos" a sessão dele recebe só as ferramentas do nível
   (leitura e MCP; leitura, MCP e edição), sem terminal.
 - A ferramenta precisa estar instalada e autenticada. A CLI não precisa estar no PATH: o board a
   procura também nas pastas de instalação usuais e dentro das extensões do editor (quem só usa a
-  extensão do Claude Code ou do Codex já tem o executável). A do Cursor é a `cursor-agent` (o
+  extensão do Claude Code já tem o executável). A do Cursor é a `cursor-agent` (o
   instalador de `curl https://cursor.com/install -fsS | bash` cria também o atalho `agent`); entre na
   conta uma vez com `cursor-agent login`.
 - Com o Claude Code, o servidor do board vai na linha de comando de cada execução: não depende de
@@ -413,20 +437,28 @@ cache, o custo em dólar, o número de turnos e o id da sessão da ferramenta. R
 **inventário** do que a IA usou: ferramentas nativas, ferramentas de MCP (com o servidor de cada
 uma), subagentes e skills, com a contagem de chamadas.
 
-- **O custo vem de duas fontes.** Quando a ferramenta informa o custo, o board grava esse valor.
-  Quando não informa, ele estima: multiplica os tokens pelo **preço por milhão de tokens** do modelo,
-  que você preenche em Configurações → **Modelos de IA** (os quatro preços: entrada, saída, leitura e
-  criação de cache) ou pelo MCP com `upsert_model`. O custo estimado vem sempre marcado como
-  "(estimado)". Modelo sem os quatro preços não tem custo calculado: o valor fica em branco, nunca 0.
+- **O custo é o que a ferramenta informa; o board não calcula nada.** Não existe tabela de preços: um
+  valor calculado a partir de uma lista de preços envelhece quando o fornecedor muda a tarifa e
+  produz relatório errado com cara de certo. Hoje:
+
+  | Ferramenta | Tokens | Custo em dólar |
+  | --- | --- | --- |
+  | Claude Code | medidos (entrada, saída, leitura e criação de cache, por modelo, subagente incluído) | o `total_cost_usd` que a própria CLI informa |
+  | Cursor | medidos (os quatro contadores) | a CLI não informa: fica em branco |
+
+  Onde aparecer "não medido" ou um custo em branco é isso, falta de medição, e nunca consumo zero.
+  Uma execução com tokens e sem custo (o caso do Cursor) conta nos tokens e fica de fora do custo;
+  o aviso das Métricas diz quantas execuções ficaram de fora.
+- **Toda execução passa por uma única porta.** O executor de cards (manual, heartbeat e modo
+  autônomo) e o chat do board chamam a IA pelo mesmo ponto do código (`AiGateway`), que abre a linha
+  no log antes de rodar, fecha com o desfecho e grava o consumo. Cada ferramenta tem um provider
+  próprio, que monta o comando e lê a saída. Uma terceira forma de chamar a IA não existe sem passar
+  por ali, e um teste falha se algum arquivo tentar. O que fica de fora do registro, por natureza, é
+  o que você roda direto no terminal ou no chat da própria ferramenta, sem o board.
 - **No canal de log** (**Saída → Faz AI**), a saída da ferramenta aparece em linhas legíveis, e no fim
   de cada execução vem uma linha de resumo com entrada, saída, leitura e criação de cache, turnos e
   custo, por exemplo `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação
-  de cache · 8 turnos · US$ 0,4210 (estimado)`. Turnos e custo ficam de fora quando a ferramenta não
-  os informa.
-- **O Copilot fica sem consumo medido.** Ele não tem saída estruturada, então as execuções dele são
-  registradas, mas sem tokens, custo nem inventário. Onde aparecer "não medido", é isso: falta de
-  medição, não consumo zero. O mesmo vale para execuções que terminam antes de a ferramenta informar
-  o consumo.
+  de cache · 8 turnos · US$ 0,4210`. Turnos e custo ficam de fora quando a ferramenta não os informa.
 - **Perguntas no chat do board** também entram no registro, sem card associado.
 - **O detalhe de cada execução é guardado por uma janela que você configura**, de 1 a 24 meses (o
   mês corrente mais os anteriores). O padrão é 6 meses. Depois da janela o detalhe é descartado, mas
@@ -472,8 +504,10 @@ pelo navegador.
 - **O que a IA usou.** Ferramentas, ferramentas de MCP (com o servidor em coluna própria), subagentes
   e skills, com o número de execuções e de usos. "Ainda não medido" (nenhuma execução gravou
   inventário) é diferente de "nenhum registro no período".
-- **Tokens e custo.** Tokens contam mesmo quando o modelo não tem preço configurado; o custo soma só
-  as execuções que têm preço, e o aviso diz quantas ficaram de fora. Antes de o board medir consumo,
+- **Tokens e custo.** O custo soma só as execuções em que a ferramenta informou o custo (o Claude Code),
+  e o aviso diz quantas ficaram de fora; os tokens contam em todas as execuções medidas. Execuções
+  antigas, de antes de o board deixar de calcular custo por tabela de preços, continuam marcadas como
+  "estimado por tabela de preços". Antes de o board medir consumo,
   custo e inventário aparecem como "não medido" e quase todo lead time como desconhecido: é o
   comportamento esperado, não falha.
 - **Detalhe guardado.** Mostra a janela de retenção do detalhe das execuções e quanto espaço ela
@@ -499,7 +533,7 @@ economizar tokens.
   (`tool`), modelo (`model`), esforço (`effort`), perfil (`profile`), card (`card`), agente (`agent`),
   skill (`skill`), ferramenta usada (`used_tool`) ou ferramenta de MCP (`mcp_tool`). Omita para obter
   apenas o total do período.
-- `tool` e `used_tool` não são a mesma coisa: `tool` é a ferramenta de IA que rodou (claude, codex);
+- `tool` e `used_tool` não são a mesma coisa: `tool` é a ferramenta de IA que rodou (claude, cursor);
   `used_tool` e `mcp_tool` são o que a execução usou (Read, Bash, `get_card`). Em `mcp_tool` o
   servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe.
 - Filtros de período (data inicial e final, em `AAAA-MM-DD`), card (ex. `72` ou `#72`), e dimensões
@@ -507,10 +541,9 @@ economizar tokens.
 - Nas dimensões **agent**, **skill**, **used_tool** e **mcp_tool** a tabela mostra só a contagem de
   execuções e de usos (sem tokens nem custo, que não é possível repartir entre componentes de uma
   execução). `effort` e `profile` têm tokens e custo.
-- Tokens contam mesmo sem preço configurado para o modelo; o custo vem só das execuções que têm preço.
+- Tokens contam em toda execução medida; o custo vem só das execuções em que a ferramenta o informou (o Claude Code).
 - Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`.
-- Valores não medidos aparecem como "-" (nunca 0), por exemplo as execuções do Copilot. Custo
-  estimado a partir do preço do modelo vem marcado como estimado.
+- Valores não medidos aparecem como "-" (nunca 0), por exemplo o custo do Cursor.
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm detalhe e só agregam os
   totais já consolidados.
@@ -525,18 +558,22 @@ commits na branch da história.
 - A branch é criada quando a IA começa a implementação (ela chama `prepare_workspace`) ou pelo
   botão **Criar branch da história** no card.
 - O card mostra a branch e abre a pasta de trabalho numa janela nova.
-- Em Configurações → **Git** ficam o modo (worktree, branch na própria pasta ou desligado), o
-  padrão do nome da branch, a pasta das worktrees, o merge automático do PR ao aprovar a homologação
-  e a detecção automática de merges, com o arquivamento das histórias já publicadas (ligada por
-  padrão).
+- O modo (worktree, branch na própria pasta ou desligado), o padrão do nome da branch, a pasta das
+  worktrees, **tocar histórias em paralelo**, o merge automático do PR ao aprovar a homologação e a
+  detecção automática de merges, com o arquivamento das histórias já publicadas (ligada por padrão),
+  ficam no Settings do editor, em **Faz AI › Git** (ver [Configurações no Settings do
+  editor](#configurações-no-settings-do-editor)); no navegador seguem na aba Git e no bloco de
+  paralelo do Harness, como antes.
 - Cada worktree é uma cópia de trabalho: as dependências precisam ser instaladas nela.
 
 ### Pull request e merge na Homologação
 
-Na Homologação a IA envia a branch, abre o pull request da história, registra o endereço no card e
-pede a sua revisão. O card mostra o link do PR.
+Na Homologação a IA escreve o roteiro **"Como testar"** (o que foi construído, os passos para
+verificar com o resultado esperado e o que ficou de fora) na descrição da história, envia a branch,
+abre o pull request com o mesmo roteiro no corpo, registra o endereço no card e pede a sua revisão.
+O card mostra o link do PR.
 
-O merge automático é opcional e começa desligado (Configurações → Git). Com ele ligado, quando você
+O merge automático é opcional e começa desligado (Settings do editor, Faz AI › Git). Com ele ligado, quando você
 aprova uma história que está na última coluna antes da conclusão:
 
 1. o board faz o merge do PR pelo GitHub CLI (`gh`), no tipo configurado (squash, merge ou rebase);
@@ -550,8 +587,8 @@ o merge automático desligado, aprovar só marca o card, e a IA o move para Conc
 ### Detecção automática de merges
 
 O board pode observar o pull request de uma história entregue e detectar quando ele é mergeado,
-concluindo a história automaticamente. A opção nasce ligada (Configurações → Git, **Concluir a
-história quando o pull request for mergeado**). Uma rotina periódica verifica o estado do PR a cada
+concluindo a história automaticamente. A opção nasce ligada (Settings do editor, Faz AI › Git,
+**Concluir a história quando o pull request for mergeado**). Uma rotina periódica verifica o estado do PR a cada
 intervalo configurável (**Verificar a cada (minutos)**, padrão 15, faixa de 5 a 1440). Quando o
 merge é detectado:
 
@@ -567,8 +604,8 @@ na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado)
 Na mesma rodada, depois de olhar os pull requests, o board dá o último passo do ciclo: **quando a
 versão que contém uma história concluída é publicada, ele registra na conversa qual versão a levou
 (tag e link da release) e arquiva o card**. Assim a coluna Concluído fica só com o que está mergeado
-e ainda não chegou a quem usa; o que já foi entregue vai para os arquivados do workflow, de onde você
-pode desarquivar a qualquer momento. Não há o que ligar: o passo vem junto com a detecção de merges,
+e ainda não chegou a quem usa; o que já foi entregue vai para a aba Arquivados, de onde você pode
+restaurar a história (com as sub-tarefas arquivadas dela) a qualquer momento. Não há o que ligar: o passo vem junto com a detecção de merges,
 no mesmo intervalo e no mesmo liga/desliga, e nasce ligado com ela.
 
 Uma história conta como publicada quando existe uma tag que **contém** o commit do merge **e** que
@@ -586,26 +623,43 @@ não têm o commit do merge guardado, continuam sendo arquivadas por você, com 
 
 Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
 intervalo, enquanto o editor estiver aberto na pasta do projeto. Em cada rodada ela avança os cards
-aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez. No modo
-"Worktree por história", **Tocar histórias em paralelo** (na mesma tela; nasce desligado) faz o heartbeat
-tocar várias histórias ao mesmo tempo, cada uma na sua pasta de trabalho: duas por padrão, até seis em
-**Histórias ao mesmo tempo**; o limite conta toda execução em
-andamento, inclusive as chamadas à mão. Fora desse modo, e no modo autônomo (cujas histórias são
-empilhadas), continua uma por vez, e o campo fica desligado. A tela de Git explica o motivo em cada
-modo: com branch na própria pasta, duas histórias ao mesmo tempo trocariam a branch uma debaixo da
-outra e misturariam alterações; com worktree elas ficam isoladas, ao custo de mais uma cópia dos
-arquivos em disco por história (com as dependências instaladas em cada uma) e de mais memória e
-processador enquanto várias sessões de IA, testes e builds rodam juntos.
+aprovados, responde às mensagens pendentes e trabalha nos cards prontos, com uma execução por história.
+As atividades **sem branch** (refinar, resumir e as fases que só produzem documento, como Discovery,
+PRD, Spec e Plan no board padrão; vale a coluna que tem artefato antes da fase de código) rodam ao
+mesmo tempo em qualquer modo de workspace, até **Histórias ao mesmo tempo** (duas por padrão, até
+seis), mesmo com **Tocar histórias em paralelo** desligado. As atividades **com branch**
+(Implementação e Homologação) seguem o limite de antes: uma por vez fora do worktree. No modo
+"Worktree por história", **Tocar histórias em paralelo** (Settings do editor, Faz AI › Git; nasce desligado) faz o heartbeat
+tocar várias histórias com branch ao mesmo tempo, cada uma na sua pasta de trabalho, até o mesmo
+**Histórias ao mesmo tempo**. Os dois tetos (texto e branch) contam separados; cada um conta toda
+execução em andamento, inclusive as chamadas à mão. No modo autônomo (cujas histórias são
+empilhadas), a ordem da fila vale para as histórias que precisam de branch; uma história em fase de
+texto começa assim que há vaga, mesmo com a anterior ainda aberta. Fora do worktree, o
+`prepare_workspace` chamado numa fase de texto enquanto outra história tem execução em andamento é
+recusado (pasta em uso): a branch nasce na fase de código. Em permissão "Sem restrições" a IA ainda
+pode trocar de branch à mão; a guarda cobre só o caminho do board. A descrição de cada chave de Git no
+Settings explica o motivo em cada modo: com branch na própria pasta, duas histórias ao mesmo tempo
+trocariam a branch uma debaixo da outra e misturariam alterações; com worktree elas ficam isoladas,
+ao custo de mais uma cópia dos arquivos em disco por história (com as dependências instaladas em
+cada uma) e de mais memória e processador enquanto várias sessões de IA, testes e builds rodam
+juntos. No editor a aba Git e o bloco de paralelo do Harness de IA viram um link para o Settings; no
+navegador seguem como campos editáveis, como antes.
 
 - Sem pendência com a IA, nada é executado.
-- A fila da rodada segue a ordem do board: os bugs primeiro e, depois, de cima para baixo — o que
+- A fila da rodada segue a ordem do board: os bugs primeiro; depois a história mais à direita (a
+  mais adiantada termina antes de uma nova começar); na mesma coluna, de cima para baixo — o que
   decide é a posição do card, não o número dele nem o que já foi aprovado.
 - Cards que estão com você (aguardando revisão ou resposta, bloqueados) não são tocados, a menos
   que você tenha deixado uma mensagem sem resposta na conversa.
 - **Rodar o heartbeat agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat agora**) começa
   uma rodada na hora, mesmo com o heartbeat desligado. **Faz AI: Parar as execuções da IA e o modo autônomo**
   interrompe tudo.
-- A barra de status mostra os cards em execução e a hora da próxima rodada.
+- A barra de atividade no pé do board (visível em qualquer vista) mostra o que a IA está fazendo
+  agora: com uma execução, "IA em #12 (Discovery, há 3 min)", com a referência do card clicável
+  para abri-lo; com várias, "IA em N cards: #12 Discovery · #15 refinando · …" e a lista completa
+  no tooltip. Sem nenhuma execução, mostra o motivo: a nota do autopiloto (por que a fila parou), o
+  estado do heartbeat ("Heartbeat desligado", "Heartbeat parado: motivo", "Próxima rodada às
+  HH:MM") ou, por fim, "IA parada".
 - O **coração** no topo direito do board mostra o heartbeat: vermelho e batendo quando ele está
   rodando; cinza e parado quando está desligado ou não consegue rodar (sem ligação com o Faz AI ou
   sem a ferramenta). Clicar nele liga e desliga o heartbeat.
@@ -633,19 +687,21 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
 - **Sem restrições**: nas execuções do modo, a IA roda com a permissão "Sem restrições" (altera
   arquivos e roda comandos), porque precisa de git e do `gh`. Ligar o modo é aceitar isso para a história.
 - **Em fila e em pilha**: o **autopiloto** toca as histórias em modo autônomo uma de cada vez, na
-  ordem do board — bugs na frente, depois de cima para baixo —, e segue para a próxima história da
+  ordem do board — bugs na frente, depois a mais à direita, e na mesma coluna de cima para baixo —, e segue para a próxima história da
   fila assim que a atual é entregue (parada na última coluna da IA, com o pull request registrado),
-  sem esperar a sua revisão nem o intervalo do heartbeat. A fila pula a história bloqueada ou que
-  está esperando uma pessoa (resposta ou revisão) e segue para a próxima; só espera quando todas as
-  pendentes estão com a pessoa, e a nota do botão traz o motivo de cada uma. A branch de cada
-  história parte da branch criada mais recentemente entre as outras histórias do modo autônomo
-  ainda abertas — pulando a que estiver bloqueada sem pull request aberto —, na mesma ordem em
+  sem esperar a sua revisão nem o intervalo do heartbeat. Nenhum impedimento segura a fila: uma
+  história bloqueada, esperando a sua resposta, esperando outro card terminar (dependência) ou
+  travada num ciclo (aberta, mas sem nada pendente com a IA) é pulada, e a vez passa para a próxima
+  história da fila que puder avançar — rodar, ou mudar de coluna quando a IA não atua nela. Uma
+  história que depende de outra continua esperando essa outra terminar, mesmo com histórias mais
+  abaixo na fila passando na frente dela; ela volta a disputar a vez quando a dependência sai de
+  aberto. Só quando nenhuma história da fila pode avançar o autopiloto mostra o aviso de
+  impedimento, com a razão da primeira história parada. A branch de cada história parte da branch
+  criada mais recentemente entre as outras histórias do modo autônomo ainda abertas — a mesma ordem em
   que a fila roda, mesmo depois de arrastar cards —, e o pull request é aberto com `--base` nela,
   formando uma pilha de PRs; sem nenhuma outra história aberta antes dela, a branch parte da principal.
   Uma história cuja anterior na pilha já teve o pull request mesclado também parte da principal, já que
-  o código dela já está lá. A conversa da história registra a base escolhida e quem foi pulada; se a
-  pulada for entregue depois, o pull request seguinte pode precisar de rebase pela sua mão — a
-  pilha vira árvore nesse ponto.
+  o código dela já está lá.
 - **Dividir um pedido grande**: a IA pode criar as histórias seguintes a partir de uma história em
   modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo, entram na fila
   e ganham um vínculo **relativo** com a história de origem (pulado em silêncio se já existir
@@ -662,62 +718,92 @@ o clique faz: **Pausar modo autônomo** (aceso, com o autopiloto tocando; pausar
 **Retomar modo autônomo** (apagado, pausado). Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
 (YOLO)** e **Faz AI: Parar as execuções da IA e o modo autônomo**. Ao abrir o editor, o autopiloto
 liga sozinho quando há história pendente em modo autônomo, a não ser que você tenha pausado: a
-pausa fica gravada no board (sobrevive a reabrir o editor), e "Retomar" a limpa; fechar o editor não
-conta como pausa, mas "Faz AI: Parar as execuções da IA e o modo autônomo" conta. Depois de uma
-falha ao iniciar a ferramenta de IA, o autopiloto não religa sozinho até você retomar. O heartbeat
-não toca histórias em modo autônomo; elas são do autopiloto.
+pausa fica gravada no board (sobrevive a reabrir o editor), e "Retomar", ou ligar o modo numa
+história, a limpa; fechar o editor não conta como pausa. Depois de uma falha ao iniciar a ferramenta
+de IA, o autopiloto não religa sozinho até você retomar. Com o login da ferramenta vencido, o
+autopiloto e o heartbeat esperam o login voltar, sem gastar execuções. O heartbeat não toca
+histórias em modo autônomo; elas são do autopiloto.
 
 
 ### Agentes
 
 ![Agente com intenção, skills escolhidas e ferramentas só de leitura](docs/images/agents.png)
 
-Um agente (Configurações → **Agentes**) diz como a IA trabalha num card: que skills ela lê, a que
-servidores MCP e ferramentas (disponíveis e negadas) tem acesso, que modelo e esforço usa e se a
-sessão é limpa (sem as personalizações da sua pasta de usuário e sem invocação automática de
-skills). Toda execução pelo board roda através de um agente: o escolhido no card; senão, o da fase
-(Workflows e colunas → Fase); senão, o padrão do board. O board sempre tem ao menos um, o **Agente
-padrão**, que não restringe nada.
+Um agente é um **arquivo de agente da ferramenta de IA** (`~/.claude/agents/<nome>.md`,
+`~/.cursor/agents/<nome>.md`): as instruções são o papel da
+sessão, e o frontmatter diz o modelo e o esforço, as ferramentas (disponíveis e negadas), as skills e
+os servidores MCP que ela recebe. Para o board, agente e perfil de execução são a mesma coisa. Os
+arquivos são lidos do disco; o board só guarda, por projeto, quais estão **disponíveis** e qual é o
+**padrão** (Harness de IA → Ferramenta e execução). Toda execução pelo board roda através de um
+agente: o escolhido no card; senão, o da fase (Workflows e colunas → Fase); senão, o padrão. Sem
+nenhum marcado, vale o agente embutido, sem instruções.
 
-Para configurar sem ter de conhecer cada skill ou ferramenta:
+Os agentes que o board cria vão para a pasta global da ferramenta (valem em qualquer projeto), e os
+que já existem no projeto aparecem na aba **Projeto**. Na primeira abertura do board, dez agentes de
+fábrica são criados no global, marcados como disponíveis, com o **condutor-do-board** como padrão:
+ele conduz os cards pelo fluxo, indica o especialista certo em cada sub-tarefa e, na Implementação,
+delega cada uma a esse especialista como subagente (a sessão da história recebe os outros agentes
+disponíveis do board como subagentes). Os outros
+(frontend-web, backend-node, backend-python, mobile-flutter, documentacao-tecnica, qa-testes,
+revisor-de-codigo, devops-infra, dados-sql) têm instruções mínimas, para você ou a IA adaptar ao
+projeto. O que você apagar não volta sozinho; **Recriar os agentes padrão** recria o que faltar.
 
-- **O que este agente faz**: uma frase de intenção. Com ela, o botão **Sugerir pela intenção** marca
-  as skills (e os servidores MCP) cujo nome ou descrição combinam. A sugestão é por palavras, local
-  e sem chamar IA; você confirma o que fica.
-- **Skills**: a mesma janela de escolha do card, com busca, abas por origem e caixa de seleção.
-- **Ferramentas**: conjuntos prontos (**Só leitura**, **Editar código**) e a lista editável.
-- **Subagente da ferramenta**: opcional, um arquivo de agente da própria ferramenta (por exemplo,
-  `.claude/agents/revisor.md`) para conduzir a sessão.
+Na aba Agentes de cada escopo:
 
-Cada execução pelo board ("Trabalhar na fase", "Refinar com IA" e heartbeat) é uma sessão nova, só com o que está no card. O
-agente vira parâmetros da linha de comando onde a ferramenta aceita; o resto segue no prompt, como
-instrução:
+- **Disponível no board**: os cards e as fases podem escolher o agente. **Tornar padrão** o faz
+  executar quando nenhum deles escolhe.
+- **Novo agente**: nome, descrição (é por ela que o Refinar com IA escolhe), modelo e instruções.
+- **Editar**: cada campo do frontmatter grava ao sair; as instruções têm Salvar. As skills vêm da
+  mesma janela do card (só as marcadas); as ferramentas têm conjuntos prontos (**Só leitura**,
+  **Editar código**).
+- **Sugerir agentes com IA**: a IA lê o projeto (estrutura, dependências, README) e cria ou ajusta
+  de 3 a 8 agentes para ele, pelo MCP, deixando-os disponíveis. O resultado fica no chat do board.
+
+Cada execução pelo board ("Trabalhar na fase", "Refinar com IA" e heartbeat) é uma sessão nova, de
+contexto vazio, só com o que está no card. O agente vira parâmetros da linha de comando onde a
+ferramenta aceita; o resto segue no prompt, como instrução:
 
 | Ferramenta | Imposto por parâmetro | Só orientado |
 | --- | --- | --- |
-| Claude Code | subagente, servidores MCP, ferramentas, modelo e esforço, sessão limpa | skills |
-| GitHub Copilot | subagente, servidores MCP, ferramentas, modelo e esforço | skills, sessão limpa |
-| Kimi Code | subagente, modelo | skills, servidores MCP, ferramentas, sessão limpa |
-| Codex | servidores MCP, modelo e esforço | subagente, skills, ferramentas, sessão limpa |
+| Claude Code | agente (inline, em `--agents`), servidores MCP, ferramentas, modelo e esforço, contexto vazio | skills e rules |
 | Cursor | modelo | todo o resto |
 
-As skills vão sempre pelo caminho do arquivo. Numa conversa aberta por você, o agente chega à IA
-pelo `get_card`, como orientação.
+As skills e as rules vão sempre pelo caminho do arquivo. Numa conversa aberta por você, o agente
+chega à IA pelo `get_card` (`execution`), como orientação. Pelo MCP, `get_board` lista os agentes
+disponíveis, `set_card_profile` escolhe o de um card e `create_agent`, `update_agent`, `get_agent` e
+`delete_agent` gerenciam os arquivos.
 
 ## Harness de IA
 
 ![Skills do projeto e globais, com a instalação da skill do fluxo no global ou no projeto](docs/images/harness.png)
 
-Em Configurações → **Harness de IA** fica tudo que as ferramentas de IA carregam, em três abas:
-**Ferramenta e execução** (a IA do projeto e como o board a chama), **Do projeto** (o arquivo de
-regras, as skills e os agentes que fazem parte do repositório, editáveis ali) e **Tudo que a
-ferramenta carrega**. Nesta última, em **Tudo que cada ferramenta carrega**, há uma aba por ferramenta com oito seções (instruções e regras, skills,
-subagentes, comandos e prompts, hooks, servidores MCP, plugins, configurações e permissões), cada uma
-dividida em três escopos:
+Toda execução pelo board parte de **contexto vazio**: nenhuma regra, skill ou agente da sua máquina
+ou do projeto entra por conta própria. Em Configurações → **Harness de IA** você marca o que entra,
+em quatro abas: **Ferramenta e execução** (a IA do projeto, a permissão, o agente padrão e o
+heartbeat), **Projeto** e **Global** (os arquivos de cada pasta, em três sub-abas: **Rules**,
+**Agentes** e **Skills**, com a marcação em cada linha) e **Tudo que a ferramenta carrega**. Projeto
+e Global são só a pasta de onde o arquivo vem; o que vale é a marcação, que é deste board.
+
+Em Rules e Skills, cada linha tem duas caixas que se excluem:
+
+- **Incluir em todo contexto**: o arquivo entra em toda execução (trabalhar a fase, refinar, chat do
+  board), pelo caminho. É o lugar da skill do fluxo e das regras que valem sempre.
+- **Usar quando fizer sentido**: vira opção dos campos **Rules** e **Skills** dos cards (e das skills
+  dos agentes), e o **Refinar com IA** a indica quando o pedido pede. Sem marcação, a execução não a
+  vê, mesmo que a ferramenta a carregue numa conversa sua.
+
+Uma marcação cujo arquivo sumiu aparece como **não encontrada**, para desmarcar ou recriar. Skills e
+agentes criados ou instalados pelo board já nascem marcados. O que ainda entra apesar do contexto
+vazio depende da ferramenta: no Claude Code 2.1 nada da sua pasta nem do projeto (verificado na
+CLI); no Cursor, tudo o que a ferramenta carregar, e o board só orienta.
+
+Na aba **Tudo que a ferramenta carrega**, em **Tudo que cada ferramenta carrega**, há uma aba por
+ferramenta com oito seções (instruções e regras, skills, subagentes, comandos e prompts, hooks,
+servidores MCP, plugins, configurações e permissões), cada uma dividida em três escopos:
 
 - **Projeto**: arquivos desta pasta; valem só aqui e vão no repositório. Esse grupo aparece sempre,
   em destaque, e diz quando o projeto não tem nada daquele tipo.
-- **Global**: arquivos da sua pasta de usuário (`~/.claude`, `~/.codex`, `~/.copilot`…); valem em
+- **Global**: arquivos da sua pasta de usuário (`~/.claude`, `~/.cursor`…); valem em
   todos os seus projetos. Toda alteração neles pede confirmação.
 - **Plugins**: vêm de pacotes instalados; não são alterados pelo board, mas podem ser copiados.
 
@@ -743,13 +829,15 @@ Cada skill tem um modo:
 - **Automática**: a IA vê a descrição em toda sessão e decide quando usar.
 - **Só quando indicada**: a IA não a invoca sozinha; vale quando um card a indica ou quando é
   chamada pelo nome.
-- **Desligada** (só no projeto): a ferramenta não a enxerga, mas um card ainda pode indicá-la.
+- **Desligada** (só no projeto): a ferramenta não a enxerga, e ela sai das opções do board.
 
-O campo "Skills" do card mostra um resumo do que está marcado e abre uma janela para escolher: busca
-por nome ou descrição, abas **Todas / Marcadas / Projeto / Globais / Plugins** e uma caixa de seleção
-por skill, com a origem à vista. Funciona com centenas de skills. O card entrega à IA o caminho do arquivo de cada skill, então ela não
-precisa estar à vista da ferramenta para ser usada. Assim dá para ter muitas skills disponíveis sem
-ocupar o contexto de toda sessão. A economia de contexto é documentada no Claude Code e no Cursor;
+O modo diz como a ferramenta trata a skill numa conversa sua; nas execuções do board o que vale é a
+marcação. O campo "Skills" do card mostra um resumo do que está marcado e abre uma janela para
+escolher entre as skills marcadas como **Usar quando fizer sentido**: busca por nome ou descrição,
+abas **Todas / Marcadas / Projeto / Globais / Plugins** e uma caixa de seleção por skill, com a
+origem à vista. O campo "Rules" faz o mesmo com os arquivos de instruções marcados. O card entrega à
+IA o caminho de cada arquivo, então ele não precisa estar à vista da ferramenta para ser usado. Assim
+dá para ter muitas skills disponíveis sem ocupar o contexto de toda sessão. A economia de contexto é documentada no Claude Code e no Cursor;
 nas outras ferramentas, a documentação diz só que a IA deixa de invocar a skill sozinha.
 
 Para não marcar skills card a card, escolha-as no tipo: em Configurações → **Tipos de card** →
@@ -768,7 +856,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 
 ## Configurações
 
-![Configurações: catálogo de modelos com preço por modelo e regras de sugestão](docs/images/settings.png)
+![Configurações: catálogo de modelos e regras de sugestão](docs/images/settings.png)
 
 | Seção | O que ajusta |
 | --- | --- |
@@ -776,21 +864,47 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos | Campos personalizados (texto, seleção, data, modelo…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
-| Agentes | Como a IA trabalha em cada card: skills, servidores MCP, ferramentas e modelo; sempre há um padrão; por fase, com troca por card e sugestão pela intenção |
-| Harness de IA | Ferramenta do projeto, arquivo de regras, skills e agentes; execução pela conversa e heartbeat; tudo que cada ferramenta carrega, por escopo (ver [Harness de IA](#harness-de-ia)) |
-| Modelos de IA | Modelos e níveis de esforço da ferramenta; o preço por milhão de tokens de cada modelo (entrada, saída, leitura e criação de cache), usado para estimar o custo; regras que sugerem o modelo de cada card |
-| Git | Branch e pasta de trabalho (worktree) de cada história: modo, nome da branch, pasta; merge automático do PR ao aprovar a homologação |
-| Aparência | **Idioma** (automático, Português (Brasil) ou English), tema (sistema, claro, escuro), fonte e tamanho dos textos longos; nome e cor dos status |
-| Backup | Exportar o board num arquivo e importar um arquivo no lugar do board atual (ver [Backup do board](#backup-do-board)) |
+| Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; rules, agentes e skills do projeto e do global, com a marcação do que as execuções usam; tudo que cada ferramenta carrega, por escopo (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
+| Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
+| Git | Fica só na aba Git do modo navegador; no editor, aponta para o Settings (Faz AI › Git) |
+| Aparência | **Idioma** (automático, Português (Brasil) ou English; fica no Settings do editor junto com tema, fonte e tamanho); status (nome e cor, na aba Fluxos; aqui só no modo navegador) |
+| Backup | No editor, exportar e importar pela paleta de comandos (`fazai.exportBoard`, `fazai.importBoard`); no modo navegador, pela aba Configurações (ver [Backup do board](#backup-do-board)) |
 
-Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Kimi Code, da configuração
-local; no Cursor, dos modelos da sua conta, pelo comando `cursor-agent models`, lido ao abrir o board
-com a CLI autenticada, e a primeira lista lida substitui a embutida uma vez só; nas outras, uma lista embutida que pode ser editada); os preços que você
-preencheu continuam lá depois de detectar de novo. No Cursor, a lista traz uma linha por nível de cada modelo
+### Configurações no Settings do editor
+
+Em `Ctrl+,` (Settings do VS Code ou do Cursor), buscar **Faz AI** mostra a categoria do Faz AI, com
+quatro seções, nesta ordem:
+
+| Seção | O que tem hoje |
+| --- | --- |
+| Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
+| Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
+| Git | As nove chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.watchMerges` e `fazai.git.watchMergeMinutes` (acompanhar merges fora do board, de 5 a 1440 minutos). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
+| Backup | Dois links de ação: **Exportar o board agora** e **Importar um board**, que disparam os comandos da paleta |
+
+Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,
+**Faz AI: Abrir as configurações do Faz AI no Settings** (o Settings já filtrado no Faz AI) e
+**Faz AI: Abrir as configurações do board** (a tela de Configurações do board). Em Configurações do
+board, o botão **Abrir no Settings do editor** faz o caminho de volta; no modo navegador
+(`faz-ai` no terminal) ele não aparece, porque não há editor.
+
+Quem manda: dentro do editor, o Settings é a fonte e o banco do board (SQLite) é a cópia, mantida
+igual a cada mudança, para o modo navegador e o servidor MCP continuarem enxergando o mesmo valor;
+fora do editor, o SQLite é a única fonte, e uma gravação feita por ali (pelo MCP ou pelo navegador)
+é levada ao Settings do Usuário quando o editor está aberto. Nas quatro chaves de Aparência
+(idioma, tema, fonte, tamanho): na primeira abertura de um board, se o Settings do editor ainda não
+tem valor explícito e o board tem um valor não-padrão, ele é copiado para o Settings (e passa a valer
+em todos os projetos); se o Settings já tem um valor explícito, ele vence e o board adota aquele
+valor. Com múltiplos boards diferentes abertos pela primeira vez após uma atualização, o valor do
+primeiro board a abrir é o que passa para o Settings, e os demais boards subsequentes herdam esse
+valor — até a pessoa alterar o Settings, momento em que todos veem o novo valor.
+
+Sobre os modelos: **Detectar modelos** lê a lista da ferramenta (no Cursor, dos modelos da sua conta, pelo comando `cursor-agent models`, lido ao abrir o board
+com a CLI autenticada, e a primeira lista lida substitui a embutida uma vez só; no Claude Code, uma lista embutida que pode ser editada). No Cursor, a lista traz uma linha por nível de cada modelo
 (`claude-opus-5-5-low`, `-medium`, `-high`…); o board junta as variantes num modelo com os níveis
 dele. As versões rápidas (`-fast`, respondem mais depressa e cobram mais pelos mesmos tokens) ficam
 de fora até você ligar **Incluir os modos rápidos** no cartão do Cursor: aí cada uma entra como um
-modelo à parte ("Claude Opus 5.5 1M Fast"), com preço próprio, só para os modelos que estão no
+modelo à parte ("Claude Opus 5.5 1M Fast"), só para os modelos que estão no
 catálogo; desligar a chave as tira do catálogo.
 Pelo MCP, é a regra `includeFastModels` do `update_rules`. No plano gratuito do Cursor só o **Auto** roda: os outros
 modelos são recusados antes de começar (o card bloqueado explica como escolher Auto), e por isso
@@ -798,34 +912,13 @@ as regras de sugestão do Cursor começam todas em Auto. As regras de sugestão 
 condições com E e OU, por exemplo `Esforço da atividade = Alto E Tags = backend`. O resultado é
 sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.
 
+Cada regra pode ter um **modelo reserva** (opcional). Quando a execução de um card falha porque o modelo principal esgotou o limite de uso do plano, e esse modelo veio de uma regra com reserva configurada, o sistema repete automaticamente a execução com o modelo reserva, uma única vez. Se o reserva também falhar ou não estiver configurado, o card é bloqueado como hoje. A troca automática aparece como um comentário na conversa do card ("O `<modelo principal>` esgotou o limite; a execução segue com `<modelo reserva>`"), e o campo Modelo do card continua mostrando o modelo principal — a próxima execução tenta o principal de novo.
+
+**Avisos de dependência entre configurações e links cruzados.** Várias opções de Configurações só fazem efeito por causa de outra. O board mostra uma linha discreta sob as opções dependentes (por exemplo, "Depende de **uma regra de sugestão de modelo** (agora: nenhuma)" abaixo de "Preencher o modelo sugerido automaticamente", ou "Depende de **agentes marcados como disponíveis**" abaixo de "Agente padrão"); a opção fica desabilitada quando a dependência não está satisfeita. Os links permitem navegar: clique em um para ir até a seção correspondente do board, que rola e destaca por 2 segundos, ou clique em um link do Settings para abrir o board na seção certa. No modo navegador, os links para o Settings aparecem só como texto. **"Preencher o modelo sugerido automaticamente"** saiu de Regras e foi para Modelos, onde faz mais sentido — um aviso simples em Regras indica a mudança de lugar. O campo Intervalo do heartbeat fica desabilitado quando o heartbeat está desligado, sem um componente de dependência adicional. Cabeçalhos novos em Modelos, Agentes, Rules e Skills mostram "Mostrando os X do [ferramenta] · trocar ferramenta", permitindo mudar a ferramenta de qualquer uma dessas telas do board.
+
 Quando uma versão nova da extensão muda o board padrão, o board pergunta se você quer atualizá-lo
 (ou use **Faz AI: Atualizar board para o padrão atual**). A atualização só acrescenta o que falta:
 nenhum card sai do lugar e o que você personalizou é mantido. Uma cópia do banco é gravada antes.
-
-### Preços do Cursor
-
-A referência é a [tabela de preços do Cursor](https://cursor.com/docs/models-and-pricing). O board
-não a consulta sozinho: os preços são mantidos à mão em **Modelos de IA** ou pela IA com
-`upsert_model`.
-
-- **Auto tem preço variável.** O Cursor cobra o preço de lista do modelo para o qual cada pedido foi
-  roteado, então não há tarifa fixa para cadastrar. O modelo `auto` já vem com **Preço variável**
-  ligado: os campos de preço dão lugar a um aviso, e a execução fica sem custo estimado (em branco,
-  nunca um número inventado). A chave existe em todo modelo; pelo MCP, é o `variable_price` do
-  `upsert_model`.
-- **Tarifa do Cursor (Cursor Token Rate).** Nos planos Teams e Enterprise, o Cursor cobra US$ 0,25
-  por milhão de tokens (entrada, saída e cache) por cima do preço dos modelos de terceiros; os
-  modelos do próprio Cursor (Composer e Grok) são isentos. Ligue **Somar a tarifa do Cursor** no
-  cartão do Cursor (pelo MCP, `cursorTokenRate` no `update_rules`) e a estimativa passa a somá-la.
-  Vale para as execuções seguintes: o custo das já registradas não muda.
-- **Modo rápido e contexto longo.** O modo rápido costuma custar 2x e entra como um modelo à parte,
-  com preço próprio (ver **Incluir os modos rápidos** acima). O contexto longo (mais de 256 mil
-  tokens) pode custar 2x, e 3x junto com o modo rápido, mas não é separado: o Cursor só informa o
-  total de tokens da execução, e a estimativa usa a tarifa cadastrada.
-- **Como os nomes se correspondem.** O identificador na ferramenta é o id que `cursor-agent models`
-  lista (`claude-opus-5-5`); o nome é o da linha na tabela de preços; no board o modelo fica como
-  `cursor:claude-opus-5-5`, e cada versão rápida tem o seu (`cursor:claude-opus-5-5-fast`). Com isso
-  a IA consegue ler a tabela e preencher os preços pelo `upsert_model`.
 
 ## Onde ficam os dados
 
@@ -838,26 +931,45 @@ entram no git normalmente. Evite abrir a mesma pasta em duas janelas do editor a
 
 ### Backup do board
 
-Para levar o board a outra máquina ou guardar uma cópia, use **Configurações → Backup**:
+Para levar o board a outra máquina ou guardar uma cópia:
 
-- **Exportar board** gera um arquivo `<nome do board>-<data>.fazai.json` com tudo o que está no
-  board: colunas, tipos, campos, regras, modelos, agentes, cards (inclusive arquivados e na
-  lixeira), conversas, checklists, vínculos, histórico e os anexos embutidos. Só o board da pasta
-  atual sai no arquivo. Ele contém as conversas e os anexos: guarde-o com cuidado.
-- **Importar de um arquivo…** mostra um resumo (nome, cards, anexos, tamanho, versão) e, depois da
-  confirmação, grava uma cópia do banco (`<arquivo>.bak`, ao lado dele), move os anexos do board
-  atual para uma pasta de backup (`<anexos>.bak-<data>`), apaga o board atual e o substitui pelo do
-  arquivo, com os mesmos números de card. O board importado passa a ser o desta pasta. Nada muda no
-  banco se o arquivo for inválido ou se algo falhar no meio. A confirmação diz que os anexos foram
-  para backup. Arquivo de importação com id de card ou nome de anexo contendo caminho (`../`) é
-  recusado.
+**No editor (VS Code ou Cursor):** use a paleta de comandos (`Ctrl+Shift+P`):
 
-Um arquivo exportado por uma versão anterior da extensão é atualizado ao ser importado; um arquivo
-de versão mais nova é recusado com a versão necessária. Importar com a IA executando um card não é
-permitido: espere a execução terminar. No navegador o fluxo é o mesmo, com o download e a escolha
-do arquivo feitos pela própria página. Limites conhecidos: o histórico mensal consolidado do log
-não vai no arquivo, e as branches e pastas de trabalho das histórias são importadas como estavam na
-máquina de origem (recrie a pasta pelo botão do card).
+- **Faz AI: Exportar o board** abre o diálogo nativo de salvamento com o nome sugerido no padrão
+  `<nome do board>-<data>.fazai.json`. Gera um arquivo com tudo o que está no board: colunas, tipos,
+  campos, regras, modelos, agentes, cards (inclusive arquivados e na lixeira), conversas, checklists,
+  vínculos, histórico e os anexos embutidos. Só o board da pasta atual sai no arquivo. Ele contém as
+  conversas e os anexos: guarde-o com cuidado. Ao terminar, a extensão mostra a notificação "Board
+  exportado em …" com o botão **Abrir pasta**.
+- **Faz AI: Importar um board** abre o diálogo nativo de abertura de arquivo. Ao escolher um arquivo,
+  mostra um resumo modal (nome do board, quantidade de cards e anexos, tamanho, versão) com aviso de
+  que o board atual será substituído e que uma cópia de segurança (`.bak`) é feita antes. Ao
+  confirmar, substitui o board e mostra a notificação com o resultado da importação.
+
+Os comandos funcionam com o board fechado (sem o painel aberto): eles abrem o banco da pasta atual
+do workspace sob demanda. Em um workspace com várias pastas, os comandos usam a primeira pasta
+(mesma limitação já existente na extensão); não há seletor de pasta.
+
+**No modo navegador** (rodando `~/.faz-ai/bin/faz-ai` no terminal): use **Configurações → Backup**:
+
+- **Exportar board** gera um arquivo `.fazai.json` no seu computador (download).
+- **Importar de um arquivo…** abre o seletor nativo da página.
+
+**Em ambos os modos,** o arquivo importado:
+
+- Mostra um resumo (nome, cards, anexos, tamanho, versão) e, depois da confirmação, grava uma cópia
+  do banco (`<arquivo>.bak`, ao lado dele ou na pasta de dados), move os anexos do board atual para
+  uma pasta de backup (`<anexos>.bak-<data>`), apaga o board atual e o substitui pelo do arquivo, com
+  os mesmos números de card. O board importado passa a ser o desta pasta. Nada muda no banco se o
+  arquivo for inválido ou se algo falhar no meio. A confirmação diz que os anexos foram para backup.
+- Um arquivo exportado por uma versão anterior da extensão é atualizado ao ser importado; um arquivo
+  de versão mais nova é recusado com a versão necessária. Importar com a IA executando um card não é
+  permitido: espere a execução terminar. Arquivo de importação com id de card ou nome de anexo
+  contendo caminho (`../`) é recusado.
+
+Limites conhecidos: o histórico mensal consolidado do log não vai no arquivo, e as branches e pastas
+de trabalho das histórias são importadas como estavam na máquina de origem (recrie a pasta pelo botão
+do card).
 
 ## Desenvolvimento
 

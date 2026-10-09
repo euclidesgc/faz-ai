@@ -26,9 +26,11 @@ export function textReader(): OutputReader {
         inventory: [],
         answer: stdoutLines.join('\n'),
         // o leitor de texto não sabe POR QUE a execução caiu para texto — quem sabe é o transporte
-        // (passo 6), que preenche isto com a frase do erro de domínio (MeasureUnsupportedError e
+        // (passo 6), que preenche isto com a frase do erro de domínio (MeasureRefusedError e
         // companhia). Não complete este campo aqui.
         reason: null,
+        // o modo texto não interpreta eventos: nunca detecta limite esgotado
+        usageLimitReached: false,
       };
     },
     sawEvent: true,

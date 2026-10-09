@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useAppearance } from './appearance';
-import { t, tn } from './i18n';
+import { t } from './i18n';
 import { rich } from './i18n/rich';
 import { humanQueue, pendingWork } from '../shared/pending';
 import { useBoardStore, useHostSync } from './store/boardStore';
 import { ui, attachments } from './commands';
 import { AttachmentModal } from './components/attachment/AttachmentModal';
 import type { Attachment } from '../shared/model';
+import { ActivityBar } from './components/ActivityBar';
 import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { Dialog } from './components/Dialog';
 import { FilterBar } from './components/FilterBar';
+import { SelectionBar } from './components/SelectionBar';
 import { AutopilotButton } from './components/AutopilotButton';
 import { HeartbeatButton } from './components/HeartbeatButton';
 import { ThemeToggle } from './components/ThemeToggle';
+import { ArchivedView } from './components/ArchivedView';
 import { TrashView } from './components/TrashView';
 import { MetricsView } from './components/metrics/MetricsView';
 import { Settings } from './components/settings/Settings';
@@ -74,7 +77,6 @@ export function App() {
     );
   const trashCount = state.cards.filter((c) => c.deletedAt !== null).length;
   const withYou = humanQueue(state, pendingWork(state)).length;
-  const running = state.aiRuns.length;
   const onlyMine = filters.owner === 'human';
 
   return (
@@ -89,6 +91,9 @@ export function App() {
           <Button active={view === 'metrics'} aria-current={view === 'metrics' ? 'page' : undefined} onClick={() => setView('metrics')}>
             {t('Métricas')}
           </Button>
+          <Button active={view === 'archived'} aria-current={view === 'archived' ? 'page' : undefined} onClick={() => setView('archived')}>
+            {t('Arquivados')}
+          </Button>
           <Button active={view === 'trash'} aria-current={view === 'trash' ? 'page' : undefined} onClick={() => setView('trash')}>
             {t('Lixeira')}
             {trashCount > 0 && ` (${trashCount})`}
@@ -98,11 +103,6 @@ export function App() {
           </Button>
         </nav>
         <span className="spacer" />
-        {running > 0 && (
-          <span className="topbar-info" title={t('Execuções da IA em andamento')}>
-            <span className="spinner" /> {tn(running, 'IA trabalhando em {n} card', 'IA trabalhando em {n} cards')}
-          </span>
-        )}
         {withYou > 0 && (
           <Button
             className="topbar-pending"
@@ -148,13 +148,16 @@ export function App() {
       {view !== 'environment' && <RequirementsBanner />}
       {/* a barra de filtros filtra cards, não o log: fica só no board (RF-01) */}
       {view === 'board' && <FilterBar />}
+      {view === 'board' && <SelectionBar />}
       <main className="content">
         {view === 'board' && <Board />}
+        {view === 'archived' && <ArchivedView />}
         {view === 'trash' && <TrashView />}
         {view === 'settings' && <Settings />}
         {view === 'metrics' && <MetricsView />}
         {view === 'environment' && <EnvironmentView />}
       </main>
+      <ActivityBar offline={offline} />
       {isWeb && chatOpen && (
         <aside className="chat-drawer">
           <Button

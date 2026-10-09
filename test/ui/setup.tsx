@@ -18,10 +18,13 @@ import { useBoardStore } from '../../src/webview/store/boardStore';
 /** Tudo que a tela mandaria ao host passa por `postToHost`: aqui ele só anota as mensagens. */
 export const posted = vi.fn<(msg: WebviewToHost) => void>();
 
-// tanto os comandos (src/webview/commands.ts) quanto os filtros compartilhados (`view.set`) chamam postToHost; trocar só ele cobre os dois
+// tanto os comandos (src/webview/commands.ts) quanto os filtros compartilhados (`view.set`) chamam postToHost; trocar só ele cobre os dois.
+// `isWeb` (modo navegador) pode ser ligado por um arquivo de teste com `vi.hoisted(() => { globalThis.__fazaiTestWeb = true })`:
+// um segundo vi.mock do mesmo módulo no arquivo de teste seria sobrescrito por este ao importar o setup.
 vi.mock('../../src/webview/vscode', async (original) => {
   const mod = await original<typeof import('../../src/webview/vscode')>();
-  return { ...mod, postToHost: (msg: WebviewToHost) => posted(msg) };
+  const web = (globalThis as { __fazaiTestWeb?: boolean }).__fazaiTestWeb;
+  return { ...mod, isWeb: web ?? mod.isWeb, postToHost: (msg: WebviewToHost) => posted(msg) };
 });
 
 // jsdom não implementa matchMedia (useAppearance/applyTheme) nem scrollIntoView

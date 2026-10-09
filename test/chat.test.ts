@@ -1,12 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ChatSession, chatPrompt } from '../src/extension/chat';
+import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import type { HeadlessCommand } from '../src/extension/headless';
 import { openInMemory } from '../src/extension/db/database';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
-import { createRunLog } from '../src/extension/log/runLog';
+import { gatewayFor } from './helpers/gateway';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import type { ChatMessage } from '../src/shared/chat';
 import { monthOf } from '../src/shared/log';
@@ -15,8 +16,6 @@ import type { Database } from 'sql.js';
 let dir: string;
 let db: Database;
 let router: MessageRouter;
-/** passado ao chat só nos testes do log; nos demais o chat roda sem log, como num board sem ele */
-let runLog: ReturnType<typeof createRunLog> | undefined;
 let spawned: {
   command: HeadlessCommand;
   emit: (text: string, stream?: 'stdout' | 'stderr') => void;
@@ -38,52 +37,47 @@ const events = (text: string, failed = false) =>
     .map((e) => `${JSON.stringify(e)}\n`)
     .join('');
 
-const build = () =>
-  new ChatSession(router, {
-    cwd: dir,
-    log: () => {},
-    runLog,
-    file: path.join(dir, 'chat.json'),
-    spawn: (command, _cwd, out) => {
-      // no modo estruturado a ferramenta escreve eventos: o falso junta o que o teste emitiu e, ao
-      // sair, escreve um evento do assistente e um `result` com esse texto, como o Claude Code faz
-      const structured = command.format !== 'text';
-      let said = '';
-      /** o teste já escreveu o fluxo inteiro (`raw`): o falso não acrescenta eventos seus */
-      let scripted = false;
-      const entry = {
-        command,
-        emit: (text: string, stream: 'stdout' | 'stderr' = 'stdout') => {
-          if (structured && stream === 'stdout') said += text;
-          else out(text, stream);
-        },
-        raw: (text: string) => {
-          scripted = true;
-          out(text, 'stdout');
-        },
-        exit: (_c: number | null, _e?: Error) => {},
-        killed: false,
-      };
-      spawned.push(entry);
-      return {
-        kill: () => {
-          entry.killed = true;
-          entry.exit(143);
-        },
-        onExit: (fn) => {
-          entry.exit = (code, error) => {
-            if (structured && !error && !scripted) out(events(said, code !== 0), 'stdout');
-            fn(code, error);
-          };
-        },
-      };
-    },
-  });
+const build = () => {
+  const spawn: SpawnFn = (command, _cwd, out) => {
+    // no modo estruturado a ferramenta escreve eventos: o falso junta o que o teste emitiu e, ao
+    // sair, escreve um evento do assistente e um `result` com esse texto, como o Claude Code faz
+    const structured = command.format !== 'text';
+    let said = '';
+    /** o teste já escreveu o fluxo inteiro (`raw`): o falso não acrescenta eventos seus */
+    let scripted = false;
+    const entry = {
+      command,
+      emit: (text: string, stream: 'stdout' | 'stderr' = 'stdout') => {
+        if (structured && stream === 'stdout') said += text;
+        else out(text, stream);
+      },
+      raw: (text: string) => {
+        scripted = true;
+        out(text, 'stdout');
+      },
+      exit: (_c: number | null, _e?: Error) => {},
+      killed: false,
+    };
+    spawned.push(entry);
+    return {
+      kill: () => {
+        entry.killed = true;
+        entry.exit(143);
+      },
+      onExit: (fn) => {
+        entry.exit = (code, error) => {
+          if (structured && !error && !scripted) out(events(said, code !== 0), 'stdout');
+          fn(code, error);
+        };
+      },
+    };
+  };
+  return new ChatSession(router, { cwd: dir, log: () => {}, file: path.join(dir, 'chat.json'), gateway: gatewayFor(router, db, spawn) });
+};
 
 beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-chat-'));
   db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
-  runLog = undefined;
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
     folderName: 'P',
@@ -185,9 +179,15 @@ describe('ChatSession', () => {
   });
 
   it('sem ferramenta que rode em segundo plano nesta permissão, recusa com o motivo', () => {
-    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
-    expect(() => router.chatCommand({ type: 'chat.send', text: 'a', model: null })).toThrow(/Sem restrições/);
-    expect(spawned).toHaveLength(0);
+    // o Claude Code recusa "Sem restrições" quando roda como root (contêiner, WSL como root)
+    const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
+    try {
+      router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude', runner: { permission: 'full' } } });
+      expect(() => router.chatCommand({ type: 'chat.send', text: 'a', model: null })).toThrow(/root/);
+      expect(spawned).toHaveLength(0);
+    } finally {
+      getuid.mockRestore();
+    }
   });
 
   it('o histórico é limitado', () => {
@@ -254,7 +254,6 @@ describe('ChatSession no log das execuções', () => {
 
   beforeEach(() => {
     runs = new AiRunRepo(db);
-    runLog = createRunLog(db);
     build();
   });
 
@@ -282,7 +281,7 @@ describe('ChatSession no log das execuções', () => {
   it('no chat não existem perfil nem subagente: as duas dimensões ficam NULL, e o modelo escolhido é gravado', () => {
     const o = router.snapshot().board.modelCatalog.find((m) => m.tool === 'claude' && m.efforts.length > 0)!;
     router.chatCommand({ type: 'chat.send', text: 'oi', model: `${o.id}@${o.efforts[0]}` });
-    expect(only()).toMatchObject({ model: o.model, effort: o.efforts[0], profile: null, agent: null, skills: [], mcp: null });
+    expect(only()).toMatchObject({ model: o.model, effort: o.efforts[0], profile: null, agent: null, skills: [], mcp: [] });
   });
 
   it('o desfecho do chat segue o mesmo vocabulário do executor de cards', () => {
@@ -300,10 +299,15 @@ describe('ChatSession no log das execuções', () => {
   });
 
   it('sem ferramenta que rode nesta permissão, a tentativa fica registrada como unsupported', () => {
-    router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
-    expect(() => router.chatCommand({ type: 'chat.send', text: 'a', model: null })).toThrow(/Sem restrições/);
+    const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
+    try {
+      router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude', runner: { permission: 'full' } } });
+      expect(() => router.chatCommand({ type: 'chat.send', text: 'a', model: null })).toThrow(/root/);
+    } finally {
+      getuid.mockRestore();
+    }
     expect(spawned).toHaveLength(0);
-    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'kimi' });
+    expect(only()).toMatchObject({ outcome: 'unsupported', tool: 'claude' });
   });
 
   it('RF-15: a execução do chat grava o consumo e o inventário com origem "chat" e sem card', () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -15,9 +15,12 @@ let shown: string[];
 let bridge: HostBridge;
 let saves: number;
 let rawDb: Awaited<ReturnType<typeof openInMemory>>;
+let dir: string;
+
+afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 beforeEach(async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-bridge-'));
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-bridge-'));
   const db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
   rawDb = db;
   saves = 0;
@@ -204,7 +207,9 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
   it('com a IA executando um card, a importação é recusada e o board fica como está', async () => {
     const { token } = router.parkImport(parseExportFile(router.exportBoardFile().text), 10);
     createCard('Card 2');
-    router.setAiRuns([router.snapshot().cards[0]!.id]);
+    router.setAiRuns([
+      { cardId: router.snapshot().cards[0]!.id, runId: '', mode: 'phase', origin: 'manual', phase: '', model: null, startedAt: Date.now() },
+    ]);
     await bridge.handle({ type: 'backup.import.apply', token });
     expect(sent.at(-1)).toEqual({ type: 'error', message: 'Espere a execução da IA terminar para importar o board.' });
     expect(router.snapshot().cards).toHaveLength(2);
@@ -261,5 +266,21 @@ describe('HostBridge: metrics.query', () => {
     expect(count('ai_runs')).toBe(runs);
     expect(changes).toBe(0);
     expect(saves).toBe(0);
+  });
+});
+
+describe('HostBridge: Settings do editor', () => {
+  it('ui.openIdeSettings pede ao editor para abrir o Settings na chave', async () => {
+    const keys: (string | undefined)[] = [];
+    env.openIdeSettings = (key) => void keys.push(key);
+    await bridge.handle({ type: 'ui.openIdeSettings', key: 'fazai.appearance.language' });
+    await bridge.handle({ type: 'ui.openIdeSettings' });
+    expect(keys).toEqual(['fazai.appearance.language', undefined]);
+  });
+
+  it('sem openIdeSettings no ambiente (modo navegador), a mensagem é ignorada sem erro', async () => {
+    delete env.openIdeSettings;
+    await expect(bridge.handle({ type: 'ui.openIdeSettings' })).resolves.toBeUndefined();
+    expect(sent.filter((m) => m.type === 'error')).toEqual([]);
   });
 });

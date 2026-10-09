@@ -1,11 +1,12 @@
-import type { CSSProperties } from 'react';
+import { useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cardRef, type Card, type FieldDef } from '../../shared/model';
 import { statusInfo } from '../../shared/status';
-import { aiWorkingChildren, fieldsForType, isAiWorking, valueOf } from '../../shared/selectors';
+import { aiWorkingChildren, fieldsForType, isAiWorking, isCardCollapsed, valueOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
+import { useReducedMotion } from '../useReducedMotion';
 import { FieldBadge, hasValue } from './FieldRenderer';
 import { IconParent } from './ui';
 import type { AiWork } from './cardView/AiLed';
@@ -13,11 +14,18 @@ import { CardFooter } from './cardView/CardFooter';
 import { StatusLine } from './cardView/StatusLine';
 import { TitleBar } from './cardView/TitleBar';
 
+/** Duração e curva da animação de arrastar (reutilizadas no dropAnimation do DragOverlay). */
+export const DRAG_ANIMATION = { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' } as const;
+
 export function SortableCard({ card }: { card: Card }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  const reduced = useReducedMotion();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: card.id,
+    transition: reduced ? null : { ...DRAG_ANIMATION },
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} className={isDragging ? 'card-ghost' : undefined} {...attributes} {...listeners}>
       <CardView card={card} />
     </div>
   );
@@ -29,6 +37,24 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
   const selectParent = useBoardStore((s) => s.selectParent);
   const openCard = useBoardStore((s) => s.openCard);
+  const selectedIds = useBoardStore((s) => s.selectedIds);
+  const toggleSelected = useBoardStore((s) => s.toggleSelected);
+  const collapsedMap = useBoardStore((s) => s.collapsed);
+  const setCollapsed = useBoardStore((s) => s.setCollapsed);
+  const collapsed = isCardCollapsed(collapsedMap, card.id);
+  // a faixa do card é a mesma nos dois estados, mas o corpo é remontado na troca; devolver o foco ao
+  // botão de colapsar garante que Enter de novo reverte, mesmo que o botão seja recriado
+  const articleRef = useRef<HTMLElement>(null);
+  const refocusToggle = useRef(false);
+  const toggleCollapse = (next: boolean) => {
+    refocusToggle.current = true;
+    setCollapsed(`card:${card.id}`, next);
+  };
+  useLayoutEffect(() => {
+    if (!refocusToggle.current) return;
+    refocusToggle.current = false;
+    articleRef.current?.querySelector<HTMLElement>('button[aria-expanded]')?.focus();
+  }, [collapsed]);
 
   const type = state.cardTypes.find((t) => t.id === card.typeId);
   const isParent = state.workflows.find((w) => w.id === card.workflowId)?.kind === 'parent';
@@ -48,10 +74,21 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   // pendência com a pessoa: a borda ganha a cor do status para achar de relance o que espera por ela
   const mine = status !== null && statusInfo(status).owner === 'human';
   const style = mine ? ({ '--status-color': state.board.appearance.statuses[status].color } as CSSProperties) : undefined;
-  const classes = ['card', selected && 'selected', overlay && 'overlay', archived && 'archived', mine && 'mine'].filter(Boolean).join(' ');
+  const classes = [
+    'card',
+    selected && 'selected',
+    overlay && 'overlay',
+    archived && 'archived',
+    mine && 'mine',
+    selectedIds.size > 0 && 'selecting',
+    collapsed && 'card-collapsed',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <article
+      ref={articleRef}
       className={classes}
       style={style}
       onClick={(e) => {
@@ -70,21 +107,55 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       tabIndex={overlay ? undefined : 0}
       title={overlay ? undefined : t('Dois cliques (ou Enter) abrem o card')}
     >
-      <TitleBar card={card} type={type} work={work} overlay={overlay} />
-      <div className="card-body">
-        <div className="card-title" title={card.title}>
-          {card.title}
-        </div>
-        {parent && (
-          <div className="card-parent" title={parent.title}>
-            <IconParent /> {cardRef(parent)} {parent.title}
+      <TitleBar
+        card={card}
+        type={type}
+        work={work}
+        overlay={overlay}
+        collapsed={collapsed}
+        onToggleCollapse={() => toggleCollapse(!collapsed)}
+        leading={
+          isParent &&
+          !archived && (
+            <input
+              type="checkbox"
+              className="card-select"
+              checked={selectedIds.has(card.id)}
+              aria-label={t('Selecionar {title}', { title: card.title })}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                e.stopPropagation();
+                toggleSelected(card.id);
+              }}
+            />
+          )
+        }
+      />
+      {collapsed ? (
+        <div className="card-body">
+          <div className="card-title" title={card.title}>
+            {card.title}
           </div>
-        )}
-        {status && <StatusLine card={card} />}
-        <FieldLine className="card-fields" fields={fields.filter((f) => f.kind !== 'model')} cardId={card.id} />
-        <FieldLine className="card-model" fields={fields.filter((f) => f.kind === 'model')} cardId={card.id} />
-        <CardFooter card={card} isParent={isParent} overlay={overlay} />
-      </div>
+        </div>
+      ) : (
+        <>
+          <div className="card-body">
+            <div className="card-title" title={card.title}>
+              {card.title}
+            </div>
+            {parent && (
+              <div className="card-parent" title={parent.title}>
+                <IconParent /> {cardRef(parent)} {parent.title}
+              </div>
+            )}
+            {status && <StatusLine card={card} />}
+            <FieldLine className="card-fields" fields={fields.filter((f) => f.kind !== 'model')} cardId={card.id} />
+            <FieldLine className="card-model" fields={fields.filter((f) => f.kind === 'model')} cardId={card.id} />
+            <CardFooter card={card} isParent={isParent} overlay={overlay} />
+          </div>
+        </>
+      )}
     </article>
   );
 }

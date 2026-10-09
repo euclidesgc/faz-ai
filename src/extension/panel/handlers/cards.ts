@@ -1,17 +1,22 @@
 import { linkProblem } from '../../../shared/links';
+import { isLive } from '../../../shared/selectors';
+import { settleDelivery } from '../../delivery';
 
+import type { Card } from '../../../shared/model';
 import type { BoardContext, HandlerMap, MessageOf } from './context';
 import { applySuggestion, suggestionFor } from './models';
 
 /**
  * Muda o status de trabalho do card. Aprovar é só da pessoa; bloquear exige o motivo. Em modo autônomo
  * (YOLO) o pedido de revisão da IA vira aprovação na hora: ninguém vai revisar, e o resumo fica na conversa.
+ * Exceção: com `pending` (algo depende da pessoa), o card fica mesmo em "waiting_review", também em modo
+ * autônomo: a pendência é dela, e o status tem de mostrar isso.
  */
 function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author: string, byAi: boolean): void {
   const note = msg.note?.trim() ?? '';
   if (msg.status === 'approved' && byAi) throw new Error('Só uma pessoa pode aprovar um card.');
   if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
-  const autoApprove = byAi && msg.status === 'waiting_review' && ctx.cards.isYolo(msg.cardId);
+  const autoApprove = byAi && msg.status === 'waiting_review' && !msg.pending && ctx.cards.isYolo(msg.cardId);
   ctx.cards.setStatus(msg.cardId, autoApprove ? 'approved' : msg.status, msg.status === 'blocked' ? note : '', author);
   if (note) ctx.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
   // só a aprovação de uma pessoa dispara o merge automático: a do modo autônomo não passa por aqui
@@ -35,6 +40,15 @@ function inheritYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.inherit'>, aut
   if (!linkProblem(ctx.state(), card.id, from.id, 'related')) ctx.links.add(card.id, from.id, 'related');
 }
 
+/** Liga ou desliga o modo autônomo de uma história já validada; libera o que estava esperando uma pessoa. */
+function applyYolo(ctx: BoardContext, card: Card, enabled: boolean, author: string): void {
+  ctx.cards.setYolo(card.id, enabled);
+  if (!enabled) return;
+  const release = card.status === 'waiting_review' ? 'approved' : card.status === 'waiting_answer' ? 'ready' : null;
+  if (release) ctx.cards.setStatus(card.id, release, '', author);
+  ctx.comments.add(card.id, author, 'Modo autônomo ligado: a IA segue por conta própria, sem pedir aprovação nem confirmação.', 'human');
+}
+
 /**
  * Liga ou desliga o modo autônomo da história. É decisão da pessoa: a IA nunca amplia a própria autonomia.
  * Ao ligar, o que estava esperando uma pessoa é liberado para a IA seguir.
@@ -45,11 +59,21 @@ function setYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.set'>, author: str
   if (!card) throw new Error('Card não encontrado');
   if (card.parentId) throw new Error('O modo autônomo vale para a história, não para uma sub-tarefa.');
   if (card.yolo === msg.enabled) return;
-  ctx.cards.setYolo(card.id, msg.enabled);
-  if (!msg.enabled) return;
-  const release = card.status === 'waiting_review' ? 'approved' : card.status === 'waiting_answer' ? 'ready' : null;
-  if (release) ctx.cards.setStatus(card.id, release, '', author);
-  ctx.comments.add(card.id, author, 'Modo autônomo ligado: a IA segue por conta própria, sem pedir aprovação nem confirmação.', 'human');
+  applyYolo(ctx, card, msg.enabled, author);
+}
+
+/**
+ * Liga ou desliga o modo autônomo de várias histórias de uma vez. Ignora silenciosamente quem da lista
+ * não for história viva (sub-tarefa, arquivada ou id inexistente); não repete o efeito em quem já está
+ * no estado pedido.
+ */
+function setYoloMany(ctx: BoardContext, msg: MessageOf<'card.yolo.setMany'>, author: string, byAi: boolean): void {
+  if (byAi) throw new Error('Só uma pessoa liga o modo autônomo.');
+  const stories = ctx.state().cards.filter((c) => msg.cardIds.includes(c.id) && !c.parentId && isLive(c));
+  for (const story of stories) {
+    if (story.yolo === msg.enabled) continue;
+    applyYolo(ctx, story, msg.enabled, author);
+  }
 }
 
 /** Cria o card e já aplica a sugestão de modelo; devolve o id. */
@@ -75,6 +99,12 @@ export const cardHandlers = {
       byAi,
       allowOpenChildren: msg.allowOpenChildren,
     });
+    // a história pode ter acabado de chegar na última coluna da IA já com o pull request registrado
+    // (ex.: quando o registro aconteceu antes do movimento, na mesma sessão): reavalia a entrega.
+    // yoloStoryIdOf é uma consulta direta (sem montar o snapshot inteiro do board), undefined no caso
+    // comum de um board (ou card) fora do modo autônomo, onde não há entrega a reavaliar.
+    const storyId = ctx.cards.yoloStoryIdOf(msg.cardId);
+    if (storyId) settleDelivery(ctx, storyId);
     return true;
   },
   'card.trash': (msg, ctx) => {
@@ -91,6 +121,10 @@ export const cardHandlers = {
   },
   'card.unarchive': (msg, ctx, { byAi }) => {
     ctx.cards.unarchive(msg.cardId, msg.columnId, msg.position, byAi);
+    return true;
+  },
+  'card.restoreArchived': (msg, ctx) => {
+    ctx.cards.restoreArchived(msg.cardId);
     return true;
   },
   'card.deletePermanent': (msg, ctx) => {
@@ -114,6 +148,10 @@ export const cardHandlers = {
   },
   'card.yolo.set': (msg, ctx, { author, byAi }) => {
     setYolo(ctx, msg, author, byAi);
+    return true;
+  },
+  'card.yolo.setMany': (msg, ctx, { author, byAi }) => {
+    setYoloMany(ctx, msg, author, byAi);
     return true;
   },
   'card.yolo.inherit': (msg, ctx, { author, byAi }) => {

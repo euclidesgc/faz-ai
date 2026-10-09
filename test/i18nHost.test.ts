@@ -42,7 +42,6 @@ describe('i18n do host: mensagens preenchidas', () => {
     ['Servidor "git" não encontrado em .mcp.json.', 'Server "git" not found in .mcp.json.'],
     ['Já existe um servidor "git" em .mcp.json.', 'A server "git" already exists in .mcp.json.'],
     ['O Claude Code não tem uma pasta de usuário para este tipo de item.', 'Claude Code has no user folder for this kind of item.'],
-    ['O Codex não tem agentes definidos em arquivos do projeto.', 'Codex has no agents defined in project files.'],
     [
       'Arquivo de regras desconhecido: "X.md". Aceitos: CLAUDE.md, AGENTS.md.',
       'Unknown rules file: "X.md". Accepted: CLAUDE.md, AGENTS.md.',
@@ -68,9 +67,9 @@ describe('i18n do host: mensagens preenchidas', () => {
       '/p/.mcp.json is not plain JSON (it may have comments or a syntax error). Open the file and edit it by hand.',
     ],
     ['A resposta passou do tempo limite (30 min) e foi encerrada.', 'The reply exceeded the time limit (30 min) and was ended.'],
-    ['Não foi possível executar o Codex: falhou', 'Could not run Codex: falhou'],
-    ['O Codex terminou com erro (código 2).', 'Codex finished with an error (code 2).'],
-    ['O Codex terminou com erro (código 2).\n\nlinha 1\nlinha 2', 'Codex finished with an error (code 2).\n\nlinha 1\nlinha 2'],
+    ['Não foi possível executar o Cursor: falhou', 'Could not run Cursor: falhou'],
+    ['O Cursor terminou com erro (código 2).', 'Cursor finished with an error (code 2).'],
+    ['O Cursor terminou com erro (código 2).\n\nlinha 1\nlinha 2', 'Cursor finished with an error (code 2).\n\nlinha 1\nlinha 2'],
     [
       'Servidores MCP do agente não encontrados na configuração do Claude Code: a, b.',
       "The agent's MCP servers were not found in the Claude Code configuration: a, b.",
@@ -101,7 +100,7 @@ describe('i18n do host: mensagens preenchidas', () => {
 
   it('a CLI não encontrada: a mensagem de cada ferramenta, sozinha e dentro do aviso do chat', () => {
     setLocale('en');
-    for (const command of ['claude', 'codex', 'copilot', 'agent', 'kimi', 'outra']) {
+    for (const command of ['claude', 'agent', 'outra']) {
       const en = t(commandNotFound(command));
       expect(en).toMatch(new RegExp(`^command "${command}" was not found in PATH`));
       expect(en).toContain(`Then check in the terminal that "${command} --version" responds.`);
@@ -141,6 +140,7 @@ describe('i18n do host: mensagens preenchidas', () => {
         parallel: false,
         parallelStories: 2,
         autopilotPaused: false,
+        defaultAgent: '',
       },
       { offline: true, unsupported: null },
     );

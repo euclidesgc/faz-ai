@@ -38,10 +38,12 @@ export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
 };
 
 /** `environment`: o Diagnóstico do ambiente, aberto pelas Configurações ou sozinho na primeira abertura */
-export type View = 'board' | 'trash' | 'settings' | 'metrics' | 'environment';
+export type View = 'board' | 'archived' | 'trash' | 'settings' | 'metrics' | 'environment';
 /** Abas da tela de Harness de IA: a ferramenta e a execução, o que é do projeto, e tudo que a ferramenta carrega. */
-export type HarnessTab = 'tool' | 'project' | 'all';
-export type SettingsTab = 'columns' | 'types' | 'fields' | 'rules' | 'models' | 'harness' | 'agents' | 'git' | 'appearance' | 'backup';
+export type HarnessTab = 'tool' | 'project' | 'user' | 'all';
+import { type SettingsTab } from '../../shared/settingsTab';
+import { SETTINGS_SECTIONS } from '../../shared/settingsSections';
+export type { SettingsTab };
 
 export interface DialogSpec {
   title: string;
@@ -50,7 +52,9 @@ export interface DialogSpec {
   danger?: boolean;
   /** quando presente, mostra um seletor e passa o valor escolhido ao confirmar */
   choices?: { label: string; options: { value: string; label: string }[] };
-  onConfirm(choice?: string): void;
+  /** quando presente, mostra um checkbox e passa se está marcado ao confirmar */
+  checkbox?: { label: string };
+  onConfirm(choice?: string, checkboxChecked?: boolean): void;
   /** chamada quando a pessoa desiste (botão, Escape ou clique fora) */
   onCancel?(): void;
   /** ação alternativa, mostrada entre Voltar e a confirmação */
@@ -76,6 +80,8 @@ interface UiState {
   openCardId: Id | null;
   /** modelo e esforço escolhidos no chat (valor do campo Modelo); null = o padrão da ferramenta */
   chatModel: string | null;
+  /** "não avisar novamente" ao ligar o modo autônomo (marcado no checkbox do diálogo de confirmação) */
+  dontWarnYolo: boolean;
 }
 
 interface BoardStore extends UiState, ViewState {
@@ -101,8 +107,30 @@ interface BoardStore extends UiState, ViewState {
   setView(view: View): void;
   /** abre as configurações numa seção (fecha o card aberto) */
   openSettings(tab: SettingsTab): void;
+  /**
+   * Leva até uma seção de Configurações (usada por `DependsOn` e por links internos entre telas):
+   * troca a aba (e a sub-aba de Harness, quando a seção mora lá) e marca `pendingSettingsSection`
+   * para a tela rolar e destacar ao renderizar. `section` sem entrada em `SETTINGS_SECTIONS` só
+   * marca a pendência, sem trocar de aba (ver `settingsSections.ts`).
+   */
+  goToSection(section: string): void;
+  /** id da seção até onde a tela de Configurações deve rolar ao abrir (vindo de `ui.openSettings`), ou null */
+  pendingSettingsSection: string | null;
+  clearPendingSettingsSection(): void;
   setSettingsNavCollapsed(collapsed: boolean): void;
+  setDontWarnYolo(value: boolean): void;
   selectParent(id: Id | null): void;
+  /**
+   * Seleção múltipla de cards no board (card 324): conceito novo e separado de `selectedParentId`
+   * (que é single-select e filtra sub-tarefas). Só local a este webview: não vai para `ViewState`
+   * nem é persistida.
+   */
+  selectedIds: Set<Id>;
+  toggleSelected(id: Id): void;
+  clearSelected(): void;
+  /** coluna com o formulário "+ Novo card" aberto: só um por vez no board (abrir um fecha o outro) */
+  addingColumnId: Id | null;
+  setAddingColumn(id: Id | null): void;
   openCard(id: Id | null): void;
   setFilters(patch: Partial<Filters>): void;
   clearFilters(): void;
@@ -118,6 +146,8 @@ interface BoardStore extends UiState, ViewState {
   setMetricsBlocks(patch: Partial<MetricsBlocksState>): void;
   /** abre/fecha uma linha ou coluna; `current` é o estado que está na tela */
   setCollapsed(key: string, collapsed: boolean): void;
+  /** abre/fecha vários cards (`card:<id>`) numa única escrita, em vez de uma por card */
+  setManyCollapsed(ids: Id[], collapsed: boolean): void;
   /** esquece a escolha manual, voltando ao padrão das configurações */
   resetCollapsed(key: string): void;
   ask(dialog: DialogSpec | null): void;
@@ -151,6 +181,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
+    dontWarnYolo: persisted?.dontWarnYolo ?? false,
     chatOpen: false,
     setChatOpen: (chatOpen) => set({ chatOpen }),
     setChatModel(chatModel) {
@@ -159,14 +190,18 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     },
     filters: EMPTY_FILTERS,
     selectedParentId: null,
+    selectedIds: new Set(),
     collapsed: {},
 
     setState(state, attachmentsBaseUri) {
       const ids = new Set(state.cards.map((c) => c.id));
-      const { selectedParentId, openCardId } = get();
+      const { selectedParentId, selectedIds, openCardId } = get();
       set({ state, attachmentsBaseUri, openCardId: openCardId && ids.has(openCardId) ? openCardId : null });
       // a história selecionada saiu do board (lixeira, arquivo ou apagada): limpa o filtro
       if (selectedParentId && !state.cards.some((c) => c.id === selectedParentId && isLive(c))) setShared({ selectedParentId: null });
+      // o mesmo, mas para a seleção múltipla: tira da seleção quem saiu do board ou não está mais vivo
+      const prunedIds = new Set([...selectedIds].filter((id) => state.cards.some((c) => c.id === id && isLive(c))));
+      if (prunedIds.size !== selectedIds.size) set({ selectedIds: prunedIds });
       persist(get());
     },
     setViewState: (view) =>
@@ -181,11 +216,40 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       set({ view: 'settings', settingsTab, openCardId: null, attachmentModal: null });
       persist(get());
     },
+    goToSection(section) {
+      const info = SETTINGS_SECTIONS[section];
+      if (info) {
+        set({
+          view: 'settings',
+          settingsTab: info.tab,
+          ...(info.harnessTab && { harnessTab: info.harnessTab as HarnessTab }),
+          pendingSettingsSection: section,
+        });
+        persist(get());
+      } else {
+        set({ pendingSettingsSection: section });
+      }
+    },
+    pendingSettingsSection: null,
+    clearPendingSettingsSection: () => set({ pendingSettingsSection: null }),
     setSettingsNavCollapsed(settingsNavCollapsed) {
       set({ settingsNavCollapsed });
       persist(get());
     },
+    setDontWarnYolo(dontWarnYolo) {
+      set({ dontWarnYolo });
+      persist(get());
+    },
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
+    toggleSelected(id) {
+      const next = new Set(get().selectedIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      set({ selectedIds: next });
+    },
+    clearSelected: () => set({ selectedIds: new Set() }),
+    addingColumnId: null,
+    setAddingColumn: (id) => set({ addingColumnId: id }),
     openCard(id) {
       // trocar (ou fechar) o card deixa a modal de anexo sem contexto: fecha junto
       set({ openCardId: id, attachmentModal: null });
@@ -199,6 +263,11 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     metricsBlocks: DEFAULT_METRICS_BLOCKS,
     setMetricsBlocks: (patch) => set({ metricsBlocks: { ...get().metricsBlocks, ...patch } }),
     setCollapsed: (key, collapsed) => setShared({ collapsed: { ...get().collapsed, [key]: collapsed } }),
+    setManyCollapsed(ids, collapsed) {
+      const patch: Record<string, boolean> = {};
+      for (const id of ids) patch[`card:${id}`] = collapsed;
+      setShared({ collapsed: { ...get().collapsed, ...patch } });
+    },
     resetCollapsed(key) {
       const { [key]: _drop, ...rest } = get().collapsed;
       setShared({ collapsed: rest });
@@ -217,6 +286,7 @@ function persist(s: BoardStore): void {
     settingsNavCollapsed: s.settingsNavCollapsed,
     openCardId: s.openCardId,
     chatModel: s.chatModel,
+    dontWarnYolo: s.dontWarnYolo,
   };
   setUiState(ui);
 }
@@ -239,7 +309,14 @@ export function useHostSync(): void {
       } else if (msg.type === 'ui.openCard') {
         s.setView('board');
         s.openCard(msg.cardId);
-      }
+      } else if (msg.type === 'ui.openSettings') {
+        const info = msg.section ? SETTINGS_SECTIONS[msg.section] : undefined;
+        s.openSettings(msg.tab);
+        useBoardStore.setState({
+          pendingSettingsSection: msg.section ?? null,
+          ...(info?.harnessTab && { harnessTab: info.harnessTab as HarnessTab }),
+        });
+      } else if (msg.type === 'ui.openView') s.setView(msg.view);
     });
     postToHost({ type: 'ready' });
     return off;

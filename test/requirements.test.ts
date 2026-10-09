@@ -64,14 +64,10 @@ describe('requisitos do board', () => {
     expect(await checkRequirements(probe({ tool: 'claude', signedIn: async () => null }))).toEqual([]);
   });
 
-  it('CLI do Claude Code ou do Codex sem login: oferece o comando de login, igual ao Cursor', async () => {
+  it('CLI do Claude Code sem login: oferece o comando de login, igual ao Cursor', async () => {
     connect('claude');
     expect(await checkRequirements(probe({ tool: 'claude', signedIn: async () => false }))).toEqual([
       { id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login', terminal: true } },
-    ]);
-    connect('codex');
-    expect(await checkRequirements(probe({ tool: 'codex', signedIn: async () => false }))).toEqual([
-      { id: 'signin', tool: 'codex', cli: 'codex', action: { kind: 'command', command: 'codex login', terminal: true } },
     ]);
   });
 
@@ -100,7 +96,6 @@ describe('requisitos do board', () => {
       (await checkRequirements(probe({ tool, permission: 'full' }))).map((r) => [r.id, r.optional ?? false]);
     expect(await ids('claude')).toEqual([['mcp', false]]);
     expect(await ids('cursor')).toEqual([['mcp', false]]);
-    expect(await ids('codex')).toEqual([['mcp', false]]);
   });
 
   it('sem a skill do fluxo, pede para instalar; sem o inventário lido, não diz nada', async () => {
@@ -137,32 +132,13 @@ describe('requisitos do board', () => {
     ]);
   });
 
-  it('permissão que a ferramenta não aceita leva às configurações', async () => {
-    connect('kimi');
-    const list = await checkRequirements(probe({ tool: 'kimi', permission: 'edits' }));
-    expect(list.map((r) => [r.id, r.action])).toEqual([['permission', { kind: 'settings' }]]);
-    expect(list[0]!.reason).toContain('Sem restrições');
-  });
-
   it('acha o registro onde cada ferramenta o lê', () => {
-    for (const tool of ['claude', 'cursor', 'codex', 'copilot', 'kimi'] as const) {
+    for (const tool of ['claude', 'cursor'] as const) {
       expect(registeredServer(tool, project, home)).toBeNull();
       connect(tool);
       expect(registeredServer(tool, project, home)).toMatchObject({ command: process.execPath });
     }
-    expect(registeredServer('codex', project, home)!.args).toEqual([BRIDGE, project]);
-  });
-
-  it('o registro global, sem a pasta, também conta e não vira aviso de outra pasta', async () => {
-    for (const tool of ['codex', 'copilot', 'kimi'] as const) {
-      expect(registeredServer(tool, project, home)).toBeNull();
-      registerClients([tool], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
-      expect(registeredServer(tool, project, home)).toMatchObject({ file: expect.stringMatching(/^~\//), scope: 'user', args: [BRIDGE] });
-    }
-    expect(await checkRequirements(probe({ tool: 'codex', permission: 'full' }))).toEqual([]);
-    // o do projeto vale sobre o global
-    connect('codex');
-    expect(registeredServer('codex', project, home)).toMatchObject({ file: '.codex/config.toml', args: [BRIDGE, project] });
+    expect(registeredServer('cursor', project, home)!.args).toEqual([BRIDGE, project]);
   });
 
   it('no Cursor o global não conta: o registro é sempre o do projeto, fora do git', async () => {
@@ -187,9 +163,10 @@ describe('requisitos do board', () => {
   });
 
   it('registro global quebrado pede para conectar de novo, sem mexer no projeto', async () => {
-    registerClients(['codex'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: '/sumiu/node', scope: 'user' });
-    expect(await checkRequirements(probe({ tool: 'codex', permission: 'full' }))).toEqual([
-      { id: 'mcp-stale', tool: 'codex', file: '~/.codex/config.toml', missing: '/sumiu/node', action: { kind: 'connect' } },
+    const server = { command: '/sumiu/node', args: [BRIDGE] };
+    fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ mcpServers: { 'faz-ai': server } }));
+    expect(await checkRequirements(probe({ tool: 'claude' }))).toEqual([
+      { id: 'mcp-stale', tool: 'claude', file: '~/.claude.json', missing: '/sumiu/node', action: { kind: 'connect' } },
     ]);
   });
 
@@ -228,27 +205,14 @@ describe('requisitos do board', () => {
     expect((await checkRequirements(probe({ ...inCursor, editorPath: nodeDir }))).map((r) => r.id)).toEqual(['mcp-enable']);
   });
 
-  it('o mcp.json global do VS Code conta para o Copilot', async () => {
-    const userDir = path.join(home, 'Code', 'User');
-    registerClients(['copilot'], {
-      bridgePath: BRIDGE,
-      workspaceDir: project,
-      homeDir: home,
-      nodeCommand: process.execPath,
-      scope: 'user',
-      editorUserDir: userDir,
-    });
-    fs.rmSync(path.join(home, '.copilot'), { recursive: true });
-    expect(registeredServer('copilot', project, home, userDir)).toMatchObject({ scope: 'user', args: [BRIDGE, '${workspaceFolder}'] });
-  });
-
   it('registro com a ponte de antes (na pasta de dados do editor) pede para instalar de novo', async () => {
     const old = path.join(home, 'Code', 'User', 'globalStorage', 'euclidesgc.faz-ai', 'mcp', 'bridge.js');
     fs.mkdirSync(path.dirname(old), { recursive: true });
     fs.writeFileSync(old, '// ponte antiga');
-    registerClients(['codex'], { bridgePath: old, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
-    expect(await checkRequirements(probe({ tool: 'codex', permission: 'full' }))).toEqual([
-      { id: 'mcp-outdated', tool: 'codex', file: '~/.codex/config.toml', missing: old, action: { kind: 'connect' } },
+    const server = { command: process.execPath, args: [old] };
+    fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ mcpServers: { 'faz-ai': server } }));
+    expect(await checkRequirements(probe({ tool: 'claude' }))).toEqual([
+      { id: 'mcp-outdated', tool: 'claude', file: '~/.claude.json', missing: old, action: { kind: 'connect' } },
     ]);
   });
 });
@@ -268,7 +232,7 @@ describe('blocksExecution', () => {
     expect(blocksExecution({ requirements: [], authExpired: null })).toBe(false);
   });
 
-  it('bloqueia pelo sinal reativo mesmo sem "signin" nos requisitos (Kimi/Copilot, sem probe)', () => {
-    expect(blocksExecution({ requirements: [], authExpired: 'kimi' })).toBe(true);
+  it('bloqueia pelo sinal reativo mesmo sem "signin" nos requisitos (o probe não soube dizer)', () => {
+    expect(blocksExecution({ requirements: [], authExpired: 'cursor' })).toBe(true);
   });
 });

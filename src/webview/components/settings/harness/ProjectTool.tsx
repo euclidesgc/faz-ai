@@ -10,7 +10,7 @@ export function ProjectTool({ tool }: { tool: AiToolInfo }) {
   const chooseTool = (id: AiTool) => id !== tool.id && settings.updateBoard({ aiTool: id });
   return (
     <>
-      <SectionHeader title={t('Ferramenta deste projeto')}>
+      <SectionHeader id="harness-tool" title={t('Ferramenta deste projeto')}>
         {t(
           'O projeto trabalha com uma ferramenta de IA por vez. Ela define o arquivo de regras, a pasta das skills, onde o servidor MCP é registrado e os modelos oferecidos nos cards. Pastas de outras ferramentas podem existir no projeto, mas o board não mexe nelas. O servidor MCP do board e a skill do fluxo são instalados em "Tudo que a ferramenta carrega", nas seções Servidores MCP e Skills de cada ferramenta.',
         )}

@@ -28,3 +28,17 @@ describe('rodadas da Implementação', () => {
     expect(MCP_INSTRUCTIONS).toMatch(/quem tem permissão/);
   });
 });
+
+describe('pendências com a pessoa', () => {
+  it('a skill nunca deixa uma pendência só num comentário: entrega com request_review e pending, mesmo em modo autônomo', () => {
+    expect(FLOW_SKILL.body).toContain('## Pendências com a pessoa');
+    expect(FLOW_SKILL.body).toMatch(/nunca fica só num\s+comentário/);
+    expect(FLOW_SKILL.body).toContain('## Ao fechar uma fase ou sub-tarefa');
+    expect(FLOW_SKILL.body).toContain('**Travado em mim**');
+    expect(FLOW_SKILL.body).toMatch(/"Travado em mim" tiver qualquer item[\s\S]*`request_review`[\s\S]*`pending`/);
+    const yolo = FLOW_SKILL.body.slice(FLOW_SKILL.body.indexOf('## Modo autônomo'), FLOW_SKILL.body.indexOf('## Quando parar'));
+    expect(yolo).toMatch(/`request_review` com\s+`pending`/);
+    expect(yolo).toContain('mesmo em modo autônomo');
+    expect(MCP_INSTRUCTIONS).toContain('request_review e `pending`');
+  });
+});

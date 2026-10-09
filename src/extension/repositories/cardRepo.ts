@@ -216,12 +216,16 @@ export class CardRepo {
         all(db, 'SELECT id FROM cards WHERE column_id = ? ORDER BY position', [fromCol]).forEach((r, i) =>
           run(db, 'UPDATE cards SET position = ? WHERE id = ?', [i, str(r.id)]),
         );
-        // o status vale para a coluna: ao entrar em outra, recomeça
-        run(db, "UPDATE cards SET status = ?, status_reason = '', status_at = ?, status_by = '' WHERE id = ?", [
-          entryStatus(col),
-          now(),
-          cardId,
-        ]);
+        // o status vale para a coluna: ao entrar em outra, recomeça. Exceção: a IA que está executando o card
+        // e o move para outra coluna em que ela atua (start_work e depois "Em andamento") continua executando;
+        // zerar aqui apagaria o LED da sub-tarefa segundos depois de acender.
+        const keepRunning = str(card.status) === 'running' && entryStatus(col) === 'ready';
+        if (!keepRunning)
+          run(db, "UPDATE cards SET status = ?, status_reason = '', status_at = ?, status_by = '' WHERE id = ?", [
+            entryStatus(col),
+            now(),
+            cardId,
+          ]);
       }
     }
   }
@@ -244,6 +248,42 @@ export class CardRepo {
     transaction(this.db, () => {
       this.unmark('archived_at', cardId, 'Desarquive a história pai primeiro');
       if (columnId) this.moveInner(cardId, columnId, position ?? Number.MAX_SAFE_INTEGER, byAi);
+    });
+  }
+
+  /**
+   * Restaura um card arquivado pela aba Arquivados. O alvo é o próprio card ou, numa sub-tarefa cuja história
+   * também está arquivada, a história: ela volta com todas as sub-tarefas arquivadas dela (as da lixeira ficam).
+   * Cada card vai para o fim da primeira coluna do próprio workflow, inativo (sem status de trabalho), e a
+   * história sai do modo autônomo. Devolve o id do alvo restaurado.
+   */
+  restoreArchived(cardId: string): string {
+    const db = this.db;
+    return transaction(db, () => {
+      const card = one(db, 'SELECT id, parent_id, archived_at FROM cards WHERE id = ?', [cardId]);
+      if (!card) throw new Error('Card não encontrado');
+      if (card.archived_at == null) return cardId;
+      let targetId = cardId;
+      if (card.parent_id != null) {
+        const parent = one(db, 'SELECT archived_at, deleted_at FROM cards WHERE id = ?', [str(card.parent_id)]);
+        if (parent && parent.archived_at != null && parent.deleted_at == null) targetId = str(card.parent_id);
+      }
+      const ids = all(
+        db,
+        'SELECT id FROM cards WHERE (id = ? OR parent_id = ?) AND archived_at IS NOT NULL AND deleted_at IS NULL ORDER BY (id = ?) DESC, archived_at',
+        [targetId, targetId, targetId],
+      ).map((r) => str(r.id));
+      for (const id of ids) {
+        const row = one(db, 'SELECT workflow_id FROM cards WHERE id = ?', [id]);
+        const first = one(db, 'SELECT id FROM columns WHERE workflow_id = ? ORDER BY position LIMIT 1', [str(row?.workflow_id)]);
+        if (!first) throw new Error('Workflow sem colunas');
+        const t = now();
+        run(db, 'UPDATE cards SET archived_at = NULL, yolo = 0, updated_at = ? WHERE id = ?', [t, id]);
+        this.moveInner(id, str(first.id), Number.MAX_SAFE_INTEGER);
+        // a primeira coluna pode ter a IA ativa (entrada "Pronto"): restaurado volta inativo, como a pessoa espera
+        run(db, "UPDATE cards SET status = NULL, status_reason = '', status_at = ?, status_by = '' WHERE id = ?", [t, id]);
+      }
+      return targetId;
     });
   }
 
@@ -278,6 +318,20 @@ export class CardRepo {
   /** Liga ou desliga o modo autônomo da história. */
   setYolo(storyId: string, enabled: boolean): void {
     run(this.db, 'UPDATE cards SET yolo = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, now(), storyId]);
+  }
+
+  /**
+   * O id da história do card (ele mesmo, ou o pai quando é uma sub-tarefa) quando ela está em modo
+   * autônomo; `null` senão. Uma consulta só, para decidir rápido se vale a pena montar o snapshot
+   * inteiro do board (ex.: `settleDelivery`, chamado a cada movimento de qualquer card).
+   */
+  yoloStoryIdOf(cardId: string): string | null {
+    const row = one(
+      this.db,
+      'SELECT COALESCE(p.id, c.id) AS story_id, COALESCE(p.yolo, c.yolo) AS yolo FROM cards c LEFT JOIN cards p ON p.id = c.parent_id WHERE c.id = ?',
+      [cardId],
+    );
+    return row && num(row.yolo) === 1 ? str(row.story_id) : null;
   }
 
   /** O card (ou a história dele, no caso de uma sub-tarefa) está em modo autônomo. */

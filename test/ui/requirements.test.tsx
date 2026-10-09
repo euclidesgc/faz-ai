@@ -34,7 +34,12 @@ const CLI: BoardRequirement = {
   action: { kind: 'command', command: 'curl https://cursor.com/install -fsS | bash' },
 };
 const MCP: BoardRequirement = { id: 'mcp', tool: 'cursor', optional: true, action: { kind: 'connect' } };
-const PERMISSION: BoardRequirement = { id: 'permission', tool: 'kimi', reason: 'Escolha "Sem restrições".', action: { kind: 'settings' } };
+const PERMISSION: BoardRequirement = {
+  id: 'permission',
+  tool: 'claude',
+  reason: 'Escolha "Sem restrições".',
+  action: { kind: 'settings' },
+};
 
 const missing = () => set([CLI, MCP, PERMISSION]);
 const region = () => screen.queryByRole('region', { name: 'Requisitos do board' });
@@ -126,7 +131,7 @@ describe('skill do fluxo', () => {
     set([{ id: 'skill', tool: 'cursor', action: { kind: 'installSkill' } }]);
     renderThemed(<RequirementsBanner />);
     expect(screen.getByText('Falta 1 requisito para o board trabalhar com a IA')).toBeInTheDocument();
-    expect(screen.getByText('A skill do fluxo (faz-ai-fluxo) não está instalada no Cursor')).toBeInTheDocument();
+    expect(screen.getByText('A skill do fluxo (faz-ai-fluxo) não está pronta para o Cursor')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Instalar a skill' }));
     expect(sentOf('harness.flowSkill.install')).toEqual([
       { type: 'harness.flowSkill.install', tool: 'cursor', scope: 'user', replace: false },
@@ -169,12 +174,12 @@ describe('login vencido: aviso de erro, item sintético e "Abrir no terminal"', 
     expect(region()).not.toHaveClass('warn');
   });
 
-  it('o sinal reativo sem "signin" nos requisitos (Kimi/Copilot, sem probe) monta o item sozinho', () => {
-    setAuthExpired('kimi');
+  it('o sinal reativo sem "signin" nos requisitos (o probe não soube dizer) monta o item sozinho', () => {
+    setAuthExpired('cursor');
     renderThemed(<RequirementsBanner />);
     expect(region()).toBeInTheDocument();
     expect(region()).toHaveClass('error');
-    expect(screen.getByText('A linha de comando do Kimi Code está sem login')).toBeInTheDocument();
+    expect(screen.getByText('A linha de comando do Cursor está sem login')).toBeInTheDocument();
   });
 
   it('"Abrir no terminal" roda o comando pelo host; some no modo navegador', async () => {

@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { TextField } from '@radix-ui/themes';
 import { useBoardStore, type SettingsTab } from '../../store/boardStore';
 import { t } from '../../i18n';
-import { settings } from '../../commands';
+import { settings, ui } from '../../commands';
+import { isWeb } from '../../vscode';
 import { WorkflowsSettings } from './workflows/WorkflowsSettings';
 import { TypesSettings } from './TypesSettings';
 import { FieldsSettings } from './FieldsSettings';
@@ -9,9 +11,9 @@ import { RulesSettings } from './RulesSettings';
 import { HarnessSettings } from './HarnessSettings';
 import { ModelsSettings } from './ModelsSettings';
 import { AppearanceSettings } from './AppearanceSettings';
-import { AgentsSettings } from './AgentsSettings';
 import { GitSettings } from './GitSettings';
 import { BackupSettings } from './BackupSettings';
+import { scrollToAndHighlight } from './highlight';
 import {
   Button,
   DeleteButton,
@@ -21,12 +23,12 @@ import {
   IconBranch,
   IconColumns,
   IconDoctor,
+  IconExternal,
   IconFields,
   IconHarness,
   IconModels,
   IconPanelClose,
   IconPanelOpen,
-  IconAgents,
   IconReset,
   IconRules,
   IconTypes,
@@ -40,11 +42,12 @@ const TABS: [SettingsTab, string, Icon][] = [
   ['fields', 'Campos', IconFields],
   ['rules', 'Regras do board', IconRules],
   ['harness', 'Harness de IA', IconHarness],
-  ['agents', 'Agentes', IconAgents],
   ['models', 'Modelos de IA', IconModels],
   ['git', 'Git', IconBranch],
   ['appearance', 'Aparência', IconAppearance],
-  ['backup', 'Backup', IconBackup],
+  // No editor (VS Code/Cursor), o backup passa a ser feito pelos comandos da paleta
+  // (fazai.exportBoard/fazai.importBoard) e pelo Settings nativo; a aba só existe no modo navegador.
+  ...(isWeb ? ([['backup', 'Backup', IconBackup]] as [SettingsTab, string, Icon][]) : []),
 ];
 
 /** Conteúdo de um botão do menu: ícone sempre; o rótulo só com o menu aberto (recolhido, ele vira o nome acessível). */
@@ -67,6 +70,15 @@ export function Settings() {
   const collapsed = useBoardStore((s) => s.settingsNavCollapsed);
   const setCollapsed = useBoardStore((s) => s.setSettingsNavCollapsed);
   const setView = useBoardStore((s) => s.setView);
+  const pendingSection = useBoardStore((s) => s.pendingSettingsSection);
+  const harnessTab = useBoardStore((s) => s.harnessTab);
+  // rola e destaca a seção pedida pelo editor (`ui.openSettings { section }`) ou por `goToSection`,
+  // depois que a aba (e a sub-aba de Harness, quando a seção mora lá) renderizou
+  useEffect(() => {
+    if (!pendingSection) return;
+    scrollToAndHighlight(pendingSection);
+    useBoardStore.getState().clearPendingSettingsSection();
+  }, [pendingSection, tab, harnessTab]);
 
   return (
     <div className="settings">
@@ -104,6 +116,14 @@ export function Settings() {
           ))}
         </nav>
         <div className="settings-side-actions">
+          {!isWeb && (
+            <Button
+              variant="ghost"
+              onClick={() => ui.openIdeSettings()}
+              {...navProps(collapsed, t('Abrir no Settings do editor'), IconExternal)}
+              title={t('Abre as configurações do Faz AI no Settings do editor (Ctrl+,)')}
+            />
+          )}
           <Button
             variant="ghost"
             onClick={() => setView('environment')}
@@ -150,8 +170,7 @@ export function Settings() {
         {tab === 'appearance' && <AppearanceSettings />}
         {tab === 'harness' && <HarnessSettings />}
         {tab === 'git' && <GitSettings />}
-        {tab === 'agents' && <AgentsSettings />}
-        {tab === 'backup' && <BackupSettings />}
+        {tab === 'backup' && isWeb && <BackupSettings />}
       </div>
     </div>
   );

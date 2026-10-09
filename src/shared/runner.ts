@@ -1,14 +1,18 @@
 /** Execução da IA pelo board: a extensão roda a ferramenta do projeto em segundo plano para trabalhar num card. */
 
+import type { ActivityKind } from './activity';
+
 /** O que a IA pode fazer sem ninguém aprovando cada passo. */
 export type RunnerPermission = 'board' | 'edits' | 'full';
 
 /**
  * O que a IA faz ao ser chamada para um card: `phase` trabalha a fase em que o card está (o que a
  * coluna pede, até passar a vez); `refine` só deixa o card claro e completo (texto, campos,
- * checklist), sem trabalhar a fase, sem mover e sem mexer em arquivos.
+ * checklist), sem trabalhar a fase, sem mover e sem mexer em arquivos; `summarize` lê a conversa do
+ * card e grava um resumo (Decisões/Observações/Pendências) como uma mensagem nova, sem mover o card
+ * nem mudar o status.
  */
-export type AiRunMode = 'phase' | 'refine';
+export type AiRunMode = 'phase' | 'refine' | 'summarize';
 
 export interface RunnerConfig {
   permission: RunnerPermission;
@@ -18,12 +22,14 @@ export interface RunnerConfig {
   heartbeat: boolean;
   /** intervalo entre as rodadas do heartbeat, em minutos */
   heartbeatMinutes: number;
-  /** o heartbeat toca várias histórias ao mesmo tempo; só vale no modo worktree, em que cada história tem a sua pasta */
+  /** o heartbeat toca várias histórias ao mesmo tempo com branch; só vale no modo worktree, em que cada história tem a sua pasta */
   parallel: boolean;
-  /** com `parallel` ligado, quantas histórias ao mesmo tempo (no mínimo duas) */
+  /** com `parallel` ligado, quantas histórias com branch ao mesmo tempo (no mínimo duas); é também o teto das atividades sem branch (só texto), em qualquer modo, mesmo com `parallel` desligado */
   parallelStories: number;
   /** a pessoa pausou o autopiloto; vale até retomar, mesmo depois de reabrir o editor */
   autopilotPaused: boolean;
+  /** nome do agente (arquivo marcado no Harness) usado quando nem o card nem a fase indicam um; vazio = o primeiro marcado, ou o embutido */
+  defaultAgent: string;
 }
 
 export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint: string }[] = [
@@ -55,6 +61,7 @@ export const DEFAULT_RUNNER: RunnerConfig = {
   parallel: false,
   parallelStories: 2,
   autopilotPaused: false,
+  defaultAgent: '',
 };
 
 /**
@@ -63,6 +70,13 @@ export const DEFAULT_RUNNER: RunnerConfig = {
  */
 export const parallelLimit = (runner: RunnerConfig, workspaceMode: string): number =>
   workspaceMode === 'worktree' && runner.parallel ? runner.parallelStories : 1;
+
+/** Teto das atividades sem branch (só texto): `parallelStories`, em qualquer modo e com `parallel` desligado. */
+export const textLimit = (runner: RunnerConfig): number => runner.parallelStories;
+
+/** Teto de execuções simultâneas para o tipo de atividade. */
+export const limitOf = (runner: RunnerConfig, workspaceMode: string, kind: ActivityKind): number =>
+  kind === 'text' ? textLimit(runner) : parallelLimit(runner, workspaceMode);
 
 /** Lê a configuração salva, completando com os padrões o que faltar ou for inválido. */
 export function parseRunner(json: string | null | undefined): RunnerConfig {
@@ -78,6 +92,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
   const parallel = Math.round(Number(raw.parallelStories));
   return {
     autopilotPaused: raw.autopilotPaused === true,
+    defaultAgent: typeof raw.defaultAgent === 'string' ? raw.defaultAgent.trim() : '',
     heartbeat: raw.heartbeat === true,
     heartbeatMinutes:
       Number.isFinite(interval) && interval > 0

@@ -6,18 +6,20 @@ import { Badge, Heading } from '@radix-ui/themes';
  * à direita (`actions`) e a descrição embaixo (`children`).
  */
 export function SectionHeader({
+  id,
   title,
   count,
   actions,
   children,
 }: {
+  id?: string;
   title: string;
   count?: number;
   actions?: ReactNode;
   children?: ReactNode;
 }) {
   return (
-    <header className="section-header">
+    <header id={id} className="section-header">
       <div className="section-header-row">
         <Heading as="h3" size="4">
           {title}

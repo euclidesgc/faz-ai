@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Card, Column as ColumnModel, ColumnCategory, Workflow } from '../../shared/model';
+import { isCardCollapsed, isLive } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { t, dt } from '../i18n';
 import { cards, settings } from '../commands';
@@ -23,8 +24,10 @@ const CATEGORIES: { value: ColumnCategory; label: string; hint: string }[] = [
 interface Props {
   column: ColumnModel;
   workflow: Workflow;
-  /** cards visíveis (após filtros) */
+  /** cards visíveis (após filtros); base da contagem do cabeçalho */
   cards: Card[];
+  /** cards da lista renderizada (faixas do arraste); padrão `cards` */
+  shown?: Card[];
   /** total de cards ativos na coluna */
   total: number;
   index: number;
@@ -81,12 +84,26 @@ export function CollapsedColumn({
   );
 }
 
-export function Column({ column, workflow, cards: visibleCards, total, index, siblings, collapsed, onToggle }: Props) {
+export function Column({ column, workflow, cards: visibleCards, shown, total, index, siblings, collapsed, onToggle }: Props) {
+  const listed = shown ?? visibleCards;
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const state = useBoardStore((s) => s.state)!;
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
+  const collapsedMap = useBoardStore((s) => s.collapsed);
+  const setManyCollapsed = useBoardStore((s) => s.setManyCollapsed);
   const ask = useBoardStore((s) => s.ask);
-  const [adding, setAdding] = useState(false);
+  // o formulário de novo card é um só no board (abrir numa coluna fecha o da outra) e Esc fecha mesmo sem foco no campo
+  const adding = useBoardStore((s) => s.addingColumnId === column.id);
+  const setAddingColumn = useBoardStore((s) => s.setAddingColumn);
+  const setAdding = (open: boolean) => setAddingColumn(open ? column.id : null);
+  useEffect(() => {
+    if (!adding) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAddingColumn(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [adding, setAddingColumn]);
   const [title, setTitle] = useState('');
   const [typeId, setTypeId] = useState<string>('');
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -122,6 +139,8 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
   };
 
   const count = visibleCards.length === total ? String(total) : `${visibleCards.length}/${total}`;
+  const liveCardIds = state.cards.filter((c) => c.columnId === column.id && isLive(c)).map((c) => c.id);
+  const allCardsCollapsed = liveCardIds.length > 0 && liveCardIds.every((id) => isCardCollapsed(collapsedMap, id));
   if (collapsed) {
     return (
       <CollapsedColumn
@@ -173,6 +192,11 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
           items={[
             { label: t('Renomear'), onClick: () => setRenaming(column.name) },
             { label: t('Colapsar'), onClick: onToggle },
+            {
+              label: allCardsCollapsed ? t('Expandir cards') : t('Colapsar cards'),
+              disabled: liveCardIds.length === 0,
+              onClick: () => setManyCollapsed(liveCardIds, !allCardsCollapsed),
+            },
             'sep',
             { header: t('Esta coluna representa') },
             ...CATEGORIES.map((c) => ({
@@ -196,14 +220,7 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
           ]}
         />
       </header>
-      <SortableContext items={visibleCards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-        <div className="column-body">
-          {visibleCards.map((card) => (
-            <SortableCard key={card.id} card={card} />
-          ))}
-        </div>
-      </SortableContext>
-      <footer className="column-footer">
+      <div className="column-footer column-footer--top">
         {adding ? (
           <div className="add-form">
             <TextField.Root
@@ -242,7 +259,14 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
             {workflow.kind === 'child' ? t('+ Nova sub-tarefa') : t('+ Novo card')}
           </Button>
         )}
-      </footer>
+      </div>
+      <SortableContext items={listed.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+        <div className="column-body">
+          {listed.map((card) => (
+            <SortableCard key={card.id} card={card} />
+          ))}
+        </div>
+      </SortableContext>
     </div>
   );
 }

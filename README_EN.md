@@ -67,7 +67,7 @@ In five minutes you have a task moving on the board, with the AI working on it.
    marketplace), open your project's folder and click the **Faz AI** icon in the sidebar. Each
    folder has its own board, already set up with the workflow phases.
 2. **Connect the AI to the board.** In **Configurações → Harness de IA** (Settings → AI harness),
-   pick the project's tool (Claude Code, Codex, Cursor, Kimi Code or GitHub Copilot). In the **Tudo
+   pick the project's tool (Claude Code or Cursor). In the **Tudo
    que a ferramenta carrega** (everything the tool loads) tab, on that tool, click **Instalar (padrão
    da ferramenta)** (install, tool default) in the **Servidores MCP** (MCP servers) section and again
    in the **Skills** section, for the flow skill, which teaches the AI to drive the phases.
@@ -77,7 +77,9 @@ In five minutes you have a task moving on the board, with the AI working on it.
 4. **Let the AI start.** Drag the card to **Discovery** and click **Trabalhar na fase** (work on the
    phase) on the card. The AI reads the card through the board, analyzes the problem and talks with you in the
    **Conversa** (conversation) tab. When it finishes, the status changes to **Aguardando
-   revisão** (waiting for review): it is your turn.
+   revisão** (waiting for review): it is your turn. The same happens when the AI leaves something
+   depending on you (a decision, an open point): the item shows up in the conversation as **Blocked
+   on you** and the card stays with you, even in autonomous mode.
 5. **Review and move on.** Read the phase document, answer, or click **Aprovar** (approve) or
    **Pedir ajustes** (ask for changes). On approval the story moves on to **PRD**, **Spec**,
    **Plan** and **Implementação** (implementation), always with the AI producing and you approving.
@@ -95,15 +97,22 @@ is needed, at the right time:
 - **Each card is a new, short session.** Instead of one long conversation that accumulates
   everything, the AI opens the card through the board (`get_card`), does that piece of work and
   stops. The history stays on the card, not in the context window.
-- **Skills only when indicated.** An automatic skill puts its description in every session; marked
-  **Só quando indicada** (only when indicated), it only enters the cards that ask for it. Under
-  **Harness de IA → Tudo que a ferramenta carrega**, the board shows how many skills are automatic
-  and how many characters of description they put into every session.
-- **Agents that restrict.** An agent can allow only some MCP servers and tools, and the **clean
-  session** drops your user-folder customizations: fewer tool definitions loaded for nothing (what
-  Claude Code and Cursor enforce by parameter is in the [Agents](#agents) table).
+- **Empty context by default.** Every run started by the board begins with no rule, skill, agent,
+  hook or plugin from your machine or the project: only what you checked under **Harness de IA**
+  gets in. In Claude Code this is enforced by parameter (`--setting-sources ""`,
+  `--disable-slash-commands` and an MCP servers file with the board's server only); in the other
+  tools, whatever the command line accepts (see the [Agents](#agents) table).
+- **Rules and skills checked, not discovered.** Each file has two check marks: **Incluir em todo
+  contexto** (include in every context: goes into every run, by path) or **Usar quando fizer
+  sentido** (use when it fits: becomes an option of the card's Rules and Skills fields, and Refine
+  with AI picks it when the request calls for it). What is not checked does not exist for the run.
+- **Agents with the minimum.** An agent allows only the MCP servers and tools it needs, carries its
+  own skills and has short instructions; everything else stays out.
 - **Documents as attachments.** PRD, Spec and Plan stay attached to the story; the AI reads them
   when the card needs it, instead of getting them pasted into every message.
+- **Markdown attachments open formatted.** A `.md`/`.markdown` file opens like a page, with headings,
+  lists, tables and code blocks formatted; a **Formatted**/**Code** selector shows the raw text when
+  needed. Edit, Save and Copy content still operate on the Markdown.
 - **The right model for each task.** Suggestion rules and the model per card or per agent avoid
   using the most expensive model where a lighter one is enough.
 
@@ -122,7 +131,7 @@ promise a percentage: it shows, in the inventory, what is being loaded.
   Discovery the AI analyzes the problem and talks to you before any requirement is written; in
   Homologação the story is only completed with your approval.
 - **Work with the AI on the same board.** The extension exposes the board over MCP. Claude Code,
-  Codex, Cursor, Kimi Code, GitHub Copilot or any other MCP client can read and edit everything the
+  Cursor or any other MCP client can read and edit everything the
   interface allows, and the changes show up on the board right away.
 - **Know who has each card.** Every card the AI works on has a status: Pronto (ready), Em execução
   (running), Aguardando resposta (waiting for an answer), Aguardando revisão (waiting for review),
@@ -146,16 +155,24 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 
 1. Open a folder in the editor and click the **Faz AI** icon in the sidebar. Each folder has its
    own board.
-2. Create stories with **+ Novo card** (new card) and drag them between columns. Clicking a story
-   shows only its sub-tasks; double-click opens the details.
+2. Create stories with **+ Novo card** (new card) and drag them between columns. While you drag, the
+   other cards slide aside with a smooth animation and a dashed gap shows where the card will land;
+   on drop it settles straight into place, without flicker. Clicking a story shows only its
+   sub-tasks; double-click opens the details.
 3. The card details hold the status, the description in Markdown, the fields, the checklist, the
    sub-tasks, the conversation and the attachments. The conversation is where you and the AI talk
    about the card. Phase documents (PRD, Spec, Plan…) are built in sub-tasks but stay attached to
    the story; in sub-tasks they appear as links.
 4. Search by text or by ID (`#12`). The **Filtros** (filters) section of the sidebar filters by
    type, fields, dates and relationships.
-5. Cards can be archived (the "Arquivados" column at the end of each row) or sent to the **Lixeira**
-   (trash), from where they can be restored.
+5. Cards can be archived (card actions menu → **Arquivar**) or sent to the **Lixeira** (trash), from
+   where they can be restored. Archived cards leave the board rows and live in the **Arquivados**
+   (archived) tab, between Métricas and Lixeira, which preserves the history: one row per workflow,
+   in board order, newest first. **Restaurar** (restore) sends the card back to the end of the first
+   column of its workflow (Backlog / A fazer on the default board), inactive. Restoring a story also
+   brings back all its archived sub-tasks and turns autonomous mode off; restoring a sub-task whose
+   story is archived asks for confirmation and restores the whole story (a sub-task of an active
+   story comes back on its own, with no confirmation).
 
 ![Open card: status, approval, fields, description and checklist](docs/images/card_en.png)
 
@@ -172,6 +189,8 @@ who the next step is waiting on (a robot for the AI, a person for you) and how l
 like that, the fields, the AI model (e.g. "Sonnet 5.5 - baixo", with the effort in Portuguese) and,
 in the footer, the counters, the branch and the PR. Cards waiting on you get a border in the
 status color, and the LED on the bar tells the card's state at a glance: green and blinking slowly while the AI is working on it (on a story, also when it works on one of its sub-tasks), yellow when it is waiting on you, red when it is blocked, and off when nothing is happening. On a story, the sub-task list shows the same LED on each one: green and blinking while running, red when blocked, yellow when waiting on you, and off when stopped.
+
+**Collapsed cards.** You can collapse cards to fit more rows of a column in the same screen. A collapsed card keeps the type's colored strip (with the AI LED, the number, the type and the buttons) and shows the title in up to two lines, hiding the rest; the status border stays (if the card is waiting on you), so you can sweep the board at a glance and know what needs your attention. Collapse can be applied in four scopes: a single card (button on the card itself), all cards in a column (item in the column's action menu), all cards on the board (button in the filter bar) or just the selected cards (button in the multi-select bar). The state is remembered between sessions.
 
 ### Links between cards
 
@@ -232,8 +251,8 @@ navegador**; the terminal `faz-ai` warns and does not start.
 
 ## Using it with AI
 
-1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code, Codex,
-   Cursor, Kimi Code or GitHub Copilot).
+1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code or
+   Cursor).
 2. In the **Tudo que a ferramenta carrega** (everything the tool loads) tab, pick the tool and, in
    the **Servidores MCP** (MCP servers) section, click **Instalar (padrão da ferramenta)** (install,
    tool default). The board registers the `faz-ai` server in the global file the tool reads.
@@ -246,14 +265,12 @@ buttons:
 
 | | Where it writes | When to use |
 |---|---|---|
-| **Instalar (padrão da ferramenta)** (tool default) | global config: `~/.claude.json` (through `claude mcp add --scope user`), `~/.cursor/mcp.json`, `~/.codex/config.toml`, `~/.kimi-code/mcp.json`, `~/.copilot/mcp-config.json`; the skill in `~/.claude/skills`, `~/.cursor/skills` and equivalents | recommended: the board works in any repository opened with it, with no file in the project |
-| **Instalar neste projeto** (this project) | `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.kimi-code/mcp.json` or `.vscode/mcp.json`; the skill in `.claude/skills`, `.cursor/skills` and equivalents | pinning a version in a repository or a fork, or a skill tailored for the team |
+| **Instalar (padrão da ferramenta)** (tool default) | global config: `~/.claude.json` (through `claude mcp add --scope user`), `~/.cursor/mcp.json`; the skill in `~/.claude/skills`, `~/.cursor/skills` and equivalents | recommended: the board works in any repository opened with it, with no file in the project |
+| **Instalar neste projeto** (this project) | `.mcp.json` or `.cursor/mcp.json`; the skill in `.claude/skills`, `.cursor/skills` and equivalents | pinning a version in a repository or a fork, or a skill tailored for the team |
 
 The global registration does not pin the project folder: Claude Code passes the folder in the
-`CLAUDE_PROJECT_DIR` variable, VS Code's `mcp.json` gets `${workspaceFolder}`, and in the others the
-board's bridge finds the board by walking up from the folder the tool was opened in. In GitHub
-Copilot, the global registration covers the Copilot CLI and, in VS Code, the editor profile's
-`mcp.json`.
+`CLAUDE_PROJECT_DIR` variable, and the board's bridge finds the board by walking up from the folder
+the tool was opened in.
 
 **In Cursor there is nothing to install.** Cursor's global scope is a single process for all windows
 and cannot tell which board to serve, so the board writes the project's `.cursor/mcp.json` on its own
@@ -273,8 +290,7 @@ the project's tool, and the MCP tool `install_flow_skill` takes `scope` (`user`,
 While something is missing for the board to work with the tool, a yellow bar stays at the top of
 the board, on every screen, and in the chat panel. It checks Node.js (the board's server runs on
 it), the tool's command line, its sign-in (for Cursor, through `cursor-agent status`; for Claude
-Code, through `claude auth status`; best-effort for Codex; Kimi and Copilot have no status command
-and rely only on the reactive warning below), the board's
+Code, through `claude auth status`), the board's
 server registration in the file the tool reads (for Claude, the registration for your user from
 `claude mcp add -s user` also counts), a registration pointing to a node or path that no longer
 exists, to another folder or to the bridge of an earlier version, and the permission level. Each
@@ -299,14 +315,13 @@ expired mid-run), it switches to an error highlight instead of the usual yellow,
 no terminal** (open in terminal) button next to the command to copy: the board opens an editor
 terminal and runs the command there, but you always do the actual sign-in. Before every AI call (the
 card's button, the heartbeat and autonomous mode), the board checks the sign-in again; if it expired,
-the run does not even start. When the tool has no status command (Kimi, Copilot) or the login
-expires mid-run, the first failure that matches a known pattern ("OAuth session expired", "not
+the run does not even start. When the login expires mid-run, the first failure that matches a known pattern ("OAuth session expired", "not
 logged in", "401", etc.) does not block the card: it goes back to the status it had, with a short
 comment, and the same error warning turns on at the top of the board — the heartbeat and autonomous
 mode do not retry on their own while it is on. The warning goes away and the queue resumes on its
 own once the sign-in is confirmed again (by the periodic check, within 10 seconds of signing in, or
-via **Já entrei: verificar de novo** — I signed in, check again) or, for tools without a status
-command, on the first manual run that succeeds. The environment check shows the same warning in the
+via **Já entrei: verificar de novo** — I signed in, check again) or, when the check cannot tell, on
+the first manual run that succeeds. The environment check shows the same warning in the
 **Login na linha de comando** (command line sign-in) item.
 
 **Environment check.** The first time the board opens on a machine, a `flutter doctor`-style list
@@ -379,7 +394,9 @@ IA → "O que a IA pode fazer" applies (by default, the board only), and so does
 
 A card has two buttons that run the project's tool in the background. It is not a live chat: the
 answer arrives as a message in the conversation when the run ends, and meanwhile the card shows "Em
-execução" (with a **Parar** button to stop it).
+execução" (with a **Parar** button to stop it). The buttons show an explanatory hint (with bold text and bullet points)
+when you hover the mouse or focus with the keyboard; the hint opens on hover and on keyboard focus, closes with Esc,
+and stays visible even when the button is blocked.
 
 - **Trabalhar na fase** (work on the phase) does the work of the column the card is in, the same as
   the heartbeat would: in Discovery it analyzes the problem, in PRD it writes the PRD, in
@@ -392,24 +409,32 @@ execução" (with a **Parar** button to stop it).
   on it: rewrites the title and description (without inventing requirements; whatever is ambiguous
   becomes a "Dúvidas em aberto" list), reviews Tags, Esforço da atividade, Modelo and Skills even if
   they already have a value, and adds the missing steps to the checklist. It does not work on the
-  phase, create sub-tasks, move the card or touch files: it runs with the board only (in Kimi, which
-  lacks that level, the request forbids touching files). At the end it summarizes in the conversation
+  phase, create sub-tasks, move the card or touch files: it runs with the board only. At the end it summarizes in the conversation
   what changed (with the previous description, if it rewrote it) and the card returns to the status
   it had, also when the run fails: the failure goes to the conversation, without blocking the card. A
   refine does not count as a run without progress for the autonomous mode.
 
 Images pasted into the message become card attachments and the AI receives them.
 
+- **Resumir a conversa** (summarize the conversation), in the Conversa tab, shows up from 2
+  messages on: it reads the whole conversation and writes a summary (Decisões, Observações,
+  Pendências — decisions, notes, pending items) as a new AI message (`kind: "summary"`), without
+  automatically deleting anything, without working on the phase, moving the card or changing its
+  status — it runs with the board only, always at the "Alto" model tier (regardless of the card's
+  Esforço). You review the summary the same way you review any message: agree by leaving it as is,
+  or edit the text. Right below it, a recommendation with the **Apagar mensagens resumidas** (delete
+  summarized messages) button deletes, with confirmation, every message before the summary;
+  summarizing again creates a new record, it does not replace the previous one. It is also
+  available as the MCP tool `generate_summary`, with the same result.
 - What the AI may do in these runs is set in Configurações → Harness de IA → **Execução pela
   conversa**: only the board (default), the board and project files, or no restrictions. The level
   in use is shown next to the button, with a shortcut to change it. The AI is told about the limit:
   if the work needs more than the level allows, it blocks the card saying which option to choose.
-- Kimi Code, when running in the background, only works at the "no restrictions" level. Cursor
-  accepts all three: at "only the board" and "board and files" its session gets only the tools of
+- Cursor accepts all three levels: at "only the board" and "board and files" its session gets only the tools of
   that level (reading and MCP; reading, MCP and editing), with no terminal.
 - The tool must be installed and signed in. Its CLI does not need to be on the PATH: the board also
   looks in the usual install folders and inside editor extensions (if you only use the Claude Code
-  or Codex extension, you already have the executable). Cursor's CLI is `cursor-agent` (the
+  extension, you already have the executable). Cursor's CLI is `cursor-agent` (the
   `curl https://cursor.com/install -fsS | bash` installer also creates the `agent` shortcut); sign in
   once with `cursor-agent login`.
 - With Claude Code, the board's server is passed on the command line of each run: it does not
@@ -434,21 +459,29 @@ creation tokens, the cost in dollars, the number of turns and the tool's session
 records the **inventory** of what the AI used: native tools, MCP tools (with the server of each
 one), subagents and skills, with the number of calls.
 
-- **Cost comes from two sources.** When the tool reports the cost, the board stores that value.
-  When it does not, the board estimates it: tokens multiplied by the model's **price per million
-  tokens**, which you fill in under Configurações → **Modelos de IA** (Settings → AI models; four
-  prices: input, output, cache read and cache creation) or through MCP with `upsert_model`. An
-  estimated cost is always marked "(estimado)". A model without all four prices gets no calculated
-  cost: the value stays blank, never 0.
+- **Cost is what the tool reports; the board calculates nothing.** There is no price table: a value
+  computed from a price list goes stale when the vendor changes its rates and produces a wrong
+  report that looks right. Today:
+
+  | Tool | Tokens | Cost in dollars |
+  | --- | --- | --- |
+  | Claude Code | measured (input, output, cache read and cache creation, per model, subagent included) | the `total_cost_usd` the CLI itself reports |
+  | Cursor | measured (the four counters) | the CLI does not report it: left blank |
+
+  Wherever you see "não medido" (not measured) or a blank cost, this is why: missing measurement,
+  never zero consumption. A run with tokens and no cost (the Cursor case) counts in the tokens and
+  stays out of the cost; the Métricas note says how many runs were left out.
+- **Every run goes through a single door.** The card runner (manual, heartbeat and autonomous mode)
+  and the board chat call the AI through the same point in the code (`AiGateway`), which opens the
+  log row before running, closes it with the outcome and stores the consumption. Each tool has its
+  own provider, which builds the command and reads the output. A third way to call the AI does not
+  exist without going through it, and a test fails if any file tries. What stays out of the record,
+  by nature, is whatever you run straight in the terminal or in the tool's own chat, without the board.
 - **In the log channel** (**Output → Faz AI**), the tool's output appears as readable lines, and at
   the end of each run a summary line follows with input, output, cache read and cache creation,
   turns and cost, for example `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100
-  criação de cache · 8 turnos · US$ 0,4210 (estimado)`. Turns and cost are left out when the tool
-  does not report them. The line is written in Portuguese, as the board's log channel is.
-- **Copilot has no measured consumption.** It has no structured output, so its runs are recorded,
-  but without tokens, cost or inventory. Wherever you see "não medido" (not measured), this is why:
-  missing measurement, not zero consumption. The same applies to runs that end before the tool
-  reports consumption.
+  criação de cache · 8 turnos · US$ 0,4210`. Turns and cost are left out when the tool does not
+  report them. The line is written in Portuguese, as the board's log channel is.
 - **Questions in the board chat** are recorded too, with no card attached.
 - **The detail of each run is kept for a window you configure**, from 1 to 24 months (the current
   month plus the earlier ones). The default is 6 months. After the window the detail is discarded,
@@ -496,8 +529,10 @@ and also in the board opened in the browser.
 - **What the AI used** ("O que a IA usou"). Tools, MCP tools (with the server in its own column),
   subagents and skills, with the number of runs and uses. "Not measured yet" (no run recorded an
   inventory) is different from "no records in the period".
-- **Tokens and cost.** Tokens count even when the model has no price configured; cost adds up only
-  the runs that have a price, and the note says how many were left out. Before the board measures
+- **Tokens and cost.** Cost adds up only the runs in which the tool reported the cost (Claude Code), and
+  the note says how many were left out; tokens count in every measured run. Older runs, from before the
+  board stopped calculating cost from a price table, stay marked "estimado por tabela de preços"
+  (estimated from a price table). Before the board measures
   consumption, cost and inventory show as "não medido" (not measured) and almost every lead time as
   unknown: that is the expected behavior, not a failure.
 - **Detail kept** ("Detalhe guardado"). Shows the retention window for the runs' detail and how much
@@ -522,7 +557,7 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 - The aggregation can group by phase (`phase`), card type (`card_type`), AI tool (`tool`), model
   (`model`), effort (`effort`), profile (`profile`), card (`card`), agent (`agent`), skill (`skill`),
   used tool (`used_tool`) or MCP tool (`mcp_tool`). Omit to get only the period's total.
-- `tool` and `used_tool` are not the same thing: `tool` is the AI tool that ran (claude, codex);
+- `tool` and `used_tool` are not the same thing: `tool` is the AI tool that ran (claude, cursor);
   `used_tool` and `mcp_tool` are what the run used (Read, Bash, `get_card`). In `mcp_tool` the server
   comes in its own column, or "servidor não registrado" (server not recorded) when the name did not
   carry it.
@@ -531,11 +566,9 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 - On the **agent**, **skill**, **used_tool** and **mcp_tool** dimensions the table shows only the
   count of runs and uses (no tokens or cost, which cannot be split among a run's components).
   `effort` and `profile` have tokens and cost.
-- Tokens count even when the model has no price configured; cost comes only from runs that have a
-  price.
+- Tokens count in every measured run; cost comes only from runs in which the tool reported it (Claude Code).
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`.
-- Unmeasured values appear as "-" (never 0), for example Copilot runs. A cost estimated from the
-  model's price is marked as estimated.
+- Unmeasured values appear as "-" (never 0), for example Cursor's cost.
 - Always tells you when the board's history started and which periods have only monthly totals
   (without per-run detail). Periods outside the retention window (6 months by default) have no detail and aggregate only
   the already-consolidated totals.
@@ -550,17 +583,22 @@ progress. Sub-tasks commit to the story's branch.
 - The branch is created when the AI starts the implementation (it calls `prepare_workspace`) or with
   the **Criar branch da história** (create the story's branch) button on the card.
 - The card shows the branch and opens the working folder in a new window.
-- Configurações → **Git** holds the mode (worktree, branch in the same folder, or off), the branch
-  name pattern, the worktrees folder, automatic PR merge when approving acceptance, and automatic
-  merge detection, with the archiving of already published stories (on by default).
+- The mode (worktree, branch in the same folder, or off), the branch name pattern, the worktrees
+  folder, **drive stories in parallel**, automatic PR merge when approving acceptance and automatic
+  merge detection, with the archiving of already published stories (on by default), live in the
+  editor Settings, under **Faz AI › Git** (see [Settings in the editor
+  Settings](#settings-in-the-editor-settings)); in the browser they stay on the Git tab and the
+  parallel block in the Harness, as before.
 - Each worktree is a working copy: dependencies have to be installed in it.
 
 ### Pull request and merge in Homologação
 
-In Homologação the AI pushes the branch, opens the story's pull request, records its address on the
+In Homologação the AI writes the **"Como testar"** (how to test) script — what was built, the steps
+to verify it with the expected result, and what was left out — in the story's description, pushes
+the branch, opens the pull request with the same script in its body, records its address on the
 card and asks for your review. The card shows the PR link.
 
-Automatic merge is optional and starts turned off (Configurações → Git). With it on, when you
+Automatic merge is optional and starts turned off (editor Settings, Faz AI › Git). With it on, when you
 approve a story that is in the last column before completion:
 
 1. the board merges the PR through the GitHub CLI (`gh`), with the configured method (squash, merge
@@ -575,8 +613,8 @@ automatic merge off, approving only marks the card, and the AI moves it to Concl
 ### Automatic merge detection
 
 The board can watch a delivered story's pull request and detect when it is merged, concluding the
-story automatically. The feature starts on (Configurações → Git, **Concluir a história quando o
-pull request for mergeado**). A periodic routine checks the PR state at a configurable interval
+story automatically. The feature starts on (editor Settings, Faz AI › Git, **Concluir a história
+quando o pull request for mergeado**). A periodic routine checks the PR state at a configurable interval
 (**Verificar a cada (minutos)**, default 15, range 5 to 1440). When the merge is detected:
 
 1. the board records the merge commit on the card;
@@ -592,7 +630,7 @@ In the same round, after looking at the pull requests, the board takes the last 
 **when the version containing a concluded story is published, it records in the conversation which
 version carried it (tag and release link) and archives the card**. That way the Concluído column
 holds only what is merged and has not reached your users yet; what was already delivered goes to the
-workflow's archived area, from which you can unarchive it at any time. There is nothing to turn on:
+Arquivados tab, from which you can restore the story (with its archived sub-tasks) at any time. There is nothing to turn on:
 the step comes along with merge detection, on the same interval and the same switch, and it is on by
 default with it.
 
@@ -612,26 +650,44 @@ version, which have no merge commit recorded, stay yours to archive with one cli
 
 With the heartbeat on (Configurações → Harness de IA), the board calls the AI on its own at every
 interval, while the editor is open in the project folder. In each round it advances approved cards,
-answers pending messages and works on ready cards, one story at a time. In "Worktree por
-história" mode, **Tocar histórias em paralelo** (drive stories in parallel; on the same screen, off by
-default) makes the heartbeat drive several stories at once, each in its own working folder: two by
-default, up to six in **Histórias ao mesmo tempo**; the limit
-counts every run in progress, including the ones called by hand. Outside that mode, and in
-autonomous mode (whose stories are stacked), it stays one at a time, and the field is disabled. The
-Git screen explains why in each mode: with a branch in the project folder, two stories at once would
-switch the branch under each other and mix their changes; with worktrees they are isolated, at the
-cost of one more copy of the files on disk per story (with dependencies installed in each) and more
-memory and CPU while several AI sessions, tests and builds run together.
+answers pending messages and works on ready cards, with one run per story. Activities **without a
+branch** (refine, summarize and the phases that only produce a document, such as Discovery, PRD,
+Spec and Plan on the default board; the rule is any column with an artifact before the code phase)
+run at the same time in any workspace mode, up to **Histórias ao mesmo tempo** (two by default, up to
+six), even with **Tocar histórias em paralelo** off. Activities **with a branch** (Implementation
+and Homologation) keep the previous limit: one at a time outside the worktree. In "Worktree por
+história" mode, **Tocar histórias em paralelo** (drive stories in parallel; editor Settings, Faz AI
+› Git; off by default) makes the heartbeat drive several branch stories at once, each in its own
+working folder, up to the same **Histórias ao mesmo tempo**. The two caps (text and branch) are
+counted separately; each counts every run in progress, including the ones called by hand. In
+autonomous mode (whose stories are stacked), the queue order applies to stories that need a branch;
+a story in a text phase starts as soon as there is a free slot, even with the previous one still
+open. Outside the worktree, `prepare_workspace` called in a text phase while another story has a run
+in progress is refused (folder in use): the branch is created in the code phase. With the "Sem
+restrições" permission the AI can still switch branches by hand; the guard covers only the board's
+path. The
+description of each Git key in the Settings explains why in each mode: with a branch in the project
+folder, two stories at once would switch the branch under each other and mix their changes; with
+worktrees they are isolated, at the cost of one more copy of the files on disk per story (with
+dependencies installed in each) and more memory and CPU while several AI sessions, tests and builds
+run together. In the editor the Git tab and the parallel block in the AI harness become a link to
+the Settings; in the browser they stay as editable fields, as before.
 
 - With nothing pending for the AI, nothing runs.
-- The round follows the board order: bugs first, then top to bottom — what decides is the card's
+- The round follows the board order: bugs first; then the rightmost story (the most advanced one
+  finishes before a new one starts); within a column, top to bottom — what decides is the card's
   position, not its number nor what has already been approved.
 - Cards that are with you (waiting for review or an answer, blocked) are not touched, unless you
   left an unanswered message in the conversation.
 - **Rodar o heartbeat agora** (run the heartbeat now), in the settings or with the command **Faz AI: Rodar o heartbeat
   agora**, starts a round right away, even with the heartbeat off. **Faz AI: Parar as execuções da
   IA** stops everything.
-- The status bar shows the cards being run and the time of the next round.
+- The activity bar at the bottom of the board (visible on every view) shows what the AI is doing
+  right now: with one run, "IA em #12 (Discovery, há 3 min)", with the card reference clickable to
+  open it; with several, "IA em N cards: #12 Discovery · #15 refinando · …" and the full list in
+  the tooltip. With no run at all, it shows the reason: the autopilot's note (why the queue
+  stopped), the heartbeat's state ("Heartbeat desligado", "Heartbeat parado: motivo", "Próxima
+  rodada às HH:MM") or, finally, "IA parada".
 - The **heart** at the top right of the board shows the heartbeat: red and beating while it is
   running; grey and still when it is off or cannot run (no connection to Faz AI, or no tool).
   Clicking it turns the heartbeat on and off.
@@ -659,19 +715,21 @@ story by itself, **without asking for authorization or confirmation on anything*
 - **No restrictions**: in the mode's runs the AI uses the "Sem restrições" permission (edits files
   and runs commands), because it needs git and `gh`. Turning the mode on accepts this for the story.
 - **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in board
-  order — bugs first, then top to bottom — and moves on to the next story in the queue as soon as
+  order — bugs first, then the rightmost, and within a column top to bottom — and moves on to the next story in the queue as soon as
   the current one is delivered (stopped at the AI's last column, with the pull request recorded),
-  without waiting for your review or the heartbeat interval. The queue skips a story that is
-  blocked or waiting on a person (an answer or a review) and moves on to the next; it only waits
-  when every pending story is with a person, and the button's note gives the reason for each one.
-  Each story's branch starts from the most recently created branch among the other autonomous-mode
-  stories still open — skipping one that is blocked with no pull request open — in the same order
-  the queue runs in, even after dragging cards — and its pull request is opened with `--base` on
-  it, forming a stack of PRs; with no other open story ahead of it, the branch starts from the main
+  without waiting for your review or the heartbeat interval. No impediment holds up the queue: a
+  story that is blocked, waiting for your answer, waiting for another card to finish (a
+  dependency), or stuck in a cycle (open, but with nothing pending with the AI) is skipped, and the
+  turn goes to the next story in the queue that can advance — run, or move to another column when
+  the AI does not work in it. A story that depends on another keeps waiting for that one to finish,
+  even while stories further down the queue run ahead of it; it goes back into contention once the
+  dependency leaves open. Only when no story in the queue can advance does the autopilot show the
+  impediment warning, with the reason of the first story that is stuck. Each story's branch starts from the
+  most recently created branch among the other autonomous-mode stories still open — the same order
+  the queue runs in, even after dragging cards — and its pull request is opened with `--base` on it,
+  forming a stack of PRs; with no other open story ahead of it, the branch starts from the main
   branch. A story whose predecessor in the stack already had its pull request merged also starts
-  from the main branch, since its code is already there. The story's conversation records the base
-  it picked and which story was skipped; if the skipped story is delivered later, the next pull
-  request may need a rebase by your hand — the stack turns into a tree at that point.
+  from the main branch, since its code is already there.
 - **Splitting a large request**: the AI can create the following stories from an autonomous story
   (`create_card` with `autonomous_from`). They are born autonomous, join the queue, and get a
   **related** link to the origin story (skipped silently if any link already exists between the
@@ -689,65 +747,98 @@ pausing interrupts the AI) or **Retomar modo autônomo** (resume; dimmed, paused
 autônomo (YOLO)** and **Faz AI: Parar as execuções da IA e o modo autônomo**. When the editor
 opens, the autopilot starts by itself whenever there is a pending autonomous-mode story, unless
 you paused it: the pause is recorded on the board (it survives reopening the editor), and
-"Retomar" clears it; closing the editor does not count as a pause, but "Faz AI: Parar as execuções
-da IA e o modo autônomo" does. After a failure to start the AI tool, the autopilot does not start
-itself again until you resume it. The heartbeat does not drive autonomous stories; they belong to
-the autopilot.
+"Retomar" (resume), or turning the mode on for a story, clears it; closing the editor does not count
+as a pause. After a failure to start the AI tool, the autopilot does not start itself again until
+you resume it. With the tool's login expired, the autopilot and the heartbeat wait for the sign-in
+to come back, without spending runs. The heartbeat does not drive autonomous stories; they belong
+to the autopilot.
 
 
 ### Agents
 
 ![Agent with intent, chosen skills and read-only tools](docs/images/agents_en.png)
 
-An agent (Configurações → **Agentes**) says how the AI works on a card: which skills it reads, which
-MCP servers and tools (available and denied) it can use, which model and effort, and whether the
-session is clean (without your user-folder customizations and without automatic skill invocation).
-Every run started by the board goes through an agent: the one chosen on the card; otherwise the
-phase's (Workflows e colunas → Fase); otherwise the board default. The board always has at least
-one, the **Agente padrão** (default agent), which restricts nothing.
+An agent is an **agent file of the AI tool** (`~/.claude/agents/<name>.md`,
+`~/.cursor/agents/<name>.md`): the instructions are the session
+role, and the frontmatter sets the model and effort, the tools (available and denied), the skills and
+the MCP servers it gets. For the board, agent and execution profile are the same thing. The files are
+read from disk; the board only stores, per project, which ones are **available** and which is the
+**default** (Harness de IA → Ferramenta e execução). Every run started by the board goes through an
+agent: the one chosen on the card; otherwise the phase's (Workflows e colunas → Fase); otherwise the
+default. With none checked, the built-in agent applies, with no instructions.
 
-To configure without knowing every skill or tool:
+Agents the board creates go to the tool's global folder (they apply in any project), and the ones
+already in the project show up under the **Projeto** tab. On the board's first opening, ten factory
+agents are created globally, checked as available, with **condutor-do-board** as the default: it
+drives cards through the flow, picks the right specialist for each subtask and, in Implementação,
+delegates each one to that specialist as a subagent (a story's session receives the board's other
+available agents as subagents). The others
+(frontend-web, backend-node, backend-python, mobile-flutter, documentacao-tecnica, qa-testes,
+revisor-de-codigo, devops-infra, dados-sql) have minimal instructions, for you or the AI to adapt to
+the project. What you delete does not come back on its own; **Recriar os agentes padrão** (recreate
+the default agents) recreates whatever is missing.
 
-- **O que este agente faz** (what this agent does): one sentence of intent. With it, the **Sugerir
-  pela intenção** (suggest from intent) button selects the skills (and MCP servers) whose name or
-  description match. The suggestion is word-based, local and does not call an AI; you confirm what
-  stays.
-- **Skills**: the same picker window as the card, with search, origin tabs and checkboxes.
-- **Tools**: ready-made sets (**Só leitura** read-only, **Editar código** edit code) and an editable
-  list.
-- **Tool subagent**: optional, an agent file of the tool itself (for example
-  `.claude/agents/reviewer.md`) to drive the session.
+On the Agentes tab of each scope:
 
-Each run started by the board ("Trabalhar na fase", "Refinar com IA" and the heartbeat) is a new session, with only what is
-on the card. The agent becomes command-line parameters where the tool accepts them; the rest goes
-into the prompt, as instructions:
+- **Disponível no board** (available on the board): cards and phases can pick the agent. **Tornar
+  padrão** (make default) makes it run when none of them picks.
+- **Novo agente** (new agent): name, description (it is how Refine with AI picks), model and
+  instructions.
+- **Editar** (edit): each frontmatter field saves on blur; the instructions have Save. Skills come
+  from the same picker as the card (checked ones only); tools have ready-made sets (**Só leitura**
+  read-only, **Editar código** edit code).
+- **Sugerir agentes com IA** (suggest agents with AI): the AI reads the project (structure,
+  dependencies, README) and creates or adjusts 3 to 8 agents for it through MCP, leaving them
+  available. The result lands in the board chat.
+
+Each run started by the board ("Trabalhar na fase", "Refinar com IA" and the heartbeat) is a new,
+empty-context session, with only what is on the card. The agent becomes command-line parameters where
+the tool accepts them; the rest goes into the prompt, as instructions:
 
 | Tool | Enforced by parameter | Advised only |
 | --- | --- | --- |
-| Claude Code | subagent, MCP servers, tools, model and effort, clean session | skills |
-| GitHub Copilot | subagent, MCP servers, tools, model and effort | skills, clean session |
-| Kimi Code | subagent, model | skills, MCP servers, tools, clean session |
-| Codex | MCP servers, model and effort | subagent, skills, tools, clean session |
+| Claude Code | agent (inline, in `--agents`), MCP servers, tools, model and effort, empty context | skills and rules |
 | Cursor | model | everything else |
 
-Skills are always passed by file path. In a conversation you open yourself, the agent reaches the
-AI through `get_card`, as guidance.
+Skills and rules are always passed by file path. In a conversation you open yourself, the agent
+reaches the AI through `get_card` (`execution`), as guidance. Through MCP, `get_board` lists the
+available agents, `set_card_profile` picks one for a card, and `create_agent`, `update_agent`,
+`get_agent` and `delete_agent` manage the files.
 
 ## AI harness
 
 ![Project and global skills, with the flow skill install, global or in the project](docs/images/harness_en.png)
 
-Configurações → **Harness de IA** holds everything the AI tools load, in three tabs: **Ferramenta e
-execução** (tool and run: the project's AI and how the board calls it), **Do projeto** (from the
-project: the rules file, skills and agents that are part of the repository, editable there) and
-**Tudo que a ferramenta carrega** (everything the tool loads). In the last one, under **Tudo que
-cada ferramenta carrega** (everything each tool loads), there is one tab per tool with eight sections (instructions
-and rules, skills, subagents, commands and prompts, hooks, MCP servers, plugins, settings and
-permissions), each split into three scopes:
+Every run started by the board starts from an **empty context**: no rule, skill or agent from your
+machine or the project gets in on its own. Under Configurações → **Harness de IA** you check what
+gets in, in four tabs: **Ferramenta e execução** (tool and run: the project's AI, the permission,
+the default agent and the heartbeat), **Projeto** and **Global** (the files of each folder, in three
+sub-tabs: **Rules**, **Agentes** and **Skills**, with the check marks on each row) and **Tudo que a
+ferramenta carrega** (everything the tool loads). Project and Global are only the folder the file
+comes from; what counts is the check mark, which belongs to this board.
+
+Under Rules and Skills, each row has two mutually exclusive boxes:
+
+- **Incluir em todo contexto** (include in every context): the file goes into every run (work the
+  phase, refine, board chat), by path. It is where the flow skill and the always-on rules go.
+- **Usar quando fizer sentido** (use when it fits): becomes an option of the cards' **Rules** and
+  **Skills** fields (and of the agents' skills), and **Refinar com IA** picks it when the request
+  calls for it. Unchecked, the run does not see it, even if the tool loads it in a conversation of
+  yours.
+
+A check mark whose file is gone shows as **não encontrada** (not found), to uncheck or recreate.
+Skills and agents created or installed through the board are born checked. What still gets in despite
+the empty context depends on the tool: in Claude Code 2.1 nothing from your folder or the project
+(verified against the CLI); in Cursor, everything the tool loads, and the board only advises.
+
+Under **Tudo que a ferramenta carrega**, in **Tudo que cada ferramenta carrega** (everything each tool
+loads), there is one tab per tool with eight sections (instructions and rules, skills, subagents,
+commands and prompts, hooks, MCP servers, plugins, settings and permissions), each split into three
+scopes:
 
 - **Projeto** (project): files in this folder; they apply only here and go into the repository.
   This group is always shown, highlighted, and says when the project has nothing of that kind.
-- **Global**: files in your user folder (`~/.claude`, `~/.codex`, `~/.copilot`…); they apply to all
+- **Global**: files in your user folder (`~/.claude`, `~/.cursor`…); they apply to all
   your projects. Every change to them asks for confirmation.
 - **Plugins**: they come from installed packages; the board does not change them, but they can be
   copied.
@@ -776,14 +867,16 @@ Each skill has a mode:
   it.
 - **Só quando indicada** (only when named): the AI does not invoke it on its own; it applies when a
   card names it or when it is called by name.
-- **Desligada** (off, project only): the tool does not see it, but a card can still name it.
+- **Desligada** (off, project only): the tool does not see it, and it leaves the board's options.
 
-The card's "Skills" field shows a summary of what is selected and opens a window to choose: search
-by name or description, **Todas / Marcadas / Projeto / Globais / Plugins** tabs (all / selected /
-project / global / plugins) and one checkbox per skill, with its origin in view. It works with
-hundreds of skills. The card hands the AI the file
-path of each skill, so a skill does not need to be visible to the tool to be used. That lets you
-keep many skills available without filling the context of every session. The context saving is
+The mode says how the tool treats the skill in a conversation of yours; in board runs what counts is
+the check mark. The card's "Skills" field shows a summary of what is selected and opens a window to
+choose among the skills checked as **Usar quando fizer sentido**: search by name or description,
+**Todas / Marcadas / Projeto / Globais / Plugins** tabs (all / selected / project / global / plugins)
+and one checkbox per skill, with its origin in view. The "Rules" field does the same with the checked
+instruction files. The card hands the AI the path of each file, so it does not need to be visible to
+the tool to be used. That lets you keep many skills available without filling the context of every
+session. The context saving is
 documented for Claude Code and Cursor; for the other tools, the documentation only says the AI
 stops invoking the skill on its own.
 
@@ -811,23 +904,50 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
 | Campos | Custom fields (text, select, date, model…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo |
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
-| Agentes | How the AI works on each card: skills, MCP servers, tools and model; there is always a default; per phase, changeable per card, with suggestions from intent |
-| Harness de IA | The project's tool, rules file, skills and agents; runs from the conversation and the heartbeat; everything each tool loads, by scope (see [AI harness](#ai-harness)) |
-| Modelos de IA | The tool's models and effort levels; each model's price per million tokens (input, output, cache read and cache creation), used to estimate cost; rules that suggest each card's model |
-| Git | Branch and working folder (worktree) of each story: mode, branch name, folder; automatic PR merge when the acceptance is approved |
-| Aparência | **Language** (automatic, Português (Brasil) or English), theme (system, light, dark), font and size of long texts; name and color of the statuses |
-| Backup | Export the board to a file and import a file in place of the current board (see [Board backup](#board-backup)) |
+| Harness de IA | The project's tool, permission, default agent and heartbeat; project and global rules, agents and skills, with the check marks of what runs use; everything each tool loads, by scope (see [AI harness](#ai-harness) and [Agents](#agents)) |
+| Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
+| Git | Only the Git tab in browser mode; in the editor, points to the Settings (Faz AI › Git) |
+| Aparência | **Language** (automatic, Português (Brasil) or English; in the editor Settings along with theme, font and size); statuses (name and color, in the Workflows tab; here only in browser mode) |
+| Backup | In the editor, export and import through the command palette (`fazai.exportBoard`, `fazai.importBoard`); in browser mode, through the Settings tab (see [Board backup](#board-backup)) |
 
-About models: **Detectar modelos** (detect models) reads the tool's list (for Kimi Code, from the
-local configuration; for Cursor, the models of your account, through the `cursor-agent models`
+### Settings in the editor Settings
+
+In `Ctrl+,` (the VS Code or Cursor Settings), searching **Faz AI** shows the Faz AI category, with
+four sections, in this order:
+
+| Section | What it has today |
+| --- | --- |
+| Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
+| Appearance | **Language** (`fazai.appearance.language`), **Theme** (`fazai.appearance.theme`), **Font** (`fazai.appearance.font`) and **Size** (`fazai.appearance.fontSize`), all with User scope — apply to all this person's projects. Statuses (name and color of each status) stay on the board, now in the Workflows tab |
+| Git | The nine `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.watchMerges` and `fazai.git.watchMergeMinutes` (watch for merges outside the board, 5 to 1440 minutes). In the editor, the Git tab and the parallel block in the AI harness become a link to these keys; in the browser they stay as editable fields |
+| Backup | Two action links: **Export the board now** and **Import a board**, which trigger the palette commands |
+
+Three new commands in the palette (`Ctrl+Shift+P`): **Faz AI: Open the Environment Diagnostics**,
+**Faz AI: Open the Faz AI settings in the editor Settings** (the Settings already filtered on Faz AI)
+and **Faz AI: Open the board settings** (the board's Configurações screen). In the board's
+Configurações, the **Abrir no Settings do editor** (open in the editor Settings) button goes the other
+way; in browser mode (`faz-ai` in the terminal) it does not appear, because there is no editor.
+
+Who wins: inside the editor, the Settings is the source and the board database (SQLite) is the copy,
+kept equal on every change so browser mode and the MCP server keep seeing the same value; outside
+the editor, SQLite is the only source, and a write made there (through MCP or the browser) is carried
+to the User Settings while the editor is open. On the four Appearance keys (language, theme, font,
+size): on a board's first opening, if the editor Settings has no explicit value yet and the board
+has a non-default value, it is copied to the Settings (and then applies to all projects); if the
+Settings already has an explicit value, it wins and the board adopts that value. With multiple
+different boards opened for the first time after an update, the value from the first board to open
+is what goes to the Settings, and subsequent boards inherit that value — until the person changes
+the Settings, at which point everyone sees the new value.
+
+About models: **Detectar modelos** (detect models) reads the tool's list (for Cursor, the models of your account, through the `cursor-agent models`
 command, read when the board opens with the CLI signed in, and the first list read replaces the built-in one
-only once; for the others, a built-in list you can
-edit); the prices you filled in stay there after detecting again. For Cursor, the list has one line per
+only once; for Claude Code, a built-in list you can
+edit). For Cursor, the list has one line per
 level of each model (`claude-opus-5-5-low`, `-medium`, `-high`…); the board groups the variants into
 one model with its levels. The fast versions (`-fast`, they answer sooner and charge more for the
 same tokens) stay out until you turn on **Incluir os modos rápidos** (include fast modes) on the
-Cursor card: then each one enters as a separate model ("Claude Opus 5.5 1M Fast"), with its own
-price, only for the models in the catalog; turning it off removes them from the catalog. Through MCP, it is the `includeFastModels` rule
+Cursor card: then each one enters as a separate model ("Claude Opus 5.5 1M Fast"), only for the
+models in the catalog; turning it off removes them from the catalog. Through MCP, it is the `includeFastModels` rule
 of `update_rules`. On Cursor's free plan only **Auto**
 runs: the other models are refused before starting (the blocked card explains how to pick Auto),
 which is why Cursor's suggestion rules all start
@@ -835,35 +955,14 @@ at Auto. Suggestion rules combine
 conditions with AND and OR, for example `Esforço da atividade = Alto E Tags = backend`. The result
 is always a suggestion: on the card, the model and the effort can be changed at any time.
 
+Each rule can have a **fallback model** (optional). When a card's execution fails because the primary model hit the plan's usage limit, and that model came from a rule with a fallback configured, the system automatically retries the execution with the fallback model, once only. If the fallback also fails or is not configured, the card is blocked as usual. The automatic switch appears as a comment in the card's conversation ("The `<primary model>` hit the usage limit; execution continues with `<fallback model>`"), and the card's Model field keeps showing the primary model — the next execution will try the primary again.
+
+**Dependency warnings between settings and cross-linked navigation.** Some configuration options only work because of another. The board shows a discreet line under dependent options (for example, "Depends on **a model suggestion rule** (now: none)" below "Fill in the suggested model automatically", or "Depends on **agents marked as available**" below "Default agent"); the option stays disabled when the dependency is not met. Links let you navigate: click one to go to the matching board section, which scrolls and highlights for 2 seconds, or click a link in the Settings to open the board at the right section. In browser mode, links to the Settings appear as text only. **"Fill in the suggested model automatically"** moved from Rules to Models, where it makes more sense — a simple notice in Rules indicates the move. The Heartbeat interval field stays disabled when the heartbeat is off, with no additional dependency component. New headers in Models, Agents, Rules and Skills show "Showing the X of [tool] · switch tool", letting you change the tool from any of these board screens.
+
 When a new version of the extension changes the default board, the board asks whether you want to
 update it (or use **Faz AI: Atualizar board para o padrão atual**). The update only adds what is
 missing: no card leaves its place and what you customized is kept. A copy of the database is saved
 first.
-
-### Cursor pricing
-
-The reference is [Cursor's pricing table](https://cursor.com/docs/models-and-pricing). The board does
-not read it on its own: prices are kept by hand in **Modelos de IA** (AI models) or by the AI through
-`upsert_model`.
-
-- **Auto has a variable price.** Cursor charges the list price of the model each request is routed
-  to, so there is no fixed rate to enter. The `auto` model comes with **Preço variável** (variable
-  price) on: the price fields give way to a notice, and the run has no estimated cost (blank, never a
-  made-up number). Every model has the switch; through MCP, it is `variable_price` in
-  `upsert_model`.
-- **Cursor Token Rate.** On Teams and Enterprise plans, Cursor charges US$ 0.25 per million tokens
-  (input, output and cache) on top of the price of third-party models; Cursor's own models (Composer
-  and Grok) are exempt. Turn on **Somar a tarifa do Cursor** (add the Cursor fee) on the Cursor card
-  (through MCP, `cursorTokenRate` in `update_rules`) and the estimate adds it. It applies to the
-  next runs: the cost of runs already recorded does not change.
-- **Fast mode and long context.** Fast mode usually costs 2x and enters as a separate model with its
-  own price (see **Incluir os modos rápidos** above). Long context (over 256 thousand tokens) may cost
-  2x, and 3x together with fast mode, but it is not told apart: Cursor only reports the run's token
-  total, and the estimate uses the price entered.
-- **How names match.** The identifier in the tool is the id `cursor-agent models` lists
-  (`claude-opus-5-5`); the name is the row in the pricing table; on the board the model is
-  `cursor:claude-opus-5-5`, and each fast version has its own (`cursor:claude-opus-5-5-fast`). With
-  that, the AI can read the table and fill in the prices through `upsert_model`.
 
 ## Where the data lives
 
@@ -876,28 +975,47 @@ time: the last one to save wins (the extension warns when that happens).
 
 ### Board backup
 
-To take the board to another machine or keep a copy, use **Configurações → Backup** (Settings →
-Backup):
+To take the board to another machine or keep a copy:
 
-- **Exportar board** (export board) creates a `<board name>-<date>.fazai.json` file with
-  everything on the board: columns, types, fields, rules, models, agents, cards (including archived
-  and trashed ones), conversations, checklists, links, history and the embedded attachments. Only
-  the current folder's board goes into the file. It contains the conversations and attachments:
-  keep it safe.
-- **Importar de um arquivo…** (import from a file) shows a summary (name, cards, attachments, size,
-  version) and, after confirmation, writes a copy of the database (`<file>.bak`, next to it),
-  moves the current board's attachments to a backup folder (`<attachments>.bak-<date>`), deletes the
-  current board and replaces it with the one from the file, keeping the card numbers. The imported
-  board becomes this folder's board. Nothing changes in the database if the file is invalid or
-  something fails midway. The confirmation says the attachments went to backup. An import file with a
-  card id or attachment name containing a path (`../`) is refused.
+**In the editor (VS Code or Cursor):** use the command palette (`Ctrl+Shift+P`):
 
-A file exported by an earlier version of the extension is upgraded on import; a file from a newer
-version is refused with the required version. Importing while the AI is running on a card is not
-allowed: wait for the run to finish. In the browser the flow is the same, with the download and the
-file picker handled by the page itself. Known limits: the monthly consolidated log history does not
-go into the file, and the stories' branches and working folders are imported as they were on the
-source machine (recreate the folder from the card's button).
+- **Faz AI: Export the board** opens the native save dialog with the suggested name in the pattern
+  `<board name>-<date>.fazai.json`. It creates a file with everything on the board: columns, types,
+  fields, rules, models, agents, cards (including archived and trashed ones), conversations,
+  checklists, links, history and the embedded attachments. Only the current folder's board goes into
+  the file. It contains the conversations and attachments: keep it safe. When done, the extension
+  shows the "Board exported in …" notification with an **Open folder** button.
+- **Faz AI: Import a board** opens the native file picker. Once you choose a file, it shows a summary
+  modal (board name, number of cards and attachments, size, version) with a warning that the current
+  board will be replaced and a backup copy (`.bak`) will be made first. On confirmation, it replaces
+  the board and shows a notification with the import result.
+
+The commands work with the board closed (without the panel open): they open the database for the
+current workspace folder on demand. In a workspace with multiple folders, the commands use the first
+folder (same limitation that already exists in the extension); there is no folder selector.
+
+**In browser mode** (running `~/.faz-ai/bin/faz-ai` in the terminal): use **Configurações →
+Backup** (Settings → Backup):
+
+- **Exportar board** (export board) creates a `.fazai.json` file on your computer (download).
+- **Importar de um arquivo…** (import from a file) opens the native file picker of the page.
+
+**In both modes,** the imported file:
+
+- Shows a summary (name, cards, attachments, size, version) and, after confirmation, writes a copy
+  of the database (`<file>.bak`, next to it or in the data folder), moves the current board's
+  attachments to a backup folder (`<attachments>.bak-<date>`), deletes the current board and
+  replaces it with the one from the file, keeping the card numbers. The imported board becomes this
+  folder's board. Nothing changes in the database if the file is invalid or something fails midway.
+  The confirmation says the attachments went to backup.
+- A file exported by an earlier version of the extension is upgraded on import; a file from a newer
+  version is refused with the required version. Importing while the AI is running on a card is not
+  allowed: wait for the run to finish. An import file with a card id or attachment name containing a
+  path (`../`) is refused.
+
+Known limits: the monthly consolidated log history does not go into the file, and the stories'
+branches and working folders are imported as they were on the source machine (recreate the folder
+from the card's button).
 
 ## Development
 
