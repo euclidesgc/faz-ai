@@ -218,6 +218,7 @@ export function ModelRulesEditor() {
   return (
     <div>
       <SectionHeader
+        id="model-rules"
         title={t('Sugestão de modelo')}
         actions={
           <>

@@ -105,33 +105,35 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
             )}
           </FormField>
           <div className="form-divider" />
-          <SwitchField
-            label={t('Heartbeat ligado')}
-            checked={runner.heartbeat}
-            onChange={(heartbeat) => settings.updateBoard({ runner: { heartbeat } })}
-          />
-          <Text as="p" size="1" color="gray">
-            {t(
-              'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
-              { tool: tool.label },
-            )}
-          </Text>
-          <FormField label={t('Intervalo')}>
-            {(id) => (
-              <div className="unit-field">
-                <NumberField
-                  id={id}
-                  min={HEARTBEAT_RANGE.min}
-                  max={HEARTBEAT_RANGE.max}
-                  value={runner.heartbeatMinutes}
-                  onCommit={(heartbeatMinutes) => settings.updateBoard({ runner: { heartbeatMinutes } })}
-                />
-                <Text size="2" color="gray">
-                  {t('minutos')}
-                </Text>
-              </div>
-            )}
-          </FormField>
+          <div id="heartbeat">
+            <SwitchField
+              label={t('Heartbeat ligado')}
+              checked={runner.heartbeat}
+              onChange={(heartbeat) => settings.updateBoard({ runner: { heartbeat } })}
+            />
+            <Text as="p" size="1" color="gray">
+              {t(
+                'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
+                { tool: tool.label },
+              )}
+            </Text>
+            <FormField label={t('Intervalo')}>
+              {(id) => (
+                <div className="unit-field">
+                  <NumberField
+                    id={id}
+                    min={HEARTBEAT_RANGE.min}
+                    max={HEARTBEAT_RANGE.max}
+                    value={runner.heartbeatMinutes}
+                    onCommit={(heartbeatMinutes) => settings.updateBoard({ runner: { heartbeatMinutes } })}
+                  />
+                  <Text size="2" color="gray">
+                    {t('minutos')}
+                  </Text>
+                </div>
+              )}
+            </FormField>
+          </div>
           <div className="form-divider" />
           {isWeb && (
             <>

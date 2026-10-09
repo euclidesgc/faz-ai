@@ -19,6 +19,7 @@ export function ScopeHarness({ tool, scope }: { tool: AiToolInfo; scope: Install
   return (
     <div className="scope-harness">
       <SectionHeader
+        id={scope === 'project' ? 'harness-project' : 'harness-user'}
         title={scope === 'project' ? t('Harness do projeto') : t('Harness global')}
         actions={
           <Button variant="soft" color="gray" title={t('Relê as pastas do projeto e do usuário')} onClick={() => harness.refresh()}>
