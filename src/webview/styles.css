@@ -2440,6 +2440,37 @@ body.host-web .drawer {
   margin-top: var(--sp-8);
 }
 
+/* DependsOn: linha discreta sob um campo que depende de outro (história 183) */
+.depends-on {
+  margin: 0;
+}
+.depends-on-unmet {
+  color: var(--warn-border);
+}
+
+/* destaque temporário (~2s) do elemento alvo de um link cruzado entre configurações (história 183) */
+@keyframes fazai-highlight {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  15%,
+  85% {
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+}
+.fazai-highlight {
+  animation: fazai-highlight 2s ease-in-out;
+  border-radius: var(--radius-lg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fazai-highlight {
+    animation: none;
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
 /* formulários dos cartões das configurações */
 .draft-card,
 .form-card {

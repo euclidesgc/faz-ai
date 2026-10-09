@@ -42,6 +42,7 @@ export type View = 'board' | 'trash' | 'settings' | 'metrics' | 'environment';
 /** Abas da tela de Harness de IA: a ferramenta e a execução, o que é do projeto, e tudo que a ferramenta carrega. */
 export type HarnessTab = 'tool' | 'project' | 'user' | 'all';
 import { type SettingsTab } from '../../shared/settingsTab';
+import { SETTINGS_SECTIONS } from '../../shared/settingsSections';
 export type { SettingsTab };
 
 export interface DialogSpec {
@@ -102,6 +103,13 @@ interface BoardStore extends UiState, ViewState {
   setView(view: View): void;
   /** abre as configurações numa seção (fecha o card aberto) */
   openSettings(tab: SettingsTab): void;
+  /**
+   * Leva até uma seção de Configurações (usada por `DependsOn` e por links internos entre telas):
+   * troca a aba (e a sub-aba de Harness, quando a seção mora lá) e marca `pendingSettingsSection`
+   * para a tela rolar e destacar ao renderizar. `section` sem entrada em `SETTINGS_SECTIONS` só
+   * marca a pendência, sem trocar de aba (ver `settingsSections.ts`).
+   */
+  goToSection(section: string): void;
   /** id da seção até onde a tela de Configurações deve rolar ao abrir (vindo de `ui.openSettings`), ou null */
   pendingSettingsSection: string | null;
   clearPendingSettingsSection(): void;
@@ -198,6 +206,20 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     openSettings(settingsTab) {
       set({ view: 'settings', settingsTab, openCardId: null, attachmentModal: null });
       persist(get());
+    },
+    goToSection(section) {
+      const info = SETTINGS_SECTIONS[section];
+      if (info) {
+        set({
+          view: 'settings',
+          settingsTab: info.tab,
+          ...(info.harnessTab && { harnessTab: info.harnessTab as HarnessTab }),
+          pendingSettingsSection: section,
+        });
+        persist(get());
+      } else {
+        set({ pendingSettingsSection: section });
+      }
     },
     pendingSettingsSection: null,
     clearPendingSettingsSection: () => set({ pendingSettingsSection: null }),

@@ -45,6 +45,10 @@ export const settings: Record<string, string> = {
   'Apagar tudo e recriar': 'Delete everything and recreate',
   'Recriar board padrão': 'Recreate default board',
   'Abrir no Settings do editor': 'Open in the editor Settings',
+  'Depende de <b>{label}</b> (agora: {state})': 'Depends on <b>{label}</b> (now: {state})',
+  'Depende de <b>{label}</b>': 'Depends on <b>{label}</b>',
+  'Abrir {label}, {hint}': 'Open {label}, {hint}',
+  abrir: 'open',
   'Abre as configurações do Faz AI no Settings do editor (Ctrl+,)': 'Opens the Faz AI settings in the editor Settings (Ctrl+,)',
   'Apaga todos os cards e configurações e recria o board com o padrão atual':
     'Deletes all cards and settings and recreates the board with the current default',
