@@ -76,6 +76,11 @@ olho.
   (IA trabalhando no card ou numa sub-tarefa dele), amarelo fixo (espera a pessoa) e vermelho fixo
   (bloqueado). Só o verde pisca, e para com `prefers-reduced-motion` (fica aceso, fixo). O estado
   também está no rótulo do LED (`aria-label`/`title`), para não depender só de cor.
+- Hierarquia de botões (`components/ui/Button.tsx`): `primary` (indigo sólido) é a ação que
+  confirma a edição ou o formulário e fica no fim do bloco, à direita (`row end`); `secondary` é
+  cancelar ou alternativa; `ghost` é navegação, alternância e ação opcional (Editar, Expandir,
+  Criar branch da história); `danger` é destrutiva. Não crie variante nova para dar destaque. Exemplo:
+  "Salvar descrição" é `primary`, logo abaixo do editor, e não um `ghost` pequeno no cabeçalho.
 - `tokens.css` tem uma declaração por linha, porque `test/tokens.test.ts` faz parse do arquivo.
 
 ## Ícones

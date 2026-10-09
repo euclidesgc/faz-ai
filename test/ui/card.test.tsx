@@ -147,9 +147,15 @@ describe('CardDrawer', () => {
 
   it('descrição: Editar, escrever e Concluir envia card.update com a descrição', async () => {
     openStory();
+    expect(screen.queryByRole('button', { name: 'Salvar descrição' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await userEvent.type(screen.getByPlaceholderText(/Descreva o problema/), 'Contexto');
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar descrição' }));
+    const save = screen.getByRole('button', { name: 'Salvar descrição' });
+    expect(save).toHaveClass('primary');
+    expect(
+      screen.getByPlaceholderText(/Descreva o problema/).compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await userEvent.click(save);
     expect(lastSent('card.update')).toEqual({ type: 'card.update', cardId: board.storyId, patch: { description: 'Contexto' } });
     expect(screen.queryByPlaceholderText(/Descreva o problema/)).toBeNull();
     expect(screen.getByText('Contexto')).toBeInTheDocument();
