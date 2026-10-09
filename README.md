@@ -142,8 +142,10 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 ## Como usar
 
 1. Abra uma pasta no editor e clique no ícone **Faz AI** na barra lateral. Cada pasta tem o seu board.
-2. Crie histórias com **+ Novo card** e arraste-as entre as colunas. Clicar numa história mostra só
-   as sub-tarefas dela; duplo clique abre o detalhe.
+2. Crie histórias com **+ Novo card** e arraste-as entre as colunas. Ao arrastar, os outros cards se
+   afastam com uma animação suave e um espaço tracejado mostra onde o card vai ficar; ao soltar, ele
+   assenta direto no lugar, sem piscar. Clicar numa história mostra só as sub-tarefas dela; duplo
+   clique abre o detalhe.
 3. No detalhe do card ficam o status, a descrição em Markdown, os campos, o checklist, as
    sub-tarefas, a conversa e os anexos. A conversa é o lugar em que você e a IA falam sobre o card.
    Os documentos das fases (PRD, Spec, Plan…) são construídos nas sub-tarefas, mas ficam anexados à

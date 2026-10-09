@@ -153,8 +153,10 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 
 1. Open a folder in the editor and click the **Faz AI** icon in the sidebar. Each folder has its
    own board.
-2. Create stories with **+ Novo card** (new card) and drag them between columns. Clicking a story
-   shows only its sub-tasks; double-click opens the details.
+2. Create stories with **+ Novo card** (new card) and drag them between columns. While you drag, the
+   other cards slide aside with a smooth animation and a dashed gap shows where the card will land;
+   on drop it settles straight into place, without flicker. Clicking a story shows only its
+   sub-tasks; double-click opens the details.
 3. The card details hold the status, the description in Markdown, the fields, the checklist, the
    sub-tasks, the conversation and the attachments. The conversation is where you and the AI talk
    about the card. Phase documents (PRD, Spec, Plan…) are built in sub-tasks but stay attached to
