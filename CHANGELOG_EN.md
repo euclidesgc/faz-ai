@@ -15,6 +15,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   (`Ctrl+,`), the "Faz AI: Backup" category now has the links "Export the board now" and "Import a
   board" that trigger the palette commands. With multiple folders in the workspace, the commands use
   the first folder (known limitation).
+- **Formatted hint on the "Trabalhar na fase" and "Refinar com IA" buttons.** The buttons that run
+  these actions (on the card's status bar and in the comments tab) now show a rich tooltip with the
+  explanation formatted in bold and bullet points, instead of the native HTML `title`. The hint opens
+  on hover or keyboard focus, closes with Esc, and stays visible when the button is blocked, so you
+  know the reason even when you cannot click.
 - **Autonomous Implementação stalled with the conductor.** A story's run is what carries out the
   Implementação subtasks, delegating each one to a subagent; but `condutor-do-board` (the default
   since the profile migration) runs read-only, and that restriction went to the Claude Code command

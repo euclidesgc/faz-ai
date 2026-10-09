@@ -185,10 +185,19 @@ export const board: Record<string, string> = {
   Desbloquear: 'Unblock',
   'Interrompe o {tool}; o status volta ao que era': 'Stops {tool}; the status goes back to what it was',
   'Parar a IA': 'Stop the AI',
-  'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está (o que a coluna pede) e passar a vez: pedir revisão, perguntar ou mover. A resposta chega na conversa.':
-    'Runs {tool} in the background to do the work of the phase the card is in (what the column asks for) and hand over: ask for review, ask a question or move. The answer arrives in the conversation.',
-  'O {tool} deixa o card claro e completo: reescreve título e descrição, preenche Tags, Esforço, Modelo e Skills e sugere o checklist. Não trabalha a fase, não move o card e não mexe em arquivos; o resumo do que mudou chega na conversa.':
-    '{tool} makes the card clear and complete: rewrites the title and description, fills Tags, Effort, Model and Skills and suggests the checklist. It does not work on the phase, does not move the card and does not touch files; the summary of what changed arrives in the conversation.',
+  'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está.':
+    'Runs {tool} in the background to do the work the phase asks for.',
+  'Parte de <b>contexto vazio</b>: só entram as rules e skills marcadas no Harness e o agente do card (ou o padrão do board).':
+    "Starts from <b>empty context</b>: only the rules and skills marked in the Harness, and the card's agent (or the board's default), come in.",
+  'Ao terminar, passa a vez — pede revisão, pergunta ou move o card — sem acompanhamento ao vivo; a resposta chega na conversa.':
+    "When it's done, it hands off — asks for review, asks a question, or moves the card — with no live follow-along; the reply shows up in the conversation.",
+  'O consumo fica registrado em Métricas.': 'Usage is logged in Metrics.',
+  'O {tool} deixa o card claro e completo, sem tocar em código nem mover o card.':
+    '{tool} makes the card clear and complete, without touching code or moving the card.',
+  'Reescreve título e descrição.': 'Rewrites the title and description.',
+  'Preenche Tags, Esforço, Modelo, Skills, <b>Rules</b> e o <b>agente</b> — só o que está marcado no Harness.':
+    "Fills in Tags, Effort, Model, Skills, <b>Rules</b> and the <b>agent</b> — only what's marked in the Harness.",
+  'Sugere o checklist.': 'Suggests the checklist.',
   'Refinar com IA': 'Refine with AI',
   'O que está impedindo o trabalho?': 'What is blocking the work?',
   Bloquear: 'Block',

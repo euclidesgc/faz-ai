@@ -14,6 +14,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   categoria "Faz AI: Backup" ganhou os links "Exportar o board agora" e "Importar um board" que
   disparam os comandos. Com múltiplas pastas no workspace, os comandos usam a primeira pasta
   (limitação conhecida).
+- **Hint formatado nos botões "Trabalhar na fase" e "Refinar com IA".** Os botões que executam essas
+  ações (na barra de status do card e na aba de comentários) mostram um tooltip rico com a explicação
+  formatada em negrito e tópicos, em lugar do `title` HTML nativo. O hint abre ao passar o mouse ou
+  focar com o teclado, fecha com Esc, e continua visível quando o botão está bloqueado, para que você
+  saiba o motivo mesmo sem poder clicar.
 - **A Implementação em modo autônomo parava com o condutor.** A execução de uma história é quem
   faz as sub-tarefas da Implementação, delegando cada uma a um subagente; mas o `condutor-do-board`
   (padrão desde a migração dos perfis) roda só com leitura, e essa restrição ia para a linha de

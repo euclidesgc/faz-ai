@@ -867,6 +867,36 @@ button.ghost.on {
   width: 100%;
 }
 
+/* hint (tooltip rico) */
+.hint-content {
+  z-index: 70;
+  max-width: 320px;
+  padding: var(--sp-8) var(--sp-12);
+  background: var(--card-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2);
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+.hint-content p {
+  margin: 0 0 var(--sp-4);
+}
+.hint-content ul {
+  margin: 0;
+  padding-left: 1.1em;
+}
+.hint-content li + li {
+  margin-top: var(--sp-4);
+}
+.hint-arrow {
+  fill: var(--card-bg);
+}
+.hint-disabled-wrap {
+  display: inline-flex;
+}
+
 /* diálogo */
 .modal-backdrop {
   position: fixed;

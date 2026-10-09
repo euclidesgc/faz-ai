@@ -9,4 +9,5 @@ export { AddInput } from './AddInput';
 export { NumberField } from './NumberField';
 export { TextField } from './TextField';
 export { FormField } from './FormField';
+export { Hint } from './Hint';
 export * from './icons';

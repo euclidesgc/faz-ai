@@ -367,7 +367,9 @@ IA → "O que a IA pode fazer" applies (by default, the board only), and so does
 
 A card has two buttons that run the project's tool in the background. It is not a live chat: the
 answer arrives as a message in the conversation when the run ends, and meanwhile the card shows "Em
-execução" (with a **Parar** button to stop it).
+execução" (with a **Parar** button to stop it). The buttons show an explanatory hint (with bold text and bullet points)
+when you hover the mouse or focus with the keyboard; the hint opens on hover and on keyboard focus, closes with Esc,
+and stays visible even when the button is blocked.
 
 - **Trabalhar na fase** (work on the phase) does the work of the column the card is in, the same as
   the heartbeat would: in Discovery it analyzes the problem, in PRD it writes the PRD, in

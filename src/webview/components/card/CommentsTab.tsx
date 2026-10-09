@@ -13,7 +13,8 @@ const ATTACHMENT_SCHEME = 'attachment:';
 const ATTACHMENT_LINK = /\]\(attachment:([^)\s]+)\)/g;
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
 import { aiBlockedReason } from '../RequirementsBanner';
-import { Button, DeleteButton, IconRun } from '../ui';
+import { Button, DeleteButton, Hint, IconRun } from '../ui';
+import { workHint } from '../aiHints';
 
 /** Conversa do card: é por aqui que a pessoa e a IA falam sobre o trabalho. */
 export function CommentsTab({
@@ -117,28 +118,17 @@ export function CommentsTab({
           <Button disabled={!draft.trim()} onClick={submit}>
             {t('Enviar')}
           </Button>
-          <Button
-            variant="primary"
-            disabled={!canCall || running}
-            title={
-              blocked ??
-              t(
-                'Roda o {tool} em segundo plano para ler a conversa e fazer o trabalho da fase em que o card está. A resposta chega aqui, sem acompanhamento ao vivo.',
-                {
-                  tool: toolLabel,
-                },
-              )
-            }
-            onClick={callAi}
-          >
-            {draft.trim() ? (
-              t('Enviar e trabalhar na fase')
-            ) : (
-              <>
-                <IconRun /> {t('Trabalhar na fase')}
-              </>
-            )}
-          </Button>
+          <Hint content={workHint(toolLabel)} disabledReason={blocked}>
+            <Button variant="primary" disabled={!canCall || running} onClick={callAi}>
+              {draft.trim() ? (
+                t('Enviar e trabalhar na fase')
+              ) : (
+                <>
+                  <IconRun /> {t('Trabalhar na fase')}
+                </>
+              )}
+            </Button>
+          </Hint>
         </div>
       </div>
     </section>
