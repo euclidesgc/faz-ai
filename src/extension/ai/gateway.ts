@@ -78,6 +78,8 @@ export interface AiRunEnd {
 export interface AiExecution {
   /** o id da linha em `ai_runs`; `''` quando o log não conseguiu gravar */
   readonly runId: string;
+  /** o mesmo valor passado a `runLog.start`: sem segundo relógio */
+  readonly startedAt: number;
   /** interrompe a execução; o desfecho gravado é `stopped` */
   stop(): void;
   /** chamado uma vez, DEPOIS de o desfecho e o consumo irem para o log */
@@ -110,8 +112,9 @@ export class AiGateway {
    */
   run(call: AiCall): AiExecution {
     const { runLog, boardId } = this.deps;
+    const startedAt = Date.now();
     // o id da ferramenta, não o rótulo: o rótulo muda e levaria as séries antigas com ele
-    const runId = runLog.start({ ...call.context, boardId, startedAt: Date.now(), origin: call.origin, tool: call.tool });
+    const runId = runLog.start({ ...call.context, boardId, startedAt, origin: call.origin, tool: call.tool });
 
     let measured: ReturnType<typeof spawnMeasured>;
     let attempts = 0;
@@ -158,6 +161,7 @@ export class AiGateway {
 
     return {
       runId,
+      startedAt,
       stop: () => {
         stopped = true;
         measured.proc.kill();

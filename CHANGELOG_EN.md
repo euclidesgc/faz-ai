@@ -7,6 +7,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Activity bar at the bottom of the board.** An always-visible line, on every view, shows what
+  the AI is doing right now: with one run, "IA em #12 (Discovery, há 3 min)"; with several, "IA em
+  N cards: #12 Discovery · #15 refinando · …" (full list in the tooltip). Clicking the card
+  reference opens the card. With no run at all, it shows the reason: the autopilot's note (why the
+  queue stopped), the heartbeat's state ("Heartbeat desligado", "Heartbeat parado: motivo",
+  "Próxima rodada às HH:MM") or "IA parada". The "IA trabalhando em N cards" counter at the top is
+  gone, replaced by this bar.
 - **Create-card button moved to the top of the column.** **+ Novo card** / **+ Nova sub-tarefa**
   moved from the column footer to the top, right below the header, so you don't have to scroll a
   full column to find it. Only the position changed: no behavior or data changes. The

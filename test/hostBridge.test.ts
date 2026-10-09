@@ -207,7 +207,9 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
   it('com a IA executando um card, a importação é recusada e o board fica como está', async () => {
     const { token } = router.parkImport(parseExportFile(router.exportBoardFile().text), 10);
     createCard('Card 2');
-    router.setAiRuns([router.snapshot().cards[0]!.id]);
+    router.setAiRuns([
+      { cardId: router.snapshot().cards[0]!.id, runId: '', mode: 'phase', origin: 'manual', phase: '', model: null, startedAt: Date.now() },
+    ]);
     await bridge.handle({ type: 'backup.import.apply', token });
     expect(sent.at(-1)).toEqual({ type: 'error', message: 'Espere a execução da IA terminar para importar o board.' });
     expect(router.snapshot().cards).toHaveLength(2);
