@@ -95,7 +95,9 @@ export function WorkflowRow({ workflow }: { workflow: Workflow }) {
           )}
         </div>
       </div>
-      <DragOverlay dropAnimation={reduced ? null : { ...DRAG_ANIMATION }}>{activeCard ? <CardView card={activeCard} overlay /> : null}</DragOverlay>
+      <DragOverlay dropAnimation={reduced ? null : { ...DRAG_ANIMATION }}>
+        {activeCard ? <CardView card={activeCard} overlay /> : null}
+      </DragOverlay>
     </DndContext>
   );
 }
