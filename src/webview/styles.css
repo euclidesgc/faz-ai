@@ -497,6 +497,20 @@ button.active {
   font-size: var(--fs-xs);
   color: var(--muted);
 }
+/* card colapsado (escopo "um card"/coluna/board/selecionados): uma linha só, chevron + LED + título */
+.card.card-collapsed {
+  min-height: 32px;
+}
+.card-collapsed-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: var(--sp-2) var(--sp-8);
+}
+.card-collapsed-row .card-title {
+  flex: 1;
+  min-width: 0;
+}
 .badge {
   font-size: var(--fs-xs);
   font-weight: 600;

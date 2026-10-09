@@ -183,3 +183,47 @@ describe('barra de seleção e ação em lote (card 326)', () => {
     expect(useBoardStore.getState().selectedIds.size).toBe(2);
   });
 });
+
+describe('colapsar/expandir selecionados (card 349)', () => {
+  it('nenhum colapsado: botão oferece "Colapsar selecionados"; clicar colapsa só os selecionados, sem fechar a barra', async () => {
+    const [firstId, secondId] = await selectTwoStories();
+    const thirdId = createExtraStory().id;
+
+    expect(screen.getByRole('button', { name: 'Colapsar selecionados' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Colapsar selecionados' }));
+
+    const collapsed = useBoardStore.getState().collapsed;
+    expect(collapsed[`card:${firstId}`]).toBe(true);
+    expect(collapsed[`card:${secondId}`]).toBe(true);
+    expect(collapsed[`card:${thirdId}`]).toBeUndefined();
+
+    // a seleção continua ativa: a barra não fecha
+    expect(screen.getByText('2 selecionados')).toBeInTheDocument();
+    expect(useBoardStore.getState().selectedIds.size).toBe(2);
+  });
+
+  it('com todos já colapsados, o botão oferece "Expandir selecionados", e clicar expande os dois', async () => {
+    const [firstId, secondId] = await selectTwoStories();
+    act(() => {
+      useBoardStore.getState().setManyCollapsed([firstId, secondId], true);
+    });
+
+    expect(screen.getByRole('button', { name: 'Expandir selecionados' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Expandir selecionados' }));
+
+    const collapsed = useBoardStore.getState().collapsed;
+    expect(collapsed[`card:${firstId}`]).toBe(false);
+    expect(collapsed[`card:${secondId}`]).toBe(false);
+    expect(useBoardStore.getState().selectedIds.size).toBe(2);
+  });
+
+  it('com menos de 2 selecionadas, a barra (e o botão) continuam não aparecendo', async () => {
+    renderBoardWithSelectionBar();
+    expect(screen.queryByRole('button', { name: 'Colapsar selecionados' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Expandir selecionados' })).toBeNull();
+
+    const box = screen.getByRole('checkbox', { name: 'Selecionar Login com Google' });
+    await userEvent.click(box);
+    expect(screen.queryByRole('button', { name: 'Colapsar selecionados' })).toBeNull();
+  });
+});

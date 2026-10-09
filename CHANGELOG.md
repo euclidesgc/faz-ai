@@ -6,6 +6,7 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Cards podem ser colapsados para mostrar só o título.** Em colunas com muitos cards, você pode colapsar cards em qualquer um de quatro escopos: um card isolado (botão no card), todos os cards da coluna (item no menu de ações), todos os cards do board (botão na barra de filtros) ou só os cards selecionados (botão na barra de seleção múltipla). Um card colapsado continua mostrando o LED de atividade da IA e a borda de status para você saber o que precisa de atenção sem expandir. O estado fica lembrado entre sessões.
 - **Barra de atividade no pé do board.** Uma linha sempre visível, em qualquer vista, mostra o que
   a IA está fazendo agora: com uma execução, "IA em #12 (Discovery, há 3 min)"; com várias, "IA em
   N cards: #12 Discovery · #15 refinando · …" (lista completa no tooltip). Clicar na referência do

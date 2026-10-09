@@ -3,15 +3,15 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cardRef, type Card, type FieldDef } from '../../shared/model';
 import { statusInfo } from '../../shared/status';
-import { aiWorkingChildren, fieldsForType, isAiWorking, valueOf } from '../../shared/selectors';
+import { aiWorkingChildren, fieldsForType, isAiWorking, isCardCollapsed, valueOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { FieldBadge, hasValue } from './FieldRenderer';
 import { IconParent } from './ui';
-import type { AiWork } from './cardView/AiLed';
+import { AiLed, type AiWork } from './cardView/AiLed';
 import { CardFooter } from './cardView/CardFooter';
 import { StatusLine } from './cardView/StatusLine';
-import { TitleBar } from './cardView/TitleBar';
+import { CollapseToggle, TitleBar } from './cardView/TitleBar';
 
 export function SortableCard({ card }: { card: Card }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
@@ -31,6 +31,9 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const openCard = useBoardStore((s) => s.openCard);
   const selectedIds = useBoardStore((s) => s.selectedIds);
   const toggleSelected = useBoardStore((s) => s.toggleSelected);
+  const collapsedMap = useBoardStore((s) => s.collapsed);
+  const setCollapsed = useBoardStore((s) => s.setCollapsed);
+  const collapsed = isCardCollapsed(collapsedMap, card.id);
 
   const type = state.cardTypes.find((t) => t.id === card.typeId);
   const isParent = state.workflows.find((w) => w.id === card.workflowId)?.kind === 'parent';
@@ -57,6 +60,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
     archived && 'archived',
     mine && 'mine',
     selectedIds.size > 0 && 'selecting',
+    collapsed && 'card-collapsed',
   ]
     .filter(Boolean)
     .join(' ');
@@ -94,21 +98,40 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
           }}
         />
       )}
-      <TitleBar card={card} type={type} work={work} overlay={overlay} />
-      <div className="card-body">
-        <div className="card-title" title={card.title}>
-          {card.title}
-        </div>
-        {parent && (
-          <div className="card-parent" title={parent.title}>
-            <IconParent /> {cardRef(parent)} {parent.title}
+      {collapsed ? (
+        <div className="card-collapsed-row">
+          <CollapseToggle collapsed={collapsed} onToggle={() => setCollapsed(`card:${card.id}`, false)} />
+          <AiLed work={work} status={status} />
+          <div className="card-title" title={card.title}>
+            {card.title}
           </div>
-        )}
-        {status && <StatusLine card={card} />}
-        <FieldLine className="card-fields" fields={fields.filter((f) => f.kind !== 'model')} cardId={card.id} />
-        <FieldLine className="card-model" fields={fields.filter((f) => f.kind === 'model')} cardId={card.id} />
-        <CardFooter card={card} isParent={isParent} overlay={overlay} />
-      </div>
+        </div>
+      ) : (
+        <>
+          <TitleBar
+            card={card}
+            type={type}
+            work={work}
+            overlay={overlay}
+            collapsed={collapsed}
+            onToggleCollapse={() => setCollapsed(`card:${card.id}`, true)}
+          />
+          <div className="card-body">
+            <div className="card-title" title={card.title}>
+              {card.title}
+            </div>
+            {parent && (
+              <div className="card-parent" title={parent.title}>
+                <IconParent /> {cardRef(parent)} {parent.title}
+              </div>
+            )}
+            {status && <StatusLine card={card} />}
+            <FieldLine className="card-fields" fields={fields.filter((f) => f.kind !== 'model')} cardId={card.id} />
+            <FieldLine className="card-model" fields={fields.filter((f) => f.kind === 'model')} cardId={card.id} />
+            <CardFooter card={card} isParent={isParent} overlay={overlay} />
+          </div>
+        </>
+      )}
     </article>
   );
 }

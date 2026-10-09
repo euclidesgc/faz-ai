@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Card, Column as ColumnModel, ColumnCategory, Workflow } from '../../shared/model';
+import { isCardCollapsed, isLive } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { t, dt } from '../i18n';
 import { cards, settings } from '../commands';
@@ -85,6 +86,8 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const state = useBoardStore((s) => s.state)!;
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
+  const collapsedMap = useBoardStore((s) => s.collapsed);
+  const setManyCollapsed = useBoardStore((s) => s.setManyCollapsed);
   const ask = useBoardStore((s) => s.ask);
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
@@ -122,6 +125,8 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
   };
 
   const count = visibleCards.length === total ? String(total) : `${visibleCards.length}/${total}`;
+  const liveCardIds = state.cards.filter((c) => c.columnId === column.id && isLive(c)).map((c) => c.id);
+  const allCardsCollapsed = liveCardIds.length > 0 && liveCardIds.every((id) => isCardCollapsed(collapsedMap, id));
   if (collapsed) {
     return (
       <CollapsedColumn
@@ -173,6 +178,11 @@ export function Column({ column, workflow, cards: visibleCards, total, index, si
           items={[
             { label: t('Renomear'), onClick: () => setRenaming(column.name) },
             { label: t('Colapsar'), onClick: onToggle },
+            {
+              label: allCardsCollapsed ? t('Expandir cards') : t('Colapsar cards'),
+              disabled: liveCardIds.length === 0,
+              onClick: () => setManyCollapsed(liveCardIds, !allCardsCollapsed),
+            },
             'sep',
             { header: t('Esta coluna representa') },
             ...CATEGORIES.map((c) => ({
