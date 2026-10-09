@@ -2,7 +2,8 @@ import type { AiRunOrigin } from '../shared/log';
 import { cardRef, type BoardState, type Card, type Column } from '../shared/model';
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
-import { parallelLimit, type AiRunMode } from '../shared/runner';
+import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
+import { limitOf, type AiRunMode } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { statusInfo } from '../shared/status';
 import { isDelivered, yoloStories } from '../shared/story';
@@ -32,34 +33,61 @@ export interface AutopilotDeps {
   defer?(fn: () => void): void;
 }
 
+/** Uma história que o autopiloto pode iniciar agora, com o tipo da atividade (texto ou branch). */
+export type AutopilotRun = { kind: 'run'; story: Card; activity: ActivityKind };
+
 /** O que fazer agora com as histórias em modo autônomo. */
 export type AutopilotStep =
   | { kind: 'idle' }
   /** a história está numa coluna em que a IA não atua (ex.: Backlog): leva para a próxima */
   | { kind: 'advance'; story: Card; column: Column }
-  | { kind: 'run'; story: Card }
+  | AutopilotRun
   | { kind: 'wait'; story: Card }
   /** a história está parada por um impedimento (bloqueio, pergunta, dependência ou ciclo emperrado) */
   | { kind: 'paused'; story: Card; reason: string };
 
+/** Histórias em modo autônomo ainda não entregues, na ordem da fila (bug primeiro, depois a posição no board). */
+const pendingStories = (s: BoardState): Card[] => yoloStories(s).filter((c) => !isDelivered(s, c));
+
 /**
- * Próximo passo. As histórias vão em fila, uma de cada vez e na ordem da posição do card no board
- * (bug sempre primeiro, `byExecutionOrder`): a branch de cada uma parte da anterior, então a seguinte
- * só começa quando a atual sai de aberto. Nenhum impedimento (bloqueio, pergunta sem resposta,
- * dependência de outro card em aberto, ciclo emperrado) segura a fila: a vez passa para a próxima
- * história que pode rodar — muitas vezes a própria dependência, que está mais abaixo no board. Só
- * quando nenhuma história da fila pode avançar é que a fila para de fato, mostrando a razão da
- * primeira que ficou parada.
+ * Todas as histórias que o autopiloto pode iniciar agora, na ordem da fila. A história em fase de texto
+ * (Discovery, PRD, Spec...) só produz documento e não precisa da branch: entra sempre que estiver com a
+ * IA (uma execução por história já é garantida por `storyStep`, que devolve `wait` enquanto ela roda).
+ * A história em fase de código (branch) parte da branch da anterior, então só entra se for a primeira
+ * da fila que está com a IA (`run` ou `wait`): qualquer história anterior em execução ou pendente, de
+ * qualquer tipo, a segura. Histórias anteriores paradas (`paused`) ou só avançando de coluna
+ * (`advance`) não seguram.
+ */
+export function autopilotRuns(s: BoardState): AutopilotRun[] {
+  const runs: AutopilotRun[] = [];
+  let busyBefore = false;
+  for (const story of pendingStories(s)) {
+    const step = storyStep(s, story);
+    if (step.kind === 'run' && (step.activity === 'text' || !busyBefore)) runs.push(step);
+    if (step.kind === 'run' || step.kind === 'wait') busyBefore = true;
+  }
+  return runs;
+}
+
+/**
+ * Próximo passo. As histórias vão em fila na ordem da posição do card no board (bug sempre primeiro,
+ * `byExecutionOrder`). Nenhum impedimento (bloqueio, pergunta sem resposta, dependência de outro card
+ * em aberto, ciclo emperrado) segura a fila: a vez passa para a próxima história que pode rodar. Uma
+ * história em execução também não segura as de fase de texto atrás dela (`autopilotRuns`). Só quando
+ * nenhuma história pode avançar é que a fila para de fato, mostrando a razão da primeira que ficou
+ * parada. Precedência: `advance` > `run` > `wait` > `paused` > `idle`.
  */
 export function autopilotStep(s: BoardState): AutopilotStep {
+  let firstWait: AutopilotStep | undefined;
   let firstPaused: AutopilotStep | undefined;
   // uma história entregue já passou para a pessoa: não segura a fila, a próxima assume
-  for (const story of yoloStories(s).filter((c) => !isDelivered(s, c))) {
+  for (const story of pendingStories(s)) {
     const step = storyStep(s, story);
-    if (step.kind !== 'paused') return step;
-    firstPaused ??= step;
+    if (step.kind === 'advance' || step.kind === 'idle') return step;
+    if (step.kind === 'wait') firstWait ??= step;
+    if (step.kind === 'paused') firstPaused ??= step;
   }
-  return firstPaused ?? { kind: 'idle' };
+  return autopilotRuns(s)[0] ?? firstWait ?? firstPaused ?? { kind: 'idle' };
 }
 
 /** O passo de uma história, olhando só para ela. */
@@ -81,7 +109,8 @@ function storyStep(s: BoardState, story: Card): AutopilotStep {
     return next ? { kind: 'advance', story, column: next } : { kind: 'idle' };
   }
   const queue = aiQueue(s, pendingWork(s));
-  if (queue.some((c) => c.id === story.id || c.parentId === story.id)) return { kind: 'run', story };
+  if (queue.some((c) => c.id === story.id || c.parentId === story.id))
+    return { kind: 'run', story, activity: activityKindOf(s, story, 'phase') };
   // a fila da IA não traz card que ainda espera uma dependência em aberto: diz de quem a história depende
   const blockers = [
     ...new Set(
@@ -253,18 +282,21 @@ export class Autopilot {
           );
           continue;
         }
-        // o limite conta toda execução em andamento (heartbeat, chamadas à mão): o autopiloto usa uma vaga livre
-        if (step.kind === 'run' && this.runner.running.length < this.limit()) this.start(step.story);
+        if (step.kind !== 'run') return;
+        // o teto é por tipo de atividade e conta toda execução em andamento (heartbeat, chamadas à mão):
+        // o autopiloto usa as vagas livres de cada tipo, na ordem da fila
+        const s = this.router.snapshot();
+        const counts = runningByKind(s, this.runner.running);
+        for (const r of autopilotRuns(s)) {
+          if (counts[r.activity] >= limitOf(s.board.runner, s.board.git.mode, r.activity)) continue;
+          this.start(r.story);
+          counts[r.activity]++;
+        }
         return;
       }
     } finally {
       this.busy = false;
     }
-  }
-
-  private limit(): number {
-    const { board } = this.router.snapshot();
-    return parallelLimit(board.runner, board.git.mode);
   }
 
   private start(story: Card): void {
@@ -290,19 +322,17 @@ export class Autopilot {
     this.publish(null);
   }
 
-  /** Um "Em execução" sem execução de verdade (a sessão caiu): volta para a IA tentar de novo. */
+  /**
+   * Um "Em execução" sem execução de verdade (a sessão caiu): volta para a IA tentar de novo. Olha todas
+   * as histórias em modo autônomo ainda não entregues, não só a da vez: com várias rodando ao mesmo
+   * tempo, qualquer uma pode ter caído.
+   */
   private recoverStale(): void {
     const s = this.router.snapshot();
-    // entregue não tem execução a recuperar; e a história parada por dependência não é a da vez
-    const step = autopilotStep(s);
-    if (step.kind === 'idle') return;
-    const story = step.story;
-    const cards = [story, ...childrenOf(s, story.id).filter(isLive)];
-    // só as execuções desta história contam: as do heartbeat em outras histórias não a seguram
-    if (cards.some((c) => this.runner.running.includes(c.id))) return;
-    for (const c of cards)
-      if (c.status === 'running' && !s.aiRuns.includes(c.id))
-        this.router.handle({ type: 'card.status.set', cardId: c.id, status: 'ready' }, { author: AUTHOR, source: 'ai' });
+    for (const story of pendingStories(s).filter(isLive))
+      for (const c of [story, ...childrenOf(s, story.id).filter(isLive)])
+        if (c.status === 'running' && !s.aiRuns.includes(c.id) && !this.runner.running.includes(c.id))
+          this.router.handle({ type: 'card.status.set', cardId: c.id, status: 'ready' }, { author: AUTHOR, source: 'ai' });
   }
 
   private publish(note: string | null): void {
