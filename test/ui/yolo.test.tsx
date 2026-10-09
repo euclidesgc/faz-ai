@@ -45,10 +45,30 @@ describe('modo autônomo no painel do card', () => {
     expect(sentOf('card.yolo.set')).toEqual([]);
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/Sem restrições/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/não faz o merge/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/do Backlog ao pull request/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('checkbox', { name: 'Não avisar novamente' })).not.toBeChecked();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ligar o modo autônomo' }));
     expect(lastSent('card.yolo.set')).toEqual({ type: 'card.yolo.set', cardId: board.storyId, enabled: true });
+  });
+
+  it('"Não avisar novamente" marcado: liga desta vez e as próximas ligam sem perguntar (#416)', async () => {
+    try {
+      const first = openDrawer(board.storyId);
+      await userEvent.click(screen.getByRole('checkbox', { name: /Modo autônomo/ }));
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Não avisar novamente' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Ligar o modo autônomo' }));
+      expect(lastSent('card.yolo.set')).toEqual({ type: 'card.yolo.set', cardId: board.storyId, enabled: true });
+      expect(useBoardStore.getState().dontWarnYolo).toBe(true);
+      first.unmount();
+
+      openDrawer(board.storyId);
+      await userEvent.click(screen.getByRole('checkbox', { name: /Modo autônomo/ }));
+      expect(useBoardStore.getState().dialog).toBeNull();
+      expect(sentOf('card.yolo.set')).toHaveLength(2);
+    } finally {
+      useBoardStore.getState().setDontWarnYolo(false);
+    }
   });
 
   it('depois de confirmar, a caixa já aparece marcada e travada até o boardState confirmar', async () => {
@@ -112,10 +132,12 @@ describe('modo autônomo no painel do card', () => {
 });
 
 describe('selo no card do board', () => {
-  it('a história em modo autônomo ganha o selo', () => {
+  it('a história em modo autônomo ganha o selo, que é também o botão de desligar (#416)', () => {
     patchCard(board.storyId, { yolo: true });
     render(<Board />);
-    expect(screen.getAllByTitle(/Modo autônomo: a IA toca/).length).toBeGreaterThan(0);
+    const marks = screen.getAllByRole('button', { name: 'Desligar modo autônomo' });
+    expect(marks.length).toBeGreaterThan(0);
+    expect(marks[0]).toHaveClass('yolo-mark', 'on');
   });
 });
 

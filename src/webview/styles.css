@@ -646,6 +646,11 @@ button.chip.on:hover:where(:not(:disabled)) {
   color: var(--muted);
   font-size: var(--fs-sm);
 }
+.dialog-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
 .markdown {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -2936,8 +2941,27 @@ body.host-web .drawer {
 .chat-drawer .chat-head {
   padding-right: var(--sp-24);
 }
-/* modo autônomo (YOLO): selo no card, barra no painel e botão do autopiloto no topo */
+/* modo autônomo (YOLO): botão no rodapé do card, barra no painel e botão do autopiloto no topo */
 .yolo-mark {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  padding: 0 var(--sp-2);
+  margin: calc(var(--sp-2) * -1) calc(var(--sp-2) * -1);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+.yolo-mark:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.yolo-mark.on {
+  color: var(--warn-border);
+}
+.yolo-mark.on:hover {
   color: var(--warn-border);
 }
 .yolo-bar label {

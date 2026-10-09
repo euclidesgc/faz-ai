@@ -52,7 +52,9 @@ export interface DialogSpec {
   danger?: boolean;
   /** quando presente, mostra um seletor e passa o valor escolhido ao confirmar */
   choices?: { label: string; options: { value: string; label: string }[] };
-  onConfirm(choice?: string): void;
+  /** quando presente, mostra um checkbox e passa se está marcado ao confirmar */
+  checkbox?: { label: string };
+  onConfirm(choice?: string, checkboxChecked?: boolean): void;
   /** chamada quando a pessoa desiste (botão, Escape ou clique fora) */
   onCancel?(): void;
   /** ação alternativa, mostrada entre Voltar e a confirmação */
@@ -78,6 +80,8 @@ interface UiState {
   openCardId: Id | null;
   /** modelo e esforço escolhidos no chat (valor do campo Modelo); null = o padrão da ferramenta */
   chatModel: string | null;
+  /** "não avisar novamente" ao ligar o modo autônomo (marcado no checkbox do diálogo de confirmação) */
+  dontWarnYolo: boolean;
 }
 
 interface BoardStore extends UiState, ViewState {
@@ -114,6 +118,7 @@ interface BoardStore extends UiState, ViewState {
   pendingSettingsSection: string | null;
   clearPendingSettingsSection(): void;
   setSettingsNavCollapsed(collapsed: boolean): void;
+  setDontWarnYolo(value: boolean): void;
   selectParent(id: Id | null): void;
   /**
    * Seleção múltipla de cards no board (card 324): conceito novo e separado de `selectedParentId`
@@ -176,6 +181,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
+    dontWarnYolo: persisted?.dontWarnYolo ?? false,
     chatOpen: false,
     setChatOpen: (chatOpen) => set({ chatOpen }),
     setChatModel(chatModel) {
@@ -230,6 +236,10 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       set({ settingsNavCollapsed });
       persist(get());
     },
+    setDontWarnYolo(dontWarnYolo) {
+      set({ dontWarnYolo });
+      persist(get());
+    },
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
     toggleSelected(id) {
       const next = new Set(get().selectedIds);
@@ -276,6 +286,7 @@ function persist(s: BoardStore): void {
     settingsNavCollapsed: s.settingsNavCollapsed,
     openCardId: s.openCardId,
     chatModel: s.chatModel,
+    dontWarnYolo: s.dontWarnYolo,
   };
   setUiState(ui);
 }

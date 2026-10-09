@@ -67,6 +67,9 @@ const selectTwoStories = async (): Promise<[string, string]> => {
   return [board.storyId, secondId];
 };
 
+/** a barra de seleção: o rodapé de cada história também tem o botão de ligar/desligar o modo autônomo (#416) */
+const bar = () => within(document.querySelector('.selectionbar') as HTMLElement);
+
 describe('seleção múltipla de cards no board', () => {
   it('marcar a caixa de uma história adiciona o id a selectedIds', async () => {
     renderBoard();
@@ -141,7 +144,7 @@ describe('barra de seleção e ação em lote (card 326)', () => {
   it('sem nenhuma selecionada em modo autônomo, confirmar liga nas duas e limpa a seleção', async () => {
     const [firstId, secondId] = await selectTwoStories();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Ligar modo autônomo' }));
+    await userEvent.click(bar().getByRole('button', { name: 'Ligar modo autônomo' }));
     expect(sentOf('card.yolo.setMany')).toEqual([]);
 
     const dialog = await screen.findByRole('dialog');
@@ -154,7 +157,7 @@ describe('barra de seleção e ação em lote (card 326)', () => {
 
     // a barra fica, mostrando "Aplicando…" com o botão travado, até o boardState refletir a mudança
     expect(useBoardStore.getState().selectedIds.size).toBe(2);
-    expect(screen.getByRole('button', { name: 'Aplicando…' })).toBeDisabled();
+    expect(bar().getByRole('button', { name: 'Aplicando…' })).toBeDisabled();
 
     act(() => {
       patchCard(firstId, { yolo: true });
@@ -171,8 +174,8 @@ describe('barra de seleção e ação em lote (card 326)', () => {
       patchCard(secondId, { yolo: true });
     });
 
-    expect(screen.getByRole('button', { name: 'Desligar modo autônomo' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Desligar modo autônomo' }));
+    expect(bar().getByRole('button', { name: 'Desligar modo autônomo' })).toBeInTheDocument();
+    await userEvent.click(bar().getByRole('button', { name: 'Desligar modo autônomo' }));
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Desligar o modo autônomo em 2 história(s)?')).toBeInTheDocument();
@@ -185,7 +188,7 @@ describe('barra de seleção e ação em lote (card 326)', () => {
 
   it('cancelar a confirmação não envia nada e mantém a seleção', async () => {
     await selectTwoStories();
-    await userEvent.click(screen.getByRole('button', { name: 'Ligar modo autônomo' }));
+    await userEvent.click(bar().getByRole('button', { name: 'Ligar modo autônomo' }));
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
 

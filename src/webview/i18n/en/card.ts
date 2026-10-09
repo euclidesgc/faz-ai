@@ -216,15 +216,15 @@ export const card: Record<string, string> = {
   'A IA trabalha nesta sub-tarefa sem pedir aprovação, como na história':
     'The AI works on this sub-task without asking for approval, as in the story',
   'Modo autônomo, da história {ref}': 'Autonomous mode, from story {ref}',
-  'A IA toca esta história sozinha, do Backlog até o pull request: cria os documentos de cada fase, o plano e as sub-tarefas, implementa uma por uma e abre o PR. Nada é pedido a você: não há aprovação, pergunta nem confirmação. A IA roda com a permissão "Sem restrições" (altera arquivos e roda comandos) e não faz o merge. As próximas histórias em modo autônomo entram na fila e viram uma pilha de pull requests. Pare a qualquer hora pelo botão do topo do board.':
-    'The AI drives this story by itself, from Backlog to the pull request: it writes the document of each phase, the plan and the sub-tasks, implements them one by one and opens the PR. Nothing is asked of you: there is no approval, question or confirmation. The AI runs with the "Sem restrições" (no restrictions) permission (it edits files and runs commands) and does not merge. The next autonomous stories join the queue and become a stack of pull requests. Stop at any time with the button at the top of the board.',
+  'A IA toca esta história sozinha, do Backlog ao pull request — sem aprovação, pergunta ou confirmação. Pare a qualquer hora pelo botão do topo do board.':
+    'The AI drives this story by itself, from Backlog to the pull request — with no approval, question or confirmation. Stop at any time with the button at the top of the board.',
   'Ligar o modo autônomo em {ref}?': 'Turn on autonomous mode for {ref}?',
   'Ligar o modo autônomo': 'Turn on autonomous mode',
+  'Não avisar novamente': "Don't warn me again",
   'O modo autônomo está tocando a fila.': 'Autonomous mode is driving the queue.',
   'O modo autônomo está pausado.': 'Autonomous mode is paused.',
   'A fila está parada em {ref}: veja a barra de atividade.': 'The queue is stopped at {ref}: see the activity bar.',
   'Modo autônomo': 'Autonomous mode',
-  'Modo autônomo: a IA toca esta história sozinha, sem aprovação': 'Autonomous mode: the AI drives this story by itself, without approval',
   'Salvar descrição': 'Save description',
   'Aplicar seleção': 'Apply selection',
   'precisa terminar antes deste card': 'must finish before this card',
