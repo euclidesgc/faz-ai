@@ -7,29 +7,6 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
-### Fixes
-
-- The autonomous-mode bar inside a card no longer shows another story's full block reason (the autopilot note is board-wide): about another card it shows a short line pointing to it; the full text stays in the activity bar.
-- **A pending item for the person now hands over the card status.** When the AI left something depending on you (a decision, an open point, something left out of the delivery), it wrote that in a comment and moved on, and the card did not show it was your turn. `request_review` now takes a `pending` parameter: the item goes to the conversation under **Blocked on you** and the card stays in **Waiting for review**, even in autonomous mode (the request is no longer auto-approved and the queue moves on with the other stories). The flow skill and the MCP server instructions now require this path and gained the "Pending with the person" section and the three-block phase wrap-up (Blocked on you, What changed, What I found). Reinstall the flow skill in Settings → Harness to update its text.
-- Claude Code's `allowed_warning` (close to the plan's cap) is no longer treated as an exhausted limit: the switch to the fallback model only happens on `rejected` or a window at 100%.
-- The switch to the fallback model only happens when the run failed; a run that finished fine is no longer redone with the fallback.
-- If the retry with the fallback model cannot start (card archived, tool refused), the card is blocked with the reason instead of staying "running" with no run.
-- On a sub-task, the run now counts as text or branch by the story's phase, as the queue does, and the activity bar shows that phase.
-- The **Export the board** and **Import a board** palette commands now have English titles when the editor is in English.
-- The "História entregue com o pull request…" comment is always authored by the AI tool, even when the person moved the card.
-- The autopilot note in the activity bar shows only the first line of the block reason, without code fences and capped at 160 characters.
-- On Windows, runs and CLI probes no longer open a `cmd.exe` window.
-- On Windows, the MCP server's named pipe carries the user name: two users with the same folder no longer compete for the same pipe.
-- The multi-select bar now has a background, border and padding, like the filter bar, in both themes.
-- The card's **Modo autônomo** checkbox and the batch button in the selection bar reflect the click right away and stay locked (the bar shows "Aplicando…") until the board confirms; with no reply in 3 s they revert.
-- Collapsing or expanding a card with the keyboard keeps focus on the collapse button: Enter again reverts.
-- The card's selection checkbox shows up when it receives keyboard focus (and while focus is inside the card).
-- The activity bar no longer announces the whole line to screen readers every minute: only the card reference and phase are announced; the "N min ago" sits outside the live region. The autopilot note stays on one line, with the full text in the tooltip.
-- Dragging a card right after dropping another starts from the order on screen, not the old one.
-- In AI Models, **Preencher o modelo sugerido automaticamente** shows as off when there is no suggestion rule (it used to stay on and locked after deleting the last rule).
-- **Resumir a conversa** locks right after the click: two quick clicks no longer start two runs.
-- Only one **+ Novo card** form is open at a time on the board, and Esc closes it even when focus is outside the field.
-
 - **Text-only phases run in parallel in any workspace mode (#331).** Refine, summarize and the phases that only produce a document (Discovery, PRD, Spec and Plan on the default board) now run at the same time, up to **Histórias ao mesmo tempo** (default 2), even with **Tocar histórias em paralelo** off. Implementation and Homologation work as before: one at a time outside the worktree, and parallel only in the worktree with the option on; the two caps are counted separately and there is still one run per story. In autonomous mode, the queue order applies to stories that need a branch; those in a text phase start when there is a free slot. Outside the worktree, `prepare_workspace` in a text phase while another story has a run in progress is refused (folder in use) and the branch is created in the code phase; with the "Sem restrições" permission the AI can still switch branches by hand, since the guard covers only the board's path.
 - **Dragging cards is now smooth (#286).** When you drag a card, within the same column or to another column (empty, collapsed or Archived), the other cards slide aside with a ~200 ms transition and a dashed gap marks where it will land. The destination column makes room and the source column closes the gap. On drop, the card settles straight into its final position, without jumping back to the origin or flickering while the board updates; if the move is refused, the screen returns to the real state. It applies to stories and sub-tasks (any workflow) and respects `prefers-reduced-motion` (no transitions). **Fix:** moving a card down within the same column and dropping it on another card now saves it after that card, where the preview showed it (it used to be saved before it).
 - **"Save description" is more prominent (#287).** When editing a card description, the button is now primary (solid indigo) and sits below the editor on the right, instead of a subtle button in the header. The button hierarchy rule is recorded in `DESIGN.md`; the other board buttons already followed the pattern.
@@ -290,6 +267,29 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 - **Theme, font and font size moved to the editor's native Settings.** The three keys `fazai.appearance.theme/font/fontSize` now exist in VS Code's and Cursor's Settings (User scope), alongside `fazai.appearance.language` which already lived there since #179. Inside the editor, the Appearance tab of the board's Settings shows a link to open the native Settings; in browser mode (`faz-ai` in the terminal), the tab stays as before, with all 4 fields, because there is no editor Settings in that mode. Syncing is automatic: if the Settings has no explicit value yet and the board has a non-default value, the board's gets copied to the Settings and applies to all projects; if the Settings already has an explicit value, it wins (sync requirement from #179 extended to the three new keys). With multiple different boards opened for the first time after the update, the value from the first board to open applies — the others follow the Settings from then on.
 - **The status table moved from the Appearance tab to the Workflows tab.** Name and color of each status stay editable on the board, but now in Settings → Workflows, not in Appearance; the interface (the fields and colors) stays identical, no existing customization is lost.
 - **Dependency warnings between settings and cross-linked navigation.** Some configuration options only work because of another, but there is no notice. A new component shows a discreet line under the dependent option (for example, "Depends on **a model suggestion rule** (now: none)") that stays disabled when the dependency is not met. The cross-linked navigation lets you click a link to go to the matching board section (which scrolls and highlights for 2 s), or to open the editor Settings at the matching option; in browser mode, links to the Settings appear as text only. **"Fill in the suggested model automatically"** moved from Rules to Models, where it makes more sense — Rules shows a simple notice about the move. The Heartbeat interval field stays disabled when the heartbeat is off, with no additional dependency component. New headers in Models, Agents, Rules and Skills show "Showing the X of Cursor · switch tool" (or of the configured tool), allowing you to switch tools from any of these screens. A link in Settings (`fazai.git.parallel`) opens the board again, at the Harness heartbeat section.
+
+### Fixes
+
+- The autonomous-mode bar inside a card no longer shows another story's full block reason (the autopilot note is board-wide): about another card it shows a short line pointing to it; the full text stays in the activity bar.
+- **A pending item for the person now hands over the card status.** When the AI left something depending on you (a decision, an open point, something left out of the delivery), it wrote that in a comment and moved on, and the card did not show it was your turn. `request_review` now takes a `pending` parameter: the item goes to the conversation under **Blocked on you** and the card stays in **Waiting for review**, even in autonomous mode (the request is no longer auto-approved and the queue moves on with the other stories). The flow skill and the MCP server instructions now require this path and gained the "Pending with the person" section and the three-block phase wrap-up (Blocked on you, What changed, What I found). Reinstall the flow skill in Settings → Harness to update its text.
+- Claude Code's `allowed_warning` (close to the plan's cap) is no longer treated as an exhausted limit: the switch to the fallback model only happens on `rejected` or a window at 100%.
+- The switch to the fallback model only happens when the run failed; a run that finished fine is no longer redone with the fallback.
+- If the retry with the fallback model cannot start (card archived, tool refused), the card is blocked with the reason instead of staying "running" with no run.
+- On a sub-task, the run now counts as text or branch by the story's phase, as the queue does, and the activity bar shows that phase.
+- The **Export the board** and **Import a board** palette commands now have English titles when the editor is in English.
+- The "História entregue com o pull request…" comment is always authored by the AI tool, even when the person moved the card.
+- The autopilot note in the activity bar shows only the first line of the block reason, without code fences and capped at 160 characters.
+- On Windows, runs and CLI probes no longer open a `cmd.exe` window.
+- On Windows, the MCP server's named pipe carries the user name: two users with the same folder no longer compete for the same pipe.
+- The multi-select bar now has a background, border and padding, like the filter bar, in both themes.
+- The card's **Modo autônomo** checkbox and the batch button in the selection bar reflect the click right away and stay locked (the bar shows "Aplicando…") until the board confirms; with no reply in 3 s they revert.
+- Collapsing or expanding a card with the keyboard keeps focus on the collapse button: Enter again reverts.
+- The card's selection checkbox shows up when it receives keyboard focus (and while focus is inside the card).
+- The activity bar no longer announces the whole line to screen readers every minute: only the card reference and phase are announced; the "N min ago" sits outside the live region. The autopilot note stays on one line, with the full text in the tooltip.
+- Dragging a card right after dropping another starts from the order on screen, not the old one.
+- In AI Models, **Preencher o modelo sugerido automaticamente** shows as off when there is no suggestion rule (it used to stay on and locked after deleting the last rule).
+- **Resumir a conversa** locks right after the click: two quick clicks no longer start two runs.
+- Only one **+ Novo card** form is open at a time on the board, and Esc closes it even when focus is outside the field.
 
 ## 0.33.0
 
