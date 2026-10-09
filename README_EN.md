@@ -77,7 +77,9 @@ In five minutes you have a task moving on the board, with the AI working on it.
 4. **Let the AI start.** Drag the card to **Discovery** and click **Trabalhar na fase** (work on the
    phase) on the card. The AI reads the card through the board, analyzes the problem and talks with you in the
    **Conversa** (conversation) tab. When it finishes, the status changes to **Aguardando
-   revisão** (waiting for review): it is your turn.
+   revisão** (waiting for review): it is your turn. The same happens when the AI leaves something
+   depending on you (a decision, an open point): the item shows up in the conversation as **Blocked
+   on you** and the card stays with you, even in autonomous mode.
 5. **Review and move on.** Read the phase document, answer, or click **Aprovar** (approve) or
    **Pedir ajustes** (ask for changes). On approval the story moves on to **PRD**, **Spec**,
    **Plan** and **Implementação** (implementation), always with the AI producing and you approving.

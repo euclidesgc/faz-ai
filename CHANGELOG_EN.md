@@ -9,6 +9,7 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ### Fixes
 
+- **A pending item for the person now hands over the card status.** When the AI left something depending on you (a decision, an open point, something left out of the delivery), it wrote that in a comment and moved on, and the card did not show it was your turn. `request_review` now takes a `pending` parameter: the item goes to the conversation under **Blocked on you** and the card stays in **Waiting for review**, even in autonomous mode (the request is no longer auto-approved and the queue moves on with the other stories). The flow skill and the MCP server instructions now require this path and gained the "Pending with the person" section and the three-block phase wrap-up (Blocked on you, What changed, What I found). Reinstall the flow skill in Settings → Harness to update its text.
 - Claude Code's `allowed_warning` (close to the plan's cap) is no longer treated as an exhausted limit: the switch to the fallback model only happens on `rejected` or a window at 100%.
 - The switch to the fallback model only happens when the run failed; a run that finished fine is no longer redone with the fallback.
 - If the retry with the fallback model cannot start (card archived, tool refused), the card is blocked with the reason instead of staying "running" with no run.

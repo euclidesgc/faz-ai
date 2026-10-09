@@ -9,12 +9,14 @@ import { applySuggestion, suggestionFor } from './models';
 /**
  * Muda o status de trabalho do card. Aprovar é só da pessoa; bloquear exige o motivo. Em modo autônomo
  * (YOLO) o pedido de revisão da IA vira aprovação na hora: ninguém vai revisar, e o resumo fica na conversa.
+ * Exceção: com `pending` (algo depende da pessoa), o card fica mesmo em "waiting_review", também em modo
+ * autônomo: a pendência é dela, e o status tem de mostrar isso.
  */
 function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author: string, byAi: boolean): void {
   const note = msg.note?.trim() ?? '';
   if (msg.status === 'approved' && byAi) throw new Error('Só uma pessoa pode aprovar um card.');
   if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
-  const autoApprove = byAi && msg.status === 'waiting_review' && ctx.cards.isYolo(msg.cardId);
+  const autoApprove = byAi && msg.status === 'waiting_review' && !msg.pending && ctx.cards.isYolo(msg.cardId);
   ctx.cards.setStatus(msg.cardId, autoApprove ? 'approved' : msg.status, msg.status === 'blocked' ? note : '', author);
   if (note) ctx.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
   // só a aprovação de uma pessoa dispara o merge automático: a do modo autônomo não passa por aqui
