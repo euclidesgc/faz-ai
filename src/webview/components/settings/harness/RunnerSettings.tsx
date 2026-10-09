@@ -6,6 +6,7 @@ import { ai, settings, ui } from '../../../commands';
 import { isWeb } from '../../../vscode';
 import { FormField, IconWarning, NumberField, SelectField, SwitchField } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
+import { DependsOn } from '../DependsOn';
 import { t } from '../../../i18n';
 
 /** O que a IA pode fazer quando o board a executa (pela conversa ou pelo heartbeat), o tempo limite e o heartbeat. */
@@ -15,6 +16,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
   const runner = board.runner;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === runner.permission)!;
   const worktree = board.git.mode === 'worktree';
+  const hasAvailableAgent = board.execProfiles.some((p) => p.scope !== 'builtin');
   return (
     <>
       <SectionHeader
@@ -76,16 +78,26 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
             hint={t('Executa os cards que não escolhem um agente, nem pela fase. Só os agentes marcados como disponíveis no Harness.')}
           >
             {(id) => (
-              <SelectField
-                id={id}
-                aria-label={t('Agente padrão')}
-                options={board.execProfiles.map((p) => ({
-                  value: p.id,
-                  label: p.scope === 'builtin' ? t('Agente embutido (sem instruções)') : p.id,
-                }))}
-                value={board.execProfiles.find((p) => p.isDefault)?.id ?? ''}
-                onChange={(defaultAgent) => settings.updateBoard({ runner: { defaultAgent } })}
-              />
+              <>
+                <SelectField
+                  id={id}
+                  aria-label={t('Agente padrão')}
+                  options={board.execProfiles.map((p) => ({
+                    value: p.id,
+                    label: p.scope === 'builtin' ? t('Agente embutido (sem instruções)') : p.id,
+                  }))}
+                  value={board.execProfiles.find((p) => p.isDefault)?.id ?? ''}
+                  onChange={(defaultAgent) => settings.updateBoard({ runner: { defaultAgent } })}
+                />
+                {!hasAvailableAgent && (
+                  <DependsOn
+                    label={t('agentes marcados como disponíveis')}
+                    satisfied={hasAvailableAgent}
+                    target={{ kind: 'board', section: 'harness-project' }}
+                    targetHint={t('em Harness › Projeto ou Global')}
+                  />
+                )}
+              </>
             )}
           </FormField>
           <FormField label={t('Tempo limite por execução')}>
@@ -125,6 +137,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
                     min={HEARTBEAT_RANGE.min}
                     max={HEARTBEAT_RANGE.max}
                     value={runner.heartbeatMinutes}
+                    disabled={!runner.heartbeat}
                     onCommit={(heartbeatMinutes) => settings.updateBoard({ runner: { heartbeatMinutes } })}
                   />
                   <Text size="2" color="gray">

@@ -452,6 +452,8 @@ export const harness: Record<string, string> = {
     'Runs the cards that pick no agent, not even through the phase. Only agents checked as available in the Harness.',
   'Agente embutido (sem instruções)': 'Built-in agent (no instructions)',
   'Agente padrão': 'Default agent',
+  'agentes marcados como disponíveis': 'agents checked as available',
+  'em Harness › Projeto ou Global': 'in Harness › Project or Global',
   // --- EXEC_ASPECTS
   'Skills e rules': 'Skills and rules',
   'Contexto vazio': 'Empty context',
