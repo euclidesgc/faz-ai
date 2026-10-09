@@ -6,6 +6,7 @@ import { settings } from '../../commands';
 import { t } from '../../i18n';
 import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
 import { FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../ui';
+import { DependsOn } from './DependsOn';
 import { ModelRulesEditor } from './ModelRulesEditor';
 import { SettingsCard } from './SettingsCard';
 import { useSentList } from './useSentList';
@@ -106,7 +107,7 @@ function NewModelCard({
 
 export function ModelsSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const { modelCatalog: catalog, aiTool } = state.board;
+  const { modelCatalog: catalog, modelRules, rules, aiTool } = state.board;
   const [adding, setAdding] = useState(false);
 
   // as mudanças partem da última lista enviada (ver useSentList)
@@ -167,8 +168,25 @@ export function ModelsSettings() {
                     'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"); desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.',
                   )}
                 </Text>
+                <DependsOn
+                  label={t('ferramenta Cursor')}
+                  satisfied={true}
+                  target={{ kind: 'board', section: 'harness-tool' }}
+                  targetHint={t('em Harness de IA')}
+                />
               </div>
             )}
+            <Text as="p" size="1" color="gray">
+              {t('Mostrando os modelos do {tool}', { tool: tl.label })}{' · '}
+              <Button
+                variant="ghost"
+                size="1"
+                aria-label={t('Trocar a ferramenta de IA, em Harness de IA')}
+                onClick={() => useBoardStore.getState().goToSection('harness-tool')}
+              >
+                {t('trocar ferramenta')}
+              </Button>
+            </Text>
             {adding && (
               <NewModelCard
                 tool={tl.id}
@@ -257,6 +275,26 @@ export function ModelsSettings() {
           </SettingsCard>
         );
       })}
+
+      <Card className="form-card" aria-label={t('Preencher o modelo sugerido')}>
+        <SwitchField
+          label={t('Preencher o modelo sugerido automaticamente')}
+          checked={rules.autoApplyModelSuggestion}
+          disabled={modelRules.length === 0}
+          onChange={(autoApplyModelSuggestion) => settings.updateRules({ autoApplyModelSuggestion })}
+        />
+        <Text as="p" size="1" color="gray">
+          {t(
+            'Ao criar ou mudar um card, preenche o campo "Modelo" com a sugestão das regras abaixo, se ele estiver vazio ou com a sugestão anterior. Um modelo escolhido à mão nunca é trocado.',
+          )}
+        </Text>
+        <DependsOn
+          label={t('uma regra de sugestão de modelo')}
+          satisfied={modelRules.length > 0}
+          target={{ kind: 'board', section: 'model-rules' }}
+          targetHint={t('mais abaixo, nesta mesma aba')}
+        />
+      </Card>
 
       <ModelRulesEditor />
     </div>

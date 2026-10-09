@@ -318,6 +318,67 @@ describe('Settings: ida e volta com o Settings do editor', () => {
     alvo.remove();
   });
 
+  it('ui.openSettings destaca a seção por ~2s e depois tira a classe', () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Theme>
+          <SettingsWithHostSync />
+        </Theme>,
+      );
+      const alvo = document.createElement('div');
+      alvo.id = 'secao-destaque';
+      alvo.scrollIntoView = vi.fn();
+      document.body.append(alvo);
+      act(() =>
+        window.dispatchEvent(
+          new MessageEvent('message', { data: { type: 'ui.openSettings', tab: 'harness', section: 'secao-destaque' } }),
+        ),
+      );
+      expect(alvo).toHaveClass('fazai-highlight');
+      act(() => vi.advanceTimersByTime(2200));
+      expect(alvo).not.toHaveClass('fazai-highlight');
+      alvo.remove();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('goToSection também destaca a seção, com a aba e a sub-aba de Harness certas', () => {
+    vi.useFakeTimers();
+    try {
+      useBoardStore.setState({ settingsTab: 'columns', harnessTab: 'tool', pendingSettingsSection: null });
+      render(
+        <Theme>
+          <SettingsWithHostSync />
+        </Theme>,
+      );
+      const alvo = document.createElement('div');
+      alvo.id = 'secao-goto';
+      alvo.scrollIntoView = vi.fn();
+      document.body.append(alvo);
+      // 'secao-goto' não está em SETTINGS_SECTIONS: só marca a pendência, sem trocar de aba
+      act(() => useBoardStore.getState().goToSection('secao-goto'));
+      expect(alvo).toHaveClass('fazai-highlight');
+      act(() => vi.advanceTimersByTime(2200));
+      expect(alvo).not.toHaveClass('fazai-highlight');
+      alvo.remove();
+
+      // com uma seção registrada que mora numa sub-aba de Harness, goToSection troca a aba e a sub-aba
+      const heartbeat = document.createElement('div');
+      heartbeat.id = 'heartbeat';
+      heartbeat.scrollIntoView = vi.fn();
+      document.body.append(heartbeat);
+      act(() => useBoardStore.getState().goToSection('heartbeat'));
+      const s = useBoardStore.getState();
+      expect(s.settingsTab).toBe('harness');
+      expect(s.harnessTab).toBe('tool');
+      heartbeat.remove();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('ui.openView mostra o Diagnóstico', () => {
     render(
       <Theme>

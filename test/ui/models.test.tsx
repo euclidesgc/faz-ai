@@ -170,6 +170,42 @@ describe('ModelsSettings: modos rápidos do Cursor', () => {
   });
 });
 
+describe('ModelsSettings: preencher o modelo sugerido (RF01/RF07)', () => {
+  it('sem regra de sugestão, o interruptor fica desabilitado e o aviso de dependência aparece', () => {
+    board.router.handle({ type: 'settings.modelRules.set', rules: [] });
+    syncStore(board.router);
+    show();
+    const toggle = screen.getByRole('switch', { name: 'Preencher o modelo sugerido automaticamente' });
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText(/Depende de/)).toBeInTheDocument();
+  });
+
+  it('com uma regra cadastrada, o interruptor fica habilitado e grava a mudança', async () => {
+    const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
+    board.router.handle({
+      type: 'settings.modelRules.set',
+      rules: [{ id: 'r3', name: 'Teste', enabled: true, groups: [[{ fieldId: '@type', op: 'is', value: 'História' }]], model: m.id }],
+    });
+    syncStore(board.router);
+    show();
+    const toggle = screen.getByRole('switch', { name: 'Preencher o modelo sugerido automaticamente' });
+    expect(toggle).toBeEnabled();
+    await userEvent.click(toggle);
+    expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { autoApplyModelSuggestion: false } });
+  });
+});
+
+describe('ModelsSettings: cabeçalho da ferramenta (RF09)', () => {
+  it('mostra a ferramenta atual e troca para a seção de ferramenta em Harness ao clicar', async () => {
+    show();
+    const link = screen.getByRole('button', { name: 'Trocar a ferramenta de IA, em Harness de IA' });
+    await userEvent.click(link);
+    const s = useBoardStore.getState();
+    expect(s.settingsTab).toBe('harness');
+    expect(s.pendingSettingsSection).toBe('harness-tool');
+  });
+});
+
 describe('regras de modelo em inglês', () => {
   it('os nomes do board padrão nas regras saem traduzidos: o campo, as opções e o nome das regras', async () => {
     const { ModelRulesEditor } = await import('../../src/webview/components/settings/ModelRulesEditor');

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Badge, Button, Card, Heading } from '@radix-ui/themes';
+import { Badge, Button, Card, Heading, Text } from '@radix-ui/themes';
 import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type CompleteParentMode, type ConfirmMode } from '../../../shared/rules';
 import { columnsOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
@@ -178,23 +178,14 @@ export function RulesSettings() {
         }
       />
 
-      <Rule
-        title={t('Preencher o modelo sugerido')}
-        active={rules.autoApplyModelSuggestion}
-        when={t('um card é criado ou um atributo dele muda, e o campo de modelo está vazio ou ainda tem a sugestão anterior')}
-        then={
-          rules.autoApplyModelSuggestion
-            ? t('preencher o modelo com a sugestão das regras. Um modelo escolhido à mão nunca é trocado.')
-            : t('não mexer no modelo. A sugestão só é aplicada pelo botão no card.')
-        }
-        control={
-          <SwitchField
-            label={t('Preencher')}
-            checked={rules.autoApplyModelSuggestion}
-            onChange={(autoApplyModelSuggestion) => set({ autoApplyModelSuggestion })}
-          />
-        }
-      />
+      <Card className="form-card" aria-label={t('Preencher o modelo sugerido')}>
+        <Text as="p" size="2">
+          {t('"Preencher o modelo sugerido automaticamente" mudou para a aba Modelos.')}
+        </Text>
+        <Button variant="soft" onClick={() => useBoardStore.getState().goToSection('model-rules')}>
+          {t('Abrir em Modelos')}
+        </Button>
+      </Card>
 
       <Rule
         title={t('Excluir card')}

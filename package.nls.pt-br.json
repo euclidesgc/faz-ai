@@ -43,7 +43,7 @@
   "config.git.mode.off": "O board não cria branches nem worktrees.",
   "config.git.branchPattern": "Nome da branch de cada história. Aceita `{tipo}`, `{numero}` (obrigatório) e `{titulo}`. Só vale quando [Onde a IA mexe no código](@id:fazai.git.mode) não é `off`.",
   "config.git.worktreeDir": "Pasta onde ficam as worktrees, relativa à pasta do projeto; `{repo}` é o nome dela. Só vale no modo `worktree` ([Onde a IA mexe no código](@id:fazai.git.mode)).",
-  "config.git.parallel": "Com o heartbeat ligado, toca várias histórias ao mesmo tempo, cada uma na sua própria worktree. Só vale no modo `worktree` ([Onde a IA mexe no código](@id:fazai.git.mode)).",
+  "config.git.parallel": "Com o heartbeat ligado, toca várias histórias ao mesmo tempo, cada uma na sua própria worktree. Só vale no modo `worktree` ([Onde a IA mexe no código](@id:fazai.git.mode)). [Abrir o heartbeat, em Harness de IA](command:fazai.openBoardSettings?%7B%22tab%22%3A%22harness%22%2C%22section%22%3A%22heartbeat%22%7D).",
   "config.git.parallelStories": "Quantas histórias ao mesmo tempo, no mínimo duas. Só vale com [Tocar histórias em paralelo](@id:fazai.git.parallel) ligado, no modo `worktree`.",
   "config.git.autoMerge": "Ao aprovar a história na última coluna antes da conclusão, faz o merge do pull request dela e conclui o card. O merge é feito no GitHub com a sua conta (comando `gh`) e não pode ser desfeito pelo board.",
   "config.git.mergeMethod": "Tipo de merge do pull request. Só vale com [merge automático](@id:fazai.git.autoMerge) ligado.",

@@ -382,6 +382,13 @@ describe('HarnessSettings: ferramenta e execução', () => {
     await userEvent.clear(timeout!);
     await userEvent.type(timeout!, '7{Enter}');
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { timeoutMinutes: 7 } });
+    // o intervalo do heartbeat só é editável com o heartbeat ligado
+    expect(interval).toBeDisabled();
+    const heartbeat = within(runner).getByRole('switch', { name: 'Heartbeat ligado' });
+    await userEvent.click(heartbeat);
+    expect(lastSent('settings.board.update').patch).toEqual({ runner: { heartbeat: true } });
+    act(() => setState((st) => ({ board: { ...st.board, runner: { ...st.board.runner, heartbeat: true } } })));
+    expect(interval).toBeEnabled();
     await userEvent.clear(interval!);
     await userEvent.type(interval!, '45{Enter}');
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { heartbeatMinutes: 45 } });
@@ -395,11 +402,6 @@ describe('HarnessSettings: ferramenta e execução', () => {
     await userEvent.clear(parallel);
     await userEvent.type(parallel, '3{Enter}');
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { parallelStories: 3 } });
-    const heartbeat = within(runner).getByRole('switch', { name: 'Heartbeat ligado' });
-    await userEvent.click(heartbeat);
-    expect(lastSent('settings.board.update').patch).toEqual({
-      runner: { heartbeat: !useBoardStore.getState().state!.board.runner.heartbeat },
-    });
     await userEvent.click(screen.getByRole('button', { name: 'Rodar o heartbeat agora' }));
     expect(lastSent('ai.heartbeat.run')).toEqual({ type: 'ai.heartbeat.run' });
   });

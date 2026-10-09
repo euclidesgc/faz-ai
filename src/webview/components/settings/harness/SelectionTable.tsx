@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Badge, Button, Checkbox, IconButton } from '@radix-ui/themes';
+import { Badge, Button, Checkbox, IconButton, Text } from '@radix-ui/themes';
 import { REFERENCE_SKILL, SKILL_MODES, type HarnessItem, type InstallScope, type SkillMode } from '../../../../shared/harness';
 import { createTargets } from '../../../../shared/harnessCatalog';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
@@ -82,6 +82,20 @@ export function SelectionTable({ tool, scope, kind }: Props) {
           })}
         </span>
       </p>
+      <Text as="p" size="1" color="gray">
+        {kind === 'instructions'
+          ? t('Mostrando as rules do {tool}', { tool: tool.label })
+          : t('Mostrando as skills do {tool}', { tool: tool.label })}
+        {' · '}
+        <Button
+          variant="ghost"
+          size="1"
+          aria-label={t('Trocar a ferramenta de IA, em Harness de IA')}
+          onClick={() => useBoardStore.getState().goToSection('harness-tool')}
+        >
+          {t('trocar ferramenta')}
+        </Button>
+      </Text>
       <div className="row selection-actions">
         {places.length > 0 && (
           <Button variant="soft" color="gray" onClick={() => setCreating(!creating)}>
