@@ -50,7 +50,7 @@ describe('DependsOn', () => {
     render(
       <Theme>
         <DependsOn
-          label="a ferramenta Cursor"
+          label="ferramenta Cursor"
           satisfied={false}
           target={{ kind: 'board', section: 'harness-tool' }}
           targetHint="em Harness de IA"

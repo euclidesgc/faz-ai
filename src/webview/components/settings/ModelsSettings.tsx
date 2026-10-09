@@ -169,7 +169,7 @@ export function ModelsSettings() {
                   )}
                 </Text>
                 <DependsOn
-                  label={t('a ferramenta Cursor')}
+                  label={t('ferramenta Cursor')}
                   satisfied={true}
                   target={{ kind: 'board', section: 'harness-tool' }}
                   targetHint={t('em Harness de IA')}
