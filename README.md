@@ -69,7 +69,9 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    Markdown, e, se quiser, escolha o modelo da IA e as skills que ela deve ler.
 4. **Deixe a IA começar.** Arraste o card para **Discovery** e clique em **Trabalhar na fase** no card. A IA
    lê o card pelo board, analisa o problema e conversa com você na aba **Conversa**. Quando termina,
-   o status muda para **Aguardando revisão**: é a sua vez.
+   o status muda para **Aguardando revisão**: é a sua vez. O mesmo acontece quando a IA deixa
+   algo dependendo de você (uma decisão, um ponto em aberto): a pendência aparece na conversa como
+   **Travado em mim** e o card fica com você, mesmo em modo autônomo.
 5. **Revise e siga.** Leia o documento da fase, responda ou clique em **Aprovar** (ou **Pedir
    ajustes**). Com a aprovação, a história avança para **PRD**, **Spec**, **Plan** e
    **Implementação**, sempre com a IA produzindo e você aprovando. As sub-tarefas da implementação
