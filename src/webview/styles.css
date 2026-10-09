@@ -431,14 +431,15 @@ button.active {
   outline: var(--focus-ring);
   outline-offset: -1px;
 }
-/* caixa de marcação da seleção múltipla (card 324): some por padrão, só aparece sob o mouse,
-   já marcada ou enquanto há alguma seleção ativa no board (classe .selecting) */
+/* caixa de marcação da seleção múltipla (card 324): tem lugar fixo na faixa do card, antes do LED,
+   para nunca cobrir o ID nem o tipo; some por padrão (o lugar fica reservado, nada se mexe) e aparece
+   sob o mouse, já marcada ou enquanto há alguma seleção ativa no board (classe .selecting) */
 .card-select {
-  position: absolute;
-  top: var(--sp-2);
-  left: var(--sp-2);
-  z-index: 1;
+  flex: none;
+  width: 14px;
+  height: 14px;
   margin: 0;
+  accent-color: var(--accent);
   opacity: 0;
   cursor: pointer;
 }
@@ -513,19 +514,18 @@ button.active {
   font-size: var(--fs-xs);
   color: var(--muted);
 }
-/* card colapsado (escopo "um card"/coluna/board/selecionados): uma linha só, chevron + LED + título */
-.card.card-collapsed {
-  min-height: 32px;
+/* card colapsado (escopo "um card"/coluna/board/selecionados): a faixa colorida fica (LED, ID, tipo e
+   botões) e o corpo guarda só o título, em até duas linhas */
+.card.card-collapsed .card-body {
+  padding-top: var(--sp-4);
+  padding-bottom: var(--sp-4);
 }
-.card-collapsed-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-6);
-  padding: var(--sp-2) var(--sp-8);
-}
-.card-collapsed-row .card-title {
-  flex: 1;
-  min-width: 0;
+.card.card-collapsed .card-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .badge {
   font-size: var(--fs-xs);

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { cardRef, type Card, type CardType } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { t, dt } from '../../i18n';
@@ -41,6 +42,7 @@ export function TitleBar({
   overlay,
   collapsed,
   onToggleCollapse,
+  leading,
 }: {
   card: Card;
   type?: CardType;
@@ -48,12 +50,20 @@ export function TitleBar({
   overlay: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  leading?: ReactNode;
 }) {
   const openCard = useBoardStore((s) => s.openCard);
   const archived = card.archivedAt !== null;
 
   return (
-    <CardBar id={cardRef(card)} typeName={type && dt(type.name)} color={type?.color} work={work} status={archived ? null : card.status}>
+    <CardBar
+      id={cardRef(card)}
+      typeName={type && dt(type.name)}
+      color={type?.color}
+      work={work}
+      status={archived ? null : card.status}
+      leading={leading}
+    >
       {!overlay && (
         <span className="card-actions">
           <CollapseToggle collapsed={collapsed} onToggle={onToggleCollapse} />

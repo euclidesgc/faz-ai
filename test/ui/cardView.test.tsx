@@ -157,14 +157,14 @@ describe('CardView', () => {
   describe('card colapsado', () => {
     const collapse = (id: string) => useBoardStore.getState().setCollapsed(`card:${id}`, true);
 
-    it('mostra só o título, sem número, barra do tipo, pai, status, campos, modelo nem rodapé', () => {
+    it('mantém a faixa (número e tipo) e o título; esconde pai, status, campos, modelo e rodapé', () => {
       patchCard(board.subId, { status: 'waiting_review', statusAt: Date.now(), parentId: board.storyId, title: 'Card colapsado' });
       collapse(board.subId);
       const { container } = show(board.subId);
       expect(screen.getByText('Card colapsado')).toBeInTheDocument();
-      expect(container.querySelector('.card-bar')).toBeNull();
-      expect(container.querySelector('.card-id')).toBeNull();
-      expect(container.querySelector('.card-type')).toBeNull();
+      expect(container.querySelector('.card-bar')).not.toBeNull();
+      expect(container.querySelector('.card-id')).not.toBeNull();
+      expect(container.querySelector('.card-type')).not.toBeNull();
       expect(container.querySelector('.card-parent')).toBeNull();
       expect(container.querySelector('.status-badge')).toBeNull();
       expect(container.querySelector('.card-fields')).toBeNull();
@@ -235,5 +235,16 @@ describe('CardView', () => {
       const collapsedRender = show(board.subId);
       expect(collapsedRender.getByRole('button', { name: 'Expandir card' })).toHaveAttribute('aria-expanded', 'false');
     });
+  });
+});
+
+describe('caixa de seleção na faixa do card', () => {
+  it('a caixa de marcação fica dentro da faixa colorida, antes do LED, e não como camada solta sobre o card', () => {
+    const { container } = show(board.storyId);
+    const bar = container.querySelector('.card-bar')!;
+    const box = bar.querySelector('input.card-select');
+    expect(box).not.toBeNull();
+    expect(bar.firstElementChild).toBe(box);
+    expect(container.querySelector('article > input.card-select')).toBeNull();
   });
 });
