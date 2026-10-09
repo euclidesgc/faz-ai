@@ -407,14 +407,15 @@ describe('CardDrawer', () => {
     expect(sentOf('card.trash')).toHaveLength(0);
   });
 
-  it('card arquivado: aviso, coluna travada, sem status e "Desarquivar" no menu', async () => {
+  it('card arquivado: aviso, coluna travada, sem status e "Restaurar" no menu (história ativa: restaura só ele)', async () => {
     patchCard(board.subId, { archivedAt: 1 });
     openCardDrawer(board.subId);
     expect(screen.getByText('Este card está arquivado.')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Coluna' })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Desarquivar' }));
-    expect(lastSent('card.unarchive')).toEqual({ type: 'card.unarchive', cardId: board.subId });
+    await userEvent.click(screen.getByRole('button', { name: 'Restaurar' }));
+    expect(useBoardStore.getState().dialog).toBeNull();
+    expect(lastSent('card.restoreArchived')).toEqual({ type: 'card.restoreArchived', cardId: board.subId });
   });
 
   it('card na lixeira: aviso, sem menu de ações e "Restaurar" envia card.restore', async () => {

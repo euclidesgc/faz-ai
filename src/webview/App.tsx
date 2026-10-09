@@ -17,6 +17,7 @@ import { SelectionBar } from './components/SelectionBar';
 import { AutopilotButton } from './components/AutopilotButton';
 import { HeartbeatButton } from './components/HeartbeatButton';
 import { ThemeToggle } from './components/ThemeToggle';
+import { ArchivedView } from './components/ArchivedView';
 import { TrashView } from './components/TrashView';
 import { MetricsView } from './components/metrics/MetricsView';
 import { Settings } from './components/settings/Settings';
@@ -90,6 +91,9 @@ export function App() {
           <Button active={view === 'metrics'} aria-current={view === 'metrics' ? 'page' : undefined} onClick={() => setView('metrics')}>
             {t('Métricas')}
           </Button>
+          <Button active={view === 'archived'} aria-current={view === 'archived' ? 'page' : undefined} onClick={() => setView('archived')}>
+            {t('Arquivados')}
+          </Button>
           <Button active={view === 'trash'} aria-current={view === 'trash' ? 'page' : undefined} onClick={() => setView('trash')}>
             {t('Lixeira')}
             {trashCount > 0 && ` (${trashCount})`}
@@ -147,6 +151,7 @@ export function App() {
       {view === 'board' && <SelectionBar />}
       <main className="content">
         {view === 'board' && <Board />}
+        {view === 'archived' && <ArchivedView />}
         {view === 'trash' && <TrashView />}
         {view === 'settings' && <Settings />}
         {view === 'metrics' && <MetricsView />}

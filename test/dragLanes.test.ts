@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { archiveKey } from '../src/shared/filters';
 import { buildLanes, laneOf, lanesMatch, moveToLane, resolveDrop, type Lanes } from '../src/shared/dragLanes';
 import { boardState, card } from './fakes/board';
 
-const ARC = archiveKey('wp');
-
-// backlog: a b c | doing: d e | done: vazia | arquivados: x
+// backlog: a b c | doing: d e | done: vazia (x está arquivado: não entra em nenhuma faixa)
 const state = boardState({
   cards: [
     card('a', { columnId: 'backlog', position: 0 }),
@@ -16,20 +13,19 @@ const state = boardState({
     card('x', { columnId: 'backlog', position: 3, archivedAt: 5 }),
   ],
 });
-const base = (): Lanes => ({ backlog: ['a', 'b', 'c'], doing: ['d', 'e'], done: [], [ARC]: ['x'] });
-const archive = { laneId: ARC, archivedIds: new Set(['x']) };
+const base = (): Lanes => ({ backlog: ['a', 'b', 'c'], doing: ['d', 'e'], done: [] });
 
 describe('buildLanes / laneOf', () => {
-  it('monta uma faixa por coluna e a de arquivados, copiando as listas', () => {
+  it('monta uma faixa por coluna (sem faixa de arquivados), copiando as listas', () => {
     const vis = { backlog: ['a'], doing: ['d'] };
-    const lanes = buildLanes(['backlog', 'doing', 'done'], vis, ARC, ['x']);
-    expect(lanes).toEqual({ backlog: ['a'], doing: ['d'], done: [], [ARC]: ['x'] });
+    const lanes = buildLanes(['backlog', 'doing', 'done'], vis);
+    expect(lanes).toEqual({ backlog: ['a'], doing: ['d'], done: [] });
     expect(lanes.backlog).not.toBe(vis.backlog);
   });
 
   it('laneOf acha a faixa do card ou undefined', () => {
     expect(laneOf(base(), 'e')).toBe('doing');
-    expect(laneOf(base(), 'x')).toBe(ARC);
+    expect(laneOf(base(), 'x')).toBeUndefined();
     expect(laneOf(base(), 'zzz')).toBeUndefined();
   });
 });
@@ -64,23 +60,10 @@ describe('moveToLane', () => {
     expect(moveToLane(base(), 'a', 'done', false).done).toEqual(['a']);
     expect(moveToLane(base(), 'a', 'doing', true).doing).toEqual(['d', 'e', 'a']);
   });
-
-  it('card vivo sobre o arquivo não muda de faixa', () => {
-    const l = base();
-    expect(moveToLane(l, 'a', ARC, false, archive)).toBe(l);
-    expect(moveToLane(l, 'a', 'x', false, archive)).toBe(l);
-  });
-
-  it('arquivado sai do arquivo e volta a ele', () => {
-    const out = moveToLane(base(), 'x', 'b', false, archive);
-    expect(out.backlog).toEqual(['a', 'x', 'b', 'c']);
-    expect(out[ARC]).toEqual([]);
-    expect(moveToLane(out, 'x', ARC, false, archive)[ARC]).toEqual(['x']);
-  });
 });
 
 describe('resolveDrop', () => {
-  const drop = (lanes: Lanes, id: string) => resolveDrop(state, lanes, id, 'wp');
+  const drop = (lanes: Lanes, id: string) => resolveDrop(state, lanes, id);
 
   it('sem mudança é none', () => {
     expect(drop(base(), 'b')).toEqual({ kind: 'none' });
@@ -117,18 +100,18 @@ describe('resolveDrop', () => {
   it('filtro ativo com vizinhos escondidos', () => {
     // doing real: d e; o filtro esconde d. Visível: [e]. Soltar antes de e -> 1; depois de e -> fim.
     const s = boardState({ cards: [...state.cards] });
-    expect(resolveDrop(s, { ...base(), backlog: ['b', 'c'], doing: ['a', 'e'] }, 'a', 'wp')).toEqual({
+    expect(resolveDrop(s, { ...base(), backlog: ['b', 'c'], doing: ['a', 'e'] }, 'a')).toEqual({
       kind: 'move',
       columnId: 'doing',
       position: 1,
     });
-    expect(resolveDrop(s, { ...base(), backlog: ['b', 'c'], doing: ['e', 'a'] }, 'a', 'wp')).toEqual({
+    expect(resolveDrop(s, { ...base(), backlog: ['b', 'c'], doing: ['e', 'a'] }, 'a')).toEqual({
       kind: 'move',
       columnId: 'doing',
       position: 2,
     });
     // tudo escondido: só o ativo na faixa -> fim da coluna real
-    expect(resolveDrop(s, { ...base(), backlog: ['b', 'c'], doing: ['a'] }, 'a', 'wp')).toEqual({
+    expect(resolveDrop(s, { ...base(), backlog: ['b', 'c'], doing: ['a'] }, 'a')).toEqual({
       kind: 'move',
       columnId: 'doing',
       position: 2,
@@ -140,17 +123,8 @@ describe('resolveDrop', () => {
     expect(drop({ ...base(), backlog: ['c', 'a'] }, 'a')).toEqual({ kind: 'move', columnId: 'backlog', position: 2 });
   });
 
-  it('card vivo na faixa de arquivados arquiva', () => {
-    expect(drop({ ...base(), backlog: ['b', 'c'], [ARC]: ['a', 'x'] }, 'a')).toEqual({ kind: 'archive' });
-  });
-
-  it('arquivado de volta ao arquivo é none', () => {
+  it('arquivado fora das faixas é none', () => {
     expect(drop(base(), 'x')).toEqual({ kind: 'none' });
-  });
-
-  it('arquivado solto numa coluna desarquiva', () => {
-    expect(drop({ ...base(), doing: ['d', 'x', 'e'], [ARC]: [] }, 'x')).toEqual({ kind: 'unarchive', columnId: 'doing', position: 1 });
-    expect(drop({ ...base(), done: ['x'], [ARC]: [] }, 'x')).toEqual({ kind: 'unarchive', columnId: 'done', position: 0 });
   });
 
   it('ignora vizinhos que sumiram do estado', () => {

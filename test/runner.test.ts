@@ -444,6 +444,74 @@ describe('executor da IA', () => {
     });
   });
 
+  describe('história #407: re-execução de uma história YOLO já entregue', () => {
+    const PR = 'https://github.com/acme/app/pull/7';
+
+    const deliver = () => {
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      const homologacao = router.snapshot().columns.find((c) => c.name === 'Homologação')!.id;
+      router.handle({ type: 'card.pr.set', cardId: storyId, url: PR });
+      router.handle({ type: 'card.move', cardId: storyId, columnId: homologacao, position: 0 });
+      expect(card().status).toBe('waiting_review'); // já entregue, a vez é da pessoa
+    };
+
+    it('a sub-tarefa que termina sem responder nem mudar status não bloqueia: a história já está com a pessoa', () => {
+      deliver();
+      const s = router.snapshot();
+      const wf = s.workflows.find((w) => w.kind === 'child')!;
+      const subId = router.createCard({
+        typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+        columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+        parentId: storyId,
+        title: 'Passo',
+      });
+      runner.start(subId);
+      procs[0]!.exit(0); // sem comentário, sem mudar o status: exatamente o caso que o bug autobloqueava
+      const sub = router.snapshot().cards.find((c) => c.id === subId)!;
+      expect(sub.status).not.toBe('blocked');
+      expect(card().status).toBe('waiting_review'); // a história continua entregue, intocada
+    });
+
+    it('regressão: sem modo autônomo, continua bloqueando com "encerrou sem responder" mesmo com a história já entregue', () => {
+      // entrega "manual" (sem YOLO): fixa o status diretamente, já que settleDelivery exige YOLO
+      const ctx = (router as any).ctx;
+      const homologacao = router.snapshot().columns.find((c) => c.name === 'Homologação')!.id;
+      ctx.cards.move(storyId, homologacao, 0);
+      ctx.cards.setPullRequest(storyId, PR);
+      ctx.cards.setStatus(storyId, 'waiting_review', '', 'Pessoa');
+      const s = router.snapshot();
+      const wf = s.workflows.find((w) => w.kind === 'child')!;
+      const subId = router.createCard({
+        typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+        columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+        parentId: storyId,
+        title: 'Passo',
+      });
+      runner.start(subId);
+      procs[0]!.exit(0);
+      const sub = router.snapshot().cards.find((c) => c.id === subId)!;
+      expect(sub.status).toBe('blocked');
+      expect(sub.statusReason).toContain('sem responder');
+    });
+
+    it('regressão: história YOLO ainda não entregue continua bloqueando', () => {
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      const s = router.snapshot();
+      const wf = s.workflows.find((w) => w.kind === 'child')!;
+      const subId = router.createCard({
+        typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+        columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+        parentId: storyId,
+        title: 'Passo',
+      });
+      runner.start(subId);
+      procs[0]!.exit(0);
+      const sub = router.snapshot().cards.find((c) => c.id === subId)!;
+      expect(sub.status).toBe('blocked');
+      expect(sub.statusReason).toContain('sem responder');
+    });
+  });
+
   it('falha, saída sem resposta e tempo limite bloqueiam o card com o motivo na conversa', () => {
     runner.start(storyId);
     procs[0]!.exit(2);

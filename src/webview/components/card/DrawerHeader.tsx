@@ -2,7 +2,7 @@ import type { Card } from '../../../shared/model';
 import { cardsIn, columnsOf, typesOf, isAiWorking, aiWorkingChildren } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
-import { requestArchive, requestMove, requestTrash } from '../../store/actions';
+import { requestArchive, requestMove, requestRestoreArchived, requestTrash } from '../../store/actions';
 import { Menu } from '../Menu';
 import { Button, IconChevronDown, IconClose, SelectField } from '../ui';
 import { t, dt } from '../../i18n';
@@ -51,7 +51,7 @@ export function DrawerHeader({ card }: { card: Card }) {
           title={t('Ações do card')}
           items={[
             archived
-              ? { label: t('Desarquivar'), onClick: () => cards.unarchive(card.id) }
+              ? { label: t('Restaurar'), onClick: () => requestRestoreArchived(card.id, close) }
               : { label: t('Arquivar'), onClick: () => requestArchive(card.id, close) },
             'sep',
             { label: t('Mover para a lixeira'), danger: true, onClick: () => requestTrash(card.id, close) },

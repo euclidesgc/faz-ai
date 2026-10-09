@@ -7,6 +7,7 @@ import { checklistOf, childrenOf, countDone, valueOf } from '../../../shared/sel
 import { useBoardStore } from '../../store/boardStore';
 import { t } from '../../i18n';
 import { cards } from '../../commands';
+import { useYoloToggle } from '../card/YoloBar';
 import {
   IconAttachment,
   IconBranch,
@@ -39,6 +40,7 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
   const suggestion = modelField ? suggestModel(state, card) : null;
   const offer = modelField && suggestion && suggestion !== valueOf(state, card.id, modelField.id) ? suggestion : null;
   const catalog = state.board.modelCatalog;
+  const { effectiveYolo, toggle: toggleYolo } = useYoloToggle(card);
 
   return (
     <div className="card-meta">
@@ -72,10 +74,20 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
           <IconDescription />
         </span>
       )}
-      {card.yolo && (
-        <span className="yolo-mark" title={t('Modo autônomo: a IA toca esta história sozinha, sem aprovação')}>
+      {isParent && card.deletedAt === null && card.archivedAt === null && (
+        <button
+          className={`yolo-mark ${effectiveYolo ? 'on' : 'off'}`}
+          title={effectiveYolo ? t('Desligar modo autônomo') : t('Ligar modo autônomo')}
+          aria-label={effectiveYolo ? t('Desligar modo autônomo') : t('Ligar modo autônomo')}
+          onPointerDown={keep}
+          onClick={(e) => {
+            keep(e);
+            toggleYolo(!effectiveYolo);
+          }}
+          onDoubleClick={keep}
+        >
           <IconYolo />
-        </span>
+        </button>
       )}
       {card.branch && (
         <span title={t('Branch: {name}', { name: card.branch })}>

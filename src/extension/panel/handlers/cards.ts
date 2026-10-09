@@ -123,6 +123,10 @@ export const cardHandlers = {
     ctx.cards.unarchive(msg.cardId, msg.columnId, msg.position, byAi);
     return true;
   },
+  'card.restoreArchived': (msg, ctx) => {
+    ctx.cards.restoreArchived(msg.cardId);
+    return true;
+  },
   'card.deletePermanent': (msg, ctx) => {
     ctx.cards.deletePermanent(msg.cardId).forEach((id) => ctx.store.removeCard(id));
     return true;

@@ -69,6 +69,7 @@ export const cards = {
   restore: (cardId: Id) => post({ type: 'card.restore', cardId }),
   archive: (cardId: Id) => post({ type: 'card.archive', cardId }),
   unarchive: (cardId: Id, to?: { columnId: Id; position: number }) => post({ type: 'card.unarchive', cardId, ...to }),
+  restoreArchived: (cardId: Id) => post({ type: 'card.restoreArchived', cardId }),
   deletePermanent: (cardId: Id) => post({ type: 'card.deletePermanent', cardId }),
   setStatus: (cardId: Id, status: CardStatus | null, note?: string) =>
     post({ type: 'card.status.set', cardId, status, ...(note !== undefined ? { note } : {}) }),

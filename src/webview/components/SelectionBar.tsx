@@ -4,7 +4,7 @@ import { usePending } from '../usePending';
 import { isCardCollapsed } from '../../shared/selectors';
 import { t } from '../i18n';
 import { cards } from '../commands';
-import { yoloWarning } from './card/YoloBar';
+import { confirmYoloOn, yoloWarning } from './card/YoloBar';
 import { Button, IconYolo } from './ui';
 
 /**
@@ -19,6 +19,8 @@ export function SelectionBar() {
   const ask = useBoardStore((s) => s.ask);
   const collapsed = useBoardStore((s) => s.collapsed);
   const setManyCollapsed = useBoardStore((s) => s.setManyCollapsed);
+  const dontWarnYolo = useBoardStore((s) => s.dontWarnYolo);
+  const setDontWarnYolo = useBoardStore((s) => s.setDontWarnYolo);
 
   // defesa extra: a caixa de marcação (card 324) só existe em histórias vivas, mas confere de novo aqui
   const selectedStories = state.cards.filter((c) => selectedIds.has(c.id));
@@ -43,20 +45,31 @@ export function SelectionBar() {
   };
 
   const toggle = () => {
-    ask({
-      title: allYolo ? t('Desligar o modo autônomo em {n} história(s)?', { n }) : t('Ligar o modo autônomo em {n} história(s)?', { n }),
-      message: yoloWarning(),
-      confirmLabel: allYolo ? t('Desligar modo autônomo') : t('Ligar modo autônomo'),
-      // desligar em lote também pede confirmação (diferente do botão de uma história só, que desliga
-      // direto): desligar várias histórias de uma vez para o autopiloto de todas, maior impacto.
-      danger: true,
-      onConfirm: () => {
-        markYolo(!allYolo);
-        cards.setYoloMany(
-          selectedStories.map((c) => c.id),
-          !allYolo,
-        );
-      },
+    const ids = selectedStories.map((c) => c.id);
+    const apply = (enabled: boolean) => {
+      markYolo(enabled);
+      cards.setYoloMany(ids, enabled);
+    };
+    // desligar em lote sempre pede confirmação (diferente do controle de uma história só, que desliga
+    // direto): desligar várias histórias de uma vez para o autopiloto de todas, maior impacto. É uma
+    // ação fora do "não avisar novamente", que é só sobre ligar: por isso aqui não há checkbox.
+    if (allYolo) {
+      ask({
+        title: t('Desligar o modo autônomo em {n} história(s)?', { n }),
+        message: yoloWarning(),
+        confirmLabel: t('Desligar modo autônomo'),
+        danger: true,
+        onConfirm: () => apply(false),
+      });
+      return;
+    }
+    confirmYoloOn({
+      ask,
+      dontWarnYolo,
+      setDontWarnYolo,
+      title: t('Ligar o modo autônomo em {n} história(s)?', { n }),
+      confirmLabel: t('Ligar modo autônomo'),
+      onEnable: () => apply(true),
     });
   };
 

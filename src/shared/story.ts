@@ -12,6 +12,11 @@ export const storyOf = (state: Pick<BoardState, 'cards'>, card: Card): Card | un
 /** Endereço aceito como pull request da história: http(s), sem espaços. */
 export const isPullRequestUrl = (url: string): boolean => /^https?:\/\/\S+$/.test(url);
 
+/** A história já está com a pessoa (status de dono humano): entregue, aguardando resposta, ou bloqueada. */
+export function isWithHuman(card: Pick<Card, 'status'>): boolean {
+  return card.status !== null && statusInfo(card.status).owner === 'human';
+}
+
 /** A história do card está em modo autônomo (YOLO): a IA segue sem pedir aprovação nem confirmação. A sub-tarefa vale o que vale a história. */
 export const isYolo = (state: Pick<BoardState, 'cards'>, card: Card): boolean => storyOf(state, card)?.yolo === true;
 

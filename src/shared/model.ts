@@ -52,8 +52,6 @@ export interface Workflow {
   kind: WorkflowKind;
   /** a linha começa colapsada no board */
   collapsed: boolean;
-  /** a coluna de arquivados desta linha começa colapsada */
-  archiveCollapsed: boolean;
 }
 
 export interface Column {

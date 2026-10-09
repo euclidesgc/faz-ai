@@ -9,10 +9,10 @@ import { t } from '../i18n';
 import { useReducedMotion } from '../useReducedMotion';
 import { FieldBadge, hasValue } from './FieldRenderer';
 import { IconParent } from './ui';
-import { AiLed, type AiWork } from './cardView/AiLed';
+import type { AiWork } from './cardView/AiLed';
 import { CardFooter } from './cardView/CardFooter';
 import { StatusLine } from './cardView/StatusLine';
-import { CollapseToggle, TitleBar } from './cardView/TitleBar';
+import { TitleBar } from './cardView/TitleBar';
 
 /** Duração e curva da animação de arrastar (reutilizadas no dropAnimation do DragOverlay). */
 export const DRAG_ANIMATION = { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' } as const;
@@ -42,8 +42,8 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const collapsedMap = useBoardStore((s) => s.collapsed);
   const setCollapsed = useBoardStore((s) => s.setCollapsed);
   const collapsed = isCardCollapsed(collapsedMap, card.id);
-  // o botão de colapsar vive em subárvores diferentes nos dois estados (linha reduzida x barra do card),
-  // então é desmontado na troca e o foco do teclado se perderia: devolve o foco ao botão novo
+  // a faixa do card é a mesma nos dois estados, mas o corpo é remontado na troca; devolver o foco ao
+  // botão de colapsar garante que Enter de novo reverte, mesmo que o botão seja recriado
   const articleRef = useRef<HTMLElement>(null);
   const refocusToggle = useRef(false);
   const toggleCollapse = (next: boolean) => {
@@ -107,37 +107,39 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       tabIndex={overlay ? undefined : 0}
       title={overlay ? undefined : t('Dois cliques (ou Enter) abrem o card')}
     >
-      {isParent && !archived && (
-        <input
-          type="checkbox"
-          className="card-select"
-          checked={selectedIds.has(card.id)}
-          aria-label={t('Selecionar {title}', { title: card.title })}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => {
-            e.stopPropagation();
-            toggleSelected(card.id);
-          }}
-        />
-      )}
+      <TitleBar
+        card={card}
+        type={type}
+        work={work}
+        overlay={overlay}
+        collapsed={collapsed}
+        onToggleCollapse={() => toggleCollapse(!collapsed)}
+        leading={
+          isParent &&
+          !archived && (
+            <input
+              type="checkbox"
+              className="card-select"
+              checked={selectedIds.has(card.id)}
+              aria-label={t('Selecionar {title}', { title: card.title })}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                e.stopPropagation();
+                toggleSelected(card.id);
+              }}
+            />
+          )
+        }
+      />
       {collapsed ? (
-        <div className="card-collapsed-row">
-          <CollapseToggle collapsed={collapsed} onToggle={() => toggleCollapse(false)} />
-          <AiLed work={work} status={status} />
+        <div className="card-body">
           <div className="card-title" title={card.title}>
             {card.title}
           </div>
         </div>
       ) : (
         <>
-          <TitleBar
-            card={card}
-            type={type}
-            work={work}
-            overlay={overlay}
-            collapsed={collapsed}
-            onToggleCollapse={() => toggleCollapse(true)}
-          />
           <div className="card-body">
             <div className="card-title" title={card.title}>
               {card.title}

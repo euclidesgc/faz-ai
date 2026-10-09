@@ -154,8 +154,14 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    história; nas sub-tarefas eles aparecem como links.
 4. Busque por texto ou pelo ID (`#12`). A seção **Filtros** da barra lateral filtra por tipo,
    campos, datas e relacionamentos.
-5. Cards podem ser arquivados (coluna "Arquivados" no fim de cada linha) ou enviados para a
-   **Lixeira**, de onde podem ser restaurados.
+5. Cards podem ser arquivados (menu de ações do card → **Arquivar**) ou enviados para a
+   **Lixeira**, de onde podem ser restaurados. Os arquivados saem das linhas do board e ficam na aba
+   **Arquivados** (entre Métricas e Lixeira), que preserva o histórico: uma linha por workflow, na
+   ordem do board, do mais recente ao mais antigo. **Restaurar** devolve o card ao fim da primeira
+   coluna do workflow dele (Backlog / A fazer no board padrão), inativo. Restaurar uma história traz
+   também todas as sub-tarefas arquivadas dela e desliga o modo autônomo; restaurar uma sub-tarefa
+   cuja história está arquivada pede confirmação e restaura a história inteira (uma sub-tarefa de
+   história ativa volta sozinha, sem confirmação).
 
 ![Card aberto: status, aprovação, campos, descrição e checklist](docs/images/card.png)
 
@@ -171,7 +177,7 @@ pendência (robô para a IA, pessoa para você) e há quanto tempo ele está ass
 de IA (ex.: "Sonnet 5.5 - baixo") e, no rodapé, os contadores, a branch e o PR. Cards com
 pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do card de relance: verde piscando devagar enquanto a IA trabalha nele (na história, também quando ela trabalha numa sub-tarefa), amarelo quando ele espera por você, vermelho quando está bloqueado e apagado quando não há nada acontecendo.
 
-**Cards colapsados.** Você pode colapsar cards para enxergar mais linhas de uma coluna na mesma tela. Um card colapsado mostra só o título, mas continua exibindo o LED da IA (se ela está trabalhando) e a borda de status (se o card espera por você), para você varrer o board de relance e saber o que precisa de atenção. O colapso pode ser aplicado em quatro escopos: um card isolado (botão no próprio card), todos os cards de uma coluna (item no menu de ações da coluna), todos os cards do board (botão na barra de filtros) ou só os cards selecionados (botão na barra de seleção múltipla). O estado fica lembrado entre sessões.
+**Cards colapsados.** Você pode colapsar cards para enxergar mais linhas de uma coluna na mesma tela. Um card colapsado mantém a faixa colorida do tipo (com o LED da IA, o número, o tipo e os botões) e mostra o título em até duas linhas, escondendo o resto; a borda de status continua (se o card espera por você), para você varrer o board de relance e saber o que precisa de atenção. O colapso pode ser aplicado em quatro escopos: um card isolado (botão no próprio card), todos os cards de uma coluna (item no menu de ações da coluna), todos os cards do board (botão na barra de filtros) ou só os cards selecionados (botão na barra de seleção múltipla). O estado fica lembrado entre sessões.
 
 ### Vínculos entre cards
 
@@ -584,8 +590,8 @@ na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado)
 Na mesma rodada, depois de olhar os pull requests, o board dá o último passo do ciclo: **quando a
 versão que contém uma história concluída é publicada, ele registra na conversa qual versão a levou
 (tag e link da release) e arquiva o card**. Assim a coluna Concluído fica só com o que está mergeado
-e ainda não chegou a quem usa; o que já foi entregue vai para os arquivados do workflow, de onde você
-pode desarquivar a qualquer momento. Não há o que ligar: o passo vem junto com a detecção de merges,
+e ainda não chegou a quem usa; o que já foi entregue vai para a aba Arquivados, de onde você pode
+restaurar a história (com as sub-tarefas arquivadas dela) a qualquer momento. Não há o que ligar: o passo vem junto com a detecção de merges,
 no mesmo intervalo e no mesmo liga/desliga, e nasce ligado com ela.
 
 Uma história conta como publicada quando existe uma tag que **contém** o commit do merge **e** que

@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { isDelivered, isDeliverableStory, lastAiColumn, stackBaseOf } from '../src/shared/story';
+import { isDelivered, isDeliverableStory, isWithHuman, lastAiColumn, stackBaseOf } from '../src/shared/story';
 import { boardState, card, column } from './fakes/board';
+
+describe('isWithHuman', () => {
+  it.each(['waiting_review', 'waiting_answer', 'blocked'] as const)('true quando o status é %s (dono humano)', (status) => {
+    expect(isWithHuman({ status })).toBe(true);
+  });
+
+  it.each(['ready', 'running', 'approved'] as const)('false quando o status é %s (dono IA)', (status) => {
+    expect(isWithHuman({ status })).toBe(false);
+  });
+
+  it('false quando o status é null', () => {
+    expect(isWithHuman({ status: null })).toBe(false);
+  });
+});
 
 describe('stackBaseOf', () => {
   it('ordem natural: a segunda história YOLO empilha sobre a primeira, que ainda não tem base', () => {
