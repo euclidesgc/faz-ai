@@ -151,7 +151,17 @@ describe('barra de seleção e ação em lote (card 326)', () => {
     const sent = lastSent('card.yolo.setMany');
     expect(sent.enabled).toBe(true);
     expect(sent.cardIds.sort()).toEqual([firstId, secondId].sort());
+
+    // a barra fica, mostrando "Aplicando…" com o botão travado, até o boardState refletir a mudança
+    expect(useBoardStore.getState().selectedIds.size).toBe(2);
+    expect(screen.getByRole('button', { name: 'Aplicando…' })).toBeDisabled();
+
+    act(() => {
+      patchCard(firstId, { yolo: true });
+      patchCard(secondId, { yolo: true });
+    });
     expect(useBoardStore.getState().selectedIds.size).toBe(0);
+    expect(screen.queryByRole('button', { name: 'Aplicando…' })).toBeNull();
   });
 
   it('com as duas já em modo autônomo, o botão oferece desligar, e confirmar envia enabled: false', async () => {

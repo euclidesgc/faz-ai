@@ -7,6 +7,27 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+### Fixes
+
+- Claude Code's `allowed_warning` (close to the plan's cap) is no longer treated as an exhausted limit: the switch to the fallback model only happens on `rejected` or a window at 100%.
+- The switch to the fallback model only happens when the run failed; a run that finished fine is no longer redone with the fallback.
+- If the retry with the fallback model cannot start (card archived, tool refused), the card is blocked with the reason instead of staying "running" with no run.
+- On a sub-task, the run now counts as text or branch by the story's phase, as the queue does, and the activity bar shows that phase.
+- The **Export the board** and **Import a board** palette commands now have English titles when the editor is in English.
+- The "História entregue com o pull request…" comment is always authored by the AI tool, even when the person moved the card.
+- The autopilot note in the activity bar shows only the first line of the block reason, without code fences and capped at 160 characters.
+- On Windows, runs and CLI probes no longer open a `cmd.exe` window.
+- On Windows, the MCP server's named pipe carries the user name: two users with the same folder no longer compete for the same pipe.
+- The multi-select bar now has a background, border and padding, like the filter bar, in both themes.
+- The card's **Modo autônomo** checkbox and the batch button in the selection bar reflect the click right away and stay locked (the bar shows "Aplicando…") until the board confirms; with no reply in 3 s they revert.
+- Collapsing or expanding a card with the keyboard keeps focus on the collapse button: Enter again reverts.
+- The card's selection checkbox shows up when it receives keyboard focus (and while focus is inside the card).
+- The activity bar no longer announces the whole line to screen readers every minute: only the card reference and phase are announced; the "N min ago" sits outside the live region. The autopilot note stays on one line, with the full text in the tooltip.
+- Dragging a card right after dropping another starts from the order on screen, not the old one.
+- In AI Models, **Preencher o modelo sugerido automaticamente** shows as off when there is no suggestion rule (it used to stay on and locked after deleting the last rule).
+- **Resumir a conversa** locks right after the click: two quick clicks no longer start two runs.
+- Only one **+ Novo card** form is open at a time on the board, and Esc closes it even when focus is outside the field.
+
 - **Text-only phases run in parallel in any workspace mode (#331).** Refine, summarize and the phases that only produce a document (Discovery, PRD, Spec and Plan on the default board) now run at the same time, up to **Histórias ao mesmo tempo** (default 2), even with **Tocar histórias em paralelo** off. Implementation and Homologation work as before: one at a time outside the worktree, and parallel only in the worktree with the option on; the two caps are counted separately and there is still one run per story. In autonomous mode, the queue order applies to stories that need a branch; those in a text phase start when there is a free slot. Outside the worktree, `prepare_workspace` in a text phase while another story has a run in progress is refused (folder in use) and the branch is created in the code phase; with the "Sem restrições" permission the AI can still switch branches by hand, since the guard covers only the board's path.
 - **Dragging cards is now smooth (#286).** When you drag a card, within the same column or to another column (empty, collapsed or Archived), the other cards slide aside with a ~200 ms transition and a dashed gap marks where it will land. The destination column makes room and the source column closes the gap. On drop, the card settles straight into its final position, without jumping back to the origin or flickering while the board updates; if the move is refused, the screen returns to the real state. It applies to stories and sub-tasks (any workflow) and respects `prefers-reduced-motion` (no transitions). **Fix:** moving a card down within the same column and dropping it on another card now saves it after that card, where the preview showed it (it used to be saved before it).
 - **"Save description" is more prominent (#287).** When editing a card description, the button is now primary (solid indigo) and sits below the editor on the right, instead of a subtle button in the header. The button hierarchy rule is recorded in `DESIGN.md`; the other board buttons already followed the pattern.

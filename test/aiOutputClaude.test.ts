@@ -279,6 +279,26 @@ describe('usageLimitReached: detecção do limite de uso esgotado', () => {
     expect(reader.report().usageLimitReached).toBe(false);
   });
 
+  it('`status: "allowed_warning"` (perto do teto, janelas abaixo de 100%) não liga a flag: a CLI ainda responde', () => {
+    const aviso = JSON.stringify({
+      type: 'rate_limit_event',
+      session_id: 's',
+      rate_limit_info: { status: 'allowed_warning', unifiedWindows: { five_hour: { utilization: 0.9 } } },
+    });
+    const { reader } = read([aviso]);
+    expect(reader.report().usageLimitReached).toBe(false);
+  });
+
+  it('`status: "rejected"` liga a flag mesmo sem janela a 100%', () => {
+    const recusa = JSON.stringify({
+      type: 'rate_limit_event',
+      session_id: 's',
+      rate_limit_info: { status: 'rejected', unifiedWindows: { five_hour: { utilization: 0.9 } } },
+    });
+    const { reader } = read([recusa]);
+    expect(reader.report().usageLimitReached).toBe(true);
+  });
+
   it('um `rate_limit_event` com todas as janelas abaixo de 100% e `status: "allowed"` não liga a flag', () => {
     const monitoramento = JSON.stringify({
       type: 'rate_limit_event',

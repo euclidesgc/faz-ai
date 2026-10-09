@@ -216,8 +216,8 @@ export class MessageRouter {
    * avisa os webviews. Chamado pelo runner ao fim de uma execução, quando o pull request já estava
    * registrado antes do card chegar na última coluna da IA.
    */
-  settleDelivery(storyId: string, author: string): boolean {
-    const delivered = settleDelivery(this.ctx, storyId, author);
+  settleDelivery(storyId: string): boolean {
+    const delivered = settleDelivery(this.ctx, storyId);
     if (delivered) this.changed();
     return delivered;
   }

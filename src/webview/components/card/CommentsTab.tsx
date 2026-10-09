@@ -4,6 +4,7 @@ import { aiToolInfo } from '../../../shared/harness';
 import { RUNNER_PERMISSIONS } from '../../../shared/runner';
 import { isLive } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
+import { usePending } from '../../usePending';
 import { ai, attachments, comments } from '../../commands';
 import { MAX_ATTACHMENT_BYTES, toBase64 } from './AttachmentsTab';
 import { formatDateTime, t } from '../../i18n';
@@ -37,6 +38,8 @@ export function CommentsTab({
   const cardComments = state.comments.filter((c) => c.cardId === cardId);
   const card = state.cards.find((c) => c.id === cardId);
   const running = state.aiRuns.includes(cardId);
+  // "Resumir a conversa" trava logo após o clique, até aiRuns refletir a execução (ou o tempo esgotar)
+  const [, summarizing, markSummarizing] = usePending(running);
   const toolLabel = aiToolInfo(state.board.aiTool).label;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === state.board.runner.permission)!;
   const blocked = aiBlockedReason(state);
@@ -86,7 +89,15 @@ export function CommentsTab({
       )}
       {cardComments.length >= 2 && (
         <Hint content={summarizeHint()} disabledReason={blocked}>
-          <Button variant="ghost" size="small" disabled={!canCall || running} onClick={() => ai.summarize(cardId)}>
+          <Button
+            variant="ghost"
+            size="small"
+            disabled={!canCall || running || summarizing}
+            onClick={() => {
+              markSummarizing(true);
+              ai.summarize(cardId);
+            }}
+          >
             <IconSuggest /> {t('Resumir a conversa')}
           </Button>
         </Hint>

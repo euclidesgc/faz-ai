@@ -459,6 +459,32 @@ describe('Board / Column', () => {
     expect(lastSent('card.create')).toMatchObject({ columnId: firstCol.id, parentId: null, title: 'Nova história' });
   });
 
+  it('só um formulário de novo card fica aberto por vez: abrir noutra coluna fecha o primeiro', async () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    const buttons = screen.getAllByRole('button', { name: '+ Novo card' });
+    await userEvent.click(buttons[0]!);
+    expect(screen.getAllByPlaceholderText('Título (Enter adiciona)')).toHaveLength(1);
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    expect(screen.getAllByPlaceholderText('Título (Enter adiciona)')).toHaveLength(1);
+  });
+
+  it('Esc fecha o formulário de novo card mesmo com o foco fora do campo', async () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    expect(screen.getByPlaceholderText('Título (Enter adiciona)')).toBeInTheDocument();
+    screen.getByRole('button', { name: 'Criar card' }).focus();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByPlaceholderText('Título (Enter adiciona)')).toBeNull();
+  });
+
   it('sem história selecionada, "+ Nova sub-tarefa" fica desligado, com a dica', () => {
     render(
       <Theme>
@@ -609,6 +635,22 @@ describe('botões de IA do card', () => {
     fireEvent.focus(workButtonComments);
     const workTooltipComments = await screen.findByRole('tooltip');
     expect(workTooltipComments.textContent).toEqual(workTextStatusBar);
+  });
+
+  it('"Resumir a conversa" trava logo após o clique: um segundo clique não dispara outro ai.run', async () => {
+    const { router, storyId } = await seedBoard();
+    router.handle({ type: 'comment.add', cardId: storyId, body: 'primeira' });
+    router.handle({ type: 'comment.add', cardId: storyId, body: 'segunda' });
+    syncStore(router);
+    posted.mockClear();
+
+    renderThemed(<CommentsTab cardId={storyId} />);
+    const button = screen.getByRole('button', { name: /Resumir a conversa/ });
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(sentOf('ai.run').filter((m) => m.mode === 'summarize')).toHaveLength(1);
   });
 
   it('Esc fecha o hint sem disparar a mensagem ao host', async () => {

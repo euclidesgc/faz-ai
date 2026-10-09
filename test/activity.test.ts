@@ -95,6 +95,16 @@ describe('runningKindOf e runningByKind', () => {
     expect(runningKindOf(router.snapshot(), card(1).id)).toBe('branch');
   });
 
+  it('numa sub-tarefa, a fase gravada é a da história (a coluna do workflow filho não existe no da história)', () => {
+    create('h', 'Spec');
+    create('s', 'Em andamento', 1);
+    run(2, 'phase', 'Spec');
+    expect(runningKindOf(router.snapshot(), card(2).id)).toBe('text');
+    // o que `runner.start` gravava antes: a coluna do próprio card, que não é coluna da história
+    run(2, 'phase', 'Em andamento');
+    expect(runningKindOf(router.snapshot(), card(2).id)).toBe('branch');
+  });
+
   it('conta por tipo', () => {
     create('a', 'Spec');
     create('b', 'Implementação');

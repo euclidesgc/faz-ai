@@ -89,7 +89,11 @@ export function activityMessage(state: BoardState, ctx: { offline: boolean; now:
     };
   }
 
-  if (state.autopilot.note) return { kind: 'idle', text: t(state.autopilot.note) };
+  // a nota pode ser longa: a barra mostra uma linha e o texto inteiro fica no tooltip
+  if (state.autopilot.note) {
+    const text = t(state.autopilot.note);
+    return { kind: 'idle', text, title: text };
+  }
 
   const beat = heartbeatState(state.board.runner, { offline: ctx.offline, unsupported: state.aiRunUnsupported });
   if (beat.kind === 'off') return { kind: 'idle', text: t('Heartbeat desligado') };

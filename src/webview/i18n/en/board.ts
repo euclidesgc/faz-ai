@@ -329,6 +329,7 @@ export const board: Record<string, string> = {
   Limpar: 'Clear',
   'Ligar modo autônomo': 'Turn on autonomous mode',
   'Desligar modo autônomo': 'Turn off autonomous mode',
+  'Aplicando…': 'Applying…',
   'Ligar o modo autônomo em {n} história(s)?': 'Turn on autonomous mode for {n} story(ies)?',
   'Desligar o modo autônomo em {n} história(s)?': 'Turn off autonomous mode for {n} story(ies)?',
   'Colapsar selecionados': 'Collapse selected',

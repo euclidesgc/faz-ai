@@ -26,6 +26,8 @@ export function runCli(file: string, args: string[], pathEnv: string | undefined
         timeout: timeoutMs,
         shell: launch.shell,
         windowsVerbatimArguments: launch.shell,
+        // no Windows, o shell abriria uma janela do cmd.exe a cada consulta
+        windowsHide: true,
         env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), NO_COLOR: '1', NO_OPEN_BROWSER: '1' },
       },
       (err, stdout, stderr) => {

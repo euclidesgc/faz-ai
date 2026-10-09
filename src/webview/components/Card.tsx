@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cardRef, type Card, type FieldDef } from '../../shared/model';
@@ -42,6 +42,19 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const collapsedMap = useBoardStore((s) => s.collapsed);
   const setCollapsed = useBoardStore((s) => s.setCollapsed);
   const collapsed = isCardCollapsed(collapsedMap, card.id);
+  // o botão de colapsar vive em subárvores diferentes nos dois estados (linha reduzida x barra do card),
+  // então é desmontado na troca e o foco do teclado se perderia: devolve o foco ao botão novo
+  const articleRef = useRef<HTMLElement>(null);
+  const refocusToggle = useRef(false);
+  const toggleCollapse = (next: boolean) => {
+    refocusToggle.current = true;
+    setCollapsed(`card:${card.id}`, next);
+  };
+  useLayoutEffect(() => {
+    if (!refocusToggle.current) return;
+    refocusToggle.current = false;
+    articleRef.current?.querySelector<HTMLElement>('button[aria-expanded]')?.focus();
+  }, [collapsed]);
 
   const type = state.cardTypes.find((t) => t.id === card.typeId);
   const isParent = state.workflows.find((w) => w.id === card.workflowId)?.kind === 'parent';
@@ -75,6 +88,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
 
   return (
     <article
+      ref={articleRef}
       className={classes}
       style={style}
       onClick={(e) => {
@@ -108,7 +122,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       )}
       {collapsed ? (
         <div className="card-collapsed-row">
-          <CollapseToggle collapsed={collapsed} onToggle={() => setCollapsed(`card:${card.id}`, false)} />
+          <CollapseToggle collapsed={collapsed} onToggle={() => toggleCollapse(false)} />
           <AiLed work={work} status={status} />
           <div className="card-title" title={card.title}>
             {card.title}
@@ -122,7 +136,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
             work={work}
             overlay={overlay}
             collapsed={collapsed}
-            onToggleCollapse={() => setCollapsed(`card:${card.id}`, true)}
+            onToggleCollapse={() => toggleCollapse(true)}
           />
           <div className="card-body">
             <div className="card-title" title={card.title}>

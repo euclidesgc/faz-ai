@@ -444,6 +444,8 @@ button.active {
 }
 .card:hover .card-select,
 .card.selecting .card-select,
+.card:focus-within .card-select,
+.card-select:focus-visible,
 .card-select:checked {
   opacity: 1;
 }
@@ -1024,6 +1026,18 @@ button.ghost.on {
   display: flex;
   flex-direction: column;
   gap: var(--sp-8);
+}
+/* barra de seleção múltipla (card 326): mesma faixa da barra de filtros, só visível com 2+ cards marcados */
+.selectionbar {
+  border-bottom: 1px solid var(--border);
+  padding: var(--sp-8) var(--sp-12);
+  display: flex;
+  gap: var(--sp-8);
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+  color: var(--fg);
+  background: var(--col-bg);
 }
 .filterbar-main {
   display: flex;

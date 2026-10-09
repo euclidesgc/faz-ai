@@ -91,7 +91,7 @@ export const cardHandlers = {
     ctx.cards.update(msg.cardId, msg.patch);
     return true;
   },
-  'card.move': (msg, ctx, { author, byAi }) => {
+  'card.move': (msg, ctx, { byAi }) => {
     ctx.cards.move(msg.cardId, msg.columnId, msg.position, {
       cancelChildren: msg.cancelChildren,
       byAi,
@@ -102,7 +102,7 @@ export const cardHandlers = {
     // yoloStoryIdOf é uma consulta direta (sem montar o snapshot inteiro do board), undefined no caso
     // comum de um board (ou card) fora do modo autônomo, onde não há entrega a reavaliar.
     const storyId = ctx.cards.yoloStoryIdOf(msg.cardId);
-    if (storyId) settleDelivery(ctx, storyId, author);
+    if (storyId) settleDelivery(ctx, storyId);
     return true;
   },
   'card.trash': (msg, ctx) => {

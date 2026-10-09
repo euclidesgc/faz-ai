@@ -1,3 +1,4 @@
+import { noteOf } from '../src/extension/autopilot';
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -677,5 +678,18 @@ describe('autopiloto com o executor de verdade', () => {
     expect(card(1).status).toBe('blocked');
     expect(card(1).statusReason).toContain('autopiloto parou');
     expect(exits).toHaveLength(MAX_RUNS_WITHOUT_PROGRESS);
+  });
+});
+
+describe('noteOf: o motivo do bloqueio na barra de atividade', () => {
+  it('fica só a primeira linha, sem cercas de código', () => {
+    expect(noteOf('```\nO teste falhou.\n```\nDetalhes...')).toBe('O teste falhou.');
+    expect(noteOf('\n\nPrimeira  \nsegunda')).toBe('Primeira');
+  });
+
+  it('corta em 160 caracteres', () => {
+    const note = noteOf('a'.repeat(300));
+    expect(note.length).toBe(160);
+    expect(note.endsWith('…')).toBe(true);
   });
 });

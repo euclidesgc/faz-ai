@@ -57,11 +57,11 @@
       },
       {
         "command": "fazai.exportBoard",
-        "title": "Faz AI: Exportar o board"
+        "title": "%command.exportBoard.title%"
       },
       {
         "command": "fazai.importBoard",
-        "title": "Faz AI: Importar um board"
+        "title": "%command.importBoard.title%"
       },
       {
         "command": "fazai.refreshSidebar",

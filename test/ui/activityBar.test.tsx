@@ -83,6 +83,28 @@ describe('ActivityBar', () => {
     expect(useBoardStore.getState().openCardId).toBe('c2');
   });
 
+  it('o "há N min" fica fora da região viva: só a referência e a fase são anunciadas', () => {
+    useBoardStore.setState({
+      state: boardState({ cards: [card('c1', { number: 12, title: 'Discovery do board' })], aiActivity: [activity()] }),
+    });
+    const { container } = renderThemed(<ActivityBar offline={false} />);
+    const live = screen.getByRole('status');
+    expect(live).toHaveAttribute('aria-live', 'polite');
+    expect(live.textContent).toContain('#12');
+    expect(live.textContent).toContain('Discovery');
+    expect(live.textContent).not.toMatch(/há \d+ h/);
+    expect(container.querySelector('.activity-bar')!.textContent).toMatch(/há \d+ h/);
+    expect(container.querySelector('.activity-bar')).not.toHaveAttribute('aria-live');
+  });
+
+  it('a nota do autopiloto fica numa linha e o texto inteiro vai para o tooltip', () => {
+    const note = 'Fila parada: #3 precisa de revisão antes de seguir para a próxima fase';
+    useBoardStore.setState({ state: boardState({ autopilot: { active: false, note } }) });
+    const { container } = renderThemed(<ActivityBar offline={false} />);
+    expect(screen.getByRole('status').textContent).toBe(note);
+    expect(container.querySelector('.activity-bar')).toHaveAttribute('title', note);
+  });
+
   it('locale en: nenhum texto em português', () => {
     setLocale('en');
     useBoardStore.setState({

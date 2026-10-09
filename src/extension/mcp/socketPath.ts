@@ -24,12 +24,26 @@ export const workspaceKey = (folderPath: string, platform = process.platform): s
  */
 export const stableBridgePath = (homeDir = os.homedir()): string => path.join(homeDir, '.faz-ai', 'mcp', 'bridge.js');
 
+/** Nome do usuário do sistema, ou '' quando não dá para saber (contas sem perfil, contêineres). */
+function userName(): string {
+  try {
+    return os.userInfo().username || process.env.USERNAME || process.env.USER || '';
+  } catch {
+    return process.env.USERNAME || process.env.USER || '';
+  }
+}
+
 /**
  * Endereço do socket local do servidor MCP de uma pasta. Fica na home (e não em tmpdir) porque o
- * VSCode e o cliente de IA podem rodar com TMPDIR diferentes.
+ * VSCode e o cliente de IA podem rodar com TMPDIR diferentes. No Windows, o named pipe é global na
+ * máquina e sem ACL: o nome leva o usuário, para dois usuários com a mesma pasta não disputarem o
+ * mesmo pipe.
  */
-export function socketPath(folderPath: string): string {
-  const key = workspaceKey(folderPath).slice(0, 16);
-  if (process.platform === 'win32') return `\\\\.\\pipe\\fazai-${key}`;
+export function socketPath(folderPath: string, platform = process.platform, user = userName()): string {
+  const key = workspaceKey(folderPath, platform).slice(0, 16);
+  if (platform === 'win32') {
+    const who = user.replace(/[^A-Za-z0-9_.-]/g, '_');
+    return `\\\\.\\pipe\\fazai-${who ? `${who}-` : ''}${key}`;
+  }
   return path.join(os.homedir(), '.faz-ai', `${key}.sock`);
 }

@@ -294,6 +294,17 @@ describe('soltura otimista', () => {
     expect(shownIds(h, c0!.id)).not.toContain(ids.a);
   });
 
+  it('um arraste novo antes da resposta do host parte da ordem que está na tela', () => {
+    const [c0, c1] = cols(parentWf());
+    const h = mount(parentWf());
+    dropAtoE(h);
+    expect(h.result.current.settled).not.toBeNull();
+    act(() => h.result.current.handlers.onDragStart(start(ids.b)));
+    expect(h.result.current.settled).toBeNull();
+    expect(shownIds(h, c1!.id)).toEqual([ids.d, ids.e, ids.a]);
+    expect(shownIds(h, c0!.id)).not.toContain(ids.a);
+  });
+
   it('some quando chega um state equivalente', () => {
     const h = mount(parentWf());
     dropAtoE(h);

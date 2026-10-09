@@ -275,6 +275,11 @@ export class AiRunner {
     const tail: string[] = [];
     // conhecidos antes do gateway.run, para a projeção publicada depois (ver `info` abaixo)
     const phase = columnOf(state, card)?.name ?? '';
+    // a fase publicada em `aiActivity` é a da HISTÓRIA (numa sub-tarefa, a coluna do card é do
+    // workflow filho): é nela que `runningKindOf` decide se a execução é de texto ou de branch,
+    // como `activityKindOf` faz com a coluna atual da história
+    const story = storyOf(state, card);
+    const storyPhase = story && story.id !== card.id ? (columnOf(state, story)?.name ?? phase) : phase;
     let activityModel: string | null = null;
     let activityEffort: string | null = null;
     // a reserva da regra que casaria com o card agora, para a retentativa quando o limite esgota (ver `settle`)
@@ -384,7 +389,7 @@ export class AiRunner {
       runId: exec.runId,
       mode,
       origin,
-      phase,
+      phase: storyPhase,
       model: activityModel,
       startedAt: exec.startedAt,
     };
@@ -435,8 +440,14 @@ export class AiRunner {
       if (retry) {
         // o modelo principal esgotou o limite e há reserva: uma nova execução assume, sem publicar nem
         // avisar o fim desta (quem decide o desfecho final é a execução da reserva)
-        this.start(cardId, origin, mode, retry);
-        return;
+        try {
+          this.start(cardId, origin, mode, retry);
+          return;
+        } catch (e) {
+          // a retentativa nem começou (card arquivado, gateway recusou): o card não pode ficar "em
+          // execução" sem execução, e quem espera o fim precisa ser avisado como em qualquer outro fim
+          this.block(cardId, `Não foi possível repetir a execução com o modelo reserva: ${e instanceof Error ? e.message : String(e)}`);
+        }
       }
       this.publish();
       this.finishListeners.forEach((fn) => fn(cardId, run.mode));
@@ -519,8 +530,9 @@ export class AiRunner {
     }
     // o modelo principal esgotou o limite de uso do plano e há reserva pronta para esta regra: a
     // retentativa assume em vez de bloquear (RF-03 exige que nenhuma outra falha caia aqui: só quando o
-    // leitor da ferramenta marcou `usageLimitReached`, nunca pelo código de saída ou por heurística do runner)
-    if (end.report.usageLimitReached && run.fallbackPending) {
+    // leitor da ferramenta marcou `usageLimitReached`, nunca pelo código de saída ou por heurística do runner).
+    // E só quando a execução falhou: uma que terminou bem não é refeita com a reserva
+    if (failure && end.report.usageLimitReached && run.fallbackPending) {
       const state = this.router.snapshot();
       const principal = toolModelDisplay(state, run.model);
       const fallback = toolModelDisplay(state, run.fallbackPending);
@@ -535,7 +547,7 @@ export class AiRunner {
     // mesma sessão fez a implementação e a homologação): reavalia a entrega agora, antes do fallback
     // de modo autônomo devolver o card para "ready".
     const story = storyOf(this.router.snapshot(), card);
-    if (story && this.router.settleDelivery(story.id, toolLabel)) return;
+    if (story && this.router.settleDelivery(story.id)) return;
     // em modo autônomo não há pessoa para esperar: o card volta para a IA seguir (o autopiloto limita as voltas sem progresso)
     if (replied && isYolo(this.router.snapshot(), card)) return void this.setStatus(cardId, 'ready', toolLabel);
     // respondeu na conversa e encerrou: a vez é da pessoa
