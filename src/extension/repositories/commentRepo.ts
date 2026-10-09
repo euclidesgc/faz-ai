@@ -8,11 +8,16 @@ export class CommentRepo {
   add(cardId: string, author: string, body: string, source: 'human' | 'ai', kind?: 'summary'): string {
     const id = newId();
     const t = now();
-    run(
-      this.db,
-      'INSERT INTO comments(id, card_id, author, body, created_at, updated_at, source, kind) VALUES (?,?,?,?,?,?,?,?)',
-      [id, cardId, author, body, t, t, source, kind ?? null],
-    );
+    run(this.db, 'INSERT INTO comments(id, card_id, author, body, created_at, updated_at, source, kind) VALUES (?,?,?,?,?,?,?,?)', [
+      id,
+      cardId,
+      author,
+      body,
+      t,
+      t,
+      source,
+      kind ?? null,
+    ]);
     return id;
   }
 

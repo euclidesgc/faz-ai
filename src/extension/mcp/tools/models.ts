@@ -97,6 +97,10 @@ export function registerModelTools(tool: DefineTool): void {
             .min(1)
             .describe('Ex.: [[{Esforço=Alto},{Tags=backend}], [{Tipo=Bug}]] significa (Esforço=Alto E Tags=backend) OU Tipo=Bug'),
           model: z.string().describe('Modelo e esforço, ex.: "claude:opus@high" ou "Opus 5.5 high"'),
+          fallback: z
+            .string()
+            .optional()
+            .describe('Modelo e esforço de reserva, usado quando o principal esgota o limite; omitido = sem reserva'),
           enabled: z.boolean().optional(),
         }),
       ),
@@ -113,6 +117,7 @@ export function registerModelTools(tool: DefineTool): void {
           g.map((c) => ({ fieldId: fieldId(c.field), op: c.not ? ('isNot' as const) : ('is' as const), value: c.value })),
         ),
         model: resolveModelInput(s.board.modelCatalog, r.model),
+        fallback: r.fallback ? resolveModelInput(s.board.modelCatalog, r.fallback) : null,
       }));
       router.handle({ type: 'settings.modelRules.set', rules });
       return models(router);

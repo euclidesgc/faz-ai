@@ -42,6 +42,8 @@ export interface ModelRule {
   groups: RuleCondition[][];
   /** valor de campo do tipo modelo: `<id do modelo>@<esforço>` */
   model: string;
+  /** modelo reserva, usado quando o principal esgota o limite de uso do plano; mesmo formato de `model` */
+  fallback?: string | null;
 }
 
 /** Lê as regras salvas, convertendo o formato antigo (um campo = um valor) para o atual. */
@@ -53,7 +55,16 @@ export function parseModelRules(json: string | null | undefined): ModelRule[] {
       : r.fieldId
         ? [[{ fieldId: r.fieldId, op: 'is' as const, value: r.value ?? '' }]]
         : [];
-    return [{ id: r.id, name: r.name ?? '', enabled: r.enabled !== false, groups, model: r.model }];
+    return [
+      {
+        id: r.id,
+        name: r.name ?? '',
+        enabled: r.enabled !== false,
+        groups,
+        model: r.model,
+        fallback: typeof r.fallback === 'string' ? r.fallback : null,
+      },
+    ];
   });
 }
 
@@ -164,9 +175,14 @@ function conditionHolds(state: BoardState, card: Card, c: RuleCondition): boolea
 export const ruleMatches = (state: BoardState, card: Card, rule: ModelRule): boolean =>
   rule.groups.some((group) => group.length > 0 && group.every((c) => conditionHolds(state, card, c)));
 
+/** Regra que casa com o card, a primeira habilitada que casa, ou null se nenhuma casa. */
+export function suggestModelRule(state: BoardState, card: Card): ModelRule | null {
+  return state.board.modelRules.find((r) => r.enabled && ruleMatches(state, card, r)) ?? null;
+}
+
 /** Modelo sugerido para o card pelas regras do board, ou null se nenhuma casa. */
 export function suggestModel(state: BoardState, card: Card): string | null {
-  return state.board.modelRules.find((r) => r.enabled && ruleMatches(state, card, r))?.model ?? null;
+  return suggestModelRule(state, card)?.model ?? null;
 }
 
 /** Texto de uma regra, ex.: `Esforço = Alto E Tags = backend OU Tipo = Bug`. */

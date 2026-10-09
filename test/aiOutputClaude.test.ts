@@ -15,6 +15,15 @@ import type { OutputReader } from '../src/extension/aiOutput/reader';
 const FIXTURE = path.join(__dirname, 'fixtures', 'claude-stream-json.jsonl');
 const EVENTS = fs.readFileSync(FIXTURE, 'utf8').split('\n').filter(Boolean);
 
+// SINTÉTICO: não há, hoje, nenhum exemplo real de saída de limite esgotado da CLI 2.1.x (ver
+// DISCOVERY.md/SPEC.md da história #257). Este fixture foi escrito à mão, com a forma que a
+// documentação e o fixture de monitoramento (`claude-stream-json.jsonl`, `rate_limit_event` com
+// `status: "allowed"`) sugerem para o caso de indisponibilidade real: `status` diferente de
+// `"allowed"` e uma janela de `unifiedWindows` com `utilization: 1`, mais um `result` de erro cujo
+// texto menciona "usage limit". Pode precisar de ajuste quando houver um exemplo real de produção.
+const RATE_LIMIT_FIXTURE = path.join(__dirname, 'fixtures', 'claude-stream-json-rate-limit.jsonl');
+const RATE_LIMIT_EVENTS = fs.readFileSync(RATE_LIMIT_FIXTURE, 'utf8').split('\n').filter(Boolean);
+
 /** Passa linhas pelo leitor e devolve o leitor e as linhas legíveis que saíram. */
 function read(lines: string[]): { reader: OutputReader; shown: string[] } {
   const reader = claudeReader({ model: 'haiku' });
@@ -238,5 +247,49 @@ describe('stderr e custo', () => {
     expect(c.costUsd).toBeNull();
     // os tokens continuam gravados: a ferramenta mediu token e não mediu dinheiro
     expect(c.outputTokens).toBe(1221);
+  });
+});
+
+describe('usageLimitReached: detecção do limite de uso esgotado', () => {
+  it('fixture sintético de limite esgotado liga a flag', () => {
+    const { reader } = read(RATE_LIMIT_EVENTS);
+    expect(reader.report().usageLimitReached).toBe(true);
+  });
+
+  it('`rate_limit_event` de simples monitoramento (`status: "allowed"`) não liga a flag', () => {
+    const { reader } = read(EVENTS);
+    expect(reader.report().usageLimitReached).toBe(false);
+  });
+
+  it('erro genérico (ferramenta com `is_error`) não liga a flag — RF-03', () => {
+    const { reader } = read(EVENTS);
+    expect(reader.report().usageLimitReached).toBe(false);
+  });
+
+  it('um `result` de erro cujo texto não bate com os termos conhecidos não liga a flag', () => {
+    const resultDeErroGenerico = JSON.stringify({
+      type: 'result',
+      session_id: 's',
+      is_error: true,
+      subtype: 'error',
+      num_turns: 1,
+      result: 'A ferramenta Bash falhou: comando não encontrado.',
+    });
+    const { reader } = read([resultDeErroGenerico]);
+    expect(reader.report().usageLimitReached).toBe(false);
+  });
+
+  it('um `rate_limit_event` com todas as janelas abaixo de 100% e `status: "allowed"` não liga a flag', () => {
+    const monitoramento = JSON.stringify({
+      type: 'rate_limit_event',
+      session_id: 's',
+      rate_limit_info: {
+        status: 'allowed',
+        overageStatus: 'rejected',
+        unifiedWindows: { five_hour: { utilization: 0.4 }, seven_day: { utilization: 0.67 } },
+      },
+    });
+    const { reader } = read([monitoramento]);
+    expect(reader.report().usageLimitReached).toBe(false);
   });
 });

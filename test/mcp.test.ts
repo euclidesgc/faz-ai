@@ -644,6 +644,31 @@ describe('regras de modelo com E e OU', () => {
     );
   });
 
+  it('aceita um modelo reserva por regra; sem reserva fica igual a antes da história', async () => {
+    const res = await call('set_model_rules', {
+      rules: [
+        { name: 'Com reserva', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku', fallback: 'opus high' },
+        { name: 'Sem reserva', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus low' },
+      ],
+    });
+    expect(res.data.rules[0]).toMatchObject({
+      name: 'Com reserva',
+      value: 'claude:haiku',
+      fallbackSuggest: expect.stringContaining('Opus'),
+      fallbackValue: 'claude:opus@high',
+    });
+    expect(res.data.rules[1]).not.toHaveProperty('fallbackValue');
+    expect(res.data.rules[1]).not.toHaveProperty('fallbackSuggest');
+
+    const rules = router.snapshot().board.modelRules;
+    expect(rules[0]?.fallback).toBe('claude:opus@high');
+    expect(rules[1]?.fallback).toBe(null);
+
+    const fromGet = (await call('get_models')).data.rules;
+    expect(fromGet[0]).toMatchObject({ fallbackValue: 'claude:opus@high' });
+    expect(fromGet[1]).not.toHaveProperty('fallbackValue');
+  });
+
   it('com o preenchimento automático desligado, só sugere', async () => {
     await call('update_rules', { autoApplyModelSuggestion: false });
     const card = (await call('create_card', { title: 'x', fields: { Esforço: 'Alto' } })).data;
@@ -654,7 +679,16 @@ describe('regras de modelo com E e OU', () => {
   it('converte regras salvas no formato antigo', async () => {
     const { parseModelRules } = await import('../src/shared/models');
     expect(parseModelRules(JSON.stringify([{ id: 'a', fieldId: 'f1', value: 'Alto', model: 'claude:opus@high' }, { nada: true }]))).toEqual(
-      [{ id: 'a', name: '', enabled: true, groups: [[{ fieldId: 'f1', op: 'is', value: 'Alto' }]], model: 'claude:opus@high' }],
+      [
+        {
+          id: 'a',
+          name: '',
+          enabled: true,
+          groups: [[{ fieldId: 'f1', op: 'is', value: 'Alto' }]],
+          model: 'claude:opus@high',
+          fallback: null,
+        },
+      ],
     );
   });
 });
@@ -1171,7 +1205,12 @@ describe('ponte stdio', () => {
     const bridge = path.resolve(__dirname, '../dist/mcp-bridge.js');
     if (!fs.existsSync(bridge)) throw new Error('rode `npm run build:ext` antes deste teste');
     const address = process.platform === 'win32' ? `\\\\.\\pipe\\fazai-test-${process.pid}` : path.join(dir, 'mcp.sock');
-    const stop = await startMcpServer(address, { getRouter: async () => router, getRunner: async () => undefined, workspaceDir: dir, version: 'test' });
+    const stop = await startMcpServer(address, {
+      getRouter: async () => router,
+      getRunner: async () => undefined,
+      workspaceDir: dir,
+      version: 'test',
+    });
     // a ponte calcula o endereço a partir da pasta; aqui o HOME aponta para um diretório de teste
     const { socketPath } = await import('../src/extension/mcp/socketPath');
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-'));
@@ -1243,7 +1282,12 @@ describe('ponte stdio: onde acha o projeto', () => {
       const project = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fz-proj-')));
       fs.mkdirSync(path.join(project, 'sub'));
       const address = path.join(project, 'mcp.sock');
-      const stop = await startMcpServer(address, { getRouter: async () => router, getRunner: async () => undefined, workspaceDir: project, version: 'test' });
+      const stop = await startMcpServer(address, {
+        getRouter: async () => router,
+        getRunner: async () => undefined,
+        workspaceDir: project,
+        version: 'test',
+      });
       const { socketPath } = await import('../src/extension/mcp/socketPath');
       const home = fs.mkdtempSync(path.join(os.tmpdir(), 'fz-'));
       const prev = process.env.HOME;
@@ -1561,9 +1605,7 @@ describe('modo autônomo (YOLO)', () => {
       await call('create_card', { title: 'Arquivada', column: 'PRD' });
       router.handle({ type: 'card.archive', cardId: card(4).id });
 
-      expect(() =>
-        setMany([card(1).id, card(2).id, card(3).id, card(4).id, 'id-inexistente'], true),
-      ).not.toThrow();
+      expect(() => setMany([card(1).id, card(2).id, card(3).id, card(4).id, 'id-inexistente'], true)).not.toThrow();
 
       expect(card(1).yolo).toBe(true);
       expect(card(2).yolo).toBe(false); // sub-tarefa ignorada
@@ -1661,7 +1703,12 @@ describe('generate_summary (ferramenta MCP)', () => {
 
   /** conecta um client MCP novo ao router, com o runner falso no lugar do de verdade */
   async function connect(r: MessageRouter, runner: unknown, dir: string) {
-    const server = createMcpServer({ getRouter: async () => r, getRunner: async () => runner as never, workspaceDir: dir, version: 'test' });
+    const server = createMcpServer({
+      getRouter: async () => r,
+      getRunner: async () => runner as never,
+      workspaceDir: dir,
+      version: 'test',
+    });
     const [a, b] = InMemoryTransport.createLinkedPair();
     await server.connect(a);
     const c = new Client({ name: 'claude-code', version: '1' });

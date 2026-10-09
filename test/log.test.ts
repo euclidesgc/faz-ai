@@ -310,9 +310,17 @@ describe('AiRunRepo', () => {
       ],
       answer: '',
       reason: null,
+      usageLimitReached: false,
       ...over,
     });
-    const none = (): RunReport => ({ measure: 'none', consumption: null, inventory: [], answer: '', reason: 'texto' });
+    const none = (): RunReport => ({
+      measure: 'none',
+      consumption: null,
+      inventory: [],
+      answer: '',
+      reason: 'texto',
+      usageLimitReached: false,
+    });
     const rows = (id: string) => db.exec(`SELECT COUNT(*) FROM ai_run_usage WHERE run_id = '${id}'`)[0]!.values[0]![0];
     const read = (id: string) => runs.byMonth('2026-01').find((r) => r.id === id)!;
 

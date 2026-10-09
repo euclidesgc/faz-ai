@@ -274,6 +274,10 @@ export const settings: Record<string, string> = {
   Editar: 'Edit',
   'Remover da lista': 'Remove from the list',
   'Nenhuma regra na lista: o board não sugere modelo.': 'No rules in the list: the board does not suggest a model.',
+  'Reserva (opcional)': 'Fallback (optional)',
+  'Sem reserva: se o modelo principal esgotar o limite, a execução não é repetida.':
+    'No fallback: if the main model hits the usage limit, the run is not retried.',
+  'reserva: {model}': 'fallback: {model}',
   'Campos personalizados': 'Custom fields',
   'Novo campo': 'New field',
   'Campos guardam informações extras do card, como prazo, pontos ou tags. Todos aparecem no card aberto; em "No board" você escolhe se e como cada um aparece também no card do board.':

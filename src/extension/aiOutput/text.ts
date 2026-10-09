@@ -29,6 +29,8 @@ export function textReader(): OutputReader {
         // (passo 6), que preenche isto com a frase do erro de domínio (MeasureRefusedError e
         // companhia). Não complete este campo aqui.
         reason: null,
+        // o modo texto não interpreta eventos: nunca detecta limite esgotado
+        usageLimitReached: false,
       };
     },
     sawEvent: true,

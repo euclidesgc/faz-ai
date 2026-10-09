@@ -7,7 +7,7 @@ import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
 import { effortToRun } from '../shared/execution';
-import { parseModelValue } from '../shared/models';
+import { modelDisplay, modelValue, parseModelValue, suggestModelRule } from '../shared/models';
 import { effortTiers } from './models';
 import { MeasureBrokenError } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
@@ -55,6 +55,12 @@ export interface RunnerDeps {
   nodePath?: string;
 }
 
+/** Par modelo/esforço no nome que a ferramenta entende (`ExecManifest.model`), não o id do catálogo. */
+interface ToolModel {
+  model: string;
+  effort: string | null;
+}
+
 interface Run {
   exec: AiExecution;
   /** status que o card tinha antes de a execução começar */
@@ -64,6 +70,14 @@ interface Run {
   mode: AiRunMode;
   /** projeção publicada ao router (ver `publish`) */
   info: AiActivity;
+  /** modelo/esforço que esta execução pediu à ferramenta; usado no comentário quando a reserva assume */
+  model: ToolModel | null;
+  /**
+   * reserva da regra que casaria com o card agora, pronta para a retentativa quando o modelo principal
+   * esgota o limite; `null` sem regra, sem reserva, modelo escolhido à mão, ou nesta própria retentativa
+   * (uma tentativa só).
+   */
+  fallbackPending: ToolModel | null;
 }
 
 const RUNNER_AUTHOR = 'Faz AI';
@@ -164,15 +178,34 @@ export const summarizePrompt = (ref: string, context: PromptContext = NO_CONTEXT
   ].join('\n');
 
 /**
+ * O modelo/esforço de um valor de campo do tipo modelo (`<id do catálogo>@<esforço>`), no catálogo da
+ * ferramenta ativa, no formato que a chamada da ferramenta entende (nome do modelo e esforço). `null`
+ * quando o valor está vazio ou o modelo não está (mais) no catálogo da ferramenta ativa.
+ */
+function resolvedModel(state: BoardState, value: string | null | undefined): { name: string; effort: string | null } | null {
+  const chosen = parseModelValue(value ?? undefined);
+  const option = chosen ? state.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === state.board.aiTool) : undefined;
+  return option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null;
+}
+
+/**
  * O modelo/esforço da faixa "Alto" do catálogo ativo, no formato que a chamada da ferramenta
  * entende (nome do modelo e esforço). Usado pelo modo `summarize`, que força sempre essa faixa,
  * independente do Esforço do card.
  */
 function highTierModel(state: BoardState): { name: string; effort: string | null } | null {
   const tier = effortTiers(state.board.aiTool, state.board.modelCatalog).find(([level]) => level === 'Alto');
-  const chosen = tier ? parseModelValue(tier[1]) : null;
-  const option = chosen ? state.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === state.board.aiTool) : undefined;
-  return option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null;
+  return tier ? resolvedModel(state, tier[1]) : null;
+}
+
+/**
+ * Texto de exibição de um `ToolModel` (nome que a ferramenta entende), traduzido de volta para o
+ * catálogo para usar `modelDisplay`; sem o modelo no catálogo, cai no próprio nome bruto.
+ */
+function toolModelDisplay(state: BoardState, pair: ToolModel | null): string {
+  if (!pair) return '';
+  const option = state.board.modelCatalog.find((o) => o.tool === state.board.aiTool && o.model === pair.model);
+  return option ? modelDisplay(state.board.modelCatalog, modelValue(option.id, pair.effort)) : pair.model;
 }
 
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
@@ -224,8 +257,12 @@ export class AiRunner {
   /**
    * Inicia a execução. Lança erro se não for possível começar; o resultado aparece no status e na
    * conversa do card. `mode` escolhe entre trabalhar a fase (o padrão) e só refinar o card.
+   *
+   * `forceModel` é de uso interno (a retentativa com o modelo reserva, ver `settle`): sobrescreve o
+   * modelo/esforço que o plano decidiria e nunca recebe `fallbackPending` (uma tentativa só). Quem
+   * chama de fora (painel, MCP) nunca informa este parâmetro.
    */
-  start(cardId: string, origin: AiRunOrigin = 'manual', mode: AiRunMode = 'phase'): void {
+  start(cardId: string, origin: AiRunOrigin = 'manual', mode: AiRunMode = 'phase', forceModel?: ToolModel): void {
     const state = this.router.snapshot();
     const card = state.cards.find((c) => c.id === cardId);
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
@@ -239,6 +276,9 @@ export class AiRunner {
     // conhecidos antes do gateway.run, para a projeção publicada depois (ver `info` abaixo)
     const phase = columnOf(state, card)?.name ?? '';
     let activityModel: string | null = null;
+    let activityEffort: string | null = null;
+    // a reserva da regra que casaria com o card agora, para a retentativa quando o limite esgota (ver `settle`)
+    let fallbackPending: ToolModel | null = null;
     let exec: AiExecution;
     try {
       exec = this.deps.gateway.run({
@@ -268,14 +308,30 @@ export class AiRunner {
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
           if (summarize) log('Resumir a conversa: lê as mensagens e grava um resumo, sem mover o card nem mudar o status.');
           log(plan.summary.join(' | '));
-          // resumir sempre usa a faixa "Alto" do catálogo ativo, independente do Esforço do card
-          const summaryModel = summarize ? highTierModel(state) : null;
-          activityModel = summarize ? summaryModel?.name ?? null : plan.manifest.model?.name ?? null;
+          if (forceModel) {
+            // a retentativa com a reserva: o modelo/esforço vêm impostos, sem voltar a resolver a regra
+            activityModel = forceModel.model;
+            activityEffort = forceModel.effort;
+          } else {
+            // resumir sempre usa a faixa "Alto" do catálogo ativo, independente do Esforço do card
+            const summaryModel = summarize ? highTierModel(state) : null;
+            activityModel = summarize ? (summaryModel?.name ?? null) : (plan.manifest.model?.name ?? null);
+            activityEffort = summarize ? (summaryModel?.effort ?? null) : (plan.manifest.model?.effort ?? null);
+            // a reserva só faz sentido no trabalho da fase, e só quando o Modelo do card é o que a
+            // regra sugeriria agora (senão foi trocado à mão, e a troca não é desta regra)
+            if (!refine && !summarize) {
+              const rule = suggestModelRule(state, card);
+              const ruleModel = rule?.fallback ? resolvedModel(state, rule.model) : null;
+              const matches = ruleModel && ruleModel.name === activityModel && ruleModel.effort === activityEffort;
+              const fallback = matches ? resolvedModel(state, rule!.fallback) : null;
+              fallbackPending = fallback ? { model: fallback.name, effort: fallback.effort } : null;
+            }
+          }
           return {
             // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
             config: {
               model: activityModel,
-              effort: summarize ? summaryModel?.effort ?? null : plan.manifest.model?.effort ?? null,
+              effort: activityEffort,
               profile: plan.manifest.profile,
               agent: plan.manifest.agent,
               autonomous,
@@ -298,7 +354,8 @@ export class AiRunner {
                     ),
               permission,
               addDirs: this.router.aiWorkDirs(),
-              exec: plan.input,
+              // a retentativa força o modelo/esforço da reserva no que vai para a ferramenta, sem voltar a resolver o plano
+              exec: forceModel ? { ...plan.input, model: { name: activityModel, effort: activityEffort } } : plan.input,
               boardServer: boardServer(this.deps),
             },
           };
@@ -331,7 +388,15 @@ export class AiRunner {
       model: activityModel,
       startedAt: exec.startedAt,
     };
-    const run: Run = { exec, previous: card.status, mode, tail, info };
+    const run: Run = {
+      exec,
+      previous: card.status,
+      mode,
+      tail,
+      info,
+      model: activityModel ? { model: activityModel, effort: activityEffort } : null,
+      fallbackPending,
+    };
     this.runs.set(cardId, run);
     this.setStatus(cardId, 'running', tool.label);
     this.publish();
@@ -358,12 +423,20 @@ export class AiRunner {
               : {},
         ),
       );
+      let retry: ToolModel | undefined;
       try {
         // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
         // mudança de status que explicam o fim da execução ficam ligados a ela
-        this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
+        retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
       } finally {
+        // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
         this.runs.delete(cardId);
+      }
+      if (retry) {
+        // o modelo principal esgotou o limite e há reserva: uma nova execução assume, sem publicar nem
+        // avisar o fim desta (quem decide o desfecho final é a execução da reserva)
+        this.start(cardId, origin, mode, retry);
+        return;
       }
       this.publish();
       this.finishListeners.forEach((fn) => fn(cardId, run.mode));
@@ -389,8 +462,13 @@ export class AiRunner {
     for (const id of this.running) this.stop(id);
   }
 
-  /** Deixa o card num status coerente quando a IA não passou a vez por conta própria. */
-  private settle(cardId: string, run: Run, end: AiRunEnd, replied: boolean, toolLabel: string): void {
+  /**
+   * Deixa o card num status coerente quando a IA não passou a vez por conta própria. Devolve o par
+   * modelo/esforço da reserva quando o modelo principal esgotou o limite e há reserva disponível: quem
+   * chama (`onExit`) inicia a retentativa com ele, depois de liberar `this.runs`; nenhum outro caso
+   * devolve valor.
+   */
+  private settle(cardId: string, run: Run, end: AiRunEnd, replied: boolean, toolLabel: string): ToolModel | void {
     const { code, error } = end;
     const card = this.router.snapshot().cards.find((c) => c.id === cardId);
     // a IA (ou a pessoa) já mudou o status durante a execução: é ele que vale
@@ -438,6 +516,19 @@ export class AiRunner {
         { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
         { author: RUNNER_AUTHOR },
       );
+    }
+    // o modelo principal esgotou o limite de uso do plano e há reserva pronta para esta regra: a
+    // retentativa assume em vez de bloquear (RF-03 exige que nenhuma outra falha caia aqui: só quando o
+    // leitor da ferramenta marcou `usageLimitReached`, nunca pelo código de saída ou por heurística do runner)
+    if (end.report.usageLimitReached && run.fallbackPending) {
+      const state = this.router.snapshot();
+      const principal = toolModelDisplay(state, run.model);
+      const fallback = toolModelDisplay(state, run.fallbackPending);
+      this.router.handle(
+        { type: 'comment.add', cardId, body: `O \`${principal}\` esgotou o limite; a execução segue com \`${fallback}\`.` },
+        { author: RUNNER_AUTHOR, source: 'ai' },
+      );
+      return run.fallbackPending;
     }
     if (failure) return this.block(cardId, failure);
     // o pull request pode ter sido registrado antes do card chegar na última coluna da IA (ex.: a
