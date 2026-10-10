@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import type { MetricsMonth } from '../../../shared/metrics';
+import { SHOW_COST, type MetricsMonth } from '../../../shared/metrics';
 import { t, tn } from '../../i18n';
 import { Button } from '../ui';
 import { formatCompact, formatMoney, formatMonth, formatNumber, unmeasured } from './format';
@@ -67,7 +67,7 @@ const TOP = 4;
  * girarem (RF-33).
  */
 export function MonthSeries({ result }: MetricsBlockProps) {
-  const [kind, setKind] = useState<SeriesKind>('cost');
+  const [kind, setKind] = useState<SeriesKind>(SHOW_COST ? 'cost' : 'tokens');
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const titleId = `${uid}-title`;
   const patternId = `${uid}-partial`;
@@ -116,13 +116,15 @@ export function MonthSeries({ result }: MetricsBlockProps) {
           </h3>
           <p className="metrics-series-unit">{unit}</p>
         </div>
-        <div className="metrics-series-toggle" role="group" aria-label={t('Série do gráfico')}>
-          {(['cost', 'tokens'] as const).map((k) => (
-            <Button key={k} type="button" size="small" on={kind === k} aria-pressed={kind === k} onClick={() => setKind(k)}>
-              {k === 'cost' ? t('Custo') : t('Tokens')}
-            </Button>
-          ))}
-        </div>
+        {SHOW_COST && (
+          <div className="metrics-series-toggle" role="group" aria-label={t('Série do gráfico')}>
+            {(['cost', 'tokens'] as const).map((k) => (
+              <Button key={k} type="button" size="small" on={kind === k} aria-pressed={kind === k} onClick={() => setKind(k)}>
+                {k === 'cost' ? t('Custo') : t('Tokens')}
+              </Button>
+            ))}
+          </div>
+        )}
       </header>
 
       {measured.length === 0 ? (

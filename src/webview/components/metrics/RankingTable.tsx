@@ -30,7 +30,7 @@
  * `CardRanking` e `PhaseRanking`, no fim do arquivo, são os dois usos com `MetricsCell`.
  */
 import { useMemo, useState, type ReactNode } from 'react';
-import { METRICS_ROW_CAP, type MetricsCell } from '../../../shared/metrics';
+import { METRICS_ROW_CAP, SHOW_COST, type MetricsCell } from '../../../shared/metrics';
 import { t, tn } from '../../i18n';
 import type { MetricsSort } from '../../store/boardStore';
 import { Button, IconArrowDown, IconArrowUp } from '../ui';
@@ -249,14 +249,17 @@ export function othersOf(covered: Measures, shown: Measures[]): Measures {
 }
 
 /**
- * O critério padrão de um ranking (RF-22): custo quando o período tem custo medido, tempo de IA quando
- * não tem. Decidido aqui, a partir do coberto da própria resposta, e escrito na tela com o motivo (RF-21).
+ * O critério padrão de um ranking (RF-22): o consumo medido do período (custo, com `SHOW_COST`; senão
+ * tokens), e o tempo de IA quando nada foi medido. Decidido aqui, a partir do coberto da própria
+ * resposta, e escrito na tela com o motivo (RF-21).
  */
 export function defaultCellSort(covered: Measures): MetricsSort {
-  return hasMeasuredCost(covered) ? { key: 'cost', dir: 'desc' } : { key: 'duration', dir: 'desc' };
+  if (hasMeasuredCost(covered)) return { key: 'cost', dir: 'desc' };
+  return hasMeasuredTokens(covered) ? { key: 'tokens', dir: 'desc' } : { key: 'duration', dir: 'desc' };
 }
 
-const hasMeasuredCost = (covered: Measures): boolean => covered.costedRuns > 0 && covered.costUsd !== null;
+const hasMeasuredCost = (covered: Measures): boolean => SHOW_COST && covered.costedRuns > 0 && covered.costUsd !== null;
+const hasMeasuredTokens = (covered: Measures): boolean => !SHOW_COST && covered.measuredRuns > 0 && covered.tokens !== null;
 
 interface RankingSortProps {
   /** `null` = o padrão do bloco (`defaultCellSort`) */
@@ -283,11 +286,25 @@ function CellRanking({ caption, labelHeader, emptyLabel, cells, covered, omitted
     ? undefined
     : hasMeasuredCost(covered)
       ? t('É o padrão quando o período tem custo medido.')
-      : t('É o padrão enquanto o período não tem custo medido.');
+      : hasMeasuredTokens(covered)
+        ? t('É o padrão quando o período tem tokens medidos.')
+        : SHOW_COST
+          ? t('É o padrão enquanto o período não tem custo medido.')
+          : t('É o padrão enquanto o período não tem tokens medidos.');
   const label = (c: MetricsCell): string => c.value || emptyLabel;
   const columns: RankingColumn<MetricsCell>[] = [
     { key: 'label', header: labelHeader, rowHeader: true, cell: (c) => <span title={label(c)}>{label(c)}</span> },
-    { key: 'cost', header: t('Custo'), numeric: true, cell: (c) => formatCost(c.costUsd), sortValue: (c) => c.costUsd },
+    ...(SHOW_COST
+      ? [
+          {
+            key: 'cost',
+            header: t('Custo'),
+            numeric: true,
+            cell: (c: MetricsCell) => formatCost(c.costUsd),
+            sortValue: (c: MetricsCell) => c.costUsd,
+          },
+        ]
+      : []),
     { key: 'tokens', header: t('Tokens'), numeric: true, cell: (c) => formatTokens(c.tokens), sortValue: (c) => c.tokens },
     { key: 'runs', header: t('Execuções'), numeric: true, cell: (c) => formatNumber(c.runs), sortValue: (c) => c.runs },
     { key: 'duration', header: t('Tempo de IA'), numeric: true, cell: (c) => formatDuration(c.durationMs), sortValue: (c) => c.durationMs },

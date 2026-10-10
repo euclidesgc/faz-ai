@@ -1,4 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
+vi.mock('../src/shared/metrics', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/shared/metrics')>()),
+  SHOW_COST: true,
+  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
+}));
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';

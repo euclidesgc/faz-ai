@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import {
   METRICS_BREAKDOWN_DIMS,
   METRICS_MEASURES,
+  SHOW_COST,
   type MetricsBreakdown,
   type MetricsBreakdownDim,
   type MetricsCell,
@@ -194,7 +195,7 @@ export function rowMarks(row: BreakdownRow): string[] {
   const c = row.cell;
   const out: string[] = [];
   if (row.ambiguous) out.push(t('nome em mais de um workflow'));
-  const noCost = c.runs - c.costedRuns;
+  const noCost = SHOW_COST ? c.runs - c.costedRuns : 0;
   if (noCost > 0) {
     if (c.costedRuns > 0) out.push(t('custo parcial'));
     out.push(tn(noCost, '{n} execução sem custo medido', '{n} execuções sem custo medido'));
@@ -204,7 +205,7 @@ export function rowMarks(row: BreakdownRow): string[] {
     if (c.measuredRuns > 0) out.push(t('tokens parciais'));
     out.push(tn(noTokens, '{n} execução sem tokens medidos', '{n} execuções sem tokens medidos'));
   }
-  if (c.costUsd !== null && c.costEstimatedUsd !== null) {
+  if (SHOW_COST && c.costUsd !== null && c.costEstimatedUsd !== null) {
     if (c.costEstimatedUsd >= c.costUsd - EPS) out.push(t('estimado por tabela de preços'));
     else if (c.costEstimatedUsd > 0)
       out.push(t('parte estimada por tabela de preços: {estimated}', { estimated: formatMoney(c.costEstimatedUsd) }));
@@ -396,9 +397,11 @@ export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
               <thead className="metrics-sticky-head">
                 <tr>
                   <th scope="col">{dimLabel(dim)}</th>
-                  <th scope="col" className="is-number">
-                    {t('Custo')}
-                  </th>
+                  {SHOW_COST && (
+                    <th scope="col" className="is-number">
+                      {t('Custo')}
+                    </th>
+                  )}
                   <th scope="col" className="is-number">
                     {t('Tokens')}
                   </th>
@@ -415,7 +418,7 @@ export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
                 {rows.map((r) => (
                   <tr key={r.key} data-category={r.other ? 'other' : r.value}>
                     <th scope="row">{rowLabel(r)}</th>
-                    <td className="is-number">{formatCost(r.cell.costUsd)}</td>
+                    {SHOW_COST && <td className="is-number">{formatCost(r.cell.costUsd)}</td>}
                     <td className="is-number">{formatTokens(r.cell.tokens)}</td>
                     <td className="is-number">{formatNumber(r.cell.runs)}</td>
                     <td className="is-number">{formatDuration(r.cell.durationMs)}</td>

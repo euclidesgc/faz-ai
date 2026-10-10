@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import type { BoardState, Id } from '../../shared/model';
 import { isLive } from '../../shared/selectors';
 import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../../shared/filters';
-import { EMPTY_METRICS_FILTERS, type MetricsBreakdownDim, type MetricsFilters, type MetricsMeasure } from '../../shared/metrics';
+import { EMPTY_METRICS_FILTERS, SHOW_COST, type MetricsBreakdownDim, type MetricsFilters, type MetricsMeasure } from '../../shared/metrics';
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 import { formatBytes, type ImportSummary } from '../../shared/backup';
 import { formatDateTime, t } from '../i18n';
@@ -31,7 +31,7 @@ export interface MetricsBlocksState {
 
 export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
   dim: 'phase',
-  measure: 'cost',
+  measure: SHOW_COST ? 'cost' : 'tokens',
   cardSort: null,
   phaseSort: null,
   leadSort: null,

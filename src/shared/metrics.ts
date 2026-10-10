@@ -128,7 +128,16 @@ export const METRICS_BREAKDOWN_DIMS: MetricsBreakdownDim[] = ['phase', 'card_typ
 /** As quatro medidas de cada categoria (RF-02). A barra mostra uma; as quatro vão em texto. */
 export type MetricsMeasure = 'cost' | 'tokens' | 'runs' | 'duration';
 
-export const METRICS_MEASURES: MetricsMeasure[] = ['cost', 'tokens', 'runs', 'duration'];
+/**
+ * Mostrar o custo em dólar. Por enquanto o board mostra só tokens: o Claude Code informa o custo, mas o
+ * Cursor não, e um total em dólar que cobre só parte das execuções confunde mais do que ajuda. O valor
+ * informado continua gravado no log (`cost_usd`); ligar de novo é só trocar esta constante.
+ */
+export const SHOW_COST = false;
+
+export const METRICS_MEASURES: MetricsMeasure[] = (['cost', 'tokens', 'runs', 'duration'] as MetricsMeasure[]).filter(
+  (m) => SHOW_COST || m !== 'cost',
+);
 
 /** Uma categoria de um corte ou de um ranking. */
 export interface MetricsCell {

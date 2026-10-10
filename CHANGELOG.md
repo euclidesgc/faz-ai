@@ -6,6 +6,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## 0.34.0
 
+- **Consumo em tokens, sem custo em dólar.** Por enquanto, o board mede o uso da IA só em tokens,
+  que o Claude Code e o Cursor informam. O custo em dólar saiu das Métricas (o total, a série mensal,
+  o corte por categoria e os rankings), da linha de consumo na conversa do card e do `get_metrics` do
+  MCP: só o Claude Code informa o custo, e um total que cobria parte das execuções confundia mais do
+  que ajudava. A série mensal mostra os tokens, e os rankings passam a ordenar por tokens quando o
+  período tem tokens medidos. O valor que o Claude Code informa continua gravado no banco, para poder
+  voltar depois sem perder o histórico.
 - **Login vencido: aviso de erro no board, em vez de parar sem explicação (#189).** O login do
   Claude Code passa a ser conferido de verdade (`claude auth status`), além do Cursor já existente;
   antes de cada chamada da IA (botão do card, heartbeat, modo autônomo), o board confere de novo, com

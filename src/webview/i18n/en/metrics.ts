@@ -197,6 +197,8 @@ export const metrics: Record<string, string> = {
   'Ordenado pela coluna "{column}", decrescente.': 'Sorted by the "{column}" column, descending.',
   'Ordenado pela coluna "{column}", crescente.': 'Sorted by the "{column}" column, ascending.',
   'É o padrão quando o período tem custo medido.': 'This is the default when the period has measured cost.',
+  'É o padrão quando o período tem tokens medidos.': 'This is the default when the period has measured tokens.',
+  'É o padrão enquanto o período não tem tokens medidos.': 'This is the default while the period has no measured tokens.',
   'É o padrão enquanto o período não tem custo medido.': 'This is the default while the period has no measured cost.',
   'Mostrar só as {n} primeiras linhas': 'Show only the first {n} rows',
   'Mostrar mais {n} linha': 'Show {n} more row',
