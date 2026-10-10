@@ -664,8 +664,11 @@ colunas. Você mesmo pode mover qualquer card sem aprovação.
 
 ### Modo autônomo (YOLO)
 
-Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo**
-(o board pede uma confirmação, porque o modo abre mão de toda aprovação). A partir daí a IA toca a
+Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo**, ou
+clique no ícone do modo no rodapé do cartão, sem abrir o card (para várias de uma vez, marque as
+histórias e use a barra de seleção). O board pede uma confirmação, porque o modo abre mão de toda
+aprovação; marque **Não avisar novamente** no aviso para ligar direto nas próximas vezes. Desligar
+uma história não pede confirmação. A partir daí a IA toca a
 história sozinha, **sem pedir autorização nem confirmação para nada**:
 
 - Do **Backlog** até a última coluna em que a IA atua (Homologação, no board padrão): ela faz o

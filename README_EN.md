@@ -690,8 +690,11 @@ e colunas. You can always move any card yourself without approval.
 
 ### Autonomous mode (YOLO)
 
-A **story** can be marked **YOLO**: in the card panel, turn on **Modo autônomo** (the board
-asks for confirmation, because the mode gives up every approval). From then on the AI drives the
+A **story** can be marked **YOLO**: in the card panel, turn on **Modo autônomo**, or click the
+mode's icon in the card footer, without opening the card (for several at once, select the stories
+and use the selection bar). The board asks for confirmation, because the mode gives up every
+approval; check **Não avisar novamente** (don't warn again) in the warning to turn it on directly
+next time. Turning a story off asks for no confirmation. From then on the AI drives the
 story by itself, **without asking for authorization or confirmation on anything**:
 
 - From **Backlog** to the last column the AI works in (Homologação, on the default board): it does
