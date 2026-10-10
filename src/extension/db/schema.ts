@@ -382,7 +382,8 @@ export function migrate(db: Database, upTo = SCHEMA_VERSION): void {
       db.exec('COMMIT;');
     } catch (e) {
       db.exec('ROLLBACK;');
-      throw e;
+      // qual migração falhou: sem isso o erro do SQLite não diz em que passo o banco parou
+      throw new Error(`Migração ${next} do banco do board: ${e instanceof Error ? e.message : String(e)}`);
     }
     current = next;
   }

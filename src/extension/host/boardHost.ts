@@ -133,14 +133,25 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // pasta compartilham o arquivo do banco, e a segunda a abrir marcaria como inconclusiva uma
   // execução viva da primeira. É a mesma ambiguidade que o `ownsBoard` existe para conter.
   const ownsBoard = !o.ownsBoard || o.ownsBoard();
-  if (ownsBoard) runLog.closeOpen(Date.now());
+  // a manutenção da abertura (fechar execuções abertas, consolidar o log) não pode impedir o board de
+  // abrir: se falhar, o motivo vai para o log e a pessoa trabalha normalmente
+  const maintain = (what: string, fn: () => void) => {
+    try {
+      fn();
+    } catch (e) {
+      o.log(`Não foi possível ${what} ao abrir o board: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  if (ownsBoard) maintain('fechar as execuções de IA que ficaram abertas', () => runLog.closeOpen(Date.now()));
   // a retenção: fora da janela, o detalhe do mês vira total em `log_months`. Roda aqui, na abertura,
   // no máximo uma vez por dia — nunca durante uma mutação do board, para não entrar no custo de uma
   // operação comum da pessoa mesmo que fique lenta.
   const boardRepo = new BoardRepo(handle.db);
-  const opened = boardRepo.openedNow(router.boardId, Date.now());
-  if (ownsBoard && opened.rollupDay !== dayOf(Date.now()))
-    consolidate(handle.db, router.boardId, Date.now(), boardRepo.retentionMonths(router.boardId));
+  maintain('consolidar o log de uso', () => {
+    const opened = boardRepo.openedNow(router.boardId, Date.now());
+    if (ownsBoard && opened.rollupDay !== dayOf(Date.now()))
+      consolidate(handle.db, router.boardId, Date.now(), boardRepo.retentionMonths(router.boardId));
+  });
   if (ownsBoard) cleanStaleTemp();
   let pathEnv = await loginShellPath();
   // o node do PATH do terminal, com caminho absoluto: é ele que a ferramenta usa para iniciar o servidor do board.
