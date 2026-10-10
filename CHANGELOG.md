@@ -4,7 +4,7 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## 0.34.0
+## 0.34.1
 
 - **Board gravado por uma versão mais nova não abre pela metade.** Ao voltar para uma versão
   anterior da extensão (por exemplo, a da loja depois de testar uma versão nova), o board antes
@@ -15,6 +15,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   completo vai para **Saída → Faz AI**. Abrir o board de novo tenta outra vez, sem precisar recarregar
   a janela. A manutenção feita na abertura (fechar execuções que ficaram abertas e consolidar o log de
   uso) não impede mais o board de abrir: se falhar, o motivo vai para o log.
+
+## 0.34.0
+
 - **Consumo em tokens, sem custo em dólar.** Por enquanto, o board mede o uso da IA só em tokens,
   que o Claude Code e o Cursor informam. O custo em dólar saiu das Métricas (o total, a série mensal,
   o corte por categoria e os rankings), da linha de consumo na conversa do card e do `get_metrics` do

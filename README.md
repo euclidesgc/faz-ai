@@ -926,6 +926,14 @@ anteriores (`fazai.db`), que fica intacto. Regras e skills são arquivos da past
 entram no git normalmente. Evite abrir a mesma pasta em duas janelas do editor ao mesmo tempo: a
 última a salvar vence (a extensão avisa quando isso acontece).
 
+**Atualizar a extensão atualiza o banco.** Ao abrir o board, a extensão aplica sozinha, em ordem,
+as mudanças de formato que faltam no banco, cada uma numa transação: se uma falhar, o banco fica
+como estava. Vale para qualquer versão de origem, em qualquer máquina. O caminho inverso não existe:
+uma versão anterior da extensão (por exemplo, depois de testar uma versão nova, a loja voltar para a
+de antes) recusa abrir um board gravado por uma versão mais nova, sem tocar nele, e pede para
+atualizar a extensão. Se o banco recusar alguma gravação ao abrir, o erro completo, com o comando
+que falhou, fica em **Saída → Faz AI**.
+
 ### Backup do board
 
 Para levar o board a outra máquina ou guardar uma cópia:
