@@ -170,16 +170,15 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   embutidos, registro do servidor MCP, regras, skills e agentes, hooks, execução pela conversa e
   Diagnóstico. Um board que estava configurado com uma delas volta para o Claude Code ao abrir. O
   que o Cursor e o Claude Code ainda carregam de `.codex/skills` ou `AGENTS.md` continua listado.
-- **O custo das execuções é o que a ferramenta informa; a tabela de preços saiu (#187).** Um valor
-  calculado a partir de preços cadastrados envelhece quando o fornecedor muda a tarifa e deixa o
-  relatório errado sem avisar, então o board deixou de calcular custo. O Claude Code grava o
-  `total_cost_usd` que a própria CLI informa, mais os quatro contadores de tokens; o Cursor grava os
-  tokens e fica sem custo (a CLI não informa). Saem a tabela embutida, a coluna de preço da aba **Modelos de IA**, o
+- **A tabela de preços saiu (#187).** Um valor calculado a partir de preços cadastrados envelhece
+  quando o fornecedor muda a tarifa e deixa o relatório errado sem avisar, então o board deixou de
+  calcular custo. As execuções gravam os quatro contadores de tokens, e o Claude Code grava também o
+  `total_cost_usd` que a própria CLI informa (o Cursor não informa custo); nesta versão as telas
+  mostram só os tokens (veja "Consumo em tokens, sem custo em dólar"). Saem a tabela embutida, a coluna de preço da aba **Modelos de IA**, o
   **Preço variável**, os campos `price_*`, `reset_price` e `variable_price` do `upsert_model`, a
   origem do preço no `get_models` e a regra **Cursor Token Rate** (`cursorTokenRate` no
   `update_rules`). Catálogos gravados antes perdem os campos de preço ao abrir o board. As execuções
-  antigas continuam nas Métricas, marcadas como "estimado por tabela de preços". O `get_metrics`
-  passa a chamar a coluna de **custo** (informado pela ferramenta), sem "estimado".
+  antigas continuam no banco, com os tokens que tinham.
 - **Toda chamada à IA passa por uma única porta (#187).** O executor de cards (manual, heartbeat e
   modo autônomo) e o chat repetiam o registro de uso, e o registro era opcional. Agora ambos pedem a
   execução a um `AiGateway`, que abre a linha em `ai_runs` antes de rodar, confere a permissão, cuida
