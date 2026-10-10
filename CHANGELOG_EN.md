@@ -7,6 +7,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## 0.34.0
 
+- **An error opening the board is explained and no longer locks the window.** When the database
+  refuses a write (such as "FOREIGN KEY constraint failed"), the message now says which statement
+  failed, and the full error goes to **Output → Faz AI**. Opening the board again retries, with no
+  need to reload the window. The upkeep done on open (closing runs left open and consolidating the
+  usage log) no longer stops the board from opening: if it fails, the reason goes to the log.
 - **Usage in tokens, no dollar cost.** For now, the board measures AI usage only in tokens, which
   Claude Code and Cursor both report. The dollar cost is gone from Métricas (the total, the monthly
   series, the breakdown by category and the rankings), from the usage line in the card conversation

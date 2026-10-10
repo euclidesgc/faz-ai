@@ -6,6 +6,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## 0.34.0
 
+- **Erro ao abrir o board fica explicado e não trava a janela.** Quando o banco recusa uma gravação
+  (como "FOREIGN KEY constraint failed"), a mensagem passa a dizer qual comando falhou, e o erro
+  completo vai para **Saída → Faz AI**. Abrir o board de novo tenta outra vez, sem precisar recarregar
+  a janela. A manutenção feita na abertura (fechar execuções que ficaram abertas e consolidar o log de
+  uso) não impede mais o board de abrir: se falhar, o motivo vai para o log.
 - **Consumo em tokens, sem custo em dólar.** Por enquanto, o board mede o uso da IA só em tokens,
   que o Claude Code e o Cursor informam. O custo em dólar saiu das Métricas (o total, a série mensal,
   o corte por categoria e os rankings), da linha de consumo na conversa do card e do `get_metrics` do

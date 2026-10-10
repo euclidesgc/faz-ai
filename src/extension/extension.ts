@@ -147,7 +147,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }, 60_000);
       void offerBoardUpgrade(context, router);
       return router;
-    })();
+    })().catch((e: unknown) => {
+      // a falha não fica guardada: a próxima tentativa de abrir o board tenta de novo, sem recarregar a janela
+      routerPromise = undefined;
+      const detail = e instanceof Error ? (e.stack ?? e.message) : String(e);
+      output.appendLine(`${new Date().toLocaleTimeString()} Não foi possível abrir o board: ${detail}`);
+      throw e;
+    });
     return routerPromise;
   };
 
