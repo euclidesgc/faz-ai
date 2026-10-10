@@ -968,6 +968,14 @@ earlier versions (`fazai.db`), which is left untouched. Rules and skills are fil
 folder and go into git as usual. Avoid opening the same folder in two editor windows at the same
 time: the last one to save wins (the extension warns when that happens).
 
+**Updating the extension updates the database.** When the board opens, the extension applies by
+itself, in order, the format changes the database is missing, each in a transaction: if one fails,
+the database stays as it was. This works from any earlier version, on any machine. The reverse path
+does not exist: an earlier version of the extension (for example, after trying a newer build, the
+store going back to the previous one) refuses to open a board saved by a newer version, without
+touching it, and asks you to update the extension. If the database refuses a write on open, the full
+error, with the statement that failed, is in **Output → Faz AI**.
+
 ### Board backup
 
 To take the board to another machine or keep a copy:
