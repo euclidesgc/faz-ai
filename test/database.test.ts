@@ -458,3 +458,16 @@ describe('banco preso por outro programa', () => {
     expect(calls).toBe(1);
   });
 });
+
+describe('banco gravado por uma versão mais nova', () => {
+  it('recusa abrir, dizendo o formato e o que fazer, sem alterar nada', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const db = new SQL.Database();
+    migrate(db);
+    db.run("UPDATE meta SET value = ? WHERE key = 'schema_version'", [String(SCHEMA_VERSION + 3)]);
+    const before = db.export();
+    db.run('PRAGMA foreign_keys = ON;');
+    expect(() => migrate(db)).toThrow(/versão mais nova do Faz AI \(formato \d+; esta versão conhece até o \d+\)\. Atualize a extensão/);
+    expect(db.export()).toEqual(before);
+  });
+});

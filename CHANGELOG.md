@@ -6,6 +6,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## 0.34.0
 
+- **Board gravado por uma versão mais nova não abre pela metade.** Ao voltar para uma versão
+  anterior da extensão (por exemplo, a da loja depois de testar uma versão nova), o board antes
+  falhava com "FOREIGN KEY constraint failed". Agora a extensão recusa abrir antes de tocar no banco
+  e explica: o board foi gravado por uma versão mais nova, atualize a extensão.
 - **Erro ao abrir o board fica explicado e não trava a janela.** Quando o banco recusa uma gravação
   (como "FOREIGN KEY constraint failed"), a mensagem passa a dizer qual comando falhou, e o erro
   completo vai para **Saída → Faz AI**. Abrir o board de novo tenta outra vez, sem precisar recarregar
