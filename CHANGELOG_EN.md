@@ -7,6 +7,10 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## 0.34.0
 
+- **A board saved by a newer version no longer half-opens.** After going back to an earlier version
+  of the extension (for example, the store's one after trying a newer build), the board used to fail
+  with "FOREIGN KEY constraint failed". Now the extension refuses to open it before touching the
+  database and explains: the board was saved by a newer version, update the extension.
 - **An error opening the board is explained and no longer locks the window.** When the database
   refuses a write (such as "FOREIGN KEY constraint failed"), the message now says which statement
   failed, and the full error goes to **Output → Faz AI**. Opening the board again retries, with no

@@ -371,6 +371,14 @@ export function migrate(db: Database, upTo = SCHEMA_VERSION): void {
   db.run('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);');
   const res = db.exec("SELECT value FROM meta WHERE key = 'schema_version'");
   let current = res[0]?.values[0]?.[0] ? Number(res[0].values[0][0]) : 0;
+  // banco gravado por uma versão mais nova da extensão (a pessoa voltou para uma versão anterior, ou a
+  // loja ainda não tem a versão que ela testou): esta versão não conhece as tabelas novas e esbarraria
+  // nelas ao gravar. Recusa antes de tocar em qualquer coisa, dizendo o que fazer.
+  if (upTo === SCHEMA_VERSION && current > SCHEMA_VERSION)
+    throw new Error(
+      `Este board foi gravado por uma versão mais nova do Faz AI (formato ${current}; esta versão conhece até o ${SCHEMA_VERSION}). ` +
+        'Atualize a extensão para abrir o board; nada foi alterado.',
+    );
   while (current < upTo) {
     const next = current + 1;
     const sql = MIGRATIONS[next];
