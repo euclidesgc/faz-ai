@@ -429,26 +429,22 @@ Imagens coladas na mensagem viram anexos do card e a IA as recebe.
 - Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo e o fim da
   saída da ferramenta. O log completo está no painel **Saída → Faz AI** (ou no terminal do `faz-ai`).
 
-### Consumo, custo e inventário de cada execução
+### Consumo e inventário de cada execução
 
 Cada vez que a IA roda (pela conversa, pelo heartbeat ou pelo modo autônomo), o board registra no
 banco o que a execução consumiu: tokens de entrada, de saída, de leitura de cache e de criação de
-cache, o custo em dólar, o número de turnos e o id da sessão da ferramenta. Registra também o
+cache, o número de turnos e o id da sessão da ferramenta. Registra também o
 **inventário** do que a IA usou: ferramentas nativas, ferramentas de MCP (com o servidor de cada
 uma), subagentes e skills, com a contagem de chamadas.
 
-- **O custo é o que a ferramenta informa; o board não calcula nada.** Não existe tabela de preços: um
-  valor calculado a partir de uma lista de preços envelhece quando o fornecedor muda a tarifa e
-  produz relatório errado com cara de certo. Hoje:
-
-  | Ferramenta | Tokens | Custo em dólar |
-  | --- | --- | --- |
-  | Claude Code | medidos (entrada, saída, leitura e criação de cache, por modelo, subagente incluído) | o `total_cost_usd` que a própria CLI informa |
-  | Cursor | medidos (os quatro contadores) | a CLI não informa: fica em branco |
-
-  Onde aparecer "não medido" ou um custo em branco é isso, falta de medição, e nunca consumo zero.
-  Uma execução com tokens e sem custo (o caso do Cursor) conta nos tokens e fica de fora do custo;
-  o aviso das Métricas diz quantas execuções ficaram de fora.
+- **O consumo é medido em tokens; o board não mostra custo em dólar.** As duas ferramentas informam
+  os tokens: no Claude Code, entrada, saída, leitura e criação de cache, por modelo, com os subagentes;
+  no Cursor, os mesmos quatro contadores. Só o Claude Code informa também o custo em dólar, e o Cursor
+  não; um total em dólar que cobrisse só parte das execuções confundiria mais do que ajudaria, e uma
+  tabela de preços envelheceria a cada mudança de tarifa. Por isso, por enquanto, o board mostra só
+  tokens. O valor em dólar que o Claude Code informa continua gravado no banco, para poder voltar
+  depois sem perder o histórico. Onde aparecer "não medido" é isso, falta de medição, e nunca
+  consumo zero.
 - **Toda execução passa por uma única porta.** O executor de cards (manual, heartbeat e modo
   autônomo) e o chat do board chamam a IA pelo mesmo ponto do código (`AiGateway`), que abre a linha
   no log antes de rodar, fecha com o desfecho e grava o consumo. Cada ferramenta tem um provider
@@ -456,9 +452,9 @@ uma), subagentes e skills, com a contagem de chamadas.
   por ali, e um teste falha se algum arquivo tentar. O que fica de fora do registro, por natureza, é
   o que você roda direto no terminal ou no chat da própria ferramenta, sem o board.
 - **No canal de log** (**Saída → Faz AI**), a saída da ferramenta aparece em linhas legíveis, e no fim
-  de cada execução vem uma linha de resumo com entrada, saída, leitura e criação de cache, turnos e
-  custo, por exemplo `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação
-  de cache · 8 turnos · US$ 0,4210`. Turnos e custo ficam de fora quando a ferramenta não os informa.
+  de cada execução vem uma linha de resumo com entrada, saída, leitura e criação de cache e turnos,
+  por exemplo `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação de
+  cache · 8 turnos`. Os turnos ficam de fora quando a ferramenta não os informa.
 - **Perguntas no chat do board** também entram no registro, sem card associado.
 - **O detalhe de cada execução é guardado por uma janela que você configura**, de 1 a 24 meses (o
   mês corrente mais os anteriores). O padrão é 6 meses. Depois da janela o detalhe é descartado, mas
@@ -475,19 +471,19 @@ pelo navegador.
 - **Filtros.** O período pode ser Hoje, 7 dias, 30 dias, Este mês, Últimos 12 meses, Tudo ou um
   Intervalo livre (data inicial e final). O filtro **Workflow** restringe os números a um workflow, e
   **Limpar filtros** volta ao padrão. Abaixo dos controles o painel escreve o período consultado.
-- **Cinco totais.** Atividades concluídas (cards que chegaram a uma coluna de conclusão), execuções
-  de IA, tokens, custo e tempo de IA. O **tempo de IA é a soma da duração de cada execução**:
+- **Quatro totais.** Atividades concluídas (cards que chegaram a uma coluna de conclusão), execuções
+  de IA, tokens e tempo de IA. O **tempo de IA é a soma da duração de cada execução**:
   execuções simultâneas somam, então o total pode passar do tempo decorrido no relógio. O que não
   foi medido aparece como "não medido", nunca como 0, e quando só parte das execuções foi medida o
   aviso diz quantas ficaram de fora.
-- **Custo e tokens por mês.** Gráfico de barras, uma série por vez (alternador **Custo** / **Tokens**).
+- **Tokens por mês.** Gráfico de barras com os tokens de cada mês.
   O mês em andamento aparece com hachura, porque ainda não terminou; um mês sem nenhum dado é um
   espaço marcado "sem dado", não uma barra de altura zero. Abaixo do gráfico fica uma tabela com os
   mesmos números e uma coluna de observação (parcial, sem dado, só total mensal).
 - **Onde o consumo aconteceu.** O consumo do período repartido por **fase, tipo de card, modelo,
   ferramenta de IA, esforço ou perfil** (seletor **Recortar por**), em barras horizontais na medida
-  escolhida em **Medida da barra**: custo, tokens, execuções ou tempo de IA. Ao lado fica a tabela com
-  as quatro medidas. As categorias além do limite somam numa linha "outros". Alcança a série inteira
+  escolhida em **Medida da barra**: tokens, execuções ou tempo de IA. Ao lado fica a tabela com
+  as três medidas. As categorias além do limite somam numa linha "outros". Alcança a série inteira
   do período, inclusive os meses já arquivados.
 - **Quanto tempo o card fica na fase.** Uma linha por fase com as permanências, a mediana, a média,
   as desconhecidas e quantos cards estão nela agora. São permanências, não cards: um card que volta
@@ -497,18 +493,16 @@ pelo navegador.
   card, ordenável. Desconhecido é o card cuja data de criação não está no detalhe guardado (o mês foi
   descartado ou o card é anterior ao log); a data não é estimada.
 - **Fases mais caras e Cards mais caros.** Dois rankings lado a lado, em tabelas que você ordena por
-  custo, tokens, execuções ou tempo de IA clicando no cabeçalho (ou com Enter/Espaço). O padrão é o
-  custo quando o período tem custo medido e o tempo de IA quando não tem, e a tela escreve o critério
-  em vigor. As fases alcançam a série inteira; os cards, só o detalhe guardado, e cada bloco avisa
+  tokens, execuções ou tempo de IA clicando no cabeçalho (ou com Enter/Espaço). O padrão são os
+  tokens quando o período tem tokens medidos e o tempo de IA quando não tem, e a tela escreve o
+  critério em vigor. As fases alcançam a série inteira; os cards, só o detalhe guardado, e cada bloco avisa
   isso.
 - **O que a IA usou.** Ferramentas, ferramentas de MCP (com o servidor em coluna própria), subagentes
   e skills, com o número de execuções e de usos. "Ainda não medido" (nenhuma execução gravou
   inventário) é diferente de "nenhum registro no período".
-- **Tokens e custo.** O custo soma só as execuções em que a ferramenta informou o custo (o Claude Code),
-  e o aviso diz quantas ficaram de fora; os tokens contam em todas as execuções medidas. Execuções
-  antigas, de antes de o board deixar de calcular custo por tabela de preços, continuam marcadas como
-  "estimado por tabela de preços". Antes de o board medir consumo,
-  custo e inventário aparecem como "não medido" e quase todo lead time como desconhecido: é o
+- **Tokens.** Os tokens contam em todas as execuções medidas, do Claude Code e do Cursor, e o aviso
+  diz quantas ficaram sem medição. Antes de o board medir consumo, tokens e inventário aparecem
+  como "não medido" e quase todo lead time como desconhecido: é o
   comportamento esperado, não falha.
 - **Detalhe guardado.** Mostra a janela de retenção do detalhe das execuções e quanto espaço ela
   ocupa. Dá para configurá-la de 1 a 24 meses (padrão 6). Aumentar grava na hora. **Baixar pede
@@ -524,7 +518,7 @@ pelo navegador.
 ### Métricas de uso com get_metrics
 
 Durante a conversa de um card, a IA pode consultar estatísticas agregadas do histórico do board — uso,
-duração e custo de execuções — sem precisar abrir nenhum painel. Chame a ferramenta `get_metrics` em
+duração e tokens das execuções — sem precisar abrir nenhum painel. Chame a ferramenta `get_metrics` em
 linguagem natural: "quanto tempo de IA o card #72 consumiu?", "qual tipo de card consome mais este
 mês?", "qual agente foi usado mais?". A ferramenta responde em uma tabela compacta, otimizada para
 economizar tokens.
@@ -539,11 +533,11 @@ economizar tokens.
 - Filtros de período (data inicial e final, em `AAAA-MM-DD`), card (ex. `72` ou `#72`), e dimensões
   (ex. fase, modelo, tipo de card).
 - Nas dimensões **agent**, **skill**, **used_tool** e **mcp_tool** a tabela mostra só a contagem de
-  execuções e de usos (sem tokens nem custo, que não é possível repartir entre componentes de uma
-  execução). `effort` e `profile` têm tokens e custo.
-- Tokens contam em toda execução medida; o custo vem só das execuções em que a ferramenta o informou (o Claude Code).
+  execuções e de usos (sem tokens, que não é possível repartir entre componentes de uma
+  execução). `effort` e `profile` têm tokens.
+- Tokens contam em toda execução medida, do Claude Code e do Cursor. A tabela não traz custo em dólar.
 - Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`.
-- Valores não medidos aparecem como "-" (nunca 0), por exemplo o custo do Cursor.
+- Valores não medidos aparecem como "-" (nunca 0).
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm detalhe e só agregam os
   totais já consolidados.

@@ -7,6 +7,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## 0.34.0
 
+- **Usage in tokens, no dollar cost.** For now, the board measures AI usage only in tokens, which
+  Claude Code and Cursor both report. The dollar cost is gone from Métricas (the total, the monthly
+  series, the breakdown by category and the rankings), from the usage line in the card conversation
+  and from the MCP `get_metrics`: only Claude Code reports the cost, and a total covering part of the
+  runs confused more than it helped. The monthly series shows tokens, and the rankings now sort by
+  tokens when the period has measured tokens. The value Claude Code reports is still stored in the
+  database, so it can come back later without losing history.
 - **Expired tool login: an error warning on the board, instead of stopping without explanation (#189).**
   The Claude Code sign-in is now actually checked (`claude auth status`), in addition to the existing
   Cursor check; before every AI call (the card's button, the heartbeat, autonomous mode), the board

@@ -1,6 +1,7 @@
 import { cardRef } from '../shared/model';
 import { aiToolInfo, type AiTool } from '../shared/harness';
 import type { AiRunOrigin, RunReport } from '../shared/log';
+import { SHOW_COST } from '../shared/metrics';
 import { columnOf, isLive } from '../shared/selectors';
 import { isWithHuman, isYolo, storyOf } from '../shared/story';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
@@ -125,7 +126,7 @@ export function consumptionLine(report: RunReport, why: { reason?: string | null
       `${COUNT.format(c.cacheReadTokens)} leitura de cache`,
       `${COUNT.format(c.cacheWriteTokens)} criação de cache`,
       ...(c.turns !== null ? [`${COUNT.format(c.turns)} ${c.turns === 1 ? 'turno' : 'turnos'}`] : []),
-      ...(c.costUsd !== null ? [`US$ ${USD.format(c.costUsd)}`] : []),
+      ...(SHOW_COST && c.costUsd !== null ? [`US$ ${USD.format(c.costUsd)}`] : []),
     ];
     return `${report.measure === 'partial' ? 'Consumo parcial' : 'Consumo'}: ${parts.join(' · ')}`;
   }

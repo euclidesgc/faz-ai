@@ -1,4 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
+vi.mock('../src/shared/metrics', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/shared/metrics')>()),
+  SHOW_COST: true,
+  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
+}));
 import { formatMetrics, isoDateArg } from '../src/extension/mcp/tools/metrics';
 import type { MetricsResult } from '../src/extension/log/metrics';
 

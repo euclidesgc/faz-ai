@@ -451,26 +451,22 @@ Images pasted into the message become card attachments and the AI receives them.
   of the tool's output. The full log is in the **Output → Faz AI** panel (or in the `faz-ai`
   terminal).
 
-### Consumption, cost and inventory of each run
+### Consumption and inventory of each run
 
 Every time the AI runs (from the conversation, the heartbeat or autonomous mode), the board records
 in the database what the run consumed: input tokens, output tokens, cache read tokens and cache
-creation tokens, the cost in dollars, the number of turns and the tool's session id. It also
+creation tokens, the number of turns and the tool's session id. It also
 records the **inventory** of what the AI used: native tools, MCP tools (with the server of each
 one), subagents and skills, with the number of calls.
 
-- **Cost is what the tool reports; the board calculates nothing.** There is no price table: a value
-  computed from a price list goes stale when the vendor changes its rates and produces a wrong
-  report that looks right. Today:
-
-  | Tool | Tokens | Cost in dollars |
-  | --- | --- | --- |
-  | Claude Code | measured (input, output, cache read and cache creation, per model, subagent included) | the `total_cost_usd` the CLI itself reports |
-  | Cursor | measured (the four counters) | the CLI does not report it: left blank |
-
-  Wherever you see "não medido" (not measured) or a blank cost, this is why: missing measurement,
-  never zero consumption. A run with tokens and no cost (the Cursor case) counts in the tokens and
-  stays out of the cost; the Métricas note says how many runs were left out.
+- **Usage is measured in tokens; the board does not show cost in dollars.** Both tools report the
+  tokens: Claude Code reports input, output, cache read and cache creation, per model, subagents
+  included; Cursor reports the same four counters. Only Claude Code also reports a dollar cost, and
+  Cursor does not; a dollar total covering only part of the runs would confuse more than help, and a
+  price table would go stale with every rate change. So, for now, the board shows only tokens. The
+  dollar value Claude Code reports is still stored in the database, so it can come back later without
+  losing history. Wherever you see "não medido" (not measured), this is why: missing measurement,
+  never zero consumption.
 - **Every run goes through a single door.** The card runner (manual, heartbeat and autonomous mode)
   and the board chat call the AI through the same point in the code (`AiGateway`), which opens the
   log row before running, closes it with the outcome and stores the consumption. Each tool has its
@@ -478,10 +474,9 @@ one), subagents and skills, with the number of calls.
   exist without going through it, and a test fails if any file tries. What stays out of the record,
   by nature, is whatever you run straight in the terminal or in the tool's own chat, without the board.
 - **In the log channel** (**Output → Faz AI**), the tool's output appears as readable lines, and at
-  the end of each run a summary line follows with input, output, cache read and cache creation,
-  turns and cost, for example `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100
-  criação de cache · 8 turnos · US$ 0,4210`. Turns and cost are left out when the tool does not
-  report them. The line is written in Portuguese, as the board's log channel is.
+  the end of each run a summary line follows with input, output, cache read and cache creation, and
+  turns, for example `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação
+  de cache · 8 turnos`. Turns are left out when the tool does not report them. The line is written in Portuguese, as the board's log channel is.
 - **Questions in the board chat** are recorded too, with no card attached.
 - **The detail of each run is kept for a window you configure**, from 1 to 24 months (the current
   month plus the earlier ones). The default is 6 months. After the window the detail is discarded,
@@ -499,19 +494,18 @@ and also in the board opened in the browser.
   meses (last 12 months), Tudo (all) or a free range (start and end date). The **Workflow** filter
   limits the numbers to one workflow, and **Limpar filtros** (clear filters) goes back to the
   default. Below the controls the panel writes the period it queried.
-- **Five totals.** Completed activities (cards that reached a completion column), AI runs, tokens,
-  cost and AI time. **AI time is the sum of each run's duration**: simultaneous runs add up, so the
+- **Four totals.** Completed activities (cards that reached a completion column), AI runs, tokens
+  and AI time. **AI time is the sum of each run's duration**: simultaneous runs add up, so the
   total can exceed the elapsed clock time. What was not measured shows as "não medido" (not
   measured), never as 0, and when only some of the runs were measured the note says how many were
   left out.
-- **Cost and tokens per month.** A bar chart, one series at a time (the **Custo** / **Tokens**
-  switch). The month in progress is hatched, because it has not ended yet; a month with no data at
+- **Tokens per month.** A bar chart with each month's tokens. The month in progress is hatched, because it has not ended yet; a month with no data at
   all is a gap marked "sem dado" (no data), not a zero-height bar. Below the chart a table has the
   same numbers and a notes column (partial, no data, monthly total only).
 - **Where the usage happened** ("Onde o consumo aconteceu"). The period's usage split by **phase,
   card type, model, AI tool, effort or profile** (the **Recortar por** / break down by selector), as
-  horizontal bars in the measure chosen in **Medida da barra** (bar measure): cost, tokens, runs or AI
-  time. The table with the four measures sits beside it. Categories past the limit add up in an
+  horizontal bars in the measure chosen in **Medida da barra** (bar measure): tokens, runs or AI
+  time. The table with the three measures sits beside it. Categories past the limit add up in an
   "others" row. It reaches the whole series of the period, including months already archived.
 - **How long a card stays in a phase** ("Quanto tempo o card fica na fase"). One row per phase with
   the permanences, the median, the mean, the unknown ones and how many cards are in it now. They are
@@ -522,18 +516,16 @@ and also in the board opened in the browser.
   sortable list per card. Unknown is a card whose creation date is not in the detail kept (the month
   was discarded or the card predates the log); the date is not estimated.
 - **Most expensive phases and Most expensive cards** ("Fases mais caras" / "Cards mais caros"). Two
-  rankings side by side, in tables you sort by cost, tokens, runs or AI time by clicking the header
-  (or with Enter/Space). The default is cost when the period has measured cost and AI time when it
-  does not, and the screen writes the criterion in force. Phases reach the whole series; cards, only
+  rankings side by side, in tables you sort by tokens, runs or AI time by clicking the header
+  (or with Enter/Space). The default is tokens when the period has measured tokens and AI time when
+  it does not, and the screen writes the criterion in force. Phases reach the whole series; cards, only
   the detail kept, and each block says so.
 - **What the AI used** ("O que a IA usou"). Tools, MCP tools (with the server in its own column),
   subagents and skills, with the number of runs and uses. "Not measured yet" (no run recorded an
   inventory) is different from "no records in the period".
-- **Tokens and cost.** Cost adds up only the runs in which the tool reported the cost (Claude Code), and
-  the note says how many were left out; tokens count in every measured run. Older runs, from before the
-  board stopped calculating cost from a price table, stay marked "estimado por tabela de preços"
-  (estimated from a price table). Before the board measures
-  consumption, cost and inventory show as "não medido" (not measured) and almost every lead time as
+- **Tokens.** Tokens count in every measured run, from Claude Code and from Cursor, and the note says
+  how many runs were left without measurement. Before the board measures consumption, tokens and
+  inventory show as "não medido" (not measured) and almost every lead time as
   unknown: that is the expected behavior, not a failure.
 - **Detail kept** ("Detalhe guardado"). Shows the retention window for the runs' detail and how much
   space it takes. You can set it from 1 to 24 months (default 6). Raising it saves right away.
@@ -550,7 +542,7 @@ and also in the board opened in the browser.
 ### Usage metrics with get_metrics
 
 During a card's conversation, the AI can query aggregated statistics from the board's history — usage,
-duration, and cost of runs — without opening any panel. Call the `get_metrics` tool in natural language:
+duration, and tokens of runs — without opening any panel. Call the `get_metrics` tool in natural language:
 "how much AI time did card #72 use?", "which card type uses the most this month?", "which agent was
 used most?". The tool replies with a compact table, optimized to save tokens.
 
@@ -564,11 +556,11 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 - Period filters (start and end date, in `YYYY-MM-DD`), card (e.g. `72` or `#72`), and dimensions
   (e.g. phase, model, card type).
 - On the **agent**, **skill**, **used_tool** and **mcp_tool** dimensions the table shows only the
-  count of runs and uses (no tokens or cost, which cannot be split among a run's components).
-  `effort` and `profile` have tokens and cost.
-- Tokens count in every measured run; cost comes only from runs in which the tool reported it (Claude Code).
+  count of runs and uses (no tokens, which cannot be split among a run's components).
+  `effort` and `profile` have tokens.
+- Tokens count in every measured run, from Claude Code and from Cursor. The table has no dollar cost.
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`.
-- Unmeasured values appear as "-" (never 0), for example Cursor's cost.
+- Unmeasured values appear as "-" (never 0).
 - Always tells you when the board's history started and which periods have only monthly totals
   (without per-run detail). Periods outside the retention window (6 months by default) have no detail and aggregate only
   the already-consolidated totals.
