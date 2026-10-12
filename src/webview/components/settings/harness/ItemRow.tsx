@@ -22,6 +22,8 @@ interface Props {
   onSelect?: (checked: boolean) => void;
   /** mostra o que o item é, numa frase, conforme o catálogo, e quando a ferramenta o carrega */
   explain?: boolean;
+  /** por que a ferramenta não lê o arquivo, embora ele exista; troca o selo de carregamento por um aviso */
+  unread?: string;
   /** controle extra antes das ações, como o uso do item nas execuções do board */
   usage?: ReactNode;
   /** arquivos de apoio da skill à mostra, numa linha logo abaixo */
@@ -30,7 +32,7 @@ interface Props {
 }
 
 /** Um item do inventário: seleção, nome, descrição como dica, o caminho do arquivo (que abre no editor) e o que dá para fazer com ele. */
-export function ItemRow({ tool, item: i, actions, selected = false, onSelect, explain, usage, filesOpen, onToggleFiles }: Props) {
+export function ItemRow({ tool, item: i, actions, selected = false, onSelect, explain, unread, usage, filesOpen, onToggleFiles }: Props) {
   const { copyable, twin, copy, setMode, deletable, remove } = actions;
   const src = i.source === undefined ? undefined : HARNESS_CATALOG[tool][i.source];
   const inProject = i.scope !== 'project' ? twin(i, 'project') : undefined;
@@ -55,12 +57,17 @@ export function ItemRow({ tool, item: i, actions, selected = false, onSelect, ex
               {i.plugin}
             </Badge>
           )}
-          {explain && src?.loads === 'always' && (
+          {unread && (
+            <Badge color="orange" variant="soft">
+              {t('não lido pelo Claude Code')}
+            </Badge>
+          )}
+          {explain && !unread && src?.loads === 'always' && (
             <Badge color="indigo" variant="soft" title={t('Entra no começo de toda conversa da ferramenta')}>
               {t('sempre carregado')}
             </Badge>
           )}
-          {explain && src?.loads === 'on-demand' && (
+          {explain && !unread && src?.loads === 'on-demand' && (
             <Badge color="gray" variant="soft" title={t('A ferramenta só lê o conteúdo quando a tarefa pede ou quando você chama')}>
               {t('sob demanda')}
             </Badge>
@@ -72,6 +79,7 @@ export function ItemRow({ tool, item: i, actions, selected = false, onSelect, ex
           )}
         </div>
         {explain && src?.hint && <p className="item-explain">{t(src.hint)}</p>}
+        {unread && <p className="item-explain item-unread">{unread}</p>}
         {i.description && (
           <p className="item-hint" title={i.description}>
             {i.description}

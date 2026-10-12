@@ -7,6 +7,8 @@ import {
   PLUGIN_COMMANDS,
   createTargets,
   hookTargets,
+  importPath,
+  instructionRoles,
   mcpTargets,
   permissionTargets,
   type HARNESS_GROUPS,
@@ -76,8 +78,23 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
   const catalog = HARNESS_CATALOG[tool];
   const sources = catalog.flatMap((src, source) => (src.group === g && src.scope === scope ? [{ src, source }] : []));
   const notes = HARNESS_NOTES[tool].filter((n) => n.group === g && n.scope === scope);
+  // por padrão o Claude Code lê o AGENTS.md do projeto só quando não há CLAUDE.md, .claude/CLAUDE.md nem CLAUDE.local.md
+  const { claudeMd, agentsMd } = g === 'main' && scope === 'project' ? instructionRoles(tool, all) : { claudeMd: [], agentsMd: [] };
   // arquivo fixo que a ferramenta leria, mas que ainda não existe: dá para criar daqui
-  const absent = sources.filter(({ src, source }) => src.layout === 'file' && !src.noCreate && !items.some((i) => i.source === source));
+  const absent = sources.filter(
+    ({ src, source }) =>
+      src.layout === 'file' &&
+      !src.noCreate &&
+      !items.some((i) => i.source === source) &&
+      !(src.role === 'agents-md' && claudeMd.length > 0),
+  );
+  const unread = (i: HarnessItem) =>
+    claudeMd[0] && agentsMd.includes(i)
+      ? t(
+          'Por padrão, o Claude Code não lê este arquivo nas suas conversas, porque o projeto tem {claude}. Para ler os dois, importe com @{path} no {claude} ou mude Project instructions no /config do Claude Code.',
+          { claude: claudeMd[0].location, path: importPath(claudeMd[0].location, i.location) },
+        )
+      : undefined;
   const creatable = createTargets(tool).filter((c) => c.scope === scope && c.layout !== 'file' && catalog[c.source]!.group === g);
   const hooks = g === 'hook' ? hookTargets(tool).filter((x) => x.scope === scope) : [];
   const mcps = g === 'mcp' ? mcpTargets(tool).filter((x) => x.scope === scope) : [];
@@ -193,6 +210,7 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
               item={i}
               actions={actions}
               explain
+              unread={unread(i)}
               usage={projectTool ? <UsageSelect item={i} /> : undefined}
               filesOpen={filesOpen === i.path}
               onToggleFiles={() => setFilesOpen(filesOpen === i.path ? null : i.path)}
@@ -217,19 +235,30 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
       {!agentsTable && items.length === 0 && notes.length === 0 && <p className="muted small scope-empty">{t('Nada aqui ainda.')}</p>}
       {absent.length > 0 && (
         <div className="harness-absent">
-          <span className="muted small">{t('A ferramenta também leria, se existissem:')}</span>
-          {absent.map(({ src, source }) => (
-            <Button
-              key={source}
-              variant="ghost"
-              size="1"
-              title={t(src.hint ?? '')}
-              aria-label={t('Criar {path}', { path: location(source) })}
-              onClick={() => createFile(source)}
-            >
-              {t('Criar {path}', { path: location(source) })}
-            </Button>
-          ))}
+          <span className="muted small">{t('Você pode criar:')}</span>
+          <ul>
+            {absent.map(({ src, source }) => (
+              <li key={source}>
+                <Button variant="ghost" size="1" onClick={() => createFile(source)}>
+                  {t('Criar {path}', { path: location(source) })}
+                </Button>
+                {src.hint && <span className="muted small">{t(src.hint)}</span>}
+              </li>
+            ))}
+          </ul>
+          {agentsMd[0] && claudeMd.length === 0 && (
+            <Callout.Root color="orange" size="1">
+              <Callout.Icon>
+                <IconWarning />
+              </Callout.Icon>
+              <Callout.Text>
+                {t(
+                  'O Claude Code está lendo o {path}. Criar um CLAUDE.md ou CLAUDE.local.md faz ele parar de ler, a menos que o arquivo novo importe com @{path}.',
+                  { path: agentsMd[0].location },
+                )}
+              </Callout.Text>
+            </Callout.Root>
+          )}
         </div>
       )}
     </SettingsCard>

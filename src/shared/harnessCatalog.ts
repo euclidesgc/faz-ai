@@ -39,8 +39,16 @@ interface SourceMeta {
   loads?: 'always' | 'on-demand';
   /** `managed`: pasta da política da organização, que depende do sistema (ver `managedDir`) */
   base?: 'managed';
-  /** o board não oferece criar o arquivo (a ferramenta ou a organização é que o mantém) */
+  /**
+   * o board não oferece criar o arquivo: a ferramenta ou a organização é que o mantém, ou é só um lugar
+   * alternativo de outro arquivo (o `.claude/CLAUDE.md` faz o papel do `CLAUDE.md`)
+   */
   noCreate?: boolean;
+  /**
+   * Papel do arquivo na regra do Claude Code para o AGENTS.md: por padrão (Project instructions =
+   * claude-md-or-agents-md), ele só lê o `agents-md` do projeto quando não há nenhum `claude-md`.
+   */
+  role?: 'claude-md' | 'agents-md';
 }
 
 /**
@@ -119,7 +127,8 @@ const CLAUDE_AGENT = 'Ajudante com instruções próprias, para o qual o Claude 
 const CLAUDE_COMMAND = 'Prompt pronto, chamado digitando /nome na conversa.';
 const CLAUDE_PERMISSIONS = 'O que a IA pode fazer sem perguntar (allow), deve perguntar antes (ask) ou nunca pode fazer (deny).';
 const CLAUDE_STYLE = 'Muda o jeito de o Claude Code responder (tom, formato); escolhido com /output-style.';
-const AGENTS_MD = 'Instruções no padrão aberto AGENTS.md; o Claude Code as lê quando o projeto não tem CLAUDE.md.';
+const AGENTS_MD =
+  'Instruções no padrão aberto AGENTS.md, lidas também pelo Cursor; o Claude Code só as lê quando o projeto não tem CLAUDE.md.';
 const CURSOR_SKILL = 'Instruções e arquivos de apoio que o Cursor carrega quando a tarefa pede; só a descrição fica sempre à vista.';
 const CURSOR_AGENT = 'Ajudante com instruções próprias, para o qual o Cursor delega partes do trabalho.';
 
@@ -128,16 +137,20 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
     file('instructions', 'project', 'CLAUDE.md', {
       group: 'main',
       loads: 'always',
+      role: 'claude-md',
       hint: 'Regras do projeto que o Claude Code lê no começo de toda conversa; vão no repositório.',
     }),
     file('instructions', 'project', '.claude/CLAUDE.md', {
       group: 'main',
       loads: 'always',
+      role: 'claude-md',
+      noCreate: true,
       hint: 'O mesmo que o CLAUDE.md da raiz, guardado na pasta .claude; também entra em toda conversa.',
     }),
     file('instructions', 'project', 'CLAUDE.local.md', {
       group: 'main',
       loads: 'always',
+      role: 'claude-md',
       hint: 'Suas regras pessoais para este projeto, lidas em toda conversa; ficam fora do repositório.',
     }),
     files('instructions', 'project', '.claude/rules', '.md', {
@@ -193,8 +206,14 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
       hint: 'Suas configurações do Claude Code, em todos os projetos.',
     }),
     files('settings', 'user', '.claude/output-styles', '.md', { group: 'style', hint: CLAUDE_STYLE }),
-    file('instructions', 'project', 'AGENTS.md', { group: 'main', loads: 'always', hint: AGENTS_MD }),
-    file('instructions', 'project', '.claude/AGENTS.md', { group: 'main', loads: 'always', hint: AGENTS_MD }),
+    file('instructions', 'project', 'AGENTS.md', { group: 'main', loads: 'always', role: 'agents-md', hint: AGENTS_MD }),
+    file('instructions', 'project', '.claude/AGENTS.md', {
+      group: 'main',
+      loads: 'always',
+      role: 'agents-md',
+      noCreate: true,
+      hint: AGENTS_MD,
+    }),
     files('memory', 'user', '.claude/projects/{project}/memory', '.md', {
       group: 'memory',
       noCreate: true,
@@ -316,6 +335,22 @@ export function managedDir(platform: string): string {
   if (platform === 'darwin') return '/Library/Application Support/ClaudeCode';
   if (platform === 'win32') return 'C:\\Program Files\\ClaudeCode';
   return '/etc/claude-code';
+}
+
+/**
+ * Os arquivos de instruções do projeto que decidem se o Claude Code lê o AGENTS.md: os `claude-md` e os
+ * `agents-md`, na ordem do catálogo (o `CLAUDE.md` da raiz, onde um `@AGENTS.md` costuma ir, vem primeiro).
+ */
+export function instructionRoles<T extends { source?: number }>(tool: AiTool, items: T[]): { claudeMd: T[]; agentsMd: T[] } {
+  const role = (i: T) => (i.source === undefined ? undefined : HARNESS_CATALOG[tool][i.source]?.role);
+  const sorted = [...items].sort((x, y) => (x.source ?? 0) - (y.source ?? 0));
+  return { claudeMd: sorted.filter((i) => role(i) === 'claude-md'), agentsMd: sorted.filter((i) => role(i) === 'agents-md') };
+}
+
+/** Caminho para importar `to` com `@` de dentro de `from`, os dois relativos à raiz do projeto. */
+export function importPath(from: string, to: string): string {
+  const dir = from.slice(0, from.lastIndexOf('/') + 1);
+  return to.startsWith(dir) ? to.slice(dir.length) : '../'.repeat(dir.split('/').length - 1) + to;
 }
 
 /** Nome da pasta de um projeto em `~/.claude/projects`: o caminho com tudo que não é letra ou número trocado por hífen. */

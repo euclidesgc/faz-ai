@@ -47,6 +47,16 @@ const CLAUDE_ITEMS: HarnessItem[] = [
   }),
 ];
 
+const agentsMd = item({ kind: 'instructions', name: 'AGENTS.md', location: 'AGENTS.md', source: sourceOf('claude', 'AGENTS.md', 'main') });
+
+/** Troca os itens do Claude Code no inventário. */
+const setClaudeItems = (items: HarnessItem[]) => {
+  const s = useBoardStore.getState().state!;
+  useBoardStore.setState({
+    state: { ...s, harness: { ...s.harness, inventory: s.harness.inventory.map((x) => (x.tool === 'claude' ? { ...x, items } : x)) } },
+  });
+};
+
 beforeEach(async () => {
   await seedBoard();
   const s = useBoardStore.getState().state!;
@@ -97,8 +107,50 @@ describe('HarnessScopeView: Projeto', () => {
       name: '',
       description: '',
     });
-    // o CLAUDE.md já existe: não é oferecido de novo
-    expect(card('Regras principais').queryByRole('button', { name: 'Criar CLAUDE.md' })).toBeNull();
+    // o CLAUDE.md já existe: não é oferecido de novo; os lugares alternativos e o AGENTS.md também não
+    for (const path of ['CLAUDE.md', '.claude/CLAUDE.md', 'AGENTS.md', '.claude/AGENTS.md'])
+      expect(card('Regras principais').queryByRole('button', { name: `Criar ${path}` })).toBeNull();
+  });
+
+  it('num projeto sem regras, oferece só o CLAUDE.md, o CLAUDE.local.md e o AGENTS.md, cada um com a sua frase', () => {
+    setClaudeItems([]);
+    renderThemed(<HarnessScopeView scope="project" />);
+    const main = card('Regras principais');
+    const offered = main.getAllByRole('button', { name: /^Criar / }).map((b) => b.textContent);
+    expect(offered).toEqual(['Criar CLAUDE.md', 'Criar CLAUDE.local.md', 'Criar AGENTS.md']);
+    expect(
+      main.getByText('Suas regras pessoais para este projeto, lidas em toda conversa; ficam fora do repositório.'),
+    ).toBeInTheDocument();
+    expect(main.getByText(/lidas também pelo Cursor/)).toBeInTheDocument();
+  });
+
+  it('com AGENTS.md e sem CLAUDE.md, avisa que criar um CLAUDE.md faz o Claude Code parar de lê-lo', () => {
+    setClaudeItems([agentsMd]);
+    renderThemed(<HarnessScopeView scope="project" />);
+    const main = card('Regras principais');
+    expect(
+      main.getByText(/Criar um CLAUDE.md ou CLAUDE.local.md faz ele parar de ler, a menos que o arquivo novo importe com @AGENTS.md/),
+    ).toBeInTheDocument();
+    expect(main.getByRole('button', { name: 'Criar CLAUDE.md' })).toBeInTheDocument();
+    expect(main.getByText('sempre carregado')).toBeInTheDocument();
+    expect(main.queryByText('não lido pelo Claude Code')).toBeNull();
+  });
+
+  it('com CLAUDE.md e AGENTS.md, marca o AGENTS.md como não lido e diz como importar', () => {
+    setClaudeItems([CLAUDE_ITEMS[0]!, agentsMd]);
+    renderThemed(<HarnessScopeView scope="project" />);
+    const main = card('Regras principais');
+    expect(main.getByText('não lido pelo Claude Code')).toBeInTheDocument();
+    expect(main.getByText(/porque o projeto tem CLAUDE.md. Para ler os dois, importe com @AGENTS.md no CLAUDE.md/)).toBeInTheDocument();
+    // só o CLAUDE.md continua sempre carregado
+    expect(main.getAllByText('sempre carregado')).toHaveLength(1);
+    expect(main.queryByText(/faz ele parar de ler/)).toBeNull();
+  });
+
+  it('no Cursor, o AGENTS.md não tem o aviso do Claude Code', async () => {
+    renderThemed(<HarnessScopeView scope="project" />);
+    await userEvent.click(screen.getByRole('radio', { name: 'Cursor' }));
+    expect(card('Regras principais').queryByText(/faz ele parar de ler/)).toBeNull();
   });
 
   it('o seletor mostra a outra ferramenta, sem a marcação das execuções', async () => {

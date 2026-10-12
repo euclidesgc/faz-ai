@@ -64,7 +64,12 @@ export const harness: Record<string, string> = {
   'Novo servidor': 'New server',
   'sem arquivo': 'no file',
   'Nada aqui ainda.': 'Nothing here yet.',
-  'A ferramenta também leria, se existissem:': 'The tool would also read, if they existed:',
+  'Você pode criar:': 'You can create:',
+  'não lido pelo Claude Code': 'not read by Claude Code',
+  'Por padrão, o Claude Code não lê este arquivo nas suas conversas, porque o projeto tem {claude}. Para ler os dois, importe com @{path} no {claude} ou mude Project instructions no /config do Claude Code.':
+    'By default, Claude Code does not read this file in your conversations, because the project has {claude}. To read both, import it with @{path} in {claude} or change Project instructions in Claude Code /config.',
+  'O Claude Code está lendo o {path}. Criar um CLAUDE.md ou CLAUDE.local.md faz ele parar de ler, a menos que o arquivo novo importe com @{path}.':
+    'Claude Code is reading {path}. Creating a CLAUDE.md or CLAUDE.local.md makes it stop, unless the new file imports it with @{path}.',
   'Criar {path}': 'Create {path}',
   'Tudo que a ferramenta de IA lê nesta pasta, por tipo: vai no repositório (menos os arquivos locais e a memória). Clique no caminho para abrir o arquivo aqui mesmo e editar. Nas rules e skills, escolha como as execuções do board usam cada uma; o que fica fora não existe para elas.':
     'Everything the AI tool reads in this folder, by type: it goes in the repository (except local files and memory). Click the path to open the file right here and edit it. For rules and skills, choose how board runs use each one; what is left out does not exist for them.',

@@ -2626,12 +2626,26 @@ body.host-web .drawer {
 .harness-tool-picker {
   margin: var(--sp-8) 0 var(--sp-12);
 }
+.item-unread {
+  color: var(--warn-border);
+}
 .harness-absent {
+  display: grid;
+  gap: var(--sp-6);
+  margin-top: var(--sp-8);
+}
+.harness-absent ul {
+  display: grid;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.harness-absent li {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-4) var(--sp-8);
-  margin-top: var(--sp-8);
+  align-items: baseline;
+  gap: var(--sp-4) var(--sp-12);
 }
 .harness-missing {
   display: inline-flex;

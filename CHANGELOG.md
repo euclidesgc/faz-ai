@@ -23,8 +23,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   regras principais, regras por assunto, memória, skills, subagentes, comandos, hooks, servidores
   MCP, configurações e permissões, e estilos de saída. Cada item diz o que é numa frase, mostra se é
   sempre carregado ou sob demanda e traz o caminho, que abre o arquivo no editor do board. Os arquivos
-  que a ferramenta leria e ainda não existem (como o `CLAUDE.local.md`) aparecem com o botão de criar,
-  e o arquivo novo já abre no editor. Um seletor mostra o que o Claude Code ou o Cursor carregam. Nas
+  que a ferramenta leria e ainda não existem aparecem com o botão de criar e a frase de cada um, e o
+  arquivo novo já abre no editor. Em Regras principais, o board oferece o `CLAUDE.md`, o
+  `CLAUDE.local.md` e, só quando o projeto não tem `CLAUDE.md`, o `AGENTS.md`. Se o projeto tem os
+  dois, o `AGENTS.md` aparece como não lido pelo Claude Code, com o `@import` que faz ele entrar; se
+  tem só o `AGENTS.md`, o board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo. Um seletor mostra o que o Claude Code ou o Cursor carregam. Nas
   rules e skills, o uso nas execuções do board vira uma escolha na própria linha.
 - **O harness completo de cada ferramenta.** O board passa a encontrar também o `AGENTS.md` (e o
   `.claude/AGENTS.md`), que o Claude Code lê quando o projeto não tem `CLAUDE.md`; a memória automática
