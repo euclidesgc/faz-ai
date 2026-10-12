@@ -2581,15 +2581,27 @@ body.host-web .drawer {
 .scope-summary {
   margin-left: var(--sp-4);
 }
-.bulk-bar {
+.item-list-head {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-8);
-  margin-top: var(--sp-6);
-  padding: var(--sp-6) var(--sp-8);
-  background: var(--hover);
-  border-radius: var(--radius);
+  align-items: center;
+  gap: var(--sp-4) var(--sp-8);
+  min-height: 32px;
+  padding: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+.item-check-all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-12);
+  margin-right: var(--sp-8);
+  cursor: pointer;
+}
+.bulk-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
 }
 .item-list {
   list-style: none;

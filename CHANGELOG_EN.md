@@ -28,9 +28,7 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   and dependency folders.
 - **The "Tudo que a ferramenta carrega" (everything the tool loads) tab is gone.** What it showed now
   lives in the Projeto and Global tabs, in groups and with each item's sentence; the MCP server, hook
-  and permission rule forms and the skill search moved along. Bulk selection (marking several items
-  to copy, change mode or delete at once) went with it: the same actions remain on each row. The
-  unregistered MCP notice leads to the Projeto tab.
+  and permission rule forms and the skill search moved along. The unregistered MCP notice leads to the Projeto tab.
 - **New Global tab in the AI harness.** The same layout as the Projeto tab for what applies to all your
   projects: the groups from your user folder, the installed **Plugins** (one block per plugin, with
   what each one brings) and **Organização** (Organization), with the company's managed policy,
@@ -47,6 +45,10 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   only `AGENTS.md`, the board warns that creating a `CLAUDE.md` makes Claude Code stop reading it. A
   selector shows what Claude Code or Cursor loads.
   For rules and skills, how board runs use them becomes a choice on the row itself.
+- **Bulk actions in the Harness.** Every group in the Projeto and Global tabs has checkboxes, and the
+  one at the top checks them all. The bar shows only the actions that apply to what is checked: use
+  in board runs, skill mode, copying to the project or global, deleting files and removing hook,
+  permission and MCP entries. Deleting and removing ask for confirmation.
 - **The harness editor no longer loads forever.** If the board does not answer the file read within
   8 seconds, the modal stops loading and says what to do: when the extension package is reinstalled
   without reloading the window, the new screen talks to the old host, which does not know the

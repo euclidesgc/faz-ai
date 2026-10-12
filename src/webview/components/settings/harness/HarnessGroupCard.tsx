@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Badge, Button, Callout } from '@radix-ui/themes';
+import { Badge, Button, Callout, Checkbox } from '@radix-ui/themes';
 import { REFERENCE_SKILL, aiToolInfo, type AiTool, type HarnessItem, type InstallScope } from '../../../../shared/harness';
 import {
   HARNESS_CATALOG,
@@ -20,6 +20,7 @@ import { IconWarning, SelectField } from '../../ui';
 import { SettingsCard } from '../SettingsCard';
 import { AgentsTable } from './AgentsTable';
 import { BoardInstall } from './BoardInstall';
+import { BulkActions, bulkSelectable } from './BulkActions';
 import { InstallSkills } from './InstallSkills';
 import { ItemRow } from './ItemRow';
 import { NewHook } from './NewHook';
@@ -74,6 +75,8 @@ interface Props {
 export function HarnessGroupCard({ group, tool, scope, items, all, actions, open, onOpen }: Props) {
   const state = useBoardStore((s) => s.state)!;
   const [filesOpen, setFilesOpen] = useState<string | null>(null);
+  // linhas marcadas para as ações em massa, pela chave da linha
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const g = group.id;
   const projectTool = tool === state.board.aiTool;
   const catalog = HARNESS_CATALOG[tool];
@@ -103,6 +106,19 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
   const permissions = g === 'settings' ? permissionTargets(tool).filter((x) => x.scope === scope) : [];
   // os agentes da ferramenta do projeto têm a tabela própria, com a marcação, o padrão e o editor do board
   const agentsTable = g === 'agent' && projectTool && !!aiToolInfo(tool).agents;
+
+  // plugins e a política da organização são só leitura; os agentes da ferramenta do projeto têm a tabela própria
+  const pickable = g === 'plugin' || g === 'managed' || agentsTable ? [] : items.filter((i) => bulkSelectable(i, actions, projectTool));
+  const chosen = pickable.filter((i) => picked.has(keyOf(i)));
+  const pick = (list: HarnessItem[], on: boolean) =>
+    setPicked((cur) => {
+      const next = new Set(cur);
+      for (const i of list) {
+        if (on) next.add(keyOf(i));
+        else next.delete(keyOf(i));
+      }
+      return next;
+    });
 
   if (g === 'managed' && items.length === 0 && notes.length === 0) return null;
   if (g !== 'plugin' && items.length === 0 && sources.length === 0 && notes.length === 0) return null;
@@ -234,35 +250,54 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
           );
         })
       ) : (
-        <ul className="item-list">
-          {items.map((i) => (
-            <ItemRow
-              key={keyOf(i)}
-              tool={tool}
-              item={i}
-              actions={actions}
-              explain
-              unread={unread(i)}
-              usage={projectTool ? <UsageSelect item={i} /> : undefined}
-              filesOpen={filesOpen === i.path}
-              onToggleFiles={() => setFilesOpen(filesOpen === i.path ? null : i.path)}
-            />
-          ))}
-          {notes.map((n) => (
-            <li key={n.name} className="item-row harness-note">
-              <span className="item-check" />
-              <div className="item-main">
-                <div className="item-title">
-                  <span className="item-name">{t(n.name)}</span>
-                  <Badge color="gray" variant="outline">
-                    {t('sem arquivo')}
-                  </Badge>
+        <>
+          {pickable.length > 0 && (
+            <div className="item-list-head" role="toolbar" aria-label={t('Ações nos itens marcados')}>
+              <label className="item-check-all">
+                <Checkbox
+                  aria-label={t('Selecionar todos: {group}', { group: t(group.label) })}
+                  checked={chosen.length === pickable.length ? true : chosen.length > 0 ? 'indeterminate' : false}
+                  onCheckedChange={(v) => pick(pickable, v === true)}
+                />
+                <span className="muted small">{chosen.length > 0 ? t('{n} marcados', { n: chosen.length }) : t('Selecionar todos')}</span>
+              </label>
+              {chosen.length > 0 && (
+                <BulkActions items={chosen} actions={actions} projectTool={projectTool} onDone={() => setPicked(new Set())} />
+              )}
+            </div>
+          )}
+          <ul className="item-list">
+            {items.map((i) => (
+              <ItemRow
+                key={keyOf(i)}
+                tool={tool}
+                item={i}
+                actions={actions}
+                selected={picked.has(keyOf(i))}
+                onSelect={pickable.includes(i) ? (on) => pick([i], on) : undefined}
+                explain
+                unread={unread(i)}
+                usage={projectTool ? <UsageSelect item={i} /> : undefined}
+                filesOpen={filesOpen === i.path}
+                onToggleFiles={() => setFilesOpen(filesOpen === i.path ? null : i.path)}
+              />
+            ))}
+            {notes.map((n) => (
+              <li key={n.name} className="item-row harness-note">
+                <span className="item-check" />
+                <div className="item-main">
+                  <div className="item-title">
+                    <span className="item-name">{t(n.name)}</span>
+                    <Badge color="gray" variant="outline">
+                      {t('sem arquivo')}
+                    </Badge>
+                  </div>
+                  <p className="item-explain">{t(n.hint)}</p>
                 </div>
-                <p className="item-explain">{t(n.hint)}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       {!agentsTable && items.length === 0 && notes.length === 0 && <p className="muted small scope-empty">{t('Nada aqui ainda.')}</p>}
       {absent.length > 0 && (

@@ -61,6 +61,13 @@ export const harness: Record<string, string> = {
   'sem arquivo': 'no file',
   'Nada aqui ainda.': 'Nothing here yet.',
   'Você pode criar:': 'You can create:',
+  'Uso nas execuções do board': 'Use in board runs',
+  'Modo da skill': 'Skill mode',
+  'Ações nos itens marcados': 'Actions on the checked items',
+  'Selecionar todos: {group}': 'Select all: {group}',
+  '{n} marcados': '{n} checked',
+  'Selecionar todos': 'Select all',
+  'Remover {n} entradas?': 'Remove {n} entries?',
   'O board não respondeu. Se a extensão acabou de ser atualizada, recarregue a janela (no VS Code, Developer: Reload Window) e abra o arquivo de novo.':
     'The board did not reply. If the extension was just updated, reload the window (in VS Code, Developer: Reload Window) and open the file again.',
   'não lido pelo Claude Code': 'not read by Claude Code',

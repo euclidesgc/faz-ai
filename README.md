@@ -824,6 +824,13 @@ board**:
   dos agentes), e o **Refinar com IA** a indica quando o pedido pede.
 - **Fora das execuções**: a execução não o vê, mesmo que a ferramenta o carregue numa conversa sua.
 
+**Ações em massa.** Cada linha que aceita alguma ação tem uma caixa, e a do topo do grupo marca todas.
+A barra que aparece mostra só o que vale para o que foi marcado: o uso nas execuções do board (rules
+e skills), o modo da skill, copiar para o projeto ou para o global, **Apagar** (arquivos e pastas) e
+**Remover** (entradas de hook, regra de permissão e servidor MCP). Quando uma ação vale só para
+parte dos marcados, o botão diz para quantos. Apagar e remover pedem confirmação antes. Plugins e
+a política da organização, que são só leitura, não têm caixa.
+
 Os subagentes da ferramenta do projeto têm a tabela própria, com **Disponível no board**, o padrão e
 o editor dos campos do board. Uma marcação cujo arquivo sumiu aparece num aviso no topo da aba, com
 **Desmarcar**. Skills e agentes criados ou instalados pelo board já nascem marcados. O que ainda

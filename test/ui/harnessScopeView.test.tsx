@@ -1,4 +1,4 @@
-import { lastSent, renderThemed, seedBoard } from './setup';
+import { lastSent, renderThemed, seedBoard, sentOf } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -243,5 +243,101 @@ describe('HarnessScopeView: Global', () => {
     expect(main.getByText('User Rules')).toBeInTheDocument();
     expect(main.getByText('sem arquivo')).toBeInTheDocument();
     expect(card('Organização').getByText('Team Rules')).toBeInTheDocument();
+  });
+});
+
+describe('HarnessScopeView: ações em massa', () => {
+  const skill = (name: string) =>
+    item({
+      kind: 'skill',
+      name,
+      location: `.claude/skills/${name}/SKILL.md`,
+      layout: 'skills',
+      mode: 'auto',
+      source: sourceOf('claude', '.claude/skills'),
+    });
+  const hook = (command: string) =>
+    item({
+      kind: 'hook',
+      name: 'PreToolUse',
+      detail: command,
+      location: '.claude/settings.json',
+      path: '/abs/.claude/settings.json',
+      layout: 'entry',
+      source: HARNESS_CATALOG.claude.findIndex((s) => s.group === 'hook' && s.scope === 'project' && s.path === '.claude/settings.json'),
+    });
+
+  it('o do topo marca todos e as ações mudam o uso de todos de uma vez', async () => {
+    setClaudeItems([skill('commit'), skill('revisar')]);
+    renderThemed(<HarnessScopeView scope="project" />);
+    const skills = card('Skills');
+    await userEvent.click(skills.getByRole('checkbox', { name: 'Selecionar todos: Skills' }));
+    expect(skills.getByRole('checkbox', { name: 'Selecionar commit' })).toBeChecked();
+    expect(skills.getByRole('checkbox', { name: 'Selecionar revisar' })).toBeChecked();
+    expect(skills.getByText('2 marcados')).toBeInTheDocument();
+    await userEvent.click(skills.getByRole('button', { name: 'Incluir em todo contexto' }));
+    expect(lastSent('harness.selection.set')).toEqual({
+      type: 'harness.selection.set',
+      items: [
+        { kind: 'skill', location: '.claude/skills/commit/SKILL.md' },
+        { kind: 'skill', location: '.claude/skills/revisar/SKILL.md' },
+      ],
+      usage: 'always',
+    });
+    // feita a ação, a seleção é limpa
+    expect(skills.getByRole('checkbox', { name: 'Selecionar commit' })).not.toBeChecked();
+  });
+
+  it('nas skills, muda o modo de invocação das marcadas', async () => {
+    setClaudeItems([skill('commit'), skill('revisar')]);
+    renderThemed(<HarnessScopeView scope="project" />);
+    const skills = card('Skills');
+    await userEvent.click(skills.getByRole('checkbox', { name: 'Selecionar revisar' }));
+    expect(skills.getByRole('checkbox', { name: 'Selecionar todos: Skills' })).toHaveAttribute('data-state', 'indeterminate');
+    await userEvent.click(skills.getByRole('button', { name: 'Só quando indicada' }));
+    expect(lastSent('harness.skill.setMode')).toMatchObject({ paths: ['/abs/.claude/skills/revisar/SKILL.md'], mode: 'manual' });
+  });
+
+  it('apagar pede confirmação antes e só então apaga todos', async () => {
+    setClaudeItems([skill('commit'), skill('revisar')]);
+    renderThemed(<HarnessScopeView scope="project" />);
+    const skills = card('Skills');
+    await userEvent.click(skills.getByRole('checkbox', { name: 'Selecionar todos: Skills' }));
+    const bar = within(skills.getByRole('toolbar', { name: 'Ações nos itens marcados' }));
+    await userEvent.click(bar.getByRole('button', { name: 'Apagar' }));
+    const dialog = useBoardStore.getState().dialog!;
+    expect(dialog.title).toBe('Apagar 2 itens?');
+    expect(sentOf('harness.item.delete')).toEqual([]);
+    act(() => dialog.onConfirm());
+    expect(sentOf('harness.item.delete').map((m) => m.path)).toEqual([
+      '/abs/.claude/skills/commit/SKILL.md',
+      '/abs/.claude/skills/revisar/SKILL.md',
+    ]);
+  });
+
+  it('nos hooks, a ação é remover as entradas do arquivo, também com confirmação', async () => {
+    setClaudeItems([hook('npm test'), hook('npm run lint')]);
+    renderThemed(<HarnessScopeView scope="project" />);
+    const hooks = card('Hooks');
+    await userEvent.click(hooks.getByRole('checkbox', { name: 'Selecionar todos: Hooks' }));
+    // hook não tem uso nas execuções, modo nem cópia
+    expect(hooks.queryByRole('button', { name: 'Incluir em todo contexto' })).toBeNull();
+    expect(hooks.queryByRole('button', { name: 'Apagar' })).toBeNull();
+    await userEvent.click(hooks.getByRole('button', { name: 'Remover' }));
+    act(() => useBoardStore.getState().dialog!.onConfirm());
+    expect(sentOf('harness.hook.remove').map((m) => m.command)).toEqual(['npm test', 'npm run lint']);
+  });
+
+  it('o que não tem ação em massa fica sem caixa', () => {
+    setClaudeItems([
+      item({
+        kind: 'settings',
+        name: 'settings.json',
+        location: '.claude/settings.json',
+        source: sourceOf('claude', '.claude/settings.json', 'settings'),
+      }),
+    ]);
+    renderThemed(<HarnessScopeView scope="project" />);
+    expect(card('Configurações e permissões').queryByRole('checkbox')).toBeNull();
   });
 });

@@ -26,8 +26,7 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   de dependências.
 - **Sai a aba "Tudo que a ferramenta carrega".** O que ela mostrava agora está nas abas Projeto e
   Global, em grupos e com a frase de cada item; os formulários de servidor MCP, hook, regra de
-  permissão e a busca de skills foram junto. A seleção em massa (marcar vários itens e copiar, mudar o
-  modo ou apagar de uma vez) saiu com ela: as mesmas ações seguem em cada linha. O aviso de MCP não
+  permissão e a busca de skills foram junto. O aviso de MCP não
   registrado leva para a aba Projeto.
 - **Nova aba Global no Harness de IA.** O mesmo modelo da aba Projeto para o que vale em todos os
   seus projetos: os grupos da pasta do usuário, os **Plugins** instalados (um bloco por plugin, com o
@@ -44,6 +43,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   dois, o `AGENTS.md` aparece como não lido pelo Claude Code, com o `@import` que faz ele entrar; se
   tem só o `AGENTS.md`, o board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo. Um seletor mostra o que o Claude Code ou o Cursor carregam. Nas
   rules e skills, o uso nas execuções do board vira uma escolha na própria linha.
+- **Ações em massa no Harness.** Cada grupo das abas Projeto e Global tem caixas de seleção, e a do
+  topo marca todos. A barra mostra só as ações que valem para o que foi marcado: uso nas execuções do
+  board, modo da skill, copiar para o projeto ou o global, apagar arquivos e remover entradas de
+  hook, permissão e MCP. Apagar e remover pedem confirmação.
 - **Editor do harness não fica carregando para sempre.** Se o board não responde à leitura do
   arquivo em 8 segundos, a modal para de carregar e diz o que fazer: quando o pacote da extensão é
   reinstalado sem recarregar a janela, a tela nova conversa com o host antigo, que não conhece o
