@@ -4,7 +4,7 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+## 0.35.0
 
 - **Diagnóstico do ambiente vira uma lista de conferência, sem instalador.** O **Instalar tudo**
   saiu: o board não instala mais nada de terceiros, só o próprio MCP e a skill do fluxo. A tela agora
