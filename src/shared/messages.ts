@@ -195,6 +195,10 @@ export type WebviewToHost =
   | { type: 'harness.refresh' }
   /** abre no editor o arquivo de um item do harness */
   | { type: 'harness.item.open'; path: string }
+  /** lê, para o editor do board, um arquivo que a varredura do harness listou */
+  | { type: 'harness.file.read'; requestId: string; path: string }
+  /** grava o texto editado no board num arquivo do harness; recusa os que são só leitura */
+  | { type: 'harness.file.write'; requestId: string; path: string; content: string }
   /** cria um item num lugar do catálogo da ferramenta (`source` é o índice em HARNESS_CATALOG) e abre o arquivo no editor */
   | { type: 'harness.item.create'; tool: AiTool; source: number; name: string; description: string }
   /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
@@ -285,6 +289,10 @@ export type HostToWebview =
   | { type: 'attachment.readResult'; requestId: string; content?: string; error?: string }
   /** resposta a `attachment.write`, correlacionada por `requestId` */
   | { type: 'attachment.writeResult'; requestId: string; ok: boolean; error?: string }
+  /** resposta a `harness.file.read`: o conteúdo e se o arquivo pode ser alterado pelo board */
+  | { type: 'harness.file.readResult'; requestId: string; content?: string; readonly?: boolean; error?: string }
+  /** resposta a `harness.file.write`, correlacionada por `requestId` */
+  | { type: 'harness.file.writeResult'; requestId: string; ok: boolean; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */

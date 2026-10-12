@@ -95,6 +95,8 @@ export const host: Record<string, string> = {
   'Anexo não encontrado': 'Attachment not found',
   'Esta história ainda não tem pasta de trabalho.': 'This story does not have a working folder yet.',
   'Arquivo fora do harness.': 'File outside the harness.',
+  'Arquivo maior que 512 KB: abra no editor.': 'File larger than 512 KB: open it in the editor.',
+  'Este arquivo não pode ser alterado pelo board.': 'This file cannot be changed by the board.',
 
   // backup do board (exportar e importar)
   'Board exportado em {path}. O arquivo contém conversas e anexos: guarde-o com cuidado.':

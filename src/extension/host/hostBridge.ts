@@ -182,6 +182,29 @@ export class HostBridge {
           await this.env.openFile(msg.path);
           return;
         }
+        case 'harness.file.read': {
+          try {
+            const { content, readonly } = this.router.readHarnessFile(msg.path);
+            this.post({ type: 'harness.file.readResult', requestId: msg.requestId, content, readonly });
+          } catch (e) {
+            this.post({ type: 'harness.file.readResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+          }
+          return;
+        }
+        case 'harness.file.write': {
+          try {
+            this.router.writeHarnessFile(msg.path, msg.content);
+            this.post({ type: 'harness.file.writeResult', requestId: msg.requestId, ok: true });
+          } catch (e) {
+            this.post({
+              type: 'harness.file.writeResult',
+              requestId: msg.requestId,
+              ok: false,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+          return;
+        }
         case 'harness.skill.file.create':
           await this.env.openFile(this.router.createSkillFile(msg.tool, msg.path, msg.file, msg.link));
           return;

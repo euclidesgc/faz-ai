@@ -21,6 +21,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   command) got an outline and the buttons on the screen are no longer the small size. At the top, **Ir
   para o board** (Go to the board) is the main button and **Verificar de novo** (Check again) is no
   longer a faint one.
+- **Harness files open in the board.** Clicking the path of a rule, skill, agent, command or settings
+  file in the AI harness opens the file in a window of the board itself, like attachments: formatted
+  Markdown or code, editing with save and cancel, and an **Abrir no editor** (Open in editor) button for
+  those who prefer the editor. Invalid JSON is not saved, and files from plugins and `~/.claude.json`
+  open read-only.
 - **Merge detection happens in the heartbeat.** The **Concluir a história quando o pull request for
   mergeado** (Complete the story when the pull request is merged) option and its own interval (15
   minutes) left the Git settings, along with the `fazai.git.watchMerges` and

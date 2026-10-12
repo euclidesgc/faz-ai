@@ -97,6 +97,8 @@ interface BoardStore extends UiState, ViewState {
   dialog: DialogSpec | null;
   /** anexo aberto na modal; null quando não há modal de anexo na tela */
   attachmentModal: AttachmentModalState | null;
+  /** arquivo do harness aberto no editor do board (caminho absoluto, como a varredura o listou) */
+  harnessFile: string | null;
   /** backup do board em andamento: exportando, ou lendo o arquivo escolhido para importar */
   backupBusy: 'export' | 'import' | null;
   setBackupBusy(busy: 'export' | 'import' | null): void;
@@ -154,6 +156,8 @@ interface BoardStore extends UiState, ViewState {
   /** abre a modal de um anexo (visualização; a edição é escolhida dentro dela) */
   openAttachmentModal(attachmentId: Id): void;
   closeAttachmentModal(): void;
+  openHarnessFile(path: string): void;
+  closeHarnessFile(): void;
 }
 
 const persisted = getUiState<Partial<UiState>>();
@@ -172,6 +176,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     notice: null,
     dialog: null,
     attachmentModal: null,
+    harnessFile: null,
     backupBusy: null,
     setBackupBusy: (backupBusy) => set({ backupBusy }),
     // o Diagnóstico é de passagem: ao reabrir, volta para o board
@@ -275,6 +280,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     ask: (dialog) => set({ dialog }),
     openAttachmentModal: (attachmentId) => set({ attachmentModal: { attachmentId } }),
     closeAttachmentModal: () => set({ attachmentModal: null }),
+    openHarnessFile: (harnessFile) => set({ harnessFile }),
+    closeHarnessFile: () => set({ harnessFile: null }),
   };
 });
 

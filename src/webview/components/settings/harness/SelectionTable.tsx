@@ -170,8 +170,8 @@ export function SelectionTable({ tool, scope, kind }: Props) {
                   <button
                     type="button"
                     className="path-link"
-                    title={t('Abre o arquivo no editor')}
-                    onClick={() => harness.openItem(i.path)}
+                    title={t('Abre o arquivo no board, para ler e editar')}
+                    onClick={() => useBoardStore.getState().openHarnessFile(i.path)}
                   >
                     {i.location}
                   </button>

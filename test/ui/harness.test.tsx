@@ -1,6 +1,6 @@
 import { choose, lastSent, posted, seedBoard, sentOf } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
@@ -208,7 +208,9 @@ describe('HarnessInventory', () => {
     renderScreen();
     const row = screen.getByText('global-skill').closest('li')!;
     await userEvent.click(within(row).getByRole('button', { name: '~/.claude/skills/global-skill/SKILL.md' }));
-    expect(lastSent('harness.item.open')).toEqual({ type: 'harness.item.open', path: '/abs/~/.claude/skills/global-skill/SKILL.md' });
+    // o caminho abre o arquivo no editor do board
+    expect(useBoardStore.getState().harnessFile).toBe('/abs/~/.claude/skills/global-skill/SKILL.md');
+    act(() => useBoardStore.getState().closeHarnessFile());
     await userEvent.click(within(row).getByRole('button', { name: 'Copiar para o projeto' }));
     expect(lastSent('harness.item.copy')).toEqual({
       type: 'harness.item.copy',
