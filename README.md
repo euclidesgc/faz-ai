@@ -272,8 +272,10 @@ MCP do board (global)** da paleta faz a instalação padrão na ferramenta do pr
 4. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
    board", "pegue a história #1 e escreva o PRD" ou "veja o que está pendente no board e dê andamento".
 
-Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, uma faixa amarela fica no topo
-do board, em todas as telas, e no painel de chat. Ela confere o Node.js (o servidor do board roda
+Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, a aba **Configurações** e o
+botão **Verificar ambiente** ganham um ícone de atenção. O hint dele resume o que falta, com o nome
+de cada item, e a explicação com a ação de cada um fica no Diagnóstico do ambiente. No painel de
+chat, que não tem as Configurações, fica uma faixa com os mesmos itens. A conferência olha o Node.js (o servidor do board roda
 com ele), a linha de comando da ferramenta, o login dela (no Cursor por `cursor-agent status`, no
 Claude Code por `claude auth status`), o
 registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
@@ -282,8 +284,7 @@ que não existe mais, para outra pasta ou para a ponte de uma versão anterior, 
 permissão. Cada item diz o efeito e traz a ação: o comando para copiar, **Instalar o MCP do board**
 (abre a seção Servidores MCP da ferramenta), **Corrigir o registro** (um registro quebrado no arquivo
 do projeto vale no lugar do global; corrigir tira ele dali e deixa o global valendo), **Recarregar a
-janela** ou o atalho para o Harness de IA. A faixa não
-fecha: some sozinha quando o último item é resolvido. A conferência roda ao abrir o board, quando a
+janela** ou o atalho para o Harness de IA. O ícone some sozinho quando o último item é resolvido. A conferência roda ao abrir o board, quando a
 ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**,
 que relê também o PATH do terminal (um node instalado com o board aberto é encontrado sem recarregar
 a janela), e diz quando nada mudou.
@@ -291,17 +292,17 @@ a janela), e diz quando nada mudou.
 O MCP do board e a skill do fluxo (`faz-ai-fluxo`) contam como requisito em todas as ferramentas:
 mesmo onde as execuções pelo board levam o MCP sozinhas (Claude, Cursor), a conversa no chat do
 editor ou no terminal depende dele, e a skill é o que faz a IA seguir o fluxo. A falta da skill tem o
-botão **Instalar a skill** na própria faixa. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
+botão **Instalar a skill** no Diagnóstico e na faixa do chat. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
 desligados, com o motivo na dica.
 
-**Login vencido: aviso de erro e retomada sozinha.** Quando o motivo da faixa é login (faltando ou
-vencido no meio de uma execução), ela fica com destaque de erro, em vez do amarelo comum, e ganha o
-botão **Abrir no terminal** ao lado do comando para copiar: o board abre um terminal do editor e roda
+**Login vencido: aviso de erro e retomada sozinha.** Quando o motivo do aviso é login (faltando ou
+vencido no meio de uma execução), o ícone de atenção fica vermelho, em vez do amarelo comum, e o
+item ganha o botão **Abrir no terminal** ao lado do comando para copiar: o board abre um terminal do editor e roda
 o comando ali, mas o login em si é sempre feito por você. Antes de cada chamada da IA (o botão do
 card, o heartbeat e o modo autônomo) o board confere o login de novo; se ele venceu, a execução nem
 começa. Quando o login vence no meio de uma execução, a primeira falha que bater um padrão conhecido ("OAuth session expired", "not logged in",
 "401" etc.) não bloqueia o card: ele volta ao status que tinha, com um comentário curto, e o mesmo
-aviso de erro liga no topo do board — o heartbeat e o modo autônomo não tentam de novo sozinhos
+aviso de erro liga — o heartbeat e o modo autônomo não tentam de novo sozinhos
 enquanto ele estiver ligado. O aviso some e a fila volta a andar sozinha quando o login é confirmado
 de novo (pela conferência periódica, em até 10 segundos depois de ligar, ou por **Já entrei:
 verificar de novo**) ou, quando a conferência não sabe dizer, na primeira execução manual que der
@@ -309,7 +310,7 @@ certo. O Diagnóstico do ambiente mostra o mesmo aviso no item **Login na linha 
 
 **Diagnóstico do ambiente.** Na primeira abertura do board na máquina, abre sozinha uma lista com
 tudo de que o board precisa e o que ele aproveita. Depois, ela abre pelo botão **Verificar
-ambiente**, nas Configurações, ou por **Ver o diagnóstico completo**, na faixa amarela. Cada item tem
+ambiente**, nas Configurações (com o ícone de atenção quando falta algo). Cada item tem
 um ícone de pronto ou de falta, e o que depende de outro item aparece dentro dele (o login dentro da
 linha de comando, o grafo dentro do Code Review Graph). Passe o mouse sobre um item para ver como o
 board o usa.
@@ -338,7 +339,7 @@ do board e a skill do fluxo, e abrir a escolha do nível de permissão.
 
 O chat do editor inicia o MCP do board com o PATH de quando o editor abriu: um Node instalado depois
 (pelo `nvm`, por exemplo) não está nele até o editor fechar e abrir de novo. Por isso, quando o Node
-aparece, ou pelo botão **Corrigir o caminho** da faixa amarela, o board grava o caminho completo do
+aparece, ou pelo botão **Corrigir o caminho** do item do MCP no Diagnóstico, o board grava o caminho completo do
 comando nos registros do `faz-ai` e do `code-review-graph` que o editor não acha. O caminho é descoberto na hora, na máquina onde
 a extensão roda, e o arquivo fica fora do git (`.git/info/exclude`). Se o arquivo de MCPs do projeto
 estiver versionado, o board não grava nele e explica as saídas.

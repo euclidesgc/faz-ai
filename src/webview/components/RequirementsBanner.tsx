@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { aiToolInfo } from '../../shared/harness';
 import type { BoardState } from '../../shared/model';
 import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
@@ -8,6 +8,9 @@ import { harness, ui } from '../commands';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { isWeb } from '../vscode';
 import { Button, IconCheck, IconConnect, IconWarning } from './ui';
+
+/** A cor do ícone de atenção: login vencido é erro, o resto que falta é atenção, e o que só é recomendado fica discreto. */
+export type RequirementsAlertLevel = 'error' | 'warn' | 'recommended';
 
 /** Título e explicação de cada requisito, no idioma da interface. */
 export function requirementTexts(r: BoardRequirement): { title: string; detail: string } {
@@ -172,12 +175,14 @@ export function CopyCommand({ command }: { command: string }) {
 export function aiBlockedReason(state: BoardState): string | null {
   if (state.aiRunUnsupported) return t(state.aiRunUnsupported);
   if (state.authExpired)
-    return t('O login do {tool} venceu: veja o aviso no topo do board.', { tool: aiToolInfo(state.authExpired).label });
+    return t('O login do {tool} venceu: veja em Configurações → Verificar ambiente.', { tool: aiToolInfo(state.authExpired).label });
   const cli = state.requirements.find((r) => r.id === 'cli' || r.id === 'signin');
   if (!cli) return null;
   return cli.id === 'cli'
-    ? t('A linha de comando do {tool} não foi encontrada: veja o aviso no topo do board.', { tool: aiToolInfo(cli.tool).label })
-    : t('A linha de comando do {tool} está sem login: veja o aviso no topo do board.', { tool: aiToolInfo(cli.tool).label });
+    ? t('A linha de comando do {tool} não foi encontrada: veja em Configurações → Verificar ambiente.', {
+        tool: aiToolInfo(cli.tool).label,
+      })
+    : t('A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.', { tool: aiToolInfo(cli.tool).label });
 }
 
 /** Se o requisito tem um botão ou comando que o resolve por aqui (na versão compacta, sem o atalho para as Configurações). */
@@ -319,32 +324,88 @@ function RecheckButton() {
   );
 }
 
-/**
- * O que falta para o board trabalhar com a ferramenta de IA. Fica visível em todas as telas enquanto
- * faltar alguma coisa, sem botão de fechar: some sozinho quando a última pendência é resolvida. O que
- * é só recomendado (não impede as execuções pelo board) não conta como pendência: sozinho, vira uma
- * caixa discreta (com a explicação) em vez da faixa de aviso.
- */
-export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
+/** O que falta para o board trabalhar com a IA, com o login que venceu no meio de uma execução. */
+function useRequirementItems(): { items: BoardRequirement[]; missing: number; authError: boolean } {
   const requirements = useBoardStore((s) => s.state?.requirements ?? []);
   const authExpired = useBoardStore((s) => s.state?.authExpired ?? null);
   // o sinal reativo (RF6) de um login que venceu no meio da execução pode não estar em `requirements`
   // (o probe não soube dizer): sem este item, a pessoa não veria o aviso
-  const items =
+  const items: BoardRequirement[] =
     authExpired && !requirements.some((r) => r.id === 'signin')
       ? [
           ...requirements,
           {
-            id: 'signin' as const,
+            id: 'signin',
             tool: authExpired,
             cli: CLI_COMMAND[authExpired],
-            action: { kind: 'command' as const, command: LOGIN_COMMAND[authExpired], terminal: true as const },
+            action: { kind: 'command', command: LOGIN_COMMAND[authExpired], terminal: true },
           },
         ]
       : requirements;
-  const missing = items.filter((r) => !r.optional).length;
-  // login vencido é mais urgente que os outros requisitos (para o board inteiro, não só um card): destaque de erro
-  const authError = requirements.some((r) => r.id === 'signin' && !r.optional) || authExpired !== null;
+  return {
+    items,
+    missing: items.filter((r) => !r.optional).length,
+    // login vencido é mais urgente que os outros requisitos (para o board inteiro, não só um card): destaque de erro
+    authError: requirements.some((r) => r.id === 'signin' && !r.optional) || authExpired !== null,
+  };
+}
+
+/** O resumo do aviso: quantos requisitos faltam, ou o passo que falta no Cursor, ou só o recomendado. */
+function requirementsSummary(items: BoardRequirement[], missing: number): string {
+  return missing === 0
+    ? t('Recomendado para a IA enxergar o board nas suas conversas')
+    : items.every((r) => r.id === 'mcp-reload' || r.id === 'mcp-enable')
+      ? t('Falta um passo para o chat do Cursor usar o board')
+      : missing === 1
+        ? t('Falta 1 requisito para o board trabalhar com a IA')
+        : t('Faltam {n} requisitos para o board trabalhar com a IA', { n: missing });
+}
+
+/**
+ * O aviso compacto do que falta, no lugar da faixa no topo do board: o ícone de atenção (na aba Configurações
+ * e no Verificar ambiente) e o hint dele, com o resumo e o nome de cada item. null quando não falta nada.
+ */
+export function useRequirementsAlert(): { level: RequirementsAlertLevel; label: string; hint: ReactNode } | null {
+  const { items, missing, authError } = useRequirementItems();
+  if (!items.length) return null;
+  const label = requirementsSummary(items, missing);
+  return {
+    level: missing ? (authError ? 'error' : 'warn') : 'recommended',
+    label,
+    hint: (
+      <>
+        <p>
+          <strong>{label}</strong>
+        </p>
+        <ul>
+          {items.map((r) => (
+            <li key={r.id}>{requirementTexts(r).title}</li>
+          ))}
+        </ul>
+        <p className="muted">{t('Veja como resolver em Configurações → Verificar ambiente.')}</p>
+      </>
+    ),
+  };
+}
+
+/** O ícone de atenção do aviso, ao lado do nome do botão; o resumo vai em texto para leitores de tela. */
+export function RequirementsAlertIcon({ level, label }: { level: RequirementsAlertLevel; label: string }) {
+  return (
+    <>
+      <IconWarning className={`requirements-alert ${level}`} aria-hidden />
+      <span className="sr-only">{label}</span>
+    </>
+  );
+}
+
+/**
+ * O que falta para o board trabalhar com a ferramenta de IA, com a explicação e a ação de cada item.
+ * No board, o aviso é o ícone de atenção de `useRequirementsAlert`; esta faixa fica no chat (compacta), que não tem
+ * as Configurações. Some sozinha quando a última pendência é resolvida. O que é só recomendado (não
+ * impede as execuções pelo board) não conta como pendência: sozinho, vira uma caixa discreta.
+ */
+export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
+  const { items, missing, authError } = useRequirementItems();
   // a lista muda (algo foi resolvido): o "nada mudou" de antes não vale mais
   const key = items.map((r) => r.id).join();
   if (!items.length) return null;
@@ -357,15 +418,7 @@ export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
     >
       <div className="requirements-head">
         {missing > 0 && <IconWarning />}
-        <strong role="status">
-          {missing === 0
-            ? t('Recomendado para a IA enxergar o board nas suas conversas')
-            : items.every((r) => r.id === 'mcp-reload' || r.id === 'mcp-enable')
-              ? t('Falta um passo para o chat do Cursor usar o board')
-              : missing === 1
-                ? t('Falta 1 requisito para o board trabalhar com a IA')
-                : t('Faltam {n} requisitos para o board trabalhar com a IA', { n: missing })}
-        </strong>
+        <strong role="status">{requirementsSummary(items, missing)}</strong>
         <span className="spacer" />
         {/* a lista completa, com o que é só recomendado (git, GitHub CLI, Code Review Graph); o chat não tem a tela */}
         {!compact && (

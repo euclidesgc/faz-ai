@@ -21,10 +21,22 @@ import { ArchivedView } from './components/ArchivedView';
 import { TrashView } from './components/TrashView';
 import { MetricsView } from './components/metrics/MetricsView';
 import { Settings } from './components/settings/Settings';
-import { RequirementsBanner } from './components/RequirementsBanner';
+import { RequirementsAlertIcon, useRequirementsAlert } from './components/RequirementsBanner';
 import { EnvironmentView } from './components/EnvironmentView';
-import { Button, IconChat, IconClose, IconExternal } from './components/ui';
+import { Button, Hint, IconChat, IconClose, IconExternal } from './components/ui';
 import { isWeb, onConnectionChange } from './vscode';
+
+/** A aba Configurações, com o ícone de atenção quando falta algo para o board trabalhar com a IA (o hint diz o quê). */
+function SettingsTab({ active, onClick }: { active: boolean; onClick: () => void }) {
+  const alert = useRequirementsAlert();
+  const tab = (
+    <Button active={active} aria-current={active ? 'page' : undefined} onClick={onClick}>
+      {t('Configurações')}
+      {alert && <RequirementsAlertIcon level={alert.level} label={alert.label} />}
+    </Button>
+  );
+  return alert ? <Hint content={alert.hint}>{tab}</Hint> : tab;
+}
 
 export function App() {
   useHostSync();
@@ -98,9 +110,7 @@ export function App() {
             {t('Lixeira')}
             {trashCount > 0 && ` (${trashCount})`}
           </Button>
-          <Button active={view === 'settings'} aria-current={view === 'settings' ? 'page' : undefined} onClick={() => setView('settings')}>
-            {t('Configurações')}
-          </Button>
+          <SettingsTab active={view === 'settings'} onClick={() => setView('settings')} />
         </nav>
         <span className="spacer" />
         {withYou > 0 && (
@@ -144,8 +154,6 @@ export function App() {
           )}
         </div>
       )}
-      {/* no Diagnóstico, os mesmos itens já estão na lista */}
-      {view !== 'environment' && <RequirementsBanner />}
       {/* a barra de filtros filtra cards, não o log: fica só no board (RF-01) */}
       {view === 'board' && <FilterBar />}
       {view === 'board' && <SelectionBar />}

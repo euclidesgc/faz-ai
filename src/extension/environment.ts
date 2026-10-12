@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import type { AiTool } from '../shared/harness';
-import { NODE_MIN_MAJOR, type EnvCheck, type EnvCheckId, type EnvironmentReport } from '../shared/environment';
+import { NODE_MIN_MAJOR, type EnvCheck, type EnvCheckId, type EnvironmentReport, type InstallStep } from '../shared/environment';
 import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement, type RequirementId } from '../shared/requirements';
 
 /** A outra ferramenta de IA, como o host a encontrou na máquina. */
@@ -29,8 +29,11 @@ export interface EnvironmentProbe {
   other: OtherToolProbe | null;
   /** o MCP do Code Review Graph está registrado na ferramenta do projeto */
   crgMcp: boolean;
-  /** no Windows, os comandos de instalação são os do PowerShell */
-  windows: boolean;
+  /** o sistema: no Windows, os comandos de instalação são os do PowerShell */
+  platform: NodeJS.Platform;
+  homeDir: string;
+  /** as pastas do PATH do terminal: diz se `~/.local/bin` (onde as CLIs e o uv se instalam) já está nele */
+  pathDirs: string[];
   /** caminho do executável de um comando, ou null */
   resolve(command: string): string | null;
   /** roda um comando e devolve a saída padrão; null quando ele falha ou não existe */
@@ -79,24 +82,38 @@ const TOOL_DOCS: Record<AiTool, Partial<Record<EnvCheckId, string>>> = {
  * os instaladores neutros, que valem em qualquer distribuição: `curl` no Linux e no macOS, PowerShell
  * no Windows. O git e o GitHub CLI não têm um assim: ficam só com o site.
  */
-const INSTALL: Record<'unix' | 'windows', Partial<Record<'node' | 'claude' | 'cursor' | 'uv', string[]>>> = {
+const steps = (...commands: string[]): InstallStep[] => commands.map((command) => ({ command }));
+const NVM: InstallStep = { command: 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash', step: 'nvm' };
+const INSTALL: Record<'unix' | 'windows', Record<'node' | 'claude' | 'cursor' | 'uv', InstallStep[]>> = {
   unix: {
-    node: [
-      'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash',
-      '. "$HOME/.nvm/nvm.sh"',
-      `nvm install ${NODE_MIN_MAJOR}`,
-    ],
-    claude: ['curl -fsSL https://claude.ai/install.sh | bash'],
-    cursor: ['curl https://cursor.com/install -fsS | bash'],
-    uv: ['curl -LsSf https://astral.sh/uv/install.sh | sh'],
+    // o Node.js pelo nvm, como o site do Node.js ensina: primeiro o nvm, depois o Node com ele
+    node: [NVM, { command: '. "$HOME/.nvm/nvm.sh"', step: 'nvm-load' }, { command: `nvm install ${NODE_MIN_MAJOR}`, step: 'node' }],
+    claude: steps('curl -fsSL https://claude.ai/install.sh | bash'),
+    cursor: steps('curl https://cursor.com/install -fsS | bash'),
+    uv: steps('curl -LsSf https://astral.sh/uv/install.sh | sh'),
   },
+  // no Windows, o instalador de cada um já põe o programa no PATH: falta só abrir um terminal novo
   windows: {
-    node: ['winget install Schniz.fnm', `fnm install ${NODE_MIN_MAJOR}`],
-    claude: ['irm https://claude.ai/install.ps1 | iex'],
-    cursor: ["irm 'https://cursor.com/install?win32=true' | iex"],
-    uv: ['powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"'],
+    node: steps('winget install OpenJS.NodeJS.LTS'),
+    claude: steps('irm https://claude.ai/install.ps1 | iex'),
+    cursor: steps("irm 'https://cursor.com/install?win32=true' | iex"),
+    uv: steps('powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"'),
   },
 };
+
+/**
+ * Os passos do PATH depois de um instalador que põe o programa em `~/.local/bin`, quando essa pasta
+ * ainda não está no PATH: sem eles, o terminal aberto não acha o comando logo depois. O da CLI do
+ * Claude Code e do Cursor só explica como pôr a pasta no PATH; o do uv já grava no arquivo do shell,
+ * e falta só o terminal aberto.
+ */
+function localBin(p: EnvironmentProbe, save: boolean): InstallStep[] {
+  const dir = path.join(p.homeDir, '.local', 'bin');
+  if (p.platform === 'win32' || p.pathDirs.some((d) => d.replace(/\/+$/, '') === dir)) return [];
+  const rc = p.platform === 'darwin' ? '~/.zshrc' : '~/.bashrc';
+  const load: InstallStep = { command: 'export PATH="$HOME/.local/bin:$PATH"', step: 'path-load' };
+  return save ? [{ command: `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ${rc}`, step: 'path-save' }, load] : [load];
+}
 
 const version = (out: string | null): string | undefined => /\d+\.\d+(?:\.\d+)?/.exec(out ?? '')?.[0];
 
@@ -145,7 +162,11 @@ function toolGroup(tool: AiTool, children: EnvCheck[]): EnvCheck {
 export async function checkEnvironment(p: EnvironmentProbe): Promise<EnvironmentReport> {
   const req = (id: EnvCheckId) => p.requirements.find((r) => FROM[id]?.includes(r.id));
   const tool = p.tool;
-  const install = INSTALL[p.windows ? 'windows' : 'unix'];
+  const windows = p.platform === 'win32';
+  const install = INSTALL[windows ? 'windows' : 'unix'];
+  const reopen = windows ? { reopenTerminal: true as const } : {};
+  // a CLI de cada ferramenta, com o PATH quando ela cai numa pasta fora dele
+  const cliInstall = (t: AiTool) => [...install[t], ...localBin(p, true)];
 
   // o Node.js que roda o MCP do board: a partir da versão mínima
   const nodeExe = p.resolve('node');
@@ -156,7 +177,13 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     status: statusOf(nodeOk),
     version: nodeVersion,
     docs: DOCS.node,
-    install: nodeOk ? undefined : install.node,
+    // com o nvm já instalado, falta só o Node com ele
+    install: nodeOk
+      ? undefined
+      : !windows && p.exists(path.join(p.homeDir, '.nvm', 'nvm.sh'))
+        ? install.node.filter((s) => s !== NVM)
+        : install.node,
+    ...(nodeOk ? {} : reopen),
   };
 
   const cliMissing = !!req('cli');
@@ -170,7 +197,8 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
       status: statusOf(!cliMissing),
       version: cliExe ? version(await p.run(cliExe, ['--version'])) : undefined,
       docs: TOOL_DOCS[tool].cli,
-      install: cliMissing ? install[tool] : undefined,
+      install: cliMissing ? cliInstall(tool) : undefined,
+      ...(cliMissing ? reopen : {}),
       children: [{ id: 'signin', tool, status: statusOf(!signin, !cliMissing), command: LOGIN_COMMAND[tool], requirement: signin }],
     },
     { id: 'mcp', tool, status: statusOf(!req('mcp')), docs: DOCS.mcp, requirement: req('mcp') },
@@ -190,7 +218,8 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
           status: statusOf(!!o.cli),
           version: o.cli ? version(await p.run(o.cli, ['--version'])) : undefined,
           docs: TOOL_DOCS[o.tool].cli,
-          install: o.cli ? undefined : install[o.tool],
+          install: o.cli ? undefined : cliInstall(o.tool),
+          ...(o.cli ? {} : reopen),
           children: [{ id: 'signin', tool: o.tool, status: statusOf(o.signedIn !== false, !!o.cli), command: LOGIN_COMMAND[o.tool] }],
         },
         { id: 'mcp', tool: o.tool, status: statusOf(o.mcp), docs: DOCS.mcp },
@@ -206,7 +235,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     status: statusOf(!!gitExe),
     version: gitExe ? version(await p.run(gitExe, ['--version'])) : undefined,
     docs: DOCS.git,
-    children: [{ id: 'repo', status: statusOf(repo, !!gitExe), command: 'git init' }],
+    children: [{ id: 'repo', status: statusOf(repo, !!gitExe), command: 'git init', inProject: true }],
   };
 
   const ghExe = p.resolve('gh');
@@ -236,13 +265,20 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
         ? 'pip install "code-review-graph[embeddings]"'
         : 'uv tool install --reinstall "code-review-graph[embeddings]"';
   const crgChildren: EnvCheck[] = [
-    { id: 'crg-graph', status: statusOf(graph, !!crgExe), command: 'code-review-graph build' },
-    { id: 'crg-mcp', tool, status: statusOf(p.crgMcp, !!crgExe), command: `code-review-graph install --platform ${CRG_PLATFORM[tool]}` },
+    { id: 'crg-graph', status: statusOf(graph, !!crgExe), command: 'code-review-graph build', inProject: true },
+    {
+      id: 'crg-mcp',
+      tool,
+      status: statusOf(p.crgMcp, !!crgExe),
+      command: `code-review-graph install --platform ${CRG_PLATFORM[tool]}`,
+      inProject: true,
+    },
     {
       id: 'crg-embeddings',
       status: statusOf(embeddings, !!crgExe),
-      install: embeddings ? undefined : [addEmbeddings],
+      install: embeddings ? undefined : steps(addEmbeddings),
       command: 'code-review-graph embed --provider local',
+      inProject: true,
       docs: DOCS['crg-embeddings'],
     },
   ];
@@ -251,7 +287,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     status: statusOf(!!crgExe, !!crgExe || !!uvExe),
     version: crgExe ? version(await p.run(crgExe, ['--version'])) : undefined,
     docs: DOCS.crg,
-    install: crgExe ? undefined : ['uv tool install code-review-graph'],
+    install: crgExe ? undefined : steps('uv tool install code-review-graph'),
     children: crgChildren,
   };
   const codeGraph: EnvCheck = crgExe
@@ -261,9 +297,18 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
         status: statusOf(!!uvExe),
         version: uvExe ? version(await p.run(uvExe, ['--version'])) : undefined,
         docs: DOCS.uv,
-        install: uvExe ? undefined : install.uv,
+        install: uvExe ? undefined : [...install.uv, ...localBin(p, false)],
+        ...(uvExe ? {} : reopen),
         children: [crg],
       };
 
-  return { tool, required: [node, own], optional, recommended: [git, gh, codeGraph], checkedAt: Date.now() };
+  return {
+    tool,
+    required: [node, own],
+    optional,
+    recommended: [git, gh, codeGraph],
+    // os instaladores do Linux e do macOS baixam pelo curl, que um Ubuntu desktop novo não traz
+    ...(!windows && !p.resolve('curl') ? { curlMissing: true as const } : {}),
+    checkedAt: Date.now(),
+  };
 }

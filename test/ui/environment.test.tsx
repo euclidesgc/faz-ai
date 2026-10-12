@@ -92,7 +92,7 @@ const report = (o: { skill?: EnvCheck['status']; optional?: boolean } = {}): Env
         {
           id: 'crg-embeddings',
           status: 'missing',
-          install: ['uv tool install --reinstall "code-review-graph[embeddings]"'],
+          install: [{ command: 'uv tool install --reinstall "code-review-graph[embeddings]"' }],
           command: 'code-review-graph embed --provider local',
         },
       ],
@@ -130,9 +130,9 @@ describe('Diagnóstico do ambiente', () => {
           id: 'node',
           status: 'missing',
           install: [
-            'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash',
-            '. "$HOME/.nvm/nvm.sh"',
-            'nvm install 22',
+            { command: 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash', step: 'nvm' },
+            { command: '. "$HOME/.nvm/nvm.sh"', step: 'nvm-load' },
+            { command: 'nvm install 22', step: 'node' },
           ],
         },
         cursor(),
@@ -140,6 +140,12 @@ describe('Diagnóstico do ambiente', () => {
     });
     const node = item('Node.js 22 ou mais novo');
     expect(within(node).getByText('Para instalar, em ordem:')).toBeInTheDocument();
+    // cada passo diz o que faz: o primeiro instala o nvm
+    expect(within(node).getByText('Instala o nvm, o gerenciador de versões do Node.js:')).toBeInTheDocument();
+    expect(within(node).getByText('Instala o Node.js 22 com ele:')).toBeInTheDocument();
+    // cada passo diz o que faz: o primeiro instala o nvm
+    expect(within(node).getByText('Instala o nvm, o gerenciador de versões do Node.js:')).toBeInTheDocument();
+    expect(within(node).getByText('Instala o Node.js 22 com ele:')).toBeInTheDocument();
     expect(
       within(node)
         .getAllByRole('listitem')

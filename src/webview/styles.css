@@ -683,7 +683,7 @@ button.chip.on:hover:where(:not(:disabled)) {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .checklist li {
   display: flex;
@@ -778,7 +778,7 @@ button.chip.on:hover:where(:not(:disabled)) {
 .tabs-vertical {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .tabs-vertical button {
   text-align: left;
@@ -1098,7 +1098,7 @@ button.ghost.on {
 /* drawer */
 .tabs {
   display: flex;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
   border-bottom: 1px solid var(--border);
 }
 .tabs button {
@@ -1181,7 +1181,7 @@ button.ghost.on {
 .md-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
   padding: var(--sp-4);
   border-bottom: 1px solid var(--border);
   background: var(--col-bg);
@@ -1934,6 +1934,20 @@ button.heartbeat.stopped:hover {
 }
 
 /* requisitos do board: fica no topo, em todas as telas, enquanto faltar alguma coisa */
+/* o ícone de atenção do que falta para o board trabalhar com a IA, na aba Configurações e no Verificar ambiente */
+.requirements-alert {
+  width: 14px;
+  height: 14px;
+  margin-left: var(--sp-4);
+  vertical-align: -2px;
+  color: var(--warn-border);
+}
+.requirements-alert.error {
+  color: var(--error);
+}
+.requirements-alert.recommended {
+  color: var(--muted);
+}
 .banner.requirements {
   margin: var(--sp-8) var(--sp-16) 0;
   display: flex;
@@ -2069,6 +2083,12 @@ button.heartbeat.stopped:hover {
   flex-basis: 100%;
   display: flex;
   flex-direction: column;
+  gap: var(--sp-4);
+}
+.env-commands li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--sp-4);
 }
 .env-busy {
@@ -2256,7 +2276,7 @@ button:where(:not([class*='rt-'])) {
   gap: var(--sp-6);
 }
 .option-chip {
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .switch-row {
   display: inline-flex;
@@ -2762,7 +2782,7 @@ body.host-web .drawer {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .children li .rt-IconButton {
   margin-left: var(--sp-6);
@@ -3207,7 +3227,7 @@ body.host-web .drawer {
 .metrics-horizon {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 
 /* card 173, painel de métricas: os cinco blocos abaixo da série. Grade auto-fit e tabelas que rolam dentro de si (RF-40) */

@@ -1,9 +1,10 @@
 import { lastSent, posted, renderThemed, seedBoard, sentOf, syncStore } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { act, screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RequirementsBanner, aiBlockedReason } from '../../src/webview/components/RequirementsBanner';
 import { useBoardStore } from '../../src/webview/store/boardStore';
+import { App } from '../../src/webview/App';
 import type { MessageRouter } from '../../src/extension/panel/messageRouter';
 import type { BoardRequirement } from '../../src/shared/requirements';
 
@@ -187,5 +188,34 @@ describe('login vencido: aviso de erro, item sintético e "Abrir no terminal"', 
     renderThemed(<RequirementsBanner />);
     await userEvent.click(screen.getByRole('button', { name: 'Abrir no terminal' }));
     expect(sentOf('ui.openTerminal')).toEqual([{ type: 'ui.openTerminal', command: 'claude auth login' }]);
+  });
+});
+
+describe('aviso compacto do que falta (no lugar da faixa no topo do board)', () => {
+  it('a aba Configurações e o Verificar ambiente ganham o ícone de atenção, e o hint diz o que falta', async () => {
+    set([CLI, MCP]);
+    renderThemed(<App />);
+    // a faixa não aparece mais no board
+    expect(screen.queryByRole('region', { name: 'Requisitos do board' })).toBeNull();
+    const tab = screen.getByRole('button', { name: /Configurações/ });
+    expect(tab).toHaveTextContent('Falta 1 requisito para o board trabalhar com a IA');
+    fireEvent.focus(tab);
+    const hint = await screen.findByRole('tooltip');
+    expect(hint).toHaveTextContent('A linha de comando do Cursor não foi encontrada');
+    expect(hint).toHaveTextContent('Veja como resolver em Configurações → Verificar ambiente.');
+    fireEvent.blur(tab);
+
+    await userEvent.click(tab);
+    // nas Configurações, o mesmo ícone no Verificar ambiente
+    const check = document.querySelector('.settings-side-actions .requirements-alert');
+    expect(check).not.toBeNull();
+  });
+
+  it('login vencido deixa o ícone com destaque de erro; sem nada faltando, não há ícone', () => {
+    setAuthExpired('cursor');
+    renderThemed(<App />);
+    expect(document.querySelector('.requirements-alert.error')).not.toBeNull();
+    setAuthExpired(null);
+    expect(document.querySelector('.requirements-alert')).toBeNull();
   });
 });

@@ -21,6 +21,10 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   versa.
 - **Node.js 22 or newer.** The environment check reads the Node.js version and shows it as missing
   below 22, the version Claude Code asks for and the oldest LTS still supported.
+- **A compact warning instead of the yellow bar.** What is missing for the board to work with the AI no
+  longer takes the top of the board: the **Configurações** (Settings) tab and the **Verificar
+  ambiente** (Check environment) button get a warning icon, and its hint sums up what is missing. The
+  icon turns red when the reason is sign-in. The chat panel, which has no Settings, keeps the bar.
 - **Claude Code sign-in with `claude auth login`.** The sign-in warning suggested `claude login`, which
   the current Claude Code documentation does not list.
 

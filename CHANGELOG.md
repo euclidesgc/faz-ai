@@ -20,6 +20,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   permissão dele, e vice-versa.
 - **Node.js 22 ou mais novo.** O Diagnóstico confere a versão do Node.js e mostra falta abaixo da 22,
   a versão que o Claude Code pede e a LTS mais antiga ainda com suporte.
+- **Aviso compacto no lugar da faixa amarela.** O que falta para o board trabalhar com a IA não ocupa
+  mais o topo do board: a aba **Configurações** e o botão **Verificar ambiente** ganham um ícone de
+  atenção, e o hint dele resume o que falta. O ícone fica vermelho quando o motivo é login. No painel
+  de chat, que não tem as Configurações, a faixa continua.
 - **Login do Claude Code com `claude auth login`.** O aviso de login sugeria `claude login`, que a
   documentação atual do Claude Code não traz.
 

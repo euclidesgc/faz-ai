@@ -287,8 +287,10 @@ the project's tool, and the MCP tool `install_flow_skill` takes `scope` (`user`,
    the board", "take story #1 and write the PRD" or "check what is pending on the board and move it
    forward".
 
-While something is missing for the board to work with the tool, a yellow bar stays at the top of
-the board, on every screen, and in the chat panel. It checks Node.js (the board's server runs on
+While something is missing for the board to work with the tool, the **Configurações** (Settings) tab
+and the **Verificar ambiente** (Check environment) button get a warning icon. Its hint sums up what is
+missing, with each item's name, and each item's explanation and action are in the environment check.
+The chat panel, which has no Settings, keeps a bar with the same items. The check looks at Node.js (the board's server runs on
 it), the tool's command line, its sign-in (for Cursor, through `cursor-agent status`; for Claude
 Code, through `claude auth status`), the board's
 server registration in the file the tool reads (for Claude, the registration for your user from
@@ -298,7 +300,7 @@ item says what it affects and brings the action: the command to copy, **Instalar
 (install the board MCP, which opens the tool's MCP servers section), **Corrigir o registro** (fix the
 registration: a broken one in the project file takes precedence over the global one; fixing removes
 it from there and leaves the global one in effect), **Recarregar a janela** (reload the window) or
-the shortcut to the AI harness. The bar has no close button: it goes away on its own when the last item is solved. The
+the shortcut to the AI harness. The icon goes away on its own when the last item is solved. The
 check runs when the board opens, when the tool or permission changes, after connecting, every 5
 minutes and on **Verificar de novo** (check again), which also rereads the terminal PATH (a node
 installed with the board open is found without reloading the window), and says when nothing
@@ -307,17 +309,17 @@ changed.
 The board MCP and the flow skill (`faz-ai-fluxo`) count as requirements for every tool: even where
 runs from the board carry the MCP on their own (Claude, Cursor), conversations in the editor chat or
 the terminal depend on it, and the skill is what makes the AI follow the flow. A missing skill has
-the **Install the skill** button right in the bar. While the command line is missing or not signed in, the card's AI buttons are
+the **Install the skill** button in the environment check and in the chat bar. While the command line is missing or not signed in, the card's AI buttons are
 disabled, with the reason in the tooltip.
 
-**Expired login: error warning and automatic resume.** When the bar's reason is sign-in (missing, or
-expired mid-run), it switches to an error highlight instead of the usual yellow, and gains an **Abrir
-no terminal** (open in terminal) button next to the command to copy: the board opens an editor
+**Expired login: error warning and automatic resume.** When the warning's reason is sign-in (missing,
+or expired mid-run), the warning icon turns red instead of the usual yellow, and the item gains an
+**Abrir no terminal** (open in terminal) button next to the command to copy: the board opens an editor
 terminal and runs the command there, but you always do the actual sign-in. Before every AI call (the
 card's button, the heartbeat and autonomous mode), the board checks the sign-in again; if it expired,
 the run does not even start. When the login expires mid-run, the first failure that matches a known pattern ("OAuth session expired", "not
 logged in", "401", etc.) does not block the card: it goes back to the status it had, with a short
-comment, and the same error warning turns on at the top of the board — the heartbeat and autonomous
+comment, and the same error warning turns on — the heartbeat and autonomous
 mode do not retry on their own while it is on. The warning goes away and the queue resumes on its
 own once the sign-in is confirmed again (by the periodic check, within 10 seconds of signing in, or
 via **Já entrei: verificar de novo** — I signed in, check again) or, when the check cannot tell, on
@@ -326,8 +328,7 @@ the first manual run that succeeds. The environment check shows the same warning
 
 **Environment check.** The first time the board opens on a machine, a list opens on its own with
 everything the board needs and what it makes use of. After that, it opens from the **Verificar
-ambiente** (Check environment) button in Settings, or from **Ver o diagnóstico completo** (See the
-full environment check) in the yellow banner. Each item has a ready or missing icon, and what depends
+ambiente** (Check environment) button in Settings (with the warning icon when something is missing). Each item has a ready or missing icon, and what depends
 on another item shows inside it (the sign-in inside the command line, the graph inside Code Review
 Graph). Hover over an item to see how the board uses it.
 
@@ -356,7 +357,7 @@ level choice.
 
 The editor chat starts the board's MCP with the PATH the editor opened with: Node installed later
 (through `nvm`, for example) is not in it until the editor is closed and reopened. So, when Node shows
-up, or through the **Corrigir o caminho** (Fix the path) button in the yellow banner, the board writes
+up, or through the **Corrigir o caminho** (Fix the path) button on the MCP item in the environment check, the board writes
 the command's full path into the `faz-ai` and `code-review-graph` registrations the editor cannot
 find. The path is found at that moment, on the machine where the extension runs, and the file stays
 out of git (`.git/info/exclude`). If the project MCP file is versioned, the board does not write to it

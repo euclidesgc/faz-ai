@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { aiToolInfo, type AiTool } from '../../shared/harness';
-import { NODE_MIN_MAJOR, missingCount, type EnvCheck } from '../../shared/environment';
+import { NODE_MIN_MAJOR, missingCount, type EnvCheck, type InstallStepKind } from '../../shared/environment';
 import { CLI_COMMAND } from '../../shared/requirements';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { useBoardStore } from '../store/boardStore';
@@ -119,6 +119,22 @@ function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string 
   }
 }
 
+/** O que faz cada passo da instalação que não se explica pelo comando. */
+function stepText(step: InstallStepKind): string {
+  switch (step) {
+    case 'nvm':
+      return t('Instala o nvm, o gerenciador de versões do Node.js:');
+    case 'nvm-load':
+      return t('Carrega o nvm neste terminal (num terminal novo, ele já vem carregado):');
+    case 'node':
+      return t('Instala o Node.js {min} com ele:', { min: String(NODE_MIN_MAJOR) });
+    case 'path-save':
+      return t('Põe a pasta ~/.local/bin, onde o programa foi instalado, no PATH dos próximos terminais:');
+    case 'path-load':
+      return t('Põe a pasta no PATH deste terminal, para achar o programa agora:');
+  }
+}
+
 /** O estado em palavras, para quem não vê o ícone. */
 function statusLabel(c: EnvCheck): string {
   if (c.status === 'ok') return t('Pronto');
@@ -177,12 +193,18 @@ function Row({ check, projectTool, busy, onFixed }: RowProps) {
         <div className="env-fix">
           <span className="small muted">{check.install.length > 1 ? t('Para instalar, em ordem:') : t('Para instalar:')}</span>
           <ol className="env-commands">
-            {check.install.map((c) => (
-              <li key={c}>
-                <CopyCommand command={c} />
+            {check.install.map((s) => (
+              <li key={s.command}>
+                {s.step && <span className="small">{stepText(s.step)}</span>}
+                <CopyCommand command={s.command} />
               </li>
             ))}
           </ol>
+          {check.reopenTerminal && (
+            <span className="small muted">
+              {t('Depois, abra um terminal novo: o que já estava aberto não enxerga o programa recém-instalado.')}
+            </span>
+          )}
         </div>
       )}
       {/* o comando com copiar; o login da ferramenta do projeto vem com o "Abrir no terminal" do aviso */}
@@ -190,6 +212,7 @@ function Row({ check, projectTool, busy, onFixed }: RowProps) {
         <div className="env-fix">
           {check.install && check.status !== 'ok' && <span className="small muted">{t('Depois:')}</span>}
           {r?.action?.kind === 'command' ? <RequirementFix r={r} /> : <CopyCommand command={check.command} />}
+          {check.inProject && <span className="small muted">{t('Na pasta do projeto.')}</span>}
         </div>
       )}
       {/* o que o board resolve sozinho: o MCP, a skill e a permissão da ferramenta do projeto */}
@@ -305,6 +328,14 @@ export function EnvironmentView() {
       <p role="status" className="env-summary">
         <strong>{summary}</strong>
       </p>
+      {report?.curlMissing && (
+        <p className="small">
+          {t(
+            'Os comandos de instalação abaixo usam o curl, que não foi encontrado nesta máquina. Instale-o antes pelo gerenciador de pacotes do sistema.',
+          )}{' '}
+          <DocsLink href="https://curl.se/download.html" />
+        </p>
+      )}
       {report && (
         <>
           <Section id="env-required" title={t('Necessários')} checks={report.required} {...rowProps} />

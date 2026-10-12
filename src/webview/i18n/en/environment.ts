@@ -48,6 +48,18 @@ export const environment: Record<string, string> = {
   'Para instalar:': 'To install:',
   'Para instalar, em ordem:': 'To install, in order:',
   'Depois:': 'Then:',
+  'Instala o nvm, o gerenciador de versões do Node.js:': 'Installs nvm, the Node.js version manager:',
+  'Carrega o nvm neste terminal (num terminal novo, ele já vem carregado):':
+    'Loads nvm in this terminal (a new terminal already has it loaded):',
+  'Põe a pasta ~/.local/bin, onde o programa foi instalado, no PATH dos próximos terminais:':
+    'Adds the ~/.local/bin folder, where the program was installed, to the PATH of future terminals:',
+  'Põe a pasta no PATH deste terminal, para achar o programa agora:': "Adds the folder to this terminal's PATH, to find the program now:",
+  'Na pasta do projeto.': 'In the project folder.',
+  'Depois, abra um terminal novo: o que já estava aberto não enxerga o programa recém-instalado.':
+    'Then open a new terminal: the one already open does not see the newly installed program.',
+  'Os comandos de instalação abaixo usam o curl, que não foi encontrado nesta máquina. Instale-o antes pelo gerenciador de pacotes do sistema.':
+    'The install commands below use curl, which was not found on this machine. Install it first with the system package manager.',
+  'Instala o Node.js {min} com ele:': 'Installs Node.js {min} with it:',
   'Node.js {min} ou mais novo': 'Node.js {min} or newer',
   'Roda o MCP do board: a ferramenta de IA o inicia com o Node.js do PATH a cada conversa e a cada execução pelo board.':
     "Runs the board's MCP: the AI tool starts it with the Node.js on the PATH in every conversation and every run from the board.",

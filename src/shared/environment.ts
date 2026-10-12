@@ -42,15 +42,31 @@ export interface EnvCheck {
   /** a versão encontrada, quando o comando diz */
   version?: string;
   /** os comandos que instalam o programa, em ordem, quando falta (os instaladores oficiais neutros: curl, PowerShell) */
-  install?: string[];
+  install?: InstallStep[];
+  /** no Windows, o programa só aparece num terminal aberto depois da instalação */
+  reopenTerminal?: true;
   /** o comando que resolve, com botão de copiar (os logins e as ações na pasta do projeto) */
   command?: string;
+  /** o comando roda na pasta do projeto */
+  inProject?: true;
   /** onde a pessoa vê como instalar ou configurar */
   docs?: string;
   /** o requisito do aviso no topo do board, com o texto e o botão que o resolvem */
   requirement?: BoardRequirement;
   /** o que depende deste item, mostrado dentro dele */
   children?: EnvCheck[];
+}
+
+/**
+ * O que um passo da instalação faz, quando não é óbvio pelo comando: o Node.js se instala pelo nvm,
+ * que vem antes dele, e o que cai em `~/.local/bin` precisa dessa pasta no PATH.
+ */
+export type InstallStepKind = 'nvm' | 'nvm-load' | 'node' | 'path-save' | 'path-load';
+
+/** Um comando da instalação, com botão de copiar. */
+export interface InstallStep {
+  command: string;
+  step?: InstallStepKind;
 }
 
 export interface EnvironmentReport {
@@ -62,6 +78,8 @@ export interface EnvironmentReport {
   optional: EnvCheck[];
   /** o que o board aproveita quando existe: git, GitHub CLI, Code Review Graph */
   recommended: EnvCheck[];
+  /** os comandos de instalação do Linux e do macOS usam o curl, e ele não está nesta máquina */
+  curlMissing?: true;
   /** quando terminou (ms) */
   checkedAt: number;
 }

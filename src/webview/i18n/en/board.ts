@@ -347,6 +347,7 @@ export const board: Record<string, string> = {
   'Criar card': 'Create card',
 
   // requisitos do board (RequirementsBanner)
+  'Veja como resolver em Configurações → Verificar ambiente.': 'See how to fix it in Settings → Check environment.',
   'Requisitos do board': 'Board requirements',
   'Falta 1 requisito para o board trabalhar com a IA': '1 requirement missing for the board to work with the AI',
   'Faltam {n} requisitos para o board trabalhar com a IA': '{n} requirements missing for the board to work with the AI',
@@ -355,11 +356,11 @@ export const board: Record<string, string> = {
   'Conferido agora: nada mudou.': 'Checked just now: nothing changed.',
   recomendado: 'recommended',
   'Recomendado para a IA enxergar o board nas suas conversas': 'Recommended so the AI sees the board in your conversations',
-  'A linha de comando do {tool} não foi encontrada: veja o aviso no topo do board.':
-    "{tool}'s command line was not found: see the notice at the top of the board.",
-  'A linha de comando do {tool} está sem login: veja o aviso no topo do board.':
-    "{tool}'s command line is not signed in: see the notice at the top of the board.",
-  'O login do {tool} venceu: veja o aviso no topo do board.': "{tool}'s login expired: see the notice at the top of the board.",
+  'A linha de comando do {tool} não foi encontrada: veja em Configurações → Verificar ambiente.':
+    "{tool}'s command line was not found: see Settings → Check environment.",
+  'A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.':
+    "{tool}'s command line is not signed in: see Settings → Check environment.",
+  'O login do {tool} venceu: veja em Configurações → Verificar ambiente.': "{tool}'s login expired: see Settings → Check environment.",
   'Abrir no terminal': 'Open in terminal',
   'Copiar comando': 'Copy command',
   Copiado: 'Copied',
