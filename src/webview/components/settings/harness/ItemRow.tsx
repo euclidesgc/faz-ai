@@ -1,5 +1,6 @@
+import type { ReactNode } from 'react';
 import { SKILL_MODES, type AiTool, type HarnessItem, type SkillMode } from '../../../../shared/harness';
-import { hookTargets, mcpTargets } from '../../../../shared/harnessCatalog';
+import { HARNESS_CATALOG, hookTargets, mcpTargets } from '../../../../shared/harnessCatalog';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { Badge, Button, Checkbox, IconButton } from '@radix-ui/themes';
@@ -16,23 +17,31 @@ interface Props {
   tool: AiTool;
   item: HarnessItem;
   actions: ItemActions;
-  selected: boolean;
-  onSelect: (checked: boolean) => void;
+  /** caixa de seleção para as ações em massa; sem ela, a linha não tem caixa */
+  selected?: boolean;
+  onSelect?: (checked: boolean) => void;
+  /** mostra o que o item é, numa frase, conforme o catálogo, e quando a ferramenta o carrega */
+  explain?: boolean;
+  /** por que a ferramenta não lê o arquivo, embora ele exista; troca o selo de carregamento por um aviso */
+  unread?: string;
+  /** controle extra antes das ações, como o uso do item nas execuções do board */
+  usage?: ReactNode;
   /** arquivos de apoio da skill à mostra, numa linha logo abaixo */
   filesOpen: boolean;
   onToggleFiles: () => void;
 }
 
 /** Um item do inventário: seleção, nome, descrição como dica, o caminho do arquivo (que abre no editor) e o que dá para fazer com ele. */
-export function ItemRow({ tool, item: i, actions, selected, onSelect, filesOpen, onToggleFiles }: Props) {
+export function ItemRow({ tool, item: i, actions, selected = false, onSelect, explain, unread, usage, filesOpen, onToggleFiles }: Props) {
   const { copyable, twin, copy, setMode, deletable, remove } = actions;
+  const src = i.source === undefined ? undefined : HARNESS_CATALOG[tool][i.source];
   const inProject = i.scope !== 'project' ? twin(i, 'project') : undefined;
   const editable = i.scope !== 'plugin' && i.layout !== 'entry';
   const selectable = deletable(i) || copyable(i, 'project') || copyable(i, 'user') || (!!i.mode && editable);
   return (
     <li className={selected ? 'item-row selected' : 'item-row'}>
       <span className="item-check">
-        {selectable && (
+        {selectable && onSelect && (
           <Checkbox
             aria-label={t('Selecionar {name}', { name: i.name })}
             checked={selected}
@@ -48,12 +57,29 @@ export function ItemRow({ tool, item: i, actions, selected, onSelect, filesOpen,
               {i.plugin}
             </Badge>
           )}
+          {unread && (
+            <Badge color="amber" variant="soft">
+              {t('não lido pelo Claude Code')}
+            </Badge>
+          )}
+          {explain && !unread && src?.loads === 'always' && (
+            <Badge color="indigo" variant="soft" title={t('Entra no começo de toda conversa da ferramenta')}>
+              {t('sempre carregado')}
+            </Badge>
+          )}
+          {explain && !unread && src?.loads === 'on-demand' && (
+            <Badge color="gray" variant="soft" title={t('A ferramenta só lê o conteúdo quando a tarefa pede ou quando você chama')}>
+              {t('sob demanda')}
+            </Badge>
+          )}
           {inProject && (
             <Badge color="indigo" variant="soft" title={inProject.location}>
               {inProject.digest === i.digest ? t('copiada no projeto') : t('no projeto, com conteúdo diferente')}
             </Badge>
           )}
         </div>
+        {explain && src?.hint && <p className="item-explain">{t(src.hint)}</p>}
+        {unread && <p className="item-explain item-unread">{unread}</p>}
         {i.description && (
           <p className="item-hint" title={i.description}>
             {i.description}
@@ -69,6 +95,7 @@ export function ItemRow({ tool, item: i, actions, selected, onSelect, filesOpen,
         </button>
       </div>
       <div className="row-actions">
+        {usage}
         {i.mode &&
           (editable ? (
             <SelectField<SkillMode>

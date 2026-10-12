@@ -21,6 +21,19 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   command) got an outline and the buttons on the screen are no longer the small size. At the top, **Ir
   para o board** (Go to the board) is the main button and **Verificar de novo** (Check again) is no
   longer a faint one.
+- **New Projeto tab in the AI harness.** Everything the tool reads in the project folder, in groups:
+  main rules, rules by topic, memory, skills, subagents, commands, hooks, MCP servers, settings and
+  permissions, and output styles. Each item says what it is in one sentence, shows whether it is
+  always loaded or on demand, and has its path, which opens the file in the board editor. Files the
+  tool would read but that do not exist yet show up with a create button and a sentence on each, and
+  the new file opens right away in the editor. In main rules, the board offers `CLAUDE.md`,
+  `CLAUDE.local.md` and, only when the project has no `CLAUDE.md`, `AGENTS.md`. If the project has
+  both, `AGENTS.md` shows as not read by Claude Code, with the `@import` that brings it in; if it has
+  only `AGENTS.md`, the board warns that creating a `CLAUDE.md` makes Claude Code stop reading it. A
+  selector shows what Claude Code or Cursor loads.
+  For rules and skills, how board runs use them becomes a choice on the row itself.
+- **Warnings actually in amber.** The warnings on the Git, run and Harness screens asked for a color
+  the board did not load and showed up with no color; they now use the palette's amber.
 - **The full harness of each tool.** The board now also finds `AGENTS.md` (and `.claude/AGENTS.md`),
   which Claude Code reads when the project has no `CLAUDE.md`; this project's Claude Code auto memory
   (`~/.claude/projects/<project>/memory/`); the organization policy (the `CLAUDE.md` and

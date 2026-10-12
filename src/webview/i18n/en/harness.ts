@@ -56,6 +56,36 @@ export const harness: Record<string, string> = {
   'Selecionar {name}': 'Select {name}',
   'copiada no projeto': 'copied in the project',
   'no projeto, com conteúdo diferente': 'in the project, with different content',
+  'Uso nas execuções do board: {name}': 'Use in board runs: {name}',
+  'Só o que está marcado entra nas execuções do board; o resto fica invisível para elas.':
+    'Only what is marked goes into board runs; the rest is invisible to them.',
+  'Fora das execuções': 'Not in runs',
+  'Novo hook': 'New hook',
+  'Novo servidor': 'New server',
+  'sem arquivo': 'no file',
+  'Nada aqui ainda.': 'Nothing here yet.',
+  'Você pode criar:': 'You can create:',
+  'não lido pelo Claude Code': 'not read by Claude Code',
+  'Por padrão, o Claude Code não lê este arquivo nas suas conversas, porque o projeto tem {claude}. Para ler os dois, importe com @{path} no {claude} ou mude Project instructions no /config do Claude Code.':
+    'By default, Claude Code does not read this file in your conversations, because the project has {claude}. To read both, import it with @{path} in {claude} or change Project instructions in Claude Code /config.',
+  'O Claude Code está lendo o {path}. Criar um CLAUDE.md ou CLAUDE.local.md faz ele parar de ler, a menos que o arquivo novo importe com @{path}.':
+    'Claude Code is reading {path}. Creating a CLAUDE.md or CLAUDE.local.md makes it stop, unless the new file imports it with @{path}.',
+  'Criar {path}': 'Create {path}',
+  'Tudo que a ferramenta de IA lê nesta pasta, por tipo: vai no repositório (menos os arquivos locais e a memória). Clique no caminho para abrir o arquivo aqui mesmo e editar. Nas rules e skills, escolha como as execuções do board usam cada uma; o que fica fora não existe para elas.':
+    'Everything the AI tool reads in this folder, by type: it goes in the repository (except local files and memory). Click the path to open the file right here and edit it. For rules and skills, choose how board runs use each one; what is left out does not exist for them.',
+  'Tudo que a ferramenta de IA lê da sua pasta de usuário, dos plugins instalados e da sua organização: vale na sua máquina, em qualquer projeto. Clique no caminho para abrir o arquivo aqui mesmo e editar. A marcação das execuções é deste board.':
+    'Everything the AI tool reads from your user folder, installed plugins and your organization: it applies on your machine, in any project. Click the path to open the file right here and edit it. The marking for runs belongs to this board.',
+  'ferramenta deste projeto': "this project's tool",
+  'Mostrando o que o {tool} carrega. As execuções do board usam o {board}: a marcação só vale para ele.':
+    'Showing what {tool} loads. Board runs use {board}: the marking only applies to it.',
+  'não encontrada nesta máquina': 'not found on this machine',
+  'Marcados para as execuções do board, mas o arquivo não existe mais:': 'Marked for board runs, but the file no longer exists:',
+  Desmarcar: 'Unmark',
+  'Entra no começo de toda conversa da ferramenta': 'Loaded at the start of every conversation of the tool',
+  'sempre carregado': 'always loaded',
+  'A ferramenta só lê o conteúdo quando a tarefa pede ou quando você chama':
+    'The tool only reads the content when the task calls for it or when you call it',
+  'sob demanda': 'on demand',
   'Abre o arquivo no board, para ler e editar': 'Opens the file in the board, to read and edit',
   'Abre o arquivo no board, só para leitura': 'Opens the file in the board, read-only',
   'Somente leitura: este arquivo é mantido pela ferramenta ou por um plugin.':

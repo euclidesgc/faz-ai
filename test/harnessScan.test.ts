@@ -14,6 +14,8 @@ import {
   createTargets,
   groupOf,
   hookTargets,
+  importPath,
+  instructionRoles,
   mcpTargets,
   permissionTargets,
 } from '../src/shared/harnessCatalog';
@@ -205,6 +207,30 @@ describe('criar, copiar e apagar itens do harness', () => {
         'x',
       ),
     ).toThrow();
+  });
+
+  it('não cria nos lugares alternativos do CLAUDE.md e do AGENTS.md', () => {
+    const ops = new HarnessOps(project, home);
+    const labels = createTargets('claude').map((t) => t.label);
+    expect(labels).toEqual(expect.arrayContaining(['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md']));
+    expect(labels).not.toContain('.claude/CLAUDE.md');
+    expect(labels).not.toContain('.claude/AGENTS.md');
+    const alt = HARNESS_CATALOG.claude.findIndex((s) => s.scope === 'project' && s.path === '.claude/CLAUDE.md');
+    expect(() => ops.create('claude', alt, '', '')).toThrow();
+  });
+
+  it('separa os arquivos que decidem se o Claude Code lê o AGENTS.md e monta o caminho do @import', () => {
+    write(project, 'CLAUDE.local.md', '# Local');
+    write(project, '.claude/AGENTS.md', '# Agentes');
+    write(project, 'CLAUDE.md', '# Projeto');
+    const { claudeMd, agentsMd } = instructionRoles('claude', scanInventory('claude', project, home));
+    expect(claudeMd.map((i) => i.location)).toEqual(['CLAUDE.md', 'CLAUDE.local.md']);
+    expect(agentsMd.map((i) => i.location)).toEqual(['.claude/AGENTS.md']);
+    // no Cursor o AGENTS.md não tem esse papel
+    expect(instructionRoles('cursor', scanInventory('cursor', project, home)).agentsMd).toEqual([]);
+    expect(importPath('CLAUDE.md', '.claude/AGENTS.md')).toBe('.claude/AGENTS.md');
+    expect(importPath('.claude/CLAUDE.md', 'AGENTS.md')).toBe('../AGENTS.md');
+    expect(importPath('.claude/CLAUDE.md', '.claude/AGENTS.md')).toBe('AGENTS.md');
   });
 
   it('copia do global e de plugin para o projeto, com a pasta inteira da skill', () => {

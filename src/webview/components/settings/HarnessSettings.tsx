@@ -4,6 +4,7 @@ import { useBoardStore, type HarnessTab } from '../../store/boardStore';
 import { HarnessInventory } from './HarnessInventory';
 import { ProjectTool } from './harness/ProjectTool';
 import { RunnerSettings } from './harness/RunnerSettings';
+import { HarnessScopeView } from './harness/HarnessScopeView';
 import { ScopeHarness } from './harness/ScopeHarness';
 import { PageHeader } from './PageHeader';
 import { t } from '../../i18n';
@@ -36,7 +37,7 @@ export function HarnessSettings() {
           <RunnerSettings tool={tool} />
         </Tabs.Content>
         <Tabs.Content value="project">
-          <ScopeHarness key="project" tool={tool} scope="project" />
+          <HarnessScopeView key="project" scope="project" />
         </Tabs.Content>
         <Tabs.Content value="user">
           <ScopeHarness key="user" tool={tool} scope="user" />

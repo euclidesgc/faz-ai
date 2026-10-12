@@ -117,8 +117,8 @@ export const shared: Record<string, string> = {
     'What the AI may do without asking (allow), must ask first (ask) or may never do (deny).',
   'Muda o jeito de o Claude Code responder (tom, formato); escolhido com /output-style.':
     'Changes the way Claude Code answers (tone, format); chosen with /output-style.',
-  'Instruções no padrão aberto AGENTS.md; o Claude Code as lê quando o projeto não tem CLAUDE.md.':
-    'Instructions in the open AGENTS.md format; Claude Code reads them when the project has no CLAUDE.md.',
+  'Instruções no padrão aberto AGENTS.md, lidas também pelo Cursor; o Claude Code só as lê quando o projeto não tem CLAUDE.md.':
+    'Instructions in the open AGENTS.md standard, also read by Cursor; Claude Code only reads them when the project has no CLAUDE.md.',
   'Instruções e arquivos de apoio que o Cursor carrega quando a tarefa pede; só a descrição fica sempre à vista.':
     'Instructions and support files Cursor loads when the task calls for them; only the description is always in view.',
   'Ajudante com instruções próprias, para o qual o Cursor delega partes do trabalho.':
@@ -129,8 +129,8 @@ export const shared: Record<string, string> = {
     'The same as the root CLAUDE.md, kept in the .claude folder; also loaded in every conversation.',
   'Suas regras pessoais para este projeto, lidas em toda conversa; ficam fora do repositório.':
     'Your personal rules for this project, read in every conversation; kept out of the repository.',
-  'Regra de um assunto; com `paths` no topo, só entra quando a IA mexe nesses arquivos.':
-    'A rule on one topic; with `paths` at the top, it only loads when the AI works on those files.',
+  'Regra de um assunto; com paths no topo, só entra quando a IA mexe nesses arquivos.':
+    'A rule on one topic; with paths at the top, it only loads when the AI works on those files.',
   'Suas regras pessoais, lidas em toda conversa de qualquer projeto.': 'Your personal rules, read in every conversation of any project.',
   'Sua regra de um assunto, que vale em todos os projetos.': 'Your rule on one topic, applied to every project.',
   'Comando que o Claude Code roda sozinho num evento (antes de editar, ao terminar…); vai no repositório.':
