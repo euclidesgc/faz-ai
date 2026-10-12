@@ -162,6 +162,13 @@ describe('HarnessScopeView: Projeto', () => {
     expect(main.queryByText(/faz ele parar de ler/)).toBeNull();
   });
 
+  it('com o AGENTS.md importado pelo CLAUDE.md, ele não aparece como não lido', () => {
+    const claude = { ...CLAUDE_ITEMS[0]!, imports: [{ path: agentsMd.path, location: 'AGENTS.md', depth: 1 }] };
+    setClaudeItems([claude, agentsMd]);
+    renderThemed(<HarnessScopeView scope="project" />);
+    expect(card('Regras principais').queryByText('não lido pelo Claude Code')).toBeNull();
+  });
+
   it('no Cursor, o AGENTS.md não tem o aviso do Claude Code', async () => {
     renderThemed(<HarnessScopeView scope="project" />);
     await userEvent.click(screen.getByRole('radio', { name: 'Cursor' }));

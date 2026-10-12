@@ -839,8 +839,16 @@ board's editor**, the same one used for attachments: formatted Markdown or code,
 (edit), **Salvar** (save) and **Cancelar** (cancel), and **Abrir no editor** (open in editor) for
 those who prefer VS Code. Invalid JSON is not saved; files from plugins, `~/.claude.json` and the
 organization policy open read-only. Files the tool would read but that do not exist yet show up at
-the end of the group with a **Criar** (create) button, and the new file opens right away in the
-editor.
+the end of the group with a **Criar** (create) button and a sentence on each, and the new file opens
+right away in the editor.
+
+In Claude Code's **Regras principais** (main rules), the board offers to create `CLAUDE.md`,
+`CLAUDE.local.md` (yours only, outside git) and, only when the project has no `CLAUDE.md`,
+`AGENTS.md`: by default, Claude Code reads `AGENTS.md` only when there is no `CLAUDE.md`,
+`.claude/CLAUDE.md` or `CLAUDE.local.md`. If the project has both and no `CLAUDE.md` imports
+`AGENTS.md` with `@`, it shows as **não lido pelo Claude Code** (not read by Claude Code), with the
+`@import` that fixes it. If it has only `AGENTS.md`, the board warns that creating a `CLAUDE.md`
+makes Claude Code stop reading it.
 
 For rules and skills of the project's tool, each row has the **Uso nas execuções do board** (use in
 board runs) choice:
