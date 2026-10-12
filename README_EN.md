@@ -1047,8 +1047,8 @@ serves the board in the browser. The tests cover the extension's activation (wit
 
 `npm run e2e:cursor` opens Cursor inside a Docker container with a clean Ubuntu 24.04: no Node, git,
 gh, uv, Code Review Graph or Cursor CLI. It is the computer's own Cursor, mounted read-only and
-without any of your settings, and it comes with the extension packaged from the current branch, in
-the `meu-app` test project. The window opens on your screen, and links (sign-in, **Learn more**)
+without any of your settings (on macOS, a Cursor downloaded into the image), and it comes with the
+extension packaged from the current branch, in the `meu-app` test project. Links (sign-in, **Learn more**)
 open in the computer's browser. Use it to see the environment check and each item's installation as
 on a new machine. Inside it, the `dev` user has passwordless `sudo`. Sign-ins are yours, done by
 you.
@@ -1060,8 +1060,17 @@ you.
 | `npm run e2e:cursor -- parar` | closes Cursor and stops the container |
 | `npm run e2e:cursor -- remover` | deletes the container, the image and the cache (`~/.cache/faz-ai-e2e`) |
 
-It needs Docker without `sudo`, a Wayland session and Cursor installed in `/usr/share/cursor` (`.deb`
-package). The files are in `scripts/e2e-cursor/`.
+It needs Docker without `sudo`. There are two modes, picked on their own:
+
+- **Linux with a Wayland session and Cursor in `/usr/share/cursor`** (`.deb` package): the container
+  uses the computer's Cursor, and the window opens on your screen.
+- **macOS, or Linux without Wayland:** the image downloads Cursor for Linux from the official site (in
+  the computer's architecture, ARM64 on an Apple Silicon Mac), and its screen opens in a browser tab,
+  at `http://localhost:6080`, through noVNC. The first start downloads Cursor and takes a few minutes.
+  The machine has the `python3` noVNC uses, like a freshly installed Ubuntu desktop.
+  `FAZAI_E2E_MODO=novnc` forces this mode on a Linux with Wayland.
+
+The files are in `scripts/e2e-cursor/`.
 
 ### Setting up the development environment
 

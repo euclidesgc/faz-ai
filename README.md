@@ -1001,8 +1001,8 @@ serve o board no navegador. Os testes cobrem a ativação da extensão (com um e
 
 `npm run e2e:cursor` abre o Cursor dentro de um contêiner Docker com Ubuntu 24.04 limpo: sem Node,
 git, gh, uv, Code Review Graph nem a CLI do Cursor. É o mesmo Cursor do computador, montado só para
-leitura e sem nenhuma configuração sua, e já vem com a extensão empacotada da branch atual, no
-projeto de teste `meu-app`. A janela abre na sua tela, e os links (login, **Saiba mais**) abrem no
+leitura e sem nenhuma configuração sua (no macOS, um Cursor baixado para a imagem), e já vem com a
+extensão empacotada da branch atual, no projeto de teste `meu-app`. Os links (login, **Saiba mais**) abrem no
 navegador do computador. Serve para ver o Diagnóstico do ambiente e instalar cada item como numa
 máquina nova. Dentro dele, o usuário `dev` tem `sudo` sem senha. Os logins são seus, feitos por
 você.
@@ -1014,8 +1014,17 @@ você.
 | `npm run e2e:cursor -- parar` | fecha o Cursor e para o contêiner |
 | `npm run e2e:cursor -- remover` | apaga o contêiner, a imagem e o cache (`~/.cache/faz-ai-e2e`) |
 
-Precisa de Docker sem `sudo`, de uma sessão Wayland e do Cursor instalado em `/usr/share/cursor`
-(pacote `.deb`). Os arquivos ficam em `scripts/e2e-cursor/`.
+Precisa de Docker sem `sudo`. Há dois modos, escolhidos sozinhos:
+
+- **Linux com sessão Wayland e o Cursor em `/usr/share/cursor`** (pacote `.deb`): o contêiner usa o
+  Cursor do computador, e a janela abre na sua tela.
+- **macOS, ou Linux sem Wayland:** a imagem baixa o Cursor para Linux do site oficial (na arquitetura
+  do computador, ARM64 num Mac Apple Silicon), e a tela dele abre numa aba do navegador, em
+  `http://localhost:6080`, pelo noVNC. A primeira subida baixa o Cursor e demora alguns minutos. A
+  máquina tem o `python3` que o noVNC usa, como um Ubuntu desktop recém-instalado.
+  `FAZAI_E2E_MODO=novnc` força este modo num Linux com Wayland.
+
+Os arquivos ficam em `scripts/e2e-cursor/`.
 
 ### Preparar o ambiente de desenvolvimento
 
