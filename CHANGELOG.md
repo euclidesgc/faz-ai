@@ -19,6 +19,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   registro, abrir no terminal) é o botão azul principal; o **Copiar comando** ganhou contorno e os
   botões da tela saíram do tamanho pequeno. No topo, **Ir para o board** é o principal e **Verificar de
   novo** deixou de ser um botão discreto.
+- **Arquivos do harness abrem no board.** Clicar no caminho de uma rule, skill, agente, comando ou
+  arquivo de configuração no Harness de IA abre o arquivo numa janela do próprio board, no mesmo
+  modelo dos anexos: Markdown formatado ou código, edição com salvar e cancelar, e o botão **Abrir no
+  editor** para quem preferir o editor. JSON inválido não é gravado, e o que vem de plugin e o
+  `~/.claude.json` abrem só para leitura.
 - **A detecção de merges acontece no heartbeat.** Saíram do Git a opção **Concluir a história
   quando o pull request for mergeado** e o intervalo próprio dela (15 minutos), com as chaves
   `fazai.git.watchMerges` e `fazai.git.watchMergeMinutes` do Settings do editor. Agora cada rodada do

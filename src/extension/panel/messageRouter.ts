@@ -74,6 +74,8 @@ const bridgeOnly = {
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
   'harness.item.open': viaBridge,
+  'harness.file.read': viaBridge,
+  'harness.file.write': viaBridge,
   'harness.item.create': viaBridge,
   'harness.skill.file.create': viaBridge,
   'harness.skill.file.open': viaBridge,
@@ -435,6 +437,17 @@ export class MessageRouter {
   /** Caminho de um arquivo de apoio que a varredura listou. */
   skillFilePath(tool: AiTool, skillMd: string, rel: string): string {
     return this.ctx.harness.skillFilePath(tool, skillMd, rel);
+  }
+
+  /** Conteúdo de um arquivo do harness para o editor do board, e se ele pode ser alterado. */
+  readHarnessFile(file: string): { content: string; readonly: boolean } {
+    return this.ctx.harness.readFile(file);
+  }
+
+  /** Grava um arquivo do harness editado no board e relê a varredura. */
+  writeHarnessFile(file: string, content: string): void {
+    this.ctx.harness.writeFile(file, content);
+    this.changed();
   }
 
   /** Cria um item do harness e devolve o caminho do arquivo, para abrir no editor. */

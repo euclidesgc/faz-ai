@@ -1023,6 +1023,19 @@ button.ghost.on {
   font-size: var(--fs-sm);
   resize: vertical;
 }
+.harness-file-path {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.attachment-modal-body pre.harness-file-meta {
+  padding: var(--sp-8);
+  border-radius: var(--radius-sm);
+  background: var(--code-bg);
+  color: var(--muted);
+}
 .attachment-modal-body img {
   max-width: 100%;
   max-height: 70vh;

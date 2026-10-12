@@ -6,6 +6,7 @@ import { humanQueue, pendingWork } from '../shared/pending';
 import { useBoardStore, useHostSync } from './store/boardStore';
 import { ui, attachments } from './commands';
 import { AttachmentModal } from './components/attachment/AttachmentModal';
+import { HarnessFileModal } from './components/settings/harness/HarnessFileModal';
 import type { Attachment } from '../shared/model';
 import { ActivityBar } from './components/ActivityBar';
 import { Board } from './components/Board';
@@ -182,6 +183,7 @@ export function App() {
       )}
       {openCardId && <CardDrawer cardId={openCardId} />}
       <AttachmentModal onSaveAs={saveAttachmentAs} />
+      <HarnessFileModal />
       <Dialog />
       <div className="toasts" aria-live="polite">
         {error && (

@@ -1,6 +1,7 @@
 import { SKILL_MODES, type AiTool, type HarnessItem, type SkillMode } from '../../../../shared/harness';
 import { hookTargets, mcpTargets } from '../../../../shared/harnessCatalog';
 import { harness } from '../../../commands';
+import { useBoardStore } from '../../../store/boardStore';
 import { Badge, Button, Checkbox, IconButton } from '@radix-ui/themes';
 import { DeleteButton, IconTrash, SelectField } from '../../ui';
 import { SkillFiles } from './SkillFiles';
@@ -61,8 +62,8 @@ export function ItemRow({ tool, item: i, actions, selected, onSelect, filesOpen,
         <button
           type="button"
           className="path-link"
-          title={editable ? t('Abre o arquivo no editor, onde ele pode ser alterado') : t('Abre o arquivo no editor')}
-          onClick={() => harness.openItem(i.path)}
+          title={editable ? t('Abre o arquivo no board, para ler e editar') : t('Abre o arquivo no board, só para leitura')}
+          onClick={() => useBoardStore.getState().openHarnessFile(i.path)}
         >
           {i.location}
         </button>

@@ -23,6 +23,9 @@ import { McpServers } from '../../mcpServers';
 import { findSkills, installSkills } from '../../skillInstall';
 import type { BoardContext, HandlerMap } from './context';
 
+/** Teto do arquivo que o editor do board abre: regras, skills e configurações passam longe disso. */
+const MAX_EDIT_BYTES = 512 * 1024;
+
 /** Regras, skills, agentes, hooks e servidores MCP do projeto e da ferramenta em uso, como a varredura os encontrou. */
 export class BoardHarness {
   current: Harness = EMPTY_HARNESS;
@@ -174,6 +177,41 @@ export class BoardHarness {
     const item = this.item(tool, 'skill', skillMd);
     if (!item.files?.includes(rel)) throw new Error('Arquivo fora do harness.');
     return path.join(path.dirname(skillMd), ...rel.split('/'));
+  }
+
+  /**
+   * Se o editor do board pode gravar no arquivo. Só abre o que a varredura listou, de qualquer ferramenta.
+   * Fica só leitura o que vem de plugin, o que está fora do projeto e da pasta do usuário, e o
+   * `~/.claude.json`, que o Claude Code reescreve o tempo todo.
+   */
+  private access(file: string): { readonly: boolean } {
+    const items = this.current.inventory.flatMap((t) => t.items).filter((i) => i.path === file);
+    if (!items.length) throw new Error('Arquivo fora do harness.');
+    const inside = [this.ctx.opts.workspaceDir, this.ctx.home].some((b) => b && file.startsWith(b + path.sep));
+    const readonly = !inside || items.some((i) => i.scope === 'plugin') || file === path.join(this.ctx.home, '.claude.json');
+    return { readonly };
+  }
+
+  /** Conteúdo de um arquivo do harness para o editor do board. */
+  readFile(file: string): { content: string; readonly: boolean } {
+    const { readonly } = this.access(file);
+    if (fs.statSync(file).size > MAX_EDIT_BYTES) throw new Error('Arquivo maior que 512 KB: abra no editor.');
+    return { content: fs.readFileSync(file, 'utf8'), readonly };
+  }
+
+  /** Grava o texto editado no board. JSON inválido é recusado: a ferramenta deixaria de ler o arquivo inteiro. */
+  writeFile(file: string, content: string): void {
+    if (this.access(file).readonly) throw new Error('Este arquivo não pode ser alterado pelo board.');
+    if (/\.json$/i.test(file)) {
+      try {
+        // os arquivos de configuração das ferramentas aceitam comentários de linha
+        JSON.parse(content.replace(/^\s*\/\/.*$/gm, ''));
+      } catch (e) {
+        throw new Error(`JSON inválido, nada foi gravado: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    fs.writeFileSync(file, content);
+    this.load();
   }
 
   /** Cria um item do harness e devolve o caminho do arquivo. */

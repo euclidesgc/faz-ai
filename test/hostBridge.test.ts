@@ -59,6 +59,54 @@ describe('HostBridge: chat', () => {
   });
 });
 
+describe('HostBridge: harness.file.read / harness.file.write', () => {
+  const result = () => sent.at(-1) as { content?: string; readonly?: boolean; error?: string; ok?: boolean };
+
+  it('lê e grava um arquivo que a varredura listou, e relê o harness', async () => {
+    fs.mkdirSync(path.join(dir, '.claude', 'rules'), { recursive: true });
+    const rule = path.join(dir, '.claude', 'rules', 'estilo.md');
+    fs.writeFileSync(rule, '# Estilo\n');
+    router.refreshHarness();
+    await bridge.handle({ type: 'harness.file.read', requestId: 'r1', path: rule });
+    expect(sent.at(-1)).toEqual({ type: 'harness.file.readResult', requestId: 'r1', content: '# Estilo\n', readonly: false });
+    await bridge.handle({
+      type: 'harness.file.write',
+      requestId: 'w1',
+      path: rule,
+      content: '---\ndescription: Estilo do código\n---\n# Estilo\n',
+    });
+    expect(sent.at(-1)).toEqual({ type: 'harness.file.writeResult', requestId: 'w1', ok: true });
+    expect(fs.readFileSync(rule, 'utf8')).toContain('Estilo do código');
+    const item = router
+      .snapshot()
+      .harness.inventory.flatMap((t) => t.items)
+      .find((i) => i.path === rule);
+    expect(item?.description).toBe('Estilo do código');
+  });
+
+  it('recusa arquivo fora da varredura, JSON inválido e o ~/.claude.json', async () => {
+    const outside = path.join(dir, 'segredo.txt');
+    fs.writeFileSync(outside, 'x');
+    await bridge.handle({ type: 'harness.file.read', requestId: 'r2', path: outside });
+    expect(result().error).toBe('Arquivo fora do harness.');
+
+    fs.writeFileSync(path.join(dir, '.mcp.json'), '{ "mcpServers": { "a": { "command": "x" } } }');
+    fs.mkdirSync(path.join(dir, 'h'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'h', '.claude.json'), '{ "mcpServers": { "b": { "command": "y" } } }');
+    router.refreshHarness();
+    await bridge.handle({ type: 'harness.file.write', requestId: 'w2', path: path.join(dir, '.mcp.json'), content: '{ quebrado' });
+    expect(result()).toMatchObject({ ok: false });
+    expect(result().error).toMatch(/^JSON inválido, nada foi gravado/);
+    expect(fs.readFileSync(path.join(dir, '.mcp.json'), 'utf8')).toContain('"a"');
+
+    const claudeJson = path.join(dir, 'h', '.claude.json');
+    await bridge.handle({ type: 'harness.file.read', requestId: 'r3', path: claudeJson });
+    expect(result()).toMatchObject({ readonly: true });
+    await bridge.handle({ type: 'harness.file.write', requestId: 'w3', path: claudeJson, content: '{}' });
+    expect(result()).toMatchObject({ ok: false, error: 'Este arquivo não pode ser alterado pelo board.' });
+  });
+});
+
 describe('HostBridge: attachment.read / attachment.write', () => {
   function createAttachment(content: string, filename = 'nota.txt'): string {
     const snap = router.snapshot();

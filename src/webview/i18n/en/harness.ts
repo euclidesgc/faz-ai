@@ -56,8 +56,12 @@ export const harness: Record<string, string> = {
   'Selecionar {name}': 'Select {name}',
   'copiada no projeto': 'copied in the project',
   'no projeto, com conteúdo diferente': 'in the project, with different content',
-  'Abre o arquivo no editor, onde ele pode ser alterado': 'Opens the file in the editor, where it can be changed',
-  'Abre o arquivo no editor': 'Opens the file in the editor',
+  'Abre o arquivo no board, para ler e editar': 'Opens the file in the board, to read and edit',
+  'Abre o arquivo no board, só para leitura': 'Opens the file in the board, read-only',
+  'Somente leitura: este arquivo é mantido pela ferramenta ou por um plugin.':
+    'Read-only: this file is maintained by the tool or by a plugin.',
+  'Conteúdo do arquivo': 'File content',
+  'Não foi possível salvar o arquivo.': 'The file could not be saved.',
   'Modo da skill {name}': 'Mode of skill {name}',
   'Skill de plugin: o modo não pode ser alterado aqui. Para mudar, copie a skill para o projeto.':
     'Plugin skill: the mode cannot be changed here. To change it, copy the skill to the project.',
