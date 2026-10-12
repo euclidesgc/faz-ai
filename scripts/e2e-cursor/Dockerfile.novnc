@@ -18,7 +18,9 @@ RUN arch="$(dpkg --print-architecture)" \
     && test -n "$url" \
     && curl -fsSL -o /tmp/cursor.deb "$url" \
     && apt-get update && apt-get install -y --no-install-recommends /tmp/cursor.deb \
-    && rm -rf /tmp/cursor.deb /var/lib/apt/lists/*
+    && rm -rf /tmp/cursor.deb /var/lib/apt/lists/* \
+    # o .deb registra o repositório do Cursor sem a chave: o `apt update` da pessoa falharia nele
+    && rm -f /etc/apt/sources.list.d/cursor.sources /etc/apt/sources.list.d/cursor.list
 COPY --chmod=755 novnc.sh /usr/local/bin/start-novnc
 COPY openbox-rc.xml /etc/xdg/openbox/fazai-rc.xml
 USER dev
