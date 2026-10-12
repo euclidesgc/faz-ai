@@ -19,6 +19,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   registro, abrir no terminal) é o botão azul principal; o **Copiar comando** ganhou contorno e os
   botões da tela saíram do tamanho pequeno. No topo, **Ir para o board** é o principal e **Verificar de
   novo** deixou de ser um botão discreto.
+- **O que as regras puxam.** Nas instruções do Claude Code, o Harness mostra os arquivos importados
+  com `@caminho` (fora de código, até quatro níveis, como o Claude Code faz), e cada um abre no editor
+  do board. Os `CLAUDE.md`, `CLAUDE.local.md` e `AGENTS.md` de subpastas, que a ferramenta lê quando
+  mexe nelas, entram em Regras principais com o selo "sob demanda"; a busca ignora pastas ocultas e
+  de dependências.
 - **Sai a aba "Tudo que a ferramenta carrega".** O que ela mostrava agora está nas abas Projeto e
   Global, em grupos e com a frase de cada item; os formulários de servidor MCP, hook, regra de
   permissão e a busca de skills foram junto. A seleção em massa (marcar vários itens e copiar, mudar o

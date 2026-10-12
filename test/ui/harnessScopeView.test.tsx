@@ -1,6 +1,6 @@
 import { lastSent, renderThemed, seedBoard } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HARNESS_CATALOG } from '../../src/shared/harnessCatalog';
 import type { AiTool, HarnessItem } from '../../src/shared/harness';
@@ -20,7 +20,13 @@ const item = (over: Partial<HarnessItem> & Pick<HarnessItem, 'name' | 'kind' | '
 });
 
 const CLAUDE_ITEMS: HarnessItem[] = [
-  item({ kind: 'instructions', name: 'CLAUDE.md', location: 'CLAUDE.md', source: sourceOf('claude', 'CLAUDE.md', 'main') }),
+  item({
+    kind: 'instructions',
+    name: 'CLAUDE.md',
+    location: 'CLAUDE.md',
+    source: sourceOf('claude', 'CLAUDE.md', 'main'),
+    imports: [{ path: '/abs/docs/guia.md', location: 'docs/guia.md', depth: 1 }],
+  }),
   item({
     kind: 'instructions',
     name: 'estilo',
@@ -97,6 +103,15 @@ describe('HarnessScopeView: Projeto', () => {
     expect(card('Memória').getByRole('button', { name: '~/.claude/projects/-abs/memory/MEMORY.md' })).toBeInTheDocument();
   });
 
+  it('mostra o que o CLAUDE.md importa com @, e o importado abre no editor do board', async () => {
+    renderThemed(<HarnessScopeView scope="project" />);
+    const main = card('Regras principais');
+    expect(main.getByText('Importa com @, e entram junto:')).toBeInTheDocument();
+    await userEvent.click(main.getByRole('button', { name: 'docs/guia.md' }));
+    expect(useBoardStore.getState().harnessFile).toBe('/abs/docs/guia.md');
+    act(() => useBoardStore.getState().closeHarnessFile());
+  });
+
   it('oferece criar os arquivos que a ferramenta leria e ainda não existem', async () => {
     renderThemed(<HarnessScopeView scope="project" />);
     await userEvent.click(card('Regras principais').getByRole('button', { name: 'Criar CLAUDE.local.md' }));
@@ -145,6 +160,13 @@ describe('HarnessScopeView: Projeto', () => {
     // só o CLAUDE.md continua sempre carregado
     expect(main.getAllByText('sempre carregado')).toHaveLength(1);
     expect(main.queryByText(/faz ele parar de ler/)).toBeNull();
+  });
+
+  it('com o AGENTS.md importado pelo CLAUDE.md, ele não aparece como não lido', () => {
+    const claude = { ...CLAUDE_ITEMS[0]!, imports: [{ path: agentsMd.path, location: 'AGENTS.md', depth: 1 }] };
+    setClaudeItems([claude, agentsMd]);
+    renderThemed(<HarnessScopeView scope="project" />);
+    expect(card('Regras principais').queryByText('não lido pelo Claude Code')).toBeNull();
   });
 
   it('no Cursor, o AGENTS.md não tem o aviso do Claude Code', async () => {

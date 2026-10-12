@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { HarnessOps } from '../src/extension/harnessOps';
-import { scanInventory } from '../src/extension/harnessScan';
+import { importsOf, scanInventory } from '../src/extension/harnessScan';
 import { HooksAndPermissions } from '../src/extension/hooksAndPermissions';
 import { McpServers } from '../src/extension/mcpServers';
 import { setSkillMode, skillMode } from '../src/extension/skillMode';
@@ -78,6 +78,50 @@ describe('varredura do harness por ferramenta e escopo', () => {
         '',
       ),
     ).toThrow('Não é possível criar um item neste lugar.');
+  });
+
+  it('Claude Code: os @caminho das instruções, fora de código, até quatro níveis e sem repetir', () => {
+    write(
+      project,
+      'CLAUDE.md',
+      [
+        'Veja @docs/arquitetura.md e @~/.claude/pessoal.md.',
+        'O e-mail fulano@empresa.com não é importação, nem `@README` em código, nem @nao-existe.md.',
+        '```',
+        '@docs/dentro-de-bloco.md',
+        '```',
+      ].join('\n'),
+    );
+    write(project, 'docs/arquitetura.md', 'Detalhes em @camadas.md');
+    write(project, 'docs/camadas.md', 'Volta para @arquitetura.md');
+    write(project, 'docs/dentro-de-bloco.md', 'x');
+    write(home, '.claude/pessoal.md', 'Meu jeito');
+    const claude = scanInventory('claude', project, home, path.join(root, 'sem-politica')).find((i) => i.location === 'CLAUDE.md')!;
+    expect(claude.imports).toEqual([
+      { path: path.join(project, 'docs/arquitetura.md'), location: 'docs/arquitetura.md', depth: 1 },
+      { path: path.join(project, 'docs/camadas.md'), location: 'docs/camadas.md', depth: 2 },
+      { path: path.join(home, '.claude/pessoal.md'), location: '~/.claude/pessoal.md', depth: 1 },
+    ]);
+    // uma cadeia longa para no quarto nível
+    for (let n = 1; n <= 6; n++) write(project, `cadeia/${n}.md`, `@${n + 1}.md`);
+    expect(importsOf(path.join(project, 'cadeia/1.md'), home).map((x) => x.depth)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('regras de subpasta: CLAUDE.md e AGENTS.md abaixo da raiz, sem pastas ocultas nem de dependências', () => {
+    write(project, 'CLAUDE.md', '# Raiz');
+    write(project, 'packages/api/CLAUDE.md', '---\ndescription: Regras da API\n---\n');
+    write(project, 'packages/web/AGENTS.md', '# Web');
+    write(project, 'node_modules/lib/CLAUDE.md', 'de dependência');
+    write(project, '.git/CLAUDE.md', 'oculto');
+    const claude = scanInventory('claude', project, home, path.join(root, 'sem-politica'));
+    const nested = claude.filter((i) => HARNESS_CATALOG.claude[i.source!]?.layout === 'nested');
+    expect(nested.map((i) => i.name)).toEqual(['packages/api/CLAUDE.md', 'packages/web/AGENTS.md']);
+    expect(nested[0]).toMatchObject({ description: 'Regras da API', layout: 'file', scope: 'project' });
+    expect(groupOf('claude', nested[0]!)).toBe('main');
+    const cursor = scanInventory('cursor', project, home, path.join(root, 'sem-politica'));
+    expect(cursor.filter((i) => HARNESS_CATALOG.cursor[i.source!]?.layout === 'nested').map((i) => i.name)).toEqual([
+      'packages/web/AGENTS.md',
+    ]);
   });
 
   it('Cursor: .cursorignore e comandos da pasta do usuário', () => {

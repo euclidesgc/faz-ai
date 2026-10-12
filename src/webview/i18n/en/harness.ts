@@ -82,6 +82,8 @@ export const harness: Record<string, string> = {
   'A ferramenta só lê o conteúdo quando a tarefa pede ou quando você chama':
     'The tool only reads the content when the task calls for it or when you call it',
   'sob demanda': 'on demand',
+  'Importa com @, e entram junto:': 'Imports with @, which load along with it:',
+  'Abre o arquivo importado no board': 'Opens the imported file in the board',
   'Abre o arquivo no board, para ler e editar': 'Opens the file in the board, to read and edit',
   'Abre o arquivo no board, só para leitura': 'Opens the file in the board, read-only',
   'Somente leitura: este arquivo é mantido pela ferramenta ou por um plugin.':

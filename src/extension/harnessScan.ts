@@ -81,6 +81,57 @@ function walk(dir: string, ext: string, depth = 0): string[] {
   });
 }
 
+/** Pastas que não entram na busca de regras de subpasta: dependências, saídas de build e controle de versão. */
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', 'vendor', 'target', 'bower_components']);
+const MAX_NESTED_DEPTH = 4;
+const MAX_NESTED_DIRS = 2000;
+
+/** Arquivos com um dos nomes nas subpastas do projeto (sem a raiz), sem entrar em pastas ocultas nem de dependências. */
+function nestedFiles(root: string, names: string[]): string[] {
+  const found: string[] = [];
+  let visited = 0;
+  const visit = (dir: string, depth: number) => {
+    if (depth > MAX_NESTED_DEPTH || ++visited > MAX_NESTED_DIRS) return;
+    for (const n of entries(dir)) {
+      if (n.startsWith('.') || SKIP_DIRS.has(n)) continue;
+      const p = path.join(dir, n);
+      if (!isDir(p)) continue;
+      for (const name of names) if (isFile(path.join(p, name))) found.push(path.join(p, name));
+      visit(p, depth + 1);
+    }
+  };
+  visit(root, 1);
+  return found;
+}
+
+/** Até onde o Claude Code segue um `@caminho` que importa outro que importa outro. */
+const MAX_IMPORT_HOPS = 4;
+
+/**
+ * Os `@caminho` de um arquivo de instruções do Claude Code: fora de blocos e trechos de código, com o
+ * caminho relativo à pasta do arquivo, a partir de `~/` ou absoluto, e `\ ` para espaço. Só os que
+ * existem, com os importados por eles, sem repetir nem voltar a um arquivo já visto.
+ */
+export function importsOf(file: string, homeDir: string, depth = 1, seen = new Set([file])): { path: string; depth: number }[] {
+  if (depth > MAX_IMPORT_HOPS) return [];
+  const text = readConfig(file);
+  if (text === null) return [];
+  const out: { path: string; depth: number }[] = [];
+  const prose = text.replace(/^(```|~~~)[\s\S]*?^\1/gm, '').replace(/`[^`\n]*`/g, '');
+  for (const m of prose.matchAll(/(?:^|\s)@((?:\\ |[^\s])+)/g)) {
+    const raw = m[1]!.replace(/\\ /g, ' ').replace(/[.,;:)]+$/, '');
+    const target = raw.startsWith('~/')
+      ? path.join(homeDir, raw.slice(2))
+      : path.isAbsolute(raw)
+        ? raw
+        : path.resolve(path.dirname(file), raw);
+    if (seen.has(target) || !isFile(target)) continue;
+    seen.add(target);
+    out.push({ path: target, depth }, ...importsOf(target, homeDir, depth + 1, seen));
+  }
+  return out;
+}
+
 const MAX_SKILL_FILES = 100;
 
 /** Arquivos de apoio da pasta de uma skill (tudo menos o SKILL.md e arquivos ocultos), relativos a ela. */
@@ -123,7 +174,7 @@ interface Ctx {
   homeDir: string;
 }
 
-type Found = Omit<HarnessItem, 'location'>;
+type Found = Omit<HarnessItem, 'location' | 'imports'>;
 
 const MAX_DIGEST_BYTES = 256 * 1024;
 
@@ -140,7 +191,8 @@ function digest(file: string): string | undefined {
 function scanSource(src: HarnessSource, base: string, ctx: Ctx, source?: number): Found[] {
   const target = path.join(base, src.path.replace('{project}', claudeProjectKey(ctx.projectDir)));
   const scope: HarnessScope = src.builtin ? 'plugin' : src.scope;
-  const layout = src.layout === 'file' || src.layout === 'files' || src.layout === 'skills' ? src.layout : 'entry';
+  const layout =
+    src.layout === 'nested' ? 'file' : src.layout === 'file' || src.layout === 'files' || src.layout === 'skills' ? src.layout : 'entry';
   const item = (name: string, description: string, file: string): Found => ({
     kind: src.kind,
     scope,
@@ -184,6 +236,8 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx, source?: number)
         ...Object.entries(local).map(([name, v]) => item(name, `${mcpSummary(v)} (só nesta pasta de projeto)`, target)),
       ];
     }
+    case 'nested':
+      return nestedFiles(base, src.names).map((f) => item(path.relative(base, f).split(path.sep).join('/'), descriptionOf(f), f));
     case 'json-permissions': {
       const permissions = obj(readJson(target)?.permissions);
       return src.lists.flatMap((list) =>
@@ -277,5 +331,14 @@ export function scanInventory(
       const key = `${i.kind}|${i.path}|${i.name}|${i.detail ?? ''}`;
       return seen.has(key) ? false : (seen.add(key), true);
     })
-    .map((i) => ({ ...i, location: location(i.path) }));
+    .map((i): HarnessItem => {
+      // o Claude Code expande os `@caminho` das instruções: a tela mostra o que cada arquivo puxa
+      const imports =
+        tool === 'claude' && i.kind === 'instructions' && i.scope !== 'plugin' && i.path.endsWith('.md') ? importsOf(i.path, homeDir) : [];
+      return {
+        ...i,
+        location: location(i.path),
+        ...(imports.length ? { imports: imports.map((x) => ({ ...x, location: location(x.path) })) } : {}),
+      };
+    });
 }

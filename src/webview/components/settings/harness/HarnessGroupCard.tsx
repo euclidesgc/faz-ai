@@ -88,8 +88,9 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
       !items.some((i) => i.source === source) &&
       !(src.role === 'agents-md' && claudeMd.length > 0),
   );
+  // um CLAUDE.md que importa o AGENTS.md com @ faz ele entrar junto
   const unread = (i: HarnessItem) =>
-    claudeMd[0] && agentsMd.includes(i)
+    claudeMd[0] && agentsMd.includes(i) && !claudeMd.some((c) => c.imports?.some((x) => x.path === i.path))
       ? t(
           'Por padrão, o Claude Code não lê este arquivo nas suas conversas, porque o projeto tem {claude}. Para ler os dois, importe com @{path} no {claude} ou mude Project instructions no /config do Claude Code.',
           { claude: claudeMd[0].location, path: importPath(claudeMd[0].location, i.location) },

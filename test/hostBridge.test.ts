@@ -84,6 +84,15 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
     expect(item?.description).toBe('Estilo do código');
   });
 
+  it('abre também o arquivo que o CLAUDE.md importa com @', async () => {
+    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'Veja @docs/guia.md');
+    fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'docs', 'guia.md'), '# Guia');
+    router.refreshHarness();
+    await bridge.handle({ type: 'harness.file.read', requestId: 'r4', path: path.join(dir, 'docs', 'guia.md') });
+    expect(result()).toMatchObject({ content: '# Guia', readonly: false });
+  });
+
   it('recusa arquivo fora da varredura, JSON inválido e o ~/.claude.json', async () => {
     const outside = path.join(dir, 'segredo.txt');
     fs.writeFileSync(outside, 'x');

@@ -85,6 +85,23 @@ export function ItemRow({ tool, item: i, actions, selected = false, onSelect, ex
             {i.description}
           </p>
         )}
+        {i.imports && i.imports.length > 0 && (
+          <div className="item-imports">
+            <span className="muted small">{t('Importa com @, e entram junto:')}</span>
+            {i.imports.map((x) => (
+              <button
+                key={x.path}
+                type="button"
+                className="path-link"
+                style={{ marginLeft: `calc(var(--sp-12) * ${x.depth - 1})` }}
+                title={t('Abre o arquivo importado no board')}
+                onClick={() => useBoardStore.getState().openHarnessFile(x.path)}
+              >
+                {x.location}
+              </button>
+            ))}
+          </div>
+        )}
         <button
           type="button"
           className="path-link"

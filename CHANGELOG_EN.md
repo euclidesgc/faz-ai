@@ -21,6 +21,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   command) got an outline and the buttons on the screen are no longer the small size. At the top, **Ir
   para o board** (Go to the board) is the main button and **Verificar de novo** (Check again) is no
   longer a faint one.
+- **What the rules pull in.** For Claude Code instructions, the harness shows the files imported with
+  `@path` (outside code, up to four levels, as Claude Code does), and each one opens in the board's
+  editor. `CLAUDE.md`, `CLAUDE.local.md` and `AGENTS.md` files in subfolders, which the tool reads
+  when it works in them, appear under main rules with the "on demand" badge; the search skips hidden
+  and dependency folders.
 - **The "Tudo que a ferramenta carrega" (everything the tool loads) tab is gone.** What it showed now
   lives in the Projeto and Global tabs, in groups and with each item's sentence; the MCP server, hook
   and permission rule forms and the skill search moved along. Bulk selection (marking several items

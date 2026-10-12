@@ -25,7 +25,13 @@ export function HarnessFileModal() {
   const file = useBoardStore((s) => s.harnessFile);
   const close = useBoardStore((s) => s.closeHarnessFile);
   // nome e caminho de exibição vêm da varredura; o arquivo apagado por fora some da lista e a modal avisa
-  const item = useBoardStore((s) => s.state?.harness.inventory.flatMap((x) => x.items).find((i) => i.path === s.harnessFile) ?? null);
+  const item = useBoardStore((s) => {
+    const items = s.state?.harness.inventory.flatMap((x) => x.items) ?? [];
+    // um arquivo importado com @ não é item da lista: o caminho de exibição vem da importação
+    return (
+      items.find((i) => i.path === s.harnessFile) ?? items.flatMap((i) => i.imports ?? []).find((x) => x.path === s.harnessFile) ?? null
+    );
+  });
 
   const [content, setContent] = useState<string | null>(null);
   const [readonly, setReadonly] = useState(true);

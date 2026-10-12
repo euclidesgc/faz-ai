@@ -785,7 +785,7 @@ carrega. O conteúdo vem separado em grupos, sempre na mesma ordem:
 
 | Grupo | O que é | Exemplos |
 | --- | --- | --- |
-| Regras principais | Entram no começo de toda conversa | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `~/.claude/CLAUDE.md`; no Cursor, `AGENTS.md` e o aviso das User Rules (que ficam nas configurações dele) |
+| Regras principais | Entram no começo de toda conversa; as de subpasta, quando a IA mexe nela | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `~/.claude/CLAUDE.md`, `packages/api/CLAUDE.md`; no Cursor, `AGENTS.md` (também de subpastas) e o aviso das User Rules (que ficam nas configurações dele) |
 | Regras por assunto | Regras por tema; algumas só entram quando a IA mexe em certos arquivos | `.claude/rules/*.md`, `~/.claude/rules/*.md`, `.cursor/rules/*.mdc` |
 | Memória (Projeto) | Anotações que o Claude Code guarda sozinho sobre o projeto | `~/.claude/projects/<projeto>/memory/` |
 | Skills | Instruções e arquivos de apoio carregados quando a tarefa pede | `.claude/skills/<nome>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
@@ -799,12 +799,21 @@ carrega. O conteúdo vem separado em grupos, sempre na mesma ordem:
 | Organização (Global) | A política da empresa, só leitura | `CLAUDE.md` e `managed-settings.json` da pasta do sistema (`/Library/Application Support/ClaudeCode` no macOS) |
 
 Cada item mostra o nome, **o que é numa frase simples**, se é **sempre carregado** ou **sob
-demanda**, a descrição do próprio arquivo e o caminho. **Clicar no caminho abre o arquivo no editor
+demanda**, a descrição do próprio arquivo e o caminho. Nas instruções do Claude Code aparecem também
+os arquivos que elas importam com `@caminho` (que entram junto, até quatro níveis), e cada um abre
+no editor do board. **Clicar no caminho abre o arquivo no editor
 do board**, o mesmo dos anexos: Markdown formatado ou código, com **Editar**, **Salvar** e
 **Cancelar**, e **Abrir no editor** para quem preferir o VS Code. JSON inválido não é gravado; o que
 vem de plugin, o `~/.claude.json` e a política da organização abrem só para leitura. Os arquivos
-que a ferramenta leria e ainda não existem aparecem no fim do grupo, com o botão **Criar**, e o
-arquivo novo já abre no editor.
+que a ferramenta leria e ainda não existem aparecem no fim do grupo, com o botão **Criar** e a frase
+de cada um, e o arquivo novo já abre no editor.
+
+Em **Regras principais** do Claude Code, o board oferece criar o `CLAUDE.md`, o `CLAUDE.local.md`
+(só seu, fora do git) e, só quando o projeto não tem `CLAUDE.md`, o `AGENTS.md`: por padrão, o
+Claude Code lê o `AGENTS.md` apenas quando não há `CLAUDE.md`, `.claude/CLAUDE.md` nem
+`CLAUDE.local.md`. Se o projeto tem os dois e nenhum `CLAUDE.md` importa o `AGENTS.md` com `@`, ele
+aparece como **não lido pelo Claude Code**, com o `@import` que resolve. Se tem só o `AGENTS.md`, o
+board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo.
 
 Nas rules e skills da ferramenta do projeto, cada linha tem a escolha **Uso nas execuções do
 board**:
