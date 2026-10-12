@@ -43,6 +43,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   dois, o `AGENTS.md` aparece como não lido pelo Claude Code, com o `@import` que faz ele entrar; se
   tem só o `AGENTS.md`, o board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo. Um seletor mostra o que o Claude Code ou o Cursor carregam. Nas
   rules e skills, o uso nas execuções do board vira uma escolha na própria linha.
+- **Recarregar a janela pelo Diagnóstico do ambiente.** Ao lado de **Verificar de novo**, no editor,
+  o botão reinicia a extensão, o que faz valer uma versão recém-instalada. Com a IA trabalhando em
+  algum card, pergunta antes, porque a execução para.
 - **Plugins: desativar, ativar e desinstalar em massa, e só os instalados de verdade.** A lista de
   plugins do Claude Code passa a vir de `claude plugin list --json`. Antes o board mostrava também os
   do catálogo dos marketplaces (`~/.claude/plugins/marketplaces`), que estão disponíveis mas não

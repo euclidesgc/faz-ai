@@ -6,6 +6,7 @@ import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { useBoardStore } from '../store/boardStore';
 import { t, tn } from '../i18n';
 import { ui } from '../commands';
+import { isWeb } from '../vscode';
 import { PageHeader } from './settings/PageHeader';
 import { CopyCommand, RequirementFix, requirementTexts } from './RequirementsBanner';
 import { Button, Hint, IconExternal, IconMissing, IconOk, IconSkipped } from './ui';
@@ -277,6 +278,23 @@ export function EnvironmentView() {
     setAskedAt(Date.now());
     ui.checkEnvironment();
   };
+  // recarregar a janela reinicia a extensão: as execuções de IA em andamento param, então pergunta antes
+  const ask = useBoardStore((s) => s.ask);
+  const running = useBoardStore((s) => s.state?.aiRuns.length ?? 0);
+  const reload = () =>
+    running
+      ? ask({
+          title: t('Recarregar a janela?'),
+          message: tn(
+            running,
+            'A IA está trabalhando em {n} card. Recarregar a janela interrompe essa execução.',
+            'A IA está trabalhando em {n} cards. Recarregar a janela interrompe essas execuções.',
+          ),
+          confirmLabel: t('Recarregar'),
+          danger: true,
+          onConfirm: () => ui.reloadWindow(),
+        })
+      : ui.reloadWindow();
   // um botão do board foi clicado: até a conferência seguinte terminar, os botões mostram que estão trabalhando
   const [fixing, setFixing] = useState(false);
   const busy = checking && fixing;
@@ -318,6 +336,17 @@ export function EnvironmentView() {
             <Button disabled={checking} onClick={recheck}>
               {t('Verificar de novo')}
             </Button>
+            {/* no navegador a página não reinicia o host: recarregar só faz sentido no editor */}
+            {!isWeb && (
+              <Button
+                title={t(
+                  'Reinicia a extensão e lê de novo o PATH, as CLIs e os plugins. Use depois de instalar algo ou de atualizar a extensão.',
+                )}
+                onClick={reload}
+              >
+                {t('Recarregar a janela')}
+              </Button>
+            )}
             <Button variant="primary" onClick={() => setView('board')}>
               {t('Ir para o board')}
             </Button>

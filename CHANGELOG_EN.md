@@ -45,6 +45,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   only `AGENTS.md`, the board warns that creating a `CLAUDE.md` makes Claude Code stop reading it. A
   selector shows what Claude Code or Cursor loads.
   For rules and skills, how board runs use them becomes a choice on the row itself.
+- **Reload the window from the environment check.** Next to **Verificar de novo** (check again), in
+  the editor, the button restarts the extension, which makes a freshly installed version take effect.
+  With the AI working on a card, it asks first, because the run stops.
 - **Plugins: bulk disable, enable and uninstall, and only the ones really installed.** Claude Code's
   plugin list now comes from `claude plugin list --json`. The board used to also show the ones in the
   marketplaces' catalog (`~/.claude/plugins/marketplaces`), which are available but not installed.

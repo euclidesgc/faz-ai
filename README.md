@@ -286,7 +286,9 @@ do projeto vale no lugar do global; corrigir tira ele dali e deixa o global vale
 janela** ou o atalho para o Harness de IA. O ícone some sozinho quando o último item é resolvido. A conferência roda ao abrir o board, quando a
 ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**,
 que relê também o PATH do terminal (um node instalado com o board aberto é encontrado sem recarregar
-a janela), e diz quando nada mudou.
+a janela), e diz quando nada mudou. Ao lado, no editor, **Recarregar a janela** reinicia a extensão:
+é o que faz valer uma extensão recém-atualizada. Com a IA trabalhando em algum card, pergunta antes,
+porque a execução para.
 
 O MCP do board e a skill do fluxo (`faz-ai-fluxo`) contam como requisito em todas as ferramentas:
 mesmo onde as execuções pelo board levam o MCP sozinhas (Claude, Cursor), a conversa no chat do

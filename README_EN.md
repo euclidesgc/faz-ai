@@ -303,7 +303,9 @@ the shortcut to the AI harness. The icon goes away on its own when the last item
 check runs when the board opens, when the tool or permission changes, after connecting, every 5
 minutes and on **Verificar de novo** (check again), which also rereads the terminal PATH (a node
 installed with the board open is found without reloading the window), and says when nothing
-changed.
+changed. Next to it, in the editor, **Recarregar a janela** (reload the window) restarts the
+extension: that is what makes a freshly updated extension take effect. With the AI working on a
+card, it asks first, because the run stops.
 
 The board MCP and the flow skill (`faz-ai-fluxo`) count as requirements for every tool: even where
 runs from the board carry the MCP on their own (Claude, Cursor), conversations in the editor chat or
