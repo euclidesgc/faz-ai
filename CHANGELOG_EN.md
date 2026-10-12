@@ -32,6 +32,8 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   only `AGENTS.md`, the board warns that creating a `CLAUDE.md` makes Claude Code stop reading it. A
   selector shows what Claude Code or Cursor loads.
   For rules and skills, how board runs use them becomes a choice on the row itself.
+- **Warnings actually in amber.** The warnings on the Git, run and Harness screens asked for a color
+  the board did not load and showed up with no color; they now use the palette's amber.
 - **The full harness of each tool.** The board now also finds `AGENTS.md` (and `.claude/AGENTS.md`),
   which Claude Code reads when the project has no `CLAUDE.md`; this project's Claude Code auto memory
   (`~/.claude/projects/<project>/memory/`); the organization policy (the `CLAUDE.md` and

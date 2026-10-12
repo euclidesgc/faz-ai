@@ -58,7 +58,7 @@ export function ItemRow({ tool, item: i, actions, selected = false, onSelect, ex
             </Badge>
           )}
           {unread && (
-            <Badge color="orange" variant="soft">
+            <Badge color="amber" variant="soft">
               {t('não lido pelo Claude Code')}
             </Badge>
           )}

@@ -94,7 +94,7 @@ export function HarnessScopeView({ scope }: { scope: InstallScope }) {
         )}
       </div>
       {missing.length > 0 && (
-        <Callout.Root color="orange" size="1">
+        <Callout.Root color="amber" size="1">
           <Callout.Icon>
             <IconWarning />
           </Callout.Icon>

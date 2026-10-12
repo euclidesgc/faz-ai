@@ -146,7 +146,7 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
       }
     >
       {g === 'hook' && (
-        <Callout.Root color="orange" size="1">
+        <Callout.Root color="amber" size="1">
           <Callout.Icon>
             <IconWarning />
           </Callout.Icon>
@@ -247,7 +247,7 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
             ))}
           </ul>
           {agentsMd[0] && claudeMd.length === 0 && (
-            <Callout.Root color="orange" size="1">
+            <Callout.Root color="amber" size="1">
               <Callout.Icon>
                 <IconWarning />
               </Callout.Icon>

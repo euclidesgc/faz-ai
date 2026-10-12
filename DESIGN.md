@@ -105,8 +105,8 @@ olho.
 - O tema envolve o app em `main.tsx` (`accentColor="indigo"`, `grayColor="slate"`, sem fundo
   próprio). O claro/escuro vem da classe `light`/`dark` que `applyTheme` põe no `body`, junto do
   `data-theme`.
-- Entram só `tokens/base.css`, as escalas `indigo`, `slate` e `red` e `components.css`; sem
-  `utilities.css`. Por isso não use as props de espaçamento e layout dos componentes (`m`, `p`,
+- Entram só `tokens/base.css`, as escalas `indigo`, `slate`, `red` e `amber` e `components.css`;
+  sem `utilities.css`. Aviso usa `color="amber"`: uma cor fora dessas escalas não pinta nada. Por isso não use as props de espaçamento e layout dos componentes (`m`, `p`,
   `gap`, `Flex`, `Box`, `Grid`): o layout fica em `styles.css`.
 - As regras de elemento de `styles.css` (`button`, `input`, `select`, `textarea`, `a`) têm
   `:where(:not([class*='rt-']))`: valem só para os nossos controles e não mexem nos do Radix. Regra
