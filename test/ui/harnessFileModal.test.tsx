@@ -1,9 +1,9 @@
 import { lastSent, renderThemed, seedBoard } from './setup';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HostToWebview } from '../../src/shared/messages';
-import { HarnessFileModal, splitFrontmatter } from '../../src/webview/components/settings/harness/HarnessFileModal';
+import { HarnessFileModal, READ_TIMEOUT_MS, splitFrontmatter } from '../../src/webview/components/settings/harness/HarnessFileModal';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 beforeAll(async () => {
@@ -66,5 +66,23 @@ describe('HarnessFileModal', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('JSON inválido');
     expect(screen.getByRole('textbox', { name: 'Conteúdo do arquivo' })).toHaveValue('{}x');
     act(() => useBoardStore.getState().closeHarnessFile());
+  });
+
+  it('sem resposta do host, desiste e diz para recarregar a janela', () => {
+    vi.useFakeTimers();
+    try {
+      renderThemed(<HarnessFileModal />);
+      open('/projeto/.claude/skills/publicar/SKILL.md');
+      expect(screen.getByText('Carregando…')).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(READ_TIMEOUT_MS));
+      expect(screen.queryByText('Carregando…')).toBeNull();
+      expect(screen.getByText(/O board não respondeu.*Developer: Reload Window/)).toBeInTheDocument();
+      // uma resposta atrasada não muda mais nada
+      reply({ type: 'harness.file.readResult', requestId: readId(), content: '# Tarde', readonly: false });
+      expect(screen.queryByRole('heading', { name: 'Tarde' })).toBeNull();
+      act(() => useBoardStore.getState().closeHarnessFile());
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

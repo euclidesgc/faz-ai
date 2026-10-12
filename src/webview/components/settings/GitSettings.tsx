@@ -117,7 +117,7 @@ export function GitSettings() {
               onChange={(autoMerge) => set({ autoMerge })}
             />
             {git.autoMerge && (
-              <Callout.Root color="orange" size="1">
+              <Callout.Root color="amber" size="1">
                 <Callout.Icon>
                   <IconWarning />
                 </Callout.Icon>

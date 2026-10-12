@@ -3,11 +3,22 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { HarnessOps } from '../src/extension/harnessOps';
-import { scanInventory } from '../src/extension/harnessScan';
+import { importsOf, scanInventory } from '../src/extension/harnessScan';
 import { HooksAndPermissions } from '../src/extension/hooksAndPermissions';
 import { McpServers } from '../src/extension/mcpServers';
 import { setSkillMode, skillMode } from '../src/extension/skillMode';
-import { HARNESS_CATALOG, createTargets, hookTargets, mcpTargets, permissionTargets } from '../src/shared/harnessCatalog';
+import {
+  HARNESS_CATALOG,
+  HARNESS_GROUPS,
+  claudeProjectKey,
+  createTargets,
+  groupOf,
+  hookTargets,
+  importPath,
+  instructionRoles,
+  mcpTargets,
+  permissionTargets,
+} from '../src/shared/harnessCatalog';
 
 let root: string;
 let project: string;
@@ -32,6 +43,100 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
 describe('varredura do harness por ferramenta e escopo', () => {
+  it('toda fonte do catálogo diz o grupo e o que é, numa frase', () => {
+    const groups = HARNESS_GROUPS.map((g) => g.id);
+    for (const list of Object.values(HARNESS_CATALOG))
+      for (const src of list) {
+        expect(groups).toContain(src.group);
+        expect(src.hint?.length).toBeGreaterThan(20);
+      }
+  });
+
+  it('Claude Code: AGENTS.md, memória automática do projeto e política da organização (só leitura, sem criar)', () => {
+    const managed = path.join(root, 'politica');
+    write(project, 'AGENTS.md', '# Agentes');
+    write(home, `.claude/projects/${claudeProjectKey(project)}/memory/MEMORY.md`, '- [Uma](uma.md)');
+    write(home, `.claude/projects/${claudeProjectKey(project)}/memory/uma.md`, '---\ndescription: Uma nota\n---\n');
+    write(home, '.claude/projects/-outro-projeto/memory/MEMORY.md', 'de outro projeto');
+    write(managed, 'CLAUDE.md', '# Da empresa');
+    write(managed, 'managed-settings.json', '{}');
+    const items = scanInventory('claude', project, home, managed);
+    const byName = (name: string) => items.find((i) => i.name === name)!;
+    expect(groupOf('claude', byName('AGENTS.md'))).toBe('main');
+    expect(items.filter((i) => i.kind === 'memory').map((i) => i.name)).toEqual(['MEMORY', 'uma']);
+    expect(byName('uma')).toMatchObject({ description: 'Uma nota', scope: 'user' });
+    expect(groupOf('claude', byName('MEMORY'))).toBe('memory');
+    const policy = items.filter((i) => groupOf('claude', i) === 'managed');
+    expect(policy.map((i) => i.location)).toEqual([path.join(managed, 'CLAUDE.md'), path.join(managed, 'managed-settings.json')]);
+    // nem a memória nem a política aparecem como lugar de criar ou destino de cópia
+    expect(createTargets('claude').some((t) => t.label.includes('memory') || (t.label === 'CLAUDE.md' && t.scope === 'user'))).toBe(false);
+    expect(() =>
+      new HarnessOps(project, home).create(
+        'claude',
+        HARNESS_CATALOG.claude.findIndex((s) => s.base === 'managed'),
+        '',
+        '',
+      ),
+    ).toThrow('Não é possível criar um item neste lugar.');
+  });
+
+  it('Claude Code: os @caminho das instruções, fora de código, até quatro níveis e sem repetir', () => {
+    write(
+      project,
+      'CLAUDE.md',
+      [
+        'Veja @docs/arquitetura.md e @~/.claude/pessoal.md.',
+        'O e-mail fulano@empresa.com não é importação, nem `@README` em código, nem @nao-existe.md.',
+        '```',
+        '@docs/dentro-de-bloco.md',
+        '```',
+      ].join('\n'),
+    );
+    write(project, 'docs/arquitetura.md', 'Detalhes em @camadas.md');
+    write(project, 'docs/camadas.md', 'Volta para @arquitetura.md');
+    write(project, 'docs/dentro-de-bloco.md', 'x');
+    write(home, '.claude/pessoal.md', 'Meu jeito');
+    const claude = scanInventory('claude', project, home, path.join(root, 'sem-politica')).find((i) => i.location === 'CLAUDE.md')!;
+    expect(claude.imports).toEqual([
+      { path: path.join(project, 'docs/arquitetura.md'), location: 'docs/arquitetura.md', depth: 1 },
+      { path: path.join(project, 'docs/camadas.md'), location: 'docs/camadas.md', depth: 2 },
+      { path: path.join(home, '.claude/pessoal.md'), location: '~/.claude/pessoal.md', depth: 1 },
+    ]);
+    // uma cadeia longa para no quarto nível
+    for (let n = 1; n <= 6; n++) write(project, `cadeia/${n}.md`, `@${n + 1}.md`);
+    expect(importsOf(path.join(project, 'cadeia/1.md'), home).map((x) => x.depth)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('regras de subpasta: CLAUDE.md e AGENTS.md abaixo da raiz, sem pastas ocultas nem de dependências', () => {
+    write(project, 'CLAUDE.md', '# Raiz');
+    write(project, 'packages/api/CLAUDE.md', '---\ndescription: Regras da API\n---\n');
+    write(project, 'packages/web/AGENTS.md', '# Web');
+    write(project, 'node_modules/lib/CLAUDE.md', 'de dependência');
+    write(project, '.git/CLAUDE.md', 'oculto');
+    const claude = scanInventory('claude', project, home, path.join(root, 'sem-politica'));
+    const nested = claude.filter((i) => HARNESS_CATALOG.claude[i.source!]?.layout === 'nested');
+    expect(nested.map((i) => i.name)).toEqual(['packages/api/CLAUDE.md', 'packages/web/AGENTS.md']);
+    expect(nested[0]).toMatchObject({ description: 'Regras da API', layout: 'file', scope: 'project' });
+    expect(groupOf('claude', nested[0]!)).toBe('main');
+    const cursor = scanInventory('cursor', project, home, path.join(root, 'sem-politica'));
+    expect(cursor.filter((i) => HARNESS_CATALOG.cursor[i.source!]?.layout === 'nested').map((i) => i.name)).toEqual([
+      'packages/web/AGENTS.md',
+    ]);
+  });
+
+  it('Cursor: .cursorignore e comandos da pasta do usuário', () => {
+    write(project, '.cursorignore', '.env\n');
+    write(home, '.cursor/commands/revisar.md', 'Revise');
+    const items = scanInventory('cursor', project, home, path.join(root, 'sem-politica'));
+    expect(
+      groupOf(
+        'cursor',
+        items.find((i) => i.name === '.cursorignore')!,
+      ),
+    ).toBe('settings');
+    expect(items.find((i) => i.name === 'revisar')).toMatchObject({ kind: 'command', scope: 'user' });
+  });
+
   it('Claude Code: separa projeto, global e plugins em todos os tipos', () => {
     write(project, 'CLAUDE.md', '# Regras');
     write(project, '.claude/rules/api/rest.md', '---\ndescription: Regras de API\n---\n');
@@ -146,6 +251,30 @@ describe('criar, copiar e apagar itens do harness', () => {
         'x',
       ),
     ).toThrow();
+  });
+
+  it('não cria nos lugares alternativos do CLAUDE.md e do AGENTS.md', () => {
+    const ops = new HarnessOps(project, home);
+    const labels = createTargets('claude').map((t) => t.label);
+    expect(labels).toEqual(expect.arrayContaining(['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md']));
+    expect(labels).not.toContain('.claude/CLAUDE.md');
+    expect(labels).not.toContain('.claude/AGENTS.md');
+    const alt = HARNESS_CATALOG.claude.findIndex((s) => s.scope === 'project' && s.path === '.claude/CLAUDE.md');
+    expect(() => ops.create('claude', alt, '', '')).toThrow();
+  });
+
+  it('separa os arquivos que decidem se o Claude Code lê o AGENTS.md e monta o caminho do @import', () => {
+    write(project, 'CLAUDE.local.md', '# Local');
+    write(project, '.claude/AGENTS.md', '# Agentes');
+    write(project, 'CLAUDE.md', '# Projeto');
+    const { claudeMd, agentsMd } = instructionRoles('claude', scanInventory('claude', project, home));
+    expect(claudeMd.map((i) => i.location)).toEqual(['CLAUDE.md', 'CLAUDE.local.md']);
+    expect(agentsMd.map((i) => i.location)).toEqual(['.claude/AGENTS.md']);
+    // no Cursor o AGENTS.md não tem esse papel
+    expect(instructionRoles('cursor', scanInventory('cursor', project, home)).agentsMd).toEqual([]);
+    expect(importPath('CLAUDE.md', '.claude/AGENTS.md')).toBe('.claude/AGENTS.md');
+    expect(importPath('.claude/CLAUDE.md', 'AGENTS.md')).toBe('../AGENTS.md');
+    expect(importPath('.claude/CLAUDE.md', '.claude/AGENTS.md')).toBe('AGENTS.md');
   });
 
   it('copia do global e de plugin para o projeto, com a pasta inteira da skill', () => {

@@ -4,7 +4,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
-import { HarnessInventory } from '../../src/webview/components/settings/HarnessInventory';
+import { HarnessScopeView } from '../../src/webview/components/settings/harness/HarnessScopeView';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { HarnessItem, ToolInventory } from '../../src/shared/harness';
 import { createTargets, hookTargets, mcpTargets, permissionTargets } from '../../src/shared/harnessCatalog';
@@ -58,18 +58,20 @@ beforeEach(async () => {
   posted.mockClear();
 });
 
-const renderScreen = () =>
+const renderScreen = (scope: 'project' | 'user' = 'project') =>
   render(
     <Theme>
-      <HarnessInventory />
+      <HarnessScopeView scope={scope} />
       <Dialog />
     </Theme>,
   );
-const section = (label: string) => screen.getByLabelText(label);
+const section = (label: string) => document.querySelector<HTMLElement>(`.settings-card[aria-label="${label}"]`)!;
+/** os agentes da ferramenta do projeto têm a tabela própria: o formulário genérico aparece no Cursor */
+const cursor = () => userEvent.click(screen.getByRole('radio', { name: 'Cursor' }));
 const dialog = () => within(screen.getByRole('dialog'));
-const userAgents = () => createTargets('claude').find((t) => t.kind === 'agent' && t.scope === 'user')!;
+const userAgents = () => createTargets('cursor').find((t) => t.kind === 'agent' && t.scope === 'user')!;
 
-describe('HarnessInventory', () => {
+describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e Global', () => {
   it('relê o harness ao abrir a tela', () => {
     renderScreen();
     expect(sentOf('harness.refresh')).toHaveLength(1);
@@ -77,20 +79,21 @@ describe('HarnessInventory', () => {
 
   it('criar um agente no projeto envia sem pedir confirmação e fecha o formulário', async () => {
     renderScreen();
+    await cursor();
     const agents = section('Subagentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
-    // o destino começa no primeiro lugar possível, o do projeto
-    expect(within(agents).getByRole('combobox', { name: 'Onde' })).toHaveTextContent('Projeto: .claude/agents/<nome>.md');
+    // o destino começa no primeiro lugar possível do projeto
+    expect(within(agents).getByRole('combobox', { name: 'Onde' })).toHaveTextContent('Projeto: .cursor/agents/<nome>.md');
     const create = within(agents).getByRole('button', { name: 'Criar e abrir no editor' });
     expect(create).toBeDisabled();
     await userEvent.type(within(agents).getByPlaceholderText('revisar-spec'), 'Meu Agente');
     await userEvent.type(within(agents).getByPlaceholderText('Quando a IA deve usar'), '  Revisa specs  ');
     await userEvent.click(create);
     expect(useBoardStore.getState().dialog).toBeNull();
-    const project = createTargets('claude').find((t) => t.kind === 'agent' && t.scope === 'project')!;
+    const project = createTargets('cursor').find((t) => t.kind === 'agent' && t.scope === 'project')!;
     expect(lastSent('harness.item.create')).toEqual({
       type: 'harness.item.create',
-      tool: 'claude',
+      tool: 'cursor',
       source: project.source,
       name: 'meu-agente',
       description: 'Revisa specs',
@@ -98,8 +101,9 @@ describe('HarnessInventory', () => {
     expect(within(agents).queryByRole('button', { name: 'Criar e abrir no editor' })).toBeNull();
   });
 
-  it('com destino global, pede confirmação e só envia depois de confirmar', async () => {
-    renderScreen();
+  it('na aba Global, criar pede confirmação e só envia depois de confirmar', async () => {
+    renderScreen('user');
+    await cursor();
     const agents = section('Subagentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
     await choose(within(agents).getByRole('combobox', { name: 'Onde' }), `Global: ${userAgents().label}`);
@@ -108,20 +112,19 @@ describe('HarnessInventory', () => {
     await userEvent.click(within(agents).getByRole('button', { name: 'Criar e abrir no editor' }));
     expect(useBoardStore.getState().dialog).toMatchObject({
       title: 'Criar na pasta do usuário?',
-      message: `~/.claude/agents/revisor-global.md\n\n${GLOBAL_WARNING}`,
+      message: `~/.cursor/agents/revisor-global.md\n\n${GLOBAL_WARNING}`,
       confirmLabel: 'Criar',
     });
     expect(sentOf('harness.item.create')).toHaveLength(0);
     await userEvent.click(dialog().getByRole('button', { name: 'Criar' }));
     expect(lastSent('harness.item.create')).toMatchObject({ source: userAgents().source, name: 'revisor-global', description: 'Revisa' });
-    expect(within(agents).queryByRole('button', { name: 'Criar e abrir no editor' })).toBeNull();
   });
 
   it('cancelar a confirmação global não envia e mantém o formulário aberto', async () => {
-    renderScreen();
+    renderScreen('user');
+    await cursor();
     const agents = section('Subagentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
-    await choose(within(agents).getByRole('combobox', { name: 'Onde' }), `Global: ${userAgents().label}`);
     await userEvent.type(within(agents).getByPlaceholderText('revisar-spec'), 'x');
     await userEvent.type(within(agents).getByPlaceholderText('Quando a IA deve usar'), 'y');
     await userEvent.click(within(agents).getByRole('button', { name: 'Criar e abrir no editor' }));
@@ -133,18 +136,18 @@ describe('HarnessInventory', () => {
 
   it('Cancelar fecha o formulário sem enviar nada', async () => {
     renderScreen();
+    const commands = section('Comandos');
     posted.mockClear();
-    const agents = section('Subagentes');
-    await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
-    await userEvent.click(within(agents).getByRole('button', { name: 'Cancelar' }));
-    expect(within(agents).queryByRole('button', { name: 'Criar e abrir no editor' })).toBeNull();
+    await userEvent.click(within(commands).getByRole('button', { name: 'Novo' }));
+    await userEvent.click(within(commands).getByRole('button', { name: 'Cancelar' }));
+    expect(within(commands).queryByRole('button', { name: 'Criar e abrir no editor' })).toBeNull();
     expect(posted).not.toHaveBeenCalled();
   });
 
   it('servidor MCP: monta o servidor com argumentos e variáveis', async () => {
     renderScreen();
     const mcp = section('Servidores MCP');
-    await userEvent.click(within(mcp).getByRole('button', { name: 'Novo' }));
+    await userEvent.click(within(mcp).getByRole('button', { name: 'Novo servidor' }));
     await userEvent.type(within(mcp).getByPlaceholderText('github'), 'github');
     await userEvent.type(within(mcp).getByPlaceholderText('npx'), 'npx');
     await userEvent.type(within(mcp).getByPlaceholderText('um por linha'), '-y{Enter}servidor');
@@ -163,7 +166,7 @@ describe('HarnessInventory', () => {
   it('hook: sempre pede confirmação, mesmo no projeto', async () => {
     renderScreen();
     const hooks = section('Hooks');
-    await userEvent.click(within(hooks).getByRole('button', { name: 'Novo' }));
+    await userEvent.click(within(hooks).getByRole('button', { name: 'Novo hook' }));
     await userEvent.type(within(hooks).getByPlaceholderText('./scripts/verificar.sh'), 'echo oi');
     await userEvent.type(within(hooks).getByPlaceholderText('padrão da ferramenta'), '30');
     await userEvent.click(within(hooks).getByRole('button', { name: 'Acrescentar hook' }));
@@ -182,11 +185,11 @@ describe('HarnessInventory', () => {
   });
 
   it('regra de permissão global: escolhe a lista e confirma', async () => {
-    renderScreen();
+    renderScreen('user');
     const settings = section('Configurações e permissões');
     await userEvent.click(within(settings).getByRole('button', { name: 'Nova regra de permissão' }));
     const user = permissionTargets('claude').find((t) => t.scope === 'user')!;
-    await choose(within(settings).getByRole('combobox', { name: 'Arquivo' }), `Global: ${user.label}`);
+    expect(within(settings).getByRole('combobox', { name: 'Arquivo' })).toHaveTextContent(`Global: ${user.label}`);
     await choose(within(settings).getByRole('combobox', { name: 'Lista' }), /negar \(deny\)/);
     await userEvent.type(within(settings).getByPlaceholderText('Ex.: Bash(npm run test *), Read(./.env)'), 'Read(./.env)');
     await userEvent.click(within(settings).getByRole('button', { name: 'Acrescentar regra' }));
@@ -205,7 +208,7 @@ describe('HarnessInventory', () => {
   });
 
   it('ações da linha: abrir, copiar para o projeto e apagar com confirmação', async () => {
-    renderScreen();
+    renderScreen('user');
     const row = screen.getByText('global-skill').closest('li')!;
     await userEvent.click(within(row).getByRole('button', { name: '~/.claude/skills/global-skill/SKILL.md' }));
     // o caminho abre o arquivo no editor do board
@@ -231,8 +234,11 @@ describe('HarnessInventory', () => {
   });
 
   it('modo da skill global pede confirmação; arquivos de apoio abrem e são criados', async () => {
-    renderScreen();
-    await choose(within(screen.getByText('global-skill').closest('li')!).getByRole('combobox'), /Só quando indicada/);
+    const { unmount } = renderScreen('user');
+    await choose(
+      within(screen.getByText('global-skill').closest('li')!).getByRole('combobox', { name: 'Modo da skill global-skill' }),
+      /Só quando indicada/,
+    );
     expect(useBoardStore.getState().dialog?.title).toBe('Alterar skills da pasta do usuário?');
     await userEvent.click(dialog().getByRole('button', { name: 'Alterar' }));
     expect(lastSent('harness.skill.setMode')).toEqual({
@@ -241,6 +247,8 @@ describe('HarnessInventory', () => {
       paths: ['/abs/~/.claude/skills/global-skill/SKILL.md'],
       mode: 'manual',
     });
+    unmount();
+    renderScreen('project');
     const row = screen.getByText('revisar-spec').closest('li')!;
     await userEvent.click(within(row).getByRole('button', { name: 'Arquivos (1)' }));
     const files = document.querySelector<HTMLElement>('.skill-files')!;
@@ -262,46 +270,13 @@ describe('HarnessInventory', () => {
     });
   });
 
-  it('cada escopo diz de onde os itens vêm: o do projeto fica marcado como parte do repositório', () => {
+  it('a linha mostra a descrição do arquivo e o caminho numa linha própria', () => {
     renderScreen();
-    const skills = within(section('Skills'));
-    expect(
-      within(skills.getByRole('region', { name: 'Projeto' })).getByText('Fazem parte deste projeto e vão no repositório.'),
-    ).toBeInTheDocument();
-    expect(within(skills.getByRole('region', { name: 'Global' })).getByText(/não vão no repositório/)).toBeInTheDocument();
-    // a descrição é a dica do nome, e o caminho vem numa linha própria
-    const row = skills.getByText('revisar-spec').closest('li')!;
+    const row = within(section('Skills')).getByText('revisar-spec').closest('li')!;
     expect(within(row).getByText('Descrição de revisar-spec')).toBeInTheDocument();
     expect(within(row).getByRole('button', { name: '.claude/skills/revisar-spec/SKILL.md' })).toBeInTheDocument();
-  });
-
-  it('marcar itens abre a barra de ações em massa; copiar do global para o projeto', async () => {
-    renderScreen();
-    const global = within(section('Skills')).getByRole('region', { name: 'Global' });
-    expect(within(global).queryByRole('toolbar')).toBeNull();
-    await userEvent.click(within(global).getByRole('checkbox', { name: 'Selecionar todos em Global' }));
-    const bar = within(within(global).getByRole('toolbar'));
-    expect(bar.getByText('1 marcados')).toBeInTheDocument();
-    await userEvent.click(bar.getByRole('button', { name: 'Copiar para o projeto (1)' }));
-    expect(lastSent('harness.item.copy')).toMatchObject({
-      to: 'project',
-      items: [{ kind: 'skill', path: '/abs/~/.claude/skills/global-skill/SKILL.md' }],
-    });
-    // a seleção some depois da ação
-    expect(within(global).queryByRole('toolbar')).toBeNull();
-  });
-
-  it('em massa: muda o modo e apaga o que foi marcado, com confirmação', async () => {
-    renderScreen();
-    const project = within(section('Skills')).getByRole('region', { name: 'Projeto' });
-    await userEvent.click(within(project).getByRole('checkbox', { name: 'Selecionar revisar-spec' }));
-    await userEvent.click(within(project).getByRole('button', { name: 'Deixar só quando indicadas' }));
-    expect(lastSent('harness.skill.setMode')).toMatchObject({ mode: 'manual', paths: ['/abs/.claude/skills/revisar-spec/SKILL.md'] });
-    await userEvent.click(within(project).getByRole('checkbox', { name: 'Selecionar revisar-spec' }));
-    await userEvent.click(within(project).getByRole('button', { name: 'Apagar (1)' }));
-    expect(useBoardStore.getState().dialog).toMatchObject({ title: 'Apagar "revisar-spec"?', danger: true });
-    await userEvent.click(dialog().getByRole('button', { name: 'Apagar' }));
-    expect(lastSent('harness.item.delete')).toMatchObject({ kind: 'skill', path: '/abs/.claude/skills/revisar-spec/SKILL.md' });
+    // a skill global fica na outra aba
+    expect(screen.queryByText('global-skill')).toBeNull();
   });
 
   it('buscar e instalar: Enter procura as skills da origem', async () => {

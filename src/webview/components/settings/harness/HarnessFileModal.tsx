@@ -10,6 +10,11 @@ import { t } from '../../../i18n';
 /** Markdown das ferramentas: as rules do Cursor são `.mdc`. */
 const isMarkdownFile = (file: string): boolean => /\.(md|mdc|markdown)$/i.test(file);
 
+/** Quanto a modal espera a leitura do arquivo antes de desistir e explicar o que fazer. */
+export const READ_TIMEOUT_MS = 8000;
+const NO_REPLY =
+  'O board não respondeu. Se a extensão acabou de ser atualizada, recarregue a janela (no VS Code, Developer: Reload Window) e abra o arquivo de novo.';
+
 /** Separa o frontmatter (`---` no topo) do corpo, para o modo formatado mostrar os metadados à parte. */
 export function splitFrontmatter(src: string): { meta: string | null; body: string } {
   const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(src);
@@ -25,7 +30,13 @@ export function HarnessFileModal() {
   const file = useBoardStore((s) => s.harnessFile);
   const close = useBoardStore((s) => s.closeHarnessFile);
   // nome e caminho de exibição vêm da varredura; o arquivo apagado por fora some da lista e a modal avisa
-  const item = useBoardStore((s) => s.state?.harness.inventory.flatMap((x) => x.items).find((i) => i.path === s.harnessFile) ?? null);
+  const item = useBoardStore((s) => {
+    const items = s.state?.harness.inventory.flatMap((x) => x.items) ?? [];
+    // um arquivo importado com @ não é item da lista: o caminho de exibição vem da importação
+    return (
+      items.find((i) => i.path === s.harnessFile) ?? items.flatMap((i) => i.imports ?? []).find((x) => x.path === s.harnessFile) ?? null
+    );
+  });
 
   const [content, setContent] = useState<string | null>(null);
   const [readonly, setReadonly] = useState(true);
@@ -69,13 +80,24 @@ export function HarnessFileModal() {
     const requestId = crypto.randomUUID();
     const off = onHostMessage((msg) => {
       if (msg.type !== 'harness.file.readResult' || msg.requestId !== requestId) return;
+      off();
+      window.clearTimeout(timer);
       setLoading(false);
       if (msg.error) return setError(msg.error);
       setContent(msg.content ?? '');
       setReadonly(msg.readonly === true);
     });
+    // a leitura é imediata; sem resposta, o host é de outra versão (pacote reinstalado sem recarregar a janela)
+    const timer = window.setTimeout(() => {
+      off();
+      setLoading(false);
+      setError(t(NO_REPLY));
+    }, READ_TIMEOUT_MS);
     postToHost({ type: 'harness.file.read', requestId, path: file });
-    return off;
+    return () => {
+      off();
+      window.clearTimeout(timer);
+    };
   }, [file]);
 
   if (!file) return null;

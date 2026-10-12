@@ -6,7 +6,7 @@ import { host } from '../src/webview/i18n/en/host';
 import { THEMES, FONTS } from '../src/shared/appearance';
 import { EXEC_ASPECTS, TOOL_PRESETS, defaultAgent } from '../src/shared/execution';
 import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS, SKILL_MODES } from '../src/shared/harness';
-import { HARNESS_CATALOG, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS } from '../src/shared/harnessCatalog';
+import { HARNESS_CATALOG, HARNESS_GROUPS, HARNESS_NOTES, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS } from '../src/shared/harnessCatalog';
 import { MERGE_METHODS, WORKSPACE_MODES } from '../src/shared/git';
 import { EFFORT_FIELD, EFFORT_LABELS, EFFORT_LEVELS, MODEL_EFFORT_LABEL } from '../src/shared/models';
 import { RUNNER_PERMISSIONS, heartbeatState } from '../src/shared/runner';
@@ -173,6 +173,9 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
       Object.values(PLUGIN_COMMANDS).flatMap((x) => [x.where, ...x.commands.filter((c) => /dono|termo|endereço|pasta/.test(c))]),
     ],
     ['HARNESS_CATALOG', Object.values(HARNESS_CATALOG).flatMap((list) => list.flatMap((s) => (s.builtin ? [s.builtin] : [])))],
+    ['HARNESS_CATALOG (frases)', Object.values(HARNESS_CATALOG).flatMap((list) => list.flatMap((s) => (s.hint ? [s.hint] : [])))],
+    ['HARNESS_GROUPS', HARNESS_GROUPS.flatMap((x) => [x.label, x.hint])],
+    ['HARNESS_NOTES', Object.values(HARNESS_NOTES).flatMap((list) => list.flatMap((x) => [x.name, x.hint]))],
   ];
 
   it.each(texts)('%s: tudo que a interface mostra tem tradução', (_name, list) => {
@@ -185,7 +188,7 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     expect(t(THEMES[1]!.label)).toBe('Light');
     expect(t(CARD_STATUSES[2]!.label)).toBe('Waiting for answer');
     expect(t(OWNER_LABEL.human)).toBe('with you');
-    expect(t(HARNESS_KINDS[2]!.label)).toBe('Subagents');
+    expect(t(HARNESS_KINDS[3]!.label)).toBe('Subagents');
     expect(t(HARNESS_SCOPES[1]!.label)).toBe('Global');
     expect(t(EXEC_ASPECTS[4]!.label)).toBe('Model and effort');
     expect(t(TOOL_PRESETS[0]!.label)).toBe('Read-only');

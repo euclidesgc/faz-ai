@@ -191,6 +191,13 @@ export class HostBridge {
           }
           return;
         }
+        case 'harness.plugin.apply':
+          try {
+            this.post({ type: 'notice', message: await this.router.applyPlugins(msg.tool, msg.action, msg.ids) });
+          } finally {
+            this.post({ type: 'harness.plugin.done' });
+          }
+          return;
         case 'harness.file.write': {
           try {
             this.router.writeHarnessFile(msg.path, msg.content);
@@ -217,7 +224,8 @@ export class HostBridge {
           return;
         }
         case 'harness.item.create':
-          await this.env.openFile(this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description));
+          // o arquivo novo abre no editor do board, onde a pessoa já escreve o conteúdo
+          this.post({ type: 'harness.item.created', path: this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description) });
           return;
         case 'ai.heartbeat.run': {
           const notice = await this.env.runHeartbeat();

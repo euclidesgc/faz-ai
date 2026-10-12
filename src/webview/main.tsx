@@ -13,6 +13,7 @@ import '@radix-ui/themes/tokens/base.css';
 import '@radix-ui/themes/tokens/colors/indigo.css';
 import '@radix-ui/themes/tokens/colors/slate.css';
 import '@radix-ui/themes/tokens/colors/red.css';
+import '@radix-ui/themes/tokens/colors/amber.css';
 import '@radix-ui/themes/components.css';
 import './tokens.css';
 import './styles.css';

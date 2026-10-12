@@ -19,6 +19,59 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   registro, abrir no terminal) é o botão azul principal; o **Copiar comando** ganhou contorno e os
   botões da tela saíram do tamanho pequeno. No topo, **Ir para o board** é o principal e **Verificar de
   novo** deixou de ser um botão discreto.
+- **O que as regras puxam.** Nas instruções do Claude Code, o Harness mostra os arquivos importados
+  com `@caminho` (fora de código, até quatro níveis, como o Claude Code faz), e cada um abre no editor
+  do board. Os `CLAUDE.md`, `CLAUDE.local.md` e `AGENTS.md` de subpastas, que a ferramenta lê quando
+  mexe nelas, entram em Regras principais com o selo "sob demanda"; a busca ignora pastas ocultas e
+  de dependências.
+- **Sai a aba "Tudo que a ferramenta carrega".** O que ela mostrava agora está nas abas Projeto e
+  Global, em grupos e com a frase de cada item; os formulários de servidor MCP, hook, regra de
+  permissão e a busca de skills foram junto. O aviso de MCP não
+  registrado leva para a aba Projeto.
+- **Nova aba Global no Harness de IA.** O mesmo modelo da aba Projeto para o que vale em todos os
+  seus projetos: os grupos da pasta do usuário, os **Plugins** instalados (um bloco por plugin, com o
+  que cada um traz) e a **Organização**, com a política gerenciada da empresa, só para leitura. No
+  Cursor, o que não fica em arquivo (User Rules, Team Rules e a lista global de ignorados) aparece como
+  aviso no grupo certo.
+- **Nova aba Projeto no Harness de IA.** Tudo que a ferramenta lê na pasta do projeto, em grupos:
+  regras principais, regras por assunto, memória, skills, subagentes, comandos, hooks, servidores
+  MCP, configurações e permissões, e estilos de saída. Cada item diz o que é numa frase, mostra se é
+  sempre carregado ou sob demanda e traz o caminho, que abre o arquivo no editor do board. Os arquivos
+  que a ferramenta leria e ainda não existem aparecem com o botão de criar e a frase de cada um, e o
+  arquivo novo já abre no editor. Em Regras principais, o board oferece o `CLAUDE.md`, o
+  `CLAUDE.local.md` e, só quando o projeto não tem `CLAUDE.md`, o `AGENTS.md`. Se o projeto tem os
+  dois, o `AGENTS.md` aparece como não lido pelo Claude Code, com o `@import` que faz ele entrar; se
+  tem só o `AGENTS.md`, o board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo. Um seletor mostra o que o Claude Code ou o Cursor carregam. Nas
+  rules e skills, o uso nas execuções do board vira uma escolha na própria linha.
+- **Recarregar a janela pelo Diagnóstico do ambiente.** Ao lado de **Verificar de novo**, no editor,
+  o botão reinicia a extensão, o que faz valer uma versão recém-instalada. Com a IA trabalhando em
+  algum card, pergunta antes, porque a execução para.
+- **Plugins: desativar, ativar e desinstalar em massa, e só os instalados de verdade.** A lista de
+  plugins do Claude Code passa a vir de `claude plugin list --json`. Antes o board mostrava também os
+  do catálogo dos marketplaces (`~/.claude/plugins/marketplaces`), que estão disponíveis mas não
+  instalados. Cada plugin ganha caixa de seleção, e a barra desativa, ativa ou desinstala os
+  marcados pela própria CLI. Os sincronizados do claude.ai e os da organização só se desativam. No
+  Cursor, desinstalar tira a pasta de `~/.cursor/plugins/local`. Desinstalar pede confirmação.
+- **Ações em massa no Harness.** Cada grupo das abas Projeto e Global tem caixas de seleção, e a do
+  topo marca todos. A barra mostra só as ações que valem para o que foi marcado: uso nas execuções do
+  board, modo da skill, copiar para o projeto ou o global, apagar arquivos e remover entradas de
+  hook, permissão e MCP. Apagar e remover pedem confirmação.
+- **Editor do harness não fica carregando para sempre.** Se o board não responde à leitura do
+  arquivo em 8 segundos, a modal para de carregar e diz o que fazer: quando o pacote da extensão é
+  reinstalado sem recarregar a janela, a tela nova conversa com o host antigo, que não conhece o
+  pedido. Basta recarregar a janela (Developer: Reload Window).
+- **Harness sem tremer ao escolher uma opção.** O seletor de uso nas execuções e o do modo da skill
+  ficam com a largura da opção mais longa: trocar o valor não faz mais o texto ao lado quebrar de
+  outro jeito e empurrar a tela. Num painel estreito, os botões de cada linha ocupam no máximo metade
+  dela e quebram em mais linhas, em vez de espremer a descrição até sumir.
+- **Avisos em âmbar de verdade.** Os avisos das telas de Git, de execução e do Harness pediam uma
+  cor que o board não carregava e apareciam sem cor; agora usam o âmbar da paleta.
+- **O harness completo de cada ferramenta.** O board passa a encontrar também o `AGENTS.md` (e o
+  `.claude/AGENTS.md`), que o Claude Code lê quando o projeto não tem `CLAUDE.md`; a memória automática
+  do Claude Code deste projeto (`~/.claude/projects/<projeto>/memory/`); a política da organização (o
+  `CLAUDE.md` e o `managed-settings.json` da pasta do sistema, só leitura); o `.cursorignore` e os
+  comandos da pasta do usuário do Cursor. Cada lugar do catálogo ganhou um grupo e uma frase simples
+  dizendo o que é, e o `get_harness` devolve o grupo de cada item.
 - **Arquivos do harness abrem no board.** Clicar no caminho de uma rule, skill, agente, comando ou
   arquivo de configuração no Harness de IA abre o arquivo numa janela do próprio board, no mesmo
   modelo dos anexos: Markdown formatado ou código, edição com salvar e cancelar, e o botão **Abrir no

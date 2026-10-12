@@ -6,8 +6,7 @@ board na hora, e as regras do board valem para ela também.
 
 ## Como conectar
 
-Em Configurações → **Harness de IA** → **Tudo que a ferramenta carrega**, na seção **Servidores MCP**
-da ferramenta, clique em **Instalar (padrão da ferramenta)** (ou rode **Faz AI: Instalar o MCP do
+Em Configurações → **Harness de IA** → **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)** (ou rode **Faz AI: Instalar o MCP do
 board (global)** na paleta). O board registra o servidor na configuração global da ferramenta, que
 vale em qualquer projeto aberto com o board, sem arquivo nenhum no repositório:
 
@@ -127,10 +126,14 @@ pasta própria (a global fica em `~/`):
 ### Projeto, global e plugins
 
 O board lê o harness de cada ferramenta em três escopos: a pasta do projeto (`project`), a pasta do
-usuário (`user`, vale em todos os projetos) e os plugins instalados (`plugin`). `get_harness` devolve
+usuário (`user`, vale em todos os projetos) e os plugins instalados (`plugin`; no Claude Code, os que
+`claude plugin list` mostra, sem o catálogo dos marketplaces). `get_harness` devolve
 em `inventory` tudo que a ferramenta do projeto carrega (instruções e regras, skills, agentes,
 comandos, hooks, servidores MCP, plugins e arquivos de configuração), com o escopo e o caminho de
-cada item. De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
+cada item, e o `group` em que a tela de Harness o mostra: `main` (regras principais), `topic` (regras
+por assunto), `memory` (memória automática do Claude Code), `skill`, `agent`, `command`, `hook`, `mcp`,
+`settings`, `style` (estilos de saída), `plugin` e `managed` (política da organização, só leitura).
+De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
 
 Toda execução pelo board parte de contexto vazio: só entra o que está marcado em Configurações →
 Harness. `set_harness_selection` marca rules (`instructions`), skills e agentes: `always` entra em

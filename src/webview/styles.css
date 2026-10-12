@@ -2581,24 +2581,37 @@ body.host-web .drawer {
 .scope-summary {
   margin-left: var(--sp-4);
 }
-.bulk-bar {
+.item-list-head {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-8);
-  margin-top: var(--sp-6);
-  padding: var(--sp-6) var(--sp-8);
-  background: var(--hover);
-  border-radius: var(--radius);
+  align-items: center;
+  gap: var(--sp-4) var(--sp-8);
+  min-height: 32px;
+  padding: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+.item-check-all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-12);
+  margin-right: var(--sp-8);
+  cursor: pointer;
+}
+.bulk-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
 }
 .item-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
+/* as ações ficam com no máximo metade da linha e quebram em mais linhas: o texto nunca some num painel estreito */
 .item-row {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-columns: 20px minmax(0, 1fr) fit-content(50%);
   gap: var(--sp-4) var(--sp-12);
   align-items: start;
   padding: var(--sp-8) var(--sp-4);
@@ -2618,6 +2631,77 @@ body.host-web .drawer {
 }
 .item-name {
   font-weight: 600;
+}
+.item-explain {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+}
+.plugin-pick {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 0 var(--sp-12);
+  align-items: start;
+  padding: 0 var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+.plugin-pick > .item-check {
+  padding-top: var(--sp-8);
+}
+.plugin-group {
+  padding: var(--sp-8) 0;
+}
+.plugin-group > summary {
+  cursor: pointer;
+}
+.item-imports {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-top: var(--sp-4);
+  padding-left: var(--sp-8);
+  border-left: 2px solid var(--border);
+}
+.harness-tool-picker {
+  margin: var(--sp-8) 0 var(--sp-12);
+}
+/* seletor de largura fixa (SelectField steady): o rótulo mais longo ocupa o lugar, invisível, atrás do escolhido */
+.select-steady {
+  display: inline-grid;
+}
+.select-steady > *,
+.select-steady::after {
+  grid-area: 1 / 1;
+}
+.select-steady::after {
+  content: attr(data-longest);
+  visibility: hidden;
+}
+.item-unread {
+  color: var(--warn-border);
+}
+.harness-absent {
+  display: grid;
+  gap: var(--sp-6);
+  margin-top: var(--sp-8);
+}
+.harness-absent ul {
+  display: grid;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.harness-absent li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-4) var(--sp-12);
+}
+.harness-missing {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-right: var(--sp-8);
 }
 .item-hint {
   margin: var(--sp-2) 0 0;

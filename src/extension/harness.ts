@@ -10,6 +10,7 @@ import {
   type AiTool,
   type Harness,
   type InstallScope,
+  type PluginInstall,
   type RuleFile,
   type Skill,
   type SkillMode,
@@ -47,6 +48,12 @@ export class HarnessStore {
     private homeDir = '',
   ) {}
 
+  /**
+   * Os plugins que o Claude Code diz ter instalados (`claude plugin list --json`). Enquanto a CLI não
+   * respondeu, ou quando ela não existe, fica null e a varredura procura nas pastas de plugin.
+   */
+  claudePlugins: PluginInstall[] | null = null;
+
   setTool(tool: AiTool): void {
     this.tool = tool;
   }
@@ -75,7 +82,7 @@ export class HarnessStore {
     return ALL_AI_TOOLS.map((tool) => ({
       tool,
       installed: installed.includes(tool),
-      items: scanInventory(tool, this.workspaceDir, this.homeDir),
+      items: scanInventory(tool, this.workspaceDir, this.homeDir, undefined, tool === 'claude' ? this.claudePlugins : null),
     }));
   }
 

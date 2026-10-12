@@ -246,6 +246,28 @@ describe('Diagnóstico do ambiente', () => {
     vi.useRealTimers();
   });
 
+  it('"Recarregar a janela" fica ao lado de "Verificar de novo" e pede a recarga ao editor', async () => {
+    show(report());
+    renderThemed(<EnvironmentView />);
+    const buttons = screen.getAllByRole('button').map((b) => b.textContent);
+    expect(buttons.indexOf('Recarregar a janela')).toBe(buttons.indexOf('Verificar de novo') + 1);
+    await userEvent.click(screen.getByRole('button', { name: 'Recarregar a janela' }));
+    expect(sentOf('ui.reloadWindow')).toHaveLength(1);
+  });
+
+  it('com a IA trabalhando, recarregar pergunta antes, porque interrompe a execução', async () => {
+    show(report());
+    const s = useBoardStore.getState().state!;
+    act(() => useBoardStore.setState({ state: { ...s, aiRuns: ['c1', 'c2'] } }));
+    renderThemed(<EnvironmentView />);
+    await userEvent.click(screen.getByRole('button', { name: 'Recarregar a janela' }));
+    const dialog = useBoardStore.getState().dialog!;
+    expect(dialog.message).toBe('A IA está trabalhando em 2 cards. Recarregar a janela interrompe essas execuções.');
+    expect(sentOf('ui.reloadWindow')).toHaveLength(0);
+    act(() => dialog.onConfirm());
+    expect(sentOf('ui.reloadWindow')).toHaveLength(1);
+  });
+
   it('abre pelas Configurações e pelo aviso de requisitos', async () => {
     syncStore(router);
     renderThemed(<Settings />);

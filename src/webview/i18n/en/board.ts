@@ -409,5 +409,13 @@ export const board: Record<string, string> = {
   '{file} usa a ponte em "{missing}", de uma versão anterior da extensão, que não é mais atualizada e pode não achar o projeto aberto. Instale de novo para gravar o registro atual.':
     '{file} uses the bridge at "{missing}", from an earlier version of the extension, which is no longer updated and may not find the open project. Install again to write the current registration.',
   'Recarregar a janela': 'Reload the window',
+  'Recarregar a janela?': 'Reload the window?',
+  Recarregar: 'Reload',
+  'A IA está trabalhando em {n} card. Recarregar a janela interrompe essa execução.':
+    'The AI is working on {n} card. Reloading the window stops that run.',
+  'A IA está trabalhando em {n} cards. Recarregar a janela interrompe essas execuções.':
+    'The AI is working on {n} cards. Reloading the window stops those runs.',
+  'Reinicia a extensão e lê de novo o PATH, as CLIs e os plugins. Use depois de instalar algo ou de atualizar a extensão.':
+    'Restarts the extension and reads the PATH, the CLIs and the plugins again. Use it after installing something or updating the extension.',
   'Abrir MCPs do Cursor': 'Open Cursor MCPs',
 };

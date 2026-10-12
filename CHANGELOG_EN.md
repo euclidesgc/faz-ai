@@ -21,6 +21,60 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   command) got an outline and the buttons on the screen are no longer the small size. At the top, **Ir
   para o board** (Go to the board) is the main button and **Verificar de novo** (Check again) is no
   longer a faint one.
+- **What the rules pull in.** For Claude Code instructions, the harness shows the files imported with
+  `@path` (outside code, up to four levels, as Claude Code does), and each one opens in the board's
+  editor. `CLAUDE.md`, `CLAUDE.local.md` and `AGENTS.md` files in subfolders, which the tool reads
+  when it works in them, appear under main rules with the "on demand" badge; the search skips hidden
+  and dependency folders.
+- **The "Tudo que a ferramenta carrega" (everything the tool loads) tab is gone.** What it showed now
+  lives in the Projeto and Global tabs, in groups and with each item's sentence; the MCP server, hook
+  and permission rule forms and the skill search moved along. The unregistered MCP notice leads to the Projeto tab.
+- **New Global tab in the AI harness.** The same layout as the Projeto tab for what applies to all your
+  projects: the groups from your user folder, the installed **Plugins** (one block per plugin, with
+  what each one brings) and **Organização** (Organization), with the company's managed policy,
+  read-only. In Cursor, what does not live in a file (User Rules, Team Rules and the global ignore
+  list) shows up as a notice in the right group.
+- **New Projeto tab in the AI harness.** Everything the tool reads in the project folder, in groups:
+  main rules, rules by topic, memory, skills, subagents, commands, hooks, MCP servers, settings and
+  permissions, and output styles. Each item says what it is in one sentence, shows whether it is
+  always loaded or on demand, and has its path, which opens the file in the board editor. Files the
+  tool would read but that do not exist yet show up with a create button and a sentence on each, and
+  the new file opens right away in the editor. In main rules, the board offers `CLAUDE.md`,
+  `CLAUDE.local.md` and, only when the project has no `CLAUDE.md`, `AGENTS.md`. If the project has
+  both, `AGENTS.md` shows as not read by Claude Code, with the `@import` that brings it in; if it has
+  only `AGENTS.md`, the board warns that creating a `CLAUDE.md` makes Claude Code stop reading it. A
+  selector shows what Claude Code or Cursor loads.
+  For rules and skills, how board runs use them becomes a choice on the row itself.
+- **Reload the window from the environment check.** Next to **Verificar de novo** (check again), in
+  the editor, the button restarts the extension, which makes a freshly installed version take effect.
+  With the AI working on a card, it asks first, because the run stops.
+- **Plugins: bulk disable, enable and uninstall, and only the ones really installed.** Claude Code's
+  plugin list now comes from `claude plugin list --json`. The board used to also show the ones in the
+  marketplaces' catalog (`~/.claude/plugins/marketplaces`), which are available but not installed.
+  Each plugin gets a checkbox, and the bar disables, enables or uninstalls the checked ones through
+  the CLI itself. Plugins synced from claude.ai and the organization's can only be disabled. In
+  Cursor, uninstalling removes the folder from `~/.cursor/plugins/local`. Uninstalling asks for
+  confirmation.
+- **Bulk actions in the Harness.** Every group in the Projeto and Global tabs has checkboxes, and the
+  one at the top checks them all. The bar shows only the actions that apply to what is checked: use
+  in board runs, skill mode, copying to the project or global, deleting files and removing hook,
+  permission and MCP entries. Deleting and removing ask for confirmation.
+- **The harness editor no longer loads forever.** If the board does not answer the file read within
+  8 seconds, the modal stops loading and says what to do: when the extension package is reinstalled
+  without reloading the window, the new screen talks to the old host, which does not know the
+  request. Reloading the window (Developer: Reload Window) fixes it.
+- **Harness no longer jumps when you pick an option.** The board-run usage selector and the skill
+  mode selector keep the width of their longest option: changing the value no longer re-wraps the
+  text next to it and pushes the screen around. In a narrow panel, each row's buttons take at most
+  half of it and wrap onto more lines, instead of squeezing the description until it disappears.
+- **Warnings actually in amber.** The warnings on the Git, run and Harness screens asked for a color
+  the board did not load and showed up with no color; they now use the palette's amber.
+- **The full harness of each tool.** The board now also finds `AGENTS.md` (and `.claude/AGENTS.md`),
+  which Claude Code reads when the project has no `CLAUDE.md`; this project's Claude Code auto memory
+  (`~/.claude/projects/<project>/memory/`); the organization policy (the `CLAUDE.md` and
+  `managed-settings.json` in the system folder, read-only); Cursor's `.cursorignore` and user-folder
+  commands. Each place in the catalog got a group and a simple sentence saying what it is, and
+  `get_harness` returns the group of each item.
 - **Harness files open in the board.** Clicking the path of a rule, skill, agent, command or settings
   file in the AI harness opens the file in a window of the board itself, like attachments: formatted
   Markdown or code, editing with save and cancel, and an **Abrir no editor** (Open in editor) button for
