@@ -7,6 +7,7 @@ const options = {
   bundle: true,
   platform: 'node',
   format: 'cjs',
+  // a extensão roda no Node do editor (o VS Code 1.90 traz o 20)
   target: 'node18',
   outfile: 'dist/extension.js',
   external: ['vscode'],
@@ -18,13 +19,22 @@ const options = {
 mkdirSync('dist', { recursive: true });
 cpSync('node_modules/sql.js/dist/sql-wasm.wasm', 'dist/sql-wasm.wasm');
 
-// ponte stdio usada pelos clientes de IA para falar com o servidor MCP da extensão
-const bridge = { ...options, entryPoints: ['src/mcp-bridge/bridge.ts'], outfile: 'dist/mcp-bridge.js', external: [], sourcemap: false };
+// ponte stdio usada pelos clientes de IA para falar com o servidor MCP da extensão; roda no Node da
+// pessoa, a partir da versão mínima que o Diagnóstico do ambiente pede (NODE_MIN_MAJOR)
+const bridge = {
+  ...options,
+  target: 'node22',
+  entryPoints: ['src/mcp-bridge/bridge.ts'],
+  outfile: 'dist/mcp-bridge.js',
+  external: [],
+  sourcemap: false,
+};
 
 // board fora do editor: `node dist/cli.js [pasta]` serve o board no navegador
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const cli = {
   ...options,
+  target: 'node22',
   entryPoints: ['src/cli/cli.ts'],
   outfile: 'dist/cli.js',
   external: [],

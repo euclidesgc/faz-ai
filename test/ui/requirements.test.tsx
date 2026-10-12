@@ -109,7 +109,7 @@ describe('faixa de requisitos do board', () => {
     expect(screen.getByText(/Nas conversas com o Cursor no editor/)).toBeInTheDocument();
     expect(screen.queryByText(/Sem ela não rodam os botões de IA/)).toBeNull();
     // sem botão que resolva (Node.js, permissão sem o atalho das configurações): a explicação fica
-    expect(screen.getByText(/roda com o Node.js 18 ou mais novo/)).toBeInTheDocument();
+    expect(screen.getByText(/roda com o Node.js 22 ou mais novo/)).toBeInTheDocument();
     expect(screen.getByText('Escolha "Sem restrições".')).toBeInTheDocument();
   });
 });
@@ -164,7 +164,7 @@ describe('login vencido: aviso de erro, item sintético e "Abrir no terminal"', 
     id: 'signin',
     tool: 'claude',
     cli: 'claude',
-    action: { kind: 'command', command: 'claude login', terminal: true },
+    action: { kind: 'command', command: 'claude auth login', terminal: true },
   };
 
   it('com o requisito "signin", a faixa fica com destaque de erro, não de aviso comum', () => {
@@ -186,6 +186,6 @@ describe('login vencido: aviso de erro, item sintético e "Abrir no terminal"', 
     set([SIGNIN]);
     renderThemed(<RequirementsBanner />);
     await userEvent.click(screen.getByRole('button', { name: 'Abrir no terminal' }));
-    expect(sentOf('ui.openTerminal')).toEqual([{ type: 'ui.openTerminal', command: 'claude login' }]);
+    expect(sentOf('ui.openTerminal')).toEqual([{ type: 'ui.openTerminal', command: 'claude auth login' }]);
   });
 });

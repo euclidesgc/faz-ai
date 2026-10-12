@@ -20,13 +20,11 @@ import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { claudeSignedIn, cursorModels, cursorSignedIn, runCli } from '../cliProbe';
 import { aiToolInfo, type AiTool, type InstallScope } from '../../shared/harness';
-import { checkRequirements } from '../requirements';
-import { headlessCommand } from '../headless';
-import type { BoardRequirement } from '../../shared/requirements';
-import { checkEnvironment } from '../environment';
-import { detectOs } from '../installers';
-import { installPlan, installScript, parseInstallResult } from '../../shared/installPlan';
-import { editorMcpFiles, pinEditorCommands, registeredIn, unreachableServers } from '../mcp/pinCommands';
+import { checkRequirements, registeredServer } from '../requirements';
+import { headlessCommand, headlessUnsupported } from '../headless';
+import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
+import { checkEnvironment, type OtherToolProbe } from '../environment';
+import { editorMcpFiles, pinEditorCommands, registeredIn } from '../mcp/pinCommands';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { selectedItems } from '../../shared/harnessSelection';
 import { resolveCommand } from '../cliResolve';
@@ -59,8 +57,8 @@ export interface BoardHostOptions {
     startedAt: number;
   };
   /**
-   * roda um comando num terminal novo do editor, à vista da pessoa (o "Instalar tudo" do Diagnóstico);
-   * ausente fora do editor, onde a tela mostra o script para copiar
+   * roda um comando num terminal novo do editor, à vista da pessoa (o login, pelo "Abrir no terminal" do aviso);
+   * ausente fora do editor, onde fica só o comando para copiar
    */
   runInTerminal?: (name: string, command: string, cwd: string) => void;
 }
@@ -345,8 +343,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   // "Abrir no terminal" do aviso de login: o board só abre o terminal, a pessoa faz o login nele
   router.onOpenTerminal((command) => o.runInTerminal?.('Faz AI: login', command, o.folderPath));
-  // o Diagnóstico do ambiente: os requisitos acima e o que o board usa quando existe (skill do fluxo,
-  // git, GitHub CLI, Code Review Graph). Roda só quando a tela pede: alguns comandos demoram
+  // o Diagnóstico do ambiente: os requisitos acima e o que o board usa quando existe (a outra ferramenta
+  // de IA, git, GitHub CLI, Code Review Graph). Roda só quando a tela pede: alguns comandos demoram
   const probeCommand = (command: string, args: string[], cwd?: string) =>
     new Promise<string | null>((resolve) =>
       execFile(
@@ -356,25 +354,16 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         (err, stdout) => resolve(err ? null : stdout),
       ),
     );
-  const readOsRelease = () => {
-    try {
-      return fs.readFileSync('/etc/os-release', 'utf8');
-    } catch {
-      return null;
-    }
-  };
-  // os MCPs que o chat do editor inicia (o do board e o do Code Review Graph): o editor os procura no
-  // PATH de quando abriu, e o que foi instalado depois só aparece nele com o caminho completo
+  // os MCPs que o chat do editor inicia: o editor os procura no PATH de quando abriu, e o que foi
+  // instalado depois só aparece nele com o caminho completo
   const editorFiles = o.editor?.name === 'cursor' ? editorMcpFiles(o.folderPath, homeDir) : null;
   const editorPath = () => process.env.PATH ?? '';
   const resolveHere = (command: string) => resolveCommand(command, pathEnv, homeDir);
-  const crgMcpState = (tool: AiTool) => {
-    if (!editorFiles || tool !== 'cursor') return undefined;
-    if (!registeredIn(editorFiles, 'code-review-graph')) return 'unregistered' as const;
-    const broken = unreachableServers(editorFiles, editorPath(), resolveHere).filter((u) => u.server === 'code-review-graph');
-    if (!broken.length) return 'ok' as const;
-    return broken.every((u) => u.tracked) ? ('tracked' as const) : ('unreachable' as const);
-  };
+  // o MCP do Code Review Graph na ferramenta: no Cursor, no arquivo do projeto ou no global
+  const crgRegistered = (tool: AiTool) =>
+    tool === 'cursor'
+      ? registeredIn(editorMcpFiles(o.folderPath, homeDir), 'code-review-graph')
+      : !!registeredServer(tool, o.folderPath, homeDir, 'code-review-graph');
   const pinMcp = () => {
     if (!editorFiles) return;
     try {
@@ -383,6 +372,25 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     } catch (e) {
       o.log(`Não foi possível gravar o caminho completo dos MCPs: ${e instanceof Error ? e.message : String(e)}`);
     }
+  };
+  /**
+   * A ferramenta de IA que não é a do projeto, quando está na máquina: a CLI no PATH ou, no Cursor, o
+   * próprio editor em que o board está aberto. null quando não foi encontrada.
+   */
+  const otherTool = async (tool: AiTool): Promise<OtherToolProbe | null> => {
+    const s = router.snapshot();
+    const other: AiTool = tool === 'claude' ? 'cursor' : 'claude';
+    const cli = resolveHere(CLI_COMMAND[other]);
+    if (!cli && !(other === 'cursor' && o.editor?.name === 'cursor')) return null;
+    const inventory = s.harness.inventory.find((t) => t.tool === other);
+    return {
+      tool: other,
+      cli,
+      signedIn: cli ? await probeSignedIn(other, cli, false) : null,
+      mcp: !!registeredServer(other, o.folderPath, homeDir),
+      skill: !!inventory?.items.some((i) => i.kind === 'skill' && i.name === FLOW_SKILL_NAME),
+      permission: headlessUnsupported(other, s.board.runner.permission),
+    };
   };
   let diagnosing: Promise<void> | null = null;
   const diagnose = () => {
@@ -398,19 +406,17 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       const cliName = 'unsupported' in built ? null : built.command;
       const syntheticSignin: BoardRequirement | null =
         s.authExpired === tool && cliName && !s.requirements.some((r) => r.id === 'signin')
-          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: `${cliName} login`, terminal: true } }
+          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: LOGIN_COMMAND[tool], terminal: true } }
           : null;
       router.setEnvironment(
         await checkEnvironment({
           tool,
           requirements: syntheticSignin ? [...s.requirements, syntheticSignin] : s.requirements,
           workspaceDir: o.folderPath,
-          os: detectOs(process.platform, readOsRelease()),
-          pathDirs: (pathEnv ?? process.env.PATH ?? '').split(path.delimiter),
-          homeDir,
           skillInstalled,
-          crgMcp: crgMcpState(tool),
-          resolve: (command) => resolveCommand(command, pathEnv, homeDir),
+          other: await otherTool(tool),
+          crgMcp: crgRegistered(tool),
+          resolve: resolveHere,
           run: probeCommand,
           firstLine: (file) => {
             try {
@@ -428,60 +434,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   // a tela abre sozinha uma vez por máquina (a marca fica na pasta de dados da extensão, fora do board)
   const seenFile = path.join(o.storageDir, 'environment-seen');
-  // "Instalar tudo": o plano sai do último Diagnóstico, vira um script e roda num terminal do editor.
-  // O script cria um arquivo ao terminar; enquanto ele não aparece, a tela mostra que está instalando
-  const installDir = path.join(o.storageDir, 'install');
-  let installTimer: NodeJS.Timeout | null = null;
-  const install = (level: 'required' | 'recommended') => {
-    const s = router.snapshot();
-    const plan = s.environment && installPlan(s.environment, level);
-    if (!plan || !o.runInTerminal || installTimer) return;
-    if (plan.installSkill) router.handle({ type: 'harness.flowSkill.install', tool: s.board.aiTool, scope: 'user' });
-    if (!plan.steps.length) return void diagnose();
-    const stamp = Date.now();
-    const result = path.join(installDir, `${level}-${stamp}.result`);
-    const file = path.join(installDir, `${level}-${stamp}.${plan.shell === 'powershell' ? 'ps1' : 'sh'}`);
-    try {
-      fs.mkdirSync(installDir, { recursive: true });
-      fs.writeFileSync(file, installScript(plan, result), { mode: 0o700 });
-    } catch (e) {
-      o.log(`Não foi possível gravar o script de instalação: ${e instanceof Error ? e.message : String(e)}`);
-      return;
-    }
-    o.runInTerminal(
-      'Faz AI: instalação',
-      plan.shell === 'powershell'
-        ? `powershell -NoProfile -ExecutionPolicy Bypass -File "${file}"`
-        : `bash '${file.replace(/'/g, `'\\''`)}'`,
-      o.folderPath,
-    );
-    router.setEnvironmentInstall({ level, startedAt: stamp });
-    const read = (f: string) => {
-      try {
-        return fs.readFileSync(f, 'utf8');
-      } catch {
-        return null;
-      }
-    };
-    // o resultado de cada passo (e o erro dos que falharam) vira o relatório da tela
-    const finish = () => {
-      if (installTimer) clearInterval(installTimer);
-      installTimer = null;
-      const { steps } = parseInstallResult(read(result) ?? '', (id) => read(`${result}.${id}.err`));
-      router.setEnvironmentInstall(null);
-      router.setEnvironmentInstallResult({ level, steps, finishedAt: Date.now() });
-      // o que acabou de ser instalado não está no PATH do editor: os MCPs ficam com o caminho completo
-      pinMcp();
-      for (const f of fs.readdirSync(installDir))
-        if (f.startsWith(`${level}-${stamp}.`)) fs.rmSync(path.join(installDir, f), { force: true });
-      void diagnose();
-    };
-    // até 3 horas: depois disso, a pessoa confere pelo "Verificar de novo"
-    installTimer = setInterval(() => {
-      if (parseInstallResult(read(result) ?? '', () => null).done || Date.now() - stamp > 3 * 3600_000) finish();
-    }, 2000);
-    installTimer.unref?.();
-  };
   router.onEnvironment(
     {
       check: () => void diagnose(),
@@ -489,7 +441,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         pinMcp();
         void diagnose();
       },
-      install: o.runInTerminal ? install : undefined,
       seen: () => {
         try {
           fs.mkdirSync(o.storageDir, { recursive: true });

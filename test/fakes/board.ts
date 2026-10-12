@@ -110,8 +110,6 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     authExpired: null,
     environment: null,
     environmentFirstRun: false,
-    environmentInstall: null,
-    environmentInstallResult: null,
     harnessInstall: null,
     ...over,
   };

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { aiToolInfo, type AiTool } from '../../shared/harness';
+import { aiToolInfo } from '../../shared/harness';
 import type { BoardState } from '../../shared/model';
-import type { BoardRequirement } from '../../shared/requirements';
+import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { harness, ui } from '../commands';
@@ -17,7 +17,7 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
       return {
         title: t('Node.js não encontrado'),
         detail: t(
-          'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 18 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.',
+          'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.',
           { tool },
         ),
       };
@@ -325,9 +325,6 @@ function RecheckButton() {
  * é só recomendado (não impede as execuções pelo board) não conta como pendência: sozinho, vira uma
  * caixa discreta (com a explicação) em vez da faixa de aviso.
  */
-/** O comando da CLI de cada ferramenta, para montar o item sintético de login sem precisar de um probe. */
-const CLI_OF: Record<AiTool, string> = { claude: 'claude', cursor: 'cursor-agent' };
-
 export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
   const requirements = useBoardStore((s) => s.state?.requirements ?? []);
   const authExpired = useBoardStore((s) => s.state?.authExpired ?? null);
@@ -340,8 +337,8 @@ export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
           {
             id: 'signin' as const,
             tool: authExpired,
-            cli: CLI_OF[authExpired],
-            action: { kind: 'command' as const, command: `${CLI_OF[authExpired]} login`, terminal: true as const },
+            cli: CLI_COMMAND[authExpired],
+            action: { kind: 'command' as const, command: LOGIN_COMMAND[authExpired], terminal: true as const },
           },
         ]
       : requirements;

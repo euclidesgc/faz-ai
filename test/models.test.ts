@@ -140,8 +140,6 @@ describe('suggestModelRule e suggestModel', () => {
     requirementsCheckedAt: 0,
     environment: null,
     environmentFirstRun: false,
-    environmentInstall: null,
-    environmentInstallResult: null,
     harnessInstall: null,
     authExpired: null,
   });

@@ -429,8 +429,6 @@ export class BoardRepo {
       authExpired: null,
       environment: null,
       environmentFirstRun: false,
-      environmentInstall: null,
-      environmentInstallResult: null,
       harnessInstall: null,
     };
   }

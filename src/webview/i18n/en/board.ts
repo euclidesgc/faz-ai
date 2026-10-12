@@ -367,8 +367,8 @@ export const board: Record<string, string> = {
     'Could not copy. Select the command and copy it with the keyboard.',
   'Abrir Harness de IA': 'Open AI harness',
   'Node.js não encontrado': 'Node.js not found',
-  'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 18 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':
-    "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 18 or newer, and it is not on the terminal's PATH. Without it, {tool} cannot reach the board. Install Node.js and click Check again.",
+  'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':
+    "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 22 or newer, and it is not on the terminal's PATH. Without it, {tool} cannot reach the board. Install Node.js and click Check again.",
   'A linha de comando do {tool} não foi encontrada': "{tool}'s command line was not found",
   'Sem ela não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale com o comando abaixo e clique em Verificar de novo.':
     'Without it, the cards\' AI buttons, the board chat, the heartbeat and autonomous mode do not run. The board looked for "{cli}" in the terminal\'s PATH, the usual install folders and the editor extensions. Install it with the command below and click Check again.',

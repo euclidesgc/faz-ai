@@ -67,7 +67,7 @@ describe('requisitos do board', () => {
   it('CLI do Claude Code sem login: oferece o comando de login, igual ao Cursor', async () => {
     connect('claude');
     expect(await checkRequirements(probe({ tool: 'claude', signedIn: async () => false }))).toEqual([
-      { id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login', terminal: true } },
+      { id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude auth login', terminal: true } },
     ]);
   });
 

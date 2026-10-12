@@ -324,44 +324,38 @@ via **Já entrei: verificar de novo** — I signed in, check again) or, when the
 the first manual run that succeeds. The environment check shows the same warning in the
 **Login na linha de comando** (command line sign-in) item.
 
-**Environment check.** The first time the board opens on a machine, a `flutter doctor`-style list
-opens on its own with everything the board needs and everything it makes use of. After that, it
-opens from **Check environment** in Settings or **See the full environment check** in the yellow
-bar. **Required:** Node.js 18 or newer, the tool's command line, its sign-in, the board MCP, the
-flow skill and the permission level (the same items as the bar, with the same actions).
-**Recommended:** Git and a repository in the folder (`git init`), the GitHub
-CLI and its sign-in (`gh auth login`, for auto-merge and PR tracking) and
-[Code Review Graph](https://github.com/tirth8205/code-review-graph), a code graph the AI queries
-instead of reading whole files. Once Code Review Graph is installed, the list suggests building the
-project graph and semantic search. Each item says what it is for, how the board uses it and what
-leaves your machine, and brings the commands to copy, a button or the download link, plus **Learn
-more**. The install commands follow the detected system: `winget` on Windows, Homebrew or
-`xcode-select` on macOS, and `apt`, `dnf` or `pacman` on Linux (Node through `nvm`); on an unknown
-distribution, the download link remains. When a program lands in a folder outside the PATH (the
-Cursor CLI and `uv`, in `~/.local/bin`), the commands include the step that adds it. Code Review
-Graph shows its prerequisites inside it, in install order: `uv` and Python 3.10 or newer, which `uv`
-downloads just for it without touching the system Python.
+**Environment check.** The first time the board opens on a machine, a list opens on its own with
+everything the board needs and what it makes use of. After that, it opens from the **Verificar
+ambiente** (Check environment) button in Settings, or from **Ver o diagnóstico completo** (See the
+full environment check) in the yellow banner. Each item has a ready or missing icon, and what depends
+on another item shows inside it (the sign-in inside the command line, the graph inside Code Review
+Graph). Hover over an item to see how the board uses it.
 
-**Install everything.** The **Install what is required** and **Install the recommended** buttons
-first show the steps, in order, and the whole script. They only run after **Run in the terminal**, in
-an editor terminal you can see: the `sudo` password and the sign-ins (`cursor-agent login`, `gh auth
-login`) stay with you, there. The script is built for the detected system (bash on Linux and macOS,
-PowerShell on Windows) and runs everything in one session, so the PATH a step adjusts applies to the
-following ones. A step that fails does not stop the others, it only skips the ones that depend on it,
-and at the end the screen shows each step's result: installed, skipped or not installed, with the
-command, the exit code and the last lines of the error. What has no command (turning on the MCP in
-Cursor, the permission) is listed as your task. In browser mode, instead of running, the screen gives
-you the script to copy.
+- **Required:** Node.js 22 or newer and the project's AI tool, with its command line, the sign-in
+  (`claude auth login` or `cursor-agent login`), the board's MCP, the flow skill and the permission
+  level.
+- **Optional:** the other AI tool, when it is on the machine (its command line on the PATH or, in
+  Cursor, the editor itself). A project on Claude Code shows Cursor here, and vice versa. The list only
+  shows the state: the board installs its MCP and skill there when it becomes the project's tool.
+- **Recommended:** Git and a repository in the folder, the GitHub CLI and its sign-in (for automatic
+  merge and PR tracking) and [Code Review Graph](https://github.com/tirth8205/code-review-graph), a
+  graph of the code the AI queries instead of reading whole files, with the project graph, its MCP and
+  semantic search.
 
-The editor chat starts MCPs with the PATH the editor opened with: what was installed later (Node
-through `nvm`, Code Review Graph's `uvx`) is not in it until the editor is closed and reopened. So, at
-the end of **Install everything**, when Node shows up, and through the **Fix the path** button, the
-board writes the command's full path into the `faz-ai` and `code-review-graph` registrations the
-editor cannot find. The path is found at that moment, on the machine where the extension runs, and the
-file stays out of git (`.git/info/exclude`). If the project MCP file is versioned, the board does not
-write to it and explains the options. Semantic search uses the `local` provider: the model is downloaded once from Hugging
-Face and runs on the machine. The screen warns that the cloud providers (`openai`, `google`,
-`minimax`, `voyage`) send code snippets to third parties, which many companies do not allow.
+The board installs nothing from third parties. Each program shows, in parentheses, the official site
+where you find how to install it. Sign-ins and actions in the project folder (`git init`,
+`gh auth login`, `code-review-graph build`, `code-review-graph install --platform …`,
+`code-review-graph embed --provider local`) show the command with a copy button. Only what belongs to
+the board has a button: installing the board's MCP and the flow skill, and opening the permission
+level choice.
+
+The editor chat starts the board's MCP with the PATH the editor opened with: Node installed later
+(through `nvm`, for example) is not in it until the editor is closed and reopened. So, when Node shows
+up, or through the **Corrigir o caminho** (Fix the path) button in the yellow banner, the board writes
+the command's full path into the `faz-ai` and `code-review-graph` registrations the editor cannot
+find. The path is found at that moment, on the machine where the extension runs, and the file stays
+out of git (`.git/info/exclude`). If the project MCP file is versioned, the board does not write to it
+and explains the options.
 
 Suggested flow: the AI reads the story and the phase instruction, creates a sub-task to build the
 phase document, attaches the document to the story and asks for review in the card's conversation.
@@ -1068,7 +1062,7 @@ machine, for example), they must be set up again:
 
 | Item | What it is for | How to get it |
 |---|---|---|
-| Node.js 18+ and git | build, tests and the `faz-ai` command | regular install |
+| Node.js 22+ and git | build, tests and the `faz-ai` command | regular install |
 | `.mcp.json` and `.claude/settings.local.json` | connect the AI to the board; hold machine paths | **Instalar neste projeto** (this project) in the MCP servers section of the AI harness |
 | Board and attachments | live in the extension's storage, not in the repository | the folder's board starts empty on the other machine |
 | `.env.release` with `OVSX_PAT` | publishing to Open VSX | token at https://open-vsx.org/user-settings/tokens |
