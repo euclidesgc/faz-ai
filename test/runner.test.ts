@@ -794,9 +794,9 @@ describe('executor da IA', () => {
     expect(router.snapshot().board.runner).toEqual({
       defaultAgent: '',
       permission: 'board',
-      timeoutMinutes: 30,
+      timeoutMinutes: 45,
       heartbeat: false,
-      heartbeatMinutes: 60,
+      heartbeatMinutes: 10,
       parallel: false,
       parallelStories: 2,
       autopilotPaused: false,
