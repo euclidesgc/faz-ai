@@ -10,7 +10,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   saiu: o board não instala mais nada de terceiros, só o próprio MCP e a skill do fluxo. A tela agora
   tem três listas, **Necessários**, **Opcionais** e **Recomendados**, com um ícone de pronto ou de
   falta em cada item e o que depende de outro item aninhado dentro dele. Cada programa traz o site
-  oficial entre parênteses. Os logins e as ações na pasta do projeto (`git init`, o build do grafo do
+  oficial entre parênteses e, enquanto falta, o comando de instalação oficial para copiar (`curl` no
+  Linux e no macOS, PowerShell no Windows). O Code Review Graph aparece dentro do uv, que o instala e
+  baixa o Python quando falta. Os logins e as ações na pasta do projeto (`git init`, o build do grafo do
   Code Review Graph, o MCP dele e a busca semântica) trazem o comando com botão de copiar. O hint de
   cada linha explica como o board usa o item.
 - **A outra ferramenta de IA aparece em Opcionais.** Num projeto com o Claude Code, o Cursor

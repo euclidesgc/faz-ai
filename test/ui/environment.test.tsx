@@ -89,7 +89,12 @@ const report = (o: { skill?: EnvCheck['status']; optional?: boolean } = {}): Env
       version: '2.3.1',
       children: [
         { id: 'crg-graph', status: 'missing', command: 'code-review-graph build' },
-        { id: 'crg-embeddings', status: 'missing', command: 'code-review-graph embed --provider local' },
+        {
+          id: 'crg-embeddings',
+          status: 'missing',
+          install: ['uv tool install --reinstall "code-review-graph[embeddings]"'],
+          command: 'code-review-graph embed --provider local',
+        },
       ],
     },
   ],
@@ -113,6 +118,36 @@ describe('Diagnóstico do ambiente', () => {
     expect(within(required).getByText('22.11.0')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Opcionais' })).getByText('Claude Code (encontrado na máquina)')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Recomendados' })).getByText('Code Review Graph')).toBeInTheDocument();
+  });
+
+  it('o que falta traz os comandos de instalação em ordem; o que está pronto, não', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show({
+      ...report(),
+      required: [
+        {
+          id: 'node',
+          status: 'missing',
+          install: [
+            'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash',
+            '. "$HOME/.nvm/nvm.sh"',
+            'nvm install 22',
+          ],
+        },
+        cursor(),
+      ],
+    });
+    const node = item('Node.js 22 ou mais novo');
+    expect(within(node).getByText('Para instalar, em ordem:')).toBeInTheDocument();
+    expect(
+      within(node)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual([expect.stringContaining('nvm-sh/nvm'), expect.stringContaining('nvm.sh'), expect.stringContaining('nvm install 22')]);
+    // o Code Review Graph está pronto: o único "Para instalar" dentro dele é o da busca semântica, que falta
+    expect(within(item('Code Review Graph')).getAllByText(/Para instalar/)).toHaveLength(1);
+    expect(within(item('Busca semântica')).getByText('Para instalar:')).toBeInTheDocument();
   });
 
   it('sem outra ferramenta na máquina, não há a lista de opcionais', () => {
@@ -152,14 +187,16 @@ describe('Diagnóstico do ambiente', () => {
     expect((await screen.findByRole('tooltip')).textContent).toMatch(/grafo do código/);
   });
 
-  it('os comandos do Code Review Graph têm copiar, e a busca semântica avisa do pacote de embeddings', () => {
+  it('os comandos do Code Review Graph têm copiar, e a busca semântica traz antes o comando de instalar o pacote', () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);
     show(report());
     expect(within(item('Grafo deste projeto')).getByText('code-review-graph build')).toBeInTheDocument();
     const semantic = item('Busca semântica');
     expect(within(semantic).getByText('code-review-graph embed --provider local')).toBeInTheDocument();
-    expect(within(semantic).getByText('Depois de instalar o pacote de embeddings.')).toBeInTheDocument();
+    expect(within(semantic).getByText('Para instalar:')).toBeInTheDocument();
+    expect(within(semantic).getByText('uv tool install --reinstall "code-review-graph[embeddings]"')).toBeInTheDocument();
+    expect(within(semantic).getByText('Depois:')).toBeInTheDocument();
   });
 
   it('o board só tem botão para o que é dele; a outra ferramenta só mostra o estado', () => {

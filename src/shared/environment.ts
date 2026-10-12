@@ -19,7 +19,6 @@ export type EnvCheckId =
   | 'gh-auth'
   | 'crg'
   | 'uv'
-  | 'python'
   | 'crg-graph'
   | 'crg-mcp'
   | 'crg-embeddings';
@@ -32,7 +31,7 @@ export type EnvStatus = 'ok' | 'missing' | 'skipped';
 
 /**
  * Um item da lista. O board só resolve o que é dele (o MCP, a skill e a permissão da ferramenta do
- * projeto, pelo `requirement`); o resto ele só confere, com o site de onde instalar ou o comando para
+ * projeto, pelo `requirement`); o resto ele só confere, com o site de onde instalar e os comandos para
  * copiar.
  */
 export interface EnvCheck {
@@ -42,6 +41,8 @@ export interface EnvCheck {
   tool?: AiTool;
   /** a versão encontrada, quando o comando diz */
   version?: string;
+  /** os comandos que instalam o programa, em ordem, quando falta (os instaladores oficiais neutros: curl, PowerShell) */
+  install?: string[];
   /** o comando que resolve, com botão de copiar (os logins e as ações na pasta do projeto) */
   command?: string;
   /** onde a pessoa vê como instalar ou configurar */

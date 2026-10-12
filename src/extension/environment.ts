@@ -29,6 +29,8 @@ export interface EnvironmentProbe {
   other: OtherToolProbe | null;
   /** o MCP do Code Review Graph está registrado na ferramenta do projeto */
   crgMcp: boolean;
+  /** no Windows, os comandos de instalação são os do PowerShell */
+  windows: boolean;
   /** caminho do executável de um comando, ou null */
   resolve(command: string): string | null;
   /** roda um comando e devolve a saída padrão; null quando ele falha ou não existe */
@@ -65,7 +67,6 @@ const DOCS: Partial<Record<EnvCheckId, string>> = {
   gh: 'https://cli.github.com',
   crg: CRG_DOCS,
   uv: 'https://docs.astral.sh/uv/getting-started/installation/',
-  python: 'https://docs.astral.sh/uv/guides/install-python/',
   'crg-embeddings': `${CRG_DOCS}#usage`,
 };
 const TOOL_DOCS: Record<AiTool, Partial<Record<EnvCheckId, string>>> = {
@@ -73,41 +74,40 @@ const TOOL_DOCS: Record<AiTool, Partial<Record<EnvCheckId, string>>> = {
   cursor: { cli: 'https://cursor.com/docs/cli/installation', permission: 'https://cursor.com/docs/cli/reference/permissions' },
 };
 
-const version = (out: string | null): string | undefined => /\d+\.\d+(?:\.\d+)?/.exec(out ?? '')?.[0];
-
-/** A versão do Python é 3.10 ou mais nova (o mínimo do Code Review Graph). */
-const python310 = (v: string | undefined): boolean => {
-  const [major = 0, minor = 0] = (v ?? '').split('.').map(Number);
-  return major > 3 || (major === 3 && minor >= 10);
+/**
+ * Os comandos que instalam cada programa, conforme o site oficial dele (conferido em 2026-10-11). Só
+ * os instaladores neutros, que valem em qualquer distribuição: `curl` no Linux e no macOS, PowerShell
+ * no Windows. O git e o GitHub CLI não têm um assim: ficam só com o site.
+ */
+const INSTALL: Record<'unix' | 'windows', Partial<Record<'node' | 'claude' | 'cursor' | 'uv', string[]>>> = {
+  unix: {
+    node: [
+      'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash',
+      '. "$HOME/.nvm/nvm.sh"',
+      `nvm install ${NODE_MIN_MAJOR}`,
+    ],
+    claude: ['curl -fsSL https://claude.ai/install.sh | bash'],
+    cursor: ['curl https://cursor.com/install -fsS | bash'],
+    uv: ['curl -LsSf https://astral.sh/uv/install.sh | sh'],
+  },
+  windows: {
+    node: ['winget install Schniz.fnm', `fnm install ${NODE_MIN_MAJOR}`],
+    claude: ['irm https://claude.ai/install.ps1 | iex'],
+    cursor: ["irm 'https://cursor.com/install?win32=true' | iex"],
+    uv: ['powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"'],
+  },
 };
 
-/**
- * Um Python 3.10 ou mais novo para o Code Review Graph: com o uv, o que ele acha (o dele ou o do
- * sistema); sem o uv, o do sistema. Devolve a versão, ou undefined.
- */
-async function findPython(p: EnvironmentProbe, uv: string | null): Promise<string | undefined> {
-  const candidates: string[] = [];
-  if (uv) {
-    const found = (await p.run(uv, ['python', 'find', '>=3.10']))?.trim();
-    if (found) candidates.push(found);
-  }
-  for (const name of process.platform === 'win32' ? ['py', 'python'] : ['python3', 'python']) {
-    const exe = p.resolve(name);
-    if (exe) candidates.push(exe);
-  }
-  for (const exe of candidates) {
-    const v = version(await p.run(exe, ['--version']));
-    if (python310(v)) return v;
-  }
-  return undefined;
-}
+const version = (out: string | null): string | undefined => /\d+\.\d+(?:\.\d+)?/.exec(out ?? '')?.[0];
 
-/** O Python do Code Review Graph, pelo `#!` do script dele. */
-function crgPython(p: EnvironmentProbe, exe: string): string | null {
+/** O Python do Code Review Graph, pelo `#!` do script dele, e por onde ele foi instalado. */
+function crgInstaller(p: EnvironmentProbe, exe: string): { python: string | null; via: 'uv' | 'pipx' | 'pip' } {
   const shebang = p.firstLine(exe);
   const words = shebang?.startsWith('#!') ? shebang.slice(2).trim().split(/\s+/) : [];
   // `#!/usr/bin/env python3`: o Python é o segundo
-  return (/(^|\/)env$/.test(words[0] ?? '') ? words[1] : words[0]) ?? null;
+  const python = (/(^|\/)env$/.test(words[0] ?? '') ? words[1] : words[0]) ?? null;
+  const where = (python ?? exe).replace(/\\/g, '/');
+  return { python, via: /\/uv\/tools\//.test(where) ? 'uv' : /\/pipx\//.test(where) ? 'pipx' : p.resolve('uv') ? 'uv' : 'pip' };
 }
 
 /** A busca semântica local precisa do sentence-transformers no mesmo Python do Code Review Graph. */
@@ -145,12 +145,19 @@ function toolGroup(tool: AiTool, children: EnvCheck[]): EnvCheck {
 export async function checkEnvironment(p: EnvironmentProbe): Promise<EnvironmentReport> {
   const req = (id: EnvCheckId) => p.requirements.find((r) => FROM[id]?.includes(r.id));
   const tool = p.tool;
+  const install = INSTALL[p.windows ? 'windows' : 'unix'];
 
   // o Node.js que roda o MCP do board: a partir da versão mínima
   const nodeExe = p.resolve('node');
   const nodeVersion = !req('node') && nodeExe ? version(await p.run(nodeExe, ['--version'])) : undefined;
   const nodeOk = !req('node') && (!nodeVersion || Number(nodeVersion.split('.')[0]) >= NODE_MIN_MAJOR);
-  const node: EnvCheck = { id: 'node', status: statusOf(nodeOk), version: nodeVersion, docs: DOCS.node };
+  const node: EnvCheck = {
+    id: 'node',
+    status: statusOf(nodeOk),
+    version: nodeVersion,
+    docs: DOCS.node,
+    install: nodeOk ? undefined : install.node,
+  };
 
   const cliMissing = !!req('cli');
   const cliExe = cliMissing ? null : p.resolve(CLI_COMMAND[tool]);
@@ -163,6 +170,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
       status: statusOf(!cliMissing),
       version: cliExe ? version(await p.run(cliExe, ['--version'])) : undefined,
       docs: TOOL_DOCS[tool].cli,
+      install: cliMissing ? install[tool] : undefined,
       children: [{ id: 'signin', tool, status: statusOf(!signin, !cliMissing), command: LOGIN_COMMAND[tool], requirement: signin }],
     },
     { id: 'mcp', tool, status: statusOf(!req('mcp')), docs: DOCS.mcp, requirement: req('mcp') },
@@ -182,6 +190,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
           status: statusOf(!!o.cli),
           version: o.cli ? version(await p.run(o.cli, ['--version'])) : undefined,
           docs: TOOL_DOCS[o.tool].cli,
+          install: o.cli ? undefined : install[o.tool],
           children: [{ id: 'signin', tool: o.tool, status: statusOf(o.signedIn !== false, !!o.cli), command: LOGIN_COMMAND[o.tool] }],
         },
         { id: 'mcp', tool: o.tool, status: statusOf(o.mcp), docs: DOCS.mcp },
@@ -211,41 +220,50 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     children: [{ id: 'gh-auth', status: statusOf(ghAuth, !!ghExe), command: 'gh auth login' }],
   };
 
+  // o Code Review Graph se instala pelo uv, que traz um Python só para ele quando falta: lendo de cima
+  // para baixo, a ordem de instalar. Com ele já instalado (por qualquer caminho), o uv não importa mais
   const crgExe = p.resolve('code-review-graph');
-  const crgChildren: EnvCheck[] = [];
-  // o uv e o Python só importam para instalar o Code Review Graph: com ele instalado, ficam de fora
-  if (!crgExe) {
-    const uvExe = p.resolve('uv');
-    const python = await findPython(p, uvExe);
-    crgChildren.push({
-      id: 'uv',
-      status: statusOf(!!uvExe),
-      version: uvExe ? version(await p.run(uvExe, ['--version'])) : undefined,
-      docs: DOCS.uv,
-      // sem Python e sem uv, o Python vem junto com o uv
-      children: [{ id: 'python', status: python ? 'ok' : uvExe ? 'missing' : 'skipped', version: python, docs: DOCS.python }],
-    });
-  }
+  const uvExe = p.resolve('uv');
   // o grafo de cada projeto fica na pasta .code-review-graph, criada pelo build
   const graph = !!crgExe && p.exists(path.join(p.workspaceDir, '.code-review-graph'));
-  const embeddings = crgExe ? await hasEmbeddings(p, crgPython(p, crgExe)) : false;
-  crgChildren.push(
+  const installer = crgExe ? crgInstaller(p, crgExe) : null;
+  const embeddings = installer ? await hasEmbeddings(p, installer.python) : false;
+  // o pacote da busca semântica vai pelo mesmo caminho por onde o Code Review Graph foi instalado
+  const addEmbeddings =
+    installer?.via === 'pipx'
+      ? 'pipx inject code-review-graph "sentence-transformers>=3,<4"'
+      : installer?.via === 'pip'
+        ? 'pip install "code-review-graph[embeddings]"'
+        : 'uv tool install --reinstall "code-review-graph[embeddings]"';
+  const crgChildren: EnvCheck[] = [
     { id: 'crg-graph', status: statusOf(graph, !!crgExe), command: 'code-review-graph build' },
     { id: 'crg-mcp', tool, status: statusOf(p.crgMcp, !!crgExe), command: `code-review-graph install --platform ${CRG_PLATFORM[tool]}` },
     {
       id: 'crg-embeddings',
       status: statusOf(embeddings, !!crgExe),
+      install: embeddings ? undefined : [addEmbeddings],
       command: 'code-review-graph embed --provider local',
       docs: DOCS['crg-embeddings'],
     },
-  );
+  ];
   const crg: EnvCheck = {
     id: 'crg',
-    status: statusOf(!!crgExe),
+    status: statusOf(!!crgExe, !!crgExe || !!uvExe),
     version: crgExe ? version(await p.run(crgExe, ['--version'])) : undefined,
     docs: DOCS.crg,
+    install: crgExe ? undefined : ['uv tool install code-review-graph'],
     children: crgChildren,
   };
+  const codeGraph: EnvCheck = crgExe
+    ? crg
+    : {
+        id: 'uv',
+        status: statusOf(!!uvExe),
+        version: uvExe ? version(await p.run(uvExe, ['--version'])) : undefined,
+        docs: DOCS.uv,
+        install: uvExe ? undefined : install.uv,
+        children: [crg],
+      };
 
-  return { tool, required: [node, own], optional, recommended: [git, gh, crg], checkedAt: Date.now() };
+  return { tool, required: [node, own], optional, recommended: [git, gh, codeGraph], checkedAt: Date.now() };
 }

@@ -93,11 +93,11 @@ function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string 
         ),
       };
     case 'uv':
-      return { title: t('uv'), hint: t('Instala e atualiza o Code Review Graph, isolado na própria pasta.') };
-    case 'python':
       return {
-        title: t('Python 3.10 ou mais novo'),
-        hint: t('O Code Review Graph é um programa em Python. Sem um Python 3.10 ou mais novo, o uv baixa um só para ele.'),
+        title: t('uv'),
+        hint: t(
+          'Instala o Code Review Graph e o mantém atualizado, isolado na própria pasta. Se faltar um Python 3.10 ou mais novo, o uv baixa um só para ele: não é preciso instalar o Python antes.',
+        ),
       };
     case 'crg-graph':
       return {
@@ -172,13 +172,24 @@ function Row({ check, projectTool, busy, onFixed }: RowProps) {
         )}
         {check.docs && <DocsLink href={check.docs} />}
       </div>
+      {/* a sugestão de como instalar, só enquanto falta: os comandos em ordem, cada um com copiar */}
+      {check.status !== 'ok' && check.install && (
+        <div className="env-fix">
+          <span className="small muted">{check.install.length > 1 ? t('Para instalar, em ordem:') : t('Para instalar:')}</span>
+          <ol className="env-commands">
+            {check.install.map((c) => (
+              <li key={c}>
+                <CopyCommand command={c} />
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
       {/* o comando com copiar; o login da ferramenta do projeto vem com o "Abrir no terminal" do aviso */}
       {check.command && (
         <div className="env-fix">
+          {check.install && check.status !== 'ok' && <span className="small muted">{t('Depois:')}</span>}
           {r?.action?.kind === 'command' ? <RequirementFix r={r} /> : <CopyCommand command={check.command} />}
-          {check.id === 'crg-embeddings' && check.status !== 'ok' && (
-            <span className="small muted">{t('Depois de instalar o pacote de embeddings.')}</span>
-          )}
         </div>
       )}
       {/* o que o board resolve sozinho: o MCP, a skill e a permissão da ferramenta do projeto */}

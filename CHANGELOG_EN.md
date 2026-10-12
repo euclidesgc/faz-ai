@@ -11,7 +11,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   everything) is gone: the board no longer installs anything from third parties, only its own MCP and
   the flow skill. The screen now has three lists, **Necessários** (Required), **Opcionais** (Optional)
   and **Recomendados** (Recommended), with a ready or missing icon on each item and what depends on
-  another item nested inside it. Each program shows its official site in parentheses. Sign-ins and
+  another item nested inside it. Each program shows its official site in parentheses and, while it is
+  missing, the official install command to copy (`curl` on Linux and macOS, PowerShell on Windows).
+  Code Review Graph shows inside uv, which installs it and downloads Python when missing. Sign-ins and
   actions in the project folder (`git init`, the Code Review Graph build, its MCP and semantic search)
   show the command with a copy button. Each row's hint explains how the board uses the item.
 - **The other AI tool shows under Optional.** In a project on Claude Code, Cursor found on the machine

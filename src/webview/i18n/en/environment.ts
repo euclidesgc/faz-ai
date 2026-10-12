@@ -27,7 +27,6 @@ export const environment: Record<string, string> = {
     '{file} starts the MCP with "{missing}", which is not in the PATH the editor opened with (the program was installed later, or lives in a folder the editor does not read). Fixing writes its full path on this machine, and the file stays out of git; then reload the window.',
   'Corrigir o caminho': 'Fix the path',
   uv: 'uv',
-  'Python 3.10 ou mais novo': 'Python 3.10 or newer',
   'Aplicando e conferindo de novo…': 'Applying and checking again…',
   'MCP do board (faz-ai)': 'Board MCP (faz-ai)',
   'Nível de permissão das execuções': 'Permission level for runs',
@@ -46,7 +45,9 @@ export const environment: Record<string, string> = {
   Opcionais: 'Optional',
   Recomendados: 'Recommended',
   '{version} encontrado': '{version} found',
-  'Depois de instalar o pacote de embeddings.': 'After installing the embeddings package.',
+  'Para instalar:': 'To install:',
+  'Para instalar, em ordem:': 'To install, in order:',
+  'Depois:': 'Then:',
   'Node.js {min} ou mais novo': 'Node.js {min} or newer',
   'Roda o MCP do board: a ferramenta de IA o inicia com o Node.js do PATH a cada conversa e a cada execução pelo board.':
     "Runs the board's MCP: the AI tool starts it with the Node.js on the PATH in every conversation and every run from the board.",
@@ -76,12 +77,10 @@ export const environment: Record<string, string> = {
     'gh uses your GitHub account to see and merge PRs. Without signing in, automatic merge and PR tracking do not work.',
   'Entrega à IA um grafo do código (funções, classes, quem chama quem): ela acha o trecho certo sem ler arquivos inteiros e gasta menos tokens.':
     'Gives the AI a graph of the code (functions, classes, who calls whom): it finds the right spot without reading whole files and spends fewer tokens.',
-  'Instala e atualiza o Code Review Graph, isolado na própria pasta.':
-    'Installs and updates Code Review Graph, isolated in its own folder.',
-  'O Code Review Graph é um programa em Python. Sem um Python 3.10 ou mais novo, o uv baixa um só para ele.':
-    'Code Review Graph is a Python program. Without Python 3.10 or newer, uv downloads one just for it.',
   'O Code Review Graph analisa o projeto uma vez; depois, o grafo se atualiza a cada mudança.':
     'Code Review Graph analyzes the project once; after that, the graph updates with every change.',
+  'Instala o Code Review Graph e o mantém atualizado, isolado na própria pasta. Se faltar um Python 3.10 ou mais novo, o uv baixa um só para ele: não é preciso instalar o Python antes.':
+    'Installs Code Review Graph and keeps it up to date, isolated in its own folder. If Python 3.10 or newer is missing, uv downloads one just for it: there is no need to install Python first.',
   'MCP do Code Review Graph': 'Code Review Graph MCP',
   'É por ele que a IA do {tool} consulta o grafo nas conversas e nas execuções.':
     'It is how the {tool} AI queries the graph in conversations and runs.',

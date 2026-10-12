@@ -416,6 +416,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           skillInstalled,
           other: await otherTool(tool),
           crgMcp: crgRegistered(tool),
+          windows: process.platform === 'win32',
           resolve: resolveHere,
           run: probeCommand,
           firstLine: (file) => {

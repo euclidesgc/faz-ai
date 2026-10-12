@@ -340,12 +340,17 @@ Graph). Hover over an item to see how the board uses it.
 - **Recommended:** Git and a repository in the folder, the GitHub CLI and its sign-in (for automatic
   merge and PR tracking) and [Code Review Graph](https://github.com/tirth8205/code-review-graph), a
   graph of the code the AI queries instead of reading whole files, with the project graph, its MCP and
-  semantic search.
+  semantic search. While it is missing, Code Review Graph shows inside [uv](https://docs.astral.sh/uv/),
+  in install order: uv installs Code Review Graph (`uv tool install code-review-graph`) and downloads
+  Python 3.10 or newer just for it, if missing.
 
 The board installs nothing from third parties. Each program shows, in parentheses, the official site
-where you find how to install it. Sign-ins and actions in the project folder (`git init`,
-`gh auth login`, `code-review-graph build`, `code-review-graph install --platform …`,
-`code-review-graph embed --provider local`) show the command with a copy button. Only what belongs to
+where you find how to install it and, while it is missing, the official install command to copy, only
+the neutral ones that work on any distribution: `curl` on Linux and macOS, PowerShell on Windows
+(Node.js through `nvm`, or `fnm` on Windows). Git and the GitHub CLI have no such installer and show
+only the site. Sign-ins and actions in the project folder (`git init`, `gh auth login`,
+`code-review-graph build`, `code-review-graph install --platform …`, `code-review-graph embed
+--provider local`) also show the command with a copy button. Only what belongs to
 the board has a button: installing the board's MCP and the flow skill, and opening the permission
 level choice.
 

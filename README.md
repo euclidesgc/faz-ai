@@ -323,12 +323,17 @@ board o usa.
 - **Recomendados:** o Git e um repositório na pasta, o GitHub CLI e o login dele (para o merge
   automático e o acompanhamento dos PRs) e o [Code Review Graph](https://github.com/tirth8205/code-review-graph),
   um grafo do código que a IA consulta em vez de ler arquivos inteiros, com o grafo do projeto, o MCP
-  dele e a busca semântica.
+  dele e a busca semântica. Enquanto falta, o Code Review Graph aparece dentro do
+  [uv](https://docs.astral.sh/uv/), na ordem de instalar: o uv instala o Code Review Graph
+  (`uv tool install code-review-graph`) e baixa um Python 3.10 ou mais novo só para ele, se faltar.
 
 O board não instala nada de terceiros. Cada programa traz, entre parênteses, o site oficial onde você
-encontra como instalar. Os logins e as ações na pasta do projeto (`git init`, `gh auth login`,
-`code-review-graph build`, `code-review-graph install --platform …`, `code-review-graph embed
---provider local`) trazem o comando com botão de copiar. Só o que é do board tem botão: instalar o MCP
+encontra como instalar e, enquanto falta, o comando de instalação oficial para copiar, só os neutros,
+que valem em qualquer distribuição: `curl` no Linux e no macOS, PowerShell no Windows (o Node.js pelo
+`nvm`, ou pelo `fnm` no Windows). O Git e o GitHub CLI não têm um instalador assim e ficam só com o
+site. Os logins e as ações na pasta do projeto (`git init`, `gh auth login`, `code-review-graph build`,
+`code-review-graph install --platform …`, `code-review-graph embed --provider local`) também trazem o
+comando com botão de copiar. Só o que é do board tem botão: instalar o MCP
 do board e a skill do fluxo, e abrir a escolha do nível de permissão.
 
 O chat do editor inicia o MCP do board com o PATH de quando o editor abriu: um Node instalado depois

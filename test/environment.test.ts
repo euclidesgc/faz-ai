@@ -13,6 +13,7 @@ function probe(o: {
   tool?: EnvironmentProbe['tool'];
   other?: OtherToolProbe | null;
   crgMcp?: boolean;
+  windows?: boolean;
 }): EnvironmentProbe & { ran: string[] } {
   const ran: string[] = [];
   return {
@@ -23,6 +24,7 @@ function probe(o: {
     skillInstalled: o.skillInstalled ?? false,
     other: o.other ?? null,
     crgMcp: o.crgMcp ?? false,
+    windows: o.windows ?? false,
     resolve: (c) => o.commands?.[c] ?? null,
     run: async (c, args) => {
       const key = [c, ...args].join(' ');
@@ -68,14 +70,20 @@ describe('Diagnóstico do ambiente', () => {
     expect(shape(r.recommended)).toEqual([
       ['git', 'missing', [['repo', 'skipped']]],
       ['gh', 'missing', [['gh-auth', 'skipped']]],
+      // na ordem de instalar: o uv, depois o Code Review Graph, depois o que ele faz no projeto
       [
-        'crg',
+        'uv',
         'missing',
         [
-          ['uv', 'missing', [['python', 'skipped']]],
-          ['crg-graph', 'skipped'],
-          ['crg-mcp', 'skipped'],
-          ['crg-embeddings', 'skipped'],
+          [
+            'crg',
+            'skipped',
+            [
+              ['crg-graph', 'skipped'],
+              ['crg-mcp', 'skipped'],
+              ['crg-embeddings', 'skipped'],
+            ],
+          ],
         ],
       ],
     ]);
@@ -222,21 +230,52 @@ describe('Diagnóstico do ambiente', () => {
     expect(find(r.recommended, 'gh-auth').status).toBe('missing');
   });
 
-  it('com o uv, o Python vem dele', async () => {
+  it('com o uv, o Code Review Graph fica faltando, com o comando dele; instalado, ele sobe e o uv sai', async () => {
     const uv = { commands: { uv: '/home/u/.local/bin/uv' }, outputs: { '/home/u/.local/bin/uv --version': 'uv 0.12.23' } };
-    const semPython = await checkEnvironment(probe(uv));
-    expect(find(semPython.recommended, 'uv')).toMatchObject({ status: 'ok', version: '0.12.23' });
-    expect(find(semPython.recommended, 'python').status).toBe('missing');
-    const comPython = await checkEnvironment(
-      probe({
-        ...uv,
-        outputs: {
-          ...uv.outputs,
-          '/home/u/.local/bin/uv python find >=3.10': '/home/u/.local/share/uv/python/cpython-3.14/bin/python3.14\n',
-          '/home/u/.local/share/uv/python/cpython-3.14/bin/python3.14 --version': 'Python 3.14.0\n',
-        },
-      }),
+    const before = await checkEnvironment(probe(uv));
+    expect(find(before.recommended, 'uv')).toMatchObject({ status: 'ok', version: '0.12.23', install: undefined });
+    expect(find(before.recommended, 'crg')).toMatchObject({ status: 'missing', install: ['uv tool install code-review-graph'] });
+    const after = await checkEnvironment(probe({ commands: { ...uv.commands, 'code-review-graph': CRG }, files: { [CRG]: `#!${UV_PY}` } }));
+    expect(after.recommended.map((c) => c.id)).toEqual(['git', 'gh', 'crg']);
+    expect(find(after.recommended, 'crg').install).toBeUndefined();
+    // a busca semântica: o pacote pelo mesmo caminho do Code Review Graph, depois o embed
+    expect(find(after.recommended, 'crg-embeddings')).toMatchObject({
+      install: ['uv tool install --reinstall "code-review-graph[embeddings]"'],
+      command: 'code-review-graph embed --provider local',
+    });
+    const pipx = await checkEnvironment(
+      probe({ commands: { 'code-review-graph': CRG }, files: { [CRG]: '#!/home/u/.local/pipx/venvs/code-review-graph/bin/python' } }),
     );
-    expect(find(comPython.recommended, 'python')).toMatchObject({ status: 'ok', version: '3.14.0' });
+    expect(find(pipx.recommended, 'crg-embeddings').install).toEqual(['pipx inject code-review-graph "sentence-transformers>=3,<4"']);
+  });
+
+  it('o que falta traz o comando de instalação oficial, neutro: curl no Linux e no macOS, PowerShell no Windows', async () => {
+    const cli: BoardRequirement = { id: 'cli', tool: 'claude', cli: 'claude', action: null };
+    const node: BoardRequirement = { id: 'node', tool: 'claude', action: null };
+    const unix = await checkEnvironment(probe({ tool: 'claude', requirements: [node, cli] }));
+    expect(find(unix.required, 'node').install).toEqual([
+      'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash',
+      '. "$HOME/.nvm/nvm.sh"',
+      'nvm install 22',
+    ]);
+    expect(find(unix.required, 'cli').install).toEqual(['curl -fsSL https://claude.ai/install.sh | bash']);
+    expect(find(unix.recommended, 'uv').install).toEqual(['curl -LsSf https://astral.sh/uv/install.sh | sh']);
+    // o git e o GitHub CLI não têm instalador neutro: só o site
+    expect(find(unix.recommended, 'git').install).toBeUndefined();
+    expect(find(unix.recommended, 'gh').install).toBeUndefined();
+    const windows = await checkEnvironment(probe({ tool: 'claude', requirements: [node, cli], windows: true }));
+    expect(find(windows.required, 'cli').install).toEqual(['irm https://claude.ai/install.ps1 | iex']);
+    expect(find(windows.required, 'node').install).toEqual(['winget install Schniz.fnm', 'fnm install 22']);
+    // a outra ferramenta, achada pelo editor sem a CLI: o comando da CLI dela
+    const cursor = await checkEnvironment(
+      probe({ tool: 'claude', other: { tool: 'cursor', cli: null, signedIn: null, mcp: false, skill: false, permission: null } }),
+    );
+    expect(find(cursor.optional, 'cli').install).toEqual(['curl https://cursor.com/install -fsS | bash']);
+  });
+
+  it('pronto não sugere instalar', async () => {
+    const r = await checkEnvironment(probe({ commands: { node: '/usr/bin/node' }, outputs: { '/usr/bin/node --version': 'v22.3.0' } }));
+    expect(find(r.required, 'node').install).toBeUndefined();
+    expect(find(r.required, 'cli').install).toBeUndefined();
   });
 });
