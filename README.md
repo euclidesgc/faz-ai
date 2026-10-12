@@ -61,9 +61,9 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    própria ferramenta), abra a pasta do seu projeto e clique no ícone **Faz AI** na barra lateral.
    Cada pasta tem o seu board, já com as fases do fluxo.
 2. **Conecte a IA ao board.** Em **Configurações → Harness de IA**, escolha a ferramenta do projeto
-   (Claude Code ou Cursor). Na aba **Tudo que a ferramenta
-   carrega**, na ferramenta, clique em **Instalar (padrão da ferramenta)** na seção **Servidores
-   MCP** e de novo na seção **Skills**, para a skill do fluxo, que ensina a IA a conduzir as fases.
+   (Claude Code ou Cursor). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
+   grupo **Servidores MCP** e de novo no grupo **Skills**, para a skill do fluxo, que ensina a IA a
+   conduzir as fases.
 3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
    exemplo, "Login com Google") e dê Enter. Duplo clique abre o card: descreva o que você quer, em
    Markdown, e, se quiser, escolha o modelo da IA e as skills que ela deve ler.
