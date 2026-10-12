@@ -1,0 +1,27 @@
+# A mesma máquina "recém-instalada" do Dockerfile, para quando o computador não tem uma sessão
+# Wayland para emprestar (o macOS, ou um Linux sem Wayland): o Cursor vem na imagem, baixado do site
+# oficial, e a tela é virtual (Xvfb), mostrada no navegador do computador pelo noVNC.
+FROM faz-ai-e2e-cursor
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      xvfb x11vnc python3-websockify openbox x11-xserver-utils \
+    && rm -rf /var/lib/apt/lists/*
+# o noVNC do GitHub, que é só HTML e JavaScript: o pacote novnc do Ubuntu traz o Node.js junto, e a
+# máquina do teste não pode ter Node antes de a pessoa instalar
+RUN mkdir -p /opt/novnc \
+    && curl -fsSL https://github.com/novnc/noVNC/archive/refs/tags/v1.5.0.tar.gz | tar -xz -C /opt/novnc --strip-components=1
+# o .deb do Cursor para a arquitetura do contêiner (arm64 num Mac Apple Silicon); ele se instala em
+# /usr/share/cursor, o mesmo caminho que o modo Wayland monta do computador
+RUN arch="$(dpkg --print-architecture)" \
+    && case "$arch" in amd64) platform=linux-x64 ;; arm64) platform=linux-arm64 ;; *) echo "arquitetura sem Cursor: $arch" >&2; exit 1 ;; esac \
+    && url="$(curl -fsSL "https://www.cursor.com/api/download?platform=$platform&releaseTrack=stable" | sed -n 's/.*"debUrl":"\([^"]*\)".*/\1/p')" \
+    && test -n "$url" \
+    && curl -fsSL -o /tmp/cursor.deb "$url" \
+    && apt-get update && apt-get install -y --no-install-recommends /tmp/cursor.deb \
+    && rm -rf /tmp/cursor.deb /var/lib/apt/lists/*
+COPY --chmod=755 novnc.sh /usr/local/bin/start-novnc
+COPY openbox-rc.xml /etc/xdg/openbox/fazai-rc.xml
+USER dev
+# sem placa de vídeo nem Wayland: o Cursor desenha no X da tela virtual, sem GPU
+ENV DISPLAY=:1 FAZAI_OZONE=x11 FAZAI_CURSOR_FLAGS=--disable-gpu
+CMD ["start-novnc"]
