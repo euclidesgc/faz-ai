@@ -5,7 +5,7 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+## 0.35.0
 
 - **The environment check becomes a checklist, with no installer.** **Instalar tudo** (Install
   everything) is gone: the board no longer installs anything from third parties, only its own MCP and
