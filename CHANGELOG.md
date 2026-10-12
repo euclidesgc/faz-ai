@@ -44,6 +44,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   dois, o `AGENTS.md` aparece como não lido pelo Claude Code, com o `@import` que faz ele entrar; se
   tem só o `AGENTS.md`, o board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo. Um seletor mostra o que o Claude Code ou o Cursor carregam. Nas
   rules e skills, o uso nas execuções do board vira uma escolha na própria linha.
+- **Harness sem tremer ao escolher uma opção.** O seletor de uso nas execuções e o do modo da skill
+  ficam com a largura da opção mais longa: trocar o valor não faz mais o texto ao lado quebrar de
+  outro jeito e empurrar a tela. Num painel estreito, os botões de cada linha ocupam no máximo metade
+  dela e quebram em mais linhas, em vez de espremer a descrição até sumir.
 - **Avisos em âmbar de verdade.** Os avisos das telas de Git, de execução e do Harness pediam uma
   cor que o board não carregava e apareciam sem cor; agora usam o âmbar da paleta.
 - **O harness completo de cada ferramenta.** O board passa a encontrar também o `AGENTS.md` (e o

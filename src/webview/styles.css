@@ -2596,9 +2596,10 @@ body.host-web .drawer {
   margin: 0;
   padding: 0;
 }
+/* as ações ficam com no máximo metade da linha e quebram em mais linhas: o texto nunca some num painel estreito */
 .item-row {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-columns: 20px minmax(0, 1fr) fit-content(50%);
   gap: var(--sp-4) var(--sp-12);
   align-items: start;
   padding: var(--sp-8) var(--sp-4);
@@ -2640,6 +2641,18 @@ body.host-web .drawer {
 }
 .harness-tool-picker {
   margin: var(--sp-8) 0 var(--sp-12);
+}
+/* seletor de largura fixa (SelectField steady): o rótulo mais longo ocupa o lugar, invisível, atrás do escolhido */
+.select-steady {
+  display: inline-grid;
+}
+.select-steady > *,
+.select-steady::after {
+  grid-area: 1 / 1;
+}
+.select-steady::after {
+  content: attr(data-longest);
+  visibility: hidden;
 }
 .item-unread {
   color: var(--warn-border);

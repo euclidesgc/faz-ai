@@ -79,6 +79,24 @@ describe('SelectField', () => {
     await choose(screen.getByRole('combobox', { name: 'Modo' }), 'B');
     expect(onChange).toHaveBeenCalledWith('b');
   });
+
+  it('com steady, reserva a largura da opção mais longa e mostra a escolhida', () => {
+    renderThemed(
+      <SelectField
+        aria-label="Uso"
+        steady
+        options={[
+          { value: 'a', label: 'Curto' },
+          { value: 'b', label: 'Bem mais comprido' },
+        ]}
+        value="a"
+        onChange={() => {}}
+      />,
+    );
+    const trigger = screen.getByRole('combobox', { name: 'Uso' });
+    expect(trigger).toHaveTextContent(/^Curto$/);
+    expect(trigger.querySelector('.select-steady')).toHaveAttribute('data-longest', 'Bem mais comprido');
+  });
 });
 
 describe('ChipsEditor', () => {

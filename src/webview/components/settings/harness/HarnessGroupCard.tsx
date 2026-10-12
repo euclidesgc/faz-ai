@@ -42,6 +42,7 @@ function UsageSelect({ item }: { item: HarnessItem }) {
   return (
     <SelectField<HarnessUsage | 'none'>
       size="1"
+      steady
       aria-label={t('Uso nas execuções do board: {name}', { name: item.name })}
       title={t('Só o que está marcado entra nas execuções do board; o resto fica invisível para elas.')}
       options={[{ value: 'none', label: t('Fora das execuções') }, ...HARNESS_USAGES.map((u) => ({ value: u.id, label: t(u.label) }))]}
