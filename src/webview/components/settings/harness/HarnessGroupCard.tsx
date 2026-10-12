@@ -113,7 +113,7 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
   return (
     <SettingsCard
       title={t(group.label)}
-      badge={{ text: String(items.length), on: false }}
+      badge={{ text: String(g === 'plugin' ? items.filter((i) => i.kind === 'plugin').length : items.length), on: false }}
       hint={t(group.hint)}
       actions={
         <>
@@ -201,6 +201,36 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
       )}
       {agentsTable ? (
         <AgentsTable tool={aiToolInfo(tool)} scope={scope} />
+      ) : g === 'plugin' ? (
+        // cada plugin traz várias skills, agentes e comandos: um bloco recolhido por plugin
+        [...new Set(items.map((i) => i.plugin ?? ''))].map((plugin) => {
+          const own = items.filter((i) => (i.plugin ?? '') === plugin && i.kind !== 'plugin');
+          const manifest = items.find((i) => i.plugin === plugin && i.kind === 'plugin');
+          return (
+            <details key={plugin} className="plugin-group">
+              <summary>
+                <span className="item-name">{plugin}</span>{' '}
+                <Badge color="gray" variant="outline">
+                  {own.length}
+                </Badge>{' '}
+                {manifest?.description && <span className="muted small">{manifest.description}</span>}
+              </summary>
+              <ul className="item-list">
+                {own.map((i) => (
+                  <ItemRow
+                    key={keyOf(i)}
+                    tool={tool}
+                    item={i}
+                    actions={actions}
+                    explain
+                    filesOpen={filesOpen === i.path}
+                    onToggleFiles={() => setFilesOpen(filesOpen === i.path ? null : i.path)}
+                  />
+                ))}
+              </ul>
+            </details>
+          );
+        })
       ) : (
         <ul className="item-list">
           {items.map((i) => (

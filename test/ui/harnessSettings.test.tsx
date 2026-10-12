@@ -171,7 +171,7 @@ describe('HarnessSettings: rules', () => {
     // o CLAUDE.md global não aparece na aba do projeto
     expect(screen.queryByRole('button', { name: '~/.claude/CLAUDE.md' })).toBeNull();
     await userEvent.click(screen.getByRole('tab', { name: /^Global/ }));
-    expect(screen.getByRole('row', { name: /~\/\.claude\/CLAUDE\.md/ })).toBeInTheDocument();
+    expect(item('CLAUDE.md').getByRole('button', { name: '~/.claude/CLAUDE.md' })).toBeInTheDocument();
   });
 
   it('o caminho de uma rule abre o arquivo no editor do board', async () => {
@@ -244,9 +244,9 @@ describe('HarnessSettings: skills', () => {
 });
 
 describe('HarnessSettings: agentes', () => {
+  // os agentes ficam no grupo Subagentes de cada aba, sem sub-aba
   const openAgents = async (tab: HarnessTab = 'user') => {
     renderScreen(tab);
-    await userEvent.click(screen.getByRole('tab', { name: /^Agentes/ }));
   };
 
   it('o global lista os agentes da pasta do usuário, com o padrão e a marcação; o projeto lista os dele', async () => {

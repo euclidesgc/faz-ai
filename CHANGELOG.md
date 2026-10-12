@@ -19,6 +19,11 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   registro, abrir no terminal) é o botão azul principal; o **Copiar comando** ganhou contorno e os
   botões da tela saíram do tamanho pequeno. No topo, **Ir para o board** é o principal e **Verificar de
   novo** deixou de ser um botão discreto.
+- **Nova aba Global no Harness de IA.** O mesmo modelo da aba Projeto para o que vale em todos os
+  seus projetos: os grupos da pasta do usuário, os **Plugins** instalados (um bloco por plugin, com o
+  que cada um traz) e a **Organização**, com a política gerenciada da empresa, só para leitura. No
+  Cursor, o que não fica em arquivo (User Rules, Team Rules e a lista global de ignorados) aparece como
+  aviso no grupo certo.
 - **Nova aba Projeto no Harness de IA.** Tudo que a ferramenta lê na pasta do projeto, em grupos:
   regras principais, regras por assunto, memória, skills, subagentes, comandos, hooks, servidores
   MCP, configurações e permissões, e estilos de saída. Cada item diz o que é numa frase, mostra se é

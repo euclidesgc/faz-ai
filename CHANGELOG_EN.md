@@ -21,6 +21,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   command) got an outline and the buttons on the screen are no longer the small size. At the top, **Ir
   para o board** (Go to the board) is the main button and **Verificar de novo** (Check again) is no
   longer a faint one.
+- **New Global tab in the AI harness.** The same layout as the Projeto tab for what applies to all your
+  projects: the groups from your user folder, the installed **Plugins** (one block per plugin, with
+  what each one brings) and **Organização** (Organization), with the company's managed policy,
+  read-only. In Cursor, what does not live in a file (User Rules, Team Rules and the global ignore
+  list) shows up as a notice in the right group.
 - **New Projeto tab in the AI harness.** Everything the tool reads in the project folder, in groups:
   main rules, rules by topic, memory, skills, subagents, commands, hooks, MCP servers, settings and
   permissions, and output styles. Each item says what it is in one sentence, shows whether it is
