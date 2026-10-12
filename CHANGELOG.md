@@ -15,6 +15,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   baixa o Python quando falta. Os logins e as ações na pasta do projeto (`git init`, o build do grafo do
   Code Review Graph, o MCP dele e a busca semântica) trazem o comando com botão de copiar. O hint de
   cada linha explica como o board usa o item.
+- **Botões do Diagnóstico com mais destaque.** A ação que resolve um item (instalar a skill, corrigir o
+  registro, abrir no terminal) é o botão azul principal; o **Copiar comando** ganhou contorno e os
+  botões da tela saíram do tamanho pequeno. No topo, **Ir para o board** é o principal e **Verificar de
+  novo** deixou de ser um botão discreto.
 - **A outra ferramenta de IA aparece em Opcionais.** Num projeto com o Claude Code, o Cursor
   encontrado na máquina aparece com a linha de comando, o login, o MCP do board, a skill e o nível de
   permissão dele, e vice-versa.

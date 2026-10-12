@@ -2098,6 +2098,15 @@ button.heartbeat.stopped:hover {
   gap: var(--sp-6);
   color: var(--muted);
 }
+/* os botões são a ação de cada item: no tamanho normal e com contorno, para não sumirem no meio do texto */
+.environment .env-fix button.small {
+  padding: var(--sp-4) var(--sp-12);
+  font-size: var(--fs-sm);
+  min-height: 28px;
+}
+.environment .env-fix button.small:not(.primary) {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
 .environment .page-header-actions [role='status'] {
   display: inline-flex;
   align-items: center;

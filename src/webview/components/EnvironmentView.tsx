@@ -215,7 +215,7 @@ function Row({ check, projectTool, busy, onFixed }: RowProps) {
       {check.command && (
         <div className="env-fix">
           {check.install && check.status !== 'ok' && <span className="small muted">{t('Depois:')}</span>}
-          {r?.action?.kind === 'command' ? <RequirementFix r={r} /> : <CopyCommand command={check.command} />}
+          {r?.action?.kind === 'command' ? <RequirementFix r={r} variant="primary" /> : <CopyCommand command={check.command} />}
           {check.inProject && <span className="small muted">{t('Na pasta do projeto.')}</span>}
         </div>
       )}
@@ -228,7 +228,7 @@ function Row({ check, projectTool, busy, onFixed }: RowProps) {
               <span className="spinner" aria-hidden /> {t('Aplicando e conferindo de novo…')}
             </p>
           ) : (
-            <RequirementFix r={r} onFixed={onFixed} />
+            <RequirementFix r={r} variant="primary" onFixed={onFixed} />
           )}
         </div>
       )}
@@ -315,10 +315,10 @@ export function EnvironmentView() {
                 </>
               )}
             </span>
-            <Button size="small" variant="ghost" disabled={checking} onClick={recheck}>
+            <Button disabled={checking} onClick={recheck}>
               {t('Verificar de novo')}
             </Button>
-            <Button size="small" onClick={() => setView('board')}>
+            <Button variant="primary" onClick={() => setView('board')}>
               {t('Ir para o board')}
             </Button>
           </>

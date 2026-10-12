@@ -7,7 +7,7 @@ import { t } from '../i18n';
 import { harness, ui } from '../commands';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { isWeb } from '../vscode';
-import { Button, IconCheck, IconConnect, IconWarning } from './ui';
+import { Button, IconCheck, IconConnect, IconWarning, type ButtonVariant } from './ui';
 
 /** A cor do ícone de atenção: login vencido é erro, o resto que falta é atenção, e o que só é recomendado fica discreto. */
 export type RequirementsAlertLevel = 'error' | 'warn' | 'recommended';
@@ -198,7 +198,18 @@ function actionable(r: BoardRequirement, compact: boolean): boolean {
  * A ação que resolve o requisito: o comando com copiar, ou o botão que faz. `onFixed` roda depois de
  * um botão que muda algo na máquina (o Diagnóstico confere de novo para o item mudar de estado).
  */
-export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequirement; compact?: boolean; onFixed?: () => void }) {
+export function RequirementFix({
+  r,
+  compact = false,
+  onFixed,
+  variant,
+}: {
+  r: BoardRequirement;
+  compact?: boolean;
+  onFixed?: () => void;
+  /** no diagnóstico do ambiente, a ação que resolve o item é `primary`; no aviso fica a padrão */
+  variant?: ButtonVariant;
+}) {
   const openSettings = useBoardStore((s) => s.openSettings);
   const openMcpInstall = () => {
     useBoardStore.setState({ harnessTab: 'all' });
@@ -212,7 +223,7 @@ export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequir
         <>
           <CopyCommand command={action.command} />
           {action.terminal && !isWeb && (
-            <Button size="small" onClick={() => ui.openTerminal(action.command)}>
+            <Button size="small" variant={variant} onClick={() => ui.openTerminal(action.command)}>
               {t('Abrir no terminal')}
             </Button>
           )}
@@ -221,7 +232,7 @@ export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequir
     case 'connect':
       // a instalação mora na seção Servidores MCP da ferramenta, onde se escolhe global ou projeto
       return (
-        <Button size="small" onClick={() => openMcpInstall()}>
+        <Button size="small" variant={variant} onClick={() => openMcpInstall()}>
           <IconConnect /> {t('Instalar o MCP do board')}
         </Button>
       );
@@ -229,6 +240,7 @@ export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequir
       return (
         <Button
           size="small"
+          variant={variant}
           onClick={() => {
             ui.fixProjectMcp(action.file);
             onFixed?.();
@@ -241,6 +253,7 @@ export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequir
       return (
         <Button
           size="small"
+          variant={variant}
           onClick={() => {
             harness.installFlowSkill(r.tool, 'user');
             onFixed?.();
@@ -253,6 +266,7 @@ export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequir
       return (
         <Button
           size="small"
+          variant={variant}
           onClick={() => {
             ui.pinMcp();
             onFixed?.();
@@ -263,19 +277,19 @@ export function RequirementFix({ r, compact = false, onFixed }: { r: BoardRequir
       );
     case 'openEditorMcp':
       return (
-        <Button size="small" onClick={() => ui.openEditorMcp()}>
+        <Button size="small" variant={variant} onClick={() => ui.openEditorMcp()}>
           <IconConnect /> {t('Abrir MCPs do Cursor')}
         </Button>
       );
     case 'reload':
       return (
-        <Button size="small" onClick={() => ui.reloadWindow()}>
+        <Button size="small" variant={variant} onClick={() => ui.reloadWindow()}>
           {t('Recarregar a janela')}
         </Button>
       );
     case 'settings':
       return (
-        <Button size="small" onClick={() => openSettings('harness')}>
+        <Button size="small" variant={variant} onClick={() => openSettings('harness')}>
           {t('Abrir Harness de IA')}
         </Button>
       );
