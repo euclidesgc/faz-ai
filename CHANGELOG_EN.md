@@ -16,6 +16,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   Code Review Graph shows inside uv, which installs it and downloads Python when missing. Sign-ins and
   actions in the project folder (`git init`, the Code Review Graph build, its MCP and semantic search)
   show the command with a copy button. Each row's hint explains how the board uses the item.
+- **More prominent buttons in the environment check.** The action that fixes an item (install the
+  skill, fix the registration, open in the terminal) is the main blue button; **Copiar comando** (Copy
+  command) got an outline and the buttons on the screen are no longer the small size. At the top, **Ir
+  para o board** (Go to the board) is the main button and **Verificar de novo** (Check again) is no
+  longer a faint one.
 - **The other AI tool shows under Optional.** In a project on Claude Code, Cursor found on the machine
   shows with its command line, sign-in, the board's MCP, the skill and its permission level, and vice
   versa.
