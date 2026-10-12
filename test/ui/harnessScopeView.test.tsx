@@ -341,3 +341,55 @@ describe('HarnessScopeView: ações em massa', () => {
     expect(card('Configurações e permissões').queryByRole('checkbox')).toBeNull();
   });
 });
+
+describe('HarnessScopeView: plugins', () => {
+  const plugin = (name: string, id: string, scopes: string[], enabled = true): HarnessItem =>
+    item({
+      kind: 'plugin',
+      scope: 'plugin',
+      name,
+      plugin: name,
+      layout: 'entry',
+      location: `~/.claude/plugins/${name}/.claude-plugin/plugin.json`,
+      install: { id, scopes, enabled, dir: `/home/.claude/plugins/${name}` },
+    });
+
+  it('o do topo marca os plugins, e desativar vai pela ferramenta', async () => {
+    setClaudeItems([plugin('design', 'design@synced', ['synced']), plugin('fmt', 'fmt@loja', ['user'])]);
+    renderThemed(<HarnessScopeView scope="user" />);
+    const plugins = card('Plugins');
+    expect(plugins.getByText('sincronizado do claude.ai')).toBeInTheDocument();
+    await userEvent.click(plugins.getByRole('checkbox', { name: 'Selecionar todos: Plugins' }));
+    // o sincronizado não se desinstala: o botão diz para quantos vale
+    expect(plugins.getByRole('button', { name: 'Desinstalar (1)' })).toBeInTheDocument();
+    await userEvent.click(plugins.getByRole('button', { name: 'Desativar' }));
+    expect(lastSent('harness.plugin.apply')).toEqual({
+      type: 'harness.plugin.apply',
+      tool: 'claude',
+      action: 'disable',
+      ids: ['design@synced', 'fmt@loja'],
+    });
+    expect(plugins.getByText('Aplicando pela ferramenta…')).toBeInTheDocument();
+  });
+
+  it('desinstalar pede confirmação antes', async () => {
+    setClaudeItems([plugin('fmt', 'fmt@loja', ['user'], false)]);
+    renderThemed(<HarnessScopeView scope="user" />);
+    const plugins = card('Plugins');
+    expect(plugins.getByText('desativado')).toBeInTheDocument();
+    await userEvent.click(plugins.getByRole('checkbox', { name: 'Selecionar fmt' }));
+    expect(plugins.getByRole('button', { name: 'Ativar' })).toBeInTheDocument();
+    await userEvent.click(plugins.getByRole('button', { name: 'Desinstalar' }));
+    const dialog = useBoardStore.getState().dialog!;
+    expect(dialog.title).toBe('Desinstalar "fmt"?');
+    expect(sentOf('harness.plugin.apply')).toEqual([]);
+    act(() => dialog.onConfirm());
+    expect(lastSent('harness.plugin.apply')).toMatchObject({ action: 'uninstall', ids: ['fmt@loja'] });
+  });
+
+  it('sem saber como o plugin foi instalado, ele fica sem caixa', () => {
+    setClaudeItems([{ ...plugin('velho', 'x', []), install: undefined }]);
+    renderThemed(<HarnessScopeView scope="user" />);
+    expect(card('Plugins').queryByRole('checkbox')).toBeNull();
+  });
+});

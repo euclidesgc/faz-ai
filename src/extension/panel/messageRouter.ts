@@ -7,7 +7,8 @@ import { newId } from '../db/ids';
 import type { ImportSummary } from '../../shared/backup';
 import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
-import type { AiTool } from '../../shared/harness';
+import type { AiTool, PluginAction } from '../../shared/harness';
+import type { ClaudeCli } from '../plugins';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import { agentProfiles } from '../../shared/execution';
 import type { AttachmentStore } from '../attachments';
@@ -75,6 +76,7 @@ const bridgeOnly = {
   'card.workspace.open': viaBridge,
   'harness.item.open': viaBridge,
   'harness.file.read': viaBridge,
+  'harness.plugin.apply': viaBridge,
   'harness.file.write': viaBridge,
   'harness.item.create': viaBridge,
   'harness.skill.file.create': viaBridge,
@@ -408,6 +410,18 @@ export class MessageRouter {
   /** Relê regras e skills do disco (chamado quando os arquivos mudam por fora) e avisa os webviews se algo mudou. */
   refreshHarness(): void {
     if (this.ctx.harness.refresh()) this.changed();
+  }
+
+  /** Liga a CLI do Claude Code, que diz quais plugins estão instalados e os desinstala, desativa e ativa. */
+  setClaudeCli(cli: ClaudeCli | null): void {
+    this.ctx.harness.setClaudeCli(cli, () => this.changed());
+  }
+
+  /** Desinstala, desativa ou ativa plugins e devolve o aviso para a pessoa. */
+  async applyPlugins(tool: AiTool, action: PluginAction, ids: string[]): Promise<string> {
+    const notice = await this.ctx.harness.applyPlugins(tool, action, ids);
+    this.changed();
+    return notice;
   }
 
   /** Guarda a origem de skills já disponível numa pasta, para a pessoa escolher o que instalar. */

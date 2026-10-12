@@ -828,7 +828,7 @@ loads. The content comes split into groups, always in the same order:
 | Servidores MCP (MCP servers) | Servers that give the AI extra tools | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
 | Configurações e permissões (settings and permissions) | How the tool behaves and what the AI does without asking | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
 | Estilos de saída (output styles) | Change the way the AI answers | `.claude/output-styles/*.md` |
-| Plugins (Global) | Installed packages, one block per plugin with what it brings | `~/.claude/plugins`, `~/.cursor/plugins/local` |
+| Plugins (Global) | Installed packages, one block per plugin with what it brings | the ones `claude plugin list` shows, `~/.cursor/plugins/local` |
 | Organização (organization, Global) | The company policy, read-only | `CLAUDE.md` and `managed-settings.json` in the system folder (`/Library/Application Support/ClaudeCode` on macOS) |
 
 Each item shows its name, **what it is in one simple sentence**, whether it is **always loaded** or
@@ -866,8 +866,15 @@ group checks them all. The bar that shows up offers only what applies to the che
 in board runs (rules and skills), the skill mode, copying to the project or to global, **Apagar**
 (delete files and folders) and **Remover** (remove hook, permission rule and MCP server entries).
 When an action applies to only part of the checked items, the button says how many. Deleting and
-removing ask for confirmation first. Plugins and the organization policy, which are read-only, have
-no checkbox.
+removing ask for confirmation first. The organization policy, which is read-only, has no checkbox.
+
+**Plugins.** Claude Code's list comes from `claude plugin list --json`: only what it loads shows up,
+never the marketplaces' catalog. With plugins checked, the bar offers **Desativar** (disable),
+**Ativar** (enable) and **Desinstalar** (uninstall), done by the CLI itself (`claude plugin disable`,
+`enable` and `uninstall`, in each scope the plugin is installed at). Plugins synced from claude.ai
+and the organization's can only be disabled. In Cursor, which has no command for it, uninstalling
+removes the plugin's folder from `~/.cursor/plugins/local`. Uninstalling asks for confirmation, and
+the change takes effect in the tool's next session (in Claude Code, also after `/reload-plugins`).
 
 The subagents of the project's tool keep their own table, with **Disponível no board** (available
 on the board), the default and the editor for the board's fields. A mark whose file is gone shows in

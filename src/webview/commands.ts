@@ -1,5 +1,5 @@
 import type { WebviewToHost } from '../shared/messages';
-import type { AiTool, HarnessKind, InstallScope, SkillMode } from '../shared/harness';
+import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from '../shared/harness';
 import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
 import type { AgentInput } from '../shared/messages';
 import type { HookInput, McpServerInput } from '../shared/harnessCatalog';
@@ -153,6 +153,7 @@ export const harness = {
   createItem: (tool: AiTool, source: number, name: string, description: string) =>
     post({ type: 'harness.item.create', tool, source, name, description }),
   deleteItem: (tool: AiTool, kind: HarnessKind, path: string) => post({ type: 'harness.item.delete', tool, kind, path }),
+  applyPlugins: (tool: AiTool, action: PluginAction, ids: string[]) => post({ type: 'harness.plugin.apply', tool, action, ids }),
   copyItems: (tool: AiTool, items: { kind: HarnessKind; path: string }[], to: HarnessScope) =>
     post({ type: 'harness.item.copy', tool, items, to }),
   writeRule: (name: string, content: string) => post({ type: 'harness.rule.write', name, content }),

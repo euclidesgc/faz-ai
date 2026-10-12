@@ -45,6 +45,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   only `AGENTS.md`, the board warns that creating a `CLAUDE.md` makes Claude Code stop reading it. A
   selector shows what Claude Code or Cursor loads.
   For rules and skills, how board runs use them becomes a choice on the row itself.
+- **Plugins: bulk disable, enable and uninstall, and only the ones really installed.** Claude Code's
+  plugin list now comes from `claude plugin list --json`. The board used to also show the ones in the
+  marketplaces' catalog (`~/.claude/plugins/marketplaces`), which are available but not installed.
+  Each plugin gets a checkbox, and the bar disables, enables or uninstalls the checked ones through
+  the CLI itself. Plugins synced from claude.ai and the organization's can only be disabled. In
+  Cursor, uninstalling removes the folder from `~/.cursor/plugins/local`. Uninstalling asks for
+  confirmation.
 - **Bulk actions in the Harness.** Every group in the Projeto and Global tabs has checkboxes, and the
   one at the top checks them all. The bar shows only the actions that apply to what is checked: use
   in board runs, skill mode, copying to the project or global, deleting files and removing hook,

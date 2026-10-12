@@ -43,6 +43,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   dois, o `AGENTS.md` aparece como não lido pelo Claude Code, com o `@import` que faz ele entrar; se
   tem só o `AGENTS.md`, o board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo. Um seletor mostra o que o Claude Code ou o Cursor carregam. Nas
   rules e skills, o uso nas execuções do board vira uma escolha na própria linha.
+- **Plugins: desativar, ativar e desinstalar em massa, e só os instalados de verdade.** A lista de
+  plugins do Claude Code passa a vir de `claude plugin list --json`. Antes o board mostrava também os
+  do catálogo dos marketplaces (`~/.claude/plugins/marketplaces`), que estão disponíveis mas não
+  instalados. Cada plugin ganha caixa de seleção, e a barra desativa, ativa ou desinstala os
+  marcados pela própria CLI. Os sincronizados do claude.ai e os da organização só se desativam. No
+  Cursor, desinstalar tira a pasta de `~/.cursor/plugins/local`. Desinstalar pede confirmação.
 - **Ações em massa no Harness.** Cada grupo das abas Projeto e Global tem caixas de seleção, e a do
   topo marca todos. A barra mostra só as ações que valem para o que foi marcado: uso nas execuções do
   board, modo da skill, copiar para o projeto ou o global, apagar arquivos e remover entradas de

@@ -27,6 +27,7 @@ import { NewHook } from './NewHook';
 import { NewItem } from './NewItem';
 import { NewMcpServer } from './NewMcpServer';
 import { NewPermission } from './NewPermission';
+import { PluginGroup } from './PluginGroup';
 import type { ItemActions } from './useItemActions';
 import { t } from '../../../i18n';
 import { rich } from '../../../i18n/rich';
@@ -175,7 +176,7 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
       )}
       {g === 'plugin' && (
         <div className="muted small">
-          {t('Plugins são instalados e removidos pela própria ferramenta, {where}:', { where: t(PLUGIN_COMMANDS[tool].where) })}
+          {t('Plugins são instalados pela própria ferramenta, {where}:', { where: t(PLUGIN_COMMANDS[tool].where) })}
           <ul>
             {PLUGIN_COMMANDS[tool].commands.map((c) => (
               <li key={c}>
@@ -220,35 +221,7 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
       {agentsTable ? (
         <AgentsTable tool={aiToolInfo(tool)} scope={scope} />
       ) : g === 'plugin' ? (
-        // cada plugin traz várias skills, agentes e comandos: um bloco recolhido por plugin
-        [...new Set(items.map((i) => i.plugin ?? ''))].map((plugin) => {
-          const own = items.filter((i) => (i.plugin ?? '') === plugin && i.kind !== 'plugin');
-          const manifest = items.find((i) => i.plugin === plugin && i.kind === 'plugin');
-          return (
-            <details key={plugin} className="plugin-group">
-              <summary>
-                <span className="item-name">{plugin}</span>{' '}
-                <Badge color="gray" variant="outline">
-                  {own.length}
-                </Badge>{' '}
-                {manifest?.description && <span className="muted small">{manifest.description}</span>}
-              </summary>
-              <ul className="item-list">
-                {own.map((i) => (
-                  <ItemRow
-                    key={keyOf(i)}
-                    tool={tool}
-                    item={i}
-                    actions={actions}
-                    explain
-                    filesOpen={filesOpen === i.path}
-                    onToggleFiles={() => setFilesOpen(filesOpen === i.path ? null : i.path)}
-                  />
-                ))}
-              </ul>
-            </details>
-          );
-        })
+        <PluginGroup tool={tool} items={items} actions={actions} />
       ) : (
         <>
           {pickable.length > 0 && (

@@ -191,6 +191,13 @@ export class HostBridge {
           }
           return;
         }
+        case 'harness.plugin.apply':
+          try {
+            this.post({ type: 'notice', message: await this.router.applyPlugins(msg.tool, msg.action, msg.ids) });
+          } finally {
+            this.post({ type: 'harness.plugin.done' });
+          }
+          return;
         case 'harness.file.write': {
           try {
             this.router.writeHarnessFile(msg.path, msg.content);

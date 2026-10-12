@@ -146,7 +146,43 @@ export interface HarnessItem {
   source?: number;
   /** valor inteiro da entrada, quando `description` o resume: o comando de um hook, ou a lista (allow, deny, ask) de uma regra de permissão */
   detail?: string;
+  /** só no item do próprio plugin (`kind: 'plugin'`): como ele está instalado, quando a ferramenta diz */
+  install?: PluginInstall;
 }
+
+/**
+ * Um plugin instalado, como a ferramenta o informa. No Claude Code vem de `claude plugin list --json`:
+ * o id é `nome@marketplace` (ou `@synced`, `@skills-dir`) e o escopo é onde ele foi instalado. No
+ * Cursor é uma pasta de `~/.cursor/plugins/local`, e o id é o nome dela.
+ */
+export interface PluginInstall {
+  id: string;
+  /** escopos em que está instalado: `user`, `project`, `local`, `managed`, `synced`… */
+  scopes: string[];
+  enabled: boolean;
+  /** pasta de onde a ferramenta carrega o plugin */
+  dir: string;
+}
+
+/** O que o board faz com um plugin instalado, pela própria ferramenta. */
+export type PluginAction = 'uninstall' | 'disable' | 'enable';
+
+/** Escopos de onde o Claude Code desinstala um plugin; os sincronizados do claude.ai e os da organização só são desativados. */
+const UNINSTALL_SCOPES = ['user', 'project', 'local'];
+
+/** As ações que valem para o plugin, conforme a ferramenta e como ele está instalado. */
+export function pluginActions(tool: AiTool, install: PluginInstall | undefined): PluginAction[] {
+  if (!install) return [];
+  // o Cursor não tem comando para desativar: um plugin local sai tirando a pasta
+  if (tool === 'cursor') return ['uninstall'];
+  const out: PluginAction[] = [install.enabled ? 'disable' : 'enable'];
+  if (/@(inline|synced|skills-dir)$/.test(install.id)) return out;
+  if (install.scopes.some((s) => UNINSTALL_SCOPES.includes(s))) out.push('uninstall');
+  return out;
+}
+
+/** Os escopos de que o Claude Code desinstala o plugin, um comando por escopo. */
+export const uninstallScopes = (install: PluginInstall): string[] => install.scopes.filter((s) => UNINSTALL_SCOPES.includes(s));
 
 /** Uma skill encontrada numa pasta ou num repositório, antes de ser instalada. */
 export interface InstallableSkill {

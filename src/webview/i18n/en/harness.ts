@@ -61,6 +61,24 @@ export const harness: Record<string, string> = {
   'sem arquivo': 'no file',
   'Nada aqui ainda.': 'Nothing here yet.',
   'Você pode criar:': 'You can create:',
+  'Desinstalar "{name}"?': 'Uninstall "{name}"?',
+  'Desinstalar {n} plugins?': 'Uninstall {n} plugins?',
+  'A pasta de cada um sai de ~/.cursor/plugins/local.': "Each one's folder is removed from ~/.cursor/plugins/local.",
+  'O Claude Code remove o plugin e apaga os dados e as opções que ele guardou.':
+    'Claude Code removes the plugin and deletes the data and options it saved.',
+  Desinstalar: 'Uninstall',
+  'Ações nos plugins marcados': 'Actions on the checked plugins',
+  'Aplicando pela ferramenta…': 'Applying through the tool…',
+  Desativar: 'Disable',
+  Ativar: 'Enable',
+  'A ferramenta não carrega o plugin até ele ser ativado de novo': 'The tool does not load the plugin until it is enabled again',
+  desativado: 'disabled',
+  'Vem da sua conta no claude.ai: dá para desativar, não para desinstalar':
+    'Comes from your claude.ai account: it can be disabled, not uninstalled',
+  'sincronizado do claude.ai': 'synced from claude.ai',
+  'Instalado pela sua organização: dá para desativar, não para desinstalar':
+    'Installed by your organization: it can be disabled, not uninstalled',
+  'da organização': 'from the organization',
   'Uso nas execuções do board': 'Use in board runs',
   'Modo da skill': 'Skill mode',
   'Ações nos itens marcados': 'Actions on the checked items',
@@ -149,7 +167,7 @@ export const harness: Record<string, string> = {
   'Modelos de classe e exemplos de código ficam bem numa skill própria, só quando indicada: os arquivos vão em <code>references/</code> e os cards que a indicam recebem os caminhos.':
     'Class templates and code examples fit well in a skill of their own, used only when indicated: the files go in <code>references/</code> and the cards that indicate it receive the paths.',
   'Criar skill de modelos': 'Create templates skill',
-  'Plugins são instalados e removidos pela própria ferramenta, {where}:': 'Plugins are installed and removed by the tool itself, {where}:',
+  'Plugins são instalados pela própria ferramenta, {where}:': 'Plugins are installed by the tool itself, {where}:',
   'no terminal': 'in the terminal',
   'no Cursor (Customize → Plugins) ou numa sessão do agente': 'in Cursor (Customize → Plugins) or in an agent session',
   'claude plugin marketplace add <dono/repositorio>': 'claude plugin marketplace add <owner/repository>',
