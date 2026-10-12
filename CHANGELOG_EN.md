@@ -21,6 +21,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   command) got an outline and the buttons on the screen are no longer the small size. At the top, **Ir
   para o board** (Go to the board) is the main button and **Verificar de novo** (Check again) is no
   longer a faint one.
+- **The "Tudo que a ferramenta carrega" (everything the tool loads) tab is gone.** What it showed now
+  lives in the Projeto and Global tabs, in groups and with each item's sentence; the MCP server, hook
+  and permission rule forms and the skill search moved along. Bulk selection (marking several items
+  to copy, change mode or delete at once) went with it: the same actions remain on each row. The
+  unregistered MCP notice leads to the Projeto tab.
 - **New Global tab in the AI harness.** The same layout as the Projeto tab for what applies to all your
   projects: the groups from your user folder, the installed **Plugins** (one block per plugin, with
   what each one brings) and **Organização** (Organization), with the company's managed policy,

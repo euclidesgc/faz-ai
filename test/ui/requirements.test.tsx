@@ -66,7 +66,7 @@ describe('faixa de requisitos do board', () => {
     // leva à seção Servidores MCP da ferramenta, onde se escolhe entre global e projeto
     await userEvent.click(screen.getByRole('button', { name: /Instalar o MCP do board/ }));
     expect(sentOf('ui.connectAI')).toHaveLength(0);
-    expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness', harnessTab: 'all' });
+    expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness', harnessTab: 'project' });
     useBoardStore.setState({ view: 'board' });
     await userEvent.click(screen.getByRole('button', { name: 'Abrir Harness de IA' }));
     expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness' });

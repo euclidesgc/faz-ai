@@ -271,7 +271,7 @@ describe('telas montam sem erro', () => {
     for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
     // cada aba do Harness é montada por vez: juntamos o texto das quatro
-    const harness = (['tool', 'project', 'user', 'all'] as const)
+    const harness = (['tool', 'project', 'user'] as const)
       .map((harnessTab) => {
         useBoardStore.setState({ harnessTab });
         return html(<HarnessSettings />);
@@ -289,7 +289,6 @@ describe('telas montam sem erro', () => {
       'Uso nas execuções do board',
       'revisar-spec',
       '.cursor/skills',
-      'Tudo que cada ferramenta carrega',
       'Servidores MCP',
       'Hooks',
       'deste projeto',
