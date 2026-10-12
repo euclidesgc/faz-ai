@@ -55,9 +55,9 @@ export const HEARTBEAT_RANGE = { min: 5, max: 1440 };
 export const PARALLEL_RANGE = { min: 2, max: 6 };
 export const DEFAULT_RUNNER: RunnerConfig = {
   permission: 'board',
-  timeoutMinutes: 30,
+  timeoutMinutes: 45,
   heartbeat: false,
-  heartbeatMinutes: 60,
+  heartbeatMinutes: 10,
   parallel: false,
   parallelStories: 2,
   autopilotPaused: false,

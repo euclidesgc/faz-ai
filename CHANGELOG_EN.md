@@ -21,6 +21,8 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   command) got an outline and the buttons on the screen are no longer the small size. At the top, **Ir
   para o board** (Go to the board) is the main button and **Verificar de novo** (Check again) is no
   longer a faint one.
+- **New defaults in the Harness.** The run time limit is now 45 minutes (was 30) and the heartbeat
+  interval 10 minutes (was 60). Boards that already saved other values keep them.
 - **The other AI tool shows under Optional.** In a project on Claude Code, Cursor found on the machine
   shows with its command line, sign-in, the board's MCP, the skill and its permission level, and vice
   versa.

@@ -19,6 +19,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   registro, abrir no terminal) é o botão azul principal; o **Copiar comando** ganhou contorno e os
   botões da tela saíram do tamanho pequeno. No topo, **Ir para o board** é o principal e **Verificar de
   novo** deixou de ser um botão discreto.
+- **Novos padrões no Harness.** O tempo limite de execução passa a ser de 45 minutos (era 30) e o
+  intervalo do heartbeat de 10 minutos (era 60). Boards que já salvaram outros valores continuam com
+  eles.
 - **A outra ferramenta de IA aparece em Opcionais.** Num projeto com o Claude Code, o Cursor
   encontrado na máquina aparece com a linha de comando, o login, o MCP do board, a skill e o nível de
   permissão dele, e vice-versa.
