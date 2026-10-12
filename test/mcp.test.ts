@@ -384,6 +384,7 @@ describe('harness e padrões pelo MCP', () => {
     const inventory = (await call('get_harness')).data.inventory;
     expect(inventory.find((i: any) => i.name === 'commit' && i.scope === 'user')).toEqual({
       kind: 'skill',
+      group: 'skill',
       scope: 'user',
       usage: 'contextual',
       name: 'commit',

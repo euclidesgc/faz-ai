@@ -19,6 +19,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   registro, abrir no terminal) é o botão azul principal; o **Copiar comando** ganhou contorno e os
   botões da tela saíram do tamanho pequeno. No topo, **Ir para o board** é o principal e **Verificar de
   novo** deixou de ser um botão discreto.
+- **O harness completo de cada ferramenta.** O board passa a encontrar também o `AGENTS.md` (e o
+  `.claude/AGENTS.md`), que o Claude Code lê quando o projeto não tem `CLAUDE.md`; a memória automática
+  do Claude Code deste projeto (`~/.claude/projects/<projeto>/memory/`); a política da organização (o
+  `CLAUDE.md` e o `managed-settings.json` da pasta do sistema, só leitura); o `.cursorignore` e os
+  comandos da pasta do usuário do Cursor. Cada lugar do catálogo ganhou um grupo e uma frase simples
+  dizendo o que é, e o `get_harness` devolve o grupo de cada item.
 - **Arquivos do harness abrem no board.** Clicar no caminho de uma rule, skill, agente, comando ou
   arquivo de configuração no Harness de IA abre o arquivo numa janela do próprio board, no mesmo
   modelo dos anexos: Markdown formatado ou código, edição com salvar e cancelar, e o botão **Abrir no

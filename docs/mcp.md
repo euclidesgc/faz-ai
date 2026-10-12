@@ -130,7 +130,10 @@ O board lê o harness de cada ferramenta em três escopos: a pasta do projeto (`
 usuário (`user`, vale em todos os projetos) e os plugins instalados (`plugin`). `get_harness` devolve
 em `inventory` tudo que a ferramenta do projeto carrega (instruções e regras, skills, agentes,
 comandos, hooks, servidores MCP, plugins e arquivos de configuração), com o escopo e o caminho de
-cada item. De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
+cada item, e o `group` em que a tela de Harness o mostra: `main` (regras principais), `topic` (regras
+por assunto), `memory` (memória automática do Claude Code), `skill`, `agent`, `command`, `hook`, `mcp`,
+`settings`, `style` (estilos de saída), `plugin` e `managed` (política da organização, só leitura).
+De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
 
 Toda execução pelo board parte de contexto vazio: só entra o que está marcado em Configurações →
 Harness. `set_harness_selection` marca rules (`instructions`), skills e agentes: `always` entra em

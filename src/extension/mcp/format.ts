@@ -1,6 +1,7 @@
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, usageOf } from '../../shared/harnessSelection';
+import { groupOf } from '../../shared/harnessCatalog';
 import { norm } from '../../shared/filters';
 import {
   describeRule,
@@ -532,6 +533,8 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
     // o que a ferramenta em uso carrega, com o escopo (project, user ou plugin) e a marcação do board
     inventory: inventory.map((i) => ({
       kind: i.kind,
+      // o grupo em que a tela de Harness mostra o item (main, topic, memory, skill… plugin, managed)
+      group: groupOf(s.board.aiTool, i),
       scope: i.scope,
       name: i.name,
       ...(isSelectableKind(i.kind) ? { usage: usage(i) } : {}),

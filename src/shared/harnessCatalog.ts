@@ -1,102 +1,332 @@
 import type { AiTool, HarnessKind } from './harness';
 
 /**
+ * Os grupos das abas Projeto e Global do Harness, na ordem em que aparecem. Cada fonte do catálogo
+ * cai num deles; os itens de plugin vão todos para `plugin`.
+ */
+export type HarnessGroup =
+  'main' | 'topic' | 'memory' | 'skill' | 'agent' | 'command' | 'hook' | 'mcp' | 'settings' | 'style' | 'plugin' | 'managed';
+
+export const HARNESS_GROUPS: { id: HarnessGroup; label: string; hint: string }[] = [
+  { id: 'main', label: 'Regras principais', hint: 'Entram no começo de toda conversa: é o que a IA sempre sabe sobre você e o projeto.' },
+  { id: 'topic', label: 'Regras por assunto', hint: 'Regras separadas por tema; algumas só entram quando a IA mexe em certos arquivos.' },
+  { id: 'memory', label: 'Memória', hint: 'Anotações que a própria IA escreve para lembrar entre uma conversa e outra.' },
+  { id: 'skill', label: 'Skills', hint: 'Pacotes de instruções e arquivos de apoio que a IA carrega quando a tarefa pede.' },
+  { id: 'agent', label: 'Subagentes', hint: 'Ajudantes com instruções próprias, para os quais a IA delega partes do trabalho.' },
+  { id: 'command', label: 'Comandos', hint: 'Prompts prontos, chamados com /nome na conversa.' },
+  { id: 'hook', label: 'Hooks', hint: 'Comandos que a ferramenta roda sozinha em certos eventos.' },
+  { id: 'mcp', label: 'Servidores MCP', hint: 'Servidores que dão ferramentas extras à IA.' },
+  {
+    id: 'settings',
+    label: 'Configurações e permissões',
+    hint: 'Como a ferramenta se comporta e o que a IA pode fazer sem perguntar.',
+  },
+  { id: 'style', label: 'Estilos de saída', hint: 'Mudam o jeito de a IA responder.' },
+  {
+    id: 'plugin',
+    label: 'Plugins',
+    hint: 'Pacotes instalados que trazem skills, agentes, comandos, hooks e servidores; mudam pela própria ferramenta.',
+  },
+  { id: 'managed', label: 'Organização', hint: 'Definido pela sua empresa para todas as pessoas; aqui é só leitura.' },
+];
+
+/** O que a fonte diz para a pessoa: o grupo, uma frase simples e quando a ferramenta a carrega. */
+interface SourceMeta {
+  group?: HarnessGroup;
+  /** o que é, numa frase simples */
+  hint?: string;
+  /** `always`: entra no começo de toda conversa; `on-demand`: só quando a tarefa pede ou a pessoa chama */
+  loads?: 'always' | 'on-demand';
+  /** `managed`: pasta da política da organização, que depende do sistema (ver `managedDir`) */
+  base?: 'managed';
+  /** o board não oferece criar o arquivo (a ferramenta ou a organização é que o mantém) */
+  noCreate?: boolean;
+}
+
+/**
  * Onde cada ferramenta guarda o que carrega, no projeto e na pasta do usuário, conforme a
- * documentação de cada uma lida em 2026-10-02:
+ * documentação de cada uma lida em 2026-10-12:
  * - Claude Code: code.claude.com/docs (memory, skills, sub-agents, hooks-guide, mcp, settings, plugins)
- * - Cursor: cursor.com/docs (rules, skills, subagents, hooks, mcp, plugins, cli/reference/configuration)
+ * - Cursor: cursor.com/docs (rules, ignore-files, skills, subagents, hooks, mcp, plugins, cli/reference/configuration)
  *
- * A varredura e a tela são genéricas sobre esta tabela: mudar um caminho é mudar um dado aqui.
+ * A varredura e a tela são genéricas sobre esta tabela: mudar um caminho é mudar um dado aqui. Os
+ * índices são usados nas mensagens da tela (`source`): fonte nova entra no fim da lista da ferramenta.
+ * `{project}` no caminho é a pasta do projeto no formato do Claude Code (ver `claudeProjectKey`).
  */
 export type HarnessSource = {
   kind: HarnessKind;
   scope: 'project' | 'user';
   path: string;
   /** rótulo de origem para itens que vêm com a ferramenta */ builtin?: string;
-} & (
-  | { layout: 'file' }
-  /** todos os arquivos da pasta (e subpastas) com a extensão */
-  | { layout: 'files'; ext: string }
-  /** pastas `<nome>/SKILL.md` */
-  | { layout: 'skills' }
-  /** um item por chave do objeto `key` de um arquivo JSON */
-  | { layout: 'json-keys'; key: string }
-  /** servidores MCP no ~/.claude.json: os globais e os gravados para esta pasta de projeto */
-  | { layout: 'claude-json' }
-  /** regras de permissão: as listas (`allow`, `deny`…) do objeto `permissions` de um arquivo JSON */
-  | { layout: 'json-permissions'; lists: string[] }
-);
+} & SourceMeta &
+  (
+    | { layout: 'file' }
+    /** todos os arquivos da pasta (e subpastas) com a extensão */
+    | { layout: 'files'; ext: string }
+    /** pastas `<nome>/SKILL.md` */
+    | { layout: 'skills' }
+    /** um item por chave do objeto `key` de um arquivo JSON */
+    | { layout: 'json-keys'; key: string }
+    /** servidores MCP no ~/.claude.json: os globais e os gravados para esta pasta de projeto */
+    | { layout: 'claude-json' }
+    /** regras de permissão: as listas (`allow`, `deny`…) do objeto `permissions` de um arquivo JSON */
+    | { layout: 'json-permissions'; lists: string[] }
+  );
 
 type Src = HarnessSource;
-const both = (kind: HarnessKind, layout: 'skills', paths: [project: string[], user: string[]]): Src[] => [
-  ...paths[0].map((path): Src => ({ kind, scope: 'project', layout, path })),
-  ...paths[1].map((path): Src => ({ kind, scope: 'user', layout, path })),
-];
-const files = (kind: HarnessKind, scope: 'project' | 'user', path: string, ext: string): Src => ({
+type Scope = 'project' | 'user';
+const skills = (scope: Scope, paths: string[], meta: SourceMeta): Src[] =>
+  paths.map((path): Src => ({ kind: 'skill', scope, layout: 'skills', path, ...meta }));
+const files = (kind: HarnessKind, scope: Scope, path: string, ext: string, meta: SourceMeta): Src => ({
   kind,
   scope,
   layout: 'files',
   path,
   ext,
+  ...meta,
 });
-const file = (kind: HarnessKind, scope: 'project' | 'user', path: string): Src => ({ kind, scope, layout: 'file', path });
+const file = (kind: HarnessKind, scope: Scope, path: string, meta: SourceMeta): Src => ({ kind, scope, layout: 'file', path, ...meta });
+const hooks = (scope: Scope, path: string, hint: string): Src => ({
+  kind: 'hook',
+  scope,
+  layout: 'json-keys',
+  path,
+  key: 'hooks',
+  group: 'hook',
+  hint,
+});
+const mcp = (scope: Scope, path: string, hint: string): Src => ({
+  kind: 'mcp',
+  scope,
+  layout: 'json-keys',
+  path,
+  key: 'mcpServers',
+  group: 'mcp',
+  hint,
+});
+const permissions = (scope: Scope, path: string, lists: string[], hint: string): Src => ({
+  kind: 'settings',
+  scope,
+  layout: 'json-permissions',
+  path,
+  lists,
+  group: 'settings',
+  hint,
+});
+
+const CLAUDE_SKILL = 'Instruções e arquivos de apoio que o Claude Code carrega quando a tarefa pede; só a descrição fica sempre à vista.';
+const CLAUDE_AGENT = 'Ajudante com instruções próprias, para o qual o Claude Code delega partes do trabalho.';
+const CLAUDE_COMMAND = 'Prompt pronto, chamado digitando /nome na conversa.';
+const CLAUDE_PERMISSIONS = 'O que a IA pode fazer sem perguntar (allow), deve perguntar antes (ask) ou nunca pode fazer (deny).';
+const CLAUDE_STYLE = 'Muda o jeito de o Claude Code responder (tom, formato); escolhido com /output-style.';
+const AGENTS_MD = 'Instruções no padrão aberto AGENTS.md; o Claude Code as lê quando o projeto não tem CLAUDE.md.';
+const CURSOR_SKILL = 'Instruções e arquivos de apoio que o Cursor carrega quando a tarefa pede; só a descrição fica sempre à vista.';
+const CURSOR_AGENT = 'Ajudante com instruções próprias, para o qual o Cursor delega partes do trabalho.';
 
 export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
   claude: [
-    file('instructions', 'project', 'CLAUDE.md'),
-    file('instructions', 'project', '.claude/CLAUDE.md'),
-    file('instructions', 'project', 'CLAUDE.local.md'),
-    files('instructions', 'project', '.claude/rules', '.md'),
-    file('instructions', 'user', '.claude/CLAUDE.md'),
-    files('instructions', 'user', '.claude/rules', '.md'),
-    ...both('skill', 'skills', [['.claude/skills'], ['.claude/skills']]),
-    files('agent', 'project', '.claude/agents', '.md'),
-    files('agent', 'user', '.claude/agents', '.md'),
-    files('command', 'project', '.claude/commands', '.md'),
-    files('command', 'user', '.claude/commands', '.md'),
-    { kind: 'hook', scope: 'project', layout: 'json-keys', path: '.claude/settings.json', key: 'hooks' },
-    { kind: 'hook', scope: 'project', layout: 'json-keys', path: '.claude/settings.local.json', key: 'hooks' },
-    { kind: 'hook', scope: 'user', layout: 'json-keys', path: '.claude/settings.json', key: 'hooks' },
-    { kind: 'mcp', scope: 'project', layout: 'json-keys', path: '.mcp.json', key: 'mcpServers' },
-    { kind: 'mcp', scope: 'user', layout: 'claude-json', path: '.claude.json' },
-    file('settings', 'project', '.claude/settings.json'),
-    file('settings', 'project', '.claude/settings.local.json'),
-    { kind: 'settings', scope: 'project', layout: 'json-permissions', path: '.claude/settings.json', lists: ['allow', 'ask', 'deny'] },
+    file('instructions', 'project', 'CLAUDE.md', {
+      group: 'main',
+      loads: 'always',
+      hint: 'Regras do projeto que o Claude Code lê no começo de toda conversa; vão no repositório.',
+    }),
+    file('instructions', 'project', '.claude/CLAUDE.md', {
+      group: 'main',
+      loads: 'always',
+      hint: 'O mesmo que o CLAUDE.md da raiz, guardado na pasta .claude; também entra em toda conversa.',
+    }),
+    file('instructions', 'project', 'CLAUDE.local.md', {
+      group: 'main',
+      loads: 'always',
+      hint: 'Suas regras pessoais para este projeto, lidas em toda conversa; ficam fora do repositório.',
+    }),
+    files('instructions', 'project', '.claude/rules', '.md', {
+      group: 'topic',
+      hint: 'Regra de um assunto; com `paths` no topo, só entra quando a IA mexe nesses arquivos.',
+    }),
+    file('instructions', 'user', '.claude/CLAUDE.md', {
+      group: 'main',
+      loads: 'always',
+      hint: 'Suas regras pessoais, lidas em toda conversa de qualquer projeto.',
+    }),
+    files('instructions', 'user', '.claude/rules', '.md', {
+      group: 'topic',
+      hint: 'Sua regra de um assunto, que vale em todos os projetos.',
+    }),
+    ...skills('project', ['.claude/skills'], { group: 'skill', loads: 'on-demand', hint: CLAUDE_SKILL }),
+    ...skills('user', ['.claude/skills'], { group: 'skill', loads: 'on-demand', hint: CLAUDE_SKILL }),
+    files('agent', 'project', '.claude/agents', '.md', { group: 'agent', loads: 'on-demand', hint: CLAUDE_AGENT }),
+    files('agent', 'user', '.claude/agents', '.md', { group: 'agent', loads: 'on-demand', hint: CLAUDE_AGENT }),
+    files('command', 'project', '.claude/commands', '.md', { group: 'command', loads: 'on-demand', hint: CLAUDE_COMMAND }),
+    files('command', 'user', '.claude/commands', '.md', { group: 'command', loads: 'on-demand', hint: CLAUDE_COMMAND }),
+    hooks(
+      'project',
+      '.claude/settings.json',
+      'Comando que o Claude Code roda sozinho num evento (antes de editar, ao terminar…); vai no repositório.',
+    ),
+    hooks('project', '.claude/settings.local.json', 'Comando que o Claude Code roda sozinho num evento, só na sua máquina.'),
+    hooks('user', '.claude/settings.json', 'Comando que o Claude Code roda sozinho num evento, em todos os projetos.'),
+    mcp('project', '.mcp.json', 'Servidor que dá ferramentas extras à IA, compartilhado no repositório.'),
     {
-      kind: 'settings',
-      scope: 'project',
-      layout: 'json-permissions',
-      path: '.claude/settings.local.json',
-      lists: ['allow', 'ask', 'deny'],
+      kind: 'mcp',
+      scope: 'user',
+      layout: 'claude-json',
+      path: '.claude.json',
+      group: 'mcp',
+      noCreate: true,
+      hint: 'Servidor adicionado pelo Claude Code (claude mcp add); o arquivo é mantido por ele.',
     },
-    { kind: 'settings', scope: 'user', layout: 'json-permissions', path: '.claude/settings.json', lists: ['allow', 'ask', 'deny'] },
-    files('settings', 'project', '.claude/output-styles', '.md'),
-    file('settings', 'user', '.claude/settings.json'),
-    files('settings', 'user', '.claude/output-styles', '.md'),
+    file('settings', 'project', '.claude/settings.json', {
+      group: 'settings',
+      hint: 'Configurações do projeto (permissões, hooks, variáveis, modelo); vão no repositório.',
+    }),
+    file('settings', 'project', '.claude/settings.local.json', {
+      group: 'settings',
+      hint: 'Configurações só suas neste projeto; ficam fora do repositório.',
+    }),
+    permissions('project', '.claude/settings.json', ['allow', 'ask', 'deny'], CLAUDE_PERMISSIONS),
+    permissions('project', '.claude/settings.local.json', ['allow', 'ask', 'deny'], CLAUDE_PERMISSIONS),
+    permissions('user', '.claude/settings.json', ['allow', 'ask', 'deny'], CLAUDE_PERMISSIONS),
+    files('settings', 'project', '.claude/output-styles', '.md', { group: 'style', hint: CLAUDE_STYLE }),
+    file('settings', 'user', '.claude/settings.json', {
+      group: 'settings',
+      hint: 'Suas configurações do Claude Code, em todos os projetos.',
+    }),
+    files('settings', 'user', '.claude/output-styles', '.md', { group: 'style', hint: CLAUDE_STYLE }),
+    file('instructions', 'project', 'AGENTS.md', { group: 'main', loads: 'always', hint: AGENTS_MD }),
+    file('instructions', 'project', '.claude/AGENTS.md', { group: 'main', loads: 'always', hint: AGENTS_MD }),
+    files('memory', 'user', '.claude/projects/{project}/memory', '.md', {
+      group: 'memory',
+      noCreate: true,
+      hint: 'Anotação que o Claude Code guarda sozinho sobre este projeto; o índice MEMORY.md entra em toda conversa.',
+    }),
+    file('instructions', 'user', 'CLAUDE.md', {
+      group: 'managed',
+      base: 'managed',
+      loads: 'always',
+      noCreate: true,
+      hint: 'Regras da sua organização, instaladas pela equipe de TI; valem para todas as pessoas.',
+    }),
+    file('settings', 'user', 'managed-settings.json', {
+      group: 'managed',
+      base: 'managed',
+      noCreate: true,
+      hint: 'Configurações impostas pela organização; valem acima das suas.',
+    }),
   ],
   cursor: [
-    file('instructions', 'project', 'AGENTS.md'),
-    files('instructions', 'project', '.cursor/rules', '.mdc'),
-    ...both('skill', 'skills', [
-      ['.cursor/skills', '.agents/skills', '.claude/skills', '.codex/skills'],
-      ['.cursor/skills', '.agents/skills', '.claude/skills', '.codex/skills'],
-    ]),
-    files('agent', 'project', '.cursor/agents', '.md'),
-    files('agent', 'project', '.claude/agents', '.md'),
-    files('agent', 'project', '.grok/agents', '.md'),
-    files('agent', 'user', '.cursor/agents', '.md'),
-    files('agent', 'user', '.claude/agents', '.md'),
-    files('command', 'project', '.cursor/commands', '.md'),
-    { kind: 'hook', scope: 'project', layout: 'json-keys', path: '.cursor/hooks.json', key: 'hooks' },
-    { kind: 'hook', scope: 'user', layout: 'json-keys', path: '.cursor/hooks.json', key: 'hooks' },
-    { kind: 'mcp', scope: 'project', layout: 'json-keys', path: '.cursor/mcp.json', key: 'mcpServers' },
-    { kind: 'mcp', scope: 'user', layout: 'json-keys', path: '.cursor/mcp.json', key: 'mcpServers' },
-    file('settings', 'project', '.cursor/cli.json'),
-    file('settings', 'user', '.cursor/cli-config.json'),
-    { kind: 'settings', scope: 'project', layout: 'json-permissions', path: '.cursor/cli.json', lists: ['allow', 'deny'] },
-    { kind: 'settings', scope: 'user', layout: 'json-permissions', path: '.cursor/cli-config.json', lists: ['allow', 'deny'] },
+    file('instructions', 'project', 'AGENTS.md', {
+      group: 'main',
+      loads: 'always',
+      hint: 'Instruções do projeto no padrão aberto AGENTS.md, lidas pelo Cursor em toda conversa.',
+    }),
+    files('instructions', 'project', '.cursor/rules', '.mdc', {
+      group: 'topic',
+      hint: 'Regra de um assunto; o topo diz se entra sempre, por caminho de arquivo ou quando a IA julgar útil.',
+    }),
+    ...skills('project', ['.cursor/skills', '.agents/skills', '.claude/skills', '.codex/skills'], {
+      group: 'skill',
+      loads: 'on-demand',
+      hint: CURSOR_SKILL,
+    }),
+    ...skills('user', ['.cursor/skills', '.agents/skills', '.claude/skills', '.codex/skills'], {
+      group: 'skill',
+      loads: 'on-demand',
+      hint: CURSOR_SKILL,
+    }),
+    files('agent', 'project', '.cursor/agents', '.md', { group: 'agent', loads: 'on-demand', hint: CURSOR_AGENT }),
+    files('agent', 'project', '.claude/agents', '.md', { group: 'agent', loads: 'on-demand', hint: CURSOR_AGENT }),
+    files('agent', 'project', '.grok/agents', '.md', { group: 'agent', loads: 'on-demand', hint: CURSOR_AGENT }),
+    files('agent', 'user', '.cursor/agents', '.md', { group: 'agent', loads: 'on-demand', hint: CURSOR_AGENT }),
+    files('agent', 'user', '.claude/agents', '.md', { group: 'agent', loads: 'on-demand', hint: CURSOR_AGENT }),
+    files('command', 'project', '.cursor/commands', '.md', {
+      group: 'command',
+      loads: 'on-demand',
+      hint: 'Prompt pronto, chamado digitando /nome no chat.',
+    }),
+    hooks('project', '.cursor/hooks.json', 'Comando que o Cursor roda sozinho num evento do agente, neste projeto.'),
+    hooks('user', '.cursor/hooks.json', 'Comando que o Cursor roda sozinho num evento do agente, em todos os projetos.'),
+    mcp('project', '.cursor/mcp.json', 'Servidor que dá ferramentas extras à IA neste projeto.'),
+    mcp('user', '.cursor/mcp.json', 'Servidor que dá ferramentas extras à IA em todos os projetos.'),
+    file('settings', 'project', '.cursor/cli.json', {
+      group: 'settings',
+      hint: 'Configuração da linha de comando do Cursor (cursor-agent) neste projeto.',
+    }),
+    file('settings', 'user', '.cursor/cli-config.json', {
+      group: 'settings',
+      hint: 'Configuração da linha de comando do Cursor (cursor-agent), em todos os projetos.',
+    }),
+    permissions(
+      'project',
+      '.cursor/cli.json',
+      ['allow', 'deny'],
+      'O que o cursor-agent pode fazer sem perguntar (allow) ou nunca pode fazer (deny).',
+    ),
+    permissions(
+      'user',
+      '.cursor/cli-config.json',
+      ['allow', 'deny'],
+      'O que o cursor-agent pode fazer sem perguntar (allow) ou nunca pode fazer (deny).',
+    ),
+    files('command', 'user', '.cursor/commands', '.md', {
+      group: 'command',
+      loads: 'on-demand',
+      hint: 'Seu prompt pronto, chamado com /nome em qualquer projeto.',
+    }),
+    file('settings', 'project', '.cursorignore', {
+      group: 'settings',
+      hint: 'Arquivos que a IA do Cursor não pode ler nem citar, no formato do .gitignore.',
+    }),
   ],
 };
+
+/**
+ * O que a ferramenta carrega sem um arquivo que o board possa mostrar: fica nas configurações dela ou
+ * num painel da web. Aparece no grupo como aviso, sem caminho.
+ */
+export const HARNESS_NOTES: Record<AiTool, { group: HarnessGroup; scope: Scope; name: string; hint: string }[]> = {
+  claude: [],
+  cursor: [
+    {
+      group: 'main',
+      scope: 'user',
+      name: 'User Rules',
+      hint: 'Suas regras pessoais do Cursor, lidas em toda conversa, ficam nas configurações dele (Customize → Rules), não num arquivo.',
+    },
+    {
+      group: 'managed',
+      scope: 'user',
+      name: 'Team Rules',
+      hint: 'Regras do time, definidas no painel do Cursor nos planos Team e Enterprise; valem acima das do projeto.',
+    },
+    {
+      group: 'settings',
+      scope: 'user',
+      name: 'Ignorados de todos os projetos',
+      hint: 'A lista global de arquivos que a IA não lê fica nas configurações do Cursor (Indexing → Ignore Files).',
+    },
+  ],
+};
+
+/**
+ * Pasta da política gerenciada do Claude Code em cada sistema, onde a equipe de TI instala o
+ * `CLAUDE.md` e o `managed-settings.json` da organização.
+ */
+export function managedDir(platform: string): string {
+  if (platform === 'darwin') return '/Library/Application Support/ClaudeCode';
+  if (platform === 'win32') return 'C:\\Program Files\\ClaudeCode';
+  return '/etc/claude-code';
+}
+
+/** Nome da pasta de um projeto em `~/.claude/projects`: o caminho com tudo que não é letra ou número trocado por hífen. */
+export const claudeProjectKey = (projectDir: string): string => projectDir.replace(/[^a-zA-Z0-9]/g, '-');
+
+/** Grupo de um item nas abas Projeto e Global: o da fonte de onde ele veio; os de plugin ficam em Plugins. */
+export function groupOf(tool: AiTool, item: { scope: string; kind: HarnessKind; source?: number }): HarnessGroup {
+  if (item.scope === 'plugin') return 'plugin';
+  const src = item.source === undefined ? undefined : HARNESS_CATALOG[tool][item.source];
+  return src?.group ?? (item.kind === 'instructions' ? 'main' : (item.kind as HarnessGroup));
+}
 
 /**
  * Onde ficam os plugins instalados de cada ferramenta (a partir da home) e os arquivos que marcam
@@ -120,7 +350,7 @@ export interface CreateTarget {
 
 export function createTargets(tool: AiTool): CreateTarget[] {
   return HARNESS_CATALOG[tool].flatMap((src, source): CreateTarget[] => {
-    if (src.builtin || (src.layout !== 'file' && src.layout !== 'files' && src.layout !== 'skills')) return [];
+    if (src.builtin || src.noCreate || (src.layout !== 'file' && src.layout !== 'files' && src.layout !== 'skills')) return [];
     const base = `${src.scope === 'user' ? '~/' : ''}${src.path}`;
     const label = src.layout === 'file' ? base : src.layout === 'skills' ? `${base}/<nome>/SKILL.md` : `${base}/<nome>${src.ext}`;
     return [{ source, kind: src.kind, scope: src.scope, layout: src.layout, label }];
@@ -134,7 +364,7 @@ export function copyTarget(
   layout: 'files' | 'skills',
   scope: 'project' | 'user',
 ): HarnessSource | undefined {
-  return HARNESS_CATALOG[tool].find((s) => !s.builtin && s.kind === kind && s.scope === scope && s.layout === layout);
+  return HARNESS_CATALOG[tool].find((s) => !s.builtin && !s.noCreate && s.kind === kind && s.scope === scope && s.layout === layout);
 }
 
 /** Um arquivo de configuração em que o board pode acrescentar e remover servidores MCP. */

@@ -2,7 +2,14 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool, HarnessItem, HarnessScope } from '../shared/harness';
-import { HARNESS_CATALOG, PERMISSION_LIST_LABEL, PLUGIN_ROOTS, type HarnessSource } from '../shared/harnessCatalog';
+import {
+  HARNESS_CATALOG,
+  PERMISSION_LIST_LABEL,
+  PLUGIN_ROOTS,
+  claudeProjectKey,
+  managedDir,
+  type HarnessSource,
+} from '../shared/harnessCatalog';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { skillMode } from './skillMode';
 
@@ -130,8 +137,8 @@ function digest(file: string): string | undefined {
   }
 }
 
-function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
-  const target = path.join(base, src.path);
+function scanSource(src: HarnessSource, base: string, ctx: Ctx, source?: number): Found[] {
+  const target = path.join(base, src.path.replace('{project}', claudeProjectKey(ctx.projectDir)));
   const scope: HarnessScope = src.builtin ? 'plugin' : src.scope;
   const layout = src.layout === 'file' || src.layout === 'files' || src.layout === 'skills' ? src.layout : 'entry';
   const item = (name: string, description: string, file: string): Found => ({
@@ -142,6 +149,7 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
     path: file,
     layout,
     ...(src.builtin ? { plugin: src.builtin } : {}),
+    ...(source !== undefined ? { source } : {}),
     ...(layout === 'files' || layout === 'skills' ? { digest: digest(file) } : {}),
   });
   const hookItem = (event: string, h: { matcher: string; command: string; type: string }, file: string): Found => ({
@@ -239,13 +247,20 @@ function scanPlugins(tool: AiTool, ctx: Ctx): Found[] {
 }
 
 /** Tudo que a ferramenta carrega: do projeto, da pasta do usuário e dos plugins instalados. */
-export function scanInventory(tool: AiTool, projectDir: string, homeDir: string): HarnessItem[] {
+export function scanInventory(
+  tool: AiTool,
+  projectDir: string,
+  homeDir: string,
+  /** pasta da política da organização; o padrão é a do sistema em que o board roda */
+  managed = managedDir(process.platform),
+): HarnessItem[] {
   const ctx: Ctx = { projectDir, homeDir };
   const found: Found[] = [];
-  for (const src of HARNESS_CATALOG[tool]) {
-    const base = src.scope === 'project' ? projectDir : homeDir;
-    if (base) found.push(...scanSource(src, base, ctx));
-  }
+  HARNESS_CATALOG[tool].forEach((src, source) => {
+    const base = src.base === 'managed' ? managed : src.scope === 'project' ? projectDir : homeDir;
+    // a memória fica numa pasta com o nome do projeto: sem projeto, não há o que procurar
+    if (base && (projectDir || !src.path.includes('{project}'))) found.push(...scanSource(src, base, ctx, source));
+  });
   if (homeDir) found.push(...scanPlugins(tool, ctx));
   const inside = (base: string, file: string) => !!base && file.startsWith(base + path.sep);
   const rel = (base: string, file: string) => path.relative(base, file).split(path.sep).join('/');
