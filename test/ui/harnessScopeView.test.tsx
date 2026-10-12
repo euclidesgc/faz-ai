@@ -1,6 +1,6 @@
 import { lastSent, renderThemed, seedBoard } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HARNESS_CATALOG } from '../../src/shared/harnessCatalog';
 import type { AiTool, HarnessItem } from '../../src/shared/harness';
@@ -20,7 +20,13 @@ const item = (over: Partial<HarnessItem> & Pick<HarnessItem, 'name' | 'kind' | '
 });
 
 const CLAUDE_ITEMS: HarnessItem[] = [
-  item({ kind: 'instructions', name: 'CLAUDE.md', location: 'CLAUDE.md', source: sourceOf('claude', 'CLAUDE.md', 'main') }),
+  item({
+    kind: 'instructions',
+    name: 'CLAUDE.md',
+    location: 'CLAUDE.md',
+    source: sourceOf('claude', 'CLAUDE.md', 'main'),
+    imports: [{ path: '/abs/docs/guia.md', location: 'docs/guia.md', depth: 1 }],
+  }),
   item({
     kind: 'instructions',
     name: 'estilo',
@@ -95,6 +101,15 @@ describe('HarnessScopeView: Projeto', () => {
     expect(main.queryByRole('button', { name: '~/.claude/CLAUDE.md' })).toBeNull();
     expect(card('Regras por assunto').getByText('Estilo de código')).toBeInTheDocument();
     expect(card('Memória').getByRole('button', { name: '~/.claude/projects/-abs/memory/MEMORY.md' })).toBeInTheDocument();
+  });
+
+  it('mostra o que o CLAUDE.md importa com @, e o importado abre no editor do board', async () => {
+    renderThemed(<HarnessScopeView scope="project" />);
+    const main = card('Regras principais');
+    expect(main.getByText('Importa com @, e entram junto:')).toBeInTheDocument();
+    await userEvent.click(main.getByRole('button', { name: 'docs/guia.md' }));
+    expect(useBoardStore.getState().harnessFile).toBe('/abs/docs/guia.md');
+    act(() => useBoardStore.getState().closeHarnessFile());
   });
 
   it('oferece criar os arquivos que a ferramenta leria e ainda não existem', async () => {

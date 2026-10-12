@@ -79,6 +79,8 @@ export type HarnessSource = {
     | { layout: 'claude-json' }
     /** regras de permissão: as listas (`allow`, `deny`…) do objeto `permissions` de um arquivo JSON */
     | { layout: 'json-permissions'; lists: string[] }
+    /** arquivos com um destes nomes nas subpastas do projeto (a raiz já tem as fontes próprias) */
+    | { layout: 'nested'; names: string[] }
   );
 
 type Src = HarnessSource;
@@ -232,6 +234,16 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
       noCreate: true,
       hint: 'Configurações impostas pela organização; valem acima das suas.',
     }),
+    {
+      kind: 'instructions',
+      scope: 'project',
+      layout: 'nested',
+      path: '',
+      names: ['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md'],
+      group: 'main',
+      loads: 'on-demand',
+      hint: 'Regras de uma subpasta: o Claude Code as lê quando mexe em arquivos dela.',
+    },
   ],
   cursor: [
     file('instructions', 'project', 'AGENTS.md', {
@@ -296,6 +308,16 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
       group: 'settings',
       hint: 'Arquivos que a IA do Cursor não pode ler nem citar, no formato do .gitignore.',
     }),
+    {
+      kind: 'instructions',
+      scope: 'project',
+      layout: 'nested',
+      path: '',
+      names: ['AGENTS.md'],
+      group: 'main',
+      loads: 'on-demand',
+      hint: 'Instruções de uma subpasta: valem quando o Cursor trabalha nela, acima das da raiz.',
+    },
   ],
 };
 

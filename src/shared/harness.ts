@@ -137,6 +137,11 @@ export interface HarnessItem {
   mode?: SkillMode;
   /** só nas skills: arquivos de apoio da pasta (referências, modelos, scripts), relativos a ela */
   files?: string[];
+  /**
+   * só nas instruções do Claude Code: os arquivos que ele importa com `@caminho` e que existem, na
+   * ordem em que aparecem, com os importados por eles (até quatro níveis, como o Claude Code)
+   */
+  imports?: { path: string; location: string; depth: number }[];
   /** índice da fonte em `HARNESS_CATALOG[tool]` de onde o item veio (os de plugin não têm) */
   source?: number;
   /** valor inteiro da entrada, quando `description` o resume: o comando de um hook, ou a lista (allow, deny, ask) de uma regra de permissão */

@@ -183,6 +183,10 @@ export const shared: Record<string, string> = {
   'Ignorados de todos os projetos': 'Ignored in every project',
   'A lista global de arquivos que a IA não lê fica nas configurações do Cursor (Indexing → Ignore Files).':
     'The global list of files the AI does not read lives in the Cursor settings (Indexing → Ignore Files).',
+  'Regras de uma subpasta: o Claude Code as lê quando mexe em arquivos dela.':
+    'Rules of a subfolder: Claude Code reads them when it works on files in it.',
+  'Instruções de uma subpasta: valem quando o Cursor trabalha nela, acima das da raiz.':
+    'Instructions of a subfolder: they apply when Cursor works in it, above the root ones.',
   // harness (harness.ts)
   Automática: 'Automatic',
   'A IA vê a descrição em toda sessão e decide quando usar a skill.':

@@ -818,7 +818,7 @@ loads. The content comes split into groups, always in the same order:
 
 | Group | What it is | Examples |
 | --- | --- | --- |
-| Regras principais (main rules) | Loaded at the start of every conversation | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `~/.claude/CLAUDE.md`; in Cursor, `AGENTS.md` and a notice about User Rules (which live in its settings) |
+| Regras principais (main rules) | Loaded at the start of every conversation; subfolder ones when the AI works in that folder | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `~/.claude/CLAUDE.md`, `packages/api/CLAUDE.md`; in Cursor, `AGENTS.md` (also in subfolders) and a notice about User Rules (which live in its settings) |
 | Regras por assunto (rules by topic) | Rules by topic; some only load when the AI works on certain files | `.claude/rules/*.md`, `~/.claude/rules/*.md`, `.cursor/rules/*.mdc` |
 | Memória (memory, Projeto) | Notes Claude Code keeps on its own about the project | `~/.claude/projects/<project>/memory/` |
 | Skills | Instructions and support files loaded when the task calls for them | `.claude/skills/<name>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
@@ -832,7 +832,9 @@ loads. The content comes split into groups, always in the same order:
 | Organização (organization, Global) | The company policy, read-only | `CLAUDE.md` and `managed-settings.json` in the system folder (`/Library/Application Support/ClaudeCode` on macOS) |
 
 Each item shows its name, **what it is in one simple sentence**, whether it is **always loaded** or
-**on demand**, the file's own description and its path. **Clicking the path opens the file in the
+**on demand**, the file's own description and its path. Claude Code instructions also list the files
+they import with `@path` (which load along with them, up to four levels), and each one opens in the
+board's editor. **Clicking the path opens the file in the
 board's editor**, the same one used for attachments: formatted Markdown or code, with **Editar**
 (edit), **Salvar** (save) and **Cancelar** (cancel), and **Abrir no editor** (open in editor) for
 those who prefer VS Code. Invalid JSON is not saved; files from plugins, `~/.claude.json` and the

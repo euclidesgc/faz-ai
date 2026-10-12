@@ -180,13 +180,15 @@ export class BoardHarness {
   }
 
   /**
-   * Se o editor do board pode gravar no arquivo. Só abre o que a varredura listou, de qualquer ferramenta.
+   * Se o editor do board pode gravar no arquivo. Só abre o que a varredura listou, de qualquer ferramenta,
+   * e os arquivos que as instruções do Claude Code importam com `@caminho`.
    * Fica só leitura o que vem de plugin, o que está fora do projeto e da pasta do usuário, e o
    * `~/.claude.json`, que o Claude Code reescreve o tempo todo.
    */
   private access(file: string): { readonly: boolean } {
-    const items = this.current.inventory.flatMap((t) => t.items).filter((i) => i.path === file);
-    if (!items.length) throw new Error('Arquivo fora do harness.');
+    const listed = this.current.inventory.flatMap((t) => t.items);
+    const items = listed.filter((i) => i.path === file);
+    if (!items.length && !listed.some((i) => i.imports?.some((x) => x.path === file))) throw new Error('Arquivo fora do harness.');
     const inside = [this.ctx.opts.workspaceDir, this.ctx.home].some((b) => b && file.startsWith(b + path.sep));
     const readonly = !inside || items.some((i) => i.scope === 'plugin') || file === path.join(this.ctx.home, '.claude.json');
     return { readonly };
