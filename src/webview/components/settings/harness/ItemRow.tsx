@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { SKILL_MODES, type AiTool, type HarnessItem, type SkillMode } from '../../../../shared/harness';
-import { HARNESS_CATALOG, hookTargets, mcpTargets } from '../../../../shared/harnessCatalog';
+import { HARNESS_CATALOG } from '../../../../shared/harnessCatalog';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { Badge, Button, Checkbox, IconButton } from '@radix-ui/themes';
@@ -17,7 +17,7 @@ interface Props {
   tool: AiTool;
   item: HarnessItem;
   actions: ItemActions;
-  /** caixa de seleção para as ações em massa; sem ela, a linha não tem caixa */
+  /** caixa de seleção para as ações em massa; sem `onSelect`, a linha não tem caixa */
   selected?: boolean;
   onSelect?: (checked: boolean) => void;
   /** mostra o que o item é, numa frase, conforme o catálogo, e quando a ferramenta o carrega */
@@ -33,15 +33,14 @@ interface Props {
 
 /** Um item do inventário: seleção, nome, descrição como dica, o caminho do arquivo (que abre no editor) e o que dá para fazer com ele. */
 export function ItemRow({ tool, item: i, actions, selected = false, onSelect, explain, unread, usage, filesOpen, onToggleFiles }: Props) {
-  const { copyable, twin, copy, setMode, deletable, remove } = actions;
+  const { copyable, twin, copy, setMode, deletable, remove, entryRemovable } = actions;
   const src = i.source === undefined ? undefined : HARNESS_CATALOG[tool][i.source];
   const inProject = i.scope !== 'project' ? twin(i, 'project') : undefined;
   const editable = i.scope !== 'plugin' && i.layout !== 'entry';
-  const selectable = deletable(i) || copyable(i, 'project') || copyable(i, 'user') || (!!i.mode && editable);
   return (
     <li className={selected ? 'item-row selected' : 'item-row'}>
       <span className="item-check">
-        {selectable && onSelect && (
+        {onSelect && (
           <Checkbox
             aria-label={t('Selecionar {name}', { name: i.name })}
             checked={selected}
@@ -168,7 +167,7 @@ export function ItemRow({ tool, item: i, actions, selected = false, onSelect, ex
             <IconTrash />
           </IconButton>
         )}
-        {i.kind === 'hook' && i.scope !== 'plugin' && hookTargets(tool).length > 0 && i.path.endsWith('.json') && (
+        {i.kind === 'hook' && entryRemovable(i) && (
           <DeleteButton
             title={t('Remover o hook deste arquivo')}
             question={t('Remover o hook de "{name}"?', { name: i.name })}
@@ -177,7 +176,7 @@ export function ItemRow({ tool, item: i, actions, selected = false, onSelect, ex
             onConfirm={() => harness.removeHook(tool, i.path, i.name, i.detail ?? '')}
           />
         )}
-        {i.kind === 'settings' && i.layout === 'entry' && i.scope !== 'plugin' && (
+        {i.kind === 'settings' && entryRemovable(i) && (
           <DeleteButton
             title={t('Remover a regra deste arquivo')}
             question={t('Remover a regra de permissão?')}
@@ -190,7 +189,7 @@ export function ItemRow({ tool, item: i, actions, selected = false, onSelect, ex
             onConfirm={() => harness.removePermission(tool, i.path, i.detail ?? '', i.name)}
           />
         )}
-        {i.kind === 'mcp' && i.scope !== 'plugin' && mcpTargets(tool).some((t) => t.label === i.location) && (
+        {i.kind === 'mcp' && entryRemovable(i) && (
           <DeleteButton
             title={t('Remover o servidor deste arquivo')}
             question={t('Remover o servidor "{name}"?', { name: i.name })}

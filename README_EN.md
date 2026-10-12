@@ -861,6 +861,14 @@ board runs) choice:
 - **Fora das execuções** (not in runs): the run does not see it, even if the tool loads it in a
   conversation of yours.
 
+**Bulk actions.** Every row that accepts some action has a checkbox, and the one at the top of the
+group checks them all. The bar that shows up offers only what applies to the checked items: the use
+in board runs (rules and skills), the skill mode, copying to the project or to global, **Apagar**
+(delete files and folders) and **Remover** (remove hook, permission rule and MCP server entries).
+When an action applies to only part of the checked items, the button says how many. Deleting and
+removing ask for confirmation first. Plugins and the organization policy, which are read-only, have
+no checkbox.
+
 The subagents of the project's tool keep their own table, with **Disponível no board** (available
 on the board), the default and the editor for the board's fields. A mark whose file is gone shows in
 a notice at the top of the tab, with **Desmarcar** (unmark). Skills and agents created or installed
