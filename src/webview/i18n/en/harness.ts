@@ -61,6 +61,8 @@ export const harness: Record<string, string> = {
   'sem arquivo': 'no file',
   'Nada aqui ainda.': 'Nothing here yet.',
   'Você pode criar:': 'You can create:',
+  'O board não respondeu. Se a extensão acabou de ser atualizada, recarregue a janela (no VS Code, Developer: Reload Window) e abra o arquivo de novo.':
+    'The board did not reply. If the extension was just updated, reload the window (in VS Code, Developer: Reload Window) and open the file again.',
   'não lido pelo Claude Code': 'not read by Claude Code',
   'Por padrão, o Claude Code não lê este arquivo nas suas conversas, porque o projeto tem {claude}. Para ler os dois, importe com @{path} no {claude} ou mude Project instructions no /config do Claude Code.':
     'By default, Claude Code does not read this file in your conversations, because the project has {claude}. To read both, import it with @{path} in {claude} or change Project instructions in Claude Code /config.',

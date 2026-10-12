@@ -44,6 +44,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   dois, o `AGENTS.md` aparece como não lido pelo Claude Code, com o `@import` que faz ele entrar; se
   tem só o `AGENTS.md`, o board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo. Um seletor mostra o que o Claude Code ou o Cursor carregam. Nas
   rules e skills, o uso nas execuções do board vira uma escolha na própria linha.
+- **Editor do harness não fica carregando para sempre.** Se o board não responde à leitura do
+  arquivo em 8 segundos, a modal para de carregar e diz o que fazer: quando o pacote da extensão é
+  reinstalado sem recarregar a janela, a tela nova conversa com o host antigo, que não conhece o
+  pedido. Basta recarregar a janela (Developer: Reload Window).
 - **Harness sem tremer ao escolher uma opção.** O seletor de uso nas execuções e o do modo da skill
   ficam com a largura da opção mais longa: trocar o valor não faz mais o texto ao lado quebrar de
   outro jeito e empurrar a tela. Num painel estreito, os botões de cada linha ocupam no máximo metade
