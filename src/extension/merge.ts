@@ -106,12 +106,9 @@ export class AutoMerger {
 }
 
 export interface MergeWatchDeps extends MergeDeps {
-  now(): number;
-  /** esta janela é a dona do board; padrão: sempre (RF15) */
-  canRun?(): boolean;
   /**
-   * Gancho do fim da rodada: é por aqui que a rodada de publicação (#49) acontece, na mesma rodada,
-   * com o mesmo liga/desliga e o mesmo intervalo da detecção de merges. Um erro dele é descartado.
+   * Gancho do fim da rodada: é por aqui que a rodada de publicação (#49) acontece, na mesma rodada da
+   * detecção de merges. Um erro dele é descartado.
    */
   afterRound?: () => Promise<void>;
 }
@@ -160,14 +157,13 @@ function doneAfter(s: BoardState, card: Card): Column | null {
 const CLOSED_MARK = 'foi fechado sem merge';
 
 /**
- * Rotina periódica: para cada história entregue (modo autônomo, na última coluna da IA, com pull
+ * Detecção de merges, chamada a cada rodada do heartbeat (sem timer nem liga/desliga próprios): para cada história entregue (modo autônomo, na última coluna da IA, com pull
  * request), pergunta ao `gh` o estado do pull request. Mergeado: grava o commit e conclui a história;
  * fechado sem merge: avisa na conversa uma vez; aberto: nada. Falhas do `gh` vão para o log, sem
- * repetir enquanto a causa for a mesma. Nenhum caminho bloqueia card nem lança para fora de `tick()`.
+ * repetir enquanto a causa for a mesma. Nenhum caminho bloqueia card nem lança para fora de `runNow()`.
  * Não depende da API do VSCode.
  */
 export class MergeWatcher {
-  private lastRoundAt: number;
   /** histórias em conclusão nesta rodada (RF11) */
   private checking = new Set<string>();
   /** última falha registrada no log (RF10) */
@@ -177,34 +173,22 @@ export class MergeWatcher {
   constructor(
     private router: MessageRouter,
     private deps: MergeWatchDeps,
-  ) {
-    // a primeira rodada acontece um intervalo depois de o board abrir, não na abertura (como o Heartbeat)
-    this.lastRoundAt = deps.now();
-  }
+  ) {}
 
-  /** Chamado de tempos em tempos (ex.: a cada minuto): começa uma rodada se o intervalo já passou. */
-  tick(): void {
-    if (this.deps.canRun && !this.deps.canRun()) return;
-    const { git } = this.router.snapshot().board;
-    if (!git.watchMerges || this.busy) return;
-    if (this.deps.now() - this.lastRoundAt >= git.watchMergeMinutes * 60_000) void this.round();
-  }
-
-  /** Uma rodada agora, mesmo com o watcher desligado. Devolve quantas histórias foram consultadas. */
-  runNow(): Promise<number> {
-    return this.round();
-  }
-
-  private async round(): Promise<number> {
+  /**
+   * Uma rodada agora. Devolve quantas histórias foram consultadas; com uma rodada ainda em andamento,
+   * não começa outra e devolve 0. Nunca rejeita.
+   */
+  async runNow(): Promise<number> {
+    if (this.busy) return 0;
     this.busy = true;
-    this.lastRoundAt = this.deps.now();
     try {
       // uma a uma, não em paralelo: ordem previsível no log e sem rajada de processos gh
       const targets = mergeWatchTargets(this.router.snapshot());
       for (const card of targets) await this.check(card);
       // depois do laço, não antes: uma história cujo merge é detectado agora e cuja versão já saiu é
       // concluída e arquivada na mesma rodada. O `catch` é a rede de segurança — quem está no gancho
-      // trata as próprias falhas, e nada daqui pode fazer o `tick()` rejeitar.
+      // trata as próprias falhas, e nada daqui pode fazer a rodada rejeitar.
       if (this.deps.afterRound) {
         try {
           await this.deps.afterRound();

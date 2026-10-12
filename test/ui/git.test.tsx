@@ -68,22 +68,10 @@ describe('GitSettings', () => {
     expect(lastSent('settings.board.update').patch).toEqual({ git: { autoMerge: true } });
   });
 
-  it('o switch de detecção de merge está marcado por padrão', async () => {
+  it('explica que a detecção de merges acontece nas rodadas do heartbeat, sem opção própria', () => {
     show();
-    const sw = screen.getByRole('switch', { name: 'Concluir a história quando o pull request for mergeado' });
-    expect(sw).toBeChecked();
-  });
-
-  it('o switch de detecção de merge pode ser desligado', async () => {
-    show();
-    const sw = screen.getByRole('switch', { name: 'Concluir a história quando o pull request for mergeado' });
-    await userEvent.click(sw);
-    expect(lastSent('settings.board.update').patch).toEqual({ git: { watchMerges: false } });
-  });
-
-  it('o intervalo tem valor padrão 15', async () => {
-    show();
-    const field = screen.getByLabelText('Verificar a cada (minutos)') as HTMLInputElement;
-    expect(field.value).toBe('15');
+    expect(screen.queryByRole('switch', { name: 'Concluir a história quando o pull request for mergeado' })).toBeNull();
+    expect(screen.queryByLabelText('Verificar a cada (minutos)')).toBeNull();
+    expect(screen.getByText(/a cada rodada do heartbeat/)).toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { DEFAULT_GIT, MERGE_METHODS, MERGE_WATCH_RANGE, WORKSPACE_MODES, branchName, type GitConfig } from '../../../shared/git';
+import { DEFAULT_GIT, MERGE_METHODS, WORKSPACE_MODES, branchName, type GitConfig } from '../../../shared/git';
 import { useBoardStore } from '../../store/boardStore';
 import { settings, ui } from '../../commands';
 import { isWeb } from '../../vscode';
@@ -107,7 +107,7 @@ export function GitSettings() {
 
           <SectionHeader title={t('Pull request e merge')}>
             {t(
-              'Na Homologação a IA abre o pull request da história e o registra no card. Com o merge automático ligado, quando você aprova uma história que está na última coluna antes da conclusão, o board faz o merge do PR e só então conclui o card. Se o merge falhar (conflito, checks obrigatórios, sem acesso), o card fica Bloqueado com o erro.',
+              'Na Homologação a IA abre o pull request da história e o registra no card. Com o merge automático ligado, quando você aprova uma história que está na última coluna antes da conclusão, o board faz o merge do PR e só então conclui o card. Se o merge falhar (conflito, checks obrigatórios, sem acesso), o card fica Bloqueado com o erro. O merge feito fora do board também conclui a história: a cada rodada do heartbeat, o board confere o pull request das histórias entregues.',
             )}
           </SectionHeader>
           <Card className="form-card" aria-label={t('Pull request e merge')}>
@@ -140,50 +140,6 @@ export function GitSettings() {
                   disabled={!git.autoMerge}
                   value={git.mergeMethod}
                   onChange={(mergeMethod) => set({ mergeMethod })}
-                />
-              )}
-            </FormField>
-            <SwitchField
-              label={t('Concluir a história quando o pull request for mergeado')}
-              checked={git.watchMerges}
-              onChange={(watchMerges) => set({ watchMerges })}
-            />
-            {git.watchMerges && (
-              <Callout.Root color="blue" size="1">
-                <Callout.Icon>
-                  <IconWarning />
-                </Callout.Icon>
-                <Callout.Text>
-                  {t(
-                    'O board consulta o GitHub periodicamente para detectar quando o pull request foi mergeado e conclui a história automaticamente. Essa opção apenas lê o estado — o merge continua sendo feito por você.',
-                  )}
-                </Callout.Text>
-              </Callout.Root>
-            )}
-            <FormField
-              label={t('Verificar a cada (minutos)')}
-              hint={rich('Intervalo entre as verificações de merge no GitHub. Mínimo {min} minutos, máximo {max} minutos.', {
-                min: MERGE_WATCH_RANGE.min,
-                max: MERGE_WATCH_RANGE.max,
-              })}
-            >
-              {(id) => (
-                <TextField.Root
-                  id={id}
-                  key={git.watchMergeMinutes}
-                  disabled={!git.watchMerges}
-                  defaultValue={String(git.watchMergeMinutes)}
-                  onBlur={(e) => {
-                    const value = Math.round(Number(e.target.value));
-                    if (!Number.isFinite(value) || value < MERGE_WATCH_RANGE.min || value > MERGE_WATCH_RANGE.max) {
-                      e.target.value = String(git.watchMergeMinutes);
-                      return;
-                    }
-                    if (value !== git.watchMergeMinutes) {
-                      set({ watchMergeMinutes: value });
-                    }
-                  }}
-                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                 />
               )}
             </FormField>

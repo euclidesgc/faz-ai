@@ -9,7 +9,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { headlessCommand } from '../src/extension/headless';
 import { createMcpServer } from '../src/extension/mcp/server';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { branchName, parseGit, slug } from '../src/shared/git';
+import { DEFAULT_GIT, branchName, parseGit, slug } from '../src/shared/git';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -78,32 +78,9 @@ describe('nome da branch', () => {
 });
 
 describe('parseGit', () => {
-  it('retorna valores padrão para JSON vazio', () => {
-    expect(parseGit('{}')).toMatchObject({
-      watchMerges: true,
-      watchMergeMinutes: 15,
-    });
-  });
-
-  it('limita watchMergeMinutes ao range [5, 1440]', () => {
-    expect(parseGit(JSON.stringify({ watchMergeMinutes: 2 }))).toMatchObject({ watchMergeMinutes: 5 });
-    expect(parseGit(JSON.stringify({ watchMergeMinutes: 9999 }))).toMatchObject({ watchMergeMinutes: 1440 });
-  });
-
-  it('usa o padrão para watchMergeMinutes inválido (string, 0, ausente)', () => {
-    expect(parseGit(JSON.stringify({ watchMergeMinutes: 'abc' }))).toMatchObject({ watchMergeMinutes: 15 });
-    expect(parseGit(JSON.stringify({ watchMergeMinutes: 0 }))).toMatchObject({ watchMergeMinutes: 15 });
-    expect(parseGit('{}')).toMatchObject({ watchMergeMinutes: 15 });
-  });
-
-  it('preserva watchMerges: true para git_json antigo de board (sem as chaves novas)', () => {
-    expect(parseGit(JSON.stringify({ mode: 'worktree', branchPattern: '{tipo}/{numero}-{titulo}', autoMerge: true }))).toMatchObject({
-      watchMerges: true,
-    });
-  });
-
-  it('respeita watchMerges: false', () => {
-    expect(parseGit(JSON.stringify({ watchMerges: false }))).toMatchObject({ watchMerges: false });
+  it('ignora as chaves da antiga detecção de merges, que agora acontece em cada rodada do heartbeat', () => {
+    const git = parseGit(JSON.stringify({ mode: 'branch', watchMerges: false, watchMergeMinutes: 30 }));
+    expect(git).toEqual({ ...DEFAULT_GIT, mode: 'branch' });
   });
 });
 

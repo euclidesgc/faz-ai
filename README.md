@@ -553,8 +553,7 @@ commits na branch da história.
   botão **Criar branch da história** no card.
 - O card mostra a branch e abre a pasta de trabalho numa janela nova.
 - O modo (worktree, branch na própria pasta ou desligado), o padrão do nome da branch, a pasta das
-  worktrees, **tocar histórias em paralelo**, o merge automático do PR ao aprovar a homologação e a
-  detecção automática de merges, com o arquivamento das histórias já publicadas (ligada por padrão),
+  worktrees, **tocar histórias em paralelo** e o merge automático do PR ao aprovar a homologação
   ficam no Settings do editor, em **Faz AI › Git** (ver [Configurações no Settings do
   editor](#configurações-no-settings-do-editor)); no navegador seguem na aba Git e no bloco de
   paralelo do Harness, como antes.
@@ -580,11 +579,10 @@ o merge automático desligado, aprovar só marca o card, e a IA o move para Conc
 
 ### Detecção automática de merges
 
-O board pode observar o pull request de uma história entregue e detectar quando ele é mergeado,
-concluindo a história automaticamente. A opção nasce ligada (Settings do editor, Faz AI › Git,
-**Concluir a história quando o pull request for mergeado**). Uma rotina periódica verifica o estado do PR a cada
-intervalo configurável (**Verificar a cada (minutos)**, padrão 15, faixa de 5 a 1440). Quando o
-merge é detectado:
+O board observa o pull request de cada história entregue e detecta quando ele é mergeado, concluindo a
+história automaticamente. Não há opção própria: a consulta acontece em cada rodada do
+[heartbeat](#heartbeat), no mesmo intervalo, e também no **Rodar o heartbeat agora**. Com o heartbeat
+desligado, ela só acontece quando você pede uma rodada. Quando o merge é detectado:
 
 1. o board grava o commit do merge no card;
 2. registra na conversa que a história foi concluída;
@@ -593,14 +591,14 @@ merge é detectado:
 Se o pull request é fechado sem merge, o board registra um aviso na conversa uma única vez. O merge
 continua sendo feito pela pessoa, manualmente ou pelo merge automático; o board só observa. Falhas
 na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado) não bloqueiam nada
-— o aviso aparece no log, e a rotina continua tentando no próximo intervalo.
+— o aviso aparece no log, e o board tenta de novo na próxima rodada.
 
 Na mesma rodada, depois de olhar os pull requests, o board dá o último passo do ciclo: **quando a
 versão que contém uma história concluída é publicada, ele registra na conversa qual versão a levou
 (tag e link da release) e arquiva o card**. Assim a coluna Concluído fica só com o que está mergeado
 e ainda não chegou a quem usa; o que já foi entregue vai para a aba Arquivados, de onde você pode
 restaurar a história (com as sub-tarefas arquivadas dela) a qualquer momento. Não há o que ligar: o passo vem junto com a detecção de merges,
-no mesmo intervalo e no mesmo liga/desliga, e nasce ligado com ela.
+na mesma rodada do heartbeat.
 
 Uma história conta como publicada quando existe uma tag que **contém** o commit do merge **e** que
 tem uma **release publicada** no GitHub — é o que o `npm run release` deste projeto cria. Tag sem
@@ -617,7 +615,8 @@ não têm o commit do merge guardado, continuam sendo arquivadas por você, com 
 
 Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
 intervalo, enquanto o editor estiver aberto na pasta do projeto. Em cada rodada ela avança os cards
-aprovados, responde às mensagens pendentes e trabalha nos cards prontos, com uma execução por história.
+aprovados, responde às mensagens pendentes e trabalha nos cards prontos, com uma execução por história,
+e confere o pull request das histórias entregues ([detecção automática de merges](#detecção-automática-de-merges)).
 As atividades **sem branch** (refinar, resumir e as fases que só produzem documento, como Discovery,
 PRD, Spec e Plan no board padrão; vale a coluna que tem artefato antes da fase de código) rodam ao
 mesmo tempo em qualquer modo de workspace, até **Histórias ao mesmo tempo** (duas por padrão, até
@@ -876,7 +875,7 @@ quatro seções, nesta ordem:
 | --- | --- |
 | Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
 | Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
-| Git | As nove chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.watchMerges` e `fazai.git.watchMergeMinutes` (acompanhar merges fora do board, de 5 a 1440 minutos). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
+| Git | As sete chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
 | Backup | Dois links de ação: **Exportar o board agora** e **Importar um board**, que disparam os comandos da paleta |
 
 Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,

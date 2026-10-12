@@ -578,8 +578,7 @@ progress. Sub-tasks commit to the story's branch.
   the **Criar branch da história** (create the story's branch) button on the card.
 - The card shows the branch and opens the working folder in a new window.
 - The mode (worktree, branch in the same folder, or off), the branch name pattern, the worktrees
-  folder, **drive stories in parallel**, automatic PR merge when approving acceptance and automatic
-  merge detection, with the archiving of already published stories (on by default), live in the
+  folder, **drive stories in parallel** and automatic PR merge when approving acceptance live in the
   editor Settings, under **Faz AI › Git** (see [Settings in the editor
   Settings](#settings-in-the-editor-settings)); in the browser they stay on the Git tab and the
   parallel block in the Harness, as before.
@@ -606,10 +605,11 @@ automatic merge off, approving only marks the card, and the AI moves it to Concl
 
 ### Automatic merge detection
 
-The board can watch a delivered story's pull request and detect when it is merged, concluding the
-story automatically. The feature starts on (editor Settings, Faz AI › Git, **Concluir a história
-quando o pull request for mergeado**). A periodic routine checks the PR state at a configurable interval
-(**Verificar a cada (minutos)**, default 15, range 5 to 1440). When the merge is detected:
+The board watches each delivered story's pull request and detects when it is merged, concluding the
+story automatically. There is no setting of its own: the check happens on every
+[heartbeat](#heartbeat) round, on the same interval, and also on **Rodar o heartbeat agora** (Run the
+heartbeat now). With the heartbeat off, it only happens when you ask for a round. When the merge is
+detected:
 
 1. the board records the merge commit on the card;
 2. registers in the conversation that the story was completed;
@@ -618,15 +618,14 @@ quando o pull request for mergeado**). A periodic routine checks the PR state at
 If the pull request is closed without a merge, the board registers a warning in the conversation
 once only. The merge is still done by the person, manually or through automatic merge; the board
 only observes. Failures in querying the PR state (no network, no authentication, no `gh`
-installed) do not block anything — the warning appears in the log, and the routine keeps trying at the next interval.
+installed) do not block anything — the warning appears in the log, and the board tries again on the next round.
 
 In the same round, after looking at the pull requests, the board takes the last step of the cycle:
 **when the version containing a concluded story is published, it records in the conversation which
 version carried it (tag and release link) and archives the card**. That way the Concluído column
 holds only what is merged and has not reached your users yet; what was already delivered goes to the
 Arquivados tab, from which you can restore the story (with its archived sub-tasks) at any time. There is nothing to turn on:
-the step comes along with merge detection, on the same interval and the same switch, and it is on by
-default with it.
+the step comes along with merge detection, in the same heartbeat round.
 
 A story counts as published when there is a tag that **contains** the merge commit **and** that has a
 **published release** on GitHub — which is what this project's `npm run release` creates. A tag
@@ -644,7 +643,8 @@ version, which have no merge commit recorded, stay yours to archive with one cli
 
 With the heartbeat on (Configurações → Harness de IA), the board calls the AI on its own at every
 interval, while the editor is open in the project folder. In each round it advances approved cards,
-answers pending messages and works on ready cards, with one run per story. Activities **without a
+answers pending messages and works on ready cards, with one run per story, and checks the pull
+request of delivered stories ([automatic merge detection](#automatic-merge-detection)). Activities **without a
 branch** (refine, summarize and the phases that only produce a document, such as Discovery, PRD,
 Spec and Plan on the default board; the rule is any column with an artifact before the code phase)
 run at the same time in any workspace mode, up to **Histórias ao mesmo tempo** (two by default, up to
@@ -916,7 +916,7 @@ four sections, in this order:
 | --- | --- |
 | Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
 | Appearance | **Language** (`fazai.appearance.language`), **Theme** (`fazai.appearance.theme`), **Font** (`fazai.appearance.font`) and **Size** (`fazai.appearance.fontSize`), all with User scope — apply to all this person's projects. Statuses (name and color of each status) stay on the board, now in the Workflows tab |
-| Git | The nine `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.watchMerges` and `fazai.git.watchMergeMinutes` (watch for merges outside the board, 5 to 1440 minutes). In the editor, the Git tab and the parallel block in the AI harness become a link to these keys; in the browser they stay as editable fields |
+| Git | The seven `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase). In the editor, the Git tab and the parallel block in the AI harness become a link to these keys; in the browser they stay as editable fields |
 | Backup | Two action links: **Export the board now** and **Import a board**, which trigger the palette commands |
 
 Three new commands in the palette (`Ctrl+Shift+P`): **Faz AI: Open the Environment Diagnostics**,

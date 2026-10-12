@@ -21,6 +21,11 @@ export interface HeartbeatDeps {
   snapshot(): BoardState;
   now(): number;
   log(line: string): void;
+  /**
+   * Começo de cada rodada, automática ou pedida: é por aqui que o board confere os pull requests das
+   * histórias entregues (detecção de merges). Não espera o fim nem trava a rodada.
+   */
+  onRound?: () => void;
 }
 
 /**
@@ -123,6 +128,7 @@ export class Heartbeat {
 
   private round(): number {
     this.lastRoundAt = this.deps.now();
+    this.deps.onRound?.();
     const targets = heartbeatTargets(this.deps.snapshot());
     this.queue = targets.map((c) => c.id);
     this.deps.log(

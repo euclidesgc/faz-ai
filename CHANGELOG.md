@@ -19,6 +19,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   registro, abrir no terminal) é o botão azul principal; o **Copiar comando** ganhou contorno e os
   botões da tela saíram do tamanho pequeno. No topo, **Ir para o board** é o principal e **Verificar de
   novo** deixou de ser um botão discreto.
+- **A detecção de merges acontece no heartbeat.** Saíram do Git a opção **Concluir a história
+  quando o pull request for mergeado** e o intervalo próprio dela (15 minutos), com as chaves
+  `fazai.git.watchMerges` e `fazai.git.watchMergeMinutes` do Settings do editor. Agora cada rodada do
+  heartbeat confere o pull request das histórias entregues e conclui a que foi mergeada, e o
+  **Rodar o heartbeat agora** também confere na hora. O arquivamento das histórias publicadas vem
+  junto, na mesma rodada. Com o heartbeat desligado, a conferência só acontece quando você pede uma
+  rodada.
 - **Novos padrões no Harness.** O tempo limite de execução passa a ser de 45 minutos (era 30) e o
   intervalo do heartbeat de 10 minutos (era 60). Boards que já salvaram outros valores continuam com
   eles.

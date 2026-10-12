@@ -14,7 +14,7 @@ import type { BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
 import { DEFAULT_APPEARANCE, FONT_SIZE_RANGE, FONTS, THEMES, type TextFont, type ThemeMode } from '../../shared/appearance';
 import { LANGUAGES, type Language } from '../../shared/language';
-import { DEFAULT_GIT, MERGE_METHODS, MERGE_WATCH_RANGE, WORKSPACE_MODES, type MergeMethod, type WorkspaceMode } from '../../shared/git';
+import { DEFAULT_GIT, MERGE_METHODS, WORKSPACE_MODES, type MergeMethod, type WorkspaceMode } from '../../shared/git';
 import { DEFAULT_RUNNER, PARALLEL_RANGE } from '../../shared/runner';
 
 export const SECTION = 'fazai';
@@ -137,25 +137,7 @@ const gitMergeMethodKey: SyncedKey<MergeMethod> = {
   migrate: true,
 };
 
-const gitWatchMergesKey: SyncedKey<boolean> = {
-  key: 'git.watchMerges',
-  fromBoard: (board) => board.git.watchMerges,
-  toBoardPatch: (value) => ({ git: { watchMerges: value } }),
-  isValid: (value): value is boolean => typeof value === 'boolean',
-  defaultValue: DEFAULT_GIT.watchMerges,
-  migrate: true,
-};
-
-const gitWatchMergeMinutesKey: SyncedKey<number> = {
-  key: 'git.watchMergeMinutes',
-  fromBoard: (board) => board.git.watchMergeMinutes,
-  toBoardPatch: (value) => ({ git: { watchMergeMinutes: value } }),
-  isValid: (value): value is number => isInteger(value, MERGE_WATCH_RANGE),
-  defaultValue: DEFAULT_GIT.watchMergeMinutes,
-  migrate: true,
-};
-
-/** As nove chaves de Git/paralelo: as únicas que passam pela migração única. */
+/** As sete chaves de Git/paralelo: as únicas que passam pela migração única. */
 export const GIT_KEYS: SyncedKey<unknown>[] = [
   gitModeKey,
   gitBranchPatternKey,
@@ -164,11 +146,9 @@ export const GIT_KEYS: SyncedKey<unknown>[] = [
   gitParallelStoriesKey,
   gitAutoMergeKey,
   gitMergeMethodKey,
-  gitWatchMergesKey,
-  gitWatchMergeMinutesKey,
 ] as SyncedKey<unknown>[];
 
-/** Chaves ligadas ao board: idioma, tema, fonte, tamanho da fonte e as nove de Git/paralelo. */
+/** Chaves ligadas ao board: idioma, tema, fonte, tamanho da fonte e as sete de Git/paralelo. */
 export const SYNCED_KEYS: SyncedKey<unknown>[] = [languageKey, themeKey, fontKey, fontSizeKey, ...GIT_KEYS] as SyncedKey<unknown>[];
 
 /** Marca em `meta`, por banco: a migração do Git/paralelo para o Settings já rodou. */

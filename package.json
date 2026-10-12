@@ -262,22 +262,6 @@
             "scope": "resource",
             "order": 7,
             "markdownDescription": "%config.git.mergeMethod%"
-          },
-          "fazai.git.watchMerges": {
-            "type": "boolean",
-            "default": true,
-            "scope": "resource",
-            "order": 8,
-            "markdownDescription": "%config.git.watchMerges%"
-          },
-          "fazai.git.watchMergeMinutes": {
-            "type": "integer",
-            "minimum": 5,
-            "maximum": 1440,
-            "default": 15,
-            "scope": "resource",
-            "order": 9,
-            "markdownDescription": "%config.git.watchMergeMinutes%"
           }
         }
       },

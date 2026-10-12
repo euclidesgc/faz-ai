@@ -21,6 +21,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   command) got an outline and the buttons on the screen are no longer the small size. At the top, **Ir
   para o board** (Go to the board) is the main button and **Verificar de novo** (Check again) is no
   longer a faint one.
+- **Merge detection happens in the heartbeat.** The **Concluir a história quando o pull request for
+  mergeado** (Complete the story when the pull request is merged) option and its own interval (15
+  minutes) left the Git settings, along with the `fazai.git.watchMerges` and
+  `fazai.git.watchMergeMinutes` keys in the editor Settings. Now every heartbeat round checks the pull
+  request of delivered stories and completes the one that was merged, and **Rodar o heartbeat agora**
+  (Run the heartbeat now) also checks right away. Archiving published stories comes along, in the
+  same round. With the heartbeat off, the check only happens when you ask for a round.
 - **New defaults in the Harness.** The run time limit is now 45 minutes (was 30) and the heartbeat
   interval 10 minutes (was 60). Boards that already saved other values keep them.
 - **The other AI tool shows under Optional.** In a project on Claude Code, Cursor found on the machine
