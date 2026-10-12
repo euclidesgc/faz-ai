@@ -47,6 +47,10 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   only `AGENTS.md`, the board warns that creating a `CLAUDE.md` makes Claude Code stop reading it. A
   selector shows what Claude Code or Cursor loads.
   For rules and skills, how board runs use them becomes a choice on the row itself.
+- **The harness editor no longer loads forever.** If the board does not answer the file read within
+  8 seconds, the modal stops loading and says what to do: when the extension package is reinstalled
+  without reloading the window, the new screen talks to the old host, which does not know the
+  request. Reloading the window (Developer: Reload Window) fixes it.
 - **Harness no longer jumps when you pick an option.** The board-run usage selector and the skill
   mode selector keep the width of their longest option: changing the value no longer re-wraps the
   text next to it and pushes the screen around. In a narrow panel, each row's buttons take at most
