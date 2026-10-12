@@ -15,7 +15,14 @@ export interface CliRun {
  * rejeita: uma CLI que falha, some ou trava vira `code: null`, e quem chama trata como "não deu
  * para saber", não como erro do board.
  */
-export function runCli(file: string, args: string[], pathEnv: string | undefined, timeoutMs = 20_000): Promise<CliRun> {
+export function runCli(
+  file: string,
+  args: string[],
+  pathEnv: string | undefined,
+  timeoutMs = 20_000,
+  /** pasta em que o comando roda; os de plugin do Claude Code acham o escopo de projeto por ela */
+  cwd?: string,
+): Promise<CliRun> {
   return new Promise((resolve) => {
     // no Windows, uma CLI instalada como .cmd só roda pelo shell, como nas execuções
     const launch = launchSpec(file, args);
@@ -24,6 +31,7 @@ export function runCli(file: string, args: string[], pathEnv: string | undefined
       launch.args,
       {
         timeout: timeoutMs,
+        ...(cwd ? { cwd } : {}),
         shell: launch.shell,
         windowsVerbatimArguments: launch.shell,
         // no Windows, o shell abriria uma janela do cmd.exe a cada consulta

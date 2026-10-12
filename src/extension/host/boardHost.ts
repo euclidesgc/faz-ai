@@ -173,6 +173,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   // o log do board liga cada evento à execução em curso no card (`run_id`); sem execução, fica nulo
   router.setRunResolver((cardId) => runner.runIdOf(cardId));
+  // os plugins do Claude Code: a lista de instalados e as ações sobre eles passam pela CLI, na pasta do projeto
+  router.setClaudeCli((args) => {
+    const exe = resolveCommand('claude', pathEnv, homeDir);
+    return exe ? runCli(exe, args, pathEnv, 60_000, o.folderPath) : Promise.resolve({ code: null, stdout: '', stderr: '' });
+  });
   // os comandos externos das rotinas periódicas: resolvem com a saída padrão, rejeitam com a mensagem
   // do comando (é ela que vai para o log). `git` aqui é assíncrono de propósito — o `src/extension/git.ts`
   // é síncrono, feito para o que a pessoa dispara, e travaria o processo da extensão numa rodada de fundo.
@@ -574,6 +579,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     },
     async dispose() {
       disposed = true;
+      router.setClaudeCli(null);
       clearInterval(requirementsTimer);
       if (enableTimer) clearInterval(enableTimer);
       // espera a conferência em andamento: sem isso ela pode gravar o board depois de o banco fechar

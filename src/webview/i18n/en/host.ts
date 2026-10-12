@@ -220,6 +220,17 @@ export const host: Record<string, string> = {
   'Skill "{name}" não encontrada.': 'Skill "{name}" not found.',
   'Agente "{name}" não encontrado.': 'Agent "{name}" not found.',
   'Servidor "{name}" não encontrado em {path}.': 'Server "{name}" not found in {path}.',
+  'Plugins desinstalados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
+    'Plugins uninstalled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
+  'Plugins desativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
+    'Plugins disabled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
+  'Plugins ativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
+    'Plugins enabled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
+  'Plugins removidos de ~/.cursor/plugins/local: {names}. Recarregue a janela do Cursor para valer.':
+    'Plugins removed from ~/.cursor/plugins/local: {names}. Reload the Cursor window for it to take effect.',
+  'Feito em {done} de {total}. Falhou: {failures}': 'Done for {done} of {total}. Failed: {failures}',
+  'Nada mudou. Falhou: {failures}': 'Nothing changed. Failed: {failures}',
+  'Nenhum dos plugins escolhidos aceita essa ação.': 'None of the chosen plugins accepts that action.',
   'Arquivo de regras desconhecido: "{name}". Aceitos: {accepted}.': 'Unknown rules file: "{name}". Accepted: {accepted}.',
   'Itens de plugin não podem ser alterados pelo board.': 'Plugin items cannot be changed by the board.',
   'Servidores de plugin não podem ser removidos pelo board.': 'Plugin servers cannot be removed by the board.',

@@ -126,7 +126,8 @@ pasta própria (a global fica em `~/`):
 ### Projeto, global e plugins
 
 O board lê o harness de cada ferramenta em três escopos: a pasta do projeto (`project`), a pasta do
-usuário (`user`, vale em todos os projetos) e os plugins instalados (`plugin`). `get_harness` devolve
+usuário (`user`, vale em todos os projetos) e os plugins instalados (`plugin`; no Claude Code, os que
+`claude plugin list` mostra, sem o catálogo dos marketplaces). `get_harness` devolve
 em `inventory` tudo que a ferramenta do projeto carrega (instruções e regras, skills, agentes,
 comandos, hooks, servidores MCP, plugins e arquivos de configuração), com o escopo e o caminho de
 cada item, e o `group` em que a tela de Harness o mostra: `main` (regras principais), `topic` (regras

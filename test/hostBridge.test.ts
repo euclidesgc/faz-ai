@@ -116,6 +116,77 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
   });
 });
 
+describe('HostBridge: plugins pela CLI do Claude Code', () => {
+  const plugin = (rel: string, name: string) => {
+    const manifest = path.join(dir, 'h', rel, '.claude-plugin', 'plugin.json');
+    fs.mkdirSync(path.dirname(manifest), { recursive: true });
+    fs.writeFileSync(manifest, JSON.stringify({ name }));
+    return path.join(dir, 'h', rel);
+  };
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it('lista os instalados pela CLI, desativa os marcados e avisa quando terminou', async () => {
+    const synced = plugin('.claude/plugins/synced/org/design~g2', 'design');
+    const cached = plugin('.claude/plugins/cache/loja/fmt/1.0', 'fmt');
+    plugin('.claude/plugins/marketplaces/loja/plugins/catalogo', 'catalogo');
+    const calls: string[][] = [];
+    router.setClaudeCli((args) => {
+      calls.push(args);
+      const stdout =
+        args[1] === 'list'
+          ? JSON.stringify([
+              { id: 'design@synced', scope: 'synced', enabled: true, installPath: synced },
+              { id: 'fmt@loja', scope: 'user', enabled: true, installPath: cached },
+            ])
+          : '{"outcome":"ok","message":"ok"}';
+      return Promise.resolve({ code: 0, stdout, stderr: '' });
+    });
+    await flush();
+    const plugins = () =>
+      router
+        .snapshot()
+        .harness.inventory.find((t) => t.tool === 'claude')!
+        .items.filter((i) => i.kind === 'plugin');
+    expect(plugins().map((p) => [p.name, p.install?.id])).toEqual([
+      ['design', 'design@synced'],
+      ['fmt', 'fmt@loja'],
+    ]);
+
+    await bridge.handle({ type: 'harness.plugin.apply', tool: 'claude', action: 'disable', ids: ['design@synced', 'fmt@loja'] });
+    expect(calls.filter((c) => c[1] === 'disable')).toEqual([
+      ['plugin', 'disable', 'design@synced', '--json'],
+      ['plugin', 'disable', 'fmt@loja', '--json'],
+    ]);
+    expect(sent.slice(-2)).toEqual([
+      {
+        type: 'notice',
+        message:
+          'Plugins desativados: design, fmt. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
+      },
+      { type: 'harness.plugin.done' },
+    ]);
+    // a lista é consultada de novo depois da ação
+    expect(calls.filter((c) => c[1] === 'list').length).toBe(2);
+  });
+
+  it('um plugin sincronizado do claude.ai não é desinstalado, e a tela recebe o erro e o fim', async () => {
+    const synced = plugin('.claude/plugins/synced/org/design', 'design');
+    router.setClaudeCli((args) =>
+      Promise.resolve({
+        code: 0,
+        stdout: args[1] === 'list' ? JSON.stringify([{ id: 'design@synced', scope: 'synced', enabled: true, installPath: synced }]) : '',
+        stderr: '',
+      }),
+    );
+    await flush();
+    await bridge.handle({ type: 'harness.plugin.apply', tool: 'claude', action: 'uninstall', ids: ['design@synced'] });
+    expect(sent.slice(-2)).toEqual([
+      { type: 'harness.plugin.done' },
+      { type: 'error', message: 'Nenhum dos plugins escolhidos aceita essa ação.' },
+    ]);
+  });
+});
+
 describe('HostBridge: attachment.read / attachment.write', () => {
   function createAttachment(content: string, filename = 'nota.txt'): string {
     const snap = router.snapshot();

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { AiTool, HarnessItem, HarnessScope } from '../shared/harness';
+import type { AiTool, HarnessItem, HarnessScope, PluginInstall } from '../shared/harness';
 import {
   HARNESS_CATALOG,
   PERMISSION_LIST_LABEL,
@@ -271,31 +271,64 @@ function latestGenerations(found: { dir: string; manifest: string }[]): { dir: s
   return [...best.values()].map((b) => b.value);
 }
 
-function scanPlugins(tool: AiTool, ctx: Ctx): Found[] {
+/**
+ * As pastas dos plugins que a ferramenta carrega. No Claude Code, com a lista da CLI, são exatamente as
+ * instaladas; sem ela, as pastas de plugin abaixo de `~/.claude/plugins`, menos os catálogos dos
+ * marketplaces (`marketplaces/`, plugins disponíveis e não instalados) e os dados que eles guardam.
+ * No Cursor, as de `~/.cursor/plugins/local`, cada uma desinstalável tirando a pasta.
+ */
+function installedPluginDirs(
+  tool: AiTool,
+  ctx: Ctx,
+  claude: PluginInstall[] | null | undefined,
+): { dir: string; manifest: string; install?: PluginInstall }[] {
+  if (tool === 'claude' && claude) {
+    const manifests = PLUGIN_ROOTS.claude[0]!.manifests;
+    // o manifesto é opcional: sem ele o item aponta para a pasta
+    return claude.map((install) => ({
+      dir: install.dir,
+      manifest: manifests.map((m) => path.join(install.dir, m)).find(isFile) ?? install.dir,
+      install,
+    }));
+  }
+  return PLUGIN_ROOTS[tool].flatMap((root) => {
+    const base = path.join(ctx.homeDir, root.path);
+    const skip = tool === 'claude' ? ['marketplaces', 'data'] : [];
+    const found = entries(base)
+      .filter((n) => !n.startsWith('.') && !skip.includes(n))
+      .flatMap((n) => pluginDirs(path.join(base, n), root.manifests, 1));
+    return latestGenerations(found).map((f) =>
+      tool === 'cursor' ? { ...f, install: { id: path.relative(base, f.dir), scopes: ['local'], enabled: true, dir: f.dir } } : f,
+    );
+  });
+}
+
+function scanPlugins(tool: AiTool, ctx: Ctx, claude: PluginInstall[] | null | undefined): Found[] {
   const out: Found[] = [];
-  for (const root of PLUGIN_ROOTS[tool]) {
-    for (const { dir, manifest } of latestGenerations(pluginDirs(path.join(ctx.homeDir, root.path), root.manifests))) {
-      const meta = readJson(manifest) ?? {};
-      const plugin = typeof meta.name === 'string' && meta.name ? meta.name : path.basename(dir).replace(/~g\d+$/, '');
-      out.push({
-        kind: 'plugin',
-        scope: 'plugin',
-        name: plugin,
-        description: typeof meta.description === 'string' ? short(meta.description) : '',
-        path: manifest,
-        plugin,
-        layout: 'entry',
-      });
-      const parts: HarnessSource[] = [
-        { kind: 'skill', scope: 'user', layout: 'skills', path: 'skills' },
-        { kind: 'agent', scope: 'user', layout: 'files', path: 'agents', ext: '.md' },
-        { kind: 'command', scope: 'user', layout: 'files', path: 'commands', ext: '.md' },
-        { kind: 'hook', scope: 'user', layout: 'json-keys', path: 'hooks/hooks.json', key: 'hooks' },
-        { kind: 'mcp', scope: 'user', layout: 'json-keys', path: '.mcp.json', key: 'mcpServers' },
-        { kind: 'mcp', scope: 'user', layout: 'json-keys', path: 'mcp.json', key: 'mcpServers' },
-      ];
-      for (const src of parts) out.push(...scanSource(src, dir, ctx).map((i): Found => ({ ...i, scope: 'plugin', plugin })));
-    }
+  for (const { dir, manifest, install } of installedPluginDirs(tool, ctx, claude)) {
+    const meta = (manifest !== dir && readJson(manifest)) || {};
+    // sem manifesto, o nome vem do id do Claude Code (`nome@marketplace`) ou da pasta
+    const fallback = install && tool === 'claude' ? install.id.replace(/@.*$/, '') : path.basename(dir).replace(/~g\d+$/, '');
+    const plugin = typeof meta.name === 'string' && meta.name ? meta.name : fallback;
+    out.push({
+      kind: 'plugin',
+      scope: 'plugin',
+      name: plugin,
+      description: typeof meta.description === 'string' ? short(meta.description) : '',
+      path: manifest,
+      plugin,
+      layout: 'entry',
+      ...(install ? { install } : {}),
+    });
+    const parts: HarnessSource[] = [
+      { kind: 'skill', scope: 'user', layout: 'skills', path: 'skills' },
+      { kind: 'agent', scope: 'user', layout: 'files', path: 'agents', ext: '.md' },
+      { kind: 'command', scope: 'user', layout: 'files', path: 'commands', ext: '.md' },
+      { kind: 'hook', scope: 'user', layout: 'json-keys', path: 'hooks/hooks.json', key: 'hooks' },
+      { kind: 'mcp', scope: 'user', layout: 'json-keys', path: '.mcp.json', key: 'mcpServers' },
+      { kind: 'mcp', scope: 'user', layout: 'json-keys', path: 'mcp.json', key: 'mcpServers' },
+    ];
+    for (const src of parts) out.push(...scanSource(src, dir, ctx).map((i): Found => ({ ...i, scope: 'plugin', plugin })));
   }
   return out;
 }
@@ -307,6 +340,8 @@ export function scanInventory(
   homeDir: string,
   /** pasta da política da organização; o padrão é a do sistema em que o board roda */
   managed = managedDir(process.platform),
+  /** plugins que o Claude Code diz ter instalados; sem a lista, valem as pastas de plugin */
+  claudePlugins?: PluginInstall[] | null,
 ): HarnessItem[] {
   const ctx: Ctx = { projectDir, homeDir };
   const found: Found[] = [];
@@ -315,7 +350,7 @@ export function scanInventory(
     // a memória fica numa pasta com o nome do projeto: sem projeto, não há o que procurar
     if (base && (projectDir || !src.path.includes('{project}'))) found.push(...scanSource(src, base, ctx, source));
   });
-  if (homeDir) found.push(...scanPlugins(tool, ctx));
+  if (homeDir) found.push(...scanPlugins(tool, ctx, claudePlugins));
   const inside = (base: string, file: string) => !!base && file.startsWith(base + path.sep);
   const rel = (base: string, file: string) => path.relative(base, file).split(path.sep).join('/');
   const location = (file: string) => {

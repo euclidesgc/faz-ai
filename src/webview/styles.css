@@ -2636,8 +2636,18 @@ body.host-web .drawer {
   margin: var(--sp-2) 0 0;
   font-size: var(--fs-sm);
 }
-.plugin-group {
+.plugin-pick {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 0 var(--sp-12);
+  align-items: start;
+  padding: 0 var(--sp-4);
   border-top: 1px solid var(--border);
+}
+.plugin-pick > .item-check {
+  padding-top: var(--sp-8);
+}
+.plugin-group {
   padding: var(--sp-8) 0;
 }
 .plugin-group > summary {

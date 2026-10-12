@@ -1,7 +1,7 @@
 import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
-import type { AiTool, HarnessKind, InstallScope, SkillMode } from './harness';
+import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from './harness';
 import type { HarnessUsage, SelectableKind } from './harnessSelection';
 import type { HookInput, McpServerInput } from './harnessCatalog';
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
@@ -203,6 +203,8 @@ export type WebviewToHost =
   | { type: 'harness.item.create'; tool: AiTool; source: number; name: string; description: string }
   /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
   | { type: 'harness.item.delete'; tool: AiTool; kind: HarnessKind; path: string }
+  /** desinstala, desativa ou ativa plugins pela ferramenta; `ids` são os de `HarnessItem.install` */
+  | { type: 'harness.plugin.apply'; tool: AiTool; action: PluginAction; ids: string[] }
   /** copia skills, agentes, comandos ou regras para o projeto ou para a pasta do usuário */
   | { type: 'harness.item.copy'; tool: AiTool; items: { kind: HarnessKind; path: string }[]; to: 'project' | 'user' }
   | { type: 'harness.rule.write'; name: string; content: string }
@@ -289,6 +291,8 @@ export type HostToWebview =
   | { type: 'attachment.readResult'; requestId: string; content?: string; error?: string }
   /** resposta a `attachment.write`, correlacionada por `requestId` */
   | { type: 'attachment.writeResult'; requestId: string; ok: boolean; error?: string }
+  /** terminou o `harness.plugin.apply` (com aviso ou erro): a tela para de mostrar que está trabalhando */
+  | { type: 'harness.plugin.done' }
   /** resposta a `harness.file.read`: o conteúdo e se o arquivo pode ser alterado pelo board */
   | { type: 'harness.file.readResult'; requestId: string; content?: string; readonly?: boolean; error?: string }
   /** item do harness criado pela tela: ela abre o arquivo no editor do board */

@@ -795,7 +795,7 @@ carrega. O conteúdo vem separado em grupos, sempre na mesma ordem:
 | Servidores MCP | Servidores que dão ferramentas extras à IA | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
 | Configurações e permissões | Como a ferramenta se comporta e o que a IA faz sem perguntar | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
 | Estilos de saída | Mudam o jeito de a IA responder | `.claude/output-styles/*.md` |
-| Plugins (Global) | Pacotes instalados, um bloco por plugin com o que ele traz | `~/.claude/plugins`, `~/.cursor/plugins/local` |
+| Plugins (Global) | Pacotes instalados, um bloco por plugin com o que ele traz | os que `claude plugin list` mostra, `~/.cursor/plugins/local` |
 | Organização (Global) | A política da empresa, só leitura | `CLAUDE.md` e `managed-settings.json` da pasta do sistema (`/Library/Application Support/ClaudeCode` no macOS) |
 
 Cada item mostra o nome, **o que é numa frase simples**, se é **sempre carregado** ou **sob
@@ -828,8 +828,16 @@ board**:
 A barra que aparece mostra só o que vale para o que foi marcado: o uso nas execuções do board (rules
 e skills), o modo da skill, copiar para o projeto ou para o global, **Apagar** (arquivos e pastas) e
 **Remover** (entradas de hook, regra de permissão e servidor MCP). Quando uma ação vale só para
-parte dos marcados, o botão diz para quantos. Apagar e remover pedem confirmação antes. Plugins e
-a política da organização, que são só leitura, não têm caixa.
+parte dos marcados, o botão diz para quantos. Apagar e remover pedem confirmação antes. A política
+da organização, que é só leitura, não tem caixa.
+
+**Plugins.** A lista do Claude Code vem de `claude plugin list --json`: só aparece o que ele carrega,
+nunca o catálogo dos marketplaces. Marcando plugins, a barra oferece **Desativar**, **Ativar** e
+**Desinstalar**, feitos pela própria CLI (`claude plugin disable`, `enable` e `uninstall`, em cada
+escopo em que o plugin está instalado). Os sincronizados do claude.ai e os da organização só se
+desativam. No Cursor, que não tem comando para isso, desinstalar tira a pasta do plugin de
+`~/.cursor/plugins/local`. Desinstalar pede confirmação, e a mudança vale na próxima sessão da
+ferramenta (no Claude Code, também depois de `/reload-plugins`).
 
 Os subagentes da ferramenta do projeto têm a tabela própria, com **Disponível no board**, o padrão e
 o editor dos campos do board. Uma marcação cujo arquivo sumiu aparece num aviso no topo da aba, com
