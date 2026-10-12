@@ -194,20 +194,14 @@ export const settings: Record<string, string> = {
   'Relativa à pasta do projeto; <code>{repo}</code> é o nome dela. O padrão (<code>{padrao}</code>) fica ao lado do projeto, fora do repositório. Cada worktree é uma cópia de trabalho: dependências (ex.: <code>node_modules</code>) precisam ser instaladas nela.':
     'Relative to the project folder; <code>{repo}</code> is its name. The default (<code>{padrao}</code>) sits next to the project, outside the repository. Each worktree is a working copy: dependencies (e.g. <code>node_modules</code>) need to be installed in it.',
   'Pull request e merge': 'Pull request and merge',
-  'Na Homologação a IA abre o pull request da história e o registra no card. Com o merge automático ligado, quando você aprova uma história que está na última coluna antes da conclusão, o board faz o merge do PR e só então conclui o card. Se o merge falhar (conflito, checks obrigatórios, sem acesso), o card fica Bloqueado com o erro.':
-    "In Staging the AI opens the story's pull request and records it on the card. With auto-merge on, when you approve a story that is in the last column before done, the board merges the PR and only then completes the card. If the merge fails (conflict, required checks, no access), the card is left Blocked with the error.",
+  'Na Homologação a IA abre o pull request da história e o registra no card. Com o merge automático ligado, quando você aprova uma história que está na última coluna antes da conclusão, o board faz o merge do PR e só então conclui o card. Se o merge falhar (conflito, checks obrigatórios, sem acesso), o card fica Bloqueado com o erro. O merge feito fora do board também conclui a história: a cada rodada do heartbeat, o board confere o pull request das histórias entregues.':
+    "In Staging the AI opens the story's pull request and records it on the card. With auto-merge on, when you approve a story that is in the last column before done, the board merges the PR and only then completes the card. If the merge fails (conflict, required checks, no access), the card is left Blocked with the error. A merge done outside the board also completes the story: on every heartbeat round, the board checks the pull request of the delivered stories.",
   'Fazer o merge do PR ao aprovar a homologação': 'Merge the PR when approving the staging review',
   'O merge é feito no GitHub com a sua conta (comando <code>gh</code>) e não pode ser desfeito pelo board.':
     'The merge is done on GitHub with your account (<code>gh</code> command) and cannot be undone by the board.',
   'Tipo de merge': 'Merge type',
   'Requer o GitHub CLI (<code>gh</code>) instalado e autenticado. No modo worktree, a pasta de trabalho da história é removida depois do merge; a branch fica.':
     "Requires the GitHub CLI (<code>gh</code>) installed and authenticated. In worktree mode, the story's working folder is removed after the merge; the branch stays.",
-  'Concluir a história quando o pull request for mergeado': 'Complete the story when the pull request is merged',
-  'O board consulta o GitHub periodicamente para detectar quando o pull request foi mergeado e conclui a história automaticamente. Essa opção apenas lê o estado — o merge continua sendo feito por você.':
-    'The board checks GitHub periodically to detect when the pull request is merged and completes the story automatically. This option only reads the state — you still do the merge.',
-  'Verificar a cada (minutos)': 'Check every (minutes)',
-  'Intervalo entre as verificações de merge no GitHub. Mínimo {min} minutos, máximo {max} minutos.':
-    'Interval between merge checks on GitHub. Minimum {min} minutes, maximum {max} minutes.',
   'Worktree por história': 'Worktree per story',
   'Branch na própria pasta': 'Branch in the project folder',
   Desligado: 'Off',

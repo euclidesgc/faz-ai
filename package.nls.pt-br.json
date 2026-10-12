@@ -52,8 +52,6 @@
   "config.git.mergeMethod.squash": "Squash (um commit só)",
   "config.git.mergeMethod.merge": "Merge commit",
   "config.git.mergeMethod.rebase": "Rebase",
-  "config.git.watchMerges": "Conclui a história sozinho quando o pull request dela é mergeado fora do board.",
-  "config.git.watchMergeMinutes": "Intervalo entre as consultas ao estado dos pull requests, em minutos. Só vale com [acompanhar merges](@id:fazai.git.watchMerges) ligado.",
   "config.backup.title": "Faz AI: Backup",
   "config.backup.info": "Guarda ou restaura o board inteiro: cards, conversas, anexos e configurações. [Exportar o board agora](command:fazai.exportBoard) | [Importar um board](command:fazai.importBoard)."
 }

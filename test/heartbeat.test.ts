@@ -102,6 +102,23 @@ beforeEach(async () => {
 });
 
 describe('heartbeat', () => {
+  it('cada rodada, automática ou pedida, confere os merges, mesmo sem nada pendente com a IA', () => {
+    let rounds = 0;
+    heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => now, log: () => {}, onRound: () => rounds++ });
+    heartbeat.tick();
+    expect(rounds).toBe(0); // o intervalo ainda não passou
+    now += 60 * 60_000;
+    heartbeat.tick();
+    expect(rounds).toBe(1);
+    heartbeat.runNow();
+    expect(rounds).toBe(2);
+    // com o heartbeat desligado, só a rodada pedida confere
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false } } });
+    now += 60 * 60_000;
+    heartbeat.tick();
+    expect(rounds).toBe(2);
+  });
+
   it('escolhe uma execução por história, na ordem da fila', () => {
     create('A', 'PRD'); // #1 pronto
     create('Sub de A', 'A fazer', 1); // #2: tratada junto com #1

@@ -116,7 +116,7 @@ async function main(): Promise<void> {
     log,
     version: FAZAI_VERSION,
   });
-  const { router, runner, heartbeat, mergeWatcher } = host;
+  const { router, runner, heartbeat } = host;
   const stopMcp = await startMcpServer(address, {
     getRouter: async () => router,
     getRunner: async () => runner,
@@ -158,7 +158,6 @@ async function main(): Promise<void> {
 
   const timer = setInterval(() => {
     heartbeat.tick();
-    mergeWatcher.tick();
   }, 60_000);
   // regras e skills editadas por fora aparecem no board
   const refresh = setInterval(() => router.refreshHarness(), 15_000);
