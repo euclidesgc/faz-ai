@@ -253,10 +253,9 @@ navegador**; the terminal `faz-ai` warns and does not start.
 
 1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code or
    Cursor).
-2. In the **Tudo que a ferramenta carrega** (everything the tool loads) tab, pick the tool and, in
-   the **Servidores MCP** (MCP servers) section, click **Instalar (padrão da ferramenta)** (install,
-   tool default). The board registers the `faz-ai` server in the global file the tool reads.
-3. In the **Skills** section of the same tool, click **Instalar (padrão da ferramenta)** for the
+2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
+   **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads.
+3. In the **Skills** group of the same tab, click **Instalar (padrão da ferramenta)** for the
    flow skill (`faz-ai-fluxo`): it teaches the AI to take cards through the phases, write the
    documents, ask for review and pick up pending work. It can be edited.
 
@@ -807,50 +806,63 @@ available agents, `set_card_profile` picks one for a card, and `create_agent`, `
 ![Project and global skills, with the flow skill install, global or in the project](docs/images/harness_en.png)
 
 Every run started by the board starts from an **empty context**: no rule, skill or agent from your
-machine or the project gets in on its own. Under Configurações → **Harness de IA** you check what
-gets in, in four tabs: **Ferramenta e execução** (tool and run: the project's AI, the permission,
-the default agent and the heartbeat), **Projeto** and **Global** (the files of each folder, in three
-sub-tabs: **Rules**, **Agentes** and **Skills**, with the check marks on each row) and **Tudo que a
-ferramenta carrega** (everything the tool loads). Project and Global are only the folder the file
-comes from; what counts is the check mark, which belongs to this board.
+machine or the project gets in on its own. Under Configurações → **Harness de IA** you see everything
+the AI tool loads and mark what goes into board runs, in three tabs: **Ferramenta e execução** (tool
+and run: the project's AI, the permission, the default agent and the heartbeat), **Projeto**
+(project) and **Global**.
 
-Under Rules and Skills, each row has two mutually exclusive boxes:
+**Projeto** shows what the tool reads in the project folder; **Global**, what it reads from your
+user folder (`~/.claude`, `~/.cursor`…), installed plugins and your organization. Both tabs open on
+the project's tool, and a selector at the top shows what the other one (Claude Code or Cursor)
+loads. The content comes split into groups, always in the same order:
+
+| Group | What it is | Examples |
+| --- | --- | --- |
+| Regras principais (main rules) | Loaded at the start of every conversation | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `~/.claude/CLAUDE.md`; in Cursor, `AGENTS.md` and a notice about User Rules (which live in its settings) |
+| Regras por assunto (rules by topic) | Rules by topic; some only load when the AI works on certain files | `.claude/rules/*.md`, `~/.claude/rules/*.md`, `.cursor/rules/*.mdc` |
+| Memória (memory, Projeto) | Notes Claude Code keeps on its own about the project | `~/.claude/projects/<project>/memory/` |
+| Skills | Instructions and support files loaded when the task calls for them | `.claude/skills/<name>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
+| Subagentes (subagents) | Helpers the AI delegates work to | `.claude/agents/*.md`, `.cursor/agents/*.md` |
+| Comandos (commands) | Ready-made prompts, called with `/name` | `.claude/commands/*.md`, `.cursor/commands/*.md` |
+| Hooks | Commands the tool runs on its own on certain events | `hooks` in `.claude/settings.json`, `.cursor/hooks.json` |
+| Servidores MCP (MCP servers) | Servers that give the AI extra tools | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
+| Configurações e permissões (settings and permissions) | How the tool behaves and what the AI does without asking | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
+| Estilos de saída (output styles) | Change the way the AI answers | `.claude/output-styles/*.md` |
+| Plugins (Global) | Installed packages, one block per plugin with what it brings | `~/.claude/plugins`, `~/.cursor/plugins/local` |
+| Organização (organization, Global) | The company policy, read-only | `CLAUDE.md` and `managed-settings.json` in the system folder (`/Library/Application Support/ClaudeCode` on macOS) |
+
+Each item shows its name, **what it is in one simple sentence**, whether it is **always loaded** or
+**on demand**, the file's own description and its path. **Clicking the path opens the file in the
+board's editor**, the same one used for attachments: formatted Markdown or code, with **Editar**
+(edit), **Salvar** (save) and **Cancelar** (cancel), and **Abrir no editor** (open in editor) for
+those who prefer VS Code. Invalid JSON is not saved; files from plugins, `~/.claude.json` and the
+organization policy open read-only. Files the tool would read but that do not exist yet show up at
+the end of the group with a **Criar** (create) button, and the new file opens right away in the
+editor.
+
+For rules and skills of the project's tool, each row has the **Uso nas execuções do board** (use in
+board runs) choice:
 
 - **Incluir em todo contexto** (include in every context): the file goes into every run (work the
   phase, refine, board chat), by path. It is where the flow skill and the always-on rules go.
 - **Usar quando fizer sentido** (use when it fits): becomes an option of the cards' **Rules** and
   **Skills** fields (and of the agents' skills), and **Refinar com IA** picks it when the request
-  calls for it. Unchecked, the run does not see it, even if the tool loads it in a conversation of
-  yours.
+  calls for it.
+- **Fora das execuções** (not in runs): the run does not see it, even if the tool loads it in a
+  conversation of yours.
 
-A check mark whose file is gone shows as **não encontrada** (not found), to uncheck or recreate.
-Skills and agents created or installed through the board are born checked. What still gets in despite
-the empty context depends on the tool: in Claude Code 2.1 nothing from your folder or the project
-(verified against the CLI); in Cursor, everything the tool loads, and the board only advises.
+The subagents of the project's tool keep their own table, with **Disponível no board** (available
+on the board), the default and the editor for the board's fields. A mark whose file is gone shows in
+a notice at the top of the tab, with **Desmarcar** (unmark). Skills and agents created or installed
+through the board are born marked. What still gets in despite the empty context depends on the tool:
+in Claude Code 2.1 nothing from your folder or the project (verified against the CLI); in Cursor,
+everything the tool loads, and the board only advises.
 
-Under **Tudo que a ferramenta carrega**, in **Tudo que cada ferramenta carrega** (everything each tool
-loads), there is one tab per tool with eight sections (instructions and rules, skills, subagents,
-commands and prompts, hooks, MCP servers, plugins, settings and permissions), each split into three
-scopes:
+What else you can do in each group:
 
-- **Projeto** (project): files in this folder; they apply only here and go into the repository.
-  This group is always shown, highlighted, and says when the project has nothing of that kind.
-- **Global**: files in your user folder (`~/.claude`, `~/.cursor`…); they apply to all
-  your projects. Every change to them asks for confirmation.
-- **Plugins**: they come from installed packages; the board does not change them, but they can be
-  copied.
-
-What you can do:
-
-- **Read the list effortlessly.** Each item shows its name, the description as a hint (capped at
-  two lines) and, on its own line, the full path of the file. Clicking the path opens the file in
-  the editor, which is also where it is edited.
-- **Act on many at once.** Each row has a checkbox, and the header one selects the whole group.
-  With items selected a bar appears: make skills automatic or only-when-indicated, copy to the
-  project or to global, and delete, always with confirmation.
 - **Create** an item in the place and format the tool expects, **delete** it, and **copy** skills,
   subagents, commands and rules from global or from a plugin into the project (and from the project to
-  global).
+  global). Every change to your user folder asks for confirmation.
 - **MCP servers**: add and remove them, in each file's format.
 - **Hooks and permissions**: add and remove hooks and allow, ask and deny rules.
 - **Find and install skills** from a folder or a git repository: the board lists the skills it
@@ -901,7 +913,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
 | Campos | Custom fields (text, select, date, model…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo |
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
-| Harness de IA | The project's tool, permission, default agent and heartbeat; project and global rules, agents and skills, with the check marks of what runs use; everything each tool loads, by scope (see [AI harness](#ai-harness) and [Agents](#agents)) |
+| Harness de IA | The project's tool, permission, default agent and heartbeat; Projeto and Global tabs with everything each tool loads, in groups, with what each file is, the path that opens in the board editor and the marking of what runs use (see [AI harness](#ai-harness) and [Agents](#agents)) |
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Only the Git tab in browser mode; in the editor, points to the Settings (Faz AI › Git) |
 | Aparência | **Language** (automatic, Português (Brasil) or English; in the editor Settings along with theme, font and size); statuses (name and color, in the Workflows tab; here only in browser mode) |

@@ -6,8 +6,7 @@ board na hora, e as regras do board valem para ela também.
 
 ## Como conectar
 
-Em Configurações → **Harness de IA** → **Tudo que a ferramenta carrega**, na seção **Servidores MCP**
-da ferramenta, clique em **Instalar (padrão da ferramenta)** (ou rode **Faz AI: Instalar o MCP do
+Em Configurações → **Harness de IA** → **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)** (ou rode **Faz AI: Instalar o MCP do
 board (global)** na paleta). O board registra o servidor na configuração global da ferramenta, que
 vale em qualquer projeto aberto com o board, sem arquivo nenhum no repositório:
 

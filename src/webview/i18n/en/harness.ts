@@ -10,13 +10,9 @@ export const harness: Record<string, string> = {
     'Everything here is files in the project folder: they go in the repository and apply to everyone working on it.',
 
   // --- HarnessInventory
-  'Tudo que cada ferramenta carrega': 'Everything each tool loads',
   'Relê as pastas do projeto e do usuário': 'Re-reads the project and user folders',
-  'O que cada ferramenta de IA lê neste projeto e na sua pasta de usuário, separado por escopo. <b>Projeto</b> vale só aqui; <b>Global</b> vale em todos os seus projetos; <b>Plugins</b> vem de pacotes instalados e não pode ser alterado, mas pode ser copiado. "Abrir" mostra o arquivo no editor, onde ele também é editado.':
-    'What each AI tool reads in this project and in your user folder, split by scope. <b>Project</b> applies only here; <b>Global</b> applies to all your projects; <b>Plugins</b> come from installed packages and cannot be changed, but can be copied. "Open" shows the file in the editor, where it is also edited.',
   'deste projeto': 'this project',
   'não encontrada': 'not found',
-  'Sem sinal de instalação nesta máquina: {tools}.': 'No sign of installation on this machine: {tools}.',
 
   // --- Formulários e editores
   Nome: 'Name',
@@ -149,14 +145,10 @@ export const harness: Record<string, string> = {
   'gh skill search <termo>': 'gh skill search <term>',
   'agent plugin marketplace add <endereço git>': 'agent plugin marketplace add <git URL>',
   '/plugins install <pasta, zip ou endereço do GitHub>': '/plugins install <folder, zip or GitHub URL>',
-  'Para aproveitar só uma skill de um plugin ou de um repositório, use "Buscar skills para instalar" na seção Skills, ou "Copiar para o projeto" na skill do plugin.':
-    'To use just one skill from a plugin or a repository, use "Find skills to install" in the Skills section, or "Copy to the project" on the plugin skill.',
   'Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.':
     'A hook is a command the tool runs on its own on your computer. Only add commands you know.',
   'Os servidores do <code>~/.claude.json</code> aparecem aqui, mas são alterados pelo Claude Code: <code>claude mcp add --scope user …</code> e <code>claude mcp remove …</code>.':
     'The servers in <code>~/.claude.json</code> show up here, but are changed by Claude Code: <code>claude mcp add --scope user …</code> and <code>claude mcp remove …</code>.',
-  '{n} skills automáticas: as descrições delas, {chars} caracteres ao todo, entram em toda sessão do {tool}. As demais só são lidas quando indicadas.':
-    '{n} automatic skills: their descriptions, {chars} characters in total, go into every {tool} session. The others are only read when indicated.',
 
   // --- Escopos
   Projeto: 'Project',
@@ -259,7 +251,6 @@ export const harness: Record<string, string> = {
     'Instructions loaded in every AI session. The shorter they are, the less context they use.',
 
   // --- ProjectSkills
-  'Nova skill': 'New skill',
   'Skills do {tool} em <code>{dir}</code>. Todas viram opções do campo "Skills" dos cards, e um card que indica uma skill entrega à IA o caminho do arquivo. Por isso uma skill não precisa ficar à vista da IA para ser usada:':
     '{tool} skills in <code>{dir}</code>. All of them become options in the "Skills" field of cards, and a card that indicates a skill hands the AI the file path. That is why a skill does not need to be in the AI\'s sight to be used:',
   '<b>Automática</b>: a IA vê a descrição em toda sessão e decide quando usar.':
@@ -317,19 +308,8 @@ export const harness: Record<string, string> = {
   Intervalo: 'Interval',
 
   // --- ScopeGroup
-  'Selecionar todos em {scope}': 'Select all in {scope}',
-  'Ações nos itens marcados': 'Actions on the selected items',
-  '{n} marcados': '{n} selected',
   'A IA vê a descrição em toda sessão e decide quando usar': 'The AI sees the description in every session and decides when to use it',
-  'Deixar automáticas': 'Set to automatic',
-  'A IA deixa de invocar sozinha; elas continuam valendo nos cards que as indicam':
-    'The AI stops invoking them on its own; they still apply on the cards that indicate them',
-  'Deixar só quando indicadas': 'Set to only when indicated',
-  'Copiar para o projeto ({n})': 'Copy to the project ({n})',
-  'Copiar para o global ({n})': 'Copy to global ({n})',
-  'Apagar ({n})': 'Delete ({n})',
   'Limpar seleção': 'Clear selection',
-  'Nada neste projeto para o {tool}.': 'Nothing in this project for {tool}.',
 
   // --- SkillFiles
   'Criar arquivo numa skill da pasta do usuário?': 'Create a file in a user-folder skill?',
@@ -417,15 +397,10 @@ export const harness: Record<string, string> = {
   'No Cursor, o servidor do board fica em <code>{project}</code>, fora do git. O global do Cursor é um processo só para todas as janelas e não sabe qual board atender. O board grava este registro sozinho ao abrir no Cursor; se o "faz-ai" aparecer desligado em Cursor Settings → MCP, ligue.':
     'In Cursor, the board server lives in <code>{project}</code>, outside git. Cursor\'s global scope is a single process for all windows and cannot tell which board to serve. The board writes this registration on its own when it opens in Cursor; if "faz-ai" shows as off in Cursor Settings → MCP, turn it on.',
   // --- HarnessSettings (contexto vazio)
-  'Toda execução pelo board parte de <b>contexto vazio</b>: nenhuma regra, skill ou agente da sua máquina ou do projeto entra por conta própria. Só entra o que você marcar aqui. <b>Projeto</b> e <b>Global</b> organizam os arquivos pela pasta de onde vêm; o que vale é a marcação. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; <b>Tudo que a ferramenta carrega</b> é o inventário completo, para criar, copiar e apagar arquivos.':
-    'Every board run starts from an <b>empty context</b>: no rule, skill or agent from your machine or the project gets in on its own. Only what you check here gets in. <b>Project</b> and <b>Global</b> organize the files by the folder they come from; what counts is the check mark. <b>Tool and execution</b> picks the AI, the permission and the default agent; <b>Everything the tool loads</b> is the full inventory, to create, copy and delete files.',
-  // --- ScopeHarness
+  'Toda execução pelo board parte de <b>contexto vazio</b>: nenhuma regra, skill ou agente da sua máquina ou do projeto entra por conta própria. Só entra o que você marcar aqui. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão. <b>Projeto</b> e <b>Global</b> mostram tudo que a ferramenta carrega, separado por tipo, com o que cada arquivo é e onde fica; clique no caminho para abrir e editar.':
+    'Every run through the board starts from <b>empty context</b>: no rule, skill or agent from your machine or the project gets in on its own. Only what you mark here gets in. <b>Ferramenta e execução</b> (Tool and run) picks the AI, the permission and the default agent. <b>Projeto</b> (Project) and <b>Global</b> show everything the tool loads, split by type, with what each file is and where it lives; click the path to open and edit it.',
   'Harness do projeto': 'Project harness',
   'Harness global': 'Global harness',
-  'Arquivos da pasta deste projeto, lidos pelo {tool}: vão no repositório. Marque o que as execuções do board podem usar; o que não está marcado não existe para elas.':
-    'Files in this project folder, read by {tool}: they go in the repository. Check what board runs may use; what is not checked does not exist for them.',
-  'Arquivos da sua pasta de usuário e dos plugins instalados, lidos pelo {tool}: valem na sua máquina, em qualquer projeto. A marcação é deste board. Os agentes que o board cria ficam aqui.':
-    'Files in your user folder and installed plugins, read by {tool}: they apply on your machine, in any project. The check marks belong to this board. Agents the board creates live here.',
   Rules: 'Rules',
   // --- SelectionTable
   'Incluir em todo contexto': 'Include in every context',
@@ -434,19 +409,6 @@ export const harness: Record<string, string> = {
   'Usar quando fizer sentido': 'Use when it fits',
   'Fica disponível para o card: a pessoa marca no card, ou o "Refinar com IA" marca quando o pedido pede.':
     'Available to the card: the person checks it on the card, or "Refine with AI" checks it when the request calls for it.',
-  '<b>Incluir em todo contexto</b>: o arquivo entra em toda execução do board, pelo caminho. <b>Usar quando fizer sentido</b>: vira opção do campo Rules dos cards, e o "Refinar com IA" o indica quando o pedido pede. Sem marcação, a execução não o vê, mesmo que a ferramenta o carregue numa conversa sua.':
-    '<b>Include in every context</b>: the file goes into every board run, by path. <b>Use when it fits</b>: becomes an option of the Rules field on cards, and "Refine with AI" picks it when the request calls for it. Unchecked, the run does not see it, even if the tool loads it in a conversation of yours.',
-  '<b>Incluir em todo contexto</b>: a skill entra em toda execução do board, pelo caminho. <b>Usar quando fizer sentido</b>: vira opção do campo Skills dos cards e dos agentes, e o "Refinar com IA" a indica quando o pedido pede. Sem marcação, a execução não a vê.':
-    '<b>Include in every context</b>: the skill goes into every board run, by path. <b>Use when it fits</b>: becomes an option of the Skills field on cards and agents, and "Refine with AI" picks it when the request calls for it. Unchecked, the run does not see it.',
-  '{always} em todo contexto · {contextual} quando fizer sentido · {total} no total.':
-    '{always} in every context · {contextual} when it fits · {total} in total.',
-  'Nova rule': 'New rule',
-  'Skill de modelos de classe e exemplos de código, só quando indicada': 'Skill for class templates and code examples, only when indicated',
-  '{usage}: {name}': '{usage}: {name}',
-  'Apagar {name}': 'Delete {name}',
-  'O arquivo marcado não está mais no disco; desmarque ou recrie.': 'The checked file is no longer on disk; uncheck it or recreate it.',
-  'Nenhum arquivo de instruções do {tool} neste escopo.': 'No {tool} instruction file in this scope.',
-  'Nenhuma skill do {tool} neste escopo.': 'No {tool} skill in this scope.',
   // --- AgentsTable
   'O {tool} não define agentes em arquivos; o board executa os cards com o agente embutido.':
     '{tool} does not define agents in files; the board runs cards with the built-in agent.',

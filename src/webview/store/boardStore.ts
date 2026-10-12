@@ -40,7 +40,7 @@ export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
 /** `environment`: o Diagnóstico do ambiente, aberto pelas Configurações ou sozinho na primeira abertura */
 export type View = 'board' | 'archived' | 'trash' | 'settings' | 'metrics' | 'environment';
 /** Abas da tela de Harness de IA: a ferramenta e a execução, o que é do projeto, e tudo que a ferramenta carrega. */
-export type HarnessTab = 'tool' | 'project' | 'user' | 'all';
+export type HarnessTab = 'tool' | 'project' | 'user';
 import { type SettingsTab } from '../../shared/settingsTab';
 import { SETTINGS_SECTIONS } from '../../shared/settingsSections';
 export type { SettingsTab };
@@ -182,7 +182,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     // o Diagnóstico é de passagem: ao reabrir, volta para o board
     view: persisted?.view === 'environment' ? 'board' : (persisted?.view ?? 'board'),
     settingsTab: persisted?.settingsTab ?? 'columns',
-    harnessTab: persisted?.harnessTab ?? 'tool',
+    // a aba "Tudo que a ferramenta carrega" (`all`) saiu: quem a deixou aberta volta para a da ferramenta
+    harnessTab: persisted?.harnessTab && persisted.harnessTab !== ('all' as string) ? persisted.harnessTab : 'tool',
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
