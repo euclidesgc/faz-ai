@@ -61,7 +61,7 @@ export interface EnvCheck {
  * O que um passo da instalação faz, quando não é óbvio pelo comando: o Node.js se instala pelo nvm,
  * que vem antes dele, e o que cai em `~/.local/bin` precisa dessa pasta no PATH.
  */
-export type InstallStepKind = 'nvm' | 'nvm-load' | 'node' | 'path-save' | 'path-load';
+export type InstallStepKind = 'nvm' | 'nvm-load' | 'node' | 'path-save' | 'path-load' | 'apt-update' | 'brew';
 
 /** Um comando da instalação, com botão de copiar. */
 export interface InstallStep {

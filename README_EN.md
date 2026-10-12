@@ -348,8 +348,10 @@ Graph). Hover over an item to see how the board uses it.
 The board installs nothing from third parties. Each program shows, in parentheses, the official site
 where you find how to install it and, while it is missing, the official install command to copy, only
 the neutral ones that work on any distribution: `curl` on Linux and macOS, PowerShell on Windows
-(Node.js through `nvm`, or `fnm` on Windows). Git and the GitHub CLI have no such installer and show
-only the site. Sign-ins and actions in the project folder (`git init`, `gh auth login`,
+(Node.js through `nvm`; on Windows, through `winget`). Git and the GitHub CLI have no such installer and
+show the system's command: `xcode-select --install` and `brew install gh` on macOS, `apt`, `dnf` or
+`pacman` on Linux (with the `sudo apt update` a new machine needs first) and `winget` on Windows; on an
+unknown distribution, only the site. Sign-ins and actions in the project folder (`git init`, `gh auth login`,
 `code-review-graph build`, `code-review-graph install --platform …`, `code-review-graph embed
 --provider local`) also show the command with a copy button. Only what belongs to
 the board has a button: installing the board's MCP and the flow skill, and opening the permission

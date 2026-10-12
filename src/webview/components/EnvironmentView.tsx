@@ -132,6 +132,10 @@ function stepText(step: InstallStepKind): string {
       return t('Põe a pasta ~/.local/bin, onde o programa foi instalado, no PATH dos próximos terminais:');
     case 'path-load':
       return t('Põe a pasta no PATH deste terminal, para achar o programa agora:');
+    case 'apt-update':
+      return t('Atualiza a lista de pacotes (numa máquina nova, o apt não acha nada antes disso):');
+    case 'brew':
+      return t('Pelo Homebrew (sem ele, instale antes pelo site brew.sh, ou baixe o instalador no site acima):');
   }
 }
 

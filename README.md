@@ -331,8 +331,10 @@ board o usa.
 O board não instala nada de terceiros. Cada programa traz, entre parênteses, o site oficial onde você
 encontra como instalar e, enquanto falta, o comando de instalação oficial para copiar, só os neutros,
 que valem em qualquer distribuição: `curl` no Linux e no macOS, PowerShell no Windows (o Node.js pelo
-`nvm`, ou pelo `fnm` no Windows). O Git e o GitHub CLI não têm um instalador assim e ficam só com o
-site. Os logins e as ações na pasta do projeto (`git init`, `gh auth login`, `code-review-graph build`,
+`nvm`; no Windows, pelo `winget`). O Git e o GitHub CLI não têm um instalador assim e trazem o comando
+do sistema: `xcode-select --install` e `brew install gh` no macOS, `apt`, `dnf` ou `pacman` no Linux
+(com o `sudo apt update` antes, que uma máquina nova precisa) e `winget` no Windows; numa
+distribuição desconhecida, fica só o site. Os logins e as ações na pasta do projeto (`git init`, `gh auth login`, `code-review-graph build`,
 `code-review-graph install --platform …`, `code-review-graph embed --provider local`) também trazem o
 comando com botão de copiar. Só o que é do board tem botão: instalar o MCP
 do board e a skill do fluxo, e abrir a escolha do nível de permissão.

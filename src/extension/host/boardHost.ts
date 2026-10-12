@@ -23,7 +23,7 @@ import { aiToolInfo, type AiTool, type InstallScope } from '../../shared/harness
 import { checkRequirements, registeredServer } from '../requirements';
 import { headlessCommand, headlessUnsupported } from '../headless';
 import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
-import { checkEnvironment, type OtherToolProbe } from '../environment';
+import { checkEnvironment, linuxFamily, type OtherToolProbe } from '../environment';
 import { editorMcpFiles, pinEditorCommands, registeredIn } from '../mcp/pinCommands';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { selectedItems } from '../../shared/harnessSelection';
@@ -354,6 +354,13 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         (err, stdout) => resolve(err ? null : stdout),
       ),
     );
+  const readOsRelease = () => {
+    try {
+      return fs.readFileSync('/etc/os-release', 'utf8');
+    } catch {
+      return null;
+    }
+  };
   // os MCPs que o chat do editor inicia: o editor os procura no PATH de quando abriu, e o que foi
   // instalado depois só aparece nele com o caminho completo
   const editorFiles = o.editor?.name === 'cursor' ? editorMcpFiles(o.folderPath, homeDir) : null;
@@ -419,6 +426,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           platform: process.platform,
           homeDir,
           pathDirs: (pathEnv ?? process.env.PATH ?? '').split(path.delimiter),
+          linux: process.platform === 'linux' ? linuxFamily(readOsRelease()) : null,
           resolve: resolveHere,
           run: probeCommand,
           firstLine: (file) => {

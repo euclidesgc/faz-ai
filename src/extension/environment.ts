@@ -3,6 +3,19 @@ import type { AiTool } from '../shared/harness';
 import { NODE_MIN_MAJOR, type EnvCheck, type EnvCheckId, type EnvironmentReport, type InstallStep } from '../shared/environment';
 import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement, type RequirementId } from '../shared/requirements';
 
+/** As famílias de distribuição Linux com gerenciador de pacotes conhecido. */
+export type LinuxFamily = 'debian' | 'fedora' | 'arch';
+
+/** A família da distribuição pelo `/etc/os-release` (`ID` e `ID_LIKE`); null quando não é uma conhecida. */
+export function linuxFamily(osRelease: string | null): LinuxFamily | null {
+  const field = (name: string) => new RegExp(`^${name}="?([^"\\n]*)"?`, 'm').exec(osRelease ?? '')?.[1] ?? '';
+  const ids = `${field('ID')} ${field('ID_LIKE')}`.toLowerCase().split(/\s+/);
+  if (ids.some((i) => i === 'debian' || i === 'ubuntu')) return 'debian';
+  if (ids.some((i) => i === 'fedora' || i === 'rhel' || i === 'centos')) return 'fedora';
+  if (ids.some((i) => i === 'arch')) return 'arch';
+  return null;
+}
+
 /** A outra ferramenta de IA, como o host a encontrou na máquina. */
 export interface OtherToolProbe {
   tool: AiTool;
@@ -34,6 +47,8 @@ export interface EnvironmentProbe {
   homeDir: string;
   /** as pastas do PATH do terminal: diz se `~/.local/bin` (onde as CLIs e o uv se instalam) já está nele */
   pathDirs: string[];
+  /** no Linux, a família da distribuição (pelo /etc/os-release): o gerenciador de pacotes do git e do gh */
+  linux: LinuxFamily | null;
   /** caminho do executável de um comando, ou null */
   resolve(command: string): string | null;
   /** roda um comando e devolve a saída padrão; null quando ele falha ou não existe */
@@ -78,9 +93,9 @@ const TOOL_DOCS: Record<AiTool, Partial<Record<EnvCheckId, string>>> = {
 };
 
 /**
- * Os comandos que instalam cada programa, conforme o site oficial dele (conferido em 2026-10-11). Só
- * os instaladores neutros, que valem em qualquer distribuição: `curl` no Linux e no macOS, PowerShell
- * no Windows. O git e o GitHub CLI não têm um assim: ficam só com o site.
+ * Os comandos que instalam cada programa, conforme o site oficial dele (conferido em 2026-10-11): os
+ * instaladores neutros, que valem em qualquer distribuição (`curl` no Linux e no macOS, PowerShell no
+ * Windows). O git e o GitHub CLI não têm um assim: ver `packageInstall`.
  */
 const steps = (...commands: string[]): InstallStep[] => commands.map((command) => ({ command }));
 const NVM: InstallStep = { command: 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash', step: 'nvm' };
@@ -100,6 +115,27 @@ const INSTALL: Record<'unix' | 'windows', Record<'node' | 'claude' | 'cursor' | 
     uv: steps('powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"'),
   },
 };
+
+/**
+ * O git e o GitHub CLI não têm instalador neutro: o comando é o do sistema (o do macOS, o winget do
+ * Windows, o gerenciador da distribuição Linux), conforme o site de cada um. Numa distribuição
+ * desconhecida, fica só o site. O apt de uma máquina nova não acha nada antes do `apt update`.
+ */
+function packageInstall(p: EnvironmentProbe, what: 'git' | 'gh'): InstallStep[] | undefined {
+  if (p.platform === 'win32') return steps(what === 'git' ? 'winget install --id Git.Git -e' : 'winget install --id GitHub.cli -e');
+  if (p.platform === 'darwin') return what === 'git' ? steps('xcode-select --install') : [{ command: 'brew install gh', step: 'brew' }];
+  const pkg = what === 'git' ? 'git' : 'gh';
+  switch (p.linux) {
+    case 'debian':
+      return [{ command: 'sudo apt update', step: 'apt-update' }, ...steps(`sudo apt install -y ${pkg}`)];
+    case 'fedora':
+      return steps(`sudo dnf install -y ${pkg}`);
+    case 'arch':
+      return steps(`sudo pacman -S --needed ${what === 'git' ? 'git' : 'github-cli'}`);
+    default:
+      return undefined;
+  }
+}
 
 /**
  * Os passos do PATH depois de um instalador que põe o programa em `~/.local/bin`, quando essa pasta
@@ -235,6 +271,8 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     status: statusOf(!!gitExe),
     version: gitExe ? version(await p.run(gitExe, ['--version'])) : undefined,
     docs: DOCS.git,
+    install: gitExe ? undefined : packageInstall(p, 'git'),
+    ...(gitExe ? {} : reopen),
     children: [{ id: 'repo', status: statusOf(repo, !!gitExe), command: 'git init', inProject: true }],
   };
 
@@ -246,6 +284,8 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     status: statusOf(!!ghExe),
     version: ghExe ? version(await p.run(ghExe, ['--version'])) : undefined,
     docs: DOCS.gh,
+    install: ghExe ? undefined : packageInstall(p, 'gh'),
+    ...(ghExe ? {} : reopen),
     children: [{ id: 'gh-auth', status: statusOf(ghAuth, !!ghExe), command: 'gh auth login' }],
   };
 

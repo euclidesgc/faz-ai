@@ -55,6 +55,10 @@ export const environment: Record<string, string> = {
     'Adds the ~/.local/bin folder, where the program was installed, to the PATH of future terminals:',
   'Põe a pasta no PATH deste terminal, para achar o programa agora:': "Adds the folder to this terminal's PATH, to find the program now:",
   'Na pasta do projeto.': 'In the project folder.',
+  'Atualiza a lista de pacotes (numa máquina nova, o apt não acha nada antes disso):':
+    'Updates the package list (on a new machine, apt finds nothing before this):',
+  'Pelo Homebrew (sem ele, instale antes pelo site brew.sh, ou baixe o instalador no site acima):':
+    'Through Homebrew (without it, install it first from brew.sh, or download the installer from the site above):',
   'Depois, abra um terminal novo: o que já estava aberto não enxerga o programa recém-instalado.':
     'Then open a new terminal: the one already open does not see the newly installed program.',
   'Os comandos de instalação abaixo usam o curl, que não foi encontrado nesta máquina. Instale-o antes pelo gerenciador de pacotes do sistema.':

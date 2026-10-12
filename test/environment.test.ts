@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkEnvironment, type EnvironmentProbe, type OtherToolProbe } from '../src/extension/environment';
+import { checkEnvironment, linuxFamily, type EnvironmentProbe, type LinuxFamily, type OtherToolProbe } from '../src/extension/environment';
 import { missingCount, type EnvCheck, type EnvCheckId, type EnvironmentReport } from '../src/shared/environment';
 import type { BoardRequirement } from '../src/shared/requirements';
 
@@ -15,6 +15,7 @@ function probe(o: {
   crgMcp?: boolean;
   platform?: NodeJS.Platform;
   pathDirs?: string[];
+  linux?: LinuxFamily | null;
 }): EnvironmentProbe & { ran: string[] } {
   const ran: string[] = [];
   return {
@@ -28,6 +29,7 @@ function probe(o: {
     platform: o.platform ?? 'linux',
     homeDir: '/home/u',
     pathDirs: o.pathDirs ?? ['/usr/bin', '/home/u/.local/bin'],
+    linux: o.linux === undefined ? 'debian' : o.linux,
     resolve: (c) => o.commands?.[c] ?? null,
     run: async (c, args) => {
       const key = [c, ...args].join(' ');
@@ -267,9 +269,6 @@ describe('Diagnóstico do ambiente', () => {
     ]);
     expect(commands(find(unix.required, 'cli'))).toEqual(['curl -fsSL https://claude.ai/install.sh | bash']);
     expect(commands(find(unix.recommended, 'uv'))).toEqual(['curl -LsSf https://astral.sh/uv/install.sh | sh']);
-    // o git e o GitHub CLI não têm instalador neutro: só o site
-    expect(find(unix.recommended, 'git').install).toBeUndefined();
-    expect(find(unix.recommended, 'gh').install).toBeUndefined();
     const windows = await checkEnvironment(probe({ tool: 'claude', requirements: [node, cli], platform: 'win32' }));
     expect(commands(find(windows.required, 'cli'))).toEqual(['irm https://claude.ai/install.ps1 | iex']);
     expect(commands(find(windows.required, 'node'))).toEqual(['winget install OpenJS.NodeJS.LTS']);
@@ -317,6 +316,35 @@ describe('Diagnóstico do ambiente', () => {
     expect(find(r.recommended, 'repo').inProject).toBe(true);
     expect(find(r.recommended, 'crg-graph').inProject).toBe(true);
     expect(find(r.recommended, 'gh-auth').inProject).toBeUndefined();
+  });
+
+  it('o git e o GitHub CLI, sem instalador neutro, trazem o comando do sistema; numa distribuição desconhecida, só o site', async () => {
+    const at = async (o: Parameters<typeof probe>[0]) => {
+      const r = await checkEnvironment(probe(o));
+      return [commands(find(r.recommended, 'git')), commands(find(r.recommended, 'gh'))];
+    };
+    // no Ubuntu de uma máquina nova, o apt não acha nada antes do update
+    expect(await at({})).toEqual([
+      ['sudo apt update', 'sudo apt install -y git'],
+      ['sudo apt update', 'sudo apt install -y gh'],
+    ]);
+    expect(await at({ linux: 'fedora' })).toEqual([['sudo dnf install -y git'], ['sudo dnf install -y gh']]);
+    expect(await at({ linux: 'arch' })).toEqual([['sudo pacman -S --needed git'], ['sudo pacman -S --needed github-cli']]);
+    expect(await at({ platform: 'darwin' })).toEqual([['xcode-select --install'], ['brew install gh']]);
+    expect(await at({ platform: 'win32' })).toEqual([['winget install --id Git.Git -e'], ['winget install --id GitHub.cli -e']]);
+    expect(await at({ linux: null })).toEqual([undefined, undefined]);
+    const r = await checkEnvironment(probe({}));
+    expect(find(r.recommended, 'git').install!.map((s) => s.step)).toEqual(['apt-update', undefined]);
+  });
+
+  it('reconhece a distribuição pelo /etc/os-release', () => {
+    expect(linuxFamily('ID=ubuntu\nPRETTY_NAME="Ubuntu 24.04.3 LTS"\n')).toBe('debian');
+    expect(linuxFamily('ID=linuxmint\nID_LIKE="ubuntu debian"\n')).toBe('debian');
+    expect(linuxFamily('ID=fedora\n')).toBe('fedora');
+    expect(linuxFamily('ID="rocky"\nID_LIKE="rhel centos fedora"\n')).toBe('fedora');
+    expect(linuxFamily('ID=manjaro\nID_LIKE=arch\n')).toBe('arch');
+    expect(linuxFamily('ID=alpine\n')).toBeNull();
+    expect(linuxFamily(null)).toBeNull();
   });
 
   it('pronto não sugere instalar', async () => {
