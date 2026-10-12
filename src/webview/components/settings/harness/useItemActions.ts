@@ -1,5 +1,5 @@
 import type { AiTool, HarnessItem, SkillMode } from '../../../../shared/harness';
-import { copyTarget } from '../../../../shared/harnessCatalog';
+import { copyTarget, groupOf } from '../../../../shared/harnessCatalog';
 import { harness, type HarnessScope } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { GLOBAL_WARNING, withGlobalWarning } from './text';
@@ -53,8 +53,9 @@ export function useItemActions(tool: AiTool, items: HarnessItem[]) {
       });
     else run();
   };
-  /** só o que é um arquivo ou pasta própria, fora de plugin, pode ser apagado daqui */
-  const deletable = (i: HarnessItem) => i.scope !== 'plugin' && i.layout !== 'entry' && i.kind !== 'settings';
+  /** só o que é um arquivo ou pasta própria, fora de plugin e da política da organização, pode ser apagado daqui */
+  const deletable = (i: HarnessItem) =>
+    i.scope !== 'plugin' && i.layout !== 'entry' && i.kind !== 'settings' && groupOf(tool, i) !== 'managed';
   const remove = (list: HarnessItem[]) => {
     const global = list.some((i) => i.scope === 'user') ? 'user' : 'project';
     ask({

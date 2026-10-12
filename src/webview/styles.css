@@ -2623,6 +2623,13 @@ body.host-web .drawer {
   margin: var(--sp-2) 0 0;
   font-size: var(--fs-sm);
 }
+.plugin-group {
+  border-top: 1px solid var(--border);
+  padding: var(--sp-8) 0;
+}
+.plugin-group > summary {
+  cursor: pointer;
+}
 .harness-tool-picker {
   margin: var(--sp-8) 0 var(--sp-12);
 }

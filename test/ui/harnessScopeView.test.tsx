@@ -163,3 +163,63 @@ describe('HarnessScopeView: Projeto', () => {
     expect(screen.queryByRole('combobox', { name: /Uso nas execuções do board/ })).toBeNull();
   });
 });
+
+describe('HarnessScopeView: Global', () => {
+  it('mostra a pasta do usuário, os plugins e a organização, sem a memória do projeto', () => {
+    const s = useBoardStore.getState().state!;
+    const policy = HARNESS_CATALOG.claude.findIndex((x) => x.base === 'managed' && x.kind === 'instructions');
+    useBoardStore.setState({
+      state: {
+        ...s,
+        harness: {
+          ...s.harness,
+          inventory: [
+            {
+              tool: 'claude',
+              installed: true,
+              items: [
+                ...CLAUDE_ITEMS,
+                item({
+                  kind: 'skill',
+                  scope: 'plugin',
+                  plugin: 'figma',
+                  name: 'figma-design',
+                  location: '~/.claude/plugins/figma/skills/figma-design/SKILL.md',
+                  layout: 'skills',
+                }),
+                item({
+                  kind: 'instructions',
+                  scope: 'user',
+                  name: 'CLAUDE.md',
+                  location: '/etc/claude-code/CLAUDE.md',
+                  path: '/etc/claude-code/CLAUDE.md',
+                  source: policy,
+                }),
+              ],
+            },
+            { tool: 'cursor', installed: true, items: [] },
+          ],
+        },
+      },
+    });
+    renderThemed(<HarnessScopeView scope="user" />);
+    expect(titles()).not.toContain('Memória');
+    expect(card('Regras principais').getByRole('button', { name: '~/.claude/CLAUDE.md' })).toBeInTheDocument();
+    // um bloco por plugin, com o que ele traz
+    expect(card('Plugins').getByText('figma', { selector: 'summary .item-name' })).toBeInTheDocument();
+    expect(card('Plugins').getByText('figma-design')).toBeInTheDocument();
+    expect(card('Organização').getByRole('button', { name: '/etc/claude-code/CLAUDE.md' })).toBeInTheDocument();
+    // a política da organização não se cria nem se apaga daqui
+    expect(card('Organização').queryByRole('button', { name: 'Apagar' })).toBeNull();
+    expect(titles().indexOf('Organização')).toBe(titles().length - 1);
+  });
+
+  it('no Cursor, o que não fica em arquivo aparece como aviso no grupo', async () => {
+    renderThemed(<HarnessScopeView scope="user" />);
+    await userEvent.click(screen.getByRole('radio', { name: 'Cursor' }));
+    const main = card('Regras principais');
+    expect(main.getByText('User Rules')).toBeInTheDocument();
+    expect(main.getByText('sem arquivo')).toBeInTheDocument();
+    expect(card('Organização').getByText('Team Rules')).toBeInTheDocument();
+  });
+});

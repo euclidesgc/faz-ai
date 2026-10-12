@@ -5,7 +5,6 @@ import { HarnessInventory } from './HarnessInventory';
 import { ProjectTool } from './harness/ProjectTool';
 import { RunnerSettings } from './harness/RunnerSettings';
 import { HarnessScopeView } from './harness/HarnessScopeView';
-import { ScopeHarness } from './harness/ScopeHarness';
 import { PageHeader } from './PageHeader';
 import { t } from '../../i18n';
 import { rich } from '../../i18n/rich';
@@ -40,7 +39,7 @@ export function HarnessSettings() {
           <HarnessScopeView key="project" scope="project" />
         </Tabs.Content>
         <Tabs.Content value="user">
-          <ScopeHarness key="user" tool={tool} scope="user" />
+          <HarnessScopeView key="user" scope="user" />
         </Tabs.Content>
         <Tabs.Content value="all">
           <HarnessInventory />
