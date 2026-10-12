@@ -47,6 +47,10 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   only `AGENTS.md`, the board warns that creating a `CLAUDE.md` makes Claude Code stop reading it. A
   selector shows what Claude Code or Cursor loads.
   For rules and skills, how board runs use them becomes a choice on the row itself.
+- **Harness no longer jumps when you pick an option.** The board-run usage selector and the skill
+  mode selector keep the width of their longest option: changing the value no longer re-wraps the
+  text next to it and pushes the screen around. In a narrow panel, each row's buttons take at most
+  half of it and wrap onto more lines, instead of squeezing the description until it disappears.
 - **Warnings actually in amber.** The warnings on the Git, run and Harness screens asked for a color
   the board did not load and showed up with no color; they now use the palette's amber.
 - **The full harness of each tool.** The board now also finds `AGENTS.md` (and `.claude/AGENTS.md`),

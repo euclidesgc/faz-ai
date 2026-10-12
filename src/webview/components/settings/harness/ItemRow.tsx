@@ -117,6 +117,7 @@ export function ItemRow({ tool, item: i, actions, selected = false, onSelect, ex
           (editable ? (
             <SelectField<SkillMode>
               size="1"
+              steady
               aria-label={t('Modo da skill {name}', { name: i.name })}
               options={MODES.map((m) => ({ ...m, label: t(m.label) }))}
               value={i.mode}
