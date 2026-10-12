@@ -21,6 +21,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   command) got an outline and the buttons on the screen are no longer the small size. At the top, **Ir
   para o board** (Go to the board) is the main button and **Verificar de novo** (Check again) is no
   longer a faint one.
+- **New Projeto tab in the AI harness.** Everything the tool reads in the project folder, in groups:
+  main rules, rules by topic, memory, skills, subagents, commands, hooks, MCP servers, settings and
+  permissions, and output styles. Each item says what it is in one sentence, shows whether it is
+  always loaded or on demand, and has its path, which opens the file in the board editor. Files the
+  tool would read but that do not exist yet (such as `CLAUDE.local.md`) show up with a create button,
+  and the new file opens right away in the editor. A selector shows what Claude Code or Cursor loads.
+  For rules and skills, how board runs use them becomes a choice on the row itself.
 - **The full harness of each tool.** The board now also finds `AGENTS.md` (and `.claude/AGENTS.md`),
   which Claude Code reads when the project has no `CLAUDE.md`; this project's Claude Code auto memory
   (`~/.claude/projects/<project>/memory/`); the organization policy (the `CLAUDE.md` and

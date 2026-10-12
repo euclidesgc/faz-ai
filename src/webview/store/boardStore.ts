@@ -309,6 +309,7 @@ export function useHostSync(): void {
         s.setError(msg.message);
         s.setBackupBusy(null);
       } else if (msg.type === 'notice') s.setNotice(msg.message);
+      else if (msg.type === 'harness.item.created') s.openHarnessFile(msg.path);
       else if (msg.type === 'backup.done') s.setBackupBusy(null);
       else if (msg.type === 'backup.import.summary') {
         s.setBackupBusy(null);

@@ -291,6 +291,8 @@ export type HostToWebview =
   | { type: 'attachment.writeResult'; requestId: string; ok: boolean; error?: string }
   /** resposta a `harness.file.read`: o conteúdo e se o arquivo pode ser alterado pelo board */
   | { type: 'harness.file.readResult'; requestId: string; content?: string; readonly?: boolean; error?: string }
+  /** item do harness criado pela tela: ela abre o arquivo no editor do board */
+  | { type: 'harness.item.created'; path: string }
   /** resposta a `harness.file.write`, correlacionada por `requestId` */
   | { type: 'harness.file.writeResult'; requestId: string; ok: boolean; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */

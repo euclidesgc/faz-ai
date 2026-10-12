@@ -129,8 +129,8 @@ export const shared: Record<string, string> = {
     'The same as the root CLAUDE.md, kept in the .claude folder; also loaded in every conversation.',
   'Suas regras pessoais para este projeto, lidas em toda conversa; ficam fora do repositório.':
     'Your personal rules for this project, read in every conversation; kept out of the repository.',
-  'Regra de um assunto; com `paths` no topo, só entra quando a IA mexe nesses arquivos.':
-    'A rule on one topic; with `paths` at the top, it only loads when the AI works on those files.',
+  'Regra de um assunto; com paths no topo, só entra quando a IA mexe nesses arquivos.':
+    'A rule on one topic; with paths at the top, it only loads when the AI works on those files.',
   'Suas regras pessoais, lidas em toda conversa de qualquer projeto.': 'Your personal rules, read in every conversation of any project.',
   'Sua regra de um assunto, que vale em todos os projetos.': 'Your rule on one topic, applied to every project.',
   'Comando que o Claude Code roda sozinho num evento (antes de editar, ao terminar…); vai no repositório.':

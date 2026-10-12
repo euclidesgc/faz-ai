@@ -142,7 +142,7 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
     }),
     files('instructions', 'project', '.claude/rules', '.md', {
       group: 'topic',
-      hint: 'Regra de um assunto; com `paths` no topo, só entra quando a IA mexe nesses arquivos.',
+      hint: 'Regra de um assunto; com paths no topo, só entra quando a IA mexe nesses arquivos.',
     }),
     file('instructions', 'user', '.claude/CLAUDE.md', {
       group: 'main',
