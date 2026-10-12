@@ -21,6 +21,12 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   command) got an outline and the buttons on the screen are no longer the small size. At the top, **Ir
   para o board** (Go to the board) is the main button and **Verificar de novo** (Check again) is no
   longer a faint one.
+- **The full harness of each tool.** The board now also finds `AGENTS.md` (and `.claude/AGENTS.md`),
+  which Claude Code reads when the project has no `CLAUDE.md`; this project's Claude Code auto memory
+  (`~/.claude/projects/<project>/memory/`); the organization policy (the `CLAUDE.md` and
+  `managed-settings.json` in the system folder, read-only); Cursor's `.cursorignore` and user-folder
+  commands. Each place in the catalog got a group and a simple sentence saying what it is, and
+  `get_harness` returns the group of each item.
 - **Harness files open in the board.** Clicking the path of a rule, skill, agent, command or settings
   file in the AI harness opens the file in a window of the board itself, like attachments: formatted
   Markdown or code, editing with save and cancel, and an **Abrir no editor** (Open in editor) button for

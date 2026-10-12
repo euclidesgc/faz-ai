@@ -71,7 +71,7 @@ export interface Agent {
 }
 
 /** Tipos de componente do harness de uma ferramenta, na ordem em que a tela os mostra. */
-export type HarnessKind = 'instructions' | 'skill' | 'agent' | 'command' | 'hook' | 'mcp' | 'plugin' | 'settings';
+export type HarnessKind = 'instructions' | 'memory' | 'skill' | 'agent' | 'command' | 'hook' | 'mcp' | 'plugin' | 'settings';
 
 /** De onde a ferramenta carrega o item: da pasta do projeto, da pasta do usuário (vale para todos os projetos) ou de um plugin. */
 export type HarnessScope = 'project' | 'user' | 'plugin';
@@ -85,6 +85,7 @@ export const HARNESS_KINDS: { id: HarnessKind; label: string; hint: string }[] =
     label: 'Instruções e regras',
     hint: 'Texto carregado em toda sessão, ou quando a IA mexe em arquivos de um caminho.',
   },
+  { id: 'memory', label: 'Memória', hint: 'Anotações que a própria IA escreve para lembrar entre uma conversa e outra.' },
   { id: 'skill', label: 'Skills', hint: 'Instruções que a IA carrega quando precisa, ou quando o card indica.' },
   { id: 'agent', label: 'Subagentes', hint: 'Ajudantes com instruções próprias, para os quais a ferramenta delega trabalho.' },
   { id: 'command', label: 'Comandos e prompts', hint: 'Prompts prontos, chamados pelo nome.' },
@@ -136,6 +137,8 @@ export interface HarnessItem {
   mode?: SkillMode;
   /** só nas skills: arquivos de apoio da pasta (referências, modelos, scripts), relativos a ela */
   files?: string[];
+  /** índice da fonte em `HARNESS_CATALOG[tool]` de onde o item veio (os de plugin não têm) */
+  source?: number;
   /** valor inteiro da entrada, quando `description` o resume: o comando de um hook, ou a lista (allow, deny, ask) de uma regra de permissão */
   detail?: string;
 }

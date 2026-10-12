@@ -7,7 +7,16 @@ import { scanInventory } from '../src/extension/harnessScan';
 import { HooksAndPermissions } from '../src/extension/hooksAndPermissions';
 import { McpServers } from '../src/extension/mcpServers';
 import { setSkillMode, skillMode } from '../src/extension/skillMode';
-import { HARNESS_CATALOG, createTargets, hookTargets, mcpTargets, permissionTargets } from '../src/shared/harnessCatalog';
+import {
+  HARNESS_CATALOG,
+  HARNESS_GROUPS,
+  claudeProjectKey,
+  createTargets,
+  groupOf,
+  hookTargets,
+  mcpTargets,
+  permissionTargets,
+} from '../src/shared/harnessCatalog';
 
 let root: string;
 let project: string;
@@ -32,6 +41,56 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
 describe('varredura do harness por ferramenta e escopo', () => {
+  it('toda fonte do catálogo diz o grupo e o que é, numa frase', () => {
+    const groups = HARNESS_GROUPS.map((g) => g.id);
+    for (const list of Object.values(HARNESS_CATALOG))
+      for (const src of list) {
+        expect(groups).toContain(src.group);
+        expect(src.hint?.length).toBeGreaterThan(20);
+      }
+  });
+
+  it('Claude Code: AGENTS.md, memória automática do projeto e política da organização (só leitura, sem criar)', () => {
+    const managed = path.join(root, 'politica');
+    write(project, 'AGENTS.md', '# Agentes');
+    write(home, `.claude/projects/${claudeProjectKey(project)}/memory/MEMORY.md`, '- [Uma](uma.md)');
+    write(home, `.claude/projects/${claudeProjectKey(project)}/memory/uma.md`, '---\ndescription: Uma nota\n---\n');
+    write(home, '.claude/projects/-outro-projeto/memory/MEMORY.md', 'de outro projeto');
+    write(managed, 'CLAUDE.md', '# Da empresa');
+    write(managed, 'managed-settings.json', '{}');
+    const items = scanInventory('claude', project, home, managed);
+    const byName = (name: string) => items.find((i) => i.name === name)!;
+    expect(groupOf('claude', byName('AGENTS.md'))).toBe('main');
+    expect(items.filter((i) => i.kind === 'memory').map((i) => i.name)).toEqual(['MEMORY', 'uma']);
+    expect(byName('uma')).toMatchObject({ description: 'Uma nota', scope: 'user' });
+    expect(groupOf('claude', byName('MEMORY'))).toBe('memory');
+    const policy = items.filter((i) => groupOf('claude', i) === 'managed');
+    expect(policy.map((i) => i.location)).toEqual([path.join(managed, 'CLAUDE.md'), path.join(managed, 'managed-settings.json')]);
+    // nem a memória nem a política aparecem como lugar de criar ou destino de cópia
+    expect(createTargets('claude').some((t) => t.label.includes('memory') || (t.label === 'CLAUDE.md' && t.scope === 'user'))).toBe(false);
+    expect(() =>
+      new HarnessOps(project, home).create(
+        'claude',
+        HARNESS_CATALOG.claude.findIndex((s) => s.base === 'managed'),
+        '',
+        '',
+      ),
+    ).toThrow('Não é possível criar um item neste lugar.');
+  });
+
+  it('Cursor: .cursorignore e comandos da pasta do usuário', () => {
+    write(project, '.cursorignore', '.env\n');
+    write(home, '.cursor/commands/revisar.md', 'Revise');
+    const items = scanInventory('cursor', project, home, path.join(root, 'sem-politica'));
+    expect(
+      groupOf(
+        'cursor',
+        items.find((i) => i.name === '.cursorignore')!,
+      ),
+    ).toBe('settings');
+    expect(items.find((i) => i.name === 'revisar')).toMatchObject({ kind: 'command', scope: 'user' });
+  });
+
   it('Claude Code: separa projeto, global e plugins em todos os tipos', () => {
     write(project, 'CLAUDE.md', '# Regras');
     write(project, '.claude/rules/api/rest.md', '---\ndescription: Regras de API\n---\n');

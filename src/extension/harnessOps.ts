@@ -48,7 +48,7 @@ export class HarnessOps {
   /** Cria o item na fonte do catálogo indicada e devolve o caminho do arquivo criado. */
   create(tool: AiTool, source: number, name: string, description: string): string {
     const src = HARNESS_CATALOG[tool][source];
-    if (!src || src.builtin || (src.layout !== 'file' && src.layout !== 'files' && src.layout !== 'skills'))
+    if (!src || src.builtin || src.noCreate || (src.layout !== 'file' && src.layout !== 'files' && src.layout !== 'skills'))
       throw new Error('Não é possível criar um item neste lugar.');
     const root = path.join(this.base(src.scope), src.path);
     let file = root;
