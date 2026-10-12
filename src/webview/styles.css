@@ -683,7 +683,7 @@ button.chip.on:hover:where(:not(:disabled)) {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .checklist li {
   display: flex;
@@ -778,7 +778,7 @@ button.chip.on:hover:where(:not(:disabled)) {
 .tabs-vertical {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .tabs-vertical button {
   text-align: left;
@@ -1098,7 +1098,7 @@ button.ghost.on {
 /* drawer */
 .tabs {
   display: flex;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
   border-bottom: 1px solid var(--border);
 }
 .tabs button {
@@ -1181,7 +1181,7 @@ button.ghost.on {
 .md-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
   padding: var(--sp-4);
   border-bottom: 1px solid var(--border);
   background: var(--col-bg);
@@ -1934,6 +1934,20 @@ button.heartbeat.stopped:hover {
 }
 
 /* requisitos do board: fica no topo, em todas as telas, enquanto faltar alguma coisa */
+/* o ícone de atenção do que falta para o board trabalhar com a IA, na aba Configurações e no Verificar ambiente */
+.requirements-alert {
+  width: 14px;
+  height: 14px;
+  margin-left: var(--sp-4);
+  vertical-align: -2px;
+  color: var(--warn-border);
+}
+.requirements-alert.error {
+  color: var(--error);
+}
+.requirements-alert.recommended {
+  color: var(--muted);
+}
 .banner.requirements {
   margin: var(--sp-8) var(--sp-16) 0;
   display: flex;
@@ -1990,7 +2004,7 @@ button.heartbeat.stopped:hover {
   overflow-wrap: anywhere;
 }
 
-/* Diagnóstico do ambiente: lista de tarefas, um item por ferramenta, com o estado à esquerda */
+/* Diagnóstico do ambiente: uma lista por seção, um item por linha, com o que depende dele aninhado */
 .environment {
   max-width: 980px;
   padding: var(--sp-12) var(--sp-20) var(--sp-20);
@@ -2010,21 +2024,29 @@ button.heartbeat.stopped:hover {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-8);
+  gap: var(--sp-4);
 }
-.env-item {
+/* o que depende do item fica recuado, com uma guia à esquerda */
+.env-list .env-list {
+  margin: var(--sp-4) 0 0 9px;
+  padding-left: var(--sp-16);
+  border-left: 1px solid var(--border);
+}
+.env-row {
   display: flex;
-  gap: var(--sp-8);
-  align-items: flex-start;
-  padding: var(--sp-8) var(--sp-12);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4) var(--sp-8);
+  min-width: 0;
 }
-.env-item > svg {
+.env-row > svg {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  margin-top: 1px;
+  width: 18px;
+  height: 18px;
+}
+.env-name {
+  border-bottom: 1px dotted var(--muted);
+  cursor: help;
 }
 .env-ok {
   color: var(--success);
@@ -2032,103 +2054,42 @@ button.heartbeat.stopped:hover {
 .env-missing {
   color: var(--error);
 }
-.env-recommend {
-  color: var(--warn-border);
-}
 .env-skipped {
   color: var(--muted);
 }
-.env-body {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--sp-6);
+.env-docs {
+  overflow-wrap: anywhere;
 }
-.env-title {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--sp-8);
-}
-.env-body dl {
-  margin: 0;
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--sp-4) var(--sp-12);
-  max-width: 100ch;
-}
-.env-body dt {
-  color: var(--muted);
-}
-.env-body dd {
-  margin: 0;
-}
-/* em tela estreita, o rótulo fica em cima do texto */
-@media (max-width: 560px) {
-  .env-body dl {
-    grid-template-columns: 1fr;
-  }
-  .env-body dd {
-    margin-bottom: var(--sp-4);
-  }
+.env-docs a svg {
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
 }
 .env-fix {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--sp-6);
+  margin: var(--sp-4) 0 0 26px;
 }
 .env-fix p {
   margin: 0;
+  flex-basis: 100%;
   max-width: 100ch;
 }
-.env-prereqs {
+.env-commands {
+  margin: 0;
+  padding-left: var(--sp-20);
+  flex-basis: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-6);
-  align-self: stretch;
+  gap: var(--sp-4);
 }
-.env-prereqs > p {
-  margin: 0;
-}
-.env-prereqs .env-item {
-  padding: var(--sp-6) var(--sp-8);
-}
-.env-os {
-  margin: 0;
-}
-.env-install-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-8);
-}
-.env-install {
+.env-commands li {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-6);
-  padding: var(--sp-12);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-.env-install h3,
-.env-install p,
-.env-install ol {
-  margin: 0;
-}
-.env-script {
-  margin: var(--sp-6) 0 0;
-  padding: var(--sp-8);
-  max-height: 320px;
-  overflow: auto;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  align-items: flex-start;
+  gap: var(--sp-4);
 }
 .env-busy {
   margin: 0;
@@ -2141,18 +2102,6 @@ button.heartbeat.stopped:hover {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-4);
-}
-.env-commands {
-  margin: 0;
-  padding-left: var(--sp-20);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
-}
-.env-body a svg {
-  width: 12px;
-  height: 12px;
-  vertical-align: -1px;
 }
 
 /* avisos flutuantes: não empurram o board nem somem atrás do card aberto */
@@ -2327,7 +2276,7 @@ button:where(:not([class*='rt-'])) {
   gap: var(--sp-6);
 }
 .option-chip {
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .switch-row {
   display: inline-flex;
@@ -2833,7 +2782,7 @@ body.host-web .drawer {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .children li .rt-IconButton {
   margin-left: var(--sp-6);
@@ -3278,7 +3227,7 @@ body.host-web .drawer {
 .metrics-horizon {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 
 /* card 173, painel de métricas: os cinco blocos abaixo da série. Grade auto-fit e tabelas que rolam dentro de si (RF-40) */

@@ -5,6 +5,29 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **The environment check becomes a checklist, with no installer.** **Instalar tudo** (Install
+  everything) is gone: the board no longer installs anything from third parties, only its own MCP and
+  the flow skill. The screen now has three lists, **Necessários** (Required), **Opcionais** (Optional)
+  and **Recomendados** (Recommended), with a ready or missing icon on each item and what depends on
+  another item nested inside it. Each program shows its official site in parentheses and, while it is
+  missing, the official install command to copy (`curl` on Linux and macOS, PowerShell on Windows).
+  Code Review Graph shows inside uv, which installs it and downloads Python when missing. Sign-ins and
+  actions in the project folder (`git init`, the Code Review Graph build, its MCP and semantic search)
+  show the command with a copy button. Each row's hint explains how the board uses the item.
+- **The other AI tool shows under Optional.** In a project on Claude Code, Cursor found on the machine
+  shows with its command line, sign-in, the board's MCP, the skill and its permission level, and vice
+  versa.
+- **Node.js 22 or newer.** The environment check reads the Node.js version and shows it as missing
+  below 22, the version Claude Code asks for and the oldest LTS still supported.
+- **A compact warning instead of the yellow bar.** What is missing for the board to work with the AI no
+  longer takes the top of the board: the **Configurações** (Settings) tab and the **Verificar
+  ambiente** (Check environment) button get a warning icon, and its hint sums up what is missing. The
+  icon turns red when the reason is sign-in. The chat panel, which has no Settings, keeps the bar.
+- **Claude Code sign-in with `claude auth login`.** The sign-in warning suggested `claude login`, which
+  the current Claude Code documentation does not list.
+
 ## 0.34.1
 
 - **A board saved by a newer version no longer half-opens.** After going back to an earlier version

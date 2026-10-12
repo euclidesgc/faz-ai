@@ -143,8 +143,6 @@ const state: BoardState = {
   authExpired: null,
   environment: null,
   environmentFirstRun: false,
-  environmentInstall: null,
-  environmentInstallResult: null,
   harnessInstall: null,
 };
 

@@ -1,9 +1,10 @@
 import { lastSent, posted, renderThemed, seedBoard, sentOf, syncStore } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { act, screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RequirementsBanner, aiBlockedReason } from '../../src/webview/components/RequirementsBanner';
 import { useBoardStore } from '../../src/webview/store/boardStore';
+import { App } from '../../src/webview/App';
 import type { MessageRouter } from '../../src/extension/panel/messageRouter';
 import type { BoardRequirement } from '../../src/shared/requirements';
 
@@ -109,7 +110,7 @@ describe('faixa de requisitos do board', () => {
     expect(screen.getByText(/Nas conversas com o Cursor no editor/)).toBeInTheDocument();
     expect(screen.queryByText(/Sem ela não rodam os botões de IA/)).toBeNull();
     // sem botão que resolva (Node.js, permissão sem o atalho das configurações): a explicação fica
-    expect(screen.getByText(/roda com o Node.js 18 ou mais novo/)).toBeInTheDocument();
+    expect(screen.getByText(/roda com o Node.js 22 ou mais novo/)).toBeInTheDocument();
     expect(screen.getByText('Escolha "Sem restrições".')).toBeInTheDocument();
   });
 });
@@ -164,7 +165,7 @@ describe('login vencido: aviso de erro, item sintético e "Abrir no terminal"', 
     id: 'signin',
     tool: 'claude',
     cli: 'claude',
-    action: { kind: 'command', command: 'claude login', terminal: true },
+    action: { kind: 'command', command: 'claude auth login', terminal: true },
   };
 
   it('com o requisito "signin", a faixa fica com destaque de erro, não de aviso comum', () => {
@@ -186,6 +187,35 @@ describe('login vencido: aviso de erro, item sintético e "Abrir no terminal"', 
     set([SIGNIN]);
     renderThemed(<RequirementsBanner />);
     await userEvent.click(screen.getByRole('button', { name: 'Abrir no terminal' }));
-    expect(sentOf('ui.openTerminal')).toEqual([{ type: 'ui.openTerminal', command: 'claude login' }]);
+    expect(sentOf('ui.openTerminal')).toEqual([{ type: 'ui.openTerminal', command: 'claude auth login' }]);
+  });
+});
+
+describe('aviso compacto do que falta (no lugar da faixa no topo do board)', () => {
+  it('a aba Configurações e o Verificar ambiente ganham o ícone de atenção, e o hint diz o que falta', async () => {
+    set([CLI, MCP]);
+    renderThemed(<App />);
+    // a faixa não aparece mais no board
+    expect(screen.queryByRole('region', { name: 'Requisitos do board' })).toBeNull();
+    const tab = screen.getByRole('button', { name: /Configurações/ });
+    expect(tab).toHaveTextContent('Falta 1 requisito para o board trabalhar com a IA');
+    fireEvent.focus(tab);
+    const hint = await screen.findByRole('tooltip');
+    expect(hint).toHaveTextContent('A linha de comando do Cursor não foi encontrada');
+    expect(hint).toHaveTextContent('Veja como resolver em Configurações → Verificar ambiente.');
+    fireEvent.blur(tab);
+
+    await userEvent.click(tab);
+    // nas Configurações, o mesmo ícone no Verificar ambiente
+    const check = document.querySelector('.settings-side-actions .requirements-alert');
+    expect(check).not.toBeNull();
+  });
+
+  it('login vencido deixa o ícone com destaque de erro; sem nada faltando, não há ícone', () => {
+    setAuthExpired('cursor');
+    renderThemed(<App />);
+    expect(document.querySelector('.requirements-alert.error')).not.toBeNull();
+    setAuthExpired(null);
+    expect(document.querySelector('.requirements-alert')).toBeNull();
   });
 });

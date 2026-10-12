@@ -347,6 +347,7 @@ export const board: Record<string, string> = {
   'Criar card': 'Create card',
 
   // requisitos do board (RequirementsBanner)
+  'Veja como resolver em Configurações → Verificar ambiente.': 'See how to fix it in Settings → Check environment.',
   'Requisitos do board': 'Board requirements',
   'Falta 1 requisito para o board trabalhar com a IA': '1 requirement missing for the board to work with the AI',
   'Faltam {n} requisitos para o board trabalhar com a IA': '{n} requirements missing for the board to work with the AI',
@@ -355,11 +356,11 @@ export const board: Record<string, string> = {
   'Conferido agora: nada mudou.': 'Checked just now: nothing changed.',
   recomendado: 'recommended',
   'Recomendado para a IA enxergar o board nas suas conversas': 'Recommended so the AI sees the board in your conversations',
-  'A linha de comando do {tool} não foi encontrada: veja o aviso no topo do board.':
-    "{tool}'s command line was not found: see the notice at the top of the board.",
-  'A linha de comando do {tool} está sem login: veja o aviso no topo do board.':
-    "{tool}'s command line is not signed in: see the notice at the top of the board.",
-  'O login do {tool} venceu: veja o aviso no topo do board.': "{tool}'s login expired: see the notice at the top of the board.",
+  'A linha de comando do {tool} não foi encontrada: veja em Configurações → Verificar ambiente.':
+    "{tool}'s command line was not found: see Settings → Check environment.",
+  'A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.':
+    "{tool}'s command line is not signed in: see Settings → Check environment.",
+  'O login do {tool} venceu: veja em Configurações → Verificar ambiente.': "{tool}'s login expired: see Settings → Check environment.",
   'Abrir no terminal': 'Open in terminal',
   'Copiar comando': 'Copy command',
   Copiado: 'Copied',
@@ -367,8 +368,8 @@ export const board: Record<string, string> = {
     'Could not copy. Select the command and copy it with the keyboard.',
   'Abrir Harness de IA': 'Open AI harness',
   'Node.js não encontrado': 'Node.js not found',
-  'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 18 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':
-    "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 18 or newer, and it is not on the terminal's PATH. Without it, {tool} cannot reach the board. Install Node.js and click Check again.",
+  'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':
+    "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 22 or newer, and it is not on the terminal's PATH. Without it, {tool} cannot reach the board. Install Node.js and click Check again.",
   'A linha de comando do {tool} não foi encontrada': "{tool}'s command line was not found",
   'Sem ela não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale com o comando abaixo e clique em Verificar de novo.':
     'Without it, the cards\' AI buttons, the board chat, the heartbeat and autonomous mode do not run. The board looked for "{cli}" in the terminal\'s PATH, the usual install folders and the editor extensions. Install it with the command below and click Check again.',

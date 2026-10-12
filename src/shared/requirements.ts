@@ -63,6 +63,12 @@ export interface BoardRequirement {
   action: RequirementAction | null;
 }
 
+/** O comando da CLI de cada ferramenta. */
+export const CLI_COMMAND: Record<AiTool, string> = { claude: 'claude', cursor: 'cursor-agent' };
+
+/** O comando que faz o login na CLI de cada ferramenta (conforme a documentação de cada uma em 2026-10-11). */
+export const LOGIN_COMMAND: Record<AiTool, string> = { claude: 'claude auth login', cursor: 'cursor-agent login' };
+
 /** Sem login a execução pelo board nem começa: usado pelos 4 gatilhos (manual, Refinar com IA, heartbeat, autopiloto). */
 export function blocksExecution(state: { requirements: BoardRequirement[]; authExpired: AiTool | null }): boolean {
   return state.requirements.some((r) => r.id === 'signin') || state.authExpired !== null;

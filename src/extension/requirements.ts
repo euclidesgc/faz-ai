@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool } from '../shared/harness';
-import type { BoardRequirement } from '../shared/requirements';
+import { LOGIN_COMMAND, type BoardRequirement } from '../shared/requirements';
 import type { RunnerPermission } from '../shared/runner';
 import { byPath, samePath } from './samePath';
 import { headlessCommand, headlessUnsupported } from './headless';
@@ -31,10 +31,10 @@ const readJson = (file: string): Record<string, unknown> | null => {
   }
 };
 
-/** O registro do servidor do board num JSON (`mcpServers`). */
-function fromJson(file: string, shown: string): Registered | null {
+/** O registro de um servidor (por padrão, o do board) num JSON (`mcpServers`). */
+function fromJson(file: string, shown: string, server = SERVER): Registered | null {
   const section = readJson(file)?.mcpServers as Record<string, { command?: unknown; args?: unknown }> | undefined;
-  const entry = section?.[SERVER];
+  const entry = section?.[server];
   if (!entry || typeof entry.command !== 'string') return null;
   return {
     file: shown,
@@ -53,19 +53,19 @@ const scopeOf = (shown: string): Registered['scope'] => (shown.startsWith('~') ?
  * mesmos lugares em que a instalação do MCP grava: primeiro o do projeto, que vale sobre o global
  * nas ferramentas, e depois o global. null quando não está registrado.
  */
-export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: string): Registered | null {
+export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: string, server = SERVER): Registered | null {
   const inProject = (rel: string) => path.join(workspaceDir, rel);
   const inHome = (rel: string) => path.join(homeDir, rel);
   switch (tool) {
     case 'claude': {
       // `claude mcp add` grava no projeto (.mcp.json) ou no ~/.claude.json: para o usuário inteiro,
       // ou só para esta pasta (escopo "local", dentro de `projects`)
-      const found = fromJson(inProject('.mcp.json'), '.mcp.json');
+      const found = fromJson(inProject('.mcp.json'), '.mcp.json', server);
       if (found) return found;
       const user = readJson(inHome('.claude.json'));
       const local = byPath(user?.projects as Record<string, Record<string, unknown>> | undefined, workspaceDir);
       for (const section of [local?.mcpServers, user?.mcpServers]) {
-        const entry = (section as Record<string, { command?: unknown; args?: unknown }> | undefined)?.[SERVER];
+        const entry = (section as Record<string, { command?: unknown; args?: unknown }> | undefined)?.[server];
         if (entry && typeof entry.command === 'string')
           return {
             file: '~/.claude.json',
@@ -79,7 +79,7 @@ export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: st
     }
     // o global do Cursor é um processo só para todas as janelas e não sabe qual board atender: não conta
     case 'cursor':
-      return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json');
+      return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json', server);
   }
 }
 
@@ -169,7 +169,7 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
   }
 
   if (cli && executable && (await p.signedIn(tool, executable)) === false)
-    out.push({ id: 'signin', tool, cli, action: { kind: 'command', command: `${cli} login`, terminal: true } });
+    out.push({ id: 'signin', tool, cli, action: { kind: 'command', command: LOGIN_COMMAND[tool], terminal: true } });
 
   // o MCP e a skill do fluxo são necessários em todas as ferramentas: mesmo onde as execuções pelo board
   // levam o servidor sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele

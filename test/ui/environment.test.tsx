@@ -1,6 +1,6 @@
 import { posted, renderThemed, seedBoard, sentOf, syncStore } from './setup';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EnvironmentView } from '../../src/webview/components/EnvironmentView';
 import { RequirementsBanner } from '../../src/webview/components/RequirementsBanner';
@@ -17,95 +17,207 @@ beforeEach(async () => {
   useBoardStore.setState({ view: 'board' });
 });
 
-const report = (checks: EnvCheck[]): EnvironmentReport => ({
-  tool: 'cursor',
-  os: { platform: 'linux', family: 'debian', label: 'Ubuntu 24.04.3 LTS' },
-  checks,
-  checkedAt: Date.now() + 1000,
-});
 const show = (r: EnvironmentReport) =>
   act(() => {
     router.setEnvironment(r);
     syncStore(router);
   });
 
-const MISSING: EnvCheck[] = [
-  {
-    id: 'cli',
-    level: 'required',
-    status: 'missing',
-    requirement: {
+/** O Cursor no projeto, sem login e sem a skill; o Claude Code na máquina; o Code Review Graph sem grafo. */
+const cursor = (skill: EnvCheck['status'] = 'missing'): EnvCheck => ({
+  id: 'tool',
+  tool: 'cursor',
+  status: 'missing',
+  children: [
+    {
       id: 'cli',
       tool: 'cursor',
-      cli: 'cursor-agent',
-      action: { kind: 'command', command: 'curl https://cursor.com/install -fsS | bash' },
+      status: 'ok',
+      version: '2026.09.30',
+      docs: 'https://cursor.com/docs/cli/installation',
+      children: [
+        {
+          id: 'signin',
+          tool: 'cursor',
+          status: 'missing',
+          command: 'cursor-agent login',
+          requirement: {
+            id: 'signin',
+            tool: 'cursor',
+            cli: 'cursor-agent',
+            action: { kind: 'command', command: 'cursor-agent login', terminal: true },
+          },
+        },
+      ],
     },
-  },
-  { id: 'signin', level: 'required', status: 'skipped' },
-  { id: 'node', level: 'required', status: 'ok', version: '22.3.0' },
-  { id: 'skill', level: 'recommended', status: 'missing', fix: { kind: 'installSkill' } },
-  {
-    id: 'crg',
-    level: 'recommended',
-    status: 'missing',
-    fix: { kind: 'commands', commands: ['uv tool install code-review-graph', 'code-review-graph install --platform cursor'] },
-  },
-  { id: 'crg-embeddings', level: 'recommended', status: 'skipped' },
-];
+    { id: 'mcp', tool: 'cursor', status: 'ok', docs: 'https://github.com/euclidesgc/faz-ai#usando-com-ia' },
+    {
+      id: 'skill',
+      tool: 'cursor',
+      status: skill,
+      requirement: skill === 'missing' ? { id: 'skill', tool: 'cursor', action: { kind: 'installSkill' } } : undefined,
+    },
+    { id: 'permission', tool: 'cursor', status: 'ok' },
+  ],
+});
+const report = (o: { skill?: EnvCheck['status']; optional?: boolean } = {}): EnvironmentReport => ({
+  tool: 'cursor',
+  required: [{ id: 'node', status: 'ok', version: '22.11.0', docs: 'https://nodejs.org/en/download' }, cursor(o.skill)],
+  optional:
+    o.optional === false
+      ? []
+      : [
+          {
+            id: 'tool',
+            tool: 'claude',
+            status: 'missing',
+            children: [
+              {
+                id: 'cli',
+                tool: 'claude',
+                status: 'ok',
+                children: [{ id: 'signin', tool: 'claude', status: 'ok', command: 'claude auth login' }],
+              },
+              { id: 'mcp', tool: 'claude', status: 'missing' },
+            ],
+          },
+        ],
+  recommended: [
+    {
+      id: 'crg',
+      status: 'ok',
+      version: '2.3.1',
+      children: [
+        { id: 'crg-graph', status: 'missing', command: 'code-review-graph build' },
+        {
+          id: 'crg-embeddings',
+          status: 'missing',
+          install: [{ command: 'uv tool install --reinstall "code-review-graph[embeddings]"' }],
+          command: 'code-review-graph embed --provider local',
+        },
+      ],
+    },
+  ],
+  checkedAt: Date.now() + 1000,
+});
 
 const item = (title: string) => screen.getByText(title).closest('li')!;
 
 describe('Diagnóstico do ambiente', () => {
-  it('confere ao abrir e mostra a lista separada em necessário e recomendado', () => {
+  it('confere ao abrir e mostra as listas de necessários, opcionais e recomendados, nessa ordem', () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);
     expect(sentOf('environment.check')).toHaveLength(1);
     expect(screen.getByText('Conferindo o ambiente…')).toBeInTheDocument();
-    show(report(MISSING));
-    expect(screen.getByText('Falta 1 item necessário para o board trabalhar com a IA.')).toBeInTheDocument();
-    const required = screen.getByRole('region', { name: 'Necessário' });
-    expect(within(required).getByText('Linha de comando do Cursor')).toBeInTheDocument();
-    expect(within(required).getByText('Pronto · 22.3.0')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Recomendado' })).getByText('Code Review Graph')).toBeInTheDocument();
+    show(report());
+    // o login e a skill: o bloco da ferramenta só resume, não conta
+    expect(screen.getByText('Faltam 2 itens necessários para o board trabalhar com a IA.')).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Necessários', 'Opcionais', 'Recomendados']);
+    const required = screen.getByRole('region', { name: 'Necessários' });
+    expect(within(required).getByText('Cursor (ferramenta do projeto)')).toBeInTheDocument();
+    expect(within(required).getByText('22.11.0')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Opcionais' })).getByText('Claude Code (encontrado na máquina)')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Recomendados' })).getByText('Code Review Graph')).toBeInTheDocument();
   });
 
-  it('cada item diz para que serve, como o board usa e como resolver, com o Saiba mais', async () => {
+  it('o que falta traz os comandos de instalação em ordem; o que está pronto, não', () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);
-    show(report(MISSING));
-    const cli = item('Linha de comando do Cursor');
-    expect(within(cli).getByText('Para que serve')).toBeInTheDocument();
-    expect(within(cli).getByText('curl https://cursor.com/install -fsS | bash')).toBeInTheDocument();
-    expect(within(cli).getByRole('link', { name: /Saiba mais/ })).toHaveAttribute('href', 'https://cursor.com/cli');
-
-    // os comandos do Code Review Graph, em ordem, com o aviso do que o install mexe
-    const crg = item('Code Review Graph');
+    show({
+      ...report(),
+      required: [
+        {
+          id: 'node',
+          status: 'missing',
+          install: [
+            { command: 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash', step: 'nvm' },
+            { command: '. "$HOME/.nvm/nvm.sh"', step: 'nvm-load' },
+            { command: 'nvm install 22', step: 'node' },
+          ],
+        },
+        cursor(),
+      ],
+    });
+    const node = item('Node.js 22 ou mais novo');
+    expect(within(node).getByText('Para instalar, em ordem:')).toBeInTheDocument();
+    // cada passo diz o que faz: o primeiro instala o nvm
+    expect(within(node).getByText('Instala o nvm, o gerenciador de versões do Node.js:')).toBeInTheDocument();
+    expect(within(node).getByText('Instala o Node.js 22 com ele:')).toBeInTheDocument();
+    // cada passo diz o que faz: o primeiro instala o nvm
+    expect(within(node).getByText('Instala o nvm, o gerenciador de versões do Node.js:')).toBeInTheDocument();
+    expect(within(node).getByText('Instala o Node.js 22 com ele:')).toBeInTheDocument();
     expect(
-      within(crg)
+      within(node)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
-    ).toEqual([
-      expect.stringContaining('uv tool install code-review-graph'),
-      expect.stringContaining('code-review-graph install --platform cursor'),
-    ]);
-    expect(within(crg).getByText(/acrescenta instruções de uso ao arquivo de regras/)).toBeInTheDocument();
-    expect(within(crg).getByText(/o código não sai dela/)).toBeInTheDocument();
+    ).toEqual([expect.stringContaining('nvm-sh/nvm'), expect.stringContaining('nvm.sh'), expect.stringContaining('nvm install 22')]);
+    // o Code Review Graph está pronto: o único "Para instalar" dentro dele é o da busca semântica, que falta
+    expect(within(item('Code Review Graph')).getAllByText(/Para instalar/)).toHaveLength(1);
+    expect(within(item('Busca semântica')).getByText('Para instalar:')).toBeInTheDocument();
+  });
 
-    // o que depende de outro item não tem ação ainda
-    expect(within(item('Busca semântica do Code Review Graph')).getByText('Depende do item anterior')).toBeInTheDocument();
-    // a privacidade da busca semântica cita os provedores de nuvem
-    expect(within(item('Busca semântica do Code Review Graph')).getByText(/muitas empresas não permitem/)).toBeInTheDocument();
+  it('sem outra ferramenta na máquina, não há a lista de opcionais', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(report({ optional: false }));
+    expect(screen.queryByRole('region', { name: 'Opcionais' })).toBeNull();
+  });
 
-    await userEvent.click(within(item('Skill do fluxo (faz-ai-fluxo)')).getByRole('button', { name: 'Instalar a skill' }));
-    expect(sentOf('harness.flowSkill.install')).toEqual([
-      { type: 'harness.flowSkill.install', tool: 'cursor', scope: 'user', replace: false },
-    ]);
+  it('cada item tem o estado em palavras e o site entre parênteses', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(report());
+    const node = item('Node.js 22 ou mais novo');
+    expect(within(node).getByText('Pronto:')).toBeInTheDocument();
+    expect(within(node).getByRole('link', { name: /nodejs\.org\/en\/download/ })).toHaveAttribute('href', 'https://nodejs.org/en/download');
+  });
+
+  it('o que depende de outro item aparece dentro dele: o login dentro da CLI', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(report());
+    const cli = within(screen.getByRole('region', { name: 'Necessários' }))
+      .getByText('Linha de comando cursor-agent')
+      .closest('li')!;
+    expect(within(cli).getByText('Login na linha de comando')).toBeInTheDocument();
+    // o login da ferramenta do projeto tem o comando para copiar e o "Abrir no terminal"
+    expect(within(cli).getByText('cursor-agent login')).toBeInTheDocument();
+    expect(within(cli).getByRole('button', { name: 'Copiar comando' })).toBeInTheDocument();
+  });
+
+  it('o hint de cada linha explica como o board usa o item', async () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(report());
+    fireEvent.focus(screen.getByText('Code Review Graph'));
+    expect((await screen.findByRole('tooltip')).textContent).toMatch(/grafo do código/);
+  });
+
+  it('os comandos do Code Review Graph têm copiar, e a busca semântica traz antes o comando de instalar o pacote', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(report());
+    expect(within(item('Grafo deste projeto')).getByText('code-review-graph build')).toBeInTheDocument();
+    const semantic = item('Busca semântica');
+    expect(within(semantic).getByText('code-review-graph embed --provider local')).toBeInTheDocument();
+    expect(within(semantic).getByText('Para instalar:')).toBeInTheDocument();
+    expect(within(semantic).getByText('uv tool install --reinstall "code-review-graph[embeddings]"')).toBeInTheDocument();
+    expect(within(semantic).getByText('Depois:')).toBeInTheDocument();
+  });
+
+  it('o board só tem botão para o que é dele; a outra ferramenta só mostra o estado', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(report());
+    expect(screen.getAllByRole('button', { name: 'Instalar a skill' })).toHaveLength(1);
+    const optional = screen.getByRole('region', { name: 'Opcionais' });
+    expect(within(optional).queryByRole('button', { name: /Instalar/ })).toBeNull();
   });
 
   it('depois de instalar a skill, mostra que está trabalhando e confere de novo sozinho', async () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);
-    show(report(MISSING));
+    show(report());
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.now() + 5000);
     await userEvent.click(within(item('Skill do fluxo (faz-ai-fluxo)')).getByRole('button', { name: 'Instalar a skill' }));
@@ -114,9 +226,8 @@ describe('Diagnóstico do ambiente', () => {
     expect(within(skill).getByText('Aplicando e conferindo de novo…')).toBeInTheDocument();
     expect(within(skill).queryByRole('button', { name: 'Instalar a skill' })).toBeNull();
     // a resposta chega com a skill instalada: o item vira "Pronto"
-    const done = MISSING.map((c) => (c.id === 'skill' ? { id: c.id, level: c.level, status: 'ok' as const } : c));
-    show({ ...report(done), checkedAt: Date.now() + 1 });
-    expect(within(item('Skill do fluxo (faz-ai-fluxo)')).getByText('Pronto')).toBeInTheDocument();
+    show({ ...report({ skill: 'ok' }), checkedAt: Date.now() + 1 });
+    expect(within(item('Skill do fluxo (faz-ai-fluxo)')).getByText('Pronto:')).toBeInTheDocument();
     expect(screen.queryByText('Aplicando e conferindo de novo…')).toBeNull();
     vi.useRealTimers();
   });
@@ -124,13 +235,13 @@ describe('Diagnóstico do ambiente', () => {
   it('"Verificar de novo" roda outra vez e fica desligado até a resposta', async () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);
-    show(report(MISSING));
+    show(report());
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.now() + 5000);
     await userEvent.click(screen.getByRole('button', { name: 'Verificar de novo' }));
     expect(sentOf('environment.check')).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Verificar de novo' })).toBeDisabled();
-    show({ ...report(MISSING), checkedAt: Date.now() + 1 });
+    show({ ...report(), checkedAt: Date.now() + 1 });
     expect(screen.getByRole('button', { name: 'Verificar de novo' })).toBeEnabled();
     vi.useRealTimers();
   });
@@ -159,125 +270,5 @@ describe('Diagnóstico do ambiente', () => {
     router.markEnvironmentSeen();
     expect(seen).toHaveBeenCalledTimes(1);
     expect(router.snapshot().environmentFirstRun).toBe(false);
-  });
-
-  it('os pré-requisitos do Code Review Graph aparecem dentro dele, antes dos comandos dele', () => {
-    syncStore(router);
-    renderThemed(<EnvironmentView />);
-    show(
-      report([
-        ...MISSING,
-        {
-          id: 'uv',
-          parent: 'crg',
-          level: 'recommended',
-          status: 'missing',
-          fix: { kind: 'commands', commands: ['curl -LsSf https://astral.sh/uv/install.sh | sh', 'export PATH="$HOME/.local/bin:$PATH"'] },
-        },
-        { id: 'python', parent: 'crg', level: 'recommended', status: 'skipped' },
-      ]),
-    );
-    expect(screen.getByText('Comandos de instalação para: Ubuntu 24.04.3 LTS')).toBeInTheDocument();
-    const prereqs = screen.getByRole('region', { name: 'Antes, os pré-requisitos' });
-    expect(prereqs.closest('li.env-item')?.querySelector('strong')?.textContent).toBe('Code Review Graph');
-    expect(within(prereqs).getByText('uv')).toBeInTheDocument();
-    expect(within(prereqs).getByText('export PATH="$HOME/.local/bin:$PATH"')).toBeInTheDocument();
-    expect(within(prereqs).getByText('Python 3.10 ou mais novo')).toBeInTheDocument();
-    // fora da lista principal: skill, Code Review Graph e busca semântica, sem o uv e o Python soltos
-    const top = screen.getByRole('region', { name: 'Recomendado' }).querySelectorAll(':scope > ul > li');
-    expect(top).toHaveLength(3);
-  });
-
-  it('com os comandos do sistema, o download vira alternativa e o Windows pede um terminal novo', () => {
-    syncStore(router);
-    renderThemed(<EnvironmentView />);
-    show(
-      report([
-        {
-          id: 'gh',
-          level: 'recommended',
-          status: 'missing',
-          fix: { kind: 'commands', commands: ['winget install --id GitHub.cli -e'], reopenTerminal: true },
-        },
-      ]),
-    );
-    const gh = item('GitHub CLI (gh)');
-    expect(within(gh).getByText('winget install --id GitHub.cli -e')).toBeInTheDocument();
-    expect(within(gh).getByText(/abra um terminal novo/)).toBeInTheDocument();
-    expect(within(gh).getByRole('link', { name: /Ou baixe o instalador/ })).toHaveAttribute('href', 'https://cli.github.com');
-  });
-
-  it('"Instalar o necessário" mostra os passos e o script antes de rodar; depois, o aviso de instalando', async () => {
-    syncStore(router);
-    renderThemed(<EnvironmentView />);
-    show(
-      report([
-        ...MISSING,
-        { id: 'signin', level: 'required', status: 'skipped', fix: { kind: 'commands', commands: ['cursor-agent login'] } },
-      ]),
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'Instalar o necessário' }));
-    const preview = screen.getByRole('region', { name: 'Instalar o necessário' });
-    expect(
-      within(preview)
-        .getAllByRole('listitem')
-        .map((li) => li.textContent),
-    ).toEqual(['Linha de comando do Cursor', 'Login na linha de comando do Cursor']);
-    expect(within(preview).getByText(/sua senha \(sudo\)/)).toBeInTheDocument();
-    expect(preview.querySelector('pre')?.textContent).toContain('cursor-agent login');
-    // nada roda antes da confirmação
-    expect(sentOf('environment.install')).toHaveLength(0);
-    await userEvent.click(within(preview).getByRole('button', { name: 'Rodar no terminal' }));
-    expect(sentOf('environment.install')).toEqual([{ type: 'environment.install', level: 'required' }]);
-
-    act(() => {
-      router.setEnvironmentInstall({ level: 'required', startedAt: Date.now() });
-      syncStore(router);
-    });
-    expect(screen.getByText(/Instalando no terminal "Faz AI: instalação"/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Instalar os recomendados' })).toBeNull();
-  });
-
-  it('"Cancelar" fecha a confirmação sem rodar nada', async () => {
-    syncStore(router);
-    renderThemed(<EnvironmentView />);
-    show(report(MISSING));
-    await userEvent.click(screen.getByRole('button', { name: 'Instalar os recomendados' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-    expect(screen.queryByRole('region', { name: 'Instalar os recomendados' })).toBeNull();
-    expect(sentOf('environment.install')).toHaveLength(0);
-  });
-
-  it('o resultado da instalação mostra o que falhou, com o comando e o erro, e o que foi pulado', async () => {
-    syncStore(router);
-    renderThemed(<EnvironmentView />);
-    show(report(MISSING));
-    act(() => {
-      router.setEnvironmentInstallResult({
-        level: 'recommended',
-        finishedAt: 1,
-        steps: [
-          { id: 'git', status: 'ok' },
-          { id: 'gh', status: 'failed', code: 100, command: 'sudo apt install -y gh', error: 'E: Unable to locate package gh' },
-          { id: 'gh-auth', status: 'skipped', because: 'gh' },
-        ],
-      });
-      syncStore(router);
-    });
-    const panel = screen.getByRole('region', { name: 'Resultado da instalação' });
-    expect(within(panel).getByText(/Não foi possível instalar 1 item/)).toBeInTheDocument();
-    expect(within(panel).getByText('O comando "sudo apt install -y gh" terminou com o código 100.')).toBeInTheDocument();
-    expect(within(panel).getByText('E: Unable to locate package gh')).toBeInTheDocument();
-    expect(within(panel).getByText('Pulado: depende de GitHub CLI (gh), que falhou')).toBeInTheDocument();
-    await userEvent.click(within(panel).getByRole('button', { name: 'Fechar o resultado' }));
-    expect(screen.queryByRole('region', { name: 'Resultado da instalação' })).toBeNull();
-  });
-
-  it('"Corrigir o caminho" grava o caminho completo e confere de novo', async () => {
-    syncStore(router);
-    renderThemed(<EnvironmentView />);
-    show(report([{ id: 'crg-mcp', level: 'recommended', status: 'missing', fix: { kind: 'pinMcp' } }]));
-    await userEvent.click(screen.getByRole('button', { name: 'Corrigir o caminho' }));
-    expect(posted.mock.calls.map(([m]) => m.type).slice(-2)).toEqual(['environment.pinMcp', 'environment.check']);
   });
 });

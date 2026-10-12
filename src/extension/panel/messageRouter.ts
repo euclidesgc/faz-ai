@@ -38,8 +38,6 @@ export interface Origin {
 export interface EnvironmentHooks {
   check(): void;
   seen(): void;
-  /** roda o "Instalar tudo" de um nível; ausente onde não há terminal para rodar (fica o script para copiar) */
-  install?(level: 'required' | 'recommended'): void;
   /** grava o caminho completo dos MCPs que o editor não acha, e confere de novo */
   pinMcp?(): void;
 }
@@ -71,7 +69,6 @@ const bridgeOnly = {
   'requirements.check': viaBridge,
   'environment.check': viaBridge,
   'environment.seen': viaBridge,
-  'environment.install': viaBridge,
   'environment.pinMcp': viaBridge,
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
@@ -124,8 +121,6 @@ export class MessageRouter {
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
   private environmentHooks: EnvironmentHooks | null = null;
-  private environmentInstall: BoardState['environmentInstall'] = null;
-  private environmentInstallResult: BoardState['environmentInstallResult'] = null;
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
 
@@ -183,8 +178,6 @@ export class MessageRouter {
       authExpired: this.authExpired,
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
-      environmentInstall: this.environmentInstall,
-      environmentInstallResult: this.environmentInstallResult,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
     };
   }
@@ -292,25 +285,8 @@ export class MessageRouter {
     this.environmentHooks?.check();
   }
 
-  /** "Instalar tudo" de um nível: quem roda é o host (num terminal do editor). */
-  installEnvironment(level: 'required' | 'recommended'): void {
-    this.environmentHooks?.install?.(level);
-  }
-
   pinEnvironmentMcp(): void {
     this.environmentHooks?.pinMcp?.();
-  }
-
-  /** O "Instalar tudo" começou ou terminou (informado pelo host). */
-  setEnvironmentInstall(state: BoardState['environmentInstall']): void {
-    this.environmentInstall = state;
-    this.notify();
-  }
-
-  /** O resultado do último "Instalar tudo" (informado pelo host ao terminar). */
-  setEnvironmentInstallResult(result: BoardState['environmentInstallResult']): void {
-    this.environmentInstallResult = result;
-    this.notify();
   }
 
   /** A tela abriu sozinha uma vez: nas próximas aberturas, só pelo botão. */

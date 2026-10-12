@@ -39,7 +39,6 @@ export const ui = {
   openTerminal: (command: string) => post({ type: 'ui.openTerminal', command }),
   checkEnvironment: () => post({ type: 'environment.check' }),
   environmentSeen: () => post({ type: 'environment.seen' }),
-  installEnvironment: (level: 'required' | 'recommended') => post({ type: 'environment.install', level }),
   pinMcp: () => post({ type: 'environment.pinMcp' }),
 };
 

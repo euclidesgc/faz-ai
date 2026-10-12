@@ -253,12 +253,10 @@ export type WebviewToHost =
   | { type: 'ui.showChat' }
   /** confere de novo o que falta para o board trabalhar com a ferramenta de IA */
   | { type: 'requirements.check' }
-  /** roda o Diagnóstico do ambiente (o que o board precisa e o que ele usa, com como resolver cada item) */
+  /** roda o Diagnóstico do ambiente (o que o board precisa, o que é opcional e o que ele aproveita) */
   | { type: 'environment.check' }
   /** o Diagnóstico já abriu sozinho nesta máquina: não abre mais na abertura do board */
   | { type: 'environment.seen' }
-  /** "Instalar tudo" de um nível: o host roda o plano do último Diagnóstico num terminal do editor */
-  | { type: 'environment.install'; level: 'required' | 'recommended' }
   /** grava o caminho completo dos MCPs (do board e do Code Review Graph) que o editor não acha */
   | { type: 'environment.pinMcp' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */

@@ -140,9 +140,6 @@ export class HostBridge {
         case 'environment.seen':
           this.router.markEnvironmentSeen();
           return;
-        case 'environment.install':
-          this.router.installEnvironment(msg.level);
-          return;
         case 'environment.pinMcp':
           this.router.pinEnvironmentMcp();
           return;

@@ -4,6 +4,29 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **Diagnóstico do ambiente vira uma lista de conferência, sem instalador.** O **Instalar tudo**
+  saiu: o board não instala mais nada de terceiros, só o próprio MCP e a skill do fluxo. A tela agora
+  tem três listas, **Necessários**, **Opcionais** e **Recomendados**, com um ícone de pronto ou de
+  falta em cada item e o que depende de outro item aninhado dentro dele. Cada programa traz o site
+  oficial entre parênteses e, enquanto falta, o comando de instalação oficial para copiar (`curl` no
+  Linux e no macOS, PowerShell no Windows). O Code Review Graph aparece dentro do uv, que o instala e
+  baixa o Python quando falta. Os logins e as ações na pasta do projeto (`git init`, o build do grafo do
+  Code Review Graph, o MCP dele e a busca semântica) trazem o comando com botão de copiar. O hint de
+  cada linha explica como o board usa o item.
+- **A outra ferramenta de IA aparece em Opcionais.** Num projeto com o Claude Code, o Cursor
+  encontrado na máquina aparece com a linha de comando, o login, o MCP do board, a skill e o nível de
+  permissão dele, e vice-versa.
+- **Node.js 22 ou mais novo.** O Diagnóstico confere a versão do Node.js e mostra falta abaixo da 22,
+  a versão que o Claude Code pede e a LTS mais antiga ainda com suporte.
+- **Aviso compacto no lugar da faixa amarela.** O que falta para o board trabalhar com a IA não ocupa
+  mais o topo do board: a aba **Configurações** e o botão **Verificar ambiente** ganham um ícone de
+  atenção, e o hint dele resume o que falta. O ícone fica vermelho quando o motivo é login. No painel
+  de chat, que não tem as Configurações, a faixa continua.
+- **Login do Claude Code com `claude auth login`.** O aviso de login sugeria `claude login`, que a
+  documentação atual do Claude Code não traz.
+
 ## 0.34.1
 
 - **Board gravado por uma versão mais nova não abre pela metade.** Ao voltar para uma versão

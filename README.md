@@ -272,8 +272,10 @@ MCP do board (global)** da paleta faz a instalação padrão na ferramenta do pr
 4. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
    board", "pegue a história #1 e escreva o PRD" ou "veja o que está pendente no board e dê andamento".
 
-Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, uma faixa amarela fica no topo
-do board, em todas as telas, e no painel de chat. Ela confere o Node.js (o servidor do board roda
+Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, a aba **Configurações** e o
+botão **Verificar ambiente** ganham um ícone de atenção. O hint dele resume o que falta, com o nome
+de cada item, e a explicação com a ação de cada um fica no Diagnóstico do ambiente. No painel de
+chat, que não tem as Configurações, fica uma faixa com os mesmos itens. A conferência olha o Node.js (o servidor do board roda
 com ele), a linha de comando da ferramenta, o login dela (no Cursor por `cursor-agent status`, no
 Claude Code por `claude auth status`), o
 registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
@@ -282,8 +284,7 @@ que não existe mais, para outra pasta ou para a ponte de uma versão anterior, 
 permissão. Cada item diz o efeito e traz a ação: o comando para copiar, **Instalar o MCP do board**
 (abre a seção Servidores MCP da ferramenta), **Corrigir o registro** (um registro quebrado no arquivo
 do projeto vale no lugar do global; corrigir tira ele dali e deixa o global valendo), **Recarregar a
-janela** ou o atalho para o Harness de IA. A faixa não
-fecha: some sozinha quando o último item é resolvido. A conferência roda ao abrir o board, quando a
+janela** ou o atalho para o Harness de IA. O ícone some sozinho quando o último item é resolvido. A conferência roda ao abrir o board, quando a
 ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**,
 que relê também o PATH do terminal (um node instalado com o board aberto é encontrado sem recarregar
 a janela), e diz quando nada mudou.
@@ -291,60 +292,59 @@ a janela), e diz quando nada mudou.
 O MCP do board e a skill do fluxo (`faz-ai-fluxo`) contam como requisito em todas as ferramentas:
 mesmo onde as execuções pelo board levam o MCP sozinhas (Claude, Cursor), a conversa no chat do
 editor ou no terminal depende dele, e a skill é o que faz a IA seguir o fluxo. A falta da skill tem o
-botão **Instalar a skill** na própria faixa. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
+botão **Instalar a skill** no Diagnóstico e na faixa do chat. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
 desligados, com o motivo na dica.
 
-**Login vencido: aviso de erro e retomada sozinha.** Quando o motivo da faixa é login (faltando ou
-vencido no meio de uma execução), ela fica com destaque de erro, em vez do amarelo comum, e ganha o
-botão **Abrir no terminal** ao lado do comando para copiar: o board abre um terminal do editor e roda
+**Login vencido: aviso de erro e retomada sozinha.** Quando o motivo do aviso é login (faltando ou
+vencido no meio de uma execução), o ícone de atenção fica vermelho, em vez do amarelo comum, e o
+item ganha o botão **Abrir no terminal** ao lado do comando para copiar: o board abre um terminal do editor e roda
 o comando ali, mas o login em si é sempre feito por você. Antes de cada chamada da IA (o botão do
 card, o heartbeat e o modo autônomo) o board confere o login de novo; se ele venceu, a execução nem
 começa. Quando o login vence no meio de uma execução, a primeira falha que bater um padrão conhecido ("OAuth session expired", "not logged in",
 "401" etc.) não bloqueia o card: ele volta ao status que tinha, com um comentário curto, e o mesmo
-aviso de erro liga no topo do board — o heartbeat e o modo autônomo não tentam de novo sozinhos
+aviso de erro liga — o heartbeat e o modo autônomo não tentam de novo sozinhos
 enquanto ele estiver ligado. O aviso some e a fila volta a andar sozinha quando o login é confirmado
 de novo (pela conferência periódica, em até 10 segundos depois de ligar, ou por **Já entrei:
 verificar de novo**) ou, quando a conferência não sabe dizer, na primeira execução manual que der
 certo. O Diagnóstico do ambiente mostra o mesmo aviso no item **Login na linha de comando**.
 
-**Diagnóstico do ambiente.** Na primeira abertura do board na máquina, abre sozinha uma lista, no
-estilo do `flutter doctor`, com tudo de que o board precisa e o que ele aproveita. Depois, ela abre
-pelo botão **Verificar ambiente**, nas Configurações, ou por **Ver o diagnóstico completo**, na
-faixa amarela. **Necessário:** Node.js 18 ou mais novo, a linha de comando da ferramenta, o login
-dela, o MCP do board, a skill do fluxo e o nível de permissão (os mesmos itens da faixa, com as
-mesmas ações). **Recomendado:** o Git e um repositório na pasta
-(`git init`), o GitHub CLI e o login dele (`gh auth login`, para o merge automático e o
-acompanhamento dos PRs) e o [Code Review Graph](https://github.com/tirth8205/code-review-graph), um
-grafo do código que a IA consulta em vez de ler arquivos inteiros. Com o Code Review Graph
-instalado, a lista sugere o build do grafo do projeto e a busca semântica. Cada item diz para que
-serve, como o board o usa e o que sai da sua máquina, e traz os comandos para copiar, um botão ou o
-link de download, além do **Saiba mais**. Os comandos de instalação saem do sistema detectado:
-`winget` no Windows, Homebrew ou `xcode-select` no macOS, e `apt`, `dnf` ou `pacman` no Linux (o Node
-pelo `nvm`); numa distribuição desconhecida, fica o link de download. Quando o programa cai numa
-pasta fora do PATH (a CLI do Cursor e o `uv`, em `~/.local/bin`), os comandos incluem o passo que a
-põe no PATH. O Code Review Graph mostra os pré-requisitos dentro dele, na ordem de instalar: o `uv` e
-o Python 3.10 ou mais novo, que o `uv` baixa só para ele, sem mexer no Python do sistema.
+**Diagnóstico do ambiente.** Na primeira abertura do board na máquina, abre sozinha uma lista com
+tudo de que o board precisa e o que ele aproveita. Depois, ela abre pelo botão **Verificar
+ambiente**, nas Configurações (com o ícone de atenção quando falta algo). Cada item tem
+um ícone de pronto ou de falta, e o que depende de outro item aparece dentro dele (o login dentro da
+linha de comando, o grafo dentro do Code Review Graph). Passe o mouse sobre um item para ver como o
+board o usa.
 
-**Instalar tudo.** Os botões **Instalar o necessário** e **Instalar os recomendados** mostram antes
-os passos, em ordem, e o script inteiro. Só depois de **Rodar no terminal** é que eles rodam, num
-terminal do editor à vista: a senha do `sudo` e os logins (`cursor-agent login`, `gh auth login`)
-ficam com você, ali. O script é montado para o sistema detectado (bash no Linux e no macOS,
-PowerShell no Windows) e roda tudo numa sessão só, para o PATH que um passo ajusta valer nos
-seguintes. Um passo que falha não para os outros, só pula os que dependem dele, e no fim a tela mostra
-o resultado de cada passo: instalado, pulado ou não instalado, com o comando, o código de saída e as
-últimas linhas do erro. O que não tem comando (ligar o MCP no Cursor, a permissão) fica listado como
-tarefa sua. No modo navegador, em vez de rodar, a tela dá o script para copiar.
+- **Necessários:** o Node.js 22 ou mais novo e a ferramenta de IA do projeto, com a linha de comando,
+  o login (`claude auth login` ou `cursor-agent login`), o MCP do board, a skill do fluxo e o nível de
+  permissão.
+- **Opcionais:** a outra ferramenta de IA, quando está na máquina (a linha de comando no PATH ou, no
+  Cursor, o próprio editor). Projeto com o Claude Code mostra o Cursor aqui, e vice-versa. A lista só
+  mostra o estado: o board instala o MCP e a skill nela quando ela vira a ferramenta do projeto.
+- **Recomendados:** o Git e um repositório na pasta, o GitHub CLI e o login dele (para o merge
+  automático e o acompanhamento dos PRs) e o [Code Review Graph](https://github.com/tirth8205/code-review-graph),
+  um grafo do código que a IA consulta em vez de ler arquivos inteiros, com o grafo do projeto, o MCP
+  dele e a busca semântica. Enquanto falta, o Code Review Graph aparece dentro do
+  [uv](https://docs.astral.sh/uv/), na ordem de instalar: o uv instala o Code Review Graph
+  (`uv tool install code-review-graph`) e baixa um Python 3.10 ou mais novo só para ele, se faltar.
 
-O chat do editor inicia os MCPs com o PATH de quando o editor abriu: o que foi instalado depois (o
-Node pelo `nvm`, o `uvx` do Code Review Graph) não está nele até o editor fechar e abrir de novo. Por
-isso, no fim do **Instalar tudo**, quando o Node aparece e pelo botão **Corrigir o caminho**, o board
-grava o caminho completo do comando nos registros do `faz-ai` e do `code-review-graph` que o editor
-não acha. O caminho é descoberto na hora, na máquina onde a extensão roda, e o arquivo fica fora do
-git (`.git/info/exclude`). Se o arquivo de MCPs do projeto estiver versionado, o board não grava nele e
-explica as saídas. A busca semântica usa o provedor `local`: o modelo é
-baixado uma vez do Hugging Face e roda na máquina. A tela avisa que os provedores de nuvem
-(`openai`, `google`, `minimax`, `voyage`) mandam trechos do código para terceiros, o que muitas
-empresas não permitem.
+O board não instala nada de terceiros. Cada programa traz, entre parênteses, o site oficial onde você
+encontra como instalar e, enquanto falta, o comando de instalação oficial para copiar, só os neutros,
+que valem em qualquer distribuição: `curl` no Linux e no macOS, PowerShell no Windows (o Node.js pelo
+`nvm`; no Windows, pelo `winget`). O Git e o GitHub CLI não têm um instalador assim e trazem o comando
+do sistema: `xcode-select --install` e `brew install gh` no macOS, `apt`, `dnf` ou `pacman` no Linux
+(com o `sudo apt update` antes, que uma máquina nova precisa) e `winget` no Windows; numa
+distribuição desconhecida, fica só o site. Os logins e as ações na pasta do projeto (`git init`, `gh auth login`, `code-review-graph build`,
+`code-review-graph install --platform …`, `code-review-graph embed --provider local`) também trazem o
+comando com botão de copiar. Só o que é do board tem botão: instalar o MCP
+do board e a skill do fluxo, e abrir a escolha do nível de permissão.
+
+O chat do editor inicia o MCP do board com o PATH de quando o editor abriu: um Node instalado depois
+(pelo `nvm`, por exemplo) não está nele até o editor fechar e abrir de novo. Por isso, quando o Node
+aparece, ou pelo botão **Corrigir o caminho** do item do MCP no Diagnóstico, o board grava o caminho completo do
+comando nos registros do `faz-ai` e do `code-review-graph` que o editor não acha. O caminho é descoberto na hora, na máquina onde
+a extensão roda, e o arquivo fica fora do git (`.git/info/exclude`). Se o arquivo de MCPs do projeto
+estiver versionado, o board não grava nele e explica as saídas.
 
 Fluxo sugerido: a IA lê a história e a instrução da fase, cria uma sub-tarefa para construir o
 documento da fase, anexa o documento à história e pede a revisão pela conversa do card. Você
@@ -1003,8 +1003,8 @@ serve o board no navegador. Os testes cobrem a ativação da extensão (com um e
 git, gh, uv, Code Review Graph nem a CLI do Cursor. É o mesmo Cursor do computador, montado só para
 leitura e sem nenhuma configuração sua, e já vem com a extensão empacotada da branch atual, no
 projeto de teste `meu-app`. A janela abre na sua tela, e os links (login, **Saiba mais**) abrem no
-navegador do computador. Serve para ver o Diagnóstico do ambiente e a instalação de cada item como
-numa máquina nova. Dentro dele, o usuário `dev` tem `sudo` sem senha. Os logins são seus, feitos por
+navegador do computador. Serve para ver o Diagnóstico do ambiente e instalar cada item como numa
+máquina nova. Dentro dele, o usuário `dev` tem `sudo` sem senha. Os logins são seus, feitos por
 você.
 
 | Comando | O que faz |
@@ -1024,7 +1024,7 @@ por exemplo), eles precisam ser refeitos:
 
 | Item | Para que serve | Como obter |
 |---|---|---|
-| Node.js 18+ e git | build, testes e o comando `faz-ai` | instalação normal |
+| Node.js 22+ e git | build, testes e o comando `faz-ai` | instalação normal |
 | `.mcp.json` e `.claude/settings.local.json` | ligam a IA ao board; guardam caminhos da máquina | **Instalar neste projeto** na seção Servidores MCP do Harness de IA |
 | Board e anexos | ficam no armazenamento da extensão, não no repositório | o board da pasta começa vazio na outra máquina |
 | `.env.release` com `OVSX_PAT` | publicar no Open VSX | token em https://open-vsx.org/user-settings/tokens |
