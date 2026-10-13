@@ -164,7 +164,9 @@ A entrega é para a pessoa testar, então o roteiro de testes é parte dela, em 
 1. Escreva a seção **"Como testar"**: o que foi construído, os passos para verificar (comandos,
    telas, dados de exemplo e o resultado esperado em cada passo) e o que ficou de fora. Acrescente-a
    à descrição da história com \`update_card\`, sem apagar o que já está lá.
-2. Envie a branch da história, abra o pull request (se ainda não existir) e registre o endereço com
+2. Se \`phase.decisionRecord\` vier no \`get_card\`, grave antes o registro de decisão no caminho
+   indicado (a decisão da Spec aprovada, as alternativas descartadas e os diagramas) e faça o commit.
+3. Envie a branch da história, abra o pull request (se ainda não existir) e registre o endereço com
    \`set_pull_request\`. O corpo explica a entrega para quem vai revisar o código, nesta ordem:
    - **Objetivo**: o problema e o resultado, em poucas frases;
    - **O que foi feito**: o resumo das mudanças;
@@ -174,7 +176,7 @@ A entrega é para a pessoa testar, então o roteiro de testes é parte dela, em 
      (ex.: um jeito parecido de obter a informação que deixaria a implementação mais complexa) e os
      desvios do plano aprovado;
    - a mesma seção **Como testar**.
-3. Resuma na conversa o que foi feito, aponte o roteiro e chame \`request_review\`.
+4. Resuma na conversa o que foi feito, aponte o roteiro e chame \`request_review\`.
 
 Não faça o merge: ele depende da aprovação da pessoa. Com o merge automático ligado (Configurações →
 Git), a aprovação dela faz o merge e leva a história a Concluído; desligado, a IA move o card aprovado.

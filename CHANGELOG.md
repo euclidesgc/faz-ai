@@ -6,6 +6,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Registros de decisão no repositório.** A nova opção **Faz AI › Git › Registros de decisão**
+  (`fazai.git.decisionRecords`) aponta para uma pasta do repositório; com ela, a Homologação grava ali
+  o registro de decisão da história (contexto, decisão, alternativas descartadas, consequências e
+  diagramas), a partir da Spec aprovada, e o leva no pull request. Desligada por padrão.
 - **Retrabalho no painel de métricas e no `get_metrics`.** O bloco novo **Retrabalho** mostra, por fase,
   as revisões pedidas pela IA, as aprovadas de primeira e os pedidos de ajuste; os pedidos de ajuste
   pelo modelo da execução que pediu a revisão; e quantas histórias concluídas no período já têm um bug

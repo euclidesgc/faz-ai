@@ -652,6 +652,17 @@ approve a story that is in the last column before completion:
 The merge does not happen if the story has no PR recorded or still has open sub-tasks. With
 automatic merge off, approving only marks the card, and the AI moves it to Concluído.
 
+### Decision records
+
+With **Faz AI › Git › Registros de decisão** (decision records, `fazai.git.decisionRecords`) pointing
+to a folder of the repository, such as `docs/decisoes`, Homologação writes there, before opening the
+pull request, the story's decision record: the context, the decision, the discarded alternatives (with
+the reason for each one), the consequences and the program design diagrams, from the approved Spec.
+The file is named `<story number>-<title>.md`, goes in a commit of the story's branch and is cited in
+the PR body. That way the decision lives in the repository, next to the code, and not only in the
+board's database. `get_card` brings the path in `phase.decisionRecord`. Empty, the default, turns it
+off.
+
 ### Automatic merge detection
 
 The board watches each delivered story's pull request and detects when it is merged, concluding the
@@ -1037,7 +1048,7 @@ four sections, in this order:
 | --- | --- |
 | Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
 | Appearance | **Language** (`fazai.appearance.language`), **Theme** (`fazai.appearance.theme`), **Font** (`fazai.appearance.font`) and **Size** (`fazai.appearance.fontSize`), all with User scope — apply to all this person's projects. Statuses (name and color of each status) stay on the board, now in the Workflows tab |
-| Git | The seven `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase). In the editor, the Git tab and the parallel block in the AI harness become a link to these keys; in the browser they stay as editable fields |
+| Git | The eight `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.decisionRecords` (the folder of the [decision records](#decision-records); empty = off). In the editor, the Git tab and the parallel block in the AI harness become a link to these keys; in the browser they stay as editable fields |
 | Backup | Two action links: **Export the board now** and **Import a board**, which trigger the palette commands |
 
 Three new commands in the palette (`Ctrl+Shift+P`): **Faz AI: Open the Environment Diagnostics**,

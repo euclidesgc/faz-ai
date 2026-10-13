@@ -1424,6 +1424,19 @@ describe('vínculos entre cards', () => {
   });
 });
 
+describe('registro de decisão na Homologação', () => {
+  it('com a pasta ligada, a última coluna da IA diz onde gravar o registro da história; desligada, não diz nada', async () => {
+    await call('create_card', { title: 'Exportar CSV', column: 'Homologação' });
+    await call('create_card', { title: 'Outra', column: 'Spec' });
+    expect((await call('get_card', { card: 1 })).data.phase.decisionRecord).toBeUndefined();
+    router.handle({ type: 'settings.board.update', patch: { git: { decisionRecords: 'docs/decisoes' } } });
+    const record = (await call('get_card', { card: 1 })).data.phase.decisionRecord;
+    expect(record.path).toBe('docs/decisoes/0001-exportar-csv.md');
+    expect(record.note).toContain('Alternativas descartadas');
+    expect((await call('get_card', { card: 2 })).data.phase.decisionRecord).toBeUndefined();
+  });
+});
+
 describe('retrabalho pelo get_metrics e no painel', () => {
   const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
 

@@ -200,6 +200,9 @@ export const settings: Record<string, string> = {
   'O merge é feito no GitHub com a sua conta (comando <code>gh</code>) e não pode ser desfeito pelo board.':
     'The merge is done on GitHub with your account (<code>gh</code> command) and cannot be undone by the board.',
   'Tipo de merge': 'Merge type',
+  'Registros de decisão': 'Decision records',
+  'Pasta do repositório onde a Homologação grava o registro de decisão de cada história (ex.: <code>docs/decisoes</code>), a partir da Spec aprovada, e o leva no pull request. Vazio = desligado.':
+    "Repository folder where Homologação writes each story's decision record (for example <code>docs/decisoes</code>), from the approved Spec, and takes it in the pull request. Empty = off.",
   'Requer o GitHub CLI (<code>gh</code>) instalado e autenticado. No modo worktree, a pasta de trabalho da história é removida depois do merge; a branch fica.':
     "Requires the GitHub CLI (<code>gh</code>) installed and authenticated. In worktree mode, the story's working folder is removed after the merge; the branch stays.",
   'Worktree por história': 'Worktree per story',

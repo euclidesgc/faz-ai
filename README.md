@@ -623,6 +623,16 @@ aprova uma história que está na última coluna antes da conclusão:
 O merge não acontece se a história não tiver PR registrado ou ainda tiver sub-tarefas em aberto. Com
 o merge automático desligado, aprovar só marca o card, e a IA o move para Concluído.
 
+### Registros de decisão
+
+Com **Faz AI › Git › Registros de decisão** (`fazai.git.decisionRecords`) apontando para uma pasta
+do repositório, como `docs/decisoes`, a Homologação grava ali, antes de abrir o pull request, o
+registro de decisão da história: o contexto, a decisão, as alternativas descartadas (com o motivo de
+cada uma), as consequências e os diagramas do desenho do programa, a partir da Spec aprovada. O
+arquivo se chama `<número da história>-<título>.md`, vai num commit da branch da história e é citado
+no corpo do PR. Assim a decisão fica no repositório, junto do código, e não só no banco do board. O
+`get_card` traz o caminho em `phase.decisionRecord`. Vazio, o padrão, desliga.
+
 ### Detecção automática de merges
 
 O board observa o pull request de cada história entregue e detecta quando ele é mergeado, concluindo a
@@ -991,7 +1001,7 @@ quatro seções, nesta ordem:
 | --- | --- |
 | Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
 | Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
-| Git | As sete chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
+| Git | As oito chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.decisionRecords` (a pasta dos [registros de decisão](#registros-de-decisão); vazio = desligado). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
 | Backup | Dois links de ação: **Exportar o board agora** e **Importar um board**, que disparam os comandos da paleta |
 
 Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,

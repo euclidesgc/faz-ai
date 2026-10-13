@@ -22,6 +22,7 @@ const GIT_PARALLEL_KEY = 'fazai.git.parallel';
 const GIT_PARALLEL_STORIES_KEY = 'fazai.git.parallelStories';
 const GIT_AUTO_MERGE_KEY = 'fazai.git.autoMerge';
 const GIT_MERGE_METHOD_KEY = 'fazai.git.mergeMethod';
+const GIT_DECISION_RECORDS_KEY = 'fazai.git.decisionRecords';
 
 beforeEach(() => {
   fakeConfig.reset();
@@ -36,6 +37,7 @@ beforeEach(() => {
   fakeConfig.values.default[GIT_PARALLEL_STORIES_KEY] = DEFAULT_RUNNER.parallelStories;
   fakeConfig.values.default[GIT_AUTO_MERGE_KEY] = DEFAULT_GIT.autoMerge;
   fakeConfig.values.default[GIT_MERGE_METHOD_KEY] = DEFAULT_GIT.mergeMethod;
+  fakeConfig.values.default[GIT_DECISION_RECORDS_KEY] = DEFAULT_GIT.decisionRecords;
 });
 
 describe('IdeSettings: ler', () => {
