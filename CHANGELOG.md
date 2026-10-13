@@ -19,6 +19,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   não muda nem limpa o valor, e ele não vira padrão do tipo de card. É a Fase que diz a que fase da
   história a sub-tarefa pertence e que segura o avanço da história. A IA continua gravando a Fase ao
   criar a sub-tarefa (`create_card`) e pode corrigi-la com `update_card`.
+- **Instruções do MCP lidas por inteiro no Claude Code.** O Claude Code corta as instruções de cada
+  servidor MCP em 2.048 caracteres, e as do board tinham 4.316: toda sessão lia só a primeira metade,
+  sem o contexto vazio, as rodadas da Implementação, os testes sem terminal e os documentos das fases.
+  As instruções agora cabem no limite, com o ciclo do card no começo, e o resto foi para onde a IA lê
+  quando precisa: a descrição de `get_card`, `get_board`, `get_models` e `link_cards`, a nota do
+  `model` no `get_card` e a nota nova `subtasksNowNote`, com as rodadas da Implementação. Um teste
+  barra instruções ou descrição de ferramenta acima do limite.
 
 ## 0.36.0
 

@@ -20,6 +20,13 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   can't change or clear the value, and it can't be a card type default. Fase says which phase of the
   story the sub-task belongs to and is what holds the story back from advancing. The AI still sets
   Fase when it creates the sub-task (`create_card`) and can correct it with `update_card`.
+- **MCP instructions read in full in Claude Code.** Claude Code cuts each MCP server's instructions
+  at 2,048 characters, and the board's had 4,316: every session read only the first half, without the
+  empty context, the Implementation rounds, tests without a terminal and the phase documents. The
+  instructions now fit the limit, with the card cycle at the start, and the rest moved to where the AI
+  reads it when it needs it: the descriptions of `get_card`, `get_board`, `get_models` and
+  `link_cards`, the `model` note in `get_card` and the new `subtasksNowNote`, with the Implementation
+  rounds. A test blocks instructions or a tool description over the limit.
 
 ## 0.36.0
 
