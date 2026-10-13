@@ -225,13 +225,14 @@ describe('MetricsView: consulta e estados', () => {
     renderThemed(<MetricsView />);
     answer(lastSent('metrics.query').requestId, panel('2026-09-01', '2026-10-04', { sections: fullSections() }));
     const bodies = [...document.querySelectorAll('.metrics-block-body')];
-    expect(bodies).toHaveLength(6);
+    expect(bodies).toHaveLength(7);
     for (const body of bodies) {
       expect(body).toHaveAttribute('tabindex', '0');
       expect(body).toHaveAttribute('role', 'region');
       expect(body.getAttribute('aria-label')).toMatch(/: área rolável$/);
     }
     expect(screen.getByRole('region', { name: 'Lead time: área rolável' })).toBe(bodies[2]);
+    expect(screen.getByRole('region', { name: 'Retrabalho: área rolável' })).toBe(bodies[3]);
   });
 
   it('erro antes da primeira resposta: só o alerta, sem o "carregando" eterno', () => {

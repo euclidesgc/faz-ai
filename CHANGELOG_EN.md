@@ -7,6 +7,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Rework in the metrics panel and in `get_metrics`.** The new **Retrabalho** (rework) block shows,
+  per phase, the reviews the AI asked for, the ones approved on the first try and the change requests;
+  the change requests by the model of the run that asked for the review; and how many stories done in
+  the period already have a linked bug. Only a person's answer counts. In MCP, `get_metrics` with
+  `rework: true`.
 - **Critical areas (core).** In Settings → Regras (rules), list the paths of the project's core, one
   per line. The AI marks the new **Criticidade** (criticality) field of stories, Núcleo (core) or
   Periferia (periphery), in Spec or Plan, and a core story waits for your approval in the columns that

@@ -26,6 +26,7 @@ import { parseRules } from '../../shared/rules';
 // #172: os tempos e o inventário do painel
 import type { CardEventKind } from '../../shared/log';
 import {
+  EMPTY_REWORK,
   METRICS_ROW_CAP,
   type MetricsDwell,
   type MetricsInventory,
@@ -34,6 +35,7 @@ import {
   type MetricsUsage,
 } from '../../shared/metrics';
 import { DWELL_EVENT_KINDS, leadTimes, phaseDwell, type TimesEventRow, type TimesPeriod } from './times';
+import { panelRework } from './rework';
 // #171: os seis cortes e o ranking por card (METRICS_ROW_CAP e MetricsPanelSections vêm do import de #172)
 import {
   METRICS_BREAKDOWN_DIMS,
@@ -950,18 +952,20 @@ function panelTimesSections(
   range: { startDate: string; endDate: string },
   workflow: string,
   empty: boolean,
-): Pick<MetricsPanelSections, 'dwell' | 'lead' | 'inventory'> {
+): Pick<MetricsPanelSections, 'dwell' | 'lead' | 'inventory' | 'rework'> {
   if (empty)
     return {
       dwell: [],
       lead: { medianMs: null, meanMs: null, counted: 0, unknown: 0, rows: [], omitted: 0 },
       inventory: { measured: inventoryMeasured(db, boardId), tools: [], mcpTools: [], agents: [], skills: [] },
+      rework: EMPTY_REWORK,
     };
   const period: TimesPeriod = { start: dayBoundary(range.startDate, false), end: dayBoundary(range.endDate, true) };
   return {
     dwell: panelDwell(db, boardId, period, workflow),
     lead: panelLead(db, boardId, period, workflow),
     inventory: panelInventory(db, boardId, { startDate: range.startDate, endDate: range.endDate, ...(workflow ? { workflow } : {}) }),
+    rework: panelRework(db, boardId, period, workflow),
   };
 }
 

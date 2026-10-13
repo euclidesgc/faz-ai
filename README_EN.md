@@ -558,6 +558,11 @@ and also in the board opened in the browser.
   period: the median in front, the mean, how many were counted, how many are unknown and the
   sortable list per card. Unknown is a card whose creation date is not in the detail kept (the month
   was discarded or the card predates the log); the date is not estimated.
+- **Rework** ("Retrabalho"). The quality signal that consumption and time don't show: how many reviews
+  the AI asked for in each phase, how many the person approved **on the first try** (the first answer
+  to a card in that phase was the approval) and how many came back with a **change request**, also by
+  the model of the run that asked for the review, and how many stories done in the period already have
+  a linked **Bug**. Only a person's answer counts: autonomous mode's automatic approval is not a review.
 - **Most expensive phases and Most expensive cards** ("Fases mais caras" / "Cards mais caros"). Two
   rankings side by side, in tables you sort by tokens, runs or AI time by clicking the header
   (or with Enter/Space). The default is tokens when the period has measured tokens and AI time when
@@ -602,7 +607,10 @@ used most?". The tool replies with a compact table, optimized to save tokens.
   count of runs and uses (no tokens, which cannot be split among a run's components).
   `effort` and `profile` have tokens.
 - Tokens count in every measured run, from Claude Code and from Cursor. The table has no dollar cost.
-- The panel's times (permanence per phase and lead time) are not in `get_metrics`.
+- The panel's times (permanence per phase and lead time) are not in `get_metrics`. Rework is: with
+  `rework: true` (and, if you want, `start_date` and `end_date`), the answer brings the reviews, the
+  first-try approvals and the change requests per phase and per model, and the done stories with a
+  linked bug.
 - Unmeasured values appear as "-" (never 0).
 - Always tells you when the board's history started and which periods have only monthly totals
   (without per-run detail). Periods outside the retention window (6 months by default) have no detail and aggregate only
