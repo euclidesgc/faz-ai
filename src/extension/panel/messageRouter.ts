@@ -14,6 +14,7 @@ import { agentProfiles } from '../../shared/execution';
 import type { AttachmentStore } from '../attachments';
 import type { HarnessStore } from '../harness';
 import { headlessUnsupported } from '../headless';
+import { boardServerFootprint } from '../mcp/footprint';
 import type { RunResolver } from '../log/eventLog';
 import { getMetrics, getPanelMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
 import type { MetricsPanelQuery, MetricsPanelResult } from '../../shared/metrics';
@@ -171,6 +172,7 @@ export class MessageRouter {
       // os agentes do board são os arquivos marcados: derivados aqui, nunca gravados
       board: { ...s.board, execProfiles: agentProfiles(current.agents, s.harnessSelection, s.board.runner.defaultAgent) },
       harness: current,
+      boardServer: boardServerFootprint(),
       aiRuns: this.aiRuns,
       aiActivity: this.aiActivity,
       heartbeatNextAt: this.heartbeatNextAt,

@@ -26,6 +26,14 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   quando precisa: a descrição de `get_card`, `get_board`, `get_models` e `link_cards`, a nota do
   `model` no `get_card` e a nota nova `subtasksNowNote`, com as rodadas da Implementação. Um teste
   barra instruções ou descrição de ferramenta acima do limite.
+- **Contexto estimado de cada card.** No rodapé do card, um anel discreto mostra quanto da janela de
+  contexto a execução do card ocupa antes de a IA começar; o clique abre o detalhe por grupo
+  (servidores MCP, agentes, rules, skills e o próprio card) e por item, como a janela de contexto do
+  Claude Code. No Claude Code, o servidor do board conta só os nomes das ferramentas e as instruções,
+  e as definições aparecem como sob demanda; os servidores liberados pelo agente aparecem como não
+  medidos. É uma estimativa pelo tamanho do texto, para achar o que pesa antes de rodar, e acompanha o
+  card: a fase da coluna, a conversa e os documentos entram na próxima execução. Ao abrir, o detalhe
+  relê os arquivos do harness e avisa quando algo mudou desde a última leitura.
 
 ## 0.36.0
 

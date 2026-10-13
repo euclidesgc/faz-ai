@@ -7,7 +7,9 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
 import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
-import { createMcpServer, startMcpServer } from '../src/extension/mcp/server';
+import { createMcpServer, MCP_INSTRUCTIONS, startMcpServer } from '../src/extension/mcp/server';
+import { boardServerFootprint } from '../src/extension/mcp/footprint';
+import { toolDefinitions } from '../src/extension/mcp/tools';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { forgetModels, parseCursorModels, rememberModels } from '../src/extension/models';
 
@@ -57,6 +59,28 @@ beforeEach(async () => {
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 describe('servidor MCP', () => {
+  it('as definições medidas sem servidor são as que o tools/list entrega, na mesma ordem', async () => {
+    const listed = (await client.listTools()).tools;
+    const defined = toolDefinitions();
+    expect(defined.map((t) => t.name)).toEqual(listed.map((t) => t.name));
+    for (const [i, t] of defined.entries()) {
+      expect(t.description).toBe(listed[i]!.description);
+      expect(t.inputSchema).toEqual(listed[i]!.inputSchema);
+    }
+  });
+
+  it('o tamanho do servidor do board para o contexto estimado: nomes com prefixo, instruções e definições', () => {
+    const f = boardServerFootprint();
+    const defined = toolDefinitions();
+    expect(f.server).toBe('faz-ai');
+    expect(f.tools).toBe(defined.length);
+    expect(f.names).toBe(defined.reduce((n, t) => n + `mcp__faz-ai__${t.name}\n`.length, 0));
+    expect(f.instructions).toBe(MCP_INSTRUCTIONS.length);
+    expect(f.definitions).toBeGreaterThan(defined.reduce((n, t) => n + t.description.length, 0));
+    // o snapshot leva a medida para a tela
+    expect(router.snapshot().boardServer).toEqual(f);
+  });
+
   it('expõe as ferramentas e descreve o board', async () => {
     const names = (await client.listTools()).tools.map((t) => t.name);
     expect(names).toEqual(

@@ -133,6 +133,7 @@ const state: BoardState = {
   currentUser: 'a',
   harness: EMPTY_HARNESS,
   harnessSelection: [],
+  boardServer: null,
   pendingUpgrade: [],
   chat: EMPTY_CHAT,
   aiRuns: [],

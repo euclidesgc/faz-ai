@@ -471,6 +471,39 @@ Imagens coladas na mensagem viram anexos do card e a IA as recebe.
 - Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo e o fim da
   saída da ferramenta. O log completo está no painel **Saída → Faz AI** (ou no terminal do `faz-ai`).
 
+### Contexto estimado de cada card
+
+No rodapé de cada card do board, um anel discreto mostra quanto da janela de contexto a execução do
+card ocupa antes de a IA começar, com o total ao lado (por exemplo, `5,8 mil`). O clique abre o
+detalhe, no formato da janela de contexto do Claude Code: o total sobre a janela do modelo do card,
+uma barra por grupo e cada item, com quanto ocupa.
+
+- **Servidores MCP.** No Claude Code, a sessão começa só com os nomes das ferramentas e as instruções
+  de cada servidor (cortadas em 2.048 caracteres); as definições completas carregam quando a IA
+  procura a ferramenta e aparecem à parte, como **sob demanda**, fora do total. O board mede o próprio
+  servidor; os servidores que o agente libera aparecem como **não medido**, porque o board não os
+  abre.
+- **Agentes.** As instruções do agente da sessão e, numa história no Claude Code, o nome e a descrição
+  de cada subagente (as instruções de um subagente vão para o contexto dele, não para o da sessão).
+- **Rules e Skills.** As marcadas como **Incluir em todo contexto** e as indicadas no card ou no
+  agente, pelo tamanho do arquivo que a sessão lê.
+- **Card.** Título e descrição, checklist, conversa, instruções e modelo da fase, e os documentos das
+  fases.
+
+É uma estimativa pelo tamanho do texto (cerca de 4 caracteres por token), feita para comparar escolhas
+e achar o que pesa antes de rodar: desmarcar uma skill, tirá-la do card ou trocar o agente muda o
+número na hora. A estimativa acompanha o card: numa coluna em que a IA atua, ela diz a fase e soma as
+instruções dela, e a conversa e os documentos entram conforme crescem. Apagar mensagens diminui só as
+próximas execuções; o que já foi gasto não volta. Ao abrir, o detalhe relê do disco os arquivos do
+harness: se algo mudou desde a última leitura (uma skill global editada fora do board, por exemplo),
+ele avisa e já mostra os números novos; o botão **Reler arquivos** faz o mesmo a pedido. Ficam fora da
+conta o prompt e as ferramentas nativas da própria ferramenta de IA. A
+janela vem do modelo do card (ou do agente): 1M no Fable 5.1, no Opus 5.5 e no Sonnet 5.5, e 200 mil
+no Haiku 4.5. Sem modelo, ou com um modelo de janela desconhecida (como os do Cursor), o anel mostra
+só o total. No Cursor, que não impõe o contexto vazio, o que a ferramenta carrega por conta própria
+também fica de fora, e as definições das ferramentas MCP contam inteiras. O que a execução gastou de
+fato aparece depois, no consumo de cada execução.
+
 ### Consumo e inventário de cada execução
 
 Cada vez que a IA roda (pela conversa, pelo heartbeat ou pelo modo autônomo), o board registra no

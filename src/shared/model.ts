@@ -2,6 +2,7 @@ import type { BoardRequirement } from './requirements';
 import type { EnvironmentReport } from './environment';
 import type { ExecProfile } from './execution';
 import type { ChatState } from './chat';
+import type { McpFootprint } from './contextEstimate';
 import type { AiTool, Harness, InstallPreview } from './harness';
 import type { HarnessSelection } from './harnessSelection';
 import type { ModelOption, ModelRule } from './models';
@@ -254,6 +255,8 @@ export interface BoardState {
   harness: Harness;
   /** o que as execuções do board podem usar do harness (rules, skills e agentes marcados), por projeto */
   harnessSelection: HarnessSelection[];
+  /** o que o servidor MCP do board põe em cada sessão (nomes, instruções e definições das ferramentas), para estimar o contexto de um card; null antes da medição */
+  boardServer: McpFootprint | null;
   /** mudanças que a atualização para o board padrão atual faria; vazio quando não há o que atualizar */
   pendingUpgrade: string[];
   /** chat com a IA do projeto */
