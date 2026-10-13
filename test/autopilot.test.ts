@@ -32,8 +32,10 @@ let runner: {
   started: string[];
   /** a origem que o autopiloto informou em cada start, na mesma ordem de `started` */
   origins: (AiRunOrigin | undefined)[];
+  /** o modo de cada start (fase, resumo), na mesma ordem de `started` */
+  modes: (AiRunMode | undefined)[];
   failToStart: string | null;
-  start(id: string, origin?: AiRunOrigin): void;
+  start(id: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(id: string): void;
   onDidFinish(fn: (id: string, mode?: AiRunMode) => void): void;
   finish(act?: () => void, mode?: AiRunMode): void;
@@ -98,12 +100,14 @@ beforeEach(async () => {
     running: [],
     started: [],
     origins: [],
+    modes: [],
     failToStart: null,
-    start(id, origin) {
+    start(id, origin, mode) {
       if (this.failToStart) throw new Error(this.failToStart);
       this.running.push(id);
       this.started.push(id);
       this.origins.push(origin);
+      this.modes.push(mode);
       router.handle({ type: 'card.status.set', cardId: id, status: 'running' }, { source: 'ai' });
     },
     stop(id) {
@@ -744,6 +748,65 @@ describe('heartbeat e autopiloto', () => {
     owns = false; // o autopiloto não age: o card fica pendente com a IA
     yolo(1);
     expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([2]);
+  });
+});
+
+describe('resumo automático da conversa entre as fases (#441)', () => {
+  const comments = (n: number) => router.snapshot().comments.filter((c) => c.cardId === card(n).id);
+  const say = (n: number, body: string) => ai({ type: 'comment.add', cardId: card(n).id, body });
+
+  it('ao trocar de coluna com a conversa cheia, resume antes da fase; o resumo substitui as mensagens anteriores', () => {
+    create('A', 'Discovery');
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Quero exportar em CSV.' });
+    yolo(1);
+    flush();
+    expect(runner.modes).toEqual([undefined]); // a primeira execução vai direto para a fase
+    // a IA trabalha a fase, conversa bastante e avança a história
+    runner.finish(() => {
+      say(1, 'Li o código.');
+      say(1, 'Decidi usar a biblioteca que o projeto já tem.');
+      say(1, 'Discovery pronto.');
+      move(1, 'PRD');
+    });
+    expect(runner.started).toHaveLength(2);
+    expect(runner.modes[1]).toBe('summarize');
+    expect(log.at(-1)).toContain('resumindo a conversa de #1');
+    const before = comments(1).map((c) => c.id);
+    expect(before).toHaveLength(5); // o pedido + a nota do modo + 3 da IA
+    // o resumo fica, as anteriores saem, e a fase começa em seguida
+    runner.finish(
+      () => ai({ type: 'comment.add', cardId: card(1).id, body: 'Decisões: CSV com a biblioteca atual.', kind: 'summary' }),
+      'summarize',
+    );
+    expect(comments(1).map((c) => c.body)).toEqual(['Decisões: CSV com a biblioteca atual.']);
+    expect(comments(1)[0]!.kind).toBe('summary');
+    expect(runner.started).toHaveLength(3);
+    expect(runner.modes[2]).toBeUndefined();
+    expect(columnName(1)).toBe('PRD');
+  });
+
+  it('conversa curta, sem troca de coluna ou sem mensagem da IA não é resumida; o resumo que falha não trava a fase', () => {
+    create('A', 'Discovery');
+    for (const body of ['Um.', 'Dois.', 'Três.']) router.handle({ type: 'comment.add', cardId: card(1).id, body });
+    yolo(1);
+    flush();
+    // só mensagens da pessoa: é o pedido, vai inteiro
+    runner.finish(() => {
+      say(1, 'Pronto.');
+      move(1, 'PRD');
+    });
+    expect(runner.modes).toEqual([undefined, 'summarize']); // 4 mensagens da pessoa + 1 da IA, nova coluna: resume
+    // a IA não gravou o resumo: a conversa fica como está, e a fase segue sem insistir
+    runner.finish(() => {}, 'summarize');
+    expect(log.at(-2)).toContain('sem resumo gravado');
+    expect(router.snapshot().comments.filter((c) => c.cardId === card(1).id)).toHaveLength(5);
+    expect(runner.modes).toEqual([undefined, 'summarize', undefined]);
+    // na mesma coluna, a conversa que cresce não dispara outro resumo
+    runner.finish(() => {
+      say(1, 'Mais uma.');
+      say(1, 'E outra.');
+    });
+    expect(runner.modes.at(-1)).toBeUndefined();
   });
 });
 

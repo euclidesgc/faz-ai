@@ -15,7 +15,7 @@ export const CARD_STATUSES: { id: CardStatus; label: string; color: string; owne
     owner: 'human',
     hint: 'O trabalho da fase está pronto para ser revisado',
   },
-  { id: 'approved', label: 'Aprovado', color: '#2ecc71', owner: 'ai', hint: 'A IA deve mover o card para a próxima coluna' },
+  { id: 'approved', label: 'Aprovado', color: '#2ecc71', owner: 'ai', hint: 'O card segue para a próxima coluna' },
   { id: 'blocked', label: 'Bloqueado', color: '#e5484d', owner: 'human', hint: 'Há um impedimento' },
 ];
 

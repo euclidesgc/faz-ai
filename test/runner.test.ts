@@ -659,17 +659,17 @@ describe('executor da IA', () => {
     });
 
     it('falha de processo grava o comentário de falha específico do resumo, e o status volta ao anterior', () => {
-      router.handle({ type: 'card.status.set', cardId: storyId, status: 'approved' });
+      router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_answer' });
       runner.start(storyId, 'manual', 'summarize');
       procs[0]!.exit(1);
-      expect(card().status).toBe('approved');
+      expect(card().status).toBe('waiting_answer');
       expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
       expect(lastMessage()!.body).toContain('O resumo da conversa não foi gerado.');
       expect(lastMessage()!.body).toContain('código 1');
 
       runner.start(storyId, 'manual', 'summarize');
       procs[1]!.exit(null, new Error('comando "claude" não encontrado.'));
-      expect(card().status).toBe('approved');
+      expect(card().status).toBe('waiting_answer');
       expect(lastMessage()!.body).toContain('O resumo da conversa não foi gerado.');
       expect(lastMessage()!.body).toContain('não encontrado');
     });
@@ -694,17 +694,17 @@ describe('executor da IA', () => {
   });
 
   it('Refinar com IA que falha não bloqueia o card: o status volta e a falha fica na conversa', () => {
-    router.handle({ type: 'card.status.set', cardId: storyId, status: 'approved' });
+    router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_answer' });
     runner.start(storyId, 'manual', 'refine');
     procs[0]!.exit(1);
-    expect(card().status).toBe('approved');
+    expect(card().status).toBe('waiting_answer');
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
     expect(lastMessage()!.body).toContain('O refinamento do card não terminou');
     expect(lastMessage()!.body).toContain('código 1');
 
     runner.start(storyId, 'manual', 'refine');
     procs[1]!.exit(null, new Error('comando "claude" não encontrado.'));
-    expect(card().status).toBe('approved');
+    expect(card().status).toBe('waiting_answer');
     expect(lastMessage()!.body).toContain('não encontrado');
   });
 

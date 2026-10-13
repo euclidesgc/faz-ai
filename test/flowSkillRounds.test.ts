@@ -33,16 +33,18 @@ describe('rodadas da Implementação', () => {
 });
 
 describe('pendências com a pessoa', () => {
-  it('a skill nunca deixa uma pendência só num comentário: entrega com request_review e pending, mesmo em modo autônomo', () => {
+  it('a skill nunca deixa uma pendência só num comentário: entrega com request_review e pending; no modo autônomo decide e segue', () => {
     expect(FLOW_SKILL.body).toContain('## Pendências com a pessoa');
     expect(FLOW_SKILL.body).toMatch(/nunca fica só num\s+comentário/);
     expect(FLOW_SKILL.body).toContain('## Ao fechar uma fase ou sub-tarefa');
     expect(FLOW_SKILL.body).toContain('**Travado em mim**');
     expect(FLOW_SKILL.body).toMatch(/"Travado em mim" tiver qualquer item[\s\S]*`request_review`[\s\S]*`pending`/);
     const yolo = FLOW_SKILL.body.slice(FLOW_SKILL.body.indexOf('## Modo autônomo'), FLOW_SKILL.body.indexOf('## Quando parar'));
-    expect(yolo).toMatch(/`request_review` com\s+`pending`/);
-    expect(yolo).toContain('mesmo em modo autônomo');
+    expect(yolo).toMatch(/`request_review` com\s+`pending` não segura o card no modo autônomo/);
+    expect(yolo).toContain('Perguntas para você');
+    expect(yolo).toContain('decidido pela IA no modo autônomo');
     expect(MCP_INSTRUCTIONS).toContain('request_review e `pending`');
+    expect(MCP_INSTRUCTIONS).toContain('No modo autônomo nada disso segura o card');
   });
 });
 
@@ -81,6 +83,6 @@ describe('Revisão antes do pull request', () => {
     expect(revisao).toContain('revisor-de-codigo');
     expect(revisao).toMatch(/só passa no teste/);
     expect(revisao).toMatch(/diretriz clara[\s\S]*corrige agora/);
-    expect(revisao).toMatch(/ambíguo[\s\S]*`ask_question`[\s\S]*`pending`/);
+    expect(revisao).toMatch(/ambíguo[\s\S]*`ask_question`[\s\S]*modo autônomo[\s\S]*menos complexo/);
   });
 });

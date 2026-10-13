@@ -179,7 +179,7 @@ export const settings: Record<string, string> = {
   'A IA pode trabalhar no card': 'The AI can work on the card',
   'Uma sessão de IA está trabalhando no card': 'An AI session is working on the card',
   'A IA fez uma pergunta na conversa': 'The AI asked a question in the conversation',
-  'A IA deve mover o card para a próxima coluna': 'The AI should move the card to the next column',
+  'O card segue para a próxima coluna': 'The card moves on to the next column',
   'Há um impedimento': 'There is a blocker',
   'Cada história trabalha numa branch própria, criada pelo board com um nome previsível. As sub-tarefas fazem commits na branch da história. A branch é criada quando a IA chama <code>prepare_workspace</code> (a fase de Implementação padrão pede isso) ou pelo botão no card.':
     "Each story works on its own branch, created by the board with a predictable name. Sub-tasks commit to the story's branch. The branch is created when the AI calls <code>prepare_workspace</code> (the default Implementation phase asks for it) or by the button on the card.",

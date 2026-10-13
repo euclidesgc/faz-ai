@@ -114,11 +114,13 @@ Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `g
 | `running` | IA | `start_work` |
 | `waiting_answer` | Pessoa | `ask_question` |
 | `waiting_review` | Pessoa | `request_review` |
-| `approved` | IA | A pessoa aprovou (não há ferramenta para a IA aprovar) |
+| `approved` | IA | A pessoa aprovou e o board não pôde mover o card (não há ferramenta para a IA aprovar; a aprovação normal já leva o card à próxima coluna) |
 | `blocked` | Pessoa | `block_card`, ou a pessoa bloqueou |
 
 Nas colunas com `requiresApproval` (em `get_board`), `move_card` só leva o card para a frente quando
-o status é `approved`. Voltar de coluna ou cancelar é livre. `update_column` liga e desliga
+o status é `approved`. Voltar de coluna ou cancelar é livre. No modo autônomo, `phase.requiresApproval`
+só vem verdadeiro na coluna até onde a pessoa liberou o modo; `request_review`, com ou sem `pending`,
+vira aprovação na hora nas outras, e a IA é mandada decidir e seguir. `update_column` liga e desliga
 `ai_active` e `requires_approval`.
 
 ### Agentes
@@ -197,7 +199,7 @@ linha de comando da ferramenta aceita é imposto por parâmetro:
 `get_pending_work` é o ponto de partida de uma sessão sem pedido específico. Ele devolve, em
 `forYou`, o que está com a IA:
 
-- `approved`: cards aprovados, para mover para a próxima coluna;
+- `approved`: cards aprovados que o board não pôde mover (a aprovação normal já leva o card à próxima coluna), para mover;
 - `unanswered`: cards em que a pessoa escreveu por último na conversa, com a mensagem;
 - `ready`: cards prontos para trabalhar (sub-tarefas de uma história que está com a pessoa ficam de fora).
 

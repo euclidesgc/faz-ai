@@ -82,12 +82,12 @@ describe('pull request e merge na homologação', () => {
     expect((await call('get_card', { card: 1 })).data.phase.instruction).toContain('set_pull_request');
   });
 
-  it('desligado (padrão): aprovar só marca o card, e a IA o move', async () => {
+  it('desligado (padrão): aprovar não faz merge, e o board leva o card a Concluído (#441)', async () => {
     await call('set_pull_request', { card: 1, url: PR });
     await approve(1);
     expect(calls).toEqual([]);
-    expect(card(1).status).toBe('approved');
-    expect((await call('move_card', { card: 1, column: 'Concluído' })).error).toBe(false);
+    expect(columnOf(1)).toBe('Concluído');
+    expect(card(1).status).toBeNull();
   });
 
   it('ligado: aprovar faz o merge, conclui o card e remove a pasta de trabalho', async () => {
@@ -123,17 +123,20 @@ describe('pull request e merge na homologação', () => {
 
   it('não faz merge sem PR, fora da última coluna, nem com sub-tarefas em aberto', async () => {
     router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true } } });
-    await approve(1); // sem PR registrado
+    await call('create_card', { title: 'Tarefa aberta', parent: 1 }); // #2: segura a conclusão
+    await approve(1); // sem PR registrado: sem merge, e a conclusão é recusada pela sub-tarefa em aberto
     expect(calls).toEqual([]);
+    expect(columnOf(1)).toBe('Homologação');
     expect(card(1).status).toBe('approved');
+    expect(router.snapshot().comments.at(-1)!.body).toContain('não foi para Concluído');
 
-    await call('create_card', { title: 'No Plan', column: 'Plan' }); // #2
-    await call('set_pull_request', { card: 2, url: PR });
-    await approve(2);
+    await call('create_card', { title: 'No Plan', column: 'Plan' }); // #3
+    await call('set_pull_request', { card: 3, url: PR });
+    await approve(3);
     expect(calls).toEqual([]);
+    expect(columnOf(3)).toBe('Implementação'); // aprovada fora da última coluna: só avança
 
     await call('set_pull_request', { card: 1, url: PR });
-    await call('create_card', { title: 'Tarefa aberta', parent: 1 });
     await approve(1);
     expect(calls).toEqual([]);
     expect(card(1).statusReason).toContain('sub-tarefa(s) da história ainda em aberto');

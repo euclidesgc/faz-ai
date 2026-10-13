@@ -346,19 +346,15 @@ function phaseOf(s: BoardState, c: Card) {
         }
       : {}),
     ...decisionRecordOf(s, story, col),
-    // no modo autônomo, a última coluna da IA entrega pelo pull request (não pede aprovação), mesmo no núcleo
-    requiresApproval:
-      (col.requiresApproval && (!story.yolo || (isCoreStory(s, story) && col.id !== lastAiColumn(s, story.workflowId)?.id))) ||
-      isAtYoloStop(s, story),
+    // no modo autônomo só a coluna até onde a pessoa liberou o modo pede aprovação; a última coluna da IA entrega pelo pull request
+    requiresApproval: (col.requiresApproval && !story.yolo) || isAtYoloStop(s, story),
     ...(story.yolo
       ? {
           autonomousNote: isAtYoloStop(s, story)
             ? `Modo autônomo (YOLO) na história ${cardRef(story)} até ${col.name}, a fase atual: é a última que a pessoa liberou para você rodar sozinho. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare: o modo autônomo se desliga e a revisão desta fase é da pessoa.`
-            : col.requiresApproval && isCoreStory(s, story) && col.id !== lastAiColumn(s, story.workflowId)?.id
-              ? `Modo autônomo (YOLO) na história ${cardRef(story)}, que é do núcleo (${CRITICALITY_FIELD} = ${CORE}): mesmo no modo autônomo, esta fase exige a aprovação da pessoa. Faça o trabalho sem perguntas e, ao terminar, chame request_review na história e pare; depois de aprovada, a IA segue sozinha.`
-              : col.id === lastAiColumn(s, story.workflowId)?.id
-                ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
-                : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Siga os padrões do projeto e as regras de arquitetura dele, escolha o caminho menos complexo entre os que os seguem, e registre as decisões na conversa.`,
+            : col.id === lastAiColumn(s, story.workflowId)?.id
+              ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
+              : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde, nem mesmo numa história do núcleo ou com pendência. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Siga os padrões do projeto e as regras de arquitetura dele, escolha o caminho menos complexo entre os que os seguem, responda você mesmo as perguntas do documento da fase (seção "Perguntas para você", com a recomendação) e registre as decisões na conversa.`,
         }
       : col.requiresApproval
         ? { reviewNote: `Ao terminar, chame request_review na história ${cardRef(story)} e pare.` }
@@ -378,7 +374,7 @@ function criticalAreasOf(s: BoardState, c: Card) {
     criticalAreas: {
       paths,
       story: isCoreStory(s, story) ? CORE : (fieldsOf(s, story)[CRITICALITY_FIELD] ?? 'não marcada'),
-      note: `Áreas críticas (o núcleo) do projeto. Na Spec e no Plan, confira se a história mexe nestes caminhos e marque o campo ${CRITICALITY_FIELD} da história com update_card: "${CORE}" se mexe, "${PERIPHERY}" se não. A história do núcleo espera a aprovação da pessoa nas fases que exigem aprovação, mesmo no modo autônomo. Na Revisão, revise com mais rigor os arquivos do diff que estão nestas áreas; no pull request, liste-os à parte em "Como revisar".`,
+      note: `Áreas críticas (o núcleo) do projeto. Na Spec e no Plan, confira se a história mexe nestes caminhos e marque o campo ${CRITICALITY_FIELD} da história com update_card: "${CORE}" se mexe, "${PERIPHERY}" se não. Fora do modo autônomo, a história do núcleo espera a aprovação da pessoa nas fases que exigem aprovação, como qualquer outra; no modo autônomo nada a segura. Na Revisão, revise com mais rigor os arquivos do diff que estão nestas áreas; no pull request, liste-os à parte em "Como revisar".`,
     },
   };
 }

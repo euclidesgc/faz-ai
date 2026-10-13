@@ -899,9 +899,8 @@ describe('status do card e checkpoint de revisão', () => {
       'Só uma pessoa',
     );
     human(1, 'approved');
-    expect(card(1)).toMatchObject({ status: 'approved', statusBy: 'Pessoa' });
-    const moved = (await call('move_card', { card: 1, column: 'Spec' })).data.card;
-    expect(moved).toMatchObject({ column: 'Spec', work: { status: 'ready' } }); // o status recomeça na coluna nova
+    // a aprovação da pessoa leva o card à coluna seguinte na hora, e o status recomeça lá (#441)
+    expect((await call('get_card', { card: 1 })).data).toMatchObject({ column: 'Spec', work: { status: 'ready' } });
 
     // voltar e cancelar são livres; a pessoa move sem aprovação
     expect((await call('move_card', { card: 1, column: 'PRD' })).error).toBe(false);
@@ -988,11 +987,11 @@ describe('status do card e checkpoint de revisão', () => {
     await call('add_comment', { card: 3, body: 'Não depende.' });
     expect(ids((await pending()).forYou.unanswered)).toEqual(['#1']);
 
-    // aprovado vai para o topo da fila; bloqueio feito pela própria pessoa não gera aviso
+    // aprovado vai para a coluna seguinte (Spec), pronto, no topo da fila por estar mais à direita; bloqueio feito pela própria pessoa não gera aviso
     human(1, 'approved');
     p = await pending();
-    expect(ids(p.forYou.approved)).toEqual(['#1']);
-    expect(ids(p.forYou.ready)).toEqual(['#2', '#4']);
+    expect(ids(p.forYou.approved)).toEqual([]);
+    expect(ids(p.forYou.ready)).toEqual(['#2', '#1', '#4']);
     // next não cita mais os nomes dos grupos (approved/unanswered/ready), manda seguir `order`
     expect(p.next).toContain('order');
     const quiet = humanQueueStatuses(router.snapshot());
@@ -1003,10 +1002,11 @@ describe('status do card e checkpoint de revisão', () => {
   });
 
   it('order traz a fila inteira em ordem, com o bug na frente mesmo vindo de outro grupo', async () => {
-    // o bug está pronto e mais abaixo no board; a história está aprovada e mais acima
+    // o bug está pronto e mais abaixo no board; a história está aprovada e mais acima. A aprovação da pessoa
+    // moveria o card (#441); aqui o status é gravado direto, para o grupo "approved" existir na fila
     await call('create_card', { title: 'Falha', type: 'Bug', column: 'Plan' }); // #1, pronto
-    await call('create_card', { title: 'Login', column: 'PRD' }); // #2, vai ser aprovado
-    human(2, 'approved');
+    await call('create_card', { title: 'Login', column: 'PRD' }); // #2, aprovado
+    (router as any).ctx.cards.setStatus(card(2).id, 'approved', '', 'Pessoa');
 
     const p = await pending();
     expect(ids(p.forYou.ready)).toEqual(['#1']);
@@ -1727,25 +1727,23 @@ describe('modo autônomo (YOLO)', () => {
     expect(card(3)).toMatchObject({ yolo: true, yoloUntil: column('Plan').id });
   });
 
-  it('história do núcleo: mesmo no modo autônomo, cada coluna que exige aprovação espera a pessoa', async () => {
+  it('história do núcleo: no modo autônomo segue sem parar, como as outras (#441); fora dele, espera a aprovação como qualquer história', async () => {
     await call('update_rules', { criticalPaths: ['src/db/**', ' src/db/** ', ''] });
     expect(router.snapshot().board.rules.criticalPaths).toEqual(['src/db/**']);
     await call('create_card', { title: 'Migração', column: 'PRD', fields: { Criticidade: 'Núcleo' } });
     setYolo(1, true);
     const before = (await call('get_card', { card: 1 })).data;
     expect(before.criticalAreas).toMatchObject({ paths: ['src/db/**'], story: 'Núcleo' });
-    expect(before.phase.requiresApproval).toBe(true);
-    expect(before.phase.autonomousNote).toContain('do núcleo');
-    expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(true);
+    expect(before.criticalAreas.note).toContain('no modo autônomo nada a segura');
+    expect(before.phase.requiresApproval).toBe(false);
+    expect(before.phase.autonomousNote).toContain('nem mesmo numa história do núcleo');
+    expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(false);
+    expect((await call('move_card', { card: 1, column: 'PRD' })).error).toBe(false);
 
+    // o pedido de revisão vira aprovação na hora, e a IA segue sozinha
     const res = (await call('request_review', { card: 1, summary: 'PRD pronto' })).data;
-    expect(res.card.work.status).toBe('waiting_review');
-    expect(res.next).toContain('História do núcleo');
+    expect(res.card.work.status).toBe('approved');
     expect(card(1).yolo).toBe(true);
-    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('História do núcleo');
-
-    // a pessoa aprova, e a IA segue sozinha
-    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'approved' });
     expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(false);
 
     // a IA não tira a história do núcleo; uma pessoa tira
@@ -1753,12 +1751,12 @@ describe('modo autônomo (YOLO)', () => {
     expect(downgrade.error).toBe(true);
     expect(downgrade.text).toContain('Só uma pessoa tira a história do núcleo');
 
-    // ligar o modo numa história do núcleo que aguarda revisão não a aprova: alguém tem de ler
+    // fora do modo, a revisão é da pessoa; ligar o modo libera a história que aguardava revisão
     setYolo(1, false);
     await call('request_review', { card: 1, summary: 'Spec pronta' });
     expect(card(1).status).toBe('waiting_review');
     setYolo(1, true);
-    expect(card(1).status).toBe('waiting_review');
+    expect(card(1).status).toBe('approved');
 
     // na última coluna da IA, a entrega é o pull request: a fase não pede aprovação, nem no núcleo
     await call('create_card', { title: 'Entrega', column: 'Homologação', fields: { Criticidade: 'Núcleo' } });
@@ -1772,22 +1770,21 @@ describe('modo autônomo (YOLO)', () => {
     expect((await call('get_card', { card: 3 })).data.criticalAreas.story).toBe('Periferia');
   });
 
-  it('request_review com pending fica em waiting_review mesmo em YOLO: a pendência é da pessoa e o status mostra isso', async () => {
+  it('request_review com pending em YOLO não segura o card (#441): vira aprovação, a pendência fica registrada e a IA é mandada decidir', async () => {
     await call('create_card', { title: 'Login', column: 'PRD' });
     setYolo(1, true);
     const approvals: string[] = [];
     router.onDidApprove((id) => approvals.push(id));
 
     const res = (await call('request_review', { card: 1, summary: 'PRD pronto', pending: 'Decidir se o limite fica em 5 ou 10' })).data;
-    expect(res.card.work).toMatchObject({ status: 'waiting_review', with: 'human' });
-    expect(res.next).toContain('pendência está com a pessoa');
-    expect(card(1).status).toBe('waiting_review');
-    const last = (await call('get_card', { card: 1 })).data.comments.at(-1).body;
-    expect(last).toContain('PRD pronto');
-    expect(last).toContain('**Travado em mim**');
-    expect(last).toContain('Decidir se o limite fica em 5 ou 10');
+    expect(res.card.work).toMatchObject({ status: 'approved', with: 'ai' });
+    expect(card(1).status).toBe('approved');
+    const comments = (await call('get_card', { card: 1 })).data.comments;
+    expect(comments.at(-2).body).toContain('**Travado em mim**');
+    expect(comments.at(-2).body).toContain('Decidir se o limite fica em 5 ou 10');
+    expect(comments.at(-1).body).toContain('Decida você mesmo');
     expect(approvals).toEqual([]);
-    expect((await call('get_pending_work', {})).data.withPerson.map((c: any) => c.id)).toContain('#1');
+    expect((await call('get_pending_work', {})).data.withPerson.map((c: any) => c.id)).not.toContain('#1');
   });
 
   it('set_pull_request na última coluna da IA entrega a história YOLO: waiting_review (não approved) e aviso na conversa', async () => {

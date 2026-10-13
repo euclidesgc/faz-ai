@@ -12,11 +12,17 @@ import type { MessageRouter } from './panel/messageRouter';
 const AUTHOR = 'Faz AI';
 /** Execuções seguidas sem nenhum progresso na história antes de o autopiloto desistir e bloquear o card. */
 export const MAX_RUNS_WITHOUT_PROGRESS = 3;
+/**
+ * A partir de quantas mensagens desde o último resumo a conversa da história é resumida ao entrar numa
+ * coluna nova, no modo autônomo (#441): a conversa inteira vai no contexto de cada execução, e as
+ * mensagens das fases anteriores só o incham.
+ */
+export const SUMMARIZE_FROM_COMMENTS = 3;
 
 /** O que o autopiloto precisa do executor: iniciar um card e saber quando termina. */
 export interface AutopilotRunner {
   readonly running: string[];
-  start(cardId: string, origin?: AiRunOrigin): void;
+  start(cardId: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(cardId: string): void;
   onDidFinish(listener: (cardId: string, mode?: AiRunMode) => void): void;
 }
@@ -139,6 +145,23 @@ function storyStep(s: BoardState, story: Card): AutopilotStep {
   return { kind: 'paused', story, reason: `${cardRef(story)} não tem nada pendente com a IA, mas ainda não foi concluído.` };
 }
 
+/** As mensagens da conversa da história depois do último resumo (todas, se não houver resumo). */
+function commentsSinceSummary(s: BoardState, storyId: string) {
+  const all = s.comments.filter((c) => c.cardId === storyId);
+  const last = all.map((c, i) => (c.kind === 'summary' ? i : -1)).reduce((a, b) => Math.max(a, b), -1);
+  return all.slice(last + 1);
+}
+
+/**
+ * A conversa da história merece um resumo antes da próxima execução: há mensagens de sobra desde o último
+ * resumo e pelo menos uma é da IA (o trabalho de uma fase anterior; uma conversa só da pessoa é o pedido,
+ * e vai inteira).
+ */
+export function needsSummary(s: BoardState, story: Card): boolean {
+  const since = commentsSinceSummary(s, story.id);
+  return since.length >= SUMMARIZE_FROM_COMMENTS && since.some((c) => c.source === 'ai');
+}
+
 /** O que muda quando a história avança: coluna, status, PR e o andamento das sub-tarefas. */
 function progressOf(s: BoardState, story: Card): string {
   const kids = childrenOf(s, story.id)
@@ -169,6 +192,12 @@ export class Autopilot {
   private held = false;
   /** `stop()` em andamento: as mudanças do board que a interrupção provoca não religam o autopiloto */
   private stopping = false;
+  /** a coluna da história na última execução de fase que o autopiloto começou: o resumo acontece ao trocar de coluna */
+  private lastRunColumn = new Map<string, string>();
+  /** a coluna em que a conversa de cada história foi resumida por último: um resumo por coluna, mesmo se ele falhar */
+  private summarizedIn = new Map<string, string>();
+  /** resumos em andamento: a quantidade de mensagens quando começou, para apagar só as que o resumo cobre */
+  private summarizing = new Map<string, number>();
 
   constructor(
     private router: MessageRouter,
@@ -263,6 +292,7 @@ export class Autopilot {
     const s = this.router.snapshot();
     const card = s.cards.find((c) => c.id === cardId);
     const story = card && (card.parentId ? s.cards.find((c) => c.id === card.parentId) : card);
+    if (mode === 'summarize' && story && this.summarizing.has(story.id)) this.replaceWithSummary(s, story);
     // refinar e resumir não movem a história de propósito: não contam como execução sem progresso
     if (story?.yolo && this.active && mode !== 'refine' && mode !== 'summarize') this.checkProgress(s, story);
     // decide depois dos demais ouvintes do fim da execução: o heartbeat guarda a vaga para o autopiloto
@@ -290,6 +320,22 @@ export class Autopilot {
       },
       { author: AUTHOR, source: 'ai' },
     );
+  }
+
+  /**
+   * O resumo ficou pronto: as mensagens que ele cobre saem da conversa (#441), como o botão "Apagar
+   * mensagens resumidas" do card faz. Se a IA não gravou o resumo, a conversa fica como está, e a coluna já
+   * marcada em `summarizedIn` evita insistir.
+   */
+  private replaceWithSummary(s: BoardState, story: Card): void {
+    const before = this.summarizing.get(story.id) ?? 0;
+    this.summarizing.delete(story.id);
+    const all = s.comments.filter((c) => c.cardId === story.id);
+    const summary = all.slice(before).find((c) => c.kind === 'summary');
+    if (!summary) return void this.deps.log(`Autopiloto: ${cardRef(story)} sem resumo gravado; a conversa fica como está.`);
+    const prior = all.filter((c) => c.createdAt < summary.createdAt && c.id !== summary.id);
+    for (const c of prior) this.router.handle({ type: 'comment.delete', commentId: c.id }, { author: AUTHOR, source: 'ai' });
+    this.deps.log(`Autopiloto: conversa de ${cardRef(story)} resumida; ${prior.length} mensagem(ns) anterior(es) apagada(s).`);
   }
 
   /** Anuncia, uma vez por história, que uma entrega parou de ocupar a fila e o autopiloto seguiu adiante. */
@@ -336,9 +382,19 @@ export class Autopilot {
         const s = this.router.snapshot();
         const counts = runningByKind(s, this.runner.running);
         for (const r of autopilotRuns(s)) {
-          if (counts[r.activity] >= limitOf(s.board.runner, s.board.git.mode, r.activity)) continue;
-          this.start(r.story);
-          counts[r.activity]++;
+          // a história passou de fase desde a última execução e a conversa está cheia: primeiro o resumo (uma
+          // execução de texto), depois a fase. Uma história que ainda não rodou nesta sessão segue direto
+          const from = this.lastRunColumn.get(r.story.id);
+          const summarize =
+            from !== undefined &&
+            from !== r.story.columnId &&
+            this.summarizedIn.get(r.story.id) !== r.story.columnId &&
+            needsSummary(s, r.story);
+          const activity: ActivityKind = summarize ? 'text' : r.activity;
+          if (counts[activity] >= limitOf(s.board.runner, s.board.git.mode, activity)) continue;
+          if (summarize) this.startSummary(s, r.story);
+          else this.start(r.story);
+          counts[activity]++;
         }
         return;
       }
@@ -352,6 +408,7 @@ export class Autopilot {
       this.deps.log(`Autopiloto: chamando a IA em ${cardRef(story)}.`);
       const s = this.router.snapshot();
       this.progress.set(story.id, { sig: progressOf(s, story), stalls: this.progress.get(story.id)?.stalls ?? 0 });
+      this.lastRunColumn.set(story.id, story.columnId);
       this.runner.start(story.id, 'autopilot');
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
@@ -360,6 +417,21 @@ export class Autopilot {
       this.held = true;
       this.active = false;
       this.publish(reason);
+    }
+  }
+
+  private startSummary(s: BoardState, story: Card): void {
+    this.summarizedIn.set(story.id, story.columnId);
+    try {
+      this.deps.log(`Autopiloto: resumindo a conversa de ${cardRef(story)} antes da próxima fase.`);
+      this.summarizing.set(story.id, s.comments.filter((c) => c.cardId === story.id).length);
+      this.runner.start(story.id, 'autopilot', 'summarize');
+    } catch (e) {
+      // sem resumo a fase segue mesmo assim: o resumo é economia, não requisito
+      this.summarizing.delete(story.id);
+      this.deps.log(
+        `Autopiloto: o resumo de ${cardRef(story)} não começou (${e instanceof Error ? e.message : String(e)}); seguindo sem ele.`,
+      );
     }
   }
 

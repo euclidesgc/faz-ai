@@ -205,7 +205,7 @@ export const board: Record<string, string> = {
   'Uma sessão de IA está trabalhando no card': 'An AI session is working on the card',
   'A IA fez uma pergunta na conversa': 'The AI asked a question in the conversation',
   'O trabalho da fase está pronto para ser revisado': 'The phase work is ready for review',
-  'A IA deve mover o card para a próxima coluna': 'The AI should move the card to the next column',
+  'O card segue para a próxima coluna': 'The card moves on to the next column',
   'Há um impedimento': 'There is a blocker',
   'Sem status': 'No status',
   'A IA não atua nesta coluna': 'The AI does not work in this column',

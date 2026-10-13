@@ -79,9 +79,11 @@ In five minutes you have a task moving on the board, with the AI working on it.
    **Conversa** (conversation) tab. When it finishes, the status changes to **Aguardando
    revisão** (waiting for review): it is your turn. The same happens when the AI leaves something
    depending on you (a decision, an open point): the item shows up in the conversation as **Blocked
-   on you** and the card stays with you, even in autonomous mode.
+   on you** and the card stays with you. Whatever depends on your answer also goes in the
+   **Perguntas para você** (questions for you) section of the phase document, with the alternatives,
+   the AI's recommendation and an `R. >` slot for your answer.
 5. **Review and move on.** Read the phase document, answer, or click **Aprovar** (approve) or
-   **Pedir ajustes** (ask for changes). On approval the story moves on to **PRD**, **Spec**,
+   **Pedir ajustes** (ask for changes). On approval the story moves on right away to **PRD**, **Spec**,
    **Plan** and **Implementação** (implementation), always with the AI producing and you approving.
    The implementation sub-tasks are born in the lower workflow and the AI completes them one by one.
 
@@ -375,7 +377,10 @@ Suggested flow: the AI reads the story and the phase instruction, creates a sub-
 phase document, attaches the document to the story and asks for review in the card's conversation.
 You answer on the card itself:
 
-- **Aprovar** (approve) marks the card as approved, and the AI takes it to the next column.
+- **Aprovar** (approve) takes the card to the next column right away (the status starts over there,
+  Pronto for the AI). It only stays Aprovado, for the AI to move, when the board cannot: the approval
+  that triggers the automatic merge concludes the card after the merge, and a conclusion refused
+  because of an open sub-task leaves a notice in the conversation.
 - **Pedir ajustes** (request changes) sends the card back to the AI with your text in the
   conversation.
 - If the AI asks a question, the card waits for an answer; once you reply in the conversation, it
@@ -708,7 +713,8 @@ approve a story that is in the last column before completion:
    error and stays in Homologação.
 
 The merge does not happen if the story has no PR recorded or still has open sub-tasks. With
-automatic merge off, approving only marks the card, and the AI moves it to Concluído.
+automatic merge off, approving takes the card to Concluído right away (or leaves it Aprovado, with a
+notice in the conversation, if an open sub-task prevents the conclusion).
 
 ### Decision records
 
@@ -834,9 +840,19 @@ story by itself, **without asking for authorization or confirmation on anything*
   last column, opens the pull request, records it with `set_pull_request` and stops there — the
   story waits for your review. Columns that require approval stop holding the card, and the AI's
   review request becomes an approval right away, with its summary recorded in the conversation.
+  Nothing holds the story before the chosen column: neither a pending item (`request_review` with
+  `pending`, which is recorded in the conversation while the AI is told to decide) nor the story
+  being core.
 - **No questions**: the AI does not use `ask_question`; faced with a doubt it decides and records
-  the decision and the reason in the conversation. Only a real impediment (access, environment, a
-  failure it cannot fix) blocks the card.
+  the decision and the reason in the conversation. The phase document's questions are still written
+  in the **Perguntas para você** section, with alternatives and a recommendation, and the AI itself
+  answers them in the `R. >` slot, marking that it decided in autonomous mode. Only a real impediment
+  (access, environment, a failure it cannot fix) blocks the card.
+- **Conversation summarized between phases**: when the story moves to another column with three or
+  more messages since the last summary (at least one from the AI), the autopilot runs **Resumir a
+  conversa** (summarize the conversation) before the new phase and deletes the messages before the
+  summary, so each run's context does not carry the whole conversation. One summary per column; if
+  the AI does not write the summary, the conversation stays and the phase goes on.
 - **By the project's patterns**: since nobody reviews the decisions along the way, the AI follows the
   project's patterns and architecture rules (`CLAUDE.md`, `AGENTS.md`, `DESIGN.md` and the similar
   code that already exists) and, among the paths that follow them, picks the least complex one.
@@ -892,10 +908,10 @@ of the project's core, one pattern per line (for example `src/db/**`). With the 
 **Criticidade** (criticality) field: **Núcleo** (core) if it touches those paths, **Periferia**
 (periphery) if not. You can also mark it by hand.
 
-- **A core story waits for your approval** in the columns that require approval, even in autonomous
-  mode: the AI does the phase's work, asks for review and stops; once you approve, it goes on by
-  itself. The periphery follows the mode as always. The AI can mark a story as Núcleo, but only you
-  take it out, and turning the mode on for a core story waiting for review doesn't approve it.
+- **The mark does not change the flow**: outside autonomous mode a core story waits for your
+  approval in the columns that require approval, like any story; in autonomous mode it goes on
+  without stopping until the chosen column, like the others. The AI can mark a story as Núcleo, but
+  only you take it out.
 - **In Revisão (review) and in the pull request**, the files of the diff that are in the core are
   reviewed more strictly and listed apart in **Como revisar** (how to review).
 - The **Criticidade** field shows on the card, filters the board and can be used in model rules (for
