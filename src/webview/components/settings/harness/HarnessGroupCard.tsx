@@ -193,7 +193,7 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
           )}
         </p>
       )}
-      {scope === 'project' && (g === 'mcp' || g === 'skill') && <BoardInstall key={tool} artifact={g} tool={tool} items={all} />}
+      {scope === 'project' && (g === 'mcp' || g === 'skill') && <BoardInstall key={`board-install:${tool}`} artifact={g} tool={tool} items={all} />}
       {g === 'skill' &&
         scope === 'project' &&
         projectTool &&
@@ -209,14 +209,14 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
             </Button>
           </div>
         )}
-      {g === 'skill' && (open === key('install') || state.harnessInstall) && <InstallSkills key={tool} tool={tool} />}
+      {g === 'skill' && (open === key('install') || state.harnessInstall) && <InstallSkills key={`install-skills:${tool}`} tool={tool} />}
       {open === key('new') && creatable.length > 0 && (
-        <NewItem key={tool} tool={tool} kind={catalog[creatable[0]!.source]!.kind} targets={creatable} onClose={() => onOpen(null)} />
+        <NewItem key={`new-item:${tool}`} tool={tool} kind={catalog[creatable[0]!.source]!.kind} targets={creatable} onClose={() => onOpen(null)} />
       )}
-      {open === key('hook') && hooks.length > 0 && <NewHook key={tool} tool={tool} targets={hooks} onClose={() => onOpen(null)} />}
-      {open === key('mcp') && mcps.length > 0 && <NewMcpServer key={tool} tool={tool} targets={mcps} onClose={() => onOpen(null)} />}
+      {open === key('hook') && hooks.length > 0 && <NewHook key={`new-hook:${tool}`} tool={tool} targets={hooks} onClose={() => onOpen(null)} />}
+      {open === key('mcp') && mcps.length > 0 && <NewMcpServer key={`new-mcp:${tool}`} tool={tool} targets={mcps} onClose={() => onOpen(null)} />}
       {open === key('permission') && permissions.length > 0 && (
-        <NewPermission key={tool} tool={tool} targets={permissions} onClose={() => onOpen(null)} />
+        <NewPermission key={`new-permission:${tool}`} tool={tool} targets={permissions} onClose={() => onOpen(null)} />
       )}
       {agentsTable ? (
         <AgentsTable tool={aiToolInfo(tool)} scope={scope} />
