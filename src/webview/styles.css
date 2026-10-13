@@ -3853,3 +3853,16 @@ div.metrics-breakdown {
 .context-notes p:last-child {
   margin-bottom: 0;
 }
+/* o harness mudou enquanto o detalhe estava aberto (ou desde a última leitura): os números já foram refeitos */
+.context-changed {
+  margin: 0;
+  padding: var(--sp-6) var(--sp-8);
+  border-left: 3px solid var(--warn-border);
+  border-radius: var(--radius-sm);
+  background: var(--warn-bg);
+  color: var(--fg);
+  font-size: var(--fs-xs);
+}
+.context-reread {
+  margin-top: var(--sp-4);
+}

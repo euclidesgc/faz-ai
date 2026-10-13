@@ -445,6 +445,11 @@ export const board: Record<string, string> = {
     "It is an estimate from text size (about {chars} characters per token), not the tool's exact count. It follows the card: it changes with the phase, the agent, the conversation and the documents.",
   'Apagar mensagens da conversa diminui só as próximas execuções: o que já foi gasto não volta.':
     'Deleting conversation messages only lowers the next runs: what was already spent does not come back.',
+  'O harness mudou desde a última leitura: os números já estão atualizados.':
+    'The harness changed since the last read: the numbers are already updated.',
+  'Reler arquivos': 'Reread files',
+  'Relê do disco as rules, as skills e os agentes, para pegar o que foi editado fora do board':
+    'Rereads the rules, skills and agents from disk, to pick up what was edited outside the board',
   'Fora da conta: o prompt e as ferramentas nativas do Claude Code, e as ferramentas dos servidores liberados pelo agente.':
     "Not counted: Claude Code's own prompt and built-in tools, and the tools of the servers the agent allows.",
   'Fora da conta: o que o Cursor carrega por conta própria (rules, skills e servidores configurados nele).':

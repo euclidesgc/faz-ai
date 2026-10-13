@@ -494,7 +494,10 @@ uma barra por grupo e cada item, com quanto ocupa.
 e achar o que pesa antes de rodar: desmarcar uma skill, tirá-la do card ou trocar o agente muda o
 número na hora. A estimativa acompanha o card: numa coluna em que a IA atua, ela diz a fase e soma as
 instruções dela, e a conversa e os documentos entram conforme crescem. Apagar mensagens diminui só as
-próximas execuções; o que já foi gasto não volta. Ficam fora da conta o prompt e as ferramentas nativas da própria ferramenta de IA. A
+próximas execuções; o que já foi gasto não volta. Ao abrir, o detalhe relê do disco os arquivos do
+harness: se algo mudou desde a última leitura (uma skill global editada fora do board, por exemplo),
+ele avisa e já mostra os números novos; o botão **Reler arquivos** faz o mesmo a pedido. Ficam fora da
+conta o prompt e as ferramentas nativas da própria ferramenta de IA. A
 janela vem do modelo do card (ou do agente): 1M no Fable 5.1, no Opus 5.5 e no Sonnet 5.5, e 200 mil
 no Haiku 4.5. Sem modelo, ou com um modelo de janela desconhecida (como os do Cursor), o anel mostra
 só o total. No Cursor, que não impõe o contexto vazio, o que a ferramenta carrega por conta própria

@@ -1,4 +1,4 @@
-import { useMemo, type SyntheticEvent } from 'react';
+import { useEffect, useMemo, useState, type SyntheticEvent } from 'react';
 import { Popover } from '@radix-ui/themes';
 import {
   CHARS_PER_TOKEN,
@@ -11,7 +11,8 @@ import type { Card } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { dt, t } from '../../i18n';
 import { formatCompact, formatNumber, intlLocale } from '../metrics/format';
-import { IconChevronRight } from '../ui';
+import { harness } from '../../commands';
+import { Button, IconChevronRight } from '../ui';
 
 // o clique no anel e no painel não arrasta, não seleciona nem abre o card
 const keep = (e: SyntheticEvent) => e.stopPropagation();
@@ -123,8 +124,20 @@ export function ContextGauge({ card }: { card: Card }) {
 export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
   // sem janela conhecida, a barra divide o próprio total
   const scale = e.window ?? e.total;
+  // o que vem do harness (servidores, agentes, rules e skills), para notar quando os arquivos mudaram
+  const harnessPart = JSON.stringify(e.groups.filter((g) => g.id !== 'card'));
+  const [opened] = useState(harnessPart);
+  // um arquivo editado fora do board (uma skill global, no modo navegador) só entra quando o board relê
+  // o disco: o detalhe relê ao abrir, e o resultado chega como um estado novo do board
+  useEffect(() => harness.refresh(), []);
+  const changed = harnessPart !== opened;
   return (
     <div className="context-detail">
+      {changed && (
+        <p className="context-changed" role="status">
+          {t('O harness mudou desde a última leitura: os números já estão atualizados.')}
+        </p>
+      )}
       <div className="context-head">
         <span className="context-title">{t('Contexto estimado')}</span>
         <span className="context-total">
@@ -211,6 +224,15 @@ export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
               : t('O card não tem modelo: sem a janela de contexto, não há porcentagem.')}
           </p>
         )}
+        <Button
+          variant="ghost"
+          size="small"
+          className="context-reread"
+          title={t('Relê do disco as rules, as skills e os agentes, para pegar o que foi editado fora do board')}
+          onClick={() => harness.refresh()}
+        >
+          {t('Reler arquivos')}
+        </Button>
       </div>
     </div>
   );
