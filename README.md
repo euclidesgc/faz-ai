@@ -171,6 +171,8 @@ pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do
 
 **Cards colapsados.** Você pode colapsar cards para enxergar mais linhas de uma coluna na mesma tela. Um card colapsado mostra só o título, mas continua exibindo o LED da IA (se ela está trabalhando) e a borda de status (se o card espera por você), para você varrer o board de relance e saber o que precisa de atenção. O colapso pode ser aplicado em quatro escopos: um card isolado (botão no próprio card), todos os cards de uma coluna (item no menu de ações da coluna), todos os cards do board (botão na barra de filtros) ou só os cards selecionados (botão na barra de seleção múltipla). O estado fica lembrado entre sessões.
 
+**Selecionar todos de uma coluna.** No menu ⋯ de uma coluna de histórias, **Selecionar todos** marca as histórias visíveis da coluna (o filtro ativo vale). Com a seleção feita, o mesmo menu oferece **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** e **Mandar selecionados para a lixeira**, cada uma com uma confirmação só para o lote; **Limpar seleção** desmarca tudo. A seleção vale para uma coluna por vez: marcar um card de outra coluna substitui a seleção. Na ação em lote, uma história com sub-tarefa em aberto não é concluída (as outras seguem), e mover para uma coluna de cancelamento cancela as sub-tarefas em aberto.
+
 ### Vínculos entre cards
 
 Além das sub-tarefas, qualquer card pode ser vinculado a outro, de qualquer workflow, em **Vínculos**
