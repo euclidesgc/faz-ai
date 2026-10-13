@@ -70,6 +70,11 @@ describe('i18n do host: mensagens preenchidas', () => {
       'Os tipos de card do campo "Criticidade" são mantidos pelo board.',
       'The card types of the "Criticidade" field are kept by the board.',
     ],
+    ['O campo "Fase" é preenchido pelo board e pela IA, não à mão.', 'The "Fase" field is filled in by the board and the AI, not by hand.'],
+    [
+      'O campo "Fase" não tem valor padrão por tipo: o board o preenche em cada card.',
+      'The "Fase" field has no default value per type: the board fills it in on each card.',
+    ],
     ['Pasta não encontrada: /home/ana/skills', 'Folder not found: /home/ana/skills'],
     ['Não foi possível clonar https://github.com/a/b.git: timeout', 'Could not clone https://github.com/a/b.git: timeout'],
     ['Skill não encontrada na origem: revisar', 'Skill not found in the source: revisar'],

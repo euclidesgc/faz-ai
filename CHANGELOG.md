@@ -15,6 +15,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   sub-tarefas na Fase. No card aberto, os campos personalizados ficam na seção própria, abaixo dos
   campos do board. Pelo MCP, `get_board` marca esses campos com `board: true`, e `update_field`,
   `delete_field` e `create_field` recusam o que quebraria o uso deles.
+- **A Fase da sub-tarefa é do board e da IA.** No card aberto ela aparece só para leitura: a pessoa
+  não muda nem limpa o valor, e ele não vira padrão do tipo de card. É a Fase que diz a que fase da
+  história a sub-tarefa pertence e que segura o avanço da história. A IA continua gravando a Fase ao
+  criar a sub-tarefa (`create_card`) e pode corrigi-la com `update_card`.
 
 ## 0.36.0
 

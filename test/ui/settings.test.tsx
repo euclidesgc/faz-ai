@@ -35,6 +35,17 @@ describe('TypesSettings', () => {
     expect(screen.queryByText('Texto difícil de ler nesta cor.')).toBeNull();
   });
 
+  it('os padrões da Sub-tarefa não oferecem a Fase, que o board preenche em cada card', () => {
+    render(
+      <Theme>
+        <TypesSettings />
+      </Theme>,
+    );
+    const defaults = within(screen.getByLabelText('Padrões do tipo Sub-tarefa'));
+    expect(defaults.queryByText('Fase')).toBeNull();
+    expect(defaults.getByText('Esforço da atividade')).toBeInTheDocument();
+  });
+
   it('cor com pouco contraste mostra o aviso e as sugestões; um clique aplica a cor sugerida', async () => {
     const t = useBoardStore.getState().state!.cardTypes[0]!;
     board.router.handle({ type: 'settings.type.update', typeId: t.id, patch: { color: '#00aaaa' } });

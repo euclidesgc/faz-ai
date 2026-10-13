@@ -1,4 +1,4 @@
-import { boardFieldNamed, fieldChangeBlocker, newFieldBlocker } from '../../../shared/boardFields';
+import { boardFieldNamed, fieldChangeBlocker, newFieldBlocker, typeDefaultsBlocker } from '../../../shared/boardFields';
 import type { Id } from '../../../shared/model';
 import { workflowDeleteBlocker } from '../../../shared/selectors';
 import { upgradeBoard } from '../../db/boardTemplate';
@@ -24,6 +24,8 @@ export const boardSettingsHandlers = {
     return true;
   },
   'settings.type.update': (msg, ctx) => {
+    const blocker = msg.patch.defaults && typeDefaultsBlocker(ctx.state(), msg.typeId, msg.patch.defaults);
+    if (blocker) throw new Error(blocker);
     ctx.settings.updateType(msg.typeId, msg.patch);
     if (msg.patch.defaultWorkflowId !== undefined) followBoardFields(ctx, msg.typeId);
     return true;

@@ -314,6 +314,26 @@ describe('CardDrawer', () => {
     syncStore(board.router);
   });
 
+  it('na sub-tarefa, a Fase aparece só para leitura', () => {
+    const fase = snap().fieldDefs.find((f) => f.name === 'Fase')!;
+    board.router.handle({ type: 'field.setValue', cardId: board.subId, fieldId: fase.id, value: 'Spec' }, { source: 'ai' });
+    syncStore(board.router);
+    useBoardStore.getState().openCard(board.subId);
+    render(
+      <Theme>
+        <CardDrawer cardId={board.subId} />
+      </Theme>,
+    );
+    const fields = screen.getByRole('region', { name: 'Campos' });
+    expect(within(fields).queryByRole('combobox', { name: 'Fase' })).toBeNull();
+    expect(within(fields).getByLabelText('Fase')).toHaveTextContent('Spec');
+    expect(within(fields).getByText('definida pelo board')).toBeInTheDocument();
+    // os outros campos do board seguem editáveis
+    expect(within(fields).getByRole('combobox', { name: 'Esforço da atividade' })).toBeInTheDocument();
+    board.router.handle({ type: 'field.setValue', cardId: board.subId, fieldId: fase.id, value: null }, { source: 'ai' });
+    syncStore(board.router);
+  });
+
   it('sem campo personalizado, a seção deles não aparece', () => {
     openStory();
     expect(screen.getByRole('region', { name: 'Campos' })).toBeInTheDocument();

@@ -1,11 +1,11 @@
 import type { Card, FieldDef, FieldValue } from '../../../shared/model';
 import { modelDisplay } from '../../modelText';
-import { isBoardField } from '../../../shared/boardFields';
+import { boardFieldNamed, isBoardField } from '../../../shared/boardFields';
 import { MODEL_EFFORT_LABEL, suggestModel } from '../../../shared/models';
 import { fieldsForType, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
-import { FieldEditor, ModelEditor } from '../FieldRenderer';
+import { FieldBadge, FieldEditor, ModelEditor, hasValue } from '../FieldRenderer';
 import { FieldRow } from '../ui';
 import { t, dt } from '../../i18n';
 
@@ -35,6 +35,16 @@ function FieldsGroup({ title, card, fields }: { title: string; card: Card; field
         {fields.map((f) => {
           const value = valueOf(state, card.id, f.id);
           const set = (v: FieldValue) => cards.setField(card.id, f.id, v);
+          // a Fase vem da história em que a sub-tarefa nasceu (ou da IA): aqui ela só aparece
+          if (boardFieldNamed(f.name)?.readOnly) {
+            return (
+              <FieldRow key={f.id} as="div" label={dt(f.name)} hint={t('definida pelo board')}>
+                <span aria-label={dt(f.name)}>
+                  {hasValue(value) ? <FieldBadge field={{ ...f, display: 'badge' }} value={value} /> : <span className="muted">—</span>}
+                </span>
+              </FieldRow>
+            );
+          }
           if (f.kind !== 'model') {
             return (
               <FieldRow key={f.id} label={dt(f.name)}>

@@ -120,3 +120,53 @@ describe('tipos de card e os campos do board', () => {
     expect(field('Fase').appliesToTypes).toEqual(before);
   });
 });
+
+describe('valor da Fase', () => {
+  const AI = { author: 'Claude Code', source: 'ai' as const };
+  const subtask = () => {
+    const s = router.snapshot();
+    const story = router.createCard({ typeId: typeNamed('História').id, columnId: s.columns[0]!.id, parentId: null, title: 'h' });
+    const child = s.columns.find((c) => c.workflowId === workflow('child'))!;
+    return router.createCard({ typeId: typeNamed('Sub-tarefa').id, columnId: child.id, parentId: story, title: 's' });
+  };
+  const phaseOf = (cardId: string) => router.snapshot().fieldValues.find((v) => v.cardId === cardId && v.fieldId === field('Fase').id);
+
+  it('a pessoa não grava nem limpa a Fase; a IA grava', () => {
+    const id = subtask();
+    const fase = field('Fase').id;
+    expect(() => router.handle({ type: 'field.setValue', cardId: id, fieldId: fase, value: 'Spec' })).toThrow(
+      'O campo "Fase" é preenchido pelo board e pela IA, não à mão.',
+    );
+    router.handle({ type: 'field.setValue', cardId: id, fieldId: fase, value: 'Spec' }, AI);
+    expect(phaseOf(id)?.value).toBe('Spec');
+    expect(() => router.handle({ type: 'field.setValue', cardId: id, fieldId: fase, value: null })).toThrow('não à mão');
+    expect(phaseOf(id)?.value).toBe('Spec');
+    // os outros campos do board seguem livres para a pessoa
+    router.handle({ type: 'field.setValue', cardId: id, fieldId: field('Esforço da atividade').id, value: 'Alto' });
+  });
+
+  it('a sub-tarefa criada à mão nasce sem Fase', () => {
+    expect(phaseOf(subtask())).toBeUndefined();
+  });
+
+  it('a Fase não vira padrão do tipo, mas um padrão antigo que volta igual passa', () => {
+    const sub = typeNamed('Sub-tarefa').id;
+    const fase = field('Fase').id;
+    const effort = field('Esforço da atividade').id;
+    expect(() => router.handle({ type: 'settings.type.update', typeId: sub, patch: { defaults: { [fase]: 'PRD' } } })).toThrow(
+      'O campo "Fase" não tem valor padrão por tipo: o board o preenche em cada card.',
+    );
+    expect(() => router.handle({ type: 'settings.type.update', typeId: sub, patch: { defaults: { [fase]: 'PRD' } } }, AI)).toThrow(
+      'não tem valor padrão por tipo',
+    );
+    // um board de antes desta regra pode ter o padrão gravado: a tela manda os padrões inteiros ao mudar outro
+    (router as unknown as { ctx: { settings: { updateType: (id: string, p: object) => void } } }).ctx.settings.updateType(sub, {
+      defaults: { [fase]: 'PRD' },
+    });
+    router.handle({ type: 'settings.type.update', typeId: sub, patch: { defaults: { [fase]: 'PRD', [effort]: 'Alto' } } });
+    expect(typeNamed('Sub-tarefa').defaults).toEqual({ [fase]: 'PRD', [effort]: 'Alto' });
+    // e tirar o padrão antigo também passa
+    router.handle({ type: 'settings.type.update', typeId: sub, patch: { defaults: { [fase]: null, [effort]: 'Alto' } } });
+    expect(typeNamed('Sub-tarefa').defaults).toEqual({ [effort]: 'Alto' });
+  });
+});

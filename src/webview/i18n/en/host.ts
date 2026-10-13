@@ -88,6 +88,9 @@ export const host: Record<string, string> = {
     'The "{name}" field belongs to the board and cannot be renamed: the rules and the AI find it by its name.',
   'As opções do campo "{name}" são mantidas pelo board.': 'The options of the "{name}" field are kept by the board.',
   'Os tipos de card do campo "{name}" são mantidos pelo board.': 'The card types of the "{name}" field are kept by the board.',
+  'O campo "{name}" é preenchido pelo board e pela IA, não à mão.': 'The "{name}" field is filled in by the board and the AI, not by hand.',
+  'O campo "{name}" não tem valor padrão por tipo: o board o preenche em cada card.':
+    'The "{name}" field has no default value per type: the board fills it in on each card.',
   'Migration {n} não encontrada': 'Migration {n} not found',
 
   // vínculos entre cards

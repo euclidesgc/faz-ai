@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { badgeStyle } from '../../../shared/color';
+import { boardFieldNamed } from '../../../shared/boardFields';
 import { fieldsForType } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
@@ -93,7 +94,8 @@ export function TypesSettings() {
       </SectionHeader>
       <div className="stack">
         {state.cardTypes.map((ct) => {
-          const fields = fieldsForType(state, ct.id);
+          // a Fase não tem padrão por tipo: o board a preenche em cada sub-tarefa
+          const fields = fieldsForType(state, ct.id).filter((f) => !boardFieldNamed(f.name)?.readOnly);
           return (
             <Card key={ct.id} className="draft-card" aria-label={t('Padrões do tipo {name}', { name: dt(ct.name) })}>
               <div className="row">
