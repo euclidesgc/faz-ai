@@ -136,12 +136,11 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
   const allCardsCollapsed = liveCardIds.length > 0 && liveCardIds.every((id) => isCardCollapsed(collapsedMap, id));
 
   // ids vivos e visíveis desta coluna (a prop já vem filtrada pela WorkflowRow, então respeita o filtro ativo)
-  const visibleLiveIds = visibleCards.map((c) => c.id);
-  // a seleção "pertence" a esta coluna quando o 1º id selecionado está nela (toggleSelected garante
-  // que a seleção nunca mistura colunas, então basta olhar o primeiro)
-  const [firstSelectedId] = selectedIds;
-  const selectedHere = firstSelectedId !== undefined && state.cards.find((c) => c.id === firstSelectedId)?.columnId === column.id;
-  const selectedHistories = selectedHere ? state.cards.filter((c) => selectedIds.has(c.id)) : [];
+  const visibleLiveIds = visibleCards.filter(isLive).map((c) => c.id);
+  // o lote é só o que está marcado E visível aqui: a seleção pode ter sobrado de antes de um filtro, e
+  // arquivar ou excluir cards que a pessoa não está vendo seria pior do que deixá-los de fora
+  const selectedHistories = visibleCards.filter((c) => selectedIds.has(c.id) && isLive(c));
+  const selectedHere = selectedHistories.length > 0;
   const otherColumns = siblings.filter((c) => c.id !== column.id);
   const doneColumn = siblings.find((c) => c.category === 'done');
   if (collapsed) {

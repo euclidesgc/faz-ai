@@ -191,6 +191,7 @@ export function requestMoveMany(histories: Card[], destinations: Column[], after
   const { ask } = useBoardStore.getState();
   ask({
     title: t('Mover {n} história(s) para outra coluna?', { n: histories.length }),
+    message: t('Quem as regras do board impedirem de mudar de coluna (sub-tarefa em aberto) fica de fora.'),
     choices: { label: t('Coluna'), options: destinations.map((c) => ({ value: c.id, label: dt(c.name) })) },
     confirmLabel: t('Mover'),
     onConfirm: (columnId) => {

@@ -294,6 +294,29 @@ describe('Column: ações em lote (RF8-RF11)', () => {
     expect(screen.getByText('Mover selecionados para...').closest('button')).toBeDisabled();
   });
 
+  it('o lote leva só o que está marcado e visível: marcado escondido depois por um filtro fica de fora', async () => {
+    const { wf, cols, col0, secondId } = selectTwoInSameColumn();
+    const visible = liveCardsIn(col0.id).filter((c) => c.id !== secondId); // o filtro passou a esconder a 2ª
+    renderColumn(col0, wf, cols, visible);
+    await openMenu();
+    await userEvent.click(screen.getByText('Arquivar selecionados'));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Arquivar 1 história(s)?' })).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Arquivar' }));
+
+    expect(lastSent('card.archiveMany').cardIds).toEqual([board.storyId]);
+  });
+
+  it('o diálogo de mover avisa que quem as regras do board impedirem fica de fora', async () => {
+    const { wf, cols, col0 } = selectTwoInSameColumn();
+    renderColumn(col0, wf, cols);
+    await openMenu();
+    await userEvent.click(screen.getByText('Mover selecionados para...'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/fica de fora/)).toBeInTheDocument();
+  });
+
   it('RF11: cancelar a confirmação não envia nada e mantém a seleção', async () => {
     const { wf, cols, col0 } = selectTwoInSameColumn();
     renderColumn(col0, wf, cols);

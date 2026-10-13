@@ -313,6 +313,8 @@ export const board: Record<string, string> = {
   'Excluir {n} história(s)?': 'Delete {n} story(ies)?',
   'Vão para a lixeira junto: {along}.': 'These go to the trash with them: {along}.',
   'Mover {n} história(s) para outra coluna?': 'Move {n} story(ies) to another column?',
+  'Quem as regras do board impedirem de mudar de coluna (sub-tarefa em aberto) fica de fora.':
+    'Whoever the board rules stop from changing column (open sub-task) is left out.',
   Mover: 'Move',
   'Concluir {n} história(s)?': 'Complete {n} story(ies)?',
   'Vão para "{column}". Quem ainda tiver sub-tarefa em aberto fica de fora.':
