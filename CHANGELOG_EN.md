@@ -16,6 +16,10 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   sub-task type joins Fase. On the open card, the custom fields get their own section, below the
   board fields. Over MCP, `get_board` marks these fields with `board: true`, and `update_field`,
   `delete_field` and `create_field` refuse what would break their use.
+- **The sub-task's Fase belongs to the board and the AI.** On the open card it is read-only: a person
+  can't change or clear the value, and it can't be a card type default. Fase says which phase of the
+  story the sub-task belongs to and is what holds the story back from advancing. The AI still sets
+  Fase when it creates the sub-task (`create_card`) and can correct it with `update_card`.
 - **MCP instructions read in full in Claude Code.** Claude Code cuts each MCP server's instructions
   at 2,048 characters, and the board's had 4,316: every session read only the first half, without the
   empty context, the Implementation rounds, tests without a terminal and the phase documents. The

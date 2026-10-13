@@ -88,6 +88,8 @@ Os campos do board (Fase, Tags, Modelo, Skills, Rules, Esforço da atividade e C
 `board: true` em `get_board.fields`: as regras, a triagem e a IA dependem deles. `delete_field` e a
 troca de nome em `update_field` são recusadas neles, assim como opções e tipos de card (as opções de
 Tags são da pessoa e mudam); a exibição muda em todos. `create_field` recusa o nome de um deles.
+O valor da Fase de uma sub-tarefa é gravado pela IA (`create_card` ou `update_card` com
+`fields.Fase`); a pessoa não o muda no card, e `update_card_type` recusa a Fase em `default_fields`.
 
 Também pelo MCP: catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
 `set_model_rules`), padrões por tipo de card (`update_card_type`), recriar o board (`reset_board`) e o

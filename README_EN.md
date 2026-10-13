@@ -177,7 +177,9 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 ![Open card: status, approval, fields, description and checklist](docs/images/card_en.png)
 
 By default, a story is not completed and does not advance a phase while it has open sub-tasks of
-that phase. These rules can be turned off in the settings.
+that phase. These rules can be turned off in the settings. The sub-task's phase is the **Fase**
+field, which the AI fills in when it creates the sub-task: on the open card it is read-only, and it
+can't be a card type default.
 
 At the top of the board, **N com você** (N with you) shows how many cards are waiting for your
 review, answer or unblocking (one click filters to them), and an indicator appears while the AI is
