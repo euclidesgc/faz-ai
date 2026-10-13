@@ -122,6 +122,7 @@ export const card: Record<string, string> = {
 
   // Campos
   Campos: 'Fields',
+  'definida pelo board': 'set by the board',
   'Esforço do modelo': 'Model effort',
   'Sugerido pelas regras: {model}': 'Suggested by the rules: {model}',
   Usar: 'Use',

@@ -1,27 +1,50 @@
-import type { Card, FieldValue } from '../../../shared/model';
+import type { Card, FieldDef, FieldValue } from '../../../shared/model';
 import { modelDisplay } from '../../modelText';
+import { boardFieldNamed, isBoardField } from '../../../shared/boardFields';
 import { MODEL_EFFORT_LABEL, suggestModel } from '../../../shared/models';
 import { fieldsForType, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
-import { FieldEditor, ModelEditor } from '../FieldRenderer';
+import { FieldBadge, FieldEditor, ModelEditor, hasValue } from '../FieldRenderer';
 import { FieldRow } from '../ui';
 import { t, dt } from '../../i18n';
 
-/** Campos personalizados que se aplicam ao tipo do card. */
+/** Os campos do tipo do card: os do board e, numa seção à parte, os personalizados. */
 export function FieldsSection({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const fields = fieldsForType(state, card.typeId);
-  if (fields.length === 0) return null;
+  const board = fields.filter(isBoardField);
+  const custom = fields.filter((f) => !isBoardField(f));
+
+  return (
+    <>
+      {board.length > 0 && <FieldsGroup title={t('Campos')} card={card} fields={board} />}
+      {custom.length > 0 && <FieldsGroup title={t('Campos personalizados')} card={card} fields={custom} />}
+    </>
+  );
+}
+
+function FieldsGroup({ title, card, fields }: { title: string; card: Card; fields: FieldDef[] }) {
+  const state = useBoardStore((s) => s.state)!;
   const suggested = suggestModel(state, card);
 
   return (
-    <section className="drawer-section">
-      <h3>{t('Campos')}</h3>
+    <section className="drawer-section" aria-label={title}>
+      <h3>{title}</h3>
       <div className="fields-grid">
         {fields.map((f) => {
           const value = valueOf(state, card.id, f.id);
           const set = (v: FieldValue) => cards.setField(card.id, f.id, v);
+          // a Fase vem da história em que a sub-tarefa nasceu (ou da IA): aqui ela só aparece
+          if (boardFieldNamed(f.name)?.readOnly) {
+            return (
+              <FieldRow key={f.id} as="div" label={dt(f.name)} hint={t('definida pelo board')}>
+                <span aria-label={dt(f.name)}>
+                  {hasValue(value) ? <FieldBadge field={{ ...f, display: 'badge' }} value={value} /> : <span className="muted">—</span>}
+                </span>
+              </FieldRow>
+            );
+          }
           if (f.kind !== 'model') {
             return (
               <FieldRow key={f.id} label={dt(f.name)}>

@@ -7,6 +7,19 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Board fields out of the settings.** Fase, Tags, Modelo, Skills, Rules, Esforço da atividade and
+  Criticidade are used by the rules, the triage and the AI, and left Settings → **Campos
+  personalizados** (custom fields, the tab's new name), which now lists only the fields you create.
+  These fields can't be deleted or renamed, and the board keeps their options and card types (the
+  Tags options are still yours, through the AI). A new field can't take one of their names nor the
+  **Modelo de IA** (AI model) type. A new story card type joins Criticidade on its own, and a new
+  sub-task type joins Fase. On the open card, the custom fields get their own section, below the
+  board fields. Over MCP, `get_board` marks these fields with `board: true`, and `update_field`,
+  `delete_field` and `create_field` refuse what would break their use.
+- **The sub-task's Fase belongs to the board and the AI.** On the open card it is read-only: a person
+  can't change or clear the value, and it can't be a card type default. Fase says which phase of the
+  story the sub-task belongs to and is what holds the story back from advancing. The AI still sets
+  Fase when it creates the sub-task (`create_card`) and can correct it with `update_card`.
 - **Estimated context of each card.** In the card footer, a discreet ring shows how much of the
   context window the card's run takes before the AI starts; clicking it opens the breakdown by group
   (MCP servers, agents, rules, skills and the card itself) and by item, like Claude Code's context

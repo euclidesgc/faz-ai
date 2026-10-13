@@ -3,6 +3,7 @@ import { norm } from '../../../shared/filters';
 import { columnOf, isLive } from '../../../shared/selectors';
 import { isAtYoloStop, lastAiColumn, yoloStopOptions } from '../../../shared/story';
 import { CORE, CRITICALITY_FIELD, isCoreStory } from '../../../shared/critical';
+import { fieldValueBlocker } from '../../../shared/boardFields';
 import { settleDelivery } from '../../delivery';
 
 import type { BoardState, Card } from '../../../shared/model';
@@ -241,6 +242,10 @@ export const cardHandlers = {
     return true;
   },
   'field.setValue': (msg, ctx, { byAi }) => {
+    if (!byAi) {
+      const blocker = fieldValueBlocker(ctx.state(), msg.fieldId);
+      if (blocker) throw new Error(blocker);
+    }
     // a IA marca a história do núcleo, mas só uma pessoa a tira dele: senão ela voltaria a se aprovar sozinha
     if (byAi && msg.value !== CORE) {
       const state = ctx.state();
