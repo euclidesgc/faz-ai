@@ -414,6 +414,12 @@ function workspaceOf(s: BoardState, c: Card) {
       };
 }
 
+/** O que fazer com o `model` do card; o "Esforço da atividade" tem o mesmo nome e outro sentido. */
+const MODEL_NOTE =
+  'Modelo e esforço que devem executar este card. Se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; ' +
+  'se não for possível, avise a pessoa em vez de executar com outra. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, ' +
+  'e as regras do board sugerem o modelo a partir dele (get_models).';
+
 export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardState['attachments'][number]) => string) {
   const skills = requiredSkills(s, c);
   const rules = requiredRules(s, c);
@@ -431,7 +437,7 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
   const suggested = suggestModel(s, c);
   return {
     ...cardSummary(s, c),
-    ...(chosen ? { model: { ...describeModel(s, chosen), note: 'Modelo e esforço que devem executar este card.' } } : {}),
+    ...(chosen ? { model: { ...describeModel(s, chosen), note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     ...(rules.length
       ? {
@@ -480,6 +486,20 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
 }
 
 /**
+ * Como conduzir as rodadas da Implementação. Fica no get_card, ao lado de `subtasksNow`, e não nas instruções
+ * do servidor: o Claude Code as corta em 2.048 caracteres, e a IA só precisa disto quando há rodada.
+ */
+export const SUBTASKS_NOW_NOTE =
+  'As rodadas da Implementação. `canRunTogether` são as sub-tarefas sem dependência pendente: se você tem subagentes, delegue cada uma a um subagente, ' +
+  'todos lançados na mesma mensagem para rodarem ao mesmo tempo, cada um com o modelo do card dele, na pasta de trabalho da história e sem fazer commit; ' +
+  'sem subagentes, execute uma por vez. As de `waiting` esperam outra sub-tarefa terminar (start_work as recusa). ' +
+  'Ao fim da rodada, verifique o conjunto, faça o commit e leia a história de novo para a próxima rodada. ' +
+  'Repita até não sobrar nenhuma que você possa tocar agora: as que estão com a pessoa (`withPerson`) ou já em execução (`running`) não são suas; ' +
+  'se só restarem as que estão com a pessoa, pare. ' +
+  'Testes, build e commit dependem do terminal: sem permissão para rodar comandos, implemente e registre na conversa o que falta rodar; ' +
+  'essa parte fica para quem tem permissão. Isso vale mesmo que a skill do fluxo instalada ainda diga para executar uma sub-tarefa por vez.';
+
+/**
  * As rodadas da Implementação: `canRunTogether` só traz as sub-tarefas que a IA pode tocar agora; as que
  * estão com a pessoa (`withPerson`) ou já em execução (`running`) vêm em grupos separados, só quando houver.
  */
@@ -493,6 +513,7 @@ function subtasksNow(s: BoardState, storyId: string) {
       ...(w.withPerson.length ? { withPerson: w.withPerson.map(cardRef) } : {}),
       ...(w.running.length ? { running: w.running.map(cardRef) } : {}),
     },
+    subtasksNowNote: SUBTASKS_NOW_NOTE,
   };
 }
 

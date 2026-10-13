@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { FLOW_SKILL } from '../src/extension/flowSkill';
+import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { MCP_INSTRUCTIONS } from '../src/extension/mcp/server';
 
-// As rodadas da Implementação, como a skill do fluxo e as instruções do servidor MCP as ensinam.
+// As rodadas da Implementação, como a skill do fluxo e a nota de `subtasksNow` no get_card as ensinam.
 
 const implementacao = FLOW_SKILL.body.slice(
   FLOW_SKILL.body.indexOf('## Sub-tarefas de implementação'),
@@ -22,10 +23,12 @@ describe('rodadas da Implementação', () => {
     expect(implementacao).toMatch(/quem tem permissão/);
   });
 
-  it('as instruções do servidor repetem a regra de parada e a condição da permissão', () => {
-    expect(MCP_INSTRUCTIONS).toMatch(/possa tocar agora/);
-    expect(MCP_INSTRUCTIONS).toContain('withPerson');
-    expect(MCP_INSTRUCTIONS).toMatch(/quem tem permissão/);
+  it('a nota das rodadas no get_card repete a regra de parada e a condição da permissão', () => {
+    expect(SUBTASKS_NOW_NOTE).toMatch(/possa tocar agora/);
+    expect(SUBTASKS_NOW_NOTE).toContain('withPerson');
+    expect(SUBTASKS_NOW_NOTE).toMatch(/com a pessoa, pare/);
+    expect(SUBTASKS_NOW_NOTE).toMatch(/quem tem permissão/);
+    expect(SUBTASKS_NOW_NOTE).toMatch(/mesma mensagem[\s\S]*sem fazer commit/);
   });
 });
 

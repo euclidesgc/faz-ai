@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
+import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { createMcpServer, MCP_INSTRUCTIONS, startMcpServer } from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
 import { toolDefinitions } from '../src/extension/mcp/tools';
@@ -13,6 +14,10 @@ import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { forgetModels, parseCursorModels, rememberModels } from '../src/extension/models';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
+
+// O Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta neste tamanho
+// (https://code.claude.com/docs/en/mcp, "Tool search for MCP server authors", lida em 2026-10-13): o resto a IA não lê.
+const CLAUDE_CODE_CUT = 2048;
 
 let dir: string;
 let router: MessageRouter;
@@ -96,6 +101,40 @@ describe('servidor MCP', () => {
       ['Backlog', 'Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Revisão', 'Homologação', 'Concluído', 'Cancelado'],
       ['A fazer', 'Em andamento', 'Concluído'],
     ]);
+  });
+
+  it('instruções e descrições das ferramentas cabem no corte do Claude Code, com o ciclo do card nas instruções', async () => {
+    const instructions = client.getInstructions() ?? '';
+    expect(instructions.length).toBeLessThanOrEqual(CLAUDE_CODE_CUT);
+    for (const part of [
+      'get_pending_work',
+      'start_work',
+      '`requiresApproval`',
+      'request_review e PARE',
+      '"approved"',
+      '`model`',
+      'subagente',
+      '`requiredRules`',
+      '`requiredSkills`',
+      'request_review e `pending`',
+    ])
+      expect(instructions).toContain(part);
+    const tooLong = (await client.listTools()).tools
+      .filter((t) => (t.description ?? '').length > CLAUDE_CODE_CUT)
+      .map((t) => `${t.name} (${t.description!.length})`);
+    expect(tooLong).toEqual([]);
+  });
+
+  it('o que não cabe nas instruções está na descrição da ferramenta em que a IA precisa dele', async () => {
+    const tools = (await client.listTools()).tools;
+    const description = (name: string) => tools.find((t) => t.name === name)!.description;
+    expect(description('get_card')).toContain('`attachment:<nome>`');
+    expect(description('get_card')).toContain('`subtasksNow`');
+    expect(description('get_board')).toContain('Configurações → Harness: não indique nada fora deles');
+    expect(description('get_models')).toContain('"Esforço da atividade" do card é o tamanho da tarefa');
+    expect(description('link_cards')).toMatch(/usa o que a outra produz ou quando as duas alteram os mesmos arquivos/);
+    expect(description('add_attachment')).toContain('`artifact: true`');
+    expect(description('get_harness')).toContain('contexto vazio');
   });
 
   it('parâmetro desconhecido é erro com o nome dele, e nada é criado', async () => {
@@ -566,6 +605,9 @@ describe('modelos de IA', () => {
 
     const card = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
     expect(card.model.value).toBe('claude:haiku');
+    // a nota diz o que fazer com o modelo e separa o esforço do modelo do "Esforço da atividade"
+    expect(card.model.note).toMatch(/delegue o trabalho a um subagente[\s\S]*avise a pessoa/);
+    expect(card.model.note).toContain('"Esforço da atividade": ele é o tamanho da tarefa');
     // o modelo veio da sugestão, então acompanha a mudança de esforço
     expect((await call('update_card', { card: 1, fields: { Esforço: 'Alto' } })).data.model.value).toBe('claude:opus@high');
     // escolhido à mão: não é mais trocado, mas a sugestão continua visível
@@ -1438,8 +1480,14 @@ describe('vínculos entre cards', () => {
     const byRef = (ref: string) => router.snapshot().cards.find((k) => `#${k.number}` === ref)!;
     router.handle({ type: 'card.status.set', cardId: byRef(b.id).id, status: 'waiting_answer' });
     router.handle({ type: 'card.status.set', cardId: byRef(c.id).id, status: 'running' }, { source: 'ai' });
-    const now = (await call('get_card', { card: story.id })).data.subtasksNow;
-    expect(now).toEqual({ canRunTogether: [a.id, d.id], waiting: [], withPerson: [b.id], running: [c.id] });
+    const got = (await call('get_card', { card: story.id })).data;
+    expect(got.subtasksNow).toEqual({ canRunTogether: [a.id, d.id], waiting: [], withPerson: [b.id], running: [c.id] });
+    // a nota das rodadas vem junto, porque não cabe nas instruções do servidor
+    expect(got.subtasksNowNote).toBe(SUBTASKS_NOW_NOTE);
+    // sub-tarefa sem rodada não traz nem as rodadas nem a nota
+    const single = (await call('get_card', { card: a.id })).data;
+    expect(single.subtasksNow).toBeUndefined();
+    expect(single.subtasksNowNote).toBeUndefined();
   });
 
   it('create_card com depends_on valida os vínculos antes de criar e ignora repetidos', async () => {
