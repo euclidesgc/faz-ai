@@ -4,6 +4,15 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **Contexto estimado de cada card.** No rodapé do card, um anel discreto mostra quanto da janela de
+  contexto a execução do card ocupa antes de a IA começar; o clique abre o detalhe por grupo
+  (servidores MCP, agentes, rules, skills e o próprio card) e por item, como a janela de contexto do
+  Claude Code. No Claude Code, o servidor do board conta só os nomes das ferramentas e as instruções,
+  e as definições aparecem como sob demanda; os servidores liberados pelo agente aparecem como não
+  medidos. É uma estimativa pelo tamanho do texto, para achar o que pesa antes de rodar.
+
 ## 0.36.0
 
 - **Registros de decisão no repositório.** A nova opção **Faz AI › Git › Registros de decisão**

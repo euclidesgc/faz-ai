@@ -1,5 +1,5 @@
 /* Tokens do Design System do board: primitivos de cor, semânticos por tema e escalas (espaço, raio, sombra, tipografia).
-   Paleta: Radix Colors (MIT, https://github.com/radix-ui/colors) — slate, indigo, red, amber e green.
+   Paleta: Radix Colors (MIT, https://github.com/radix-ui/colors) — slate, indigo, red, amber, green, violet, orange e cyan.
    Hex literal só pode existir neste arquivo; styles.css consome apenas var(--token).
    Formato fixo (uma declaração por linha) porque test/tokens.test.ts faz parse deste arquivo. */
 
@@ -82,6 +82,9 @@ body[data-theme='light'] {
   --amber-9: #ffc53d;
   --amber-11: #ab6400;
   --green-11: #218358;
+  --violet-11: #6550b9;
+  --orange-11: #cc4e00;
+  --cyan-11: #107d98;
   /* semânticos */
   --bg: var(--slate-1);
   --col-bg: var(--slate-3);
@@ -114,6 +117,12 @@ body[data-theme='light'] {
   --chart-bar: var(--indigo-9);
   --chart-bar-partial: var(--amber-11);
   --chart-axis: var(--slate-9);
+  /* contexto estimado do card: uma cor por grupo (servidores MCP, agentes, rules, skills, card); 3:1 sobre o fundo */
+  --ctx-mcp: var(--indigo-9);
+  --ctx-agents: var(--violet-11);
+  --ctx-rules: var(--green-11);
+  --ctx-skills: var(--orange-11);
+  --ctx-card: var(--cyan-11);
 }
 
 body[data-theme='dark'] {
@@ -137,6 +146,9 @@ body[data-theme='dark'] {
   --amber-9: #ffc53d;
   --amber-11: #ffca16;
   --green-11: #3dd68c;
+  --violet-11: #baa7ff;
+  --orange-11: #ffa057;
+  --cyan-11: #4ccce6;
   /* semânticos */
   --bg: var(--slate-1);
   --col-bg: var(--slate-2);
@@ -169,6 +181,12 @@ body[data-theme='dark'] {
   --chart-bar: var(--indigo-10);
   --chart-bar-partial: var(--amber-9);
   --chart-axis: var(--slate-9);
+  /* contexto estimado do card: uma cor por grupo (servidores MCP, agentes, rules, skills, card); 3:1 sobre o fundo */
+  --ctx-mcp: var(--indigo-10);
+  --ctx-agents: var(--violet-11);
+  --ctx-rules: var(--green-11);
+  --ctx-skills: var(--orange-11);
+  --ctx-card: var(--cyan-11);
 }
 
 /* instante antes de o JS definir data-theme: não pinta nada por cima do host */

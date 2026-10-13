@@ -418,4 +418,35 @@ export const board: Record<string, string> = {
   'Reinicia a extensão e lê de novo o PATH, as CLIs e os plugins. Use depois de instalar algo ou de atualizar a extensão.':
     'Restarts the extension and reads the PATH, the CLIs and the plugins again. Use it after installing something or updating the extension.',
   'Abrir MCPs do Cursor': 'Open Cursor MCPs',
+
+  // Contexto estimado do card (anel no rodapé e o detalhe)
+  'Contexto estimado': 'Estimated context',
+  'Contexto estimado do card: {tokens} de {window} tokens ({share}). Clique para ver o detalhe.':
+    'Estimated card context: {tokens} of {window} tokens ({share}). Click for the breakdown.',
+  'Contexto estimado do card: {tokens} tokens. Clique para ver o detalhe.':
+    'Estimated card context: {tokens} tokens. Click for the breakdown.',
+  'nomes das ferramentas': 'tool names',
+  'instruções do servidor': 'server instructions',
+  'definições das ferramentas': 'tool definitions',
+  'servidor do board': 'board server',
+  'liberado pelo agente': 'allowed by the agent',
+  'instruções do agente': 'agent instructions',
+  'subagente: nome e descrição': 'subagent: name and description',
+  'Título e descrição': 'Title and description',
+  'Instruções e modelo da fase': 'Phase instructions and template',
+  'Documentos das fases': 'Phase documents',
+  Livre: 'Free',
+  'Carrega só quando a IA procura a ferramenta': 'Loads only when the AI looks up the tool',
+  'Sob demanda: mais {tokens} das definições das ferramentas MCP, carregadas quando a IA procura uma ferramenta.':
+    'On demand: {tokens} more from the MCP tool definitions, loaded when the AI looks up a tool.',
+  'Estimativa pelo tamanho do texto, cerca de {chars} caracteres por token.':
+    'Estimated from text size, about {chars} characters per token.',
+  'Fora da conta: o prompt e as ferramentas nativas do Claude Code, e as ferramentas dos servidores liberados pelo agente.':
+    "Not counted: Claude Code's own prompt and built-in tools, and the tools of the servers the agent allows.",
+  'Fora da conta: o que o Cursor carrega por conta própria (rules, skills e servidores configurados nele).':
+    'Not counted: what Cursor loads on its own (rules, skills and the servers configured in it).',
+  'O board não conhece a janela de contexto de {model}: sem ela, não há porcentagem.':
+    'The board does not know the context window of {model}: without it, there is no percentage.',
+  'O card não tem modelo: sem a janela de contexto, não há porcentagem.':
+    'The card has no model: without the context window, there is no percentage.',
 };

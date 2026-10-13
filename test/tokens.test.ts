@@ -78,6 +78,12 @@ const pairs: Array<[string, string, number]> = [
   ['--chart-bar-partial', '--card-bg', 3],
   ['--chart-axis', '--bg', 3],
   ['--chart-axis', '--card-bg', 3],
+  // contexto estimado do card: as cores dos grupos na barra e nos quadrados, sobre o painel (que usa --card-bg)
+  ['--ctx-mcp', '--card-bg', 3],
+  ['--ctx-agents', '--card-bg', 3],
+  ['--ctx-rules', '--card-bg', 3],
+  ['--ctx-skills', '--card-bg', 3],
+  ['--ctx-card', '--card-bg', 3],
 ];
 
 describe.each(Object.entries(themes))('tokens.css: tema %s', (_name, tokens) => {
@@ -109,7 +115,15 @@ describe('styles.css consome só tokens', () => {
 
   it('só referencia tokens definidos em tokens.css (ou os que o JS define)', () => {
     const defined = new Set(Object.keys({ ...themes.light, ...themes.dark }));
-    const fromJs = new Set(['--text-font', '--text-size', '--status-color', '--vscode-font-family', '--vscode-editor-font-family']);
+    // o Radix (Popper) define a altura livre do popover no próprio elemento, ao posicioná-lo
+    const fromJs = new Set([
+      '--text-font',
+      '--text-size',
+      '--status-color',
+      '--vscode-font-family',
+      '--vscode-editor-font-family',
+      '--radix-popover-content-available-height',
+    ]);
     const used = new Set([...stylesCss.matchAll(/var\((--[\w-]+)/g)].map((m) => m[1]!));
     const missing = [...used].filter((v) => !defined.has(v) && !fromJs.has(v));
     expect(missing).toEqual([]);

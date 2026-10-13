@@ -5,6 +5,15 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **Estimated context of each card.** In the card footer, a discreet ring shows how much of the
+  context window the card's run takes before the AI starts; clicking it opens the breakdown by group
+  (MCP servers, agents, rules, skills and the card itself) and by item, like Claude Code's context
+  window. In Claude Code, the board's server counts only the tool names and the instructions, and the
+  definitions show up as on demand; the servers the agent allows show up as not measured. It is an
+  estimate from text size, to find what weighs before running.
+
 ## 0.36.0
 
 - **Decision records in the repository.** The new **Faz AI › Git › Registros de decisão** (decision

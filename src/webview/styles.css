@@ -3666,3 +3666,190 @@ div.metrics-breakdown {
 .models-fast p {
   margin: 0;
 }
+/* Contexto estimado do card: um anel discreto no rodapé e o detalhe num popover, como a janela de contexto das ferramentas de IA */
+.context-gauge {
+  margin-left: auto;
+  min-height: 0;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-2);
+  margin-top: calc(var(--sp-2) * -1);
+  margin-bottom: calc(var(--sp-2) * -1);
+  background: transparent;
+  color: var(--muted);
+}
+/* com a sugestão de modelo, os dois ficam juntos à direita */
+.suggest-model + .context-gauge {
+  margin-left: 0;
+}
+.context-gauge:hover:where(:not(:disabled)) {
+  background: var(--hover);
+  color: var(--fg);
+}
+.context-ring {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.context-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+.context-ring-track {
+  stroke: var(--border);
+}
+.context-ring-fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+}
+.context-popover.rt-PopoverContent {
+  width: 360px;
+  max-width: calc(100vw - 2 * var(--sp-16));
+  /* com os grupos abertos o detalhe cresce: fica no espaço que sobra na tela e rola */
+  max-height: var(--radix-popover-content-available-height);
+  overflow-y: auto;
+  padding: var(--sp-12);
+  background: var(--card-bg);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+}
+.context-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  font-variant-numeric: tabular-nums;
+}
+.context-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-8);
+}
+.context-title {
+  font-size: var(--fs-h);
+  font-weight: 600;
+}
+.context-total,
+.context-model {
+  color: var(--muted);
+}
+.context-model {
+  margin-top: calc(var(--sp-6) * -1);
+  font-size: var(--fs-xs);
+}
+.context-bar {
+  display: flex;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--hover);
+}
+.context-bar > span {
+  min-width: 2px;
+  height: 100%;
+}
+.ctx-mcp {
+  background: var(--ctx-mcp);
+}
+.ctx-agents {
+  background: var(--ctx-agents);
+}
+.ctx-rules {
+  background: var(--ctx-rules);
+}
+.ctx-skills {
+  background: var(--ctx-skills);
+}
+.ctx-card {
+  background: var(--ctx-card);
+}
+.context-groups {
+  display: flex;
+  flex-direction: column;
+}
+.context-group > summary,
+.context-free {
+  display: grid;
+  grid-template-columns: 12px 10px 1fr auto 56px;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: var(--sp-4) 0;
+}
+.context-group > summary {
+  list-style: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.context-group > summary::-webkit-details-marker {
+  display: none;
+}
+.context-group > summary:hover {
+  background: var(--hover);
+}
+.context-group > summary:focus-visible {
+  outline: var(--focus-ring);
+}
+.context-group > summary > svg {
+  color: var(--muted);
+}
+.context-group[open] > summary > svg {
+  transform: rotate(90deg);
+}
+.context-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.context-free .context-swatch {
+  border: 1px solid var(--border-strong);
+}
+.context-tokens,
+.context-share {
+  text-align: right;
+}
+.context-share {
+  color: var(--muted);
+}
+.context-entries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-6);
+  padding: 0 0 0 calc(22px + var(--sp-12));
+  list-style: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.context-entries li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+.context-entries li.on-demand {
+  font-style: italic;
+}
+.context-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.context-entry code {
+  font-family: var(--font-mono);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.context-entries .context-tokens {
+  flex: none;
+}
+.context-notes {
+  padding-top: var(--sp-8);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.context-notes p {
+  margin: 0 0 var(--sp-4);
+}
+.context-notes p:last-child {
+  margin-bottom: 0;
+}

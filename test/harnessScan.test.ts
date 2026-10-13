@@ -214,6 +214,20 @@ describe('varredura do harness por ferramenta e escopo', () => {
     expect(cursor.find((i) => i.kind === 'hook')).toMatchObject({ name: 'afterFileEdit', description: 'fmt.sh' });
   });
 
+  it('guarda o tamanho dos arquivos (rules, skills, agentes), mas não o das entradas de um arquivo de configuração', () => {
+    write(project, 'CLAUDE.md', '# Regras do projeto');
+    write(project, '.claude/skills/revisar/SKILL.md', skill('Revisa o diff'));
+    write(project, '.claude/agents/revisor.md', '---\nname: revisor\ndescription: Revisa\n---\n\nRevise o diff.');
+    write(project, '.mcp.json', JSON.stringify({ mcpServers: { local: { command: 'npx' } } }));
+    const items = scanInventory('claude', project, home);
+    const of = (kind: string, name: string) => items.find((i) => i.kind === kind && i.name === name);
+    expect(of('instructions', 'CLAUDE.md')?.size).toBe(Buffer.byteLength('# Regras do projeto'));
+    expect(of('skill', 'revisar')?.size).toBe(Buffer.byteLength(skill('Revisa o diff')));
+    expect(of('agent', 'revisor')?.size).toBeGreaterThan(0);
+    expect(of('mcp', 'local')).toBeDefined();
+    expect(of('mcp', 'local')?.size).toBeUndefined();
+  });
+
   it('pastas ausentes e arquivos inválidos não quebram a varredura', () => {
     write(project, '.mcp.json', '{ isto não é json');
     expect(scanInventory('claude', project, home)).toEqual([]);
