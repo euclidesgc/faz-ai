@@ -143,6 +143,23 @@ export function GitSettings() {
                 />
               )}
             </FormField>
+            <FormField
+              label={t('Registros de decisão')}
+              hint={rich(
+                'Pasta do repositório onde a Homologação grava o registro de decisão de cada história (ex.: <code>docs/decisoes</code>), a partir da Spec aprovada, e o leva no pull request. Vazio = desligado.',
+              )}
+            >
+              {(id) => (
+                <TextField.Root
+                  id={id}
+                  key={git.decisionRecords}
+                  placeholder="docs/decisoes"
+                  defaultValue={git.decisionRecords}
+                  onBlur={(e) => e.target.value.trim() !== git.decisionRecords && set({ decisionRecords: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                />
+              )}
+            </FormField>
           </Card>
         </>
       )}

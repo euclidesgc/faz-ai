@@ -11,6 +11,11 @@ export interface GitConfig {
   /** ao aprovar a história na última coluna antes da conclusão, faz o merge do PR dela e conclui o card */
   autoMerge: boolean;
   mergeMethod: MergeMethod;
+  /**
+   * pasta do repositório (relativa à do projeto) onde a Homologação grava o registro de decisão da
+   * história, a partir da Spec aprovada, e o leva no pull request; '' = desligado
+   */
+  decisionRecords: string;
 }
 
 export type MergeMethod = 'squash' | 'merge' | 'rebase';
@@ -41,7 +46,21 @@ export const DEFAULT_GIT: GitConfig = {
   worktreeDir: '../{repo}.worktrees',
   autoMerge: false,
   mergeMethod: 'squash',
+  decisionRecords: '',
 };
+
+/** A pasta dos registros de decisão, limpa: relativa, com barras normais e sem barra nas pontas; '' quando não vale. */
+export function cleanDecisionDir(v: unknown): string {
+  if (typeof v !== 'string') return '';
+  const dir = v
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\/+/, '')
+    .replace(/^\/+|\/+$/g, '');
+  // fora do repositório não é registro do projeto
+  if (!dir || dir.split('/').includes('..') || /^[a-zA-Z]:/.test(dir)) return '';
+  return dir;
+}
 
 const text = (v: unknown, fallback: string): string => (typeof v === 'string' && v.trim() ? v.trim() : fallback);
 
@@ -62,6 +81,7 @@ export function parseGit(json: string | null | undefined): GitConfig {
     worktreeDir: text(raw.worktreeDir, DEFAULT_GIT.worktreeDir),
     autoMerge: raw.autoMerge === true,
     mergeMethod: MERGE_METHODS.some((m) => m.value === raw.mergeMethod) ? (raw.mergeMethod as MergeMethod) : DEFAULT_GIT.mergeMethod,
+    decisionRecords: cleanDecisionDir(raw.decisionRecords),
   };
 }
 

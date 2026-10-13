@@ -9,7 +9,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { headlessCommand } from '../src/extension/headless';
 import { createMcpServer } from '../src/extension/mcp/server';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { DEFAULT_GIT, branchName, parseGit, slug } from '../src/shared/git';
+import { DEFAULT_GIT, branchName, cleanDecisionDir, parseGit, slug } from '../src/shared/git';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -81,6 +81,19 @@ describe('parseGit', () => {
   it('ignora as chaves da antiga detecção de merges, que agora acontece em cada rodada do heartbeat', () => {
     const git = parseGit(JSON.stringify({ mode: 'branch', watchMerges: false, watchMergeMinutes: 30 }));
     expect(git).toEqual({ ...DEFAULT_GIT, mode: 'branch' });
+  });
+});
+
+describe('pasta dos registros de decisão', () => {
+  it('desligada por padrão; fica relativa, com barras normais e sem barra nas pontas', () => {
+    expect(DEFAULT_GIT.decisionRecords).toBe('');
+    expect(parseGit('{}').decisionRecords).toBe('');
+    expect(parseGit(JSON.stringify({ decisionRecords: ' ./docs\\decisoes/ ' })).decisionRecords).toBe('docs/decisoes');
+  });
+
+  it('fora do repositório não vale: caminho que sobe de pasta ou com letra de unidade', () => {
+    for (const dir of ['../fora', 'docs/../../fora', 'C:/docs', 3, null]) expect(cleanDecisionDir(dir)).toBe('');
+    expect(cleanDecisionDir('/docs/adr')).toBe('docs/adr');
   });
 });
 

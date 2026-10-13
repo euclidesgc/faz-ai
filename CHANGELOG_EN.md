@@ -7,6 +7,11 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Decision records in the repository.** The new **Faz AI › Git › Registros de decisão** (decision
+  records, `fazai.git.decisionRecords`) option points to a folder of the repository; with it,
+  Homologação writes the story's decision record there (context, decision, discarded alternatives,
+  consequences and diagrams), from the approved Spec, and takes it in the pull request. Off by
+  default.
 - **Rework in the metrics panel and in `get_metrics`.** The new **Retrabalho** (rework) block shows,
   per phase, the reviews the AI asked for, the ones approved on the first try and the change requests;
   the change requests by the model of the run that asked for the review; and how many stories done in

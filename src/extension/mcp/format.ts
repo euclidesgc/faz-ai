@@ -18,6 +18,7 @@ import { childrenOf, columnOf, columnsOf, isArchived, isLive, valueOf } from '..
 import { statusInfo } from '../../shared/status';
 import { isAtYoloStop, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../../shared/story';
 import { CORE, CRITICALITY_FIELD, PERIPHERY, isCoreStory } from '../../shared/critical';
+import { slug } from '../../shared/git';
 import {
   cardRef,
   type BoardState,
@@ -304,6 +305,22 @@ function missingArtifacts(s: BoardState, story: Card, col: Column): string[] {
 }
 
 /**
+ * Onde a Homologação grava o registro de decisão da história, quando o board liga os registros (Git →
+ * registros de decisão): um arquivo por história, pelo número, para a decisão ficar no repositório.
+ */
+function decisionRecordOf(s: BoardState, story: Card, col: Column) {
+  const dir = s.board.git.decisionRecords;
+  if (!dir || col.id !== lastAiColumn(s, story.workflowId)?.id) return {};
+  const path = `${dir}/${String(story.number).padStart(4, '0')}-${slug(story.title) || 'historia'}.md`;
+  return {
+    decisionRecord: {
+      path,
+      note: `Antes de abrir o pull request, grave em ${path} o registro de decisão desta história, a partir da Spec aprovada e dos desvios do plano: Contexto, Decisão, Alternativas descartadas (com o motivo de cada uma), Consequências e os diagramas Mermaid do desenho do programa. Se o arquivo já existe (a história voltou), atualize-o. Faça o commit na branch da história e cite o arquivo no corpo do PR.`,
+    },
+  };
+}
+
+/**
  * A fase em que o card está: o que a IA deve fazer e o documento que a fase produz. Numa
  * sub-tarefa, é a fase da história, porque o artefato é construído na sub-tarefa mas pertence à história.
  */
@@ -327,6 +344,7 @@ function phaseOf(s: BoardState, c: Card) {
           artifactNote: `Construa o documento numa sub-tarefa da história com Fase = "${col.name}" e grave-o com add_attachment (artifact: true, filename: "${col.artifactName}"): ele fica anexado à história e substitui a versão anterior.`,
         }
       : {}),
+    ...decisionRecordOf(s, story, col),
     requiresApproval: (col.requiresApproval && (!story.yolo || isCoreStory(s, story))) || isAtYoloStop(s, story),
     ...(story.yolo
       ? {

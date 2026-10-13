@@ -262,6 +262,13 @@
             "scope": "resource",
             "order": 7,
             "markdownDescription": "%config.git.mergeMethod%"
+          },
+          "fazai.git.decisionRecords": {
+            "type": "string",
+            "default": "",
+            "scope": "resource",
+            "order": 8,
+            "markdownDescription": "%config.git.decisionRecords%"
           }
         }
       },

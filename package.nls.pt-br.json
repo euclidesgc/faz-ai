@@ -52,6 +52,7 @@
   "config.git.mergeMethod.squash": "Squash (um commit só)",
   "config.git.mergeMethod.merge": "Merge commit",
   "config.git.mergeMethod.rebase": "Rebase",
+  "config.git.decisionRecords": "Pasta do repositório onde a Homologação grava o **registro de decisão** de cada história (ex.: `docs/decisoes`), a partir da Spec aprovada: o contexto, a decisão, as alternativas descartadas e os diagramas. O arquivo vai no pull request. Vazio = desligado.",
   "config.backup.title": "Faz AI: Backup",
   "config.backup.info": "Guarda ou restaura o board inteiro: cards, conversas, anexos e configurações. [Exportar o board agora](command:fazai.exportBoard) | [Importar um board](command:fazai.importBoard)."
 }
