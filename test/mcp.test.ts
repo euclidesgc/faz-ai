@@ -1424,6 +1424,44 @@ describe('vínculos entre cards', () => {
   });
 });
 
+describe('histórias derivadas e caminho curto', () => {
+  const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
+
+  it('create_card com derived_from marca a origem, vincula as duas e explica a pilha na conversa', async () => {
+    const origem = (await call('create_card', { title: 'Exportar CSV', column: 'Plan' })).data;
+    const derivada = (await call('create_card', { title: 'Exportar CSV: filtros', derived_from: origem.id })).data;
+    expect(derivada.derivedFrom).toBe(`${origem.id} Exportar CSV`);
+    expect(card(2).derivedFrom).toBe(card(1).id);
+    expect(card(2).yolo).toBe(false);
+    expect(router.snapshot().links).toMatchObject([{ kind: 'related' }]);
+    const comments = router.snapshot().comments.filter((m) => m.cardId === card(2).id);
+    expect(comments.at(-1)!.body).toContain(`Derivada de ${origem.id} Exportar CSV`);
+    expect((await call('get_card', { card: derivada.id })).data.derivedFrom).toBe(`${origem.id} Exportar CSV`);
+  });
+
+  it('derived_from só vale entre histórias, sem ciclo e antes de a derivada ter branch', async () => {
+    const a = (await call('create_card', { title: 'A' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: a.id })).data;
+    expect((await call('create_card', { title: 'Sub derivada', parent: a.id, derived_from: a.id })).error).toBe(true);
+    expect((await call('create_card', { title: 'De sub-tarefa', derived_from: sub.id })).error).toBe(true);
+    const b = (await call('create_card', { title: 'B', derived_from: a.id })).data;
+    // A já não pode derivar de B: a pilha viraria um ciclo
+    expect(() => router.handle({ type: 'card.derive', cardId: card(1).id, fromId: card(3).id })).toThrow(/já deriva/);
+    expect(() => router.handle({ type: 'card.derive', cardId: card(1).id, fromId: card(1).id })).toThrow(/dela mesma/);
+    expect(b.derivedFrom).toBe(`${a.id} A`);
+  });
+
+  it('a história criada direto numa fase adiante sabe quais documentos das fases anteriores não existem', async () => {
+    const curta = (await call('create_card', { title: 'Ajuste de texto', column: 'Plan' })).data;
+    const phase = (await call('get_card', { card: curta.id })).data.phase;
+    expect(phase.missingArtifacts).toEqual(['DISCOVERY.md', 'PRD.md', 'SPEC.md']);
+    expect(phase.missingArtifactsNote).toContain('Não crie esses documentos');
+
+    const longa = (await call('create_card', { title: 'Do começo', column: 'Discovery' })).data;
+    expect((await call('get_card', { card: longa.id })).data.phase.missingArtifacts).toBeUndefined();
+  });
+});
+
 describe('modo autônomo (YOLO)', () => {
   const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
   const column = (name: string) => router.snapshot().columns.find((c) => c.name === name)!;
@@ -1560,7 +1598,7 @@ describe('modo autônomo (YOLO)', () => {
     setYolo(1, true);
     const asked = await call('ask_question', { card: 1, question: 'Qual provedor?' });
     expect(asked.error).toBe(true);
-    expect(asked.text).toContain('Decida por conta própria');
+    expect(asked.text).toContain('segue os padrões do projeto');
     expect(card(1).status).toBe('ready');
     // impedimento de verdade continua possível
     expect((await call('block_card', { card: 1, reason: 'Sem acesso' })).error).toBe(false);

@@ -53,7 +53,7 @@ function prepareStoryWorkspace(ctx: BoardContext, cardId: string): void {
     });
   const worktreePath =
     story.worktreePath || path.join(worktreeRoot(ctx) ?? projectDir, `${story.number}-${slug(story.title) || 'historia'}`);
-  // história em modo autônomo parte da branch da anterior; a base escolhida na primeira vez vale daí em diante
+  // a história derivada parte da branch da origem, e a do modo autônomo, da anterior na fila; a base escolhida na primeira vez vale daí em diante
   const ws = prepareWorkspace({
     projectDir,
     mode: git.mode,

@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -362,6 +362,11 @@ const MIGRATIONS: Record<number, string> = {
   27: `
     -- #191: marca o comentário que é o resumo da conversa do card; NULL = mensagem comum.
     ALTER TABLE comments ADD COLUMN kind TEXT;
+  `,
+  28: `
+    -- história derivada de outra (a funcionalidade dividida em entregas): a branch dela parte da branch
+    -- da história de origem, e o pull request é empilhado sobre o dela. '' = não é derivada.
+    ALTER TABLE cards ADD COLUMN derived_from TEXT NOT NULL DEFAULT '';
   `,
 };
 

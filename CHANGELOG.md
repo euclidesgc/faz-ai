@@ -4,6 +4,31 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **Spec com o desenho do programa.** O modelo da Spec ganha a seção **Desenho do programa**: os
+  tipos e as assinaturas novos ou alterados, o arquivo de cada um e quem chama quem, com o fluxo da
+  funcionalidade em diagramas Mermaid. As alternativas descartadas passam a vir com o motivo.
+- **Plan com partes fáceis de revisar e histórias derivadas.** Cada passo do plano é uma parte
+  inteligível e verificável sozinha (recortar por camada vale), e o plano estima as linhas de código
+  da entrega. Acima de umas 400, a IA cria as próximas partes como histórias derivadas, com o novo
+  parâmetro `derived_from` do `create_card`: a branch da derivada parte da branch da origem e o pull
+  request dela é empilhado sobre o da origem, também fora do modo autônomo. O card mostra **Derivada
+  de #N**.
+- **Pull request que explica a entrega.** O corpo do PR da Homologação passa a ter **Objetivo**,
+  **O que foi feito**, **Como revisar** (por onde começar, a ordem dos commits e o tamanho do diff),
+  **Decisões** (o caminho escolhido, as alternativas descartadas e os desvios do plano) e o roteiro
+  **Como testar**.
+- **Caminho curto para histórias pequenas.** Uma história criada ou movida direto para uma fase
+  adiante, como o Plan, começa dali: o `get_card` lista em `phase.missingArtifacts` os documentos das
+  fases anteriores que não existem, e a IA trabalha a partir da descrição e da conversa, sem criá-los.
+  Na Implementação, uma história sem sub-tarefas ganha uma a partir da descrição.
+- **Modo autônomo pelos padrões do projeto.** No modo autônomo, a IA segue os padrões e as regras de
+  arquitetura do projeto e, entre os caminhos que os seguem, escolhe o menos complexo.
+- **Atualizar board** troca os textos das fases PRD, Spec, Plan, Implementação e Homologação que ainda
+  estão no padrão anterior; os personalizados ficam. Reinstale a skill do fluxo (substituindo) para ela
+  acompanhar.
+
 ## 0.35.0
 
 - **Diagnóstico do ambiente vira uma lista de conferência, sem instalador.** O **Instalar tudo**

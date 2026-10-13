@@ -34,6 +34,80 @@ export const HOMOLOGATION_INSTRUCTION_V4 = [
   'Não faça o merge: a conclusão depende da aprovação da pessoa. Depois de aprovado, se o card continuar nesta coluna, mova a história para a coluna de conclusão.',
 ].join('\n');
 
+// Os textos padrão da versão 5 do board (até a 0.35.0), guardados para a atualização reconhecer a coluna
+// que ainda está no padrão e trocá-la pelo atual (ver PHASE_HISTORY).
+
+const PRD_INSTRUCTION_V5 = [
+  'Escreva o documento de requisitos do produto a partir do Discovery aprovado e da conversa do card.',
+  'Descreva o comportamento esperado do ponto de vista de quem usa, sem decidir a implementação.',
+  'Cada requisito precisa de um critério de aceite verificável.',
+].join('\n');
+
+const SPEC_INSTRUCTION_V5 = [
+  'Escreva a especificação técnica que atende ao PRD aprovado.',
+  'Investigue o código existente e reaproveite o que já existe; descreva o que muda, onde e por quê.',
+  'Aponte as alternativas descartadas e os riscos.',
+].join('\n');
+
+const SPEC_TEMPLATE_V5 = [
+  '# Spec: <título>',
+  '',
+  '## Resumo da solução',
+  '',
+  '## Arquitetura e componentes afetados',
+  '',
+  '## Modelo de dados e migrações',
+  '',
+  '## Interfaces (APIs, mensagens, telas)',
+  '',
+  '## Casos de erro e limites',
+  '',
+  '## Estratégia de testes',
+  '',
+  '## Alternativas consideradas',
+  '',
+  '## Riscos',
+].join('\n');
+
+const PLAN_INSTRUCTION_V5 = [
+  'Quebre a Spec aprovada em passos pequenos, que possam ser implementados e verificados um a um.',
+  'Registre o plano no artefato e crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da atividade" avaliado (o modelo é sugerido a partir dele) e as Skills necessárias.',
+  'A descrição de cada sub-tarefa deve bastar para executá-la: o que fazer, onde e como verificar.',
+].join('\n');
+
+const PLAN_TEMPLATE_V5 = [
+  '# Plano: <título>',
+  '',
+  '## Ordem de execução',
+  '| # | Sub-tarefa | Esforço | Depende de | Como verificar |',
+  '| --- | --- | --- | --- | --- |',
+  '',
+  '## Pontos de atenção',
+  '',
+  '## Verificação final',
+].join('\n');
+
+const IMPLEMENTATION_INSTRUCTION_V5 = [
+  'Antes de alterar qualquer código, chame prepare_workspace na história: o board cria a branch e a pasta de trabalho dela. Altere o código só nessa pasta e nessa branch.',
+  'Execute as sub-tarefas de implementação da história, uma por vez, na ordem do plano.',
+  'Em cada uma: chame start_work, mova para "Em andamento", use o modelo e as skills indicados no card, verifique o resultado, faça o commit na branch da história e mova para a coluna de conclusão, registrando na conversa o que foi feito.',
+  'Quando todas estiverem concluídas, mova a história para a próxima coluna.',
+].join('\n');
+
+const HOMOLOGATION_INSTRUCTION_V5 = [
+  'Prepare a entrega para a validação da pessoa.',
+  'Escreva o roteiro de testes: o que foi construído, como testar passo a passo (comandos, telas, dados de exemplo, resultado esperado em cada passo) e o que ficou de fora. Acrescente-o à descrição do card com update_card, numa seção "Como testar", sem apagar o que já está lá.',
+  'Envie a branch da história (git push) e abra o pull request dela, se ainda não existir (ex.: gh pr create), com o resumo do que foi feito e o mesmo roteiro "Como testar" no corpo. Registre o endereço com set_pull_request.',
+  'Resuma na conversa o que foi feito, aponte o roteiro e peça a revisão.',
+  'Não faça o merge: a conclusão depende da aprovação da pessoa. Depois de aprovado, se o card continuar nesta coluna, mova a história para a coluna de conclusão.',
+].join('\n');
+
+/**
+ * Tamanho, em linhas de código, a partir do qual o Plan propõe dividir a funcionalidade em histórias
+ * derivadas, com os pull requests empilhados: acima disso a revisão fica pesada.
+ */
+export const PR_LINES_BUDGET = 400;
+
 export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   Discovery: {
     instruction: [
@@ -67,7 +141,7 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   },
   PRD: {
     instruction: [
-      'Escreva o documento de requisitos do produto a partir do Discovery aprovado e da conversa do card.',
+      'Escreva o documento de requisitos do produto a partir do Discovery aprovado e da conversa do card. Se a história começou nesta fase, sem Discovery, parta da descrição e da conversa.',
       'Descreva o comportamento esperado do ponto de vista de quem usa, sem decidir a implementação.',
       'Cada requisito precisa de um critério de aceite verificável.',
     ].join('\n'),
@@ -96,9 +170,10 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   },
   Spec: {
     instruction: [
-      'Escreva a especificação técnica que atende ao PRD aprovado.',
-      'Investigue o código existente e reaproveite o que já existe; descreva o que muda, onde e por quê.',
-      'Aponte as alternativas descartadas e os riscos.',
+      'Escreva a especificação técnica que atende ao PRD aprovado. Se a história começou nesta fase, sem PRD, parta da descrição e da conversa do card.',
+      'Investigue o código existente e reaproveite o que já existe; descreva o que muda, onde e por quê, seguindo os padrões do projeto e as regras de arquitetura dele.',
+      'Desenhe o programa antes do código: os tipos e as assinaturas novos ou alterados, o arquivo de cada um e quem chama quem no caminho principal. Mostre o fluxo da funcionalidade em diagramas Mermaid (sequência ou fluxograma) que alguém que não conhece o código consiga seguir. Se o projeto tem um grafo de chamadas (ex.: o code-review-graph), use-o para confirmar o fluxo.',
+      'Registre as alternativas descartadas e o motivo de cada uma (ex.: um jeito parecido de obter a informação que deixaria a implementação mais complexa) e os riscos.',
     ].join('\n'),
     artifactName: 'SPEC.md',
     artifactTemplate: [
@@ -108,6 +183,20 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
       '',
       '## Arquitetura e componentes afetados',
       '',
+      '## Desenho do programa',
+      'Tipos e assinaturas novos ou alterados, o arquivo de cada um e quem chama quem no caminho principal.',
+      'Troque o exemplo abaixo pelo fluxo real; use um diagrama por caminho quando houver mais de um.',
+      '',
+      '```mermaid',
+      'sequenceDiagram',
+      '  participant Pessoa',
+      '  participant Tela',
+      '  participant Serviço',
+      '  Pessoa->>Tela: ação',
+      '  Tela->>Serviço: chamada(parâmetros)',
+      '  Serviço-->>Tela: resultado',
+      '```',
+      '',
       '## Modelo de dados e migrações',
       '',
       '## Interfaces (APIs, mensagens, telas)',
@@ -116,14 +205,17 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
       '',
       '## Estratégia de testes',
       '',
-      '## Alternativas consideradas',
+      '## Alternativas descartadas',
+      'O que foi considerado, por que ficou de fora e o que custaria.',
       '',
       '## Riscos',
     ].join('\n'),
   },
   Plan: {
     instruction: [
-      'Quebre a Spec aprovada em passos pequenos, que possam ser implementados e verificados um a um.',
+      'Quebre a Spec aprovada em passos pequenos, que possam ser implementados e verificados um a um. Se a história começou nesta fase, sem Spec, parta da descrição e da conversa do card.',
+      'Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como verificá-la (teste, typecheck, comando ou tela). Recortar por camada (dados, regras de negócio, tela) vale, desde que cada parte seja verificável e fácil de revisar.',
+      `Estime o tamanho da entrega em linhas de código. A história é uma funcionalidade e vira um pull request; se a estimativa passar de umas ${PR_LINES_BUDGET} linhas, divida a funcionalidade: deixe nesta história a primeira parte e crie as seguintes como histórias derivadas (create_card com derived_from = esta história), cada uma com o seu pull request empilhado sobre o da anterior. Registre no plano o que fica em cada uma.`,
       'Registre o plano no artefato e crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da atividade" avaliado (o modelo é sugerido a partir dele) e as Skills necessárias.',
       'A descrição de cada sub-tarefa deve bastar para executá-la: o que fazer, onde e como verificar.',
     ].join('\n'),
@@ -132,8 +224,11 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
       '# Plano: <título>',
       '',
       '## Ordem de execução',
-      '| # | Sub-tarefa | Esforço | Depende de | Como verificar |',
-      '| --- | --- | --- | --- | --- |',
+      '| # | Sub-tarefa | Esforço | Linhas estimadas | Depende de | Como verificar |',
+      '| --- | --- | --- | --- | --- | --- |',
+      '',
+      '## Tamanho da entrega',
+      `Total estimado de linhas de código. Acima de umas ${PR_LINES_BUDGET}, as histórias derivadas e o que fica em cada uma.`,
       '',
       '## Pontos de atenção',
       '',
@@ -143,7 +238,7 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   Implementação: {
     instruction: [
       'Antes de alterar qualquer código, chame prepare_workspace na história: o board cria a branch e a pasta de trabalho dela. Altere o código só nessa pasta e nessa branch.',
-      'Execute as sub-tarefas de implementação da história, uma por vez, na ordem do plano.',
+      'Execute as sub-tarefas de implementação da história, uma por vez, na ordem do plano. Se a história começou nesta fase e não tem sub-tarefas, crie uma a partir da descrição e da conversa do card.',
       'Em cada uma: chame start_work, mova para "Em andamento", use o modelo e as skills indicados no card, verifique o resultado, faça o commit na branch da história e mova para a coluna de conclusão, registrando na conversa o que foi feito.',
       'Quando todas estiverem concluídas, mova a história para a próxima coluna.',
     ].join('\n'),
@@ -153,10 +248,43 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
     instruction: [
       'Prepare a entrega para a validação da pessoa.',
       'Escreva o roteiro de testes: o que foi construído, como testar passo a passo (comandos, telas, dados de exemplo, resultado esperado em cada passo) e o que ficou de fora. Acrescente-o à descrição do card com update_card, numa seção "Como testar", sem apagar o que já está lá.',
-      'Envie a branch da história (git push) e abra o pull request dela, se ainda não existir (ex.: gh pr create), com o resumo do que foi feito e o mesmo roteiro "Como testar" no corpo. Registre o endereço com set_pull_request.',
+      'Envie a branch da história (git push) e abra o pull request dela, se ainda não existir (ex.: gh pr create). O corpo explica a entrega para quem vai revisar o código, nesta ordem: **Objetivo** (o problema e o resultado, em poucas frases); **O que foi feito** (o resumo das mudanças); **Como revisar** (por onde começar a ler, a ordem dos commits e o tamanho do diff em linhas de código, de testes e de documentação); **Decisões** (por que o caminho escolhido, as alternativas descartadas com o motivo de cada uma, ex.: um jeito parecido de obter a informação que deixaria a implementação mais complexa, e os desvios do plano aprovado); e o mesmo roteiro **Como testar**. Registre o endereço com set_pull_request.',
       'Resuma na conversa o que foi feito, aponte o roteiro e peça a revisão.',
       'Não faça o merge: a conclusão depende da aprovação da pessoa. Depois de aprovado, se o card continuar nesta coluna, mova a história para a coluna de conclusão.',
     ].join('\n'),
     ...NO_ARTIFACT,
+  },
+};
+
+/** Textos padrão anteriores de uma fase e o que a versão atual traz de novo, para a atualização do board. */
+export interface PhaseHistory {
+  instructions: string[];
+  templates: string[];
+  /** o que muda para quem ainda tem um texto antigo; entra na descrição da atualização */
+  change: string;
+}
+
+/**
+ * Versões anteriores do padrão de cada fase. Na atualização do board, a coluna que ainda tem uma
+ * delas (o texto exato, ou seja, não personalizado) recebe a versão atual de PHASE_DEFAULTS. Quem
+ * muda um texto padrão acrescenta o anterior aqui e sobe BOARD_TEMPLATE_VERSION.
+ */
+export const PHASE_HISTORY: Record<string, PhaseHistory> = {
+  PRD: { instructions: [PRD_INSTRUCTION_V5], templates: [], change: 'a fase pode começar sem o Discovery' },
+  Spec: {
+    instructions: [SPEC_INSTRUCTION_V5],
+    templates: [SPEC_TEMPLATE_V5],
+    change: 'a Spec traz o desenho do programa (tipos, assinaturas e fluxo em diagramas Mermaid) e o motivo de cada alternativa descartada',
+  },
+  Plan: {
+    instructions: [PLAN_INSTRUCTION_V5],
+    templates: [PLAN_TEMPLATE_V5],
+    change: `cada passo fica fácil de revisar sozinho e o plano estima o tamanho da entrega, dividindo em histórias derivadas o que passar de umas ${PR_LINES_BUDGET} linhas`,
+  },
+  Implementação: { instructions: [IMPLEMENTATION_INSTRUCTION_V5], templates: [], change: 'a fase pode começar sem sub-tarefas do Plan' },
+  Homologação: {
+    instructions: [HOMOLOGATION_INSTRUCTION_V5],
+    templates: [],
+    change: 'o pull request explica o objetivo, como revisar o código e as decisões tomadas, com as alternativas descartadas',
   },
 };

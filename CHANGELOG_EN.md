@@ -5,6 +5,32 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **Spec with the program design.** The Spec template gets the **Desenho do programa** (program
+  design) section: the new or changed types and signatures, the file of each one and who calls whom,
+  with the feature flow in Mermaid diagrams. Discarded alternatives now come with the reason.
+- **Plan with parts that are easy to review, and derived stories.** Each step of the plan is an
+  understandable part that can be checked on its own (splitting by layer is fine), and the plan
+  estimates the lines of code of the delivery. Above about 400, the AI creates the next parts as
+  derived stories, with the new `derived_from` parameter of `create_card`: the branch of the derived
+  story starts from the origin's branch and its pull request is stacked on top of the origin's, also
+  outside autonomous mode. The card shows **Derivada de #N** (derived from #N).
+- **A pull request that explains the delivery.** The body of the Homologação PR now has **Objetivo**
+  (goal), **O que foi feito** (what was done), **Como revisar** (how to review: where to start, the
+  order of the commits and the size of the diff), **Decisões** (decisions: the chosen path, the
+  discarded alternatives and the deviations from the plan) and the **Como testar** (how to test)
+  script.
+- **Short path for small stories.** A story created or moved straight to a later phase, such as Plan,
+  starts from there: `get_card` lists in `phase.missingArtifacts` the documents of the earlier phases
+  that don't exist, and the AI works from the description and the conversation, without creating them.
+  In Implementação, a story without sub-tasks gets one from the description.
+- **Autonomous mode by the project's patterns.** In autonomous mode, the AI follows the project's
+  patterns and architecture rules and, among the paths that follow them, picks the least complex one.
+- **Atualizar board** (update board) replaces the texts of the PRD, Spec, Plan, Implementação and
+  Homologação phases that still have the previous default; customized ones stay. Reinstall the flow
+  skill (replacing) for it to keep up.
+
 ## 0.35.0
 
 - **The environment check becomes a checklist, with no installer.** **Instalar tudo** (Install

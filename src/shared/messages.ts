@@ -95,6 +95,8 @@ export type WebviewToHost =
   | { type: 'card.yolo.setMany'; cardIds: Id[]; enabled: boolean }
   /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */
   | { type: 'card.yolo.inherit'; cardId: Id; fromId: Id }
+  /** a história é uma entrega derivada de outra: a branch dela parte da branch da origem, com o pull request empilhado */
+  | { type: 'card.derive'; cardId: Id; fromId: Id }
   /** agente de execução do card (nome do agente marcado no Harness); null volta ao da coluna */
   | { type: 'card.execProfile.set'; cardId: Id; profileId: Id | null }
   /** a pasta de trabalho da história foi removida (a branch continua registrada) */

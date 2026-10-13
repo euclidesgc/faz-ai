@@ -29,7 +29,10 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
    - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, delegue a um subagente com essa configuração; se não for possível, avise a pessoa na conversa;
    - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no caminho indicado, mesmo que não apareça na sua lista de skills: as execuções do board partem de contexto vazio e só conhecem o que o Harness marcou.
 2. Chame \`start_work\` antes de começar.
-3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história).
+3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história),
+   quando houver. Uma história pode ser criada ou movida direto para uma fase adiante (o Plan, por
+   exemplo) e começar dali: sem os documentos anteriores, trabalhe a partir da descrição, da conversa
+   e do código, sem criar os documentos que faltam nem bloquear por falta deles.
 4. Ao terminar:
    - se ficou algo dependendo da pessoa (veja "Pendências com a pessoa"), entregue com \`request_review\` e \`pending\`, e **pare**;
    - se \`phase.requiresApproval\` for verdadeiro, chame \`request_review\` na história, com um resumo do que fez e do que a pessoa deve olhar, e **pare**;
@@ -64,13 +67,21 @@ conversa dizendo o que mudou e chame \`request_review\` de novo.
 
 No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da
 atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e as Skills
-necessárias.
+necessárias. Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como
+verificá-la (teste, typecheck, comando ou tela). Recortar por camada (dados, regras de negócio, tela)
+vale, desde que cada parte seja verificável.
+
+Uma história é uma funcionalidade e vira um pull request. Estime o tamanho em linhas de código: se
+passar de umas 400, deixe nesta história a primeira parte e crie as seguintes como histórias
+derivadas (\`create_card\` com \`derived_from\` = esta história, ou \`autonomous_from\` no modo
+autônomo). A branch de cada derivada parte da branch da anterior, e o pull request dela é empilhado
+sobre o da anterior (\`workspace.baseBranch\` no \`get_card\`).
 
 Declare a ordem entre elas: em \`create_card\`, \`depends_on\` lista as sub-tarefas que precisam
 terminar antes (ou use \`link_cards\` com \`depends_on\` depois). Uma sub-tarefa depende de outra
 quando usa o que a outra produz **ou quando as duas alteram os mesmos arquivos**. Só deixe sem
-dependência as que são de fato independentes: elas serão executadas ao mesmo tempo. Prefira recortar
-os passos de modo que cada um mexa em arquivos diferentes.
+dependência as que são de fato independentes: elas serão executadas ao mesmo tempo. Entre recortes
+igualmente fáceis de revisar, prefira o que deixa cada passo em arquivos diferentes.
 
 Antes de alterar código do projeto, chame \`prepare_workspace\` na história: o board cria a branch e a
 pasta de trabalho dela e devolve onde trabalhar (também em \`workspace\` no \`get_card\`). Altere o
@@ -127,8 +138,16 @@ A entrega é para a pessoa testar, então o roteiro de testes é parte dela, em 
 1. Escreva a seção **"Como testar"**: o que foi construído, os passos para verificar (comandos,
    telas, dados de exemplo e o resultado esperado em cada passo) e o que ficou de fora. Acrescente-a
    à descrição da história com \`update_card\`, sem apagar o que já está lá.
-2. Envie a branch da história, abra o pull request (se ainda não existir) com o resumo do que foi
-   feito e a mesma seção "Como testar" no corpo, e registre o endereço com \`set_pull_request\`.
+2. Envie a branch da história, abra o pull request (se ainda não existir) e registre o endereço com
+   \`set_pull_request\`. O corpo explica a entrega para quem vai revisar o código, nesta ordem:
+   - **Objetivo**: o problema e o resultado, em poucas frases;
+   - **O que foi feito**: o resumo das mudanças;
+   - **Como revisar**: por onde começar a ler, a ordem dos commits e o tamanho do diff (linhas de
+     código, de testes e de documentação);
+   - **Decisões**: por que o caminho escolhido, as alternativas descartadas com o motivo de cada uma
+     (ex.: um jeito parecido de obter a informação que deixaria a implementação mais complexa) e os
+     desvios do plano aprovado;
+   - a mesma seção **Como testar**.
 3. Resuma na conversa o que foi feito, aponte o roteiro e chame \`request_review\`.
 
 Não faça o merge: ele depende da aprovação da pessoa. Com o merge automático ligado (Configurações →
@@ -142,7 +161,10 @@ rodar sozinha: ninguém aprova nem responde. Então:
 - não chame \`ask_question\` (a pergunta é recusada) nem \`request_review\` sem \`pending\`, exceto na
   única situação descrita no item da Homologação abaixo: ao terminar a fase, registre na conversa o
   que fez e mova o card para a próxima coluna;
-- decida as dúvidas pela opção mais razoável e registre a decisão e o motivo na conversa;
+- ninguém revisa as decisões do meio do caminho, então siga sempre os padrões do projeto e as regras
+  de arquitetura dele (CLAUDE.md, AGENTS.md, DESIGN.md e o código parecido que já existe) e, entre os
+  caminhos que seguem esses padrões, escolha o menos complexo;
+- decida as dúvidas por esse critério e registre a decisão e o motivo na conversa;
 - ficou algo que a pessoa precisa avaliar (ponto em aberto, escopo que ficou de fora, decisão que
   você tomou no lugar dela e que muda o resultado)? Não siga adiante: \`request_review\` com
   \`pending\`. Nesse caso o card fica em "Aguardando revisão" mesmo em modo autônomo, e a fila

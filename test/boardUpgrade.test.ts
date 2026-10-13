@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import type { Database } from 'sql.js';
 import { BOARD_TEMPLATE_VERSION, pendingUpgrade, upgradeBoard } from '../src/extension/db/boardTemplate';
 import { run } from '../src/extension/db/query';
-import { HOMOLOGATION_INSTRUCTION_V4, PHASE_DEFAULTS } from '../src/shared/phaseDefaults';
+import { HOMOLOGATION_INSTRUCTION_V4, PHASE_DEFAULTS, PHASE_HISTORY } from '../src/shared/phaseDefaults';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
@@ -154,6 +154,36 @@ describe('atualização do board para o padrão atual', () => {
 
     settings.updateColumn(col('Homologação').id, { aiInstruction: 'minha instrução' });
     run(db, 'UPDATE boards SET template_version = 4 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+  });
+
+  it('versão 6: as fases com o texto padrão da 0.35 recebem o atual; o que a pessoa personalizou fica', () => {
+    upgradeBoard(db, boardId);
+    const settings = new SettingsRepo(db);
+    settings.updateColumn(col('Spec').id, {
+      aiInstruction: PHASE_HISTORY['Spec']!.instructions[0]!,
+      artifactTemplate: PHASE_HISTORY['Spec']!.templates[0]!,
+    });
+    settings.updateColumn(col('Homologação').id, { aiInstruction: PHASE_HISTORY['Homologação']!.instructions[0]! });
+    // o Plan com a instrução antiga, mas o modelo do documento personalizado: só a instrução muda
+    settings.updateColumn(col('Plan').id, { aiInstruction: PHASE_HISTORY['Plan']!.instructions[0]!, artifactTemplate: '# Meu plano' });
+    settings.updateColumn(col('PRD').id, { aiInstruction: 'minha instrução de PRD' });
+    run(db, 'UPDATE boards SET template_version = 5 WHERE id = ?', [boardId]);
+
+    expect(pendingUpgrade(db, boardId)).toEqual([
+      `Coluna "Spec": ${PHASE_HISTORY['Spec']!.change}.`,
+      `Coluna "Plan": ${PHASE_HISTORY['Plan']!.change}.`,
+      `Coluna "Homologação": ${PHASE_HISTORY['Homologação']!.change}.`,
+    ]);
+    upgradeBoard(db, boardId);
+    expect(col('Spec')).toMatchObject({
+      aiInstruction: PHASE_DEFAULTS['Spec']!.instruction,
+      artifactTemplate: PHASE_DEFAULTS['Spec']!.artifactTemplate,
+    });
+    expect(col('Spec').artifactTemplate).toContain('```mermaid');
+    expect(col('Plan')).toMatchObject({ aiInstruction: PHASE_DEFAULTS['Plan']!.instruction, artifactTemplate: '# Meu plano' });
+    expect(col('Homologação').aiInstruction).toContain('**Decisões**');
+    expect(col('PRD').aiInstruction).toBe('minha instrução de PRD');
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 

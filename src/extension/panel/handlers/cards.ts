@@ -40,6 +40,32 @@ function inheritYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.inherit'>, aut
   if (!linkProblem(ctx.state(), card.id, from.id, 'related')) ctx.links.add(card.id, from.id, 'related');
 }
 
+/**
+ * A história `cardId` é uma entrega derivada de `fromId` (a funcionalidade dividida em partes): a branch
+ * dela vai partir da branch da origem, com o pull request empilhado sobre o dela, e as duas ficam
+ * vinculadas como relativas. Vale para qualquer história, dentro ou fora do modo autônomo.
+ */
+function derive(ctx: BoardContext, msg: MessageOf<'card.derive'>, author: string, byAi: boolean): void {
+  const cards = ctx.state().cards;
+  const from = cards.find((c) => c.id === msg.fromId);
+  const card = cards.find((c) => c.id === msg.cardId);
+  if (!from || !card) throw new Error('Card não encontrado');
+  if (from.parentId || card.parentId) throw new Error('Só uma história deriva de outra história; sub-tarefas seguem a história delas.');
+  if (from.id === card.id) throw new Error('Uma história não deriva dela mesma.');
+  // a origem não pode, ela mesma, derivar (direta ou indiretamente) da nova: a pilha viraria um ciclo
+  for (let c: Card | undefined = from; c?.derivedFrom; c = cards.find((k) => k.id === c!.derivedFrom))
+    if (c.derivedFrom === card.id) throw new Error(`#${from.number} já deriva de #${card.number}.`);
+  if (card.branch) throw new Error(`#${card.number} já tem branch (${card.branch}): a base dela não muda mais.`);
+  ctx.cards.setDerivedFrom(card.id, from.id);
+  ctx.comments.add(
+    card.id,
+    author,
+    `Derivada de #${from.number} ${from.title}: a branch desta história parte da branch dela, e o pull request é empilhado sobre o dela.`,
+    byAi ? 'ai' : 'human',
+  );
+  if (!linkProblem(ctx.state(), card.id, from.id, 'related')) ctx.links.add(card.id, from.id, 'related');
+}
+
 /** Liga ou desliga o modo autônomo de uma história já validada; libera o que estava esperando uma pessoa. */
 function applyYolo(ctx: BoardContext, card: Card, enabled: boolean, author: string): void {
   ctx.cards.setYolo(card.id, enabled);
@@ -157,6 +183,10 @@ export const cardHandlers = {
   'card.yolo.inherit': (msg, ctx, { author, byAi }) => {
     if (!byAi) throw new Error('Para ligar o modo autônomo numa história, use card.yolo.set.');
     inheritYolo(ctx, msg, author);
+    return true;
+  },
+  'card.derive': (msg, ctx, { author, byAi }) => {
+    derive(ctx, msg, author, byAi);
     return true;
   },
   'card.execProfile.set': (msg, ctx) => {
