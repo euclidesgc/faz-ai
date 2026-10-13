@@ -1,11 +1,12 @@
-import type { Autopilot, Card } from '../../../shared/model';
+import type { Autopilot, BoardState, Card, Column, Id } from '../../../shared/model';
 import { cardRef } from '../../../shared/model';
-import { storyOf } from '../../../shared/story';
+import { norm } from '../../../shared/filters';
+import { lastAiColumn, storyOf, yoloStopOf, yoloStopOptions } from '../../../shared/story';
 import { useBoardStore, type DialogSpec } from '../../store/boardStore';
 import { usePending } from '../../usePending';
 import { t } from '../../i18n';
 import { ai, cards } from '../../commands';
-import { Button, IconYolo } from '../ui';
+import { Button, IconYolo, SelectField } from '../ui';
 
 /**
  * O aviso sobre o que o modo autônomo faz, mostrado na confirmação de ligar (aqui, no botão do card e na
@@ -14,53 +15,97 @@ import { Button, IconYolo } from '../ui';
  */
 export const yoloWarning = (): string =>
   t(
-    'A IA toca esta história sozinha, do Backlog ao pull request — sem aprovação, pergunta ou confirmação. Pare a qualquer hora pelo botão do topo do board.',
+    'A IA toca esta história sozinha, sem aprovação, pergunta ou confirmação, até a fase que você escolher: ali ela faz o trabalho, pede a sua revisão e o modo se desliga. Pare a qualquer hora pelo botão do topo do board.',
   );
 
+/** Uma opção de "Até onde": a coluna e o rótulo que a pessoa lê (a última da IA diz que abre o pull request). */
+export interface YoloStop {
+  value: Id;
+  name: string;
+  label: string;
+}
+
+const stopOf = (state: BoardState, column: Column): YoloStop => ({
+  value: column.id,
+  name: column.name,
+  label:
+    column.id === lastAiColumn(state, column.workflowId)?.id ? t('{column} (abre o pull request)', { column: column.name }) : column.name,
+});
+
 /**
- * Confirmação de ligar o modo autônomo, compartilhada por `YoloBar`, `CardFooter` e `SelectionBar`: pula o
- * diálogo quando a pessoa já marcou "não avisar novamente" (`dontWarnYolo`), senão mostra o aviso com esse
- * checkbox e só liga (`onEnable`) ao confirmar.
+ * As opções de "Até onde" para ligar o modo em uma ou mais histórias: as colunas em que a IA atua, da
+ * coluna atual em diante. Em lote, só as que valem para todas (pelo nome, que é como o host as casa
+ * entre workflows), com as colunas do workflow da primeira história.
+ */
+export function yoloStopChoices(state: BoardState, stories: Card[]): YoloStop[] {
+  const [first, ...rest] = stories;
+  if (!first) return [];
+  return yoloStopOptions(state, first)
+    .filter((c) => rest.every((s) => yoloStopOptions(state, s).some((o) => norm(o.name) === norm(c.name))))
+    .map((c) => stopOf(state, c));
+}
+
+/** A opção que começa escolhida: a última que a pessoa usou, quando ainda vale; senão, a do fim (o pull request). */
+const initialStop = (stops: YoloStop[], remembered: string): YoloStop | undefined =>
+  (remembered ? stops.find((s) => norm(s.name) === norm(remembered)) : undefined) ?? stops.at(-1);
+
+/**
+ * Confirmação de ligar o modo autônomo, compartilhada por `YoloBar`, `CardFooter` e `SelectionBar`. O aviso
+ * traz o seletor "Até onde" (`stops`), que começa na última escolha da pessoa; ligar passa a coluna
+ * escolhida (`onEnable`). Com "não avisar novamente" marcado (`dontWarnYolo`), liga direto até a última escolha.
  */
 export function confirmYoloOn(opts: {
   ask(dialog: DialogSpec | null): void;
   dontWarnYolo: boolean;
   setDontWarnYolo(value: boolean): void;
+  stops: YoloStop[];
+  untilName: string;
+  setUntilName(name: string): void;
   title: string;
   confirmLabel?: string;
-  onEnable(): void;
+  onEnable(until: Id | null): void;
 }): void {
-  if (opts.dontWarnYolo) {
-    opts.onEnable();
-    return;
-  }
+  const initial = initialStop(opts.stops, opts.untilName);
+  const enable = (value: string | undefined) => {
+    const stop = opts.stops.find((s) => s.value === value);
+    // o fim (o pull request) fica guardado como "sem escolha", para valer em qualquer board
+    if (stop) opts.setUntilName(stop === opts.stops.at(-1) ? '' : stop.name);
+    opts.onEnable(stop && stop !== opts.stops.at(-1) ? stop.value : null);
+  };
+  if (opts.dontWarnYolo) return enable(initial?.value);
   opts.ask({
     title: opts.title,
     message: yoloWarning(),
     confirmLabel: opts.confirmLabel ?? t('Ligar o modo autônomo'),
     danger: true,
+    ...(opts.stops.length
+      ? { choices: { label: t('Até onde'), options: opts.stops.map(({ value, label }) => ({ value, label })), value: initial?.value } }
+      : {}),
     checkbox: { label: t('Não avisar novamente') },
-    onConfirm: (_choice, checkboxChecked) => {
+    onConfirm: (choice, checkboxChecked) => {
       if (checkboxChecked) opts.setDontWarnYolo(true);
-      opts.onEnable();
+      enable(choice);
     },
   });
 }
 
 /**
  * Liga/desliga o modo autônomo de um card (história): desligar aplica direto; ligar passa por
- * `confirmYoloOn`. O valor mostrado reflete o clique na hora e fica travado (`applying`) até o
- * `boardState` confirmar ou o tempo esgotar. Usado por `YoloBar` e por `CardFooter` (o controle fora do detalhe).
+ * `confirmYoloOn`, com o "Até onde". O valor mostrado reflete o clique na hora e fica travado (`applying`)
+ * até o `boardState` confirmar ou o tempo esgotar. Usado por `YoloBar` e por `CardFooter` (o controle fora do detalhe).
  */
 export function useYoloToggle(card: Card): { effectiveYolo: boolean; applying: boolean; toggle(enabled: boolean): void } {
+  const state = useBoardStore((s) => s.state)!;
   const ask = useBoardStore((s) => s.ask);
   const dontWarnYolo = useBoardStore((s) => s.dontWarnYolo);
   const setDontWarnYolo = useBoardStore((s) => s.setDontWarnYolo);
+  const untilName = useBoardStore((s) => s.yoloUntilName);
+  const setUntilName = useBoardStore((s) => s.setYoloUntilName);
   const [effectiveYolo, applying, markYolo] = usePending(card.yolo);
 
-  const apply = (enabled: boolean) => {
+  const apply = (enabled: boolean, until: Id | null = null) => {
     markYolo(enabled);
-    cards.setYolo(card.id, enabled);
+    cards.setYolo(card.id, enabled, until);
   };
   const toggle = (enabled: boolean) => {
     if (applying) return;
@@ -69,8 +114,11 @@ export function useYoloToggle(card: Card): { effectiveYolo: boolean; applying: b
       ask,
       dontWarnYolo,
       setDontWarnYolo,
+      stops: yoloStopChoices(state, [card]),
+      untilName,
+      setUntilName,
       title: t('Ligar o modo autônomo em {ref}?', { ref: cardRef(card) }),
-      onEnable: () => apply(true),
+      onEnable: (until) => apply(true, until),
     });
   };
 
@@ -95,6 +143,7 @@ function queueNote(t: (s: string, v?: Record<string, string>) => string, card: C
 /** Modo autônomo (YOLO) da história: liga e desliga e mostra o andamento do autopiloto. A sub-tarefa mostra o da história. */
 export function YoloBar({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
+  const setUntilName = useBoardStore((s) => s.setYoloUntilName);
   const { effectiveYolo, applying, toggle } = useYoloToggle(card);
   if (card.deletedAt !== null || card.archivedAt !== null) return null;
   const story = storyOf(state, card) ?? card;
@@ -110,13 +159,31 @@ export function YoloBar({ card }: { card: Card }) {
     ) : null;
 
   const warning = yoloWarning();
+  const stop = card.yolo ? yoloStopOf(state, card) : undefined;
+  // a coluna em que o modo para pode ficar para trás da lista (a história já está nela): entra sempre
+  const stops = card.yolo ? yoloStopChoices(state, [card]) : [];
+  const options = stop && !stops.some((s) => s.value === stop.id) ? [stopOf(state, stop), ...stops] : stops;
 
   return (
     <div className="drawer-workspace yolo-bar">
       <label title={warning}>
         <input type="checkbox" checked={effectiveYolo} disabled={applying} onChange={(e) => toggle(e.target.checked)} /> <IconYolo />{' '}
-        {t('Modo autônomo')}
+        {card.yolo && stop ? t('Modo autônomo até') : t('Modo autônomo')}
       </label>
+      {card.yolo && stop && (
+        <SelectField
+          size="1"
+          aria-label={t('Até onde vai o modo autônomo')}
+          title={t('Ao terminar o trabalho desta fase, a IA pede a sua revisão e o modo se desliga')}
+          options={options.map(({ value, label }) => ({ value, label }))}
+          value={stop.id}
+          onChange={(value) => {
+            const chosen = options.find((o) => o.value === value);
+            setUntilName(chosen && chosen.value !== options.at(-1)?.value ? chosen.name : '');
+            cards.setYolo(card.id, true, value);
+          }}
+        />
+      )}
       {card.yolo && (
         <>
           <span className="muted small">{queueNote(t, card, autopilot)}</span>

@@ -219,8 +219,15 @@ export const card: Record<string, string> = {
   'A IA trabalha nesta sub-tarefa sem pedir aprovação, como na história':
     'The AI works on this sub-task without asking for approval, as in the story',
   'Modo autônomo, da história {ref}': 'Autonomous mode, from story {ref}',
-  'A IA toca esta história sozinha, do Backlog ao pull request — sem aprovação, pergunta ou confirmação. Pare a qualquer hora pelo botão do topo do board.':
-    'The AI drives this story by itself, from Backlog to the pull request — with no approval, question or confirmation. Stop at any time with the button at the top of the board.',
+  'A IA toca esta história sozinha, sem aprovação, pergunta ou confirmação, até a fase que você escolher: ali ela faz o trabalho, pede a sua revisão e o modo se desliga. Pare a qualquer hora pelo botão do topo do board.':
+    'The AI drives this story by itself, with no approval, question or confirmation, up to the phase you choose: there it does the work, asks for your review and the mode turns off. Stop at any time with the button at the top of the board.',
+  'Até onde': 'Up to',
+  '{column} (abre o pull request)': '{column} (opens the pull request)',
+  'Modo autônomo até': 'Autonomous mode up to',
+  'Até onde vai o modo autônomo': 'How far autonomous mode goes',
+  'Ao terminar o trabalho desta fase, a IA pede a sua revisão e o modo se desliga':
+    'When the work of this phase is done, the AI asks for your review and the mode turns off',
+  'Modo autônomo até {column}. Clique para desligar.': 'Autonomous mode up to {column}. Click to turn it off.',
   'Ligar o modo autônomo em {ref}?': 'Turn on autonomous mode for {ref}?',
   'Ligar o modo autônomo': 'Turn on autonomous mode',
   'Não avisar novamente': "Don't warn me again",

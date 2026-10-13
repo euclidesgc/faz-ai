@@ -12,7 +12,16 @@ import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { CURSOR_TOOLS, headlessCommand, headlessUnsupported } from '../src/extension/headless';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt, consumptionLine, summarizePrompt } from '../src/extension/runner';
+import {
+  AiRunner,
+  AUTONOMOUS_ADVICE,
+  PERMISSION_ADVICE,
+  cardPrompt,
+  consumptionLine,
+  summarizePrompt,
+  yoloStopAdvice,
+} from '../src/extension/runner';
+import { boardState, card as fakeCard, column as fakeColumn } from './fakes/board';
 import type { RunnerDeps } from '../src/extension/runner';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
@@ -24,6 +33,29 @@ import { monthOf, type RunReport } from '../src/shared/log';
 import { parseRunner } from '../src/shared/runner';
 import { TYPE_CONDITION, modelValue } from '../src/shared/models';
 import type { Database } from 'sql.js';
+
+it('com o modo autônomo só até uma fase, o pedido diz até onde e, na própria fase, manda pedir a revisão e parar', () => {
+  const columns = [
+    { ...fakeColumn('spec', 'wp', 1), aiActive: true },
+    { ...fakeColumn('plan', 'wp', 2), aiActive: true },
+    { ...fakeColumn('homolog', 'wp', 3), aiActive: true },
+  ];
+  const at = (columnId: string, yoloUntil: string | null) =>
+    boardState({
+      columns,
+      cards: [fakeCard('h', { yolo: true, columnId, yoloUntil }), fakeCard('t', { parentId: 'h', workflowId: 'wc' })],
+    });
+  const before = at('spec', 'plan');
+  expect(yoloStopAdvice(before, before.cards[0]!)).toBe(
+    'O modo autônomo desta história vai até plan: lá, ao terminar o trabalho da fase, a IA pede a revisão da pessoa e para.',
+  );
+  const stop = at('plan', 'plan');
+  expect(yoloStopAdvice(stop, stop.cards[0]!)).toMatch(/^MODO AUTÔNOMO ATÉ plan:[\s\S]*request_review/);
+  // a sub-tarefa não pede a revisão da fase: só fica sabendo até onde vai
+  expect(yoloStopAdvice(stop, stop.cards[1]!)).toMatch(/^O modo autônomo desta história vai até plan/);
+  const full = at('spec', null);
+  expect(yoloStopAdvice(full, full.cards[0]!)).toBeNull();
+});
 
 it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
   expect(AUTONOMOUS_ADVICE).not.toContain('coluna de conclusão');

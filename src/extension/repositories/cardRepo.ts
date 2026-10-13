@@ -195,12 +195,22 @@ export class CardRepo {
         }
       }
       // regra: a IA só avança um card de uma coluna que exige aprovação depois que uma pessoa aprova; voltar ou cancelar é livre.
-      // Em modo autônomo (YOLO) a aprovação não é exigida: a pessoa abriu mão dela ao ligar o modo na história
-      if (byAi && !this.isYolo(cardId) && fromCol !== columnId && str(col.category) !== 'cancelled') {
+      // Em modo autônomo (YOLO) a aprovação não é exigida: a pessoa abriu mão dela ao ligar o modo na história. Exceção: a
+      // coluna até onde a pessoa liberou o modo (`yolo_until`) segura a história como se exigisse aprovação
+      const yolo = this.yoloOf(cardId);
+      const stop = yolo.yolo && yolo.until === fromCol;
+      if (byAi && (!yolo.yolo || stop) && fromCol !== columnId && str(col.category) !== 'cancelled') {
         const from = one(db, 'SELECT name, position, requires_approval FROM columns WHERE id = ?', [fromCol]);
-        if (from && num(from.requires_approval) === 1 && num(col.position) > num(from.position) && str(card.status) !== 'approved')
+        if (
+          from &&
+          (num(from.requires_approval) === 1 || stop) &&
+          num(col.position) > num(from.position) &&
+          str(card.status) !== 'approved'
+        )
           throw new Error(
-            `"${str(card.title)}" só sai de ${str(from.name)} com a aprovação de uma pessoa. Peça a revisão com request_review e pare; quando o status for "approved", mova o card.`,
+            stop
+              ? `"${str(card.title)}" está em ${str(from.name)}, a última fase que a pessoa liberou para o modo autônomo. Ao terminar o trabalho da fase, chame request_review na história e pare.`
+              : `"${str(card.title)}" só sai de ${str(from.name)} com a aprovação de uma pessoa. Peça a revisão com request_review e pare; quando o status for "approved", mova o card.`,
           );
       }
       const ids = all(db, 'SELECT id FROM cards WHERE column_id = ? AND id != ? ORDER BY position', [columnId, cardId]).map((r) =>
@@ -320,9 +330,27 @@ export class CardRepo {
     run(this.db, 'UPDATE cards SET exec_profile = ? WHERE id = ?', [profileId || null, cardId]);
   }
 
-  /** Liga ou desliga o modo autônomo da história. */
-  setYolo(storyId: string, enabled: boolean): void {
-    run(this.db, 'UPDATE cards SET yolo = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, now(), storyId]);
+  /**
+   * Liga ou desliga o modo autônomo da história. `until` é a coluna em que o modo para ('' = até a
+   * última coluna da IA); desligar limpa a escolha.
+   */
+  setYolo(storyId: string, enabled: boolean, until = ''): void {
+    run(this.db, 'UPDATE cards SET yolo = ?, yolo_until = ?, updated_at = ? WHERE id = ?', [
+      enabled ? 1 : 0,
+      enabled ? until : '',
+      now(),
+      storyId,
+    ]);
+  }
+
+  /** O modo autônomo da história do card (ele mesmo, ou o pai numa sub-tarefa) e a coluna em que ele para ('' = no fim). */
+  private yoloOf(cardId: string): { yolo: boolean; until: string } {
+    const row = one(
+      this.db,
+      'SELECT COALESCE(p.yolo, c.yolo) AS yolo, COALESCE(p.yolo_until, c.yolo_until) AS until FROM cards c LEFT JOIN cards p ON p.id = c.parent_id WHERE c.id = ?',
+      [cardId],
+    );
+    return { yolo: num(row?.yolo) === 1, until: str(row?.until) };
   }
 
   /**

@@ -740,6 +740,18 @@ approval; check **Não avisar novamente** (don't warn again) in the warning to t
 next time. Turning a story off asks for no confirmation. From then on the AI drives the
 story by itself, **without asking for authorization or confirmation on anything**:
 
+- **Até onde** (up to): the warning to turn it on brings the **Até onde** selector, with the phases the
+  AI works in from the story's current column on; the default is the last one, **Homologação (abre o
+  pull request)** (opens the pull request), which is the full mode described below. Pick an earlier
+  phase, such as Plan, and the AI goes on by itself up to it: it does that phase's work, asks for your
+  review and the mode turns off, with a note in the conversation. For it to go on by itself from
+  there, turn the mode on again. With the mode on, the card bar shows **Modo autônomo até [phase]**
+  (autonomous mode up to), and changing the phase there asks for no confirmation. The selector starts
+  at the last phase you chose, and with **Não avisar novamente** checked the mode turns on straight up
+  to it. In the selection bar, the selector only offers the phases that apply to every selected story.
+  The AI reads the stop in `autonomousUntil` in `get_card`, and in the stop phase
+  `phase.requiresApproval` comes as true.
+
 - From **Backlog** to the last column the AI works in (Homologação, on the default board): it does
   Discovery, PRD, Spec and Plan, creates the sub-tasks, implements them one by one, reviews and, in that
   last column, opens the pull request, records it with `set_pull_request` and stops there — the

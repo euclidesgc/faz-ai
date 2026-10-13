@@ -38,6 +38,7 @@ const card = (id: string, over: Partial<Card> = {}): Card => ({
   mergeCommit: '',
   execProfile: null,
   yolo: false,
+  yoloUntil: null,
   derivedFrom: null,
   ...over,
 });

@@ -58,6 +58,44 @@ export const lastAiColumn = (state: BoardState, workflowId: Id): Column | undefi
     .at(-1);
 
 /**
+ * Onde o modo autônomo da história para: a coluna escolhida ao ligar o modo (`yoloUntil`) ou, sem
+ * escolha, com uma que não vale mais (apagada, de outro workflow, onde a IA não atua) ou que a
+ * história já passou (a pessoa a arrastou adiante), a última coluna em que a IA atua.
+ */
+export function yoloStopOf(state: BoardState, story: Card): Column | undefined {
+  const last = lastAiColumn(state, story.workflowId);
+  const chosen = story.yoloUntil ? state.columns.find((c) => c.id === story.yoloUntil) : undefined;
+  if (!chosen || chosen.workflowId !== story.workflowId || chosen.category !== 'open' || !chosen.aiActive) return last;
+  const current = columnOf(state, story);
+  if (current && current.position > chosen.position) return last;
+  return chosen;
+}
+
+/**
+ * A história em modo autônomo está na coluna até onde a pessoa liberou o modo, antes da última coluna
+ * da IA: ali a IA faz o trabalho da fase, pede a revisão e o modo se desliga (na última coluna, a
+ * entrega é o pull request, como sempre).
+ */
+export function isAtYoloStop(state: BoardState, story: Card): boolean {
+  if (!story.yolo || story.parentId) return false;
+  const stop = yoloStopOf(state, story);
+  return !!stop && stop.id === story.columnId && stop.id !== lastAiColumn(state, story.workflowId)?.id;
+}
+
+/**
+ * As colunas que a pessoa pode escolher como "até onde" ao ligar o modo autônomo: as abertas em que a
+ * IA atua, da coluna atual em diante. A atual fica de fora quando o trabalho dela já foi entregue
+ * para revisão (ou aprovado): parar ali não deixaria nada para a IA fazer.
+ */
+export function yoloStopOptions(state: BoardState, story: Card): Column[] {
+  const current = columnOf(state, story);
+  const done = story.status === 'waiting_review' || story.status === 'approved';
+  return columnsOf(state, story.workflowId).filter(
+    (c) => c.category === 'open' && c.aiActive && (!current || c.position > current.position || (c.id === current.id && !done)),
+  );
+}
+
+/**
  * A história (não a sub-tarefa) está entregue: modo autônomo, parada na última coluna em que a IA
  * atua, com pull request registrado e o status passado para a pessoa — exceto bloqueio, que é
  * impedimento, não entrega.
