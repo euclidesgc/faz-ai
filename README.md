@@ -438,7 +438,7 @@ e continua visível mesmo quando o botão está bloqueado.
   a falha fica na conversa, sem bloquear o card. Um refino não conta como execução sem progresso
   para o modo autônomo.
 
-Imagens coladas na mensagem viram anexos do card e a IA as recebe.
+Imagens coladas na mensagem ou na descrição do card viram anexos dele e a IA as recebe.
 
 - **Resumir a conversa**, na aba Conversa, aparece a partir de 2 mensagens: lê a conversa inteira e
   grava um resumo (Decisões, Observações, Pendências) como uma mensagem nova da IA (`kind:

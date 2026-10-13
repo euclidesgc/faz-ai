@@ -463,7 +463,7 @@ and stays visible even when the button is blocked.
   it had, also when the run fails: the failure goes to the conversation, without blocking the card. A
   refine does not count as a run without progress for the autonomous mode.
 
-Images pasted into the message become card attachments and the AI receives them.
+Images pasted into the message or into the card description become card attachments and the AI receives them.
 
 - **Resumir a conversa** (summarize the conversation), in the Conversa tab, shows up from 2
   messages on: it reads the whole conversation and writes a summary (Decisões, Observações,

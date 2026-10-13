@@ -215,8 +215,8 @@ manda trabalhar no card. Os comandos, conforme a documentação de cada ferramen
 | Claude Code | `claude -p` (prompt pela entrada padrão) | `--permission-mode dontAsk` com `--allowedTools "mcp__faz-ai__*" Read Glob Grep`; `acceptEdits`; `bypassPermissions` |
 | Cursor | `cursor-agent -p --output-format stream-json --force --approve-mcps --trust` (servidor do board gravado no `.cursor/mcp.json` antes de rodar) | `--allowed-tools` com as ferramentas de leitura e de MCP; mais as de edição; sem `--allowed-tools` |
 
-Uma imagem colada numa mensagem aparece no texto como `attachment:<nome>`; o arquivo é o anexo de
-mesmo nome em `attachments` de `get_card`.
+Uma imagem colada numa mensagem ou na descrição do card aparece no texto como `attachment:<nome>`; o
+arquivo é o anexo de mesmo nome em `attachments` de `get_card`.
 
 ### Branch e pasta de trabalho
 

@@ -167,6 +167,75 @@ describe('CardDrawer', () => {
     expect(screen.getByPlaceholderText(/Descreva o problema/)).toHaveFocus();
   });
 
+  describe('imagem colada na descrição', () => {
+    const anexo = (filename: string, storedName: string) => ({
+      id: 'anexo-1',
+      cardId: board.storyId,
+      filename,
+      storedName,
+      mime: 'image/png',
+      size: 4,
+      createdAt: 1,
+      artifact: false,
+    });
+
+    beforeEach(() => useBoardStore.setState({ error: null, attachmentsBaseUri: '' }));
+
+    it('colar uma imagem envia o anexo ao card e põe a referência no texto', async () => {
+      openStory();
+      await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+      const box = screen.getByPlaceholderText(/cole imagens direto aqui/) as HTMLTextAreaElement;
+      const file = new File(['abcd'], 'captura.png', { type: 'image/png' });
+      fireEvent.paste(box, { clipboardData: { files: [file] } });
+      await waitFor(() => expect(sentOf('attachment.addData')).toHaveLength(1));
+      const sent = lastSent('attachment.addData');
+      expect(sent.cardId).toBe(board.storyId);
+      expect(sent.filename).toMatch(/^colado-\d+\.png$/);
+      expect(sent.base64).toBe(btoa('abcd'));
+      expect(box.value).toBe(`![${sent.filename}](attachment:${sent.filename})`);
+    });
+
+    it('arquivo acima de 20 MB não é anexado, avisa o erro e não altera o texto', async () => {
+      openStory();
+      await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+      const box = screen.getByPlaceholderText(/cole imagens direto aqui/) as HTMLTextAreaElement;
+      await userEvent.type(box, 'antes');
+      const file = new File(['x'], 'grande.png', { type: 'image/png' });
+      Object.defineProperty(file, 'size', { value: 20 * 1024 * 1024 + 1 });
+      fireEvent.paste(box, { clipboardData: { files: [file] } });
+      expect(sentOf('attachment.addData')).toHaveLength(0);
+      expect(useBoardStore.getState().error).toBe('"grande.png" tem mais de 20 MB e não foi anexado.');
+      expect(box.value).toBe('antes');
+    });
+
+    it('na leitura, a referência vira a imagem com o endereço do anexo', () => {
+      patchState((s) => ({ attachments: [...s.attachments, anexo('tela.png', 'guardado.png')] }));
+      patchCard(board.storyId, { description: 'veja ![tela](attachment:tela.png)' });
+      useBoardStore.setState({ attachmentsBaseUri: 'https://anexos' });
+      openStory();
+      const img = screen.getByAltText('tela');
+      expect(img).toHaveAttribute('src', `https://anexos/${board.storyId}/guardado.png`);
+    });
+
+    it('na aba Visualizar do editor, a imagem também aparece com o endereço do anexo', async () => {
+      patchState((s) => ({ attachments: [...s.attachments, anexo('tela.png', 'guardado.png')] }));
+      patchCard(board.storyId, { description: 'veja ![tela](attachment:tela.png)' });
+      useBoardStore.setState({ attachmentsBaseUri: 'https://anexos' });
+      openStory();
+      await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Visualizar' }));
+      expect(screen.getByAltText('tela')).toHaveAttribute('src', `https://anexos/${board.storyId}/guardado.png`);
+    });
+
+    it('na caixa de mensagem da conversa, colar e visualizar usam o mesmo caminho', async () => {
+      patchState((s) => ({ attachments: [...s.attachments, anexo('tela.png', 'guardado.png')] }));
+      useBoardStore.setState({ attachmentsBaseUri: 'https://anexos' });
+      renderThemed(<CommentsTab cardId={board.storyId} draft="![tela](attachment:tela.png)" onDraft={() => {}} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Visualizar' }));
+      expect(screen.getByAltText('tela')).toHaveAttribute('src', `https://anexos/${board.storyId}/guardado.png`);
+    });
+  });
+
   it('a descrição em edição continua aberta depois de trocar de aba', async () => {
     openStory();
     await userEvent.click(screen.getByRole('button', { name: 'Editar' }));

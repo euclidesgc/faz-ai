@@ -116,8 +116,8 @@ export const card: Record<string, string> = {
 
   // Descrição
   Descrição: 'Description',
-  'Descreva o problema, o contexto e o critério de aceite. Markdown suportado.':
-    'Describe the problem, the context and the acceptance criteria. Markdown supported.',
+  'Descreva o problema, o contexto e o critério de aceite. Markdown suportado; cole imagens direto aqui.':
+    'Describe the problem, the context and the acceptance criteria. Markdown supported; paste images right here.',
   'Clique para adicionar uma descrição…': 'Click to add a description…',
 
   // Campos

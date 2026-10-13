@@ -129,6 +129,7 @@ describe('servidor MCP', () => {
     const tools = (await client.listTools()).tools;
     const description = (name: string) => tools.find((t) => t.name === name)!.description;
     expect(description('get_card')).toContain('`attachment:<nome>`');
+    expect(description('get_card')).toContain('colado numa mensagem ou na descrição aparece como `attachment:<nome>`');
     expect(description('get_card')).toContain('`subtasksNow`');
     expect(description('get_board')).toContain('Configurações → Harness: não indique nada fora deles');
     expect(description('get_models')).toContain('"Esforço da atividade" do card é o tamanho da tarefa');
