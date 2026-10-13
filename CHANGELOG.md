@@ -11,7 +11,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   (servidores MCP, agentes, rules, skills e o próprio card) e por item, como a janela de contexto do
   Claude Code. No Claude Code, o servidor do board conta só os nomes das ferramentas e as instruções,
   e as definições aparecem como sob demanda; os servidores liberados pelo agente aparecem como não
-  medidos. É uma estimativa pelo tamanho do texto, para achar o que pesa antes de rodar.
+  medidos. É uma estimativa pelo tamanho do texto, para achar o que pesa antes de rodar, e acompanha o card: a
+  fase da coluna, a conversa e os documentos entram na próxima execução.
 
 ## 0.36.0
 

@@ -517,7 +517,9 @@ card's model, a bar per group and each item, with how much it takes.
 
 It is an estimate from text size (about 4 characters per token), meant to compare choices and find
 what weighs before running: unmarking a skill, removing it from the card or switching the agent
-changes the number right away. The AI tool's own prompt and built-in tools are not counted. The
+changes the number right away. The estimate follows the card: in a column where the AI works, it
+names the phase and adds its instructions, and the conversation and documents count as they grow.
+Deleting messages only lowers the next runs; what was already spent does not come back. The AI tool's own prompt and built-in tools are not counted. The
 window comes from the card's model (or the agent's): 1M for Fable 5.1, Opus 5.5 and Sonnet 5.5, and
 200K for Haiku 4.5. Without a model, or with a model whose window is unknown (such as Cursor's), the
 ring shows only the total. In Cursor, which does not enforce the empty context, what the tool loads on

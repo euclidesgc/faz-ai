@@ -421,10 +421,12 @@ export const board: Record<string, string> = {
 
   // Contexto estimado do card (anel no rodapé e o detalhe)
   'Contexto estimado': 'Estimated context',
-  'Contexto estimado do card: {tokens} de {window} tokens ({share}). Clique para ver o detalhe.':
-    'Estimated card context: {tokens} of {window} tokens ({share}). Click for the breakdown.',
-  'Contexto estimado do card: {tokens} tokens. Clique para ver o detalhe.':
-    'Estimated card context: {tokens} tokens. Click for the breakdown.',
+  'Contexto estimado do card: cerca de {tokens} de {window} tokens ({share}). Clique para ver o detalhe.':
+    'Estimated card context: about {tokens} of {window} tokens ({share}). Click for the breakdown.',
+  'Contexto estimado do card: cerca de {tokens} tokens. Clique para ver o detalhe.':
+    'Estimated card context: about {tokens} tokens. Click for the breakdown.',
+  'Estimativa da próxima execução': 'Estimate for the next run',
+  'Estimativa da próxima execução, na fase {phase}': 'Estimate for the next run, in the {phase} phase',
   'nomes das ferramentas': 'tool names',
   'instruções do servidor': 'server instructions',
   'definições das ferramentas': 'tool definitions',
@@ -439,8 +441,10 @@ export const board: Record<string, string> = {
   'Carrega só quando a IA procura a ferramenta': 'Loads only when the AI looks up the tool',
   'Sob demanda: mais {tokens} das definições das ferramentas MCP, carregadas quando a IA procura uma ferramenta.':
     'On demand: {tokens} more from the MCP tool definitions, loaded when the AI looks up a tool.',
-  'Estimativa pelo tamanho do texto, cerca de {chars} caracteres por token.':
-    'Estimated from text size, about {chars} characters per token.',
+  'É uma estimativa pelo tamanho do texto (cerca de {chars} caracteres por token), não a contagem exata da ferramenta. Acompanha o card: muda com a fase, o agente, a conversa e os documentos.':
+    "It is an estimate from text size (about {chars} characters per token), not the tool's exact count. It follows the card: it changes with the phase, the agent, the conversation and the documents.",
+  'Apagar mensagens da conversa diminui só as próximas execuções: o que já foi gasto não volta.':
+    'Deleting conversation messages only lowers the next runs: what was already spent does not come back.',
   'Fora da conta: o prompt e as ferramentas nativas do Claude Code, e as ferramentas dos servidores liberados pelo agente.':
     "Not counted: Claude Code's own prompt and built-in tools, and the tools of the servers the agent allows.",
   'Fora da conta: o que o Cursor carrega por conta própria (rules, skills e servidores configurados nele).':

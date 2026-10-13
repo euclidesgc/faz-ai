@@ -9,7 +9,7 @@ import {
 } from '../../../shared/contextEstimate';
 import type { Card } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
-import { t } from '../../i18n';
+import { dt, t } from '../../i18n';
 import { formatCompact, formatNumber, intlLocale } from '../metrics/format';
 import { IconChevronRight } from '../ui';
 
@@ -79,12 +79,12 @@ function Ring({ share }: { share: number | null }) {
 /** Resumo de uma frase, para o nome acessível e a dica do botão. */
 function summary(e: ContextEstimate): string {
   return e.window
-    ? t('Contexto estimado do card: {tokens} de {window} tokens ({share}). Clique para ver o detalhe.', {
+    ? t('Contexto estimado do card: cerca de {tokens} de {window} tokens ({share}). Clique para ver o detalhe.', {
         tokens: formatNumber(e.total),
         window: formatNumber(e.window),
         share: formatShare(e.total, e.window),
       })
-    : t('Contexto estimado do card: {tokens} tokens. Clique para ver o detalhe.', { tokens: formatNumber(e.total) });
+    : t('Contexto estimado do card: cerca de {tokens} tokens. Clique para ver o detalhe.', { tokens: formatNumber(e.total) });
 }
 
 /**
@@ -100,7 +100,7 @@ export function ContextGauge({ card }: { card: Card }) {
       <Popover.Trigger>
         <button className="context-gauge" title={label} aria-label={label} onPointerDown={keep} onClick={keep} onDoubleClick={keep}>
           <Ring share={estimate.window ? estimate.total / estimate.window : null} />
-          <span>{formatCompact(estimate.total)}</span>
+          <span>~{formatCompact(estimate.total)}</span>
         </button>
       </Popover.Trigger>
       <Popover.Content
@@ -129,11 +129,18 @@ export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
         <span className="context-title">{t('Contexto estimado')}</span>
         <span className="context-total">
           {e.window
-            ? `${formatCompact(e.total)} / ${formatCompact(e.window)} (${formatShare(e.total, e.window)})`
-            : `${formatCompact(e.total)} tokens`}
+            ? `~${formatCompact(e.total)} / ${formatCompact(e.window)} (${formatShare(e.total, e.window)})`
+            : `~${formatCompact(e.total)} tokens`}
         </span>
       </div>
-      {e.model && <div className="context-model">{e.model}</div>}
+      <div className="context-model">
+        {[
+          e.phase ? t('Estimativa da próxima execução, na fase {phase}', { phase: dt(e.phase) }) : t('Estimativa da próxima execução'),
+          e.model,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      </div>
       <div className="context-bar" aria-hidden="true">
         {e.groups.map((g) =>
           g.tokens > 0 && scale > 0 ? (
@@ -185,7 +192,13 @@ export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
             })}
           </p>
         )}
-        <p>{t('Estimativa pelo tamanho do texto, cerca de {chars} caracteres por token.', { chars: CHARS_PER_TOKEN })}</p>
+        <p>
+          {t(
+            'É uma estimativa pelo tamanho do texto (cerca de {chars} caracteres por token), não a contagem exata da ferramenta. Acompanha o card: muda com a fase, o agente, a conversa e os documentos.',
+            { chars: CHARS_PER_TOKEN },
+          )}
+        </p>
+        <p>{t('Apagar mensagens da conversa diminui só as próximas execuções: o que já foi gasto não volta.')}</p>
         <p>
           {e.tool === 'claude'
             ? t('Fora da conta: o prompt e as ferramentas nativas do Claude Code, e as ferramentas dos servidores liberados pelo agente.')

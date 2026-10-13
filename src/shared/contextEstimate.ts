@@ -86,6 +86,8 @@ export interface ContextEstimate {
   window: number | null;
   /** rótulo do modelo do card no catálogo, ex.: "Opus 5.5"; null sem modelo */
   model: string | null;
+  /** a fase da próxima execução (a coluna do card, quando a IA atua nela); null fora de uma fase da IA */
+  phase: string | null;
   /** os grupos com alguma linha, na ordem da tela */
   groups: ContextGroup[];
   /** o que pode entrar depois, sob demanda (as definições das ferramentas MCP) */
@@ -179,7 +181,11 @@ function cardEntries(s: BoardState, c: Card): ContextEntry[] {
 
 const sum = (entries: ContextEntry[]): number => entries.reduce((n, e) => n + (e.onDemand ? 0 : (e.tokens ?? 0)), 0);
 
-/** O contexto estimado de uma execução do card, com o agente, as rules, as skills e o modelo que valem para ele agora. */
+/**
+ * O contexto estimado da próxima execução do card, com o agente, as rules, as skills, o modelo e a fase
+ * que valem para ele agora: muda quando o card muda de coluna, quando a conversa cresce ou encolhe e
+ * quando a fase anexa um documento.
+ */
 export function estimateContext(s: BoardState, c: Card): ContextEstimate {
   const tool = s.board.aiTool;
   const m = manifestOf(s, c);
@@ -198,11 +204,13 @@ export function estimateContext(s: BoardState, c: Card): ContextEstimate {
   }));
   const entries = groups.flatMap((g) => g.entries);
   const option = m.model ? s.board.modelCatalog.find((o) => o.tool === tool && o.model === m.model!.name) : undefined;
+  const col = columnOf(s, c);
   return {
     tool,
     total: groups.reduce((n, g) => n + g.tokens, 0),
     window: m.model ? contextWindowOf(tool, m.model.name) : null,
     model: option?.label ?? m.model?.name ?? null,
+    phase: col?.aiActive ? col.name : null,
     groups,
     onDemand: entries.reduce((n, e) => n + (e.onDemand ? (e.tokens ?? 0) : 0), 0),
     unmeasured: entries.filter((e) => e.tokens === null).length,

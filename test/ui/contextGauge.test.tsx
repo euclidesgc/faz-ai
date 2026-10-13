@@ -44,7 +44,7 @@ describe('contexto estimado no card do board', () => {
   it('sem modelo, o anel fica só com o aro e o nome acessível dá só o total', () => {
     setModel(board.storyId, '');
     const { container } = show(board.storyId);
-    expect(gauge()).toHaveAccessibleName(/^Contexto estimado do card: [\d.]+ tokens\./);
+    expect(gauge()).toHaveAccessibleName(/^Contexto estimado do card: cerca de [\d.]+ tokens\./);
     expect(container.querySelector('.context-gauge .context-ring-fill')).toBeNull();
   });
 
@@ -58,7 +58,8 @@ describe('contexto estimado no card do board', () => {
     expect(within(panel).getByText('Servidores MCP')).toBeInTheDocument();
     expect(within(panel).getByText('Card')).toBeInTheDocument();
     expect(within(panel).getByText('Livre')).toBeInTheDocument();
-    expect(within(panel).getByText('Opus 5.5')).toBeInTheDocument();
+    // o card está no Backlog, onde a IA não atua: a estimativa não cita fase
+    expect(within(panel).getByText('Estimativa da próxima execução · Opus 5.5')).toBeInTheDocument();
     // o servidor do board: nomes e instruções contam; as definições aparecem como sob demanda
     await userEvent.click(within(panel).getByText('Servidores MCP'));
     expect(within(panel).getByText('nomes das ferramentas')).toBeInTheDocument();
@@ -66,6 +67,21 @@ describe('contexto estimado no card do board', () => {
     expect(within(panel).getByText(/^Sob demanda: mais/)).toBeInTheDocument();
     expect(within(panel).getByText(/Fora da conta: o prompt e as ferramentas nativas do Claude Code/)).toBeInTheDocument();
     expect(posted).not.toHaveBeenCalled();
+  });
+
+  it('acompanha o card: numa coluna em que a IA atua, a estimativa diz a fase e soma as instruções dela', async () => {
+    setModel(board.storyId, 'claude:opus@high');
+    const phase = state().columns.find((c) => c.workflowId === cardOf(board.storyId).workflowId && c.aiActive && c.aiInstruction)!;
+    const { unmount } = show(board.storyId);
+    const total = () => Number(/cerca de ([\d.]+)/.exec(gauge().getAttribute('aria-label')!)![1]!.replace(/\./g, ''));
+    const inBacklog = total();
+    unmount();
+    patchCard(board.storyId, { columnId: phase.id });
+    show(board.storyId);
+    expect(total()).toBeGreaterThan(inBacklog);
+    await userEvent.click(gauge());
+    const panel = await screen.findByRole('dialog', { name: 'Contexto estimado' });
+    expect(within(panel).getByText(`Estimativa da próxima execução, na fase ${phase.name} · Opus 5.5`)).toBeInTheDocument();
   });
 
   it('sem modelo, o detalhe explica por que não há porcentagem', async () => {

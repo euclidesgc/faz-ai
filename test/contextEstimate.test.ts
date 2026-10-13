@@ -200,6 +200,7 @@ describe('contexto estimado de um card', () => {
       ],
     };
     const e = estimateContext(s, story);
+    expect(e.phase).toBe('doing');
     expect(group(e, 'card')!.entries).toEqual([
       { kind: 'card-text', tokens: tokensOf('Tela'.length + 'Uma tela nova'.length) },
       { kind: 'card-checklist', count: 1, tokens: tokensOf('Validar'.length) },
@@ -215,7 +216,8 @@ describe('contexto estimado de um card', () => {
     const story = card('h1');
     const withModel = stateWith({ cards: [story], fieldValues: [{ cardId: 'h1', fieldId: 'f-model', value: 'claude:opus@high' }] });
     expect(estimateContext(withModel, story)).toMatchObject({ window: 1_000_000, model: 'Opus 5.5' });
-    expect(estimateContext(stateWith({ cards: [story] }), story)).toMatchObject({ window: null, model: null });
+    // no backlog a IA não atua: não há fase
+    expect(estimateContext(stateWith({ cards: [story] }), story)).toMatchObject({ window: null, model: null, phase: null });
     const custom: ModelOption = { ...OPUS, id: 'claude:meu-modelo', model: 'meu-modelo', label: 'Meu modelo' };
     const unknown = stateWith({ cards: [story], fieldValues: [{ cardId: 'h1', fieldId: 'f-model', value: 'claude:meu-modelo' }] });
     expect(estimateContext({ ...unknown, board: { ...unknown.board, modelCatalog: [custom] } }, story)).toMatchObject({
