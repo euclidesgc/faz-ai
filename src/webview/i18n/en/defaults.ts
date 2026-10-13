@@ -7,6 +7,7 @@ export const defaults: Record<string, string> = {
   'Sub-tarefas': 'Sub-tasks',
   // colunas das histórias (as fases do SDD) e das sub-tarefas
   Implementação: 'Implementation',
+  Revisão: 'Review',
   Homologação: 'Acceptance',
   Concluído: 'Done',
   Cancelado: 'Cancelled',

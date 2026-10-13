@@ -15,7 +15,7 @@ import { all, bool, num, one, run, str, transaction } from './query';
  * Board padrão. Cada mudança no padrão sobe a versão; boards criados antes são atualizados no
  * lugar (com confirmação), sem recriar nada: os cards continuam na coluna em que estavam.
  */
-export const BOARD_TEMPLATE_VERSION = 6;
+export const BOARD_TEMPLATE_VERSION = 7;
 
 export interface TemplateColumn {
   name: string;
@@ -34,6 +34,7 @@ export const BOARD_TEMPLATE: Record<WorkflowKind, TemplateColumn[]> = {
     { name: 'Spec', category: 'open', aiActive: true, requiresApproval: true },
     { name: 'Plan', category: 'open', aiActive: true, requiresApproval: true },
     { name: 'Implementação', category: 'open', aiActive: true },
+    { name: 'Revisão', category: 'open', aiActive: true },
     { name: 'Homologação', category: 'open', aiActive: true, requiresApproval: true },
     { name: 'Concluído', category: 'done' },
     { name: 'Cancelado', category: 'cancelled' },
@@ -198,7 +199,61 @@ function steps(db: Database, boardId: string): Step[] {
       });
     }
   }
+  if (version < 7) out.push(...reviewSteps(db, boardId));
   if (version < BOARD_TEMPLATE_VERSION) out.push(...phaseTextSteps(db, boardId));
+  return out;
+}
+
+/**
+ * A coluna Revisão entre a Implementação e a Homologação, e a opção dela no campo "Fase". As posições e
+ * as opções são lidas na hora de aplicar: um passo anterior da mesma atualização pode ter mexido nelas.
+ */
+function reviewSteps(db: Database, boardId: string): Step[] {
+  const out: Step[] = [];
+  const parent = one(db, "SELECT id FROM workflows WHERE board_id = ? AND kind = 'parent' ORDER BY position LIMIT 1", [boardId]);
+  const wf = parent ? str(parent.id) : null;
+  const named = (name: string) =>
+    wf
+      ? all(db, 'SELECT id, name, position FROM columns WHERE workflow_id = ?', [wf]).find((c) => norm(str(c.name)) === norm(name))
+      : undefined;
+  if (wf && !named('Revisão')) {
+    out.push({
+      description:
+        'Nova coluna "Revisão" entre a Implementação e a Homologação: a IA roda as checagens do projeto e revisa o código antes do pull request, corrige o que tem diretriz e pergunta o que é ambíguo.',
+      apply: () => {
+        const after = named('Implementação');
+        const before = named('Homologação');
+        const firstTerminal = one(db, "SELECT MIN(position) AS p FROM columns WHERE workflow_id = ? AND category != 'open'", [wf])?.p;
+        const end = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM columns WHERE workflow_id = ?', [wf])?.p);
+        const position = after ? num(after.position) + 1 : before ? num(before.position) : firstTerminal == null ? end : num(firstTerminal);
+        insertColumn(
+          db,
+          wf,
+          BOARD_TEMPLATE.parent.find((c) => c.name === 'Revisão')!,
+          position,
+        );
+      },
+    });
+  }
+  const fase = () =>
+    one(db, "SELECT id, options_json FROM field_defs WHERE board_id = ? AND lower(name) = 'fase' AND kind = 'select'", [boardId]);
+  const options = (row: ReturnType<typeof fase>) => JSON.parse(str(row?.options_json) || '[]') as string[];
+  const field = fase();
+  if (field && !options(field).some((o) => norm(o) === norm('Revisão'))) {
+    out.push({
+      description: 'Campo "Fase" das sub-tarefas: nova opção Revisão.',
+      apply: () => {
+        const now = fase()!;
+        const list = options(now);
+        if (list.some((o) => norm(o) === norm('Revisão'))) return;
+        const impl = list.findIndex((o) => norm(o) === norm('Implementação'));
+        const homolog = list.findIndex((o) => norm(o) === norm('Homologação'));
+        const at = impl >= 0 ? impl + 1 : homolog >= 0 ? homolog : list.length;
+        list.splice(at, 0, 'Revisão');
+        run(db, 'UPDATE field_defs SET options_json = ? WHERE id = ?', [JSON.stringify(list), str(now.id)]);
+      },
+    });
+  }
   return out;
 }
 
