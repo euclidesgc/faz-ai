@@ -16,7 +16,10 @@ export const fake = {
   folder: undefined as string | undefined,
   /** várias pastas (multi-root): quando definido, substitui `folder` no `workspace.workspaceFolders` */
   folders: undefined as string[] | undefined,
+  /** cada `createFileSystemWatcher`, com o padrão pedido; `fire` simula a mudança de um arquivo */
+  watchers: [] as FakeWatcher[],
   reset(): void {
+    this.watchers.length = 0;
     this.commands.clear();
     this.messages.length = 0;
     this.opened.length = 0;
@@ -109,6 +112,26 @@ export class RelativePattern {
     public pattern: string,
   ) {}
 }
+
+class FakeWatcher {
+  disposed = false;
+  private listeners = new Set<(uri: Uri) => void>();
+  constructor(readonly glob: unknown) {}
+  private listen = (fn: (uri: Uri) => void) => {
+    this.listeners.add(fn);
+    return { dispose: () => void this.listeners.delete(fn) };
+  };
+  onDidCreate = this.listen;
+  onDidChange = this.listen;
+  onDidDelete = this.listen;
+  fire(uri: Uri): void {
+    this.listeners.forEach((fn) => fn(uri));
+  }
+  dispose(): void {
+    this.disposed = true;
+    this.listeners.clear();
+  }
+}
 export const TreeItemCollapsibleState = { None: 0, Collapsed: 1, Expanded: 2 };
 export const StatusBarAlignment = { Left: 1, Right: 2 };
 export const ViewColumn = { One: 1, Beside: -2 };
@@ -193,12 +216,11 @@ export const workspace = {
     if (fake.folders) return fake.folders.map((f, index) => ({ uri: Uri.file(f), name: path.basename(f), index }));
     return fake.folder ? [{ uri: Uri.file(fake.folder), name: path.basename(fake.folder), index: 0 }] : undefined;
   },
-  createFileSystemWatcher: () => ({
-    onDidCreate: () => disposable,
-    onDidChange: () => disposable,
-    onDidDelete: () => disposable,
-    dispose() {},
-  }),
+  createFileSystemWatcher: (glob: unknown) => {
+    const watcher = new FakeWatcher(glob);
+    fake.watchers.push(watcher);
+    return watcher;
+  },
   getConfiguration(section: string) {
     const full = (k: string) => `${section}.${k}`;
     return {
