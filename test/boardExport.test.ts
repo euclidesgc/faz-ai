@@ -375,6 +375,48 @@ describe('importBoard', () => {
     ).toEqual(['Card antigo']);
   });
 
+  it('export antigo sem branch_kind: a importação migra e o Bug sai em hotfix, o Retrabalho em bugfix', () => {
+    const old = newDatabase();
+    migrate(old, 29);
+    old.run(`
+      INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws-old', 'Antigo');
+      INSERT INTO workflows (id, board_id, name, position, kind) VALUES ('w', 'b', 'Histórias', 0, 'parent');
+      INSERT INTO columns (id, workflow_id, name, position) VALUES ('c', 'w', 'Backlog', 0);
+      INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t1', 'b', 'História', '#000', 'w');
+      INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t2', 'b', 'Bug', '#000', 'w');
+      INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t3', 'b', 'Retrabalho', '#000', 'w');
+    `);
+    const tables: Record<string, ReturnType<typeof all>> = {};
+    for (const t of EXPORT_TABLES)
+      tables[t.name] = all(old, 'SELECT name FROM sqlite_master WHERE name = ?', [t.name]).length
+        ? all(old, `SELECT * FROM ${t.name}`)
+        : [];
+    // o arquivo antigo não tem a coluna branch_kind
+    expect(Object.keys(tables.card_types![0]!)).not.toContain('branch_kind');
+    const board = all(old, 'SELECT * FROM boards')[0]!;
+    delete board.workspace_key;
+    old.close();
+    const file = parseExportFile(
+      JSON.stringify({
+        fazai: 'board-export',
+        formatVersion: 1,
+        schemaVersion: 29,
+        extensionVersion: '0.39.0',
+        exportedAt: '',
+        board,
+        tables,
+        files: [],
+      }),
+    );
+
+    importBoard(target(router), file);
+
+    const kinds = Object.fromEntries(
+      all(db, 'SELECT name, branch_kind FROM card_types WHERE board_id = ?', ['b']).map((r) => [str(r.name), str(r.branch_kind)]),
+    );
+    expect(kinds).toEqual({ História: 'feature', Bug: 'hotfix', Retrabalho: 'bugfix' });
+  });
+
   it('atomicidade: base64 inválido lança antes de tocar o banco, e o board original fica como estava', () => {
     const before = comparable(router.snapshot());
     const files = readAll(router);
