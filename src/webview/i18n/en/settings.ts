@@ -1,7 +1,6 @@
 export const settings: Record<string, string> = {
   'Workflows e colunas': 'Workflows and columns',
   'Tipos de card': 'Card types',
-  Campos: 'Fields',
   'Regras do board': 'Board rules',
   'Harness de IA': 'AI harness',
   Agentes: 'Agents',
@@ -284,17 +283,17 @@ export const settings: Record<string, string> = {
   'reserva: {model}': 'fallback: {model}',
   'Campos personalizados': 'Custom fields',
   'Novo campo': 'New field',
-  'Campos guardam informações extras do card, como prazo, pontos ou tags. Todos aparecem no card aberto; em "No board" você escolhe se e como cada um aparece também no card do board.':
-    'Fields hold extra information about the card, such as deadline, points or tags. All of them show on the open card; in "On the board" you choose whether and how each one also shows on the board card.',
+  'Campos guardam informações extras do card, como prazo, pontos ou cliente. Todos aparecem no card aberto; em "No board" você escolhe se e como cada um aparece também no card do board.':
+    'Fields hold extra information about the card, such as deadline, points or client. All of them show on the open card; in "On the board" you choose whether and how each one also shows on the board card.',
+  'Os campos do board ({fields}) não aparecem aqui: as regras e a IA dependem deles.':
+    "The board fields ({fields}) don't show here: the rules and the AI depend on them.",
+  'Nenhum campo personalizado. Use "Novo campo" para criar um.': 'No custom fields. Use "New field" to create one.',
   'Campo {name}': 'Field {name}',
   Tipo: 'Type',
   'Apagar o campo': 'Delete the field',
   'Apagar o campo "{name}"?': 'Delete the field "{name}"?',
   'Os valores deste campo em todos os cards serão apagados.': 'The values of this field on all cards will be deleted.',
   Opções: 'Options',
-  'As opções acompanham as skills do projeto e as instaladas (Configurações > Harness de IA).':
-    'The options follow the project skills and the installed ones (Settings > AI harness).',
-  '{count} skills disponíveis': '{count} skills available',
   'Campo novo': 'New field',
   'Ex.: Prazo, Pontos, Cliente': 'E.g. Deadline, Points, Client',
   'O tipo não muda depois de criado.': "The type can't be changed after it's created.",

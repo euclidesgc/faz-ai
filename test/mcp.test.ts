@@ -226,6 +226,16 @@ describe('servidor MCP', () => {
     expect(board.workflows[0].columns[8].name).toBe('Feito');
     board = (await call('create_field', { name: 'Estimativa', kind: 'number', applies_to_types: ['História'] })).data;
     expect(board.fields.at(-1)).toMatchObject({ name: 'Estimativa', appliesTo: ['História'] });
+    expect(board.fields.at(-1).board).toBeUndefined();
+    // os campos do board vêm marcados, e o que as regras usam deles não muda pelo MCP
+    expect(board.fields.find((f: any) => f.name === 'Fase').board).toBe(true);
+    const rename = await call('update_field', { field: 'Fase', name: 'Etapa' });
+    expect(rename.error).toBe(true);
+    expect(rename.text).toContain('não pode ser renomeado');
+    expect((await call('delete_field', { field: 'Criticidade' })).text).toContain('não pode ser apagado');
+    expect((await call('create_field', { name: 'skills', kind: 'text' })).text).toContain('é o nome de um campo do board');
+    board = (await call('update_field', { field: 'Tags', options: ['web', 'mobile'], display: 'inline' })).data;
+    expect(board.fields.find((f: any) => f.name === 'Tags')).toMatchObject({ board: true, options: ['web', 'mobile'], display: 'inline' });
     expect((await call('update_rules', { blockDoneWithOpenChildren: false })).data.blockDoneWithOpenChildren).toBe(false);
   });
 });
@@ -469,16 +479,23 @@ describe('harness e padrões pelo MCP', () => {
   });
 
   it('aplica os padrões do tipo aos cards novos e recria o board', async () => {
+    // a Fase não tem padrão por tipo: ela é a fase da história a que cada sub-tarefa pertence
+    const phase = await call('update_card_type', { type: 'Sub-tarefa', default_fields: { Fase: 'Implementação' } });
+    expect(phase.text).toContain('não tem valor padrão por tipo');
     const board = (
-      await call('update_card_type', { type: 'Sub-tarefa', default_fields: { Modelo: 'claude sonnet 5.5 high', Fase: 'Implementação' } })
+      await call('update_card_type', {
+        type: 'Sub-tarefa',
+        default_fields: { Modelo: 'claude sonnet 5.5 high', 'Esforço da atividade': 'Médio' },
+      })
     ).data;
     expect(board.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toEqual({
       Modelo: 'claude:sonnet@high',
-      Fase: 'Implementação',
+      'Esforço da atividade': 'Médio',
     });
     await call('create_card', { title: 'História' });
-    const sub = (await call('create_card', { title: 'Tarefa', parent: 1, fields: { Fase: 'Spec' } })).data;
-    expect(sub.fields).toEqual({ Modelo: 'Claude Code · Sonnet 5.5 · high', Fase: 'Spec' }); // o valor informado vence o padrão
+    const sub = (await call('create_card', { title: 'Tarefa', parent: 1, fields: { Fase: 'Spec', 'Esforço da atividade': 'Alto' } })).data;
+    // o valor informado vence o padrão, e a IA grava a Fase
+    expect(sub.fields).toEqual({ Fase: 'Spec', 'Esforço da atividade': 'Alto', Modelo: 'Claude Code · Sonnet 5.5 · high' });
     expect((await call('get_card', { card: 1 })).data.fields).toBeUndefined();
 
     const fresh = (await call('reset_board')).data;

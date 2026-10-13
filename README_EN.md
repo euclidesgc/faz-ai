@@ -177,7 +177,9 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 ![Open card: status, approval, fields, description and checklist](docs/images/card_en.png)
 
 By default, a story is not completed and does not advance a phase while it has open sub-tasks of
-that phase. These rules can be turned off in the settings.
+that phase. These rules can be turned off in the settings. The sub-task's phase is the **Fase**
+field, which the AI fills in when it creates the sub-task: on the open card it is read-only, and it
+can't be a card type default.
 
 At the top of the board, **N com você** (N with you) shows how many cards are waiting for your
 review, answer or unblocking (one click filters to them), and an indicator appears while the AI is
@@ -872,8 +874,9 @@ of the project's core, one pattern per line (for example `src/db/**`). With the 
   take it out, and turning the mode on for a core story waiting for review doesn't approve it.
 - **In Revisão (review) and in the pull request**, the files of the diff that are in the core are
   reviewed more strictly and listed apart in **Como revisar** (how to review).
-- The **Criticidade** field is a field like the others: it shows on the card, filters the board and
-  can be used in model rules (for example, core with the "Alto" tier model).
+- The **Criticidade** field shows on the card, filters the board and can be used in model rules (for
+  example, core with the "Alto" tier model). Being a board field, it stays out of Campos
+  personalizados (custom fields), and a new story card type joins it on its own.
 
 Boards created before get the field through **Atualizar board** (update board). Through MCP,
 `update_rules` accepts `criticalPaths`.
@@ -1064,7 +1067,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | --- | --- |
 | Workflows e colunas | As many workflows as you want (independent cards or sub-tasks), with editable names and a position you change by dragging; **Nova coluna** (new column) on each one; names, order (drag) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template). Opening and closing workflows and columns happens on the board itself and is remembered |
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
-| Campos | Custom fields (text, select, date, model…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo |
+| Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, Esforço da atividade and Criticidade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section |
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model and the [critical areas](#critical-areas-core) |
 | Harness de IA | The project's tool, permission, default agent and heartbeat; Projeto and Global tabs with everything each tool loads, in groups, with what each file is, the path that opens in the board editor and the marking of what runs use (see [AI harness](#ai-harness) and [Agents](#agents)) |
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |

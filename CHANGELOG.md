@@ -6,13 +6,26 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Campos do board fora das configurações.** Fase, Tags, Modelo, Skills, Rules, Esforço da atividade
+  e Criticidade são usados pelas regras, pela triagem e pela IA, e saíram de Configurações → **Campos
+  personalizados** (o novo nome da aba), que agora lista só os campos que você cria. Esses campos não
+  se apagam nem se renomeiam, e as opções e os tipos de card deles são mantidos pelo board (as opções
+  de Tags continuam suas, pela IA). Um campo novo não pode usar o nome de um deles nem o tipo
+  **Modelo de IA**. Um tipo de card novo das histórias entra sozinho na Criticidade, e um das
+  sub-tarefas na Fase. No card aberto, os campos personalizados ficam na seção própria, abaixo dos
+  campos do board. Pelo MCP, `get_board` marca esses campos com `board: true`, e `update_field`,
+  `delete_field` e `create_field` recusam o que quebraria o uso deles.
+- **A Fase da sub-tarefa é do board e da IA.** No card aberto ela aparece só para leitura: a pessoa
+  não muda nem limpa o valor, e ele não vira padrão do tipo de card. É a Fase que diz a que fase da
+  história a sub-tarefa pertence e que segura o avanço da história. A IA continua gravando a Fase ao
+  criar a sub-tarefa (`create_card`) e pode corrigi-la com `update_card`.
 - **Contexto estimado de cada card.** No rodapé do card, um anel discreto mostra quanto da janela de
   contexto a execução do card ocupa antes de a IA começar; o clique abre o detalhe por grupo
   (servidores MCP, agentes, rules, skills e o próprio card) e por item, como a janela de contexto do
   Claude Code. No Claude Code, o servidor do board conta só os nomes das ferramentas e as instruções,
   e as definições aparecem como sob demanda; os servidores liberados pelo agente aparecem como não
-  medidos. É uma estimativa pelo tamanho do texto, para achar o que pesa antes de rodar, e acompanha o card: a
-  fase da coluna, a conversa e os documentos entram na próxima execução.
+  medidos. É uma estimativa pelo tamanho do texto, para achar o que pesa antes de rodar, e acompanha o
+  card: a fase da coluna, a conversa e os documentos entram na próxima execução.
 
 ## 0.36.0
 

@@ -41,7 +41,7 @@ import {
 const TABS: [SettingsTab, string, Icon][] = [
   ['columns', 'Workflows e colunas', IconColumns],
   ['types', 'Tipos de card', IconTypes],
-  ['fields', 'Campos', IconFields],
+  ['fields', 'Campos personalizados', IconFields],
   ['rules', 'Regras do board', IconRules],
   ['harness', 'Harness de IA', IconHarness],
   ['models', 'Modelos de IA', IconModels],
