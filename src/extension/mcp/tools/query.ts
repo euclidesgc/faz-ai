@@ -70,7 +70,7 @@ export function registerQueryTools(tool: DefineTool): void {
   tool(
     'get_card',
     'Detalhe completo de um card: descrição (markdown), campos, sub-tarefas, checklist, conversa e anexos. Em `phase` vem o que fazer na fase em que o card está e o modelo do documento que ela produz; numa sub-tarefa, `storyArtifacts` traz os documentos já anexados à história. ' +
-      'Numa história, `subtasksNow` traz as rodadas da Implementação. Uma imagem ou arquivo colado numa mensagem aparece como `attachment:<nome>`: o arquivo é o anexo de mesmo nome em `attachments`, e pode ser lido pelo `path`.',
+      'Numa história, `subtasksNow` traz as rodadas da Implementação. Uma imagem ou arquivo colado numa mensagem ou na descrição aparece como `attachment:<nome>`: o arquivo é o anexo de mesmo nome em `attachments`, e pode ser lido pelo `path`.',
     { card: cardArg },
     (a, router) => detail(router, findCard(router.snapshot(), a.card).id),
     true,
