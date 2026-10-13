@@ -4,7 +4,7 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+## 0.37.0
 
 - **Campos do board fora das configurações.** Fase, Tags, Modelo, Skills, Rules, Esforço da atividade
   e Criticidade são usados pelas regras, pela triagem e pela IA, e saíram de Configurações → **Campos
