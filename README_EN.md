@@ -123,7 +123,7 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 ## What it is for
 
 - **Plan in phases.** The story columns are the phases of the flow: Backlog, Discovery, PRD, Spec,
-  Plan, Implementação (implementation), Homologação (acceptance), Concluído (done) and Cancelado
+  Plan, Implementação (implementation), Revisão (review), Homologação (acceptance), Concluído (done) and Cancelado
   (cancelled). Each story breaks down into sub-tasks, which have their own flow: A fazer (to do),
   Em andamento (in progress), Concluído (done).
 - **Tell the AI what to do in each phase.** Each column has an instruction for the AI and, if the
@@ -392,6 +392,15 @@ code review quick later:
   (`create_card` with `derived_from`). The branch of each derived story starts from the branch of the
   origin story and its pull request is stacked on top of the origin's; the card shows **Derivada de
   #N** (derived from #N).
+- **Review before the pull request.** After Implementação, the **Revisão** (review) column runs the
+  project's checks (typecheck, lint, tests and build, as the project defines them) and reviews the
+  story's diff with independent eyes: it delegates to the `revisor-de-codigo` agent, in a new
+  session, when that agent is among the board's agents. Besides defects, the review looks for code
+  that only passes the test (a new test that already passed before the change, a test changed
+  together with the code it covers, a try/catch that swallows errors, a forced cast, new coupling).
+  What has a clear guideline is fixed right away; what is ambiguous or changes the agreed behavior
+  becomes a question for you, and the AI stops. The column doesn't ask for approval: the result stays
+  in the conversation and goes into the PR's **Como revisar** (how to review).
 - **A pull request that explains the delivery.** In Homologação, the PR body brings the **Objetivo**
   (goal), **O que foi feito** (what was done), **Como revisar** (how to review: where to start reading,
   the order of the commits and the size of the diff), the **Decisões** (decisions: why the chosen path,
@@ -732,7 +741,7 @@ next time. Turning a story off asks for no confirmation. From then on the AI dri
 story by itself, **without asking for authorization or confirmation on anything**:
 
 - From **Backlog** to the last column the AI works in (Homologação, on the default board): it does
-  Discovery, PRD, Spec and Plan, creates the sub-tasks, implements them one by one and, in that
+  Discovery, PRD, Spec and Plan, creates the sub-tasks, implements them one by one, reviews and, in that
   last column, opens the pull request, records it with `set_pull_request` and stops there — the
   story waits for your review. Columns that require approval stop holding the card, and the AI's
   review request becomes an approval right away, with its summary recorded in the conversation.

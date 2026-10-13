@@ -69,7 +69,7 @@ describe('servidor MCP', () => {
     );
     const board = (await call('get_board')).data;
     expect(board.workflows.map((w: any) => w.columns.map((c: any) => c.name))).toEqual([
-      ['Backlog', 'Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação', 'Concluído', 'Cancelado'],
+      ['Backlog', 'Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Revisão', 'Homologação', 'Concluído', 'Cancelado'],
       ['A fazer', 'Em andamento', 'Concluído'],
     ]);
   });
@@ -199,7 +199,7 @@ describe('servidor MCP', () => {
     expect(board.workflows[1].columns[0].name).toBe('Triagem');
     expect((await call('update_column', { column: 'Concluído', name: 'Feito' })).text).toContain('informe também o workflow');
     board = (await call('update_column', { column: 'Concluído', workflow: 'parent', name: 'Feito' })).data;
-    expect(board.workflows[0].columns[7].name).toBe('Feito');
+    expect(board.workflows[0].columns[8].name).toBe('Feito');
     board = (await call('create_field', { name: 'Estimativa', kind: 'number', applies_to_types: ['História'] })).data;
     expect(board.fields.at(-1)).toMatchObject({ name: 'Estimativa', appliesTo: ['História'] });
     expect((await call('update_rules', { blockDoneWithOpenChildren: false })).data.blockDoneWithOpenChildren).toBe(false);

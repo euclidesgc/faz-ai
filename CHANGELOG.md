@@ -6,6 +6,17 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Nova coluna Revisão, entre a Implementação e a Homologação.** Antes do pull request, a IA roda as
+  checagens do projeto e revisa o diff da história com o agente `revisor-de-codigo`, numa sessão
+  nova. A revisão procura também o código que só passa no teste (teste que já passava antes, teste
+  alterado junto com o código, try/catch que engole erro, cast forçado, acoplamento novo). O que tem
+  diretriz clara é corrigido na hora; o que é ambíguo vira pergunta para você. A coluna não pede
+  aprovação. Boards existentes recebem a coluna e a opção **Revisão** do campo Fase pelo **Atualizar
+  board**.
+- **Revisor de código com roteiro novo.** O agente de fábrica `revisor-de-codigo` passa a classificar
+  cada achado (bloqueia ou sugestão; correção clara ou ambígua), a procurar o código que só passa no
+  teste e a ser breve: todos os que bloqueiam e no máximo três sugestões. Vale para os agentes
+  criados a partir de agora; o que você já tem não muda.
 - **Spec com o desenho do programa.** O modelo da Spec ganha a seção **Desenho do programa**: os
   tipos e as assinaturas novos ou alterados, o arquivo de cada um e quem chama quem, com o fluxo da
   funcionalidade em diagramas Mermaid. As alternativas descartadas passam a vir com o motivo.

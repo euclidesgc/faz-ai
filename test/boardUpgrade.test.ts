@@ -27,12 +27,12 @@ const places = () =>
     .cards.map((c) => [c.title, c.columnId, c.position, c.status])
     .sort();
 
-/** Deixa o board como os criados antes do status de card: sem Discovery e Homologação, colunas sem papel da IA nem fase, e versão 0. */
+/** Deixa o board como os criados antes do status de card: sem Discovery, Revisão e Homologação, colunas sem papel da IA nem fase, e versão 0. */
 beforeEach(async () => {
   db = await openInMemory(WASM_DIR);
   boards = new BoardRepo(db);
   boardId = boards.getOrCreate('ws', 'Projeto').id;
-  db.run("DELETE FROM columns WHERE name IN ('Discovery', 'Homologação')");
+  db.run("DELETE FROM columns WHERE name IN ('Discovery', 'Revisão', 'Homologação')");
   db.run("UPDATE columns SET ai_active = 0, requires_approval = 0, ai_instruction = '', artifact_name = '', artifact_template = ''");
   db.run(`UPDATE field_defs SET options_json = '["PRD","Spec","Plan","Implementação"]' WHERE name = 'Fase'`);
   db.run('UPDATE boards SET template_version = 0');
@@ -51,7 +51,7 @@ describe('atualização do board para o padrão atual', () => {
         .filter((c) => c.aiActive)
         .map((c) => c.name)
         .sort(),
-    ).toEqual(['A fazer', 'Discovery', 'Em andamento', 'Homologação', 'Implementação', 'PRD', 'Plan', 'Spec']);
+    ).toEqual(['A fazer', 'Discovery', 'Em andamento', 'Homologação', 'Implementação', 'PRD', 'Plan', 'Revisão', 'Spec']);
     expect(s.columns.find((c) => c.name === 'PRD')).toMatchObject({ artifactName: 'PRD.md' });
     expect(s.columns.find((c) => c.name === 'Discovery')!.aiInstruction).toContain('ask_question');
     expect(s.fieldDefs.find((f) => f.name === 'Fase')!.options).toEqual([
@@ -60,6 +60,7 @@ describe('atualização do board para o padrão atual', () => {
       'Spec',
       'Plan',
       'Implementação',
+      'Revisão',
       'Homologação',
     ]);
   });
@@ -94,6 +95,8 @@ describe('atualização do board para o padrão atual', () => {
       'Coluna "Plan": instrução para a IA e modelo do documento PLAN.md.',
       'Coluna "Implementação": instrução para a IA.',
       'Campo "Fase" das sub-tarefas: novas opções Discovery e Homologação.',
+      'Nova coluna "Revisão" entre a Implementação e a Homologação: a IA roda as checagens do projeto e revisa o código antes do pull request, corrige o que tem diretriz e pergunta o que é ambíguo.',
+      'Campo "Fase" das sub-tarefas: nova opção Revisão.',
     ]);
     upgradeBoard(db, boardId);
 
@@ -115,6 +118,7 @@ describe('atualização do board para o padrão atual', () => {
       'Spec',
       'Plan',
       'Implementação',
+      'Revisão',
       'Homologação',
       'Concluído',
       'Cancelado',
@@ -122,6 +126,8 @@ describe('atualização do board para o padrão atual', () => {
     ]);
     expect(col('Discovery')).toMatchObject({ aiActive: true, requiresApproval: true, artifactName: 'DISCOVERY.md' });
     expect(col('Homologação')).toMatchObject({ aiActive: true, requiresApproval: true, artifactName: '' });
+    expect(col('Revisão')).toMatchObject({ aiActive: true, requiresApproval: false, artifactName: '' });
+    expect(col('Revisão').aiInstruction).toContain('revisor-de-codigo');
     expect(col('Requisitos')).toMatchObject({ aiInstruction: '', artifactName: '' });
     expect(col('Plan').artifactTemplate).toContain('# Plano');
     expect(s2.fieldDefs.find((f) => f.name === 'Fase')!.options).toEqual([
@@ -130,6 +136,7 @@ describe('atualização do board para o padrão atual', () => {
       'Spec',
       'Plan',
       'Implementação',
+      'Revisão',
       'Homologação',
     ]);
 
@@ -184,6 +191,54 @@ describe('atualização do board para o padrão atual', () => {
     expect(col('Plan')).toMatchObject({ aiInstruction: PHASE_DEFAULTS['Plan']!.instruction, artifactTemplate: '# Meu plano' });
     expect(col('Homologação').aiInstruction).toContain('**Decisões**');
     expect(col('PRD').aiInstruction).toBe('minha instrução de PRD');
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+  });
+
+  it('versão 7: o board na 6 ganha a coluna Revisão depois da Implementação, e a opção dela no campo Fase', () => {
+    upgradeBoard(db, boardId);
+    db.run("DELETE FROM columns WHERE name = 'Revisão'");
+    db.run(`UPDATE field_defs SET options_json = '["Discovery","PRD","Spec","Plan","Implementação","Homologação"]' WHERE name = 'Fase'`);
+    run(db, 'UPDATE boards SET template_version = 6 WHERE id = ?', [boardId]);
+    const before = places();
+    expect(pendingUpgrade(db, boardId)).toEqual([
+      'Nova coluna "Revisão" entre a Implementação e a Homologação: a IA roda as checagens do projeto e revisa o código antes do pull request, corrige o que tem diretriz e pergunta o que é ambíguo.',
+      'Campo "Fase" das sub-tarefas: nova opção Revisão.',
+    ]);
+    upgradeBoard(db, boardId);
+    const s = snap();
+    const parentWf = s.workflows.find((w) => w.kind === 'parent')!.id;
+    const names = s.columns.filter((c) => c.workflowId === parentWf).map((c) => c.name);
+    expect(names.slice(names.indexOf('Implementação'), names.indexOf('Implementação') + 3)).toEqual([
+      'Implementação',
+      'Revisão',
+      'Homologação',
+    ]);
+    expect(col('Revisão').aiInstruction).toBe(PHASE_DEFAULTS['Revisão']!.instruction);
+    expect(s.fieldDefs.find((f) => f.name === 'Fase')!.options).toEqual([
+      'Discovery',
+      'PRD',
+      'Spec',
+      'Plan',
+      'Implementação',
+      'Revisão',
+      'Homologação',
+    ]);
+    expect(places()).toEqual(before);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+  });
+
+  it('versão 7: com a Implementação renomeada, a Revisão entra antes da Homologação; uma coluna "Revisão" da pessoa não é duplicada', () => {
+    upgradeBoard(db, boardId);
+    db.run("DELETE FROM columns WHERE name = 'Revisão'");
+    new SettingsRepo(db).updateColumn(col('Implementação').id, { name: 'Código' });
+    run(db, 'UPDATE boards SET template_version = 6 WHERE id = ?', [boardId]);
+    upgradeBoard(db, boardId);
+    const s = snap();
+    const parentWf = s.workflows.find((w) => w.kind === 'parent')!.id;
+    const names = s.columns.filter((c) => c.workflowId === parentWf).map((c) => c.name);
+    expect(names.indexOf('Revisão')).toBe(names.indexOf('Homologação') - 1);
+
+    run(db, 'UPDATE boards SET template_version = 6 WHERE id = ?', [boardId]);
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 

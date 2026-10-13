@@ -7,6 +7,17 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **New Revisão (review) column, between Implementação and Homologação.** Before the pull request,
+  the AI runs the project's checks and reviews the story's diff with the `revisor-de-codigo` agent, in
+  a new session. The review also looks for code that only passes the test (a test that already passed
+  before, a test changed together with the code, a try/catch that swallows errors, a forced cast, new
+  coupling). What has a clear guideline is fixed right away; what is ambiguous becomes a question for
+  you. The column doesn't ask for approval. Existing boards get the column and the **Revisão** option
+  of the Fase (phase) field through **Atualizar board** (update board).
+- **Code reviewer with a new script.** The factory agent `revisor-de-codigo` now classifies each
+  finding (blocking or suggestion; clear or ambiguous fix), looks for code that only passes the test
+  and keeps it short: every blocking finding and at most three suggestions. It applies to agents
+  created from now on; the ones you already have don't change.
 - **Spec with the program design.** The Spec template gets the **Desenho do programa** (program
   design) section: the new or changed types and signatures, the file of each one and who calls whom,
   with the feature flow in Mermaid diagrams. Discarded alternatives now come with the reason.

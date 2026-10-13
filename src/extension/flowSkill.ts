@@ -127,9 +127,26 @@ Se "Travado em mim" tiver qualquer item, o resumo vai no \`request_review\` com 
 \`pending\` (ou em \`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`:
 o card precisa ficar com a pessoa.
 
-Ao revisar código (Implementação ou Homologação), concentre-se no diff da branch da história e no
+Ao revisar código (Implementação, Revisão ou Homologação), concentre-se no diff da branch da história e no
 contexto necessário dos arquivos tocados; releia o projeto inteiro só quando o pedido pedir
 expressamente uma auditoria geral.
+
+## Revisão
+
+Depois da Implementação e antes do pull request, a história passa pela Revisão:
+
+1. Rode as checagens do projeto (typecheck, lint, testes e build, como o projeto os define).
+2. Revise o diff da história contra a base com um olhar independente: delegue ao agente
+   \`revisor-de-codigo\`, se ele estiver nos agentes do board, numa sessão nova. Além dos defeitos,
+   procure o código que só passa no teste: teste novo que já passa no commit base, teste existente
+   alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado e acoplamento
+   novo entre módulos.
+3. Trate cada achado. O que tem diretriz clara (regra do projeto, padrão já usado no código, teste
+   que falha) você corrige agora, delegando ao especialista, e registra na conversa. O que é ambíguo
+   ou muda o comportamento combinado é decisão da pessoa: \`ask_question\` (no modo autônomo,
+   \`request_review\` com \`pending\`) e pare.
+4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
+   revisar" do pull request) e mova a história para a próxima coluna.
 
 ## Homologação
 
@@ -170,7 +187,8 @@ rodar sozinha: ninguém aprova nem responde. Então:
   \`pending\`. Nesse caso o card fica em "Aguardando revisão" mesmo em modo autônomo, e a fila
   continua com as outras histórias;
 - \`block_card\` só para impedimento real (acesso, ambiente, falha que você não resolve);
-- na Implementação, execute todas as sub-tarefas até o fim; na última coluna em que a IA atua
+- na Implementação, execute todas as sub-tarefas até o fim; na Revisão, corrija o que tem diretriz e
+  entregue o que é ambíguo com \`request_review\` e \`pending\`; na última coluna em que a IA atua
   (Homologação, no board padrão) não há aprovação nem próxima fase: grave o "Como testar" na
   descrição da história, abra o pull request com ele no corpo, registre-o com \`set_pull_request\`
   (é o registro que entrega a história e a passa para a pessoa), resuma na conversa o que foi feito,

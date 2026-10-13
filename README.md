@@ -115,7 +115,7 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 ## Para que serve
 
 - **Planejar em fases.** As colunas das histórias são as fases do fluxo: Backlog, Discovery, PRD,
-  Spec, Plan, Implementação, Homologação, Concluído e Cancelado. Cada história se desdobra em
+  Spec, Plan, Implementação, Revisão, Homologação, Concluído e Cancelado. Cada história se desdobra em
   sub-tarefas, que têm um fluxo próprio (A fazer, Em andamento, Concluído).
 - **Dizer à IA o que fazer em cada fase.** Cada coluna tem uma instrução para a IA e, se a fase
   gera um documento (Discovery, PRD, Spec, Plan), o modelo desse documento. No Discovery a IA
@@ -371,6 +371,14 @@ do código rápida depois:
   história a primeira parte e cria as seguintes como **histórias derivadas** (`create_card` com
   `derived_from`). A branch de cada derivada parte da branch da história de origem e o pull request
   dela é empilhado sobre o da origem; o card mostra **Derivada de #N**.
+- **Revisão antes do pull request.** Depois da Implementação, a coluna **Revisão** roda as checagens
+  do projeto (typecheck, lint, testes e build, como o projeto os define) e revisa o diff da história
+  com um olhar independente: delega ao agente `revisor-de-codigo`, numa sessão nova, quando ele está
+  entre os agentes do board. Além dos defeitos, a revisão procura o código que só passa no teste
+  (teste novo que já passava antes da mudança, teste alterado junto com o código que ele cobre,
+  try/catch que engole erro, cast forçado, acoplamento novo). O que tem diretriz clara é corrigido na
+  hora; o que é ambíguo ou muda o comportamento combinado vira pergunta para você, e a IA para. A
+  coluna não pede aprovação: o resultado fica na conversa e entra no **Como revisar** do PR.
 - **Pull request que explica a entrega.** Na Homologação, o corpo do PR traz o **Objetivo**, **O que
   foi feito**, **Como revisar** (por onde começar a ler, a ordem dos commits e o tamanho do diff), as
   **Decisões** (por que o caminho escolhido, as alternativas descartadas e os desvios do plano) e o
@@ -701,7 +709,7 @@ uma história não pede confirmação. A partir daí a IA toca a
 história sozinha, **sem pedir autorização nem confirmação para nada**:
 
 - Do **Backlog** até a última coluna em que a IA atua (Homologação, no board padrão): ela faz o
-  Discovery, o PRD, a Spec e o Plan, cria as sub-tarefas, implementa uma por uma e, nessa última
+  Discovery, o PRD, a Spec e o Plan, cria as sub-tarefas, implementa uma por uma, revisa e, nessa última
   coluna, abre o pull request, registra com `set_pull_request` e para ali — a história fica
   aguardando a sua revisão. As colunas que exigem aprovação deixam de segurar o card, e o pedido de
   revisão da IA vira aprovação na hora, com o resumo registrado na conversa.

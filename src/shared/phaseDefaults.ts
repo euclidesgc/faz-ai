@@ -244,6 +244,17 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
     ].join('\n'),
     ...NO_ARTIFACT,
   },
+  Revisão: {
+    instruction: [
+      'Revise a entrega antes do pull request, na branch e na pasta de trabalho da história (workspace no get_card).',
+      '1. Rode as checagens do projeto: as que ele define para typecheck, lint, testes e build (package.json, Makefile, CLAUDE.md, AGENTS.md ou a documentação de desenvolvimento).',
+      '2. Revise o diff da história contra a base (git diff <base>...HEAD) com um olhar independente: delegue ao agente revisor-de-codigo, se ele estiver nos agentes do board, numa sessão nova; senão, revise você mesmo pelo mesmo roteiro. Procure também o código que só passa no teste: teste novo que já passa no commit base (não testa nada), teste existente alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado e acoplamento novo entre módulos.',
+      '3. Trate cada achado. O que tem diretriz clara (regra do projeto, padrão já usado no código, teste que falha) você corrige agora, delegando ao especialista quando houver, e registra na conversa. O que é ambíguo ou muda o comportamento combinado é decisão da pessoa: ask_question (no modo autônomo, request_review com pending) e pare.',
+      '4. Depois das correções, rode as checagens de novo e faça o commit na branch da história. Sem permissão para rodar comandos, revise lendo o código e registre na conversa o que falta rodar.',
+      '5. Registre na conversa o resultado (o que foi checado, o que foi corrigido e as sugestões que ficaram de fora): ele alimenta o "Como revisar" do pull request. Depois mova a história para a próxima coluna.',
+    ].join('\n'),
+    ...NO_ARTIFACT,
+  },
   Homologação: {
     instruction: [
       'Prepare a entrega para a validação da pessoa.',

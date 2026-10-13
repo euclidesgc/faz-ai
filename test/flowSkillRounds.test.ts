@@ -70,3 +70,14 @@ describe('fases do fluxo na skill', () => {
     expect(yolo).toMatch(/menos complexo/);
   });
 });
+
+describe('Revisão antes do pull request', () => {
+  it('a skill manda checar, revisar com o revisor-de-codigo, corrigir o que tem diretriz e perguntar o ambíguo', () => {
+    const revisao = FLOW_SKILL.body.slice(FLOW_SKILL.body.indexOf('## Revisão'), FLOW_SKILL.body.indexOf('## Homologação'));
+    expect(revisao).toMatch(/checagens do projeto/);
+    expect(revisao).toContain('revisor-de-codigo');
+    expect(revisao).toMatch(/só passa no teste/);
+    expect(revisao).toMatch(/diretriz clara[\s\S]*corrige agora/);
+    expect(revisao).toMatch(/ambíguo[\s\S]*`ask_question`[\s\S]*`pending`/);
+  });
+});
