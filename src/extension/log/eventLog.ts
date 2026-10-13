@@ -124,7 +124,10 @@ export class EventLog {
         const ids = [...before.keys()];
         return { before, after: () => cardFacts(db, ids), cardId: null, extra: {} };
       }
-      case 'card.yolo.setMany': {
+      case 'card.yolo.setMany':
+      case 'card.archiveMany':
+      case 'card.trashMany':
+      case 'card.moveMany': {
         const ids = msg.cardIds;
         return { before: cardFacts(db, ids), after: () => cardFacts(db, ids), cardId: null, extra: {} };
       }

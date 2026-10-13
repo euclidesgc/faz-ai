@@ -4,6 +4,10 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **"Selecionar todos" e ações em lote no menu da coluna (#436).** O menu ⋯ de uma coluna de histórias ganhou **Selecionar todos**, que marca as histórias da coluna que estão visíveis (o filtro ativo vale: o que ele esconde fica de fora). Com histórias marcadas, o mesmo menu passa a oferecer **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados**, **Mandar selecionados para a lixeira** e **Limpar seleção**; Renomear, Colapsar, "Esta coluna representa", mover e excluir a coluna ficam desabilitados enquanto houver seleção. Cada ação abre um único diálogo de confirmação para o lote inteiro e, ao confirmar, limpa a seleção. Em lote, uma história com sub-tarefa em aberto não é concluída e o resto segue; mover para uma coluna de cancelamento cancela as sub-tarefas em aberto sem perguntar de novo. **Mudança de comportamento:** a seleção múltipla passou a valer para uma coluna por vez; marcar um card de outra coluna substitui a seleção em vez de somar.
+
 ## 0.37.0
 
 - **Campos do board fora das configurações.** Fase, Tags, Modelo, Skills, Rules, Esforço da atividade

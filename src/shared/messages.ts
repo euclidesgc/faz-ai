@@ -101,6 +101,12 @@ export type WebviewToHost =
    * `until` vale para todas: numa história de outro workflow, vale a coluna de mesmo nome
    */
   | { type: 'card.yolo.setMany'; cardIds: Id[]; enabled: boolean; until?: Id | null }
+  /** arquiva várias histórias de uma vez; ignora quem não for história viva */
+  | { type: 'card.archiveMany'; cardIds: Id[] }
+  /** manda várias histórias para a lixeira de uma vez; ignora quem não for história viva */
+  | { type: 'card.trashMany'; cardIds: Id[] }
+  /** move várias histórias para a mesma coluna de uma vez; cancela as sub-tarefas em aberto do lote quando o destino é cancelamento */
+  | { type: 'card.moveMany'; cardIds: Id[]; columnId: Id }
   /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */
   | { type: 'card.yolo.inherit'; cardId: Id; fromId: Id }
   /** a história é uma entrega derivada de outra: a branch dela parte da branch da origem, com o pull request empilhado */

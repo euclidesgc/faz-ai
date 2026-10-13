@@ -2,7 +2,7 @@ import { cardRef, type Card, type Column, type Id } from '../../shared/model';
 import { childrenToCancel, dependents, parentToComplete } from '../../shared/cascade';
 import { linkedParentsToComplete } from '../../shared/links';
 import { cards } from '../commands';
-import { t, tn } from '../i18n';
+import { dt, t, tn } from '../i18n';
 import { useBoardStore } from './boardStore';
 
 /** Frase "Junto vão: 3 sub-tarefas e 2 anexos." ou '' se não houver nada. */
@@ -12,6 +12,19 @@ function alongWith(children: number, attachments: number): string {
     attachments ? tn(attachments, '{n} anexo', '{n} anexos') : '',
   ].filter(Boolean);
   return parts.length === 2 ? t('{a} e {b}', { a: parts[0]!, b: parts[1]! }) : (parts[0] ?? '');
+}
+
+/** Mesma frase de `alongWith`, somando os dependentes (sub-tarefas e anexos) de todo o lote. */
+function alongWithMany(histories: Card[]): string {
+  const { state } = useBoardStore.getState();
+  const totals = histories.reduce(
+    (acc, card) => {
+      const d = dependents(state!, card);
+      return { children: acc.children + d.children.length, attachments: acc.attachments + d.attachments };
+    },
+    { children: 0, attachments: 0 },
+  );
+  return alongWith(totals.children, totals.attachments);
 }
 
 /**
@@ -166,5 +179,74 @@ export function requestRestoreArchived(cardId: Id, after?: () => void): void {
     confirmLabel: t('Restaurar história'),
     danger: false,
     onConfirm: go,
+  });
+}
+
+/** Arquiva o lote inteiro; diferente de `requestArchive`, sempre confirma, sem olhar a regra `confirmArchive`. */
+export function requestArchiveMany(histories: Card[], after?: () => void): void {
+  const { ask } = useBoardStore.getState();
+  const along = alongWithMany(histories);
+  ask({
+    title: t('Arquivar {n} história(s)?', { n: histories.length }),
+    message: (along ? t('Serão arquivados junto: {along}.', { along }) + ' ' : '') + t('Nada é apagado, e desarquivar traz tudo de volta.'),
+    confirmLabel: t('Arquivar'),
+    onConfirm: () => {
+      cards.archiveMany(histories.map((c) => c.id));
+      after?.();
+    },
+  });
+}
+
+/** Manda o lote inteiro para a lixeira; diferente de `requestTrash`, sempre confirma, sem olhar a regra `confirmTrash`. */
+export function requestTrashMany(histories: Card[], after?: () => void): void {
+  const { ask } = useBoardStore.getState();
+  const along = alongWithMany(histories);
+  ask({
+    title: t('Excluir {n} história(s)?', { n: histories.length }),
+    message: (along ? t('Vão para a lixeira junto: {along}.', { along }) + ' ' : '') + t('Dá para restaurar pela aba Lixeira.'),
+    confirmLabel: t('Excluir'),
+    danger: true,
+    onConfirm: () => {
+      cards.trashMany(histories.map((c) => c.id));
+      after?.();
+    },
+  });
+}
+
+/** Move o lote inteiro para a coluna escolhida no diálogo. */
+export function requestMoveMany(histories: Card[], destinations: Column[], after?: () => void): void {
+  const { ask } = useBoardStore.getState();
+  ask({
+    title: t('Mover {n} história(s) para outra coluna?', { n: histories.length }),
+    message: t('Quem as regras do board impedirem de mudar de coluna (sub-tarefa em aberto) fica de fora.'),
+    choices: { label: t('Coluna'), options: destinations.map((c) => ({ value: c.id, label: dt(c.name) })) },
+    confirmLabel: t('Mover'),
+    onConfirm: (columnId) => {
+      cards.moveMany(
+        histories.map((c) => c.id),
+        columnId!,
+      );
+      after?.();
+    },
+  });
+}
+
+/**
+ * Conclui o lote inteiro, sempre na mesma coluna de conclusão (sem escolha no diálogo). Quem ainda
+ * tiver sub-tarefa em aberto fica de fora, sem aviso individual (o host recusa e o lote segue).
+ */
+export function requestConcludeMany(histories: Card[], doneColumn: Column, after?: () => void): void {
+  const { ask } = useBoardStore.getState();
+  ask({
+    title: t('Concluir {n} história(s)?', { n: histories.length }),
+    message: t('Vão para "{column}". Quem ainda tiver sub-tarefa em aberto fica de fora.', { column: dt(doneColumn.name) }),
+    confirmLabel: t('Concluir'),
+    onConfirm: () => {
+      cards.moveMany(
+        histories.map((c) => c.id),
+        doneColumn.id,
+      );
+      after?.();
+    },
   });
 }

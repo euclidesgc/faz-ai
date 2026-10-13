@@ -5,6 +5,10 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **"Selecionar todos" and bulk actions in the column menu (#436).** The ⋯ menu of a story column now has **Selecionar todos**, which selects the column's stories that are visible (the active filter applies: whatever it hides is left out). With stories selected, the same menu offers **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados**, **Mandar selecionados para a lixeira** and **Limpar seleção**; Rename, Collapse, "This column represents", moving and deleting the column are disabled while a selection exists. Each action opens a single confirmation dialog for the whole batch and, on confirm, clears the selection. In a batch, a story with an open sub-task is not concluded and the rest go ahead; moving to a cancellation column cancels open sub-tasks without asking again. **Behavior change:** multi-select now applies to one column at a time; selecting a card in another column replaces the selection instead of adding to it.
+
 ## 0.37.0
 
 - **Board fields out of the settings.** Fase, Tags, Modelo, Skills, Rules, Esforço da atividade and
