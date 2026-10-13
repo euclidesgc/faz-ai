@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import type { Card } from '../../../shared/model';
 import { branchName, slug } from '../../../shared/git';
 import { isPullRequestUrl, stackBaseOf, storyOf } from '../../../shared/story';
+import { columnOf, isLive } from '../../../shared/selectors';
 import { settleDelivery } from '../../delivery';
 import { now } from '../../db/ids';
 import { prepareWorkspace } from '../../git';
@@ -43,6 +44,12 @@ function prepareStoryWorkspace(ctx: BoardContext, cardId: string): void {
   if (git.mode === 'off') throw new Error('A criação de branches está desligada neste board (Configurações → Git).');
   if (!projectDir) throw new Error('Nenhuma pasta de projeto aberta.');
   const story = storyOfCard(ctx, cardId);
+  // a derivada parte da branch da parte anterior: sem ela ainda, a base sairia da principal e ficaria fixa
+  const origin = !story.branch && story.derivedFrom ? s.cards.find((c) => c.id === story.derivedFrom) : undefined;
+  if (origin && isLive(origin) && columnOf(s, origin)?.category === 'open' && !origin.branch)
+    throw new Error(
+      `#${story.number} deriva de #${origin.number}, que ainda não tem branch: a branch desta parte parte da dela. Implemente #${origin.number} antes.`,
+    );
   // a branch já registrada vale mesmo que o título ou o padrão tenham mudado depois
   const branch =
     story.branch ||

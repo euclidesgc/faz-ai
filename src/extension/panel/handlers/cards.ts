@@ -12,8 +12,9 @@ import { applySuggestion, suggestionFor } from './models';
 /**
  * Muda o status de trabalho do card. Aprovar é só da pessoa; bloquear exige o motivo. Em modo autônomo
  * (YOLO) o pedido de revisão da IA vira aprovação na hora: ninguém vai revisar, e o resumo fica na conversa.
- * Exceção: com `pending` (algo depende da pessoa), o card fica mesmo em "waiting_review", também em modo
- * autônomo: a pendência é dela, e o status tem de mostrar isso.
+ * Exceções, em que o card fica mesmo em "waiting_review": com `pending` (a pendência é da pessoa, e o
+ * status tem de mostrar isso); na coluna até onde a pessoa liberou o modo (ali o modo se desliga); e na
+ * história do núcleo, numa coluna que exige aprovação (depois de aprovada, ela segue no modo).
  */
 function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author: string, byAi: boolean): void {
   const note = msg.note?.trim() ?? '';
@@ -44,7 +45,7 @@ function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author:
       'ai',
     );
   if (atStop) {
-    ctx.cards.setYolo(card!.id, false);
+    ctx.cards.stopYolo(card!.id);
     ctx.comments.add(
       card!.id,
       author,
@@ -132,7 +133,10 @@ function applyYolo(ctx: BoardContext, card: Card, enabled: boolean, author: stri
   const state = ctx.state();
   ctx.cards.setYolo(card.id, enabled, until);
   if (!enabled) return;
-  const release = card.status === 'waiting_review' ? 'approved' : card.status === 'waiting_answer' ? 'ready' : null;
+  // a revisão pendente da história do núcleo, numa coluna que exige aprovação, continua esperando a
+  // pessoa: ligar o modo não é ler o que a IA entregou
+  const coreReview = card.status === 'waiting_review' && isCoreStory(state, card) && !!columnOf(state, card)?.requiresApproval;
+  const release = card.status === 'waiting_review' && !coreReview ? 'approved' : card.status === 'waiting_answer' ? 'ready' : null;
   if (release) ctx.cards.setStatus(card.id, release, '', author);
   ctx.comments.add(card.id, author, yoloOnNote(state, until), 'human');
 }
@@ -236,7 +240,15 @@ export const cardHandlers = {
     ctx.cards.emptyTrash(ctx.boardId).forEach((id) => ctx.store.removeCard(id));
     return true;
   },
-  'field.setValue': (msg, ctx) => {
+  'field.setValue': (msg, ctx, { byAi }) => {
+    // a IA marca a história do núcleo, mas só uma pessoa a tira dele: senão ela voltaria a se aprovar sozinha
+    if (byAi && msg.value !== CORE) {
+      const state = ctx.state();
+      const field = state.fieldDefs.find((f) => f.id === msg.fieldId);
+      const card = state.cards.find((c) => c.id === msg.cardId);
+      if (field && card && norm(field.name) === norm(CRITICALITY_FIELD) && isCoreStory(state, card))
+        throw new Error(`Só uma pessoa tira a história do núcleo: o campo ${CRITICALITY_FIELD} fica em ${CORE}.`);
+    }
     // se o modelo atual veio da sugestão (ou está vazio), ele acompanha a nova sugestão
     const before = suggestionFor(ctx, msg.cardId);
     ctx.cards.setFieldValue(msg.cardId, msg.fieldId, msg.value);

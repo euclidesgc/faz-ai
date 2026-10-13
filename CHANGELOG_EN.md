@@ -20,8 +20,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 - **Critical areas (core).** In Settings → Regras (rules), list the paths of the project's core, one
   per line. The AI marks the new **Criticidade** (criticality) field of stories, Núcleo (core) or
   Periferia (periphery), in Spec or Plan, and a core story waits for your approval in the columns that
-  require approval, even in autonomous mode; once approved, it goes on by itself. In Revisão (review)
-  and in the PR, core files come apart. Existing boards get the field through **Atualizar board**
+  require approval, even in autonomous mode; once approved, it goes on by itself. Only a person takes a
+  story out of the core, and turning the mode on for a core story waiting for review doesn't approve
+  it. In Revisão (review) and in the PR, core files come apart. Existing boards get the field through **Atualizar board**
   (update board); `update_rules` accepts `criticalPaths` and `get_card` brings `criticalAreas`.
 - **Autonomous mode up to a phase.** When turning on autonomous mode, the warning brings the **Até
   onde** (up to) selector, with the phases the AI works in from the current column on. The default is
@@ -48,9 +49,10 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 - **Plan with parts that are easy to review, and derived stories.** Each step of the plan is an
   understandable part that can be checked on its own (splitting by layer is fine), and the plan
   estimates the lines of code of the delivery. Above about 400, the AI creates the next parts as
-  derived stories, with the new `derived_from` parameter of `create_card`: the branch of the derived
-  story starts from the origin's branch and its pull request is stacked on top of the origin's, also
-  outside autonomous mode. The card shows **Derivada de #N** (derived from #N).
+  derived stories, in order, with the new `derived_from` parameter of `create_card` pointing to the
+  previous part: the branch of the derived story starts from the previous part's branch and its pull
+  request is stacked on top of that one, also outside autonomous mode. The card shows **Derivada de
+  #N** (derived from #N).
 - **A pull request that explains the delivery.** The body of the Homologação PR now has **Objetivo**
   (goal), **O que foi feito** (what was done), **Como revisar** (how to review: where to start, the
   order of the commits and the size of the diff), **Decisões** (decisions: the chosen path, the

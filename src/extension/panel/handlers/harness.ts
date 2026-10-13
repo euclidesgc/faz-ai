@@ -125,15 +125,24 @@ export class BoardHarness {
     const before = JSON.stringify(this.current);
     this.load();
     // os plugins do Claude Code vêm da CLI: consultada de novo só quando os arquivos dela mudaram
-    void this.refreshPlugins();
+    this.refreshPluginsInBackground();
     return JSON.stringify(this.current) !== before;
+  }
+
+  /**
+   * A consulta dos plugins sem ninguém esperando por ela. O board pode fechar enquanto a CLI responde
+   * (o editor fechou, a pasta trocou): aí reler o harness falha no banco já fechado, e não há o que
+   * fazer além de deixar para a próxima abertura, que consulta de novo.
+   */
+  private refreshPluginsInBackground(force = false): void {
+    this.refreshPlugins(force).catch(() => undefined);
   }
 
   /** Liga a CLI do Claude Code e já busca a lista de plugins instalados. */
   setClaudeCli(cli: ClaudeCli | null, onChanged: () => void): void {
     this.claudeCli = cli;
     this.pluginsChanged = onChanged;
-    void this.refreshPlugins(true);
+    this.refreshPluginsInBackground(true);
   }
 
   /**

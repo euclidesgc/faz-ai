@@ -1456,14 +1456,27 @@ describe('retrabalho pelo get_metrics e no painel', () => {
     await call('create_card', { title: 'Exportar falha com acento', type: 'Bug' });
     router.handle({ type: 'link.add', fromId: card(3).id, toId: card(2).id, kind: 'related' });
 
+    // #4: a pessoa arrasta para a Spec o card que aguardava revisão: não aprovou nem pediu ajuste
+    await call('create_card', { title: 'Importar', column: 'PRD' });
+    await call('request_review', { card: 4, summary: 'PRD pronto' });
+    const spec = router.snapshot().columns.find((c) => c.workflowId === card(4).workflowId && c.name === 'Spec')!;
+    router.handle({ type: 'card.move', cardId: card(4).id, columnId: spec.id, position: 0 });
+
+    // #6 veio corrigir o Bug #5, que já existia: o bug não escapou de #6. E o próprio Bug, concluído, não é história
+    await call('create_card', { title: 'Acento quebra o CSV', type: 'Bug' });
+    await call('create_card', { title: 'Corrigir acento' });
+    router.handle({ type: 'link.add', fromId: card(5).id, toId: card(6).id, kind: 'related' });
+    router.handle({ type: 'card.move', cardId: card(6).id, columnId: done.id, position: 0 });
+    router.handle({ type: 'card.move', cardId: card(5).id, columnId: done.id, position: 0 });
+
     const rework = router.panelMetrics({}).sections.rework;
-    expect(rework.phases).toEqual([{ phase: 'PRD', reviews: 3, approved: 2, adjusted: 1, resolved: 2, firstPass: 1 }]);
-    expect(rework.escapes).toEqual({ stories: 1, withBugs: 1, bugs: 1 });
+    expect(rework.phases).toEqual([{ phase: 'PRD', reviews: 4, approved: 2, adjusted: 1, resolved: 2, firstPass: 1 }]);
+    expect(rework.escapes).toEqual({ stories: 2, withBugs: 1, bugs: 1 });
 
     const text = (await call('get_metrics', { rework: true })).text;
     expect(text).toContain('retrabalho por fase');
     expect(text).toContain('1 de 2');
-    expect(text).toContain('com bug vinculado: 1 (1 bug(s))');
+    expect(text).toContain('histórias concluídas no período: 2; com bug vinculado: 1 (1 bug(s))');
   });
 });
 
@@ -1480,6 +1493,12 @@ describe('histórias derivadas e caminho curto', () => {
     const comments = router.snapshot().comments.filter((m) => m.cardId === card(2).id);
     expect(comments.at(-1)!.body).toContain(`Derivada de ${origem.id} Exportar CSV`);
     expect((await call('get_card', { card: derivada.id })).data.derivedFrom).toBe(`${origem.id} Exportar CSV`);
+  });
+
+  it('a derivada não cria branch enquanto a parte anterior, aberta, ainda não tem a dela', async () => {
+    await call('create_card', { title: 'Parte 1', column: 'Plan' });
+    await call('create_card', { title: 'Parte 2', column: 'Implementação', derived_from: 1 });
+    expect(() => router.handle({ type: 'card.workspace.prepare', cardId: card(2).id })).toThrow(/#1, que ainda não tem branch/);
   });
 
   it('derived_from só vale entre histórias, sem ciclo e antes de a derivada ter branch', async () => {
@@ -1573,7 +1592,8 @@ describe('modo autônomo (YOLO)', () => {
     const res = (await call('request_review', { card: 1, summary: 'Spec pronta' })).data;
     expect(res.card.work.status).toBe('waiting_review');
     expect(res.next).toContain('o modo foi desligado');
-    expect(card(1)).toMatchObject({ yolo: false, yoloUntil: null, status: 'waiting_review' });
+    // o modo se desliga, mas a história guarda até onde foi: a entrega dela segue na pilha do modo
+    expect(card(1)).toMatchObject({ yolo: false, yoloUntil: column('Spec').id, status: 'waiting_review' });
     expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('O modo autônomo chegou até Spec');
     // daqui em diante valem as aprovações de sempre
     expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(true);
@@ -1638,11 +1658,28 @@ describe('modo autônomo (YOLO)', () => {
     router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'approved' });
     expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(false);
 
+    // a IA não tira a história do núcleo; uma pessoa tira
+    const downgrade = await call('update_card', { card: 1, fields: { Criticidade: 'Periferia' } });
+    expect(downgrade.error).toBe(true);
+    expect(downgrade.text).toContain('Só uma pessoa tira a história do núcleo');
+
+    // ligar o modo numa história do núcleo que aguarda revisão não a aprova: alguém tem de ler
+    setYolo(1, false);
+    await call('request_review', { card: 1, summary: 'Spec pronta' });
+    expect(card(1).status).toBe('waiting_review');
+    setYolo(1, true);
+    expect(card(1).status).toBe('waiting_review');
+
+    // na última coluna da IA, a entrega é o pull request: a fase não pede aprovação, nem no núcleo
+    await call('create_card', { title: 'Entrega', column: 'Homologação', fields: { Criticidade: 'Núcleo' } });
+    setYolo(2, true);
+    expect((await call('get_card', { card: 2 })).data.phase.requiresApproval).toBe(false);
+
     // a periferia segue o modo como sempre
     await call('create_card', { title: 'Texto', column: 'PRD', fields: { Criticidade: 'Periferia' } });
-    setYolo(2, true);
-    expect((await call('request_review', { card: 2, summary: 'PRD pronto' })).data.card.work.status).toBe('approved');
-    expect((await call('get_card', { card: 2 })).data.criticalAreas.story).toBe('Periferia');
+    setYolo(3, true);
+    expect((await call('request_review', { card: 3, summary: 'PRD pronto' })).data.card.work.status).toBe('approved');
+    expect((await call('get_card', { card: 3 })).data.criticalAreas.story).toBe('Periferia');
   });
 
   it('request_review com pending fica em waiting_review mesmo em YOLO: a pendência é da pessoa e o status mostra isso', async () => {

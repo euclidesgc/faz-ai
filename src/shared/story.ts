@@ -26,7 +26,8 @@ const stackable = (c: Card): boolean => !!c.branch && c.mergeCommit === '' && c.
 /**
  * Em que a branch de uma história se apoia. A derivada (`derivedFrom`) parte da branch da história de
  * origem, enquanto o pull request dela não foi mesclado. A história em modo autônomo parte da história
- * YOLO aberta com a branch criada mais recentemente, para os pull requests formarem uma pilha na ordem
+ * YOLO aberta com a branch criada mais recentemente (contando a que parou no "Até onde": o modo se
+ * desligou, mas `yoloUntil` fica, e a entrega dela segue na pilha), para os pull requests formarem uma pilha na ordem
  * real de execução (#185) — e não pelo número do card, que diverge da fila quando a pessoa reordena os
  * cards por arrasto. Sem candidata, a branch principal. Conta também a anterior já concluída, mas não
  * a que já teve o pull request mesclado (`mergeCommit` preenchido): o código dela já está na
@@ -39,7 +40,7 @@ export function stackBaseOf(state: Pick<BoardState, 'cards'>, story: Card): Card
   if (origin && origin.id !== story.id && stackable(origin)) return origin;
   if (!story.yolo) return undefined;
   return state.cards
-    .filter((c) => c.yolo && !c.parentId && c.id !== story.id && stackable(c))
+    .filter((c) => (c.yolo || !!c.yoloUntil) && !c.parentId && c.id !== story.id && stackable(c))
     .sort((a, b) => Number(b.branchCreatedAt) - Number(a.branchCreatedAt) || b.number - a.number)[0];
 }
 

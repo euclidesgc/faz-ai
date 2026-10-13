@@ -73,9 +73,11 @@ vale, desde que cada parte seja verificável.
 
 Uma história é uma funcionalidade e vira um pull request. Estime o tamanho em linhas de código: se
 passar de umas 400, deixe nesta história a primeira parte e crie as seguintes como histórias
-derivadas (\`create_card\` com \`derived_from\` = esta história, ou \`autonomous_from\` no modo
-autônomo). A branch de cada derivada parte da branch da anterior, e o pull request dela é empilhado
-sobre o da anterior (\`workspace.baseBranch\` no \`get_card\`).
+derivadas, em ordem, cada uma com \`derived_from\` = a parte anterior (a primeira derivada, desta
+história; a segunda, da primeira derivada, e assim por diante). No modo autônomo, use
+\`autonomous_from\` = esta história em todas, na ordem: a fila já empilha cada uma sobre a anterior. A
+branch de cada derivada parte da branch da anterior, e o pull request dela é empilhado sobre o da
+anterior (\`workspace.baseBranch\` no \`get_card\`).
 
 Declare a ordem entre elas: em \`create_card\`, \`depends_on\` lista as sub-tarefas que precisam
 terminar antes (ou use \`link_cards\` com \`depends_on\` depois). Uma sub-tarefa depende de outra
@@ -186,9 +188,10 @@ Git), a aprovação dela faz o merge e leva a história a Concluído; desligado,
 Quando o card (ou a história dele) mostra \`autonomous: true\`, a pessoa liberou a história para
 rodar sozinha: ninguém aprova nem responde. Então:
 
-- não chame \`ask_question\` (a pergunta é recusada) nem \`request_review\` sem \`pending\`, exceto na
-  coluna em que o modo para (abaixo) e na única situação descrita no item da Homologação: ao terminar
-  a fase, registre na conversa o que fez e mova o card para a próxima coluna;
+- não chame \`ask_question\` (a pergunta é recusada) nem \`request_review\` sem \`pending\`, exceto
+  quando \`phase.requiresApproval\` vier verdadeiro (a coluna em que o modo para, abaixo, ou uma
+  história do núcleo, em "Áreas críticas") e na única situação descrita no item da Homologação: ao
+  terminar a fase, registre na conversa o que fez e mova o card para a próxima coluna;
 - a pessoa pode ter liberado o modo só até uma fase (\`autonomousUntil\` no \`get_card\`). Nessa fase,
   faça o trabalho sem perguntas e, ao terminar, chame \`request_review\` na história com o resumo e
   pare: o modo se desliga e a revisão é da pessoa (\`phase.requiresApproval\` vem verdadeiro ali);

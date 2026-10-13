@@ -23,14 +23,19 @@ export interface YoloStop {
   value: Id;
   name: string;
   label: string;
+  /** a última coluna da IA no workflow dela: escolher esta é ir até o pull request */
+  last: boolean;
 }
 
-const stopOf = (state: BoardState, column: Column): YoloStop => ({
-  value: column.id,
-  name: column.name,
-  label:
-    column.id === lastAiColumn(state, column.workflowId)?.id ? t('{column} (abre o pull request)', { column: column.name }) : column.name,
-});
+const stopOf = (state: BoardState, column: Column): YoloStop => {
+  const last = column.id === lastAiColumn(state, column.workflowId)?.id;
+  return {
+    value: column.id,
+    name: column.name,
+    last,
+    label: last ? t('{column} (abre o pull request)', { column: column.name }) : column.name,
+  };
+};
 
 /**
  * As opções de "Até onde" para ligar o modo em uma ou mais histórias: as colunas em que a IA atua, da
@@ -69,8 +74,10 @@ export function confirmYoloOn(opts: {
   const enable = (value: string | undefined) => {
     const stop = opts.stops.find((s) => s.value === value);
     // o fim (o pull request) fica guardado como "sem escolha", para valer em qualquer board
-    if (stop) opts.setUntilName(stop === opts.stops.at(-1) ? '' : stop.name);
-    opts.onEnable(stop && stop !== opts.stops.at(-1) ? stop.value : null);
+    if (stop) opts.setUntilName(stop.last ? '' : stop.name);
+    // a coluna vai sempre pelo id: o host sabe qual é a última da IA de cada história (em lote, a última
+    // opção comum pode não ser a última de nenhuma delas)
+    opts.onEnable(stop && !stop.last ? stop.value : null);
   };
   if (opts.dontWarnYolo) return enable(initial?.value);
   opts.ask({
@@ -179,7 +186,7 @@ export function YoloBar({ card }: { card: Card }) {
           value={stop.id}
           onChange={(value) => {
             const chosen = options.find((o) => o.value === value);
-            setUntilName(chosen && chosen.value !== options.at(-1)?.value ? chosen.name : '');
+            setUntilName(chosen && !chosen.last ? chosen.name : '');
             cards.setYolo(card.id, true, value);
           }}
         />

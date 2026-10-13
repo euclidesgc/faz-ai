@@ -218,7 +218,10 @@ function reviewSteps(db: Database, boardId: string): Step[] {
     wf
       ? all(db, 'SELECT id, name, position FROM columns WHERE workflow_id = ?', [wf]).find((c) => norm(str(c.name)) === norm(name))
       : undefined;
-  if (wf && !named('Revisão')) {
+  // sem a Implementação nem a Homologação (renomeadas), o board não diz onde a Revisão caberia: não oferece
+  const anchored = !!named('Implementação') || !!named('Homologação');
+  const insert = !!wf && !named('Revisão') && anchored;
+  if (insert) {
     out.push({
       description:
         'Nova coluna "Revisão" entre a Implementação e a Homologação: a IA roda as checagens do projeto e revisa o código antes do pull request, corrige o que tem diretriz e pergunta o que é ambíguo.',
@@ -230,7 +233,7 @@ function reviewSteps(db: Database, boardId: string): Step[] {
         const position = after ? num(after.position) + 1 : before ? num(before.position) : firstTerminal == null ? end : num(firstTerminal);
         insertColumn(
           db,
-          wf,
+          wf!,
           BOARD_TEMPLATE.parent.find((c) => c.name === 'Revisão')!,
           position,
         );
@@ -241,7 +244,8 @@ function reviewSteps(db: Database, boardId: string): Step[] {
     one(db, "SELECT id, options_json FROM field_defs WHERE board_id = ? AND lower(name) = 'fase' AND kind = 'select'", [boardId]);
   const options = (row: ReturnType<typeof fase>) => JSON.parse(str(row?.options_json) || '[]') as string[];
   const field = fase();
-  if (field && !options(field).some((o) => norm(o) === norm('Revisão'))) {
+  // a opção só faz sentido com a coluna: a que já existe ou a que este passo cria
+  if (field && (insert || !!named('Revisão')) && !options(field).some((o) => norm(o) === norm('Revisão'))) {
     out.push({
       description: 'Campo "Fase" das sub-tarefas: nova opção Revisão.',
       apply: () => {

@@ -76,64 +76,78 @@ export function reworkOf(rows: ReworkEventRow[], period: ReworkPeriod): Pick<Met
 }
 
 /**
- * As histórias concluídas no período (a primeira conclusão cai nele) e os bugs vinculados a elas hoje,
- * em qualquer direção do vínculo. "Bug" é o tipo de card com esse nome. O vínculo é lido do board atual:
- * o bug aberto depois do período, contra uma história concluída nele, é justamente o que escapou.
+ * As histórias concluídas no período (a primeira conclusão cai nele), fora as do tipo Bug, e os bugs
+ * vinculados a elas hoje, em qualquer direção do vínculo, que nasceram depois da conclusão. "Bug" é o
+ * tipo de card com esse nome. O vínculo é lido do board atual: o bug aberto depois, contra uma história
+ * concluída no período, é justamente o que escapou; o bug que a história veio corrigir, criado antes
+ * dela terminar, não.
  */
 function escapes(db: Database, boardId: string, period: ReworkPeriod, workflow: string): MetricsRework['escapes'] {
   const wf = workflow ? ' AND e.workflow = ?' : '';
   const stories = all(
     db,
-    `SELECT e.card_id AS id, MIN(e.at) AS done_at FROM card_events e JOIN cards c ON c.id = e.card_id
-     WHERE e.board_id = ? AND e.kind = 'done' AND c.parent_id IS NULL${wf} GROUP BY e.card_id`,
+    `SELECT e.card_id AS id, MIN(e.at) AS done_at, t.name AS type FROM card_events e
+     JOIN cards c ON c.id = e.card_id JOIN card_types t ON t.id = c.type_id
+     WHERE e.board_id = ? AND e.kind = 'done' AND c.parent_id IS NULL AND c.deleted_at IS NULL${wf} GROUP BY e.card_id`,
     [boardId, ...(workflow ? [workflow] : [])],
-  )
-    .filter((r) => num(r.done_at) >= period.start && num(r.done_at) <= period.end)
-    .map((r) => str(r.id));
-  if (!stories.length) return { stories: 0, withBugs: 0, bugs: 0 };
+  ).filter((r) => num(r.done_at) >= period.start && num(r.done_at) <= period.end && norm(str(r.type)) !== 'bug');
+  const doneAt = new Map(stories.map((r) => [str(r.id), num(r.done_at)]));
+  if (!doneAt.size) return { stories: 0, withBugs: 0, bugs: 0 };
   const bugsOf = new Map<string, Set<string>>();
-  const marks = stories.map(() => '?').join(',');
+  const ids = [...doneAt.keys()];
+  const marks = ids.map(() => '?').join(',');
   for (const r of all(
     db,
-    `SELECT l.from_id AS a, l.to_id AS b, ta.name AS type_a, tb.name AS type_b
+    `SELECT l.from_id AS a, l.to_id AS b, ta.name AS type_a, tb.name AS type_b, ca.created_at AS created_a, cb.created_at AS created_b
      FROM card_links l
      JOIN cards ca ON ca.id = l.from_id JOIN card_types ta ON ta.id = ca.type_id
      JOIN cards cb ON cb.id = l.to_id JOIN card_types tb ON tb.id = cb.type_id
      WHERE (l.from_id IN (${marks}) OR l.to_id IN (${marks})) AND ca.deleted_at IS NULL AND cb.deleted_at IS NULL`,
-    [...stories, ...stories],
+    [...ids, ...ids],
   )) {
-    for (const [story, other, type] of [
-      [str(r.a), str(r.b), str(r.type_b)],
-      [str(r.b), str(r.a), str(r.type_a)],
+    for (const [story, other, type, created] of [
+      [str(r.a), str(r.b), str(r.type_b), num(r.created_b)],
+      [str(r.b), str(r.a), str(r.type_a), num(r.created_a)],
     ] as const) {
-      if (!stories.includes(story) || norm(type) !== 'bug') continue;
+      const done = doneAt.get(story);
+      if (done === undefined || norm(type) !== 'bug' || created < done) continue;
       (bugsOf.get(story) ?? bugsOf.set(story, new Set()).get(story)!).add(other);
     }
   }
   return {
-    stories: stories.length,
+    stories: doneAt.size,
     withBugs: bugsOf.size,
     bugs: new Set([...bugsOf.values()].flatMap((s) => [...s])).size,
   };
 }
 
-/** O retrabalho do período, no recorte de workflow do painel (`card_events` guarda o workflow). */
+/**
+ * O retrabalho do período, no recorte de workflow do painel (`card_events` guarda o workflow). Duas
+ * mudanças de status não são resposta à revisão: a que vem de mover o card de coluna (o status recomeça
+ * na coluna nova; arrastar o card que aguardava revisão não é aprovar nem pedir ajuste) e a que vem de
+ * ligar o modo autônomo (que libera a revisão pendente sem ninguém ler). Elas saem pelo `column_changed`
+ * ou `yolo_changed` gravado junto, na mesma mensagem (mesmo card, mesmo instante).
+ */
 export function panelRework(db: Database, boardId: string, period: ReworkPeriod, workflow: string): MetricsRework {
   const wf = workflow ? ' AND e.workflow = ?' : '';
-  const rows: ReworkEventRow[] = all(
+  const events = all(
     db,
-    `SELECT e.card_number, e.column_name, e.at, e.from_value, e.to_value, e.source, r.model
+    `SELECT e.kind, e.card_number, e.column_name, e.at, e.from_value, e.to_value, e.source, r.model
      FROM card_events e LEFT JOIN ai_runs r ON r.id = e.run_id
-     WHERE e.board_id = ? AND e.kind = 'status_changed' AND e.at <= ?${wf}`,
+     WHERE e.board_id = ? AND e.kind IN ('status_changed', 'column_changed', 'yolo_changed') AND e.at <= ?${wf}`,
     [boardId, period.end, ...(workflow ? [workflow] : [])],
-  ).map((r) => ({
-    cardNumber: num(r.card_number),
-    phase: str(r.column_name),
-    at: num(r.at),
-    from: str(r.from_value),
-    to: str(r.to_value),
-    source: str(r.source) === 'ai' ? 'ai' : 'human',
-    model: str(r.model),
-  }));
+  );
+  const moves = new Set(events.filter((r) => str(r.kind) !== 'status_changed').map((r) => `${num(r.card_number)}:${num(r.at)}`));
+  const rows: ReworkEventRow[] = events
+    .filter((r) => str(r.kind) === 'status_changed' && !moves.has(`${num(r.card_number)}:${num(r.at)}`))
+    .map((r) => ({
+      cardNumber: num(r.card_number),
+      phase: str(r.column_name),
+      at: num(r.at),
+      from: str(r.from_value),
+      to: str(r.to_value),
+      source: str(r.source) === 'ai' ? 'ai' : 'human',
+      model: str(r.model),
+    }));
   return { ...reworkOf(rows, period), escapes: escapes(db, boardId, period, workflow) };
 }

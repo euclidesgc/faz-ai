@@ -388,10 +388,11 @@ code review quick later:
 - **Plan with parts that are easy to review.** Each step is an understandable part of the delivery
   and says how to check it (test, typecheck, command or screen); splitting by layer is fine, as long
   as each part can be checked. The plan estimates the lines of code of the delivery: above about 400,
-  the AI keeps the first part in the story and creates the next ones as **derived stories**
-  (`create_card` with `derived_from`). The branch of each derived story starts from the branch of the
-  origin story and its pull request is stacked on top of the origin's; the card shows **Derivada de
-  #N** (derived from #N).
+  the AI keeps the first part in the story and creates the next ones as **derived stories**, in order
+  (`create_card` with `derived_from` pointing to the previous part). The branch of each derived story
+  starts from the branch of the previous part and its pull request is stacked on top of that one; the
+  card shows **Derivada de #N** (derived from #N). If the previous part has no branch yet, the derived
+  story waits for it before creating its own.
 - **Review before the pull request.** After Implementação, the **Revisão** (review) column runs the
   project's checks (typecheck, lint, tests and build, as the project defines them) and reviews the
   story's diff with independent eyes: it delegates to the `revisor-de-codigo` agent, in a new
@@ -836,7 +837,8 @@ of the project's core, one pattern per line (for example `src/db/**`). With the 
 
 - **A core story waits for your approval** in the columns that require approval, even in autonomous
   mode: the AI does the phase's work, asks for review and stops; once you approve, it goes on by
-  itself. The periphery follows the mode as always.
+  itself. The periphery follows the mode as always. The AI can mark a story as Núcleo, but only you
+  take it out, and turning the mode on for a core story waiting for review doesn't approve it.
 - **In Revisão (review) and in the pull request**, the files of the diff that are in the core are
   reviewed more strictly and listed apart in **Como revisar** (how to review).
 - The **Criticidade** field is a field like the others: it shows on the card, filters the board and

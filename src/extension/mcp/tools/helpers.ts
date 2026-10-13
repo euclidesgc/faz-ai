@@ -17,12 +17,19 @@ export const detail = (router: MessageRouter, cardId: string) => {
 };
 
 /** Grava os campos informados por nome; valida tudo antes de gravar qualquer coisa. */
-export const setFields = (router: MessageRouter, s: BoardState, cardId: string, fields: Record<string, unknown> | undefined): void => {
+/** Grava os campos em nome de quem chamou (`origin`): as regras que só uma pessoa pode desfazer valem para a IA. */
+export const setFields = (
+  router: MessageRouter,
+  s: BoardState,
+  cardId: string,
+  fields: Record<string, unknown> | undefined,
+  origin?: { author: string; source: 'ai' },
+): void => {
   const values = Object.entries(fields ?? {}).map(([name, value]) => {
     const f = findField(s, name);
     return { fieldId: f.id, value: coerceFieldValue(f, value, s.board.modelCatalog) };
   });
-  for (const v of values) router.handle({ type: 'field.setValue', cardId, ...v });
+  for (const v of values) router.handle({ type: 'field.setValue', cardId, ...v }, origin);
 };
 
 /** Só valida os campos (sem gravar), para não deixar um card pela metade. */

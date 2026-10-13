@@ -368,9 +368,10 @@ do código rápida depois:
 - **Plan com partes fáceis de revisar.** Cada passo é uma parte inteligível da entrega e diz como
   verificá-la (teste, typecheck, comando ou tela); recortar por camada vale, desde que cada parte seja
   verificável. O plano estima as linhas de código da entrega: acima de umas 400, a IA deixa na
-  história a primeira parte e cria as seguintes como **histórias derivadas** (`create_card` com
-  `derived_from`). A branch de cada derivada parte da branch da história de origem e o pull request
-  dela é empilhado sobre o da origem; o card mostra **Derivada de #N**.
+  história a primeira parte e cria as seguintes como **histórias derivadas**, em ordem (`create_card`
+  com `derived_from` apontando para a parte anterior). A branch de cada derivada parte da branch da
+  parte anterior e o pull request dela é empilhado sobre o dela; o card mostra **Derivada de #N**. Se a
+  parte anterior ainda não tem branch, a derivada espera por ela antes de criar a sua.
 - **Revisão antes do pull request.** Depois da Implementação, a coluna **Revisão** roda as checagens
   do projeto (typecheck, lint, testes e build, como o projeto os define) e revisa o diff da história
   com um olhar independente: delega ao agente `revisor-de-codigo`, numa sessão nova, quando ele está
@@ -800,7 +801,8 @@ ela mexe nesses caminhos, **Periferia** se não. Você também pode marcar à m�
 
 - **A história do núcleo espera a sua aprovação** nas colunas que exigem aprovação, mesmo no modo
   autônomo: a IA faz o trabalho da fase, pede a revisão e para; depois que você aprova, ela segue
-  sozinha. A periferia segue o modo como sempre.
+  sozinha. A periferia segue o modo como sempre. A IA pode marcar uma história como Núcleo, mas só
+  você a tira de lá, e ligar o modo numa história do núcleo que aguarda revisão não a aprova.
 - **Na Revisão e no pull request**, os arquivos do diff que estão no núcleo são revisados com mais
   rigor e listados à parte em **Como revisar**.
 - O campo **Criticidade** é um campo como os outros: aparece no card, filtra o board e pode entrar nas

@@ -212,10 +212,11 @@ pasta em que o código deve ser alterado. O nome da branch e a pasta são defini
 não deve criar branches por conta própria. Nas execuções pelo board, a pasta das worktrees é
 passada à ferramenta como pasta de trabalho extra (`--add-dir`).
 
-Uma história criada com `create_card` e `derived_from` (uma entrega derivada de outra, quando a
-funcionalidade passa de umas 400 linhas) parte da branch da história de origem enquanto o PR dela não
-foi mesclado; `workspace.baseBranch` traz essa base, e o PR é aberto com `--base` nela. `get_card`
-mostra a origem em `derivedFrom`.
+Uma história criada com `create_card` e `derived_from` (a próxima parte de uma funcionalidade dividida
+em entregas, quando ela passa de umas 400 linhas; `derived_from` aponta para a parte anterior) parte
+da branch da parte anterior enquanto o PR dela não foi mesclado; `workspace.baseBranch` traz essa base,
+e o PR é aberto com `--base` nela. Enquanto a parte anterior, aberta, ainda não tem branch,
+`prepare_workspace` recusa a derivada. `get_card` mostra a origem em `derivedFrom`.
 
 `set_pull_request` registra na história o endereço do PR aberto pela IA; ele volta em
 `workspace.pullRequest`. A IA não faz o merge: com o merge automático ligado, é o board que roda

@@ -345,7 +345,10 @@ function phaseOf(s: BoardState, c: Card) {
         }
       : {}),
     ...decisionRecordOf(s, story, col),
-    requiresApproval: (col.requiresApproval && (!story.yolo || isCoreStory(s, story))) || isAtYoloStop(s, story),
+    // no modo autônomo, a última coluna da IA entrega pelo pull request (não pede aprovação), mesmo no núcleo
+    requiresApproval:
+      (col.requiresApproval && (!story.yolo || (isCoreStory(s, story) && col.id !== lastAiColumn(s, story.workflowId)?.id))) ||
+      isAtYoloStop(s, story),
     ...(story.yolo
       ? {
           autonomousNote: isAtYoloStop(s, story)
