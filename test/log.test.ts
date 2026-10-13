@@ -820,7 +820,8 @@ describe('EventLog no MessageRouter', () => {
     router.handle({ type: 'field.setValue', cardId: id, fieldId: field('Modelo').id, value: 'claude:sonnet' });
     router.handle({ type: 'field.setValue', cardId: id, fieldId: field('Skills').id, value: ['unit-testing'] });
     router.handle({ type: 'field.setValue', cardId: id, fieldId: field('Esforço da atividade').id, value: 'Alto' });
-    router.handle({ type: 'field.setValue', cardId: id, fieldId: field('Fase').id, value: 'PRD' });
+    // a Fase só é gravada pela IA (a pessoa não a muda no card)
+    router.handle({ type: 'field.setValue', cardId: id, fieldId: field('Fase').id, value: 'PRD' }, AI);
 
     const changes = of(id).filter((e) => e.kind === 'field_changed');
     expect(changes.map((e) => [e.subject, e.fromValue, e.toValue])).toEqual([

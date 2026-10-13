@@ -1,6 +1,6 @@
 import { CRITICALITY_FIELD } from './critical';
 import { norm } from './filters';
-import type { BoardState, FieldDef, FieldKind, Id, WorkflowKind } from './model';
+import type { BoardState, FieldDef, FieldKind, FieldValue, Id, WorkflowKind } from './model';
 import { EFFORT_FIELD } from './models';
 
 // Os campos que o board padrão cria e que o mecanismo procura pelo nome: a triagem, as regras de modelo,
@@ -24,10 +24,13 @@ export interface BoardField {
   workflow?: WorkflowKind;
   /** as opções são da pessoa (a IA só escolhe entre elas); nos outros, quem as mantém é o board */
   ownOptions?: boolean;
+  /** o valor é do board e da IA: a pessoa não o muda no card nem o põe como padrão do tipo */
+  readOnly?: boolean;
 }
 
 export const BOARD_FIELDS: BoardField[] = [
-  { name: PHASE_FIELD, workflow: 'child' },
+  // a Fase diz a que fase da história a sub-tarefa pertence, e a regra de avanço conta por ela
+  { name: PHASE_FIELD, workflow: 'child', readOnly: true },
   { name: TAGS_FIELD, ownOptions: true },
   { name: MODEL_FIELD },
   { name: SKILLS_FIELD },
@@ -68,4 +71,28 @@ export function fieldChangeBlocker(
   if (change.appliesToTypes !== undefined && JSON.stringify(change.appliesToTypes) !== JSON.stringify(field.appliesToTypes))
     return `Os tipos de card do campo "${name}" são mantidos pelo board.`;
   return null;
+}
+
+const readOnlyField = (state: BoardState, fieldId: Id): FieldDef | undefined => {
+  const field = state.fieldDefs.find((f) => f.id === fieldId);
+  return field && boardFieldNamed(field.name)?.readOnly ? field : undefined;
+};
+
+/** Por que a pessoa não pode gravar este valor no card; null quando pode. A IA grava em qualquer campo. */
+export function fieldValueBlocker(state: BoardState, fieldId: Id): string | null {
+  const field = readOnlyField(state, fieldId);
+  return field ? `O campo "${field.name}" é preenchido pelo board e pela IA, não à mão.` : null;
+}
+
+/**
+ * Por que estes padrões do tipo de card não podem ser gravados; null quando podem. Um padrão que o tipo já
+ * tinha volta igual quando a tela grava os outros, e passa.
+ */
+export function typeDefaultsBlocker(state: BoardState, typeId: Id, defaults: Record<Id, FieldValue>): string | null {
+  const current = state.cardTypes.find((t) => t.id === typeId)?.defaults ?? {};
+  const id = Object.keys(defaults).find((fieldId) => {
+    const value = defaults[fieldId];
+    return readOnlyField(state, fieldId) && value !== null && value !== '' && JSON.stringify(value) !== JSON.stringify(current[fieldId]);
+  });
+  return id ? `O campo "${readOnlyField(state, id)!.name}" não tem valor padrão por tipo: o board o preenche em cada card.` : null;
 }

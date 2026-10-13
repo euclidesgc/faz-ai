@@ -166,7 +166,9 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 ![Card aberto: status, aprovação, campos, descrição e checklist](docs/images/card.png)
 
 Por padrão, uma história não é concluída nem avança de fase enquanto tiver sub-tarefas em aberto
-daquela fase. Essas regras podem ser desligadas nas configurações.
+daquela fase. Essas regras podem ser desligadas nas configurações. A fase da sub-tarefa é o campo
+**Fase**, que a IA preenche ao criá-la: no card aberto ele aparece só para leitura e não vira padrão
+do tipo de card.
 
 No topo do board, **N com você** mostra quantos cards esperam revisão, resposta ou desbloqueio (um
 clique filtra só eles), e um indicador aparece enquanto a IA trabalha em algum card.
