@@ -427,6 +427,26 @@ describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada 
     expect(installBlock('Skill do fluxo').getByText('~/.claude/skills/faz-ai-fluxo')).toBeInTheDocument();
   });
 
+  it('abrir e fechar a busca de skills várias vezes não duplica o card "Skill do fluxo" (nem o "Servidor do board")', async () => {
+    // com a key repetida entre os irmãos, o React avisa e passa a duplicar o card
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    renderScreen('project');
+    const skills = document.querySelector<HTMLElement>('.settings-card[aria-label="Skills"]')!;
+    const mcp = document.querySelector<HTMLElement>('.settings-card[aria-label="Servidores MCP"]')!;
+    for (let i = 0; i < 4; i++) {
+      await userEvent.click(within(skills).getByRole('button', { name: 'Buscar skills para instalar' }));
+    }
+    expect(screen.getAllByLabelText('Skill do fluxo')).toHaveLength(1);
+    // o mesmo card (BoardInstall) vale para o servidor MCP: abrir e fechar o formulário ao lado dele não o duplica
+    for (let i = 0; i < 4; i++) {
+      await userEvent.click(within(mcp).getByRole('button', { name: 'Novo servidor' }));
+    }
+    expect(screen.getAllByLabelText('Servidor do board')).toHaveLength(1);
+    const repetidas = erro.mock.calls.filter((c) => String(c[0]).includes('two children with the same key'));
+    erro.mockRestore();
+    expect(repetidas).toHaveLength(0);
+  });
+
   it('o padrão da ferramenta instala no global, depois de confirmar', async () => {
     renderScreen('project');
     await userEvent.click(installBlock('Servidor do board').getByRole('button', { name: 'Instalar (padrão da ferramenta)' }));
