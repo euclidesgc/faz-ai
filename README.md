@@ -498,6 +498,24 @@ só o total. No Cursor, que não impõe o contexto vazio, o que a ferramenta car
 também fica de fora, e as definições das ferramentas MCP contam inteiras. O que a execução gastou de
 fato aparece depois, no consumo de cada execução.
 
+### Aba Consumo do card
+
+O card aberto tem a aba **Consumo**, que junta as duas contas:
+
+- **Próxima execução**: a mesma estimativa do anel do board, com a fase, o modelo e o detalhe por
+  grupo.
+- **Gasto até agora**: o que a ferramenta mediu no fim de cada execução do card, uma linha por fase
+  (Discovery, PRD, Spec…), com execuções, tempo, tokens de entrada, de saída, de leitura e de escrita
+  de cache, e o total. Numa história, as execuções das sub-tarefas entram numa linha à parte e no
+  total. A fase é a coluna em que o card estava quando a execução rodou.
+
+O gasto é histórico e só cresce: apagar mensagens da conversa, desmarcar uma skill ou trocar o agente
+diminui as próximas execuções (a estimativa), nunca o que já foi gasto. Uma execução sem medição conta
+nas execuções e aparece como **não medido**, nunca como zero; uma execução em andamento entra quando
+termina, e a aba se atualiza sozinha. As execuções de meses que passaram da retenção do detalhe ficam
+só nos totais mensais do board e a aba avisa até quando. Como no resto do board, o consumo é em
+tokens, sem custo em dólar.
+
 ### Consumo e inventário de cada execução
 
 Cada vez que a IA roda (pela conversa, pelo heartbeat ou pelo modo autônomo), o board registra no

@@ -274,6 +274,15 @@ export class HostBridge {
           }
           return;
         }
+        case 'card.usage.query': {
+          // ler o log não é mutação do board, como em `metrics.query`
+          try {
+            this.post({ type: 'card.usage.result', requestId: msg.requestId, usage: this.router.cardUsage(msg.cardId) });
+          } catch (e) {
+            this.post({ type: 'card.usage.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+          }
+          return;
+        }
         case 'backup.export': {
           const { text, name, warnings } = this.router.exportBoardFile();
           const saved = await this.env.saveTextAs?.(text, name);

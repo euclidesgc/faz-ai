@@ -5,6 +5,7 @@ import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from 
 import type { HarnessUsage, SelectableKind } from './harnessSelection';
 import type { HookInput, McpServerInput } from './harnessCatalog';
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
+import type { CardUsage } from './cardUsage';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
@@ -126,6 +127,8 @@ export type WebviewToHost =
   | { type: 'attachment.write'; requestId: string; attachmentId: Id; content: string }
   /** consulta o log para o painel de métricas; não altera nada, a resposta é `metrics.result` */
   | { type: 'metrics.query'; requestId: string; query: MetricsPanelQuery }
+  /** consulta o que o card já gastou nas execuções de IA (o log); não altera nada, a resposta é `card.usage.result` */
+  | { type: 'card.usage.query'; requestId: string; cardId: Id }
   /** diálogo nativo de "salvar como" (só no editor; na web a modal faz o download direto) */
   | { type: 'attachment.saveAs'; attachmentId: Id }
   | { type: 'attachment.delete'; attachmentId: Id }
@@ -310,6 +313,8 @@ export type HostToWebview =
   | { type: 'harness.file.writeResult'; requestId: string; ok: boolean; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
+  /** resposta a `card.usage.query`, correlacionada por `requestId` */
+  | { type: 'card.usage.result'; requestId: string; usage?: CardUsage; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */
   | { type: 'backup.import.summary'; token: string; summary: ImportSummary }
   /** a exportação ou a escolha do arquivo terminou (com sucesso ou porque a pessoa desistiu): a interface sai do estado "ocupado" */

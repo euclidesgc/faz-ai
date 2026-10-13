@@ -526,6 +526,24 @@ ring shows only the total. In Cursor, which does not enforce the empty context, 
 its own is also left out, and the MCP tool definitions count in full. What the run actually spent
 shows up afterwards, in the consumption of each run.
 
+### Card Usage tab
+
+The open card has the **Consumo** (usage) tab, which brings the two numbers together:
+
+- **Próxima execução** (next run): the same estimate as the ring on the board, with the phase, the
+  model and the breakdown by group.
+- **Gasto até agora** (spent so far): what the tool measured at the end of each of the card's runs,
+  one row per phase (Discovery, PRD, Spec…), with runs, time, input, output, cache read and cache write
+  tokens, and the total. For a story, the sub-tasks' runs get a row of their own and count in the
+  total. The phase is the column the card was in when the run happened.
+
+What was spent is history and only grows: deleting conversation messages, unmarking a skill or
+switching the agent lowers the next runs (the estimate), never what was already spent. A run without
+measurement counts as a run and shows as **não medido** (not measured), never as zero; a run in
+progress counts when it ends, and the tab updates on its own. Runs from months past the detail
+retention stay only in the board's monthly totals, and the tab says up to when. As everywhere else on
+the board, usage is in tokens, with no dollar cost.
+
 ### Consumption and inventory of each run
 
 Every time the AI runs (from the conversation, the heartbeat or autonomous mode), the board records
