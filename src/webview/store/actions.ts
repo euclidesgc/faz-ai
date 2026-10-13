@@ -161,8 +161,7 @@ export function requestArchiveMany(histories: Card[], after?: () => void): void 
   const along = alongWithMany(histories);
   ask({
     title: t('Arquivar {n} história(s)?', { n: histories.length }),
-    message:
-      (along ? t('Serão arquivados junto: {along}.', { along }) + ' ' : '') + t('Nada é apagado, e desarquivar traz tudo de volta.'),
+    message: (along ? t('Serão arquivados junto: {along}.', { along }) + ' ' : '') + t('Nada é apagado, e desarquivar traz tudo de volta.'),
     confirmLabel: t('Arquivar'),
     onConfirm: () => {
       cards.archiveMany(histories.map((c) => c.id));
@@ -177,8 +176,7 @@ export function requestTrashMany(histories: Card[], after?: () => void): void {
   const along = alongWithMany(histories);
   ask({
     title: t('Excluir {n} história(s)?', { n: histories.length }),
-    message:
-      (along ? t('Vão para a lixeira junto: {along}.', { along }) + ' ' : '') + t('Dá para restaurar pela aba Lixeira.'),
+    message: (along ? t('Vão para a lixeira junto: {along}.', { along }) + ' ' : '') + t('Dá para restaurar pela aba Lixeira.'),
     confirmLabel: t('Excluir'),
     danger: true,
     onConfirm: () => {
@@ -196,7 +194,10 @@ export function requestMoveMany(histories: Card[], destinations: Column[], after
     choices: { label: t('Coluna'), options: destinations.map((c) => ({ value: c.id, label: dt(c.name) })) },
     confirmLabel: t('Mover'),
     onConfirm: (columnId) => {
-      cards.moveMany(histories.map((c) => c.id), columnId!);
+      cards.moveMany(
+        histories.map((c) => c.id),
+        columnId!,
+      );
       after?.();
     },
   });
@@ -213,7 +214,10 @@ export function requestConcludeMany(histories: Card[], doneColumn: Column, after
     message: t('Vão para "{column}". Quem ainda tiver sub-tarefa em aberto fica de fora.', { column: dt(doneColumn.name) }),
     confirmLabel: t('Concluir'),
     onConfirm: () => {
-      cards.moveMany(histories.map((c) => c.id), doneColumn.id);
+      cards.moveMany(
+        histories.map((c) => c.id),
+        doneColumn.id,
+      );
       after?.();
     },
   });
