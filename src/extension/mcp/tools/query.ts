@@ -13,7 +13,8 @@ const MAX_READ_BYTES = 256 * 1024;
 export function registerQueryTools(tool: DefineTool): void {
   tool(
     'get_board',
-    'Visão geral do board: workflows, colunas (com categoria e quantidade de cards), tipos de card, campos personalizados e regras. Chame primeiro para conhecer os nomes válidos.',
+    'Visão geral do board: workflows, colunas (com categoria e quantidade de cards), tipos de card, campos personalizados e regras. Chame primeiro para conhecer os nomes válidos. ' +
+      'As opções dos campos Rules e Skills e os `agents` são tudo o que o board marcou em Configurações → Harness: não indique nada fora deles.',
     {},
     (_a, router) => boardOverview(router.snapshot()),
     true,
@@ -68,7 +69,8 @@ export function registerQueryTools(tool: DefineTool): void {
 
   tool(
     'get_card',
-    'Detalhe completo de um card: descrição (markdown), campos, sub-tarefas, checklist, conversa e anexos. Em `phase` vem o que fazer na fase em que o card está e o modelo do documento que ela produz; numa sub-tarefa, `storyArtifacts` traz os documentos já anexados à história.',
+    'Detalhe completo de um card: descrição (markdown), campos, sub-tarefas, checklist, conversa e anexos. Em `phase` vem o que fazer na fase em que o card está e o modelo do documento que ela produz; numa sub-tarefa, `storyArtifacts` traz os documentos já anexados à história. ' +
+      'Numa história, `subtasksNow` traz as rodadas da Implementação. Uma imagem ou arquivo colado numa mensagem aparece como `attachment:<nome>`: o arquivo é o anexo de mesmo nome em `attachments`, e pode ser lido pelo `path`.',
     { card: cardArg },
     (a, router) => detail(router, findCard(router.snapshot(), a.card).id),
     true,
