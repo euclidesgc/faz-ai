@@ -517,6 +517,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // router.onDidChange → publishHeartbeat → setHeartbeat → notify
   const publishHeartbeat = () => router.setHeartbeat({ nextRoundAt: heartbeat.nextRoundAt });
   heartbeat.onDidChange(publishHeartbeat);
+  // aprovar uma história chama a IA na hora, respeitando os tetos de paralelismo, com ou sem heartbeat ligado
+  router.onDidApprove((cardId) => {
+    if (!o.ownsBoard || o.ownsBoard()) heartbeat.enqueue(cardId);
+  });
   router.onDidChange(publishHeartbeat);
   publishHeartbeat();
 

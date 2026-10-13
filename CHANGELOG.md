@@ -4,6 +4,10 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não publicado
+
+- **Aprovar chama a IA na hora (#475).** Aprovar uma história agora inicia a IA imediatamente, respeitando os tetos de execuções em paralelo, sem esperar a próxima rodada do heartbeat e mesmo com ele desligado.
+
 ## 0.39.0
 
 - **Aprovar leva o card para a próxima coluna (#441).** Clicar em **Aprovar** numa história levava o card a Aprovado e esperava a IA movê-lo; com frequência ela refazia o trabalho da mesma coluna e pedia a revisão de novo. Agora a aprovação de uma pessoa move a história para a coluna seguinte na hora, com o status recomeçando lá (Pronto, onde a IA atua), e a IA trabalha a fase nova e pede a sua revisão ao terminar. Ficam para a IA só os casos em que o board não pode mover: a aprovação que faz o merge automático (a conclusão é feita depois do merge) e a conclusão recusada por sub-tarefa em aberto, que deixa o card Aprovado com o aviso na conversa. As métricas de retrabalho continuam contando a aprovação.
