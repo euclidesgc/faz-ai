@@ -9,6 +9,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { t } from '../../i18n';
 import { cards } from '../../commands';
 import { useYoloToggle } from '../card/YoloBar';
+import { ContextGauge } from './ContextGauge';
 import {
   IconAttachment,
   IconBranch,
@@ -25,7 +26,7 @@ import {
 // o clique num controle do rodapé não arrasta nem abre o card
 const keep = (e: SyntheticEvent) => e.stopPropagation();
 
-/** Rodapé do card: contadores, branch e PR do próprio card e a sugestão de modelo das regras. */
+/** Rodapé do card: contadores, branch e PR do próprio card, a sugestão de modelo das regras e o contexto estimado. */
 export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: boolean; overlay: boolean }) {
   const state = useBoardStore((s) => s.state)!;
   const children = isParent ? childrenOf(state, card.id) : [];
@@ -130,6 +131,7 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
           <IconSuggest /> {modelDisplay(catalog, offer)}
         </button>
       )}
+      {!overlay && card.deletedAt === null && card.archivedAt === null && <ContextGauge card={card} />}
     </div>
   );
 }

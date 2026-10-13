@@ -188,6 +188,15 @@ function digest(file: string): string | undefined {
   }
 }
 
+/** O tamanho do arquivo em bytes, quando ele pode ser lido. */
+function sizeField(file: string): { size?: number } {
+  try {
+    return { size: fs.statSync(file).size };
+  } catch {
+    return {};
+  }
+}
+
 function scanSource(src: HarnessSource, base: string, ctx: Ctx, source?: number): Found[] {
   const target = path.join(base, src.path.replace('{project}', claudeProjectKey(ctx.projectDir)));
   const scope: HarnessScope = src.builtin ? 'plugin' : src.scope;
@@ -203,6 +212,8 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx, source?: number)
     ...(src.builtin ? { plugin: src.builtin } : {}),
     ...(source !== undefined ? { source } : {}),
     ...(layout === 'files' || layout === 'skills' ? { digest: digest(file) } : {}),
+    // o tamanho vale para o arquivo inteiro: uma entrada de um arquivo de configuração não tem tamanho próprio
+    ...(layout !== 'entry' ? sizeField(file) : {}),
   });
   const hookItem = (event: string, h: { matcher: string; command: string; type: string }, file: string): Found => ({
     ...item(event, short(`${h.matcher ? `${h.matcher} → ` : ''}${h.command || `(${h.type})`}`), file),

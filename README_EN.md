@@ -498,6 +498,58 @@ Images pasted into the message become card attachments and the AI receives them.
   of the tool's output. The full log is in the **Output → Faz AI** panel (or in the `faz-ai`
   terminal).
 
+### Estimated context of each card
+
+In the footer of each card on the board, a discreet ring shows how much of the context window the
+card's run takes before the AI starts, with the total next to it (for example, `5.8K`). Clicking it
+opens the breakdown, shaped like Claude Code's context window: the total over the window of the
+card's model, a bar per group and each item, with how much it takes.
+
+- **MCP servers.** In Claude Code, the session starts with only the tool names and each server's
+  instructions (cut at 2,048 characters); the full definitions load when the AI looks up a tool and
+  show up separately, as **sob demanda** (on demand), outside the total. The board measures its own
+  server; the servers the agent allows show up as **não medido** (not measured), because the board
+  does not open them.
+- **Agents.** The instructions of the session's agent and, for a story in Claude Code, the name and
+  description of each subagent (a subagent's instructions go into its own context, not the
+  session's).
+- **Rules and Skills.** The ones marked **Incluir em todo contexto** (include in every context) and
+  the ones the card or the agent asks for, by the size of the file the session reads.
+- **Card.** Title and description, checklist, conversation, the phase's instructions and template,
+  and the phase documents.
+
+It is an estimate from text size (about 4 characters per token), meant to compare choices and find
+what weighs before running: unmarking a skill, removing it from the card or switching the agent
+changes the number right away. The estimate follows the card: in a column where the AI works, it
+names the phase and adds its instructions, and the conversation and documents count as they grow.
+Deleting messages only lowers the next runs; what was already spent does not come back. When it
+opens, the breakdown rereads the harness files from disk: if something changed since the last read (a
+global skill edited outside the board, for example), it says so and already shows the new numbers;
+the **Reler arquivos** (reread files) button does the same on request. The AI tool's own prompt and built-in tools are not counted. The
+window comes from the card's model (or the agent's): 1M for Fable 5.1, Opus 5.5 and Sonnet 5.5, and
+200K for Haiku 4.5. Without a model, or with a model whose window is unknown (such as Cursor's), the
+ring shows only the total. In Cursor, which does not enforce the empty context, what the tool loads on
+its own is also left out, and the MCP tool definitions count in full. What the run actually spent
+shows up afterwards, in the consumption of each run.
+
+### Card Usage tab
+
+The open card has the **Consumo** (usage) tab, which brings the two numbers together:
+
+- **Próxima execução** (next run): the same estimate as the ring on the board, with the phase, the
+  model and the breakdown by group.
+- **Gasto até agora** (spent so far): what the tool measured at the end of each of the card's runs,
+  one row per phase (Discovery, PRD, Spec…), with runs, time, input, output, cache read and cache write
+  tokens, and the total. For a story, the sub-tasks' runs get a row of their own and count in the
+  total. The phase is the column the card was in when the run happened.
+
+What was spent is history and only grows: deleting conversation messages, unmarking a skill or
+switching the agent lowers the next runs (the estimate), never what was already spent. A run without
+measurement counts as a run and shows as **não medido** (not measured), never as zero; a run in
+progress counts when it ends, and the tab updates on its own. Runs from months past the detail
+retention stay only in the board's monthly totals, and the tab says up to when. As everywhere else on
+the board, usage is in tokens, with no dollar cost.
+
 ### Consumption and inventory of each run
 
 Every time the AI runs (from the conversation, the heartbeat or autonomous mode), the board records

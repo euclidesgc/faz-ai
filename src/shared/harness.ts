@@ -133,6 +133,8 @@ export interface HarnessItem {
   layout: 'file' | 'files' | 'skills' | 'entry';
   /** resumo do conteúdo do arquivo, para saber se uma cópia divergiu do original */
   digest?: string;
+  /** tamanho do arquivo em bytes, para estimar quanto ele ocupa no contexto quando a sessão o lê; ausente numa entrada de arquivo de configuração */
+  size?: number;
   /** só nas skills: invocação automática ou só quando indicada */
   mode?: SkillMode;
   /** só nas skills: arquivos de apoio da pasta (referências, modelos, scripts), relativos a ela */

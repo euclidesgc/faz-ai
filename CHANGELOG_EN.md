@@ -27,17 +27,30 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   reads it when it needs it: the descriptions of `get_card`, `get_board`, `get_models` and
   `link_cards`, the `model` note in `get_card` and the new `subtasksNowNote`, with the Implementation
   rounds. A test blocks instructions or a tool description over the limit.
+- **Estimated context of each card.** In the card footer, a discreet ring shows how much of the
+  context window the card's run takes before the AI starts; clicking it opens the breakdown by group
+  (MCP servers, agents, rules, skills and the card itself) and by item, like Claude Code's context
+  window. In Claude Code, the board's server counts only the tool names and the instructions, and the
+  definitions show up as on demand; the servers the agent allows show up as not measured. It is an
+  estimate from text size, to find what weighs before running, and it follows the card: the column's
+  phase, the conversation and the documents count in the next run. When it opens, the breakdown
+  rereads the harness files and says when something changed since the last read.
+- **Usage tab on the card.** The open card gets the **Consumo** (usage) tab: the estimate for the next
+  run and what the card has already spent, measured in each run, by phase (runs, time, input, output and
+  cache tokens) and in total, with a story's sub-tasks in a row of their own. What was spent is history
+  and only grows; deleting messages only changes the estimate for the next runs.
 - **The global harness reread right away.** A skill, subagent, rule, settings file or MCP server in
   your user folder (`~/.claude`, `~/.claude.json`, `~/.cursor`, `~/.agents`) edited outside the
-  board, in the editor, by the AI or by git, shows up on the board right away, as files in the project
-  already did; the same goes for the project memory and for plugins installed, enabled or removed.
-  Before, the board only saw the change when it was opened again or when its own screen changed the
-  harness. Only the folders and files the Global tab shows are watched, never the whole home folder:
-  from `~/.claude/projects`, only this project's `memory` folder; from `~/.claude/plugins`, only the
-  registry of installed plugins. A skill installed as a link to another folder is watched too. In
-  browser mode (`faz-ai`), which reread everything every 15 seconds, the same global files are now
-  watched and, in the project, the folders and files the Projeto tab shows; the full reread runs every
-  minute, for what a watcher doesn't see (rules in subfolders, network file systems).
+  board, in the editor, by the AI or by git, shows up on the board right away, and each card's
+  estimated context follows, as files in the project already did; the same goes for the project
+  memory and for plugins installed, enabled or removed. Before, the board only saw the change when it
+  was opened again or when its own screen changed the harness. Only the folders and files the Global
+  tab shows are watched, never the whole home folder: from `~/.claude/projects`, only this project's
+  `memory` folder; from `~/.claude/plugins`, only the registry of installed plugins. A skill installed
+  as a link to another folder is watched too. In browser mode (`faz-ai`), which reread everything
+  every 15 seconds, the same global files are now watched and, in the project, the folders and files
+  the Projeto tab shows; the full reread runs every minute, for what a watcher doesn't see (rules in
+  subfolders, network file systems).
 
 ## 0.36.0
 

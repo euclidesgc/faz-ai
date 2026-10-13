@@ -397,6 +397,27 @@ describe('HostBridge: metrics.query', () => {
   });
 });
 
+describe('HostBridge: card.usage.query', () => {
+  it('responde card.usage.result com o mesmo requestId e o consumo do card, sem mudar o board', async () => {
+    const s = router.snapshot();
+    const story = s.cardTypes.find((t) => s.workflows.find((w) => w.id === t.defaultWorkflowId)?.kind === 'parent')!;
+    const col = s.columns.find((c) => c.workflowId === story.defaultWorkflowId)!;
+    const cardId = router.createCard({ typeId: story.id, columnId: col.id, parentId: null, title: 'Card' });
+    let changes = 0;
+    router.onDidChange(() => void changes++);
+    await bridge.handle({ type: 'card.usage.query', requestId: 'u1', cardId });
+    const msg = sent.at(-1) as Extract<HostToWebview, { type: 'card.usage.result' }>;
+    expect(msg).toMatchObject({ type: 'card.usage.result', requestId: 'u1' });
+    expect(msg.usage).toMatchObject({ phases: [], subtasks: null, total: { runs: 0, tokens: null } });
+    expect(changes).toBe(0);
+  });
+
+  it('card que não existe vira error dentro da resposta', async () => {
+    await bridge.handle({ type: 'card.usage.query', requestId: 'u2', cardId: 'nao-existe' });
+    expect(sent.at(-1)).toEqual({ type: 'card.usage.result', requestId: 'u2', error: 'Card não encontrado.' });
+  });
+});
+
 describe('HostBridge: Settings do editor', () => {
   it('ui.openIdeSettings pede ao editor para abrir o Settings na chave', async () => {
     const keys: (string | undefined)[] = [];

@@ -26,17 +26,30 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   quando precisa: a descrição de `get_card`, `get_board`, `get_models` e `link_cards`, a nota do
   `model` no `get_card` e a nota nova `subtasksNowNote`, com as rodadas da Implementação. Um teste
   barra instruções ou descrição de ferramenta acima do limite.
+- **Contexto estimado de cada card.** No rodapé do card, um anel discreto mostra quanto da janela de
+  contexto a execução do card ocupa antes de a IA começar; o clique abre o detalhe por grupo
+  (servidores MCP, agentes, rules, skills e o próprio card) e por item, como a janela de contexto do
+  Claude Code. No Claude Code, o servidor do board conta só os nomes das ferramentas e as instruções,
+  e as definições aparecem como sob demanda; os servidores liberados pelo agente aparecem como não
+  medidos. É uma estimativa pelo tamanho do texto, para achar o que pesa antes de rodar, e acompanha o
+  card: a fase da coluna, a conversa e os documentos entram na próxima execução. Ao abrir, o detalhe
+  relê os arquivos do harness e avisa quando algo mudou desde a última leitura.
+- **Aba Consumo no card.** O card aberto ganha a aba **Consumo**: a estimativa da próxima execução e o
+  que o card já gastou, medido em cada execução, por fase (execuções, tempo, tokens de entrada, saída e
+  cache) e no total, com as sub-tarefas de uma história numa linha à parte. O gasto é histórico e só
+  cresce; apagar mensagens muda só a estimativa das próximas execuções.
 - **O harness global relido na hora.** Uma skill, um subagente, uma regra, um settings ou um servidor
   MCP da sua pasta de usuário (`~/.claude`, `~/.claude.json`, `~/.cursor`, `~/.agents`) editado por
-  fora, no editor, pela IA ou pelo git, aparece no board na hora, como já acontecia com os arquivos do
-  projeto; o mesmo vale para a memória do projeto e para os plugins instalados, ativados ou removidos.
-  Antes, o board só via a mudança quando era aberto de novo ou quando a própria tela mexia no harness.
-  São observados só as pastas e os arquivos que a aba Global mostra, nunca a home inteira: de
-  `~/.claude/projects`, só a pasta `memory` deste projeto; de `~/.claude/plugins`, só o registro dos
-  instalados. Uma skill instalada como link para outra pasta também é observada. No modo navegador
-  (`faz-ai`), que relia tudo a cada 15 segundos, passam a ser observados os mesmos arquivos globais e,
-  no projeto, as pastas e os arquivos que a aba Projeto mostra; a releitura completa fica a cada
-  minuto, para o que um watcher não vê (regras de subpasta, sistemas de arquivos de rede).
+  fora, no editor, pela IA ou pelo git, aparece no board na hora, e o contexto estimado de cada card
+  acompanha, como já acontecia com os arquivos do projeto; o mesmo vale para a memória do projeto e
+  para os plugins instalados, ativados ou removidos. Antes, o board só via a mudança quando era aberto
+  de novo ou quando a própria tela mexia no harness. São observados só as pastas e os arquivos que a
+  aba Global mostra, nunca a home inteira: de `~/.claude/projects`, só a pasta `memory` deste projeto;
+  de `~/.claude/plugins`, só o registro dos instalados. Uma skill instalada como link para outra pasta
+  também é observada. No modo navegador (`faz-ai`), que relia tudo a cada 15 segundos, passam a ser
+  observados os mesmos arquivos globais e, no projeto, as pastas e os arquivos que a aba Projeto
+  mostra; a releitura completa fica a cada minuto, para o que um watcher não vê (regras de subpasta,
+  sistemas de arquivos de rede).
 
 ## 0.36.0
 

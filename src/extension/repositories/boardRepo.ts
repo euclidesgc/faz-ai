@@ -419,6 +419,7 @@ export class BoardRepo {
       currentUser,
       harness: EMPTY_HARNESS,
       harnessSelection: this.selection(boardId),
+      boardServer: null,
       pendingUpgrade: pendingUpgrade(db, boardId),
       chat: EMPTY_CHAT,
       aiRuns: [],

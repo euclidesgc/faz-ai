@@ -3,6 +3,7 @@ import { useBoardStore } from '../store/boardStore';
 import { AttachmentsTab } from './card/AttachmentsTab';
 import { CardHeading } from './card/CardHeading';
 import { CardTabs, type CardTab } from './card/CardTabs';
+import { UsageTab } from './card/UsageTab';
 import { ChecklistSection } from './card/ChecklistSection';
 import { CommentsTab } from './card/CommentsTab';
 import { DescriptionSection } from './card/DescriptionSection';
@@ -70,6 +71,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
 
         {tab === 'comments' && <CommentsTab cardId={card.id} draft={message} onDraft={setMessage} />}
         {tab === 'attachments' && <AttachmentsTab cardId={card.id} />}
+        {tab === 'usage' && <UsageTab card={card} />}
 
         {tab === 'details' && (
           <>
