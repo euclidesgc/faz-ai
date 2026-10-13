@@ -807,6 +807,25 @@ to come back, without spending runs. The heartbeat does not drive autonomous sto
 to the autopilot.
 
 
+### Critical areas (core)
+
+In Settings → **Regras** (rules), **Áreas críticas (núcleo)** (critical areas, core) takes the paths
+of the project's core, one pattern per line (for example `src/db/**`). With the list filled in,
+`get_card` brings the areas in `criticalAreas`, and the AI, in Spec or Plan, marks the story's
+**Criticidade** (criticality) field: **Núcleo** (core) if it touches those paths, **Periferia**
+(periphery) if not. You can also mark it by hand.
+
+- **A core story waits for your approval** in the columns that require approval, even in autonomous
+  mode: the AI does the phase's work, asks for review and stops; once you approve, it goes on by
+  itself. The periphery follows the mode as always.
+- **In Revisão (review) and in the pull request**, the files of the diff that are in the core are
+  reviewed more strictly and listed apart in **Como revisar** (how to review).
+- The **Criticidade** field is a field like the others: it shows on the card, filters the board and
+  can be used in model rules (for example, core with the "Alto" tier model).
+
+Boards created before get the field through **Atualizar board** (update board). Through MCP,
+`update_rules` accepts `criticalPaths`.
+
 ### Agents
 
 ![Agent with intent, chosen skills and read-only tools](docs/images/agents_en.png)
@@ -994,7 +1013,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Workflows e colunas | As many workflows as you want (independent cards or sub-tasks), with editable names and a position you change by dragging; **Nova coluna** (new column) on each one; names, order (drag) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template). Opening and closing workflows and columns happens on the board itself and is remembered |
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
 | Campos | Custom fields (text, select, date, model…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo |
-| Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
+| Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model and the [critical areas](#critical-areas-core) |
 | Harness de IA | The project's tool, permission, default agent and heartbeat; Projeto and Global tabs with everything each tool loads, in groups, with what each file is, the path that opens in the board editor and the marking of what runs use (see [AI harness](#ai-harness) and [Agents](#agents)) |
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Only the Git tab in browser mode; in the editor, points to the Settings (Faz AI › Git) |

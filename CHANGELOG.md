@@ -6,6 +6,12 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Áreas críticas (núcleo).** Em Configurações → Regras, liste os caminhos do núcleo do projeto, um
+  por linha. A IA marca o novo campo **Criticidade** (Núcleo ou Periferia) das histórias na Spec ou no
+  Plan, e a história do núcleo espera a sua aprovação nas colunas que exigem aprovação, mesmo no modo
+  autônomo; depois de aprovada, segue sozinha. Na Revisão e no PR, os arquivos do núcleo vêm à parte.
+  Boards existentes ganham o campo pelo **Atualizar board**; `update_rules` aceita `criticalPaths` e
+  `get_card` traz `criticalAreas`.
 - **Modo autônomo até uma fase.** Ao ligar o modo autônomo, o aviso traz o seletor **Até onde**, com
   as fases em que a IA atua a partir da coluna atual. O padrão continua sendo ir até o pull request.
   Escolhendo uma fase antes, como o Plan, a IA segue sozinha até ela, faz o trabalho dela, pede a sua

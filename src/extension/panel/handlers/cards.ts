@@ -2,6 +2,7 @@ import { linkProblem } from '../../../shared/links';
 import { norm } from '../../../shared/filters';
 import { columnOf, isLive } from '../../../shared/selectors';
 import { isAtYoloStop, lastAiColumn, yoloStopOptions } from '../../../shared/story';
+import { CORE, CRITICALITY_FIELD, isCoreStory } from '../../../shared/critical';
 import { settleDelivery } from '../../delivery';
 
 import type { BoardState, Card } from '../../../shared/model';
@@ -23,9 +24,25 @@ function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author:
   const state = yolo ? ctx.state() : null;
   const card = state?.cards.find((c) => c.id === msg.cardId);
   const atStop = byAi && msg.status === 'waiting_review' && !!state && !!card && isAtYoloStop(state, card);
-  const autoApprove = byAi && msg.status === 'waiting_review' && !msg.pending && yolo && !atStop;
+  // a história do núcleo espera a pessoa nas colunas que exigem aprovação, mesmo no modo autônomo
+  const core =
+    byAi &&
+    msg.status === 'waiting_review' &&
+    !!state &&
+    !!card &&
+    !card.parentId &&
+    isCoreStory(state, card) &&
+    !!columnOf(state, card)?.requiresApproval;
+  const autoApprove = byAi && msg.status === 'waiting_review' && !msg.pending && yolo && !atStop && !core;
   ctx.cards.setStatus(msg.cardId, autoApprove ? 'approved' : msg.status, msg.status === 'blocked' ? note : '', author);
   if (note) ctx.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
+  if (core && !atStop && !msg.pending)
+    ctx.comments.add(
+      card!.id,
+      author,
+      `História do núcleo (${CRITICALITY_FIELD} = ${CORE}): mesmo no modo autônomo, ${columnOf(state!, card!)?.name ?? 'esta fase'} espera a sua aprovação. Depois de aprovada, a IA segue sozinha.`,
+      'ai',
+    );
   if (atStop) {
     ctx.cards.setYolo(card!.id, false);
     ctx.comments.add(

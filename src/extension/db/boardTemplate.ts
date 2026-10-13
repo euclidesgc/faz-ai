@@ -2,6 +2,7 @@ import type { Database } from 'sql.js';
 import { norm } from '../../shared/filters';
 import type { ColumnCategory, WorkflowKind } from '../../shared/model';
 import { newId } from './ids';
+import { CRITICALITY_FIELD, CRITICALITY_LEVELS } from '../../shared/critical';
 import {
   HOMOLOGATION_INSTRUCTION_V2,
   HOMOLOGATION_INSTRUCTION_V4,
@@ -15,7 +16,7 @@ import { all, bool, num, one, run, str, transaction } from './query';
  * Board padrão. Cada mudança no padrão sobe a versão; boards criados antes são atualizados no
  * lugar (com confirmação), sem recriar nada: os cards continuam na coluna em que estavam.
  */
-export const BOARD_TEMPLATE_VERSION = 7;
+export const BOARD_TEMPLATE_VERSION = 8;
 
 export interface TemplateColumn {
   name: string;
@@ -200,6 +201,7 @@ function steps(db: Database, boardId: string): Step[] {
     }
   }
   if (version < 7) out.push(...reviewSteps(db, boardId));
+  if (version < 8) out.push(...criticalitySteps(db, boardId));
   if (version < BOARD_TEMPLATE_VERSION) out.push(...phaseTextSteps(db, boardId));
   return out;
 }
@@ -255,6 +257,29 @@ function reviewSteps(db: Database, boardId: string): Step[] {
     });
   }
   return out;
+}
+
+/** O campo Criticidade das histórias, quando o board ainda não tem um campo com esse nome. */
+function criticalitySteps(db: Database, boardId: string): Step[] {
+  if (one(db, 'SELECT id FROM field_defs WHERE board_id = ? AND lower(name) = lower(?)', [boardId, CRITICALITY_FIELD])) return [];
+  return [
+    {
+      description: `Novo campo "${CRITICALITY_FIELD}" das histórias (Núcleo ou Periferia): a história do núcleo espera a sua aprovação nas fases que pedem aprovação, mesmo no modo autônomo.`,
+      apply: () => {
+        const types = all(
+          db,
+          "SELECT t.id FROM card_types t JOIN workflows w ON w.id = t.default_workflow_id WHERE t.board_id = ? AND w.kind = 'parent' ORDER BY t.rowid",
+          [boardId],
+        ).map((r) => str(r.id));
+        const position = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM field_defs WHERE board_id = ?', [boardId])?.p);
+        run(
+          db,
+          'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
+          [newId(), boardId, CRITICALITY_FIELD, 'select', JSON.stringify(CRITICALITY_LEVELS), JSON.stringify(types), 'badge', position],
+        );
+      },
+    },
+  ];
 }
 
 /**

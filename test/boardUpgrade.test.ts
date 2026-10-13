@@ -242,6 +242,28 @@ describe('atualização do board para o padrão atual', () => {
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 
+  it('versão 8: o board ganha o campo Criticidade nas histórias, sem duplicar um campo de mesmo nome', () => {
+    upgradeBoard(db, boardId);
+    db.run("DELETE FROM field_defs WHERE name = 'Criticidade'");
+    run(db, 'UPDATE boards SET template_version = 7 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([
+      'Novo campo "Criticidade" das histórias (Núcleo ou Periferia): a história do núcleo espera a sua aprovação nas fases que pedem aprovação, mesmo no modo autônomo.',
+    ]);
+    upgradeBoard(db, boardId);
+    const s = snap();
+    const field = s.fieldDefs.find((f) => f.name === 'Criticidade')!;
+    expect(field).toMatchObject({ kind: 'select', options: ['Núcleo', 'Periferia'], display: 'badge' });
+    const parentWf = s.workflows.find((w) => w.kind === 'parent')!.id;
+    expect(field.appliesToTypes!.sort()).toEqual(
+      s.cardTypes
+        .filter((t) => t.defaultWorkflowId === parentWf)
+        .map((t) => t.id)
+        .sort(),
+    );
+    run(db, 'UPDATE boards SET template_version = 7 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+  });
+
   it('pelo roteador: o board antigo avisa o que muda e é atualizado por mensagem, com cópia de segurança', () => {
     let backups = 0;
     const handle = { db, scheduleSave: () => {}, backup: () => backups++, close: async () => {} };

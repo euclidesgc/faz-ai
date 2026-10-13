@@ -773,6 +773,24 @@ autopiloto e o heartbeat esperam o login voltar, sem gastar execuções. O heart
 histórias em modo autônomo; elas são do autopiloto.
 
 
+### Áreas críticas (núcleo)
+
+Em Configurações → **Regras**, **Áreas críticas (núcleo)** recebe os caminhos do núcleo do projeto, um
+padrão por linha (ex.: `src/db/**`). Com a lista preenchida, o `get_card` passa a trazer as áreas em
+`criticalAreas`, e a IA, na Spec ou no Plan, marca o campo **Criticidade** da história: **Núcleo** se
+ela mexe nesses caminhos, **Periferia** se não. Você também pode marcar à mão.
+
+- **A história do núcleo espera a sua aprovação** nas colunas que exigem aprovação, mesmo no modo
+  autônomo: a IA faz o trabalho da fase, pede a revisão e para; depois que você aprova, ela segue
+  sozinha. A periferia segue o modo como sempre.
+- **Na Revisão e no pull request**, os arquivos do diff que estão no núcleo são revisados com mais
+  rigor e listados à parte em **Como revisar**.
+- O campo **Criticidade** é um campo como os outros: aparece no card, filtra o board e pode entrar nas
+  regras de modelo (ex.: núcleo com o modelo da faixa "Alto").
+
+Boards criados antes ganham o campo pelo **Atualizar board**. Pelo MCP, `update_rules` aceita
+`criticalPaths`.
+
 ### Agentes
 
 ![Agente com intenção, skills escolhidas e ferramentas só de leitura](docs/images/agents.png)
@@ -949,7 +967,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Workflows e colunas | Quantos workflows quiser (cards independentes ou sub-tarefas), com nome editável e posição que você muda arrastando; **Nova coluna** em cada um; nomes, ordem (arrastando) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento). Abrir e fechar workflows e colunas é feito no próprio board e fica lembrado |
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos | Campos personalizados (texto, seleção, data, modelo…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo |
-| Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
+| Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido e as [áreas críticas](#áreas-críticas-núcleo) |
 | Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; abas Projeto e Global com tudo que cada ferramenta carrega, em grupos, com o que cada arquivo é, o caminho que abre no editor do board e a marcação do que as execuções usam (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Fica só na aba Git do modo navegador; no editor, aponta para o Settings (Faz AI › Git) |

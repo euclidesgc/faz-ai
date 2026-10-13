@@ -4,6 +4,7 @@ import type { AiRunOrigin, RunReport } from '../shared/log';
 import { SHOW_COST } from '../shared/metrics';
 import { columnOf, isLive } from '../shared/selectors';
 import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../shared/story';
+import { CORE, CRITICALITY_FIELD, isCoreStory } from '../shared/critical';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
@@ -151,6 +152,16 @@ export const AUTONOMOUS_ADVICE = [
  */
 export function yoloStopAdvice(state: BoardState, card: Card): string | null {
   const story = storyOf(state, card) ?? card;
+  const column = state.columns.find((c) => c.id === story.columnId);
+  // a história do núcleo espera a pessoa em cada coluna que exige aprovação, mesmo antes da parada
+  if (
+    card.id === story.id &&
+    column?.requiresApproval &&
+    column.id !== lastAiColumn(state, story.workflowId)?.id &&
+    !isAtYoloStop(state, story) &&
+    isCoreStory(state, story)
+  )
+    return `HISTÓRIA DO NÚCLEO (${CRITICALITY_FIELD} = ${CORE}): mesmo no modo autônomo, ${column.name} exige a aprovação da pessoa. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare; depois de aprovada, a IA segue sozinha.`;
   const stop = yoloStopOf(state, story);
   if (!stop || stop.id === lastAiColumn(state, story.workflowId)?.id) return null;
   if (card.id === story.id && isAtYoloStop(state, story))

@@ -1,6 +1,13 @@
-import type { ReactNode } from 'react';
-import { Badge, Button, Card, Heading, Text } from '@radix-ui/themes';
-import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type CompleteParentMode, type ConfirmMode } from '../../../shared/rules';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Badge, Button, Card, Heading, Text, TextArea } from '@radix-ui/themes';
+import {
+  DEFAULT_RULES,
+  cleanCriticalPaths,
+  type BoardRules,
+  type CancelChildrenMode,
+  type CompleteParentMode,
+  type ConfirmMode,
+} from '../../../shared/rules';
 import { columnsOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { t, dt } from '../../i18n';
@@ -26,7 +33,22 @@ const COMPLETE_OPTIONS: { value: CompleteParentMode; label: string }[] = [
   { value: 'off', label: 'Não fazer nada' },
 ];
 
-function Rule({ title, when, then, active, control }: { title: string; when: string; then: string; active: boolean; control: ReactNode }) {
+function Rule({
+  title,
+  when,
+  then,
+  active,
+  control,
+  below,
+}: {
+  title: string;
+  when: string;
+  then: string;
+  active: boolean;
+  control?: ReactNode;
+  /** controle largo (um campo de texto), abaixo da explicação em vez de ao lado do título */
+  below?: ReactNode;
+}) {
   return (
     <Card className={`rule ${active ? '' : 'off'}`} aria-label={title}>
       <div className="rule-head">
@@ -36,7 +58,7 @@ function Rule({ title, when, then, active, control }: { title: string; when: str
         <Badge color={active ? 'indigo' : 'gray'} variant={active ? 'soft' : 'outline'}>
           {active ? t('Ativa') : t('Desligada')}
         </Badge>
-        <div className="rule-control">{control}</div>
+        {control && <div className="rule-control">{control}</div>}
       </div>
       <dl className="when">
         <dt>{t('Quando')}</dt>
@@ -44,7 +66,33 @@ function Rule({ title, when, then, active, control }: { title: string; when: str
         <dt>{t('Então')}</dt>
         <dd>{then}</dd>
       </dl>
+      {below && <div className="rule-below">{below}</div>}
     </Card>
+  );
+}
+
+/**
+ * As áreas críticas (o núcleo), um padrão de caminho por linha. Grava ao sair do campo, e só o que
+ * mudou: a lista limpa (sem vazios nem repetidos) é a que vale.
+ */
+function CriticalPaths({ value, onChange }: { value: string[]; onChange(paths: string[]): void }) {
+  const [draft, setDraft] = useState(value.join('\n'));
+  useEffect(() => setDraft(value.join('\n')), [value]);
+  const commit = () => {
+    const next = cleanCriticalPaths(draft.split('\n'));
+    if (JSON.stringify(next) !== JSON.stringify(value)) onChange(next);
+    else setDraft(value.join('\n'));
+  };
+  return (
+    <TextArea
+      aria-label={t('Áreas críticas, um caminho por linha')}
+      className="critical-paths"
+      rows={4}
+      placeholder={'src/db/**\nsrc/core/**'}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+    />
   );
 }
 
@@ -62,7 +110,10 @@ export function RulesSettings() {
       : [];
     return list.length ? list.join(', ') : t('nenhuma coluna definida ainda');
   };
-  const changed = (Object.keys(DEFAULT_RULES) as (keyof BoardRules)[]).some((k) => rules[k] !== DEFAULT_RULES[k]);
+  // as áreas críticas são uma lista: compara pelo conteúdo
+  const changed = (Object.keys(DEFAULT_RULES) as (keyof BoardRules)[]).some(
+    (k) => JSON.stringify(rules[k]) !== JSON.stringify(DEFAULT_RULES[k]),
+  );
 
   const confirmSelect = (key: 'confirmTrash' | 'confirmArchive', label: string) => (
     <SelectField
@@ -176,6 +227,18 @@ export function RulesSettings() {
             onChange={(onAllChildrenDone) => set({ onAllChildrenDone })}
           />
         }
+      />
+
+      <Rule
+        title={t('Áreas críticas (núcleo)')}
+        active={rules.criticalPaths.length > 0}
+        when={t(
+          'uma história mexe nestes caminhos: a IA marca o campo "Criticidade" dela como Núcleo na Spec ou no Plan, e você também pode marcar à mão',
+        )}
+        then={t(
+          'a história do núcleo espera a sua aprovação nas colunas que exigem aprovação, mesmo no modo autônomo; na Revisão e no pull request, os arquivos do núcleo vêm à parte e são revisados com mais rigor.',
+        )}
+        below={<CriticalPaths value={rules.criticalPaths} onChange={(criticalPaths) => set({ criticalPaths })} />}
       />
 
       <Card className="form-card" aria-label={t('Preencher o modelo sugerido')}>

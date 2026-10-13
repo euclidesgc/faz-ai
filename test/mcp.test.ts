@@ -1574,6 +1574,34 @@ describe('modo autônomo (YOLO)', () => {
     expect(card(3)).toMatchObject({ yolo: true, yoloUntil: column('Plan').id });
   });
 
+  it('história do núcleo: mesmo no modo autônomo, cada coluna que exige aprovação espera a pessoa', async () => {
+    await call('update_rules', { criticalPaths: ['src/db/**', ' src/db/** ', ''] });
+    expect(router.snapshot().board.rules.criticalPaths).toEqual(['src/db/**']);
+    await call('create_card', { title: 'Migração', column: 'PRD', fields: { Criticidade: 'Núcleo' } });
+    setYolo(1, true);
+    const before = (await call('get_card', { card: 1 })).data;
+    expect(before.criticalAreas).toMatchObject({ paths: ['src/db/**'], story: 'Núcleo' });
+    expect(before.phase.requiresApproval).toBe(true);
+    expect(before.phase.autonomousNote).toContain('do núcleo');
+    expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(true);
+
+    const res = (await call('request_review', { card: 1, summary: 'PRD pronto' })).data;
+    expect(res.card.work.status).toBe('waiting_review');
+    expect(res.next).toContain('História do núcleo');
+    expect(card(1).yolo).toBe(true);
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('História do núcleo');
+
+    // a pessoa aprova, e a IA segue sozinha
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'approved' });
+    expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(false);
+
+    // a periferia segue o modo como sempre
+    await call('create_card', { title: 'Texto', column: 'PRD', fields: { Criticidade: 'Periferia' } });
+    setYolo(2, true);
+    expect((await call('request_review', { card: 2, summary: 'PRD pronto' })).data.card.work.status).toBe('approved');
+    expect((await call('get_card', { card: 2 })).data.criticalAreas.story).toBe('Periferia');
+  });
+
   it('request_review com pending fica em waiting_review mesmo em YOLO: a pendência é da pessoa e o status mostra isso', async () => {
     await call('create_card', { title: 'Login', column: 'PRD' });
     setYolo(1, true);

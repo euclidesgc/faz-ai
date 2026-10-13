@@ -4,6 +4,7 @@ import { cardRef } from '../../../shared/model';
 import { activityKindOf } from '../../../shared/activity';
 import { columnOf } from '../../../shared/selectors';
 import { isAtYoloStop, isDelivered, isYolo, storyOf } from '../../../shared/story';
+import { isCoreStory } from '../../../shared/critical';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { cardSummary, findCard } from '../format';
 import { cardArg } from './args';
@@ -74,6 +75,8 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
       const yolo = isYolo(s, card);
       // na coluna até onde a pessoa liberou o modo, o pedido é para ela, e o modo se desliga
       const stop = isAtYoloStop(s, card);
+      // a história do núcleo espera a pessoa nas colunas que exigem aprovação, mesmo no modo autônomo
+      const core = yolo && !card.parentId && isCoreStory(s, card) && !!columnOf(s, card)?.requiresApproval;
       const pending = a.pending?.trim();
       const note = pending ? `${a.summary.trim()}\n\n**Travado em mim**\n${pending}` : a.summary;
       return setStatus(
@@ -83,11 +86,13 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
         note,
         stop
           ? 'Pare aqui. Esta era a última fase que a pessoa liberou para o modo autônomo: o modo foi desligado e a revisão é dela. Não mova o card nem continue o trabalho dele.'
-          : yolo && !pending
-            ? 'Modo autônomo (YOLO): o card foi aprovado automaticamente. Mova-o para a próxima coluna e siga o trabalho.'
-            : pending
-              ? 'Pare aqui. A pendência está com a pessoa: não mova o card nem continue o trabalho dele até ela resolver e aprovar ou pedir ajustes.'
-              : 'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.',
+          : core && !pending
+            ? 'Pare aqui. História do núcleo: mesmo no modo autônomo, esta fase espera a aprovação da pessoa. Quando ela aprovar, a IA segue sozinha.'
+            : yolo && !pending
+              ? 'Modo autônomo (YOLO): o card foi aprovado automaticamente. Mova-o para a próxima coluna e siga o trabalho.'
+              : pending
+                ? 'Pare aqui. A pendência está com a pessoa: não mova o card nem continue o trabalho dele até ela resolver e aprovar ou pedir ajustes.'
+                : 'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.',
         Boolean(pending),
       );
     },
