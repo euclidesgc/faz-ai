@@ -5,7 +5,7 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+## 0.37.0
 
 - **Board fields out of the settings.** Fase, Tags, Modelo, Skills, Rules, Esforço da atividade and
   Criticidade are used by the rules, the triage and the AI, and left Settings → **Campos
