@@ -275,6 +275,31 @@ describe('atualização do board para o padrão atual', () => {
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 
+  it('versão 9: os documentos das fases com o modelo padrão da 0.38 ganham a seção "Perguntas para você"; o personalizado fica', () => {
+    upgradeBoard(db, boardId);
+    const settings = new SettingsRepo(db);
+    for (const name of ['Discovery', 'PRD', 'Spec'])
+      settings.updateColumn(col(name).id, { artifactTemplate: PHASE_HISTORY[name]!.templates.at(-1)! });
+    settings.updateColumn(col('Plan').id, { artifactTemplate: '# Meu plano' });
+    run(db, 'UPDATE boards SET template_version = 8 WHERE id = ?', [boardId]);
+    // o Discovery foi recriado pela atualização e fica por último na tabela
+    expect(pendingUpgrade(db, boardId)).toEqual([
+      `Coluna "PRD": ${PHASE_HISTORY['PRD']!.change}.`,
+      `Coluna "Spec": ${PHASE_HISTORY['Spec']!.change}.`,
+      `Coluna "Discovery": ${PHASE_HISTORY['Discovery']!.change}.`,
+    ]);
+    upgradeBoard(db, boardId);
+    for (const name of ['Discovery', 'PRD', 'Spec']) {
+      expect(col(name).artifactTemplate).toBe(PHASE_DEFAULTS[name]!.artifactTemplate);
+      expect(col(name).artifactTemplate).toContain('## ❓ Perguntas para você');
+      expect(col(name).artifactTemplate).toContain('**Recomendação:**');
+      expect(col(name).artifactTemplate).toContain('**R.** >');
+    }
+    expect(col('PRD').artifactTemplate).not.toContain('## Questões em aberto');
+    expect(col('Plan').artifactTemplate).toBe('# Meu plano');
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+  });
+
   it('pelo roteador: o board antigo avisa o que muda e é atualizado por mensagem, com cópia de segurança', () => {
     let backups = 0;
     const handle = { db, scheduleSave: () => {}, backup: () => backups++, close: async () => {} };

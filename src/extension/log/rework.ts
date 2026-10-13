@@ -126,7 +126,8 @@ function escapes(db: Database, boardId: string, period: ReworkPeriod, workflow: 
  * mudanças de status não são resposta à revisão: a que vem de mover o card de coluna (o status recomeça
  * na coluna nova; arrastar o card que aguardava revisão não é aprovar nem pedir ajuste) e a que vem de
  * ligar o modo autônomo (que libera a revisão pendente sem ninguém ler). Elas saem pelo `column_changed`
- * ou `yolo_changed` gravado junto, na mesma mensagem (mesmo card, mesmo instante).
+ * ou `yolo_changed` gravado junto, na mesma mensagem (mesmo card, mesmo instante). A exceção é a aprovação:
+ * desde a #441 ela leva o card à coluna seguinte na mesma mensagem, e continua sendo a resposta da pessoa.
  */
 export function panelRework(db: Database, boardId: string, period: ReworkPeriod, workflow: string): MetricsRework {
   const wf = workflow ? ' AND e.workflow = ?' : '';
@@ -139,7 +140,7 @@ export function panelRework(db: Database, boardId: string, period: ReworkPeriod,
   );
   const moves = new Set(events.filter((r) => str(r.kind) !== 'status_changed').map((r) => `${num(r.card_number)}:${num(r.at)}`));
   const rows: ReworkEventRow[] = events
-    .filter((r) => str(r.kind) === 'status_changed' && !moves.has(`${num(r.card_number)}:${num(r.at)}`))
+    .filter((r) => str(r.kind) === 'status_changed' && (str(r.to_value) === 'approved' || !moves.has(`${num(r.card_number)}:${num(r.at)}`)))
     .map((r) => ({
       cardNumber: num(r.card_number),
       phase: str(r.column_name),

@@ -158,9 +158,12 @@ describe('heartbeat', () => {
   it('bug "Pronto" vem antes de um card "Aprovado" que está mais adiante no board', () => {
     const bugTypeId = createBugType();
     createTyped(bugTypeId, 'Bug', 'PRD'); // #1: pronto, numa coluna anterior
-    create('Aprovada', 'Homologação'); // #2: aprovado, e bem mais adiante
+    create('Aprovada', 'Revisão'); // #2: aprovado, e bem mais adiante
     setStatus(2, 'approved');
-    // a categoria "approved" não pesa, e o bug vence até a coluna mais à direita
+    // a aprovação da pessoa leva o card à coluna seguinte (Homologação), pronto para a IA (#441)
+    expect(router.snapshot().columns.find((c) => c.id === card(2).columnId)!.name).toBe('Homologação');
+    expect(card(2).status).toBe('ready');
+    // o bug vence até a coluna mais à direita
     expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1, 2]);
   });
 

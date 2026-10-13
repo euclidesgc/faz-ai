@@ -1,6 +1,6 @@
 import { linkProblem } from '../../../shared/links';
 import { norm } from '../../../shared/filters';
-import { columnOf, isLive } from '../../../shared/selectors';
+import { columnOf, columnsOf, isLive } from '../../../shared/selectors';
 import { isAtYoloStop, lastAiColumn, yoloStopOptions } from '../../../shared/story';
 import { CORE, CRITICALITY_FIELD, isCoreStory } from '../../../shared/critical';
 import { fieldValueBlocker } from '../../../shared/boardFields';
@@ -13,9 +13,14 @@ import { applySuggestion, suggestionFor } from './models';
 /**
  * Muda o status de trabalho do card. Aprovar é só da pessoa; bloquear exige o motivo. Em modo autônomo
  * (YOLO) o pedido de revisão da IA vira aprovação na hora: ninguém vai revisar, e o resumo fica na conversa.
- * Exceções, em que o card fica mesmo em "waiting_review": com `pending` (a pendência é da pessoa, e o
- * status tem de mostrar isso); na coluna até onde a pessoa liberou o modo (ali o modo se desliga); e na
- * história do núcleo, numa coluna que exige aprovação (depois de aprovada, ela segue no modo).
+ * A única exceção, em que o card fica mesmo em "waiting_review", é a coluna até onde a pessoa liberou o
+ * modo: ali o modo se desliga e a revisão é dela. Nem `pending` nem a história do núcleo seguram a fila
+ * (#441): no modo autônomo a IA decide o que ficou em aberto e registra a decisão.
+ *
+ * A aprovação da pessoa numa história leva o card para a próxima coluna na hora (#441): esperar a IA
+ * mover deixava o card na mesma coluna, e ela refazia a fase e pedia a revisão de novo. Ficam para a IA
+ * só os casos em que o board não pode mover sozinho: a aprovação que faz o merge automático (a
+ * conclusão é do `AutoMerger`) e a conclusão recusada (sub-tarefa em aberto).
  */
 function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author: string, byAi: boolean): void {
   const note = msg.note?.trim() ?? '';
@@ -26,23 +31,14 @@ function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author:
   const state = yolo ? ctx.state() : null;
   const card = state?.cards.find((c) => c.id === msg.cardId);
   const atStop = byAi && msg.status === 'waiting_review' && !!state && !!card && isAtYoloStop(state, card);
-  // a história do núcleo espera a pessoa nas colunas que exigem aprovação, mesmo no modo autônomo
-  const core =
-    byAi &&
-    msg.status === 'waiting_review' &&
-    !!state &&
-    !!card &&
-    !card.parentId &&
-    isCoreStory(state, card) &&
-    !!columnOf(state, card)?.requiresApproval;
-  const autoApprove = byAi && msg.status === 'waiting_review' && !msg.pending && yolo && !atStop && !core;
+  const autoApprove = byAi && msg.status === 'waiting_review' && yolo && !atStop;
   ctx.cards.setStatus(msg.cardId, autoApprove ? 'approved' : msg.status, msg.status === 'blocked' ? note : '', author);
   if (note) ctx.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
-  if (core && !atStop && !msg.pending)
+  if (autoApprove && msg.pending)
     ctx.comments.add(
-      card!.id,
+      msg.cardId,
       author,
-      `História do núcleo (${CRITICALITY_FIELD} = ${CORE}): mesmo no modo autônomo, ${columnOf(state!, card!)?.name ?? 'esta fase'} espera a sua aprovação. Depois de aprovada, a IA segue sozinha.`,
+      'Modo autônomo: a pendência acima não segura a história. Decida você mesmo (registre a decisão e o motivo na conversa e no documento da fase) e siga.',
       'ai',
     );
   if (atStop) {
@@ -55,7 +51,40 @@ function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author:
     );
   }
   // só a aprovação de uma pessoa dispara o merge automático: a do modo autônomo não passa por aqui
-  if (msg.status === 'approved') ctx.approved.push(msg.cardId);
+  if (msg.status === 'approved') {
+    ctx.approved.push(msg.cardId);
+    if (!byAi) advanceApproved(ctx, msg.cardId);
+  }
+}
+
+/**
+ * Leva a história aprovada pela pessoa para a próxima coluna (o status recomeça lá: "pronto" onde a IA
+ * atua). Não move quando a aprovação vai fazer o merge automático (a próxima coluna é a de conclusão, há
+ * pull request e o merge automático está ligado: o `AutoMerger` conclui o card depois do merge), e deixa
+ * o card aprovado, para a IA, quando o board recusa o movimento (ex.: conclusão com sub-tarefa em aberto).
+ */
+function advanceApproved(ctx: BoardContext, cardId: string): void {
+  const state = ctx.state();
+  const card = state.cards.find((c) => c.id === cardId);
+  if (!card || card.parentId) return;
+  const column = columnOf(state, card);
+  if (!column) return;
+  const next = columnsOf(state, card.workflowId).find((c) => c.position > column.position && c.category !== 'cancelled');
+  if (!next) return;
+  if (next.category === 'done' && state.board.git.autoMerge && card.prUrl) return;
+  try {
+    ctx.cards.move(card.id, next.id, Number.MAX_SAFE_INTEGER, { byAi: false });
+  } catch (e) {
+    ctx.comments.add(
+      card.id,
+      'Faz AI',
+      `Aprovado, mas o card não foi para ${next.name}: ${e instanceof Error ? e.message : String(e)}`,
+      'ai',
+    );
+    return;
+  }
+  const storyId = ctx.cards.yoloStoryIdOf(card.id);
+  if (storyId) settleDelivery(ctx, storyId);
 }
 
 /**
@@ -134,10 +163,7 @@ function applyYolo(ctx: BoardContext, card: Card, enabled: boolean, author: stri
   const state = ctx.state();
   ctx.cards.setYolo(card.id, enabled, until);
   if (!enabled) return;
-  // a revisão pendente da história do núcleo, numa coluna que exige aprovação, continua esperando a
-  // pessoa: ligar o modo não é ler o que a IA entregou
-  const coreReview = card.status === 'waiting_review' && isCoreStory(state, card) && !!columnOf(state, card)?.requiresApproval;
-  const release = card.status === 'waiting_review' && !coreReview ? 'approved' : card.status === 'waiting_answer' ? 'ready' : null;
+  const release = card.status === 'waiting_review' ? 'approved' : card.status === 'waiting_answer' ? 'ready' : null;
   if (release) ctx.cards.setStatus(card.id, release, '', author);
   ctx.comments.add(card.id, author, yoloOnNote(state, until), 'human');
 }

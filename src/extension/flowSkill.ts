@@ -15,7 +15,7 @@ Toda conversa com a pessoa sobre um card acontece na conversa do card, não fora
 
 1. Chame \`get_pending_work\`. Ele devolve o que está com você, em três grupos.
 2. Trate nesta ordem:
-   - \`approved\`: a pessoa aprovou. Mova o card para a próxima coluna com \`move_card\` e continue o trabalho na fase nova.
+   - \`approved\`: a pessoa aprovou e o board já levou o card para a próxima coluna (o status \`approved\` só fica quando o board não pôde mover; aí mova com \`move_card\`). Continue o trabalho na fase nova.
    - \`unanswered\`: a pessoa escreveu na conversa e espera resposta. Leia o card e responda com \`add_comment\`.
    - \`ready\`: pode trabalhar. Se houver mensagens recentes da pessoa (pedido de ajustes, resposta a uma pergunta), elas dizem o que fazer.
 3. Se a lista vier vazia, não há nada para você: encerre.
@@ -48,15 +48,20 @@ comentário**: ela entrega o card para a pessoa.
 - Precisa da resposta para continuar: \`ask_question\`.
 - Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\`.
 - Decidiu ou deixou algo em aberto que ela precisa avaliar: \`request_review\` com \`pending\`
-  dizendo o que depende dela. Vale mesmo em coluna sem aprovação e mesmo em modo autônomo: com
-  \`pending\` o card fica em "Aguardando revisão" em vez de ser aprovado automaticamente.
+  dizendo o que depende dela. Vale mesmo em coluna sem aprovação. No modo autônomo, não: ali nada
+  segura o card (veja "Modo autônomo"), você decide e registra.
 
 Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela.
 
 ## Fases que produzem documento
 
 1. Crie uma sub-tarefa na história com o campo Fase igual ao nome da coluna (\`create_card\` com \`parent\`).
-2. Construa o documento seguindo o modelo em \`phase.artifact.template\`.
+2. Construa o documento seguindo o modelo em \`phase.artifact.template\`. O que depende de uma
+   resposta da pessoa vai na seção **"Perguntas para você"**, no fim do documento, uma pergunta por
+   vez: as alternativas com o impacto de cada uma (o que custa, o que quebra, o que adia), a sua
+   recomendação com a justificativa e o espaço \`**R.** >\` para ela responder. Repita as perguntas
+   no \`request_review\` (ou em \`ask_question\`, quando não dá para seguir sem a resposta). Sem
+   perguntas, escreva "Nenhuma" na seção.
 3. Grave com \`add_attachment\` usando \`artifact: true\` e o nome em \`phase.artifact.filename\`. O arquivo fica anexado à história, mesmo enviado da sub-tarefa, e substitui a versão anterior.
 4. Mova a sub-tarefa para a coluna de conclusão e peça a revisão na história.
 
@@ -145,8 +150,8 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
    novo entre módulos.
 3. Trate cada achado. O que tem diretriz clara (regra do projeto, padrão já usado no código, teste
    que falha) você corrige agora, delegando ao especialista, e registra na conversa. O que é ambíguo
-   ou muda o comportamento combinado é decisão da pessoa: \`ask_question\` (no modo autônomo,
-   \`request_review\` com \`pending\`) e pare.
+   ou muda o comportamento combinado é decisão da pessoa: \`ask_question\` e pare (no modo autônomo,
+   decida pelo padrão do projeto e pelo caminho menos complexo, registre e siga).
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
    revisar" do pull request) e mova a história para a próxima coluna.
 
@@ -154,10 +159,9 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
 
 Quando o board define áreas críticas (o núcleo do projeto), \`get_card\` traz \`criticalAreas\`. Na
 Spec e no Plan, confira se a história mexe nesses caminhos e marque o campo Criticidade dela
-(\`Núcleo\` ou \`Periferia\`) com \`update_card\`. A história do núcleo espera a aprovação da pessoa
-nas colunas que exigem aprovação, mesmo no modo autônomo: ao terminar a fase, \`request_review\` e
-pare. Na Revisão, revise com mais rigor os arquivos do núcleo; no pull request, liste-os à parte em
-"Como revisar".
+(\`Núcleo\` ou \`Periferia\`) com \`update_card\`. Na Revisão, revise com mais rigor os arquivos do
+núcleo; no pull request, liste-os à parte em "Como revisar". A marca não muda o fluxo: no modo
+autônomo a história do núcleo segue sem parar, como as outras.
 
 ## Homologação
 
@@ -188,10 +192,15 @@ Git), a aprovação dela faz o merge e leva a história a Concluído; desligado,
 Quando o card (ou a história dele) mostra \`autonomous: true\`, a pessoa liberou a história para
 rodar sozinha: ninguém aprova nem responde. Então:
 
-- não chame \`ask_question\` (a pergunta é recusada) nem \`request_review\` sem \`pending\`, exceto
-  quando \`phase.requiresApproval\` vier verdadeiro (a coluna em que o modo para, abaixo, ou uma
-  história do núcleo, em "Áreas críticas") e na única situação descrita no item da Homologação: ao
-  terminar a fase, registre na conversa o que fez e mova o card para a próxima coluna;
+- não chame \`ask_question\` (a pergunta é recusada) nem \`request_review\`, com ou sem \`pending\`,
+  exceto quando \`phase.requiresApproval\` vier verdadeiro (a coluna em que o modo para, abaixo) e na
+  única situação descrita no item da Homologação: ao terminar a fase, registre na conversa o que fez e
+  mova o card para a próxima coluna. Nada segura a história antes da coluna escolhida: nem uma
+  pendência, nem a história ser do núcleo;
+- as perguntas do documento da fase continuam: escreva cada uma na seção "Perguntas para você" com as
+  alternativas, o impacto de cada uma e a sua recomendação justificada, e responda você mesmo no
+  espaço \`**R.** >\` com a alternativa escolhida e "(decidido pela IA no modo autônomo)". A pessoa
+  lê as decisões quando o modo parar;
 - a pessoa pode ter liberado o modo só até uma fase (\`autonomousUntil\` no \`get_card\`). Nessa fase,
   faça o trabalho sem perguntas e, ao terminar, chame \`request_review\` na história com o resumo e
   pare: o modo se desliga e a revisão é da pessoa (\`phase.requiresApproval\` vem verdadeiro ali);
@@ -200,12 +209,11 @@ rodar sozinha: ninguém aprova nem responde. Então:
   caminhos que seguem esses padrões, escolha o menos complexo;
 - decida as dúvidas por esse critério e registre a decisão e o motivo na conversa;
 - ficou algo que a pessoa precisa avaliar (ponto em aberto, escopo que ficou de fora, decisão que
-  você tomou no lugar dela e que muda o resultado)? Não siga adiante: \`request_review\` com
-  \`pending\`. Nesse caso o card fica em "Aguardando revisão" mesmo em modo autônomo, e a fila
-  continua com as outras histórias;
+  você tomou no lugar dela e que muda o resultado)? Registre na conversa, em "Travado em mim", e siga:
+  \`request_review\` com \`pending\` não segura o card no modo autônomo (vira aprovação na hora);
 - \`block_card\` só para impedimento real (acesso, ambiente, falha que você não resolve);
 - na Implementação, execute todas as sub-tarefas até o fim; na Revisão, corrija o que tem diretriz e
-  entregue o que é ambíguo com \`request_review\` e \`pending\`; na última coluna em que a IA atua
+  decida o que é ambíguo pelo padrão do projeto, registrando; na última coluna em que a IA atua
   (Homologação, no board padrão) não há aprovação nem próxima fase: grave o "Como testar" na
   descrição da história, abra o pull request com ele no corpo, registre-o com \`set_pull_request\`
   (é o registro que entrega a história e a passa para a pessoa), resuma na conversa o que foi feito,
@@ -225,6 +233,7 @@ rodar sozinha: ninguém aprova nem responde. Então:
 - Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\` com o motivo.
 - Ficou algo para a pessoa avaliar: \`request_review\` com \`pending\`, e pare.
 - Depois de \`request_review\`: pare. Só uma pessoa aprova.
+- No modo autônomo, só a coluna escolhida ao ligar o modo para a história; o resto é decisão sua.
 
 ## O que não fazer
 

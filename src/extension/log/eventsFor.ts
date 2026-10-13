@@ -107,7 +107,12 @@ export function eventsFor(
         if (a.columnCategory === 'done') add(parentOf(a), 'subtask_done', { subject: `#${a.number}` });
       }
     }
-    if ((a.status ?? '') !== (b.status ?? '')) add(b, 'status_changed', { fromValue: b.status ?? '', toValue: a.status ?? '' });
+    // a aprovação da pessoa leva o card à coluna seguinte na mesma mensagem (#441): o log guarda a aprovação
+    // (é ela que o retrabalho conta), e a mudança de coluna já diz que o status recomeçou lá
+    const approvedThenMoved =
+      msg.type === 'card.status.set' && msg.status === 'approved' && msg.cardId === id && a.columnName !== b.columnName;
+    if (approvedThenMoved) add(b, 'status_changed', { fromValue: b.status ?? '', toValue: 'approved' });
+    else if ((a.status ?? '') !== (b.status ?? '')) add(b, 'status_changed', { fromValue: b.status ?? '', toValue: a.status ?? '' });
     if (a.archived !== b.archived) add(b, a.archived ? 'archived' : 'unarchived');
     // o modo que se desliga sozinho ao chegar à coluna escolhida (as mensagens do modo registram o próprio evento abaixo)
     if (a.yolo !== b.yolo && !msg.type.startsWith('card.yolo.'))

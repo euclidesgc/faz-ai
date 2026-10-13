@@ -1,7 +1,6 @@
 import type { Database } from 'sql.js';
 import type { FieldValue } from '../../shared/model';
 import { norm } from '../../shared/filters';
-import { CORE, CRITICALITY_FIELD } from '../../shared/critical';
 import { parseRules } from '../../shared/rules';
 import type { CardStatus } from '../../shared/status';
 import { newId, now } from '../db/ids';
@@ -196,12 +195,11 @@ export class CardRepo {
         }
       }
       // regra: a IA só avança um card de uma coluna que exige aprovação depois que uma pessoa aprova; voltar ou cancelar é livre.
-      // Em modo autônomo (YOLO) a aprovação não é exigida: a pessoa abriu mão dela ao ligar o modo na história. Exceções: a
-      // coluna até onde a pessoa liberou o modo (`yolo_until`) segura a história como se exigisse aprovação, e a história do
-      // núcleo (campo Criticidade) continua precisando dela nas colunas que a exigem
+      // Em modo autônomo (YOLO) a aprovação não é exigida: a pessoa abriu mão dela ao ligar o modo na história. A única
+      // exceção é a coluna até onde a pessoa liberou o modo (`yolo_until`), que segura a história como se exigisse aprovação
       const yolo = this.yoloOf(cardId);
       const stop = yolo.yolo && yolo.until === fromCol;
-      const bypass = yolo.yolo && !stop && !(card.parent_id == null && this.isCore(cardId));
+      const bypass = yolo.yolo && !stop;
       if (byAi && !bypass && fromCol !== columnId && str(col.category) !== 'cancelled') {
         const from = one(db, 'SELECT name, position, requires_approval FROM columns WHERE id = ?', [fromCol]);
         if (
@@ -344,25 +342,6 @@ export class CardRepo {
       now(),
       storyId,
     ]);
-  }
-
-  /** A história do card (ele mesmo, ou o pai numa sub-tarefa) está marcada como do núcleo no campo Criticidade. */
-  private isCore(cardId: string): boolean {
-    const row = one(
-      this.db,
-      `SELECT fv.value_json FROM cards c
-       JOIN field_values fv ON fv.card_id = COALESCE(c.parent_id, c.id)
-       JOIN field_defs f ON f.id = fv.field_id
-       WHERE c.id = ? AND lower(f.name) = lower(?)`,
-      [cardId, CRITICALITY_FIELD],
-    );
-    if (!row) return false;
-    try {
-      const value: unknown = JSON.parse(str(row.value_json));
-      return typeof value === 'string' && norm(value) === norm(CORE);
-    } catch {
-      return false;
-    }
   }
 
   /**

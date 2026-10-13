@@ -71,9 +71,11 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    lê o card pelo board, analisa o problema e conversa com você na aba **Conversa**. Quando termina,
    o status muda para **Aguardando revisão**: é a sua vez. O mesmo acontece quando a IA deixa
    algo dependendo de você (uma decisão, um ponto em aberto): a pendência aparece na conversa como
-   **Travado em mim** e o card fica com você, mesmo em modo autônomo.
+   **Travado em mim** e o card fica com você. O que depende de uma resposta sua vai também na seção
+   **Perguntas para você** do documento da fase, com as alternativas, a recomendação da IA e o espaço
+   `R. >` para você responder.
 5. **Revise e siga.** Leia o documento da fase, responda ou clique em **Aprovar** (ou **Pedir
-   ajustes**). Com a aprovação, a história avança para **PRD**, **Spec**, **Plan** e
+   ajustes**). Com a aprovação, a história avança na hora para **PRD**, **Spec**, **Plan** e
    **Implementação**, sempre com a IA produzindo e você aprovando. As sub-tarefas da implementação
    nascem no workflow de baixo e a IA as conclui uma a uma.
 
@@ -356,7 +358,10 @@ Fluxo sugerido: a IA lê a história e a instrução da fase, cria uma sub-taref
 documento da fase, anexa o documento à história e pede a revisão pela conversa do card. Você
 responde no próprio card:
 
-- **Aprovar** deixa o card Aprovado, e a IA o leva para a próxima coluna.
+- **Aprovar** leva o card para a próxima coluna na hora (o status recomeça lá, Pronto para a IA).
+  Só fica Aprovado, para a IA mover, quando o board não pode: a aprovação que faz o merge automático
+  conclui o card depois do merge, e a conclusão recusada por sub-tarefa em aberto deixa o aviso na
+  conversa.
 - **Pedir ajustes** devolve o card para a IA com o seu texto na conversa.
 - Se a IA fizer uma pergunta, o card fica Aguardando resposta; ao responder na conversa, ele volta
   para a IA.
@@ -678,7 +683,8 @@ aprova uma história que está na última coluna antes da conclusão:
    e continua na Homologação.
 
 O merge não acontece se a história não tiver PR registrado ou ainda tiver sub-tarefas em aberto. Com
-o merge automático desligado, aprovar só marca o card, e a IA o move para Concluído.
+o merge automático desligado, aprovar leva o card para Concluído na hora (ou o deixa Aprovado, com o
+aviso na conversa, se uma sub-tarefa em aberto impedir a conclusão).
 
 ### Registros de decisão
 
@@ -798,10 +804,18 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   Discovery, o PRD, a Spec e o Plan, cria as sub-tarefas, implementa uma por uma, revisa e, nessa última
   coluna, abre o pull request, registra com `set_pull_request` e para ali — a história fica
   aguardando a sua revisão. As colunas que exigem aprovação deixam de segurar o card, e o pedido de
-  revisão da IA vira aprovação na hora, com o resumo registrado na conversa.
+  revisão da IA vira aprovação na hora, com o resumo registrado na conversa. Nada segura a história
+  antes da coluna escolhida: nem uma pendência (`request_review` com `pending`, que fica registrada
+  na conversa e a IA é mandada decidir), nem a história ser do núcleo.
 - **Sem perguntas**: a IA não usa `ask_question`; diante de uma dúvida ela decide e registra a
-  decisão e o motivo na conversa. Só um impedimento real (acesso, ambiente, falha que ela não
-  resolve) bloqueia o card.
+  decisão e o motivo na conversa. As perguntas do documento da fase continuam sendo escritas na
+  seção **Perguntas para você**, com alternativas e recomendação, e a própria IA as responde no
+  espaço `R. >`, marcando que foi decidido por ela no modo autônomo. Só um impedimento real (acesso,
+  ambiente, falha que ela não resolve) bloqueia o card.
+- **Conversa resumida entre as fases**: ao passar para outra coluna com três ou mais mensagens desde
+  o último resumo (ao menos uma da IA), o autopiloto roda **Resumir a conversa** antes da fase nova e
+  apaga as mensagens anteriores ao resumo, para o contexto de cada execução não carregar a conversa
+  inteira. Um resumo por coluna; se a IA não gravar o resumo, a conversa fica e a fase segue.
 - **Pelos padrões do projeto**: como ninguém revisa as decisões do meio do caminho, a IA segue os
   padrões e as regras de arquitetura do projeto (`CLAUDE.md`, `AGENTS.md`, `DESIGN.md` e o código
   parecido que já existe) e, entre os caminhos que os seguem, escolhe o menos complexo.
@@ -855,10 +869,9 @@ padrão por linha (ex.: `src/db/**`). Com a lista preenchida, o `get_card` passa
 `criticalAreas`, e a IA, na Spec ou no Plan, marca o campo **Criticidade** da história: **Núcleo** se
 ela mexe nesses caminhos, **Periferia** se não. Você também pode marcar à mão.
 
-- **A história do núcleo espera a sua aprovação** nas colunas que exigem aprovação, mesmo no modo
-  autônomo: a IA faz o trabalho da fase, pede a revisão e para; depois que você aprova, ela segue
-  sozinha. A periferia segue o modo como sempre. A IA pode marcar uma história como Núcleo, mas só
-  você a tira de lá, e ligar o modo numa história do núcleo que aguarda revisão não a aprova.
+- **A marca não muda o fluxo**: fora do modo autônomo, a história do núcleo espera a sua aprovação
+  nas colunas que exigem aprovação, como qualquer história; no modo autônomo ela segue sem parar até a
+  coluna escolhida, como as outras. A IA pode marcar uma história como Núcleo, mas só você a tira de lá.
 - **Na Revisão e no pull request**, os arquivos do diff que estão no núcleo são revisados com mais
   rigor e listados à parte em **Como revisar**.
 - O campo **Criticidade** aparece no card, filtra o board e pode entrar nas regras de modelo (ex.:

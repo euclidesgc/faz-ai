@@ -4,7 +4,6 @@ import type { AiRunOrigin, RunReport } from '../shared/log';
 import { SHOW_COST } from '../shared/metrics';
 import { columnOf, isLive } from '../shared/selectors';
 import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../shared/story';
-import { CORE, CRITICALITY_FIELD, isCoreStory } from '../shared/critical';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
@@ -139,8 +138,9 @@ export function consumptionLine(report: RunReport, why: { reason?: string | null
 /** O que a IA recebe a mais quando a história está em modo autônomo (YOLO): sem aprovação, sem perguntas, até o pull request. */
 export const AUTONOMOUS_ADVICE = [
   'MODO AUTÔNOMO (YOLO): esta história foi liberada para rodar sozinha. Ninguém aprova, responde nem acompanha esta sessão.',
-  'Não chame request_review nem ask_question (a pergunta é recusada). Ao terminar a fase, registre na conversa o que foi feito e as decisões que tomou (add_comment) e mova o card para a próxima coluna.',
+  'Não chame request_review nem ask_question (a pergunta é recusada), nem request_review com pending: no modo autônomo nenhuma pendência segura o card, nem numa história do núcleo. Ao terminar a fase, registre na conversa o que foi feito e as decisões que tomou (add_comment) e mova o card para a próxima coluna.',
   'Ninguém revisa as decisões do meio do caminho: siga sempre os padrões do projeto e as regras de arquitetura dele (CLAUDE.md, AGENTS.md, DESIGN.md e o código parecido que já existe) e, entre os caminhos que seguem esses padrões, escolha o menos complexo. Diante de uma dúvida, decida por esse critério e registre a decisão e o motivo na conversa.',
+  'As perguntas do documento da fase continuam: escreva cada uma na seção "Perguntas para você" do documento, com as alternativas, o impacto de cada uma e a sua recomendação justificada, e responda você mesmo no espaço "R. >" com a alternativa escolhida, marcando "(decidido pela IA no modo autônomo)". A pessoa lê as decisões depois.',
   'Use block_card só se for impossível seguir (acesso, ambiente, falha que você não resolve), explicando o que é preciso para destravar.',
   'Na Implementação, execute todas as sub-tarefas até o fim. Na última coluna em que a IA atua (Homologação, no board padrão) não há aprovação nem próxima fase: envie a branch, abra o pull request, registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa), resuma na conversa o que foi feito e como testar, e pare: não avance o card. Não faça o merge.',
   'Se o pedido for grande demais para uma entrega só (partes independentes), divida-o no Discovery: mantenha nesta história a primeira entrega e crie as seguintes com create_card (autonomous_from = esta história), em ordem de dependência. Elas entram na fila e cada uma parte da branch da anterior, com o pull request empilhado (--base na branch anterior).',
@@ -152,16 +152,6 @@ export const AUTONOMOUS_ADVICE = [
  */
 export function yoloStopAdvice(state: BoardState, card: Card): string | null {
   const story = storyOf(state, card) ?? card;
-  const column = state.columns.find((c) => c.id === story.columnId);
-  // a história do núcleo espera a pessoa em cada coluna que exige aprovação, mesmo antes da parada
-  if (
-    card.id === story.id &&
-    column?.requiresApproval &&
-    column.id !== lastAiColumn(state, story.workflowId)?.id &&
-    !isAtYoloStop(state, story) &&
-    isCoreStory(state, story)
-  )
-    return `HISTÓRIA DO NÚCLEO (${CRITICALITY_FIELD} = ${CORE}): mesmo no modo autônomo, ${column.name} exige a aprovação da pessoa. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare; depois de aprovada, a IA segue sozinha. É uma exceção ao "não chame request_review" do modo autônomo.`;
   const stop = yoloStopOf(state, story);
   if (!stop || stop.id === lastAiColumn(state, story.workflowId)?.id) return null;
   if (card.id === story.id && isAtYoloStop(state, story))
