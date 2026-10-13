@@ -74,6 +74,57 @@ describe('stackBaseOf', () => {
   });
 });
 
+describe('stackBaseOf de uma história derivada', () => {
+  it('fora do modo autônomo, a derivada parte da branch da origem', () => {
+    const s = boardState({
+      cards: [card('h10', { number: 10, branch: 'b10', branchCreatedAt: '100' }), card('h11', { number: 11, derivedFrom: 'h10' })],
+    });
+
+    expect(stackBaseOf(s, s.cards[1]!)?.id).toBe('h10');
+  });
+
+  it('a origem vale mais que a história YOLO mais recente', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100' }),
+        card('h11', { number: 11, yolo: true, branch: 'b11', branchCreatedAt: '200' }),
+        card('h12', { number: 12, yolo: true, derivedFrom: 'h10' }),
+      ],
+    });
+
+    expect(stackBaseOf(s, s.cards[2]!)?.id).toBe('h10');
+  });
+
+  it('origem sem branch, já mesclada, na lixeira ou arquivada: a derivada fora do modo autônomo parte da principal', () => {
+    for (const over of [{ branch: '' }, { mergeCommit: 'abc' }, { deletedAt: 1 }, { archivedAt: 1 }]) {
+      const s = boardState({
+        cards: [card('h10', { number: 10, branch: 'b10', ...over }), card('h11', { number: 11, derivedFrom: 'h10' })],
+      });
+      expect(stackBaseOf(s, s.cards[1]!)).toBeUndefined();
+    }
+  });
+
+  it('origem já mesclada no modo autônomo: volta para a regra da fila', () => {
+    const s = boardState({
+      cards: [
+        card('h9', { number: 9, yolo: true, branch: 'b9', branchCreatedAt: '50' }),
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100', mergeCommit: 'abc' }),
+        card('h11', { number: 11, yolo: true, derivedFrom: 'h10' }),
+      ],
+    });
+
+    expect(stackBaseOf(s, s.cards[2]!)?.id).toBe('h9');
+  });
+
+  it('sub-tarefa nunca empilha', () => {
+    const s = boardState({
+      cards: [card('h10', { number: 10, branch: 'b10' }), card('t1', { number: 11, parentId: 'h10', derivedFrom: 'h10' })],
+    });
+
+    expect(stackBaseOf(s, s.cards[1]!)).toBeUndefined();
+  });
+});
+
 describe('lastAiColumn', () => {
   it('é a última coluna aberta com aiActive, por posição, mesmo com colunas renomeadas e fora de ordem', () => {
     const s = boardState({

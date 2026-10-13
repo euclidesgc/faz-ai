@@ -302,6 +302,11 @@ export class CardRepo {
   }
 
   /** Guarda de qual branch a da história partiu (vazio = a principal). */
+  /** Marca a história como derivada de outra: a branch dela vai partir da branch da origem. */
+  setDerivedFrom(cardId: string, fromId: string): void {
+    run(this.db, 'UPDATE cards SET derived_from = ?, updated_at = ? WHERE id = ?', [fromId, now(), cardId]);
+  }
+
   setBaseBranch(cardId: string, base: string): void {
     run(this.db, 'UPDATE cards SET base_branch = ? WHERE id = ?', [base, cardId]);
   }

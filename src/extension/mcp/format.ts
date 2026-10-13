@@ -14,7 +14,7 @@ import {
 } from '../../shared/models';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
 import { childProgress, linkedCards, openPredecessors, subtaskWaves } from '../../shared/links';
-import { childrenOf, columnOf, isArchived, isLive, valueOf } from '../../shared/selectors';
+import { childrenOf, columnOf, columnsOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
 import { isYolo, lastAiColumn, storyOf } from '../../shared/story';
 import {
@@ -157,6 +157,12 @@ function linksOf(s: BoardState, c: Card) {
   };
 }
 
+/** A história de que esta é uma entrega derivada; vazio quando não é. */
+function derivedOf(s: BoardState, c: Card) {
+  const from = c.derivedFrom ? s.cards.find((k) => k.id === c.derivedFrom) : undefined;
+  return from ? { derivedFrom: `${cardRef(from)} ${from.title}` } : {};
+}
+
 /** Linha de listagem: o suficiente para decidir qual card abrir. */
 export function cardSummary(s: BoardState, c: Card) {
   const parent = c.parentId ? s.cards.find((p) => p.id === c.parentId) : undefined;
@@ -172,6 +178,7 @@ export function cardSummary(s: BoardState, c: Card) {
     ...(workStatus(s, c) ? { work: workStatus(s, c) } : {}),
     ...(isYolo(s, c) ? { autonomous: true } : {}),
     ...(parent ? { parent: `${cardRef(parent)} ${parent.title}` } : {}),
+    ...derivedOf(s, c),
     ...(Object.keys(fieldsOf(s, c)).length ? { fields: fieldsOf(s, c) } : {}),
     ...(kids.length ? { subtasks: `${kids.filter((k) => cardStatus(s, k) !== 'open').length}/${kids.length} fora de aberto` } : {}),
     ...(checklist.length ? { checklist: `${checklist.filter((i) => i.done).length}/${checklist.length}` } : {}),
@@ -275,6 +282,17 @@ export function requiredSkills(s: BoardState, c: Card) {
 }
 
 /**
+ * Os documentos das fases anteriores que a história não tem: ela foi criada ou movida direto para uma
+ * fase adiante (o caminho curto de uma história pequena) e começou dali.
+ */
+function missingArtifacts(s: BoardState, story: Card, col: Column): string[] {
+  return columnsOf(s, story.workflowId)
+    .filter((k) => k.position < col.position && k.category === 'open' && k.aiActive && k.artifactName)
+    .map((k) => k.artifactName)
+    .filter((name) => !s.attachments.some((a) => a.cardId === story.id && a.artifact && same(a.filename, name)));
+}
+
+/**
  * A fase em que o card está: o que a IA deve fazer e o documento que a fase produz. Numa
  * sub-tarefa, é a fase da história, porque o artefato é construído na sub-tarefa mas pertence à história.
  */
@@ -282,9 +300,16 @@ function phaseOf(s: BoardState, c: Card) {
   const story = storyOf(s, c) ?? c;
   const col = columnOf(s, story);
   if (!col || !col.aiActive || (!col.aiInstruction && !col.artifactName)) return undefined;
+  const missing = missingArtifacts(s, story, col);
   return {
     name: col.name,
     ...(col.aiInstruction ? { instruction: col.aiInstruction } : {}),
+    ...(missing.length
+      ? {
+          missingArtifacts: missing,
+          missingArtifactsNote: `A história começou nesta fase, sem ${list(missing)} das fases anteriores: trabalhe a partir da descrição, da conversa e do código. Não crie esses documentos nem bloqueie por falta deles.`,
+        }
+      : {}),
     ...(col.artifactName
       ? {
           artifact: { filename: col.artifactName, ...(col.artifactTemplate ? { template: col.artifactTemplate } : {}) },
@@ -297,7 +322,7 @@ function phaseOf(s: BoardState, c: Card) {
           autonomousNote:
             col.id === lastAiColumn(s, story.workflowId)?.id
               ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
-              : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Decida as dúvidas por conta própria e registre a decisão na conversa.`,
+              : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Siga os padrões do projeto e as regras de arquitetura dele, escolha o caminho menos complexo entre os que os seguem, e registre as decisões na conversa.`,
         }
       : col.requiresApproval
         ? { reviewNote: `Ao terminar, chame request_review na história ${cardRef(story)} e pare.` }

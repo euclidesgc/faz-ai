@@ -178,6 +178,10 @@ export function eventsFor(
       add(card, 'comment');
       break;
     }
+    case 'card.derive':
+      // o handler escreve na conversa da derivada de onde ela partiu
+      add(factsOf(msg.cardId), 'comment');
+      break;
     default:
       break;
   }

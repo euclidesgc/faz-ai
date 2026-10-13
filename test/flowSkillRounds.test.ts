@@ -42,3 +42,31 @@ describe('pendências com a pessoa', () => {
     expect(MCP_INSTRUCTIONS).toContain('request_review e `pending`');
   });
 });
+
+describe('fases do fluxo na skill', () => {
+  const section = (from: string, to: string) => FLOW_SKILL.body.slice(FLOW_SKILL.body.indexOf(from), FLOW_SKILL.body.indexOf(to));
+
+  it('a história pode começar numa fase adiante, sem os documentos anteriores', () => {
+    expect(section('## Trabalhar num card', '## Pendências com a pessoa')).toMatch(/fase adiante[\s\S]*sem criar os documentos que faltam/);
+  });
+
+  it('o Plan recorta em partes fáceis de revisar e divide em histórias derivadas o que passar de umas 400 linhas', () => {
+    const plan = section('## Sub-tarefas de implementação', '## Ao fechar uma fase');
+    expect(plan).toMatch(/fácil de revisar sozinha/);
+    expect(plan).toMatch(/Recortar por camada/);
+    expect(plan).toMatch(/400[\s\S]*`derived_from`/);
+  });
+
+  it('o pull request explica objetivo, como revisar e as decisões, além do roteiro de testes', () => {
+    const homologacao = section('## Homologação', '## Modo autônomo');
+    for (const part of ['**Objetivo**', '**O que foi feito**', '**Como revisar**', '**Decisões**', '**Como testar**'])
+      expect(homologacao).toContain(part);
+    expect(homologacao).toMatch(/alternativas descartadas com o motivo/);
+  });
+
+  it('no modo autônomo a IA segue os padrões do projeto e escolhe o caminho menos complexo', () => {
+    const yolo = section('## Modo autônomo', '## Quando parar');
+    expect(yolo).toMatch(/padrões do projeto/);
+    expect(yolo).toMatch(/menos complexo/);
+  });
+});

@@ -377,6 +377,37 @@ You answer on the card itself:
   goes back to the AI.
 - **Bloquear** (block) records a blocker, with the reason.
 
+### What each phase delivers
+
+The instructions and document templates of the default board ask, in each phase, for what makes the
+code review quick later:
+
+- **Spec with the program design.** Besides the architecture, the Spec brings the new or changed
+  types and signatures, the file of each one and who calls whom on the main path, with the feature
+  flow in Mermaid diagrams. Discarded alternatives come with the reason for each one.
+- **Plan with parts that are easy to review.** Each step is an understandable part of the delivery
+  and says how to check it (test, typecheck, command or screen); splitting by layer is fine, as long
+  as each part can be checked. The plan estimates the lines of code of the delivery: above about 400,
+  the AI keeps the first part in the story and creates the next ones as **derived stories**
+  (`create_card` with `derived_from`). The branch of each derived story starts from the branch of the
+  origin story and its pull request is stacked on top of the origin's; the card shows **Derivada de
+  #N** (derived from #N).
+- **A pull request that explains the delivery.** In Homologação, the PR body brings the **Objetivo**
+  (goal), **O que foi feito** (what was done), **Como revisar** (how to review: where to start reading,
+  the order of the commits and the size of the diff), the **Decisões** (decisions: why the chosen path,
+  the discarded alternatives and the deviations from the plan) and the **Como testar** (how to test)
+  script.
+
+**Short path for small stories.** Create the story straight in the column where it should start (the
+**+** at the top of each column) or drag it there, for example to Plan. The AI starts from there:
+without the documents of the earlier phases, it works from the description, the conversation and the
+code, and `get_card` says which documents don't exist so it neither creates them nor blocks for lack
+of them. In Implementação, a story without sub-tasks gets one from the description.
+
+Boards created before get the new texts through **Atualizar board** (update board, in Settings), only
+in the columns that still have the previous default text: what you customized stays as it is. The
+installed flow skill doesn't change by itself; reinstall it (replacing) for it to teach the same.
+
 ### Chat with the AI
 
 ![AI chat: question and answer using the board](docs/images/chat_en.png)
@@ -708,6 +739,9 @@ story by itself, **without asking for authorization or confirmation on anything*
 - **No questions**: the AI does not use `ask_question`; faced with a doubt it decides and records
   the decision and the reason in the conversation. Only a real impediment (access, environment, a
   failure it cannot fix) blocks the card.
+- **By the project's patterns**: since nobody reviews the decisions along the way, the AI follows the
+  project's patterns and architecture rules (`CLAUDE.md`, `AGENTS.md`, `DESIGN.md` and the similar
+  code that already exists) and, among the paths that follow them, picks the least complex one.
 - **No merge**: the AI stops at the last column it works in, with the pull request open; merging and
   moving the card on to Concluído stay with you. Concluído means merged.
 - **No restrictions**: in the mode's runs the AI uses the "Sem restrições" permission (edits files

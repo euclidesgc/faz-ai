@@ -336,6 +336,7 @@ export class BoardRepo {
       mergeCommit: str(r.merge_commit),
       execProfile: r.exec_profile == null ? null : str(r.exec_profile),
       yolo: num(r.yolo) === 1,
+      derivedFrom: str(r.derived_from) || null,
     }));
 
     const fieldDefs: FieldDef[] = all(db, 'SELECT * FROM field_defs WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({

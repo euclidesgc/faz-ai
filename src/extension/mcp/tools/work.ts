@@ -94,7 +94,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
     (a, router) => {
       if (isYolo(router.snapshot(), live(findCard(router.snapshot(), a.card))))
         throw new Error(
-          'Modo autônomo (YOLO): ninguém vai responder. Decida por conta própria, registre a decisão e o motivo na conversa do card com add_comment e siga o trabalho. Use block_card só se for impossível continuar.',
+          'Modo autônomo (YOLO): ninguém vai responder. Decida pelo caminho que segue os padrões do projeto e as regras de arquitetura dele, o menos complexo entre os que os seguem, registre a decisão e o motivo na conversa do card com add_comment e siga o trabalho. Use block_card só se for impossível continuar.',
         );
       return setStatus(
         router,

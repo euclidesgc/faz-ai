@@ -29,6 +29,11 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
         .describe(
           'Só em história: número de uma história em modo autônomo (YOLO) de que esta nasce. A nova também fica em modo autônomo e entra na fila depois dela, com o pull request empilhado. Use para dividir um pedido grande em entregas.',
         ),
+      derived_from: cardArg
+        .optional()
+        .describe(
+          'Só em história: número da história de que esta é uma entrega derivada (a funcionalidade dividida em partes, ex.: no Plan, quando passa de umas 400 linhas). A branch da nova parte da branch da origem e o pull request dela é empilhado sobre o da origem. Vale dentro e fora do modo autônomo; não liga o modo.',
+        ),
     },
     (a, router) => {
       const s = router.snapshot();
@@ -36,6 +41,10 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
         throw new Error('autonomous_from vale para histórias; sub-tarefas herdam o modo da história.');
       const origin = a.autonomous_from !== undefined ? live(findCard(s, a.autonomous_from)) : null;
       if (origin && !origin.yolo) throw new Error(`#${origin.number} não está em modo autônomo; só uma pessoa liga o modo numa história.`);
+      if (a.derived_from !== undefined && a.parent !== undefined)
+        throw new Error('derived_from vale para histórias; sub-tarefas seguem a branch da história delas.');
+      const derivedFrom = a.derived_from !== undefined ? live(findCard(s, a.derived_from)) : null;
+      if (derivedFrom?.parentId) throw new Error(`#${derivedFrom.number} é uma sub-tarefa; informe a história de origem.`);
       const parent = a.parent !== undefined ? live(findCard(s, a.parent)) : null;
       if (a.depends_on?.length && !parent) throw new Error('depends_on vale para sub-tarefas: informe `parent`.');
       // a mesma dependência informada duas vezes vira um vínculo só
@@ -63,6 +72,7 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       setFields(router, s, id, a.fields);
       for (const dep of dependsOn) router.handle({ type: 'link.add', fromId: dep.id, toId: id, kind: 'precedes' }, aiOrigin(ctx));
       if (origin) router.handle({ type: 'card.yolo.inherit', cardId: id, fromId: origin.id }, aiOrigin(ctx));
+      if (derivedFrom) router.handle({ type: 'card.derive', cardId: id, fromId: derivedFrom.id }, aiOrigin(ctx));
       return detail(router, id);
     },
   );

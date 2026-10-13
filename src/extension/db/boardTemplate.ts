@@ -7,6 +7,7 @@ import {
   HOMOLOGATION_INSTRUCTION_V4,
   IMPLEMENTATION_INSTRUCTION_V2,
   PHASE_DEFAULTS,
+  PHASE_HISTORY,
 } from '../../shared/phaseDefaults';
 import { all, bool, num, one, run, str, transaction } from './query';
 
@@ -14,7 +15,7 @@ import { all, bool, num, one, run, str, transaction } from './query';
  * Board padrão. Cada mudança no padrão sobe a versão; boards criados antes são atualizados no
  * lugar (com confirmação), sem recriar nada: os cards continuam na coluna em que estavam.
  */
-export const BOARD_TEMPLATE_VERSION = 5;
+export const BOARD_TEMPLATE_VERSION = 6;
 
 export interface TemplateColumn {
   name: string;
@@ -196,6 +197,37 @@ function steps(db: Database, boardId: string): Step[] {
           run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [PHASE_DEFAULTS['Homologação']!.instruction, str(col.id)]),
       });
     }
+  }
+  if (version < BOARD_TEMPLATE_VERSION) out.push(...phaseTextSteps(db, boardId));
+  return out;
+}
+
+/**
+ * As colunas cuja instrução ou modelo do documento ainda é um texto padrão anterior (PHASE_HISTORY)
+ * recebem o atual. O que a pessoa personalizou não casa com nenhum texto antigo e fica como está.
+ */
+function phaseTextSteps(db: Database, boardId: string): Step[] {
+  const cols = all(
+    db,
+    'SELECT c.id, c.name, c.ai_instruction, c.artifact_template FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ?',
+    [boardId],
+  );
+  const out: Step[] = [];
+  for (const col of cols) {
+    const name = Object.keys(PHASE_HISTORY).find((n) => norm(n) === norm(str(col.name)));
+    const phase = name ? PHASE_DEFAULTS[name] : undefined;
+    if (!name || !phase) continue;
+    const history = PHASE_HISTORY[name]!;
+    const instruction = history.instructions.includes(str(col.ai_instruction));
+    const template = history.templates.includes(str(col.artifact_template));
+    if (!instruction && !template) continue;
+    out.push({
+      description: `Coluna "${str(col.name)}": ${history.change}.`,
+      apply: () => {
+        if (instruction) run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [phase.instruction, str(col.id)]);
+        if (template) run(db, 'UPDATE columns SET artifact_template = ? WHERE id = ?', [phase.artifactTemplate, str(col.id)]);
+      },
+    });
   }
   return out;
 }

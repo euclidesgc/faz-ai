@@ -357,6 +357,35 @@ responde no próprio card:
   para a IA.
 - **Bloquear** registra um impedimento, com o motivo.
 
+### O que cada fase entrega
+
+As instruções e os modelos de documento do board padrão pedem, em cada fase, o que deixa a revisão
+do código rápida depois:
+
+- **Spec com o desenho do programa.** Além da arquitetura, a Spec traz os tipos e as assinaturas
+  novos ou alterados, o arquivo de cada um e quem chama quem no caminho principal, com o fluxo da
+  funcionalidade em diagramas Mermaid. As alternativas descartadas vêm com o motivo de cada uma.
+- **Plan com partes fáceis de revisar.** Cada passo é uma parte inteligível da entrega e diz como
+  verificá-la (teste, typecheck, comando ou tela); recortar por camada vale, desde que cada parte seja
+  verificável. O plano estima as linhas de código da entrega: acima de umas 400, a IA deixa na
+  história a primeira parte e cria as seguintes como **histórias derivadas** (`create_card` com
+  `derived_from`). A branch de cada derivada parte da branch da história de origem e o pull request
+  dela é empilhado sobre o da origem; o card mostra **Derivada de #N**.
+- **Pull request que explica a entrega.** Na Homologação, o corpo do PR traz o **Objetivo**, **O que
+  foi feito**, **Como revisar** (por onde começar a ler, a ordem dos commits e o tamanho do diff), as
+  **Decisões** (por que o caminho escolhido, as alternativas descartadas e os desvios do plano) e o
+  roteiro **Como testar**.
+
+**Caminho curto para histórias pequenas.** Crie a história direto na coluna em que ela deve começar
+(o **+** no topo de cada coluna) ou arraste-a para lá, por exemplo para o Plan. A IA começa dali: sem
+os documentos das fases anteriores, trabalha a partir da descrição, da conversa e do código, e o
+`get_card` diz quais documentos não existem para ela não os criar nem bloquear por falta deles. Na
+Implementação, uma história sem sub-tarefas ganha uma a partir da descrição.
+
+Boards criados antes recebem os textos novos pelo **Atualizar board** (Configurações), só nas colunas
+que ainda têm o texto padrão anterior: o que você personalizou fica como está. A skill do fluxo
+instalada não muda sozinha; reinstale-a (substituindo) para ela ensinar o mesmo.
+
 ### Chat com a IA
 
 ![Chat com a IA: pergunta e resposta usando o board](docs/images/chat.png)
@@ -679,6 +708,9 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
 - **Sem perguntas**: a IA não usa `ask_question`; diante de uma dúvida ela decide e registra a
   decisão e o motivo na conversa. Só um impedimento real (acesso, ambiente, falha que ela não
   resolve) bloqueia o card.
+- **Pelos padrões do projeto**: como ninguém revisa as decisões do meio do caminho, a IA segue os
+  padrões e as regras de arquitetura do projeto (`CLAUDE.md`, `AGENTS.md`, `DESIGN.md` e o código
+  parecido que já existe) e, entre os caminhos que os seguem, escolhe o menos complexo.
 - **Sem merge**: a IA para na última coluna em que atua, com o pull request aberto; o merge e o
   avanço até Concluído continuam sendo seus. Concluído quer dizer mergeado.
 - **Sem restrições**: nas execuções do modo, a IA roda com a permissão "Sem restrições" (altera

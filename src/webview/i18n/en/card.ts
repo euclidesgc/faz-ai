@@ -37,6 +37,9 @@ export const card: Record<string, string> = {
   'Cria a branch da história e, no modo worktree, a pasta de trabalho dela':
     'Creates the story branch and, in worktree mode, its working folder',
   'Criar branch da história': 'Create story branch',
+  'Derivada de {ref}': 'Derived from {ref}',
+  'A branch desta história parte da branch de {ref}, e o pull request é empilhado sobre o dela':
+    'The branch of this story starts from the branch of {ref}, and its pull request is stacked on top of that one',
 
   // Anexos
   '"{name}" tem mais de 20 MB e não foi anexado.': '"{name}" is larger than 20 MB and was not attached.',
