@@ -220,7 +220,8 @@ The board refuses a dependency cycle.
 The AI uses this to speed up Implementation. In Plan it declares the order between sub-tasks
 (`create_card` with `depends_on`, or `link_cards` with `depends_on`): one depends on another when it
 uses what the other produces or when both change the same files. In Implementation, the story's
-`get_card` returns in `subtasksNow` what can run now, and the AI delegates **the sub-tasks with no
+`get_card` returns in `subtasksNow` what can run now (and in `subtasksNowNote`, how to run the
+round), and the AI delegates **the sub-tasks with no
 pending dependency to simultaneous subagents**, each with its card's model; at the end of the round
 it verifies the whole, commits and moves on to the next round. `start_work` refuses a sub-task that
 is still waiting for another. With no dependencies declared, all open sub-tasks are considered

@@ -94,6 +94,13 @@ Também pelo MCP: catálogo e regras de modelos (`get_models`, `detect_models`, 
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
 `set_skill_enabled`, `delete_skill`…).
 
+Toda sessão recebe as instruções do servidor: o ciclo do card (por onde começar, status, revisão,
+modelo do card, rules e skills obrigatórias e pendências com a pessoa) em menos de 2.048 caracteres,
+o tamanho em que o Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta
+(documentação de 2026-10-13). O detalhe de cada passo fica onde a IA o lê quando precisa: na
+descrição da ferramenta, nas notas do `get_card` (como `subtasksNowNote`, com as rodadas da
+Implementação) e na skill `faz-ai-fluxo`.
+
 ### Status e revisão
 
 Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `get_card` e

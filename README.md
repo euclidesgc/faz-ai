@@ -207,7 +207,8 @@ dependência.
 A IA usa isso para acelerar a Implementação. No Plan ela declara a ordem entre as sub-tarefas
 (`create_card` com `depends_on`, ou `link_cards` com `depends_on`): uma depende da outra quando usa o
 que ela produz ou quando as duas alteram os mesmos arquivos. Na Implementação, o `get_card` da
-história devolve em `subtasksNow` o que pode rodar agora, e a IA delega **as sub-tarefas sem
+história devolve em `subtasksNow` o que pode rodar agora (e em `subtasksNowNote`, como conduzir a
+rodada), e a IA delega **as sub-tarefas sem
 dependência pendente a subagentes simultâneos**, cada um com o modelo do seu card; ao fim da rodada
 ela verifica o conjunto, faz o commit e parte para a rodada seguinte. `start_work` recusa a
 sub-tarefa que ainda espera outra. Sem dependências declaradas, todas as sub-tarefas em aberto são

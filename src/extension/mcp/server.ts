@@ -24,36 +24,27 @@ const CLIENT_NAMES: Record<string, string> = {
   'cursor-vscode': 'Cursor',
 };
 
-/** O que o servidor MCP ensina a toda sessão, antes de qualquer ferramenta. */
+/**
+ * O que o servidor MCP ensina a toda sessão, antes de qualquer ferramenta. O Claude Code corta as instruções
+ * de cada servidor em 2.048 caracteres (documentação de 2026-10-13), então elas trazem só o ciclo, com o mais
+ * crítico no começo; o detalhe de cada passo vai onde a IA o lê quando precisa: a descrição da ferramenta,
+ * as notas do get_card e a skill do fluxo.
+ */
 export const MCP_INSTRUCTIONS =
-  'Board kanban do projeto (Faz AI). Histórias ficam no workflow pai e sub-tarefas no workflow filho, ligadas a uma história. ' +
-  'Cards são identificados pelo número (#12). Comece por get_board para conhecer colunas, tipos e campos. ' +
-  'Sinalize o progresso movendo os cards entre colunas e registre decisões e resultados em comentários ou anexos. ' +
-  'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_question). ' +
-  'Uma imagem ou arquivo colado numa mensagem aparece como `attachment:<nome>`: o arquivo é o anexo de mesmo nome em `attachments` de get_card, e pode ser lido pelo `path`. ' +
-  'Cada card tem um status de trabalho em `work`: "ready" e "approved" estão com você, "waiting_review", "waiting_answer" e "blocked" estão com a pessoa. ' +
-  'Ao começar um card chame start_work. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
+  'Board kanban do projeto (Faz AI). As histórias (workflow pai) passam pelas fases do fluxo, que são as colunas, uma por vez até a conclusão; ' +
+  'as sub-tarefas (workflow filho) ficam ligadas a uma história. Cards são identificados pelo número (#12). Sinalize o progresso movendo os cards (move_card). ' +
+  'Sem um pedido específico, comece por get_pending_work: ele lista o que está com você. get_board mostra colunas, tipos, campos e agentes. ' +
+  'Cada card tem um status de trabalho em `work`: "ready" e "approved" estão com você; "waiting_review", "waiting_answer" e "blocked" estão com a pessoa. ' +
+  'Ao começar um card chame start_work e siga `phase` do get_card. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
   'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
+  'get_card devolve em `model` o modelo e o esforço que devem executar o card: se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; ' +
+  'se não for possível, avise a pessoa em vez de executar com outra. ' +
+  'Antes de executar, leia os arquivos de `requiredRules` e `requiredSkills` do get_card, mesmo os que não estão na sua lista de skills. ' +
+  'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_question); registre ali decisões e resultados. ' +
   'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +
-  'Ficou algo dependendo da pessoa (decisão, dado, ponto em aberto que ela precisa avaliar)? Não registre só num comentário: entregue com request_review e `pending`, e o card fica com ela (status "waiting_review"), mesmo em modo autônomo. ' +
-  'Sem um pedido específico, comece por get_pending_work: ele lista o que está com você (aprovados para avançar, mensagens sem resposta, cards prontos). ' +
-  'Para perguntas de uso, tokens e tempo (quantos tokens gastou, qual fase/modelo consome mais, quanto tempo levou), use get_metrics em vez de abrir o painel. ' +
-  'get_card devolve em `model` a ferramenta, o modelo e o nível de esforço que devem executar o card: antes de trabalhar nele, ' +
-  'se o modelo ou o esforço forem diferentes dos seus, delegue o trabalho a um subagente com esse modelo e esforço; ' +
-  'se não for possível, avise a pessoa em vez de executar com outra configuração. ' +
-  'O campo "Esforço da atividade" é o tamanho da tarefa (não é o esforço do modelo); as regras do board sugerem o modelo a partir dele (get_models). ' +
-  'Toda execução pelo board parte de contexto vazio: o que a IA deve conhecer vem no pedido e no get_card, pelo caminho dos arquivos. ' +
-  'Os campos "Rules" e "Skills" listam o que o card exige: get_card devolve `requiredRules` e `requiredSkills` com o caminho de cada arquivo, ' +
-  'e todos devem ser lidos nesse caminho antes de executar o card, mesmo que não apareçam na sua lista de skills. As opções desses campos e os agentes de get_board são tudo o que o board marcou em Configurações → Harness; não indique nada fora deles. ' +
-  'As colunas das histórias são as fases do fluxo; sua intenção é sempre levar a história até a conclusão, uma coluna por vez. ' +
-  'get_card devolve em `phase` o que fazer na fase atual e o modelo do documento que ela produz. ' +
-  'Sub-tarefas podem depender umas das outras (create_card com depends_on, ou link_cards com "depends_on"): declare a dependência quando uma usa o que a outra produz ou quando as duas alteram os mesmos arquivos. ' +
-  'Na Implementação, get_card na história devolve em `subtasksNow.canRunTogether` as sub-tarefas sem dependência pendente: se você tem subagentes, delegue cada uma a um subagente, todos lançados na mesma mensagem para rodarem ao mesmo tempo, cada um com o modelo do card dele, na pasta de trabalho da história e sem fazer commit; ao fim da rodada, verifique o conjunto, faça o commit e leia a história de novo para a próxima rodada. ' +
-  'Isso vale mesmo que a skill do fluxo instalada ainda diga para executar uma sub-tarefa por vez. start_work recusa a sub-tarefa que depende de outra ainda em aberto (`waitingFor`). ' +
-  'Repita até não sobrar nenhuma que você possa tocar agora: as que estão com a pessoa (`subtasksNow.withPerson`) ou já em execução (`subtasksNow.running`) não são suas; se só restarem as que estão com a pessoa, pare. ' +
-  'Testes, build e commit dependem do terminal: sem permissão para rodar comandos, implemente e registre na conversa o que falta rodar; essa parte fica para quem tem permissão. ' +
-  'O documento de cada fase é construído numa sub-tarefa (campo Fase = nome da coluna), mas fica anexado à história: grave-o com add_attachment e artifact: true. ' +
-  'O harness do projeto (arquivos de regras e skills) também é gerenciado por aqui: veja get_harness.';
+  'Ficou algo dependendo da pessoa (decisão, dado, ponto em aberto que ela precisa avaliar)? Não registre só num comentário: entregue com request_review e `pending`, e o card fica com ela, mesmo em modo autônomo. ' +
+  'Uso, tokens e tempo: get_metrics. Rules, skills e agentes do projeto: get_harness. Modelos e regras de sugestão: get_models. ' +
+  'O detalhe vem onde você precisa: na descrição de cada ferramenta, nas notas do get_card e na skill faz-ai-fluxo.';
 
 /** Cria um servidor MCP (uma sessão) com as ferramentas do board. */
 export function createMcpServer(opts: McpOptions): McpServer {
