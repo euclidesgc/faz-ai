@@ -161,7 +161,7 @@ export function yoloStopAdvice(state: BoardState, card: Card): string | null {
     !isAtYoloStop(state, story) &&
     isCoreStory(state, story)
   )
-    return `HISTÓRIA DO NÚCLEO (${CRITICALITY_FIELD} = ${CORE}): mesmo no modo autônomo, ${column.name} exige a aprovação da pessoa. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare; depois de aprovada, a IA segue sozinha.`;
+    return `HISTÓRIA DO NÚCLEO (${CRITICALITY_FIELD} = ${CORE}): mesmo no modo autônomo, ${column.name} exige a aprovação da pessoa. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare; depois de aprovada, a IA segue sozinha. É uma exceção ao "não chame request_review" do modo autônomo.`;
   const stop = yoloStopOf(state, story);
   if (!stop || stop.id === lastAiColumn(state, story.workflowId)?.id) return null;
   if (card.id === story.id && isAtYoloStop(state, story))

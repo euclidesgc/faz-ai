@@ -242,6 +242,17 @@ describe('atualização do board para o padrão atual', () => {
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 
+  it('versão 7: com a Implementação e a Homologação renomeadas, o board não diz onde a Revisão caberia e não a oferece', () => {
+    upgradeBoard(db, boardId);
+    db.run("DELETE FROM columns WHERE name = 'Revisão'");
+    db.run(`UPDATE field_defs SET options_json = '["Discovery","PRD","Spec","Plan","Dev","QA"]' WHERE name = 'Fase'`);
+    const settings = new SettingsRepo(db);
+    settings.updateColumn(col('Implementação').id, { name: 'Dev' });
+    settings.updateColumn(col('Homologação').id, { name: 'QA' });
+    run(db, 'UPDATE boards SET template_version = 6 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+  });
+
   it('versão 8: o board ganha o campo Criticidade nas histórias, sem duplicar um campo de mesmo nome', () => {
     upgradeBoard(db, boardId);
     db.run("DELETE FROM field_defs WHERE name = 'Criticidade'");

@@ -125,6 +125,17 @@ describe('stackBaseOf de uma história derivada', () => {
     expect(stackBaseOf(s, s.cards[2]!)?.id).toBe('h9');
   });
 
+  it('a história que parou no "Até onde" continua na pilha do modo, com o modo já desligado', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: false, yoloUntil: 'review', branch: 'b10', branchCreatedAt: '100' }),
+        card('h11', { number: 11, yolo: true }),
+      ],
+    });
+
+    expect(stackBaseOf(s, s.cards[1]!)?.id).toBe('h10');
+  });
+
   it('sub-tarefa nunca empilha', () => {
     const s = boardState({
       cards: [card('h10', { number: 10, branch: 'b10' }), card('t1', { number: 11, parentId: 'h10', derivedFrom: 'h10' })],

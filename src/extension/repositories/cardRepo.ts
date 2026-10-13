@@ -365,6 +365,14 @@ export class CardRepo {
     }
   }
 
+  /**
+   * O modo autônomo chegou à coluna escolhida e se desliga, mas a história guarda até onde foi: a
+   * entrega dela continua na pilha de pull requests do modo (ver `stackBaseOf`).
+   */
+  stopYolo(storyId: string): void {
+    run(this.db, 'UPDATE cards SET yolo = 0, updated_at = ? WHERE id = ?', [now(), storyId]);
+  }
+
   /** O modo autônomo da história do card (ele mesmo, ou o pai numa sub-tarefa) e a coluna em que ele para ('' = no fim). */
   private yoloOf(cardId: string): { yolo: boolean; until: string } {
     const row = one(

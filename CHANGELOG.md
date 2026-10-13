@@ -17,7 +17,9 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - **Áreas críticas (núcleo).** Em Configurações → Regras, liste os caminhos do núcleo do projeto, um
   por linha. A IA marca o novo campo **Criticidade** (Núcleo ou Periferia) das histórias na Spec ou no
   Plan, e a história do núcleo espera a sua aprovação nas colunas que exigem aprovação, mesmo no modo
-  autônomo; depois de aprovada, segue sozinha. Na Revisão e no PR, os arquivos do núcleo vêm à parte.
+  autônomo; depois de aprovada, segue sozinha. Só uma pessoa tira a história do núcleo, e ligar o modo
+  numa história do núcleo que aguarda revisão não a aprova. Na Revisão e no PR, os arquivos do núcleo
+  vêm à parte.
   Boards existentes ganham o campo pelo **Atualizar board**; `update_rules` aceita `criticalPaths` e
   `get_card` traz `criticalAreas`.
 - **Modo autônomo até uma fase.** Ao ligar o modo autônomo, o aviso traz o seletor **Até onde**, com
@@ -43,10 +45,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   funcionalidade em diagramas Mermaid. As alternativas descartadas passam a vir com o motivo.
 - **Plan com partes fáceis de revisar e histórias derivadas.** Cada passo do plano é uma parte
   inteligível e verificável sozinha (recortar por camada vale), e o plano estima as linhas de código
-  da entrega. Acima de umas 400, a IA cria as próximas partes como histórias derivadas, com o novo
-  parâmetro `derived_from` do `create_card`: a branch da derivada parte da branch da origem e o pull
-  request dela é empilhado sobre o da origem, também fora do modo autônomo. O card mostra **Derivada
-  de #N**.
+  da entrega. Acima de umas 400, a IA cria as próximas partes como histórias derivadas, em ordem, com
+  o novo parâmetro `derived_from` do `create_card` apontando para a parte anterior: a branch da
+  derivada parte da branch da anterior e o pull request dela é empilhado sobre o da anterior, também
+  fora do modo autônomo. O card mostra **Derivada de #N**.
 - **Pull request que explica a entrega.** O corpo do PR da Homologação passa a ter **Objetivo**,
   **O que foi feito**, **Como revisar** (por onde começar, a ordem dos commits e o tamanho do diff),
   **Decisões** (o caminho escolhido, as alternativas descartadas e os desvios do plano) e o roteiro
