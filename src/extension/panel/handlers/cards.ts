@@ -74,6 +74,39 @@ function setYoloMany(ctx: BoardContext, msg: MessageOf<'card.yolo.setMany'>, aut
   }
 }
 
+/** As histórias vivas do lote, na ordem em que a mensagem listou os ids. */
+function liveStoriesOf(ctx: BoardContext, cardIds: string[]): Card[] {
+  return ctx.state().cards.filter((c) => cardIds.includes(c.id) && !c.parentId && isLive(c));
+}
+
+/** Arquiva várias histórias de uma vez; ignora silenciosamente quem da lista não for história viva. */
+function archiveMany(ctx: BoardContext, msg: MessageOf<'card.archiveMany'>): void {
+  for (const story of liveStoriesOf(ctx, msg.cardIds)) ctx.cards.archive(story.id);
+}
+
+/** Manda várias histórias para a lixeira de uma vez; ignora silenciosamente quem da lista não for história viva. */
+function trashMany(ctx: BoardContext, msg: MessageOf<'card.trashMany'>): void {
+  for (const story of liveStoriesOf(ctx, msg.cardIds)) ctx.cards.trash(story.id);
+}
+
+/**
+ * Move várias histórias de uma vez para a mesma coluna. `cancelChildren: true` sempre: cobre RF13
+ * (cancelar as sub-tarefas em aberto do lote ao mover para uma coluna de cancelamento, sem perguntar
+ * de novo) sem efeito quando o destino não é cancelamento (mesma regra de `card.move` de hoje).
+ * Quando o `moveInner` recusa uma história (ex.: sub-tarefa em aberto indo para conclusão), pula ela
+ * e segue o lote (RF12), em vez de deixar a exceção interromper as demais.
+ */
+function moveMany(ctx: BoardContext, msg: MessageOf<'card.moveMany'>, byAi: boolean): void {
+  const stories = liveStoriesOf(ctx, msg.cardIds).filter((c) => c.columnId !== msg.columnId);
+  for (const story of stories) {
+    try {
+      ctx.cards.move(story.id, msg.columnId, Number.MAX_SAFE_INTEGER, { cancelChildren: true, byAi });
+    } catch {
+      // história bloqueada pelo moveInner (ex.: sub-tarefa em aberto indo para conclusão, RF12): pula e segue o lote
+    }
+  }
+}
+
 /** Cria o card e já aplica a sugestão de modelo; devolve o id. */
 export function createCard(ctx: BoardContext, input: { typeId: string; columnId: string; parentId: string | null; title: string }): string {
   const id = ctx.cards.create(ctx.boardId, input);
@@ -146,6 +179,18 @@ export const cardHandlers = {
   },
   'card.yolo.setMany': (msg, ctx, { author, byAi }) => {
     setYoloMany(ctx, msg, author, byAi);
+    return true;
+  },
+  'card.archiveMany': (msg, ctx) => {
+    archiveMany(ctx, msg);
+    return true;
+  },
+  'card.trashMany': (msg, ctx) => {
+    trashMany(ctx, msg);
+    return true;
+  },
+  'card.moveMany': (msg, ctx, { byAi }) => {
+    moveMany(ctx, msg, byAi);
     return true;
   },
   'card.yolo.inherit': (msg, ctx, { author, byAi }) => {

@@ -131,6 +131,8 @@ interface BoardStore extends UiState, ViewState {
    */
   selectedIds: Set<Id>;
   toggleSelected(id: Id): void;
+  /** substitui a seleção inteira pelos ids informados (usado por "Selecionar todos" da coluna) */
+  selectMany(ids: Id[]): void;
   clearSelected(): void;
   openCard(id: Id | null): void;
   setFilters(patch: Partial<Filters>): void;
@@ -261,11 +263,18 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     },
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
     toggleSelected(id) {
-      const next = new Set(get().selectedIds);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      set({ selectedIds: next });
+      const { state, selectedIds } = get();
+      const card = state?.cards.find((c) => c.id === id);
+      if (!card) return;
+      const [firstId] = selectedIds;
+      const firstCard = firstId !== undefined ? state!.cards.find((c) => c.id === firstId) : undefined;
+      // seleção de outra coluna: substitui em vez de somar (a seleção vale para uma coluna por vez)
+      const base = firstCard && firstCard.columnId !== card.columnId ? new Set<Id>() : new Set(selectedIds);
+      if (base.has(id)) base.delete(id);
+      else base.add(id);
+      set({ selectedIds: base });
     },
+    selectMany: (ids) => set({ selectedIds: new Set(ids) }),
     clearSelected: () => set({ selectedIds: new Set() }),
     openCard(id) {
       // trocar (ou fechar) o card deixa a modal de anexo sem contexto: fecha junto
