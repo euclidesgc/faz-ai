@@ -84,6 +84,11 @@ de vez, mexer em checklist, na conversa do card e em anexos (inclusive ler anexo
 colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
 pelo nome. Mensagens da IA na conversa saem assinadas com o nome do cliente (ex.: "Claude Code").
 
+Os campos do board (Fase, Tags, Modelo, Skills, Rules, Esforço da atividade e Criticidade) vêm com
+`board: true` em `get_board.fields`: as regras, a triagem e a IA dependem deles. `delete_field` e a
+troca de nome em `update_field` são recusadas neles, assim como opções e tipos de card (as opções de
+Tags são da pessoa e mudam); a exibição muda em todos. `create_field` recusa o nome de um deles.
+
 Também pelo MCP: catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
 `set_model_rules`), padrões por tipo de card (`update_card_type`), recriar o board (`reset_board`) e o
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,

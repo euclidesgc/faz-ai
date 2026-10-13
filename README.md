@@ -805,8 +805,9 @@ ela mexe nesses caminhos, **Periferia** se não. Você também pode marcar à m�
   você a tira de lá, e ligar o modo numa história do núcleo que aguarda revisão não a aprova.
 - **Na Revisão e no pull request**, os arquivos do diff que estão no núcleo são revisados com mais
   rigor e listados à parte em **Como revisar**.
-- O campo **Criticidade** é um campo como os outros: aparece no card, filtra o board e pode entrar nas
-  regras de modelo (ex.: núcleo com o modelo da faixa "Alto").
+- O campo **Criticidade** aparece no card, filtra o board e pode entrar nas regras de modelo (ex.:
+  núcleo com o modelo da faixa "Alto"). Como é um campo do board, ele fica fora de Campos
+  personalizados, e um tipo de card novo das histórias entra nele sozinho.
 
 Boards criados antes ganham o campo pelo **Atualizar board**. Pelo MCP, `update_rules` aceita
 `criticalPaths`.
@@ -986,7 +987,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | --- | --- |
 | Workflows e colunas | Quantos workflows quiser (cards independentes ou sub-tarefas), com nome editável e posição que você muda arrastando; **Nova coluna** em cada um; nomes, ordem (arrastando) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento). Abrir e fechar workflows e colunas é feito no próprio board e fica lembrado |
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
-| Campos | Campos personalizados (texto, seleção, data, modelo…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo |
+| Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, Esforço da atividade e Criticidade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido e as [áreas críticas](#áreas-críticas-núcleo) |
 | Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; abas Projeto e Global com tudo que cada ferramenta carrega, em grupos, com o que cada arquivo é, o caminho que abre no editor do board e a marcação do que as execuções usam (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |

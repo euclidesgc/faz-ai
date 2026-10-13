@@ -14,16 +14,9 @@ async function setup() {
     workspaceDir: '/tmp',
     homeDir: '/tmp',
   });
+  // os quatro campos de triagem são campos do board: o board padrão já os cria
   const s0 = router.snapshot();
   const typeId = s0.cardTypes[0]!.id;
-  for (const [name, kind] of [
-    ['Tags', 'multiselect'],
-    ['Esforço da atividade', 'select'],
-    ['Modelo', 'model'],
-    ['Skills', 'multiselect'],
-  ] as const) {
-    router.handle({ type: 'settings.field.create', name, kind, options: ['x'], appliesToTypes: null, display: 'chip' });
-  }
   const columnId = router.snapshot().columns[0]!.id;
   const cardId = router.createCard({ typeId, columnId, parentId: null, title: 'card' });
   return { router, cardId, typeId };
@@ -40,7 +33,7 @@ describe('needsTriage', () => {
   it('é false quando qualquer um dos quatro campos está preenchido', async () => {
     const { router, cardId } = await setup();
     const tags = router.snapshot().fieldDefs.find((f) => f.name === 'Tags')!;
-    router.handle({ type: 'field.setValue', cardId, fieldId: tags.id, value: ['x'] });
+    router.handle({ type: 'field.setValue', cardId, fieldId: tags.id, value: ['docs'] });
     const s = router.snapshot();
     const card = s.cards.find((c) => c.id === cardId)!;
     expect(needsTriage(s, card)).toBe(false);
@@ -49,13 +42,12 @@ describe('needsTriage', () => {
   it('ignora campo fora de appliesToTypes do tipo do card', async () => {
     const { router, cardId, typeId } = await setup();
     const outraTypeId = router.snapshot().cardTypes.find((t) => t.id !== typeId)?.id;
-    const modelo = router.snapshot().fieldDefs.find((f) => f.name === 'Modelo')!;
-    router.handle({
-      type: 'settings.field.update',
-      fieldId: modelo.id,
-      patch: { appliesToTypes: outraTypeId ? [outraTypeId] : [] },
-    });
-    const s = router.snapshot();
+    // os tipos de um campo do board não mudam pelas configurações: o estado é montado à mão
+    const s0 = router.snapshot();
+    const s = {
+      ...s0,
+      fieldDefs: s0.fieldDefs.map((f) => (f.name === 'Modelo' ? { ...f, appliesToTypes: outraTypeId ? [outraTypeId] : [] } : f)),
+    };
     const card = s.cards.find((c) => c.id === cardId)!;
     expect(needsTriage(s, card)).toBe(true);
   });

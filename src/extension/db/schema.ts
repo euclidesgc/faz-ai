@@ -1,13 +1,7 @@
 import type { Database } from 'sql.js';
+import { MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
 export const SCHEMA_VERSION = 29;
-
-/** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
-/** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
-export const SKILLS_FIELD = 'Skills';
-/** Campo padrão "Rules": arquivos de instruções marcados no Harness que a execução do card deve ler. */
-export const RULES_FIELD = 'Rules';
-export const MODEL_FIELD = 'Modelo';
 
 const MIGRATIONS: Record<number, string> = {
   1: `

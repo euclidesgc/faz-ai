@@ -1,6 +1,8 @@
+import { boardFieldNamed, fieldChangeBlocker, newFieldBlocker } from '../../../shared/boardFields';
+import type { Id } from '../../../shared/model';
 import { workflowDeleteBlocker } from '../../../shared/selectors';
 import { upgradeBoard } from '../../db/boardTemplate';
-import type { HandlerMap } from './context';
+import type { BoardContext, HandlerMap } from './context';
 import { applyFastModels, initModels, useTool } from './models';
 
 /** Configurações do board: colunas, tipos, campos, workflows, regras, agentes de execução e o próprio board. */
@@ -18,11 +20,12 @@ export const boardSettingsHandlers = {
     return true;
   },
   'settings.type.create': (msg, ctx) => {
-    ctx.settings.createType(ctx.boardId, msg.name, msg.color, msg.defaultWorkflowId);
+    followBoardFields(ctx, ctx.settings.createType(ctx.boardId, msg.name, msg.color, msg.defaultWorkflowId));
     return true;
   },
   'settings.type.update': (msg, ctx) => {
     ctx.settings.updateType(msg.typeId, msg.patch);
+    if (msg.patch.defaultWorkflowId !== undefined) followBoardFields(ctx, msg.typeId);
     return true;
   },
   'settings.type.delete': (msg, ctx) => {
@@ -30,14 +33,20 @@ export const boardSettingsHandlers = {
     return true;
   },
   'settings.field.create': (msg, ctx) => {
+    const blocker = newFieldBlocker(msg);
+    if (blocker) throw new Error(blocker);
     ctx.settings.createField(ctx.boardId, msg);
     return true;
   },
   'settings.field.update': (msg, ctx) => {
+    const blocker = fieldChangeBlocker(ctx.state(), msg.fieldId, msg.patch);
+    if (blocker) throw new Error(blocker);
     ctx.settings.updateField(msg.fieldId, msg.patch);
     return true;
   },
   'settings.field.delete': (msg, ctx) => {
+    const blocker = fieldChangeBlocker(ctx.state(), msg.fieldId, 'delete');
+    if (blocker) throw new Error(blocker);
     ctx.settings.deleteField(msg.fieldId);
     return true;
   },
@@ -78,3 +87,22 @@ export const boardSettingsHandlers = {
     return true;
   },
 } satisfies Partial<HandlerMap>;
+
+/**
+ * "Fase" vale nos tipos das sub-tarefas e "Criticidade" nos das histórias. Como os campos do board não
+ * aparecem em Configurações, o tipo novo (ou que mudou de workflow) entra neles ou sai deles sozinho.
+ */
+function followBoardFields(ctx: BoardContext, typeId: Id): void {
+  const s = ctx.state();
+  const type = s.cardTypes.find((t) => t.id === typeId);
+  const kind = s.workflows.find((w) => w.id === type?.defaultWorkflowId)?.kind;
+  for (const f of s.fieldDefs) {
+    const workflow = boardFieldNamed(f.name)?.workflow;
+    if (!workflow || f.appliesToTypes === null) continue;
+    const has = f.appliesToTypes.includes(typeId);
+    if (has === (kind === workflow)) continue;
+    ctx.settings.updateField(f.id, {
+      appliesToTypes: has ? f.appliesToTypes.filter((id) => id !== typeId) : [...f.appliesToTypes, typeId],
+    });
+  }
+}

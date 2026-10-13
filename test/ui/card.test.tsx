@@ -293,6 +293,33 @@ describe('CardDrawer', () => {
     board.router.handle({ type: 'settings.field.delete', fieldId: field.id });
   });
 
+  it('os campos personalizados ficam numa seção à parte dos campos do board', () => {
+    board.router.handle({
+      type: 'settings.field.create',
+      name: 'Cliente',
+      kind: 'text',
+      options: [],
+      appliesToTypes: null,
+      display: 'badge',
+    });
+    syncStore(board.router);
+    openStory();
+    const boardFields = screen.getByRole('region', { name: 'Campos' });
+    const custom = screen.getByRole('region', { name: 'Campos personalizados' });
+    expect(within(boardFields).getByRole('combobox', { name: 'Esforço da atividade' })).toBeInTheDocument();
+    expect(within(boardFields).queryByLabelText('Cliente')).toBeNull();
+    expect(within(custom).getByLabelText('Cliente')).toBeInTheDocument();
+    expect(within(custom).queryByRole('combobox', { name: 'Esforço da atividade' })).toBeNull();
+    board.router.handle({ type: 'settings.field.delete', fieldId: snap().fieldDefs.find((f) => f.name === 'Cliente')!.id });
+    syncStore(board.router);
+  });
+
+  it('sem campo personalizado, a seção deles não aparece', () => {
+    openStory();
+    expect(screen.getByRole('region', { name: 'Campos' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Campos personalizados' })).toBeNull();
+  });
+
   it('as abas mostram a conversa e os anexos, com a contagem no rótulo', async () => {
     patchState((s) => ({
       comments: [{ id: 'c1', cardId: board.storyId, author: 'Pessoa', body: 'oi', createdAt: 0, updatedAt: 0 } as never, ...s.comments],

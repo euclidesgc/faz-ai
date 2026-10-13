@@ -202,6 +202,16 @@ describe('servidor MCP', () => {
     expect(board.workflows[0].columns[8].name).toBe('Feito');
     board = (await call('create_field', { name: 'Estimativa', kind: 'number', applies_to_types: ['História'] })).data;
     expect(board.fields.at(-1)).toMatchObject({ name: 'Estimativa', appliesTo: ['História'] });
+    expect(board.fields.at(-1).board).toBeUndefined();
+    // os campos do board vêm marcados, e o que as regras usam deles não muda pelo MCP
+    expect(board.fields.find((f: any) => f.name === 'Fase').board).toBe(true);
+    const rename = await call('update_field', { field: 'Fase', name: 'Etapa' });
+    expect(rename.error).toBe(true);
+    expect(rename.text).toContain('não pode ser renomeado');
+    expect((await call('delete_field', { field: 'Criticidade' })).text).toContain('não pode ser apagado');
+    expect((await call('create_field', { name: 'skills', kind: 'text' })).text).toContain('é o nome de um campo do board');
+    board = (await call('update_field', { field: 'Tags', options: ['web', 'mobile'], display: 'inline' })).data;
+    expect(board.fields.find((f: any) => f.name === 'Tags')).toMatchObject({ board: true, options: ['web', 'mobile'], display: 'inline' });
     expect((await call('update_rules', { blockDoneWithOpenChildren: false })).data.blockDoneWithOpenChildren).toBe(false);
   });
 });

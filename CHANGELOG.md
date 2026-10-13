@@ -4,6 +4,18 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **Campos do board fora das configurações.** Fase, Tags, Modelo, Skills, Rules, Esforço da atividade
+  e Criticidade são usados pelas regras, pela triagem e pela IA, e saíram de Configurações → **Campos
+  personalizados** (o novo nome da aba), que agora lista só os campos que você cria. Esses campos não
+  se apagam nem se renomeiam, e as opções e os tipos de card deles são mantidos pelo board (as opções
+  de Tags continuam suas, pela IA). Um campo novo não pode usar o nome de um deles nem o tipo
+  **Modelo de IA**. Um tipo de card novo das histórias entra sozinho na Criticidade, e um das
+  sub-tarefas na Fase. No card aberto, os campos personalizados ficam na seção própria, abaixo dos
+  campos do board. Pelo MCP, `get_board` marca esses campos com `board: true`, e `update_field`,
+  `delete_field` e `create_field` recusam o que quebraria o uso deles.
+
 ## 0.36.0
 
 - **Registros de decisão no repositório.** A nova opção **Faz AI › Git › Registros de decisão**

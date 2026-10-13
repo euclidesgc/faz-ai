@@ -79,6 +79,15 @@ export const host: Record<string, string> = {
   'O workflow tem {cards} card(s), inclusive arquivados e na lixeira':
     'The workflow has {cards} card(s), including archived and trashed ones',
   '{types} tipo(s) de card nascem neste workflow': '{types} card type(s) are created in this workflow',
+  // campos do board (src/shared/boardFields.ts)
+  '"{name}" é o nome de um campo do board; escolha outro nome.': '"{name}" is the name of a board field; choose another name.',
+  'O campo de modelo de IA é só um, o "Modelo" do board.': 'There is only one AI model field, the board\'s "Modelo".',
+  'O campo "{name}" é do board e não pode ser apagado: as regras e a IA dependem dele.':
+    'The "{name}" field belongs to the board and cannot be deleted: the rules and the AI depend on it.',
+  'O campo "{name}" é do board e não pode ser renomeado: as regras e a IA o encontram pelo nome.':
+    'The "{name}" field belongs to the board and cannot be renamed: the rules and the AI find it by its name.',
+  'As opções do campo "{name}" são mantidas pelo board.': 'The options of the "{name}" field are kept by the board.',
+  'Os tipos de card do campo "{name}" são mantidos pelo board.': 'The card types of the "{name}" field are kept by the board.',
   'Migration {n} não encontrada': 'Migration {n} not found',
 
   // vínculos entre cards
