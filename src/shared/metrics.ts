@@ -243,6 +243,41 @@ export interface MetricsUsage {
   calls: number;
 }
 
+/**
+ * O retrabalho de uma fase: o que a IA entregou para revisão e o que a pessoa fez com isso. Só conta a
+ * resposta de uma pessoa (aprovar ou pedir ajustes); a aprovação automática do modo autônomo não entra.
+ */
+export interface MetricsReworkPhase {
+  phase: string;
+  /** pedidos de revisão: o card foi para "Aguardando revisão" */
+  reviews: number;
+  /** revisões aprovadas por uma pessoa */
+  approved: number;
+  /** revisões devolvidas com pedido de ajuste */
+  adjusted: number;
+  /** cards cuja primeira resposta da pessoa nesta fase caiu no período */
+  resolved: number;
+  /** desses, os aprovados de primeira, sem nenhum pedido de ajuste antes */
+  firstPass: number;
+}
+
+/** Os pedidos de revisão e de ajuste pelo modelo da execução que entregou o trabalho; '' = não definido. */
+export interface MetricsReworkModel {
+  model: string;
+  reviews: number;
+  adjusted: number;
+}
+
+/** O retrabalho do período: o sinal de qualidade que o consumo e o tempo não mostram. */
+export interface MetricsRework {
+  phases: MetricsReworkPhase[];
+  models: MetricsReworkModel[];
+  /** histórias concluídas no período e quantas delas já têm um bug vinculado (o defeito que escapou) */
+  escapes: { stories: number; withBugs: number; bugs: number };
+}
+
+export const EMPTY_REWORK: MetricsRework = { phases: [], models: [], escapes: { stories: 0, withBugs: 0, bugs: 0 } };
+
 /** As seções que acompanham `MetricsPanelResult`. */
 export interface MetricsPanelSections {
   /** um por dimensão de `METRICS_BREAKDOWN_DIMS`, na ordem */
@@ -251,6 +286,7 @@ export interface MetricsPanelSections {
   lead: MetricsLead;
   cards: MetricsRanking;
   inventory: MetricsInventory;
+  rework: MetricsRework;
 }
 
 /** Teto de linhas por tabela, no host. Acima dele a resposta conta o que ficou fora (RF-33). */

@@ -6,6 +6,10 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Retrabalho no painel de métricas e no `get_metrics`.** O bloco novo **Retrabalho** mostra, por fase,
+  as revisões pedidas pela IA, as aprovadas de primeira e os pedidos de ajuste; os pedidos de ajuste
+  pelo modelo da execução que pediu a revisão; e quantas histórias concluídas no período já têm um bug
+  vinculado. Só conta a resposta de uma pessoa. No MCP, `get_metrics` com `rework: true`.
 - **Áreas críticas (núcleo).** Em Configurações → Regras, liste os caminhos do núcleo do projeto, um
   por linha. A IA marca o novo campo **Criticidade** (Núcleo ou Periferia) das histórias na Spec ou no
   Plan, e a história do núcleo espera a sua aprovação nas colunas que exigem aprovação, mesmo no modo

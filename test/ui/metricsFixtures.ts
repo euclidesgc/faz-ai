@@ -1,4 +1,10 @@
-import { METRICS_BREAKDOWN_DIMS, type MetricsBreakdown, type MetricsCell, type MetricsPanelSections } from '../../src/shared/metrics';
+import {
+  EMPTY_REWORK,
+  METRICS_BREAKDOWN_DIMS,
+  type MetricsBreakdown,
+  type MetricsCell,
+  type MetricsPanelSections,
+} from '../../src/shared/metrics';
 
 // Fixture compartilhada dos testes de tela do painel de métricas: o `sections` de um período sem dado
 // (o que o host devolve quando não há nada a mostrar, RF-34). Quem monta um `MetricsPanelResult` à mão
@@ -28,5 +34,6 @@ export function emptySections(): MetricsPanelSections {
     lead: { medianMs: null, meanMs: null, counted: 0, unknown: 0, rows: [], omitted: 0 },
     cards: { cells: [], covered: { ...emptyCovered }, omitted: 0 },
     inventory: { measured: false, tools: [], mcpTools: [], agents: [], skills: [] },
+    rework: { ...EMPTY_REWORK, escapes: { ...EMPTY_REWORK.escapes } },
   };
 }

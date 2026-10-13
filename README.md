@@ -530,6 +530,11 @@ pelo navegador.
   mediana em destaque, a média, quantos entraram na conta, quantos ficaram desconhecidos e a lista por
   card, ordenável. Desconhecido é o card cuja data de criação não está no detalhe guardado (o mês foi
   descartado ou o card é anterior ao log); a data não é estimada.
+- **Retrabalho.** O sinal de qualidade que o consumo e o tempo não mostram: quantas revisões a IA pediu
+  em cada fase, quantas a pessoa aprovou **de primeira** (a primeira resposta a um card naquela fase
+  foi a aprovação) e quantas voltaram com **pedido de ajuste**, também pelo modelo da execução que pediu
+  a revisão, e quantas histórias concluídas no período já têm um **Bug vinculado**. Só conta a resposta
+  de uma pessoa: a aprovação automática do modo autônomo não é revisão.
 - **Fases mais caras e Cards mais caros.** Dois rankings lado a lado, em tabelas que você ordena por
   tokens, execuções ou tempo de IA clicando no cabeçalho (ou com Enter/Espaço). O padrão são os
   tokens quando o período tem tokens medidos e o tempo de IA quando não tem, e a tela escreve o
@@ -574,7 +579,10 @@ economizar tokens.
   execuções e de usos (sem tokens, que não é possível repartir entre componentes de uma
   execução). `effort` e `profile` têm tokens.
 - Tokens contam em toda execução medida, do Claude Code e do Cursor. A tabela não traz custo em dólar.
-- Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`.
+- Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`. O retrabalho está:
+  com `rework: true` (e, se quiser, `start_date` e `end_date`), a resposta traz as revisões, as
+  aprovações de primeira e os pedidos de ajuste por fase e por modelo, e as histórias concluídas com bug
+  vinculado.
 - Valores não medidos aparecem como "-" (nunca 0).
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm detalhe e só agregam os

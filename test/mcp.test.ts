@@ -1424,6 +1424,36 @@ describe('vínculos entre cards', () => {
   });
 });
 
+describe('retrabalho pelo get_metrics e no painel', () => {
+  const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
+
+  it('conta a revisão devolvida com ajuste, a aprovada de primeira e o bug vinculado a uma história concluída', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD' });
+    await call('create_card', { title: 'Exportar', column: 'PRD' });
+    // #1: devolvida com ajuste, aprovada na segunda
+    await call('request_review', { card: 1, summary: 'PRD pronto' });
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'ready', note: 'Falta o caso de erro' });
+    await call('request_review', { card: 1, summary: 'PRD com o caso de erro' });
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'approved' });
+    // #2: aprovada de primeira, e concluída; depois aparece um bug vinculado a ela
+    await call('request_review', { card: 2, summary: 'PRD pronto' });
+    router.handle({ type: 'card.status.set', cardId: card(2).id, status: 'approved' });
+    const done = router.snapshot().columns.find((c) => c.workflowId === card(2).workflowId && c.category === 'done')!;
+    router.handle({ type: 'card.move', cardId: card(2).id, columnId: done.id, position: 0 });
+    await call('create_card', { title: 'Exportar falha com acento', type: 'Bug' });
+    router.handle({ type: 'link.add', fromId: card(3).id, toId: card(2).id, kind: 'related' });
+
+    const rework = router.panelMetrics({}).sections.rework;
+    expect(rework.phases).toEqual([{ phase: 'PRD', reviews: 3, approved: 2, adjusted: 1, resolved: 2, firstPass: 1 }]);
+    expect(rework.escapes).toEqual({ stories: 1, withBugs: 1, bugs: 1 });
+
+    const text = (await call('get_metrics', { rework: true })).text;
+    expect(text).toContain('retrabalho por fase');
+    expect(text).toContain('1 de 2');
+    expect(text).toContain('com bug vinculado: 1 (1 bug(s))');
+  });
+});
+
 describe('histórias derivadas e caminho curto', () => {
   const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
 

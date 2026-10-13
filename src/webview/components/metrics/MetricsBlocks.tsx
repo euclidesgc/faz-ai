@@ -6,6 +6,7 @@ import { Inventory } from './Inventory';
 import { MetricsBlock, MetricsBlockGroup } from './MetricsBlock';
 import { CardRanking, PhaseRanking } from './RankingTable';
 import { DwellTable, LeadTable } from './Times';
+import { ReworkTables } from './Rework';
 
 /**
  * Os cinco blocos abaixo da série por mês (card 173): cortes, permanência por fase, lead time, os dois
@@ -52,6 +53,15 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
         result={result}
       >
         <LeadTable result={result} sections={sections} sort={blocks.leadSort} onSort={(leadSort) => setBlocks({ leadSort })} />
+      </MetricsBlock>
+
+      <MetricsBlock
+        title={t('Retrabalho')}
+        intro={t('O que voltou com pedido de ajuste, o que foi aprovado de primeira e os bugs que apareceram em histórias concluídas.')}
+        horizon="detail"
+        result={result}
+      >
+        <ReworkTables result={result} sections={sections} />
       </MetricsBlock>
 
       <MetricsBlockGroup
