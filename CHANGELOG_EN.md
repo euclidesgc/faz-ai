@@ -7,6 +7,14 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Autonomous mode up to a phase.** When turning on autonomous mode, the warning brings the **Até
+  onde** (up to) selector, with the phases the AI works in from the current column on. The default is
+  still going up to the pull request. Picking an earlier phase, such as Plan, the AI goes on by itself
+  up to it, does its work, asks for your review and the mode turns off. The card bar shows **Modo
+  autônomo até [phase]** (autonomous mode up to), with the selector to change it; the selection bar
+  offers only the phases that apply to every selected story; the selector remembers the last choice.
+  Through MCP, `get_card` brings `autonomousUntil`, and `card.yolo.set` and `card.yolo.setMany` accept
+  `until`. Stories created with `autonomous_from` go up to the same point as their origin.
 - **New Revisão (review) column, between Implementação and Homologação.** Before the pull request,
   the AI runs the project's checks and reviews the story's diff with the `revisor-de-codigo` agent, in
   a new session. The review also looks for code that only passes the test (a test that already passed

@@ -176,8 +176,11 @@ Quando o card (ou a história dele) mostra \`autonomous: true\`, a pessoa libero
 rodar sozinha: ninguém aprova nem responde. Então:
 
 - não chame \`ask_question\` (a pergunta é recusada) nem \`request_review\` sem \`pending\`, exceto na
-  única situação descrita no item da Homologação abaixo: ao terminar a fase, registre na conversa o
-  que fez e mova o card para a próxima coluna;
+  coluna em que o modo para (abaixo) e na única situação descrita no item da Homologação: ao terminar
+  a fase, registre na conversa o que fez e mova o card para a próxima coluna;
+- a pessoa pode ter liberado o modo só até uma fase (\`autonomousUntil\` no \`get_card\`). Nessa fase,
+  faça o trabalho sem perguntas e, ao terminar, chame \`request_review\` na história com o resumo e
+  pare: o modo se desliga e a revisão é da pessoa (\`phase.requiresApproval\` vem verdadeiro ali);
 - ninguém revisa as decisões do meio do caminho, então siga sempre os padrões do projeto e as regras
   de arquitetura dele (CLAUDE.md, AGENTS.md, DESIGN.md e o código parecido que já existe) e, entre os
   caminhos que seguem esses padrões, escolha o menos complexo;

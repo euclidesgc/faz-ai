@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js';
 
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 29;
 
 /** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
 /** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
@@ -367,6 +367,11 @@ const MIGRATIONS: Record<number, string> = {
     -- história derivada de outra (a funcionalidade dividida em entregas): a branch dela parte da branch
     -- da história de origem, e o pull request é empilhado sobre o dela. '' = não é derivada.
     ALTER TABLE cards ADD COLUMN derived_from TEXT NOT NULL DEFAULT '';
+  `,
+  29: `
+    -- até onde vai o modo autônomo da história: a coluna em que a IA faz o trabalho, pede a revisão e o
+    -- modo se desliga. '' = até a última coluna em que a IA atua (o pull request).
+    ALTER TABLE cards ADD COLUMN yolo_until TEXT NOT NULL DEFAULT '';
   `,
 };
 

@@ -89,10 +89,17 @@ export type WebviewToHost =
   | { type: 'card.pr.set'; cardId: Id; url: string }
   /** registra o commit do merge do pull request da história do card; sem efeito colateral (ao contrário do card.pr.set) */
   | { type: 'card.merge.set'; cardId: Id; commit: string }
-  /** liga ou desliga o modo autônomo (YOLO) da história do card */
-  | { type: 'card.yolo.set'; cardId: Id; enabled: boolean }
-  /** liga ou desliga o modo autônomo (YOLO) de várias histórias de uma vez; ignora quem não for história viva */
-  | { type: 'card.yolo.setMany'; cardIds: Id[]; enabled: boolean }
+  /**
+   * liga ou desliga o modo autônomo (YOLO) da história do card. `until` é a coluna até onde ele vai (a IA
+   * faz o trabalho dela, pede a revisão e o modo se desliga); ausente ou null = até a última coluna da IA.
+   * Com o modo já ligado, um `until` diferente só muda até onde ele vai.
+   */
+  | { type: 'card.yolo.set'; cardId: Id; enabled: boolean; until?: Id | null }
+  /**
+   * liga ou desliga o modo autônomo (YOLO) de várias histórias de uma vez; ignora quem não for história viva.
+   * `until` vale para todas: numa história de outro workflow, vale a coluna de mesmo nome
+   */
+  | { type: 'card.yolo.setMany'; cardIds: Id[]; enabled: boolean; until?: Id | null }
   /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */
   | { type: 'card.yolo.inherit'; cardId: Id; fromId: Id }
   /** a história é uma entrega derivada de outra: a branch dela parte da branch da origem, com o pull request empilhado */

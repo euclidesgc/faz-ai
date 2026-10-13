@@ -3,7 +3,7 @@ import { aiToolInfo, type AiTool } from '../shared/harness';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { SHOW_COST } from '../shared/metrics';
 import { columnOf, isLive } from '../shared/selectors';
-import { isWithHuman, isYolo, storyOf } from '../shared/story';
+import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../shared/story';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
@@ -17,7 +17,7 @@ import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
 import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
 import type { MessageRouter } from './panel/messageRouter';
-import type { AiActivity, BoardState } from '../shared/model';
+import type { AiActivity, BoardState, Card } from '../shared/model';
 
 /** Processo da ferramenta de IA em execução. */
 export interface RunningProcess {
@@ -144,6 +144,19 @@ export const AUTONOMOUS_ADVICE = [
   'Na Implementação, execute todas as sub-tarefas até o fim. Na última coluna em que a IA atua (Homologação, no board padrão) não há aprovação nem próxima fase: envie a branch, abra o pull request, registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa), resuma na conversa o que foi feito e como testar, e pare: não avance o card. Não faça o merge.',
   'Se o pedido for grande demais para uma entrega só (partes independentes), divida-o no Discovery: mantenha nesta história a primeira entrega e crie as seguintes com create_card (autonomous_from = esta história), em ordem de dependência. Elas entram na fila e cada uma parte da branch da anterior, com o pull request empilhado (--base na branch anterior).',
 ].join('\n');
+
+/**
+ * O que a IA recebe a mais quando a pessoa ligou o modo autônomo só até uma fase: na própria fase, que
+ * ali ela pede a revisão e para; antes dela, até onde vai. `null` quando o modo vai até o fim.
+ */
+export function yoloStopAdvice(state: BoardState, card: Card): string | null {
+  const story = storyOf(state, card) ?? card;
+  const stop = yoloStopOf(state, story);
+  if (!stop || stop.id === lastAiColumn(state, story.workflowId)?.id) return null;
+  if (card.id === story.id && isAtYoloStop(state, story))
+    return `MODO AUTÔNOMO ATÉ ${stop.name}: esta é a última fase que a pessoa liberou para você rodar sozinho. Faça o trabalho dela sem perguntas e, ao terminar, chame request_review na história com o resumo e pare. É a única vez em que request_review sem pending vale no modo autônomo: o modo se desliga e a revisão desta fase é da pessoa.`;
+  return `O modo autônomo desta história vai até ${stop.name}: lá, ao terminar o trabalho da fase, a IA pede a revisão da pessoa e para.`;
+}
 
 /** O que a IA recebe a mais quando os quatro campos de triagem do card (Tags, Esforço, Modelo, Skills) estão vazios. */
 export const TRIAGE_ADVICE =
@@ -327,6 +340,7 @@ export class AiRunner {
           // refinar e resumir não mexem em arquivos: rodam só com o board
           const permission = autonomous ? 'full' : refine || summarize ? 'board' : state.board.runner.permission;
           const permissionAdvice = refine || summarize ? null : PERMISSION_ADVICE[permission];
+          const stopAdvice = autonomous ? yoloStopAdvice(state, card) : null;
           if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
           if (summarize) log('Resumir a conversa: lê as mensagens e grava um resumo, sem mover o card nem mudar o status.');
@@ -371,7 +385,7 @@ export class AiRunner {
                   : cardPrompt(
                       cardRef(card),
                       contextLines(state, card),
-                      [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+                      [...(stopAdvice ? [stopAdvice] : []), ...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
                       autonomous,
                       needsTriage(state, card),
                     ),

@@ -336,6 +336,7 @@ export class BoardRepo {
       mergeCommit: str(r.merge_commit),
       execProfile: r.exec_profile == null ? null : str(r.exec_profile),
       yolo: num(r.yolo) === 1,
+      yoloUntil: str(r.yolo_until) || null,
       derivedFrom: str(r.derived_from) || null,
     }));
 

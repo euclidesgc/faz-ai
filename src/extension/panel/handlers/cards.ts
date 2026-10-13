@@ -1,8 +1,10 @@
 import { linkProblem } from '../../../shared/links';
-import { isLive } from '../../../shared/selectors';
+import { norm } from '../../../shared/filters';
+import { columnOf, isLive } from '../../../shared/selectors';
+import { isAtYoloStop, lastAiColumn, yoloStopOptions } from '../../../shared/story';
 import { settleDelivery } from '../../delivery';
 
-import type { Card } from '../../../shared/model';
+import type { BoardState, Card } from '../../../shared/model';
 import type { BoardContext, HandlerMap, MessageOf } from './context';
 import { applySuggestion, suggestionFor } from './models';
 
@@ -16,9 +18,23 @@ function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author:
   const note = msg.note?.trim() ?? '';
   if (msg.status === 'approved' && byAi) throw new Error('Só uma pessoa pode aprovar um card.');
   if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
-  const autoApprove = byAi && msg.status === 'waiting_review' && !msg.pending && ctx.cards.isYolo(msg.cardId);
+  // a história chegou à coluna até onde a pessoa liberou o modo autônomo: o pedido de revisão é para ela
+  const yolo = ctx.cards.isYolo(msg.cardId);
+  const state = yolo ? ctx.state() : null;
+  const card = state?.cards.find((c) => c.id === msg.cardId);
+  const atStop = byAi && msg.status === 'waiting_review' && !!state && !!card && isAtYoloStop(state, card);
+  const autoApprove = byAi && msg.status === 'waiting_review' && !msg.pending && yolo && !atStop;
   ctx.cards.setStatus(msg.cardId, autoApprove ? 'approved' : msg.status, msg.status === 'blocked' ? note : '', author);
   if (note) ctx.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
+  if (atStop) {
+    ctx.cards.setYolo(card!.id, false);
+    ctx.comments.add(
+      card!.id,
+      author,
+      `O modo autônomo chegou até ${columnOf(state!, card!)?.name ?? 'a fase escolhida'}, como foi pedido ao ligá-lo, e foi desligado: a revisão desta fase é sua. Para a IA seguir sozinha daqui, ligue o modo de novo.`,
+      'ai',
+    );
+  }
   // só a aprovação de uma pessoa dispara o merge automático: a do modo autônomo não passa por aqui
   if (msg.status === 'approved') ctx.approved.push(msg.cardId);
 }
@@ -35,7 +51,8 @@ function inheritYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.inherit'>, aut
   if (!from || !card) throw new Error('Card não encontrado');
   if (from.parentId || !from.yolo) throw new Error(`#${from.number} não é uma história em modo autônomo.`);
   if (card.parentId) throw new Error('O modo autônomo vale para a história, não para uma sub-tarefa.');
-  ctx.cards.setYolo(card.id, true);
+  // a nova vai até onde a de origem vai: a pessoa liberou esse trabalho até ali
+  ctx.cards.setYolo(card.id, true, from.yoloUntil ?? '');
   ctx.comments.add(card.id, author, `Criada em modo autônomo a partir de #${from.number} ${from.title}.`, 'ai');
   if (!linkProblem(ctx.state(), card.id, from.id, 'related')) ctx.links.add(card.id, from.id, 'related');
 }
@@ -66,40 +83,81 @@ function derive(ctx: BoardContext, msg: MessageOf<'card.derive'>, author: string
   if (!linkProblem(ctx.state(), card.id, from.id, 'related')) ctx.links.add(card.id, from.id, 'related');
 }
 
+/**
+ * A coluna até onde o modo autônomo da história vai, validada: '' quando é até a última coluna da IA
+ * (sem escolha, ou a própria última). Numa coluna de outro workflow, vale a de mesmo nome no workflow da
+ * história (a ação em lote escolhe uma coluna só para todas). Recusa a que a história já passou.
+ */
+function yoloStop(state: BoardState, story: Card, until: string | null | undefined): string {
+  if (!until) return '';
+  const chosen = state.columns.find((c) => c.id === until);
+  if (!chosen) throw new Error('Coluna não encontrada');
+  const options = yoloStopOptions(state, story);
+  const target = chosen.workflowId === story.workflowId ? chosen : options.find((c) => norm(c.name) === norm(chosen.name));
+  if (!target) throw new Error(`O workflow de #${story.number} não tem a coluna ${chosen.name} para o modo autônomo parar nela.`);
+  if (!options.some((c) => c.id === target.id))
+    throw new Error(
+      `#${story.number} não pode ir em modo autônomo só até ${target.name}: escolha uma coluna em que a IA atua, de ${columnOf(state, story)?.name ?? 'onde ela está'} em diante.`,
+    );
+  return target.id === lastAiColumn(state, story.workflowId)?.id ? '' : target.id;
+}
+
+/** O que a conversa diz ao ligar o modo, com o ponto de parada quando ele não é o fim. */
+function yoloOnNote(state: BoardState, until: string): string {
+  const stop = until ? state.columns.find((c) => c.id === until)?.name : undefined;
+  return stop
+    ? `Modo autônomo ligado até ${stop}: a IA segue sozinha, sem pedir aprovação nem confirmação, até terminar o trabalho de ${stop}; ali ela pede a sua revisão e o modo se desliga.`
+    : 'Modo autônomo ligado: a IA segue por conta própria, sem pedir aprovação nem confirmação.';
+}
+
 /** Liga ou desliga o modo autônomo de uma história já validada; libera o que estava esperando uma pessoa. */
-function applyYolo(ctx: BoardContext, card: Card, enabled: boolean, author: string): void {
-  ctx.cards.setYolo(card.id, enabled);
+function applyYolo(ctx: BoardContext, card: Card, enabled: boolean, author: string, until = ''): void {
+  const state = ctx.state();
+  ctx.cards.setYolo(card.id, enabled, until);
   if (!enabled) return;
   const release = card.status === 'waiting_review' ? 'approved' : card.status === 'waiting_answer' ? 'ready' : null;
   if (release) ctx.cards.setStatus(card.id, release, '', author);
-  ctx.comments.add(card.id, author, 'Modo autônomo ligado: a IA segue por conta própria, sem pedir aprovação nem confirmação.', 'human');
+  ctx.comments.add(card.id, author, yoloOnNote(state, until), 'human');
 }
 
 /**
  * Liga ou desliga o modo autônomo da história. É decisão da pessoa: a IA nunca amplia a própria autonomia.
- * Ao ligar, o que estava esperando uma pessoa é liberado para a IA seguir.
+ * Ao ligar, o que estava esperando uma pessoa é liberado para a IA seguir. Com o modo já ligado, um ponto
+ * de parada diferente só muda até onde ele vai.
  */
 function setYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.set'>, author: string, byAi: boolean): void {
   if (byAi) throw new Error('Só uma pessoa liga o modo autônomo.');
-  const card = ctx.state().cards.find((c) => c.id === msg.cardId);
+  const state = ctx.state();
+  const card = state.cards.find((c) => c.id === msg.cardId);
   if (!card) throw new Error('Card não encontrado');
   if (card.parentId) throw new Error('O modo autônomo vale para a história, não para uma sub-tarefa.');
-  if (card.yolo === msg.enabled) return;
-  applyYolo(ctx, card, msg.enabled, author);
+  const until = msg.enabled ? yoloStop(state, card, msg.until) : '';
+  if (card.yolo === msg.enabled) {
+    if (!msg.enabled || until === (card.yoloUntil ?? '')) return;
+    ctx.cards.setYolo(card.id, true, until);
+    const stop = until ? state.columns.find((c) => c.id === until)?.name : undefined;
+    ctx.comments.add(
+      card.id,
+      author,
+      stop ? `O modo autônomo agora vai até ${stop}.` : 'O modo autônomo agora vai até a última fase da IA, com o pull request.',
+      'human',
+    );
+    return;
+  }
+  applyYolo(ctx, card, msg.enabled, author, until);
 }
 
 /**
  * Liga ou desliga o modo autônomo de várias histórias de uma vez. Ignora silenciosamente quem da lista
  * não for história viva (sub-tarefa, arquivada ou id inexistente); não repete o efeito em quem já está
- * no estado pedido.
+ * no estado pedido. O ponto de parada é validado em todas antes de ligar qualquer uma.
  */
 function setYoloMany(ctx: BoardContext, msg: MessageOf<'card.yolo.setMany'>, author: string, byAi: boolean): void {
   if (byAi) throw new Error('Só uma pessoa liga o modo autônomo.');
-  const stories = ctx.state().cards.filter((c) => msg.cardIds.includes(c.id) && !c.parentId && isLive(c));
-  for (const story of stories) {
-    if (story.yolo === msg.enabled) continue;
-    applyYolo(ctx, story, msg.enabled, author);
-  }
+  const state = ctx.state();
+  const stories = state.cards.filter((c) => msg.cardIds.includes(c.id) && !c.parentId && isLive(c) && c.yolo !== msg.enabled);
+  const stops = new Map(stories.map((story) => [story.id, msg.enabled ? yoloStop(state, story, msg.until) : '']));
+  for (const story of stories) applyYolo(ctx, story, msg.enabled, author, stops.get(story.id));
 }
 
 /** Cria o card e já aplica a sugestão de modelo; devolve o id. */

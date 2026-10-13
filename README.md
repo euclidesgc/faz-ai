@@ -708,6 +708,17 @@ aprovação; marque **Não avisar novamente** no aviso para ligar direto nas pr�
 uma história não pede confirmação. A partir daí a IA toca a
 história sozinha, **sem pedir autorização nem confirmação para nada**:
 
+- **Até onde**: o aviso de ligar traz o seletor **Até onde**, com as fases em que a IA atua a partir
+  da coluna atual da história; o padrão é a última, a **Homologação (abre o pull request)**, que é o
+  modo completo descrito abaixo. Escolha uma fase antes, como o Plan, e a IA segue sozinha até ela:
+  faz o trabalho dessa fase, pede a sua revisão e o modo se desliga, com um aviso na conversa. Para
+  ela seguir sozinha dali, ligue o modo de novo. Com o modo ligado, a barra do card mostra **Modo
+  autônomo até [fase]**, e trocar a fase ali não pede confirmação. O seletor começa na última fase que
+  você escolheu, e com **Não avisar novamente** marcado o modo liga direto até ela. Na barra de
+  seleção, o seletor só oferece as fases que valem para todas as histórias marcadas. A IA lê o ponto de
+  parada em `autonomousUntil` no `get_card`, e na fase de parada `phase.requiresApproval` vem
+  verdadeiro.
+
 - Do **Backlog** até a última coluna em que a IA atua (Homologação, no board padrão): ela faz o
   Discovery, o PRD, a Spec e o Plan, cria as sub-tarefas, implementa uma por uma, revisa e, nessa última
   coluna, abre o pull request, registra com `set_pull_request` e para ali — a história fica

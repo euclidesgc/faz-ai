@@ -87,6 +87,7 @@ describe('suggestModelRule e suggestModel', () => {
     mergeCommit: '',
     execProfile: null,
     yolo: false,
+    yoloUntil: null,
     derivedFrom: null,
     ...over,
   });

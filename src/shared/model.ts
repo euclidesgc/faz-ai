@@ -128,6 +128,11 @@ export interface Card {
   execProfile: Id | null;
   /** modo autônomo (YOLO), só em histórias: a IA toca o card sem pedir aprovação nem confirmação */
   yolo: boolean;
+  /**
+   * até onde vai o modo autônomo: a coluna em que a IA faz o trabalho, pede a revisão e o modo se
+   * desliga; null = até a última coluna em que a IA atua (o pull request)
+   */
+  yoloUntil: Id | null;
   /** história de que esta deriva (a funcionalidade dividida em entregas); null = não é derivada */
   derivedFrom: Id | null;
 }

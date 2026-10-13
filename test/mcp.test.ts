@@ -1507,6 +1507,73 @@ describe('modo autônomo (YOLO)', () => {
     expect(approvals).toEqual([]);
   });
 
+  it('até onde: a IA segue sozinha até a fase escolhida, pede a revisão nela e o modo se desliga', async () => {
+    await call('create_card', { title: 'Login', column: 'Discovery' });
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('Spec').id });
+    expect(card(1).yoloUntil).toBe(column('Spec').id);
+    expect((await call('get_card', { card: 1 })).data).toMatchObject({ autonomous: true, autonomousUntil: 'Spec' });
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('Modo autônomo ligado até Spec');
+
+    // antes da parada, as aprovações não seguram
+    expect((await call('request_review', { card: 1, summary: 'Discovery pronto' })).data.card.work.status).toBe('approved');
+    await call('move_card', { card: 1, column: 'PRD' });
+    await call('move_card', { card: 1, column: 'Spec' });
+
+    // na parada, a coluna segura como se exigisse aprovação
+    const phase = (await call('get_card', { card: 1 })).data.phase;
+    expect(phase.requiresApproval).toBe(true);
+    expect(phase.autonomousNote).toContain('até Spec');
+    const early = await call('move_card', { card: 1, column: 'Plan' });
+    expect(early.error).toBe(true);
+    expect(early.text).toContain('última fase que a pessoa liberou');
+
+    const res = (await call('request_review', { card: 1, summary: 'Spec pronta' })).data;
+    expect(res.card.work.status).toBe('waiting_review');
+    expect(res.next).toContain('o modo foi desligado');
+    expect(card(1)).toMatchObject({ yolo: false, yoloUntil: null, status: 'waiting_review' });
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('O modo autônomo chegou até Spec');
+    // daqui em diante valem as aprovações de sempre
+    expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(true);
+  });
+
+  it('até onde: só colunas da IA da atual em diante; a última vale como "até o fim"; com o modo ligado, só muda a parada', async () => {
+    await call('create_card', { title: 'Login', column: 'Spec' });
+    expect(() => router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('PRD').id })).toThrow(
+      /de Spec em diante/,
+    );
+    const done = router.snapshot().columns.find((c) => c.workflowId === card(1).workflowId && c.category === 'done')!;
+    expect(() => router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: done.id })).toThrow();
+    const childTodo = router.snapshot().columns.find((c) => c.name === 'A fazer')!;
+    expect(() => router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: childTodo.id })).toThrow(
+      /não tem a coluna/,
+    );
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('Homologação').id });
+    expect(card(1)).toMatchObject({ yolo: true, yoloUntil: null });
+    expect((await call('get_card', { card: 1 })).data.autonomousUntil).toBeUndefined();
+
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('Plan').id });
+    expect(card(1)).toMatchObject({ yolo: true, yoloUntil: column('Plan').id });
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toBe('O modo autônomo agora vai até Plan.');
+  });
+
+  it('até onde: a história já aguardando revisão na coluna atual não pode parar nela', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD' });
+    await call('request_review', { card: 1, summary: 'PRD pronto' });
+    expect(() => router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('PRD').id })).toThrow();
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('Spec').id });
+    // ligar libera a revisão pendente, e a IA segue até a Spec
+    expect(card(1)).toMatchObject({ yolo: true, status: 'approved' });
+  });
+
+  it('até onde em lote vale para cada história, e a história criada a partir de outra vai até o mesmo ponto', async () => {
+    await call('create_card', { title: 'A', column: 'Discovery' });
+    await call('create_card', { title: 'B', column: 'PRD' });
+    router.handle({ type: 'card.yolo.setMany', cardIds: [card(1).id, card(2).id], enabled: true, until: column('Plan').id });
+    expect([card(1).yoloUntil, card(2).yoloUntil]).toEqual([column('Plan').id, column('Plan').id]);
+    await call('create_card', { title: 'A2', autonomous_from: 1 });
+    expect(card(3)).toMatchObject({ yolo: true, yoloUntil: column('Plan').id });
+  });
+
   it('request_review com pending fica em waiting_review mesmo em YOLO: a pendência é da pessoa e o status mostra isso', async () => {
     await call('create_card', { title: 'Login', column: 'PRD' });
     setYolo(1, true);

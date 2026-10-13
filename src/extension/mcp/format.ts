@@ -16,7 +16,7 @@ import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
 import { childProgress, linkedCards, openPredecessors, subtaskWaves } from '../../shared/links';
 import { childrenOf, columnOf, columnsOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
-import { isYolo, lastAiColumn, storyOf } from '../../shared/story';
+import { isAtYoloStop, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../../shared/story';
 import {
   cardRef,
   type BoardState,
@@ -157,6 +157,16 @@ function linksOf(s: BoardState, c: Card) {
   };
 }
 
+/** O modo autônomo da história do card e, quando ele não vai até o fim, a coluna em que ele para. */
+function autonomyOf(s: BoardState, c: Card) {
+  if (!isYolo(s, c)) return {};
+  const story = storyOf(s, c) ?? c;
+  const stop = yoloStopOf(s, story);
+  return stop && stop.id !== lastAiColumn(s, story.workflowId)?.id
+    ? { autonomous: true, autonomousUntil: stop.name }
+    : { autonomous: true };
+}
+
 /** A história de que esta é uma entrega derivada; vazio quando não é. */
 function derivedOf(s: BoardState, c: Card) {
   const from = c.derivedFrom ? s.cards.find((k) => k.id === c.derivedFrom) : undefined;
@@ -176,7 +186,7 @@ export function cardSummary(s: BoardState, c: Card) {
     column: columnOf(s, c)?.name,
     status: cardStatus(s, c),
     ...(workStatus(s, c) ? { work: workStatus(s, c) } : {}),
-    ...(isYolo(s, c) ? { autonomous: true } : {}),
+    ...autonomyOf(s, c),
     ...(parent ? { parent: `${cardRef(parent)} ${parent.title}` } : {}),
     ...derivedOf(s, c),
     ...(Object.keys(fieldsOf(s, c)).length ? { fields: fieldsOf(s, c) } : {}),
@@ -316,11 +326,12 @@ function phaseOf(s: BoardState, c: Card) {
           artifactNote: `Construa o documento numa sub-tarefa da história com Fase = "${col.name}" e grave-o com add_attachment (artifact: true, filename: "${col.artifactName}"): ele fica anexado à história e substitui a versão anterior.`,
         }
       : {}),
-    requiresApproval: col.requiresApproval && !story.yolo,
+    requiresApproval: (col.requiresApproval && !story.yolo) || isAtYoloStop(s, story),
     ...(story.yolo
       ? {
-          autonomousNote:
-            col.id === lastAiColumn(s, story.workflowId)?.id
+          autonomousNote: isAtYoloStop(s, story)
+            ? `Modo autônomo (YOLO) na história ${cardRef(story)} até ${col.name}, a fase atual: é a última que a pessoa liberou para você rodar sozinho. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare: o modo autônomo se desliga e a revisão desta fase é da pessoa.`
+            : col.id === lastAiColumn(s, story.workflowId)?.id
               ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
               : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Siga os padrões do projeto e as regras de arquitetura dele, escolha o caminho menos complexo entre os que os seguem, e registre as decisões na conversa.`,
         }

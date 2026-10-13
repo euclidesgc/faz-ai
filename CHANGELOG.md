@@ -6,6 +6,13 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Modo autônomo até uma fase.** Ao ligar o modo autônomo, o aviso traz o seletor **Até onde**, com
+  as fases em que a IA atua a partir da coluna atual. O padrão continua sendo ir até o pull request.
+  Escolhendo uma fase antes, como o Plan, a IA segue sozinha até ela, faz o trabalho dela, pede a sua
+  revisão e o modo se desliga. A barra do card mostra **Modo autônomo até [fase]**, com o seletor para
+  trocar; a barra de seleção oferece só as fases que valem para todas as marcadas; o seletor lembra a
+  última escolha. Pelo MCP, `get_card` traz `autonomousUntil`, e `card.yolo.set` e `card.yolo.setMany`
+  aceitam `until`. As histórias criadas com `autonomous_from` vão até o mesmo ponto da de origem.
 - **Nova coluna Revisão, entre a Implementação e a Homologação.** Antes do pull request, a IA roda as
   checagens do projeto e revisa o diff da história com o agente `revisor-de-codigo`, numa sessão
   nova. A revisão procura também o código que só passa no teste (teste que já passava antes, teste

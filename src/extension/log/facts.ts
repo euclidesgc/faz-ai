@@ -20,13 +20,16 @@ export interface CardFacts {
   prUrl: string;
   /** a branch da história (vazia quando ainda não há); é o `subject` de `workspace_prepared` */
   branch: string;
+  /** o modo autônomo da história e a coluna até onde ele vai ('' = até a última da IA) */
+  yolo: boolean;
+  yoloUntil: string;
 }
 
 const SELECT = `
   SELECT c.id AS id, c.number AS number, c.title AS title, t.name AS card_type, w.name AS workflow,
          col.name AS column_name, col.category AS column_category, c.status AS status,
          c.archived_at AS archived_at, c.deleted_at AS deleted_at, c.parent_id AS parent_id, c.pr_url AS pr_url,
-         c.branch AS branch
+         c.branch AS branch, c.yolo AS yolo, c.yolo_until AS yolo_until
   FROM cards c
   JOIN columns col ON col.id = c.column_id
   JOIN card_types t ON t.id = c.type_id
@@ -48,6 +51,8 @@ function toFacts(r: Row): CardFacts {
     parentId: strOrNull(r.parent_id),
     prUrl: str(r.pr_url),
     branch: str(r.branch),
+    yolo: num(r.yolo) === 1,
+    yoloUntil: str(r.yolo_until),
   };
 }
 

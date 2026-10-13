@@ -73,8 +73,8 @@ export const cards = {
   deletePermanent: (cardId: Id) => post({ type: 'card.deletePermanent', cardId }),
   setStatus: (cardId: Id, status: CardStatus | null, note?: string) =>
     post({ type: 'card.status.set', cardId, status, ...(note !== undefined ? { note } : {}) }),
-  setYolo: (cardId: Id, enabled: boolean) => post({ type: 'card.yolo.set', cardId, enabled }),
-  setYoloMany: (cardIds: Id[], enabled: boolean) => post({ type: 'card.yolo.setMany', cardIds, enabled }),
+  setYolo: (cardId: Id, enabled: boolean, until?: Id | null) => post({ type: 'card.yolo.set', cardId, enabled, until }),
+  setYoloMany: (cardIds: Id[], enabled: boolean, until?: Id | null) => post({ type: 'card.yolo.setMany', cardIds, enabled, until }),
   setExecProfile: (cardId: Id, profileId: Id | null) => post({ type: 'card.execProfile.set', cardId, profileId }),
   setField: (cardId: Id, fieldId: Id, value: FieldValue) => post({ type: 'field.setValue', cardId, fieldId, value }),
   setPr: (cardId: Id, url: string) => post({ type: 'card.pr.set', cardId, url }),

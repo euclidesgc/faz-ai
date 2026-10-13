@@ -186,6 +186,29 @@ describe('barra de seleção e ação em lote (card 326)', () => {
     expect(sent.cardIds.sort()).toEqual([firstId, secondId].sort());
   });
 
+  it('o "Até onde" em lote só oferece as fases que valem para todas as histórias marcadas', async () => {
+    const [firstId, secondId] = await selectTwoStories();
+    const col = (name: string) => useBoardStore.getState().state!.columns.find((c) => c.name === name)!;
+    // uma das duas já está na Spec: Discovery e PRD ficaram para trás dela
+    act(() => patchCard(secondId, { columnId: col('Spec').id, status: 'ready' }));
+    await userEvent.click(bar().getByRole('button', { name: 'Ligar modo autônomo' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Até onde' }));
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
+      'Spec',
+      'Plan',
+      'Implementação',
+      'Revisão',
+      'Homologação (abre o pull request)',
+    ]);
+    await userEvent.click(screen.getByRole('option', { name: 'Plan' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ligar modo autônomo' }));
+    const sent = lastSent('card.yolo.setMany');
+    expect(sent).toMatchObject({ enabled: true, until: col('Plan').id });
+    expect(sent.cardIds.sort()).toEqual([firstId, secondId].sort());
+    useBoardStore.getState().setYoloUntilName('');
+  });
+
   it('cancelar a confirmação não envia nada e mantém a seleção', async () => {
     await selectTwoStories();
     await userEvent.click(bar().getByRole('button', { name: 'Ligar modo autônomo' }));

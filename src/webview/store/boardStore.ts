@@ -50,8 +50,8 @@ export interface DialogSpec {
   message?: string;
   confirmLabel?: string;
   danger?: boolean;
-  /** quando presente, mostra um seletor e passa o valor escolhido ao confirmar */
-  choices?: { label: string; options: { value: string; label: string }[] };
+  /** quando presente, mostra um seletor e passa o valor escolhido ao confirmar; `value` é o escolhido de início (padrão: o primeiro) */
+  choices?: { label: string; options: { value: string; label: string }[]; value?: string };
   /** quando presente, mostra um checkbox e passa se está marcado ao confirmar */
   checkbox?: { label: string };
   onConfirm(choice?: string, checkboxChecked?: boolean): void;
@@ -82,6 +82,8 @@ interface UiState {
   chatModel: string | null;
   /** "não avisar novamente" ao ligar o modo autônomo (marcado no checkbox do diálogo de confirmação) */
   dontWarnYolo: boolean;
+  /** o nome da coluna escolhida por último em "Até onde" ao ligar o modo autônomo; '' = até o fim */
+  yoloUntilName: string;
 }
 
 interface BoardStore extends UiState, ViewState {
@@ -121,6 +123,7 @@ interface BoardStore extends UiState, ViewState {
   clearPendingSettingsSection(): void;
   setSettingsNavCollapsed(collapsed: boolean): void;
   setDontWarnYolo(value: boolean): void;
+  setYoloUntilName(name: string): void;
   selectParent(id: Id | null): void;
   /**
    * Seleção múltipla de cards no board (card 324): conceito novo e separado de `selectedParentId`
@@ -188,6 +191,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
     dontWarnYolo: persisted?.dontWarnYolo ?? false,
+    yoloUntilName: persisted?.yoloUntilName ?? '',
     chatOpen: false,
     setChatOpen: (chatOpen) => set({ chatOpen }),
     setChatModel(chatModel) {
@@ -246,6 +250,10 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       set({ dontWarnYolo });
       persist(get());
     },
+    setYoloUntilName(yoloUntilName) {
+      set({ yoloUntilName });
+      persist(get());
+    },
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
     toggleSelected(id) {
       const next = new Set(get().selectedIds);
@@ -295,6 +303,7 @@ function persist(s: BoardStore): void {
     openCardId: s.openCardId,
     chatModel: s.chatModel,
     dontWarnYolo: s.dontWarnYolo,
+    yoloUntilName: s.yoloUntilName,
   };
   setUiState(ui);
 }

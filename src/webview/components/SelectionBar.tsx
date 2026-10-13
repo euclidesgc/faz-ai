@@ -4,7 +4,7 @@ import { usePending } from '../usePending';
 import { isCardCollapsed } from '../../shared/selectors';
 import { t } from '../i18n';
 import { cards } from '../commands';
-import { confirmYoloOn, yoloWarning } from './card/YoloBar';
+import { confirmYoloOn, yoloStopChoices, yoloWarning } from './card/YoloBar';
 import { Button, IconYolo } from './ui';
 
 /**
@@ -21,6 +21,8 @@ export function SelectionBar() {
   const setManyCollapsed = useBoardStore((s) => s.setManyCollapsed);
   const dontWarnYolo = useBoardStore((s) => s.dontWarnYolo);
   const setDontWarnYolo = useBoardStore((s) => s.setDontWarnYolo);
+  const untilName = useBoardStore((s) => s.yoloUntilName);
+  const setUntilName = useBoardStore((s) => s.setYoloUntilName);
 
   // defesa extra: a caixa de marcação (card 324) só existe em histórias vivas, mas confere de novo aqui
   const selectedStories = state.cards.filter((c) => selectedIds.has(c.id));
@@ -46,9 +48,9 @@ export function SelectionBar() {
 
   const toggle = () => {
     const ids = selectedStories.map((c) => c.id);
-    const apply = (enabled: boolean) => {
+    const apply = (enabled: boolean, until: string | null = null) => {
       markYolo(enabled);
-      cards.setYoloMany(ids, enabled);
+      cards.setYoloMany(ids, enabled, until);
     };
     // desligar em lote sempre pede confirmação (diferente do controle de uma história só, que desliga
     // direto): desligar várias histórias de uma vez para o autopiloto de todas, maior impacto. É uma
@@ -63,13 +65,18 @@ export function SelectionBar() {
       });
       return;
     }
+    // só as que ainda estão desligadas mudam: o "Até onde" precisa valer para elas
+    const off = selectedStories.filter((c) => !c.yolo);
     confirmYoloOn({
       ask,
       dontWarnYolo,
       setDontWarnYolo,
+      stops: yoloStopChoices(state, off),
+      untilName,
+      setUntilName,
       title: t('Ligar o modo autônomo em {n} história(s)?', { n }),
       confirmLabel: t('Ligar modo autônomo'),
-      onEnable: () => apply(true),
+      onEnable: (until) => apply(true, until),
     });
   };
 
