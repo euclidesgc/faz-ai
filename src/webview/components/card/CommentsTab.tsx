@@ -99,6 +99,7 @@ export function CommentsTab({
           onChange={setDraft}
           onSubmit={submit}
           onPasteFiles={pasteFiles}
+          resolveRefs={resolve}
           placeholder={t('Escreva uma mensagem… (Cmd+Enter envia; cole imagens direto aqui)')}
         />
         <div className="row wrap">
@@ -181,7 +182,7 @@ function CommentItem({
         <div className="markdown plain" dangerouslySetInnerHTML={{ __html: renderMarkdown(render(comment.body)) }} />
       ) : (
         <>
-          <MarkdownEditor compact autoFocus minRows={3} value={editing} onChange={setEditing} onSubmit={save} />
+          <MarkdownEditor compact autoFocus minRows={3} value={editing} onChange={setEditing} onSubmit={save} resolveRefs={render} />
           <div className="row end">
             <Button onClick={() => setEditing(null)}>{t('Cancelar')}</Button>
             <Button variant="primary" onClick={save}>

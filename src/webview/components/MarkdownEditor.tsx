@@ -91,11 +91,24 @@ interface Props {
   onSubmit?(): void;
   /** arquivos colados (ex.: uma imagem): devolve o markdown a inserir no lugar do cursor */
   onPasteFiles?(files: File[]): string;
+  /** troca referências do texto (ex.: `attachment:<nome>`) pelos endereços reais; usado só na prévia */
+  resolveRefs?(markdown: string): string;
   /** esconde o botão de expandir (usado dentro do próprio modo expandido e nos comentários) */
   compact?: boolean;
 }
 
-export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows = 8, autoFocus, onSubmit, onPasteFiles, compact }: Props) {
+export function MarkdownEditor({
+  value,
+  onChange,
+  onCommit,
+  placeholder,
+  minRows = 8,
+  autoFocus,
+  onSubmit,
+  onPasteFiles,
+  resolveRefs,
+  compact,
+}: Props) {
   const [mode, setMode] = useState<'write' | 'preview'>('write');
   const [expanded, setExpanded] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -238,7 +251,11 @@ export function MarkdownEditor({ value, onChange, onCommit, placeholder, minRows
   const preview = (
     <div
       className="markdown"
-      dangerouslySetInnerHTML={{ __html: value.trim() ? renderMarkdown(value) : `<p class="muted">${t('Nada para visualizar.')}</p>` }}
+      dangerouslySetInnerHTML={{
+        __html: value.trim()
+          ? renderMarkdown(resolveRefs ? resolveRefs(value) : value)
+          : `<p class="muted">${t('Nada para visualizar.')}</p>`,
+      }}
     />
   );
 

@@ -76,7 +76,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
         {tab === 'details' && (
           <>
             <FieldsSection card={card} />
-            <DescriptionSection draft={draft} />
+            <DescriptionSection cardId={card.id} draft={draft} />
             <ChecklistSection cardId={card.id} />
             {isStory && <SubtasksSection story={card} />}
             <LinksSection key={card.id} card={card} />
