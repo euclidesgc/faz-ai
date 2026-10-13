@@ -5,7 +5,7 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+## 0.36.0
 
 - **Decision records in the repository.** The new **Faz AI › Git › Registros de decisão** (decision
   records, `fazai.git.decisionRecords`) option points to a folder of the repository; with it,
