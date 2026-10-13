@@ -3853,6 +3853,38 @@ div.metrics-breakdown {
 .context-notes p:last-child {
   margin-bottom: 0;
 }
+/* Aba Consumo do card aberto: a estimativa da próxima execução numa caixa, e o gasto por fase numa tabela */
+.usage-estimate {
+  max-width: 480px;
+  padding: var(--sp-12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.usage-table-wrap {
+  overflow-x: auto;
+}
+.usage-table {
+  font-size: var(--fs-sm);
+}
+.usage-table th[scope='row'] {
+  font-weight: normal;
+}
+.usage-table thead th {
+  color: var(--muted);
+  font-weight: normal;
+  border-top: none;
+}
+.usage-table .usage-total th,
+.usage-table .usage-total td {
+  font-weight: 600;
+  border-top: 1px solid var(--border-strong);
+}
+.usage-tab .context-notes {
+  margin-top: var(--sp-8);
+}
+.usage-tab .drawer-section + .drawer-section {
+  margin-top: var(--sp-16);
+}
 /* o harness mudou enquanto o detalhe estava aberto (ou desde a última leitura): os números já foram refeitos */
 .context-changed {
   margin: 0;

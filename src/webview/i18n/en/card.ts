@@ -250,4 +250,23 @@ export const card: Record<string, string> = {
   'O que a sessão de IA usa para trabalhar neste card: agente, skills, rules, servidores MCP, ferramentas e modelo':
     'What the AI session uses to work on this card: agent, skills, rules, MCP servers, tools and model',
   'rules: {list}': 'rules: {list}',
+
+  // Aba Consumo: a estimativa da próxima execução e o gasto medido por fase
+  Consumo: 'Usage',
+  'Próxima execução': 'Next run',
+  'Gasto até agora': 'Spent so far',
+  Tempo: 'Time',
+  Total: 'Total',
+  'sem fase': 'no phase',
+  'Nenhuma execução de IA neste card ainda.': 'No AI runs on this card yet.',
+  'Nenhuma execução neste card. As sub-tarefas rodam dentro da sessão da história: o consumo delas aparece na história.':
+    "No runs on this card. Sub-tasks run inside the story's session: their usage shows up on the story.",
+  'Medido pela ferramenta no fim de cada execução: inclui tudo o que a IA leu e escreveu no trabalho, não só o contexto inicial. Só cresce: apagar mensagens ou desmarcar itens muda as próximas execuções, não o que já foi gasto.':
+    'Measured by the tool at the end of each run: it includes everything the AI read and wrote while working, not only the initial context. It only grows: deleting messages or unmarking items changes the next runs, not what was already spent.',
+  'Uma execução em andamento: o consumo dela entra quando terminar.': 'One run in progress: its usage counts when it ends.',
+  '{n} execuções em andamento: o consumo delas entra quando terminarem.': '{n} runs in progress: their usage counts when they end.',
+  'As execuções até {month} ficaram só nos totais mensais do board (retenção do detalhe) e não aparecem aqui.':
+    "Runs up to {month} were kept only in the board's monthly totals (detail retention) and do not show up here.",
+  'Não foi possível ler o consumo do card.': "Could not read the card's usage.",
+  'A consulta do consumo demorou demais. Tente de novo.': 'The usage query took too long. Try again.',
 };

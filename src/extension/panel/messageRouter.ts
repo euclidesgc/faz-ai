@@ -11,12 +11,15 @@ import type { AiTool, PluginAction } from '../../shared/harness';
 import type { ClaudeCli } from '../plugins';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import { agentProfiles } from '../../shared/execution';
+import { columnsOf } from '../../shared/selectors';
 import type { AttachmentStore } from '../attachments';
 import type { HarnessStore } from '../harness';
 import { headlessUnsupported } from '../headless';
 import { boardServerFootprint } from '../mcp/footprint';
 import type { RunResolver } from '../log/eventLog';
 import { getMetrics, getPanelMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
+import { cardUsage } from '../log/cardUsage';
+import type { CardUsage } from '../../shared/cardUsage';
 import type { MetricsPanelQuery, MetricsPanelResult } from '../../shared/metrics';
 import { BoardContext, type Actor, type Handler, type HandlerMap, type MessageType, type RouterOptions } from './handlers/context';
 import { boardBackupHandlers } from './handlers/boardBackup';
@@ -90,6 +93,7 @@ const bridgeOnly = {
   'attachment.saveAs': viaBridge,
   // ler o log não muda o board: a `HostBridge` responde por `panelMetrics`, sem passar por `handle`
   'metrics.query': viaBridge,
+  'card.usage.query': viaBridge,
   'backup.export': viaBridge,
   'backup.import.pick': viaBridge,
   'backup.import.cancel': viaBridge,
@@ -394,6 +398,17 @@ export class MessageRouter {
   /** Consulta do painel de métricas: só lê o log (sem sonda, sem registro, sem `notify` nem gravação do banco). */
   panelMetrics(query: MetricsPanelQuery): MetricsPanelResult {
     return getPanelMetrics(this.ctx.dbHandle.db, this.ctx.boardId, query);
+  }
+
+  /** O que o card gastou até agora, por fase (e, numa história, as sub-tarefas), lido do log das execuções. */
+  cardUsage(cardId: string): CardUsage {
+    const s = this.ctx.boards.snapshot(this.ctx.boardId, this.ctx.opts.author);
+    const card = s.cards.find((c) => c.id === cardId);
+    if (!card) throw new Error('Card não encontrado.');
+    const phases = columnsOf(s, card.workflowId).map((c) => c.name);
+    // o que foi gasto não some: as sub-tarefas na lixeira também contam
+    const subtasks = s.cards.filter((c) => c.parentId === card.id).map((c) => c.number);
+    return cardUsage(this.ctx.dbHandle.db, this.ctx.boardId, card.number, phases, subtasks);
   }
 
   /** Copia arquivos do disco como anexos do card (usado pelo seletor de arquivos). */
