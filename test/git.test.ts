@@ -9,7 +9,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { headlessCommand } from '../src/extension/headless';
 import { createMcpServer } from '../src/extension/mcp/server';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { DEFAULT_GIT, branchName, cleanDecisionDir, parseGit, slug } from '../src/shared/git';
+import { DEFAULT_GIT, LEGACY_BRANCH_PATTERN, branchName, cleanDecisionDir, parseGit, slug } from '../src/shared/git';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -62,18 +62,28 @@ beforeEach(async () => {
 afterEach(() => fs.rmSync(base, { recursive: true, force: true }));
 
 describe('nome da branch', () => {
-  it('monta o nome a partir do tipo, número e título', () => {
+  it('monta o nome a partir do fluxo, tipo, número e título', () => {
     expect(slug('Login com Google: 2ª tentativa!')).toBe('login-com-google-2-tentativa');
-    expect(branchName('{tipo}/{numero}-{titulo}', { type: 'Débito técnico', number: 7, title: 'Atualizar SDK' })).toBe(
+    expect(branchName('{tipo}/{numero}-{titulo}', { type: 'Débito técnico', number: 7, title: 'Atualizar SDK', flow: 'feature/' })).toBe(
       'debito-tecnico/7-atualizar-sdk',
     );
-    expect(branchName('feat/{numero}', { type: 'História', number: 3, title: 'x' })).toBe('feat/3');
-    expect(branchName('{numero}-{titulo}', { type: 'Bug', number: 9, title: '???' })).toBe('9-sem-titulo');
+    expect(branchName('feat/{numero}', { type: 'História', number: 3, title: 'x', flow: 'feature/' })).toBe('feat/3');
+    expect(branchName('{numero}-{titulo}', { type: 'Bug', number: 9, title: '???', flow: 'hotfix/' })).toBe('9-sem-titulo');
     // sem o número o padrão é recusado
     expect(parseGit(JSON.stringify({ branchPattern: '{titulo}', mode: 'nada' }))).toMatchObject({
-      branchPattern: '{tipo}/{numero}-{titulo}',
+      branchPattern: '{fluxo}{numero}-{titulo}',
       mode: 'worktree',
     });
+  });
+
+  it('{fluxo} recebe o prefixo como veio, com ou sem a barra', () => {
+    expect(branchName(DEFAULT_GIT.branchPattern, { type: 'História', number: 462, title: 'Adotar gitflow', flow: 'feature/' })).toBe(
+      'feature/462-adotar-gitflow',
+    );
+    expect(branchName(DEFAULT_GIT.branchPattern, { type: 'Bug', number: 5, title: 'Erro', flow: 'hotfix/' })).toBe('hotfix/5-erro');
+    expect(branchName(DEFAULT_GIT.branchPattern, { type: 'História', number: 5, title: 'Erro', flow: 'feat-' })).toBe('feat-5-erro');
+    // sem prefixo o nome não começa com barra nem hífen
+    expect(branchName(DEFAULT_GIT.branchPattern, { type: 'História', number: 5, title: 'Erro', flow: '' })).toBe('5-erro');
   });
 });
 
@@ -81,6 +91,50 @@ describe('parseGit', () => {
   it('ignora as chaves da antiga detecção de merges, que agora acontece em cada rodada do heartbeat', () => {
     const git = parseGit(JSON.stringify({ mode: 'branch', watchMerges: false, watchMergeMinutes: 30 }));
     expect(git).toEqual({ ...DEFAULT_GIT, mode: 'branch' });
+  });
+
+  it('gitflow ausente vale ligado, também em board antigo; só false desliga', () => {
+    expect(parseGit('{}').gitflow).toBe(true);
+    expect(parseGit(null).gitflow).toBe(true);
+    expect(parseGit(JSON.stringify({ gitflow: 'não' })).gitflow).toBe(true);
+    expect(parseGit(JSON.stringify({ gitflow: false })).gitflow).toBe(false);
+    expect(parseGit('{}')).toMatchObject({
+      developBranch: 'develop',
+      featurePrefix: 'feature/',
+      bugfixPrefix: 'bugfix/',
+      hotfixPrefix: 'hotfix/',
+      releasePrefix: 'release/',
+    });
+  });
+
+  it('prefixo ou develop vazio ou inválido volta ao padrão; válido é mantido mesmo sem a barra', () => {
+    expect(parseGit(JSON.stringify({ featurePrefix: '' })).featurePrefix).toBe('feature/');
+    expect(parseGit(JSON.stringify({ featurePrefix: '   ' })).featurePrefix).toBe('feature/');
+    expect(parseGit(JSON.stringify({ featurePrefix: 'feat ure/' })).featurePrefix).toBe('feature/');
+    expect(parseGit(JSON.stringify({ featurePrefix: '/feat/' })).featurePrefix).toBe('feature/');
+    expect(parseGit(JSON.stringify({ featurePrefix: 'feat..ure/' })).featurePrefix).toBe('feature/');
+    expect(parseGit(JSON.stringify({ featurePrefix: 'a//b/' })).featurePrefix).toBe('feature/');
+    expect(parseGit(JSON.stringify({ featurePrefix: 'a@{b/' })).featurePrefix).toBe('feature/');
+    expect(parseGit(JSON.stringify({ featurePrefix: '-feat/' })).featurePrefix).toBe('feature/');
+    expect(parseGit(JSON.stringify({ featurePrefix: 12 })).featurePrefix).toBe('feature/');
+    expect(parseGit(JSON.stringify({ featurePrefix: 'feat-' })).featurePrefix).toBe('feat-');
+    expect(parseGit(JSON.stringify({ bugfixPrefix: 'fix/', hotfixPrefix: 'hot/', releasePrefix: 'rel/' }))).toMatchObject({
+      bugfixPrefix: 'fix/',
+      hotfixPrefix: 'hot/',
+      releasePrefix: 'rel/',
+    });
+    // a develop é um nome de branch: não termina em barra
+    expect(parseGit(JSON.stringify({ developBranch: 'dev' })).developBranch).toBe('dev');
+    expect(parseGit(JSON.stringify({ developBranch: 'dev/' })).developBranch).toBe('develop');
+    expect(parseGit(JSON.stringify({ developBranch: '' })).developBranch).toBe('develop');
+    expect(parseGit(JSON.stringify({ developBranch: 'a b' })).developBranch).toBe('develop');
+  });
+
+  it('converte o padrão de fábrica antigo no novo e mantém um padrão personalizado', () => {
+    expect(LEGACY_BRANCH_PATTERN).toBe('{tipo}/{numero}-{titulo}');
+    expect(parseGit(JSON.stringify({ branchPattern: LEGACY_BRANCH_PATTERN })).branchPattern).toBe('{fluxo}{numero}-{titulo}');
+    expect(parseGit(JSON.stringify({ branchPattern: 'feat/{numero}' })).branchPattern).toBe('feat/{numero}');
+    expect(parseGit(JSON.stringify({ branchPattern: '{tipo}/{numero}' })).branchPattern).toBe('{tipo}/{numero}');
   });
 });
 
