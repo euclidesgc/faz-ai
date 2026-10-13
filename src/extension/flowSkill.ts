@@ -148,6 +148,15 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
    revisar" do pull request) e mova a história para a próxima coluna.
 
+## Áreas críticas
+
+Quando o board define áreas críticas (o núcleo do projeto), \`get_card\` traz \`criticalAreas\`. Na
+Spec e no Plan, confira se a história mexe nesses caminhos e marque o campo Criticidade dela
+(\`Núcleo\` ou \`Periferia\`) com \`update_card\`. A história do núcleo espera a aprovação da pessoa
+nas colunas que exigem aprovação, mesmo no modo autônomo: ao terminar a fase, \`request_review\` e
+pare. Na Revisão, revise com mais rigor os arquivos do núcleo; no pull request, liste-os à parte em
+"Como revisar".
+
 ## Homologação
 
 A entrega é para a pessoa testar, então o roteiro de testes é parte dela, em dois lugares:

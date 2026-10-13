@@ -342,6 +342,12 @@ export const settings: Record<string, string> = {
   'Criar tipo': 'Create type',
   'Restaurar aparência padrão': 'Restore default appearance',
   'Restaurar regras padrão': 'Restore default rules',
+  'Áreas críticas (núcleo)': 'Critical areas (core)',
+  'Áreas críticas, um caminho por linha': 'Critical areas, one path per line',
+  'uma história mexe nestes caminhos: a IA marca o campo "Criticidade" dela como Núcleo na Spec ou no Plan, e você também pode marcar à mão':
+    'a story touches these paths: the AI marks its "Criticidade" (criticality) field as Núcleo (core) in Spec or Plan, and you can also mark it by hand',
+  'a história do núcleo espera a sua aprovação nas colunas que exigem aprovação, mesmo no modo autônomo; na Revisão e no pull request, os arquivos do núcleo vêm à parte e são revisados com mais rigor.':
+    'a core story waits for your approval in the columns that require approval, even in autonomous mode; in Revisão (review) and in the pull request, core files come apart and are reviewed more strictly.',
   'Histórias em paralelo': 'Stories in parallel',
   'Não foi possível copiar. Selecione o nome e copie com o teclado:': 'Could not copy. Select the name and copy it with the keyboard:',
   'Histórias em paralelo: disponíveis neste modo. Cada história tem a sua pasta, então o heartbeat pode tocar várias ao mesmo tempo (ligue "Tocar histórias em paralelo", na execução pela IA). O custo: cada worktree é mais uma cópia dos arquivos do projeto em disco e precisa das próprias dependências instaladas; e cada história em paralelo é mais um processo de IA, com os testes e builds dela, usando memória e processador ao mesmo tempo.':

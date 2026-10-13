@@ -22,6 +22,9 @@ export const defaults: Record<string, string> = {
   Fase: 'Phase',
   Modelo: 'Model',
   'Esforço da atividade': 'Task effort',
+  Criticidade: 'Criticality',
+  Núcleo: 'Core',
+  Periferia: 'Periphery',
   // os nomes das regras que "Recriar as regras" monta
   'Esforço da atividade baixo': 'Task effort low',
   'Esforço da atividade médio': 'Task effort medium',

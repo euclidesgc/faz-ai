@@ -23,6 +23,20 @@ const rule = (title: string) => screen.getByLabelText(title);
 const rules = () => useBoardStore.getState().state!.board.rules;
 
 describe('RulesSettings', () => {
+  it('as áreas críticas são um caminho por linha, gravadas limpas ao sair do campo', async () => {
+    show();
+    const card = rule('Áreas críticas (núcleo)');
+    expect(within(card).getByText('Desligada')).toBeInTheDocument();
+    const field = within(card).getByRole('textbox', { name: 'Áreas críticas, um caminho por linha' });
+    await userEvent.type(field, '  src/db/**{enter}{enter}src/mcp/**{enter}src/db/**');
+    expect(sentOf('settings.rules.update')).toEqual([]);
+    await userEvent.tab();
+    expect(lastSent('settings.rules.update')).toEqual({
+      type: 'settings.rules.update',
+      patch: { criticalPaths: ['src/db/**', 'src/mcp/**'] },
+    });
+  });
+
   it('cada regra é um cartão com o selo Ativa/Desligada e o "Quando / Então"', () => {
     show();
     const card = rule('Concluir história com sub-tarefas em aberto');

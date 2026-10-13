@@ -27,6 +27,12 @@ export interface BoardRules {
   includeFastModels: boolean;
   /** meses completos de detalhe do log guardados além do mês corrente (de 1 a 24); os totais por mês nunca expiram */
   logRetentionMonths: number;
+  /**
+   * áreas críticas (o núcleo) do projeto, em padrões de caminho (ex.: `src/db/**`): a IA marca o campo
+   * Criticidade das histórias que mexem nelas, e a história do núcleo espera a aprovação da pessoa
+   * mesmo no modo autônomo
+   */
+  criticalPaths: string[];
 }
 
 export const DEFAULT_RULES: BoardRules = {
@@ -39,7 +45,22 @@ export const DEFAULT_RULES: BoardRules = {
   autoApplyModelSuggestion: true,
   includeFastModels: false,
   logRetentionMonths: DEFAULT_LOG_RETENTION_MONTHS,
+  criticalPaths: [],
 };
+
+/** Teto de padrões de áreas críticas: a lista vai no pedido da IA. */
+export const CRITICAL_PATHS_MAX = 50;
+
+/** Os padrões de áreas críticas limpos: texto, sem espaços nas pontas, sem vazios nem repetidos, até o teto. */
+export function cleanCriticalPaths(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const item of v) {
+    const path = typeof item === 'string' ? item.trim() : '';
+    if (path && !out.includes(path)) out.push(path);
+  }
+  return out.slice(0, CRITICAL_PATHS_MAX);
+}
 
 /** Lê o JSON salvo, completando com os padrões o que faltar ou for inválido. */
 export function parseRules(json: string | null | undefined): BoardRules {
@@ -74,5 +95,6 @@ export function parseRules(json: string | null | undefined): BoardRules {
       raw.logRetentionMonths <= LOG_RETENTION_MAX
         ? raw.logRetentionMonths
         : DEFAULT_RULES.logRetentionMonths,
+    criticalPaths: cleanCriticalPaths(raw.criticalPaths),
   };
 }

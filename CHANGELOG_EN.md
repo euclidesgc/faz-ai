@@ -7,6 +7,12 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Critical areas (core).** In Settings → Regras (rules), list the paths of the project's core, one
+  per line. The AI marks the new **Criticidade** (criticality) field of stories, Núcleo (core) or
+  Periferia (periphery), in Spec or Plan, and a core story waits for your approval in the columns that
+  require approval, even in autonomous mode; once approved, it goes on by itself. In Revisão (review)
+  and in the PR, core files come apart. Existing boards get the field through **Atualizar board**
+  (update board); `update_rules` accepts `criticalPaths` and `get_card` brings `criticalAreas`.
 - **Autonomous mode up to a phase.** When turning on autonomous mode, the warning brings the **Até
   onde** (up to) selector, with the phases the AI works in from the current column on. The default is
   still going up to the pull request. Picking an earlier phase, such as Plan, the AI goes on by itself
