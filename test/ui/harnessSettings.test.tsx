@@ -430,7 +430,7 @@ describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada 
   it('abrir e fechar a busca de skills várias vezes não duplica o card "Skill do fluxo" (nem o "Servidor do board")', async () => {
     // com a key repetida entre os irmãos, o React avisa e passa a duplicar o card
     const erro = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    renderScreen('all');
+    renderScreen('project');
     const skills = document.querySelector<HTMLElement>('.settings-card[aria-label="Skills"]')!;
     const mcp = document.querySelector<HTMLElement>('.settings-card[aria-label="Servidores MCP"]')!;
     for (let i = 0; i < 4; i++) {
@@ -439,7 +439,7 @@ describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada 
     expect(screen.getAllByLabelText('Skill do fluxo')).toHaveLength(1);
     // o mesmo card (BoardInstall) vale para o servidor MCP: abrir e fechar o formulário ao lado dele não o duplica
     for (let i = 0; i < 4; i++) {
-      await userEvent.click(within(mcp).getByRole('button', { name: 'Novo' }));
+      await userEvent.click(within(mcp).getByRole('button', { name: 'Novo servidor' }));
     }
     expect(screen.getAllByLabelText('Servidor do board')).toHaveLength(1);
     const repetidas = erro.mock.calls.filter((c) => String(c[0]).includes('two children with the same key'));
