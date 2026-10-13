@@ -4,7 +4,7 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+## 0.36.0
 
 - **Registros de decisão no repositório.** A nova opção **Faz AI › Git › Registros de decisão**
   (`fazai.git.decisionRecords`) aponta para uma pasta do repositório; com ela, a Homologação grava ali
