@@ -14,7 +14,7 @@ import {
   pluginActions,
 } from '../../../shared/harness';
 import { copyTarget } from '../../../shared/harnessCatalog';
-import { RULES_FIELD, SKILLS_FIELD } from '../../db/schema';
+import { RULES_FIELD, SKILLS_FIELD } from '../../../shared/boardFields';
 import { isSelectableKind, selectedRuleLocations, selectedSkillNames } from '../../../shared/harnessSelection';
 import { CONDUCTOR_AGENT, migrateExecProfiles, seedAgents } from '../../agentSeeds';
 import { FLOW_SKILL } from '../../flowSkill';

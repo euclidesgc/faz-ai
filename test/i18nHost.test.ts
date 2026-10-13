@@ -55,6 +55,21 @@ describe('i18n do host: mensagens preenchidas', () => {
       'Model "xyz" is not in the catalog. Available: Opus (claude:opus).',
     ],
     ['O board não tem o campo "Esforço da atividade".', 'The board has no "Esforço da atividade" field.'],
+    ['"Prazo" é o nome de um campo do board; escolha outro nome.', '"Prazo" is the name of a board field; choose another name.'],
+    ['O campo de modelo de IA é só um, o "Modelo" do board.', 'There is only one AI model field, the board\'s "Modelo".'],
+    [
+      'O campo "Fase" é do board e não pode ser apagado: as regras e a IA dependem dele.',
+      'The "Fase" field belongs to the board and cannot be deleted: the rules and the AI depend on it.',
+    ],
+    [
+      'O campo "Tags" é do board e não pode ser renomeado: as regras e a IA o encontram pelo nome.',
+      'The "Tags" field belongs to the board and cannot be renamed: the rules and the AI find it by its name.',
+    ],
+    ['As opções do campo "Skills" são mantidas pelo board.', 'The options of the "Skills" field are kept by the board.'],
+    [
+      'Os tipos de card do campo "Criticidade" são mantidos pelo board.',
+      'The card types of the "Criticidade" field are kept by the board.',
+    ],
     ['Pasta não encontrada: /home/ana/skills', 'Folder not found: /home/ana/skills'],
     ['Não foi possível clonar https://github.com/a/b.git: timeout', 'Could not clone https://github.com/a/b.git: timeout'],
     ['Skill não encontrada na origem: revisar', 'Skill not found in the source: revisar'],

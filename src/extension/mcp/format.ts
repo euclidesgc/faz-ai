@@ -18,6 +18,7 @@ import { childrenOf, columnOf, columnsOf, isArchived, isLive, valueOf } from '..
 import { statusInfo } from '../../shared/status';
 import { isAtYoloStop, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../../shared/story';
 import { CORE, CRITICALITY_FIELD, PERIPHERY, isCoreStory } from '../../shared/critical';
+import { isBoardField } from '../../shared/boardFields';
 import { slug } from '../../shared/git';
 import {
   cardRef,
@@ -566,6 +567,8 @@ export function boardOverview(s: BoardState) {
     fields: s.fieldDefs.map((f) => ({
       name: f.name,
       kind: f.kind,
+      // campo do board: as regras e a IA dependem dele, e só a exibição (e as opções de Tags) muda
+      ...(isBoardField(f) ? { board: true } : {}),
       ...(f.options.length ? { options: f.options } : {}),
       appliesTo: f.appliesToTypes === null ? 'todos os tipos' : f.appliesToTypes.map((id) => s.cardTypes.find((t) => t.id === id)?.name),
       display: f.display,

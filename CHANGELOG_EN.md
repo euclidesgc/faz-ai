@@ -5,6 +5,18 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **Board fields out of the settings.** Fase, Tags, Modelo, Skills, Rules, Esforço da atividade and
+  Criticidade are used by the rules, the triage and the AI, and left Settings → **Campos
+  personalizados** (custom fields, the tab's new name), which now lists only the fields you create.
+  These fields can't be deleted or renamed, and the board keeps their options and card types (the
+  Tags options are still yours, through the AI). A new field can't take one of their names nor the
+  **Modelo de IA** (AI model) type. A new story card type joins Criticidade on its own, and a new
+  sub-task type joins Fase. On the open card, the custom fields get their own section, below the
+  board fields. Over MCP, `get_board` marks these fields with `board: true`, and `update_field`,
+  `delete_field` and `create_field` refuse what would break their use.
+
 ## 0.36.0
 
 - **Decision records in the repository.** The new **Faz AI › Git › Registros de decisão** (decision

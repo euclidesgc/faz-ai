@@ -65,7 +65,7 @@ export function registerTypeAndFieldTools(tool: DefineTool): void {
 
   tool(
     'create_field',
-    'Cria um campo personalizado para os cards.',
+    'Cria um campo personalizado para os cards. Os nomes dos campos do board (os de `board: true` em get_board) são reservados.',
     {
       name: z.string().min(1),
       kind: kindArg,
@@ -89,7 +89,7 @@ export function registerTypeAndFieldTools(tool: DefineTool): void {
 
   tool(
     'update_field',
-    'Altera nome, opções, tipos de card ou exibição de um campo personalizado.',
+    'Altera nome, opções, tipos de card ou exibição de um campo personalizado. Num campo do board (`board: true` em get_board) só muda a exibição, e em Tags também as opções: as regras e a IA dependem do resto.',
     {
       field: z.string(),
       name: z.string().min(1).optional(),
@@ -108,8 +108,13 @@ export function registerTypeAndFieldTools(tool: DefineTool): void {
     },
   );
 
-  tool('delete_field', 'Exclui um campo personalizado e os valores dele em todos os cards.', { field: z.string() }, (a, router) => {
-    router.handle({ type: 'settings.field.delete', fieldId: findField(router.snapshot(), a.field).id });
-    return overview(router);
-  });
+  tool(
+    'delete_field',
+    'Exclui um campo personalizado e os valores dele em todos os cards. Os campos do board (`board: true` em get_board) não se excluem.',
+    { field: z.string() },
+    (a, router) => {
+      router.handle({ type: 'settings.field.delete', fieldId: findField(router.snapshot(), a.field).id });
+      return overview(router);
+    },
+  );
 }

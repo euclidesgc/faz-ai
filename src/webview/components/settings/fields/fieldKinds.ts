@@ -35,6 +35,9 @@ export const FIELD_KINDS: { value: FieldKind; label: string; hint: string; sampl
 
 export const kindInfo = (kind: FieldKind) => FIELD_KINDS.find((k) => k.value === kind)!;
 
+/** O que se escolhe num campo novo: o de modelo de IA é um só, o "Modelo" do board. */
+export const NEW_FIELD_KINDS = FIELD_KINDS.filter((k) => k.value !== 'model');
+
 /** Como o campo aparece na face do card no board. */
 export const FIELD_DISPLAYS: { value: FieldDisplay; label: string; hint: string }[] = [
   { value: 'badge', label: 'Selo', hint: 'Selo preenchido com o valor.' },
