@@ -54,6 +54,11 @@ export const board: Record<string, string> = {
   'Colapsar a coluna': 'Collapse the column',
   'Colapsar cards': 'Collapse cards',
   'Expandir cards': 'Expand cards',
+  'Selecionar todos': 'Select all',
+  'Arquivar selecionados': 'Archive selected',
+  'Mover selecionados para...': 'Move selected to...',
+  'Concluir selecionados': 'Complete selected',
+  'Mandar selecionados para a lixeira': 'Move selected to trash',
   'Duplo clique para renomear': 'Double-click to rename',
   'Exige aprovação: a IA só avança o card desta coluna depois que você aprova':
     'Requires approval: the AI only advances a card from this column after you approve',
@@ -301,6 +306,18 @@ export const board: Record<string, string> = {
   'Serão arquivados junto com o card: {along}.': 'These will be archived with the card: {along}.',
   'O card sai do board.': 'The card leaves the board.',
   'Nada é apagado, e desarquivar traz tudo de volta.': 'Nothing is deleted, and unarchiving brings everything back.',
+
+  // Ações em lote (seleção de uma coluna; store/actions.ts)
+  'Arquivar {n} história(s)?': 'Archive {n} story(ies)?',
+  'Serão arquivados junto: {along}.': 'These will be archived with them: {along}.',
+  'Excluir {n} história(s)?': 'Delete {n} story(ies)?',
+  'Vão para a lixeira junto: {along}.': 'These go to the trash with them: {along}.',
+  'Mover {n} história(s) para outra coluna?': 'Move {n} story(ies) to another column?',
+  Mover: 'Move',
+  'Concluir {n} história(s)?': 'Complete {n} story(ies)?',
+  'Vão para "{column}". Quem ainda tiver sub-tarefa em aberto fica de fora.':
+    'They go to "{column}". Whoever still has an open sub-task is left out.',
+  Concluir: 'Complete',
 
   'Modo autônomo: tocando {n} história(s) em fila.{detail} Clique para pausar e interromper a IA.':
     'Autonomous mode: driving {n} queued story(ies).{detail} Click to pause and interrupt the AI.',

@@ -6,6 +6,7 @@ import { isCardCollapsed, isLive } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { t, dt } from '../i18n';
 import { cards, settings } from '../commands';
+import { requestArchiveMany, requestConcludeMany, requestMoveMany, requestTrashMany } from '../store/actions';
 import { SortableCard } from './Card';
 import { Menu } from './Menu';
 import { TextField } from '@radix-ui/themes';
@@ -91,6 +92,9 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
   const collapsedMap = useBoardStore((s) => s.collapsed);
   const setManyCollapsed = useBoardStore((s) => s.setManyCollapsed);
+  const selectedIds = useBoardStore((s) => s.selectedIds);
+  const selectMany = useBoardStore((s) => s.selectMany);
+  const clearSelected = useBoardStore((s) => s.clearSelected);
   const ask = useBoardStore((s) => s.ask);
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
@@ -130,6 +134,16 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
   const count = visibleCards.length === total ? String(total) : `${visibleCards.length}/${total}`;
   const liveCardIds = state.cards.filter((c) => c.columnId === column.id && isLive(c)).map((c) => c.id);
   const allCardsCollapsed = liveCardIds.length > 0 && liveCardIds.every((id) => isCardCollapsed(collapsedMap, id));
+
+  // ids vivos e visíveis desta coluna (a prop já vem filtrada pela WorkflowRow, então respeita o filtro ativo)
+  const visibleLiveIds = visibleCards.map((c) => c.id);
+  // a seleção "pertence" a esta coluna quando o 1º id selecionado está nela (toggleSelected garante
+  // que a seleção nunca mistura colunas, então basta olhar o primeiro)
+  const [firstSelectedId] = selectedIds;
+  const selectedHere = firstSelectedId !== undefined && state.cards.find((c) => c.id === firstSelectedId)?.columnId === column.id;
+  const selectedHistories = selectedHere ? state.cards.filter((c) => selectedIds.has(c.id)) : [];
+  const otherColumns = siblings.filter((c) => c.id !== column.id);
+  const doneColumn = siblings.find((c) => c.category === 'done');
   if (collapsed) {
     return (
       <CollapsedColumn
@@ -179,33 +193,70 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
         <Menu
           title={t('Ações da coluna')}
           items={[
-            { label: t('Renomear'), onClick: () => setRenaming(column.name) },
-            { label: t('Colapsar'), onClick: onToggle },
+            { label: t('Renomear'), disabled: selectedHere, onClick: () => setRenaming(column.name) },
+            { label: t('Colapsar'), disabled: selectedHere, onClick: onToggle },
             {
               label: allCardsCollapsed ? t('Expandir cards') : t('Colapsar cards'),
-              disabled: liveCardIds.length === 0,
+              disabled: selectedHere || liveCardIds.length === 0,
               onClick: () => setManyCollapsed(liveCardIds, !allCardsCollapsed),
             },
             'sep',
+            ...(workflow.kind === 'parent'
+              ? [
+                  {
+                    label: t('Selecionar todos'),
+                    disabled: visibleLiveIds.length === 0,
+                    onClick: () => selectMany(visibleLiveIds),
+                  },
+                  ...(selectedHere
+                    ? [
+                        { label: t('Limpar seleção'), onClick: clearSelected },
+                        'sep' as const,
+                        {
+                          label: t('Arquivar selecionados'),
+                          onClick: () => requestArchiveMany(selectedHistories, clearSelected),
+                        },
+                        {
+                          label: t('Mover selecionados para...'),
+                          disabled: otherColumns.length === 0,
+                          onClick: () => requestMoveMany(selectedHistories, otherColumns, clearSelected),
+                        },
+                        {
+                          label: t('Concluir selecionados'),
+                          disabled: !doneColumn,
+                          onClick: () => doneColumn && requestConcludeMany(selectedHistories, doneColumn, clearSelected),
+                        },
+                        'sep' as const,
+                        {
+                          label: t('Mandar selecionados para a lixeira'),
+                          danger: true,
+                          onClick: () => requestTrashMany(selectedHistories, clearSelected),
+                        },
+                      ]
+                    : []),
+                  'sep' as const,
+                ]
+              : []),
             { header: t('Esta coluna representa') },
             ...CATEGORIES.map((c) => ({
               label: t(c.label),
               checked: column.category === c.value,
+              disabled: selectedHere,
               onClick: () => settings.updateColumn(column.id, { category: c.value }),
             })),
             'sep' as const,
             {
               label: t('Mover para a esquerda'),
-              disabled: index === 0,
+              disabled: selectedHere || index === 0,
               onClick: () => settings.updateColumn(column.id, { position: index - 1 }),
             },
             {
               label: t('Mover para a direita'),
-              disabled: index === siblings.length - 1,
+              disabled: selectedHere || index === siblings.length - 1,
               onClick: () => settings.updateColumn(column.id, { position: index + 1 }),
             },
             'sep',
-            { label: t('Excluir coluna'), danger: true, disabled: siblings.length <= 1, onClick: remove },
+            { label: t('Excluir coluna'), danger: true, disabled: selectedHere || siblings.length <= 1, onClick: remove },
           ]}
         />
       </header>
