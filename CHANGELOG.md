@@ -32,7 +32,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   Claude Code. No Claude Code, o servidor do board conta só os nomes das ferramentas e as instruções,
   e as definições aparecem como sob demanda; os servidores liberados pelo agente aparecem como não
   medidos. É uma estimativa pelo tamanho do texto, para achar o que pesa antes de rodar, e acompanha o
-  card: a fase da coluna, a conversa e os documentos entram na próxima execução.
+  card: a fase da coluna, a conversa e os documentos entram na próxima execução. Ao abrir, o detalhe
+  relê os arquivos do harness e avisa quando algo mudou desde a última leitura.
 - **Aba Consumo no card.** O card aberto ganha a aba **Consumo**: a estimativa da próxima execução e o
   que o card já gastou, medido em cada execução, por fase (execuções, tempo, tokens de entrada, saída e
   cache) e no total, com as sub-tarefas de uma história numa linha à parte. O gasto é histórico e só

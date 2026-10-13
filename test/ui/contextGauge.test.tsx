@@ -1,6 +1,6 @@
 import { renderThemed, seedBoard, syncStore, type SeededBoard } from './setup';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CardView } from '../../src/webview/components/Card';
 import { ENTRY_LABELS, GROUP_LABELS } from '../../src/webview/components/cardView/ContextGauge';
@@ -66,7 +66,8 @@ describe('contexto estimado no card do board', () => {
     expect(within(panel).getByText('definições das ferramentas').closest('li')).toHaveClass('on-demand');
     expect(within(panel).getByText(/^Sob demanda: mais/)).toBeInTheDocument();
     expect(within(panel).getByText(/Fora da conta: o prompt e as ferramentas nativas do Claude Code/)).toBeInTheDocument();
-    expect(posted).not.toHaveBeenCalled();
+    // abrir só relê o harness do disco: nada no board muda
+    expect(posted.mock.calls.map(([m]) => m.type)).toEqual(['harness.refresh']);
   });
 
   it('acompanha o card: numa coluna em que a IA atua, a estimativa diz a fase e soma as instruções dela', async () => {
@@ -82,6 +83,39 @@ describe('contexto estimado no card do board', () => {
     await userEvent.click(gauge());
     const panel = await screen.findByRole('dialog', { name: 'Contexto estimado' });
     expect(within(panel).getByText(`Estimativa da próxima execução, na fase ${phase.name} · Opus 5.5`)).toBeInTheDocument();
+  });
+
+  it('ao abrir, relê o harness; se ele mudou desde a última leitura, avisa e mostra os números novos', async () => {
+    setModel(board.storyId, 'claude:opus@high');
+    show(board.storyId);
+    posted.mockClear();
+    await userEvent.click(gauge());
+    const panel = await screen.findByRole('dialog', { name: 'Contexto estimado' });
+    expect(posted.mock.calls.map(([m]) => m.type)).toEqual(['harness.refresh']);
+    expect(within(panel).queryByRole('status')).toBeNull();
+    // o host responde com o harness relido: uma rule nova em todo contexto, editada fora do board
+    const rule = {
+      kind: 'instructions' as const,
+      scope: 'user' as const,
+      name: 'CLAUDE.md',
+      description: '',
+      path: '/home/.claude/CLAUDE.md',
+      location: '~/.claude/CLAUDE.md',
+      layout: 'file' as const,
+      size: 8000,
+    };
+    act(() =>
+      patchState((s) => ({
+        harness: { ...s.harness, inventory: [{ tool: 'claude', installed: true, items: [rule] }] },
+        harnessSelection: [{ kind: 'instructions', location: rule.location, usage: 'always' }],
+      })),
+    );
+    expect(within(panel).getByRole('status')).toHaveTextContent('O harness mudou desde a última leitura');
+    expect(within(panel).getByText('Rules')).toBeInTheDocument();
+    // o botão relê de novo, a pedido
+    posted.mockClear();
+    await userEvent.click(within(panel).getByRole('button', { name: 'Reler arquivos' }));
+    expect(posted.mock.calls.map(([m]) => m.type)).toEqual(['harness.refresh']);
   });
 
   it('sem modelo, o detalhe explica por que não há porcentagem', async () => {

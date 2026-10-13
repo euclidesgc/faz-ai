@@ -33,7 +33,8 @@ English; names of screens and buttons appear here as they are in the Portuguese 
   window. In Claude Code, the board's server counts only the tool names and the instructions, and the
   definitions show up as on demand; the servers the agent allows show up as not measured. It is an
   estimate from text size, to find what weighs before running, and it follows the card: the column's
-  phase, the conversation and the documents count in the next run.
+  phase, the conversation and the documents count in the next run. When it opens, the breakdown
+  rereads the harness files and says when something changed since the last read.
 - **Usage tab on the card.** The open card gets the **Consumo** (usage) tab: the estimate for the next
   run and what the card has already spent, measured in each run, by phase (runs, time, input, output and
   cache tokens) and in total, with a story's sub-tasks in a row of their own. What was spent is history
