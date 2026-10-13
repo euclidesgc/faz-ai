@@ -18,16 +18,25 @@ function useNow(ms: number, active: boolean): number {
 }
 
 const MARKER = '\u0000REF\u0000';
+const SINCE = '\u0000SINCE\u0000';
 
-/** Texto com uma referência de card clicável no meio, preservando a ordem das palavras do idioma. */
+/**
+ * Texto com uma referência de card clicável no meio, preservando a ordem das palavras do idioma. O "há N min"
+ * (`since`) muda a cada minuto e fica fora da região viva: só a parte até ele é anunciada pelo leitor de tela.
+ */
 function RefSentence({ item, onOpen }: { item: ActivityItem; onOpen: (id: ActivityItem['cardId']) => void }) {
-  const text = t('IA em {ref} ({what}, {since})', { ref: MARKER, what: item.what, since: item.since });
-  const [before, after] = text.split(MARKER);
+  const text = t('IA em {ref} ({what}, {since})', { ref: MARKER, what: item.what, since: SINCE });
+  const [head = '', tail = ''] = text.split(SINCE);
+  const [before, after] = head.split(MARKER);
   return (
     <>
-      {before}
-      <RefButton item={item} onOpen={onOpen} />
-      {after}
+      <span role="status" aria-live="polite">
+        {before}
+        <RefButton item={item} onOpen={onOpen} />
+        {after}
+      </span>
+      {item.since}
+      {tail}
     </>
   );
 }
@@ -52,14 +61,20 @@ export function ActivityBar({ offline }: { offline: boolean }) {
   if (!state) return null;
   const msg = activityMessage(state, { offline, now });
 
+  // a região viva cobre só o que muda quando o conjunto de execuções muda; o "há N min" (atualizado a
+  // cada minuto) fica fora dela, para não anunciar a barra toda a cada minuto
   return (
-    <div className="activity-bar" role="status" aria-live="polite" title={msg.title}>
+    <div className="activity-bar" title={msg.title}>
       {msg.kind === 'running' && <span className="spinner" />}
       <span className="list">
-        {msg.kind === 'idle' && msg.text}
+        {msg.kind === 'idle' && (
+          <span role="status" aria-live="polite">
+            {msg.text}
+          </span>
+        )}
         {msg.kind === 'running' && msg.count === 1 && <RefSentence item={msg.items[0]!} onOpen={openCard} />}
         {msg.kind === 'running' && msg.count > 1 && (
-          <>
+          <span role="status" aria-live="polite">
             {t('IA em {n} cards: ', { n: msg.count })}
             {msg.items.map((item, i) => (
               <span key={item.cardId}>
@@ -67,7 +82,7 @@ export function ActivityBar({ offline }: { offline: boolean }) {
                 <RefButton item={item} onOpen={openCard} /> {item.what}
               </span>
             ))}
-          </>
+          </span>
         )}
       </span>
     </div>

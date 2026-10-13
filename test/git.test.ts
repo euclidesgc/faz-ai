@@ -9,7 +9,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { headlessCommand } from '../src/extension/headless';
 import { createMcpServer } from '../src/extension/mcp/server';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { branchName, parseGit, slug } from '../src/shared/git';
+import { DEFAULT_GIT, branchName, cleanDecisionDir, parseGit, slug } from '../src/shared/git';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -78,32 +78,22 @@ describe('nome da branch', () => {
 });
 
 describe('parseGit', () => {
-  it('retorna valores padrão para JSON vazio', () => {
-    expect(parseGit('{}')).toMatchObject({
-      watchMerges: true,
-      watchMergeMinutes: 15,
-    });
+  it('ignora as chaves da antiga detecção de merges, que agora acontece em cada rodada do heartbeat', () => {
+    const git = parseGit(JSON.stringify({ mode: 'branch', watchMerges: false, watchMergeMinutes: 30 }));
+    expect(git).toEqual({ ...DEFAULT_GIT, mode: 'branch' });
+  });
+});
+
+describe('pasta dos registros de decisão', () => {
+  it('desligada por padrão; fica relativa, com barras normais e sem barra nas pontas', () => {
+    expect(DEFAULT_GIT.decisionRecords).toBe('');
+    expect(parseGit('{}').decisionRecords).toBe('');
+    expect(parseGit(JSON.stringify({ decisionRecords: ' ./docs\\decisoes/ ' })).decisionRecords).toBe('docs/decisoes');
   });
 
-  it('limita watchMergeMinutes ao range [5, 1440]', () => {
-    expect(parseGit(JSON.stringify({ watchMergeMinutes: 2 }))).toMatchObject({ watchMergeMinutes: 5 });
-    expect(parseGit(JSON.stringify({ watchMergeMinutes: 9999 }))).toMatchObject({ watchMergeMinutes: 1440 });
-  });
-
-  it('usa o padrão para watchMergeMinutes inválido (string, 0, ausente)', () => {
-    expect(parseGit(JSON.stringify({ watchMergeMinutes: 'abc' }))).toMatchObject({ watchMergeMinutes: 15 });
-    expect(parseGit(JSON.stringify({ watchMergeMinutes: 0 }))).toMatchObject({ watchMergeMinutes: 15 });
-    expect(parseGit('{}')).toMatchObject({ watchMergeMinutes: 15 });
-  });
-
-  it('preserva watchMerges: true para git_json antigo de board (sem as chaves novas)', () => {
-    expect(parseGit(JSON.stringify({ mode: 'worktree', branchPattern: '{tipo}/{numero}-{titulo}', autoMerge: true }))).toMatchObject({
-      watchMerges: true,
-    });
-  });
-
-  it('respeita watchMerges: false', () => {
-    expect(parseGit(JSON.stringify({ watchMerges: false }))).toMatchObject({ watchMerges: false });
+  it('fora do repositório não vale: caminho que sobe de pasta ou com letra de unidade', () => {
+    for (const dir of ['../fora', 'docs/../../fora', 'C:/docs', 3, null]) expect(cleanDecisionDir(dir)).toBe('');
+    expect(cleanDecisionDir('/docs/adr')).toBe('docs/adr');
   });
 });
 
@@ -173,6 +163,20 @@ describe('branch e worktree por história', () => {
     const outside = (await call('prepare_workspace', { card: 4 })).data;
     expect(outside.baseBranch).toBeUndefined();
     expect(() => git(repo, 'merge-base', '--is-ancestor', 'main', outside.branch)).not.toThrow();
+  });
+
+  it('sem história pulada não registra nada na conversa', async () => {
+    const yolo = (n: number) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled: true });
+    await call('create_card', { title: 'Base', column: 'Implementação' });
+    await call('create_card', { title: 'Segunda', column: 'Implementação' });
+    yolo(1);
+    yolo(2);
+
+    await call('prepare_workspace', { card: 1 });
+    await call('prepare_workspace', { card: 2 });
+
+    expect(router.snapshot().comments.filter((c) => c.cardId === card(2).id && c.source === 'ai')).toHaveLength(0);
+    expect(router.snapshot().comments.filter((c) => c.cardId === card(1).id && c.source === 'ai')).toHaveLength(0);
   });
 
   it('modo branch cria a branch sem trocar a atual; desligado recusa', async () => {

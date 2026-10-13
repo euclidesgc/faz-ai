@@ -14,8 +14,10 @@ import { AppearanceSettings } from './AppearanceSettings';
 import { GitSettings } from './GitSettings';
 import { BackupSettings } from './BackupSettings';
 import { scrollToAndHighlight } from './highlight';
+import { RequirementsAlertIcon, useRequirementsAlert } from '../RequirementsBanner';
 import {
   Button,
+  Hint,
   DeleteButton,
   FormField,
   IconAppearance,
@@ -39,7 +41,7 @@ import {
 const TABS: [SettingsTab, string, Icon][] = [
   ['columns', 'Workflows e colunas', IconColumns],
   ['types', 'Tipos de card', IconTypes],
-  ['fields', 'Campos', IconFields],
+  ['fields', 'Campos personalizados', IconFields],
   ['rules', 'Regras do board', IconRules],
   ['harness', 'Harness de IA', IconHarness],
   ['models', 'Modelos de IA', IconModels],
@@ -61,6 +63,30 @@ const navProps = (collapsed: boolean, label: string, Glyph: Icon) => ({
     </>
   ),
 });
+
+/** O "Verificar ambiente", com o ícone de atenção e o hint do que falta quando o board não tem tudo para trabalhar com a IA. */
+function CheckEnvironmentButton({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
+  const alert = useRequirementsAlert();
+  const nav = navProps(collapsed, t('Verificar ambiente'), IconDoctor);
+  const button = (
+    <Button
+      variant="ghost"
+      onClick={onClick}
+      {...nav}
+      // com o ícone de atenção, o hint dele faz o papel do title
+      title={
+        alert
+          ? undefined
+          : (nav.title ??
+            t('Abre o Diagnóstico do ambiente: o que o board precisa e o que ele usa nesta máquina, com como resolver o que falta'))
+      }
+    >
+      {nav.children}
+      {alert && <RequirementsAlertIcon level={alert.level} label={alert.label} />}
+    </Button>
+  );
+  return alert ? <Hint content={alert.hint}>{button}</Hint> : button;
+}
 
 export function Settings() {
   const state = useBoardStore((s) => s.state)!;
@@ -124,12 +150,7 @@ export function Settings() {
               title={t('Abre as configurações do Faz AI no Settings do editor (Ctrl+,)')}
             />
           )}
-          <Button
-            variant="ghost"
-            onClick={() => setView('environment')}
-            {...navProps(collapsed, t('Verificar ambiente'), IconDoctor)}
-            title={t('Abre o Diagnóstico do ambiente: o que o board precisa e o que ele usa nesta máquina, com como resolver o que falta')}
-          />
+          <CheckEnvironmentButton collapsed={collapsed} onClick={() => setView('environment')} />
           {state.pendingUpgrade.length > 0 && (
             <Button
               variant="primary"

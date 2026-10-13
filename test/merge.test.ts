@@ -142,11 +142,8 @@ describe('pull request e merge na homologação', () => {
 });
 
 describe('MergeWatcher', () => {
-  const MINUTE = 60_000;
-  let now: number;
   let log: string[];
   let watcher: MergeWatcher;
-  let canRun: () => boolean;
   /** o gancho do fim da rodada (a rodada de publicação, #49); por padrão não faz nada */
   let after: () => Promise<void>;
   /** quantas chamadas de `gh` já tinham acontecido a cada vez que o gancho rodou */
@@ -158,7 +155,6 @@ describe('MergeWatcher', () => {
   const OPEN = json({ state: 'OPEN', mergedAt: null, mergeCommit: null });
   const prOf = (n: number) => `https://github.com/acme/app/pull/${n}`;
   const comments = (n: number) => router.snapshot().comments.filter((c) => c.cardId === card(n).id && c.author === 'Faz AI');
-  const flush = () => new Promise((r) => setTimeout(r, 0));
   /** deixa a história entregue: modo autônomo, pull request registrado e status com a pessoa */
   const deliver = async (n: number, url = prOf(n)) => {
     router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled: true });
@@ -167,9 +163,7 @@ describe('MergeWatcher', () => {
   };
 
   beforeEach(async () => {
-    now = 1_000_000;
     log = [];
-    canRun = () => true;
     after = async () => {};
     afterRuns = [];
     watcher = new MergeWatcher(router, {
@@ -182,8 +176,6 @@ describe('MergeWatcher', () => {
       removeWorktree: (_dir, p) => {
         removed.push(p);
       },
-      now: () => now,
-      canRun: () => canRun(),
       afterRound: () => {
         afterRuns.push(calls.length);
         return after();
@@ -252,8 +244,8 @@ describe('MergeWatcher', () => {
     expect(comments(1).filter((c) => c.body.includes('mergeado'))).toHaveLength(1);
     expect(removed).toEqual(['/projeto.worktrees/1-login']);
     expect(log.filter((l) => l.includes('mergeado'))).toHaveLength(1);
-    // depois de concluída, a história sai dos alvos: nenhuma consulta nova
-    expect(calls).toHaveLength(2);
+    // a rodada em paralelo não começa, e depois de concluída a história sai dos alvos: uma consulta só
+    expect(calls).toHaveLength(1);
   });
 
   it('fechado sem merge: avisa uma vez e não move nem bloqueia (RF7)', async () => {
@@ -359,65 +351,23 @@ describe('MergeWatcher', () => {
     expect(log).toEqual([]);
   });
 
-  it('tick respeita o liga/desliga e o intervalo configurado (RF13/RF14)', async () => {
-    ghResult = OPEN;
-    router.handle({ type: 'settings.board.update', patch: { git: { watchMerges: false, watchMergeMinutes: 15 } } });
-    now += 60 * MINUTE;
-    watcher.tick();
-    await flush();
-    expect(calls).toEqual([]);
-
-    // desligado, o relógio não anda: ao religar com o intervalo vencido, a rodada acontece
-    router.handle({ type: 'settings.board.update', patch: { git: { watchMerges: true } } });
-    watcher.tick();
-    await flush();
-    expect(calls).toHaveLength(1);
-
-    // a rodada zera a contagem: o tick seguinte espera outro intervalo inteiro
-    now += 14 * MINUTE;
-    watcher.tick();
-    await flush();
-    expect(calls).toHaveLength(1);
-
-    now += MINUTE;
-    watcher.tick();
-    await flush();
-    expect(calls).toHaveLength(2);
-  });
-
-  it('a primeira rodada acontece um intervalo depois de abrir o board, não na abertura', async () => {
-    ghResult = OPEN;
-    watcher.tick();
-    await flush();
-    expect(calls).toEqual([]);
-    now += 15 * MINUTE;
-    watcher.tick();
-    await flush();
-    expect(calls).toHaveLength(1);
-  });
-
-  it('só a janela dona do board consulta (RF15)', async () => {
-    ghResult = OPEN;
-    canRun = () => false;
-    now += 60 * MINUTE;
-    watcher.tick();
-    await flush();
-    expect(calls).toEqual([]);
-    canRun = () => true;
-    watcher.tick();
-    await flush();
-    expect(calls).toHaveLength(1);
-  });
-
-  it('nunca bloqueia nem deixa um erro escapar do tick', async () => {
+  it('nunca bloqueia nem deixa um erro escapar da rodada', async () => {
     ghResult = async () => {
       throw new Error('sem rede');
     };
-    now += 60 * MINUTE;
-    expect(() => watcher.tick()).not.toThrow();
-    await flush();
+    await expect(watcher.runNow()).resolves.toBe(1);
     expect(card(1).status).toBe('waiting_review');
     expect(log).toEqual(['Merges: sem rede']);
+  });
+
+  it('não começa outra rodada enquanto a anterior está em andamento', async () => {
+    let release!: () => void;
+    ghResult = () => new Promise<string>((r) => (release = () => r(JSON.stringify({ state: 'OPEN', mergedAt: null }))));
+    const first = watcher.runNow();
+    expect(await watcher.runNow()).toBe(0);
+    release();
+    expect(await first).toBe(1);
+    expect(calls).toHaveLength(1);
   });
 
   it('o gancho do fim da rodada roda uma vez, depois do último pull request consultado', async () => {
@@ -433,23 +383,6 @@ describe('MergeWatcher', () => {
     expect(afterRuns).toEqual([2]);
   });
 
-  it('com a detecção de merges desligada, nenhuma das duas rodadas acontece (RF1)', async () => {
-    ghResult = OPEN;
-    router.handle({ type: 'settings.board.update', patch: { git: { watchMerges: false } } });
-    now += 60 * MINUTE;
-    watcher.tick();
-    await flush();
-    expect(calls).toEqual([]);
-    expect(afterRuns).toEqual([]);
-
-    // o mesmo liga/desliga vale para as duas: religado, a rodada faz a consulta de merges e o gancho
-    router.handle({ type: 'settings.board.update', patch: { git: { watchMerges: true } } });
-    watcher.tick();
-    await flush();
-    expect(calls).toHaveLength(1);
-    expect(afterRuns).toEqual([1]);
-  });
-
   it('um erro do gancho não escapa da rodada e não trava a rodada seguinte', async () => {
     ghResult = OPEN;
     after = async () => {
@@ -458,10 +391,8 @@ describe('MergeWatcher', () => {
     await expect(watcher.runNow()).resolves.toBe(1);
     expect(log).toEqual([]);
 
-    // o `busy` voltou a false: o tick seguinte, com o intervalo vencido, faz outra rodada
-    now += 60 * MINUTE;
-    expect(() => watcher.tick()).not.toThrow();
-    await flush();
+    // o `busy` voltou a false: a rodada seguinte acontece
+    await expect(watcher.runNow()).resolves.toBe(1);
     expect(afterRuns).toHaveLength(2);
   });
 });

@@ -4,8 +4,9 @@ import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fake, fakeConfig, Uri } from './fakes/vscode';
+import { fake, fakeConfig, RelativePattern, Uri } from './fakes/vscode';
 import type { BoardState } from '../src/shared/model';
+import { claudeProjectKey } from '../src/shared/harnessCatalog';
 
 /**
  * Ponta a ponta da extensão com um editor de mentira: ativa, abre o board, cria um card pela
@@ -137,6 +138,47 @@ it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serv
   expect(fs.statSync(path.join(storage, 'boards', boards[0]!)).size).toBeGreaterThan(1000);
   expect(fs.existsSync(path.join(storage, 'fazai.db'))).toBe(false);
 });
+
+it.skipIf(process.platform === 'win32')(
+  'a skill global editada por fora chega ao board aberto, pelos watchers da pasta do usuário',
+  async () => {
+    const { deactivate } = await activateExtension();
+    // os watchers de fora da pasta do projeto têm um Uri como base; o da pasta, a pasta aberta
+    const outside = () =>
+      fake.watchers.flatMap((w) =>
+        w.glob instanceof RelativePattern && w.glob.base instanceof Uri
+          ? [{ watcher: w, base: w.glob.base.fsPath, glob: w.glob.pattern }]
+          : [],
+      );
+    const watched = () => outside().map((w) => `${w.glob} ${path.relative(home, w.base).split(path.sep).join('/')}`);
+    // sem o board carregado, nada da home é observado
+    expect(outside()).toEqual([]);
+
+    await fake.commands.get('fazai.openBoard')!();
+    const { webview } = fake.panels[0]!;
+    webview.receive({ type: 'ready' });
+    await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'boardState'), 'board enviado ao painel');
+    expect(watched()).toEqual(expect.arrayContaining(['** .claude/skills', '* .claude/CLAUDE.md', '* .claude.json', '** .cursor/agents']));
+    // nem a home inteira nem as transcrições de ~/.claude/projects: só a memória deste projeto
+    expect(watched().filter((w) => / (|\.claude|\.claude\/projects)$/.test(w))).toEqual([]);
+    expect(watched().filter((w) => w.includes('.claude/projects/'))).toEqual([`** .claude/projects/${claudeProjectKey(project)}/memory`]);
+
+    const skill = path.join(home, '.claude', 'skills', 'revisao-global', 'SKILL.md');
+    fs.mkdirSync(path.dirname(skill), { recursive: true });
+    fs.writeFileSync(skill, '---\nname: revisao-global\ndescription: Revisa o diff\n---\n');
+    outside()
+      .find((w) => w.base === path.join(home, '.claude', 'skills'))!
+      .watcher.fire(Uri.file(skill));
+    const userSkills = () => {
+      const last = webview.posted.filter((m) => (m as { type: string }).type === 'boardState').at(-1) as { state: BoardState };
+      return last.state.harness.inventory.flatMap((t) => t.items).filter((i) => i.kind === 'skill' && i.scope === 'user');
+    };
+    await wait(() => userSkills().some((i) => i.name === 'revisao-global'), 'skill global relida');
+
+    await deactivate();
+    expect(outside().every((w) => w.watcher.disposed)).toBe(true);
+  },
+);
 
 it.skipIf(process.platform === 'win32')('comandos de ida e volta entre o board e o Settings do editor', async () => {
   const { deactivate } = await activateExtension();

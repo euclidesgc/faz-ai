@@ -102,6 +102,23 @@ beforeEach(async () => {
 });
 
 describe('heartbeat', () => {
+  it('cada rodada, automática ou pedida, confere os merges, mesmo sem nada pendente com a IA', () => {
+    let rounds = 0;
+    heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => now, log: () => {}, onRound: () => rounds++ });
+    heartbeat.tick();
+    expect(rounds).toBe(0); // o intervalo ainda não passou
+    now += 60 * 60_000;
+    heartbeat.tick();
+    expect(rounds).toBe(1);
+    heartbeat.runNow();
+    expect(rounds).toBe(2);
+    // com o heartbeat desligado, só a rodada pedida confere
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false } } });
+    now += 60 * 60_000;
+    heartbeat.tick();
+    expect(rounds).toBe(2);
+  });
+
   it('escolhe uma execução por história, na ordem da fila', () => {
     create('A', 'PRD'); // #1 pronto
     create('Sub de A', 'A fazer', 1); // #2: tratada junto com #1
@@ -340,5 +357,23 @@ describe('heartbeat', () => {
     heartbeat.runNow();
     expect(log.at(-1)).toBe('Heartbeat: ferramenta indisponível');
     expect(heartbeat.busy).toBe(false);
+  });
+
+  it('com o login vencido (preventivo ou reativo), não inicia nenhuma história e esvazia a rodada', () => {
+    create('A', 'PRD');
+    create('B', 'Spec');
+    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+    heartbeat.runNow();
+    expect(runner.started).toEqual([]);
+
+    router.setRequirements([]);
+    router.setAuthExpired('claude');
+    heartbeat.runNow();
+    expect(runner.started).toEqual([]);
+
+    router.setAuthExpired(null);
+    heartbeat.runNow();
+    // as duas estão em fase de texto e cabem no teto de texto (2): o login de volta libera as duas
+    expect(runner.started).toHaveLength(2);
   });
 });

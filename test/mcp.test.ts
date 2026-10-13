@@ -6,11 +6,18 @@ import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
-import { createMcpServer, startMcpServer } from '../src/extension/mcp/server';
+import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
+import { createMcpServer, MCP_INSTRUCTIONS, startMcpServer } from '../src/extension/mcp/server';
+import { boardServerFootprint } from '../src/extension/mcp/footprint';
+import { toolDefinitions } from '../src/extension/mcp/tools';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { forgetModels, parseCursorModels, rememberModels } from '../src/extension/models';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
+
+// O Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta neste tamanho
+// (https://code.claude.com/docs/en/mcp, "Tool search for MCP server authors", lida em 2026-10-13): o resto a IA não lê.
+const CLAUDE_CODE_CUT = 2048;
 
 let dir: string;
 let router: MessageRouter;
@@ -52,6 +59,28 @@ beforeEach(async () => {
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 describe('servidor MCP', () => {
+  it('as definições medidas sem servidor são as que o tools/list entrega, na mesma ordem', async () => {
+    const listed = (await client.listTools()).tools;
+    const defined = toolDefinitions();
+    expect(defined.map((t) => t.name)).toEqual(listed.map((t) => t.name));
+    for (const [i, t] of defined.entries()) {
+      expect(t.description).toBe(listed[i]!.description);
+      expect(t.inputSchema).toEqual(listed[i]!.inputSchema);
+    }
+  });
+
+  it('o tamanho do servidor do board para o contexto estimado: nomes com prefixo, instruções e definições', () => {
+    const f = boardServerFootprint();
+    const defined = toolDefinitions();
+    expect(f.server).toBe('faz-ai');
+    expect(f.tools).toBe(defined.length);
+    expect(f.names).toBe(defined.reduce((n, t) => n + `mcp__faz-ai__${t.name}\n`.length, 0));
+    expect(f.instructions).toBe(MCP_INSTRUCTIONS.length);
+    expect(f.definitions).toBeGreaterThan(defined.reduce((n, t) => n + t.description.length, 0));
+    // o snapshot leva a medida para a tela
+    expect(router.snapshot().boardServer).toEqual(f);
+  });
+
   it('expõe as ferramentas e descreve o board', async () => {
     const names = (await client.listTools()).tools.map((t) => t.name);
     expect(names).toEqual(
@@ -69,9 +98,43 @@ describe('servidor MCP', () => {
     );
     const board = (await call('get_board')).data;
     expect(board.workflows.map((w: any) => w.columns.map((c: any) => c.name))).toEqual([
-      ['Backlog', 'Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Homologação', 'Concluído', 'Cancelado'],
+      ['Backlog', 'Discovery', 'PRD', 'Spec', 'Plan', 'Implementação', 'Revisão', 'Homologação', 'Concluído', 'Cancelado'],
       ['A fazer', 'Em andamento', 'Concluído'],
     ]);
+  });
+
+  it('instruções e descrições das ferramentas cabem no corte do Claude Code, com o ciclo do card nas instruções', async () => {
+    const instructions = client.getInstructions() ?? '';
+    expect(instructions.length).toBeLessThanOrEqual(CLAUDE_CODE_CUT);
+    for (const part of [
+      'get_pending_work',
+      'start_work',
+      '`requiresApproval`',
+      'request_review e PARE',
+      '"approved"',
+      '`model`',
+      'subagente',
+      '`requiredRules`',
+      '`requiredSkills`',
+      'request_review e `pending`',
+    ])
+      expect(instructions).toContain(part);
+    const tooLong = (await client.listTools()).tools
+      .filter((t) => (t.description ?? '').length > CLAUDE_CODE_CUT)
+      .map((t) => `${t.name} (${t.description!.length})`);
+    expect(tooLong).toEqual([]);
+  });
+
+  it('o que não cabe nas instruções está na descrição da ferramenta em que a IA precisa dele', async () => {
+    const tools = (await client.listTools()).tools;
+    const description = (name: string) => tools.find((t) => t.name === name)!.description;
+    expect(description('get_card')).toContain('`attachment:<nome>`');
+    expect(description('get_card')).toContain('`subtasksNow`');
+    expect(description('get_board')).toContain('Configurações → Harness: não indique nada fora deles');
+    expect(description('get_models')).toContain('"Esforço da atividade" do card é o tamanho da tarefa');
+    expect(description('link_cards')).toMatch(/usa o que a outra produz ou quando as duas alteram os mesmos arquivos/);
+    expect(description('add_attachment')).toContain('`artifact: true`');
+    expect(description('get_harness')).toContain('contexto vazio');
   });
 
   it('parâmetro desconhecido é erro com o nome dele, e nada é criado', async () => {
@@ -199,9 +262,19 @@ describe('servidor MCP', () => {
     expect(board.workflows[1].columns[0].name).toBe('Triagem');
     expect((await call('update_column', { column: 'Concluído', name: 'Feito' })).text).toContain('informe também o workflow');
     board = (await call('update_column', { column: 'Concluído', workflow: 'parent', name: 'Feito' })).data;
-    expect(board.workflows[0].columns[7].name).toBe('Feito');
+    expect(board.workflows[0].columns[8].name).toBe('Feito');
     board = (await call('create_field', { name: 'Estimativa', kind: 'number', applies_to_types: ['História'] })).data;
     expect(board.fields.at(-1)).toMatchObject({ name: 'Estimativa', appliesTo: ['História'] });
+    expect(board.fields.at(-1).board).toBeUndefined();
+    // os campos do board vêm marcados, e o que as regras usam deles não muda pelo MCP
+    expect(board.fields.find((f: any) => f.name === 'Fase').board).toBe(true);
+    const rename = await call('update_field', { field: 'Fase', name: 'Etapa' });
+    expect(rename.error).toBe(true);
+    expect(rename.text).toContain('não pode ser renomeado');
+    expect((await call('delete_field', { field: 'Criticidade' })).text).toContain('não pode ser apagado');
+    expect((await call('create_field', { name: 'skills', kind: 'text' })).text).toContain('é o nome de um campo do board');
+    board = (await call('update_field', { field: 'Tags', options: ['web', 'mobile'], display: 'inline' })).data;
+    expect(board.fields.find((f: any) => f.name === 'Tags')).toMatchObject({ board: true, options: ['web', 'mobile'], display: 'inline' });
     expect((await call('update_rules', { blockDoneWithOpenChildren: false })).data.blockDoneWithOpenChildren).toBe(false);
   });
 });
@@ -384,6 +457,7 @@ describe('harness e padrões pelo MCP', () => {
     const inventory = (await call('get_harness')).data.inventory;
     expect(inventory.find((i: any) => i.name === 'commit' && i.scope === 'user')).toEqual({
       kind: 'skill',
+      group: 'skill',
       scope: 'user',
       usage: 'contextual',
       name: 'commit',
@@ -444,16 +518,23 @@ describe('harness e padrões pelo MCP', () => {
   });
 
   it('aplica os padrões do tipo aos cards novos e recria o board', async () => {
+    // a Fase não tem padrão por tipo: ela é a fase da história a que cada sub-tarefa pertence
+    const phase = await call('update_card_type', { type: 'Sub-tarefa', default_fields: { Fase: 'Implementação' } });
+    expect(phase.text).toContain('não tem valor padrão por tipo');
     const board = (
-      await call('update_card_type', { type: 'Sub-tarefa', default_fields: { Modelo: 'claude sonnet 5.5 high', Fase: 'Implementação' } })
+      await call('update_card_type', {
+        type: 'Sub-tarefa',
+        default_fields: { Modelo: 'claude sonnet 5.5 high', 'Esforço da atividade': 'Médio' },
+      })
     ).data;
     expect(board.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toEqual({
       Modelo: 'claude:sonnet@high',
-      Fase: 'Implementação',
+      'Esforço da atividade': 'Médio',
     });
     await call('create_card', { title: 'História' });
-    const sub = (await call('create_card', { title: 'Tarefa', parent: 1, fields: { Fase: 'Spec' } })).data;
-    expect(sub.fields).toEqual({ Modelo: 'Claude Code · Sonnet 5.5 · high', Fase: 'Spec' }); // o valor informado vence o padrão
+    const sub = (await call('create_card', { title: 'Tarefa', parent: 1, fields: { Fase: 'Spec', 'Esforço da atividade': 'Alto' } })).data;
+    // o valor informado vence o padrão, e a IA grava a Fase
+    expect(sub.fields).toEqual({ Fase: 'Spec', 'Esforço da atividade': 'Alto', Modelo: 'Claude Code · Sonnet 5.5 · high' });
     expect((await call('get_card', { card: 1 })).data.fields).toBeUndefined();
 
     const fresh = (await call('reset_board')).data;
@@ -524,6 +605,9 @@ describe('modelos de IA', () => {
 
     const card = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
     expect(card.model.value).toBe('claude:haiku');
+    // a nota diz o que fazer com o modelo e separa o esforço do modelo do "Esforço da atividade"
+    expect(card.model.note).toMatch(/delegue o trabalho a um subagente[\s\S]*avise a pessoa/);
+    expect(card.model.note).toContain('"Esforço da atividade": ele é o tamanho da tarefa');
     // o modelo veio da sugestão, então acompanha a mudança de esforço
     expect((await call('update_card', { card: 1, fields: { Esforço: 'Alto' } })).data.model.value).toBe('claude:opus@high');
     // escolhido à mão: não é mais trocado, mas a sugestão continua visível
@@ -1396,8 +1480,14 @@ describe('vínculos entre cards', () => {
     const byRef = (ref: string) => router.snapshot().cards.find((k) => `#${k.number}` === ref)!;
     router.handle({ type: 'card.status.set', cardId: byRef(b.id).id, status: 'waiting_answer' });
     router.handle({ type: 'card.status.set', cardId: byRef(c.id).id, status: 'running' }, { source: 'ai' });
-    const now = (await call('get_card', { card: story.id })).data.subtasksNow;
-    expect(now).toEqual({ canRunTogether: [a.id, d.id], waiting: [], withPerson: [b.id], running: [c.id] });
+    const got = (await call('get_card', { card: story.id })).data;
+    expect(got.subtasksNow).toEqual({ canRunTogether: [a.id, d.id], waiting: [], withPerson: [b.id], running: [c.id] });
+    // a nota das rodadas vem junto, porque não cabe nas instruções do servidor
+    expect(got.subtasksNowNote).toBe(SUBTASKS_NOW_NOTE);
+    // sub-tarefa sem rodada não traz nem as rodadas nem a nota
+    const single = (await call('get_card', { card: a.id })).data;
+    expect(single.subtasksNow).toBeUndefined();
+    expect(single.subtasksNowNote).toBeUndefined();
   });
 
   it('create_card com depends_on valida os vínculos antes de criar e ignora repetidos', async () => {
@@ -1420,6 +1510,106 @@ describe('vínculos entre cards', () => {
     await call('link_cards', { card: a.id, other: b.id, relation: 'parent' });
     expect(router.snapshot().links[0]).toMatchObject({ kind: 'child' });
     expect((await call('get_card', { card: a.id })).data.links.parents).toMatchObject([{ id: b.id }]);
+  });
+});
+
+describe('registro de decisão na Homologação', () => {
+  it('com a pasta ligada, a última coluna da IA diz onde gravar o registro da história; desligada, não diz nada', async () => {
+    await call('create_card', { title: 'Exportar CSV', column: 'Homologação' });
+    await call('create_card', { title: 'Outra', column: 'Spec' });
+    expect((await call('get_card', { card: 1 })).data.phase.decisionRecord).toBeUndefined();
+    router.handle({ type: 'settings.board.update', patch: { git: { decisionRecords: 'docs/decisoes' } } });
+    const record = (await call('get_card', { card: 1 })).data.phase.decisionRecord;
+    expect(record.path).toBe('docs/decisoes/0001-exportar-csv.md');
+    expect(record.note).toContain('Alternativas descartadas');
+    expect((await call('get_card', { card: 2 })).data.phase.decisionRecord).toBeUndefined();
+  });
+});
+
+describe('retrabalho pelo get_metrics e no painel', () => {
+  const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
+
+  it('conta a revisão devolvida com ajuste, a aprovada de primeira e o bug vinculado a uma história concluída', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD' });
+    await call('create_card', { title: 'Exportar', column: 'PRD' });
+    // #1: devolvida com ajuste, aprovada na segunda
+    await call('request_review', { card: 1, summary: 'PRD pronto' });
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'ready', note: 'Falta o caso de erro' });
+    await call('request_review', { card: 1, summary: 'PRD com o caso de erro' });
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'approved' });
+    // #2: aprovada de primeira, e concluída; depois aparece um bug vinculado a ela
+    await call('request_review', { card: 2, summary: 'PRD pronto' });
+    router.handle({ type: 'card.status.set', cardId: card(2).id, status: 'approved' });
+    const done = router.snapshot().columns.find((c) => c.workflowId === card(2).workflowId && c.category === 'done')!;
+    router.handle({ type: 'card.move', cardId: card(2).id, columnId: done.id, position: 0 });
+    await call('create_card', { title: 'Exportar falha com acento', type: 'Bug' });
+    router.handle({ type: 'link.add', fromId: card(3).id, toId: card(2).id, kind: 'related' });
+
+    // #4: a pessoa arrasta para a Spec o card que aguardava revisão: não aprovou nem pediu ajuste
+    await call('create_card', { title: 'Importar', column: 'PRD' });
+    await call('request_review', { card: 4, summary: 'PRD pronto' });
+    const spec = router.snapshot().columns.find((c) => c.workflowId === card(4).workflowId && c.name === 'Spec')!;
+    router.handle({ type: 'card.move', cardId: card(4).id, columnId: spec.id, position: 0 });
+
+    // #6 veio corrigir o Bug #5, que já existia: o bug não escapou de #6. E o próprio Bug, concluído, não é história
+    await call('create_card', { title: 'Acento quebra o CSV', type: 'Bug' });
+    await call('create_card', { title: 'Corrigir acento' });
+    router.handle({ type: 'link.add', fromId: card(5).id, toId: card(6).id, kind: 'related' });
+    router.handle({ type: 'card.move', cardId: card(6).id, columnId: done.id, position: 0 });
+    router.handle({ type: 'card.move', cardId: card(5).id, columnId: done.id, position: 0 });
+
+    const rework = router.panelMetrics({}).sections.rework;
+    expect(rework.phases).toEqual([{ phase: 'PRD', reviews: 4, approved: 2, adjusted: 1, resolved: 2, firstPass: 1 }]);
+    expect(rework.escapes).toEqual({ stories: 2, withBugs: 1, bugs: 1 });
+
+    const text = (await call('get_metrics', { rework: true })).text;
+    expect(text).toContain('retrabalho por fase');
+    expect(text).toContain('1 de 2');
+    expect(text).toContain('histórias concluídas no período: 2; com bug vinculado: 1 (1 bug(s))');
+  });
+});
+
+describe('histórias derivadas e caminho curto', () => {
+  const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
+
+  it('create_card com derived_from marca a origem, vincula as duas e explica a pilha na conversa', async () => {
+    const origem = (await call('create_card', { title: 'Exportar CSV', column: 'Plan' })).data;
+    const derivada = (await call('create_card', { title: 'Exportar CSV: filtros', derived_from: origem.id })).data;
+    expect(derivada.derivedFrom).toBe(`${origem.id} Exportar CSV`);
+    expect(card(2).derivedFrom).toBe(card(1).id);
+    expect(card(2).yolo).toBe(false);
+    expect(router.snapshot().links).toMatchObject([{ kind: 'related' }]);
+    const comments = router.snapshot().comments.filter((m) => m.cardId === card(2).id);
+    expect(comments.at(-1)!.body).toContain(`Derivada de ${origem.id} Exportar CSV`);
+    expect((await call('get_card', { card: derivada.id })).data.derivedFrom).toBe(`${origem.id} Exportar CSV`);
+  });
+
+  it('a derivada não cria branch enquanto a parte anterior, aberta, ainda não tem a dela', async () => {
+    await call('create_card', { title: 'Parte 1', column: 'Plan' });
+    await call('create_card', { title: 'Parte 2', column: 'Implementação', derived_from: 1 });
+    expect(() => router.handle({ type: 'card.workspace.prepare', cardId: card(2).id })).toThrow(/#1, que ainda não tem branch/);
+  });
+
+  it('derived_from só vale entre histórias, sem ciclo e antes de a derivada ter branch', async () => {
+    const a = (await call('create_card', { title: 'A' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: a.id })).data;
+    expect((await call('create_card', { title: 'Sub derivada', parent: a.id, derived_from: a.id })).error).toBe(true);
+    expect((await call('create_card', { title: 'De sub-tarefa', derived_from: sub.id })).error).toBe(true);
+    const b = (await call('create_card', { title: 'B', derived_from: a.id })).data;
+    // A já não pode derivar de B: a pilha viraria um ciclo
+    expect(() => router.handle({ type: 'card.derive', cardId: card(1).id, fromId: card(3).id })).toThrow(/já deriva/);
+    expect(() => router.handle({ type: 'card.derive', cardId: card(1).id, fromId: card(1).id })).toThrow(/dela mesma/);
+    expect(b.derivedFrom).toBe(`${a.id} A`);
+  });
+
+  it('a história criada direto numa fase adiante sabe quais documentos das fases anteriores não existem', async () => {
+    const curta = (await call('create_card', { title: 'Ajuste de texto', column: 'Plan' })).data;
+    const phase = (await call('get_card', { card: curta.id })).data.phase;
+    expect(phase.missingArtifacts).toEqual(['DISCOVERY.md', 'PRD.md', 'SPEC.md']);
+    expect(phase.missingArtifactsNote).toContain('Não crie esses documentos');
+
+    const longa = (await call('create_card', { title: 'Do começo', column: 'Discovery' })).data;
+    expect((await call('get_card', { card: longa.id })).data.phase.missingArtifacts).toBeUndefined();
   });
 });
 
@@ -1466,6 +1656,137 @@ describe('modo autônomo (YOLO)', () => {
     expect(card(1).status).toBe('approved');
     expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toBe('PRD pronto');
     expect(approvals).toEqual([]);
+  });
+
+  it('até onde: a IA segue sozinha até a fase escolhida, pede a revisão nela e o modo se desliga', async () => {
+    await call('create_card', { title: 'Login', column: 'Discovery' });
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('Spec').id });
+    expect(card(1).yoloUntil).toBe(column('Spec').id);
+    expect((await call('get_card', { card: 1 })).data).toMatchObject({ autonomous: true, autonomousUntil: 'Spec' });
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('Modo autônomo ligado até Spec');
+
+    // antes da parada, as aprovações não seguram
+    expect((await call('request_review', { card: 1, summary: 'Discovery pronto' })).data.card.work.status).toBe('approved');
+    await call('move_card', { card: 1, column: 'PRD' });
+    await call('move_card', { card: 1, column: 'Spec' });
+
+    // na parada, a coluna segura como se exigisse aprovação
+    const phase = (await call('get_card', { card: 1 })).data.phase;
+    expect(phase.requiresApproval).toBe(true);
+    expect(phase.autonomousNote).toContain('até Spec');
+    const early = await call('move_card', { card: 1, column: 'Plan' });
+    expect(early.error).toBe(true);
+    expect(early.text).toContain('última fase que a pessoa liberou');
+
+    const res = (await call('request_review', { card: 1, summary: 'Spec pronta' })).data;
+    expect(res.card.work.status).toBe('waiting_review');
+    expect(res.next).toContain('o modo foi desligado');
+    // o modo se desliga, mas a história guarda até onde foi: a entrega dela segue na pilha do modo
+    expect(card(1)).toMatchObject({ yolo: false, yoloUntil: column('Spec').id, status: 'waiting_review' });
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('O modo autônomo chegou até Spec');
+    // daqui em diante valem as aprovações de sempre
+    expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(true);
+  });
+
+  it('até onde: só colunas da IA da atual em diante; a última vale como "até o fim"; com o modo ligado, só muda a parada', async () => {
+    await call('create_card', { title: 'Login', column: 'Spec' });
+    expect(() => router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('PRD').id })).toThrow(
+      /de Spec em diante/,
+    );
+    const done = router.snapshot().columns.find((c) => c.workflowId === card(1).workflowId && c.category === 'done')!;
+    expect(() => router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: done.id })).toThrow();
+    const childTodo = router.snapshot().columns.find((c) => c.name === 'A fazer')!;
+    expect(() => router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: childTodo.id })).toThrow(
+      /não tem a coluna/,
+    );
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('Homologação').id });
+    expect(card(1)).toMatchObject({ yolo: true, yoloUntil: null });
+    expect((await call('get_card', { card: 1 })).data.autonomousUntil).toBeUndefined();
+
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('Plan').id });
+    expect(card(1)).toMatchObject({ yolo: true, yoloUntil: column('Plan').id });
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toBe('O modo autônomo agora vai até Plan.');
+  });
+
+  it('até onde: a história já aguardando revisão na coluna atual não pode parar nela', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD' });
+    await call('request_review', { card: 1, summary: 'PRD pronto' });
+    expect(() => router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('PRD').id })).toThrow();
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('Spec').id });
+    // ligar libera a revisão pendente, e a IA segue até a Spec
+    expect(card(1)).toMatchObject({ yolo: true, status: 'approved' });
+  });
+
+  it('até onde em lote vale para cada história, e a história criada a partir de outra vai até o mesmo ponto', async () => {
+    await call('create_card', { title: 'A', column: 'Discovery' });
+    await call('create_card', { title: 'B', column: 'PRD' });
+    router.handle({ type: 'card.yolo.setMany', cardIds: [card(1).id, card(2).id], enabled: true, until: column('Plan').id });
+    expect([card(1).yoloUntil, card(2).yoloUntil]).toEqual([column('Plan').id, column('Plan').id]);
+    await call('create_card', { title: 'A2', autonomous_from: 1 });
+    expect(card(3)).toMatchObject({ yolo: true, yoloUntil: column('Plan').id });
+  });
+
+  it('história do núcleo: mesmo no modo autônomo, cada coluna que exige aprovação espera a pessoa', async () => {
+    await call('update_rules', { criticalPaths: ['src/db/**', ' src/db/** ', ''] });
+    expect(router.snapshot().board.rules.criticalPaths).toEqual(['src/db/**']);
+    await call('create_card', { title: 'Migração', column: 'PRD', fields: { Criticidade: 'Núcleo' } });
+    setYolo(1, true);
+    const before = (await call('get_card', { card: 1 })).data;
+    expect(before.criticalAreas).toMatchObject({ paths: ['src/db/**'], story: 'Núcleo' });
+    expect(before.phase.requiresApproval).toBe(true);
+    expect(before.phase.autonomousNote).toContain('do núcleo');
+    expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(true);
+
+    const res = (await call('request_review', { card: 1, summary: 'PRD pronto' })).data;
+    expect(res.card.work.status).toBe('waiting_review');
+    expect(res.next).toContain('História do núcleo');
+    expect(card(1).yolo).toBe(true);
+    expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('História do núcleo');
+
+    // a pessoa aprova, e a IA segue sozinha
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'approved' });
+    expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(false);
+
+    // a IA não tira a história do núcleo; uma pessoa tira
+    const downgrade = await call('update_card', { card: 1, fields: { Criticidade: 'Periferia' } });
+    expect(downgrade.error).toBe(true);
+    expect(downgrade.text).toContain('Só uma pessoa tira a história do núcleo');
+
+    // ligar o modo numa história do núcleo que aguarda revisão não a aprova: alguém tem de ler
+    setYolo(1, false);
+    await call('request_review', { card: 1, summary: 'Spec pronta' });
+    expect(card(1).status).toBe('waiting_review');
+    setYolo(1, true);
+    expect(card(1).status).toBe('waiting_review');
+
+    // na última coluna da IA, a entrega é o pull request: a fase não pede aprovação, nem no núcleo
+    await call('create_card', { title: 'Entrega', column: 'Homologação', fields: { Criticidade: 'Núcleo' } });
+    setYolo(2, true);
+    expect((await call('get_card', { card: 2 })).data.phase.requiresApproval).toBe(false);
+
+    // a periferia segue o modo como sempre
+    await call('create_card', { title: 'Texto', column: 'PRD', fields: { Criticidade: 'Periferia' } });
+    setYolo(3, true);
+    expect((await call('request_review', { card: 3, summary: 'PRD pronto' })).data.card.work.status).toBe('approved');
+    expect((await call('get_card', { card: 3 })).data.criticalAreas.story).toBe('Periferia');
+  });
+
+  it('request_review com pending fica em waiting_review mesmo em YOLO: a pendência é da pessoa e o status mostra isso', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD' });
+    setYolo(1, true);
+    const approvals: string[] = [];
+    router.onDidApprove((id) => approvals.push(id));
+
+    const res = (await call('request_review', { card: 1, summary: 'PRD pronto', pending: 'Decidir se o limite fica em 5 ou 10' })).data;
+    expect(res.card.work).toMatchObject({ status: 'waiting_review', with: 'human' });
+    expect(res.next).toContain('pendência está com a pessoa');
+    expect(card(1).status).toBe('waiting_review');
+    const last = (await call('get_card', { card: 1 })).data.comments.at(-1).body;
+    expect(last).toContain('PRD pronto');
+    expect(last).toContain('**Travado em mim**');
+    expect(last).toContain('Decidir se o limite fica em 5 ou 10');
+    expect(approvals).toEqual([]);
+    expect((await call('get_pending_work', {})).data.withPerson.map((c: any) => c.id)).toContain('#1');
   });
 
   it('set_pull_request na última coluna da IA entrega a história YOLO: waiting_review (não approved) e aviso na conversa', async () => {
@@ -1541,7 +1862,7 @@ describe('modo autônomo (YOLO)', () => {
     setYolo(1, true);
     const asked = await call('ask_question', { card: 1, question: 'Qual provedor?' });
     expect(asked.error).toBe(true);
-    expect(asked.text).toContain('Decida por conta própria');
+    expect(asked.text).toContain('segue os padrões do projeto');
     expect(card(1).status).toBe('ready');
     // impedimento de verdade continua possível
     expect((await call('block_card', { card: 1, reason: 'Sem acesso' })).error).toBe(false);

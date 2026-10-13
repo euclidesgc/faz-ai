@@ -126,6 +126,24 @@ export const metrics: Record<string, string> = {
   'Média e mediana de cada passagem por uma fase, e quantos cards estão nela agora.':
     'Mean and median of each pass through a phase, and how many cards are in it now.',
   'Lead time': 'Lead time',
+  // retrabalho (Rework)
+  Retrabalho: 'Rework',
+  'O que voltou com pedido de ajuste, o que foi aprovado de primeira e os bugs que apareceram em histórias concluídas.':
+    'What came back with a change request, what was approved on the first try and the bugs that showed up in done stories.',
+  'Nenhuma revisão nem história concluída neste período.': 'No review or done story in this period.',
+  'Aprovadas de primeira': 'Approved on the first try',
+  '{pct} ({n} de {total} respostas)': '{pct} ({n} of {total} answers)',
+  'nenhuma resposta da pessoa no período': 'no answer from a person in the period',
+  'Pedidos de ajuste': 'Change requests',
+  'Histórias concluídas com bug vinculado': 'Done stories with a linked bug',
+  '{n} de {total} ({bugs} bug(s))': '{n} of {total} ({bugs} bug(s))',
+  'nenhuma história concluída no período': 'no story done in the period',
+  'Retrabalho por fase': 'Rework by phase',
+  'Retrabalho por modelo': 'Rework by model',
+  'Revisões pedidas': 'Reviews requested',
+  '{n} de {total}': '{n} of {total}',
+  'Conta só a resposta de uma pessoa: aprovar ou pedir ajustes. A aprovação automática do modo autônomo não é revisão. "De primeira" é a primeira resposta da pessoa àquele card naquela fase; o ajuste conta para o modelo da execução que pediu a revisão.':
+    'Only a person\'s answer counts: approving or requesting changes. The automatic approval of autonomous mode is not a review. "On the first try" is the person\'s first answer to that card in that phase; a change request counts for the model of the run that asked for the review.',
   'Do primeiro registro do card até a conclusão, dos cards concluídos no período.':
     'From the first record of the card to its completion, for the cards completed in the period.',
   'Mais caros e mais demorados': 'Most expensive and slowest',
@@ -197,6 +215,8 @@ export const metrics: Record<string, string> = {
   'Ordenado pela coluna "{column}", decrescente.': 'Sorted by the "{column}" column, descending.',
   'Ordenado pela coluna "{column}", crescente.': 'Sorted by the "{column}" column, ascending.',
   'É o padrão quando o período tem custo medido.': 'This is the default when the period has measured cost.',
+  'É o padrão quando o período tem tokens medidos.': 'This is the default when the period has measured tokens.',
+  'É o padrão enquanto o período não tem tokens medidos.': 'This is the default while the period has no measured tokens.',
   'É o padrão enquanto o período não tem custo medido.': 'This is the default while the period has no measured cost.',
   'Mostrar só as {n} primeiras linhas': 'Show only the first {n} rows',
   'Mostrar mais {n} linha': 'Show {n} more row',

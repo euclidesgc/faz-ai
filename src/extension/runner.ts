@@ -1,8 +1,10 @@
 import { cardRef } from '../shared/model';
-import { aiToolInfo } from '../shared/harness';
+import { aiToolInfo, type AiTool } from '../shared/harness';
 import type { AiRunOrigin, RunReport } from '../shared/log';
+import { SHOW_COST } from '../shared/metrics';
 import { columnOf, isLive } from '../shared/selectors';
-import { isWithHuman, isYolo, storyOf } from '../shared/story';
+import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../shared/story';
+import { CORE, CRITICALITY_FIELD, isCoreStory } from '../shared/critical';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
@@ -16,7 +18,7 @@ import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
 import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
 import type { MessageRouter } from './panel/messageRouter';
-import type { AiActivity, BoardState } from '../shared/model';
+import type { AiActivity, BoardState, Card } from '../shared/model';
 
 /** Processo da ferramenta de IA em execução. */
 export interface RunningProcess {
@@ -81,6 +83,17 @@ interface Run {
 }
 
 const RUNNER_AUTHOR = 'Faz AI';
+
+/**
+ * Padrões de saída que indicam login vencido, por ferramenta: a falha vira o aviso global (RF6), não
+ * um bloqueio do card. Risco já documentado na Spec: a lista pode ficar desatualizada se a CLI mudar o
+ * texto de erro; qualquer saída que não bata nenhum padrão segue o caminho atual (RF7).
+ */
+const AUTH_FAILURE_PATTERNS: Record<AiTool, RegExp[]> = {
+  claude: [/oauth session expired/i, /failed to authenticate/i, /not logged in/i, /invalid api key/i],
+  cursor: [/not authenticated/i, /please (log|sign) in/i],
+};
+
 const TAIL_LINES = 12;
 /** Tamanho de cada linha do `tail`: a explicação da falha no card não vira despejo de saída. */
 const TAIL_CHARS = 300;
@@ -114,7 +127,7 @@ export function consumptionLine(report: RunReport, why: { reason?: string | null
       `${COUNT.format(c.cacheReadTokens)} leitura de cache`,
       `${COUNT.format(c.cacheWriteTokens)} criação de cache`,
       ...(c.turns !== null ? [`${COUNT.format(c.turns)} ${c.turns === 1 ? 'turno' : 'turnos'}`] : []),
-      ...(c.costUsd !== null ? [`US$ ${USD.format(c.costUsd)}`] : []),
+      ...(SHOW_COST && c.costUsd !== null ? [`US$ ${USD.format(c.costUsd)}`] : []),
     ];
     return `${report.measure === 'partial' ? 'Consumo parcial' : 'Consumo'}: ${parts.join(' · ')}`;
   }
@@ -127,11 +140,34 @@ export function consumptionLine(report: RunReport, why: { reason?: string | null
 export const AUTONOMOUS_ADVICE = [
   'MODO AUTÔNOMO (YOLO): esta história foi liberada para rodar sozinha. Ninguém aprova, responde nem acompanha esta sessão.',
   'Não chame request_review nem ask_question (a pergunta é recusada). Ao terminar a fase, registre na conversa o que foi feito e as decisões que tomou (add_comment) e mova o card para a próxima coluna.',
-  'Diante de uma dúvida, decida pela opção mais razoável segundo o código, a documentação e a conversa, e registre a decisão e o motivo na conversa.',
+  'Ninguém revisa as decisões do meio do caminho: siga sempre os padrões do projeto e as regras de arquitetura dele (CLAUDE.md, AGENTS.md, DESIGN.md e o código parecido que já existe) e, entre os caminhos que seguem esses padrões, escolha o menos complexo. Diante de uma dúvida, decida por esse critério e registre a decisão e o motivo na conversa.',
   'Use block_card só se for impossível seguir (acesso, ambiente, falha que você não resolve), explicando o que é preciso para destravar.',
   'Na Implementação, execute todas as sub-tarefas até o fim. Na última coluna em que a IA atua (Homologação, no board padrão) não há aprovação nem próxima fase: envie a branch, abra o pull request, registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa), resuma na conversa o que foi feito e como testar, e pare: não avance o card. Não faça o merge.',
   'Se o pedido for grande demais para uma entrega só (partes independentes), divida-o no Discovery: mantenha nesta história a primeira entrega e crie as seguintes com create_card (autonomous_from = esta história), em ordem de dependência. Elas entram na fila e cada uma parte da branch da anterior, com o pull request empilhado (--base na branch anterior).',
 ].join('\n');
+
+/**
+ * O que a IA recebe a mais quando a pessoa ligou o modo autônomo só até uma fase: na própria fase, que
+ * ali ela pede a revisão e para; antes dela, até onde vai. `null` quando o modo vai até o fim.
+ */
+export function yoloStopAdvice(state: BoardState, card: Card): string | null {
+  const story = storyOf(state, card) ?? card;
+  const column = state.columns.find((c) => c.id === story.columnId);
+  // a história do núcleo espera a pessoa em cada coluna que exige aprovação, mesmo antes da parada
+  if (
+    card.id === story.id &&
+    column?.requiresApproval &&
+    column.id !== lastAiColumn(state, story.workflowId)?.id &&
+    !isAtYoloStop(state, story) &&
+    isCoreStory(state, story)
+  )
+    return `HISTÓRIA DO NÚCLEO (${CRITICALITY_FIELD} = ${CORE}): mesmo no modo autônomo, ${column.name} exige a aprovação da pessoa. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare; depois de aprovada, a IA segue sozinha. É uma exceção ao "não chame request_review" do modo autônomo.`;
+  const stop = yoloStopOf(state, story);
+  if (!stop || stop.id === lastAiColumn(state, story.workflowId)?.id) return null;
+  if (card.id === story.id && isAtYoloStop(state, story))
+    return `MODO AUTÔNOMO ATÉ ${stop.name}: esta é a última fase que a pessoa liberou para você rodar sozinho. Faça o trabalho dela sem perguntas e, ao terminar, chame request_review na história com o resumo e pare. É a única vez em que request_review sem pending vale no modo autônomo: o modo se desliga e a revisão desta fase é da pessoa.`;
+  return `O modo autônomo desta história vai até ${stop.name}: lá, ao terminar o trabalho da fase, a IA pede a revisão da pessoa e para.`;
+}
 
 /** O que a IA recebe a mais quando os quatro campos de triagem do card (Tags, Esforço, Modelo, Skills) estão vazios. */
 export const TRIAGE_ADVICE =
@@ -267,6 +303,12 @@ export class AiRunner {
     const card = state.cards.find((c) => c.id === cardId);
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
+    // sem login confirmado pelo probe (preventivo, RF1), nenhum gatilho gasta uma execução — diferente do sinal
+    // reativo (`authExpired`), que heartbeat.ts/autopilot.ts recusam por conta própria (RF8): aqui ele não
+    // bloqueia, para o login que o probe não soube confirmar poder se recuperar com uma execução
+    // manual que dá certo (RF9, limpa em settle()) — sem essa válvula, authExpired nunca mais sairia de `true`
+    if (state.requirements.some((r) => r.id === 'signin'))
+      throw new Error(`O login do ${aiToolInfo(state.board.aiTool).label} venceu: veja o aviso no topo do board.`);
     const tool = aiToolInfo(state.board.aiTool);
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const refine = mode === 'refine';
@@ -275,6 +317,11 @@ export class AiRunner {
     const tail: string[] = [];
     // conhecidos antes do gateway.run, para a projeção publicada depois (ver `info` abaixo)
     const phase = columnOf(state, card)?.name ?? '';
+    // a fase publicada em `aiActivity` é a da HISTÓRIA (numa sub-tarefa, a coluna do card é do
+    // workflow filho): é nela que `runningKindOf` decide se a execução é de texto ou de branch,
+    // como `activityKindOf` faz com a coluna atual da história
+    const story = storyOf(state, card);
+    const storyPhase = story && story.id !== card.id ? (columnOf(state, story)?.name ?? phase) : phase;
     let activityModel: string | null = null;
     let activityEffort: string | null = null;
     // a reserva da regra que casaria com o card agora, para a retentativa quando o limite esgota (ver `settle`)
@@ -304,6 +351,7 @@ export class AiRunner {
           // refinar e resumir não mexem em arquivos: rodam só com o board
           const permission = autonomous ? 'full' : refine || summarize ? 'board' : state.board.runner.permission;
           const permissionAdvice = refine || summarize ? null : PERMISSION_ADVICE[permission];
+          const stopAdvice = autonomous ? yoloStopAdvice(state, card) : null;
           if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
           if (summarize) log('Resumir a conversa: lê as mensagens e grava um resumo, sem mover o card nem mudar o status.');
@@ -348,7 +396,7 @@ export class AiRunner {
                   : cardPrompt(
                       cardRef(card),
                       contextLines(state, card),
-                      [...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+                      [...(stopAdvice ? [stopAdvice] : []), ...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
                       autonomous,
                       needsTriage(state, card),
                     ),
@@ -384,7 +432,7 @@ export class AiRunner {
       runId: exec.runId,
       mode,
       origin,
-      phase,
+      phase: storyPhase,
       model: activityModel,
       startedAt: exec.startedAt,
     };
@@ -435,8 +483,14 @@ export class AiRunner {
       if (retry) {
         // o modelo principal esgotou o limite e há reserva: uma nova execução assume, sem publicar nem
         // avisar o fim desta (quem decide o desfecho final é a execução da reserva)
-        this.start(cardId, origin, mode, retry);
-        return;
+        try {
+          this.start(cardId, origin, mode, retry);
+          return;
+        } catch (e) {
+          // a retentativa nem começou (card arquivado, gateway recusou): o card não pode ficar "em
+          // execução" sem execução, e quem espera o fim precisa ser avisado como em qualquer outro fim
+          this.block(cardId, `Não foi possível repetir a execução com o modelo reserva: ${e instanceof Error ? e.message : String(e)}`);
+        }
       }
       this.publish();
       this.finishListeners.forEach((fn) => fn(cardId, run.mode));
@@ -479,6 +533,30 @@ export class AiRunner {
         { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
         { author: RUNNER_AUTHOR },
       );
+    const toolId = this.router.snapshot().board.aiTool;
+    const authFailed = AUTH_FAILURE_PATTERNS[toolId]?.some((re) => run.tail.some((l) => re.test(l))) ?? false;
+    // falha de autenticação vale para o board inteiro, não só para este card: não bloqueia, e o aviso
+    // global (RF3) é quem explica à pessoa o que fazer. Entra antes do caminho de "refinar" porque RF6
+    // vale para os dois modos, e antes do `failure` genérico, que continua tratando qualquer outra falha
+    if (authFailed) {
+      if (this.router.setAuthExpired(toolId)) this.deps.log(`Login do ${toolLabel} vencido: execuções suspensas.`);
+      this.router.handle(
+        {
+          type: 'comment.add',
+          cardId,
+          body: `Não rodou: o login do ${toolLabel} venceu. Faça login de novo; a execução pode ser repetida depois.`,
+        },
+        { author: RUNNER_AUTHOR, source: 'ai' },
+      );
+      return void this.router.handle(
+        { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
+        { author: RUNNER_AUTHOR },
+      );
+    }
+    // a execução não falhou por autenticação: se o sinal estava ligado para esta ferramenta, ela voltou
+    // a funcionar (RF9) — cobre o login que o probe não soube confirmar, que só tem este caminho
+    if (this.router.snapshot().authExpired === toolId && this.router.setAuthExpired(null))
+      this.deps.log(`Login do ${toolLabel} de volta: execuções retomadas.`);
     // o fim do que a ferramenta escreveu vai junto: a pessoa entende a falha sem sair do card
     // o plano gratuito do Cursor só roda o Auto: a recusa diz pouco, e a saída é o modelo do card
     const freePlan = run.tail.some((l) => /free plans can only use auto/i.test(l))
@@ -519,8 +597,9 @@ export class AiRunner {
     }
     // o modelo principal esgotou o limite de uso do plano e há reserva pronta para esta regra: a
     // retentativa assume em vez de bloquear (RF-03 exige que nenhuma outra falha caia aqui: só quando o
-    // leitor da ferramenta marcou `usageLimitReached`, nunca pelo código de saída ou por heurística do runner)
-    if (end.report.usageLimitReached && run.fallbackPending) {
+    // leitor da ferramenta marcou `usageLimitReached`, nunca pelo código de saída ou por heurística do runner).
+    // E só quando a execução falhou: uma que terminou bem não é refeita com a reserva
+    if (failure && end.report.usageLimitReached && run.fallbackPending) {
       const state = this.router.snapshot();
       const principal = toolModelDisplay(state, run.model);
       const fallback = toolModelDisplay(state, run.fallbackPending);
@@ -535,7 +614,7 @@ export class AiRunner {
     // mesma sessão fez a implementação e a homologação): reavalia a entrega agora, antes do fallback
     // de modo autônomo devolver o card para "ready".
     const story = storyOf(this.router.snapshot(), card);
-    if (story && this.router.settleDelivery(story.id, toolLabel)) return;
+    if (story && this.router.settleDelivery(story.id)) return;
     // em modo autônomo não há pessoa para esperar: o card volta para a IA seguir (o autopiloto limita as voltas sem progresso)
     if (replied && isYolo(this.router.snapshot(), card)) return void this.setStatus(cardId, 'ready', toolLabel);
     // respondeu na conversa e encerrou: a vez é da pessoa

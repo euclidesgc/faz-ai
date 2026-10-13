@@ -1,3 +1,4 @@
+import { aiToolInfo } from '../shared/harness';
 import { isDeliverableStory } from '../shared/story';
 import { statusInfo } from '../shared/status';
 import type { BoardContext } from './panel/handlers/context';
@@ -12,7 +13,7 @@ import type { BoardContext } from './panel/handlers/context';
  * também precisa ser chamada de `panel/handlers/cards.ts` (no `card.move`) e de `runner.ts` (no
  * fim de uma execução), e essas importações cruzadas criariam um ciclo com `workspace.ts`.
  */
-export function settleDelivery(ctx: BoardContext, storyId: string, author: string): boolean {
+export function settleDelivery(ctx: BoardContext, storyId: string): boolean {
   // sai sem montar o snapshot inteiro do board (caro) quando a história nem está em modo autônomo —
   // é o caso comum de um board sem YOLO, e card.move passa por aqui a cada movimento de qualquer card
   if (!ctx.cards.isYolo(storyId)) return false;
@@ -20,6 +21,9 @@ export function settleDelivery(ctx: BoardContext, storyId: string, author: strin
   const story = state.cards.find((c) => c.id === storyId);
   if (!story || !isDeliverableStory(state, story)) return false;
   if (story.status !== null && statusInfo(story.status).owner === 'human') return false;
+  // a entrega é sempre anunciada pela IA, seja quem for que moveu o card ou registrou o pull request:
+  // o autor é o mesmo que o runner usa ao fim de uma execução (o nome da ferramenta de IA)
+  const author = aiToolInfo(state.board.aiTool).label;
   ctx.cards.setStatus(story.id, 'waiting_review', '', author);
   ctx.comments.add(story.id, author, `História entregue com o pull request ${story.prUrl}; aguardando a revisão da pessoa.`, 'ai');
   return true;

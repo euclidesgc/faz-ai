@@ -35,6 +35,8 @@ export const card = (id: string, over: Partial<Card> = {}): Card => ({
   mergeCommit: '',
   execProfile: null,
   yolo: false,
+  yoloUntil: null,
+  derivedFrom: null,
   ...over,
 });
 
@@ -75,8 +77,8 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
       execProfiles: [],
     },
     workflows: [
-      { id: 'wp', boardId: 'b', name: 'Histórias', position: 0, kind: 'parent', collapsed: false, archiveCollapsed: true },
-      { id: 'wc', boardId: 'b', name: 'Sub-tarefas', position: 1, kind: 'child', collapsed: false, archiveCollapsed: true },
+      { id: 'wp', boardId: 'b', name: 'Histórias', position: 0, kind: 'parent', collapsed: false },
+      { id: 'wc', boardId: 'b', name: 'Sub-tarefas', position: 1, kind: 'child', collapsed: false },
     ],
     columns: [
       column('done', 'wp', 2, 'done'),
@@ -98,6 +100,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     currentUser: 'a',
     harness: EMPTY_HARNESS,
     harnessSelection: [],
+    boardServer: null,
     pendingUpgrade: [],
     chat: EMPTY_CHAT,
     aiRuns: [],
@@ -107,10 +110,9 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     aiRunUnsupported: null,
     requirements: [],
     requirementsCheckedAt: 0,
+    authExpired: null,
     environment: null,
     environmentFirstRun: false,
-    environmentInstall: null,
-    environmentInstallResult: null,
     harnessInstall: null,
     ...over,
   };

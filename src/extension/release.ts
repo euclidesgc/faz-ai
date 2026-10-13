@@ -100,7 +100,7 @@ const VERSION_TAG = '<!-- faz-ai:saiu-na-versao -->';
  * numa tag com release publicada. Está: registra na conversa qual versão levou a história e arquiva o
  * card, nessa ordem.
  *
- * Sem timer próprio e sem `canRun` próprio — o `MergeWatcher` já guarda a rodada inteira. Nenhum
+ * Sem timer próprio: roda junto com a detecção de merges, que é parte de cada rodada do heartbeat. Nenhum
  * caminho lança para fora de `sweep()`, nenhum bloqueia card, e as falhas vão para o log sem repetir
  * enquanto a causa for a mesma. Não depende da API do VSCode.
  */

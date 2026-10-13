@@ -106,6 +106,7 @@ export class EventLog {
       case 'card.restore':
       case 'card.archive':
       case 'card.unarchive':
+      case 'card.restoreArchived':
       case 'card.deletePermanent':
       case 'card.status.set':
       case 'attachment.addData':

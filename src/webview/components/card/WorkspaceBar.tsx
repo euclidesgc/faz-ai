@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Card } from '../../../shared/model';
+import { cardRef, type Card } from '../../../shared/model';
 import { storyOf } from '../../../shared/story';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
@@ -20,6 +20,7 @@ export function WorkspaceBar({ card }: { card: Card }) {
   }, [copied]);
   if (card.deletedAt !== null || mode === 'off') return null;
   const story = storyOf(state, card) ?? card;
+  const origin = story.derivedFrom ? state.cards.find((c) => c.id === story.derivedFrom) : undefined;
 
   return (
     <div className="drawer-workspace">
@@ -75,6 +76,14 @@ export function WorkspaceBar({ card }: { card: Card }) {
         >
           {t('Criar branch da história')}
         </Button>
+      )}
+      {origin && (
+        <span
+          className="muted small"
+          title={t('A branch desta história parte da branch de {ref}, e o pull request é empilhado sobre o dela', { ref: cardRef(origin) })}
+        >
+          {t('Derivada de {ref}', { ref: cardRef(origin) })}
+        </span>
       )}
       {story.prUrl && (
         <a href={story.prUrl} title={story.prUrl}>

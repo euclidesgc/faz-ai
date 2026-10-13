@@ -46,7 +46,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
         )}
       </SectionHeader>
       {unsupported ? (
-        <Callout.Root color="orange">
+        <Callout.Root color="amber">
           <Callout.Icon>
             <IconWarning />
           </Callout.Icon>
@@ -66,7 +66,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
             )}
           </FormField>
           {runner.permission === 'full' && (
-            <Callout.Root color="orange" size="1">
+            <Callout.Root color="amber" size="1">
               <Callout.Icon>
                 <IconWarning />
               </Callout.Icon>

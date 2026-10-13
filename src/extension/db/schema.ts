@@ -1,13 +1,7 @@
 import type { Database } from 'sql.js';
+import { MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 27;
-
-/** Campo padrão "Modelo": qual modelo de IA deve executar o card. As opções são editáveis nas configurações. */
-/** Campo padrão "Skills": skills do projeto que devem ser carregadas obrigatoriamente ao executar o card. */
-export const SKILLS_FIELD = 'Skills';
-/** Campo padrão "Rules": arquivos de instruções marcados no Harness que a execução do card deve ler. */
-export const RULES_FIELD = 'Rules';
-export const MODEL_FIELD = 'Modelo';
+export const SCHEMA_VERSION = 29;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -363,6 +357,16 @@ const MIGRATIONS: Record<number, string> = {
     -- #191: marca o comentário que é o resumo da conversa do card; NULL = mensagem comum.
     ALTER TABLE comments ADD COLUMN kind TEXT;
   `,
+  28: `
+    -- história derivada de outra (a funcionalidade dividida em entregas): a branch dela parte da branch
+    -- da história de origem, e o pull request é empilhado sobre o dela. '' = não é derivada.
+    ALTER TABLE cards ADD COLUMN derived_from TEXT NOT NULL DEFAULT '';
+  `,
+  29: `
+    -- até onde vai o modo autônomo da história: a coluna em que a IA faz o trabalho, pede a revisão e o
+    -- modo se desliga. '' = até a última coluna em que a IA atua (o pull request).
+    ALTER TABLE cards ADD COLUMN yolo_until TEXT NOT NULL DEFAULT '';
+  `,
 };
 
 /** Aplica as migrações pendentes até `upTo` (por padrão, a versão atual). */
@@ -371,6 +375,14 @@ export function migrate(db: Database, upTo = SCHEMA_VERSION): void {
   db.run('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);');
   const res = db.exec("SELECT value FROM meta WHERE key = 'schema_version'");
   let current = res[0]?.values[0]?.[0] ? Number(res[0].values[0][0]) : 0;
+  // banco gravado por uma versão mais nova da extensão (a pessoa voltou para uma versão anterior, ou a
+  // loja ainda não tem a versão que ela testou): esta versão não conhece as tabelas novas e esbarraria
+  // nelas ao gravar. Recusa antes de tocar em qualquer coisa, dizendo o que fazer.
+  if (upTo === SCHEMA_VERSION && current > SCHEMA_VERSION)
+    throw new Error(
+      `Este board foi gravado por uma versão mais nova do Faz AI (formato ${current}; esta versão conhece até o ${SCHEMA_VERSION}). ` +
+        'Atualize a extensão para abrir o board; nada foi alterado.',
+    );
   while (current < upTo) {
     const next = current + 1;
     const sql = MIGRATIONS[next];
@@ -382,7 +394,8 @@ export function migrate(db: Database, upTo = SCHEMA_VERSION): void {
       db.exec('COMMIT;');
     } catch (e) {
       db.exec('ROLLBACK;');
-      throw e;
+      // qual migração falhou: sem isso o erro do SQLite não diz em que passo o banco parou
+      throw new Error(`Migração ${next} do banco do board: ${e instanceof Error ? e.message : String(e)}`);
     }
     current = next;
   }

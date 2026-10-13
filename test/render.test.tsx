@@ -113,16 +113,15 @@ describe('telas montam sem erro', () => {
     expect(board).toContain('revisar-spec');
     expect(board).toContain('Opus 5.5 - alto');
     expect(board).toContain('suggest-model');
-    // a coluna de arquivados está sempre no board, colapsada por padrão; as demais abertas
-    expect(board.match(/column collapsed archive/g)).toHaveLength(2);
+    // a linha não tem mais a coluna de arquivados: eles ficam na aba Arquivados
+    expect(board).not.toContain('column collapsed archive');
     expect(board).not.toContain('Arraste um card para cá para arquivar');
     const s = useBoardStore.getState().state!;
     const prd = s.columns.find((c) => c.name === 'PRD')!;
     const child = s.workflows.find((w) => w.kind === 'child')!;
-    useBoardStore.setState({ collapsed: { [prd.id]: true, [`archive:${s.workflows[0]!.id}`]: false, [child.id]: true } });
+    useBoardStore.setState({ collapsed: { [prd.id]: true, [child.id]: true } });
     const custom = html(<Board />);
     expect(custom).toContain('Expandir &quot;PRD&quot;');
-    expect(custom).toContain('Arraste um card para cá para arquivar'); // arquivados da linha de cima aberto
     expect(custom).toContain('workflow workflow-child collapsed');
     expect(custom).not.toContain('A fazer'); // linha de baixo fechada não mostra as colunas
     useBoardStore.setState({ collapsed: {} }); // a história tem modelo manual diferente da sugestão
@@ -272,7 +271,7 @@ describe('telas montam sem erro', () => {
     for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
     // cada aba do Harness é montada por vez: juntamos o texto das quatro
-    const harness = (['tool', 'project', 'user', 'all'] as const)
+    const harness = (['tool', 'project', 'user'] as const)
       .map((harnessTab) => {
         useBoardStore.setState({ harnessTab });
         return html(<HarnessSettings />);
@@ -286,10 +285,10 @@ describe('telas montam sem erro', () => {
       'AGENTS.md',
       'Harness do projeto',
       'Harness global',
-      'Incluir em todo contexto',
+      'Regras principais',
+      'Uso nas execuções do board',
       'revisar-spec',
       '.cursor/skills',
-      'Tudo que cada ferramenta carrega',
       'Servidores MCP',
       'Hooks',
       'deste projeto',

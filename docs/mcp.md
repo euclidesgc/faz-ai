@@ -6,8 +6,7 @@ board na hora, e as regras do board valem para ela também.
 
 ## Como conectar
 
-Em Configurações → **Harness de IA** → **Tudo que a ferramenta carrega**, na seção **Servidores MCP**
-da ferramenta, clique em **Instalar (padrão da ferramenta)** (ou rode **Faz AI: Instalar o MCP do
+Em Configurações → **Harness de IA** → **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)** (ou rode **Faz AI: Instalar o MCP do
 board (global)** na paleta). O board registra o servidor na configuração global da ferramenta, que
 vale em qualquer projeto aberto com o board, sem arquivo nenhum no repositório:
 
@@ -85,10 +84,24 @@ de vez, mexer em checklist, na conversa do card e em anexos (inclusive ler anexo
 colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
 pelo nome. Mensagens da IA na conversa saem assinadas com o nome do cliente (ex.: "Claude Code").
 
+Os campos do board (Fase, Tags, Modelo, Skills, Rules, Esforço da atividade e Criticidade) vêm com
+`board: true` em `get_board.fields`: as regras, a triagem e a IA dependem deles. `delete_field` e a
+troca de nome em `update_field` são recusadas neles, assim como opções e tipos de card (as opções de
+Tags são da pessoa e mudam); a exibição muda em todos. `create_field` recusa o nome de um deles.
+O valor da Fase de uma sub-tarefa é gravado pela IA (`create_card` ou `update_card` com
+`fields.Fase`); a pessoa não o muda no card, e `update_card_type` recusa a Fase em `default_fields`.
+
 Também pelo MCP: catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
 `set_model_rules`), padrões por tipo de card (`update_card_type`), recriar o board (`reset_board`) e o
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
 `set_skill_enabled`, `delete_skill`…).
+
+Toda sessão recebe as instruções do servidor: o ciclo do card (por onde começar, status, revisão,
+modelo do card, rules e skills obrigatórias e pendências com a pessoa) em menos de 2.048 caracteres,
+o tamanho em que o Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta
+(documentação de 2026-10-13). O detalhe de cada passo fica onde a IA o lê quando precisa: na
+descrição da ferramenta, nas notas do `get_card` (como `subtasksNowNote`, com as rodadas da
+Implementação) e na skill `faz-ai-fluxo`.
 
 ### Status e revisão
 
@@ -127,10 +140,14 @@ pasta própria (a global fica em `~/`):
 ### Projeto, global e plugins
 
 O board lê o harness de cada ferramenta em três escopos: a pasta do projeto (`project`), a pasta do
-usuário (`user`, vale em todos os projetos) e os plugins instalados (`plugin`). `get_harness` devolve
+usuário (`user`, vale em todos os projetos) e os plugins instalados (`plugin`; no Claude Code, os que
+`claude plugin list` mostra, sem o catálogo dos marketplaces). `get_harness` devolve
 em `inventory` tudo que a ferramenta do projeto carrega (instruções e regras, skills, agentes,
 comandos, hooks, servidores MCP, plugins e arquivos de configuração), com o escopo e o caminho de
-cada item. De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
+cada item, e o `group` em que a tela de Harness o mostra: `main` (regras principais), `topic` (regras
+por assunto), `memory` (memória automática do Claude Code), `skill`, `agent`, `command`, `hook`, `mcp`,
+`settings`, `style` (estilos de saída), `plugin` e `managed` (política da organização, só leitura).
+De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
 
 Toda execução pelo board parte de contexto vazio: só entra o que está marcado em Configurações →
 Harness. `set_harness_selection` marca rules (`instructions`), skills e agentes: `always` entra em
@@ -209,6 +226,12 @@ pasta em que o código deve ser alterado. O nome da branch e a pasta são defini
 não deve criar branches por conta própria. Nas execuções pelo board, a pasta das worktrees é
 passada à ferramenta como pasta de trabalho extra (`--add-dir`).
 
+Uma história criada com `create_card` e `derived_from` (a próxima parte de uma funcionalidade dividida
+em entregas, quando ela passa de umas 400 linhas; `derived_from` aponta para a parte anterior) parte
+da branch da parte anterior enquanto o PR dela não foi mesclado; `workspace.baseBranch` traz essa base,
+e o PR é aberto com `--base` nela. Enquanto a parte anterior, aberta, ainda não tem branch,
+`prepare_workspace` recusa a derivada. `get_card` mostra a origem em `derivedFrom`.
+
 `set_pull_request` registra na história o endereço do PR aberto pela IA; ele volta em
 `workspace.pullRequest`. A IA não faz o merge: com o merge automático ligado, é o board que roda
 `gh pr merge <url> --squash|--merge|--rebase` quando a pessoa aprova a homologação.
@@ -217,7 +240,9 @@ passada à ferramenta como pasta de trabalho extra (`--add-dir`).
 
 Cada coluna em que a IA atua é uma fase. `get_card` devolve em `phase` a instrução da fase, o nome
 e o modelo do documento que ela produz e se a coluna exige aprovação. Numa sub-tarefa, `phase` é a
-fase da história e `storyArtifacts` lista os documentos já anexados a ela.
+fase da história e `storyArtifacts` lista os documentos já anexados a ela. Uma história criada ou
+movida direto para uma fase adiante recebe em `phase.missingArtifacts` os documentos das fases
+anteriores que não existem: a IA trabalha a partir da descrição e da conversa, sem criá-los.
 
 O documento é construído numa sub-tarefa (campo Fase = nome da coluna), mas fica na história:
 `add_attachment` com `artifact: true` grava o arquivo no card da história, mesmo quando chamado na

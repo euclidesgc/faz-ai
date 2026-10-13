@@ -180,6 +180,16 @@ describe('ModelsSettings: preencher o modelo sugerido (RF01/RF07)', () => {
     expect(screen.getByText(/Depende de/)).toBeInTheDocument();
   });
 
+  it('sem regra, o interruptor aparece desligado mesmo com a preferência gravada como ligada', () => {
+    board.router.handle({ type: 'settings.rules.update', patch: { autoApplyModelSuggestion: true } });
+    board.router.handle({ type: 'settings.modelRules.set', rules: [] });
+    syncStore(board.router);
+    show();
+    const toggle = screen.getByRole('switch', { name: 'Preencher o modelo sugerido automaticamente' });
+    expect(toggle).toBeDisabled();
+    expect(toggle).not.toBeChecked();
+  });
+
   it('com uma regra cadastrada, o interruptor fica habilitado e grava a mudança', async () => {
     const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
     board.router.handle({

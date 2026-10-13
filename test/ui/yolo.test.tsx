@@ -1,4 +1,4 @@
-import { lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import { Theme } from '@radix-ui/themes';
@@ -17,6 +17,7 @@ beforeAll(async () => {
 beforeEach(() => {
   syncStore(board.router);
   posted.mockClear();
+  useBoardStore.getState().setYoloUntilName('');
 });
 
 const patchState = (patch: (s: BoardState) => Partial<BoardState>) => {
@@ -45,10 +46,84 @@ describe('modo autônomo no painel do card', () => {
     expect(sentOf('card.yolo.set')).toEqual([]);
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/Sem restrições/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/não faz o merge/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/até a fase que você escolher/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('checkbox', { name: 'Não avisar novamente' })).not.toBeChecked();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ligar o modo autônomo' }));
-    expect(lastSent('card.yolo.set')).toEqual({ type: 'card.yolo.set', cardId: board.storyId, enabled: true });
+    // sem mexer no "Até onde", vai até o fim: o pull request
+    expect(lastSent('card.yolo.set')).toEqual({ type: 'card.yolo.set', cardId: board.storyId, enabled: true, until: null });
+  });
+
+  it('o "Até onde" lista as fases da IA a partir da coluna atual e manda a escolhida; a escolha volta da próxima vez', async () => {
+    const col = (name: string) => useBoardStore.getState().state!.columns.find((c) => c.name === name)!;
+    const first = openDrawer(board.storyId);
+    await userEvent.click(screen.getByRole('checkbox', { name: /Modo autônomo/ }));
+    const dialog = await screen.findByRole('dialog');
+    const until = within(dialog).getByRole('combobox', { name: 'Até onde' });
+    expect(until).toHaveTextContent('Homologação (abre o pull request)');
+    await userEvent.click(until);
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
+      'Discovery',
+      'PRD',
+      'Spec',
+      'Plan',
+      'Implementação',
+      'Revisão',
+      'Homologação (abre o pull request)',
+    ]);
+    await userEvent.click(screen.getByRole('option', { name: 'Plan' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ligar o modo autônomo' }));
+    expect(lastSent('card.yolo.set')).toEqual({ type: 'card.yolo.set', cardId: board.storyId, enabled: true, until: col('Plan').id });
+    expect(useBoardStore.getState().yoloUntilName).toBe('Plan');
+    first.unmount();
+
+    openDrawer(board.storyId);
+    await userEvent.click(screen.getByRole('checkbox', { name: /Modo autônomo/ }));
+    expect(within(await screen.findByRole('dialog')).getByRole('combobox', { name: 'Até onde' })).toHaveTextContent('Plan');
+  });
+
+  it('com o modo ligado até uma fase, a barra mostra até onde e troca a fase sem perguntar de novo', async () => {
+    const col = (name: string) => useBoardStore.getState().state!.columns.find((c) => c.name === name)!;
+    patchCard(board.storyId, { yolo: true, yoloUntil: col('Spec').id });
+    openDrawer(board.storyId);
+    expect(screen.getByRole('checkbox', { name: /Modo autônomo até/ })).toBeChecked();
+    const until = screen.getByRole('combobox', { name: 'Até onde vai o modo autônomo' });
+    expect(until).toHaveTextContent('Spec');
+    await choose(until, 'Revisão');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(lastSent('card.yolo.set')).toEqual({ type: 'card.yolo.set', cardId: board.storyId, enabled: true, until: col('Revisão').id });
+  });
+
+  it('"Não avisar novamente" marcado: liga desta vez e as próximas ligam sem perguntar (#416)', async () => {
+    try {
+      const first = openDrawer(board.storyId);
+      await userEvent.click(screen.getByRole('checkbox', { name: /Modo autônomo/ }));
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Não avisar novamente' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Ligar o modo autônomo' }));
+      expect(lastSent('card.yolo.set')).toEqual({ type: 'card.yolo.set', cardId: board.storyId, enabled: true, until: null });
+      expect(useBoardStore.getState().dontWarnYolo).toBe(true);
+      first.unmount();
+
+      openDrawer(board.storyId);
+      await userEvent.click(screen.getByRole('checkbox', { name: /Modo autônomo/ }));
+      expect(useBoardStore.getState().dialog).toBeNull();
+      expect(sentOf('card.yolo.set')).toHaveLength(2);
+    } finally {
+      useBoardStore.getState().setDontWarnYolo(false);
+    }
+  });
+
+  it('depois de confirmar, a caixa já aparece marcada e travada até o boardState confirmar', async () => {
+    openDrawer(board.storyId);
+    await userEvent.click(screen.getByRole('checkbox', { name: /Modo autônomo/ }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Ligar o modo autônomo' }));
+    const toggle = screen.getByRole('checkbox', { name: /Modo autônomo/ });
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+
+    act(() => patchCard(board.storyId, { yolo: true }));
+    expect(screen.getByRole('checkbox', { name: /Modo autônomo/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Modo autônomo/ })).toBeEnabled();
   });
 
   it('cancelar a confirmação não liga nada', async () => {
@@ -63,7 +138,7 @@ describe('modo autônomo no painel do card', () => {
     openDrawer(board.storyId);
     await userEvent.click(screen.getByRole('checkbox', { name: /Modo autônomo/ }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(lastSent('card.yolo.set')).toEqual({ type: 'card.yolo.set', cardId: board.storyId, enabled: false });
+    expect(lastSent('card.yolo.set')).toEqual({ type: 'card.yolo.set', cardId: board.storyId, enabled: false, until: null });
   });
 
   it('com o modo ligado mostra o andamento do autopiloto e permite pausar e retomar', async () => {
@@ -76,6 +151,11 @@ describe('modo autônomo no painel do card', () => {
 
     act(() => autopilot({ active: false, note: '#1 está bloqueado: Sem acesso' }));
     expect(screen.getByText('#1 está bloqueado: Sem acesso')).toBeInTheDocument();
+
+    // a nota sobre OUTRA história não entra inteira no card: só uma linha que aponta para ela
+    act(() => autopilot({ active: false, note: '#298 está bloqueado: Entrega já concluída e verificada 6x nesta coluna...' }));
+    expect(screen.queryByText(/Entrega já concluída/)).toBeNull();
+    expect(screen.getByText('A fila está parada em #298: veja a barra de atividade.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Retomar modo autônomo' }));
     expect(lastSent('ai.autopilot.resume')).toEqual({ type: 'ai.autopilot.resume' });
   });
@@ -94,10 +174,12 @@ describe('modo autônomo no painel do card', () => {
 });
 
 describe('selo no card do board', () => {
-  it('a história em modo autônomo ganha o selo', () => {
+  it('a história em modo autônomo ganha o selo, que é também o botão de desligar (#416)', () => {
     patchCard(board.storyId, { yolo: true });
     render(<Board />);
-    expect(screen.getAllByTitle(/Modo autônomo: a IA toca/).length).toBeGreaterThan(0);
+    const marks = screen.getAllByRole('button', { name: 'Desligar modo autônomo' });
+    expect(marks.length).toBeGreaterThan(0);
+    expect(marks[0]).toHaveClass('yolo-mark', 'on');
   });
 });
 

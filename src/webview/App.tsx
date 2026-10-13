@@ -6,6 +6,7 @@ import { humanQueue, pendingWork } from '../shared/pending';
 import { useBoardStore, useHostSync } from './store/boardStore';
 import { ui, attachments } from './commands';
 import { AttachmentModal } from './components/attachment/AttachmentModal';
+import { HarnessFileModal } from './components/settings/harness/HarnessFileModal';
 import type { Attachment } from '../shared/model';
 import { ActivityBar } from './components/ActivityBar';
 import { Board } from './components/Board';
@@ -17,13 +18,26 @@ import { SelectionBar } from './components/SelectionBar';
 import { AutopilotButton } from './components/AutopilotButton';
 import { HeartbeatButton } from './components/HeartbeatButton';
 import { ThemeToggle } from './components/ThemeToggle';
+import { ArchivedView } from './components/ArchivedView';
 import { TrashView } from './components/TrashView';
 import { MetricsView } from './components/metrics/MetricsView';
 import { Settings } from './components/settings/Settings';
-import { RequirementsBanner } from './components/RequirementsBanner';
+import { RequirementsAlertIcon, useRequirementsAlert } from './components/RequirementsBanner';
 import { EnvironmentView } from './components/EnvironmentView';
-import { Button, IconChat, IconClose, IconExternal } from './components/ui';
+import { Button, Hint, IconChat, IconClose, IconExternal } from './components/ui';
 import { isWeb, onConnectionChange } from './vscode';
+
+/** A aba Configurações, com o ícone de atenção quando falta algo para o board trabalhar com a IA (o hint diz o quê). */
+function SettingsTab({ active, onClick }: { active: boolean; onClick: () => void }) {
+  const alert = useRequirementsAlert();
+  const tab = (
+    <Button active={active} aria-current={active ? 'page' : undefined} onClick={onClick}>
+      {t('Configurações')}
+      {alert && <RequirementsAlertIcon level={alert.level} label={alert.label} />}
+    </Button>
+  );
+  return alert ? <Hint content={alert.hint}>{tab}</Hint> : tab;
+}
 
 export function App() {
   useHostSync();
@@ -90,13 +104,14 @@ export function App() {
           <Button active={view === 'metrics'} aria-current={view === 'metrics' ? 'page' : undefined} onClick={() => setView('metrics')}>
             {t('Métricas')}
           </Button>
+          <Button active={view === 'archived'} aria-current={view === 'archived' ? 'page' : undefined} onClick={() => setView('archived')}>
+            {t('Arquivados')}
+          </Button>
           <Button active={view === 'trash'} aria-current={view === 'trash' ? 'page' : undefined} onClick={() => setView('trash')}>
             {t('Lixeira')}
             {trashCount > 0 && ` (${trashCount})`}
           </Button>
-          <Button active={view === 'settings'} aria-current={view === 'settings' ? 'page' : undefined} onClick={() => setView('settings')}>
-            {t('Configurações')}
-          </Button>
+          <SettingsTab active={view === 'settings'} onClick={() => setView('settings')} />
         </nav>
         <span className="spacer" />
         {withYou > 0 && (
@@ -140,13 +155,12 @@ export function App() {
           )}
         </div>
       )}
-      {/* no Diagnóstico, os mesmos itens já estão na lista */}
-      {view !== 'environment' && <RequirementsBanner />}
       {/* a barra de filtros filtra cards, não o log: fica só no board (RF-01) */}
       {view === 'board' && <FilterBar />}
       {view === 'board' && <SelectionBar />}
       <main className="content">
         {view === 'board' && <Board />}
+        {view === 'archived' && <ArchivedView />}
         {view === 'trash' && <TrashView />}
         {view === 'settings' && <Settings />}
         {view === 'metrics' && <MetricsView />}
@@ -169,6 +183,7 @@ export function App() {
       )}
       {openCardId && <CardDrawer cardId={openCardId} />}
       <AttachmentModal onSaveAs={saveAttachmentAs} />
+      <HarnessFileModal />
       <Dialog />
       <div className="toasts" aria-live="polite">
         {error && (

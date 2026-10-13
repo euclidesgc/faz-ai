@@ -1,8 +1,15 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { AiTool, HarnessItem, HarnessScope } from '../shared/harness';
-import { HARNESS_CATALOG, PERMISSION_LIST_LABEL, PLUGIN_ROOTS, type HarnessSource } from '../shared/harnessCatalog';
+import type { AiTool, HarnessItem, HarnessScope, PluginInstall } from '../shared/harness';
+import {
+  HARNESS_CATALOG,
+  PERMISSION_LIST_LABEL,
+  PLUGIN_ROOTS,
+  claudeProjectKey,
+  managedDir,
+  type HarnessSource,
+} from '../shared/harnessCatalog';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { skillMode } from './skillMode';
 
@@ -74,6 +81,57 @@ function walk(dir: string, ext: string, depth = 0): string[] {
   });
 }
 
+/** Pastas que não entram na busca de regras de subpasta: dependências, saídas de build e controle de versão. */
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', 'vendor', 'target', 'bower_components']);
+const MAX_NESTED_DEPTH = 4;
+const MAX_NESTED_DIRS = 2000;
+
+/** Arquivos com um dos nomes nas subpastas do projeto (sem a raiz), sem entrar em pastas ocultas nem de dependências. */
+function nestedFiles(root: string, names: string[]): string[] {
+  const found: string[] = [];
+  let visited = 0;
+  const visit = (dir: string, depth: number) => {
+    if (depth > MAX_NESTED_DEPTH || ++visited > MAX_NESTED_DIRS) return;
+    for (const n of entries(dir)) {
+      if (n.startsWith('.') || SKIP_DIRS.has(n)) continue;
+      const p = path.join(dir, n);
+      if (!isDir(p)) continue;
+      for (const name of names) if (isFile(path.join(p, name))) found.push(path.join(p, name));
+      visit(p, depth + 1);
+    }
+  };
+  visit(root, 1);
+  return found;
+}
+
+/** Até onde o Claude Code segue um `@caminho` que importa outro que importa outro. */
+const MAX_IMPORT_HOPS = 4;
+
+/**
+ * Os `@caminho` de um arquivo de instruções do Claude Code: fora de blocos e trechos de código, com o
+ * caminho relativo à pasta do arquivo, a partir de `~/` ou absoluto, e `\ ` para espaço. Só os que
+ * existem, com os importados por eles, sem repetir nem voltar a um arquivo já visto.
+ */
+export function importsOf(file: string, homeDir: string, depth = 1, seen = new Set([file])): { path: string; depth: number }[] {
+  if (depth > MAX_IMPORT_HOPS) return [];
+  const text = readConfig(file);
+  if (text === null) return [];
+  const out: { path: string; depth: number }[] = [];
+  const prose = text.replace(/^(```|~~~)[\s\S]*?^\1/gm, '').replace(/`[^`\n]*`/g, '');
+  for (const m of prose.matchAll(/(?:^|\s)@((?:\\ |[^\s])+)/g)) {
+    const raw = m[1]!.replace(/\\ /g, ' ').replace(/[.,;:)]+$/, '');
+    const target = raw.startsWith('~/')
+      ? path.join(homeDir, raw.slice(2))
+      : path.isAbsolute(raw)
+        ? raw
+        : path.resolve(path.dirname(file), raw);
+    if (seen.has(target) || !isFile(target)) continue;
+    seen.add(target);
+    out.push({ path: target, depth }, ...importsOf(target, homeDir, depth + 1, seen));
+  }
+  return out;
+}
+
 const MAX_SKILL_FILES = 100;
 
 /** Arquivos de apoio da pasta de uma skill (tudo menos o SKILL.md e arquivos ocultos), relativos a ela. */
@@ -116,7 +174,7 @@ interface Ctx {
   homeDir: string;
 }
 
-type Found = Omit<HarnessItem, 'location'>;
+type Found = Omit<HarnessItem, 'location' | 'imports'>;
 
 const MAX_DIGEST_BYTES = 256 * 1024;
 
@@ -130,10 +188,20 @@ function digest(file: string): string | undefined {
   }
 }
 
-function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
-  const target = path.join(base, src.path);
+/** O tamanho do arquivo em bytes, quando ele pode ser lido. */
+function sizeField(file: string): { size?: number } {
+  try {
+    return { size: fs.statSync(file).size };
+  } catch {
+    return {};
+  }
+}
+
+function scanSource(src: HarnessSource, base: string, ctx: Ctx, source?: number): Found[] {
+  const target = path.join(base, src.path.replace('{project}', claudeProjectKey(ctx.projectDir)));
   const scope: HarnessScope = src.builtin ? 'plugin' : src.scope;
-  const layout = src.layout === 'file' || src.layout === 'files' || src.layout === 'skills' ? src.layout : 'entry';
+  const layout =
+    src.layout === 'nested' ? 'file' : src.layout === 'file' || src.layout === 'files' || src.layout === 'skills' ? src.layout : 'entry';
   const item = (name: string, description: string, file: string): Found => ({
     kind: src.kind,
     scope,
@@ -142,7 +210,10 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
     path: file,
     layout,
     ...(src.builtin ? { plugin: src.builtin } : {}),
+    ...(source !== undefined ? { source } : {}),
     ...(layout === 'files' || layout === 'skills' ? { digest: digest(file) } : {}),
+    // o tamanho vale para o arquivo inteiro: uma entrada de um arquivo de configuração não tem tamanho próprio
+    ...(layout !== 'entry' ? sizeField(file) : {}),
   });
   const hookItem = (event: string, h: { matcher: string; command: string; type: string }, file: string): Found => ({
     ...item(event, short(`${h.matcher ? `${h.matcher} → ` : ''}${h.command || `(${h.type})`}`), file),
@@ -176,6 +247,8 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx): Found[] {
         ...Object.entries(local).map(([name, v]) => item(name, `${mcpSummary(v)} (só nesta pasta de projeto)`, target)),
       ];
     }
+    case 'nested':
+      return nestedFiles(base, src.names).map((f) => item(path.relative(base, f).split(path.sep).join('/'), descriptionOf(f), f));
     case 'json-permissions': {
       const permissions = obj(readJson(target)?.permissions);
       return src.lists.flatMap((list) =>
@@ -209,44 +282,86 @@ function latestGenerations(found: { dir: string; manifest: string }[]): { dir: s
   return [...best.values()].map((b) => b.value);
 }
 
-function scanPlugins(tool: AiTool, ctx: Ctx): Found[] {
+/**
+ * As pastas dos plugins que a ferramenta carrega. No Claude Code, com a lista da CLI, são exatamente as
+ * instaladas; sem ela, as pastas de plugin abaixo de `~/.claude/plugins`, menos os catálogos dos
+ * marketplaces (`marketplaces/`, plugins disponíveis e não instalados) e os dados que eles guardam.
+ * No Cursor, as de `~/.cursor/plugins/local`, cada uma desinstalável tirando a pasta.
+ */
+function installedPluginDirs(
+  tool: AiTool,
+  ctx: Ctx,
+  claude: PluginInstall[] | null | undefined,
+): { dir: string; manifest: string; install?: PluginInstall }[] {
+  if (tool === 'claude' && claude) {
+    const manifests = PLUGIN_ROOTS.claude[0]!.manifests;
+    // o manifesto é opcional: sem ele o item aponta para a pasta
+    return claude.map((install) => ({
+      dir: install.dir,
+      manifest: manifests.map((m) => path.join(install.dir, m)).find(isFile) ?? install.dir,
+      install,
+    }));
+  }
+  return PLUGIN_ROOTS[tool].flatMap((root) => {
+    const base = path.join(ctx.homeDir, root.path);
+    const skip = tool === 'claude' ? ['marketplaces', 'data'] : [];
+    const found = entries(base)
+      .filter((n) => !n.startsWith('.') && !skip.includes(n))
+      .flatMap((n) => pluginDirs(path.join(base, n), root.manifests, 1));
+    return latestGenerations(found).map((f) =>
+      tool === 'cursor' ? { ...f, install: { id: path.relative(base, f.dir), scopes: ['local'], enabled: true, dir: f.dir } } : f,
+    );
+  });
+}
+
+function scanPlugins(tool: AiTool, ctx: Ctx, claude: PluginInstall[] | null | undefined): Found[] {
   const out: Found[] = [];
-  for (const root of PLUGIN_ROOTS[tool]) {
-    for (const { dir, manifest } of latestGenerations(pluginDirs(path.join(ctx.homeDir, root.path), root.manifests))) {
-      const meta = readJson(manifest) ?? {};
-      const plugin = typeof meta.name === 'string' && meta.name ? meta.name : path.basename(dir).replace(/~g\d+$/, '');
-      out.push({
-        kind: 'plugin',
-        scope: 'plugin',
-        name: plugin,
-        description: typeof meta.description === 'string' ? short(meta.description) : '',
-        path: manifest,
-        plugin,
-        layout: 'entry',
-      });
-      const parts: HarnessSource[] = [
-        { kind: 'skill', scope: 'user', layout: 'skills', path: 'skills' },
-        { kind: 'agent', scope: 'user', layout: 'files', path: 'agents', ext: '.md' },
-        { kind: 'command', scope: 'user', layout: 'files', path: 'commands', ext: '.md' },
-        { kind: 'hook', scope: 'user', layout: 'json-keys', path: 'hooks/hooks.json', key: 'hooks' },
-        { kind: 'mcp', scope: 'user', layout: 'json-keys', path: '.mcp.json', key: 'mcpServers' },
-        { kind: 'mcp', scope: 'user', layout: 'json-keys', path: 'mcp.json', key: 'mcpServers' },
-      ];
-      for (const src of parts) out.push(...scanSource(src, dir, ctx).map((i): Found => ({ ...i, scope: 'plugin', plugin })));
-    }
+  for (const { dir, manifest, install } of installedPluginDirs(tool, ctx, claude)) {
+    const meta = (manifest !== dir && readJson(manifest)) || {};
+    // sem manifesto, o nome vem do id do Claude Code (`nome@marketplace`) ou da pasta
+    const fallback = install && tool === 'claude' ? install.id.replace(/@.*$/, '') : path.basename(dir).replace(/~g\d+$/, '');
+    const plugin = typeof meta.name === 'string' && meta.name ? meta.name : fallback;
+    out.push({
+      kind: 'plugin',
+      scope: 'plugin',
+      name: plugin,
+      description: typeof meta.description === 'string' ? short(meta.description) : '',
+      path: manifest,
+      plugin,
+      layout: 'entry',
+      ...(install ? { install } : {}),
+    });
+    const parts: HarnessSource[] = [
+      { kind: 'skill', scope: 'user', layout: 'skills', path: 'skills' },
+      { kind: 'agent', scope: 'user', layout: 'files', path: 'agents', ext: '.md' },
+      { kind: 'command', scope: 'user', layout: 'files', path: 'commands', ext: '.md' },
+      { kind: 'hook', scope: 'user', layout: 'json-keys', path: 'hooks/hooks.json', key: 'hooks' },
+      { kind: 'mcp', scope: 'user', layout: 'json-keys', path: '.mcp.json', key: 'mcpServers' },
+      { kind: 'mcp', scope: 'user', layout: 'json-keys', path: 'mcp.json', key: 'mcpServers' },
+    ];
+    for (const src of parts) out.push(...scanSource(src, dir, ctx).map((i): Found => ({ ...i, scope: 'plugin', plugin })));
   }
   return out;
 }
 
 /** Tudo que a ferramenta carrega: do projeto, da pasta do usuário e dos plugins instalados. */
-export function scanInventory(tool: AiTool, projectDir: string, homeDir: string): HarnessItem[] {
+export function scanInventory(
+  tool: AiTool,
+  projectDir: string,
+  homeDir: string,
+  /** pasta da política da organização; o padrão é a do sistema em que o board roda */
+  managed = managedDir(process.platform),
+  /** plugins que o Claude Code diz ter instalados; sem a lista, valem as pastas de plugin */
+  claudePlugins?: PluginInstall[] | null,
+): HarnessItem[] {
   const ctx: Ctx = { projectDir, homeDir };
   const found: Found[] = [];
-  for (const src of HARNESS_CATALOG[tool]) {
-    const base = src.scope === 'project' ? projectDir : homeDir;
-    if (base) found.push(...scanSource(src, base, ctx));
-  }
-  if (homeDir) found.push(...scanPlugins(tool, ctx));
+  HARNESS_CATALOG[tool].forEach((src, source) => {
+    const base = src.base === 'managed' ? managed : src.scope === 'project' ? projectDir : homeDir;
+    // a memória fica numa pasta com o nome do projeto: sem projeto, não há o que procurar
+    if (base && (projectDir || !src.path.includes('{project}'))) found.push(...scanSource(src, base, ctx, source));
+  });
+  if (homeDir) found.push(...scanPlugins(tool, ctx, claudePlugins));
   const inside = (base: string, file: string) => !!base && file.startsWith(base + path.sep);
   const rel = (base: string, file: string) => path.relative(base, file).split(path.sep).join('/');
   const location = (file: string) => {
@@ -262,5 +377,14 @@ export function scanInventory(tool: AiTool, projectDir: string, homeDir: string)
       const key = `${i.kind}|${i.path}|${i.name}|${i.detail ?? ''}`;
       return seen.has(key) ? false : (seen.add(key), true);
     })
-    .map((i) => ({ ...i, location: location(i.path) }));
+    .map((i): HarnessItem => {
+      // o Claude Code expande os `@caminho` das instruções: a tela mostra o que cada arquivo puxa
+      const imports =
+        tool === 'claude' && i.kind === 'instructions' && i.scope !== 'plugin' && i.path.endsWith('.md') ? importsOf(i.path, homeDir) : [];
+      return {
+        ...i,
+        location: location(i.path),
+        ...(imports.length ? { imports: imports.map((x) => ({ ...x, location: location(x.path) })) } : {}),
+      };
+    });
 }

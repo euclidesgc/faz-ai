@@ -1,6 +1,7 @@
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, usageOf } from '../../shared/harnessSelection';
+import { groupOf } from '../../shared/harnessCatalog';
 import { norm } from '../../shared/filters';
 import {
   describeRule,
@@ -13,9 +14,12 @@ import {
 } from '../../shared/models';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
 import { childProgress, linkedCards, openPredecessors, subtaskWaves } from '../../shared/links';
-import { childrenOf, columnOf, isArchived, isLive, valueOf } from '../../shared/selectors';
+import { childrenOf, columnOf, columnsOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
-import { isYolo, lastAiColumn, storyOf } from '../../shared/story';
+import { isAtYoloStop, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../../shared/story';
+import { CORE, CRITICALITY_FIELD, PERIPHERY, isCoreStory } from '../../shared/critical';
+import { isBoardField } from '../../shared/boardFields';
+import { slug } from '../../shared/git';
 import {
   cardRef,
   type BoardState,
@@ -156,6 +160,22 @@ function linksOf(s: BoardState, c: Card) {
   };
 }
 
+/** O modo autônomo da história do card e, quando ele não vai até o fim, a coluna em que ele para. */
+function autonomyOf(s: BoardState, c: Card) {
+  if (!isYolo(s, c)) return {};
+  const story = storyOf(s, c) ?? c;
+  const stop = yoloStopOf(s, story);
+  return stop && stop.id !== lastAiColumn(s, story.workflowId)?.id
+    ? { autonomous: true, autonomousUntil: stop.name }
+    : { autonomous: true };
+}
+
+/** A história de que esta é uma entrega derivada; vazio quando não é. */
+function derivedOf(s: BoardState, c: Card) {
+  const from = c.derivedFrom ? s.cards.find((k) => k.id === c.derivedFrom) : undefined;
+  return from ? { derivedFrom: `${cardRef(from)} ${from.title}` } : {};
+}
+
 /** Linha de listagem: o suficiente para decidir qual card abrir. */
 export function cardSummary(s: BoardState, c: Card) {
   const parent = c.parentId ? s.cards.find((p) => p.id === c.parentId) : undefined;
@@ -169,8 +189,9 @@ export function cardSummary(s: BoardState, c: Card) {
     column: columnOf(s, c)?.name,
     status: cardStatus(s, c),
     ...(workStatus(s, c) ? { work: workStatus(s, c) } : {}),
-    ...(isYolo(s, c) ? { autonomous: true } : {}),
+    ...autonomyOf(s, c),
     ...(parent ? { parent: `${cardRef(parent)} ${parent.title}` } : {}),
+    ...derivedOf(s, c),
     ...(Object.keys(fieldsOf(s, c)).length ? { fields: fieldsOf(s, c) } : {}),
     ...(kids.length ? { subtasks: `${kids.filter((k) => cardStatus(s, k) !== 'open').length}/${kids.length} fora de aberto` } : {}),
     ...(checklist.length ? { checklist: `${checklist.filter((i) => i.done).length}/${checklist.length}` } : {}),
@@ -274,6 +295,33 @@ export function requiredSkills(s: BoardState, c: Card) {
 }
 
 /**
+ * Os documentos das fases anteriores que a história não tem: ela foi criada ou movida direto para uma
+ * fase adiante (o caminho curto de uma história pequena) e começou dali.
+ */
+function missingArtifacts(s: BoardState, story: Card, col: Column): string[] {
+  return columnsOf(s, story.workflowId)
+    .filter((k) => k.position < col.position && k.category === 'open' && k.aiActive && k.artifactName)
+    .map((k) => k.artifactName)
+    .filter((name) => !s.attachments.some((a) => a.cardId === story.id && a.artifact && same(a.filename, name)));
+}
+
+/**
+ * Onde a Homologação grava o registro de decisão da história, quando o board liga os registros (Git →
+ * registros de decisão): um arquivo por história, pelo número, para a decisão ficar no repositório.
+ */
+function decisionRecordOf(s: BoardState, story: Card, col: Column) {
+  const dir = s.board.git.decisionRecords;
+  if (!dir || col.id !== lastAiColumn(s, story.workflowId)?.id) return {};
+  const path = `${dir}/${String(story.number).padStart(4, '0')}-${slug(story.title) || 'historia'}.md`;
+  return {
+    decisionRecord: {
+      path,
+      note: `Antes de abrir o pull request, grave em ${path} o registro de decisão desta história, a partir da Spec aprovada e dos desvios do plano: Contexto, Decisão, Alternativas descartadas (com o motivo de cada uma), Consequências e os diagramas Mermaid do desenho do programa. Se o arquivo já existe (a história voltou), atualize-o. Faça o commit na branch da história e cite o arquivo no corpo do PR.`,
+    },
+  };
+}
+
+/**
  * A fase em que o card está: o que a IA deve fazer e o documento que a fase produz. Numa
  * sub-tarefa, é a fase da história, porque o artefato é construído na sub-tarefa mas pertence à história.
  */
@@ -281,26 +329,57 @@ function phaseOf(s: BoardState, c: Card) {
   const story = storyOf(s, c) ?? c;
   const col = columnOf(s, story);
   if (!col || !col.aiActive || (!col.aiInstruction && !col.artifactName)) return undefined;
+  const missing = missingArtifacts(s, story, col);
   return {
     name: col.name,
     ...(col.aiInstruction ? { instruction: col.aiInstruction } : {}),
+    ...(missing.length
+      ? {
+          missingArtifacts: missing,
+          missingArtifactsNote: `A história começou nesta fase, sem ${list(missing)} das fases anteriores: trabalhe a partir da descrição, da conversa e do código. Não crie esses documentos nem bloqueie por falta deles.`,
+        }
+      : {}),
     ...(col.artifactName
       ? {
           artifact: { filename: col.artifactName, ...(col.artifactTemplate ? { template: col.artifactTemplate } : {}) },
           artifactNote: `Construa o documento numa sub-tarefa da história com Fase = "${col.name}" e grave-o com add_attachment (artifact: true, filename: "${col.artifactName}"): ele fica anexado à história e substitui a versão anterior.`,
         }
       : {}),
-    requiresApproval: col.requiresApproval && !story.yolo,
+    ...decisionRecordOf(s, story, col),
+    // no modo autônomo, a última coluna da IA entrega pelo pull request (não pede aprovação), mesmo no núcleo
+    requiresApproval:
+      (col.requiresApproval && (!story.yolo || (isCoreStory(s, story) && col.id !== lastAiColumn(s, story.workflowId)?.id))) ||
+      isAtYoloStop(s, story),
     ...(story.yolo
       ? {
-          autonomousNote:
-            col.id === lastAiColumn(s, story.workflowId)?.id
-              ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
-              : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Decida as dúvidas por conta própria e registre a decisão na conversa.`,
+          autonomousNote: isAtYoloStop(s, story)
+            ? `Modo autônomo (YOLO) na história ${cardRef(story)} até ${col.name}, a fase atual: é a última que a pessoa liberou para você rodar sozinho. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare: o modo autônomo se desliga e a revisão desta fase é da pessoa.`
+            : col.requiresApproval && isCoreStory(s, story) && col.id !== lastAiColumn(s, story.workflowId)?.id
+              ? `Modo autônomo (YOLO) na história ${cardRef(story)}, que é do núcleo (${CRITICALITY_FIELD} = ${CORE}): mesmo no modo autônomo, esta fase exige a aprovação da pessoa. Faça o trabalho sem perguntas e, ao terminar, chame request_review na história e pare; depois de aprovada, a IA segue sozinha.`
+              : col.id === lastAiColumn(s, story.workflowId)?.id
+                ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
+                : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Siga os padrões do projeto e as regras de arquitetura dele, escolha o caminho menos complexo entre os que os seguem, e registre as decisões na conversa.`,
         }
       : col.requiresApproval
         ? { reviewNote: `Ao terminar, chame request_review na história ${cardRef(story)} e pare.` }
         : {}),
+  };
+}
+
+/**
+ * As áreas críticas (o núcleo) do projeto, quando o board as define: a IA marca a Criticidade da
+ * história e, no código, trata o núcleo com mais rigor e à parte no pull request.
+ */
+function criticalAreasOf(s: BoardState, c: Card) {
+  const paths = s.board.rules.criticalPaths;
+  if (!paths.length) return {};
+  const story = storyOf(s, c) ?? c;
+  return {
+    criticalAreas: {
+      paths,
+      story: isCoreStory(s, story) ? CORE : (fieldsOf(s, story)[CRITICALITY_FIELD] ?? 'não marcada'),
+      note: `Áreas críticas (o núcleo) do projeto. Na Spec e no Plan, confira se a história mexe nestes caminhos e marque o campo ${CRITICALITY_FIELD} da história com update_card: "${CORE}" se mexe, "${PERIPHERY}" se não. A história do núcleo espera a aprovação da pessoa nas fases que exigem aprovação, mesmo no modo autônomo. Na Revisão, revise com mais rigor os arquivos do diff que estão nestas áreas; no pull request, liste-os à parte em "Como revisar".`,
+    },
   };
 }
 
@@ -335,6 +414,12 @@ function workspaceOf(s: BoardState, c: Card) {
       };
 }
 
+/** O que fazer com o `model` do card; o "Esforço da atividade" tem o mesmo nome e outro sentido. */
+const MODEL_NOTE =
+  'Modelo e esforço que devem executar este card. Se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; ' +
+  'se não for possível, avise a pessoa em vez de executar com outra. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, ' +
+  'e as regras do board sugerem o modelo a partir dele (get_models).';
+
 export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardState['attachments'][number]) => string) {
   const skills = requiredSkills(s, c);
   const rules = requiredRules(s, c);
@@ -352,7 +437,7 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
   const suggested = suggestModel(s, c);
   return {
     ...cardSummary(s, c),
-    ...(chosen ? { model: { ...describeModel(s, chosen), note: 'Modelo e esforço que devem executar este card.' } } : {}),
+    ...(chosen ? { model: { ...describeModel(s, chosen), note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     ...(rules.length
       ? {
@@ -369,6 +454,7 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
         }
       : {}),
     ...(phase ? { phase } : {}),
+    ...criticalAreasOf(s, c),
     ...executionOf(s, c),
     ...workspaceOf(s, c),
     description: c.description,
@@ -400,6 +486,20 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
 }
 
 /**
+ * Como conduzir as rodadas da Implementação. Fica no get_card, ao lado de `subtasksNow`, e não nas instruções
+ * do servidor: o Claude Code as corta em 2.048 caracteres, e a IA só precisa disto quando há rodada.
+ */
+export const SUBTASKS_NOW_NOTE =
+  'As rodadas da Implementação. `canRunTogether` são as sub-tarefas sem dependência pendente: se você tem subagentes, delegue cada uma a um subagente, ' +
+  'todos lançados na mesma mensagem para rodarem ao mesmo tempo, cada um com o modelo do card dele, na pasta de trabalho da história e sem fazer commit; ' +
+  'sem subagentes, execute uma por vez. As de `waiting` esperam outra sub-tarefa terminar (start_work as recusa). ' +
+  'Ao fim da rodada, verifique o conjunto, faça o commit e leia a história de novo para a próxima rodada. ' +
+  'Repita até não sobrar nenhuma que você possa tocar agora: as que estão com a pessoa (`withPerson`) ou já em execução (`running`) não são suas; ' +
+  'se só restarem as que estão com a pessoa, pare. ' +
+  'Testes, build e commit dependem do terminal: sem permissão para rodar comandos, implemente e registre na conversa o que falta rodar; ' +
+  'essa parte fica para quem tem permissão. Isso vale mesmo que a skill do fluxo instalada ainda diga para executar uma sub-tarefa por vez.';
+
+/**
  * As rodadas da Implementação: `canRunTogether` só traz as sub-tarefas que a IA pode tocar agora; as que
  * estão com a pessoa (`withPerson`) ou já em execução (`running`) vêm em grupos separados, só quando houver.
  */
@@ -413,6 +513,7 @@ function subtasksNow(s: BoardState, storyId: string) {
       ...(w.withPerson.length ? { withPerson: w.withPerson.map(cardRef) } : {}),
       ...(w.running.length ? { running: w.running.map(cardRef) } : {}),
     },
+    subtasksNowNote: SUBTASKS_NOW_NOTE,
   };
 }
 
@@ -487,6 +588,8 @@ export function boardOverview(s: BoardState) {
     fields: s.fieldDefs.map((f) => ({
       name: f.name,
       kind: f.kind,
+      // campo do board: as regras e a IA dependem dele, e só a exibição (e as opções de Tags) muda
+      ...(isBoardField(f) ? { board: true } : {}),
       ...(f.options.length ? { options: f.options } : {}),
       appliesTo: f.appliesToTypes === null ? 'todos os tipos' : f.appliesToTypes.map((id) => s.cardTypes.find((t) => t.id === id)?.name),
       display: f.display,
@@ -532,6 +635,8 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
     // o que a ferramenta em uso carrega, com o escopo (project, user ou plugin) e a marcação do board
     inventory: inventory.map((i) => ({
       kind: i.kind,
+      // o grupo em que a tela de Harness mostra o item (main, topic, memory, skill… plugin, managed)
+      group: groupOf(s.board.aiTool, i),
       scope: i.scope,
       name: i.name,
       ...(isSelectableKind(i.kind) ? { usage: usage(i) } : {}),

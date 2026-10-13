@@ -125,6 +125,9 @@ export class HostBridge {
         case 'ui.openEditorMcp':
           await this.env.openEditorMcp?.();
           return;
+        case 'ui.openTerminal':
+          this.router.openTerminal(msg.command);
+          return;
         case 'ui.showChat':
           await this.env.showChat?.();
           return;
@@ -136,9 +139,6 @@ export class HostBridge {
           return;
         case 'environment.seen':
           this.router.markEnvironmentSeen();
-          return;
-        case 'environment.install':
-          this.router.installEnvironment(msg.level);
           return;
         case 'environment.pinMcp':
           this.router.pinEnvironmentMcp();
@@ -182,6 +182,36 @@ export class HostBridge {
           await this.env.openFile(msg.path);
           return;
         }
+        case 'harness.file.read': {
+          try {
+            const { content, readonly } = this.router.readHarnessFile(msg.path);
+            this.post({ type: 'harness.file.readResult', requestId: msg.requestId, content, readonly });
+          } catch (e) {
+            this.post({ type: 'harness.file.readResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+          }
+          return;
+        }
+        case 'harness.plugin.apply':
+          try {
+            this.post({ type: 'notice', message: await this.router.applyPlugins(msg.tool, msg.action, msg.ids) });
+          } finally {
+            this.post({ type: 'harness.plugin.done' });
+          }
+          return;
+        case 'harness.file.write': {
+          try {
+            this.router.writeHarnessFile(msg.path, msg.content);
+            this.post({ type: 'harness.file.writeResult', requestId: msg.requestId, ok: true });
+          } catch (e) {
+            this.post({
+              type: 'harness.file.writeResult',
+              requestId: msg.requestId,
+              ok: false,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+          return;
+        }
         case 'harness.skill.file.create':
           await this.env.openFile(this.router.createSkillFile(msg.tool, msg.path, msg.file, msg.link));
           return;
@@ -194,7 +224,8 @@ export class HostBridge {
           return;
         }
         case 'harness.item.create':
-          await this.env.openFile(this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description));
+          // o arquivo novo abre no editor do board, onde a pessoa já escreve o conteúdo
+          this.post({ type: 'harness.item.created', path: this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description) });
           return;
         case 'ai.heartbeat.run': {
           const notice = await this.env.runHeartbeat();
@@ -240,6 +271,15 @@ export class HostBridge {
             this.post({ type: 'metrics.result', requestId: msg.requestId, result: this.router.panelMetrics(msg.query) });
           } catch (e) {
             this.post({ type: 'metrics.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+          }
+          return;
+        }
+        case 'card.usage.query': {
+          // ler o log não é mutação do board, como em `metrics.query`
+          try {
+            this.post({ type: 'card.usage.result', requestId: msg.requestId, usage: this.router.cardUsage(msg.cardId) });
+          } catch (e) {
+            this.post({ type: 'card.usage.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
           }
           return;
         }

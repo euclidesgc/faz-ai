@@ -99,13 +99,21 @@ describe('entrega da história em modo autônomo', () => {
     expect(deliveryComments(storyId)).toHaveLength(1);
   });
 
+  it('a pessoa move o card: o comentário de entrega sai com o autor e a fonte da IA, não com o nome da pessoa', () => {
+    router.handle({ type: 'card.pr.set', cardId: storyId, url: PR });
+    moveToHomologacao();
+    const [comment] = deliveryComments(storyId);
+    expect(comment).toMatchObject({ author: 'Claude Code', source: 'ai' });
+    expect(comment!.author).not.toBe('Pessoa');
+  });
+
   it('RF6: depois de entregue, reavaliar a entrega não duplica o comentário', () => {
     router.handle({ type: 'card.pr.set', cardId: storyId, url: PR });
     moveToHomologacao();
     expect(deliveryComments(storyId)).toHaveLength(1);
 
     // simula a reavaliação que o runner faz ao fim de uma execução
-    expect(router.settleDelivery(storyId, 'Claude Code')).toBe(false);
+    expect(router.settleDelivery(storyId)).toBe(false);
     expect(deliveryComments(storyId)).toHaveLength(1);
     expect(card(storyId).status).toBe('waiting_review');
   });

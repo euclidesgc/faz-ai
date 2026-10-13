@@ -10,13 +10,9 @@ export const harness: Record<string, string> = {
     'Everything here is files in the project folder: they go in the repository and apply to everyone working on it.',
 
   // --- HarnessInventory
-  'Tudo que cada ferramenta carrega': 'Everything each tool loads',
   'Relê as pastas do projeto e do usuário': 'Re-reads the project and user folders',
-  'O que cada ferramenta de IA lê neste projeto e na sua pasta de usuário, separado por escopo. <b>Projeto</b> vale só aqui; <b>Global</b> vale em todos os seus projetos; <b>Plugins</b> vem de pacotes instalados e não pode ser alterado, mas pode ser copiado. "Abrir" mostra o arquivo no editor, onde ele também é editado.':
-    'What each AI tool reads in this project and in your user folder, split by scope. <b>Project</b> applies only here; <b>Global</b> applies to all your projects; <b>Plugins</b> come from installed packages and cannot be changed, but can be copied. "Open" shows the file in the editor, where it is also edited.',
   'deste projeto': 'this project',
   'não encontrada': 'not found',
-  'Sem sinal de instalação nesta máquina: {tools}.': 'No sign of installation on this machine: {tools}.',
 
   // --- Formulários e editores
   Nome: 'Name',
@@ -56,8 +52,71 @@ export const harness: Record<string, string> = {
   'Selecionar {name}': 'Select {name}',
   'copiada no projeto': 'copied in the project',
   'no projeto, com conteúdo diferente': 'in the project, with different content',
-  'Abre o arquivo no editor, onde ele pode ser alterado': 'Opens the file in the editor, where it can be changed',
-  'Abre o arquivo no editor': 'Opens the file in the editor',
+  'Uso nas execuções do board: {name}': 'Use in board runs: {name}',
+  'Só o que está marcado entra nas execuções do board; o resto fica invisível para elas.':
+    'Only what is marked goes into board runs; the rest is invisible to them.',
+  'Fora das execuções': 'Not in runs',
+  'Novo hook': 'New hook',
+  'Novo servidor': 'New server',
+  'sem arquivo': 'no file',
+  'Nada aqui ainda.': 'Nothing here yet.',
+  'Você pode criar:': 'You can create:',
+  'Desinstalar "{name}"?': 'Uninstall "{name}"?',
+  'Desinstalar {n} plugins?': 'Uninstall {n} plugins?',
+  'A pasta de cada um sai de ~/.cursor/plugins/local.': "Each one's folder is removed from ~/.cursor/plugins/local.",
+  'O Claude Code remove o plugin e apaga os dados e as opções que ele guardou.':
+    'Claude Code removes the plugin and deletes the data and options it saved.',
+  Desinstalar: 'Uninstall',
+  'Ações nos plugins marcados': 'Actions on the checked plugins',
+  'Aplicando pela ferramenta…': 'Applying through the tool…',
+  Desativar: 'Disable',
+  Ativar: 'Enable',
+  'A ferramenta não carrega o plugin até ele ser ativado de novo': 'The tool does not load the plugin until it is enabled again',
+  desativado: 'disabled',
+  'Vem da sua conta no claude.ai: dá para desativar, não para desinstalar':
+    'Comes from your claude.ai account: it can be disabled, not uninstalled',
+  'sincronizado do claude.ai': 'synced from claude.ai',
+  'Instalado pela sua organização: dá para desativar, não para desinstalar':
+    'Installed by your organization: it can be disabled, not uninstalled',
+  'da organização': 'from the organization',
+  'Uso nas execuções do board': 'Use in board runs',
+  'Modo da skill': 'Skill mode',
+  'Ações nos itens marcados': 'Actions on the checked items',
+  'Selecionar todos: {group}': 'Select all: {group}',
+  '{n} marcados': '{n} checked',
+  'Selecionar todos': 'Select all',
+  'Remover {n} entradas?': 'Remove {n} entries?',
+  'O board não respondeu. Se a extensão acabou de ser atualizada, recarregue a janela (no VS Code, Developer: Reload Window) e abra o arquivo de novo.':
+    'The board did not reply. If the extension was just updated, reload the window (in VS Code, Developer: Reload Window) and open the file again.',
+  'não lido pelo Claude Code': 'not read by Claude Code',
+  'Por padrão, o Claude Code não lê este arquivo nas suas conversas, porque o projeto tem {claude}. Para ler os dois, importe com @{path} no {claude} ou mude Project instructions no /config do Claude Code.':
+    'By default, Claude Code does not read this file in your conversations, because the project has {claude}. To read both, import it with @{path} in {claude} or change Project instructions in Claude Code /config.',
+  'O Claude Code está lendo o {path}. Criar um CLAUDE.md ou CLAUDE.local.md faz ele parar de ler, a menos que o arquivo novo importe com @{path}.':
+    'Claude Code is reading {path}. Creating a CLAUDE.md or CLAUDE.local.md makes it stop, unless the new file imports it with @{path}.',
+  'Criar {path}': 'Create {path}',
+  'Tudo que a ferramenta de IA lê nesta pasta, por tipo: vai no repositório (menos os arquivos locais e a memória). Clique no caminho para abrir o arquivo aqui mesmo e editar. Nas rules e skills, escolha como as execuções do board usam cada uma; o que fica fora não existe para elas.':
+    'Everything the AI tool reads in this folder, by type: it goes in the repository (except local files and memory). Click the path to open the file right here and edit it. For rules and skills, choose how board runs use each one; what is left out does not exist for them.',
+  'Tudo que a ferramenta de IA lê da sua pasta de usuário, dos plugins instalados e da sua organização: vale na sua máquina, em qualquer projeto. Clique no caminho para abrir o arquivo aqui mesmo e editar. A marcação das execuções é deste board.':
+    'Everything the AI tool reads from your user folder, installed plugins and your organization: it applies on your machine, in any project. Click the path to open the file right here and edit it. The marking for runs belongs to this board.',
+  'ferramenta deste projeto': "this project's tool",
+  'Mostrando o que o {tool} carrega. As execuções do board usam o {board}: a marcação só vale para ele.':
+    'Showing what {tool} loads. Board runs use {board}: the marking only applies to it.',
+  'não encontrada nesta máquina': 'not found on this machine',
+  'Marcados para as execuções do board, mas o arquivo não existe mais:': 'Marked for board runs, but the file no longer exists:',
+  Desmarcar: 'Unmark',
+  'Entra no começo de toda conversa da ferramenta': 'Loaded at the start of every conversation of the tool',
+  'sempre carregado': 'always loaded',
+  'A ferramenta só lê o conteúdo quando a tarefa pede ou quando você chama':
+    'The tool only reads the content when the task calls for it or when you call it',
+  'sob demanda': 'on demand',
+  'Importa com @, e entram junto:': 'Imports with @, which load along with it:',
+  'Abre o arquivo importado no board': 'Opens the imported file in the board',
+  'Abre o arquivo no board, para ler e editar': 'Opens the file in the board, to read and edit',
+  'Abre o arquivo no board, só para leitura': 'Opens the file in the board, read-only',
+  'Somente leitura: este arquivo é mantido pela ferramenta ou por um plugin.':
+    'Read-only: this file is maintained by the tool or by a plugin.',
+  'Conteúdo do arquivo': 'File content',
+  'Não foi possível salvar o arquivo.': 'The file could not be saved.',
   'Modo da skill {name}': 'Mode of skill {name}',
   'Skill de plugin: o modo não pode ser alterado aqui. Para mudar, copie a skill para o projeto.':
     'Plugin skill: the mode cannot be changed here. To change it, copy the skill to the project.',
@@ -108,21 +167,17 @@ export const harness: Record<string, string> = {
   'Modelos de classe e exemplos de código ficam bem numa skill própria, só quando indicada: os arquivos vão em <code>references/</code> e os cards que a indicam recebem os caminhos.':
     'Class templates and code examples fit well in a skill of their own, used only when indicated: the files go in <code>references/</code> and the cards that indicate it receive the paths.',
   'Criar skill de modelos': 'Create templates skill',
-  'Plugins são instalados e removidos pela própria ferramenta, {where}:': 'Plugins are installed and removed by the tool itself, {where}:',
+  'Plugins são instalados pela própria ferramenta, {where}:': 'Plugins are installed by the tool itself, {where}:',
   'no terminal': 'in the terminal',
   'no Cursor (Customize → Plugins) ou numa sessão do agente': 'in Cursor (Customize → Plugins) or in an agent session',
   'claude plugin marketplace add <dono/repositorio>': 'claude plugin marketplace add <owner/repository>',
   'gh skill search <termo>': 'gh skill search <term>',
   'agent plugin marketplace add <endereço git>': 'agent plugin marketplace add <git URL>',
   '/plugins install <pasta, zip ou endereço do GitHub>': '/plugins install <folder, zip or GitHub URL>',
-  'Para aproveitar só uma skill de um plugin ou de um repositório, use "Buscar skills para instalar" na seção Skills, ou "Copiar para o projeto" na skill do plugin.':
-    'To use just one skill from a plugin or a repository, use "Find skills to install" in the Skills section, or "Copy to the project" on the plugin skill.',
   'Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.':
     'A hook is a command the tool runs on its own on your computer. Only add commands you know.',
   'Os servidores do <code>~/.claude.json</code> aparecem aqui, mas são alterados pelo Claude Code: <code>claude mcp add --scope user …</code> e <code>claude mcp remove …</code>.':
     'The servers in <code>~/.claude.json</code> show up here, but are changed by Claude Code: <code>claude mcp add --scope user …</code> and <code>claude mcp remove …</code>.',
-  '{n} skills automáticas: as descrições delas, {chars} caracteres ao todo, entram em toda sessão do {tool}. As demais só são lidas quando indicadas.':
-    '{n} automatic skills: their descriptions, {chars} characters in total, go into every {tool} session. The others are only read when indicated.',
 
   // --- Escopos
   Projeto: 'Project',
@@ -225,7 +280,6 @@ export const harness: Record<string, string> = {
     'Instructions loaded in every AI session. The shorter they are, the less context they use.',
 
   // --- ProjectSkills
-  'Nova skill': 'New skill',
   'Skills do {tool} em <code>{dir}</code>. Todas viram opções do campo "Skills" dos cards, e um card que indica uma skill entrega à IA o caminho do arquivo. Por isso uma skill não precisa ficar à vista da IA para ser usada:':
     '{tool} skills in <code>{dir}</code>. All of them become options in the "Skills" field of cards, and a card that indicates a skill hands the AI the file path. That is why a skill does not need to be in the AI\'s sight to be used:',
   '<b>Automática</b>: a IA vê a descrição em toda sessão e decide quando usar.':
@@ -283,19 +337,8 @@ export const harness: Record<string, string> = {
   Intervalo: 'Interval',
 
   // --- ScopeGroup
-  'Selecionar todos em {scope}': 'Select all in {scope}',
-  'Ações nos itens marcados': 'Actions on the selected items',
-  '{n} marcados': '{n} selected',
   'A IA vê a descrição em toda sessão e decide quando usar': 'The AI sees the description in every session and decides when to use it',
-  'Deixar automáticas': 'Set to automatic',
-  'A IA deixa de invocar sozinha; elas continuam valendo nos cards que as indicam':
-    'The AI stops invoking them on its own; they still apply on the cards that indicate them',
-  'Deixar só quando indicadas': 'Set to only when indicated',
-  'Copiar para o projeto ({n})': 'Copy to the project ({n})',
-  'Copiar para o global ({n})': 'Copy to global ({n})',
-  'Apagar ({n})': 'Delete ({n})',
   'Limpar seleção': 'Clear selection',
-  'Nada neste projeto para o {tool}.': 'Nothing in this project for {tool}.',
 
   // --- SkillFiles
   'Criar arquivo numa skill da pasta do usuário?': 'Create a file in a user-folder skill?',
@@ -383,15 +426,10 @@ export const harness: Record<string, string> = {
   'No Cursor, o servidor do board fica em <code>{project}</code>, fora do git. O global do Cursor é um processo só para todas as janelas e não sabe qual board atender. O board grava este registro sozinho ao abrir no Cursor; se o "faz-ai" aparecer desligado em Cursor Settings → MCP, ligue.':
     'In Cursor, the board server lives in <code>{project}</code>, outside git. Cursor\'s global scope is a single process for all windows and cannot tell which board to serve. The board writes this registration on its own when it opens in Cursor; if "faz-ai" shows as off in Cursor Settings → MCP, turn it on.',
   // --- HarnessSettings (contexto vazio)
-  'Toda execução pelo board parte de <b>contexto vazio</b>: nenhuma regra, skill ou agente da sua máquina ou do projeto entra por conta própria. Só entra o que você marcar aqui. <b>Projeto</b> e <b>Global</b> organizam os arquivos pela pasta de onde vêm; o que vale é a marcação. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; <b>Tudo que a ferramenta carrega</b> é o inventário completo, para criar, copiar e apagar arquivos.':
-    'Every board run starts from an <b>empty context</b>: no rule, skill or agent from your machine or the project gets in on its own. Only what you check here gets in. <b>Project</b> and <b>Global</b> organize the files by the folder they come from; what counts is the check mark. <b>Tool and execution</b> picks the AI, the permission and the default agent; <b>Everything the tool loads</b> is the full inventory, to create, copy and delete files.',
-  // --- ScopeHarness
+  'Toda execução pelo board parte de <b>contexto vazio</b>: nenhuma regra, skill ou agente da sua máquina ou do projeto entra por conta própria. Só entra o que você marcar aqui. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão. <b>Projeto</b> e <b>Global</b> mostram tudo que a ferramenta carrega, separado por tipo, com o que cada arquivo é e onde fica; clique no caminho para abrir e editar.':
+    'Every run through the board starts from <b>empty context</b>: no rule, skill or agent from your machine or the project gets in on its own. Only what you mark here gets in. <b>Ferramenta e execução</b> (Tool and run) picks the AI, the permission and the default agent. <b>Projeto</b> (Project) and <b>Global</b> show everything the tool loads, split by type, with what each file is and where it lives; click the path to open and edit it.',
   'Harness do projeto': 'Project harness',
   'Harness global': 'Global harness',
-  'Arquivos da pasta deste projeto, lidos pelo {tool}: vão no repositório. Marque o que as execuções do board podem usar; o que não está marcado não existe para elas.':
-    'Files in this project folder, read by {tool}: they go in the repository. Check what board runs may use; what is not checked does not exist for them.',
-  'Arquivos da sua pasta de usuário e dos plugins instalados, lidos pelo {tool}: valem na sua máquina, em qualquer projeto. A marcação é deste board. Os agentes que o board cria ficam aqui.':
-    'Files in your user folder and installed plugins, read by {tool}: they apply on your machine, in any project. The check marks belong to this board. Agents the board creates live here.',
   Rules: 'Rules',
   // --- SelectionTable
   'Incluir em todo contexto': 'Include in every context',
@@ -400,19 +438,6 @@ export const harness: Record<string, string> = {
   'Usar quando fizer sentido': 'Use when it fits',
   'Fica disponível para o card: a pessoa marca no card, ou o "Refinar com IA" marca quando o pedido pede.':
     'Available to the card: the person checks it on the card, or "Refine with AI" checks it when the request calls for it.',
-  '<b>Incluir em todo contexto</b>: o arquivo entra em toda execução do board, pelo caminho. <b>Usar quando fizer sentido</b>: vira opção do campo Rules dos cards, e o "Refinar com IA" o indica quando o pedido pede. Sem marcação, a execução não o vê, mesmo que a ferramenta o carregue numa conversa sua.':
-    '<b>Include in every context</b>: the file goes into every board run, by path. <b>Use when it fits</b>: becomes an option of the Rules field on cards, and "Refine with AI" picks it when the request calls for it. Unchecked, the run does not see it, even if the tool loads it in a conversation of yours.',
-  '<b>Incluir em todo contexto</b>: a skill entra em toda execução do board, pelo caminho. <b>Usar quando fizer sentido</b>: vira opção do campo Skills dos cards e dos agentes, e o "Refinar com IA" a indica quando o pedido pede. Sem marcação, a execução não a vê.':
-    '<b>Include in every context</b>: the skill goes into every board run, by path. <b>Use when it fits</b>: becomes an option of the Skills field on cards and agents, and "Refine with AI" picks it when the request calls for it. Unchecked, the run does not see it.',
-  '{always} em todo contexto · {contextual} quando fizer sentido · {total} no total.':
-    '{always} in every context · {contextual} when it fits · {total} in total.',
-  'Nova rule': 'New rule',
-  'Skill de modelos de classe e exemplos de código, só quando indicada': 'Skill for class templates and code examples, only when indicated',
-  '{usage}: {name}': '{usage}: {name}',
-  'Apagar {name}': 'Delete {name}',
-  'O arquivo marcado não está mais no disco; desmarque ou recrie.': 'The checked file is no longer on disk; uncheck it or recreate it.',
-  'Nenhum arquivo de instruções do {tool} neste escopo.': 'No {tool} instruction file in this scope.',
-  'Nenhuma skill do {tool} neste escopo.': 'No {tool} skill in this scope.',
   // --- AgentsTable
   'O {tool} não define agentes em arquivos; o board executa os cards com o agente embutido.':
     '{tool} does not define agents in files; the board runs cards with the built-in agent.',

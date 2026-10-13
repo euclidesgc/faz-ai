@@ -10,6 +10,8 @@
   "command.autopilot.pause.title": "Faz AI: Pausar o modo autônomo (YOLO)",
   "command.autopilot.resume.title": "Faz AI: Retomar o modo autônomo (YOLO)",
   "command.showLog.title": "Faz AI: Mostrar o log das execuções",
+  "command.exportBoard.title": "Faz AI: Exportar o board",
+  "command.importBoard.title": "Faz AI: Importar um board",
   "viewsContainer.fazai.title": "Faz AI",
   "view.sidebar.name": "Board",
   "view.filters.name": "Filtros",
@@ -50,8 +52,7 @@
   "config.git.mergeMethod.squash": "Squash (um commit só)",
   "config.git.mergeMethod.merge": "Merge commit",
   "config.git.mergeMethod.rebase": "Rebase",
-  "config.git.watchMerges": "Conclui a história sozinho quando o pull request dela é mergeado fora do board.",
-  "config.git.watchMergeMinutes": "Intervalo entre as consultas ao estado dos pull requests, em minutos. Só vale com [acompanhar merges](@id:fazai.git.watchMerges) ligado.",
+  "config.git.decisionRecords": "Pasta do repositório onde a Homologação grava o **registro de decisão** de cada história (ex.: `docs/decisoes`), a partir da Spec aprovada: o contexto, a decisão, as alternativas descartadas e os diagramas. O arquivo vai no pull request. Vazio = desligado.",
   "config.backup.title": "Faz AI: Backup",
   "config.backup.info": "Guarda ou restaura o board inteiro: cards, conversas, anexos e configurações. [Exportar o board agora](command:fazai.exportBoard) | [Importar um board](command:fazai.importBoard)."
 }

@@ -18,13 +18,13 @@ import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
-import { cursorModels, cursorSignedIn, runCli } from '../cliProbe';
-import type { AiTool, InstallScope } from '../../shared/harness';
-import { checkRequirements } from '../requirements';
-import { checkEnvironment } from '../environment';
-import { detectOs } from '../installers';
-import { installPlan, installScript, parseInstallResult } from '../../shared/installPlan';
-import { editorMcpFiles, pinEditorCommands, registeredIn, unreachableServers } from '../mcp/pinCommands';
+import { claudeSignedIn, cursorModels, cursorSignedIn, runCli } from '../cliProbe';
+import { aiToolInfo, type AiTool, type InstallScope } from '../../shared/harness';
+import { checkRequirements, registeredServer } from '../requirements';
+import { headlessCommand, headlessUnsupported } from '../headless';
+import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
+import { checkEnvironment, linuxFamily, type OtherToolProbe } from '../environment';
+import { editorMcpFiles, pinEditorCommands, registeredIn } from '../mcp/pinCommands';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { selectedItems } from '../../shared/harnessSelection';
 import { resolveCommand } from '../cliResolve';
@@ -57,8 +57,8 @@ export interface BoardHostOptions {
     startedAt: number;
   };
   /**
-   * roda um comando num terminal novo do editor, à vista da pessoa (o "Instalar tudo" do Diagnóstico);
-   * ausente fora do editor, onde a tela mostra o script para copiar
+   * roda um comando num terminal novo do editor, à vista da pessoa (o login, pelo "Abrir no terminal" do aviso);
+   * ausente fora do editor, onde fica só o comando para copiar
    */
   runInTerminal?: (name: string, command: string, cwd: string) => void;
 }
@@ -131,14 +131,25 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // pasta compartilham o arquivo do banco, e a segunda a abrir marcaria como inconclusiva uma
   // execução viva da primeira. É a mesma ambiguidade que o `ownsBoard` existe para conter.
   const ownsBoard = !o.ownsBoard || o.ownsBoard();
-  if (ownsBoard) runLog.closeOpen(Date.now());
+  // a manutenção da abertura (fechar execuções abertas, consolidar o log) não pode impedir o board de
+  // abrir: se falhar, o motivo vai para o log e a pessoa trabalha normalmente
+  const maintain = (what: string, fn: () => void) => {
+    try {
+      fn();
+    } catch (e) {
+      o.log(`Não foi possível ${what} ao abrir o board: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  if (ownsBoard) maintain('fechar as execuções de IA que ficaram abertas', () => runLog.closeOpen(Date.now()));
   // a retenção: fora da janela, o detalhe do mês vira total em `log_months`. Roda aqui, na abertura,
   // no máximo uma vez por dia — nunca durante uma mutação do board, para não entrar no custo de uma
   // operação comum da pessoa mesmo que fique lenta.
   const boardRepo = new BoardRepo(handle.db);
-  const opened = boardRepo.openedNow(router.boardId, Date.now());
-  if (ownsBoard && opened.rollupDay !== dayOf(Date.now()))
-    consolidate(handle.db, router.boardId, Date.now(), boardRepo.retentionMonths(router.boardId));
+  maintain('consolidar o log de uso', () => {
+    const opened = boardRepo.openedNow(router.boardId, Date.now());
+    if (ownsBoard && opened.rollupDay !== dayOf(Date.now()))
+      consolidate(handle.db, router.boardId, Date.now(), boardRepo.retentionMonths(router.boardId));
+  });
   if (ownsBoard) cleanStaleTemp();
   let pathEnv = await loginShellPath();
   // o node do PATH do terminal, com caminho absoluto: é ele que a ferramenta usa para iniciar o servidor do board.
@@ -162,6 +173,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   // o log do board liga cada evento à execução em curso no card (`run_id`); sem execução, fica nulo
   router.setRunResolver((cardId) => runner.runIdOf(cardId));
+  // os plugins do Claude Code: a lista de instalados e as ações sobre eles passam pela CLI, na pasta do projeto
+  router.setClaudeCli((args) => {
+    const exe = resolveCommand('claude', pathEnv, homeDir);
+    return exe ? runCli(exe, args, pathEnv, 60_000, o.folderPath) : Promise.resolve({ code: null, stdout: '', stderr: '' });
+  });
   // os comandos externos das rotinas periódicas: resolvem com a saída padrão, rejeitam com a mensagem
   // do comando (é ela que vai para o log). `git` aqui é assíncrono de propósito — o `src/extension/git.ts`
   // é síncrono, feito para o que a pessoa dispara, e travaria o processo da extensão numa rodada de fundo.
@@ -244,7 +260,22 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let cursorBlocked = false;
   let enableTimer: NodeJS.Timeout | null = null;
   let checkAgain = false;
+  let forceSigninCheck = false;
+  /** o host encerrou: nenhuma conferência nova começa e a que estava em andamento não mexe mais no board */
+  let disposed = false;
+  const SIGNIN_CACHE_MS = 3 * 60_000;
+  const signinCache = new Map<AiTool, { at: number; value: boolean | null }>();
+  // dispatch por ferramenta: `cursor` e `claude` têm probe; quando o probe não sabe dizer (`null`), vale
+  // só o sinal reativo de falha na execução
+  const probeSignedIn = async (tool: AiTool, exe: string, force: boolean): Promise<boolean | null> => {
+    const cached = !force && signinCache.get(tool);
+    if (cached && Date.now() - cached.at < SIGNIN_CACHE_MS) return cached.value;
+    const value = await (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : claudeSignedIn(exe, pathEnv));
+    signinCache.set(tool, { at: Date.now(), value });
+    return value;
+  };
   const checkNow = (): Promise<void> => {
+    if (disposed) return Promise.resolve();
     if (checking) {
       checkAgain = true;
       return checking;
@@ -263,21 +294,32 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       bridgePath: o.bridgePath,
       nodePath,
       resolve: (command) => resolveCommand(command, pathEnv, homeDir),
-      signedIn: (tool, exe) => (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : Promise.resolve(null)),
+      signedIn: (tool, exe) => probeSignedIn(tool, exe, forceSigninCheck),
       editor: o.editor?.name,
       windowStartedAt: o.editor?.startedAt,
       editorPath: o.editor ? (process.env.PATH ?? '') : undefined,
       skillInstalled: flowSkillInstalled(),
     })
       .then((list) => {
+        // a conferência (com o probe de login, que chama a CLI) pode terminar depois do encerramento
+        if (disposed) return;
         // a CLI do Cursor acabou de ficar pronta (instalada, com login): só agora dá para ler os modelos da conta
         const blocked = board.aiTool === 'cursor' && list.some((r) => r.id === 'cli' || r.id === 'signin');
         if (cursorBlocked && !blocked && router.snapshot().board.aiTool === 'cursor') refreshCursorModels();
         cursorBlocked = blocked;
         router.setRequirements(list);
+        // o sinal reativo (RF6) limpa quando o probe da própria ferramenta volta a confirmar o login —
+        // a essa altura `signinCache` já tem o valor fresco desta conferência (lido pelo `signedIn` acima);
+        // cobre Claude e Cursor, que têm probe (quando o probe não sabe dizer, só se recupera por uma execução
+        // manual que dá certo, em `runner.ts`). Ao trocar de ferramenta o sinal já foi limpo incondicionalmente
+        const expired = router.snapshot().authExpired;
+        if (expired && signinCache.get(expired)?.value === true && router.setAuthExpired(null))
+          o.log(`Login do ${aiToolInfo(expired).label} de volta: execuções retomadas.`);
         // ligar o MCP no Cursor é com a pessoa, fora do board: enquanto falta, confere a cada 10 s, para
-        // o aviso sumir logo depois que ela liga (a conferência lê só uma pasta)
-        if (list.some((r) => r.id === 'mcp-enable')) {
+        // o aviso sumir logo depois que ela liga (a conferência lê só uma pasta). O login (`signin`) entra
+        // no mesmo timer: a ferramenta com probe (Claude, Cursor) retoma em até 10 s, sem esperar
+        // os 5 minutos do ciclo normal
+        if (list.some((r) => r.id === 'mcp-enable' || r.id === 'signin')) {
           enableTimer ??= setInterval(() => void checkNow(), 10_000);
           enableTimer.unref?.();
         } else if (enableTimer) {
@@ -288,6 +330,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       .catch((e) => o.log(`Não foi possível conferir os requisitos do board: ${e instanceof Error ? e.message : String(e)}`))
       .finally(() => {
         checking = null;
+        forceSigninCheck = false;
         if (checkAgain) {
           checkAgain = false;
           void checkNow();
@@ -295,15 +338,18 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       });
     return checking;
   };
-  // o "Verificar de novo" relê também o PATH do terminal, para achar o que acabou de ser instalado
-  router.onRequirementsCheck(
-    () =>
-      void loginShellPath(true)
-        .then((fresh) => (pathEnv = fresh ?? pathEnv))
-        .finally(() => void checkNow()),
-  );
-  // o Diagnóstico do ambiente: os requisitos acima e o que o board usa quando existe (skill do fluxo,
-  // git, GitHub CLI, Code Review Graph). Roda só quando a tela pede: alguns comandos demoram
+  // o "Verificar de novo" relê também o PATH do terminal, para achar o que acabou de ser instalado, e
+  // pula o cache do login: é o clique da pessoa depois de entrar na conta, não pode esperar o TTL de 3 min
+  router.onRequirementsCheck(() => {
+    forceSigninCheck = true;
+    void loginShellPath(true)
+      .then((fresh) => (pathEnv = fresh ?? pathEnv))
+      .finally(() => void checkNow());
+  });
+  // "Abrir no terminal" do aviso de login: o board só abre o terminal, a pessoa faz o login nele
+  router.onOpenTerminal((command) => o.runInTerminal?.('Faz AI: login', command, o.folderPath));
+  // o Diagnóstico do ambiente: os requisitos acima e o que o board usa quando existe (a outra ferramenta
+  // de IA, git, GitHub CLI, Code Review Graph). Roda só quando a tela pede: alguns comandos demoram
   const probeCommand = (command: string, args: string[], cwd?: string) =>
     new Promise<string | null>((resolve) =>
       execFile(
@@ -320,18 +366,16 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return null;
     }
   };
-  // os MCPs que o chat do editor inicia (o do board e o do Code Review Graph): o editor os procura no
-  // PATH de quando abriu, e o que foi instalado depois só aparece nele com o caminho completo
+  // os MCPs que o chat do editor inicia: o editor os procura no PATH de quando abriu, e o que foi
+  // instalado depois só aparece nele com o caminho completo
   const editorFiles = o.editor?.name === 'cursor' ? editorMcpFiles(o.folderPath, homeDir) : null;
   const editorPath = () => process.env.PATH ?? '';
   const resolveHere = (command: string) => resolveCommand(command, pathEnv, homeDir);
-  const crgMcpState = (tool: AiTool) => {
-    if (!editorFiles || tool !== 'cursor') return undefined;
-    if (!registeredIn(editorFiles, 'code-review-graph')) return 'unregistered' as const;
-    const broken = unreachableServers(editorFiles, editorPath(), resolveHere).filter((u) => u.server === 'code-review-graph');
-    if (!broken.length) return 'ok' as const;
-    return broken.every((u) => u.tracked) ? ('tracked' as const) : ('unreachable' as const);
-  };
+  // o MCP do Code Review Graph na ferramenta: no Cursor, no arquivo do projeto ou no global
+  const crgRegistered = (tool: AiTool) =>
+    tool === 'cursor'
+      ? registeredIn(editorMcpFiles(o.folderPath, homeDir), 'code-review-graph')
+      : !!registeredServer(tool, o.folderPath, homeDir, 'code-review-graph');
   const pinMcp = () => {
     if (!editorFiles) return;
     try {
@@ -341,6 +385,25 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       o.log(`Não foi possível gravar o caminho completo dos MCPs: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
+  /**
+   * A ferramenta de IA que não é a do projeto, quando está na máquina: a CLI no PATH ou, no Cursor, o
+   * próprio editor em que o board está aberto. null quando não foi encontrada.
+   */
+  const otherTool = async (tool: AiTool): Promise<OtherToolProbe | null> => {
+    const s = router.snapshot();
+    const other: AiTool = tool === 'claude' ? 'cursor' : 'claude';
+    const cli = resolveHere(CLI_COMMAND[other]);
+    if (!cli && !(other === 'cursor' && o.editor?.name === 'cursor')) return null;
+    const inventory = s.harness.inventory.find((t) => t.tool === other);
+    return {
+      tool: other,
+      cli,
+      signedIn: cli ? await probeSignedIn(other, cli, false) : null,
+      mcp: !!registeredServer(other, o.folderPath, homeDir),
+      skill: !!inventory?.items.some((i) => i.kind === 'skill' && i.name === FLOW_SKILL_NAME),
+      permission: headlessUnsupported(other, s.board.runner.permission),
+    };
+  };
   let diagnosing: Promise<void> | null = null;
   const diagnose = () => {
     diagnosing ??= (async () => {
@@ -349,17 +412,27 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       const s = router.snapshot();
       const tool = s.board.aiTool;
       const skillInstalled = selectedItems(s, 'skill', 'always').some((i) => i.name === FLOW_SKILL_NAME);
+      // o sinal reativo (RF6) também vira o item "signin" do Diagnóstico quando o probe não soube dizer
+      // (`null`): sem isso, `s.requirements` não teria `signin` para um login que venceu no meio da execução
+      const built = headlessCommand(tool, { prompt: '', permission: 'full' });
+      const cliName = 'unsupported' in built ? null : built.command;
+      const syntheticSignin: BoardRequirement | null =
+        s.authExpired === tool && cliName && !s.requirements.some((r) => r.id === 'signin')
+          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: LOGIN_COMMAND[tool], terminal: true } }
+          : null;
       router.setEnvironment(
         await checkEnvironment({
           tool,
-          requirements: s.requirements,
+          requirements: syntheticSignin ? [...s.requirements, syntheticSignin] : s.requirements,
           workspaceDir: o.folderPath,
-          os: detectOs(process.platform, readOsRelease()),
-          pathDirs: (pathEnv ?? process.env.PATH ?? '').split(path.delimiter),
-          homeDir,
           skillInstalled,
-          crgMcp: crgMcpState(tool),
-          resolve: (command) => resolveCommand(command, pathEnv, homeDir),
+          other: await otherTool(tool),
+          crgMcp: crgRegistered(tool),
+          platform: process.platform,
+          homeDir,
+          pathDirs: (pathEnv ?? process.env.PATH ?? '').split(path.delimiter),
+          linux: process.platform === 'linux' ? linuxFamily(readOsRelease()) : null,
+          resolve: resolveHere,
           run: probeCommand,
           firstLine: (file) => {
             try {
@@ -377,60 +450,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   // a tela abre sozinha uma vez por máquina (a marca fica na pasta de dados da extensão, fora do board)
   const seenFile = path.join(o.storageDir, 'environment-seen');
-  // "Instalar tudo": o plano sai do último Diagnóstico, vira um script e roda num terminal do editor.
-  // O script cria um arquivo ao terminar; enquanto ele não aparece, a tela mostra que está instalando
-  const installDir = path.join(o.storageDir, 'install');
-  let installTimer: NodeJS.Timeout | null = null;
-  const install = (level: 'required' | 'recommended') => {
-    const s = router.snapshot();
-    const plan = s.environment && installPlan(s.environment, level);
-    if (!plan || !o.runInTerminal || installTimer) return;
-    if (plan.installSkill) router.handle({ type: 'harness.flowSkill.install', tool: s.board.aiTool, scope: 'user' });
-    if (!plan.steps.length) return void diagnose();
-    const stamp = Date.now();
-    const result = path.join(installDir, `${level}-${stamp}.result`);
-    const file = path.join(installDir, `${level}-${stamp}.${plan.shell === 'powershell' ? 'ps1' : 'sh'}`);
-    try {
-      fs.mkdirSync(installDir, { recursive: true });
-      fs.writeFileSync(file, installScript(plan, result), { mode: 0o700 });
-    } catch (e) {
-      o.log(`Não foi possível gravar o script de instalação: ${e instanceof Error ? e.message : String(e)}`);
-      return;
-    }
-    o.runInTerminal(
-      'Faz AI: instalação',
-      plan.shell === 'powershell'
-        ? `powershell -NoProfile -ExecutionPolicy Bypass -File "${file}"`
-        : `bash '${file.replace(/'/g, `'\\''`)}'`,
-      o.folderPath,
-    );
-    router.setEnvironmentInstall({ level, startedAt: stamp });
-    const read = (f: string) => {
-      try {
-        return fs.readFileSync(f, 'utf8');
-      } catch {
-        return null;
-      }
-    };
-    // o resultado de cada passo (e o erro dos que falharam) vira o relatório da tela
-    const finish = () => {
-      if (installTimer) clearInterval(installTimer);
-      installTimer = null;
-      const { steps } = parseInstallResult(read(result) ?? '', (id) => read(`${result}.${id}.err`));
-      router.setEnvironmentInstall(null);
-      router.setEnvironmentInstallResult({ level, steps, finishedAt: Date.now() });
-      // o que acabou de ser instalado não está no PATH do editor: os MCPs ficam com o caminho completo
-      pinMcp();
-      for (const f of fs.readdirSync(installDir))
-        if (f.startsWith(`${level}-${stamp}.`)) fs.rmSync(path.join(installDir, f), { force: true });
-      void diagnose();
-    };
-    // até 3 horas: depois disso, a pessoa confere pelo "Verificar de novo"
-    installTimer = setInterval(() => {
-      if (parseInstallResult(read(result) ?? '', () => null).done || Date.now() - stamp > 3 * 3600_000) finish();
-    }, 2000);
-    installTimer.unref?.();
-  };
   router.onEnvironment(
     {
       check: () => void diagnose(),
@@ -438,7 +457,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         pinMcp();
         void diagnose();
       },
-      install: o.runInTerminal ? install : undefined,
       seen: () => {
         try {
           fs.mkdirSync(o.storageDir, { recursive: true });
@@ -470,29 +488,37 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     const toolChanged = board.aiTool !== toolInUse;
     toolInUse = board.aiTool;
     permissionInUse = board.runner.permission;
+    // o sinal reativo só vale para a ferramenta que falhou; trocando de ferramenta, ele não diz nada sobre a nova
+    if (toolChanged) router.setAuthExpired(null);
     void checkNow();
     if (toolChanged && board.aiTool === 'cursor') refreshCursorModels();
   });
   const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
-  const heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => Date.now(), log: o.log });
-  // publica a próxima rodada agendada; a guarda em `setHeartbeat` (só notifica se mudou) evita o laço
-  // router.onDidChange → publishHeartbeat → setHeartbeat → notify
-  const publishHeartbeat = () => router.setHeartbeat({ nextRoundAt: heartbeat.nextRoundAt });
-  heartbeat.onDidChange(publishHeartbeat);
-  router.onDidChange(publishHeartbeat);
-  publishHeartbeat();
-  // sem timer próprio: o arquivamento das histórias publicadas acontece no fim da rodada de merges,
-  // com o mesmo liga/desliga, o mesmo intervalo e a mesma janela dona
+  // sem timers próprios: a detecção de merges acontece em cada rodada do heartbeat, e o arquivamento das
+  // histórias publicadas no fim da rodada de merges
   const releaseWatcher = new ReleaseWatcher(router, { cwd: o.folderPath, log: o.log, gh, git });
   const mergeWatcher = new MergeWatcher(router, {
     cwd: o.folderPath,
     log: o.log,
     gh,
     removeWorktree,
-    now: () => Date.now(),
-    canRun: o.ownsBoard,
     afterRound: () => releaseWatcher.sweep(),
   });
+  const heartbeat = new Heartbeat(runner, {
+    snapshot: () => router.snapshot(),
+    now: () => Date.now(),
+    log: o.log,
+    // como o heartbeat e o autopiloto, só a janela dona do board confere os merges, para não concluir em dobro
+    onRound: () => {
+      if (!o.ownsBoard || o.ownsBoard()) void mergeWatcher.runNow();
+    },
+  });
+  // publica a próxima rodada agendada; a guarda em `setHeartbeat` (só notifica se mudou) evita o laço
+  // router.onDidChange → publishHeartbeat → setHeartbeat → notify
+  const publishHeartbeat = () => router.setHeartbeat({ nextRoundAt: heartbeat.nextRoundAt });
+  heartbeat.onDidChange(publishHeartbeat);
+  router.onDidChange(publishHeartbeat);
+  publishHeartbeat();
 
   const gitignore = path.join(o.folderPath, '.gitignore');
   const api: BoardHost = {
@@ -552,9 +578,13 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       fs.writeFileSync(gitignore, `${current}${current && !current.endsWith('\n') ? '\n' : ''}${lines.join('\n')}\n`);
     },
     async dispose() {
+      disposed = true;
+      router.setClaudeCli(null);
       clearInterval(requirementsTimer);
       if (enableTimer) clearInterval(enableTimer);
-      autopilot.pause();
+      // espera a conferência em andamento: sem isso ela pode gravar o board depois de o banco fechar
+      await checking;
+      autopilot.stop(); // fechar o editor não é uma pausa da pessoa: na reabertura a fila retoma
       heartbeat.stop();
       runner.dispose();
       chat.dispose();

@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { HarnessWatcher, nodeWatch, projectWatchTargets, userWatchTargets } from '../extension/harnessWatch';
 import { createBoardHost } from '../extension/host/boardHost';
 import { startMcpServer } from '../extension/mcp/server';
 import { canonicalFolder, socketPath, stableBridgePath, workspaceKey } from '../extension/mcp/socketPath';
@@ -116,7 +117,7 @@ async function main(): Promise<void> {
     log,
     version: FAZAI_VERSION,
   });
-  const { router, runner, heartbeat, mergeWatcher } = host;
+  const { router, runner, heartbeat } = host;
   const stopMcp = await startMcpServer(address, {
     getRouter: async () => router,
     getRunner: async () => runner,
@@ -158,10 +159,15 @@ async function main(): Promise<void> {
 
   const timer = setInterval(() => {
     heartbeat.tick();
-    mergeWatcher.tick();
   }, 60_000);
-  // regras e skills editadas por fora aparecem no board
-  const refresh = setInterval(() => router.refreshHarness(), 15_000);
+  // regras e skills editadas por fora aparecem no board: os watchers avisam na hora, e a releitura de
+  // cada minuto cobre o que eles não veem (regras de subpasta, sistemas de arquivos de rede)
+  const harnessWatch = new HarnessWatcher(
+    () => [...projectWatchTargets(folderPath), ...userWatchTargets(os.homedir(), folderPath)],
+    nodeWatch(),
+    () => router.refreshHarness(),
+  );
+  const refresh = setInterval(() => router.refreshHarness(), 60_000);
 
   let closing = false;
   const shutdown = async () => {
@@ -169,6 +175,7 @@ async function main(): Promise<void> {
     closing = true;
     clearInterval(timer);
     clearInterval(refresh);
+    harnessWatch.dispose();
     web.close();
     stopMcp();
     await host.dispose();

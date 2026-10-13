@@ -15,6 +15,7 @@ export function CardBar({
   color,
   work = null,
   status = null,
+  leading,
   children,
 }: {
   id: string;
@@ -22,10 +23,13 @@ export function CardBar({
   color?: string;
   work?: AiWork;
   status?: CardStatus | null;
+  /** vai antes do LED, na mesma faixa: a caixa de seleção múltipla do card */
+  leading?: ReactNode;
   children?: ReactNode;
 }) {
   return (
     <div className="card-bar" style={badgeStyle(color)}>
+      {leading}
       <AiLed work={work} status={status} />
       <span className="card-id" title={t('ID do card')}>
         {id}

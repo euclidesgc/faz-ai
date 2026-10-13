@@ -2,12 +2,14 @@ import type { SyntheticEvent } from 'react';
 import { modelDisplay } from '../../modelText';
 import type { Card } from '../../../shared/model';
 import { modelFieldOf, suggestModel } from '../../../shared/models';
+import { lastAiColumn, yoloStopOf } from '../../../shared/story';
 import { childProgress, linkedCards } from '../../../shared/links';
 import { checklistOf, childrenOf, countDone, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { t } from '../../i18n';
 import { cards } from '../../commands';
 import { useYoloToggle } from '../card/YoloBar';
+import { ContextGauge } from './ContextGauge';
 import {
   IconAttachment,
   IconBranch,
@@ -24,7 +26,7 @@ import {
 // o clique num controle do rodapé não arrasta nem abre o card
 const keep = (e: SyntheticEvent) => e.stopPropagation();
 
-/** Rodapé do card: contadores, branch e PR do próprio card e a sugestão de modelo das regras. */
+/** Rodapé do card: contadores, branch e PR do próprio card, a sugestão de modelo das regras e o contexto estimado. */
 export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: boolean; overlay: boolean }) {
   const state = useBoardStore((s) => s.state)!;
   const children = isParent ? childrenOf(state, card.id) : [];
@@ -41,6 +43,9 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
   const offer = modelField && suggestion && suggestion !== valueOf(state, card.id, modelField.id) ? suggestion : null;
   const catalog = state.board.modelCatalog;
   const { effectiveYolo, toggle: toggleYolo } = useYoloToggle(card);
+  // o modo ligado só até uma fase diz qual no hint do botão
+  const stop = card.yolo ? yoloStopOf(state, card) : undefined;
+  const until = stop && stop.id !== lastAiColumn(state, card.workflowId)?.id ? stop.name : null;
 
   return (
     <div className="card-meta">
@@ -77,7 +82,13 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
       {isParent && card.deletedAt === null && card.archivedAt === null && (
         <button
           className={`yolo-mark ${effectiveYolo ? 'on' : 'off'}`}
-          title={effectiveYolo ? t('Desligar modo autônomo') : t('Ligar modo autônomo')}
+          title={
+            effectiveYolo
+              ? until
+                ? t('Modo autônomo até {column}. Clique para desligar.', { column: until })
+                : t('Desligar modo autônomo')
+              : t('Ligar modo autônomo')
+          }
           aria-label={effectiveYolo ? t('Desligar modo autônomo') : t('Ligar modo autônomo')}
           onPointerDown={keep}
           onClick={(e) => {
@@ -120,6 +131,7 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
           <IconSuggest /> {modelDisplay(catalog, offer)}
         </button>
       )}
+      {!overlay && card.deletedAt === null && card.archivedAt === null && <ContextGauge card={card} />}
     </div>
   );
 }

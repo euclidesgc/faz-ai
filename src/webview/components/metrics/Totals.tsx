@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import type { MetricsPanelResult } from '../../../shared/metrics';
+import { SHOW_COST, type MetricsPanelResult } from '../../../shared/metrics';
 import { t } from '../../i18n';
 import { formatCost, formatDuration, formatMoney, formatNumber, formatTokens, unmeasured } from './format';
 import { Note } from './Note';
@@ -40,9 +40,11 @@ export function Totals({ result }: { result: MetricsPanelResult }) {
         {(valueId, noteId) => <TokensBody totals={totals} valueId={valueId} noteId={noteId} />}
       </Total>
 
-      <Total label={t('Custo')} hint={t('Em dólares, somando as execuções medidas.')}>
-        {(valueId, noteId) => <CostBody totals={totals} valueId={valueId} noteId={noteId} />}
-      </Total>
+      {SHOW_COST && (
+        <Total label={t('Custo')} hint={t('Em dólares, somando as execuções medidas.')}>
+          {(valueId, noteId) => <CostBody totals={totals} valueId={valueId} noteId={noteId} />}
+        </Total>
+      )}
 
       <Total
         label={t('Tempo de IA')}

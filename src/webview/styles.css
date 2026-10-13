@@ -431,19 +431,22 @@ button.active {
   outline: var(--focus-ring);
   outline-offset: -1px;
 }
-/* caixa de marcação da seleção múltipla (card 324): some por padrão, só aparece sob o mouse,
-   já marcada ou enquanto há alguma seleção ativa no board (classe .selecting) */
+/* caixa de marcação da seleção múltipla (card 324): tem lugar fixo na faixa do card, antes do LED,
+   para nunca cobrir o ID nem o tipo; some por padrão (o lugar fica reservado, nada se mexe) e aparece
+   sob o mouse, já marcada ou enquanto há alguma seleção ativa no board (classe .selecting) */
 .card-select {
-  position: absolute;
-  top: var(--sp-2);
-  left: var(--sp-2);
-  z-index: 1;
+  flex: none;
+  width: 14px;
+  height: 14px;
   margin: 0;
+  accent-color: var(--accent);
   opacity: 0;
   cursor: pointer;
 }
 .card:hover .card-select,
 .card.selecting .card-select,
+.card:focus-within .card-select,
+.card-select:focus-visible,
 .card-select:checked {
   opacity: 1;
 }
@@ -511,19 +514,18 @@ button.active {
   font-size: var(--fs-xs);
   color: var(--muted);
 }
-/* card colapsado (escopo "um card"/coluna/board/selecionados): uma linha só, chevron + LED + título */
-.card.card-collapsed {
-  min-height: 32px;
+/* card colapsado (escopo "um card"/coluna/board/selecionados): a faixa colorida fica (LED, ID, tipo e
+   botões) e o corpo guarda só o título, em até duas linhas */
+.card.card-collapsed .card-body {
+  padding-top: var(--sp-4);
+  padding-bottom: var(--sp-4);
 }
-.card-collapsed-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-6);
-  padding: var(--sp-2) var(--sp-8);
-}
-.card-collapsed-row .card-title {
-  flex: 1;
-  min-width: 0;
+.card.card-collapsed .card-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .badge {
   font-size: var(--fs-xs);
@@ -681,7 +683,7 @@ button.chip.on:hover:where(:not(:disabled)) {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .checklist li {
   display: flex;
@@ -704,9 +706,15 @@ button.chip.on:hover:where(:not(:disabled)) {
 }
 .children li {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: var(--sp-6);
   padding: var(--sp-4) var(--sp-6);
   border-radius: var(--radius-sm);
+}
+/* LED de atividade de cada sub-tarefa: alinhado com o texto, com respiro até o título */
+.children li .ai-led {
+  margin-right: var(--sp-4);
 }
 .children li:hover {
   background: var(--hover);
@@ -770,7 +778,7 @@ button.chip.on:hover:where(:not(:disabled)) {
 .tabs-vertical {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .tabs-vertical button {
   text-align: left;
@@ -1015,6 +1023,19 @@ button.ghost.on {
   font-size: var(--fs-sm);
   resize: vertical;
 }
+.harness-file-path {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.attachment-modal-body pre.harness-file-meta {
+  padding: var(--sp-8);
+  border-radius: var(--radius-sm);
+  background: var(--code-bg);
+  color: var(--muted);
+}
 .attachment-modal-body img {
   max-width: 100%;
   max-height: 70vh;
@@ -1029,6 +1050,18 @@ button.ghost.on {
   display: flex;
   flex-direction: column;
   gap: var(--sp-8);
+}
+/* barra de seleção múltipla (card 326): mesma faixa da barra de filtros, só visível com 2+ cards marcados */
+.selectionbar {
+  border-bottom: 1px solid var(--border);
+  padding: var(--sp-8) var(--sp-12);
+  display: flex;
+  gap: var(--sp-8);
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+  color: var(--fg);
+  background: var(--col-bg);
 }
 .filterbar-main {
   display: flex;
@@ -1065,10 +1098,6 @@ button.ghost.on {
 .column-add input {
   width: 180px;
 }
-.column.archive {
-  border-style: dashed;
-  opacity: 0.9;
-}
 .column .empty {
   font-size: var(--fs-xs);
   padding: var(--sp-8) var(--sp-4);
@@ -1082,7 +1111,7 @@ button.ghost.on {
 /* drawer */
 .tabs {
   display: flex;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
   border-bottom: 1px solid var(--border);
 }
 .tabs button {
@@ -1165,7 +1194,7 @@ button.ghost.on {
 .md-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
   padding: var(--sp-4);
   border-bottom: 1px solid var(--border);
   background: var(--col-bg);
@@ -1317,6 +1346,48 @@ button.ghost.on {
   white-space: nowrap;
 }
 
+/* arquivados: uma linha por workflow, cards em fluxo que quebra linha */
+.archived {
+  padding: var(--sp-12) var(--sp-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+.archived-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+.archived-row > header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.archived-row > header h2 {
+  margin: 0;
+  font-size: var(--fs-h);
+}
+.archived-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: flex-start;
+}
+.archived-cards > .archived-item {
+  flex: 0 1 260px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.archived-item .archived-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
 /* lixeira */
 .trash {
   padding: var(--sp-12) var(--sp-20);
@@ -1407,6 +1478,26 @@ button.ghost.on {
 }
 .rule .when dd {
   margin: 0;
+}
+.metrics-rework-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-4) var(--sp-12);
+  margin: 0 0 var(--sp-12);
+  font-size: var(--fs-sm);
+}
+.metrics-rework-summary dt {
+  color: var(--muted);
+}
+.metrics-rework-summary dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.rule-below {
+  margin-top: var(--sp-12);
+}
+.rule-below .critical-paths textarea {
+  font-family: var(--font-mono);
 }
 
 /* harness e padrões por tipo */
@@ -1876,6 +1967,20 @@ button.heartbeat.stopped:hover {
 }
 
 /* requisitos do board: fica no topo, em todas as telas, enquanto faltar alguma coisa */
+/* o ícone de atenção do que falta para o board trabalhar com a IA, na aba Configurações e no Verificar ambiente */
+.requirements-alert {
+  width: 14px;
+  height: 14px;
+  margin-left: var(--sp-4);
+  vertical-align: -2px;
+  color: var(--warn-border);
+}
+.requirements-alert.error {
+  color: var(--error);
+}
+.requirements-alert.recommended {
+  color: var(--muted);
+}
 .banner.requirements {
   margin: var(--sp-8) var(--sp-16) 0;
   display: flex;
@@ -1932,7 +2037,7 @@ button.heartbeat.stopped:hover {
   overflow-wrap: anywhere;
 }
 
-/* Diagnóstico do ambiente: lista de tarefas, um item por ferramenta, com o estado à esquerda */
+/* Diagnóstico do ambiente: uma lista por seção, um item por linha, com o que depende dele aninhado */
 .environment {
   max-width: 980px;
   padding: var(--sp-12) var(--sp-20) var(--sp-20);
@@ -1952,21 +2057,29 @@ button.heartbeat.stopped:hover {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-8);
+  gap: var(--sp-4);
 }
-.env-item {
+/* o que depende do item fica recuado, com uma guia à esquerda */
+.env-list .env-list {
+  margin: var(--sp-4) 0 0 9px;
+  padding-left: var(--sp-16);
+  border-left: 1px solid var(--border);
+}
+.env-row {
   display: flex;
-  gap: var(--sp-8);
-  align-items: flex-start;
-  padding: var(--sp-8) var(--sp-12);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4) var(--sp-8);
+  min-width: 0;
 }
-.env-item > svg {
+.env-row > svg {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  margin-top: 1px;
+  width: 18px;
+  height: 18px;
+}
+.env-name {
+  border-bottom: 1px dotted var(--muted);
+  cursor: help;
 }
 .env-ok {
   color: var(--success);
@@ -1974,103 +2087,42 @@ button.heartbeat.stopped:hover {
 .env-missing {
   color: var(--error);
 }
-.env-recommend {
-  color: var(--warn-border);
-}
 .env-skipped {
   color: var(--muted);
 }
-.env-body {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--sp-6);
+.env-docs {
+  overflow-wrap: anywhere;
 }
-.env-title {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--sp-8);
-}
-.env-body dl {
-  margin: 0;
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--sp-4) var(--sp-12);
-  max-width: 100ch;
-}
-.env-body dt {
-  color: var(--muted);
-}
-.env-body dd {
-  margin: 0;
-}
-/* em tela estreita, o rótulo fica em cima do texto */
-@media (max-width: 560px) {
-  .env-body dl {
-    grid-template-columns: 1fr;
-  }
-  .env-body dd {
-    margin-bottom: var(--sp-4);
-  }
+.env-docs a svg {
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
 }
 .env-fix {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--sp-6);
+  margin: var(--sp-4) 0 0 26px;
 }
 .env-fix p {
   margin: 0;
+  flex-basis: 100%;
   max-width: 100ch;
 }
-.env-prereqs {
+.env-commands {
+  margin: 0;
+  padding-left: var(--sp-20);
+  flex-basis: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-6);
-  align-self: stretch;
+  gap: var(--sp-4);
 }
-.env-prereqs > p {
-  margin: 0;
-}
-.env-prereqs .env-item {
-  padding: var(--sp-6) var(--sp-8);
-}
-.env-os {
-  margin: 0;
-}
-.env-install-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-8);
-}
-.env-install {
+.env-commands li {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-6);
-  padding: var(--sp-12);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-.env-install h3,
-.env-install p,
-.env-install ol {
-  margin: 0;
-}
-.env-script {
-  margin: var(--sp-6) 0 0;
-  padding: var(--sp-8);
-  max-height: 320px;
-  overflow: auto;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  align-items: flex-start;
+  gap: var(--sp-4);
 }
 .env-busy {
   margin: 0;
@@ -2079,22 +2131,19 @@ button.heartbeat.stopped:hover {
   gap: var(--sp-6);
   color: var(--muted);
 }
+/* os botões são a ação de cada item: no tamanho normal e com contorno, para não sumirem no meio do texto */
+.environment .env-fix button.small {
+  padding: var(--sp-4) var(--sp-12);
+  font-size: var(--fs-sm);
+  min-height: 28px;
+}
+.environment .env-fix button.small:not(.primary) {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
 .environment .page-header-actions [role='status'] {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-4);
-}
-.env-commands {
-  margin: 0;
-  padding-left: var(--sp-20);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
-}
-.env-body a svg {
-  width: 12px;
-  height: 12px;
-  vertical-align: -1px;
 }
 
 /* avisos flutuantes: não empurram o board nem somem atrás do card aberto */
@@ -2269,7 +2318,7 @@ button:where(:not([class*='rt-'])) {
   gap: var(--sp-6);
 }
 .option-chip {
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .switch-row {
   display: inline-flex;
@@ -2552,24 +2601,37 @@ body.host-web .drawer {
 .scope-summary {
   margin-left: var(--sp-4);
 }
-.bulk-bar {
+.item-list-head {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-8);
-  margin-top: var(--sp-6);
-  padding: var(--sp-6) var(--sp-8);
-  background: var(--hover);
-  border-radius: var(--radius);
+  align-items: center;
+  gap: var(--sp-4) var(--sp-8);
+  min-height: 32px;
+  padding: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+.item-check-all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-12);
+  margin-right: var(--sp-8);
+  cursor: pointer;
+}
+.bulk-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
 }
 .item-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
+/* as ações ficam com no máximo metade da linha e quebram em mais linhas: o texto nunca some num painel estreito */
 .item-row {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-columns: 20px minmax(0, 1fr) fit-content(50%);
   gap: var(--sp-4) var(--sp-12);
   align-items: start;
   padding: var(--sp-8) var(--sp-4);
@@ -2589,6 +2651,77 @@ body.host-web .drawer {
 }
 .item-name {
   font-weight: 600;
+}
+.item-explain {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+}
+.plugin-pick {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 0 var(--sp-12);
+  align-items: start;
+  padding: 0 var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+.plugin-pick > .item-check {
+  padding-top: var(--sp-8);
+}
+.plugin-group {
+  padding: var(--sp-8) 0;
+}
+.plugin-group > summary {
+  cursor: pointer;
+}
+.item-imports {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-top: var(--sp-4);
+  padding-left: var(--sp-8);
+  border-left: 2px solid var(--border);
+}
+.harness-tool-picker {
+  margin: var(--sp-8) 0 var(--sp-12);
+}
+/* seletor de largura fixa (SelectField steady): o rótulo mais longo ocupa o lugar, invisível, atrás do escolhido */
+.select-steady {
+  display: inline-grid;
+}
+.select-steady > *,
+.select-steady::after {
+  grid-area: 1 / 1;
+}
+.select-steady::after {
+  content: attr(data-longest);
+  visibility: hidden;
+}
+.item-unread {
+  color: var(--warn-border);
+}
+.harness-absent {
+  display: grid;
+  gap: var(--sp-6);
+  margin-top: var(--sp-8);
+}
+.harness-absent ul {
+  display: grid;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.harness-absent li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-4) var(--sp-12);
+}
+.harness-missing {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-right: var(--sp-8);
 }
 .item-hint {
   margin: var(--sp-2) 0 0;
@@ -2775,7 +2908,7 @@ body.host-web .drawer {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 .children li .rt-IconButton {
   margin-left: var(--sp-6);
@@ -3220,7 +3353,7 @@ body.host-web .drawer {
 .metrics-horizon {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
 }
 
 /* card 173, painel de métricas: os cinco blocos abaixo da série. Grade auto-fit e tabelas que rolam dentro de si (RF-40) */
@@ -3532,4 +3665,236 @@ div.metrics-breakdown {
 }
 .models-fast p {
   margin: 0;
+}
+/* Contexto estimado do card: um anel discreto no rodapé e o detalhe num popover, como a janela de contexto das ferramentas de IA */
+.context-gauge {
+  margin-left: auto;
+  min-height: 0;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-2);
+  margin-top: calc(var(--sp-2) * -1);
+  margin-bottom: calc(var(--sp-2) * -1);
+  background: transparent;
+  color: var(--muted);
+}
+/* com a sugestão de modelo, os dois ficam juntos à direita */
+.suggest-model + .context-gauge {
+  margin-left: 0;
+}
+.context-gauge:hover:where(:not(:disabled)) {
+  background: var(--hover);
+  color: var(--fg);
+}
+.context-ring {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.context-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+.context-ring-track {
+  stroke: var(--border);
+}
+.context-ring-fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+}
+.context-popover.rt-PopoverContent {
+  width: 360px;
+  max-width: calc(100vw - 2 * var(--sp-16));
+  /* com os grupos abertos o detalhe cresce: fica no espaço que sobra na tela e rola */
+  max-height: var(--radix-popover-content-available-height);
+  overflow-y: auto;
+  padding: var(--sp-12);
+  background: var(--card-bg);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+}
+.context-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  font-variant-numeric: tabular-nums;
+}
+.context-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-8);
+}
+.context-title {
+  font-size: var(--fs-h);
+  font-weight: 600;
+}
+.context-total,
+.context-model {
+  color: var(--muted);
+}
+.context-model {
+  margin-top: calc(var(--sp-6) * -1);
+  font-size: var(--fs-xs);
+}
+.context-bar {
+  display: flex;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--hover);
+}
+.context-bar > span {
+  min-width: 2px;
+  height: 100%;
+}
+.ctx-mcp {
+  background: var(--ctx-mcp);
+}
+.ctx-agents {
+  background: var(--ctx-agents);
+}
+.ctx-rules {
+  background: var(--ctx-rules);
+}
+.ctx-skills {
+  background: var(--ctx-skills);
+}
+.ctx-card {
+  background: var(--ctx-card);
+}
+.context-groups {
+  display: flex;
+  flex-direction: column;
+}
+.context-group > summary,
+.context-free {
+  display: grid;
+  grid-template-columns: 12px 10px 1fr auto 56px;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: var(--sp-4) 0;
+}
+.context-group > summary {
+  list-style: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.context-group > summary::-webkit-details-marker {
+  display: none;
+}
+.context-group > summary:hover {
+  background: var(--hover);
+}
+.context-group > summary:focus-visible {
+  outline: var(--focus-ring);
+}
+.context-group > summary > svg {
+  color: var(--muted);
+}
+.context-group[open] > summary > svg {
+  transform: rotate(90deg);
+}
+.context-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.context-free .context-swatch {
+  border: 1px solid var(--border-strong);
+}
+.context-tokens,
+.context-share {
+  text-align: right;
+}
+.context-share {
+  color: var(--muted);
+}
+.context-entries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-6);
+  padding: 0 0 0 calc(22px + var(--sp-12));
+  list-style: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.context-entries li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+.context-entries li.on-demand {
+  font-style: italic;
+}
+.context-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.context-entry code {
+  font-family: var(--font-mono);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.context-entries .context-tokens {
+  flex: none;
+}
+.context-notes {
+  padding-top: var(--sp-8);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.context-notes p {
+  margin: 0 0 var(--sp-4);
+}
+.context-notes p:last-child {
+  margin-bottom: 0;
+}
+/* Aba Consumo do card aberto: a estimativa da próxima execução numa caixa, e o gasto por fase numa tabela */
+.usage-estimate {
+  max-width: 480px;
+  padding: var(--sp-12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.usage-table-wrap {
+  overflow-x: auto;
+}
+.usage-table {
+  font-size: var(--fs-sm);
+}
+.usage-table th[scope='row'] {
+  font-weight: normal;
+}
+.usage-table thead th {
+  color: var(--muted);
+  font-weight: normal;
+  border-top: none;
+}
+.usage-table .usage-total th,
+.usage-table .usage-total td {
+  font-weight: 600;
+  border-top: 1px solid var(--border-strong);
+}
+.usage-tab .context-notes {
+  margin-top: var(--sp-8);
+}
+.usage-tab .drawer-section + .drawer-section {
+  margin-top: var(--sp-16);
+}
+/* o harness mudou enquanto o detalhe estava aberto (ou desde a última leitura): os números já foram refeitos */
+.context-changed {
+  margin: 0;
+  padding: var(--sp-6) var(--sp-8);
+  border-left: 3px solid var(--warn-border);
+  border-radius: var(--radius-sm);
+  background: var(--warn-bg);
+  color: var(--fg);
+  font-size: var(--fs-xs);
+}
+.context-reread {
+  margin-top: var(--sp-4);
 }

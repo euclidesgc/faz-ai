@@ -1,11 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
+vi.mock('../src/shared/metrics', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/shared/metrics')>()),
+  SHOW_COST: true,
+  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
+}));
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { CURSOR_TOOLS, headlessCommand, headlessUnsupported } from '../src/extension/headless';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { AiRunner, AUTONOMOUS_ADVICE, PERMISSION_ADVICE, cardPrompt, consumptionLine, summarizePrompt } from '../src/extension/runner';
+import {
+  AiRunner,
+  AUTONOMOUS_ADVICE,
+  PERMISSION_ADVICE,
+  cardPrompt,
+  consumptionLine,
+  summarizePrompt,
+  yoloStopAdvice,
+} from '../src/extension/runner';
+import { boardState, card as fakeCard, column as fakeColumn } from './fakes/board';
 import type { RunnerDeps } from '../src/extension/runner';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
@@ -14,8 +30,32 @@ import { createRunLog } from '../src/extension/log/runLog';
 import { gatewayFor } from './helpers/gateway';
 import { executionPlan } from '../src/extension/execution';
 import { monthOf, type RunReport } from '../src/shared/log';
+import { parseRunner } from '../src/shared/runner';
 import { TYPE_CONDITION, modelValue } from '../src/shared/models';
 import type { Database } from 'sql.js';
+
+it('com o modo autônomo só até uma fase, o pedido diz até onde e, na própria fase, manda pedir a revisão e parar', () => {
+  const columns = [
+    { ...fakeColumn('spec', 'wp', 1), aiActive: true },
+    { ...fakeColumn('plan', 'wp', 2), aiActive: true },
+    { ...fakeColumn('homolog', 'wp', 3), aiActive: true },
+  ];
+  const at = (columnId: string, yoloUntil: string | null) =>
+    boardState({
+      columns,
+      cards: [fakeCard('h', { yolo: true, columnId, yoloUntil }), fakeCard('t', { parentId: 'h', workflowId: 'wc' })],
+    });
+  const before = at('spec', 'plan');
+  expect(yoloStopAdvice(before, before.cards[0]!)).toBe(
+    'O modo autônomo desta história vai até plan: lá, ao terminar o trabalho da fase, a IA pede a revisão da pessoa e para.',
+  );
+  const stop = at('plan', 'plan');
+  expect(yoloStopAdvice(stop, stop.cards[0]!)).toMatch(/^MODO AUTÔNOMO ATÉ plan:[\s\S]*request_review/);
+  // a sub-tarefa não pede a revisão da fase: só fica sabendo até onde vai
+  expect(yoloStopAdvice(stop, stop.cards[1]!)).toMatch(/^O modo autônomo desta história vai até plan/);
+  const full = at('spec', null);
+  expect(yoloStopAdvice(full, full.cards[0]!)).toBeNull();
+});
 
 it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
   expect(AUTONOMOUS_ADVICE).not.toContain('coluna de conclusão');
@@ -375,6 +415,13 @@ describe('executor da IA', () => {
     expect(runner.isRunning(storyId)).toBe(false);
   });
 
+  it('com o login da ferramenta vencido (requisito "signin"), não inicia e não gasta uma execução', () => {
+    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+    expect(() => runner.start(storyId)).toThrow(/login/i);
+    expect(procs).toHaveLength(0);
+    expect(card().status).not.toBe('running');
+  });
+
   it('se a IA só respondeu na conversa, a vez passa para a pessoa', () => {
     runner.start(storyId);
     ai({ type: 'comment.add', cardId: storyId, body: 'Entendi. Qual o provedor de login?' });
@@ -510,6 +557,41 @@ describe('executor da IA', () => {
       expect(sub.status).toBe('blocked');
       expect(sub.statusReason).toContain('sem responder');
     });
+  });
+
+  it('falha de autenticação não bloqueia o card: ele volta ao status anterior, avisa na conversa e liga o sinal reativo', () => {
+    const before = card().status;
+    runner.start(storyId);
+    procs[0]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[0]!.exit(1);
+    expect(card().status).toBe(before);
+    expect(card().status).not.toBe('blocked');
+    expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+    expect(lastMessage()!.body).toContain('login do Claude Code venceu');
+    expect(router.snapshot().authExpired).toBe('claude');
+    expect(log.some((l) => l.includes('Login do Claude Code vencido'))).toBe(true);
+
+    // uma segunda falha igual, com o sinal já ligado, não duplica o log de suspensão
+    const logCountBefore = log.filter((l) => l.includes('Login do Claude Code vencido')).length;
+    runner.start(storyId);
+    procs[1]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[1]!.exit(1);
+    expect(log.filter((l) => l.includes('Login do Claude Code vencido')).length).toBe(logCountBefore);
+
+    // uma execução que termina sem falha de autenticação limpa o sinal e avisa a retomada
+    runner.start(storyId);
+    ai({ type: 'comment.add', cardId: storyId, body: 'Entendi. Qual o provedor de login?' });
+    procs[2]!.exit(0);
+    expect(router.snapshot().authExpired).toBeNull();
+    expect(log.some((l) => l.includes('Login do Claude Code de volta'))).toBe(true);
+  });
+
+  it('falha sem nenhum padrão de autenticação continua bloqueando o card como antes (regressão)', () => {
+    runner.start(storyId);
+    procs[0]!.emit('algum outro erro qualquer\n', 'stderr');
+    procs[0]!.exit(1);
+    expect(card().status).toBe('blocked');
+    expect(router.snapshot().authExpired).toBeNull();
   });
 
   it('falha, saída sem resposta e tempo limite bloqueiam o card com o motivo na conversa', () => {
@@ -744,11 +826,12 @@ describe('executor da IA', () => {
     expect(router.snapshot().board.runner).toEqual({
       defaultAgent: '',
       permission: 'board',
-      timeoutMinutes: 30,
+      timeoutMinutes: 45,
       heartbeat: false,
-      heartbeatMinutes: 60,
+      heartbeatMinutes: 10,
       parallel: false,
       parallelStories: 2,
+      autopilotPaused: false,
     });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'edits', timeoutMinutes: 999 } } });
     expect(router.snapshot().board.runner).toMatchObject({ permission: 'edits', timeoutMinutes: 240 });
@@ -1233,6 +1316,32 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     expect(card().status).toBe('blocked');
   });
 
+  it('execução que terminou bem (código 0) com a flag ligada: não repete a fase com a reserva', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+    procs[0]!.exit(0);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('waiting_answer');
+  });
+
+  it('a retentativa não consegue começar (card arquivado no meio): o card é bloqueado com o motivo e o fim é avisado', () => {
+    useSonnetMedium();
+    ruleWithFallback(modelValue(fable().id, 'low'));
+    const finished: string[] = [];
+    runner.onDidFinish((id) => finished.push(id));
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    router.handle({ type: 'card.archive', cardId: storyId });
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(finished).toEqual([storyId]);
+    expect(runner.running).not.toContain(storyId);
+    expect(router.snapshot().aiActivity.some((a) => a.cardId === storyId)).toBe(false);
+  });
+
   it('modo autônomo (YOLO): a retentativa não deixa o card "waiting_answer" nem "blocked" só por causa da troca — a fila segue', () => {
     router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
     useSonnetMedium();
@@ -1243,6 +1352,18 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
 
     expect(procs).toHaveLength(2);
     expect(card().status).toBe('running');
+  });
+});
+
+describe('parseRunner', () => {
+  it('autopilotPaused ausente ou inválido vira false', () => {
+    expect(parseRunner(null).autopilotPaused).toBe(false);
+    expect(parseRunner('{}').autopilotPaused).toBe(false);
+    expect(parseRunner(JSON.stringify({ autopilotPaused: 'sim' })).autopilotPaused).toBe(false);
+  });
+
+  it('autopilotPaused: true é lido', () => {
+    expect(parseRunner(JSON.stringify({ autopilotPaused: true })).autopilotPaused).toBe(true);
   });
 });
 

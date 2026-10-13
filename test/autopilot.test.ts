@@ -1,3 +1,4 @@
+import { noteOf } from '../src/extension/autopilot';
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -624,6 +625,69 @@ describe('autopiloto', () => {
     expect(router.snapshot().autopilot).toEqual({ active: false, note: 'O Claude Code não está instalado.' });
   });
 
+  it('a pausa fica gravada no board: ao reabrir o editor não liga sozinho; retomar limpa a pausa e liga (#220)', () => {
+    create('A', 'PRD');
+    yolo(1);
+    autopilot.pause();
+    expect(router.snapshot().board.runner.autopilotPaused).toBe(true);
+    // o editor reabre: um autopiloto novo sobre o mesmo board, com a história pendente
+    const fresh = new Autopilot(router, runner, { log: (l) => log.push(l), canRun: () => owns, defer: (fn) => deferred.push(fn) });
+    flush();
+    expect(fresh.isActive).toBe(false);
+    expect(runner.started).toEqual([card(1).id]);
+
+    fresh.resume();
+    expect(router.snapshot().board.runner.autopilotPaused).toBe(false);
+    expect(runner.started).toEqual([card(1).id, card(1).id]);
+  });
+
+  it('stop() desliga sem gravar pausa (fechar o editor não é pausa), e a fila retoma na próxima mudança do board', () => {
+    create('A', 'PRD');
+    yolo(1);
+    expect(runner.running).toEqual([card(1).id]);
+    autopilot.stop();
+    expect(autopilot.isActive).toBe(false);
+    expect(runner.running).toEqual([]);
+    expect(router.snapshot().board.runner.autopilotPaused).toBe(false);
+
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
+    flush();
+    expect(autopilot.isActive).toBe(true);
+    expect(runner.started).toHaveLength(2);
+  });
+
+  it('falha ao iniciar a ferramenta não religa sozinho na próxima mudança do board; retomar tenta de novo', () => {
+    runner.failToStart = 'O Claude Code não está instalado.';
+    create('A', 'PRD');
+    yolo(1);
+    expect(autopilot.isActive).toBe(false);
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
+    flush();
+    expect(autopilot.isActive).toBe(false);
+    expect(runner.started).toEqual([]);
+
+    runner.failToStart = null;
+    autopilot.resume();
+    expect(runner.started).toEqual([card(1).id]);
+  });
+
+  it('com o login vencido (preventivo ou reativo), não inicia a história e fica à espera, sem desligar (#189)', () => {
+    create('A', 'Backlog');
+    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+    yolo(1);
+    expect(runner.started).toEqual([]);
+    expect(autopilot.isActive).toBe(true); // diferente de uma falha real: não desliga, só espera
+
+    router.setRequirements([]);
+    router.setAuthExpired('claude');
+    flush();
+    expect(runner.started).toEqual([]);
+
+    router.setAuthExpired(null);
+    flush();
+    expect(runner.started).toEqual([card(1).id]);
+  });
+
   it('um "Em execução" sem execução de verdade volta para a IA', () => {
     create('A', 'PRD');
     status(1, 'running'); // a sessão caiu sem avisar
@@ -709,5 +773,18 @@ describe('autopiloto com o executor de verdade', () => {
     expect(card(1).status).toBe('blocked');
     expect(card(1).statusReason).toContain('autopiloto parou');
     expect(exits).toHaveLength(MAX_RUNS_WITHOUT_PROGRESS);
+  });
+});
+
+describe('noteOf: o motivo do bloqueio na barra de atividade', () => {
+  it('fica só a primeira linha, sem cercas de código', () => {
+    expect(noteOf('```\nO teste falhou.\n```\nDetalhes...')).toBe('O teste falhou.');
+    expect(noteOf('\n\nPrimeira  \nsegunda')).toBe('Primeira');
+  });
+
+  it('corta em 160 caracteres', () => {
+    const note = noteOf('a'.repeat(300));
+    expect(note.length).toBe(160);
+    expect(note.endsWith('…')).toBe(true);
   });
 });

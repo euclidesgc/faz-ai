@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import type { Card } from '../../../shared/model';
 import { branchName, slug } from '../../../shared/git';
 import { isPullRequestUrl, stackBaseOf, storyOf } from '../../../shared/story';
+import { columnOf, isLive } from '../../../shared/selectors';
 import { settleDelivery } from '../../delivery';
 import { now } from '../../db/ids';
 import { prepareWorkspace } from '../../git';
@@ -43,6 +44,12 @@ function prepareStoryWorkspace(ctx: BoardContext, cardId: string): void {
   if (git.mode === 'off') throw new Error('A criação de branches está desligada neste board (Configurações → Git).');
   if (!projectDir) throw new Error('Nenhuma pasta de projeto aberta.');
   const story = storyOfCard(ctx, cardId);
+  // a derivada parte da branch da parte anterior: sem ela ainda, a base sairia da principal e ficaria fixa
+  const origin = !story.branch && story.derivedFrom ? s.cards.find((c) => c.id === story.derivedFrom) : undefined;
+  if (origin && isLive(origin) && columnOf(s, origin)?.category === 'open' && !origin.branch)
+    throw new Error(
+      `#${story.number} deriva de #${origin.number}, que ainda não tem branch: a branch desta parte parte da dela. Implemente #${origin.number} antes.`,
+    );
   // a branch já registrada vale mesmo que o título ou o padrão tenham mudado depois
   const branch =
     story.branch ||
@@ -53,7 +60,7 @@ function prepareStoryWorkspace(ctx: BoardContext, cardId: string): void {
     });
   const worktreePath =
     story.worktreePath || path.join(worktreeRoot(ctx) ?? projectDir, `${story.number}-${slug(story.title) || 'historia'}`);
-  // história em modo autônomo parte da branch da anterior; a base escolhida na primeira vez vale daí em diante
+  // a história derivada parte da branch da origem, e a do modo autônomo, da anterior na fila; a base escolhida na primeira vez vale daí em diante
   const ws = prepareWorkspace({
     projectDir,
     mode: git.mode,
@@ -79,7 +86,7 @@ export const workspaceHandlers = {
     ctx.cards.setWorkspace(story.id, story.branch, '');
     return true;
   },
-  'card.pr.set': (msg, ctx, { author }) => {
+  'card.pr.set': (msg, ctx) => {
     const url = msg.url.trim();
     if (url && !isPullRequestUrl(url)) throw new Error('Informe o endereço (URL) do pull request.');
     const storyId = storyOfCard(ctx, msg.cardId).id;
@@ -90,7 +97,7 @@ export const workspaceHandlers = {
     // do meio); aqui a entrega é para a pessoa revisar, não para a IA seguir, e o merge continua só
     // dela (ctx.approved). Bloqueio é a exceção: é impedimento aberto, e registrar o pull request não
     // o resolve (ver `isDeliverableStory`).
-    settleDelivery(ctx, storyId, author);
+    settleDelivery(ctx, storyId);
     return true;
   },
   // Sem efeito colateral de propósito: ao contrário do card.pr.set (que fecha a entrega e avisa a

@@ -85,7 +85,15 @@ export const board: Record<string, string> = {
   'Nova coluna': 'New column',
   'Nome da coluna': 'Column name',
   Arquivados: 'Archived',
-  'Arraste um card para cá para arquivar.': 'Drag a card here to archive it.',
+  // Aba Arquivados
+  'Nenhum card arquivado neste workflow.': 'No archived cards in this workflow.',
+  'Cards arquivados ficam aqui, por workflow, do mais recente ao mais antigo. Restaurar leva o card para a primeira coluna do workflow dele.':
+    'Archived cards stay here, by workflow, newest first. Restore sends the card to the first column of its workflow.',
+  'Restaurar a história junto?': 'Restore the story along?',
+  'A sub-tarefa {sub} pertence à história {story}, que está arquivada. Restaurar traz a história e todas as sub-tarefas arquivadas dela para o Backlog.':
+    'Sub-task {sub} belongs to story {story}, which is archived. Restoring brings the story and all its archived sub-tasks back to the Backlog.',
+  'Restaurar história': 'Restore story',
+  'Restaurar {title}': 'Restore {title}',
 
   // Lixeira
   'Esvaziar a lixeira?': 'Empty the trash?',
@@ -251,7 +259,6 @@ export const board: Record<string, string> = {
   'Abrir o card': 'Open the card',
   'Ações do card': 'Card actions',
   'Abrir detalhes': 'Open details',
-  Desarquivar: 'Unarchive',
   Arquivar: 'Archive',
   'Mover para a lixeira': 'Move to trash',
   'Colapsar card': 'Collapse card',
@@ -348,6 +355,7 @@ export const board: Record<string, string> = {
   Limpar: 'Clear',
   'Ligar modo autônomo': 'Turn on autonomous mode',
   'Desligar modo autônomo': 'Turn off autonomous mode',
+  'Aplicando…': 'Applying…',
   'Ligar o modo autônomo em {n} história(s)?': 'Turn on autonomous mode for {n} story(ies)?',
   'Desligar o modo autônomo em {n} história(s)?': 'Turn off autonomous mode for {n} story(ies)?',
   'Colapsar selecionados': 'Collapse selected',
@@ -358,6 +366,7 @@ export const board: Record<string, string> = {
   'Criar card': 'Create card',
 
   // requisitos do board (RequirementsBanner)
+  'Veja como resolver em Configurações → Verificar ambiente.': 'See how to fix it in Settings → Check environment.',
   'Requisitos do board': 'Board requirements',
   'Falta 1 requisito para o board trabalhar com a IA': '1 requirement missing for the board to work with the AI',
   'Faltam {n} requisitos para o board trabalhar com a IA': '{n} requirements missing for the board to work with the AI',
@@ -366,18 +375,20 @@ export const board: Record<string, string> = {
   'Conferido agora: nada mudou.': 'Checked just now: nothing changed.',
   recomendado: 'recommended',
   'Recomendado para a IA enxergar o board nas suas conversas': 'Recommended so the AI sees the board in your conversations',
-  'A linha de comando do {tool} não foi encontrada: veja o aviso no topo do board.':
-    "{tool}'s command line was not found: see the notice at the top of the board.",
-  'A linha de comando do {tool} está sem login: veja o aviso no topo do board.':
-    "{tool}'s command line is not signed in: see the notice at the top of the board.",
+  'A linha de comando do {tool} não foi encontrada: veja em Configurações → Verificar ambiente.':
+    "{tool}'s command line was not found: see Settings → Check environment.",
+  'A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.':
+    "{tool}'s command line is not signed in: see Settings → Check environment.",
+  'O login do {tool} venceu: veja em Configurações → Verificar ambiente.': "{tool}'s login expired: see Settings → Check environment.",
+  'Abrir no terminal': 'Open in terminal',
   'Copiar comando': 'Copy command',
   Copiado: 'Copied',
   'Não foi possível copiar. Selecione o comando e copie com o teclado.':
     'Could not copy. Select the command and copy it with the keyboard.',
   'Abrir Harness de IA': 'Open AI harness',
   'Node.js não encontrado': 'Node.js not found',
-  'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 18 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':
-    "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 18 or newer, and it is not on the terminal's PATH. Without it, {tool} cannot reach the board. Install Node.js and click Check again.",
+  'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':
+    "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 22 or newer, and it is not on the terminal's PATH. Without it, {tool} cannot reach the board. Install Node.js and click Check again.",
   'A linha de comando do {tool} não foi encontrada': "{tool}'s command line was not found",
   'Sem ela não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale com o comando abaixo e clique em Verificar de novo.':
     'Without it, the cards\' AI buttons, the board chat, the heartbeat and autonomous mode do not run. The board looked for "{cli}" in the terminal\'s PATH, the usual install folders and the editor extensions. Install it with the command below and click Check again.',
@@ -417,5 +428,53 @@ export const board: Record<string, string> = {
   '{file} usa a ponte em "{missing}", de uma versão anterior da extensão, que não é mais atualizada e pode não achar o projeto aberto. Instale de novo para gravar o registro atual.':
     '{file} uses the bridge at "{missing}", from an earlier version of the extension, which is no longer updated and may not find the open project. Install again to write the current registration.',
   'Recarregar a janela': 'Reload the window',
+  'Recarregar a janela?': 'Reload the window?',
+  Recarregar: 'Reload',
+  'A IA está trabalhando em {n} card. Recarregar a janela interrompe essa execução.':
+    'The AI is working on {n} card. Reloading the window stops that run.',
+  'A IA está trabalhando em {n} cards. Recarregar a janela interrompe essas execuções.':
+    'The AI is working on {n} cards. Reloading the window stops those runs.',
+  'Reinicia a extensão e lê de novo o PATH, as CLIs e os plugins. Use depois de instalar algo ou de atualizar a extensão.':
+    'Restarts the extension and reads the PATH, the CLIs and the plugins again. Use it after installing something or updating the extension.',
   'Abrir MCPs do Cursor': 'Open Cursor MCPs',
+
+  // Contexto estimado do card (anel no rodapé e o detalhe)
+  'Contexto estimado': 'Estimated context',
+  'Contexto estimado do card: cerca de {tokens} de {window} tokens ({share}). Clique para ver o detalhe.':
+    'Estimated card context: about {tokens} of {window} tokens ({share}). Click for the breakdown.',
+  'Contexto estimado do card: cerca de {tokens} tokens. Clique para ver o detalhe.':
+    'Estimated card context: about {tokens} tokens. Click for the breakdown.',
+  'Estimativa da próxima execução': 'Estimate for the next run',
+  'Estimativa da próxima execução, na fase {phase}': 'Estimate for the next run, in the {phase} phase',
+  'nomes das ferramentas': 'tool names',
+  'instruções do servidor': 'server instructions',
+  'definições das ferramentas': 'tool definitions',
+  'servidor do board': 'board server',
+  'liberado pelo agente': 'allowed by the agent',
+  'instruções do agente': 'agent instructions',
+  'subagente: nome e descrição': 'subagent: name and description',
+  'Título e descrição': 'Title and description',
+  'Instruções e modelo da fase': 'Phase instructions and template',
+  'Documentos das fases': 'Phase documents',
+  Livre: 'Free',
+  'Carrega só quando a IA procura a ferramenta': 'Loads only when the AI looks up the tool',
+  'Sob demanda: mais {tokens} das definições das ferramentas MCP, carregadas quando a IA procura uma ferramenta.':
+    'On demand: {tokens} more from the MCP tool definitions, loaded when the AI looks up a tool.',
+  'É uma estimativa pelo tamanho do texto (cerca de {chars} caracteres por token), não a contagem exata da ferramenta. Acompanha o card: muda com a fase, o agente, a conversa e os documentos.':
+    "It is an estimate from text size (about {chars} characters per token), not the tool's exact count. It follows the card: it changes with the phase, the agent, the conversation and the documents.",
+  'Apagar mensagens da conversa diminui só as próximas execuções: o que já foi gasto não volta.':
+    'Deleting conversation messages only lowers the next runs: what was already spent does not come back.',
+  'O harness mudou desde a última leitura: os números já estão atualizados.':
+    'The harness changed since the last read: the numbers are already updated.',
+  'Reler arquivos': 'Reread files',
+  'Relê do disco as rules, as skills e os agentes, para pegar o que foi editado fora do board':
+    'Rereads the rules, skills and agents from disk, to pick up what was edited outside the board',
+  'Fora da conta: o prompt e as ferramentas nativas do Claude Code, e as ferramentas dos servidores liberados pelo agente.':
+    "Not counted: Claude Code's own prompt and built-in tools, and the tools of the servers the agent allows.",
+  'Fora da conta: o que o Cursor carrega por conta própria (rules, skills e servidores configurados nele).':
+    'Not counted: what Cursor loads on its own (rules, skills and the servers configured in it).',
+  'O board não conhece a janela de contexto de {model}: sem ela, não há porcentagem.':
+    'The board does not know the context window of {model}: without it, there is no percentage.',
+  'O card não tem modelo: sem a janela de contexto, não há porcentagem.':
+    'The card has no model: without the context window, there is no percentage.',
 };

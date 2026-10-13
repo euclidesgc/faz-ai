@@ -22,7 +22,7 @@ beforeEach(() => syncStore(board.router));
 /** Abre o drawer da história como o App faz: `openCardId` na store e o componente com o id. */
 function openStory() {
   useBoardStore.getState().openCard(board.storyId);
-  render(
+  return render(
     <Theme>
       <CardDrawer cardId={board.storyId} />
     </Theme>,
@@ -293,6 +293,53 @@ describe('CardDrawer', () => {
     board.router.handle({ type: 'settings.field.delete', fieldId: field.id });
   });
 
+  it('os campos personalizados ficam numa seção à parte dos campos do board', () => {
+    board.router.handle({
+      type: 'settings.field.create',
+      name: 'Cliente',
+      kind: 'text',
+      options: [],
+      appliesToTypes: null,
+      display: 'badge',
+    });
+    syncStore(board.router);
+    openStory();
+    const boardFields = screen.getByRole('region', { name: 'Campos' });
+    const custom = screen.getByRole('region', { name: 'Campos personalizados' });
+    expect(within(boardFields).getByRole('combobox', { name: 'Esforço da atividade' })).toBeInTheDocument();
+    expect(within(boardFields).queryByLabelText('Cliente')).toBeNull();
+    expect(within(custom).getByLabelText('Cliente')).toBeInTheDocument();
+    expect(within(custom).queryByRole('combobox', { name: 'Esforço da atividade' })).toBeNull();
+    board.router.handle({ type: 'settings.field.delete', fieldId: snap().fieldDefs.find((f) => f.name === 'Cliente')!.id });
+    syncStore(board.router);
+  });
+
+  it('na sub-tarefa, a Fase aparece só para leitura', () => {
+    const fase = snap().fieldDefs.find((f) => f.name === 'Fase')!;
+    board.router.handle({ type: 'field.setValue', cardId: board.subId, fieldId: fase.id, value: 'Spec' }, { source: 'ai' });
+    syncStore(board.router);
+    useBoardStore.getState().openCard(board.subId);
+    render(
+      <Theme>
+        <CardDrawer cardId={board.subId} />
+      </Theme>,
+    );
+    const fields = screen.getByRole('region', { name: 'Campos' });
+    expect(within(fields).queryByRole('combobox', { name: 'Fase' })).toBeNull();
+    expect(within(fields).getByLabelText('Fase')).toHaveTextContent('Spec');
+    expect(within(fields).getByText('definida pelo board')).toBeInTheDocument();
+    // os outros campos do board seguem editáveis
+    expect(within(fields).getByRole('combobox', { name: 'Esforço da atividade' })).toBeInTheDocument();
+    board.router.handle({ type: 'field.setValue', cardId: board.subId, fieldId: fase.id, value: null }, { source: 'ai' });
+    syncStore(board.router);
+  });
+
+  it('sem campo personalizado, a seção deles não aparece', () => {
+    openStory();
+    expect(screen.getByRole('region', { name: 'Campos' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Campos personalizados' })).toBeNull();
+  });
+
   it('as abas mostram a conversa e os anexos, com a contagem no rótulo', async () => {
     patchState((s) => ({
       comments: [{ id: 'c1', cardId: board.storyId, author: 'Pessoa', body: 'oi', createdAt: 0, updatedAt: 0 } as never, ...s.comments],
@@ -322,6 +369,18 @@ describe('CardDrawer', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ver no board' }));
     expect(useBoardStore.getState().selectedParentId).toBe(board.storyId);
     expect(useBoardStore.getState().openCardId).toBeNull();
+  });
+
+  it('a lista de sub-tarefas mostra o LED de cada uma: aceso na que está em execução, vermelho na bloqueada, apagado nas demais', () => {
+    const sub = card(board.subId);
+    const running = board.router.createCard({ typeId: sub.typeId, columnId: sub.columnId, parentId: board.storyId, title: 'Rodando' });
+    const blocked = board.router.createCard({ typeId: sub.typeId, columnId: sub.columnId, parentId: board.storyId, title: 'Bloqueada' });
+    syncStore(board.router);
+    patchCard(running, { status: 'running', statusAt: Date.now() });
+    patchCard(blocked, { status: 'blocked', statusReason: 'Falta algo', statusAt: Date.now() });
+    const { container } = openStory();
+    const leds = Array.from(container.querySelectorAll('.children li .ai-led'));
+    expect(leds.map((l) => l.className)).toEqual(['ai-led off', 'ai-led working', 'ai-led error']);
   });
 
   it('sem branch, "Criar branch da história" envia card.workspace.prepare', async () => {
@@ -407,14 +466,15 @@ describe('CardDrawer', () => {
     expect(sentOf('card.trash')).toHaveLength(0);
   });
 
-  it('card arquivado: aviso, coluna travada, sem status e "Desarquivar" no menu', async () => {
+  it('card arquivado: aviso, coluna travada, sem status e "Restaurar" no menu (história ativa: restaura só ele)', async () => {
     patchCard(board.subId, { archivedAt: 1 });
     openCardDrawer(board.subId);
     expect(screen.getByText('Este card está arquivado.')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Coluna' })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Desarquivar' }));
-    expect(lastSent('card.unarchive')).toEqual({ type: 'card.unarchive', cardId: board.subId });
+    await userEvent.click(screen.getByRole('button', { name: 'Restaurar' }));
+    expect(useBoardStore.getState().dialog).toBeNull();
+    expect(lastSent('card.restoreArchived')).toEqual({ type: 'card.restoreArchived', cardId: board.subId });
   });
 
   it('card na lixeira: aviso, sem menu de ações e "Restaurar" envia card.restore', async () => {
@@ -457,6 +517,32 @@ describe('Board / Column', () => {
     await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
     await userEvent.type(screen.getByPlaceholderText('Título (Enter adiciona)'), 'Nova história{Enter}');
     expect(lastSent('card.create')).toMatchObject({ columnId: firstCol.id, parentId: null, title: 'Nova história' });
+  });
+
+  it('só um formulário de novo card fica aberto por vez: abrir noutra coluna fecha o primeiro', async () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    const buttons = screen.getAllByRole('button', { name: '+ Novo card' });
+    await userEvent.click(buttons[0]!);
+    expect(screen.getAllByPlaceholderText('Título (Enter adiciona)')).toHaveLength(1);
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    expect(screen.getAllByPlaceholderText('Título (Enter adiciona)')).toHaveLength(1);
+  });
+
+  it('Esc fecha o formulário de novo card mesmo com o foco fora do campo', async () => {
+    render(
+      <Theme>
+        <Board />
+      </Theme>,
+    );
+    await userEvent.click(screen.getAllByRole('button', { name: '+ Novo card' })[0]!);
+    expect(screen.getByPlaceholderText('Título (Enter adiciona)')).toBeInTheDocument();
+    screen.getByRole('button', { name: 'Criar card' }).focus();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByPlaceholderText('Título (Enter adiciona)')).toBeNull();
   });
 
   it('sem história selecionada, "+ Nova sub-tarefa" fica desligado, com a dica', () => {
@@ -582,6 +668,29 @@ describe('botões de IA do card', () => {
     }
   });
 
+  it('com o login vencido durante a execução (sinal reativo, sem o requisito "signin"), os dois também ficam desligados', async () => {
+    const { router, storyId } = await seedBoard();
+    act(() => {
+      router.setAuthExpired('claude');
+      syncStore(router);
+    });
+    renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
+    for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toBeDisabled();
+      // o motivo do bloqueio vem no hint, aberto pelo foco
+      fireEvent.focus(button);
+      expect(await screen.findByText(/login do Claude Code venceu/)).toBeInTheDocument();
+      fireEvent.blur(button);
+    }
+
+    act(() => {
+      router.setAuthExpired(null);
+      syncStore(router);
+    });
+    for (const name of [/Trabalhar na fase/, /Refinar com IA/]) expect(screen.getByRole('button', { name })).toBeEnabled();
+  });
+
   it('o hint de Trabalhar na fase e Refinar com IA tem negrito e tópicos, e o texto é idêntico nos dois botões de "Trabalhar na fase"', async () => {
     const { router, storyId } = await seedBoard();
     syncStore(router);
@@ -609,6 +718,22 @@ describe('botões de IA do card', () => {
     fireEvent.focus(workButtonComments);
     const workTooltipComments = await screen.findByRole('tooltip');
     expect(workTooltipComments.textContent).toEqual(workTextStatusBar);
+  });
+
+  it('"Resumir a conversa" trava logo após o clique: um segundo clique não dispara outro ai.run', async () => {
+    const { router, storyId } = await seedBoard();
+    router.handle({ type: 'comment.add', cardId: storyId, body: 'primeira' });
+    router.handle({ type: 'comment.add', cardId: storyId, body: 'segunda' });
+    syncStore(router);
+    posted.mockClear();
+
+    renderThemed(<CommentsTab cardId={storyId} />);
+    const button = screen.getByRole('button', { name: /Resumir a conversa/ });
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(sentOf('ai.run').filter((m) => m.mode === 'summarize')).toHaveLength(1);
   });
 
   it('Esc fecha o hint sem disparar a mensagem ao host', async () => {

@@ -109,6 +109,9 @@ export function eventsFor(
     }
     if ((a.status ?? '') !== (b.status ?? '')) add(b, 'status_changed', { fromValue: b.status ?? '', toValue: a.status ?? '' });
     if (a.archived !== b.archived) add(b, a.archived ? 'archived' : 'unarchived');
+    // o modo que se desliga sozinho ao chegar à coluna escolhida (as mensagens do modo registram o próprio evento abaixo)
+    if (a.yolo !== b.yolo && !msg.type.startsWith('card.yolo.'))
+      add(b, 'yolo_changed', { fromValue: b.yolo ? 'on' : 'off', toValue: a.yolo ? 'on' : 'off' });
     if (a.trashed !== b.trashed) add(b, a.trashed ? 'trashed' : 'restored');
   }
   for (const [id, a] of after) {
@@ -157,6 +160,13 @@ export function eventsFor(
       break;
     case 'card.yolo.set': {
       const card = factsOf(msg.cardId);
+      // com o modo já ligado, a mensagem só muda até onde ele vai: o handler comenta, e o modo não mudou
+      const was = before.get(msg.cardId);
+      const now = after.get(msg.cardId);
+      if (msg.enabled && was?.yolo && now?.yolo) {
+        if (was.yoloUntil !== now.yoloUntil) add(card, 'comment');
+        break;
+      }
       add(card, 'yolo_changed', { fromValue: msg.enabled ? 'off' : 'on', toValue: msg.enabled ? 'on' : 'off' });
       // o handler só escreve na conversa ao ligar
       if (msg.enabled) add(card, 'comment');
@@ -178,6 +188,10 @@ export function eventsFor(
       add(card, 'comment');
       break;
     }
+    case 'card.derive':
+      // o handler escreve na conversa da derivada de onde ela partiu
+      add(factsOf(msg.cardId), 'comment');
+      break;
     default:
       break;
   }

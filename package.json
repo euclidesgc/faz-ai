@@ -2,7 +2,7 @@
   "name": "faz-ai",
   "displayName": "Faz AI Kanban",
   "description": "Board kanban para Spec-Driven Development com IA, no editor ou no navegador: histórias, sub-tarefas e um servidor MCP para a IA ler e atualizar o board",
-  "version": "0.33.0",
+  "version": "0.37.0",
   "publisher": "euclidesgc",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -22,10 +22,7 @@
     "mcp",
     "ai",
     "claude",
-    "cursor",
-    "codex",
-    "kimi",
-    "copilot"
+    "cursor"
   ],
   "galleryBanner": {
     "color": "#1e1b4b",
@@ -57,11 +54,11 @@
       },
       {
         "command": "fazai.exportBoard",
-        "title": "Faz AI: Exportar o board"
+        "title": "%command.exportBoard.title%"
       },
       {
         "command": "fazai.importBoard",
-        "title": "Faz AI: Importar um board"
+        "title": "%command.importBoard.title%"
       },
       {
         "command": "fazai.refreshSidebar",
@@ -266,21 +263,12 @@
             "order": 7,
             "markdownDescription": "%config.git.mergeMethod%"
           },
-          "fazai.git.watchMerges": {
-            "type": "boolean",
-            "default": true,
+          "fazai.git.decisionRecords": {
+            "type": "string",
+            "default": "",
             "scope": "resource",
             "order": 8,
-            "markdownDescription": "%config.git.watchMerges%"
-          },
-          "fazai.git.watchMergeMinutes": {
-            "type": "integer",
-            "minimum": 5,
-            "maximum": 1440,
-            "default": 15,
-            "scope": "resource",
-            "order": 9,
-            "markdownDescription": "%config.git.watchMergeMinutes%"
+            "markdownDescription": "%config.git.decisionRecords%"
           }
         }
       },

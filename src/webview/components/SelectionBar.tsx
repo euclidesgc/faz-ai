@@ -1,8 +1,10 @@
+import { useEffect, useRef } from 'react';
 import { useBoardStore } from '../store/boardStore';
+import { usePending } from '../usePending';
 import { isCardCollapsed } from '../../shared/selectors';
 import { t } from '../i18n';
 import { cards } from '../commands';
-import { confirmYoloOn, yoloWarning } from './card/YoloBar';
+import { confirmYoloOn, yoloStopChoices, yoloWarning } from './card/YoloBar';
 import { Button, IconYolo } from './ui';
 
 /**
@@ -19,12 +21,21 @@ export function SelectionBar() {
   const setManyCollapsed = useBoardStore((s) => s.setManyCollapsed);
   const dontWarnYolo = useBoardStore((s) => s.dontWarnYolo);
   const setDontWarnYolo = useBoardStore((s) => s.setDontWarnYolo);
+  const untilName = useBoardStore((s) => s.yoloUntilName);
+  const setUntilName = useBoardStore((s) => s.setYoloUntilName);
 
   // defesa extra: a caixa de marcação (card 324) só existe em histórias vivas, mas confere de novo aqui
   const selectedStories = state.cards.filter((c) => selectedIds.has(c.id));
+  const allYolo = selectedStories.every((c) => c.yolo);
+  // em lote, a barra mostra "Aplicando…" até os cards mudarem (ou o tempo esgotar) e só então limpa a seleção
+  const [target, applying, markYolo] = usePending(allYolo);
+  const targetRef = useRef(target);
+  targetRef.current = target;
+  useEffect(() => {
+    if (applying && allYolo === targetRef.current) clearSelected();
+  }, [allYolo, applying, clearSelected]);
   if (selectedStories.length < 2) return null;
 
-  const allYolo = selectedStories.every((c) => c.yolo);
   const allCollapsed = selectedStories.every((c) => isCardCollapsed(collapsed, c.id));
   const n = selectedStories.length;
 
@@ -37,6 +48,10 @@ export function SelectionBar() {
 
   const toggle = () => {
     const ids = selectedStories.map((c) => c.id);
+    const apply = (enabled: boolean, until: string | null = null) => {
+      markYolo(enabled);
+      cards.setYoloMany(ids, enabled, until);
+    };
     // desligar em lote sempre pede confirmação (diferente do controle de uma história só, que desliga
     // direto): desligar várias histórias de uma vez para o autopiloto de todas, maior impacto. É uma
     // ação fora do "não avisar novamente", que é só sobre ligar: por isso aqui não há checkbox.
@@ -46,23 +61,22 @@ export function SelectionBar() {
         message: yoloWarning(),
         confirmLabel: t('Desligar modo autônomo'),
         danger: true,
-        onConfirm: () => {
-          cards.setYoloMany(ids, false);
-          clearSelected();
-        },
+        onConfirm: () => apply(false),
       });
       return;
     }
+    // só as que ainda estão desligadas mudam: o "Até onde" precisa valer para elas
+    const off = selectedStories.filter((c) => !c.yolo);
     confirmYoloOn({
       ask,
       dontWarnYolo,
       setDontWarnYolo,
+      stops: yoloStopChoices(state, off),
+      untilName,
+      setUntilName,
       title: t('Ligar o modo autônomo em {n} história(s)?', { n }),
       confirmLabel: t('Ligar modo autônomo'),
-      onEnable: () => {
-        cards.setYoloMany(ids, true);
-        clearSelected();
-      },
+      onEnable: (until) => apply(true, until),
     });
   };
 
@@ -72,8 +86,8 @@ export function SelectionBar() {
       <Button variant="ghost" size="small" onClick={clearSelected}>
         {t('Limpar')}
       </Button>
-      <Button size="small" danger onClick={toggle}>
-        <IconYolo /> {allYolo ? t('Desligar modo autônomo') : t('Ligar modo autônomo')}
+      <Button size="small" danger disabled={applying} onClick={toggle}>
+        <IconYolo /> {applying ? t('Aplicando…') : allYolo ? t('Desligar modo autônomo') : t('Ligar modo autônomo')}
       </Button>
       <Button size="small" onClick={toggleCollapse}>
         {allCollapsed ? t('Expandir selecionados') : t('Colapsar selecionados')}

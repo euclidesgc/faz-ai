@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { checkEnvironment, type EnvironmentProbe } from '../src/extension/environment';
-import type { EnvCheckId, EnvOs } from '../src/shared/environment';
-import { detectOs, installFix } from '../src/extension/installers';
-
-const UBUNTU: EnvOs = { platform: 'linux', family: 'debian', label: 'Ubuntu 24.04.3 LTS' };
+import { checkEnvironment, linuxFamily, type EnvironmentProbe, type LinuxFamily, type OtherToolProbe } from '../src/extension/environment';
+import { missingCount, type EnvCheck, type EnvCheckId, type EnvironmentReport } from '../src/shared/environment';
 import type { BoardRequirement } from '../src/shared/requirements';
 
 /** Uma máquina de mentira: os comandos que existem, o que cada um responde e os arquivos. */
@@ -14,8 +11,11 @@ function probe(o: {
   requirements?: BoardRequirement[];
   skillInstalled?: boolean;
   tool?: EnvironmentProbe['tool'];
-  os?: EnvOs;
+  other?: OtherToolProbe | null;
+  crgMcp?: boolean;
+  platform?: NodeJS.Platform;
   pathDirs?: string[];
+  linux?: LinuxFamily | null;
 }): EnvironmentProbe & { ran: string[] } {
   const ran: string[] = [];
   return {
@@ -23,10 +23,13 @@ function probe(o: {
     tool: o.tool ?? 'cursor',
     requirements: o.requirements ?? [],
     workspaceDir: '/proj',
-    os: o.os ?? UBUNTU,
-    pathDirs: o.pathDirs ?? ['/usr/bin'],
-    homeDir: '/home/u',
     skillInstalled: o.skillInstalled ?? false,
+    other: o.other ?? null,
+    crgMcp: o.crgMcp ?? false,
+    platform: o.platform ?? 'linux',
+    homeDir: '/home/u',
+    pathDirs: o.pathDirs ?? ['/usr/bin', '/home/u/.local/bin'],
+    linux: o.linux === undefined ? 'debian' : o.linux,
     resolve: (c) => o.commands?.[c] ?? null,
     run: async (c, args) => {
       const key = [c, ...args].join(' ');
@@ -38,88 +41,141 @@ function probe(o: {
   };
 }
 
-const byId = (checks: { id: EnvCheckId }[], id: EnvCheckId) => checks.find((c) => c.id === id) as never as Record<string, unknown>;
+/** Todos os itens da árvore, na ordem da tela. */
+const flat = (checks: EnvCheck[]): EnvCheck[] => checks.flatMap((c) => [c, ...flat(c.children ?? [])]);
+const all = (r: EnvironmentReport) => flat([...r.required, ...r.optional, ...r.recommended]);
+const find = (checks: EnvCheck[], id: EnvCheckId) => flat(checks).find((c) => c.id === id)!;
+/** A árvore só com id e estado, para comparar a forma inteira. */
+/** Só os comandos da instalação de um item. */
+const commands = (c: EnvCheck) => c.install?.map((s) => s.command);
+const shape = (checks: EnvCheck[]): unknown[] =>
+  checks.map((c) => (c.children?.length ? [c.id, c.status, shape(c.children)] : [c.id, c.status]));
 
 const CRG = '/home/u/.local/bin/code-review-graph';
 const UV_PY = '/home/u/.local/share/uv/tools/code-review-graph/bin/python';
 const FIND_SPEC = `${UV_PY} -c import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('sentence_transformers') else 1)`;
 
 describe('Diagnóstico do ambiente', () => {
-  it('máquina vazia: os itens que dependem de outro ficam para depois, e cada falta tem como resolver', async () => {
-    const cli: BoardRequirement = {
-      id: 'cli',
+  it('máquina vazia: o que depende de outro item fica dentro dele, esperando', async () => {
+    const node: BoardRequirement = { id: 'node', tool: 'cursor', action: null };
+    const cli: BoardRequirement = { id: 'cli', tool: 'cursor', cli: 'cursor-agent', action: null };
+    const r = await checkEnvironment(probe({ requirements: [node, cli] }));
+    expect(shape(r.required)).toEqual([
+      ['node', 'missing'],
+      [
+        'tool',
+        'missing',
+        [
+          ['cli', 'missing', [['signin', 'skipped']]],
+          ['mcp', 'ok'],
+          ['skill', 'missing'],
+          ['permission', 'ok'],
+        ],
+      ],
+    ]);
+    expect(r.optional).toEqual([]);
+    expect(shape(r.recommended)).toEqual([
+      ['git', 'missing', [['repo', 'skipped']]],
+      ['gh', 'missing', [['gh-auth', 'skipped']]],
+      // na ordem de instalar: o uv, depois o Code Review Graph, depois o que ele faz no projeto
+      [
+        'uv',
+        'missing',
+        [
+          [
+            'crg',
+            'skipped',
+            [
+              ['crg-graph', 'skipped'],
+              ['crg-mcp', 'skipped'],
+              ['crg-embeddings', 'skipped'],
+            ],
+          ],
+        ],
+      ],
+    ]);
+    // o bloco da ferramenta só resume: contam o Node, a CLI e a skill
+    expect(missingCount(r.required)).toBe(3);
+  });
+
+  it('o board não instala nada de terceiros: cada item traz o site ou o comando para copiar', async () => {
+    const r = await checkEnvironment(probe({ tool: 'claude' }));
+    const items = all(r);
+    expect(items.filter((c) => c.requirement?.action && c.requirement.action.kind !== 'installSkill')).toEqual([]);
+    expect(find(r.required, 'node').docs).toBe('https://nodejs.org/en/download');
+    expect(find(r.required, 'cli').docs).toBe('https://code.claude.com/docs/en/setup');
+    expect(find(r.required, 'signin').command).toBe('claude auth login');
+    expect(find(r.recommended, 'repo').command).toBe('git init');
+    expect(find(r.recommended, 'gh-auth').command).toBe('gh auth login');
+    expect(find(r.recommended, 'crg-graph').command).toBe('code-review-graph build');
+    expect(find(r.recommended, 'crg-mcp').command).toBe('code-review-graph install --platform claude-code');
+    expect(find(r.recommended, 'crg-embeddings').command).toBe('code-review-graph embed --provider local');
+  });
+
+  it('o MCP, a skill e a permissão da ferramenta do projeto levam o requisito do aviso, com o botão dele', async () => {
+    const mcp: BoardRequirement = { id: 'mcp-enable', tool: 'cursor', action: { kind: 'openEditorMcp' } };
+    const signin: BoardRequirement = {
+      id: 'signin',
       tool: 'cursor',
       cli: 'cursor-agent',
-      action: { kind: 'command', command: 'curl https://cursor.com/install -fsS | bash' },
+      action: { kind: 'command', command: 'cursor-agent login' },
     };
-    const node: BoardRequirement = { id: 'node', tool: 'cursor', action: null };
-    const r = await checkEnvironment(probe({ requirements: [node, cli] }));
-    expect(r.checks.map((c) => [c.id, c.status])).toEqual([
-      ['node', 'missing'],
-      ['cli', 'missing'],
-      ['signin', 'skipped'],
-      ['mcp', 'ok'],
-      ['permission', 'ok'],
-      ['skill', 'missing'],
-      ['git', 'missing'],
-      ['repo', 'skipped'],
-      ['gh', 'missing'],
-      ['gh-auth', 'skipped'],
-      ['crg', 'missing'],
-      ['uv', 'missing'],
-      ['python', 'skipped'],
-      ['crg-graph', 'skipped'],
-      ['crg-embeddings', 'skipped'],
-    ]);
-    // o obrigatório leva o requisito do aviso, com o texto e a ação dele
-    expect(byId(r.checks, 'cli').requirement).toBe(cli);
-    expect(byId(r.checks, 'skill').fix).toEqual({ kind: 'installSkill' });
-    // o que espera o item anterior já traz o comando, para o "Instalar tudo" rodar em sequência
-    expect(byId(r.checks, 'signin').fix).toEqual({ kind: 'commands', commands: ['cursor-agent login'] });
-    expect(byId(r.checks, 'repo').fix).toEqual({ kind: 'commands', commands: ['git init'] });
-    expect(byId(r.checks, 'gh-auth').fix).toEqual({ kind: 'commands', commands: ['gh auth login'] });
-    expect(byId(r.checks, 'crg-graph').fix).toEqual({ kind: 'commands', commands: ['code-review-graph build'] });
-    expect((byId(r.checks, 'crg-embeddings').fix as { commands: string[] }).commands[0]).toContain('uv tool install');
-    // o registro do MCP vai só para a ferramenta do projeto; o uv é um pré-requisito à parte, com o PATH
-    expect(byId(r.checks, 'crg').fix).toEqual({
-      kind: 'commands',
-      commands: ['uv tool install code-review-graph', 'code-review-graph install --platform cursor'],
-    });
-    expect(byId(r.checks, 'uv')).toMatchObject({
-      parent: 'crg',
-      fix: { kind: 'commands', commands: ['curl -LsSf https://astral.sh/uv/install.sh | sh', 'export PATH="$HOME/.local/bin:$PATH"'] },
-    });
-    // a CLI do Cursor cai em ~/.local/bin, fora do PATH: os comandos incluem a pasta
-    expect(byId(r.checks, 'cli').fix).toEqual({
-      kind: 'commands',
-      commands: [
-        'curl https://cursor.com/install -fsS | bash',
-        `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc`,
-        'export PATH="$HOME/.local/bin:$PATH"',
+    const r = await checkEnvironment(probe({ requirements: [mcp, signin], commands: { 'cursor-agent': '/bin/cursor-agent' } }));
+    expect(find(r.required, 'mcp')).toMatchObject({ status: 'missing', requirement: mcp });
+    expect(find(r.required, 'skill')).toMatchObject({ status: 'missing', requirement: { action: { kind: 'installSkill' } } });
+    expect(find(r.required, 'signin')).toMatchObject({ status: 'missing', command: 'cursor-agent login', requirement: signin });
+  });
+
+  it('Node.js abaixo da versão mínima falta, com a versão encontrada', async () => {
+    const old = await checkEnvironment(
+      probe({ commands: { node: '/usr/bin/node' }, outputs: { '/usr/bin/node --version': 'v20.11.0\n' } }),
+    );
+    expect(find(old.required, 'node')).toMatchObject({ status: 'missing', version: '20.11.0' });
+    const ok = await checkEnvironment(probe({ commands: { node: '/usr/bin/node' }, outputs: { '/usr/bin/node --version': 'v22.3.0\n' } }));
+    expect(find(ok.required, 'node')).toMatchObject({ status: 'ok', version: '22.3.0' });
+  });
+
+  it('a outra ferramenta encontrada na máquina entra nos opcionais, só com o estado de cada item', async () => {
+    const claude: OtherToolProbe = { tool: 'claude', cli: '/bin/claude', signedIn: false, mcp: true, skill: false, permission: null };
+    const r = await checkEnvironment(probe({ other: claude, outputs: { '/bin/claude --version': '2.1.4 (Claude Code)' } }));
+    expect(shape(r.optional)).toEqual([
+      [
+        'tool',
+        'missing',
+        [
+          ['cli', 'ok', [['signin', 'missing']]],
+          ['mcp', 'ok'],
+          ['skill', 'missing'],
+          ['permission', 'ok'],
+        ],
       ],
-    });
-    // Node, git e gh com o comando do sistema
-    expect((byId(r.checks, 'node').fix as { commands: string[] }).commands.at(-1)).toBe('nvm install --lts');
-    expect(byId(r.checks, 'git').fix).toEqual({ kind: 'commands', commands: ['sudo apt update', 'sudo apt install -y git'] });
-    expect(byId(r.checks, 'gh').fix).toEqual({ kind: 'commands', commands: ['sudo apt update', 'sudo apt install -y gh'] });
+    ]);
+    expect(r.optional[0]!.tool).toBe('claude');
+    expect(find(r.optional, 'cli').version).toBe('2.1.4');
+    expect(find(r.optional, 'signin').command).toBe('claude auth login');
+    expect(flat(r.optional).some((c) => c.requirement)).toBe(false);
+    // a ferramenta achada pelo editor, sem a CLI: o login espera a CLI
+    const editor = await checkEnvironment(
+      probe({ tool: 'claude', other: { tool: 'cursor', cli: null, signedIn: null, mcp: false, skill: false, permission: null } }),
+    );
+    expect(find(editor.optional, 'cli').status).toBe('missing');
+    expect(find(editor.optional, 'signin').status).toBe('skipped');
   });
 
-  it('o MCP e a skill do fluxo são necessários em todas as ferramentas', async () => {
-    const mcp: BoardRequirement = { id: 'mcp-enable', tool: 'cursor', action: { kind: 'openEditorMcp' } };
-    const cursor = await checkEnvironment(probe({ requirements: [mcp] }));
-    expect(byId(cursor.checks, 'mcp')).toMatchObject({ level: 'required', status: 'missing', requirement: mcp });
-    expect(byId(cursor.checks, 'skill')).toMatchObject({ level: 'required', status: 'missing', fix: { kind: 'installSkill' } });
-    const claude = await checkEnvironment(probe({ tool: 'claude', skillInstalled: true }));
-    expect(byId(claude.checks, 'mcp')).toMatchObject({ level: 'required', status: 'ok' });
-    expect(byId(claude.checks, 'skill')).toMatchObject({ level: 'required', status: 'ok' });
-  });
-
-  it('tudo instalado: mostra as versões e não sugere nada', async () => {
+  it('tudo instalado: mostra as versões e não falta nada', async () => {
     const p = probe({
       skillInstalled: true,
-      commands: { node: '/usr/bin/node', git: '/usr/bin/git', gh: '/usr/bin/gh', 'code-review-graph': CRG, uv: '/usr/bin/uv' },
+      crgMcp: true,
+      commands: {
+        node: '/usr/bin/node',
+        'cursor-agent': '/bin/cursor-agent',
+        git: '/usr/bin/git',
+        gh: '/usr/bin/gh',
+        'code-review-graph': CRG,
+      },
       outputs: {
         '/usr/bin/node --version': 'v22.3.0\n',
+        '/bin/cursor-agent --version': '2026.09.30-abc\n',
         '/usr/bin/git --version': 'git version 2.43.0\n',
         '/usr/bin/git rev-parse --is-inside-work-tree': 'true\n',
         '/usr/bin/gh --version': 'gh version 2.92.0 (2026-04-28)\n',
@@ -130,129 +186,170 @@ describe('Diagnóstico do ambiente', () => {
       files: { [CRG]: `#!${UV_PY}\nimport sys`, '/proj/.code-review-graph': '' },
     });
     const r = await checkEnvironment(p);
-    expect(r.checks.filter((c) => c.status !== 'ok').map((c) => c.id)).toEqual([]);
-    expect(r.checks.filter((c) => c.version).map((c) => [c.id, c.version])).toEqual([
+    expect(
+      all(r)
+        .filter((c) => c.status !== 'ok')
+        .map((c) => c.id),
+    ).toEqual([]);
+    expect(
+      all(r)
+        .filter((c) => c.version)
+        .map((c) => [c.id, c.version]),
+    ).toEqual([
       ['node', '22.3.0'],
+      ['cli', '2026.09.30'],
       ['git', '2.43.0'],
       ['gh', '2.92.0'],
       ['crg', '2.3.6'],
     ]);
-  });
-
-  it('Code Review Graph sem grafo e sem a busca semântica: build e embed local, pelo instalador que ele usou', async () => {
-    const base = { commands: { 'code-review-graph': CRG }, outputs: { [`${CRG} --version`]: '2.3.6' } };
-    const uv = await checkEnvironment(probe({ ...base, files: { [CRG]: `#!${UV_PY}` } }));
-    expect(byId(uv.checks, 'crg-graph').fix).toEqual({ kind: 'commands', commands: ['code-review-graph build'] });
-    expect(byId(uv.checks, 'crg-embeddings').fix).toEqual({
-      kind: 'commands',
-      commands: ['uv tool install --reinstall "code-review-graph[embeddings]"', 'code-review-graph embed --provider local'],
-    });
-    const pipx = await checkEnvironment(probe({ ...base, files: { [CRG]: '#!/home/u/.local/pipx/venvs/code-review-graph/bin/python' } }));
-    expect((byId(pipx.checks, 'crg-embeddings').fix as { commands: string[] }).commands[0]).toBe(
-      'pipx inject code-review-graph "sentence-transformers>=3,<4"',
-    );
+    // com o Code Review Graph instalado, o uv e o Python ficam de fora
+    expect(find(r.recommended, 'crg').children!.map((c) => c.id)).toEqual(['crg-graph', 'crg-mcp', 'crg-embeddings']);
   });
 
   it('sem o #! (Windows), a busca semântica é lida da lista do uv', async () => {
     const r = await checkEnvironment(
       probe({
-        os: { platform: 'win32', family: 'windows', label: 'Windows' },
         commands: { 'code-review-graph': 'C:\\u\\.local\\bin\\code-review-graph.exe', uv: 'C:\\uv.exe' },
         outputs: {
           'uv tool list --show-with --show-extras': 'code-review-graph v2.3.6 [with: sentence-transformers]\n- code-review-graph\n',
         },
       }),
     );
-    expect(byId(r.checks, 'crg-embeddings').status).toBe('ok');
+    expect(find(r.recommended, 'crg-embeddings').status).toBe('ok');
   });
 
   it('o #! com env usa o Python que vem depois', async () => {
-    const p = probe({
-      commands: { 'code-review-graph': CRG },
-      files: { [CRG]: '#!/usr/bin/env python3\n' },
-      outputs: { "python3 -c import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('sentence_transformers') else 1)": '' },
-    });
-    const r = await checkEnvironment(p);
-    expect(byId(r.checks, 'crg-embeddings').status).toBe('ok');
+    const r = await checkEnvironment(
+      probe({
+        commands: { 'code-review-graph': CRG },
+        files: { [CRG]: '#!/usr/bin/env python3\n' },
+        outputs: { "python3 -c import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('sentence_transformers') else 1)": '' },
+      }),
+    );
+    expect(find(r.recommended, 'crg-embeddings').status).toBe('ok');
   });
 
-  it('git sem repositório e gh sem login: git init e gh auth login', async () => {
+  it('git sem repositório e gh sem login', async () => {
     const r = await checkEnvironment(
       probe({ commands: { git: '/usr/bin/git', gh: '/usr/bin/gh' }, outputs: { '/usr/bin/git rev-parse --is-inside-work-tree': null } }),
     );
-    expect(byId(r.checks, 'repo')).toMatchObject({ status: 'missing', fix: { kind: 'commands', commands: ['git init'] } });
-    expect(byId(r.checks, 'gh-auth')).toMatchObject({ status: 'missing', fix: { kind: 'commands', commands: ['gh auth login'] } });
+    expect(find(r.recommended, 'repo').status).toBe('missing');
+    expect(find(r.recommended, 'gh-auth').status).toBe('missing');
   });
 
-  it('o uv e o Python só aparecem enquanto falta o Code Review Graph; com o uv, o Python vem dele', async () => {
+  it('com o uv, o Code Review Graph fica faltando, com o comando dele; instalado, ele sobe e o uv sai', async () => {
     const uv = { commands: { uv: '/home/u/.local/bin/uv' }, outputs: { '/home/u/.local/bin/uv --version': 'uv 0.12.23' } };
-    const semPython = await checkEnvironment(probe(uv));
-    expect(byId(semPython.checks, 'uv')).toMatchObject({ status: 'ok', version: '0.12.23' });
-    expect(byId(semPython.checks, 'python')).toMatchObject({
-      status: 'missing',
-      fix: { kind: 'commands', commands: ['uv python install 3.12'] },
+    const before = await checkEnvironment(probe(uv));
+    expect(find(before.recommended, 'uv')).toMatchObject({ status: 'ok', version: '0.12.23', install: undefined });
+    expect(find(before.recommended, 'crg').status).toBe('missing');
+    expect(commands(find(before.recommended, 'crg'))).toEqual(['uv tool install code-review-graph']);
+    const after = await checkEnvironment(probe({ commands: { ...uv.commands, 'code-review-graph': CRG }, files: { [CRG]: `#!${UV_PY}` } }));
+    expect(after.recommended.map((c) => c.id)).toEqual(['git', 'gh', 'crg']);
+    expect(find(after.recommended, 'crg').install).toBeUndefined();
+    // a busca semântica: o pacote pelo mesmo caminho do Code Review Graph, depois o embed
+    expect(commands(find(after.recommended, 'crg-embeddings'))).toEqual(['uv tool install --reinstall "code-review-graph[embeddings]"']);
+    expect(find(after.recommended, 'crg-embeddings')).toMatchObject({
+      command: 'code-review-graph embed --provider local',
+      inProject: true,
     });
-    const comPython = await checkEnvironment(
-      probe({
-        ...uv,
-        outputs: {
-          ...uv.outputs,
-          '/home/u/.local/bin/uv python find >=3.10': '/home/u/.local/share/uv/python/cpython-3.14/bin/python3.14\n',
-          '/home/u/.local/share/uv/python/cpython-3.14/bin/python3.14 --version': 'Python 3.14.0',
-        },
-      }),
+    const pipx = await checkEnvironment(
+      probe({ commands: { 'code-review-graph': CRG }, files: { [CRG]: '#!/home/u/.local/pipx/venvs/code-review-graph/bin/python' } }),
     );
-    expect(byId(comPython.checks, 'python')).toMatchObject({ status: 'ok', version: '3.14.0' });
-    // um Python antigo do sistema não serve
-    const antigo = await checkEnvironment(
-      probe({ commands: { python3: '/usr/bin/python3' }, outputs: { '/usr/bin/python3 --version': 'Python 3.8.10' } }),
-    );
-    expect(byId(antigo.checks, 'python').status).toBe('skipped');
-    const instalado = await checkEnvironment(probe({ commands: { 'code-review-graph': CRG } }));
-    expect(instalado.checks.map((c) => c.id)).not.toContain('uv');
+    expect(commands(find(pipx.recommended, 'crg-embeddings'))).toEqual(['pipx inject code-review-graph "sentence-transformers>=3,<4"']);
   });
 
-  it('com ~/.local/bin no PATH, a CLI do Cursor não pede o passo do PATH', async () => {
-    const cli: BoardRequirement = {
-      id: 'cli',
-      tool: 'cursor',
-      action: { kind: 'command', command: 'curl https://cursor.com/install -fsS | bash' },
+  it('o que falta traz o comando de instalação oficial, neutro: curl no Linux e no macOS, PowerShell no Windows', async () => {
+    const cli: BoardRequirement = { id: 'cli', tool: 'claude', cli: 'claude', action: null };
+    const node: BoardRequirement = { id: 'node', tool: 'claude', action: null };
+    const unix = await checkEnvironment(probe({ tool: 'claude', requirements: [node, cli] }));
+    expect(commands(find(unix.required, 'node'))).toEqual([
+      'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash',
+      '. "$HOME/.nvm/nvm.sh"',
+      'nvm install 22',
+    ]);
+    expect(commands(find(unix.required, 'cli'))).toEqual(['curl -fsSL https://claude.ai/install.sh | bash']);
+    expect(commands(find(unix.recommended, 'uv'))).toEqual(['curl -LsSf https://astral.sh/uv/install.sh | sh']);
+    const windows = await checkEnvironment(probe({ tool: 'claude', requirements: [node, cli], platform: 'win32' }));
+    expect(commands(find(windows.required, 'cli'))).toEqual(['irm https://claude.ai/install.ps1 | iex']);
+    expect(commands(find(windows.required, 'node'))).toEqual(['winget install OpenJS.NodeJS.LTS']);
+    // no Windows, o programa só aparece num terminal novo
+    expect(find(windows.required, 'node').reopenTerminal).toBe(true);
+    expect(windows.curlMissing).toBeUndefined();
+    // a outra ferramenta, achada pelo editor sem a CLI: o comando da CLI dela
+    const cursor = await checkEnvironment(
+      probe({ tool: 'claude', other: { tool: 'cursor', cli: null, signedIn: null, mcp: false, skill: false, permission: null } }),
+    );
+    expect(commands(find(cursor.optional, 'cli'))).toEqual(['curl https://cursor.com/install -fsS | bash']);
+  });
+
+  it('o Node.js pelo nvm diz cada passo; com o nvm já instalado, falta só o Node', async () => {
+    const node: BoardRequirement = { id: 'node', tool: 'claude', action: null };
+    const sem = await checkEnvironment(probe({ tool: 'claude', requirements: [node] }));
+    expect(find(sem.required, 'node').install!.map((s) => s.step)).toEqual(['nvm', 'nvm-load', 'node']);
+    const com = await checkEnvironment(probe({ tool: 'claude', requirements: [node], files: { '/home/u/.nvm/nvm.sh': '' } }));
+    expect(commands(find(com.required, 'node'))).toEqual(['. "$HOME/.nvm/nvm.sh"', 'nvm install 22']);
+  });
+
+  it('sem ~/.local/bin no PATH, a CLI e o uv trazem o passo do PATH; sem curl, o aviso', async () => {
+    const cli: BoardRequirement = { id: 'cli', tool: 'cursor', cli: 'cursor-agent', action: null };
+    const r = await checkEnvironment(probe({ requirements: [cli], pathDirs: ['/usr/bin'] }));
+    expect(commands(find(r.required, 'cli'))).toEqual([
+      'curl https://cursor.com/install -fsS | bash',
+      `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc`,
+      'export PATH="$HOME/.local/bin:$PATH"',
+    ]);
+    // o instalador do uv já grava no arquivo do shell: falta só o terminal aberto
+    expect(commands(find(r.recommended, 'uv'))).toEqual([
+      'curl -LsSf https://astral.sh/uv/install.sh | sh',
+      'export PATH="$HOME/.local/bin:$PATH"',
+    ]);
+    expect(r.curlMissing).toBe(true);
+    const mac = await checkEnvironment(
+      probe({ requirements: [cli], pathDirs: ['/usr/bin'], platform: 'darwin', commands: { curl: '/usr/bin/curl' } }),
+    );
+    expect(commands(find(mac.required, 'cli'))![1]).toBe(`echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc`);
+    expect(mac.curlMissing).toBeUndefined();
+  });
+
+  it('as ações no projeto dizem que rodam na pasta do projeto', async () => {
+    const r = await checkEnvironment(probe({ commands: { git: '/usr/bin/git' } }));
+    expect(find(r.recommended, 'repo').inProject).toBe(true);
+    expect(find(r.recommended, 'crg-graph').inProject).toBe(true);
+    expect(find(r.recommended, 'gh-auth').inProject).toBeUndefined();
+  });
+
+  it('o git e o GitHub CLI, sem instalador neutro, trazem o comando do sistema; numa distribuição desconhecida, só o site', async () => {
+    const at = async (o: Parameters<typeof probe>[0]) => {
+      const r = await checkEnvironment(probe(o));
+      return [commands(find(r.recommended, 'git')), commands(find(r.recommended, 'gh'))];
     };
-    const r = await checkEnvironment(probe({ requirements: [cli], pathDirs: ['/home/u/.local/bin/', '/usr/bin'] }));
-    expect(byId(r.checks, 'cli').fix).toBeUndefined();
-  });
-});
-
-describe('instaladores por sistema', () => {
-  it('reconhece a família pelo /etc/os-release', () => {
-    expect(detectOs('linux', 'PRETTY_NAME="Zorin OS 18.1"\nID=zorin\nID_LIKE="ubuntu debian"\n')).toEqual({
-      platform: 'linux',
-      family: 'debian',
-      label: 'Zorin OS 18.1',
-    });
-    expect(detectOs('linux', 'ID=fedora\nPRETTY_NAME="Fedora Linux 42"').family).toBe('fedora');
-    expect(detectOs('linux', 'ID=arch\n').family).toBe('arch');
-    expect(detectOs('linux', 'ID=nixos\n')).toMatchObject({ family: 'linux', label: 'Linux' });
-    expect(detectOs('darwin', null).family).toBe('macos');
-    expect(detectOs('win32', null).family).toBe('windows');
+    // no Ubuntu de uma máquina nova, o apt não acha nada antes do update
+    expect(await at({})).toEqual([
+      ['sudo apt update', 'sudo apt install -y git'],
+      ['sudo apt update', 'sudo apt install -y gh'],
+    ]);
+    expect(await at({ linux: 'fedora' })).toEqual([['sudo dnf install -y git'], ['sudo dnf install -y gh']]);
+    expect(await at({ linux: 'arch' })).toEqual([['sudo pacman -S --needed git'], ['sudo pacman -S --needed github-cli']]);
+    expect(await at({ platform: 'darwin' })).toEqual([['xcode-select --install'], ['brew install gh']]);
+    expect(await at({ platform: 'win32' })).toEqual([['winget install --id Git.Git -e'], ['winget install --id GitHub.cli -e']]);
+    expect(await at({ linux: null })).toEqual([undefined, undefined]);
+    const r = await checkEnvironment(probe({}));
+    expect(find(r.recommended, 'git').install!.map((s) => s.step)).toEqual(['apt-update', undefined]);
   });
 
-  it('cada sistema com o seu gerenciador', () => {
-    const win: EnvOs = { platform: 'win32', family: 'windows', label: 'Windows' };
-    const mac: EnvOs = { platform: 'darwin', family: 'macos', label: 'macOS' };
-    expect(installFix('gh', win)).toEqual({ kind: 'commands', commands: ['winget install --id GitHub.cli -e'], reopenTerminal: true });
-    expect(installFix('uv', win)).toMatchObject({ reopenTerminal: true, commands: [expect.stringContaining('install.ps1')] });
-    expect(installFix('gh', mac)).toEqual({ kind: 'commands', commands: ['brew install gh'], brew: true });
-    expect(installFix('git', mac)).toEqual({ kind: 'commands', commands: ['xcode-select --install'] });
-    expect(installFix('gh', { platform: 'linux', family: 'arch', label: 'Arch' })).toEqual({
-      kind: 'commands',
-      commands: ['sudo pacman -S --needed github-cli'],
-    });
-    expect(installFix('git', { platform: 'linux', family: 'fedora', label: 'Fedora' })).toEqual({
-      kind: 'commands',
-      commands: ['sudo dnf install -y git'],
-    });
-    // distribuição desconhecida: sem comando, fica o link de download
-    expect(installFix('git', { platform: 'linux', family: 'linux', label: 'Linux' })).toBeNull();
+  it('reconhece a distribuição pelo /etc/os-release', () => {
+    expect(linuxFamily('ID=ubuntu\nPRETTY_NAME="Ubuntu 24.04.3 LTS"\n')).toBe('debian');
+    expect(linuxFamily('ID=linuxmint\nID_LIKE="ubuntu debian"\n')).toBe('debian');
+    expect(linuxFamily('ID=fedora\n')).toBe('fedora');
+    expect(linuxFamily('ID="rocky"\nID_LIKE="rhel centos fedora"\n')).toBe('fedora');
+    expect(linuxFamily('ID=manjaro\nID_LIKE=arch\n')).toBe('arch');
+    expect(linuxFamily('ID=alpine\n')).toBeNull();
+    expect(linuxFamily(null)).toBeNull();
+  });
+
+  it('pronto não sugere instalar', async () => {
+    const r = await checkEnvironment(probe({ commands: { node: '/usr/bin/node' }, outputs: { '/usr/bin/node --version': 'v22.3.0' } }));
+    expect(find(r.required, 'node').install).toBeUndefined();
+    expect(find(r.required, 'cli').install).toBeUndefined();
   });
 });

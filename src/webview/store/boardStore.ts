@@ -3,11 +3,11 @@ import { create } from 'zustand';
 import type { BoardState, Id } from '../../shared/model';
 import { isLive } from '../../shared/selectors';
 import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../../shared/filters';
-import { EMPTY_METRICS_FILTERS, type MetricsBreakdownDim, type MetricsFilters, type MetricsMeasure } from '../../shared/metrics';
+import { EMPTY_METRICS_FILTERS, SHOW_COST, type MetricsBreakdownDim, type MetricsFilters, type MetricsMeasure } from '../../shared/metrics';
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 import { formatBytes, type ImportSummary } from '../../shared/backup';
 import { formatDateTime, t } from '../i18n';
-import { backup, cards } from '../commands';
+import { backup } from '../commands';
 
 /** Ordenação de uma tabela do painel: `key` é o id da coluna; `null` em `MetricsBlocksState` = o padrão do bloco. */
 export interface MetricsSort {
@@ -31,16 +31,16 @@ export interface MetricsBlocksState {
 
 export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
   dim: 'phase',
-  measure: 'cost',
+  measure: SHOW_COST ? 'cost' : 'tokens',
   cardSort: null,
   phaseSort: null,
   leadSort: null,
 };
 
 /** `environment`: o Diagnóstico do ambiente, aberto pelas Configurações ou sozinho na primeira abertura */
-export type View = 'board' | 'trash' | 'settings' | 'metrics' | 'environment';
+export type View = 'board' | 'archived' | 'trash' | 'settings' | 'metrics' | 'environment';
 /** Abas da tela de Harness de IA: a ferramenta e a execução, o que é do projeto, e tudo que a ferramenta carrega. */
-export type HarnessTab = 'tool' | 'project' | 'user' | 'all';
+export type HarnessTab = 'tool' | 'project' | 'user';
 import { type SettingsTab } from '../../shared/settingsTab';
 import { SETTINGS_SECTIONS } from '../../shared/settingsSections';
 export type { SettingsTab };
@@ -50,8 +50,8 @@ export interface DialogSpec {
   message?: string;
   confirmLabel?: string;
   danger?: boolean;
-  /** quando presente, mostra um seletor e passa o valor escolhido ao confirmar */
-  choices?: { label: string; options: { value: string; label: string }[] };
+  /** quando presente, mostra um seletor e passa o valor escolhido ao confirmar; `value` é o escolhido de início (padrão: o primeiro) */
+  choices?: { label: string; options: { value: string; label: string }[]; value?: string };
   /** quando presente, mostra um checkbox e passa se está marcado ao confirmar */
   checkbox?: { label: string };
   onConfirm(choice?: string, checkboxChecked?: boolean): void;
@@ -82,6 +82,8 @@ interface UiState {
   chatModel: string | null;
   /** "não avisar novamente" ao ligar o modo autônomo (marcado no checkbox do diálogo de confirmação) */
   dontWarnYolo: boolean;
+  /** o nome da coluna escolhida por último em "Até onde" ao ligar o modo autônomo; '' = até o fim */
+  yoloUntilName: string;
 }
 
 interface BoardStore extends UiState, ViewState {
@@ -97,14 +99,12 @@ interface BoardStore extends UiState, ViewState {
   dialog: DialogSpec | null;
   /** anexo aberto na modal; null quando não há modal de anexo na tela */
   attachmentModal: AttachmentModalState | null;
+  /** arquivo do harness aberto no editor do board (caminho absoluto, como a varredura o listou) */
+  harnessFile: string | null;
   /** backup do board em andamento: exportando, ou lendo o arquivo escolhido para importar */
   backupBusy: 'export' | 'import' | null;
   setBackupBusy(busy: 'export' | 'import' | null): void;
   setState(state: BoardState, attachmentsBaseUri: string): void;
-  /** sobreposições otimistas do toggle de modo autônomo, por id de card, pendentes de confirmação do host */
-  yoloOverrides: Map<Id, boolean>;
-  /** aplica o toggle na hora (otimista) e manda a mudança para o host */
-  setYoloOptimistic(cardId: Id, enabled: boolean): void;
   setViewState(view: ViewState): void;
   setError(msg: string | null): void;
   setNotice(msg: string | null): void;
@@ -123,6 +123,7 @@ interface BoardStore extends UiState, ViewState {
   clearPendingSettingsSection(): void;
   setSettingsNavCollapsed(collapsed: boolean): void;
   setDontWarnYolo(value: boolean): void;
+  setYoloUntilName(name: string): void;
   selectParent(id: Id | null): void;
   /**
    * Seleção múltipla de cards no board (card 324): conceito novo e separado de `selectedParentId`
@@ -134,6 +135,9 @@ interface BoardStore extends UiState, ViewState {
   /** substitui a seleção inteira pelos ids informados (usado por "Selecionar todos" da coluna) */
   selectMany(ids: Id[]): void;
   clearSelected(): void;
+  /** coluna com o formulário "+ Novo card" aberto: só um por vez no board (abrir um fecha o outro) */
+  addingColumnId: Id | null;
+  setAddingColumn(id: Id | null): void;
   openCard(id: Id | null): void;
   setFilters(patch: Partial<Filters>): void;
   clearFilters(): void;
@@ -157,6 +161,8 @@ interface BoardStore extends UiState, ViewState {
   /** abre a modal de um anexo (visualização; a edição é escolhida dentro dela) */
   openAttachmentModal(attachmentId: Id): void;
   closeAttachmentModal(): void;
+  openHarnessFile(path: string): void;
+  closeHarnessFile(): void;
 }
 
 const persisted = getUiState<Partial<UiState>>();
@@ -175,16 +181,19 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     notice: null,
     dialog: null,
     attachmentModal: null,
+    harnessFile: null,
     backupBusy: null,
     setBackupBusy: (backupBusy) => set({ backupBusy }),
     // o Diagnóstico é de passagem: ao reabrir, volta para o board
     view: persisted?.view === 'environment' ? 'board' : (persisted?.view ?? 'board'),
     settingsTab: persisted?.settingsTab ?? 'columns',
-    harnessTab: persisted?.harnessTab ?? 'tool',
+    // a aba "Tudo que a ferramenta carrega" (`all`) saiu: quem a deixou aberta volta para a da ferramenta
+    harnessTab: persisted?.harnessTab && persisted.harnessTab !== ('all' as string) ? persisted.harnessTab : 'tool',
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
     dontWarnYolo: persisted?.dontWarnYolo ?? false,
+    yoloUntilName: persisted?.yoloUntilName ?? '',
     chatOpen: false,
     setChatOpen: (chatOpen) => set({ chatOpen }),
     setChatModel(chatModel) {
@@ -195,34 +204,16 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     selectedParentId: null,
     selectedIds: new Set(),
     collapsed: {},
-    yoloOverrides: new Map(),
-    setYoloOptimistic(cardId, enabled) {
-      const next = new Map(get().yoloOverrides);
-      next.set(cardId, enabled);
-      set({ yoloOverrides: next });
-      cards.setYolo(cardId, enabled);
-    },
 
     setState(state, attachmentsBaseUri) {
       const ids = new Set(state.cards.map((c) => c.id));
-      const { selectedParentId, selectedIds, openCardId, yoloOverrides } = get();
+      const { selectedParentId, selectedIds, openCardId } = get();
       set({ state, attachmentsBaseUri, openCardId: openCardId && ids.has(openCardId) ? openCardId : null });
       // a história selecionada saiu do board (lixeira, arquivo ou apagada): limpa o filtro
       if (selectedParentId && !state.cards.some((c) => c.id === selectedParentId && isLive(c))) setShared({ selectedParentId: null });
       // o mesmo, mas para a seleção múltipla: tira da seleção quem saiu do board ou não está mais vivo
       const prunedIds = new Set([...selectedIds].filter((id) => state.cards.some((c) => c.id === id && isLive(c))));
       if (prunedIds.size !== selectedIds.size) set({ selectedIds: prunedIds });
-      // toggle de modo autônomo otimista: tira a sobreposição quando o host confirma (card já com o valor) ou o card saiu do board
-      let changed = false;
-      const nextOverrides = new Map(yoloOverrides);
-      for (const [id, pendingValue] of yoloOverrides) {
-        const current = state.cards.find((c) => c.id === id);
-        if (!current || current.yolo === pendingValue) {
-          nextOverrides.delete(id);
-          changed = true;
-        }
-      }
-      if (changed) set({ yoloOverrides: nextOverrides });
       persist(get());
     },
     setViewState: (view) =>
@@ -261,6 +252,10 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       set({ dontWarnYolo });
       persist(get());
     },
+    setYoloUntilName(yoloUntilName) {
+      set({ yoloUntilName });
+      persist(get());
+    },
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
     toggleSelected(id) {
       const { state, selectedIds } = get();
@@ -276,6 +271,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     },
     selectMany: (ids) => set({ selectedIds: new Set(ids) }),
     clearSelected: () => set({ selectedIds: new Set() }),
+    addingColumnId: null,
+    setAddingColumn: (id) => set({ addingColumnId: id }),
     openCard(id) {
       // trocar (ou fechar) o card deixa a modal de anexo sem contexto: fecha junto
       set({ openCardId: id, attachmentModal: null });
@@ -301,6 +298,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     ask: (dialog) => set({ dialog }),
     openAttachmentModal: (attachmentId) => set({ attachmentModal: { attachmentId } }),
     closeAttachmentModal: () => set({ attachmentModal: null }),
+    openHarnessFile: (harnessFile) => set({ harnessFile }),
+    closeHarnessFile: () => set({ harnessFile: null }),
   };
 });
 
@@ -313,6 +312,7 @@ function persist(s: BoardStore): void {
     openCardId: s.openCardId,
     chatModel: s.chatModel,
     dontWarnYolo: s.dontWarnYolo,
+    yoloUntilName: s.yoloUntilName,
   };
   setUiState(ui);
 }
@@ -327,9 +327,8 @@ export function useHostSync(): void {
       else if (msg.type === 'error') {
         s.setError(msg.message);
         s.setBackupBusy(null);
-        // a mensagem de erro não identifica o card: descarta todas as sobreposições otimistas pendentes
-        useBoardStore.setState({ yoloOverrides: new Map() });
       } else if (msg.type === 'notice') s.setNotice(msg.message);
+      else if (msg.type === 'harness.item.created') s.openHarnessFile(msg.path);
       else if (msg.type === 'backup.done') s.setBackupBusy(null);
       else if (msg.type === 'backup.import.summary') {
         s.setBackupBusy(null);

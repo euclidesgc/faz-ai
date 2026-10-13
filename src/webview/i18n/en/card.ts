@@ -13,7 +13,6 @@ export const card: Record<string, string> = {
   Restaurar: 'Restore',
   'Ações do card': 'Card actions',
   Ações: 'Actions',
-  Desarquivar: 'Unarchive',
   Arquivar: 'Archive',
   'Mover para a lixeira': 'Move to trash',
   'Fechar (Esc)': 'Close (Esc)',
@@ -38,6 +37,9 @@ export const card: Record<string, string> = {
   'Cria a branch da história e, no modo worktree, a pasta de trabalho dela':
     'Creates the story branch and, in worktree mode, its working folder',
   'Criar branch da história': 'Create story branch',
+  'Derivada de {ref}': 'Derived from {ref}',
+  'A branch desta história parte da branch de {ref}, e o pull request é empilhado sobre o dela':
+    'The branch of this story starts from the branch of {ref}, and its pull request is stacked on top of that one',
 
   // Anexos
   '"{name}" tem mais de 20 MB e não foi anexado.': '"{name}" is larger than 20 MB and was not attached.',
@@ -120,6 +122,7 @@ export const card: Record<string, string> = {
 
   // Campos
   Campos: 'Fields',
+  'definida pelo board': 'set by the board',
   'Esforço do modelo': 'Model effort',
   'Sugerido pelas regras: {model}': 'Suggested by the rules: {model}',
   Usar: 'Use',
@@ -217,13 +220,21 @@ export const card: Record<string, string> = {
   'A IA trabalha nesta sub-tarefa sem pedir aprovação, como na história':
     'The AI works on this sub-task without asking for approval, as in the story',
   'Modo autônomo, da história {ref}': 'Autonomous mode, from story {ref}',
-  'A IA toca esta história sozinha, do Backlog ao pull request — sem aprovação, pergunta ou confirmação. Pare a qualquer hora pelo botão do topo do board.':
-    'The AI drives this story by itself, from Backlog to the pull request — with no approval, question or confirmation. Stop at any time with the button at the top of the board.',
+  'A IA toca esta história sozinha, sem aprovação, pergunta ou confirmação, até a fase que você escolher: ali ela faz o trabalho, pede a sua revisão e o modo se desliga. Pare a qualquer hora pelo botão do topo do board.':
+    'The AI drives this story by itself, with no approval, question or confirmation, up to the phase you choose: there it does the work, asks for your review and the mode turns off. Stop at any time with the button at the top of the board.',
+  'Até onde': 'Up to',
+  '{column} (abre o pull request)': '{column} (opens the pull request)',
+  'Modo autônomo até': 'Autonomous mode up to',
+  'Até onde vai o modo autônomo': 'How far autonomous mode goes',
+  'Ao terminar o trabalho desta fase, a IA pede a sua revisão e o modo se desliga':
+    'When the work of this phase is done, the AI asks for your review and the mode turns off',
+  'Modo autônomo até {column}. Clique para desligar.': 'Autonomous mode up to {column}. Click to turn it off.',
   'Ligar o modo autônomo em {ref}?': 'Turn on autonomous mode for {ref}?',
   'Ligar o modo autônomo': 'Turn on autonomous mode',
   'Não avisar novamente': "Don't warn me again",
   'O modo autônomo está tocando a fila.': 'Autonomous mode is driving the queue.',
   'O modo autônomo está pausado.': 'Autonomous mode is paused.',
+  'A fila está parada em {ref}: veja a barra de atividade.': 'The queue is stopped at {ref}: see the activity bar.',
   'Modo autônomo': 'Autonomous mode',
   'Salvar descrição': 'Save description',
   'Aplicar seleção': 'Apply selection',
@@ -239,4 +250,23 @@ export const card: Record<string, string> = {
   'O que a sessão de IA usa para trabalhar neste card: agente, skills, rules, servidores MCP, ferramentas e modelo':
     'What the AI session uses to work on this card: agent, skills, rules, MCP servers, tools and model',
   'rules: {list}': 'rules: {list}',
+
+  // Aba Consumo: a estimativa da próxima execução e o gasto medido por fase
+  Consumo: 'Usage',
+  'Próxima execução': 'Next run',
+  'Gasto até agora': 'Spent so far',
+  Tempo: 'Time',
+  Total: 'Total',
+  'sem fase': 'no phase',
+  'Nenhuma execução de IA neste card ainda.': 'No AI runs on this card yet.',
+  'Nenhuma execução neste card. As sub-tarefas rodam dentro da sessão da história: o consumo delas aparece na história.':
+    "No runs on this card. Sub-tasks run inside the story's session: their usage shows up on the story.",
+  'Medido pela ferramenta no fim de cada execução: inclui tudo o que a IA leu e escreveu no trabalho, não só o contexto inicial. Só cresce: apagar mensagens ou desmarcar itens muda as próximas execuções, não o que já foi gasto.':
+    'Measured by the tool at the end of each run: it includes everything the AI read and wrote while working, not only the initial context. It only grows: deleting messages or unmarking items changes the next runs, not what was already spent.',
+  'Uma execução em andamento: o consumo dela entra quando terminar.': 'One run in progress: its usage counts when it ends.',
+  '{n} execuções em andamento: o consumo delas entra quando terminarem.': '{n} runs in progress: their usage counts when they end.',
+  'As execuções até {month} ficaram só nos totais mensais do board (retenção do detalhe) e não aparecem aqui.':
+    "Runs up to {month} were kept only in the board's monthly totals (detail retention) and do not show up here.",
+  'Não foi possível ler o consumo do card.': "Could not read the card's usage.",
+  'A consulta do consumo demorou demais. Tente de novo.': 'The usage query took too long. Try again.',
 };

@@ -23,16 +23,20 @@ const activity = (over: Partial<AiActivity> = {}): AiActivity => ({
 });
 
 describe('activityMessage: sem execução', () => {
-  it('mostra a nota do autopiloto quando há uma', () => {
+  it('mostra a nota do autopiloto quando há uma, com o texto inteiro no título (tooltip)', () => {
     const state = boardState({ autopilot: { active: true, note: 'Esperando aprovação em #12.' } });
-    expect(activityMessage(state, { offline: false, now: NOW })).toEqual({ kind: 'idle', text: 'Esperando aprovação em #12.' });
+    expect(activityMessage(state, { offline: false, now: NOW })).toEqual({
+      kind: 'idle',
+      text: 'Esperando aprovação em #12.',
+      title: 'Esperando aprovação em #12.',
+    });
   });
 
   it('nota do autopiloto em inglês passa por t()', () => {
     setLocale('en');
     const state = boardState({ autopilot: { active: true, note: 'Esperando aprovação em #12.' } });
     const msg = activityMessage(state, { offline: false, now: NOW });
-    expect(msg).toEqual({ kind: 'idle', text: 'Esperando aprovação em #12.' });
+    expect(msg).toEqual({ kind: 'idle', text: 'Esperando aprovação em #12.', title: 'Esperando aprovação em #12.' });
   });
 
   it('heartbeat desligado', () => {

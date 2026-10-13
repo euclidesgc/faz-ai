@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { isDelivered, isDeliverableStory, isWithHuman, lastAiColumn, stackBaseOf } from '../src/shared/story';
+import {
+  isAtYoloStop,
+  isDelivered,
+  isDeliverableStory,
+  isWithHuman,
+  lastAiColumn,
+  stackBaseOf,
+  yoloStopOf,
+  yoloStopOptions,
+} from '../src/shared/story';
 import { boardState, card, column } from './fakes/board';
 
 describe('isWithHuman', () => {
@@ -68,6 +77,68 @@ describe('stackBaseOf', () => {
         card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100', mergeCommit: 'abc123' }),
         card('h11', { number: 11, yolo: true }),
       ],
+    });
+
+    expect(stackBaseOf(s, s.cards[1]!)).toBeUndefined();
+  });
+});
+
+describe('stackBaseOf de uma história derivada', () => {
+  it('fora do modo autônomo, a derivada parte da branch da origem', () => {
+    const s = boardState({
+      cards: [card('h10', { number: 10, branch: 'b10', branchCreatedAt: '100' }), card('h11', { number: 11, derivedFrom: 'h10' })],
+    });
+
+    expect(stackBaseOf(s, s.cards[1]!)?.id).toBe('h10');
+  });
+
+  it('a origem vale mais que a história YOLO mais recente', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100' }),
+        card('h11', { number: 11, yolo: true, branch: 'b11', branchCreatedAt: '200' }),
+        card('h12', { number: 12, yolo: true, derivedFrom: 'h10' }),
+      ],
+    });
+
+    expect(stackBaseOf(s, s.cards[2]!)?.id).toBe('h10');
+  });
+
+  it('origem sem branch, já mesclada, na lixeira ou arquivada: a derivada fora do modo autônomo parte da principal', () => {
+    for (const over of [{ branch: '' }, { mergeCommit: 'abc' }, { deletedAt: 1 }, { archivedAt: 1 }]) {
+      const s = boardState({
+        cards: [card('h10', { number: 10, branch: 'b10', ...over }), card('h11', { number: 11, derivedFrom: 'h10' })],
+      });
+      expect(stackBaseOf(s, s.cards[1]!)).toBeUndefined();
+    }
+  });
+
+  it('origem já mesclada no modo autônomo: volta para a regra da fila', () => {
+    const s = boardState({
+      cards: [
+        card('h9', { number: 9, yolo: true, branch: 'b9', branchCreatedAt: '50' }),
+        card('h10', { number: 10, yolo: true, branch: 'b10', branchCreatedAt: '100', mergeCommit: 'abc' }),
+        card('h11', { number: 11, yolo: true, derivedFrom: 'h10' }),
+      ],
+    });
+
+    expect(stackBaseOf(s, s.cards[2]!)?.id).toBe('h9');
+  });
+
+  it('a história que parou no "Até onde" continua na pilha do modo, com o modo já desligado', () => {
+    const s = boardState({
+      cards: [
+        card('h10', { number: 10, yolo: false, yoloUntil: 'review', branch: 'b10', branchCreatedAt: '100' }),
+        card('h11', { number: 11, yolo: true }),
+      ],
+    });
+
+    expect(stackBaseOf(s, s.cards[1]!)?.id).toBe('h10');
+  });
+
+  it('sub-tarefa nunca empilha', () => {
+    const s = boardState({
+      cards: [card('h10', { number: 10, branch: 'b10' }), card('t1', { number: 11, parentId: 'h10', derivedFrom: 'h10' })],
     });
 
     expect(stackBaseOf(s, s.cards[1]!)).toBeUndefined();
@@ -185,5 +256,51 @@ describe('isDeliverableStory', () => {
       cards: [card('h1', { yolo: true, columnId: 'homologacao' }), card('t1', { ...base, parentId: 'h1' })],
     });
     expect(isDeliverableStory(s3, s3.cards[1]!)).toBe(false);
+  });
+});
+
+describe('até onde vai o modo autônomo', () => {
+  // backlog → spec → plan → impl → homolog (a última da IA) → done
+  const columns = [
+    column('backlog', 'wp', 0),
+    { ...column('spec', 'wp', 1), aiActive: true },
+    { ...column('plan', 'wp', 2), aiActive: true },
+    { ...column('impl', 'wp', 3), aiActive: true },
+    { ...column('homolog', 'wp', 4), aiActive: true },
+    column('done', 'wp', 5, 'done'),
+  ];
+  const state = (over: Partial<Parameters<typeof card>[1]>) =>
+    boardState({ columns, cards: [card('h', { number: 1, yolo: true, columnId: 'spec', ...over })] });
+
+  it('sem escolha, o modo vai até a última coluna da IA', () => {
+    const s = state({});
+    expect(yoloStopOf(s, s.cards[0]!)?.id).toBe('homolog');
+    expect(isAtYoloStop(s, s.cards[0]!)).toBe(false);
+  });
+
+  it('com a escolha, para nela; a história parada ali está na parada, antes e depois não', () => {
+    expect(yoloStopOf(state({ yoloUntil: 'plan' }), state({ yoloUntil: 'plan' }).cards[0]!)?.id).toBe('plan');
+    const at = state({ yoloUntil: 'plan', columnId: 'plan' });
+    expect(isAtYoloStop(at, at.cards[0]!)).toBe(true);
+    const before = state({ yoloUntil: 'plan', columnId: 'spec' });
+    expect(isAtYoloStop(before, before.cards[0]!)).toBe(false);
+    const off = state({ yoloUntil: 'plan', columnId: 'plan', yolo: false });
+    expect(isAtYoloStop(off, off.cards[0]!)).toBe(false);
+  });
+
+  it('a escolha que não vale mais (apagada, onde a IA não atua, ou já ultrapassada) volta para o fim', () => {
+    for (const over of [{ yoloUntil: 'sumiu' }, { yoloUntil: 'backlog', columnId: 'backlog' }, { yoloUntil: 'spec', columnId: 'impl' }]) {
+      const s = state(over);
+      expect(yoloStopOf(s, s.cards[0]!)?.id).toBe('homolog');
+    }
+  });
+
+  it('as opções são as colunas da IA da atual em diante, sem a atual quando ela já foi entregue para revisão', () => {
+    const s = state({ status: 'ready' });
+    expect(yoloStopOptions(s, s.cards[0]!).map((c) => c.id)).toEqual(['spec', 'plan', 'impl', 'homolog']);
+    const waiting = state({ status: 'waiting_review' });
+    expect(yoloStopOptions(waiting, waiting.cards[0]!).map((c) => c.id)).toEqual(['plan', 'impl', 'homolog']);
+    const backlog = state({ columnId: 'backlog' });
+    expect(yoloStopOptions(backlog, backlog.cards[0]!).map((c) => c.id)).toEqual(['spec', 'plan', 'impl', 'homolog']);
   });
 });

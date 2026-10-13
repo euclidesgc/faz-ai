@@ -1,8 +1,8 @@
 import type { BoardRequirement } from './requirements';
 import type { EnvironmentReport } from './environment';
-import type { InstallStepResult } from './installPlan';
 import type { ExecProfile } from './execution';
 import type { ChatState } from './chat';
+import type { McpFootprint } from './contextEstimate';
 import type { AiTool, Harness, InstallPreview } from './harness';
 import type { HarnessSelection } from './harnessSelection';
 import type { ModelOption, ModelRule } from './models';
@@ -52,8 +52,6 @@ export interface Workflow {
   kind: WorkflowKind;
   /** a linha começa colapsada no board */
   collapsed: boolean;
-  /** a coluna de arquivados desta linha começa colapsada */
-  archiveCollapsed: boolean;
 }
 
 export interface Column {
@@ -131,6 +129,13 @@ export interface Card {
   execProfile: Id | null;
   /** modo autônomo (YOLO), só em histórias: a IA toca o card sem pedir aprovação nem confirmação */
   yolo: boolean;
+  /**
+   * até onde vai o modo autônomo: a coluna em que a IA faz o trabalho, pede a revisão e o modo se
+   * desliga; null = até a última coluna em que a IA atua (o pull request)
+   */
+  yoloUntil: Id | null;
+  /** história de que esta deriva (a funcionalidade dividida em entregas); null = não é derivada */
+  derivedFrom: Id | null;
 }
 
 /** ID do card como aparece na interface. */
@@ -224,7 +229,7 @@ export interface AiActivity {
 }
 
 export interface Autopilot {
-  /** está tocando as histórias; desligado depois de pausar, ou ao abrir o editor, até alguém ligar o modo numa história ou retomar */
+  /** está tocando as histórias; desligado depois de pausar ou quando a fila acaba; liga sozinho ao abrir o editor com história pendente */
   active: boolean;
   /** por que está parado esperando uma pessoa (impedimento numa história); null quando segue normalmente */
   note: string | null;
@@ -250,6 +255,8 @@ export interface BoardState {
   harness: Harness;
   /** o que as execuções do board podem usar do harness (rules, skills e agentes marcados), por projeto */
   harnessSelection: HarnessSelection[];
+  /** o que o servidor MCP do board põe em cada sessão (nomes, instruções e definições das ferramentas), para estimar o contexto de um card; null antes da medição */
+  boardServer: McpFootprint | null;
   /** mudanças que a atualização para o board padrão atual faria; vazio quando não há o que atualizar */
   pendingUpgrade: string[];
   /** chat com a IA do projeto */
@@ -268,14 +275,12 @@ export interface BoardState {
   requirements: BoardRequirement[];
   /** quando o host terminou a última conferência dos requisitos (ms), mesmo sem mudança; 0 antes da primeira */
   requirementsCheckedAt: number;
+  /** a ferramenta ativa falhou por login vencido numa execução; null quando não há aviso reativo ativo */
+  authExpired: AiTool | null;
   /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */
   environment: EnvironmentReport | null;
   /** o Diagnóstico ainda não abriu sozinho nesta máquina: a interface abre a tela uma vez */
   environmentFirstRun: boolean;
-  /** o "Instalar tudo" rodando num terminal do editor; null fora disso */
-  environmentInstall: { level: 'required' | 'recommended'; startedAt: number } | null;
-  /** o resultado do último "Instalar tudo": o que deu certo, o que falhou (com o erro) e o que foi pulado */
-  environmentInstallResult: { level: 'required' | 'recommended'; steps: InstallStepResult[]; finishedAt: number } | null;
   /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */
   harnessInstall: InstallPreview | null;
 }

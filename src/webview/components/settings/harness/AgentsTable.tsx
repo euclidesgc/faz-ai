@@ -201,8 +201,8 @@ export function AgentsTable({ tool, scope }: { tool: AiToolInfo; scope: InstallS
                   <button
                     type="button"
                     className="path-link"
-                    title={t('Abre o arquivo no editor')}
-                    onClick={() => harness.openItem(a.path)}
+                    title={t('Abre o arquivo no board, para ler e editar')}
+                    onClick={() => useBoardStore.getState().openHarnessFile(a.path)}
                   >
                     {a.location}
                   </button>

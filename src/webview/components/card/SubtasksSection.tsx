@@ -1,8 +1,9 @@
 import { cardRef, type Card } from '../../../shared/model';
-import { childrenOf, columnOf, subtaskSlot } from '../../../shared/selectors';
+import { childrenOf, columnOf, isAiWorking, subtaskSlot } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { AddInput, Button } from '../ui';
+import { AiLed } from '../cardView/AiLed';
 import { t, dt } from '../../i18n';
 
 /** Sub-tarefas da história: lista com a coluna de cada uma, atalho para o board e criação rápida. */
@@ -42,6 +43,8 @@ export function SubtasksSection({ story }: { story: Card }) {
           const col = columnOf(state, c);
           return (
             <li key={c.id} className={col?.isTerminal ? 'done' : ''}>
+              {/* LED de atividade da sub-tarefa: acende enquanto a IA trabalha nela, fica vermelho se bloqueada */}
+              <AiLed work={isAiWorking(state, c) ? { mode: 'self' } : null} status={c.status} />
               <a onClick={() => openCard(c.id)}>
                 <span className="card-id">{cardRef(c)}</span> {c.title}
               </a>

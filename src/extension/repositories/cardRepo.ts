@@ -1,6 +1,7 @@
 import type { Database } from 'sql.js';
 import type { FieldValue } from '../../shared/model';
 import { norm } from '../../shared/filters';
+import { CORE, CRITICALITY_FIELD } from '../../shared/critical';
 import { parseRules } from '../../shared/rules';
 import type { CardStatus } from '../../shared/status';
 import { newId, now } from '../db/ids';
@@ -195,12 +196,24 @@ export class CardRepo {
         }
       }
       // regra: a IA só avança um card de uma coluna que exige aprovação depois que uma pessoa aprova; voltar ou cancelar é livre.
-      // Em modo autônomo (YOLO) a aprovação não é exigida: a pessoa abriu mão dela ao ligar o modo na história
-      if (byAi && !this.isYolo(cardId) && fromCol !== columnId && str(col.category) !== 'cancelled') {
+      // Em modo autônomo (YOLO) a aprovação não é exigida: a pessoa abriu mão dela ao ligar o modo na história. Exceções: a
+      // coluna até onde a pessoa liberou o modo (`yolo_until`) segura a história como se exigisse aprovação, e a história do
+      // núcleo (campo Criticidade) continua precisando dela nas colunas que a exigem
+      const yolo = this.yoloOf(cardId);
+      const stop = yolo.yolo && yolo.until === fromCol;
+      const bypass = yolo.yolo && !stop && !(card.parent_id == null && this.isCore(cardId));
+      if (byAi && !bypass && fromCol !== columnId && str(col.category) !== 'cancelled') {
         const from = one(db, 'SELECT name, position, requires_approval FROM columns WHERE id = ?', [fromCol]);
-        if (from && num(from.requires_approval) === 1 && num(col.position) > num(from.position) && str(card.status) !== 'approved')
+        if (
+          from &&
+          (num(from.requires_approval) === 1 || stop) &&
+          num(col.position) > num(from.position) &&
+          str(card.status) !== 'approved'
+        )
           throw new Error(
-            `"${str(card.title)}" só sai de ${str(from.name)} com a aprovação de uma pessoa. Peça a revisão com request_review e pare; quando o status for "approved", mova o card.`,
+            stop
+              ? `"${str(card.title)}" está em ${str(from.name)}, a última fase que a pessoa liberou para o modo autônomo. Ao terminar o trabalho da fase, chame request_review na história e pare.`
+              : `"${str(card.title)}" só sai de ${str(from.name)} com a aprovação de uma pessoa. Peça a revisão com request_review e pare; quando o status for "approved", mova o card.`,
           );
       }
       const ids = all(db, 'SELECT id FROM cards WHERE column_id = ? AND id != ? ORDER BY position', [columnId, cardId]).map((r) =>
@@ -251,6 +264,42 @@ export class CardRepo {
     });
   }
 
+  /**
+   * Restaura um card arquivado pela aba Arquivados. O alvo é o próprio card ou, numa sub-tarefa cuja história
+   * também está arquivada, a história: ela volta com todas as sub-tarefas arquivadas dela (as da lixeira ficam).
+   * Cada card vai para o fim da primeira coluna do próprio workflow, inativo (sem status de trabalho), e a
+   * história sai do modo autônomo. Devolve o id do alvo restaurado.
+   */
+  restoreArchived(cardId: string): string {
+    const db = this.db;
+    return transaction(db, () => {
+      const card = one(db, 'SELECT id, parent_id, archived_at FROM cards WHERE id = ?', [cardId]);
+      if (!card) throw new Error('Card não encontrado');
+      if (card.archived_at == null) return cardId;
+      let targetId = cardId;
+      if (card.parent_id != null) {
+        const parent = one(db, 'SELECT archived_at, deleted_at FROM cards WHERE id = ?', [str(card.parent_id)]);
+        if (parent && parent.archived_at != null && parent.deleted_at == null) targetId = str(card.parent_id);
+      }
+      const ids = all(
+        db,
+        'SELECT id FROM cards WHERE (id = ? OR parent_id = ?) AND archived_at IS NOT NULL AND deleted_at IS NULL ORDER BY (id = ?) DESC, archived_at',
+        [targetId, targetId, targetId],
+      ).map((r) => str(r.id));
+      for (const id of ids) {
+        const row = one(db, 'SELECT workflow_id FROM cards WHERE id = ?', [id]);
+        const first = one(db, 'SELECT id FROM columns WHERE workflow_id = ? ORDER BY position LIMIT 1', [str(row?.workflow_id)]);
+        if (!first) throw new Error('Workflow sem colunas');
+        const t = now();
+        run(db, 'UPDATE cards SET archived_at = NULL, yolo = 0, updated_at = ? WHERE id = ?', [t, id]);
+        this.moveInner(id, str(first.id), Number.MAX_SAFE_INTEGER);
+        // a primeira coluna pode ter a IA ativa (entrada "Pronto"): restaurado volta inativo, como a pessoa espera
+        run(db, "UPDATE cards SET status = NULL, status_reason = '', status_at = ?, status_by = '' WHERE id = ?", [t, id]);
+      }
+      return targetId;
+    });
+  }
+
   setStatus(cardId: string, status: CardStatus | null, reason: string, by: string): void {
     run(this.db, 'UPDATE cards SET status = ?, status_reason = ?, status_at = ?, status_by = ? WHERE id = ?', [
       status,
@@ -266,6 +315,11 @@ export class CardRepo {
   }
 
   /** Guarda de qual branch a da história partiu (vazio = a principal). */
+  /** Marca a história como derivada de outra: a branch dela vai partir da branch da origem. */
+  setDerivedFrom(cardId: string, fromId: string): void {
+    run(this.db, 'UPDATE cards SET derived_from = ?, updated_at = ? WHERE id = ?', [fromId, now(), cardId]);
+  }
+
   setBaseBranch(cardId: string, base: string): void {
     run(this.db, 'UPDATE cards SET base_branch = ? WHERE id = ?', [base, cardId]);
   }
@@ -279,9 +333,54 @@ export class CardRepo {
     run(this.db, 'UPDATE cards SET exec_profile = ? WHERE id = ?', [profileId || null, cardId]);
   }
 
-  /** Liga ou desliga o modo autônomo da história. */
-  setYolo(storyId: string, enabled: boolean): void {
-    run(this.db, 'UPDATE cards SET yolo = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, now(), storyId]);
+  /**
+   * Liga ou desliga o modo autônomo da história. `until` é a coluna em que o modo para ('' = até a
+   * última coluna da IA); desligar limpa a escolha.
+   */
+  setYolo(storyId: string, enabled: boolean, until = ''): void {
+    run(this.db, 'UPDATE cards SET yolo = ?, yolo_until = ?, updated_at = ? WHERE id = ?', [
+      enabled ? 1 : 0,
+      enabled ? until : '',
+      now(),
+      storyId,
+    ]);
+  }
+
+  /** A história do card (ele mesmo, ou o pai numa sub-tarefa) está marcada como do núcleo no campo Criticidade. */
+  private isCore(cardId: string): boolean {
+    const row = one(
+      this.db,
+      `SELECT fv.value_json FROM cards c
+       JOIN field_values fv ON fv.card_id = COALESCE(c.parent_id, c.id)
+       JOIN field_defs f ON f.id = fv.field_id
+       WHERE c.id = ? AND lower(f.name) = lower(?)`,
+      [cardId, CRITICALITY_FIELD],
+    );
+    if (!row) return false;
+    try {
+      const value: unknown = JSON.parse(str(row.value_json));
+      return typeof value === 'string' && norm(value) === norm(CORE);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * O modo autônomo chegou à coluna escolhida e se desliga, mas a história guarda até onde foi: a
+   * entrega dela continua na pilha de pull requests do modo (ver `stackBaseOf`).
+   */
+  stopYolo(storyId: string): void {
+    run(this.db, 'UPDATE cards SET yolo = 0, updated_at = ? WHERE id = ?', [now(), storyId]);
+  }
+
+  /** O modo autônomo da história do card (ele mesmo, ou o pai numa sub-tarefa) e a coluna em que ele para ('' = no fim). */
+  private yoloOf(cardId: string): { yolo: boolean; until: string } {
+    const row = one(
+      this.db,
+      'SELECT COALESCE(p.yolo, c.yolo) AS yolo, COALESCE(p.yolo_until, c.yolo_until) AS until FROM cards c LEFT JOIN cards p ON p.id = c.parent_id WHERE c.id = ?',
+      [cardId],
+    );
+    return { yolo: num(row?.yolo) === 1, until: str(row?.until) };
   }
 
   /**

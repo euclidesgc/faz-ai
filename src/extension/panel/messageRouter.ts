@@ -7,14 +7,19 @@ import { newId } from '../db/ids';
 import type { ImportSummary } from '../../shared/backup';
 import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
-import type { AiTool } from '../../shared/harness';
+import type { AiTool, PluginAction } from '../../shared/harness';
+import type { ClaudeCli } from '../plugins';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import { agentProfiles } from '../../shared/execution';
+import { columnsOf } from '../../shared/selectors';
 import type { AttachmentStore } from '../attachments';
 import type { HarnessStore } from '../harness';
 import { headlessUnsupported } from '../headless';
+import { boardServerFootprint } from '../mcp/footprint';
 import type { RunResolver } from '../log/eventLog';
 import { getMetrics, getPanelMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
+import { cardUsage } from '../log/cardUsage';
+import type { CardUsage } from '../../shared/cardUsage';
 import type { MetricsPanelQuery, MetricsPanelResult } from '../../shared/metrics';
 import { BoardContext, type Actor, type Handler, type HandlerMap, type MessageType, type RouterOptions } from './handlers/context';
 import { boardBackupHandlers } from './handlers/boardBackup';
@@ -38,8 +43,6 @@ export interface Origin {
 export interface EnvironmentHooks {
   check(): void;
   seen(): void;
-  /** roda o "Instalar tudo" de um nível; ausente onde não há terminal para rodar (fica o script para copiar) */
-  install?(level: 'required' | 'recommended'): void;
   /** grava o caminho completo dos MCPs que o editor não acha, e confere de novo */
   pinMcp?(): void;
 }
@@ -57,6 +60,7 @@ const bridgeOnly = {
   'ui.fixProjectMcp': viaBridge,
   'ui.reloadWindow': viaBridge,
   'ui.openEditorMcp': viaBridge,
+  'ui.openTerminal': viaBridge,
   'ui.openInBrowser': viaBridge,
   'ui.openIdeSettings': viaBridge,
   'ai.run': viaBridge,
@@ -70,12 +74,14 @@ const bridgeOnly = {
   'requirements.check': viaBridge,
   'environment.check': viaBridge,
   'environment.seen': viaBridge,
-  'environment.install': viaBridge,
   'environment.pinMcp': viaBridge,
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
   'harness.item.open': viaBridge,
+  'harness.file.read': viaBridge,
+  'harness.plugin.apply': viaBridge,
+  'harness.file.write': viaBridge,
   'harness.item.create': viaBridge,
   'harness.skill.file.create': viaBridge,
   'harness.skill.file.open': viaBridge,
@@ -87,6 +93,7 @@ const bridgeOnly = {
   'attachment.saveAs': viaBridge,
   // ler o log não muda o board: a `HostBridge` responde por `panelMetrics`, sem passar por `handle`
   'metrics.query': viaBridge,
+  'card.usage.query': viaBridge,
   'backup.export': viaBridge,
   'backup.import.pick': viaBridge,
   'backup.import.cancel': viaBridge,
@@ -118,11 +125,11 @@ export class MessageRouter {
   private requirements: BoardRequirement[] = [];
   private requirementsCheckedAt = 0;
   private requirementsCheck: (() => void) | null = null;
+  private authExpired: AiTool | null = null;
+  private openTerminalHook: ((command: string) => void) | null = null;
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
   private environmentHooks: EnvironmentHooks | null = null;
-  private environmentInstall: BoardState['environmentInstall'] = null;
-  private environmentInstallResult: BoardState['environmentInstallResult'] = null;
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
 
@@ -169,6 +176,7 @@ export class MessageRouter {
       // os agentes do board são os arquivos marcados: derivados aqui, nunca gravados
       board: { ...s.board, execProfiles: agentProfiles(current.agents, s.harnessSelection, s.board.runner.defaultAgent) },
       harness: current,
+      boardServer: boardServerFootprint(),
       aiRuns: this.aiRuns,
       aiActivity: this.aiActivity,
       heartbeatNextAt: this.heartbeatNextAt,
@@ -177,10 +185,9 @@ export class MessageRouter {
       aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission),
       requirements: this.requirements,
       requirementsCheckedAt: this.requirementsCheckedAt,
+      authExpired: this.authExpired,
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
-      environmentInstall: this.environmentInstall,
-      environmentInstallResult: this.environmentInstallResult,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
     };
   }
@@ -216,8 +223,8 @@ export class MessageRouter {
    * avisa os webviews. Chamado pelo runner ao fim de uma execução, quando o pull request já estava
    * registrado antes do card chegar na última coluna da IA.
    */
-  settleDelivery(storyId: string, author: string): boolean {
-    const delivered = settleDelivery(this.ctx, storyId, author);
+  settleDelivery(storyId: string): boolean {
+    const delivered = settleDelivery(this.ctx, storyId);
     if (delivered) this.changed();
     return delivered;
   }
@@ -248,6 +255,27 @@ export class MessageRouter {
     this.requirementsCheck?.();
   }
 
+  /** Quem abre um terminal do editor e roda o comando pedido (o login de uma CLI); a pessoa conclui o login. */
+  onOpenTerminal(fn: (command: string) => void): void {
+    this.openTerminalHook = fn;
+  }
+
+  openTerminal(command: string): void {
+    this.openTerminalHook?.(command);
+  }
+
+  /**
+   * A ferramenta de IA falhou por login vencido nesta execução (RF6), ou o probe confirmou que voltou;
+   * null quando não há aviso reativo ativo. Devolve se mudou, para quem chama decidir se loga a transição
+   * (o log não é responsabilidade do `MessageRouter`, como nas outras operações).
+   */
+  setAuthExpired(tool: AiTool | null): boolean {
+    if (this.authExpired === tool) return false;
+    this.authExpired = tool;
+    this.notify();
+    return true;
+  }
+
   /** O resultado do Diagnóstico do ambiente (informado pelo host, que confere). */
   setEnvironment(report: EnvironmentReport): void {
     this.environment = report;
@@ -267,25 +295,8 @@ export class MessageRouter {
     this.environmentHooks?.check();
   }
 
-  /** "Instalar tudo" de um nível: quem roda é o host (num terminal do editor). */
-  installEnvironment(level: 'required' | 'recommended'): void {
-    this.environmentHooks?.install?.(level);
-  }
-
   pinEnvironmentMcp(): void {
     this.environmentHooks?.pinMcp?.();
-  }
-
-  /** O "Instalar tudo" começou ou terminou (informado pelo host). */
-  setEnvironmentInstall(state: BoardState['environmentInstall']): void {
-    this.environmentInstall = state;
-    this.notify();
-  }
-
-  /** O resultado do último "Instalar tudo" (informado pelo host ao terminar). */
-  setEnvironmentInstallResult(result: BoardState['environmentInstallResult']): void {
-    this.environmentInstallResult = result;
-    this.notify();
   }
 
   /** A tela abriu sozinha uma vez: nas próximas aberturas, só pelo botão. */
@@ -389,6 +400,17 @@ export class MessageRouter {
     return getPanelMetrics(this.ctx.dbHandle.db, this.ctx.boardId, query);
   }
 
+  /** O que o card gastou até agora, por fase (e, numa história, as sub-tarefas), lido do log das execuções. */
+  cardUsage(cardId: string): CardUsage {
+    const s = this.ctx.boards.snapshot(this.ctx.boardId, this.ctx.opts.author);
+    const card = s.cards.find((c) => c.id === cardId);
+    if (!card) throw new Error('Card não encontrado.');
+    const phases = columnsOf(s, card.workflowId).map((c) => c.name);
+    // o que foi gasto não some: as sub-tarefas na lixeira também contam
+    const subtasks = s.cards.filter((c) => c.parentId === card.id).map((c) => c.number);
+    return cardUsage(this.ctx.dbHandle.db, this.ctx.boardId, card.number, phases, subtasks);
+  }
+
   /** Copia arquivos do disco como anexos do card (usado pelo seletor de arquivos). */
   addAttachmentFiles(cardId: string, paths: string[], artifact = false, ctx: Origin = {}): BoardState {
     const actor = this.actorOf(ctx);
@@ -405,6 +427,18 @@ export class MessageRouter {
   /** Relê regras e skills do disco (chamado quando os arquivos mudam por fora) e avisa os webviews se algo mudou. */
   refreshHarness(): void {
     if (this.ctx.harness.refresh()) this.changed();
+  }
+
+  /** Liga a CLI do Claude Code, que diz quais plugins estão instalados e os desinstala, desativa e ativa. */
+  setClaudeCli(cli: ClaudeCli | null): void {
+    this.ctx.harness.setClaudeCli(cli, () => this.changed());
+  }
+
+  /** Desinstala, desativa ou ativa plugins e devolve o aviso para a pessoa. */
+  async applyPlugins(tool: AiTool, action: PluginAction, ids: string[]): Promise<string> {
+    const notice = await this.ctx.harness.applyPlugins(tool, action, ids);
+    this.changed();
+    return notice;
   }
 
   /** Guarda a origem de skills já disponível numa pasta, para a pessoa escolher o que instalar. */
@@ -434,6 +468,17 @@ export class MessageRouter {
   /** Caminho de um arquivo de apoio que a varredura listou. */
   skillFilePath(tool: AiTool, skillMd: string, rel: string): string {
     return this.ctx.harness.skillFilePath(tool, skillMd, rel);
+  }
+
+  /** Conteúdo de um arquivo do harness para o editor do board, e se ele pode ser alterado. */
+  readHarnessFile(file: string): { content: string; readonly: boolean } {
+    return this.ctx.harness.readFile(file);
+  }
+
+  /** Grava um arquivo do harness editado no board e relê a varredura. */
+  writeHarnessFile(file: string, content: string): void {
+    this.ctx.harness.writeFile(file, content);
+    this.changed();
   }
 
   /** Cria um item do harness e devolve o caminho do arquivo, para abrir no editor. */

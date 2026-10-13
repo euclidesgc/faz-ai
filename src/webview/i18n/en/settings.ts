@@ -1,7 +1,6 @@
 export const settings: Record<string, string> = {
   'Workflows e colunas': 'Workflows and columns',
   'Tipos de card': 'Card types',
-  Campos: 'Fields',
   'Regras do board': 'Board rules',
   'Harness de IA': 'AI harness',
   Agentes: 'Agents',
@@ -194,20 +193,17 @@ export const settings: Record<string, string> = {
   'Relativa à pasta do projeto; <code>{repo}</code> é o nome dela. O padrão (<code>{padrao}</code>) fica ao lado do projeto, fora do repositório. Cada worktree é uma cópia de trabalho: dependências (ex.: <code>node_modules</code>) precisam ser instaladas nela.':
     'Relative to the project folder; <code>{repo}</code> is its name. The default (<code>{padrao}</code>) sits next to the project, outside the repository. Each worktree is a working copy: dependencies (e.g. <code>node_modules</code>) need to be installed in it.',
   'Pull request e merge': 'Pull request and merge',
-  'Na Homologação a IA abre o pull request da história e o registra no card. Com o merge automático ligado, quando você aprova uma história que está na última coluna antes da conclusão, o board faz o merge do PR e só então conclui o card. Se o merge falhar (conflito, checks obrigatórios, sem acesso), o card fica Bloqueado com o erro.':
-    "In Staging the AI opens the story's pull request and records it on the card. With auto-merge on, when you approve a story that is in the last column before done, the board merges the PR and only then completes the card. If the merge fails (conflict, required checks, no access), the card is left Blocked with the error.",
+  'Na Homologação a IA abre o pull request da história e o registra no card. Com o merge automático ligado, quando você aprova uma história que está na última coluna antes da conclusão, o board faz o merge do PR e só então conclui o card. Se o merge falhar (conflito, checks obrigatórios, sem acesso), o card fica Bloqueado com o erro. O merge feito fora do board também conclui a história: a cada rodada do heartbeat, o board confere o pull request das histórias entregues.':
+    "In Staging the AI opens the story's pull request and records it on the card. With auto-merge on, when you approve a story that is in the last column before done, the board merges the PR and only then completes the card. If the merge fails (conflict, required checks, no access), the card is left Blocked with the error. A merge done outside the board also completes the story: on every heartbeat round, the board checks the pull request of the delivered stories.",
   'Fazer o merge do PR ao aprovar a homologação': 'Merge the PR when approving the staging review',
   'O merge é feito no GitHub com a sua conta (comando <code>gh</code>) e não pode ser desfeito pelo board.':
     'The merge is done on GitHub with your account (<code>gh</code> command) and cannot be undone by the board.',
   'Tipo de merge': 'Merge type',
+  'Registros de decisão': 'Decision records',
+  'Pasta do repositório onde a Homologação grava o registro de decisão de cada história (ex.: <code>docs/decisoes</code>), a partir da Spec aprovada, e o leva no pull request. Vazio = desligado.':
+    "Repository folder where Homologação writes each story's decision record (for example <code>docs/decisoes</code>), from the approved Spec, and takes it in the pull request. Empty = off.",
   'Requer o GitHub CLI (<code>gh</code>) instalado e autenticado. No modo worktree, a pasta de trabalho da história é removida depois do merge; a branch fica.':
     "Requires the GitHub CLI (<code>gh</code>) installed and authenticated. In worktree mode, the story's working folder is removed after the merge; the branch stays.",
-  'Concluir a história quando o pull request for mergeado': 'Complete the story when the pull request is merged',
-  'O board consulta o GitHub periodicamente para detectar quando o pull request foi mergeado e conclui a história automaticamente. Essa opção apenas lê o estado — o merge continua sendo feito por você.':
-    'The board checks GitHub periodically to detect when the pull request is merged and completes the story automatically. This option only reads the state — you still do the merge.',
-  'Verificar a cada (minutos)': 'Check every (minutes)',
-  'Intervalo entre as verificações de merge no GitHub. Mínimo {min} minutos, máximo {max} minutos.':
-    'Interval between merge checks on GitHub. Minimum {min} minutes, maximum {max} minutes.',
   'Worktree por história': 'Worktree per story',
   'Branch na própria pasta': 'Branch in the project folder',
   Desligado: 'Off',
@@ -287,17 +283,17 @@ export const settings: Record<string, string> = {
   'reserva: {model}': 'fallback: {model}',
   'Campos personalizados': 'Custom fields',
   'Novo campo': 'New field',
-  'Campos guardam informações extras do card, como prazo, pontos ou tags. Todos aparecem no card aberto; em "No board" você escolhe se e como cada um aparece também no card do board.':
-    'Fields hold extra information about the card, such as deadline, points or tags. All of them show on the open card; in "On the board" you choose whether and how each one also shows on the board card.',
+  'Campos guardam informações extras do card, como prazo, pontos ou cliente. Todos aparecem no card aberto; em "No board" você escolhe se e como cada um aparece também no card do board.':
+    'Fields hold extra information about the card, such as deadline, points or client. All of them show on the open card; in "On the board" you choose whether and how each one also shows on the board card.',
+  'Os campos do board ({fields}) não aparecem aqui: as regras e a IA dependem deles.':
+    "The board fields ({fields}) don't show here: the rules and the AI depend on them.",
+  'Nenhum campo personalizado. Use "Novo campo" para criar um.': 'No custom fields. Use "New field" to create one.',
   'Campo {name}': 'Field {name}',
   Tipo: 'Type',
   'Apagar o campo': 'Delete the field',
   'Apagar o campo "{name}"?': 'Delete the field "{name}"?',
   'Os valores deste campo em todos os cards serão apagados.': 'The values of this field on all cards will be deleted.',
   Opções: 'Options',
-  'As opções acompanham as skills do projeto e as instaladas (Configurações > Harness de IA).':
-    'The options follow the project skills and the installed ones (Settings > AI harness).',
-  '{count} skills disponíveis': '{count} skills available',
   'Campo novo': 'New field',
   'Ex.: Prazo, Pontos, Cliente': 'E.g. Deadline, Points, Client',
   'O tipo não muda depois de criado.': "The type can't be changed after it's created.",
@@ -348,6 +344,12 @@ export const settings: Record<string, string> = {
   'Criar tipo': 'Create type',
   'Restaurar aparência padrão': 'Restore default appearance',
   'Restaurar regras padrão': 'Restore default rules',
+  'Áreas críticas (núcleo)': 'Critical areas (core)',
+  'Áreas críticas, um caminho por linha': 'Critical areas, one path per line',
+  'uma história mexe nestes caminhos: a IA marca o campo "Criticidade" dela como Núcleo na Spec ou no Plan, e você também pode marcar à mão':
+    'a story touches these paths: the AI marks its "Criticidade" (criticality) field as Núcleo (core) in Spec or Plan, and you can also mark it by hand',
+  'a história do núcleo espera a sua aprovação nas colunas que exigem aprovação, mesmo no modo autônomo; na Revisão e no pull request, os arquivos do núcleo vêm à parte e são revisados com mais rigor.':
+    'a core story waits for your approval in the columns that require approval, even in autonomous mode; in Revisão (review) and in the pull request, core files come apart and are reviewed more strictly.',
   'Histórias em paralelo': 'Stories in parallel',
   'Não foi possível copiar. Selecione o nome e copie com o teclado:': 'Could not copy. Select the name and copy it with the keyboard:',
   'Histórias em paralelo: disponíveis neste modo. Cada história tem a sua pasta, então o heartbeat pode tocar várias ao mesmo tempo (ligue "Tocar histórias em paralelo", na execução pela IA). O custo: cada worktree é mais uma cópia dos arquivos do projeto em disco e precisa das próprias dependências instaladas; e cada história em paralelo é mais um processo de IA, com os testes e builds dela, usando memória e processador ao mesmo tempo.':
@@ -363,8 +365,6 @@ export const settings: Record<string, string> = {
   'em Harness de IA': 'in AI harness',
   'Mostrando os modelos do {tool}': 'Showing the {tool} models',
   'Mostrando os agentes do {tool}': 'Showing the {tool} agents',
-  'Mostrando as rules do {tool}': 'Showing the {tool} rules',
-  'Mostrando as skills do {tool}': 'Showing the {tool} skills',
   'trocar ferramenta': 'switch tool',
   'Trocar a ferramenta de IA, em Harness de IA': 'Switch the AI tool, in AI harness',
   'Preencher o modelo sugerido automaticamente': 'Fill in the suggested model automatically',

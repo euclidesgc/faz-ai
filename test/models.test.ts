@@ -87,6 +87,8 @@ describe('suggestModelRule e suggestModel', () => {
     mergeCommit: '',
     execProfile: null,
     yolo: false,
+    yoloUntil: null,
+    derivedFrom: null,
     ...over,
   });
 
@@ -129,6 +131,7 @@ describe('suggestModelRule e suggestModel', () => {
     currentUser: 'a',
     harness: EMPTY_HARNESS,
     harnessSelection: [],
+    boardServer: null,
     pendingUpgrade: [],
     chat: EMPTY_CHAT,
     aiRuns: [],
@@ -140,9 +143,8 @@ describe('suggestModelRule e suggestModel', () => {
     requirementsCheckedAt: 0,
     environment: null,
     environmentFirstRun: false,
-    environmentInstall: null,
-    environmentInstallResult: null,
     harnessInstall: null,
+    authExpired: null,
   });
 
   const rule = (over: Partial<ModelRule> = {}): ModelRule => ({

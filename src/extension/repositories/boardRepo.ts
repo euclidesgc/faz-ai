@@ -278,7 +278,6 @@ export class BoardRepo {
       position: num(r.position),
       kind: str(r.kind) as Workflow['kind'],
       collapsed: bool(r.collapsed),
-      archiveCollapsed: bool(r.archive_collapsed),
     }));
 
     const columns: Column[] = all(
@@ -337,6 +336,8 @@ export class BoardRepo {
       mergeCommit: str(r.merge_commit),
       execProfile: r.exec_profile == null ? null : str(r.exec_profile),
       yolo: num(r.yolo) === 1,
+      yoloUntil: str(r.yolo_until) || null,
+      derivedFrom: str(r.derived_from) || null,
     }));
 
     const fieldDefs: FieldDef[] = all(db, 'SELECT * FROM field_defs WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
@@ -418,6 +419,7 @@ export class BoardRepo {
       currentUser,
       harness: EMPTY_HARNESS,
       harnessSelection: this.selection(boardId),
+      boardServer: null,
       pendingUpgrade: pendingUpgrade(db, boardId),
       chat: EMPTY_CHAT,
       aiRuns: [],
@@ -427,10 +429,9 @@ export class BoardRepo {
       aiRunUnsupported: null,
       requirements: [],
       requirementsCheckedAt: 0,
+      authExpired: null,
       environment: null,
       environmentFirstRun: false,
-      environmentInstall: null,
-      environmentInstallResult: null,
       harnessInstall: null,
     };
   }

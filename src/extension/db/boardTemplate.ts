@@ -2,11 +2,13 @@ import type { Database } from 'sql.js';
 import { norm } from '../../shared/filters';
 import type { ColumnCategory, WorkflowKind } from '../../shared/model';
 import { newId } from './ids';
+import { CRITICALITY_FIELD, CRITICALITY_LEVELS } from '../../shared/critical';
 import {
   HOMOLOGATION_INSTRUCTION_V2,
   HOMOLOGATION_INSTRUCTION_V4,
   IMPLEMENTATION_INSTRUCTION_V2,
   PHASE_DEFAULTS,
+  PHASE_HISTORY,
 } from '../../shared/phaseDefaults';
 import { all, bool, num, one, run, str, transaction } from './query';
 
@@ -14,7 +16,7 @@ import { all, bool, num, one, run, str, transaction } from './query';
  * Board padrão. Cada mudança no padrão sobe a versão; boards criados antes são atualizados no
  * lugar (com confirmação), sem recriar nada: os cards continuam na coluna em que estavam.
  */
-export const BOARD_TEMPLATE_VERSION = 5;
+export const BOARD_TEMPLATE_VERSION = 8;
 
 export interface TemplateColumn {
   name: string;
@@ -33,6 +35,7 @@ export const BOARD_TEMPLATE: Record<WorkflowKind, TemplateColumn[]> = {
     { name: 'Spec', category: 'open', aiActive: true, requiresApproval: true },
     { name: 'Plan', category: 'open', aiActive: true, requiresApproval: true },
     { name: 'Implementação', category: 'open', aiActive: true },
+    { name: 'Revisão', category: 'open', aiActive: true },
     { name: 'Homologação', category: 'open', aiActive: true, requiresApproval: true },
     { name: 'Concluído', category: 'done' },
     { name: 'Cancelado', category: 'cancelled' },
@@ -196,6 +199,119 @@ function steps(db: Database, boardId: string): Step[] {
           run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [PHASE_DEFAULTS['Homologação']!.instruction, str(col.id)]),
       });
     }
+  }
+  if (version < 7) out.push(...reviewSteps(db, boardId));
+  if (version < 8) out.push(...criticalitySteps(db, boardId));
+  if (version < BOARD_TEMPLATE_VERSION) out.push(...phaseTextSteps(db, boardId));
+  return out;
+}
+
+/**
+ * A coluna Revisão entre a Implementação e a Homologação, e a opção dela no campo "Fase". As posições e
+ * as opções são lidas na hora de aplicar: um passo anterior da mesma atualização pode ter mexido nelas.
+ */
+function reviewSteps(db: Database, boardId: string): Step[] {
+  const out: Step[] = [];
+  const parent = one(db, "SELECT id FROM workflows WHERE board_id = ? AND kind = 'parent' ORDER BY position LIMIT 1", [boardId]);
+  const wf = parent ? str(parent.id) : null;
+  const named = (name: string) =>
+    wf
+      ? all(db, 'SELECT id, name, position FROM columns WHERE workflow_id = ?', [wf]).find((c) => norm(str(c.name)) === norm(name))
+      : undefined;
+  // sem a Implementação nem a Homologação (renomeadas), o board não diz onde a Revisão caberia: não oferece
+  const anchored = !!named('Implementação') || !!named('Homologação');
+  const insert = !!wf && !named('Revisão') && anchored;
+  if (insert) {
+    out.push({
+      description:
+        'Nova coluna "Revisão" entre a Implementação e a Homologação: a IA roda as checagens do projeto e revisa o código antes do pull request, corrige o que tem diretriz e pergunta o que é ambíguo.',
+      apply: () => {
+        const after = named('Implementação');
+        const before = named('Homologação');
+        const firstTerminal = one(db, "SELECT MIN(position) AS p FROM columns WHERE workflow_id = ? AND category != 'open'", [wf])?.p;
+        const end = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM columns WHERE workflow_id = ?', [wf])?.p);
+        const position = after ? num(after.position) + 1 : before ? num(before.position) : firstTerminal == null ? end : num(firstTerminal);
+        insertColumn(
+          db,
+          wf!,
+          BOARD_TEMPLATE.parent.find((c) => c.name === 'Revisão')!,
+          position,
+        );
+      },
+    });
+  }
+  const fase = () =>
+    one(db, "SELECT id, options_json FROM field_defs WHERE board_id = ? AND lower(name) = 'fase' AND kind = 'select'", [boardId]);
+  const options = (row: ReturnType<typeof fase>) => JSON.parse(str(row?.options_json) || '[]') as string[];
+  const field = fase();
+  // a opção só faz sentido com a coluna: a que já existe ou a que este passo cria
+  if (field && (insert || !!named('Revisão')) && !options(field).some((o) => norm(o) === norm('Revisão'))) {
+    out.push({
+      description: 'Campo "Fase" das sub-tarefas: nova opção Revisão.',
+      apply: () => {
+        const now = fase()!;
+        const list = options(now);
+        if (list.some((o) => norm(o) === norm('Revisão'))) return;
+        const impl = list.findIndex((o) => norm(o) === norm('Implementação'));
+        const homolog = list.findIndex((o) => norm(o) === norm('Homologação'));
+        const at = impl >= 0 ? impl + 1 : homolog >= 0 ? homolog : list.length;
+        list.splice(at, 0, 'Revisão');
+        run(db, 'UPDATE field_defs SET options_json = ? WHERE id = ?', [JSON.stringify(list), str(now.id)]);
+      },
+    });
+  }
+  return out;
+}
+
+/** O campo Criticidade das histórias, quando o board ainda não tem um campo com esse nome. */
+function criticalitySteps(db: Database, boardId: string): Step[] {
+  if (one(db, 'SELECT id FROM field_defs WHERE board_id = ? AND lower(name) = lower(?)', [boardId, CRITICALITY_FIELD])) return [];
+  return [
+    {
+      description: `Novo campo "${CRITICALITY_FIELD}" das histórias (Núcleo ou Periferia): a história do núcleo espera a sua aprovação nas fases que pedem aprovação, mesmo no modo autônomo.`,
+      apply: () => {
+        const types = all(
+          db,
+          "SELECT t.id FROM card_types t JOIN workflows w ON w.id = t.default_workflow_id WHERE t.board_id = ? AND w.kind = 'parent' ORDER BY t.rowid",
+          [boardId],
+        ).map((r) => str(r.id));
+        const position = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM field_defs WHERE board_id = ?', [boardId])?.p);
+        run(
+          db,
+          'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
+          [newId(), boardId, CRITICALITY_FIELD, 'select', JSON.stringify(CRITICALITY_LEVELS), JSON.stringify(types), 'badge', position],
+        );
+      },
+    },
+  ];
+}
+
+/**
+ * As colunas cuja instrução ou modelo do documento ainda é um texto padrão anterior (PHASE_HISTORY)
+ * recebem o atual. O que a pessoa personalizou não casa com nenhum texto antigo e fica como está.
+ */
+function phaseTextSteps(db: Database, boardId: string): Step[] {
+  const cols = all(
+    db,
+    'SELECT c.id, c.name, c.ai_instruction, c.artifact_template FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ?',
+    [boardId],
+  );
+  const out: Step[] = [];
+  for (const col of cols) {
+    const name = Object.keys(PHASE_HISTORY).find((n) => norm(n) === norm(str(col.name)));
+    const phase = name ? PHASE_DEFAULTS[name] : undefined;
+    if (!name || !phase) continue;
+    const history = PHASE_HISTORY[name]!;
+    const instruction = history.instructions.includes(str(col.ai_instruction));
+    const template = history.templates.includes(str(col.artifact_template));
+    if (!instruction && !template) continue;
+    out.push({
+      description: `Coluna "${str(col.name)}": ${history.change}.`,
+      apply: () => {
+        if (instruction) run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [phase.instruction, str(col.id)]);
+        if (template) run(db, 'UPDATE columns SET artifact_template = ? WHERE id = ?', [phase.artifactTemplate, str(col.id)]);
+      },
+    });
   }
   return out;
 }

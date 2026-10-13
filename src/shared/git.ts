@@ -11,10 +11,11 @@ export interface GitConfig {
   /** ao aprovar a história na última coluna antes da conclusão, faz o merge do PR dela e conclui o card */
   autoMerge: boolean;
   mergeMethod: MergeMethod;
-  /** conclui a história sozinho quando o pull request dela é mergeado */
-  watchMerges: boolean;
-  /** intervalo entre as consultas ao estado dos pull requests, em minutos */
-  watchMergeMinutes: number;
+  /**
+   * pasta do repositório (relativa à do projeto) onde a Homologação grava o registro de decisão da
+   * história, a partir da Spec aprovada, e o leva no pull request; '' = desligado
+   */
+  decisionRecords: string;
 }
 
 export type MergeMethod = 'squash' | 'merge' | 'rebase';
@@ -23,8 +24,6 @@ export const MERGE_METHODS: { value: MergeMethod; label: string }[] = [
   { value: 'merge', label: 'Merge commit' },
   { value: 'rebase', label: 'Rebase' },
 ];
-
-export const MERGE_WATCH_RANGE = { min: 5, max: 1440 };
 
 /** `package.nls.json` e `package.nls.pt-br.json` repetem estas `hint`s nas chaves `config.git.mode.*`: mantenha em sincronia. */
 export const WORKSPACE_MODES: { value: WorkspaceMode; label: string; hint: string }[] = [
@@ -47,9 +46,21 @@ export const DEFAULT_GIT: GitConfig = {
   worktreeDir: '../{repo}.worktrees',
   autoMerge: false,
   mergeMethod: 'squash',
-  watchMerges: true,
-  watchMergeMinutes: 15,
+  decisionRecords: '',
 };
+
+/** A pasta dos registros de decisão, limpa: relativa, com barras normais e sem barra nas pontas; '' quando não vale. */
+export function cleanDecisionDir(v: unknown): string {
+  if (typeof v !== 'string') return '';
+  const dir = v
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\/+/, '')
+    .replace(/^\/+|\/+$/g, '');
+  // fora do repositório não é registro do projeto
+  if (!dir || dir.split('/').includes('..') || /^[a-zA-Z]:/.test(dir)) return '';
+  return dir;
+}
 
 const text = (v: unknown, fallback: string): string => (typeof v === 'string' && v.trim() ? v.trim() : fallback);
 
@@ -63,18 +74,14 @@ export function parseGit(json: string | null | undefined): GitConfig {
     /* inválido: usa os padrões */
   }
   const pattern = text(raw.branchPattern, DEFAULT_GIT.branchPattern);
-  const n = Math.round(Number(raw.watchMergeMinutes));
   return {
     mode: WORKSPACE_MODES.some((m) => m.value === raw.mode) ? (raw.mode as WorkspaceMode) : DEFAULT_GIT.mode,
     // sem o número, duas histórias de mesmo título disputariam a mesma branch
     branchPattern: pattern.includes('{numero}') ? pattern : DEFAULT_GIT.branchPattern,
     worktreeDir: text(raw.worktreeDir, DEFAULT_GIT.worktreeDir),
-    // !== false faz a opção nascer ligada nos boards que já existem, cujo git_json foi gravado antes desta versão (RF13)
     autoMerge: raw.autoMerge === true,
     mergeMethod: MERGE_METHODS.some((m) => m.value === raw.mergeMethod) ? (raw.mergeMethod as MergeMethod) : DEFAULT_GIT.mergeMethod,
-    watchMerges: raw.watchMerges !== false,
-    watchMergeMinutes:
-      Number.isFinite(n) && n > 0 ? Math.min(MERGE_WATCH_RANGE.max, Math.max(MERGE_WATCH_RANGE.min, n)) : DEFAULT_GIT.watchMergeMinutes,
+    decisionRecords: cleanDecisionDir(raw.decisionRecords),
   };
 }
 

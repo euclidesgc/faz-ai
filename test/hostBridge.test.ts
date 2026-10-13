@@ -59,6 +59,134 @@ describe('HostBridge: chat', () => {
   });
 });
 
+describe('HostBridge: harness.file.read / harness.file.write', () => {
+  const result = () => sent.at(-1) as { content?: string; readonly?: boolean; error?: string; ok?: boolean };
+
+  it('lê e grava um arquivo que a varredura listou, e relê o harness', async () => {
+    fs.mkdirSync(path.join(dir, '.claude', 'rules'), { recursive: true });
+    const rule = path.join(dir, '.claude', 'rules', 'estilo.md');
+    fs.writeFileSync(rule, '# Estilo\n');
+    router.refreshHarness();
+    await bridge.handle({ type: 'harness.file.read', requestId: 'r1', path: rule });
+    expect(sent.at(-1)).toEqual({ type: 'harness.file.readResult', requestId: 'r1', content: '# Estilo\n', readonly: false });
+    await bridge.handle({
+      type: 'harness.file.write',
+      requestId: 'w1',
+      path: rule,
+      content: '---\ndescription: Estilo do código\n---\n# Estilo\n',
+    });
+    expect(sent.at(-1)).toEqual({ type: 'harness.file.writeResult', requestId: 'w1', ok: true });
+    expect(fs.readFileSync(rule, 'utf8')).toContain('Estilo do código');
+    const item = router
+      .snapshot()
+      .harness.inventory.flatMap((t) => t.items)
+      .find((i) => i.path === rule);
+    expect(item?.description).toBe('Estilo do código');
+  });
+
+  it('abre também o arquivo que o CLAUDE.md importa com @', async () => {
+    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'Veja @docs/guia.md');
+    fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'docs', 'guia.md'), '# Guia');
+    router.refreshHarness();
+    await bridge.handle({ type: 'harness.file.read', requestId: 'r4', path: path.join(dir, 'docs', 'guia.md') });
+    expect(result()).toMatchObject({ content: '# Guia', readonly: false });
+  });
+
+  it('recusa arquivo fora da varredura, JSON inválido e o ~/.claude.json', async () => {
+    const outside = path.join(dir, 'segredo.txt');
+    fs.writeFileSync(outside, 'x');
+    await bridge.handle({ type: 'harness.file.read', requestId: 'r2', path: outside });
+    expect(result().error).toBe('Arquivo fora do harness.');
+
+    fs.writeFileSync(path.join(dir, '.mcp.json'), '{ "mcpServers": { "a": { "command": "x" } } }');
+    fs.mkdirSync(path.join(dir, 'h'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'h', '.claude.json'), '{ "mcpServers": { "b": { "command": "y" } } }');
+    router.refreshHarness();
+    await bridge.handle({ type: 'harness.file.write', requestId: 'w2', path: path.join(dir, '.mcp.json'), content: '{ quebrado' });
+    expect(result()).toMatchObject({ ok: false });
+    expect(result().error).toMatch(/^JSON inválido, nada foi gravado/);
+    expect(fs.readFileSync(path.join(dir, '.mcp.json'), 'utf8')).toContain('"a"');
+
+    const claudeJson = path.join(dir, 'h', '.claude.json');
+    await bridge.handle({ type: 'harness.file.read', requestId: 'r3', path: claudeJson });
+    expect(result()).toMatchObject({ readonly: true });
+    await bridge.handle({ type: 'harness.file.write', requestId: 'w3', path: claudeJson, content: '{}' });
+    expect(result()).toMatchObject({ ok: false, error: 'Este arquivo não pode ser alterado pelo board.' });
+  });
+});
+
+describe('HostBridge: plugins pela CLI do Claude Code', () => {
+  const plugin = (rel: string, name: string) => {
+    const manifest = path.join(dir, 'h', rel, '.claude-plugin', 'plugin.json');
+    fs.mkdirSync(path.dirname(manifest), { recursive: true });
+    fs.writeFileSync(manifest, JSON.stringify({ name }));
+    return path.join(dir, 'h', rel);
+  };
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it('lista os instalados pela CLI, desativa os marcados e avisa quando terminou', async () => {
+    const synced = plugin('.claude/plugins/synced/org/design~g2', 'design');
+    const cached = plugin('.claude/plugins/cache/loja/fmt/1.0', 'fmt');
+    plugin('.claude/plugins/marketplaces/loja/plugins/catalogo', 'catalogo');
+    const calls: string[][] = [];
+    router.setClaudeCli((args) => {
+      calls.push(args);
+      const stdout =
+        args[1] === 'list'
+          ? JSON.stringify([
+              { id: 'design@synced', scope: 'synced', enabled: true, installPath: synced },
+              { id: 'fmt@loja', scope: 'user', enabled: true, installPath: cached },
+            ])
+          : '{"outcome":"ok","message":"ok"}';
+      return Promise.resolve({ code: 0, stdout, stderr: '' });
+    });
+    await flush();
+    const plugins = () =>
+      router
+        .snapshot()
+        .harness.inventory.find((t) => t.tool === 'claude')!
+        .items.filter((i) => i.kind === 'plugin');
+    expect(plugins().map((p) => [p.name, p.install?.id])).toEqual([
+      ['design', 'design@synced'],
+      ['fmt', 'fmt@loja'],
+    ]);
+
+    await bridge.handle({ type: 'harness.plugin.apply', tool: 'claude', action: 'disable', ids: ['design@synced', 'fmt@loja'] });
+    expect(calls.filter((c) => c[1] === 'disable')).toEqual([
+      ['plugin', 'disable', 'design@synced', '--json'],
+      ['plugin', 'disable', 'fmt@loja', '--json'],
+    ]);
+    expect(sent.slice(-2)).toEqual([
+      {
+        type: 'notice',
+        message:
+          'Plugins desativados: design, fmt. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
+      },
+      { type: 'harness.plugin.done' },
+    ]);
+    // a lista é consultada de novo depois da ação
+    expect(calls.filter((c) => c[1] === 'list').length).toBe(2);
+  });
+
+  it('um plugin sincronizado do claude.ai não é desinstalado, e a tela recebe o erro e o fim', async () => {
+    const synced = plugin('.claude/plugins/synced/org/design', 'design');
+    router.setClaudeCli((args) =>
+      Promise.resolve({
+        code: 0,
+        stdout: args[1] === 'list' ? JSON.stringify([{ id: 'design@synced', scope: 'synced', enabled: true, installPath: synced }]) : '',
+        stderr: '',
+      }),
+    );
+    await flush();
+    await bridge.handle({ type: 'harness.plugin.apply', tool: 'claude', action: 'uninstall', ids: ['design@synced'] });
+    expect(sent.slice(-2)).toEqual([
+      { type: 'harness.plugin.done' },
+      { type: 'error', message: 'Nenhum dos plugins escolhidos aceita essa ação.' },
+    ]);
+  });
+});
+
 describe('HostBridge: attachment.read / attachment.write', () => {
   function createAttachment(content: string, filename = 'nota.txt'): string {
     const snap = router.snapshot();
@@ -266,6 +394,27 @@ describe('HostBridge: metrics.query', () => {
     expect(count('ai_runs')).toBe(runs);
     expect(changes).toBe(0);
     expect(saves).toBe(0);
+  });
+});
+
+describe('HostBridge: card.usage.query', () => {
+  it('responde card.usage.result com o mesmo requestId e o consumo do card, sem mudar o board', async () => {
+    const s = router.snapshot();
+    const story = s.cardTypes.find((t) => s.workflows.find((w) => w.id === t.defaultWorkflowId)?.kind === 'parent')!;
+    const col = s.columns.find((c) => c.workflowId === story.defaultWorkflowId)!;
+    const cardId = router.createCard({ typeId: story.id, columnId: col.id, parentId: null, title: 'Card' });
+    let changes = 0;
+    router.onDidChange(() => void changes++);
+    await bridge.handle({ type: 'card.usage.query', requestId: 'u1', cardId });
+    const msg = sent.at(-1) as Extract<HostToWebview, { type: 'card.usage.result' }>;
+    expect(msg).toMatchObject({ type: 'card.usage.result', requestId: 'u1' });
+    expect(msg.usage).toMatchObject({ phases: [], subtasks: null, total: { runs: 0, tokens: null } });
+    expect(changes).toBe(0);
+  });
+
+  it('card que não existe vira error dentro da resposta', async () => {
+    await bridge.handle({ type: 'card.usage.query', requestId: 'u2', cardId: 'nao-existe' });
+    expect(sent.at(-1)).toEqual({ type: 'card.usage.result', requestId: 'u2', error: 'Card não encontrado.' });
   });
 });
 

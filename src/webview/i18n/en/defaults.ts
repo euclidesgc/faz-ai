@@ -7,6 +7,7 @@ export const defaults: Record<string, string> = {
   'Sub-tarefas': 'Sub-tasks',
   // colunas das histórias (as fases do SDD) e das sub-tarefas
   Implementação: 'Implementation',
+  Revisão: 'Review',
   Homologação: 'Acceptance',
   Concluído: 'Done',
   Cancelado: 'Cancelled',
@@ -21,6 +22,9 @@ export const defaults: Record<string, string> = {
   Fase: 'Phase',
   Modelo: 'Model',
   'Esforço da atividade': 'Task effort',
+  Criticidade: 'Criticality',
+  Núcleo: 'Core',
+  Periferia: 'Periphery',
   // os nomes das regras que "Recriar as regras" monta
   'Esforço da atividade baixo': 'Task effort low',
   'Esforço da atividade médio': 'Task effort medium',

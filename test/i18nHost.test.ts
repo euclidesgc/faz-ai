@@ -6,7 +6,7 @@ import { host } from '../src/webview/i18n/en/host';
 import { THEMES, FONTS } from '../src/shared/appearance';
 import { EXEC_ASPECTS, TOOL_PRESETS, defaultAgent } from '../src/shared/execution';
 import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS, SKILL_MODES } from '../src/shared/harness';
-import { HARNESS_CATALOG, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS } from '../src/shared/harnessCatalog';
+import { HARNESS_CATALOG, HARNESS_GROUPS, HARNESS_NOTES, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS } from '../src/shared/harnessCatalog';
 import { MERGE_METHODS, WORKSPACE_MODES } from '../src/shared/git';
 import { EFFORT_FIELD, EFFORT_LABELS, EFFORT_LEVELS, MODEL_EFFORT_LABEL } from '../src/shared/models';
 import { RUNNER_PERMISSIONS, heartbeatState } from '../src/shared/runner';
@@ -55,6 +55,26 @@ describe('i18n do host: mensagens preenchidas', () => {
       'Model "xyz" is not in the catalog. Available: Opus (claude:opus).',
     ],
     ['O board não tem o campo "Esforço da atividade".', 'The board has no "Esforço da atividade" field.'],
+    ['"Prazo" é o nome de um campo do board; escolha outro nome.', '"Prazo" is the name of a board field; choose another name.'],
+    ['O campo de modelo de IA é só um, o "Modelo" do board.', 'There is only one AI model field, the board\'s "Modelo".'],
+    [
+      'O campo "Fase" é do board e não pode ser apagado: as regras e a IA dependem dele.',
+      'The "Fase" field belongs to the board and cannot be deleted: the rules and the AI depend on it.',
+    ],
+    [
+      'O campo "Tags" é do board e não pode ser renomeado: as regras e a IA o encontram pelo nome.',
+      'The "Tags" field belongs to the board and cannot be renamed: the rules and the AI find it by its name.',
+    ],
+    ['As opções do campo "Skills" são mantidas pelo board.', 'The options of the "Skills" field are kept by the board.'],
+    [
+      'Os tipos de card do campo "Criticidade" são mantidos pelo board.',
+      'The card types of the "Criticidade" field are kept by the board.',
+    ],
+    ['O campo "Fase" é preenchido pelo board e pela IA, não à mão.', 'The "Fase" field is filled in by the board and the AI, not by hand.'],
+    [
+      'O campo "Fase" não tem valor padrão por tipo: o board o preenche em cada card.',
+      'The "Fase" field has no default value per type: the board fills it in on each card.',
+    ],
     ['Pasta não encontrada: /home/ana/skills', 'Folder not found: /home/ana/skills'],
     ['Não foi possível clonar https://github.com/a/b.git: timeout', 'Could not clone https://github.com/a/b.git: timeout'],
     ['Skill não encontrada na origem: revisar', 'Skill not found in the source: revisar'],
@@ -139,6 +159,7 @@ describe('i18n do host: mensagens preenchidas', () => {
         heartbeatMinutes: 60,
         parallel: false,
         parallelStories: 2,
+        autopilotPaused: false,
         defaultAgent: '',
       },
       { offline: true, unsupported: null },
@@ -172,6 +193,9 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
       Object.values(PLUGIN_COMMANDS).flatMap((x) => [x.where, ...x.commands.filter((c) => /dono|termo|endereço|pasta/.test(c))]),
     ],
     ['HARNESS_CATALOG', Object.values(HARNESS_CATALOG).flatMap((list) => list.flatMap((s) => (s.builtin ? [s.builtin] : [])))],
+    ['HARNESS_CATALOG (frases)', Object.values(HARNESS_CATALOG).flatMap((list) => list.flatMap((s) => (s.hint ? [s.hint] : [])))],
+    ['HARNESS_GROUPS', HARNESS_GROUPS.flatMap((x) => [x.label, x.hint])],
+    ['HARNESS_NOTES', Object.values(HARNESS_NOTES).flatMap((list) => list.flatMap((x) => [x.name, x.hint]))],
   ];
 
   it.each(texts)('%s: tudo que a interface mostra tem tradução', (_name, list) => {
@@ -184,7 +208,7 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     expect(t(THEMES[1]!.label)).toBe('Light');
     expect(t(CARD_STATUSES[2]!.label)).toBe('Waiting for answer');
     expect(t(OWNER_LABEL.human)).toBe('with you');
-    expect(t(HARNESS_KINDS[2]!.label)).toBe('Subagents');
+    expect(t(HARNESS_KINDS[3]!.label)).toBe('Subagents');
     expect(t(HARNESS_SCOPES[1]!.label)).toBe('Global');
     expect(t(EXEC_ASPECTS[4]!.label)).toBe('Model and effort');
     expect(t(TOOL_PRESETS[0]!.label)).toBe('Read-only');

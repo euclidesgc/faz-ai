@@ -18,8 +18,25 @@ export function one(db: Database, sql: string, params: SqlValue[] = []): Row | u
   return all(db, sql, params)[0];
 }
 
+/**
+ * Erro do SQLite com o comando que falhou: "FOREIGN KEY constraint failed" sozinho não diz qual
+ * gravação foi recusada. Só o texto do comando entra (encurtado), nunca os valores, que são dados da pessoa.
+ */
+export function withSql(e: unknown, sql: string): Error {
+  const message = e instanceof Error ? e.message : String(e);
+  if (message.includes(' — SQL: ')) return e instanceof Error ? e : new Error(message);
+  const statement = sql.replace(/\s+/g, ' ').trim().slice(0, 160);
+  const error = new Error(`${message} — SQL: ${statement}`);
+  if (e instanceof Error && e.stack) error.stack = `${error.message}\n${e.stack.split('\n').slice(1).join('\n')}`;
+  return error;
+}
+
 export function run(db: Database, sql: string, params: SqlValue[] = []): void {
-  db.run(sql, params);
+  try {
+    db.run(sql, params);
+  } catch (e) {
+    throw withSql(e, sql);
+  }
 }
 
 export function transaction<T>(db: Database, fn: () => T): T {

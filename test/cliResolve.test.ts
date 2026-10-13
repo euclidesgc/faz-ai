@@ -1,8 +1,21 @@
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { commandNotFound, resolveCommand } from '../src/extension/cliResolve';
+
+// as pastas do sistema que a busca também olha (/opt/homebrew/bin, /usr/local/bin) ficam vazias no
+// teste: senão o resultado depende do que está instalado na máquina (um `claude` do Homebrew, por exemplo)
+vi.mock('node:fs', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:fs')>();
+  const system = (file: unknown) => typeof file === 'string' && /^\/(opt\/homebrew|usr\/local)\/bin\//.test(file);
+  const missing = (file: unknown) => Object.assign(new Error(`ENOENT: ${String(file)}`), { code: 'ENOENT' });
+  const statSync = ((file: fs.PathLike, ...rest: unknown[]) => {
+    if (system(file)) throw missing(file);
+    return (real.statSync as (...a: unknown[]) => unknown)(file, ...rest);
+  }) as typeof real.statSync;
+  return { ...real, default: { ...real, statSync }, statSync };
+});
 
 let home: string;
 const exe = (file: string) => {

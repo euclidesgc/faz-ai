@@ -20,6 +20,8 @@ const facts = (over: Partial<CardFacts> & { id: string; number: number }): CardF
   parentId: null,
   prUrl: '',
   branch: '',
+  yolo: false,
+  yoloUntil: '',
   ...over,
 });
 
@@ -425,6 +427,25 @@ describe('eventsFor: pull request, workspace e modo autônomo', () => {
     const events = eventsFor(msg, actor, mapOf(before), mapOf(after), extra);
 
     expect(kinds(events)).toEqual(['comment', 'status_changed', 'yolo_changed']);
+  });
+
+  it('o modo que se desliga sozinho na coluna escolhida gera yolo_changed junto com o pedido de revisão', () => {
+    const msg: WebviewToHost = { type: 'card.status.set', cardId: 'h', status: 'waiting_review', note: 'Spec pronta' };
+    const before = facts({ id: 'h', number: 1, status: 'running', yolo: true, yoloUntil: 'spec' });
+    const after = { ...before, status: 'waiting_review', yolo: false, yoloUntil: '' };
+
+    const events = eventsFor(msg, { author: 'IA', byAi: true }, mapOf(before), mapOf(after), extra);
+
+    expect(kinds(events)).toEqual(['review_requested', 'status_changed', 'yolo_changed']);
+    expect(only(events, 'yolo_changed')).toMatchObject({ fromValue: 'on', toValue: 'off' });
+  });
+
+  it('card.yolo.set com o modo já ligado só muda a parada: um comment, sem yolo_changed', () => {
+    const msg: WebviewToHost = { type: 'card.yolo.set', cardId: 'h', enabled: true, until: 'plan' };
+    const before = facts({ id: 'h', number: 1, yolo: true, yoloUntil: 'spec' });
+
+    expect(kinds(eventsFor(msg, actor, mapOf(before), mapOf({ ...before, yoloUntil: 'plan' }), extra))).toEqual(['comment']);
+    expect(eventsFor(msg, actor, mapOf(before), mapOf(before), extra)).toEqual([]);
   });
 
   it('card.yolo.inherit gera yolo_changed e comment no card novo, com #n da origem em subject', () => {

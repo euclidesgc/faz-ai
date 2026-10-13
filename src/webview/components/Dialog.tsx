@@ -11,7 +11,7 @@ export function Dialog() {
   const [checkboxChecked, setCheckboxChecked] = useState(false);
 
   useEffect(() => {
-    setChoice(dialog?.choices?.options[0]?.value ?? '');
+    setChoice(dialog?.choices?.value ?? dialog?.choices?.options[0]?.value ?? '');
     setCheckboxChecked(false);
   }, [dialog]);
 
@@ -37,7 +37,8 @@ export function Dialog() {
   };
   const confirm = () => {
     ask(null);
-    dialog.onConfirm(dialog.choices ? choice : undefined, checkboxChecked);
+    if (dialog.checkbox) dialog.onConfirm(dialog.choices ? choice : undefined, checkboxChecked);
+    else dialog.onConfirm(dialog.choices ? choice : undefined);
   };
 
   return (

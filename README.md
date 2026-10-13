@@ -61,15 +61,17 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    própria ferramenta), abra a pasta do seu projeto e clique no ícone **Faz AI** na barra lateral.
    Cada pasta tem o seu board, já com as fases do fluxo.
 2. **Conecte a IA ao board.** Em **Configurações → Harness de IA**, escolha a ferramenta do projeto
-   (Claude Code ou Cursor). Na aba **Tudo que a ferramenta
-   carrega**, na ferramenta, clique em **Instalar (padrão da ferramenta)** na seção **Servidores
-   MCP** e de novo na seção **Skills**, para a skill do fluxo, que ensina a IA a conduzir as fases.
+   (Claude Code ou Cursor). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
+   grupo **Servidores MCP** e de novo no grupo **Skills**, para a skill do fluxo, que ensina a IA a
+   conduzir as fases.
 3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
    exemplo, "Login com Google") e dê Enter. Duplo clique abre o card: descreva o que você quer, em
    Markdown, e, se quiser, escolha o modelo da IA e as skills que ela deve ler.
 4. **Deixe a IA começar.** Arraste o card para **Discovery** e clique em **Trabalhar na fase** no card. A IA
    lê o card pelo board, analisa o problema e conversa com você na aba **Conversa**. Quando termina,
-   o status muda para **Aguardando revisão**: é a sua vez.
+   o status muda para **Aguardando revisão**: é a sua vez. O mesmo acontece quando a IA deixa
+   algo dependendo de você (uma decisão, um ponto em aberto): a pendência aparece na conversa como
+   **Travado em mim** e o card fica com você, mesmo em modo autônomo.
 5. **Revise e siga.** Leia o documento da fase, responda ou clique em **Aprovar** (ou **Pedir
    ajustes**). Com a aprovação, a história avança para **PRD**, **Spec**, **Plan** e
    **Implementação**, sempre com a IA produzindo e você aprovando. As sub-tarefas da implementação
@@ -113,7 +115,7 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 ## Para que serve
 
 - **Planejar em fases.** As colunas das histórias são as fases do fluxo: Backlog, Discovery, PRD,
-  Spec, Plan, Implementação, Homologação, Concluído e Cancelado. Cada história se desdobra em
+  Spec, Plan, Implementação, Revisão, Homologação, Concluído e Cancelado. Cada história se desdobra em
   sub-tarefas, que têm um fluxo próprio (A fazer, Em andamento, Concluído).
 - **Dizer à IA o que fazer em cada fase.** Cada coluna tem uma instrução para a IA e, se a fase
   gera um documento (Discovery, PRD, Spec, Plan), o modelo desse documento. No Discovery a IA
@@ -152,13 +154,21 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    história; nas sub-tarefas eles aparecem como links.
 4. Busque por texto ou pelo ID (`#12`). A seção **Filtros** da barra lateral filtra por tipo,
    campos, datas e relacionamentos.
-5. Cards podem ser arquivados (coluna "Arquivados" no fim de cada linha) ou enviados para a
-   **Lixeira**, de onde podem ser restaurados.
+5. Cards podem ser arquivados (menu de ações do card → **Arquivar**) ou enviados para a
+   **Lixeira**, de onde podem ser restaurados. Os arquivados saem das linhas do board e ficam na aba
+   **Arquivados** (entre Métricas e Lixeira), que preserva o histórico: uma linha por workflow, na
+   ordem do board, do mais recente ao mais antigo. **Restaurar** devolve o card ao fim da primeira
+   coluna do workflow dele (Backlog / A fazer no board padrão), inativo. Restaurar uma história traz
+   também todas as sub-tarefas arquivadas dela e desliga o modo autônomo; restaurar uma sub-tarefa
+   cuja história está arquivada pede confirmação e restaura a história inteira (uma sub-tarefa de
+   história ativa volta sozinha, sem confirmação).
 
 ![Card aberto: status, aprovação, campos, descrição e checklist](docs/images/card.png)
 
 Por padrão, uma história não é concluída nem avança de fase enquanto tiver sub-tarefas em aberto
-daquela fase. Essas regras podem ser desligadas nas configurações.
+daquela fase. Essas regras podem ser desligadas nas configurações. A fase da sub-tarefa é o campo
+**Fase**, que a IA preenche ao criá-la: no card aberto ele aparece só para leitura e não vira padrão
+do tipo de card.
 
 No topo do board, **N com você** mostra quantos cards esperam revisão, resposta ou desbloqueio (um
 clique filtra só eles), e um indicador aparece enquanto a IA trabalha em algum card.
@@ -167,9 +177,9 @@ Cada card tem uma barra na cor do tipo, com o ID, o tipo e os botões de abrir e
 vêm o título (inteiro no tooltip, se não couber), o status com um ícone de com quem está a
 pendência (robô para a IA, pessoa para você) e há quanto tempo ele está assim, os campos, o modelo
 de IA (ex.: "Sonnet 5.5 - baixo") e, no rodapé, os contadores, a branch e o PR. Cards com
-pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do card de relance: verde piscando devagar enquanto a IA trabalha nele (na história, também quando ela trabalha numa sub-tarefa), amarelo quando ele espera por você, vermelho quando está bloqueado e apagado quando não há nada acontecendo.
+pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do card de relance: verde piscando devagar enquanto a IA trabalha nele (na história, também quando ela trabalha numa sub-tarefa), amarelo quando ele espera por você, vermelho quando está bloqueado e apagado quando não há nada acontecendo. Na história, a lista de sub-tarefas mostra o mesmo LED em cada uma: verde piscando em execução, vermelho bloqueada, amarelo esperando a pessoa e apagado parada.
 
-**Cards colapsados.** Você pode colapsar cards para enxergar mais linhas de uma coluna na mesma tela. Um card colapsado mostra só o título, mas continua exibindo o LED da IA (se ela está trabalhando) e a borda de status (se o card espera por você), para você varrer o board de relance e saber o que precisa de atenção. O colapso pode ser aplicado em quatro escopos: um card isolado (botão no próprio card), todos os cards de uma coluna (item no menu de ações da coluna), todos os cards do board (botão na barra de filtros) ou só os cards selecionados (botão na barra de seleção múltipla). O estado fica lembrado entre sessões.
+**Cards colapsados.** Você pode colapsar cards para enxergar mais linhas de uma coluna na mesma tela. Um card colapsado mantém a faixa colorida do tipo (com o LED da IA, o número, o tipo e os botões) e mostra o título em até duas linhas, escondendo o resto; a borda de status continua (se o card espera por você), para você varrer o board de relance e saber o que precisa de atenção. O colapso pode ser aplicado em quatro escopos: um card isolado (botão no próprio card), todos os cards de uma coluna (item no menu de ações da coluna), todos os cards do board (botão na barra de filtros) ou só os cards selecionados (botão na barra de seleção múltipla). O estado fica lembrado entre sessões.
 
 **Selecionar todos de uma coluna.** No menu ⋯ de uma coluna de histórias, **Selecionar todos** marca as histórias visíveis da coluna (o filtro ativo vale). Com a seleção feita, o mesmo menu oferece **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** e **Mandar selecionados para a lixeira**, cada uma com uma confirmação só para o lote; **Limpar seleção** desmarca tudo. A seleção vale para uma coluna por vez: marcar um card de outra coluna substitui a seleção. Na ação em lote, uma história com sub-tarefa em aberto não é concluída (as outras seguem), e mover para uma coluna de cancelamento cancela as sub-tarefas em aberto.
 
@@ -201,7 +211,8 @@ dependência.
 A IA usa isso para acelerar a Implementação. No Plan ela declara a ordem entre as sub-tarefas
 (`create_card` com `depends_on`, ou `link_cards` com `depends_on`): uma depende da outra quando usa o
 que ela produz ou quando as duas alteram os mesmos arquivos. Na Implementação, o `get_card` da
-história devolve em `subtasksNow` o que pode rodar agora, e a IA delega **as sub-tarefas sem
+história devolve em `subtasksNow` o que pode rodar agora (e em `subtasksNowNote`, como conduzir a
+rodada), e a IA delega **as sub-tarefas sem
 dependência pendente a subagentes simultâneos**, cada um com o modelo do seu card; ao fim da rodada
 ela verifica o conjunto, faz o commit e parte para a rodada seguinte. `start_work` recusa a
 sub-tarefa que ainda espera outra. Sem dependências declaradas, todas as sub-tarefas em aberto são
@@ -234,10 +245,9 @@ o `faz-ai` do terminal avisa e não inicia.
 
 1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code ou
    Cursor).
-2. Na aba **Tudo que a ferramenta carrega**, escolha a ferramenta e, na seção **Servidores MCP**,
-   clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
+2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
    global que a ferramenta lê.
-3. Na seção **Skills** da mesma ferramenta, clique em **Instalar (padrão da ferramenta)** para a
+3. No grupo **Skills** da mesma aba, clique em **Instalar (padrão da ferramenta)** para a
    skill do fluxo (`faz-ai-fluxo`): ela ensina a IA a conduzir os cards pelas fases, gerar os
    documentos, pedir revisão e retomar pendências. Pode ser editada.
 
@@ -266,65 +276,81 @@ MCP do board (global)** da paleta faz a instalação padrão na ferramenta do pr
 4. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
    board", "pegue a história #1 e escreva o PRD" ou "veja o que está pendente no board e dê andamento".
 
-Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, uma faixa amarela fica no topo
-do board, em todas as telas, e no painel de chat. Ela confere o Node.js (o servidor do board roda
-com ele), a linha de comando da ferramenta, o login dela (no Cursor, por `cursor-agent status`), o
+Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, a aba **Configurações** e o
+botão **Verificar ambiente** ganham um ícone de atenção. O hint dele resume o que falta, com o nome
+de cada item, e a explicação com a ação de cada um fica no Diagnóstico do ambiente. No painel de
+chat, que não tem as Configurações, fica uma faixa com os mesmos itens. A conferência olha o Node.js (o servidor do board roda
+com ele), a linha de comando da ferramenta, o login dela (no Cursor por `cursor-agent status`, no
+Claude Code por `claude auth status`), o
 registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
 para o seu usuário, de `claude mcp add -s user`), um registro apontando para um node ou um caminho
 que não existe mais, para outra pasta ou para a ponte de uma versão anterior, e o nível de
 permissão. Cada item diz o efeito e traz a ação: o comando para copiar, **Instalar o MCP do board**
 (abre a seção Servidores MCP da ferramenta), **Corrigir o registro** (um registro quebrado no arquivo
 do projeto vale no lugar do global; corrigir tira ele dali e deixa o global valendo), **Recarregar a
-janela** ou o atalho para o Harness de IA. A faixa não
-fecha: some sozinha quando o último item é resolvido. A conferência roda ao abrir o board, quando a
+janela** ou o atalho para o Harness de IA. O ícone some sozinho quando o último item é resolvido. A conferência roda ao abrir o board, quando a
 ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**,
 que relê também o PATH do terminal (um node instalado com o board aberto é encontrado sem recarregar
-a janela), e diz quando nada mudou.
+a janela), e diz quando nada mudou. Ao lado, no editor, **Recarregar a janela** reinicia a extensão:
+é o que faz valer uma extensão recém-atualizada. Com a IA trabalhando em algum card, pergunta antes,
+porque a execução para.
 
 O MCP do board e a skill do fluxo (`faz-ai-fluxo`) contam como requisito em todas as ferramentas:
 mesmo onde as execuções pelo board levam o MCP sozinhas (Claude, Cursor), a conversa no chat do
 editor ou no terminal depende dele, e a skill é o que faz a IA seguir o fluxo. A falta da skill tem o
-botão **Instalar a skill** na própria faixa. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
+botão **Instalar a skill** no Diagnóstico e na faixa do chat. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
 desligados, com o motivo na dica.
 
-**Diagnóstico do ambiente.** Na primeira abertura do board na máquina, abre sozinha uma lista, no
-estilo do `flutter doctor`, com tudo de que o board precisa e o que ele aproveita. Depois, ela abre
-pelo botão **Verificar ambiente**, nas Configurações, ou por **Ver o diagnóstico completo**, na
-faixa amarela. **Necessário:** Node.js 18 ou mais novo, a linha de comando da ferramenta, o login
-dela, o MCP do board, a skill do fluxo e o nível de permissão (os mesmos itens da faixa, com as
-mesmas ações). **Recomendado:** o Git e um repositório na pasta
-(`git init`), o GitHub CLI e o login dele (`gh auth login`, para o merge automático e o
-acompanhamento dos PRs) e o [Code Review Graph](https://github.com/tirth8205/code-review-graph), um
-grafo do código que a IA consulta em vez de ler arquivos inteiros. Com o Code Review Graph
-instalado, a lista sugere o build do grafo do projeto e a busca semântica. Cada item diz para que
-serve, como o board o usa e o que sai da sua máquina, e traz os comandos para copiar, um botão ou o
-link de download, além do **Saiba mais**. Os comandos de instalação saem do sistema detectado:
-`winget` no Windows, Homebrew ou `xcode-select` no macOS, e `apt`, `dnf` ou `pacman` no Linux (o Node
-pelo `nvm`); numa distribuição desconhecida, fica o link de download. Quando o programa cai numa
-pasta fora do PATH (a CLI do Cursor e o `uv`, em `~/.local/bin`), os comandos incluem o passo que a
-põe no PATH. O Code Review Graph mostra os pré-requisitos dentro dele, na ordem de instalar: o `uv` e
-o Python 3.10 ou mais novo, que o `uv` baixa só para ele, sem mexer no Python do sistema.
+**Login vencido: aviso de erro e retomada sozinha.** Quando o motivo do aviso é login (faltando ou
+vencido no meio de uma execução), o ícone de atenção fica vermelho, em vez do amarelo comum, e o
+item ganha o botão **Abrir no terminal** ao lado do comando para copiar: o board abre um terminal do editor e roda
+o comando ali, mas o login em si é sempre feito por você. Antes de cada chamada da IA (o botão do
+card, o heartbeat e o modo autônomo) o board confere o login de novo; se ele venceu, a execução nem
+começa. Quando o login vence no meio de uma execução, a primeira falha que bater um padrão conhecido ("OAuth session expired", "not logged in",
+"401" etc.) não bloqueia o card: ele volta ao status que tinha, com um comentário curto, e o mesmo
+aviso de erro liga — o heartbeat e o modo autônomo não tentam de novo sozinhos
+enquanto ele estiver ligado. O aviso some e a fila volta a andar sozinha quando o login é confirmado
+de novo (pela conferência periódica, em até 10 segundos depois de ligar, ou por **Já entrei:
+verificar de novo**) ou, quando a conferência não sabe dizer, na primeira execução manual que der
+certo. O Diagnóstico do ambiente mostra o mesmo aviso no item **Login na linha de comando**.
 
-**Instalar tudo.** Os botões **Instalar o necessário** e **Instalar os recomendados** mostram antes
-os passos, em ordem, e o script inteiro. Só depois de **Rodar no terminal** é que eles rodam, num
-terminal do editor à vista: a senha do `sudo` e os logins (`cursor-agent login`, `gh auth login`)
-ficam com você, ali. O script é montado para o sistema detectado (bash no Linux e no macOS,
-PowerShell no Windows) e roda tudo numa sessão só, para o PATH que um passo ajusta valer nos
-seguintes. Um passo que falha não para os outros, só pula os que dependem dele, e no fim a tela mostra
-o resultado de cada passo: instalado, pulado ou não instalado, com o comando, o código de saída e as
-últimas linhas do erro. O que não tem comando (ligar o MCP no Cursor, a permissão) fica listado como
-tarefa sua. No modo navegador, em vez de rodar, a tela dá o script para copiar.
+**Diagnóstico do ambiente.** Na primeira abertura do board na máquina, abre sozinha uma lista com
+tudo de que o board precisa e o que ele aproveita. Depois, ela abre pelo botão **Verificar
+ambiente**, nas Configurações (com o ícone de atenção quando falta algo). Cada item tem
+um ícone de pronto ou de falta, e o que depende de outro item aparece dentro dele (o login dentro da
+linha de comando, o grafo dentro do Code Review Graph). Passe o mouse sobre um item para ver como o
+board o usa.
 
-O chat do editor inicia os MCPs com o PATH de quando o editor abriu: o que foi instalado depois (o
-Node pelo `nvm`, o `uvx` do Code Review Graph) não está nele até o editor fechar e abrir de novo. Por
-isso, no fim do **Instalar tudo**, quando o Node aparece e pelo botão **Corrigir o caminho**, o board
-grava o caminho completo do comando nos registros do `faz-ai` e do `code-review-graph` que o editor
-não acha. O caminho é descoberto na hora, na máquina onde a extensão roda, e o arquivo fica fora do
-git (`.git/info/exclude`). Se o arquivo de MCPs do projeto estiver versionado, o board não grava nele e
-explica as saídas. A busca semântica usa o provedor `local`: o modelo é
-baixado uma vez do Hugging Face e roda na máquina. A tela avisa que os provedores de nuvem
-(`openai`, `google`, `minimax`, `voyage`) mandam trechos do código para terceiros, o que muitas
-empresas não permitem.
+- **Necessários:** o Node.js 22 ou mais novo e a ferramenta de IA do projeto, com a linha de comando,
+  o login (`claude auth login` ou `cursor-agent login`), o MCP do board, a skill do fluxo e o nível de
+  permissão.
+- **Opcionais:** a outra ferramenta de IA, quando está na máquina (a linha de comando no PATH ou, no
+  Cursor, o próprio editor). Projeto com o Claude Code mostra o Cursor aqui, e vice-versa. A lista só
+  mostra o estado: o board instala o MCP e a skill nela quando ela vira a ferramenta do projeto.
+- **Recomendados:** o Git e um repositório na pasta, o GitHub CLI e o login dele (para o merge
+  automático e o acompanhamento dos PRs) e o [Code Review Graph](https://github.com/tirth8205/code-review-graph),
+  um grafo do código que a IA consulta em vez de ler arquivos inteiros, com o grafo do projeto, o MCP
+  dele e a busca semântica. Enquanto falta, o Code Review Graph aparece dentro do
+  [uv](https://docs.astral.sh/uv/), na ordem de instalar: o uv instala o Code Review Graph
+  (`uv tool install code-review-graph`) e baixa um Python 3.10 ou mais novo só para ele, se faltar.
+
+O board não instala nada de terceiros. Cada programa traz, entre parênteses, o site oficial onde você
+encontra como instalar e, enquanto falta, o comando de instalação oficial para copiar, só os neutros,
+que valem em qualquer distribuição: `curl` no Linux e no macOS, PowerShell no Windows (o Node.js pelo
+`nvm`; no Windows, pelo `winget`). O Git e o GitHub CLI não têm um instalador assim e trazem o comando
+do sistema: `xcode-select --install` e `brew install gh` no macOS, `apt`, `dnf` ou `pacman` no Linux
+(com o `sudo apt update` antes, que uma máquina nova precisa) e `winget` no Windows; numa
+distribuição desconhecida, fica só o site. Os logins e as ações na pasta do projeto (`git init`, `gh auth login`, `code-review-graph build`,
+`code-review-graph install --platform …`, `code-review-graph embed --provider local`) também trazem o
+comando com botão de copiar. Só o que é do board tem botão: instalar o MCP
+do board e a skill do fluxo, e abrir a escolha do nível de permissão.
+
+O chat do editor inicia o MCP do board com o PATH de quando o editor abriu: um Node instalado depois
+(pelo `nvm`, por exemplo) não está nele até o editor fechar e abrir de novo. Por isso, quando o Node
+aparece, ou pelo botão **Corrigir o caminho** do item do MCP no Diagnóstico, o board grava o caminho completo do
+comando nos registros do `faz-ai` e do `code-review-graph` que o editor não acha. O caminho é descoberto na hora, na máquina onde
+a extensão roda, e o arquivo fica fora do git (`.git/info/exclude`). Se o arquivo de MCPs do projeto
+estiver versionado, o board não grava nele e explica as saídas.
 
 Fluxo sugerido: a IA lê a história e a instrução da fase, cria uma sub-tarefa para construir o
 documento da fase, anexa o documento à história e pede a revisão pela conversa do card. Você
@@ -335,6 +361,44 @@ responde no próprio card:
 - Se a IA fizer uma pergunta, o card fica Aguardando resposta; ao responder na conversa, ele volta
   para a IA.
 - **Bloquear** registra um impedimento, com o motivo.
+
+### O que cada fase entrega
+
+As instruções e os modelos de documento do board padrão pedem, em cada fase, o que deixa a revisão
+do código rápida depois:
+
+- **Spec com o desenho do programa.** Além da arquitetura, a Spec traz os tipos e as assinaturas
+  novos ou alterados, o arquivo de cada um e quem chama quem no caminho principal, com o fluxo da
+  funcionalidade em diagramas Mermaid. As alternativas descartadas vêm com o motivo de cada uma.
+- **Plan com partes fáceis de revisar.** Cada passo é uma parte inteligível da entrega e diz como
+  verificá-la (teste, typecheck, comando ou tela); recortar por camada vale, desde que cada parte seja
+  verificável. O plano estima as linhas de código da entrega: acima de umas 400, a IA deixa na
+  história a primeira parte e cria as seguintes como **histórias derivadas**, em ordem (`create_card`
+  com `derived_from` apontando para a parte anterior). A branch de cada derivada parte da branch da
+  parte anterior e o pull request dela é empilhado sobre o dela; o card mostra **Derivada de #N**. Se a
+  parte anterior ainda não tem branch, a derivada espera por ela antes de criar a sua.
+- **Revisão antes do pull request.** Depois da Implementação, a coluna **Revisão** roda as checagens
+  do projeto (typecheck, lint, testes e build, como o projeto os define) e revisa o diff da história
+  com um olhar independente: delega ao agente `revisor-de-codigo`, numa sessão nova, quando ele está
+  entre os agentes do board. Além dos defeitos, a revisão procura o código que só passa no teste
+  (teste novo que já passava antes da mudança, teste alterado junto com o código que ele cobre,
+  try/catch que engole erro, cast forçado, acoplamento novo). O que tem diretriz clara é corrigido na
+  hora; o que é ambíguo ou muda o comportamento combinado vira pergunta para você, e a IA para. A
+  coluna não pede aprovação: o resultado fica na conversa e entra no **Como revisar** do PR.
+- **Pull request que explica a entrega.** Na Homologação, o corpo do PR traz o **Objetivo**, **O que
+  foi feito**, **Como revisar** (por onde começar a ler, a ordem dos commits e o tamanho do diff), as
+  **Decisões** (por que o caminho escolhido, as alternativas descartadas e os desvios do plano) e o
+  roteiro **Como testar**.
+
+**Caminho curto para histórias pequenas.** Crie a história direto na coluna em que ela deve começar
+(o **+** no topo de cada coluna) ou arraste-a para lá, por exemplo para o Plan. A IA começa dali: sem
+os documentos das fases anteriores, trabalha a partir da descrição, da conversa e do código, e o
+`get_card` diz quais documentos não existem para ela não os criar nem bloquear por falta deles. Na
+Implementação, uma história sem sub-tarefas ganha uma a partir da descrição.
+
+Boards criados antes recebem os textos novos pelo **Atualizar board** (Configurações), só nas colunas
+que ainda têm o texto padrão anterior: o que você personalizou fica como está. A skill do fluxo
+instalada não muda sozinha; reinstale-a (substituindo) para ela ensinar o mesmo.
 
 ### Chat com a IA
 
@@ -409,26 +473,73 @@ Imagens coladas na mensagem viram anexos do card e a IA as recebe.
 - Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo e o fim da
   saída da ferramenta. O log completo está no painel **Saída → Faz AI** (ou no terminal do `faz-ai`).
 
-### Consumo, custo e inventário de cada execução
+### Contexto estimado de cada card
+
+No rodapé de cada card do board, um anel discreto mostra quanto da janela de contexto a execução do
+card ocupa antes de a IA começar, com o total ao lado (por exemplo, `5,8 mil`). O clique abre o
+detalhe, no formato da janela de contexto do Claude Code: o total sobre a janela do modelo do card,
+uma barra por grupo e cada item, com quanto ocupa.
+
+- **Servidores MCP.** No Claude Code, a sessão começa só com os nomes das ferramentas e as instruções
+  de cada servidor (cortadas em 2.048 caracteres); as definições completas carregam quando a IA
+  procura a ferramenta e aparecem à parte, como **sob demanda**, fora do total. O board mede o próprio
+  servidor; os servidores que o agente libera aparecem como **não medido**, porque o board não os
+  abre.
+- **Agentes.** As instruções do agente da sessão e, numa história no Claude Code, o nome e a descrição
+  de cada subagente (as instruções de um subagente vão para o contexto dele, não para o da sessão).
+- **Rules e Skills.** As marcadas como **Incluir em todo contexto** e as indicadas no card ou no
+  agente, pelo tamanho do arquivo que a sessão lê.
+- **Card.** Título e descrição, checklist, conversa, instruções e modelo da fase, e os documentos das
+  fases.
+
+É uma estimativa pelo tamanho do texto (cerca de 4 caracteres por token), feita para comparar escolhas
+e achar o que pesa antes de rodar: desmarcar uma skill, tirá-la do card ou trocar o agente muda o
+número na hora. A estimativa acompanha o card: numa coluna em que a IA atua, ela diz a fase e soma as
+instruções dela, e a conversa e os documentos entram conforme crescem. Apagar mensagens diminui só as
+próximas execuções; o que já foi gasto não volta. Ao abrir, o detalhe relê do disco os arquivos do
+harness: se algo mudou desde a última leitura (uma skill global editada fora do board, por exemplo),
+ele avisa e já mostra os números novos; o botão **Reler arquivos** faz o mesmo a pedido. Ficam fora da
+conta o prompt e as ferramentas nativas da própria ferramenta de IA. A
+janela vem do modelo do card (ou do agente): 1M no Fable 5.1, no Opus 5.5 e no Sonnet 5.5, e 200 mil
+no Haiku 4.5. Sem modelo, ou com um modelo de janela desconhecida (como os do Cursor), o anel mostra
+só o total. No Cursor, que não impõe o contexto vazio, o que a ferramenta carrega por conta própria
+também fica de fora, e as definições das ferramentas MCP contam inteiras. O que a execução gastou de
+fato aparece depois, no consumo de cada execução.
+
+### Aba Consumo do card
+
+O card aberto tem a aba **Consumo**, que junta as duas contas:
+
+- **Próxima execução**: a mesma estimativa do anel do board, com a fase, o modelo e o detalhe por
+  grupo.
+- **Gasto até agora**: o que a ferramenta mediu no fim de cada execução do card, uma linha por fase
+  (Discovery, PRD, Spec…), com execuções, tempo, tokens de entrada, de saída, de leitura e de escrita
+  de cache, e o total. Numa história, as execuções das sub-tarefas entram numa linha à parte e no
+  total. A fase é a coluna em que o card estava quando a execução rodou.
+
+O gasto é histórico e só cresce: apagar mensagens da conversa, desmarcar uma skill ou trocar o agente
+diminui as próximas execuções (a estimativa), nunca o que já foi gasto. Uma execução sem medição conta
+nas execuções e aparece como **não medido**, nunca como zero; uma execução em andamento entra quando
+termina, e a aba se atualiza sozinha. As execuções de meses que passaram da retenção do detalhe ficam
+só nos totais mensais do board e a aba avisa até quando. Como no resto do board, o consumo é em
+tokens, sem custo em dólar.
+
+### Consumo e inventário de cada execução
 
 Cada vez que a IA roda (pela conversa, pelo heartbeat ou pelo modo autônomo), o board registra no
 banco o que a execução consumiu: tokens de entrada, de saída, de leitura de cache e de criação de
-cache, o custo em dólar, o número de turnos e o id da sessão da ferramenta. Registra também o
+cache, o número de turnos e o id da sessão da ferramenta. Registra também o
 **inventário** do que a IA usou: ferramentas nativas, ferramentas de MCP (com o servidor de cada
 uma), subagentes e skills, com a contagem de chamadas.
 
-- **O custo é o que a ferramenta informa; o board não calcula nada.** Não existe tabela de preços: um
-  valor calculado a partir de uma lista de preços envelhece quando o fornecedor muda a tarifa e
-  produz relatório errado com cara de certo. Hoje:
-
-  | Ferramenta | Tokens | Custo em dólar |
-  | --- | --- | --- |
-  | Claude Code | medidos (entrada, saída, leitura e criação de cache, por modelo, subagente incluído) | o `total_cost_usd` que a própria CLI informa |
-  | Cursor | medidos (os quatro contadores) | a CLI não informa: fica em branco |
-
-  Onde aparecer "não medido" ou um custo em branco é isso, falta de medição, e nunca consumo zero.
-  Uma execução com tokens e sem custo (o caso do Cursor) conta nos tokens e fica de fora do custo;
-  o aviso das Métricas diz quantas execuções ficaram de fora.
+- **O consumo é medido em tokens; o board não mostra custo em dólar.** As duas ferramentas informam
+  os tokens: no Claude Code, entrada, saída, leitura e criação de cache, por modelo, com os subagentes;
+  no Cursor, os mesmos quatro contadores. Só o Claude Code informa também o custo em dólar, e o Cursor
+  não; um total em dólar que cobrisse só parte das execuções confundiria mais do que ajudaria, e uma
+  tabela de preços envelheceria a cada mudança de tarifa. Por isso, por enquanto, o board mostra só
+  tokens. O valor em dólar que o Claude Code informa continua gravado no banco, para poder voltar
+  depois sem perder o histórico. Onde aparecer "não medido" é isso, falta de medição, e nunca
+  consumo zero.
 - **Toda execução passa por uma única porta.** O executor de cards (manual, heartbeat e modo
   autônomo) e o chat do board chamam a IA pelo mesmo ponto do código (`AiGateway`), que abre a linha
   no log antes de rodar, fecha com o desfecho e grava o consumo. Cada ferramenta tem um provider
@@ -436,9 +547,9 @@ uma), subagentes e skills, com a contagem de chamadas.
   por ali, e um teste falha se algum arquivo tentar. O que fica de fora do registro, por natureza, é
   o que você roda direto no terminal ou no chat da própria ferramenta, sem o board.
 - **No canal de log** (**Saída → Faz AI**), a saída da ferramenta aparece em linhas legíveis, e no fim
-  de cada execução vem uma linha de resumo com entrada, saída, leitura e criação de cache, turnos e
-  custo, por exemplo `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação
-  de cache · 8 turnos · US$ 0,4210`. Turnos e custo ficam de fora quando a ferramenta não os informa.
+  de cada execução vem uma linha de resumo com entrada, saída, leitura e criação de cache e turnos,
+  por exemplo `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação de
+  cache · 8 turnos`. Os turnos ficam de fora quando a ferramenta não os informa.
 - **Perguntas no chat do board** também entram no registro, sem card associado.
 - **O detalhe de cada execução é guardado por uma janela que você configura**, de 1 a 24 meses (o
   mês corrente mais os anteriores). O padrão é 6 meses. Depois da janela o detalhe é descartado, mas
@@ -455,19 +566,19 @@ pelo navegador.
 - **Filtros.** O período pode ser Hoje, 7 dias, 30 dias, Este mês, Últimos 12 meses, Tudo ou um
   Intervalo livre (data inicial e final). O filtro **Workflow** restringe os números a um workflow, e
   **Limpar filtros** volta ao padrão. Abaixo dos controles o painel escreve o período consultado.
-- **Cinco totais.** Atividades concluídas (cards que chegaram a uma coluna de conclusão), execuções
-  de IA, tokens, custo e tempo de IA. O **tempo de IA é a soma da duração de cada execução**:
+- **Quatro totais.** Atividades concluídas (cards que chegaram a uma coluna de conclusão), execuções
+  de IA, tokens e tempo de IA. O **tempo de IA é a soma da duração de cada execução**:
   execuções simultâneas somam, então o total pode passar do tempo decorrido no relógio. O que não
   foi medido aparece como "não medido", nunca como 0, e quando só parte das execuções foi medida o
   aviso diz quantas ficaram de fora.
-- **Custo e tokens por mês.** Gráfico de barras, uma série por vez (alternador **Custo** / **Tokens**).
+- **Tokens por mês.** Gráfico de barras com os tokens de cada mês.
   O mês em andamento aparece com hachura, porque ainda não terminou; um mês sem nenhum dado é um
   espaço marcado "sem dado", não uma barra de altura zero. Abaixo do gráfico fica uma tabela com os
   mesmos números e uma coluna de observação (parcial, sem dado, só total mensal).
 - **Onde o consumo aconteceu.** O consumo do período repartido por **fase, tipo de card, modelo,
   ferramenta de IA, esforço ou perfil** (seletor **Recortar por**), em barras horizontais na medida
-  escolhida em **Medida da barra**: custo, tokens, execuções ou tempo de IA. Ao lado fica a tabela com
-  as quatro medidas. As categorias além do limite somam numa linha "outros". Alcança a série inteira
+  escolhida em **Medida da barra**: tokens, execuções ou tempo de IA. Ao lado fica a tabela com
+  as três medidas. As categorias além do limite somam numa linha "outros". Alcança a série inteira
   do período, inclusive os meses já arquivados.
 - **Quanto tempo o card fica na fase.** Uma linha por fase com as permanências, a mediana, a média,
   as desconhecidas e quantos cards estão nela agora. São permanências, não cards: um card que volta
@@ -476,19 +587,22 @@ pelo navegador.
   mediana em destaque, a média, quantos entraram na conta, quantos ficaram desconhecidos e a lista por
   card, ordenável. Desconhecido é o card cuja data de criação não está no detalhe guardado (o mês foi
   descartado ou o card é anterior ao log); a data não é estimada.
+- **Retrabalho.** O sinal de qualidade que o consumo e o tempo não mostram: quantas revisões a IA pediu
+  em cada fase, quantas a pessoa aprovou **de primeira** (a primeira resposta a um card naquela fase
+  foi a aprovação) e quantas voltaram com **pedido de ajuste**, também pelo modelo da execução que pediu
+  a revisão, e quantas histórias concluídas no período já têm um **Bug vinculado**. Só conta a resposta
+  de uma pessoa: a aprovação automática do modo autônomo não é revisão.
 - **Fases mais caras e Cards mais caros.** Dois rankings lado a lado, em tabelas que você ordena por
-  custo, tokens, execuções ou tempo de IA clicando no cabeçalho (ou com Enter/Espaço). O padrão é o
-  custo quando o período tem custo medido e o tempo de IA quando não tem, e a tela escreve o critério
-  em vigor. As fases alcançam a série inteira; os cards, só o detalhe guardado, e cada bloco avisa
+  tokens, execuções ou tempo de IA clicando no cabeçalho (ou com Enter/Espaço). O padrão são os
+  tokens quando o período tem tokens medidos e o tempo de IA quando não tem, e a tela escreve o
+  critério em vigor. As fases alcançam a série inteira; os cards, só o detalhe guardado, e cada bloco avisa
   isso.
 - **O que a IA usou.** Ferramentas, ferramentas de MCP (com o servidor em coluna própria), subagentes
   e skills, com o número de execuções e de usos. "Ainda não medido" (nenhuma execução gravou
   inventário) é diferente de "nenhum registro no período".
-- **Tokens e custo.** O custo soma só as execuções em que a ferramenta informou o custo (o Claude Code),
-  e o aviso diz quantas ficaram de fora; os tokens contam em todas as execuções medidas. Execuções
-  antigas, de antes de o board deixar de calcular custo por tabela de preços, continuam marcadas como
-  "estimado por tabela de preços". Antes de o board medir consumo,
-  custo e inventário aparecem como "não medido" e quase todo lead time como desconhecido: é o
+- **Tokens.** Os tokens contam em todas as execuções medidas, do Claude Code e do Cursor, e o aviso
+  diz quantas ficaram sem medição. Antes de o board medir consumo, tokens e inventário aparecem
+  como "não medido" e quase todo lead time como desconhecido: é o
   comportamento esperado, não falha.
 - **Detalhe guardado.** Mostra a janela de retenção do detalhe das execuções e quanto espaço ela
   ocupa. Dá para configurá-la de 1 a 24 meses (padrão 6). Aumentar grava na hora. **Baixar pede
@@ -504,7 +618,7 @@ pelo navegador.
 ### Métricas de uso com get_metrics
 
 Durante a conversa de um card, a IA pode consultar estatísticas agregadas do histórico do board — uso,
-duração e custo de execuções — sem precisar abrir nenhum painel. Chame a ferramenta `get_metrics` em
+duração e tokens das execuções — sem precisar abrir nenhum painel. Chame a ferramenta `get_metrics` em
 linguagem natural: "quanto tempo de IA o card #72 consumiu?", "qual tipo de card consome mais este
 mês?", "qual agente foi usado mais?". A ferramenta responde em uma tabela compacta, otimizada para
 economizar tokens.
@@ -519,11 +633,14 @@ economizar tokens.
 - Filtros de período (data inicial e final, em `AAAA-MM-DD`), card (ex. `72` ou `#72`), e dimensões
   (ex. fase, modelo, tipo de card).
 - Nas dimensões **agent**, **skill**, **used_tool** e **mcp_tool** a tabela mostra só a contagem de
-  execuções e de usos (sem tokens nem custo, que não é possível repartir entre componentes de uma
-  execução). `effort` e `profile` têm tokens e custo.
-- Tokens contam em toda execução medida; o custo vem só das execuções em que a ferramenta o informou (o Claude Code).
-- Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`.
-- Valores não medidos aparecem como "-" (nunca 0), por exemplo o custo do Cursor.
+  execuções e de usos (sem tokens, que não é possível repartir entre componentes de uma
+  execução). `effort` e `profile` têm tokens.
+- Tokens contam em toda execução medida, do Claude Code e do Cursor. A tabela não traz custo em dólar.
+- Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`. O retrabalho está:
+  com `rework: true` (e, se quiser, `start_date` e `end_date`), a resposta traz as revisões, as
+  aprovações de primeira e os pedidos de ajuste por fase e por modelo, e as histórias concluídas com bug
+  vinculado.
+- Valores não medidos aparecem como "-" (nunca 0).
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm detalhe e só agregam os
   totais já consolidados.
@@ -539,8 +656,7 @@ commits na branch da história.
   botão **Criar branch da história** no card.
 - O card mostra a branch e abre a pasta de trabalho numa janela nova.
 - O modo (worktree, branch na própria pasta ou desligado), o padrão do nome da branch, a pasta das
-  worktrees, **tocar histórias em paralelo**, o merge automático do PR ao aprovar a homologação e a
-  detecção automática de merges, com o arquivamento das histórias já publicadas (ligada por padrão),
+  worktrees, **tocar histórias em paralelo** e o merge automático do PR ao aprovar a homologação
   ficam no Settings do editor, em **Faz AI › Git** (ver [Configurações no Settings do
   editor](#configurações-no-settings-do-editor)); no navegador seguem na aba Git e no bloco de
   paralelo do Harness, como antes.
@@ -564,13 +680,22 @@ aprova uma história que está na última coluna antes da conclusão:
 O merge não acontece se a história não tiver PR registrado ou ainda tiver sub-tarefas em aberto. Com
 o merge automático desligado, aprovar só marca o card, e a IA o move para Concluído.
 
+### Registros de decisão
+
+Com **Faz AI › Git › Registros de decisão** (`fazai.git.decisionRecords`) apontando para uma pasta
+do repositório, como `docs/decisoes`, a Homologação grava ali, antes de abrir o pull request, o
+registro de decisão da história: o contexto, a decisão, as alternativas descartadas (com o motivo de
+cada uma), as consequências e os diagramas do desenho do programa, a partir da Spec aprovada. O
+arquivo se chama `<número da história>-<título>.md`, vai num commit da branch da história e é citado
+no corpo do PR. Assim a decisão fica no repositório, junto do código, e não só no banco do board. O
+`get_card` traz o caminho em `phase.decisionRecord`. Vazio, o padrão, desliga.
+
 ### Detecção automática de merges
 
-O board pode observar o pull request de uma história entregue e detectar quando ele é mergeado,
-concluindo a história automaticamente. A opção nasce ligada (Settings do editor, Faz AI › Git,
-**Concluir a história quando o pull request for mergeado**). Uma rotina periódica verifica o estado do PR a cada
-intervalo configurável (**Verificar a cada (minutos)**, padrão 15, faixa de 5 a 1440). Quando o
-merge é detectado:
+O board observa o pull request de cada história entregue e detecta quando ele é mergeado, concluindo a
+história automaticamente. Não há opção própria: a consulta acontece em cada rodada do
+[heartbeat](#heartbeat), no mesmo intervalo, e também no **Rodar o heartbeat agora**. Com o heartbeat
+desligado, ela só acontece quando você pede uma rodada. Quando o merge é detectado:
 
 1. o board grava o commit do merge no card;
 2. registra na conversa que a história foi concluída;
@@ -579,14 +704,14 @@ merge é detectado:
 Se o pull request é fechado sem merge, o board registra um aviso na conversa uma única vez. O merge
 continua sendo feito pela pessoa, manualmente ou pelo merge automático; o board só observa. Falhas
 na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado) não bloqueiam nada
-— o aviso aparece no log, e a rotina continua tentando no próximo intervalo.
+— o aviso aparece no log, e o board tenta de novo na próxima rodada.
 
 Na mesma rodada, depois de olhar os pull requests, o board dá o último passo do ciclo: **quando a
 versão que contém uma história concluída é publicada, ele registra na conversa qual versão a levou
 (tag e link da release) e arquiva o card**. Assim a coluna Concluído fica só com o que está mergeado
-e ainda não chegou a quem usa; o que já foi entregue vai para os arquivados do workflow, de onde você
-pode desarquivar a qualquer momento. Não há o que ligar: o passo vem junto com a detecção de merges,
-no mesmo intervalo e no mesmo liga/desliga, e nasce ligado com ela.
+e ainda não chegou a quem usa; o que já foi entregue vai para a aba Arquivados, de onde você pode
+restaurar a história (com as sub-tarefas arquivadas dela) a qualquer momento. Não há o que ligar: o passo vem junto com a detecção de merges,
+na mesma rodada do heartbeat.
 
 Uma história conta como publicada quando existe uma tag que **contém** o commit do merge **e** que
 tem uma **release publicada** no GitHub — é o que o `npm run release` deste projeto cria. Tag sem
@@ -603,7 +728,8 @@ não têm o commit do merge guardado, continuam sendo arquivadas por você, com 
 
 Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
 intervalo, enquanto o editor estiver aberto na pasta do projeto. Em cada rodada ela avança os cards
-aprovados, responde às mensagens pendentes e trabalha nos cards prontos, com uma execução por história.
+aprovados, responde às mensagens pendentes e trabalha nos cards prontos, com uma execução por história,
+e confere o pull request das histórias entregues ([detecção automática de merges](#detecção-automática-de-merges)).
 As atividades **sem branch** (refinar, resumir e as fases que só produzem documento, como Discovery,
 PRD, Spec e Plan no board padrão; vale a coluna que tem artefato antes da fase de código) rodam ao
 mesmo tempo em qualquer modo de workspace, até **Histórias ao mesmo tempo** (duas por padrão, até
@@ -650,18 +776,35 @@ colunas. Você mesmo pode mover qualquer card sem aprovação.
 
 ### Modo autônomo (YOLO)
 
-Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo**
-(o board pede uma confirmação, porque o modo abre mão de toda aprovação). A partir daí a IA toca a
+Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo**, ou
+clique no ícone do modo no rodapé do cartão, sem abrir o card (para várias de uma vez, marque as
+histórias e use a barra de seleção). O board pede uma confirmação, porque o modo abre mão de toda
+aprovação; marque **Não avisar novamente** no aviso para ligar direto nas próximas vezes. Desligar
+uma história não pede confirmação. A partir daí a IA toca a
 história sozinha, **sem pedir autorização nem confirmação para nada**:
 
+- **Até onde**: o aviso de ligar traz o seletor **Até onde**, com as fases em que a IA atua a partir
+  da coluna atual da história; o padrão é a última, a **Homologação (abre o pull request)**, que é o
+  modo completo descrito abaixo. Escolha uma fase antes, como o Plan, e a IA segue sozinha até ela:
+  faz o trabalho dessa fase, pede a sua revisão e o modo se desliga, com um aviso na conversa. Para
+  ela seguir sozinha dali, ligue o modo de novo. Com o modo ligado, a barra do card mostra **Modo
+  autônomo até [fase]**, e trocar a fase ali não pede confirmação. O seletor começa na última fase que
+  você escolheu, e com **Não avisar novamente** marcado o modo liga direto até ela. Na barra de
+  seleção, o seletor só oferece as fases que valem para todas as histórias marcadas. A IA lê o ponto de
+  parada em `autonomousUntil` no `get_card`, e na fase de parada `phase.requiresApproval` vem
+  verdadeiro.
+
 - Do **Backlog** até a última coluna em que a IA atua (Homologação, no board padrão): ela faz o
-  Discovery, o PRD, a Spec e o Plan, cria as sub-tarefas, implementa uma por uma e, nessa última
+  Discovery, o PRD, a Spec e o Plan, cria as sub-tarefas, implementa uma por uma, revisa e, nessa última
   coluna, abre o pull request, registra com `set_pull_request` e para ali — a história fica
   aguardando a sua revisão. As colunas que exigem aprovação deixam de segurar o card, e o pedido de
   revisão da IA vira aprovação na hora, com o resumo registrado na conversa.
 - **Sem perguntas**: a IA não usa `ask_question`; diante de uma dúvida ela decide e registra a
   decisão e o motivo na conversa. Só um impedimento real (acesso, ambiente, falha que ela não
   resolve) bloqueia o card.
+- **Pelos padrões do projeto**: como ninguém revisa as decisões do meio do caminho, a IA segue os
+  padrões e as regras de arquitetura do projeto (`CLAUDE.md`, `AGENTS.md`, `DESIGN.md` e o código
+  parecido que já existe) e, entre os caminhos que os seguem, escolhe o menos complexo.
 - **Sem merge**: a IA para na última coluna em que atua, com o pull request aberto; o merge e o
   avanço até Concluído continuam sendo seus. Concluído quer dizer mergeado.
 - **Sem restrições**: nas execuções do modo, a IA roda com a permissão "Sem restrições" (altera
@@ -686,17 +829,44 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo, entram na fila
   e ganham um vínculo **relativo** com a história de origem (pulado em silêncio se já existir
   qualquer vínculo entre as duas). Ela nunca liga o modo numa história que você não ligou.
-- **Freios**: o autopiloto para quando a IA bloqueia o card ou quando uma execução falha (o card
-  fica Bloqueado, com o motivo) e bloqueia a história depois de 3 execuções seguidas que não
-  avançaram nada. Ao destravar o card, ele continua sozinho.
+- **Freios**: o autopiloto continua **uma história por vez**: a história destravada volta para a
+  posição que ocupa no board e espera a que estiver em execução terminar. Uma execução que falha
+  deixa o card Bloqueado, com o motivo, e o disjuntor bloqueia a história depois de 3 execuções
+  seguidas sem avanço; bloquear uma história libera a fila para seguir com a próxima, em vez de
+  travá-la — histórias que emperram podem gastar até 3 execuções cada, em todas da fila. Ao
+  destravar o card, ele continua sozinho.
 
 O **botão do modo autônomo** no topo do board aparece enquanto houver história na fila e diz o que
 o clique faz: **Pausar modo autônomo** (aceso, com o autopiloto tocando; pausar interrompe a IA) ou
 **Retomar modo autônomo** (apagado, pausado). Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
 (YOLO)** e **Faz AI: Parar as execuções da IA e o modo autônomo**. Ao abrir o editor, o autopiloto
-retoma sozinho a fila que ficou pendente (a pausa é sua: o que você pausou só volta quando você
-retomar). O heartbeat não toca histórias em modo autônomo; elas são do autopiloto.
+liga sozinho quando há história pendente em modo autônomo, a não ser que você tenha pausado: a
+pausa fica gravada no board (sobrevive a reabrir o editor), e "Retomar", ou ligar o modo numa
+história, a limpa; fechar o editor não conta como pausa. Depois de uma falha ao iniciar a ferramenta
+de IA, o autopiloto não religa sozinho até você retomar. Com o login da ferramenta vencido, o
+autopiloto e o heartbeat esperam o login voltar, sem gastar execuções. O heartbeat não toca
+histórias em modo autônomo; elas são do autopiloto.
 
+
+### Áreas críticas (núcleo)
+
+Em Configurações → **Regras**, **Áreas críticas (núcleo)** recebe os caminhos do núcleo do projeto, um
+padrão por linha (ex.: `src/db/**`). Com a lista preenchida, o `get_card` passa a trazer as áreas em
+`criticalAreas`, e a IA, na Spec ou no Plan, marca o campo **Criticidade** da história: **Núcleo** se
+ela mexe nesses caminhos, **Periferia** se não. Você também pode marcar à mão.
+
+- **A história do núcleo espera a sua aprovação** nas colunas que exigem aprovação, mesmo no modo
+  autônomo: a IA faz o trabalho da fase, pede a revisão e para; depois que você aprova, ela segue
+  sozinha. A periferia segue o modo como sempre. A IA pode marcar uma história como Núcleo, mas só
+  você a tira de lá, e ligar o modo numa história do núcleo que aguarda revisão não a aprova.
+- **Na Revisão e no pull request**, os arquivos do diff que estão no núcleo são revisados com mais
+  rigor e listados à parte em **Como revisar**.
+- O campo **Criticidade** aparece no card, filtra o board e pode entrar nas regras de modelo (ex.:
+  núcleo com o modelo da faixa "Alto"). Como é um campo do board, ele fica fora de Campos
+  personalizados, e um tipo de card novo das histórias entra nele sozinho.
+
+Boards criados antes ganham o campo pelo **Atualizar board**. Pelo MCP, `update_rules` aceita
+`criticalPaths`.
 
 ### Agentes
 
@@ -751,49 +921,101 @@ disponíveis, `set_card_profile` escolhe o de um card e `create_agent`, `update_
 ![Skills do projeto e globais, com a instalação da skill do fluxo no global ou no projeto](docs/images/harness.png)
 
 Toda execução pelo board parte de **contexto vazio**: nenhuma regra, skill ou agente da sua máquina
-ou do projeto entra por conta própria. Em Configurações → **Harness de IA** você marca o que entra,
-em quatro abas: **Ferramenta e execução** (a IA do projeto, a permissão, o agente padrão e o
-heartbeat), **Projeto** e **Global** (os arquivos de cada pasta, em três sub-abas: **Rules**,
-**Agentes** e **Skills**, com a marcação em cada linha) e **Tudo que a ferramenta carrega**. Projeto
-e Global são só a pasta de onde o arquivo vem; o que vale é a marcação, que é deste board.
+ou do projeto entra por conta própria. Em Configurações → **Harness de IA** você vê tudo que a
+ferramenta de IA carrega e marca o que entra nas execuções do board, em três abas:
+**Ferramenta e execução** (a IA do projeto, a permissão, o agente padrão e o heartbeat), **Projeto**
+e **Global**.
 
-Em Rules e Skills, cada linha tem duas caixas que se excluem:
+**Projeto** mostra o que a ferramenta lê na pasta do projeto; **Global**, o que ela lê da sua pasta
+de usuário (`~/.claude`, `~/.cursor`…), dos plugins instalados e da sua organização. As duas abas
+abrem na ferramenta do projeto, e um seletor no topo mostra o que a outra (Claude Code ou Cursor)
+carrega. O conteúdo vem separado em grupos, sempre na mesma ordem:
+
+| Grupo | O que é | Exemplos |
+| --- | --- | --- |
+| Regras principais | Entram no começo de toda conversa; as de subpasta, quando a IA mexe nela | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `~/.claude/CLAUDE.md`, `packages/api/CLAUDE.md`; no Cursor, `AGENTS.md` (também de subpastas) e o aviso das User Rules (que ficam nas configurações dele) |
+| Regras por assunto | Regras por tema; algumas só entram quando a IA mexe em certos arquivos | `.claude/rules/*.md`, `~/.claude/rules/*.md`, `.cursor/rules/*.mdc` |
+| Memória (Projeto) | Anotações que o Claude Code guarda sozinho sobre o projeto | `~/.claude/projects/<projeto>/memory/` |
+| Skills | Instruções e arquivos de apoio carregados quando a tarefa pede | `.claude/skills/<nome>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
+| Subagentes | Ajudantes para os quais a IA delega trabalho | `.claude/agents/*.md`, `.cursor/agents/*.md` |
+| Comandos | Prompts prontos, chamados com `/nome` | `.claude/commands/*.md`, `.cursor/commands/*.md` |
+| Hooks | Comandos que a ferramenta roda sozinha em certos eventos | `hooks` do `.claude/settings.json`, `.cursor/hooks.json` |
+| Servidores MCP | Servidores que dão ferramentas extras à IA | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
+| Configurações e permissões | Como a ferramenta se comporta e o que a IA faz sem perguntar | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
+| Estilos de saída | Mudam o jeito de a IA responder | `.claude/output-styles/*.md` |
+| Plugins (Global) | Pacotes instalados, um bloco por plugin com o que ele traz | os que `claude plugin list` mostra, `~/.cursor/plugins/local` |
+| Organização (Global) | A política da empresa, só leitura | `CLAUDE.md` e `managed-settings.json` da pasta do sistema (`/Library/Application Support/ClaudeCode` no macOS) |
+
+Cada item mostra o nome, **o que é numa frase simples**, se é **sempre carregado** ou **sob
+demanda**, a descrição do próprio arquivo e o caminho. Nas instruções do Claude Code aparecem também
+os arquivos que elas importam com `@caminho` (que entram junto, até quatro níveis), e cada um abre
+no editor do board. **Clicar no caminho abre o arquivo no editor
+do board**, o mesmo dos anexos: Markdown formatado ou código, com **Editar**, **Salvar** e
+**Cancelar**, e **Abrir no editor** para quem preferir o VS Code. JSON inválido não é gravado; o que
+vem de plugin, o `~/.claude.json` e a política da organização abrem só para leitura. Os arquivos
+que a ferramenta leria e ainda não existem aparecem no fim do grupo, com o botão **Criar** e a frase
+de cada um, e o arquivo novo já abre no editor.
+
+Em **Regras principais** do Claude Code, o board oferece criar o `CLAUDE.md`, o `CLAUDE.local.md`
+(só seu, fora do git) e, só quando o projeto não tem `CLAUDE.md`, o `AGENTS.md`: por padrão, o
+Claude Code lê o `AGENTS.md` apenas quando não há `CLAUDE.md`, `.claude/CLAUDE.md` nem
+`CLAUDE.local.md`. Se o projeto tem os dois e nenhum `CLAUDE.md` importa o `AGENTS.md` com `@`, ele
+aparece como **não lido pelo Claude Code**, com o `@import` que resolve. Se tem só o `AGENTS.md`, o
+board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo.
+
+Nas rules e skills da ferramenta do projeto, cada linha tem a escolha **Uso nas execuções do
+board**:
 
 - **Incluir em todo contexto**: o arquivo entra em toda execução (trabalhar a fase, refinar, chat do
   board), pelo caminho. É o lugar da skill do fluxo e das regras que valem sempre.
 - **Usar quando fizer sentido**: vira opção dos campos **Rules** e **Skills** dos cards (e das skills
-  dos agentes), e o **Refinar com IA** a indica quando o pedido pede. Sem marcação, a execução não a
-  vê, mesmo que a ferramenta a carregue numa conversa sua.
+  dos agentes), e o **Refinar com IA** a indica quando o pedido pede.
+- **Fora das execuções**: a execução não o vê, mesmo que a ferramenta o carregue numa conversa sua.
 
-Uma marcação cujo arquivo sumiu aparece como **não encontrada**, para desmarcar ou recriar. Skills e
-agentes criados ou instalados pelo board já nascem marcados. O que ainda entra apesar do contexto
-vazio depende da ferramenta: no Claude Code 2.1 nada da sua pasta nem do projeto (verificado na
-CLI); no Cursor, tudo o que a ferramenta carregar, e o board só orienta.
+**Ações em massa.** Cada linha que aceita alguma ação tem uma caixa, e a do topo do grupo marca todas.
+A barra que aparece mostra só o que vale para o que foi marcado: o uso nas execuções do board (rules
+e skills), o modo da skill, copiar para o projeto ou para o global, **Apagar** (arquivos e pastas) e
+**Remover** (entradas de hook, regra de permissão e servidor MCP). Quando uma ação vale só para
+parte dos marcados, o botão diz para quantos. Apagar e remover pedem confirmação antes. A política
+da organização, que é só leitura, não tem caixa.
 
-Na aba **Tudo que a ferramenta carrega**, em **Tudo que cada ferramenta carrega**, há uma aba por
-ferramenta com oito seções (instruções e regras, skills, subagentes, comandos e prompts, hooks,
-servidores MCP, plugins, configurações e permissões), cada uma dividida em três escopos:
+**Plugins.** A lista do Claude Code vem de `claude plugin list --json`: só aparece o que ele carrega,
+nunca o catálogo dos marketplaces. Marcando plugins, a barra oferece **Desativar**, **Ativar** e
+**Desinstalar**, feitos pela própria CLI (`claude plugin disable`, `enable` e `uninstall`, em cada
+escopo em que o plugin está instalado). Os sincronizados do claude.ai e os da organização só se
+desativam. No Cursor, que não tem comando para isso, desinstalar tira a pasta do plugin de
+`~/.cursor/plugins/local`. Desinstalar pede confirmação, e a mudança vale na próxima sessão da
+ferramenta (no Claude Code, também depois de `/reload-plugins`).
 
-- **Projeto**: arquivos desta pasta; valem só aqui e vão no repositório. Esse grupo aparece sempre,
-  em destaque, e diz quando o projeto não tem nada daquele tipo.
-- **Global**: arquivos da sua pasta de usuário (`~/.claude`, `~/.cursor`…); valem em
-  todos os seus projetos. Toda alteração neles pede confirmação.
-- **Plugins**: vêm de pacotes instalados; não são alterados pelo board, mas podem ser copiados.
+Os subagentes da ferramenta do projeto têm a tabela própria, com **Disponível no board**, o padrão e
+o editor dos campos do board. Uma marcação cujo arquivo sumiu aparece num aviso no topo da aba, com
+**Desmarcar**. Skills e agentes criados ou instalados pelo board já nascem marcados. O que ainda
+entra apesar do contexto vazio depende da ferramenta: no Claude Code 2.1 nada da sua pasta nem do
+projeto (verificado na CLI); no Cursor, tudo o que a ferramenta carregar, e o board só orienta.
 
-O que dá para fazer:
+O que mais dá para fazer em cada grupo:
 
-- **Ler a lista sem esforço.** Cada item mostra o nome, a descrição como dica (limitada a duas
-  linhas) e, numa linha própria, o caminho do arquivo por inteiro. Clicar no caminho abre o arquivo
-  no editor, onde ele também é editado.
-- **Agir em vários de uma vez.** Cada linha tem uma caixa de seleção, e a do cabeçalho marca o
-  grupo todo. Com itens marcados aparece uma barra: deixar as skills automáticas ou só quando
-  indicadas, copiar para o projeto ou para o global, e apagar, sempre com confirmação.
 - **Criar** um item no lugar e no formato que a ferramenta espera, **apagar**, e **copiar** skills,
   subagentes, comandos e regras do global ou de um plugin para o projeto (e do projeto para o global).
+  Toda alteração na pasta do usuário pede confirmação.
 - **Servidores MCP**: acrescentar e remover, no formato de cada arquivo.
 - **Hooks e permissões**: acrescentar e remover hooks e regras de permitir, perguntar e negar.
 - **Buscar e instalar skills** de uma pasta ou de um repositório git: o board lista as skills
   encontradas e copia só as que você escolher. Nada do repositório é executado.
+
+**Mudanças feitas por fora.** O board relê o harness sozinho quando um arquivo muda fora dele (no
+editor, pela IA, pelo git), e junta numa releitura só as mudanças de uma mesma rajada (300 ms). No
+projeto, valem o `CLAUDE.md`, o `AGENTS.md`, o `.mcp.json` e tudo de `.claude/`, `.cursor/` e
+`.agents/`. Na pasta do usuário, só as pastas e os arquivos que a aba Global mostra, nunca a home
+inteira: o `~/.claude/CLAUDE.md`, as pastas de regras, skills, subagentes, comandos e estilos, os
+settings, o `~/.claude.json` e os equivalentes do Cursor; de `~/.claude/projects`, só a pasta
+`memory` deste projeto (o resto recebe as transcrições das sessões o tempo todo); dos plugins, o
+registro de instalados do Claude Code e os plugins locais do Cursor. Uma skill ou um subagente
+instalado como link para outra pasta também é observado. No editor, a pasta do usuário passa a ser
+observada quando o board carrega. No modo navegador, são observados os mesmos arquivos globais e, no
+projeto, as pastas e os arquivos que a aba Projeto mostra (sem as worktrees que ficam em `.claude/`),
+e o board relê tudo a cada minuto para o que um watcher não vê. As regras
+de subpasta e a política da organização não são observadas: entram na releitura seguinte.
 
 ### Skills sob demanda
 
@@ -835,9 +1057,9 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | --- | --- |
 | Workflows e colunas | Quantos workflows quiser (cards independentes ou sub-tarefas), com nome editável e posição que você muda arrastando; **Nova coluna** em cada um; nomes, ordem (arrastando) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento). Abrir e fechar workflows e colunas é feito no próprio board e fica lembrado |
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
-| Campos | Campos personalizados (texto, seleção, data, modelo…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo |
-| Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
-| Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; rules, agentes e skills do projeto e do global, com a marcação do que as execuções usam; tudo que cada ferramenta carrega, por escopo (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
+| Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, Esforço da atividade e Criticidade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria |
+| Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido e as [áreas críticas](#áreas-críticas-núcleo) |
+| Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; abas Projeto e Global com tudo que cada ferramenta carrega, em grupos, com o que cada arquivo é, o caminho que abre no editor do board e a marcação do que as execuções usam (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Fica só na aba Git do modo navegador; no editor, aponta para o Settings (Faz AI › Git) |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English; fica no Settings do editor junto com tema, fonte e tamanho); status (nome e cor, na aba Fluxos; aqui só no modo navegador) |
@@ -852,7 +1074,7 @@ quatro seções, nesta ordem:
 | --- | --- |
 | Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
 | Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
-| Git | As nove chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.watchMerges` e `fazai.git.watchMergeMinutes` (acompanhar merges fora do board, de 5 a 1440 minutos). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
+| Git | As oito chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.decisionRecords` (a pasta dos [registros de decisão](#registros-de-decisão); vazio = desligado). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
 | Backup | Dois links de ação: **Exportar o board agora** e **Importar um board**, que disparam os comandos da paleta |
 
 Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,
@@ -901,6 +1123,14 @@ interferem uma na outra. Na primeira vez, o board parte de uma cópia do banco �
 anteriores (`fazai.db`), que fica intacto. Regras e skills são arquivos da pasta do projeto e
 entram no git normalmente. Evite abrir a mesma pasta em duas janelas do editor ao mesmo tempo: a
 última a salvar vence (a extensão avisa quando isso acontece).
+
+**Atualizar a extensão atualiza o banco.** Ao abrir o board, a extensão aplica sozinha, em ordem,
+as mudanças de formato que faltam no banco, cada uma numa transação: se uma falhar, o banco fica
+como estava. Vale para qualquer versão de origem, em qualquer máquina. O caminho inverso não existe:
+uma versão anterior da extensão (por exemplo, depois de testar uma versão nova, a loja voltar para a
+de antes) recusa abrir um board gravado por uma versão mais nova, sem tocar nele, e pede para
+atualizar a extensão. Se o banco recusar alguma gravação ao abrir, o erro completo, com o comando
+que falhou, fica em **Saída → Faz AI**.
 
 ### Backup do board
 
@@ -969,10 +1199,10 @@ serve o board no navegador. Os testes cobrem a ativação da extensão (com um e
 
 `npm run e2e:cursor` abre o Cursor dentro de um contêiner Docker com Ubuntu 24.04 limpo: sem Node,
 git, gh, uv, Code Review Graph nem a CLI do Cursor. É o mesmo Cursor do computador, montado só para
-leitura e sem nenhuma configuração sua, e já vem com a extensão empacotada da branch atual, no
-projeto de teste `meu-app`. A janela abre na sua tela, e os links (login, **Saiba mais**) abrem no
-navegador do computador. Serve para ver o Diagnóstico do ambiente e a instalação de cada item como
-numa máquina nova. Dentro dele, o usuário `dev` tem `sudo` sem senha. Os logins são seus, feitos por
+leitura e sem nenhuma configuração sua (no macOS, um Cursor baixado para a imagem), e já vem com a
+extensão empacotada da branch atual, no projeto de teste `meu-app`. Os links (login, **Saiba mais**) abrem no
+navegador do computador. Serve para ver o Diagnóstico do ambiente e instalar cada item como numa
+máquina nova. Dentro dele, o usuário `dev` tem `sudo` sem senha. Os logins são seus, feitos por
 você.
 
 | Comando | O que faz |
@@ -982,8 +1212,17 @@ você.
 | `npm run e2e:cursor -- parar` | fecha o Cursor e para o contêiner |
 | `npm run e2e:cursor -- remover` | apaga o contêiner, a imagem e o cache (`~/.cache/faz-ai-e2e`) |
 
-Precisa de Docker sem `sudo`, de uma sessão Wayland e do Cursor instalado em `/usr/share/cursor`
-(pacote `.deb`). Os arquivos ficam em `scripts/e2e-cursor/`.
+Precisa de Docker sem `sudo`. Há dois modos, escolhidos sozinhos:
+
+- **Linux com sessão Wayland e o Cursor em `/usr/share/cursor`** (pacote `.deb`): o contêiner usa o
+  Cursor do computador, e a janela abre na sua tela.
+- **macOS, ou Linux sem Wayland:** a imagem baixa o Cursor para Linux do site oficial (na arquitetura
+  do computador, ARM64 num Mac Apple Silicon), e a tela dele abre numa aba do navegador, em
+  `http://localhost:6080`, pelo noVNC. A primeira subida baixa o Cursor e demora alguns minutos. A
+  máquina tem o `python3` que o noVNC usa, como um Ubuntu desktop recém-instalado.
+  `FAZAI_E2E_MODO=novnc` força este modo num Linux com Wayland.
+
+Os arquivos ficam em `scripts/e2e-cursor/`.
 
 ### Preparar o ambiente de desenvolvimento
 
@@ -992,7 +1231,7 @@ por exemplo), eles precisam ser refeitos:
 
 | Item | Para que serve | Como obter |
 |---|---|---|
-| Node.js 18+ e git | build, testes e o comando `faz-ai` | instalação normal |
+| Node.js 22+ e git | build, testes e o comando `faz-ai` | instalação normal |
 | `.mcp.json` e `.claude/settings.local.json` | ligam a IA ao board; guardam caminhos da máquina | **Instalar neste projeto** na seção Servidores MCP do Harness de IA |
 | Board e anexos | ficam no armazenamento da extensão, não no repositório | o board da pasta começa vazio na outra máquina |
 | `.env.release` com `OVSX_PAT` | publicar no Open VSX | token em https://open-vsx.org/user-settings/tokens |

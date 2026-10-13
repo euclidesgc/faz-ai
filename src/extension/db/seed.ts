@@ -3,7 +3,8 @@ import type { WorkflowKind } from '../../shared/model';
 import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION, STORY_PHASES, insertColumn } from './boardTemplate';
 import { newId } from './ids';
 import { EFFORT_FIELD, EFFORT_LEVELS } from '../../shared/models';
-import { MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from './schema';
+import { CRITICALITY_FIELD, CRITICALITY_LEVELS } from '../../shared/critical';
+import { MODEL_FIELD, PHASE_FIELD, RULES_FIELD, SKILLS_FIELD, TAGS_FIELD } from '../../shared/boardFields';
 
 /** Cria o board padrão para um workspace e devolve seu id. */
 export function seedBoard(db: Database, workspaceKey: string, name: string): string {
@@ -41,11 +42,11 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
 
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
-      [newId(), boardId, 'Fase', 'select', JSON.stringify(STORY_PHASES), JSON.stringify([subtaskType]), 'badge', 0],
+      [newId(), boardId, PHASE_FIELD, 'select', JSON.stringify(STORY_PHASES), JSON.stringify([subtaskType]), 'badge', 0],
     );
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
-      [newId(), boardId, 'Tags', 'multiselect', JSON.stringify(['frontend', 'backend', 'infra', 'docs']), null, 'chip', 1],
+      [newId(), boardId, TAGS_FIELD, 'multiselect', JSON.stringify(['frontend', 'backend', 'infra', 'docs']), null, 'chip', 1],
     );
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
@@ -65,6 +66,20 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
       [newId(), boardId, EFFORT_FIELD, 'select', JSON.stringify(EFFORT_LEVELS), null, 'badge', 2],
+    );
+    // núcleo ou periferia: a história do núcleo espera a aprovação da pessoa mesmo no modo autônomo
+    db.run(
+      'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
+      [
+        newId(),
+        boardId,
+        CRITICALITY_FIELD,
+        'select',
+        JSON.stringify(CRITICALITY_LEVELS),
+        JSON.stringify(types.filter(([, , , wf]) => wf === parentWf).map(([id]) => id)),
+        'badge',
+        6,
+      ],
     );
     db.exec('COMMIT;');
   } catch (e) {

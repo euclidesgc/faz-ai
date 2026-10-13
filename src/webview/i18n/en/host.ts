@@ -79,6 +79,18 @@ export const host: Record<string, string> = {
   'O workflow tem {cards} card(s), inclusive arquivados e na lixeira':
     'The workflow has {cards} card(s), including archived and trashed ones',
   '{types} tipo(s) de card nascem neste workflow': '{types} card type(s) are created in this workflow',
+  // campos do board (src/shared/boardFields.ts)
+  '"{name}" é o nome de um campo do board; escolha outro nome.': '"{name}" is the name of a board field; choose another name.',
+  'O campo de modelo de IA é só um, o "Modelo" do board.': 'There is only one AI model field, the board\'s "Modelo".',
+  'O campo "{name}" é do board e não pode ser apagado: as regras e a IA dependem dele.':
+    'The "{name}" field belongs to the board and cannot be deleted: the rules and the AI depend on it.',
+  'O campo "{name}" é do board e não pode ser renomeado: as regras e a IA o encontram pelo nome.':
+    'The "{name}" field belongs to the board and cannot be renamed: the rules and the AI find it by its name.',
+  'As opções do campo "{name}" são mantidas pelo board.': 'The options of the "{name}" field are kept by the board.',
+  'Os tipos de card do campo "{name}" são mantidos pelo board.': 'The card types of the "{name}" field are kept by the board.',
+  'O campo "{name}" é preenchido pelo board e pela IA, não à mão.': 'The "{name}" field is filled in by the board and the AI, not by hand.',
+  'O campo "{name}" não tem valor padrão por tipo: o board o preenche em cada card.':
+    'The "{name}" field has no default value per type: the board fills it in on each card.',
   'Migration {n} não encontrada': 'Migration {n} not found',
 
   // vínculos entre cards
@@ -95,6 +107,8 @@ export const host: Record<string, string> = {
   'Anexo não encontrado': 'Attachment not found',
   'Esta história ainda não tem pasta de trabalho.': 'This story does not have a working folder yet.',
   'Arquivo fora do harness.': 'File outside the harness.',
+  'Arquivo maior que 512 KB: abra no editor.': 'File larger than 512 KB: open it in the editor.',
+  'Este arquivo não pode ser alterado pelo board.': 'This file cannot be changed by the board.',
 
   // backup do board (exportar e importar)
   'Board exportado em {path}. O arquivo contém conversas e anexos: guarde-o com cuidado.':
@@ -218,6 +232,17 @@ export const host: Record<string, string> = {
   'Skill "{name}" não encontrada.': 'Skill "{name}" not found.',
   'Agente "{name}" não encontrado.': 'Agent "{name}" not found.',
   'Servidor "{name}" não encontrado em {path}.': 'Server "{name}" not found in {path}.',
+  'Plugins desinstalados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
+    'Plugins uninstalled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
+  'Plugins desativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
+    'Plugins disabled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
+  'Plugins ativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
+    'Plugins enabled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
+  'Plugins removidos de ~/.cursor/plugins/local: {names}. Recarregue a janela do Cursor para valer.':
+    'Plugins removed from ~/.cursor/plugins/local: {names}. Reload the Cursor window for it to take effect.',
+  'Feito em {done} de {total}. Falhou: {failures}': 'Done for {done} of {total}. Failed: {failures}',
+  'Nada mudou. Falhou: {failures}': 'Nothing changed. Failed: {failures}',
+  'Nenhum dos plugins escolhidos aceita essa ação.': 'None of the chosen plugins accepts that action.',
   'Arquivo de regras desconhecido: "{name}". Aceitos: {accepted}.': 'Unknown rules file: "{name}". Accepted: {accepted}.',
   'Itens de plugin não podem ser alterados pelo board.': 'Plugin items cannot be changed by the board.',
   'Servidores de plugin não podem ser removidos pelo board.': 'Plugin servers cannot be removed by the board.',

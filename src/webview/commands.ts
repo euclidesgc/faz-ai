@@ -1,5 +1,5 @@
 import type { WebviewToHost } from '../shared/messages';
-import type { AiTool, HarnessKind, InstallScope, SkillMode } from '../shared/harness';
+import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from '../shared/harness';
 import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
 import type { AgentInput } from '../shared/messages';
 import type { HookInput, McpServerInput } from '../shared/harnessCatalog';
@@ -36,9 +36,9 @@ export const ui = {
   fixProjectMcp: (file: string) => post({ type: 'ui.fixProjectMcp', file }),
   reloadWindow: () => post({ type: 'ui.reloadWindow' }),
   openEditorMcp: () => post({ type: 'ui.openEditorMcp' }),
+  openTerminal: (command: string) => post({ type: 'ui.openTerminal', command }),
   checkEnvironment: () => post({ type: 'environment.check' }),
   environmentSeen: () => post({ type: 'environment.seen' }),
-  installEnvironment: (level: 'required' | 'recommended') => post({ type: 'environment.install', level }),
   pinMcp: () => post({ type: 'environment.pinMcp' }),
 };
 
@@ -69,11 +69,12 @@ export const cards = {
   restore: (cardId: Id) => post({ type: 'card.restore', cardId }),
   archive: (cardId: Id) => post({ type: 'card.archive', cardId }),
   unarchive: (cardId: Id, to?: { columnId: Id; position: number }) => post({ type: 'card.unarchive', cardId, ...to }),
+  restoreArchived: (cardId: Id) => post({ type: 'card.restoreArchived', cardId }),
   deletePermanent: (cardId: Id) => post({ type: 'card.deletePermanent', cardId }),
   setStatus: (cardId: Id, status: CardStatus | null, note?: string) =>
     post({ type: 'card.status.set', cardId, status, ...(note !== undefined ? { note } : {}) }),
-  setYolo: (cardId: Id, enabled: boolean) => post({ type: 'card.yolo.set', cardId, enabled }),
-  setYoloMany: (cardIds: Id[], enabled: boolean) => post({ type: 'card.yolo.setMany', cardIds, enabled }),
+  setYolo: (cardId: Id, enabled: boolean, until?: Id | null) => post({ type: 'card.yolo.set', cardId, enabled, until }),
+  setYoloMany: (cardIds: Id[], enabled: boolean, until?: Id | null) => post({ type: 'card.yolo.setMany', cardIds, enabled, until }),
   archiveMany: (cardIds: Id[]) => post({ type: 'card.archiveMany', cardIds }),
   trashMany: (cardIds: Id[]) => post({ type: 'card.trashMany', cardIds }),
   moveMany: (cardIds: Id[], columnId: Id) => post({ type: 'card.moveMany', cardIds, columnId }),
@@ -155,6 +156,7 @@ export const harness = {
   createItem: (tool: AiTool, source: number, name: string, description: string) =>
     post({ type: 'harness.item.create', tool, source, name, description }),
   deleteItem: (tool: AiTool, kind: HarnessKind, path: string) => post({ type: 'harness.item.delete', tool, kind, path }),
+  applyPlugins: (tool: AiTool, action: PluginAction, ids: string[]) => post({ type: 'harness.plugin.apply', tool, action, ids }),
   copyItems: (tool: AiTool, items: { kind: HarnessKind; path: string }[], to: HarnessScope) =>
     post({ type: 'harness.item.copy', tool, items, to }),
   writeRule: (name: string, content: string) => post({ type: 'harness.rule.write', name, content }),

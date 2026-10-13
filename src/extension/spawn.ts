@@ -100,6 +100,8 @@ export function spawnHeadless(
     stdio: ['pipe', 'pipe', 'pipe'],
     shell: launch.shell,
     windowsVerbatimArguments: launch.shell,
+    // no Windows, o shell abriria uma janela do cmd.exe a cada execução
+    windowsHide: true,
     // fora do Windows, um grupo de processos próprio: Parar encerra a CLI e tudo o que ela iniciou
     // (servidores MCP, testes, comandos do terminal), e não só o processo direto
     detached: process.platform !== 'win32',

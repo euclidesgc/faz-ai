@@ -10,9 +10,11 @@ import {
   type HarnessKind,
   type InstallableSkill,
   type InstallScope,
+  type PluginAction,
+  pluginActions,
 } from '../../../shared/harness';
 import { copyTarget } from '../../../shared/harnessCatalog';
-import { RULES_FIELD, SKILLS_FIELD } from '../../db/schema';
+import { RULES_FIELD, SKILLS_FIELD } from '../../../shared/boardFields';
 import { isSelectableKind, selectedRuleLocations, selectedSkillNames } from '../../../shared/harnessSelection';
 import { CONDUCTOR_AGENT, migrateExecProfiles, seedAgents } from '../../agentSeeds';
 import { FLOW_SKILL } from '../../flowSkill';
@@ -20,14 +22,34 @@ import { skillTemplate, type HarnessStore } from '../../harness';
 import { HarnessOps } from '../../harnessOps';
 import { HooksAndPermissions } from '../../hooksAndPermissions';
 import { McpServers } from '../../mcpServers';
+import { applyClaudePlugin, parseClaudePlugins, pluginSignature, removeCursorPlugin, type ClaudeCli } from '../../plugins';
 import { findSkills, installSkills } from '../../skillInstall';
 import type { BoardContext, HandlerMap } from './context';
+
+/** Teto do arquivo que o editor do board abre: regras, skills e configurações passam longe disso. */
+const MAX_EDIT_BYTES = 512 * 1024;
+
+/** O aviso depois de mudar plugins do Claude Code: a sessão aberta só vê a mudança depois de recarregar. */
+const PLUGIN_DONE: Record<PluginAction, string> = {
+  uninstall:
+    'Plugins desinstalados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
+  disable: 'Plugins desativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
+  enable: 'Plugins ativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
+};
+const fill = (text: string, params: Record<string, string | number>) =>
+  text.replace(/\{(\w+)\}/g, (m, n: string) => String(params[n] ?? m));
 
 /** Regras, skills, agentes, hooks e servidores MCP do projeto e da ferramenta em uso, como a varredura os encontrou. */
 export class BoardHarness {
   current: Harness = EMPTY_HARNESS;
   /** origem de skills já baixada, à espera da escolha do que instalar */
   install: { source: string; dir: string; skills: InstallableSkill[]; cleanup: () => void } | null = null;
+  /** a CLI do Claude Code, para a lista de plugins instalados e as ações sobre eles; quem abre o board a fornece */
+  private claudeCli: ClaudeCli | null = null;
+  /** como estavam os arquivos que mudam a lista de plugins na última vez que a CLI foi consultada */
+  private pluginSig = '';
+  /** avisa a tela quando a lista de plugins muda sem uma mensagem dela (a consulta à CLI é assíncrona) */
+  private pluginsChanged: (() => void) | null = null;
 
   constructor(
     private ctx: BoardContext,
@@ -102,7 +124,82 @@ export class BoardHarness {
   refresh(): boolean {
     const before = JSON.stringify(this.current);
     this.load();
+    // os plugins do Claude Code vêm da CLI: consultada de novo só quando os arquivos dela mudaram
+    this.refreshPluginsInBackground();
     return JSON.stringify(this.current) !== before;
+  }
+
+  /**
+   * A consulta dos plugins sem ninguém esperando por ela. O board pode fechar enquanto a CLI responde
+   * (o editor fechou, a pasta trocou): aí reler o harness falha no banco já fechado, e não há o que
+   * fazer além de deixar para a próxima abertura, que consulta de novo.
+   */
+  private refreshPluginsInBackground(force = false): void {
+    this.refreshPlugins(force).catch(() => undefined);
+  }
+
+  /** Liga a CLI do Claude Code e já busca a lista de plugins instalados. */
+  setClaudeCli(cli: ClaudeCli | null, onChanged: () => void): void {
+    this.claudeCli = cli;
+    this.pluginsChanged = onChanged;
+    this.refreshPluginsInBackground(true);
+  }
+
+  /**
+   * Busca em `claude plugin list --json` os plugins que o Claude Code carrega nesta pasta, quando o
+   * registro de instalados, os sincronizados ou os `enabledPlugins` mudaram (ou com `force`). Sem a
+   * CLI, ou com uma saída que não é a lista, a varredura volta a procurar nas pastas de plugin.
+   */
+  async refreshPlugins(force = false): Promise<boolean> {
+    const store = this.store;
+    if (!store || !this.claudeCli) return false;
+    const sig = pluginSignature(this.ctx.home, store.workspaceDir);
+    if (!force && sig === this.pluginSig) return false;
+    this.pluginSig = sig;
+    const run = await this.claudeCli(['plugin', 'list', '--json']);
+    const list = run.code === 0 ? parseClaudePlugins(run.stdout, store.workspaceDir) : null;
+    if (JSON.stringify(list) === JSON.stringify(store.claudePlugins)) return false;
+    store.claudePlugins = list;
+    const before = JSON.stringify(this.current);
+    this.load();
+    const changed = JSON.stringify(this.current) !== before;
+    if (changed) this.pluginsChanged?.();
+    return changed;
+  }
+
+  /**
+   * Desinstala, desativa ou ativa plugins pela própria ferramenta, um por vez, e devolve o aviso para a
+   * pessoa. No Claude Code é a CLI (`claude plugin …`); no Cursor, que não tem comando, desinstalar tira
+   * a pasta do plugin local. Só valem os plugins que a varredura listou, com a ação que cabe a cada um.
+   */
+  async applyPlugins(tool: AiTool, action: PluginAction, ids: string[]): Promise<string> {
+    const plugins = (this.current.inventory.find((t) => t.tool === tool)?.items ?? []).filter(
+      (i) => i.kind === 'plugin' && i.install && ids.includes(i.install.id) && pluginActions(tool, i.install).includes(action),
+    );
+    if (!plugins.length) throw new Error('Nenhum dos plugins escolhidos aceita essa ação.');
+    const failed: string[] = [];
+    for (const p of plugins) {
+      try {
+        if (tool === 'cursor') removeCursorPlugin(this.ctx.home, p.install!);
+        else {
+          if (!this.claudeCli) throw new Error('a CLI do Claude Code não foi encontrada');
+          const error = await applyClaudePlugin(this.claudeCli, action, p.install!);
+          if (error) throw new Error(error);
+        }
+      } catch (e) {
+        failed.push(`${p.name}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    if (tool === 'claude') await this.refreshPlugins(true);
+    else this.load();
+    const done = plugins.filter((p) => !failed.some((f) => f.startsWith(`${p.name}: `))).map((p) => p.name);
+    if (failed.length)
+      return done.length
+        ? fill('Feito em {done} de {total}. Falhou: {failures}', { done: done.length, total: plugins.length, failures: failed.join('; ') })
+        : fill('Nada mudou. Falhou: {failures}', { failures: failed.join('; ') });
+    return tool === 'cursor'
+      ? fill('Plugins removidos de ~/.cursor/plugins/local: {names}. Recarregue a janela do Cursor para valer.', { names: done.join(', ') })
+      : fill(PLUGIN_DONE[action], { names: done.join(', ') });
   }
 
   /** Passa a varrer a pasta de skills da ferramenta. */
@@ -174,6 +271,43 @@ export class BoardHarness {
     const item = this.item(tool, 'skill', skillMd);
     if (!item.files?.includes(rel)) throw new Error('Arquivo fora do harness.');
     return path.join(path.dirname(skillMd), ...rel.split('/'));
+  }
+
+  /**
+   * Se o editor do board pode gravar no arquivo. Só abre o que a varredura listou, de qualquer ferramenta,
+   * e os arquivos que as instruções do Claude Code importam com `@caminho`.
+   * Fica só leitura o que vem de plugin, o que está fora do projeto e da pasta do usuário, e o
+   * `~/.claude.json`, que o Claude Code reescreve o tempo todo.
+   */
+  private access(file: string): { readonly: boolean } {
+    const listed = this.current.inventory.flatMap((t) => t.items);
+    const items = listed.filter((i) => i.path === file);
+    if (!items.length && !listed.some((i) => i.imports?.some((x) => x.path === file))) throw new Error('Arquivo fora do harness.');
+    const inside = [this.ctx.opts.workspaceDir, this.ctx.home].some((b) => b && file.startsWith(b + path.sep));
+    const readonly = !inside || items.some((i) => i.scope === 'plugin') || file === path.join(this.ctx.home, '.claude.json');
+    return { readonly };
+  }
+
+  /** Conteúdo de um arquivo do harness para o editor do board. */
+  readFile(file: string): { content: string; readonly: boolean } {
+    const { readonly } = this.access(file);
+    if (fs.statSync(file).size > MAX_EDIT_BYTES) throw new Error('Arquivo maior que 512 KB: abra no editor.');
+    return { content: fs.readFileSync(file, 'utf8'), readonly };
+  }
+
+  /** Grava o texto editado no board. JSON inválido é recusado: a ferramenta deixaria de ler o arquivo inteiro. */
+  writeFile(file: string, content: string): void {
+    if (this.access(file).readonly) throw new Error('Este arquivo não pode ser alterado pelo board.');
+    if (/\.json$/i.test(file)) {
+      try {
+        // os arquivos de configuração das ferramentas aceitam comentários de linha
+        JSON.parse(content.replace(/^\s*\/\/.*$/gm, ''));
+      } catch (e) {
+        throw new Error(`JSON inválido, nada foi gravado: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    fs.writeFileSync(file, content);
+    this.load();
   }
 
   /** Cria um item do harness e devolve o caminho do arquivo. */

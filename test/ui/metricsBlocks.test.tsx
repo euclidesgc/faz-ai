@@ -1,5 +1,12 @@
 import { renderThemed } from './setup';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
+vi.mock('../../src/shared/metrics', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/shared/metrics')>()),
+  SHOW_COST: true,
+  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
+}));
 import { act, screen, within } from '@testing-library/react';
 import { EMPTY_METRICS_FILTERS, type MetricsMonth, type MetricsPanelResult } from '../../src/shared/metrics';
 import { setLocale } from '../../src/webview/i18n';

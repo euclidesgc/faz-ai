@@ -1,10 +1,11 @@
 import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
-import type { AiTool, HarnessKind, InstallScope, SkillMode } from './harness';
+import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from './harness';
 import type { HarnessUsage, SelectableKind } from './harnessSelection';
 import type { HookInput, McpServerInput } from './harnessCatalog';
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
+import type { CardUsage } from './cardUsage';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
@@ -40,6 +41,8 @@ export type WebviewToHost =
   | { type: 'ui.reloadWindow' }
   /** abre a tela de MCPs do editor (no Cursor, Customize → MCPs) */
   | { type: 'ui.openEditorMcp' }
+  /** abre um terminal do editor e roda o comando (ex.: o login de uma CLI); a pessoa conclui o login */
+  | { type: 'ui.openTerminal'; command: string }
   /** abre este board no navegador, fora do editor */
   | { type: 'ui.openInBrowser' }
   /** pede ao editor para abrir o Settings nativo filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */
@@ -73,6 +76,12 @@ export type WebviewToHost =
   | { type: 'card.restore'; cardId: Id }
   | { type: 'card.archive'; cardId: Id }
   | { type: 'card.unarchive'; cardId: Id; columnId?: Id; position?: number }
+  /**
+   * restaura um card arquivado pela aba Arquivados: uma história volta com as sub-tarefas arquivadas dela; uma
+   * sub-tarefa de história arquivada restaura a história. Cada card vai para o fim da primeira coluna do próprio
+   * workflow, inativo, e a história sai do modo autônomo
+   */
+  | { type: 'card.restoreArchived'; cardId: Id }
   | { type: 'card.deletePermanent'; cardId: Id }
   | { type: 'trash.empty' }
   /** cria (ou reaproveita) a branch e a worktree da história do card */
@@ -81,10 +90,17 @@ export type WebviewToHost =
   | { type: 'card.pr.set'; cardId: Id; url: string }
   /** registra o commit do merge do pull request da história do card; sem efeito colateral (ao contrário do card.pr.set) */
   | { type: 'card.merge.set'; cardId: Id; commit: string }
-  /** liga ou desliga o modo autônomo (YOLO) da história do card */
-  | { type: 'card.yolo.set'; cardId: Id; enabled: boolean }
-  /** liga ou desliga o modo autônomo (YOLO) de várias histórias de uma vez; ignora quem não for história viva */
-  | { type: 'card.yolo.setMany'; cardIds: Id[]; enabled: boolean }
+  /**
+   * liga ou desliga o modo autônomo (YOLO) da história do card. `until` é a coluna até onde ele vai (a IA
+   * faz o trabalho dela, pede a revisão e o modo se desliga); ausente ou null = até a última coluna da IA.
+   * Com o modo já ligado, um `until` diferente só muda até onde ele vai.
+   */
+  | { type: 'card.yolo.set'; cardId: Id; enabled: boolean; until?: Id | null }
+  /**
+   * liga ou desliga o modo autônomo (YOLO) de várias histórias de uma vez; ignora quem não for história viva.
+   * `until` vale para todas: numa história de outro workflow, vale a coluna de mesmo nome
+   */
+  | { type: 'card.yolo.setMany'; cardIds: Id[]; enabled: boolean; until?: Id | null }
   /** arquiva várias histórias de uma vez; ignora quem não for história viva */
   | { type: 'card.archiveMany'; cardIds: Id[] }
   /** manda várias histórias para a lixeira de uma vez; ignora quem não for história viva */
@@ -93,6 +109,8 @@ export type WebviewToHost =
   | { type: 'card.moveMany'; cardIds: Id[]; columnId: Id }
   /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */
   | { type: 'card.yolo.inherit'; cardId: Id; fromId: Id }
+  /** a história é uma entrega derivada de outra: a branch dela parte da branch da origem, com o pull request empilhado */
+  | { type: 'card.derive'; cardId: Id; fromId: Id }
   /** agente de execução do card (nome do agente marcado no Harness); null volta ao da coluna */
   | { type: 'card.execProfile.set'; cardId: Id; profileId: Id | null }
   /** a pasta de trabalho da história foi removida (a branch continua registrada) */
@@ -100,7 +118,8 @@ export type WebviewToHost =
   /** abre a pasta de trabalho da história numa janela nova do editor */
   | { type: 'card.workspace.open'; cardId: Id }
   /** muda o status de trabalho do card; `note` é o motivo do bloqueio ou o texto que vai junto para a conversa */
-  | { type: 'card.status.set'; cardId: Id; status: CardStatus | null; note?: string }
+  /** `pending`: há algo que depende da pessoa; em modo autônomo o pedido de revisão não vira aprovação automática */
+  | { type: 'card.status.set'; cardId: Id; status: CardStatus | null; note?: string; pending?: boolean }
   | { type: 'comment.add'; cardId: Id; body: string; kind?: 'summary' }
   | { type: 'comment.update'; commentId: Id; body: string }
   | { type: 'comment.delete'; commentId: Id }
@@ -114,6 +133,8 @@ export type WebviewToHost =
   | { type: 'attachment.write'; requestId: string; attachmentId: Id; content: string }
   /** consulta o log para o painel de métricas; não altera nada, a resposta é `metrics.result` */
   | { type: 'metrics.query'; requestId: string; query: MetricsPanelQuery }
+  /** consulta o que o card já gastou nas execuções de IA (o log); não altera nada, a resposta é `card.usage.result` */
+  | { type: 'card.usage.query'; requestId: string; cardId: Id }
   /** diálogo nativo de "salvar como" (só no editor; na web a modal faz o download direto) */
   | { type: 'attachment.saveAs'; attachmentId: Id }
   | { type: 'attachment.delete'; attachmentId: Id }
@@ -192,10 +213,16 @@ export type WebviewToHost =
   | { type: 'harness.refresh' }
   /** abre no editor o arquivo de um item do harness */
   | { type: 'harness.item.open'; path: string }
+  /** lê, para o editor do board, um arquivo que a varredura do harness listou */
+  | { type: 'harness.file.read'; requestId: string; path: string }
+  /** grava o texto editado no board num arquivo do harness; recusa os que são só leitura */
+  | { type: 'harness.file.write'; requestId: string; path: string; content: string }
   /** cria um item num lugar do catálogo da ferramenta (`source` é o índice em HARNESS_CATALOG) e abre o arquivo no editor */
   | { type: 'harness.item.create'; tool: AiTool; source: number; name: string; description: string }
   /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
   | { type: 'harness.item.delete'; tool: AiTool; kind: HarnessKind; path: string }
+  /** desinstala, desativa ou ativa plugins pela ferramenta; `ids` são os de `HarnessItem.install` */
+  | { type: 'harness.plugin.apply'; tool: AiTool; action: PluginAction; ids: string[] }
   /** copia skills, agentes, comandos ou regras para o projeto ou para a pasta do usuário */
   | { type: 'harness.item.copy'; tool: AiTool; items: { kind: HarnessKind; path: string }[]; to: 'project' | 'user' }
   | { type: 'harness.rule.write'; name: string; content: string }
@@ -250,12 +277,10 @@ export type WebviewToHost =
   | { type: 'ui.showChat' }
   /** confere de novo o que falta para o board trabalhar com a ferramenta de IA */
   | { type: 'requirements.check' }
-  /** roda o Diagnóstico do ambiente (o que o board precisa e o que ele usa, com como resolver cada item) */
+  /** roda o Diagnóstico do ambiente (o que o board precisa, o que é opcional e o que ele aproveita) */
   | { type: 'environment.check' }
   /** o Diagnóstico já abriu sozinho nesta máquina: não abre mais na abertura do board */
   | { type: 'environment.seen' }
-  /** "Instalar tudo" de um nível: o host roda o plano do último Diagnóstico num terminal do editor */
-  | { type: 'environment.install'; level: 'required' | 'recommended' }
   /** grava o caminho completo dos MCPs (do board e do Code Review Graph) que o editor não acha */
   | { type: 'environment.pinMcp' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
@@ -284,8 +309,18 @@ export type HostToWebview =
   | { type: 'attachment.readResult'; requestId: string; content?: string; error?: string }
   /** resposta a `attachment.write`, correlacionada por `requestId` */
   | { type: 'attachment.writeResult'; requestId: string; ok: boolean; error?: string }
+  /** terminou o `harness.plugin.apply` (com aviso ou erro): a tela para de mostrar que está trabalhando */
+  | { type: 'harness.plugin.done' }
+  /** resposta a `harness.file.read`: o conteúdo e se o arquivo pode ser alterado pelo board */
+  | { type: 'harness.file.readResult'; requestId: string; content?: string; readonly?: boolean; error?: string }
+  /** item do harness criado pela tela: ela abre o arquivo no editor do board */
+  | { type: 'harness.item.created'; path: string }
+  /** resposta a `harness.file.write`, correlacionada por `requestId` */
+  | { type: 'harness.file.writeResult'; requestId: string; ok: boolean; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
+  /** resposta a `card.usage.query`, correlacionada por `requestId` */
+  | { type: 'card.usage.result'; requestId: string; usage?: CardUsage; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */
   | { type: 'backup.import.summary'; token: string; summary: ImportSummary }
   /** a exportação ou a escolha do arquivo terminou (com sucesso ou porque a pessoa desistiu): a interface sai do estado "ocupado" */
