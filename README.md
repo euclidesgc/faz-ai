@@ -1001,6 +1001,20 @@ O que mais dá para fazer em cada grupo:
 - **Buscar e instalar skills** de uma pasta ou de um repositório git: o board lista as skills
   encontradas e copia só as que você escolher. Nada do repositório é executado.
 
+**Mudanças feitas por fora.** O board relê o harness sozinho quando um arquivo muda fora dele (no
+editor, pela IA, pelo git), e junta numa releitura só as mudanças de uma mesma rajada (300 ms). No
+projeto, valem o `CLAUDE.md`, o `AGENTS.md`, o `.mcp.json` e tudo de `.claude/`, `.cursor/` e
+`.agents/`. Na pasta do usuário, só as pastas e os arquivos que a aba Global mostra, nunca a home
+inteira: o `~/.claude/CLAUDE.md`, as pastas de regras, skills, subagentes, comandos e estilos, os
+settings, o `~/.claude.json` e os equivalentes do Cursor; de `~/.claude/projects`, só a pasta
+`memory` deste projeto (o resto recebe as transcrições das sessões o tempo todo); dos plugins, o
+registro de instalados do Claude Code e os plugins locais do Cursor. Uma skill ou um subagente
+instalado como link para outra pasta também é observado. No editor, a pasta do usuário passa a ser
+observada quando o board carrega. No modo navegador, são observados os mesmos arquivos globais e, no
+projeto, as pastas e os arquivos que a aba Projeto mostra (sem as worktrees que ficam em `.claude/`),
+e o board relê tudo a cada minuto para o que um watcher não vê. As regras
+de subpasta e a política da organização não são observadas: entram na releitura seguinte.
+
 ### Skills sob demanda
 
 Cada skill tem um modo:

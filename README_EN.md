@@ -1046,6 +1046,20 @@ What else you can do in each group:
 - **Find and install skills** from a folder or a git repository: the board lists the skills it
   finds and copies only the ones you pick. Nothing from the repository is executed.
 
+**Changes made outside the board.** The board rereads the harness on its own when a file changes
+outside it (in the editor, by the AI, by git), and folds the changes of one burst (300 ms) into a
+single reread. In the project, that covers `CLAUDE.md`, `AGENTS.md`, `.mcp.json` and everything in
+`.claude/`, `.cursor/` and `.agents/`. In your user folder, only the folders and files the Global
+tab shows, never the whole home folder: `~/.claude/CLAUDE.md`, the rules, skills, subagents,
+commands and styles folders, the settings, `~/.claude.json` and the Cursor equivalents; from
+`~/.claude/projects`, only this project's `memory` folder (the rest gets session transcripts all the
+time); for plugins, Claude Code's registry of installed plugins and Cursor's local plugins. A skill
+or subagent installed as a link to another folder is watched too. In the editor, the user folder is
+watched once the board loads. In browser mode, the same global files are watched and, in the
+project, the folders and files the Projeto tab shows (without the worktrees kept in `.claude/`), and
+the board rereads everything every minute for what a watcher doesn't see. Rules in
+subfolders and the organization policy aren't watched: they come in with the next reread.
+
 ### On-demand skills
 
 Each skill has a mode:

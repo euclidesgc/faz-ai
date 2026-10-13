@@ -38,6 +38,18 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
   que o card já gastou, medido em cada execução, por fase (execuções, tempo, tokens de entrada, saída e
   cache) e no total, com as sub-tarefas de uma história numa linha à parte. O gasto é histórico e só
   cresce; apagar mensagens muda só a estimativa das próximas execuções.
+- **O harness global relido na hora.** Uma skill, um subagente, uma regra, um settings ou um servidor
+  MCP da sua pasta de usuário (`~/.claude`, `~/.claude.json`, `~/.cursor`, `~/.agents`) editado por
+  fora, no editor, pela IA ou pelo git, aparece no board na hora, e o contexto estimado de cada card
+  acompanha, como já acontecia com os arquivos do projeto; o mesmo vale para a memória do projeto e
+  para os plugins instalados, ativados ou removidos. Antes, o board só via a mudança quando era aberto
+  de novo ou quando a própria tela mexia no harness. São observados só as pastas e os arquivos que a
+  aba Global mostra, nunca a home inteira: de `~/.claude/projects`, só a pasta `memory` deste projeto;
+  de `~/.claude/plugins`, só o registro dos instalados. Uma skill instalada como link para outra pasta
+  também é observada. No modo navegador (`faz-ai`), que relia tudo a cada 15 segundos, passam a ser
+  observados os mesmos arquivos globais e, no projeto, as pastas e os arquivos que a aba Projeto
+  mostra; a releitura completa fica a cada minuto, para o que um watcher não vê (regras de subpasta,
+  sistemas de arquivos de rede).
 
 ## 0.36.0
 

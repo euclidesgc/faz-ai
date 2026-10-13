@@ -38,14 +38,19 @@ export function parseClaudePlugins(stdout: string, projectDir: string): PluginIn
 }
 
 /**
- * O que muda a lista de plugins do Claude Code: o registro de instalados, os sincronizados do claude.ai
- * e os `enabledPlugins` dos settings. Comparar isto é barato; rodar a CLI, não.
+ * Na home, o que muda a lista de plugins do Claude Code: o registro de instalados, os sincronizados do
+ * claude.ai e os `enabledPlugins` dos settings. O resto de `~/.claude/plugins` (catálogos dos
+ * marketplaces, caches) muda sem mudar o que está instalado.
+ */
+export const CLAUDE_PLUGIN_STATE = ['.claude/plugins/installed_plugins.json', '.claude/plugins/synced', '.claude/settings.json'];
+
+/**
+ * O que muda a lista de plugins do Claude Code: o estado da home e os `enabledPlugins` dos settings do
+ * projeto. Comparar isto é barato; rodar a CLI, não.
  */
 export function pluginSignature(homeDir: string, projectDir: string): string {
   const files = [
-    path.join(homeDir, '.claude/plugins/installed_plugins.json'),
-    path.join(homeDir, '.claude/plugins/synced'),
-    path.join(homeDir, '.claude/settings.json'),
+    ...CLAUDE_PLUGIN_STATE.map((f) => path.join(homeDir, f)),
     path.join(projectDir, '.claude/settings.json'),
     path.join(projectDir, '.claude/settings.local.json'),
   ];
