@@ -7,6 +7,7 @@ import { blocksExecution } from '../shared/requirements';
 import { limitOf, type AiRunMode } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
+import { autopilotQueue } from '../shared/autopilotQueue';
 import type { MessageRouter } from './panel/messageRouter';
 
 const AUTHOR = 'Faz AI';
@@ -52,8 +53,12 @@ export type AutopilotStep =
   /** a história está parada por um impedimento (bloqueio, pergunta, dependência ou ciclo emperrado) */
   | { kind: 'paused'; story: Card; reason: string };
 
-/** Histórias em modo autônomo ainda não entregues, na ordem da fila (bug primeiro, depois a posição no board). */
-const pendingStories = (s: BoardState): Card[] => yoloStories(s).filter((c) => !isDelivered(s, c));
+/**
+ * Histórias em modo autônomo ainda não entregues, na ordem da fila: bug primeiro, depois a posição no
+ * board, e a que depende de outra da fila (ou deriva dela) só depois dela (`autopilotQueue`). É a mesma
+ * ordem que o card mostra na posição da fila.
+ */
+const pendingStories = (s: BoardState): Card[] => autopilotQueue(s);
 
 /**
  * Todas as histórias que o autopiloto pode iniciar agora, na ordem da fila. A história em fase de texto
@@ -449,10 +454,14 @@ export class Autopilot {
    */
   private recoverStale(): void {
     const s = this.router.snapshot();
-    for (const story of pendingStories(s).filter(isLive))
-      for (const c of [story, ...childrenOf(s, story.id).filter(isLive)])
-        if (c.status === 'running' && !s.aiRuns.includes(c.id) && !this.runner.running.includes(c.id))
+    const live = (id: string) => s.aiRuns.includes(id) || this.runner.running.includes(id);
+    for (const story of pendingStories(s).filter(isLive)) {
+      // a sessão da história é quem marca as sub-tarefas "Em execução": enquanto ela roda, elas estão de verdade em execução
+      const kids = live(story.id) ? [] : childrenOf(s, story.id).filter(isLive);
+      for (const c of [story, ...kids])
+        if (c.status === 'running' && !live(c.id))
           this.router.handle({ type: 'card.status.set', cardId: c.id, status: 'ready' }, { author: AUTHOR, source: 'ai' });
+    }
   }
 
   private publish(note: string | null): void {

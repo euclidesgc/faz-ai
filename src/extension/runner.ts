@@ -470,6 +470,9 @@ export class AiRunner {
         // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
         this.runs.delete(cardId);
       }
+      // a sessão da história é quem marca as sub-tarefas "Em execução" (start_work); com ela encerrada, nenhuma
+      // continua em execução de verdade. Sem isto a sub-tarefa ficava presa e segurava a história para sempre
+      if (!retry) this.releaseSubtasks(cardId, tool.label);
       if (retry) {
         // o modelo principal esgotou o limite e há reserva: uma nova execução assume, sem publicar nem
         // avisar o fim desta (quem decide o desfecho final é a execução da reserva)
@@ -617,6 +620,15 @@ export class AiRunner {
     const currentStory = currentCard && storyOf(current, currentCard);
     if (currentStory && isYolo(current, currentCard) && isWithHuman(currentStory)) return;
     this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);
+  }
+
+  /** As sub-tarefas da história que a sessão encerrada deixou "Em execução" voltam para a IA. */
+  private releaseSubtasks(storyId: string, toolLabel: string): void {
+    const s = this.router.snapshot();
+    for (const kid of s.cards.filter((c) => c.parentId === storyId && isLive(c) && c.status === 'running' && !this.runs.has(c.id))) {
+      this.deps.log(`[${cardRef(kid)}] A sessão da história encerrou com a sub-tarefa "Em execução"; voltou para Pronto.`);
+      this.setStatus(kid.id, 'ready', toolLabel);
+    }
   }
 
   private aiMessages(cardId: string): number {

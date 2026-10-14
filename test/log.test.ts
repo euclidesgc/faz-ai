@@ -261,9 +261,9 @@ describe('AiRunRepo', () => {
     expect(run!.endedAt).not.toBeNull();
   });
 
-  it('closeOpen marca como unknown toda linha com outcome nulo, com ended_at preenchido e duration_ms nulo', () => {
+  it('closeOpen marca como unknown toda linha com outcome nulo, com ended_at preenchido e duration_ms nulo, e devolve os cards delas', () => {
     const open = runs.start(baseStart());
-    runs.closeOpen(5_000);
+    expect(runs.closeOpen(5_000)).toEqual([baseStart().cardId].filter((id) => id !== null));
     const [run] = runs.byMonth('2026-01');
     expect(run!.id).toBe(open);
     expect(run!.outcome).toBe('unknown');
@@ -275,7 +275,7 @@ describe('AiRunRepo', () => {
     const closed = runs.start(baseStart());
     runs.finish(closed, 'done', 0);
     const before = runs.byMonth('2026-01').find((r) => r.id === closed)!;
-    runs.closeOpen(9_999_999);
+    expect(runs.closeOpen(9_999_999)).toEqual([]);
     const after = runs.byMonth('2026-01').find((r) => r.id === closed)!;
     expect(after.outcome).toBe('done');
     expect(after.endedAt).toBe(before.endedAt);

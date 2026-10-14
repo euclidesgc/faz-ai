@@ -196,7 +196,7 @@ status color, and the LED on the bar tells the card's state at a glance: green a
 
 **Collapsed cards.** You can collapse cards to fit more rows of a column in the same screen. A collapsed card keeps the type's colored strip (with the AI LED, the number, the type and the buttons) and shows the title in up to two lines, hiding the rest; the status border stays (if the card is waiting on you), so you can sweep the board at a glance and know what needs your attention. Collapse can be applied in four scopes: a single card (button on the card itself), all cards in a column (item in the column's action menu), all cards on the board (button in the filter bar) or just the selected cards (button in the multi-select bar). The state is remembered between sessions.
 
-**Select all in a column.** In the ⋯ menu of a story column, **Selecionar todos** selects the column's visible stories (the active filter applies). With the selection made, the same menu offers **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** and **Mandar selecionados para a lixeira**, each with a single confirmation for the whole batch; **Limpar seleção** clears it. The selection applies to one column at a time: selecting a card in another column replaces the selection. In a batch, a story with an open sub-task is not concluded (the others go ahead), and moving to a cancellation column cancels open sub-tasks.
+**Select all in a column.** The checkbox next to the count in a story column's header (or **Selecionar todos** in the ⋯ menu) selects the column's visible stories (the active filter applies); checked again, it clears the selection. With the selection made, the same menu offers **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** and **Mandar selecionados para a lixeira**, each with a single confirmation for the whole batch; **Limpar seleção** clears it. The selection applies to one column at a time: selecting a card in another column replaces the selection. In a batch, a story with an open sub-task is not concluded (the others go ahead), and moving to a cancellation column cancels open sub-tasks.
 
 ### Links between cards
 
@@ -861,7 +861,12 @@ story by itself, **without asking for authorization or confirmation on anything*
 - **No restrictions**: in the mode's runs the AI uses the "Sem restrições" permission (edits files
   and runs commands), because it needs git and `gh`. Turning the mode on accepts this for the story.
 - **Queued and stacked**: the **autopilot** drives autonomous stories one at a time, in board
-  order — bugs first, then the rightmost, and within a column top to bottom — and moves on to the next story in the queue as soon as
+  order — bugs first, then the rightmost, and within a column top to bottom — corrected by
+  precedence: a story that depends on another in the queue (**depends on** link, including through
+  a sub-task) or derives from it comes after it, however high it sits on the board. With the mode
+  on, each story waiting for its turn shows the **Fila N** (queue N) badge on the card (1 = next);
+  the number disappears when the AI starts on the story, when it passes to you and when it is
+  concluded, and pausing the mode clears them all. The autopilot moves on to the next story in the queue as soon as
   the current one is delivered (stopped at the AI's last column, with the pull request recorded),
   without waiting for your review or the heartbeat interval. No impediment holds up the queue: a
   story that is blocked, waiting for your answer, waiting for another card to finish (a
@@ -887,9 +892,13 @@ story by itself, **without asking for authorization or confirmation on anything*
   locking it up — a story that keeps getting stuck can spend up to 3 runs each, across the whole
   queue. Once you unblock the card it carries on by itself.
 
-The **autonomous mode button** at the top of the board shows while there is a story in the queue
-and says what the click does: **Pausar modo autônomo** (pause; lit, with the autopilot driving;
-pausing interrupts the AI) or **Retomar modo autônomo** (resume; dimmed, paused). From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
+The **autonomous mode button** at the top of the board exists whenever there is an open story and
+says what the click does: **Ligar modo autônomo** (turn on; no story in the mode: after the
+confirmation with "Até onde", it puts every unfinished story in the mode — or only the selected
+ones, when there is a selection — and they join the queue and are driven one at a time, respecting
+the parallel-run limits), **Pausar modo autônomo** (pause; lit, with the autopilot driving; pausing
+interrupts the AI) or **Retomar modo autônomo** (resume; dimmed, paused; with open stories still
+outside the mode, it also puts them in the mode before resuming, with the same confirmation). From the editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo
 autônomo (YOLO)** and **Faz AI: Parar as execuções da IA e o modo autônomo**. When the editor
 opens, the autopilot starts by itself whenever there is a pending autonomous-mode story, unless
 you paused it: the pause is recorded on the board (it survives reopening the editor), and
@@ -898,6 +907,14 @@ as a pause. After a failure to start the AI tool, the autopilot does not start i
 you resume it. With the tool's login expired, the autopilot and the heartbeat wait for the sign-in
 to come back, without spending runs. The heartbeat does not drive autonomous stories; they belong
 to the autopilot.
+
+**Card stuck in "Em execução" (running).** A card is "Em execução" only while an AI session is on
+it. If the session that marked it ended without passing the turn (the editor window closed with the
+AI running, the story session finished with a sub-task marked by `start_work`, a session outside
+the board crashed), the board sends it back to Pronto (ready): when the board opens, the cards of
+runs the previous session left open (and their sub-tasks); when a story's session ends, its
+sub-tasks; and every minute, any card "Em execução" with no board run for longer than one run's
+time limit (Settings → AI Harness → maximum time), with the explanation in the conversation.
 
 
 ### Critical areas (core)

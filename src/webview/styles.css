@@ -255,6 +255,14 @@ button.active {
 .terminal-mark {
   color: var(--success);
 }
+.column-select {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 .column-count {
   color: var(--muted);
   font-weight: 400;
@@ -1708,6 +1716,30 @@ code {
   align-items: center;
   gap: var(--sp-6);
   margin-top: var(--sp-6);
+}
+.card-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+  margin-top: var(--sp-6);
+}
+.card-status-row .card-status {
+  margin-top: 0;
+}
+/* posição na fila do modo autônomo: selo só de leitura, na cor do modo */
+.queue-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--warn-border);
+  border: 1px solid var(--warn-border);
+  padding: 0 var(--sp-6);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .card-status-age {
   font-size: var(--fs-xs);

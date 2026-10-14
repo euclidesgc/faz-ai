@@ -183,7 +183,7 @@ pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do
 
 **Cards colapsados.** Você pode colapsar cards para enxergar mais linhas de uma coluna na mesma tela. Um card colapsado mantém a faixa colorida do tipo (com o LED da IA, o número, o tipo e os botões) e mostra o título em até duas linhas, escondendo o resto; a borda de status continua (se o card espera por você), para você varrer o board de relance e saber o que precisa de atenção. O colapso pode ser aplicado em quatro escopos: um card isolado (botão no próprio card), todos os cards de uma coluna (item no menu de ações da coluna), todos os cards do board (botão na barra de filtros) ou só os cards selecionados (botão na barra de seleção múltipla). O estado fica lembrado entre sessões.
 
-**Selecionar todos de uma coluna.** No menu ⋯ de uma coluna de histórias, **Selecionar todos** marca as histórias visíveis da coluna (o filtro ativo vale). Com a seleção feita, o mesmo menu oferece **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** e **Mandar selecionados para a lixeira**, cada uma com uma confirmação só para o lote; **Limpar seleção** desmarca tudo. A seleção vale para uma coluna por vez: marcar um card de outra coluna substitui a seleção. Na ação em lote, uma história com sub-tarefa em aberto não é concluída (as outras seguem), e mover para uma coluna de cancelamento cancela as sub-tarefas em aberto.
+**Selecionar todos de uma coluna.** A caixa ao lado da contagem no cabeçalho de uma coluna de histórias (ou **Selecionar todos**, no menu ⋯) marca as histórias visíveis da coluna (o filtro ativo vale); marcada de novo, limpa a seleção. Com a seleção feita, o mesmo menu oferece **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** e **Mandar selecionados para a lixeira**, cada uma com uma confirmação só para o lote; **Limpar seleção** desmarca tudo. A seleção vale para uma coluna por vez: marcar um card de outra coluna substitui a seleção. Na ação em lote, uma história com sub-tarefa em aberto não é concluída (as outras seguem), e mover para uma coluna de cancelamento cancela as sub-tarefas em aberto.
 
 ### Vínculos entre cards
 
@@ -824,7 +824,12 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
 - **Sem restrições**: nas execuções do modo, a IA roda com a permissão "Sem restrições" (altera
   arquivos e roda comandos), porque precisa de git e do `gh`. Ligar o modo é aceitar isso para a história.
 - **Em fila e em pilha**: o **autopiloto** toca as histórias em modo autônomo uma de cada vez, na
-  ordem do board — bugs na frente, depois a mais à direita, e na mesma coluna de cima para baixo —, e segue para a próxima história da
+  ordem do board — bugs na frente, depois a mais à direita, e na mesma coluna de cima para baixo —,
+  corrigida pelas precedências: uma história que depende de outra da fila (vínculo **depende de**,
+  inclusive por uma sub-tarefa) ou derivada dela vem depois, por mais acima que esteja no board. Com
+  o modo ligado, cada história que espera a vez mostra no card o selo **Fila N** (1 = a próxima); o
+  número some quando a IA começa nela, quando ela passa para você e quando ela é concluída, e pausar o
+  modo apaga todos. O autopiloto segue para a próxima história da
   fila assim que a atual é entregue (parada na última coluna da IA, com o pull request registrado),
   sem esperar a sua revisão nem o intervalo do heartbeat. Nenhum impedimento segura a fila: uma
   história bloqueada, esperando a sua resposta, esperando outro card terminar (dependência) ou
@@ -850,9 +855,13 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   travá-la — histórias que emperram podem gastar até 3 execuções cada, em todas da fila. Ao
   destravar o card, ele continua sozinho.
 
-O **botão do modo autônomo** no topo do board aparece enquanto houver história na fila e diz o que
-o clique faz: **Pausar modo autônomo** (aceso, com o autopiloto tocando; pausar interrompe a IA) ou
-**Retomar modo autônomo** (apagado, pausado). Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
+O **botão do modo autônomo** no topo do board existe sempre que há história em aberto e diz o que
+o clique faz: **Ligar modo autônomo** (nenhuma história no modo: depois da confirmação com o "Até
+onde", põe no modo todas as histórias ainda não concluídas — ou só as selecionadas, quando há
+seleção —, que entram na fila e são tocadas cada uma na sua vez, respeitando os tetos de execuções em
+paralelo), **Pausar modo autônomo** (aceso, com o autopiloto tocando; pausar interrompe a IA) ou
+**Retomar modo autônomo** (apagado, pausado; com histórias em aberto ainda fora do modo, também as
+põe no modo antes de retomar, com a mesma confirmação). Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo
 (YOLO)** e **Faz AI: Parar as execuções da IA e o modo autônomo**. Ao abrir o editor, o autopiloto
 liga sozinho quando há história pendente em modo autônomo, a não ser que você tenha pausado: a
 pausa fica gravada no board (sobrevive a reabrir o editor), e "Retomar", ou ligar o modo numa
@@ -860,6 +869,14 @@ história, a limpa; fechar o editor não conta como pausa. Depois de uma falha a
 de IA, o autopiloto não religa sozinho até você retomar. Com o login da ferramenta vencido, o
 autopiloto e o heartbeat esperam o login voltar, sem gastar execuções. O heartbeat não toca
 histórias em modo autônomo; elas são do autopiloto.
+
+**Card preso em "Em execução".** Um card só fica "Em execução" enquanto há uma sessão de IA nele.
+Se a sessão que o marcou acabou sem passar a vez (a janela do editor fechou com a IA rodando, a
+sessão da história terminou com uma sub-tarefa marcada por `start_work`, uma sessão fora do board
+caiu), o board o devolve para Pronto: na abertura, os cards das execuções que a sessão anterior
+deixou abertas (e as sub-tarefas deles); ao fim da sessão de uma história, as sub-tarefas dela; e, a
+cada minuto, qualquer card "Em execução" sem execução do board há mais tempo que o limite de uma
+execução (Configurações → Harness de IA → tempo máximo), com a explicação na conversa.
 
 
 ### Áreas críticas (núcleo)
