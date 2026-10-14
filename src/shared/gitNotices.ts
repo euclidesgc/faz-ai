@@ -4,7 +4,7 @@
 
 type Params = Record<string, string | number>;
 
-/** As chaves desta parte; `stack.*`, `back.*` e `cleanup.remoteStillBase` entram na parte 2 (#480). */
+/** As chaves da limpeza (#464), da pilha (`stack.*`) e da volta da principal no hotfix (`back.*`), estas da #480. */
 export type GitNoticeKey =
   | 'cleanup.title'
   | 'cleanup.worktreeRemoved'
@@ -26,7 +26,18 @@ export type GitNoticeKey =
   | 'cleanup.remoteMoved'
   | 'cleanup.headMismatch'
   | 'cleanup.noPullRequest'
-  | 'cleanup.noOrigin';
+  | 'cleanup.noOrigin'
+  | 'cleanup.remoteStillBase'
+  | 'stack.moved'
+  | 'stack.prMoved'
+  | 'stack.prFailed'
+  | 'back.merged'
+  | 'back.already'
+  | 'back.conflict'
+  | 'back.notMerged'
+  | 'back.createFailed'
+  | 'back.prTitle'
+  | 'back.prBody';
 
 /** Os textos em português; os avisos já levam o prefixo `**Aviso:**`. */
 export const GIT_NOTICES: Record<GitNoticeKey, string> = {
@@ -61,6 +72,23 @@ export const GIT_NOTICES: Record<GitNoticeKey, string> = {
     '**Aviso:** A limpeza não apagou nada: o pull request {pr} é da branch {head}, e a branch registrada no card é {branch}.',
   'cleanup.noPullRequest': '**Aviso:** A limpeza não apagou nada: não foi possível confirmar o pull request {pr} pelo gh ({error}).',
   'cleanup.noOrigin': '**Aviso:** O repositório não tem o remoto origin: a branch remota e a {develop} não foram tocadas.',
+  'cleanup.remoteStillBase':
+    '**Aviso:** A branch remota origin/{branch} não foi apagada: o pull request {nextPr} da história #{number} ainda a usa como base. Troque a base dele (gh pr edit {nextPr} --base {base}) e apague com: git push origin --delete {branch}',
+  'stack.moved':
+    'A história #{prev}, sobre a qual esta estava empilhada, foi concluída: a base desta história passou de {old} para {base}. Antes de continuar, traga a nova base para a branch (git fetch origin {base} e git merge origin/{base}), sem rebase nem push forçado.',
+  'stack.prMoved': 'A base do pull request {pr} também passou para {base}.',
+  'stack.prFailed': '**Aviso:** a base do pull request {pr} não foi trocada: {error}. Troque com: gh pr edit {pr} --base {base}',
+  'back.merged': 'A {main} voltou para a {develop} pelo pull request {url}, com merge commit.',
+  'back.already': 'A {develop} já contém a {main}: não foi preciso abrir o pull request de volta.',
+  'back.conflict':
+    '**Aviso:** O pull request {url} da {main} para a {develop} tem conflito e ficou aberto. O board não resolve conflitos: resolva-o no GitHub ou localmente e faça o merge com merge commit (gh pr merge {url} --merge).',
+  'back.notMerged':
+    '**Aviso:** O pull request {url} da {main} para a {develop} ficou aberto: {error}. Faça o merge com merge commit: gh pr merge {url} --merge',
+  'back.createFailed':
+    '**Aviso:** O pull request da {main} para a {develop} não foi aberto: {error}. Abra com: gh pr create --base {develop} --head {main}',
+  'back.prTitle': 'Volta da {main} para a {develop} depois do hotfix #{number}',
+  'back.prBody':
+    'Aberto pelo Faz AI depois do merge de {pr}. Faça o merge com merge commit, não com squash: a {develop} precisa conter os commits da {main}.',
 };
 
 /** O texto do aviso em português, com cada `{param}` no lugar. Parâmetro que falta fica como `{param}`. */
