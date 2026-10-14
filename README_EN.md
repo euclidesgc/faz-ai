@@ -968,12 +968,51 @@ On the Agentes tab of each scope:
   padrão** (make default) makes it run when none of them picks.
 - **Novo agente** (new agent): name, description (it is how Refine with AI picks), model and
   instructions.
-- **Editar** (edit): each frontmatter field saves on blur; the instructions have Save. Skills come
-  from the same picker as the card (checked ones only); tools have ready-made sets (**Só leitura**
-  read-only, **Editar código** edit code).
+- **Criar agente com ajuda** (create agent with help): a seven-step assistant for a narrow-scope
+  agent (see below).
+- **Sugestões prontas** (ready-made suggestions): read-only reviewer, test writer, documentation
+  writer and migration runner; each opens the assistant with the answers filled in, for you to adjust
+  and confirm. They are local, with no AI.
+- **Editar** (edit): the editor shows only what the agent's tool accepts (table below). Each
+  frontmatter field saves on blur; the instructions have Save. Skills come from the same picker as
+  the card (checked ones only). In Claude Code, the available and denied tools are **checkable
+  lists** grouped by scope (reading, file editing, commands, network, other agents and others), with
+  the **amplia o escopo** (widens the scope) warning on the groups that give the agent more power,
+  and there are ready-made sets (**Só leitura** read-only, **Editar código** edit code). What the file
+  already has and the list does not know (such as `mcp__github__*` or `Bash(git diff *)`) shows as a
+  checked chip you can remove, and you can add a board MCP server as `mcp__<name>__*`. In Cursor
+  there is no tool list: the editor shows only **Somente leitura** (read-only) and **Em segundo
+  plano** (in the background).
 - **Sugerir agentes com IA** (suggest agents with AI): the AI reads the project (structure,
   dependencies, README) and creates or adjusts 3 to 8 agents for it through MCP, leaving them
   available. The result lands in the board chat.
+
+What the agent file of each tool accepts (official documentation read on 2026-10-14):
+
+| Tool | Agent frontmatter | The editor shows |
+| --- | --- | --- |
+| Claude Code | `description`, `tools`, `disallowedTools`, `model`, `skills`, among others | instructions, model and effort, skills, MCP servers, available and denied tools |
+| Cursor | `description`, `model`, `readonly`, `is_background`; no list of tools, skills or MCP (inherits everything from the main conversation) | instructions, model and effort, **Somente leitura** and **Em segundo plano** |
+
+An agent created for one tool lives in that tool's folder and only shows under its tab.
+
+**Criar agente com ajuda.** One step at a time, in a card, with **Voltar** (back) and **Continuar**
+(continue); each step brings an example answer and a suggestion without hiding the other options,
+and nothing is written before the last one. (1) **Para que serve** (what it is for): the role and
+goal (example: "Reviews a branch's diff before the pull request and points out bugs, changing
+nothing."). (2) **Ferramentas** (tools): the minimum set from the guideline (review, read and
+analyze: `Read`, `Grep`, `Glob`; edit, implement and fix: also `Edit`, `Write` and `Bash`; test and
+run: `Bash`; search the web: `WebFetch` and `WebSearch`; never `Agent` by default), with the reason
+for each, the full list and the warning for what widens the scope; in Cursor the step is the choice
+of **Somente leitura**. (3) **Servidores MCP**: only the board's, which always goes along; the
+board's others as options. (4) **Skills de apoio** (supporting skills): the board's in Per card
+mode, with the ones tied to the guideline suggested and the one-per-subject rule. (5) **Modelo e
+esforço** (model and effort): reading and review ask for the smallest catalog model with low effort;
+planning, architecture and implementation, a larger one. (6) **Instruções** (instructions): a draft
+generated from the answers (how it works, standards, what it never does), editable. (7) **Resumo**
+(summary): the whole agent and the name (derived from the guideline, editable and validated); only
+**Criar agente** writes. In Cursor, the MCP servers and skills steps say the agent file does not
+accept them.
 
 Each run started by the board ("Trabalhar na fase", "Refinar com IA" and the heartbeat) is a new,
 empty-context session, with only what is on the card. The agent becomes command-line parameters where
@@ -1121,6 +1160,32 @@ never the marketplaces' catalog. With plugins checked, the bar offers **Desativa
 and the organization's can only be disabled. In Cursor, which has no command for it, uninstalling
 removes the plugin's folder from `~/.cursor/plugins/local`. Uninstalling asks for confirmation, and
 the change takes effect in the tool's next session (in Claude Code, also after `/reload-plugins`).
+
+**Create rule and skill with help.** Whoever starts a project from scratch with the board has no
+rules or skills at all. In the Projeto and Global origins of the project's tool, the **Regras**
+(rules) and **Skills** subjects have an assistant, with the same principles as the agents one
+(question by question, an example answer in each, suggestions that do not hide the options, nothing
+written before the last step):
+
+- **Criar regra com ajuda** (5 steps): (1) where it applies: the **main** rule (the tool's rules
+  file, created or appended to at the end if it already exists) or **by subject** (a new file in
+  `.claude/rules/<name>.md` or `.cursor/rules/<name>.mdc`, with `paths:` in Claude Code or `globs:`
+  in Cursor); (2) what it guarantees; (3) project conventions, which the board reads without AI
+  (languages, test, lint and format commands from `package.json`, tools such as eslint, prettier,
+  vitest, pytest and ruff, and the main folders) and offers as checkable items; (4) a check against
+  the board's flow, which points out passages that say not to use MCP, ignore the board, not ask for
+  review, skip the approval, commit straight to main or not create a branch; (5) editable draft and
+  summary. The rule **enters the board switched off**; a file that was already on the board keeps the
+  mode you gave it.
+- **Criar skill com ajuda** (6 steps): (1) the task the skill teaches, which becomes the description;
+  (2) when to use it, which goes in the description; (3) the steps, proposed from the task's verbs and
+  the project's commands, as an editable list; (4) what the skill never does; (5) optional supporting
+  files in `references/`, `assets/` and `scripts/`, created empty; (6) the full `SKILL.md` and the
+  summary. The skill is written to Projeto or Global and sent to the board as **Pelo card** (per card).
+- **Sugerir regras com IA** and **Sugerir skills com IA** (suggest rules / skills with AI): the AI
+  reads the project and writes 3 to 5 ready-filled items (rules in the tool's rules file, without
+  deleting what exists, and switched off on the board; skills as Per card). The result lands in the
+  board chat.
 
 The sub-agents of the project's tool keep their own table in the Projeto and Global origins, with
 **Disponível no board** (available on the board), the default and the editor for the board's fields;

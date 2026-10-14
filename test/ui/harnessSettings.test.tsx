@@ -45,6 +45,8 @@ const agent: Agent = {
   skills: [],
   mcp: [],
   seed: false,
+  readonly: false,
+  background: false,
 };
 const projectAgent: Agent = {
   ...agent,
@@ -408,6 +410,53 @@ describe('HarnessSettings: agentes', () => {
     renderTool();
     const runner = document.querySelector<HTMLElement>('.runner-settings')!;
     expect(within(runner).getByRole('combobox', { name: 'Agente padrão' })).toHaveTextContent('revisor');
+  });
+});
+
+describe('HarnessSettings: assistentes e sugestões de regras e skills', () => {
+  it('Regras: o assistente abre no Projeto e no Global, a IA sugere, e nenhum aparece no Board', async () => {
+    await renderScreen('rules');
+    await userEvent.click(screen.getByRole('button', { name: 'Criar regra com ajuda' }));
+    expect(screen.getByText('Passo 1 de 5')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByText('Passo 1 de 5')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sugerir regras com IA' }));
+    expect(lastSent('ai.suggestRules')).toEqual({ type: 'ai.suggestRules' });
+    act(() => setState((st) => ({ chat: { ...st.chat, busy: true } })));
+    expect(screen.getByRole('button', { name: 'Sugerir regras com IA' })).toBeDisabled();
+    act(() => setState((st) => ({ chat: { ...st.chat, busy: false } })));
+
+    // trocar de origem fecha o assistente aberto; no Global ele grava na pasta do usuário
+    await userEvent.click(screen.getByRole('button', { name: 'Criar regra com ajuda' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Global' }));
+    expect(screen.queryByText('Passo 1 de 5')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Criar regra com ajuda' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'Board' }));
+    expect(screen.queryByRole('button', { name: 'Criar regra com ajuda' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sugerir regras com IA' })).toBeNull();
+  });
+
+  it('Skills: o assistente e a sugestão da IA', async () => {
+    await renderScreen('skill');
+    await userEvent.click(screen.getByRole('button', { name: 'Criar skill com ajuda' }));
+    expect(screen.getByText('Passo 1 de 6')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Sugerir skills com IA' }));
+    expect(lastSent('ai.suggestSkills')).toEqual({ type: 'ai.suggestSkills' });
+    expect(screen.queryByRole('button', { name: 'Criar regra com ajuda' })).toBeNull();
+  });
+
+  it('em Sub-agentes e Hooks não há assistente de regras nem de skills', async () => {
+    await renderScreen('hook');
+    expect(screen.queryByRole('button', { name: 'Criar regra com ajuda' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Criar skill com ajuda' })).toBeNull();
+  });
+
+  it('a ferramenta que não é a do projeto não oferece os assistentes', async () => {
+    useBoardStore.setState({ harnessTopic: 'rules' });
+    renderTab('cursor');
+    expect(screen.queryByRole('button', { name: 'Criar regra com ajuda' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sugerir regras com IA' })).toBeNull();
   });
 });
 

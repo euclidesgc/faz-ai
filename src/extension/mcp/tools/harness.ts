@@ -245,6 +245,11 @@ export function registerHarnessTools(tool: DefineTool): void {
       deniedTools: listArg('Ferramentas retiradas da sessão'),
       skills: listArg('Skills que toda execução com o agente lê (só as marcadas em get_harness)'),
       mcp: listArg('Servidores MCP liberados além do do board'),
+      readonly: z
+        .boolean()
+        .optional()
+        .describe('Só no Cursor: o agente não edita arquivos nem roda comandos que mudem estado (`readonly: true`)'),
+      background: z.boolean().optional().describe('Só no Cursor: o agente roda em segundo plano (`is_background: true`)'),
     },
     (a, router) => {
       router.handle({
@@ -259,6 +264,8 @@ export function registerHarnessTools(tool: DefineTool): void {
           deniedTools: a.deniedTools ?? [],
           skills: a.skills ?? [],
           mcp: a.mcp ?? [],
+          ...(a.readonly !== undefined ? { readonly: a.readonly } : {}),
+          ...(a.background !== undefined ? { background: a.background } : {}),
         },
       });
       return harness(router);
@@ -279,6 +286,8 @@ export function registerHarnessTools(tool: DefineTool): void {
       deniedTools: listArg('Ferramentas retiradas'),
       skills: listArg('Skills do agente'),
       mcp: listArg('Servidores MCP além do do board'),
+      readonly: z.boolean().optional().describe('Só no Cursor: sem edição de arquivos nem comandos que mudem estado'),
+      background: z.boolean().optional().describe('Só no Cursor: roda em segundo plano'),
     },
     (a, router) => {
       const found = agent(router, a.agent, a.scope as InstallScope | undefined);
@@ -295,6 +304,8 @@ export function registerHarnessTools(tool: DefineTool): void {
             ...(a.deniedTools ? { deniedTools: a.deniedTools } : {}),
             ...(a.skills ? { skills: a.skills } : {}),
             ...(a.mcp ? { mcp: a.mcp } : {}),
+            ...(a.readonly !== undefined ? { readonly: a.readonly } : {}),
+            ...(a.background !== undefined ? { background: a.background } : {}),
           },
           body: a.body,
         });

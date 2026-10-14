@@ -11,6 +11,7 @@ import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { GitConfig } from './git';
+import type { ProjectProfile } from './projectProfile';
 
 /** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
 export interface AgentInput {
@@ -25,6 +26,10 @@ export interface AgentInput {
   skills: string[];
   /** servidores MCP além do do board */
   mcp: string[];
+  /** só no Cursor (`readonly: true`): o agente não edita arquivos nem roda comandos que mudem estado */
+  readonly?: boolean;
+  /** só no Cursor (`is_background: true`): o agente roda em segundo plano, sem esperar a conversa */
+  background?: boolean;
 }
 import type { SettingsTab } from './settingsTab';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
@@ -219,6 +224,14 @@ export type WebviewToHost =
   | { type: 'harness.file.write'; requestId: string; path: string; content: string }
   /** cria um item num lugar do catálogo da ferramenta (`source` é o índice em HARNESS_CATALOG) e abre o arquivo no editor */
   | { type: 'harness.item.create'; tool: AiTool; source: number; name: string; description: string }
+  /**
+   * cria um item já com o conteúdo (os assistentes de regras e de skills) e abre o arquivo no editor do board. Numa
+   * skill, `files` são arquivos de apoio criados vazios na pasta dela. Com `append`, um arquivo fixo que já existe
+   * (CLAUDE.md, AGENTS.md) ganha o conteúdo no fim em vez de dar erro
+   */
+  | { type: 'harness.item.write'; tool: AiTool; source: number; name: string; content: string; files?: string[]; append?: boolean }
+  /** o perfil do projeto (linguagens, comandos, ferramentas, pastas) para os assistentes; a resposta é `harness.project.profileResult` */
+  | { type: 'harness.project.profile'; requestId: string }
   /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
   | { type: 'harness.item.delete'; tool: AiTool; kind: HarnessKind; path: string }
   /** desinstala, desativa ou ativa plugins pela ferramenta; `ids` são os de `HarnessItem.install` */
@@ -279,6 +292,10 @@ export type WebviewToHost =
   | { type: 'harness.agents.seed'; force?: boolean }
   /** a IA lê o projeto e propõe os agentes do board (cria, ajusta e marca); o resultado vai para o chat do board */
   | { type: 'ai.suggestAgents' }
+  /** a IA lê o projeto e propõe de 3 a 5 regras, gravadas e enviadas ao board desligadas; o resultado vai para o chat */
+  | { type: 'ai.suggestRules' }
+  /** a IA lê o projeto e propõe de 3 a 5 skills, gravadas e enviadas ao board em "Pelo card"; o resultado vai para o chat */
+  | { type: 'ai.suggestSkills' }
   /** chat com a IA do projeto: envia uma mensagem (com o modelo escolhido, ou null para o padrão), interrompe ou limpa a conversa */
   | { type: 'chat.send'; text: string; model: string | null }
   | { type: 'chat.stop' }
@@ -325,6 +342,8 @@ export type HostToWebview =
   | { type: 'harness.file.readResult'; requestId: string; content?: string; readonly?: boolean; error?: string }
   /** item do harness criado pela tela: ela abre o arquivo no editor do board */
   | { type: 'harness.item.created'; path: string }
+  /** resposta a `harness.project.profile`, correlacionada por `requestId` */
+  | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
   /** resposta a `harness.file.write`, correlacionada por `requestId` */
   | { type: 'harness.file.writeResult'; requestId: string; ok: boolean; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */

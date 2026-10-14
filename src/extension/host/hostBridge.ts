@@ -149,6 +149,8 @@ export class HostBridge {
         case 'chat.stop':
         case 'chat.clear':
         case 'ai.suggestAgents':
+        case 'ai.suggestRules':
+        case 'ai.suggestSkills':
         case 'harness.suggest.run':
           this.router.chatCommand(msg);
           return;
@@ -238,6 +240,25 @@ export class HostBridge {
         case 'harness.item.create':
           // o arquivo novo abre no editor do board, onde a pessoa já escreve o conteúdo
           this.post({ type: 'harness.item.created', path: this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description) });
+          return;
+        case 'harness.item.write':
+          // o arquivo criado abre no editor do board, para a pessoa ler o que o assistente gravou
+          this.post({
+            type: 'harness.item.created',
+            path: this.router.writeHarnessItem(msg.tool, msg.source, msg.name, msg.content, msg.files, msg.append),
+          });
+          return;
+        case 'harness.project.profile':
+          // ler o projeto não muda o board: o erro vai na própria resposta
+          try {
+            this.post({ type: 'harness.project.profileResult', requestId: msg.requestId, profile: this.router.projectProfile() });
+          } catch (e) {
+            this.post({
+              type: 'harness.project.profileResult',
+              requestId: msg.requestId,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
           return;
         case 'ai.heartbeat.run': {
           const notice = await this.env.runHeartbeat();

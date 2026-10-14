@@ -68,6 +68,10 @@ export interface Agent {
   mcp: string[];
   /** criado pelo board como agente padrão de fábrica */
   seed: boolean;
+  /** só no Cursor (`readonly: true` no frontmatter): o agente não edita arquivos nem roda comandos que mudem estado */
+  readonly: boolean;
+  /** só no Cursor (`is_background: true`): o agente roda em segundo plano */
+  background: boolean;
 }
 
 /** Tipos de componente do harness de uma ferramenta, na ordem em que a tela os mostra. */

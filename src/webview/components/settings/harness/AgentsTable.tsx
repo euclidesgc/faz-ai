@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Badge, Button, Card, Checkbox, Text, TextArea, TextField } from '@radix-ui/themes';
+import { AGENT_SUGGESTIONS, type AgentSuggestion } from '../../../../shared/agentSuggestions';
 import type { Agent, InstallScope } from '../../../../shared/harness';
 import { isFreeName, toItemName, type AiToolInfo } from '../../../../shared/harnessProject';
 import { usageOf } from '../../../../shared/harnessSelection';
@@ -7,8 +8,9 @@ import { matchesQuery } from '../../../../shared/harnessTopics';
 import { ai, harness, settings } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { ModelEditor } from '../../FieldRenderer';
-import { DeleteButton, FormField, IconPlus } from '../../ui';
+import { DeleteButton, FormField, IconAgents, IconPlus } from '../../ui';
 import { AgentEditor } from './AgentEditor';
+import { AgentWizard } from './AgentWizard';
 import { FormActions } from './FormActions';
 import { withGlobalWarning } from './text';
 import { t } from '../../../i18n';
@@ -24,6 +26,8 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
   const state = useBoardStore((s) => s.state)!;
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  // o assistente de criação, aberto limpo ou com uma sugestão pronta
+  const [wizard, setWizard] = useState<{ preset?: AgentSuggestion; at: number } | null>(null);
   const [draft, setDraft] = useState(EMPTY);
   const agents = state.harness.agents.filter((a) => a.scope === scope && matchesQuery(query, a.name, a.description));
   const defaultName = state.board.execProfiles.find((p) => p.isDefault && p.scope !== 'builtin')?.id ?? '';
@@ -76,8 +80,24 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
         </Button>
       </Text>
       <div className="row selection-actions">
-        <Button onClick={() => setCreating(!creating)}>
+        <Button
+          onClick={() => {
+            setCreating(!creating);
+            setWizard(null);
+          }}
+        >
           <IconPlus /> {t('Novo agente')}
+        </Button>
+        <Button
+          variant="soft"
+          color="gray"
+          title={t('Um passo a passo com exemplos e sugestões para criar um agente de escopo reduzido.')}
+          onClick={() => {
+            setWizard({ at: Date.now() });
+            setCreating(false);
+          }}
+        >
+          <IconAgents /> {t('Criar agente com ajuda')}
         </Button>
         <Button
           variant="soft"
@@ -103,6 +123,25 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
           </Button>
         )}
       </div>
+      <div className="row wrap agent-ready" role="group" aria-label={t('Sugestões prontas')}>
+        <span className="muted small">{t('Sugestões prontas:')}</span>
+        {AGENT_SUGGESTIONS.map((s) => (
+          <Button
+            key={s.id}
+            variant="soft"
+            color="gray"
+            size="1"
+            title={t('Abre o assistente com as respostas preenchidas, para você ajustar e confirmar.')}
+            onClick={() => {
+              setWizard({ preset: s, at: Date.now() });
+              setCreating(false);
+            }}
+          >
+            {t(s.label)}
+          </Button>
+        ))}
+      </div>
+      {wizard && <AgentWizard key={wizard.at} tool={tool} scope={scope} preset={wizard.preset} onClose={() => setWizard(null)} />}
       {creating && (
         <Card className="draft-card" aria-label={t('Agente novo')}>
           <FormField label={t('Nome')} hint={draft.name && !nameOk ? t('Nome inválido ou já usado.') : undefined}>

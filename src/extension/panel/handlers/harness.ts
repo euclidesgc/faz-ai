@@ -342,6 +342,13 @@ export class BoardHarness {
     return file;
   }
 
+  /** Cria um item do harness com o conteúdo pronto (assistentes de regras e skills) e devolve o caminho do arquivo. */
+  writeItem(tool: AiTool, source: number, name: string, content: string, files: string[] = [], append = false): string {
+    const file = this.ops.write(tool, source, name, content, files, append);
+    this.load();
+    return file;
+  }
+
   /** Operação nas regras e skills do projeto (exige uma pasta aberta); relê o disco depois. */
   op(fn: (store: HarnessStore) => void): boolean {
     if (!this.store) throw new Error('Nenhuma pasta de projeto aberta.');
