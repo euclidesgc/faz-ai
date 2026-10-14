@@ -100,6 +100,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     currentUser: 'a',
     harness: EMPTY_HARNESS,
     harnessSelection: [],
+    harnessImports: [],
     boardServer: null,
     pendingUpgrade: [],
     chat: EMPTY_CHAT,
@@ -114,6 +115,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     environment: null,
     environmentFirstRun: false,
     harnessInstall: null,
+    harnessSuggestions: null,
     mainBranch: null,
     ...over,
   };

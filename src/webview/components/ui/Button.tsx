@@ -12,6 +12,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   on?: boolean;
   /** aba ou item selecionado (`tabs`, `tabs-vertical`, `topbar nav`) */
   active?: boolean;
+  /** esperando o host: desabilita, marca `aria-busy` e mostra o spinner antes do texto */
+  loading?: boolean;
 }
 
 /**
@@ -20,11 +22,16 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * (o Menu mede o botão para posicionar a lista).
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = 'secondary', size, danger, on, active, className, ...rest },
+  { variant = 'secondary', size, danger, on, active, loading, className, disabled, children, ...rest },
   ref,
 ) {
   const classes = [variant === 'secondary' ? '' : variant, size, danger && 'danger', on && 'on', active && 'active', className]
     .filter(Boolean)
     .join(' ');
-  return <button ref={ref} className={classes || undefined} {...rest} />;
+  return (
+    <button ref={ref} className={classes || undefined} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
+      {loading && <span className="spinner" aria-hidden />}
+      {children}
+    </button>
+  );
 });

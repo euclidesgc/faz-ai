@@ -3,9 +3,10 @@ import { AI_TOOLS, type AiTool } from '../../../shared/harness';
 import { modelId, type ModelOption } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
+import { useAction } from '../../useAction';
 import { t } from '../../i18n';
 import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
-import { FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../ui';
+import { ActionButton, FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../ui';
 import { DependsOn } from './DependsOn';
 import { ModelRulesEditor } from './ModelRulesEditor';
 import { SettingsCard } from './SettingsCard';
@@ -109,6 +110,9 @@ export function ModelsSettings() {
   const state = useBoardStore((s) => s.state)!;
   const { modelCatalog: catalog, modelRules, rules, aiTool } = state.board;
   const [adding, setAdding] = useState(false);
+  // detectar lê a CLI ou a conta: o botão da ferramenta clicada mostra a espera
+  const detect = useAction((tool: AiTool) => settings.detectModels(tool));
+  const [detecting, setDetecting] = useState<AiTool | null>(null);
 
   // as mudanças partem da última lista enviada (ver useSentList)
   const sent = useSentList(catalog, settings.setModels);
@@ -126,19 +130,28 @@ export function ModelsSettings() {
         actions={
           <>
             {tools.map((tl) => (
-              <Button
+              <ActionButton
                 key={tl.id}
                 variant="soft"
                 color="gray"
-                title={t('Fonte: {source}', { source: t(SOURCES[tl.id]) })}
-                onClick={() => settings.detectModels(tl.id)}
+                loading={detect.busy && detecting === tl.id}
+                hint={t('Fonte: {source}', { source: t(SOURCES[tl.id]) })}
+                onClick={() => {
+                  setDetecting(tl.id);
+                  void detect.run(tl.id);
+                }}
               >
                 {t('Detectar modelos')}
-              </Button>
+              </ActionButton>
             ))}
-            <Button disabled={adding} onClick={() => setAdding(true)}>
+            <ActionButton
+              disabled={adding}
+              disabledReason={t('O formulário já está aberto logo abaixo.')}
+              hint={t('Abre o formulário de um modelo novo.')}
+              onClick={() => setAdding(true)}
+            >
               <IconPlus /> {t('Novo modelo')}
-            </Button>
+            </ActionButton>
           </>
         }
       >

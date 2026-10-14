@@ -17,6 +17,8 @@ export const MODEL_FIELD = 'Modelo';
 export const SKILLS_FIELD = 'Skills';
 /** Arquivos de instruções marcados no Harness que a execução do card deve ler. */
 export const RULES_FIELD = 'Rules';
+/** Servidores MCP do board (modo "Pelo card") que a execução do card recebe além do servidor do board. */
+export const MCPS_FIELD = 'MCPs';
 
 export interface BoardField {
   name: string;
@@ -35,6 +37,7 @@ export const BOARD_FIELDS: BoardField[] = [
   { name: MODEL_FIELD },
   { name: SKILLS_FIELD },
   { name: RULES_FIELD },
+  { name: MCPS_FIELD },
   { name: EFFORT_FIELD },
   { name: CRITICALITY_FIELD, workflow: 'parent' },
 ];

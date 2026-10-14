@@ -344,7 +344,25 @@ function scanPlugins(tool: AiTool, ctx: Ctx, claude: PluginInstall[] | null | un
   return out;
 }
 
-/** Tudo que a ferramenta carrega: do projeto, da pasta do usuário e dos plugins instalados. */
+/**
+ * Os artefatos de uma pasta importada, no formato que a ferramenta reconhece num projeto (as fontes de
+ * projeto do catálogo: regras, skills, agentes, comandos, hooks, servidores MCP, configurações), mais a
+ * própria pasta como pasta de skills (uma coleção de skills costuma ser só isso). A ferramenta não os
+ * carrega: ficam com o escopo `imported`, e só entram nas execuções quando enviados ao board.
+ */
+function scanImported(tool: AiTool, dir: string, ctx: Ctx): Found[] {
+  if (!isDir(dir)) return [];
+  const found: Found[] = [];
+  HARNESS_CATALOG[tool].forEach((src, source) => {
+    // as regras de subpasta e a memória são do projeto; o ~/.claude.json é do Claude Code
+    if (src.scope !== 'project' || src.layout === 'nested' || src.path.includes('{project}') || src.base) return;
+    found.push(...scanSource(src, dir, ctx, source));
+  });
+  found.push(...scanSource({ kind: 'skill', scope: 'project', layout: 'skills', path: '', group: 'skill' }, dir, ctx));
+  return found.map((i) => ({ ...i, scope: 'imported' as const }));
+}
+
+/** Tudo que a ferramenta carrega: do projeto, da pasta do usuário e dos plugins instalados; mais o que há nas pastas importadas. */
 export function scanInventory(
   tool: AiTool,
   projectDir: string,
@@ -353,6 +371,8 @@ export function scanInventory(
   managed = managedDir(process.platform),
   /** plugins que o Claude Code diz ter instalados; sem a lista, valem as pastas de plugin */
   claudePlugins?: PluginInstall[] | null,
+  /** pastas importadas pela pessoa para esta ferramenta */
+  imports: string[] = [],
 ): HarnessItem[] {
   const ctx: Ctx = { projectDir, homeDir };
   const found: Found[] = [];
@@ -362,6 +382,7 @@ export function scanInventory(
     if (base && (projectDir || !src.path.includes('{project}'))) found.push(...scanSource(src, base, ctx, source));
   });
   if (homeDir) found.push(...scanPlugins(tool, ctx, claudePlugins));
+  for (const dir of imports) found.push(...scanImported(tool, dir, ctx));
   const inside = (base: string, file: string) => !!base && file.startsWith(base + path.sep);
   const rel = (base: string, file: string) => path.relative(base, file).split(path.sep).join('/');
   const location = (file: string) => {
@@ -383,7 +404,9 @@ export function scanInventory(
         tool === 'claude' && i.kind === 'instructions' && i.scope !== 'plugin' && i.path.endsWith('.md') ? importsOf(i.path, homeDir) : [];
       return {
         ...i,
-        location: location(i.path),
+        // um artefato importado é identificado pelo caminho absoluto, esteja a pasta onde estiver (dentro
+        // da home ou do projeto): é por esse prefixo que tirar a pasta tira os artefatos dela do board
+        location: i.scope === 'imported' ? i.path : location(i.path),
         ...(imports.length ? { imports: imports.map((x) => ({ ...x, location: location(x.path) })) } : {}),
       };
     });

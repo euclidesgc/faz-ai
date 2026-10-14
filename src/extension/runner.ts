@@ -174,7 +174,7 @@ const NO_CONTEXT: PromptContext = { always: [], card: [] };
 /**
  * O que a IA recebe no "Refinar com IA": deixar o card claro e completo para quem vai trabalhar nele,
  * sem fazer o trabalho da fase. O executor devolve o card ao status que tinha quando ela termina. O
- * catálogo é tudo o que ela pode indicar: o que o Harness marcou como "usar quando fizer sentido" e os agentes disponíveis.
+ * catálogo é tudo o que ela pode indicar: os artefatos do board em modo "Pelo card" e os agentes disponíveis.
  */
 export const refinePrompt = (ref: string, context: PromptContext = NO_CONTEXT, catalog?: RefineCatalog): string =>
   [
@@ -184,7 +184,7 @@ export const refinePrompt = (ref: string, context: PromptContext = NO_CONTEXT, c
     ...(catalog ? catalogLines(catalog) : []),
     'Leia o card com get_card (descrição, conversa, anexos e campos) e, como apoio, get_board e get_models (tipos, campos, agentes e catálogo de modelos). Pode ler o projeto para entender o contexto.',
     '1. Título e descrição: reescreva com update_card para ficarem claros e objetivos, mantendo a intenção e tudo o que a pessoa escreveu. Não invente requisito: o que estiver ambíguo vira uma lista "Dúvidas em aberto" no fim da descrição. Se o texto já estiver bom, não mexa.',
-    '2. Campos: revise Tags, Esforço da atividade, Modelo, Skills e Rules e aplique com update_card (fields), mesmo que já tenham valor; mantenha o que fizer sentido. Escolha o agente do card com set_card_profile quando um da lista couber melhor que o padrão. Skills, rules e agente só do catálogo acima: o que não está nele não existe para este board.',
+    '2. Campos: revise Tags, Esforço da atividade, Modelo, Skills, Rules e MCPs e aplique com update_card (fields), mesmo que já tenham valor; mantenha o que fizer sentido. Escolha o agente do card com set_card_profile quando um da lista couber melhor que o padrão. Skills, rules, servidores MCP e agente só do catálogo acima: o que não está nele não existe para este board.',
     '3. Checklist: acrescente com add_checklist_item os passos que faltam para concluir o card, sem repetir os que já existem.',
     '4. Termine com add_comment na conversa do card, resumindo o que mudou e por quê. Se reescreveu a descrição, inclua o texto anterior, para a pessoa poder voltar a ele.',
     'Não faça o trabalho da fase: não crie sub-tarefas nem anexos, não mova o card e não mude o status (sem start_work, move_card, request_review, ask_question nem block_card). Não altere arquivos do projeto nem rode comandos.',
@@ -470,6 +470,9 @@ export class AiRunner {
         // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
         this.runs.delete(cardId);
       }
+      // a sessão da história é quem marca as sub-tarefas "Em execução" (start_work); com ela encerrada, nenhuma
+      // continua em execução de verdade. Sem isto a sub-tarefa ficava presa e segurava a história para sempre
+      if (!retry) this.releaseSubtasks(cardId, tool.label);
       if (retry) {
         // o modelo principal esgotou o limite e há reserva: uma nova execução assume, sem publicar nem
         // avisar o fim desta (quem decide o desfecho final é a execução da reserva)
@@ -617,6 +620,15 @@ export class AiRunner {
     const currentStory = currentCard && storyOf(current, currentCard);
     if (currentStory && isYolo(current, currentCard) && isWithHuman(currentStory)) return;
     this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);
+  }
+
+  /** As sub-tarefas da história que a sessão encerrada deixou "Em execução" voltam para a IA. */
+  private releaseSubtasks(storyId: string, toolLabel: string): void {
+    const s = this.router.snapshot();
+    for (const kid of s.cards.filter((c) => c.parentId === storyId && isLive(c) && c.status === 'running' && !this.runs.has(c.id))) {
+      this.deps.log(`[${cardRef(kid)}] A sessão da história encerrou com a sub-tarefa "Em execução"; voltou para Pronto.`);
+      this.setStatus(kid.id, 'ready', toolLabel);
+    }
   }
 
   private aiMessages(cardId: string): number {

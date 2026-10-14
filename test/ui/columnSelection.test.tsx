@@ -1,4 +1,4 @@
-import { choose, lastSent, sentOf, seedBoard, syncStore, type SeededBoard } from './setup';
+import { choose, confirmLast, lastSent, sentOf, seedBoard, syncStore, type SeededBoard } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -95,6 +95,35 @@ describe('Column: "Selecionar todos" (RF1, RF4, RF5)', () => {
     renderColumn(col0, wf, cols, []);
     await openMenu();
     expect(screen.getByText('Selecionar todos').closest('button')).toBeDisabled();
+  });
+});
+
+describe('Column: caixa de selecionar todos no cabeçalho', () => {
+  it('marca todas as histórias visíveis da coluna; marcada de novo, limpa a seleção; parcial fica indeterminada', async () => {
+    const { wf, cols, col0, secondId } = selectTwoInSameColumn();
+    useBoardStore.getState().clearSelected();
+    renderColumn(col0, wf, cols);
+    const box = screen.getByRole('checkbox', { name: `Selecionar todos de ${col0.name}` }) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    await userEvent.click(box);
+    expect(useBoardStore.getState().selectedIds).toEqual(new Set([board.storyId, secondId]));
+    expect(screen.getByRole('checkbox', { name: `Desmarcar todos de ${col0.name}` })).toBeChecked();
+
+    act(() => useBoardStore.getState().toggleSelected(secondId));
+    const partial = screen.getByRole('checkbox', { name: `Selecionar todos de ${col0.name}` }) as HTMLInputElement;
+    expect(partial.indeterminate).toBe(true);
+
+    await userEvent.click(partial);
+    expect(useBoardStore.getState().selectedIds.size).toBe(2);
+    await userEvent.click(screen.getByRole('checkbox', { name: `Desmarcar todos de ${col0.name}` }));
+    expect(useBoardStore.getState().selectedIds.size).toBe(0);
+  });
+
+  it('não existe numa coluna de sub-tarefas nem numa coluna sem cards visíveis', () => {
+    const wf = childWorkflow();
+    const cols = columnsOf(wf.id);
+    renderColumn(cols[0]!, wf, cols);
+    expect(screen.queryByRole('checkbox', { name: /Selecionar todos de/ })).toBeNull();
   });
 });
 
@@ -259,6 +288,12 @@ describe('Column: ações em lote (RF8-RF11)', () => {
     const sent = lastSent('card.moveMany');
     expect(sent.cardIds.slice().sort()).toEqual([board.storyId, secondId].sort());
     expect(sent.columnId).toBe(destination.id);
+    // a seleção só limpa quando o host confirma o lote; até lá a barra mostra o status
+    expect(useBoardStore.getState().bulkBusy).toBe('Movendo 2 história(s)…');
+    expect(useBoardStore.getState().selectedIds.size).toBe(2);
+    confirmLast();
+    await act(async () => {});
+    expect(useBoardStore.getState().bulkBusy).toBeNull();
     expect(useBoardStore.getState().selectedIds.size).toBe(0);
   });
 
@@ -276,6 +311,8 @@ describe('Column: ações em lote (RF8-RF11)', () => {
     const sent = lastSent('card.moveMany');
     expect(sent.cardIds.slice().sort()).toEqual([board.storyId, secondId].sort());
     expect(sent.columnId).toBe(doneColumn.id);
+    confirmLast();
+    await act(async () => {});
     expect(useBoardStore.getState().selectedIds.size).toBe(0);
   });
 

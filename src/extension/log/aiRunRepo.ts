@@ -233,10 +233,15 @@ export class AiRunRepo {
 
   /**
    * Marca como `unknown` toda linha que a sessão anterior não chegou a fechar (`outcome IS NULL`),
-   * com `ended_at` preenchido e `duration_ms` nulo (RF-18). Não toca em linha já fechada.
+   * com `ended_at` preenchido e `duration_ms` nulo (RF-18). Não toca em linha já fechada. Devolve os
+   * cards dessas execuções, para o board devolvê-los à IA (ficaram "Em execução" sem execução).
    */
-  closeOpen(at: number): void {
+  closeOpen(at: number): string[] {
+    const cardIds = all(this.db, 'SELECT DISTINCT card_id FROM ai_runs WHERE outcome IS NULL AND card_id IS NOT NULL')
+      .map((r) => strOrNull(r.card_id))
+      .filter((id): id is string => id !== null);
     run(this.db, "UPDATE ai_runs SET outcome = 'unknown', ended_at = ?, duration_ms = NULL WHERE outcome IS NULL", [at]);
+    return cardIds;
   }
 
   /** Execuções de um mês ('YYYY-MM'), da mais antiga para a mais recente. */

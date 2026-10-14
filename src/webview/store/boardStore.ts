@@ -39,8 +39,9 @@ export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
 
 /** `environment`: o Diagnóstico do ambiente, aberto pelas Configurações ou sozinho na primeira abertura */
 export type View = 'board' | 'archived' | 'trash' | 'settings' | 'metrics' | 'environment';
-/** Abas da tela de Harness de IA: a ferramenta e a execução, o que é do projeto, e tudo que a ferramenta carrega. */
-export type HarnessTab = 'tool' | 'project' | 'user';
+/** Abas da tela de Harness de IA: a ferramenta e a execução, ou uma ferramenta de IA (ver `harnessTopics.ts`). */
+export type { HarnessTab };
+import { resolveHarnessTab, type HarnessOrigin, type HarnessTab, type HarnessTopic } from '../../shared/harnessTopics';
 import { type SettingsTab } from '../../shared/settingsTab';
 import { SETTINGS_SECTIONS } from '../../shared/settingsSections';
 export type { SettingsTab };
@@ -84,10 +85,16 @@ interface UiState {
   dontWarnYolo: boolean;
   /** o nome da coluna escolhida por último em "Até onde" ao ligar o modo autônomo; '' = até o fim */
   yoloUntilName: string;
+  /** a pessoa já dispensou o aviso de como usar o Harness ("Entendi, não mostrar de novo") */
+  harnessIntroSeen: boolean;
 }
 
 interface BoardStore extends UiState, ViewState {
   state: BoardState | null;
+  /** o assunto aberto dentro da aba da ferramenta no Harness; fica na memória, não é guardado */
+  harnessTopic: HarnessTopic;
+  /** a origem escolhida na aba da ferramenta (Board, Projeto, Global, Importados); vale para todos os assuntos, fica na memória */
+  harnessOrigin: HarnessOrigin;
   /** o chat está aberto no painel lateral do board (no navegador; no editor ele fica na barra lateral) */
   chatOpen: boolean;
   setChatOpen(open: boolean): void;
@@ -104,6 +111,12 @@ interface BoardStore extends UiState, ViewState {
   /** backup do board em andamento: exportando, ou lendo o arquivo escolhido para importar */
   backupBusy: 'export' | 'import' | null;
   setBackupBusy(busy: 'export' | 'import' | null): void;
+  /** véu sobre o board inteiro enquanto uma ação que troca todo o estado roda (ver `withOverlay`) */
+  busyOverlay: { label: string } | null;
+  setBusyOverlay(overlay: { label: string } | null): void;
+  /** uma ação em lote sobre os cards selecionados está esperando o host (texto do status) */
+  bulkBusy: string | null;
+  setBulkBusy(label: string | null): void;
   setState(state: BoardState, attachmentsBaseUri: string): void;
   setViewState(view: ViewState): void;
   setError(msg: string | null): void;
@@ -123,6 +136,7 @@ interface BoardStore extends UiState, ViewState {
   clearPendingSettingsSection(): void;
   setSettingsNavCollapsed(collapsed: boolean): void;
   setDontWarnYolo(value: boolean): void;
+  setHarnessIntroSeen(seen: boolean): void;
   setYoloUntilName(name: string): void;
   selectParent(id: Id | null): void;
   /**
@@ -165,6 +179,10 @@ interface BoardStore extends UiState, ViewState {
   closeHarnessFile(): void;
 }
 
+/** A aba de Harness de uma seção: `project` e `user` levam à ferramenta do projeto, que só se sabe com o board carregado. */
+const harnessTabOf = (raw: string, state: BoardState | null): HarnessTab =>
+  state ? resolveHarnessTab(raw, state.board.aiTool) : (raw as HarnessTab);
+
 const persisted = getUiState<Partial<UiState>>();
 
 export const useBoardStore = create<BoardStore>((set, get) => {
@@ -184,15 +202,23 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     harnessFile: null,
     backupBusy: null,
     setBackupBusy: (backupBusy) => set({ backupBusy }),
+    busyOverlay: null,
+    setBusyOverlay: (busyOverlay) => set({ busyOverlay }),
+    bulkBusy: null,
+    setBulkBusy: (bulkBusy) => set({ bulkBusy }),
     // o Diagnóstico é de passagem: ao reabrir, volta para o board
     view: persisted?.view === 'environment' ? 'board' : (persisted?.view ?? 'board'),
     settingsTab: persisted?.settingsTab ?? 'columns',
-    // a aba "Tudo que a ferramenta carrega" (`all`) saiu: quem a deixou aberta volta para a da ferramenta
+    // as abas Projeto e Global (`project`, `user`) viraram uma aba por ferramenta e a `all` saiu: quem deixou uma
+    // delas aberta guarda o valor antigo, que a tela resolve para a ferramenta do projeto (`resolveHarnessTab`)
     harnessTab: persisted?.harnessTab && persisted.harnessTab !== ('all' as string) ? persisted.harnessTab : 'tool',
+    harnessTopic: 'rules',
+    harnessOrigin: 'project',
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
     dontWarnYolo: persisted?.dontWarnYolo ?? false,
+    harnessIntroSeen: persisted?.harnessIntroSeen ?? false,
     yoloUntilName: persisted?.yoloUntilName ?? '',
     chatOpen: false,
     setChatOpen: (chatOpen) => set({ chatOpen }),
@@ -234,7 +260,9 @@ export const useBoardStore = create<BoardStore>((set, get) => {
         set({
           view: 'settings',
           settingsTab: info.tab,
-          ...(info.harnessTab && { harnessTab: info.harnessTab as HarnessTab }),
+          ...(info.harnessTab && { harnessTab: harnessTabOf(info.harnessTab, get().state) }),
+          ...(info.harnessTopic && { harnessTopic: info.harnessTopic }),
+          ...(info.harnessOrigin && { harnessOrigin: info.harnessOrigin }),
           pendingSettingsSection: section,
         });
         persist(get());
@@ -250,6 +278,10 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     },
     setDontWarnYolo(dontWarnYolo) {
       set({ dontWarnYolo });
+      persist(get());
+    },
+    setHarnessIntroSeen(harnessIntroSeen) {
+      set({ harnessIntroSeen });
       persist(get());
     },
     setYoloUntilName(yoloUntilName) {
@@ -313,6 +345,7 @@ function persist(s: BoardStore): void {
     chatModel: s.chatModel,
     dontWarnYolo: s.dontWarnYolo,
     yoloUntilName: s.yoloUntilName,
+    harnessIntroSeen: s.harnessIntroSeen,
   };
   setUiState(ui);
 }
@@ -341,7 +374,9 @@ export function useHostSync(): void {
         s.openSettings(msg.tab);
         useBoardStore.setState({
           pendingSettingsSection: msg.section ?? null,
-          ...(info?.harnessTab && { harnessTab: info.harnessTab as HarnessTab }),
+          ...(info?.harnessTab && { harnessTab: harnessTabOf(info.harnessTab, s.state) }),
+          ...(info?.harnessTopic && { harnessTopic: info.harnessTopic }),
+          ...(info?.harnessOrigin && { harnessOrigin: info.harnessOrigin }),
         });
       } else if (msg.type === 'ui.openView') s.setView(msg.view);
     });
@@ -355,6 +390,22 @@ export function useFilteredIds(): Set<Id> | null {
   const state = useBoardStore((s) => s.state);
   const filters = useBoardStore((s) => s.filters);
   return useMemo(() => (state ? applyFilters(state, filters) : null), [state, filters]);
+}
+
+/**
+ * Roda uma ação que troca o board inteiro com o véu de espera na tela (`BusyOverlay`): o véu fecha quando o host
+ * confirma ou falha (o erro já virou toast). Para ações que cabem num botão ou numa seção, use `useAction`.
+ */
+export async function withOverlay(label: string, fn: () => Promise<void>): Promise<void> {
+  const { setBusyOverlay } = useBoardStore.getState();
+  setBusyOverlay({ label });
+  try {
+    await fn();
+  } catch {
+    /* o toast de erro já apareceu; o que importa aqui é tirar o véu */
+  } finally {
+    setBusyOverlay(null);
+  }
 }
 
 /** O diálogo de confirmação da importação: o resumo do arquivo e o aviso de que o board atual será apagado. */
@@ -381,7 +432,7 @@ export function importDialog(token: string, summary: ImportSummary): DialogSpec 
     message: `${intro}${large} ${warning}`,
     confirmLabel: t('Importar e substituir'),
     danger: true,
-    onConfirm: () => backup.importApply(token),
+    onConfirm: () => withOverlay(t('Importando o board…'), () => backup.importApply(token)),
     onCancel: () => backup.importCancel(token),
   };
 }

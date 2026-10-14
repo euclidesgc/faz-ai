@@ -2,7 +2,7 @@ import { Card } from '@radix-ui/themes';
 import { useBoardStore } from '../../store/boardStore';
 import { backup } from '../../commands';
 import { t } from '../../i18n';
-import { Button } from '../ui';
+import { ActionButton } from '../ui';
 import { PageHeader } from './PageHeader';
 
 /** Aba Backup: exportar o board num arquivo e importar um arquivo no lugar do board atual. */
@@ -31,9 +31,14 @@ export function BackupSettings() {
           )}
         </p>
         <div className="row">
-          <Button variant="primary" disabled={busy !== null} onClick={() => start('export')}>
+          <ActionButton
+            disabled={busy !== null}
+            loading={busy === 'export'}
+            hint={t('Gera o arquivo .fazai.json e abre o diálogo para salvar.')}
+            onClick={() => start('export')}
+          >
             {busy === 'export' ? t('Exportando…') : t('Exportar board')}
-          </Button>
+          </ActionButton>
         </div>
       </Card>
 
@@ -45,13 +50,17 @@ export function BackupSettings() {
           )}
         </p>
         <div className="row">
-          <Button
+          <ActionButton
+            variant="soft"
+            color="gray"
             disabled={busy !== null || running}
-            title={running ? t('Espere a execução da IA terminar') : undefined}
+            disabledReason={running ? t('Espere a execução da IA terminar') : null}
+            loading={busy === 'import'}
+            hint={t('Abre o seletor de arquivo; você confirma depois de ver o resumo.')}
             onClick={() => start('import')}
           >
             {busy === 'import' ? t('Lendo o arquivo…') : t('Importar de um arquivo…')}
-          </Button>
+          </ActionButton>
           {running && <span className="muted">{t('Espere a execução da IA terminar')}</span>}
         </div>
       </Card>

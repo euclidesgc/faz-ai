@@ -1,7 +1,7 @@
 import { badgeStyle } from '../../shared/color';
 import { cardRef } from '../../shared/model';
 import { columnOf } from '../../shared/selectors';
-import { useBoardStore } from '../store/boardStore';
+import { useBoardStore, withOverlay } from '../store/boardStore';
 import { formatDateTime, t, dt } from '../i18n';
 import { cards, trash } from '../commands';
 import { Button, DeleteButton, IconParent } from './ui';
@@ -31,7 +31,7 @@ export function TrashView() {
               }),
               confirmLabel: t('Esvaziar lixeira'),
               danger: true,
-              onConfirm: () => trash.empty(),
+              onConfirm: () => withOverlay(t('Esvaziando a lixeira…'), () => trash.empty()),
             })
           }
         >

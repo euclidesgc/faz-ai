@@ -89,6 +89,16 @@ function vscodeEnv(webview: vscode.Webview, router: MessageRouter): HostEnv {
       await fs.writeFile(uri.fsPath, content, 'utf8');
       return uri.fsPath;
     },
+    pickFolder: async (title) =>
+      (
+        await vscode.window.showOpenDialog({
+          canSelectFiles: false,
+          canSelectFolders: true,
+          canSelectMany: false,
+          openLabel: 'Importar',
+          title,
+        })
+      )?.[0]?.fsPath,
     pickBackupFile: async () =>
       (
         await vscode.window.showOpenDialog({

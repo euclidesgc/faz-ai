@@ -7,7 +7,9 @@ import { newId } from '../db/ids';
 import type { ImportSummary } from '../../shared/backup';
 import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
-import type { AiTool, PluginAction } from '../../shared/harness';
+import type { AiTool, HarnessSuggestions, PluginAction } from '../../shared/harness';
+import type { ProjectProfile } from '../../shared/projectProfile';
+import { readProjectProfile } from '../projectProfile';
 import type { ClaudeCli } from '../plugins';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import { agentProfiles } from '../../shared/execution';
@@ -41,14 +43,18 @@ export interface Origin {
 
 /** O que o host faz pelo Diagnóstico do ambiente. */
 export interface EnvironmentHooks {
-  check(): void;
+  /** roda o Diagnóstico; resolve quando o relatório já está no board e rejeita se a conferência falhou */
+  check(): Promise<void>;
   seen(): void;
   /** grava o caminho completo dos MCPs que o editor não acha, e confere de novo */
-  pinMcp?(): void;
+  pinMcp?(): Promise<void>;
 }
 
 /** As mensagens do webview que o chat executa. */
-export type ChatMessageIn = Extract<WebviewToHost, { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' }>;
+export type ChatMessageIn = Extract<
+  WebviewToHost,
+  { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' | 'ai.suggestRules' | 'ai.suggestSkills' | 'harness.suggest.run' }
+>;
 
 /** Tratadas pela ponte do webview (dependem do VSCode): aqui não mudam o board. */
 const viaBridge = () => false;
@@ -70,6 +76,10 @@ const bridgeOnly = {
   'chat.stop': viaBridge,
   'chat.clear': viaBridge,
   'ai.suggestAgents': viaBridge,
+  'ai.suggestRules': viaBridge,
+  'ai.suggestSkills': viaBridge,
+  'harness.suggest.run': viaBridge,
+  'harness.suggest.clear': viaBridge,
   'ui.showChat': viaBridge,
   'requirements.check': viaBridge,
   'environment.check': viaBridge,
@@ -81,11 +91,15 @@ const bridgeOnly = {
   'harness.item.open': viaBridge,
   'harness.file.read': viaBridge,
   'harness.plugin.apply': viaBridge,
+  'harness.refresh': viaBridge,
   'harness.file.write': viaBridge,
   'harness.item.create': viaBridge,
+  'harness.item.write': viaBridge,
+  'harness.project.profile': viaBridge,
   'harness.skill.file.create': viaBridge,
   'harness.skill.file.open': viaBridge,
   'harness.install.scan': viaBridge,
+  'harness.import.pick': viaBridge,
   'attachment.pick': viaBridge,
   'attachment.reveal': viaBridge,
   'attachment.read': viaBridge,
@@ -115,16 +129,18 @@ const HANDLERS: HandlerMap = {
 export class MessageRouter {
   private ctx: BoardContext;
   private listeners = new Set<() => void>();
+  private errorListeners = new Set<(message: string) => void>();
   private approveListeners: ((cardId: string) => void)[] = [];
   private aiRuns: string[] = [];
   private aiActivity: AiActivity[] = [];
   private heartbeatNextAt: number | null = null;
   private chat: ChatState = EMPTY_CHAT;
   private chatHandler: ((msg: ChatMessageIn) => void) | null = null;
+  private suggestions: HarnessSuggestions | null = null;
   private autopilot: Autopilot = { active: false, note: null };
   private requirements: BoardRequirement[] = [];
   private requirementsCheckedAt = 0;
-  private requirementsCheck: (() => void) | null = null;
+  private requirementsCheck: (() => Promise<void>) | null = null;
   private authExpired: AiTool | null = null;
   private openTerminalHook: ((command: string) => void) | null = null;
   private environment: EnvironmentReport | null = null;
@@ -163,6 +179,17 @@ export class MessageRouter {
     return () => this.listeners.delete(fn);
   }
 
+  /** Avisa de uma falha que não veio de uma mensagem da interface (tarefa em segundo plano); a interface mostra como erro. */
+  onDidError(fn: (message: string) => void): () => void {
+    this.errorListeners.add(fn);
+    return () => this.errorListeners.delete(fn);
+  }
+
+  /** Uma tarefa em segundo plano falhou: além do log, a pessoa precisa ver, senão a tela fica esperando para sempre. */
+  reportError(message: string): void {
+    this.errorListeners.forEach((fn) => fn(message));
+  }
+
   /** Avisa quando uma pessoa aprova um card (usado pelo merge automático). */
   onDidApprove(fn: (cardId: string) => void): void {
     this.approveListeners.push(fn);
@@ -189,6 +216,7 @@ export class MessageRouter {
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
+      harnessSuggestions: this.suggestions,
       mainBranch: this.ctx.mainBranch(),
     };
   }
@@ -247,13 +275,13 @@ export class MessageRouter {
     this.notify();
   }
 
-  /** Quem confere os requisitos quando a pessoa pede "Verificar de novo". */
-  onRequirementsCheck(fn: () => void): void {
+  /** Quem confere os requisitos quando a pessoa pede "Verificar de novo"; resolve ao terminar e rejeita se falhou. */
+  onRequirementsCheck(fn: () => Promise<void>): void {
     this.requirementsCheck = fn;
   }
 
-  recheckRequirements(): void {
-    this.requirementsCheck?.();
+  recheckRequirements(): Promise<void> {
+    return this.requirementsCheck?.() ?? Promise.resolve();
   }
 
   /** Quem abre um terminal do editor e roda o comando pedido (o login de uma CLI); a pessoa conclui o login. */
@@ -292,12 +320,12 @@ export class MessageRouter {
     this.environmentFirstRun = firstRun;
   }
 
-  checkEnvironment(): void {
-    this.environmentHooks?.check();
+  checkEnvironment(): Promise<void> {
+    return this.environmentHooks?.check() ?? Promise.resolve();
   }
 
-  pinEnvironmentMcp(): void {
-    this.environmentHooks?.pinMcp?.();
+  pinEnvironmentMcp(): Promise<void> {
+    return this.environmentHooks?.pinMcp?.() ?? Promise.resolve();
   }
 
   /** A tela abriu sozinha uma vez: nas próximas aberturas, só pelo botão. */
@@ -353,6 +381,12 @@ export class MessageRouter {
     // o .bak já foi gravado e a pessoa pode fechar o editor logo depois: grava agora, sem esperar o debounce
     void this.ctx.dbHandle.flush?.().catch((e: unknown) => console.error('[fazai] falha ao salvar o board importado', e));
     return result;
+  }
+
+  /** O resultado de "Indicar artefatos" (informado pela sessão de chat), ou null para descartar. */
+  setSuggestions(suggestions: HarnessSuggestions | null): void {
+    this.suggestions = suggestions;
+    this.notify();
   }
 
   /** O chat com a IA (informado pela sessão de chat): as mensagens e se a IA está respondendo. */
@@ -430,6 +464,15 @@ export class MessageRouter {
     if (this.ctx.harness.refresh()) this.changed();
   }
 
+  /**
+   * O "Reler pastas" da tela: relê o disco e espera também a lista de plugins da CLI, para o `done` da mensagem
+   * só sair quando tudo o que a tela vai mostrar já chegou.
+   */
+  async refreshHarnessAndPlugins(): Promise<void> {
+    this.refreshHarness();
+    await this.ctx.harness.refreshPlugins();
+  }
+
   /** Liga a CLI do Claude Code, que diz quais plugins estão instalados e os desinstala, desativa e ativa. */
   setClaudeCli(cli: ClaudeCli | null): void {
     this.ctx.harness.setClaudeCli(cli, () => this.changed());
@@ -487,6 +530,18 @@ export class MessageRouter {
     const file = this.ctx.harness.createItem(tool, source, name, description);
     this.changed();
     return file;
+  }
+
+  /** Cria um item do harness com o conteúdo pronto e devolve o caminho do arquivo, para abrir no editor. */
+  writeHarnessItem(tool: AiTool, source: number, name: string, content: string, files?: string[], append?: boolean): string {
+    const file = this.ctx.harness.writeItem(tool, source, name, content, files, append);
+    this.changed();
+    return file;
+  }
+
+  /** O perfil do projeto aberto, para os assistentes de regras e de skills. */
+  projectProfile(): ProjectProfile {
+    return readProjectProfile(this.ctx.opts.workspaceDir ?? '');
   }
 
   private notify(): void {

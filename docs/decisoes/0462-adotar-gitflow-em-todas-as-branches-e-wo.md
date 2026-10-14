@@ -16,7 +16,7 @@ conclusão limpa e a release (#464), a limpeza de órfãs (#465) e o renomear da
 
 ## Decisão
 
-- **Tipo de branch no banco.** A coluna `card_types.branch_kind` (migração 30; `feature`, `bugfix` ou
+- **Tipo de branch no banco.** A coluna `card_types.branch_kind` (migração 31; `feature`, `bugfix` ou
   `hotfix`) diz o que cada tipo de card gera. O padrão é `feature`; Retrabalho vira `bugfix` e Bug vira
   `hotfix`. Edita-se na aba Git, não no card nem pelo MCP. As regras do card Bug continuam valendo.
 - **`{fluxo}` no padrão do nome.** O padrão passou a `{fluxo}{numero}-{titulo}`; `{fluxo}` recebe o

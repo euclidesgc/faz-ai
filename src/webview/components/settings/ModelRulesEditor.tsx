@@ -5,10 +5,11 @@ import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelValue, type ModelRule,
 import type { BoardState } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
+import { useAction } from '../../useAction';
 import { t, dt } from '../../i18n';
 import { ModelEditor } from '../FieldRenderer';
 import { Button, Card, IconButton, Switch, TextField } from '@radix-ui/themes';
-import { FormField, IconArrowDown, IconArrowUp, IconClose, IconEdit, IconPlus, IconTrash, SelectField } from '../ui';
+import { ActionButton, FormField, IconArrowDown, IconArrowUp, IconClose, IconEdit, IconPlus, IconTrash, SelectField } from '../ui';
 import { useSentList } from './useSentList';
 import { SectionHeader } from './SectionHeader';
 
@@ -184,6 +185,7 @@ export function ModelRulesEditor() {
   const { modelRules: rules, modelCatalog: allModels, aiTool } = state.board;
   const catalog = allModels.filter((o) => o.tool === aiTool);
   const [editing, setEditing] = useState<ModelRule | null>(null);
+  const suggest = useAction(() => settings.suggestModelRules(aiTool));
 
   // as mudanças partem da última lista enviada (ver useSentList)
   const sent = useSentList(rules, settings.setModelRules);
@@ -222,18 +224,25 @@ export function ModelRulesEditor() {
         title={t('Sugestão de modelo')}
         actions={
           <>
-            <Button
+            <ActionButton
               variant="soft"
               color="gray"
               disabled={!hasEffort}
-              title={t('Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do {tool}', { tool: tool.label })}
-              onClick={() => settings.suggestModelRules(aiTool)}
+              disabledReason={t('O board não tem o campo "{field}".', { field: dt(EFFORT_FIELD) })}
+              loading={suggest.busy}
+              hint={t('Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do {tool}', { tool: tool.label })}
+              onClick={() => void suggest.run()}
             >
               {t('Recriar as regras de "{field}"', { field: dt(EFFORT_FIELD) })}
-            </Button>
-            <Button disabled={!catalog.length || editing !== null} onClick={startNew}>
+            </ActionButton>
+            <ActionButton
+              disabled={!catalog.length || editing !== null}
+              disabledReason={!catalog.length ? t('Cadastre um modelo antes.') : t('Termine a regra que está aberta.')}
+              hint={t('Abre o formulário de uma regra nova.')}
+              onClick={startNew}
+            >
               <IconPlus /> {t('Montar nova regra')}
-            </Button>
+            </ActionButton>
           </>
         }
       >
