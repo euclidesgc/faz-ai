@@ -10,11 +10,12 @@ vi.hoisted(() => {
   (globalThis as { __fazaiTestWeb?: boolean }).__fazaiTestWeb = true;
 });
 
-import { choose, lastSent, posted, seedBoard, sentOf } from './setup';
+import { choose, confirmLast, lastSent, posted, seedBoard, sentOf } from './setup';
 import { RUNNER_PERMISSIONS } from '../../src/shared/runner';
 import { profileOfAgent } from '../../src/shared/execution';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { HarnessSettings } from '../../src/webview/components/settings/HarnessSettings';
+import type { HarnessTopic } from '../../src/shared/harnessTopics';
 import { useBoardStore, type HarnessTab } from '../../src/webview/store/boardStore';
 import type { Agent, Harness, HarnessItem, Skill } from '../../src/shared/harness';
 import type { BoardState } from '../../src/shared/model';
@@ -44,6 +45,8 @@ const agent: Agent = {
   skills: [],
   mcp: [],
   seed: false,
+  readonly: false,
+  background: false,
 };
 const projectAgent: Agent = {
   ...agent,
@@ -116,7 +119,7 @@ beforeEach(async () => {
   posted.mockClear();
 });
 
-const renderScreen = (tab: HarnessTab = 'project') => {
+const renderTab = (tab: HarnessTab) => {
   useBoardStore.setState({ harnessTab: tab });
   return render(
     <Theme>
@@ -125,24 +128,95 @@ const renderScreen = (tab: HarnessTab = 'project') => {
     </Theme>,
   );
 };
+/** Ferramenta e execução */
+const renderTool = () => renderTab('tool');
+/** A aba da ferramenta do projeto, no assunto e na origem pedidos (Projeto abre por padrão). */
+const renderScreen = async (topic: HarnessTopic = 'rules', origin?: string) => {
+  useBoardStore.setState({ harnessTopic: topic });
+  const view = renderTab('claude');
+  if (origin) await userEvent.click(screen.getByRole('radio', { name: origin }));
+  return view;
+};
 /** a linha de um item na tabela, pelo nome dele (a primeira: com o editor aberto, a linha de edição também o cita) */
 const row = (name: string | RegExp) => within(screen.getAllByRole('row', { name })[0]!);
 const dialog = () => within(screen.getByRole('dialog'));
 
 describe('HarnessSettings: abas', () => {
-  it('três abas: ferramenta, projeto e global', async () => {
-    renderScreen('tool');
+  it('uma aba por ferramenta, a do projeto primeiro, depois de Ferramenta e execução', async () => {
+    renderTool();
+    const tabs = screen.getAllByRole('tab');
+    [/^Ferramenta e execução/, /^Claude Code/, /^Cursor/].forEach((name, i) => expect(tabs[i]).toHaveAccessibleName(name));
+    expect(tabs).toHaveLength(3);
     expect(screen.getByText('Ferramenta deste projeto')).toBeInTheDocument();
-    expect(screen.queryByText('Harness do projeto')).toBeNull();
-    await userEvent.click(screen.getByRole('tab', { name: /^Projeto/ }));
-    expect(screen.getByText('Harness do projeto')).toBeInTheDocument();
-    expect(useBoardStore.getState().harnessTab).toBe('project');
-    // abrir um escopo relê as pastas (a do usuário não é vigiada)
+    expect(screen.queryByText('Harness do Claude Code')).toBeNull();
+    await userEvent.click(screen.getByRole('tab', { name: /^Claude Code/ }));
+    expect(screen.getByText('Harness do Claude Code')).toBeInTheDocument();
+    expect(screen.getByText('ferramenta deste projeto')).toBeInTheDocument();
+    expect(useBoardStore.getState().harnessTab).toBe('claude');
+    // abrir uma ferramenta relê as pastas (a do usuário não é vigiada)
     expect(sentOf('harness.refresh').length).toBeGreaterThan(0);
-    await userEvent.click(screen.getByRole('tab', { name: /^Global/ }));
-    expect(screen.getByText('Harness global')).toBeInTheDocument();
-    expect(useBoardStore.getState().harnessTab).toBe('user');
-    expect(screen.queryByRole('tab', { name: /Tudo que a ferramenta carrega/ })).toBeNull();
+    await userEvent.click(screen.getByRole('tab', { name: /^Cursor/ }));
+    expect(screen.getByText('Harness do Cursor')).toBeInTheDocument();
+    expect(screen.queryByText('ferramenta deste projeto')).toBeNull();
+    expect(screen.getByText(/a marcação só vale para ele/)).toBeInTheDocument();
+    expect(useBoardStore.getState().harnessTab).toBe('cursor');
+    expect(screen.queryByRole('tab', { name: /^Projeto/ })).toBeNull();
+  });
+
+  it('com o Cursor como ferramenta do projeto, ele vem primeiro', () => {
+    setState((s) => ({ board: { ...s.board, aiTool: 'cursor' } }));
+    renderTool();
+    const tabs = screen.getAllByRole('tab');
+    [/^Ferramenta e execução/, /^Cursor/, /^Claude Code/].forEach((name, i) => expect(tabs[i]).toHaveAccessibleName(name));
+  });
+
+  it('o valor antigo das abas Projeto e Global abre a aba da ferramenta do projeto', () => {
+    // a sessão anterior deixou "project" guardado
+    useBoardStore.setState({ harnessTab: 'project' as HarnessTab, harnessTopic: 'rules' });
+    render(
+      <Theme>
+        <HarnessSettings />
+      </Theme>,
+    );
+    expect(screen.getByRole('tab', { name: /^Claude Code/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Harness do Claude Code')).toBeInTheDocument();
+  });
+
+  it('as seções harness-project e harness-user levam à ferramenta do projeto, e harness-agents ao assunto Sub-agentes', () => {
+    setState((s) => ({ board: { ...s.board, aiTool: 'cursor' } }));
+    useBoardStore.setState({ harnessTab: 'tool', harnessTopic: 'rules' });
+    useBoardStore.getState().goToSection('harness-user');
+    expect(useBoardStore.getState()).toMatchObject({ harnessTab: 'cursor', harnessOrigin: 'user' });
+    // a pendência "nenhum agente do board" cai no Board, onde se vê o que falta enviar
+    useBoardStore.getState().goToSection('harness-agents');
+    expect(useBoardStore.getState()).toMatchObject({ harnessTab: 'cursor', harnessTopic: 'agent', harnessOrigin: 'board' });
+  });
+});
+
+describe('HarnessSettings: importar artefatos no navegador', () => {
+  it('sem seletor de pasta, a pessoa digita o caminho, e o board varre a pasta', async () => {
+    await renderScreen('skill');
+    // no navegador o botão abre um campo, em vez de pedir o seletor do editor
+    await userEvent.click(screen.getByRole('button', { name: 'Importar artefatos' }));
+    expect(sentOf('harness.import.pick')).toHaveLength(0);
+    const importar = screen.getByRole('button', { name: 'Importar' });
+    expect(importar).toBeDisabled();
+    await userEvent.type(screen.getByRole('textbox', { name: 'Caminho da pasta a importar' }), '  /srv/colecao  ');
+    await userEvent.click(importar);
+    expect(lastSent('harness.import.add')).toEqual({ type: 'harness.import.add', tool: 'claude', dir: '/srv/colecao' });
+    // o campo fica, mostrando a espera, e fecha quando o host confirma a importação
+    expect(screen.getByRole('textbox', { name: 'Caminho da pasta a importar' })).toBeInTheDocument();
+    confirmLast();
+    await act(async () => {});
+    expect(screen.queryByRole('textbox', { name: 'Caminho da pasta a importar' })).toBeNull();
+  });
+
+  it('Cancelar fecha o campo sem enviar nada', async () => {
+    await renderScreen('skill');
+    await userEvent.click(screen.getByRole('button', { name: 'Importar artefatos' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('textbox', { name: 'Caminho da pasta a importar' })).toBeNull();
+    expect(sentOf('harness.import.add')).toHaveLength(0);
   });
 });
 
@@ -151,10 +225,10 @@ const item = (name: string) => within(screen.getAllByText(name, { selector: '.it
 
 describe('HarnessSettings: rules', () => {
   it('marcar e desmarcar uma rule do projeto grava a marcação; o global mostra os arquivos da pasta do usuário', async () => {
-    renderScreen('project');
-    const usage = () => item('AGENTS.md').getByRole('combobox', { name: 'Uso nas execuções do board: AGENTS.md' });
-    expect(usage()).toHaveTextContent('Fora das execuções');
-    await choose(usage(), 'Incluir em todo contexto');
+    await renderScreen('rules');
+    const usage = () => item('AGENTS.md').getByRole('combobox', { name: 'Modo no board: AGENTS.md' });
+    expect(usage()).toHaveTextContent('Fora do board');
+    await choose(usage(), 'Sempre');
     expect(lastSent('harness.selection.set')).toEqual({
       type: 'harness.selection.set',
       items: [{ kind: 'instructions', location: 'AGENTS.md' }],
@@ -163,29 +237,30 @@ describe('HarnessSettings: rules', () => {
     act(() =>
       setState((s) => ({ harnessSelection: [...s.harnessSelection, { kind: 'instructions', location: 'AGENTS.md', usage: 'always' }] })),
     );
-    expect(usage()).toHaveTextContent('Incluir em todo contexto');
-    await choose(usage(), 'Fora das execuções');
+    expect(usage()).toHaveTextContent('Sempre');
+    await choose(usage(), 'Fora do board');
     expect(lastSent('harness.selection.set').usage).toBeNull();
     // o CLAUDE.md global não aparece na aba do projeto
     expect(screen.queryByRole('button', { name: '~/.claude/CLAUDE.md' })).toBeNull();
-    await userEvent.click(screen.getByRole('tab', { name: /^Global/ }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Global' }));
     expect(item('CLAUDE.md').getByRole('button', { name: '~/.claude/CLAUDE.md' })).toBeInTheDocument();
   });
 
   it('o caminho de uma rule abre o arquivo no editor do board', async () => {
-    renderScreen('project');
+    await renderScreen('rules');
     await userEvent.click(item('AGENTS.md').getByRole('button', { name: 'AGENTS.md' }));
     expect(useBoardStore.getState().harnessFile).toBe('/abs/AGENTS.md');
     act(() => useBoardStore.getState().closeHarnessFile());
   });
 
-  it('uma marcação cujo arquivo sumiu aparece no aviso e pode ser desmarcada', async () => {
+  it('uma marcação cujo arquivo sumiu aparece como ausente na origem Board e pode ser removida', async () => {
     setState((s) => ({
       harnessSelection: [...s.harnessSelection, { kind: 'instructions', location: '.claude/rules/velha.md', usage: 'contextual' }],
     }));
-    renderScreen('project');
-    const missing = within(screen.getByText('.claude/rules/velha.md').parentElement!);
-    await userEvent.click(missing.getByRole('button', { name: 'Desmarcar' }));
+    await renderScreen('rules', 'Board');
+    const missing = within(screen.getByText('.claude/rules/velha.md').closest('li')!);
+    expect(missing.getByText('ausente')).toBeInTheDocument();
+    await userEvent.click(missing.getByRole('button', { name: /^Remover do board/ }));
     expect(lastSent('harness.selection.set')).toEqual({
       type: 'harness.selection.set',
       items: [{ kind: 'instructions', location: '.claude/rules/velha.md' }],
@@ -196,10 +271,10 @@ describe('HarnessSettings: rules', () => {
 
 describe('HarnessSettings: skills', () => {
   it('o uso nas execuções troca entre as duas marcações', async () => {
-    renderScreen('project');
-    const usage = item('revisar-spec').getByRole('combobox', { name: 'Uso nas execuções do board: revisar-spec' });
-    expect(usage).toHaveTextContent('Incluir em todo contexto');
-    await choose(usage, 'Usar quando fizer sentido');
+    await renderScreen('skill');
+    const usage = item('revisar-spec').getByRole('combobox', { name: 'Modo no board: revisar-spec' });
+    expect(usage).toHaveTextContent('Sempre');
+    await choose(usage, 'Pelo card');
     expect(lastSent('harness.selection.set')).toEqual({
       type: 'harness.selection.set',
       items: [{ kind: 'skill', location: '.claude/skills/revisar-spec/SKILL.md' }],
@@ -210,7 +285,7 @@ describe('HarnessSettings: skills', () => {
   });
 
   it('modo, abrir e apagar uma skill do projeto', async () => {
-    renderScreen('project');
+    await renderScreen('skill');
     const k = item('revisar-spec');
     await choose(k.getByRole('combobox', { name: 'Modo da skill revisar-spec' }), 'Só quando indicada');
     expect(lastSent('harness.skill.setMode')).toEqual({
@@ -233,7 +308,7 @@ describe('HarnessSettings: skills', () => {
   });
 
   it('nova skill abre o formulário de criação com o destino, e a skill do fluxo é instalada daqui', async () => {
-    renderScreen('project');
+    await renderScreen('skill');
     const skills = within(document.querySelector<HTMLElement>('.settings-card[aria-label="Skills"]')!);
     await userEvent.click(skills.getByRole('button', { name: 'Novo' }));
     expect(skills.getByText('Onde')).toBeInTheDocument();
@@ -242,9 +317,9 @@ describe('HarnessSettings: skills', () => {
 });
 
 describe('HarnessSettings: agentes', () => {
-  // os agentes ficam no grupo Subagentes de cada aba, sem sub-aba
-  const openAgents = async (tab: HarnessTab = 'user') => {
-    renderScreen(tab);
+  // os agentes ficam no assunto Sub-agentes; a origem escolhe a pasta (Projeto ou Global)
+  const openAgents = async (origin: string = 'Global') => {
+    await renderScreen('agent', origin === 'Projeto' ? undefined : origin);
   };
 
   it('o global lista os agentes da pasta do usuário, com o padrão e a marcação; o projeto lista os dele', async () => {
@@ -260,8 +335,8 @@ describe('HarnessSettings: agentes', () => {
       items: [{ kind: 'agent', location: '~/.claude/agents/revisor.md' }],
       usage: null,
     });
-    // no Projeto, os agentes ficam no grupo Subagentes, sem sub-aba
-    await userEvent.click(screen.getByRole('tab', { name: /^Projeto/ }));
+    // na origem Projeto ficam os agentes do projeto
+    await userEvent.click(screen.getByRole('radio', { name: 'Projeto' }));
     const local = row(/local/);
     expect(local.getByText('de fábrica')).toBeInTheDocument();
     expect(local.getByRole('checkbox', { name: 'Disponível no board: local' })).not.toBeChecked();
@@ -331,20 +406,67 @@ describe('HarnessSettings: agentes', () => {
     expect(lastSent('harness.agents.seed')).toEqual({ type: 'harness.agents.seed', force: true });
     act(() => setState((s) => ({ chat: { ...s.chat, busy: true } })));
     expect(screen.getByRole('button', { name: 'Sugerir agentes com IA' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('tab', { name: /^Projeto/ }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Projeto' }));
     expect(screen.queryByRole('button', { name: 'Recriar os agentes padrão' })).toBeNull();
   });
 
   it('o agente padrão é escolhido em Ferramenta e execução entre os disponíveis', async () => {
-    renderScreen('tool');
+    renderTool();
     const runner = document.querySelector<HTMLElement>('.runner-settings')!;
     expect(within(runner).getByRole('combobox', { name: 'Agente padrão' })).toHaveTextContent('revisor');
   });
 });
 
+describe('HarnessSettings: assistentes e sugestões de regras e skills', () => {
+  it('Regras: o assistente abre no Projeto e no Global, a IA sugere, e nenhum aparece no Board', async () => {
+    await renderScreen('rules');
+    await userEvent.click(screen.getByRole('button', { name: 'Criar regra com ajuda' }));
+    expect(screen.getByText('Passo 1 de 5')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByText('Passo 1 de 5')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sugerir regras com IA' }));
+    expect(lastSent('ai.suggestRules')).toEqual({ type: 'ai.suggestRules' });
+    act(() => setState((st) => ({ chat: { ...st.chat, busy: true } })));
+    expect(screen.getByRole('button', { name: 'Sugerir regras com IA' })).toBeDisabled();
+    act(() => setState((st) => ({ chat: { ...st.chat, busy: false } })));
+
+    // trocar de origem fecha o assistente aberto; no Global ele grava na pasta do usuário
+    await userEvent.click(screen.getByRole('button', { name: 'Criar regra com ajuda' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Global' }));
+    expect(screen.queryByText('Passo 1 de 5')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Criar regra com ajuda' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'Board' }));
+    expect(screen.queryByRole('button', { name: 'Criar regra com ajuda' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sugerir regras com IA' })).toBeNull();
+  });
+
+  it('Skills: o assistente e a sugestão da IA', async () => {
+    await renderScreen('skill');
+    await userEvent.click(screen.getByRole('button', { name: 'Criar skill com ajuda' }));
+    expect(screen.getByText('Passo 1 de 6')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Sugerir skills com IA' }));
+    expect(lastSent('ai.suggestSkills')).toEqual({ type: 'ai.suggestSkills' });
+    expect(screen.queryByRole('button', { name: 'Criar regra com ajuda' })).toBeNull();
+  });
+
+  it('em Sub-agentes e Hooks não há assistente de regras nem de skills', async () => {
+    await renderScreen('hook');
+    expect(screen.queryByRole('button', { name: 'Criar regra com ajuda' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Criar skill com ajuda' })).toBeNull();
+  });
+
+  it('a ferramenta que não é a do projeto não oferece os assistentes', async () => {
+    useBoardStore.setState({ harnessTopic: 'rules' });
+    renderTab('cursor');
+    expect(screen.queryByRole('button', { name: 'Criar regra com ajuda' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sugerir regras com IA' })).toBeNull();
+  });
+});
+
 describe('HarnessSettings: ferramenta e execução', () => {
   it('escolher outra ferramenta grava no board; a atual não envia nada', async () => {
-    renderScreen('tool');
+    renderTool();
     const radios = screen.getAllByRole('radio');
     await userEvent.click(radios[0]!);
     expect(sentOf('settings.board.update')).toHaveLength(0);
@@ -353,13 +475,13 @@ describe('HarnessSettings: ferramenta e execução', () => {
   });
 
   it('a aba da ferramenta não instala o MCP: aponta para a seção da ferramenta', () => {
-    renderScreen('tool');
+    renderTool();
     expect(screen.queryByRole('button', { name: /MCP/ })).toBeNull();
-    expect(screen.getByText(/nas seções Servidores MCP e Skills de cada ferramenta/)).toBeInTheDocument();
+    expect(screen.getByText(/na aba de cada ferramenta, nos assuntos MCPs e Skills, em Projeto/)).toBeInTheDocument();
   });
 
   it('permissão, tempo limite, heartbeat e Rodar o heartbeat agora', async () => {
-    renderScreen('tool');
+    renderTool();
     const runner = document.querySelector<HTMLElement>('.runner-settings')!;
     await choose(
       within(runner).getByRole('combobox', { name: 'O que a IA pode fazer' }),
@@ -396,7 +518,7 @@ describe('HarnessSettings: ferramenta e execução', () => {
 
   it('sem suporte à execução, mostra o aviso no lugar dos campos', () => {
     setState(() => ({ aiRunUnsupported: 'Esta ferramenta não roda pelo board.' }));
-    renderScreen('tool');
+    renderTool();
     expect(screen.getByText('Esta ferramenta não roda pelo board.')).toBeInTheDocument();
     expect(document.querySelector('.runner-settings')).toBeNull();
   });
@@ -418,26 +540,32 @@ describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada 
     setState((s) => ({ harness: { ...s.harness, inventory: [{ tool: 'claude', installed: true, items }] } }));
   const installBlock = (label: string) => within(screen.getByRole('generic', { name: label }));
 
-  it('um só lugar por tipo: o MCP na seção Servidores MCP e a skill na seção Skills', () => {
-    renderScreen('project');
+  it('um só lugar por tipo: o MCP no assunto MCPs e a skill no assunto Skills', async () => {
+    const { unmount } = await renderScreen('mcp');
     expect(screen.getAllByLabelText('Servidor do board')).toHaveLength(1);
-    expect(screen.getAllByLabelText('Skill do fluxo')).toHaveLength(1);
+    expect(screen.queryByLabelText('Skill do fluxo')).toBeNull();
     expect(installBlock('Servidor do board').getByText('global: não instalado')).toBeInTheDocument();
     expect(installBlock('Servidor do board').getByText(/~\/\.claude\.json/)).toBeInTheDocument();
+    unmount();
+    await renderScreen('skill');
+    expect(screen.getAllByLabelText('Skill do fluxo')).toHaveLength(1);
+    expect(screen.queryByLabelText('Servidor do board')).toBeNull();
     expect(installBlock('Skill do fluxo').getByText('~/.claude/skills/faz-ai-fluxo')).toBeInTheDocument();
   });
 
   it('abrir e fechar a busca de skills várias vezes não duplica o card "Skill do fluxo" (nem o "Servidor do board")', async () => {
     // com a key repetida entre os irmãos, o React avisa e passa a duplicar o card
     const erro = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    renderScreen('project');
+    const { unmount } = await renderScreen('skill');
     const skills = document.querySelector<HTMLElement>('.settings-card[aria-label="Skills"]')!;
-    const mcp = document.querySelector<HTMLElement>('.settings-card[aria-label="Servidores MCP"]')!;
     for (let i = 0; i < 4; i++) {
       await userEvent.click(within(skills).getByRole('button', { name: 'Buscar skills para instalar' }));
     }
     expect(screen.getAllByLabelText('Skill do fluxo')).toHaveLength(1);
+    unmount();
     // o mesmo card (BoardInstall) vale para o servidor MCP: abrir e fechar o formulário ao lado dele não o duplica
+    await renderScreen('mcp');
+    const mcp = document.querySelector<HTMLElement>('.settings-card[aria-label="Servidores MCP"]')!;
     for (let i = 0; i < 4; i++) {
       await userEvent.click(within(mcp).getByRole('button', { name: 'Novo servidor' }));
     }
@@ -448,13 +576,15 @@ describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada 
   });
 
   it('o padrão da ferramenta instala no global, depois de confirmar', async () => {
-    renderScreen('project');
+    const { unmount } = await renderScreen('mcp');
     await userEvent.click(installBlock('Servidor do board').getByRole('button', { name: 'Instalar (padrão da ferramenta)' }));
     expect(sentOf('ui.connectAI')).toHaveLength(0);
     expect(dialog().getByText(/vale para todos os seus projetos/)).toBeInTheDocument();
     await userEvent.click(dialog().getByRole('button', { name: 'Instalar' }));
     expect(lastSent('ui.connectAI')).toEqual({ type: 'ui.connectAI', tool: 'claude', scope: 'user' });
+    unmount();
 
+    await renderScreen('skill');
     await userEvent.click(installBlock('Skill do fluxo').getByRole('button', { name: 'Instalar (padrão da ferramenta)' }));
     await userEvent.click(dialog().getByRole('button', { name: 'Instalar' }));
     expect(lastSent('harness.flowSkill.install')).toEqual({
@@ -466,10 +596,12 @@ describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada 
   });
 
   it('no projeto sem global instala direto; com global, pergunta antes', async () => {
-    renderScreen('project');
+    await renderScreen('mcp');
     await userEvent.click(installBlock('Servidor do board').getByRole('button', { name: 'Instalar neste projeto' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(lastSent('ui.connectAI')).toEqual({ type: 'ui.connectAI', tool: 'claude', scope: 'project' });
+    confirmLast();
+    await act(async () => {});
 
     posted.mockClear();
     act(() => withItems([item('mcp', 'user', 'faz-ai')]));
@@ -483,7 +615,7 @@ describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada 
 
   it('a skill que já existe no destino só é substituída depois de confirmar', async () => {
     withItems([item('skill', 'project', 'faz-ai-fluxo')]);
-    renderScreen('project');
+    await renderScreen('skill');
     await userEvent.click(installBlock('Skill do fluxo').getByRole('button', { name: 'Reinstalar neste projeto' }));
     expect(dialog().getByText(/será substituída/)).toBeInTheDocument();
     await userEvent.click(dialog().getByRole('button', { name: 'Substituir' }));
@@ -493,5 +625,21 @@ describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada 
       scope: 'project',
       replace: true,
     });
+  });
+});
+
+describe('HarnessSettings: aviso de como usar', () => {
+  it('aparece até a pessoa dispensar, fica guardado, e volta pelo "Como funciona"', async () => {
+    useBoardStore.setState({ harnessIntroSeen: false });
+    renderTab('claude');
+    const note = () => screen.queryByRole('note', { name: 'Como usar o Harness' });
+    expect(note()).toBeInTheDocument();
+    expect(note()).toHaveTextContent('Por onde começar');
+    expect(screen.queryByRole('button', { name: 'Como funciona' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Entendi, não mostrar de novo' }));
+    expect(note()).toBeNull();
+    expect(useBoardStore.getState().harnessIntroSeen).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Como funciona' }));
+    expect(note()).toBeInTheDocument();
   });
 });

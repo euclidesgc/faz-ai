@@ -184,6 +184,20 @@ describe('autopilotStep', () => {
     expect(runner.started).toEqual([card(2).id, card(1).id]);
   });
 
+  it('a história derivada entra na fila depois da origem, mesmo acima dela no board (a branch dela parte da origem)', () => {
+    create('Parte 2', 'PRD'); // #1, no topo
+    create('Parte 1', 'PRD'); // #2, abaixo
+    ai({ type: 'card.derive', cardId: card(1).id, fromId: card(2).id });
+    owns = false;
+    yolo(1);
+    yolo(2);
+    expect(autopilotRuns(router.snapshot()).map((r) => r.story.number)).toEqual([2, 1]);
+    owns = true;
+    autopilot.resume();
+    // as duas estão em fase de texto: rodam juntas, na ordem da fila
+    expect(runner.started.map((id) => router.snapshot().cards.find((c) => c.id === id)!.number)).toEqual([2, 1]);
+  });
+
   it('com todas as histórias esperando dependência, a fila para com o motivo da primeira', () => {
     create('Base', 'PRD'); // #1, fora do modo autônomo
     create('Y', 'PRD'); // #2
@@ -697,6 +711,20 @@ describe('autopiloto', () => {
     status(1, 'running'); // a sessão caiu sem avisar
     yolo(1);
     expect(runner.started).toEqual([card(1).id]);
+  });
+
+  it('a sub-tarefa marcada "Em execução" pela sessão viva da história não é devolvida para Pronto a cada mudança do board', () => {
+    create('A', 'Implementação'); // #1
+    create('Passo', 'A fazer', 1); // #2
+    yolo(1);
+    expect(runner.running).toEqual([card(1).id]);
+    status(2, 'running'); // a sessão da história chamou start_work na sub-tarefa
+    ai({ type: 'comment.add', cardId: card(1).id, body: 'Trabalhando.' }); // outra mudança do board
+    flush();
+    expect(card(2).status).toBe('running');
+    // a sessão acabou com a sub-tarefa ainda marcada: aí sim ela volta para a IA
+    runner.finish();
+    expect(card(2).status).toBe('ready');
   });
 
   it('história entregue: a IA não a retoma, não a move, e o disjuntor de falta de progresso não a alcança', () => {

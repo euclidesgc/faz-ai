@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { AiTool } from '../../../../shared/harness';
 import { harness, type HarnessScope } from '../../../commands';
+import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
-import { Badge, Button, Card, Checkbox, TextField } from '@radix-ui/themes';
-import { SelectField, type EnumOption } from '../../ui';
+import { Badge, Card, Checkbox, TextField } from '@radix-ui/themes';
+import { ActionButton, SelectField, type EnumOption } from '../../ui';
 import { withGlobalWarning } from './text';
 import { t } from '../../../i18n';
 
@@ -29,6 +30,9 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
   );
   const installable = preview?.skills.filter((k) => k.valid && !existing.has(k.name)) ?? [];
   const picked = chosen.filter((rel) => installable.some((k) => k.rel === rel));
+  // clonar o repositório e copiar as pastas levam segundos: os botões mostram a espera até o host confirmar
+  const scan = useAction(() => harness.scanInstall(source));
+  const install = useAction(() => harness.applyInstall(tool, to, picked));
   const apply = () =>
     ask({
       title: t('Instalar {n} skill(s)?', { n: picked.length }),
@@ -40,9 +44,8 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
         to,
       ),
       confirmLabel: t('Instalar'),
-      onConfirm: () => {
-        harness.applyInstall(tool, to, picked);
-        setChosen([]);
+      onConfirm: async () => {
+        if (await install.run()) setChosen([]);
       },
     });
   return (
@@ -54,12 +57,23 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
           onChange={(e) => setSource(e.target.value)}
           placeholder={t('dono/repositorio, endereço git (https ou ssh) ou o caminho de uma pasta')}
           spellCheck={false}
-          onKeyDown={(e) => e.key === 'Enter' && source.trim() && harness.scanInstall(source)}
+          onKeyDown={(e) => e.key === 'Enter' && source.trim() && void scan.run()}
         />
-        <Button disabled={!source.trim()} onClick={() => harness.scanInstall(source)}>
+        <ActionButton
+          disabled={!source.trim()}
+          disabledReason={t('Informe a origem: dono/repositório, endereço git ou o caminho de uma pasta.')}
+          loading={scan.busy}
+          hint={t('Clona ou lê a origem numa pasta temporária, sem rodar nada, e lista as skills encontradas.')}
+          onClick={() => void scan.run()}
+        >
           {t('Procurar skills')}
-        </Button>
+        </ActionButton>
       </div>
+      {scan.busy && (
+        <p role="status" className="muted small">
+          <span className="spinner" aria-hidden /> {t('Buscando a origem e procurando skills…')}
+        </p>
+      )}
       <p className="muted small">
         {t(
           'Um repositório é clonado numa pasta temporária, sem rodar nada dele. Você vê as skills encontradas antes de copiar qualquer coisa.',
@@ -112,23 +126,35 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
           {preview.skills.length === 0 && <p className="muted small">{t('Nenhuma pasta com SKILL.md nessa origem.')}</p>}
           <div className="form-actions">
             {installable.length > 1 && (
-              <Button variant="ghost" size="1" onClick={() => setChosen(installable.map((k) => k.rel))}>
+              <ActionButton
+                variant="ghost"
+                size="1"
+                hint={t('Marca todas as skills que podem ser instaladas.')}
+                onClick={() => setChosen(installable.map((k) => k.rel))}
+              >
                 {t('Selecionar todas')}
-              </Button>
+              </ActionButton>
             )}
-            <Button
+            <ActionButton
               variant="soft"
               color="gray"
+              hint={t('Descarta a lista e apaga a pasta temporária; nada foi instalado.')}
               onClick={() => {
                 harness.cancelInstall();
                 setChosen([]);
               }}
             >
               {t('Fechar')}
-            </Button>
-            <Button disabled={picked.length === 0} onClick={apply}>
+            </ActionButton>
+            <ActionButton
+              disabled={picked.length === 0}
+              disabledReason={t('Marque pelo menos uma skill.')}
+              loading={install.busy}
+              hint={t('Copia as pastas das skills marcadas para o destino escolhido.')}
+              onClick={apply}
+            >
               {t('Instalar {n} selecionada(s)', { n: picked.length || '' })}
-            </Button>
+            </ActionButton>
           </div>
         </>
       )}

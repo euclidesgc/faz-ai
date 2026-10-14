@@ -6,6 +6,7 @@ import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { useBoardStore } from '../store/boardStore';
 import { t, tn } from '../i18n';
 import { ui } from '../commands';
+import { useAction } from '../useAction';
 import { isWeb } from '../vscode';
 import { PageHeader } from './settings/PageHeader';
 import { CopyCommand, RequirementFix, requirementTexts } from './RequirementsBanner';
@@ -54,6 +55,45 @@ function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string 
       return {
         title: t('Skill do fluxo ({name})', { name: FLOW_SKILL_NAME }),
         hint: t('Ensina a IA do {tool} a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências.', { tool }),
+      };
+    case 'harness':
+      return {
+        title: t('Definição do harness'),
+        hint: t(
+          'O banco de artefatos do board: as skills, agentes, servidores MCP e regras que as execuções podem usar, no modo de cada um. Sem ele o board funciona, mas sem o ganho de economia e precisão.',
+        ),
+      };
+    case 'harness-artifacts':
+      return {
+        title: t('Artefatos no board'),
+        hint: t(
+          'Nenhuma skill, agente ou servidor MCP em modo "Pelo card": o planejamento dos cards não tem de onde escolher. Use "Indicar artefatos" na aba do {tool} no Harness.',
+          { tool },
+        ),
+      };
+    case 'harness-agents':
+      return {
+        title: t('Agente do board'),
+        hint: t('Sem agente, toda execução roda com o escopo cheio. Crie um com "Criar agente com ajuda" ou "Sugerir agentes com IA".'),
+      };
+    case 'harness-rules':
+      return {
+        title: t('Regras revisadas'),
+        hint: t('Há regras enviadas ao board ainda desligadas: revise o texto na aba Regras e ative, ou tire do board.'),
+      };
+    case 'harness-missing':
+      return {
+        title: t('Artefatos presentes'),
+        hint: t(
+          'Um artefato do board sumiu da origem; a aba do assunto mostra quais estão ausentes, para tirar do board ou repor o arquivo.',
+        ),
+      };
+    case 'harness-cursor':
+      return {
+        title: t('Artefatos do projeto fora do board'),
+        hint: t(
+          'A linha de comando do Cursor não desliga nada: regras, servidores MCP e hooks do projeto entram no contexto sem passar pelo board. Desligue nas configurações do Cursor ou remova do projeto; o board só confere.',
+        ),
       };
     case 'permission':
       return {
@@ -268,16 +308,23 @@ export function EnvironmentView() {
   const report = useBoardStore((s) => s.state?.environment ?? null);
   const tool = useBoardStore((s) => s.state!.board.aiTool);
   const setView = useBoardStore((s) => s.setView);
-  const [askedAt, setAskedAt] = useState(() => Date.now());
-  const checking = !report || report.checkedAt < askedAt;
+  // a espera é a da mensagem: o host confirma (`done`) quando o relatório já está no board, ou avisa a falha
+  const check = useAction(() => ui.checkEnvironment());
+  const checking = check.busy;
   // confere ao abrir: a pessoa pode ter instalado algo desde a última vez
   useEffect(() => {
-    ui.checkEnvironment();
+    void check.run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const recheck = () => {
-    setAskedAt(Date.now());
-    ui.checkEnvironment();
-  };
+  // um pedido no meio de uma conferência (instalou a skill enquanto a abertura ainda confere) roda logo depois
+  const [again, setAgain] = useState(false);
+  const recheck = () => (check.busy ? setAgain(true) : void check.run());
+  useEffect(() => {
+    if (check.busy || !again) return;
+    setAgain(false);
+    void check.run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [check.busy, again]);
   // recarregar a janela reinicia a extensão: as execuções de IA em andamento param, então pergunta antes
   const ask = useBoardStore((s) => s.ask);
   const running = useBoardStore((s) => s.state?.aiRuns.length ?? 0);
@@ -306,7 +353,9 @@ export function EnvironmentView() {
   const missing = report ? missingCount(report.required) : 0;
   const suggested = report ? missingCount(report.recommended) : 0;
   const summary = !report
-    ? t('Conferindo o ambiente…')
+    ? check.error
+      ? t('A conferência falhou. Tente de novo.')
+      : t('Conferindo o ambiente…')
     : missing
       ? missing === 1
         ? t('Falta 1 item necessário para o board trabalhar com a IA.')

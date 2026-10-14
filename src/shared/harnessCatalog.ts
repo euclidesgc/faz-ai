@@ -1,7 +1,7 @@
 import type { AiTool, HarnessKind } from './harness';
 
 /**
- * Os grupos das abas Projeto e Global do Harness, na ordem em que aparecem. Cada fonte do catálogo
+ * Os grupos do catálogo do Harness (agrupados em assuntos por `harnessTopics.ts`), na ordem em que aparecem. Cada fonte do catálogo
  * cai num deles; os itens de plugin vão todos para `plugin`.
  */
 export type HarnessGroup =
@@ -378,7 +378,7 @@ export function importPath(from: string, to: string): string {
 /** Nome da pasta de um projeto em `~/.claude/projects`: o caminho com tudo que não é letra ou número trocado por hífen. */
 export const claudeProjectKey = (projectDir: string): string => projectDir.replace(/[^a-zA-Z0-9]/g, '-');
 
-/** Grupo de um item nas abas Projeto e Global: o da fonte de onde ele veio; os de plugin ficam em Plugins. */
+/** Grupo de um item no catálogo do Harness: o da fonte de onde ele veio; os de plugin ficam em Plugins. */
 export function groupOf(tool: AiTool, item: { scope: string; kind: HarnessKind; source?: number }): HarnessGroup {
   if (item.scope === 'plugin') return 'plugin';
   const src = item.source === undefined ? undefined : HARNESS_CATALOG[tool][item.source];

@@ -13,6 +13,8 @@ import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { Dialog } from './components/Dialog';
+import { BusyOverlay } from './components/BusyOverlay';
+import { BoardPlaceholder } from './components/ui';
 import { FilterBar } from './components/FilterBar';
 import { SelectionBar } from './components/SelectionBar';
 import { AutopilotButton } from './components/AutopilotButton';
@@ -44,6 +46,7 @@ export function App() {
   useAppearance();
   const { state, error, notice, view, setError, setNotice, setView, openCardId, filters, setFilters, chatOpen, setChatOpen } =
     useBoardStore();
+  const busyOverlay = useBoardStore((s) => s.busyOverlay);
   const attachmentsBaseUri = useBoardStore((s) => s.attachmentsBaseUri);
   const [offline, setOffline] = useState(false);
 
@@ -82,18 +85,24 @@ export function App() {
     ui.environmentSeen();
   }, [firstRun, setView]);
 
+  // antes do primeiro estado a tela mostra a forma do board, não um texto solto
   if (!state)
-    return (
-      <div className="loading">
-        {offline ? t('Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.') : t('Carregando board…')}
-      </div>
+    return offline ? (
+      <div className="loading">{t('Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.')}</div>
+    ) : (
+      <BoardPlaceholder />
     );
   const trashCount = state.cards.filter((c) => c.deletedAt !== null).length;
   const withYou = humanQueue(state, pendingWork(state)).length;
   const onlyMine = filters.owner === 'human';
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      aria-busy={busyOverlay ? true : undefined}
+      // `inert` tira foco e clique de tudo atrás do véu; o React 18 ainda não o tipa, por isso o spread
+      {...(busyOverlay ? { inert: '' } : {})}
+    >
       <header className="topbar">
         <h1 title={state.board.name}>{state.board.name}</h1>
         <nav>
@@ -185,6 +194,7 @@ export function App() {
       <AttachmentModal onSaveAs={saveAttachmentAs} />
       <HarnessFileModal />
       <Dialog />
+      {busyOverlay && <BusyOverlay label={busyOverlay.label} />}
       <div className="toasts" aria-live="polite">
         {error && (
           <div className="toast error" role="alert">

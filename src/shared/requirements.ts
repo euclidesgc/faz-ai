@@ -1,4 +1,5 @@
 import type { AiTool } from './harness';
+import type { HarnessIssue } from './harnessStatus';
 
 /** O que falta para o board trabalhar com a ferramenta de IA do projeto. */
 export type RequirementId =
@@ -13,6 +14,7 @@ export type RequirementId =
   | 'mcp-enable'
   | 'mcp-path'
   | 'skill'
+  | 'harness'
   | 'permission';
 
 /** O que a pessoa pode fazer, pela própria faixa de aviso, para resolver. */
@@ -55,6 +57,8 @@ export interface BoardRequirement {
   tracked?: true;
   /** a explicação da recusa, em `permission` (a mesma de `aiRunUnsupported`) */
   reason?: string;
+  /** o que falta no banco de artefatos do board, em `harness` */
+  harnessIssues?: HarnessIssue[];
   /**
    * recomendado, mas não impede as execuções pelo board (o servidor do board no Claude e no Cursor,
    * que as execuções levam sozinhas): o aviso mostra, sem contar como requisito que falta

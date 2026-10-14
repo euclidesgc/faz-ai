@@ -4,11 +4,12 @@ import { CSS } from '@dnd-kit/utilities';
 import { cardRef, type Card, type FieldDef } from '../../shared/model';
 import { statusInfo } from '../../shared/status';
 import { aiWorkingChildren, fieldsForType, isAiWorking, isCardCollapsed, valueOf } from '../../shared/selectors';
+import { queuePositions } from '../../shared/autopilotQueue';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { useReducedMotion } from '../useReducedMotion';
 import { FieldBadge, hasValue } from './FieldRenderer';
-import { IconParent } from './ui';
+import { IconParent, IconYolo } from './ui';
 import type { AiWork } from './cardView/AiLed';
 import { CardFooter } from './cardView/CardFooter';
 import { StatusLine } from './cardView/StatusLine';
@@ -71,6 +72,8 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         ? { mode: 'children', count: workingChildren }
         : null;
   const status = archived ? null : card.status;
+  // a posição na fila do modo autônomo: só enquanto o autopiloto está ligado e a história espera a vez
+  const queuePosition = isParent && !archived && state.autopilot.active ? queuePositions(state).get(card.id) : undefined;
   // pendência com a pessoa: a borda ganha a cor do status para achar de relance o que espera por ela
   const mine = status !== null && statusInfo(status).owner === 'human';
   const style = mine ? ({ '--status-color': state.board.appearance.statuses[status].color } as CSSProperties) : undefined;
@@ -149,7 +152,12 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
                 <IconParent /> {cardRef(parent)} {parent.title}
               </div>
             )}
-            {status && <StatusLine card={card} />}
+            {(status || queuePosition) && (
+              <div className="card-status-row">
+                {status && <StatusLine card={card} />}
+                {queuePosition && <QueueBadge position={queuePosition} />}
+              </div>
+            )}
             <FieldLine className="card-fields" fields={fields.filter((f) => f.kind !== 'model')} cardId={card.id} />
             <FieldLine className="card-model" fields={fields.filter((f) => f.kind === 'model')} cardId={card.id} />
             <CardFooter card={card} isParent={isParent} overlay={overlay} />
@@ -157,6 +165,20 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         </>
       )}
     </article>
+  );
+}
+
+/** A posição da história na fila do modo autônomo (1 = a próxima), só leitura; some com o modo desligado e quando a IA começa nela. */
+function QueueBadge({ position }: { position: number }) {
+  return (
+    <span
+      className="queue-badge"
+      title={t('{n}ª na fila do modo autônomo: a IA trata esta história depois das anteriores, respeitando as dependências.', {
+        n: position,
+      })}
+    >
+      <IconYolo /> {t('Fila {n}', { n: position })}
+    </span>
   );
 }
 

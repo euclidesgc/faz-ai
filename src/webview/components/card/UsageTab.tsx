@@ -5,6 +5,7 @@ import type { Card } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { dt, t, tn } from '../../i18n';
 import { ContextDetail } from '../cardView/ContextGauge';
+import { Placeholder } from '../ui';
 import { formatCompact, formatDuration, formatMonth, formatNumber, unmeasured } from '../metrics/format';
 import { useCardUsage } from './useCardUsage';
 
@@ -52,7 +53,7 @@ export function UsageTab({ card }: { card: Card }) {
       <section className="drawer-section" aria-busy={loading}>
         <h3>{t('Gasto até agora')}</h3>
         {error && <p className="error">{error}</p>}
-        {!usage && loading && <p className="muted">{t('Carregando…')}</p>}
+        {!usage && loading && <Placeholder label={t('Carregando…')} lines={4} />}
         {empty && (
           <p className="muted">
             {card.parentId

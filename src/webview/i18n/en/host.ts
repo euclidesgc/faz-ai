@@ -243,6 +243,8 @@ export const host: Record<string, string> = {
   'A resposta passou do tempo limite ({minutes} min) e foi encerrada.': 'The reply exceeded the time limit ({minutes} min) and was ended.',
   'Não foi possível executar o {tool}: {reason}': 'Could not run {tool}: {reason}',
   'O {tool} terminou com erro (código {code}).': '{tool} finished with an error (code {code}).',
+  'Não foi possível conferir os requisitos do board: {error}': 'Could not check the board requirements: {error}',
+  'Não foi possível rodar o Diagnóstico do ambiente: {error}': 'Could not run the environment Diagnosis: {error}',
   'O {tool} terminou com erro (código {code}).\n\n{tail}': '{tool} finished with an error (code {code}).\n\n{tail}',
   'A IA terminou sem escrever uma resposta.': 'The AI finished without writing a reply.',
   'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Instale o servidor em Configurações → Harness de IA → Tudo que a ferramenta carrega → Claude Code → Servidores MCP.':

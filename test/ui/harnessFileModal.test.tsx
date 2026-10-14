@@ -1,4 +1,4 @@
-import { lastSent, renderThemed, seedBoard } from './setup';
+import { lastSent, renderThemed, seedBoard, confirmLast } from './setup';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -40,10 +40,11 @@ describe('HarnessFileModal', () => {
     const area = screen.getByRole('textbox', { name: 'Conteúdo do arquivo' });
     await userEvent.type(area, 'Use tabs.');
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
-    const write = lastSent('harness.file.write') as { requestId: string; path: string; content: string };
+    const write = lastSent('harness.file.write');
     expect(write.path).toBe('/projeto/.claude/rules/estilo.md');
     expect(write.content).toContain('Use tabs.');
-    reply({ type: 'harness.file.writeResult', requestId: write.requestId, ok: true });
+    confirmLast();
+    await act(async () => {});
     expect(screen.queryByRole('textbox', { name: 'Conteúdo do arquivo' })).toBeNull();
     act(() => useBoardStore.getState().closeHarnessFile());
   });
@@ -61,8 +62,9 @@ describe('HarnessFileModal', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await userEvent.type(screen.getByRole('textbox', { name: 'Conteúdo do arquivo' }), 'x');
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
-    const write = lastSent('harness.file.write') as { requestId: string };
-    reply({ type: 'harness.file.writeResult', requestId: write.requestId, ok: false, error: 'JSON inválido, nada foi gravado: x' });
+    expect(lastSent('harness.file.write').content).toBe('{}x');
+    confirmLast(false, 'JSON inválido, nada foi gravado: x');
+    await act(async () => {});
     expect(screen.getByRole('alert')).toHaveTextContent('JSON inválido');
     expect(screen.getByRole('textbox', { name: 'Conteúdo do arquivo' })).toHaveValue('{}x');
     act(() => useBoardStore.getState().closeHarnessFile());

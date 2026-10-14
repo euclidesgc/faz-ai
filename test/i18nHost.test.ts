@@ -4,7 +4,13 @@ import { setLocale, t } from '../src/webview/i18n';
 import { EN } from '../src/webview/i18n/en';
 import { host } from '../src/webview/i18n/en/host';
 import { THEMES, FONTS } from '../src/shared/appearance';
+import { AGENT_SUGGESTIONS } from '../src/shared/agentSuggestions';
+import { AGENT_TOOLS } from '../src/shared/agentTools';
+import { AGENT_WIZARD_STEPS, MODEL_REASONS, TOOL_REASONS } from '../src/shared/agentWizard';
 import { EXEC_ASPECTS, TOOL_PRESETS, defaultAgent } from '../src/shared/execution';
+import { RULE_CONFLICT_REASONS } from '../src/shared/ruleConflicts';
+import { RULE_IDEAS, RULE_WIZARD_STEPS, conventionItems, pathSuggestions } from '../src/shared/ruleWizard';
+import { SKILL_WIZARD_STEPS } from '../src/shared/skillWizard';
 import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS, SKILL_MODES } from '../src/shared/harness';
 import { HARNESS_CATALOG, HARNESS_GROUPS, HARNESS_NOTES, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS } from '../src/shared/harnessCatalog';
 import { BRANCH_KINDS, MERGE_METHODS, WORKSPACE_MODES } from '../src/shared/git';
@@ -212,6 +218,28 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     ['BRANCH_KINDS', BRANCH_KINDS.map((x) => x.label)],
     ['EXEC_ASPECTS', EXEC_ASPECTS.map((x) => x.label)],
     ['TOOL_PRESETS', TOOL_PRESETS.flatMap((x) => [x.label, x.hint])],
+    [
+      'AGENT_TOOLS',
+      Object.values(AGENT_TOOLS).flatMap((groups) => groups.flatMap((g) => [g.label, g.hint, ...g.tools.map((x) => x.hint)])),
+    ],
+    ['AGENT_SUGGESTIONS', AGENT_SUGGESTIONS.map((x) => x.label)],
+    ['assistentes (passos)', [...AGENT_WIZARD_STEPS, ...RULE_WIZARD_STEPS, ...SKILL_WIZARD_STEPS]],
+    ['assistente de agente (motivos)', [...Object.values(TOOL_REASONS), ...Object.values(MODEL_REASONS)]],
+    ['RULE_CONFLICT_REASONS', RULE_CONFLICT_REASONS],
+    ['RULE_IDEAS', RULE_IDEAS.map((x) => x.label)],
+    [
+      'convenções e caminhos sugeridos',
+      [
+        ...conventionItems({
+          languages: ['TypeScript'],
+          scripts: { test: 'a', lint: 'a', format: 'a', typecheck: 'a', build: 'a' },
+          tools: ['eslint'],
+          folders: ['src'],
+          readme: '',
+        }).map((x) => x.label),
+        ...pathSuggestions({ languages: [], scripts: {}, tools: [], folders: ['src'], readme: '' }).map((x) => x.label),
+      ],
+    ],
     ['agente padrão', [defaultAgent().name]],
     ['esforço', [EFFORT_FIELD, MODEL_EFFORT_LABEL, ...EFFORT_LEVELS, ...Object.values(EFFORT_LABELS)]],
     ['SKILL_MODES', SKILL_MODES.flatMap((x) => [x.label, x.hint])],
