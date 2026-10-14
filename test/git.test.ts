@@ -12,6 +12,7 @@ import { headlessCommand } from '../src/extension/headless';
 import { createMcpServer } from '../src/extension/mcp/server';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BOARD_AUTHOR } from '../src/shared/gitflow';
+import { setLocale, t } from '../src/webview/i18n';
 import { DEFAULT_GIT, LEGACY_BRANCH_PATTERN, branchName, cleanDecisionDir, parseGit, slug } from '../src/shared/git';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -683,6 +684,137 @@ describe('branch e worktree por história', () => {
     });
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
     expect(router.aiWorkDirs()).toEqual([]);
+  });
+});
+
+describe('casos de borda do gitflow (revisão da #462)', () => {
+  afterEach(() => setLocale('pt-BR'));
+
+  it('B1: sem origin e sem develop, ela nasce local e o único aviso é o de sem origin', async () => {
+    await reset({ origin: false });
+    await call('create_card', { title: 'Solto', column: 'Implementação' });
+    const ws = (await call('prepare_workspace', { card: 1 })).data;
+    expect(ws).toMatchObject({ branch: 'feature/1-solto', baseBranch: 'develop' });
+    expect(rev(repo, 'develop')).toBe(rev(repo, 'main'));
+    // nada de "git push -u origin develop": não há origin para onde enviar
+    expect(notices(1)).toEqual(['O repositório não tem origin: a branch feature/1-solto partiu de develop como está nesta máquina.']);
+  });
+
+  it('B2: fetch falhou e a develop não existe nesta máquina: recusa, sem criar nem enviar a develop', async () => {
+    // a develop já existe no origin, mas este clone ainda não a baixou: criá-la aqui a deixaria divergente
+    await reset({ develop: false });
+    const other = path.join(base, 'outro');
+    git(base, 'clone', '-q', origin, other);
+    identity(other);
+    git(other, 'switch', '-q', '-c', 'develop');
+    git(other, 'commit', '-q', '--allow-empty', '-m', 'develop de outra pessoa');
+    git(other, 'push', '-q', 'origin', 'develop');
+    const beforeOrigin = refs(origin);
+    git(repo, 'remote', 'set-url', 'origin', path.join(base, 'nao-existe.git'));
+    const before = refs(repo);
+
+    await call('create_card', { title: 'Sem rede', column: 'Implementação' });
+    const res = await call('prepare_workspace', { card: 1 });
+    expect(res.error).toBe(true);
+    expect(res.text).toContain('Não foi possível atualizar as refs do origin');
+    expect(res.text).toContain('a branch develop não existe nesta máquina');
+    expect(res.text).toContain('Verifique a rede e as credenciais do git');
+    setLocale('en');
+    expect(t(res.text)).toContain('Check the network and the git credentials');
+    expect(refs(repo)).toEqual(before);
+    expect(refs(origin)).toEqual(beforeOrigin);
+    expect(card(1).branch).toBe('');
+    expect(notices(1)).toEqual([]);
+  });
+
+  it('B3: sem origin/HEAD e sem main nem master, não cria a develop a partir da branch atual', async () => {
+    await reset({ develop: false, main: 'trunk' });
+    git(repo, 'remote', 'set-head', 'origin', '-d');
+    git(repo, 'switch', '-q', '-c', 'wip/x');
+    expect(detectMainBranch(repo)).toEqual({ name: 'wip/x', source: 'current' });
+    const beforeOrigin = refs(origin);
+
+    await call('create_card', { title: 'Tela', column: 'Implementação' });
+    const res = await call('prepare_workspace', { card: 1 });
+    expect(res.error).toBe(true);
+    expect(res.text).toContain('Não foi possível saber qual é a branch principal');
+    expect(res.text).toContain('wip/x');
+    expect(res.text).toContain('git remote set-head origin -a');
+    expect(hasRef(repo, 'refs/heads/develop')).toBe(false);
+    expect(refs(origin)).toEqual(beforeOrigin);
+    setLocale('en');
+    expect(t(res.text)).toContain('the board does not create it from the current branch (wip/x)');
+    setLocale('pt-BR');
+
+    // depois do set-head a principal é a do origin e a develop nasce dela
+    git(repo, 'remote', 'set-head', 'origin', '-a');
+    const ws = (await call('prepare_workspace', { card: 1 })).data;
+    expect(ws).toMatchObject({ branch: 'feature/1-tela', baseBranch: 'develop' });
+    expect(rev(origin, 'develop')).toBe(rev(origin, 'trunk'));
+  });
+
+  it('B3 sem origin: a mensagem pede para criar a develop à mão, sem citar o origin', async () => {
+    await reset({ origin: false, main: 'trunk' });
+    git(repo, 'switch', '-q', '-c', 'wip/x');
+    await call('create_card', { title: 'Tela', column: 'Implementação' });
+    const res = await call('prepare_workspace', { card: 1 });
+    expect(res.error).toBe(true);
+    expect(res.text).toContain('git branch develop <principal>');
+    expect(res.text).not.toContain('set-head');
+    setLocale('en');
+    expect(t(res.text)).toContain('Create develop by hand from the main branch');
+    expect(hasRef(repo, 'refs/heads/develop')).toBe(false);
+  });
+
+  it('B4: branch ou worktree com o nome da história já existem: reaproveitadas, com a base que o board usaria', async () => {
+    // worktree, branch criada à mão
+    await call('create_card', { title: 'Feita a mao', column: 'Implementação' });
+    git(repo, 'branch', 'feature/1-feita-a-mao', 'origin/main');
+    expect((await call('prepare_workspace', { card: 1 })).data).toMatchObject({ baseBranch: 'develop', prBase: 'develop' });
+    expect(card(1).baseBranch).toBe('develop');
+
+    // worktree já registrada na pasta que o board usaria
+    await call('create_card', { title: 'Worktree pronta', column: 'Implementação' });
+    const dir = path.join(router.aiWorkDirs()[0]!, '2-worktree-pronta');
+    git(repo, 'worktree', 'add', '-q', '-b', 'feature/2-worktree-pronta', dir, 'origin/develop');
+    expect((await call('prepare_workspace', { card: 2 })).data).toMatchObject({ path: dir, baseBranch: 'develop' });
+
+    // derivada: a base é a branch da parte anterior
+    await call('create_card', { title: 'Continua', column: 'Implementação', derived_from: 1 });
+    git(repo, 'branch', 'feature/3-continua', 'feature/1-feita-a-mao');
+    expect((await call('prepare_workspace', { card: 3 })).data).toMatchObject({ baseBranch: 'feature/1-feita-a-mao' });
+
+    // modo branch, Bug: hotfix parte da principal
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
+    await call('create_card', { title: 'Crash', type: 'Bug', column: 'Implementação' });
+    git(repo, 'branch', 'hotfix/4-crash', 'origin/main');
+    expect((await call('prepare_workspace', { card: 4 })).data).toMatchObject({ baseBranch: 'main', prBase: 'main' });
+    expect(notices(1)).toEqual([]);
+  });
+
+  it('B6: branch apagada cuja base (a anterior da pilha, já mesclada) sumiu: volta da base do fluxo, com aviso', async () => {
+    const yolo = (n: number) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled: true });
+    await call('create_card', { title: 'Base', column: 'Implementação' });
+    await call('create_card', { title: 'Segunda', column: 'Implementação' });
+    yolo(1);
+    yolo(2);
+    const first = (await call('prepare_workspace', { card: 1 })).data;
+    const second = (await call('prepare_workspace', { card: 2 })).data;
+    expect(second.baseBranch).toBe(first.branch);
+    // as duas somem: a primeira foi mesclada e apagada, a segunda apagada à mão
+    for (const ws of [second, first]) {
+      git(repo, 'worktree', 'remove', '--force', ws.path);
+      git(repo, 'branch', '-D', ws.branch);
+    }
+
+    const again = await call('prepare_workspace', { card: 2 });
+    expect(again.error).toBe(false);
+    expect(again.data).toMatchObject({ branch: second.branch, baseBranch: 'develop', prBase: 'develop' });
+    expect(rev(repo, second.branch)).toBe(rev(repo, 'origin/develop'));
+    expect(card(2).baseBranch).toBe('develop');
+    expect(notices(2)).toEqual([
+      `A branch ${first.branch}, de onde a ${second.branch} tinha partido, não existe mais nesta máquina nem no origin: a ${second.branch} foi recriada a partir de develop, que passa a ser a base do pull request.`,
+    ]);
   });
 });
 
