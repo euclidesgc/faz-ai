@@ -439,6 +439,8 @@ export class BoardRepo {
       environment: null,
       environmentFirstRun: false,
       harnessInstall: null,
+      // detectada pelo router, que tem a pasta do projeto; o banco não sabe
+      mainBranch: null,
     };
   }
 }
