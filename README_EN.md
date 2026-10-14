@@ -682,7 +682,7 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 ### Branch and working folder per story
 
 Each story works on its own branch, created by the board (for example
-`historia/12-login-com-google`). By default it comes with a worktree: a separate working folder,
+`feature/12-login-com-google`). By default it comes with a worktree: a separate working folder,
 next to the project, where the AI changes the code without touching your folder or your work in
 progress. Sub-tasks commit to the story's branch.
 
@@ -695,6 +695,49 @@ progress. Sub-tasks commit to the story's branch.
   Settings](#settings-in-the-editor-settings)); in the browser they stay on the Git tab and the
   parallel block in the Harness, as before.
 - Each worktree is a working copy: dependencies have to be installed in it.
+
+#### Gitflow
+
+Branches follow gitflow, on by default (`fazai.git.gitflow`). The card type sets the branch kind, and
+each kind starts from one place and goes back to another:
+
+| Branch | Produced by | Starts from | The PR goes to |
+| --- | --- | --- | --- |
+| main (`main`, `master`...) | — | — | — |
+| `develop` | — | the main branch | — |
+| `feature/` | História and Débito técnico | `develop` | `develop` |
+| `bugfix/` | Retrabalho | `develop` | `develop` |
+| `hotfix/` | Bug | the main branch | the main branch |
+| `release/` | no card type (prefix only) | `develop` | the main branch |
+
+- The **main branch is detected on its own**, with no network: the `origin` HEAD; otherwise `main` or
+  `master`; otherwise the current branch. The gitflow section on the Git tab shows which one and why.
+- If `develop` doesn't exist, the board creates it from the main branch and pushes it to `origin`; if
+  it can't push, it says so in the story's conversation, with the command to run by hand.
+- Before creating the branch, the board runs `git fetch origin` (up to 20 s, no password prompt) and
+  starts from `origin/<base>`, with no upstream (`--no-track`). With no `origin`, or if the fetch
+  fails, it starts from the local refs and says so in the conversation.
+- The AI reads the PR base in `workspace.prBase` of `get_card` and opens the pull request with
+  `--base`. In stacked stories (autonomous mode or derived ones) the base is the previous story's branch.
+- A defect in a feature that is still only on `develop` is **Retrabalho** (rework), not Bug. Each card
+  type's branch kind is chosen on the Git tab.
+- The branch name uses `{fluxo}` (the kind's prefix: `feature/`, `bugfix/`, `hotfix/`). The old
+  pattern `{tipo}/{numero}-{titulo}` is converted to `{fluxo}{numero}-{titulo}` when the setting is read.
+
+Options under **Faz AI › Git** in the editor Settings:
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `fazai.git.gitflow` | on | Off, every branch starts from the main branch and `{fluxo}` becomes `<type>/`. |
+| `fazai.git.developBranch` | `develop` | Integration branch. |
+| `fazai.git.featurePrefix` | `feature/` | Prefix of feature branches. |
+| `fazai.git.bugfixPrefix` | `bugfix/` | Prefix of bugfix branches. |
+| `fazai.git.hotfixPrefix` | `hotfix/` | Prefix of hotfix branches. |
+| `fazai.git.releasePrefix` | `release/` | Informational only: no card type produces a release. |
+
+An empty prefix or name, or one git doesn't accept, goes back to the default. Cleaning up branches and
+worktrees when a story is concluded, orphan cleanup and renaming the main branch on `origin` come in
+later deliveries.
 
 ### Pull request and merge in Homologação
 
