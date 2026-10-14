@@ -6,7 +6,7 @@ import { settings } from '../../commands';
 import { useAction } from '../../useAction';
 import { t } from '../../i18n';
 import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
-import { FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../ui';
+import { ActionButton, FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../ui';
 import { DependsOn } from './DependsOn';
 import { ModelRulesEditor } from './ModelRulesEditor';
 import { SettingsCard } from './SettingsCard';
@@ -130,23 +130,28 @@ export function ModelsSettings() {
         actions={
           <>
             {tools.map((tl) => (
-              <Button
+              <ActionButton
                 key={tl.id}
                 variant="soft"
                 color="gray"
                 loading={detect.busy && detecting === tl.id}
-                title={t('Fonte: {source}', { source: t(SOURCES[tl.id]) })}
+                hint={t('Fonte: {source}', { source: t(SOURCES[tl.id]) })}
                 onClick={() => {
                   setDetecting(tl.id);
                   void detect.run(tl.id);
                 }}
               >
                 {t('Detectar modelos')}
-              </Button>
+              </ActionButton>
             ))}
-            <Button disabled={adding} onClick={() => setAdding(true)}>
+            <ActionButton
+              disabled={adding}
+              disabledReason={t('O formulário já está aberto logo abaixo.')}
+              hint={t('Abre o formulário de um modelo novo.')}
+              onClick={() => setAdding(true)}
+            >
               <IconPlus /> {t('Novo modelo')}
-            </Button>
+            </ActionButton>
           </>
         }
       >

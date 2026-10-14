@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Button, Callout, SegmentedControl, TextField } from '@radix-ui/themes';
+import { Callout, SegmentedControl, TextField } from '@radix-ui/themes';
 import { HARNESS_SCOPES, type AiTool } from '../../../../shared/harness';
 import { HARNESS_GROUPS, groupOf } from '../../../../shared/harnessCatalog';
 import { catalogOriginOf, groupsFor, matchesQuery, type HarnessOrigin, type TopicInfo } from '../../../../shared/harnessTopics';
 import { ai, harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { IconRules, IconSkills, IconWarning } from '../../ui';
+import { ActionButton, IconRules, IconSkills, IconWarning } from '../../ui';
 import { BoardList } from './BoardList';
 import { HarnessGroupCard } from './HarnessGroupCard';
 import { ImportedFolders } from './ImportedFolders';
@@ -110,23 +110,19 @@ export function TopicView({ tool, topic }: { tool: AiTool; topic: TopicInfo }) {
       </div>
       <p className="muted small topic-origin-hint">{t(ORIGIN_HINTS[origin])}</p>
       {canSuggest && (
-        <div className="row wrap topic-suggest">
-          <Button
+        <div className="actions-toolbar topic-suggest">
+          <ActionButton
             variant="soft"
             color="gray"
-            size="1"
             disabled={busy}
-            title={
-              busy
-                ? t('A IA ainda está respondendo no chat do board.')
-                : t(
-                    'A IA lê o projeto e o catálogo deste assunto e deixa pré-selecionados os artefatos que fazem mais sentido; você confirma.',
-                  )
-            }
+            disabledReason={t('A IA ainda está respondendo no chat do board.')}
+            hint={t(
+              'A IA lê o projeto e o catálogo deste assunto e deixa pré-selecionados os artefatos que fazem mais sentido; você confirma.',
+            )}
             onClick={suggest}
           >
             {asked && busy ? t('Indicando…') : t('Indicar artefatos')}
-          </Button>
+          </ActionButton>
           {suggested && !suggestions?.error && (
             <span className="muted small">
               {suggestions!.items.length
@@ -135,19 +131,22 @@ export function TopicView({ tool, topic }: { tool: AiTool; topic: TopicInfo }) {
             </span>
           )}
           {suggested && (
-            <Button variant="ghost" size="1" onClick={() => harness.clearSuggestions()}>
+            <ActionButton
+              variant="ghost"
+              hint={t('Limpa a pré-seleção indicada pela IA; nada foi enviado ao board.')}
+              onClick={() => harness.clearSuggestions()}
+            >
               {t('Descartar indicação')}
-            </Button>
+            </ActionButton>
           )}
         </div>
       )}
       {assist && (
-        <div className="row wrap topic-suggest">
-          <Button
+        <div className="actions-toolbar topic-suggest">
+          <ActionButton
             variant="soft"
             color="gray"
-            size="1"
-            title={
+            hint={
               assist === 'rule'
                 ? t('Um passo a passo para escrever uma regra no formato da ferramenta; ela entra no board desligada.')
                 : t('Um passo a passo para escrever uma skill no formato da ferramenta; ela entra no board em "Pelo card".')
@@ -156,23 +155,21 @@ export function TopicView({ tool, topic }: { tool: AiTool; topic: TopicInfo }) {
           >
             {assist === 'rule' ? <IconRules /> : <IconSkills />}{' '}
             {assist === 'rule' ? t('Criar regra com ajuda') : t('Criar skill com ajuda')}
-          </Button>
-          <Button
+          </ActionButton>
+          <ActionButton
             variant="soft"
             color="gray"
-            size="1"
             disabled={busy}
-            title={
-              busy
-                ? t('A IA ainda está respondendo no chat do board.')
-                : assist === 'rule'
-                  ? t('A IA lê o projeto e escreve de 3 a 5 regras, desligadas no board; acompanhe no chat do board.')
-                  : t('A IA lê o projeto e cria de 3 a 5 skills, em "Pelo card"; acompanhe no chat do board.')
+            disabledReason={t('A IA ainda está respondendo no chat do board.')}
+            hint={
+              assist === 'rule'
+                ? t('A IA lê o projeto e escreve de 3 a 5 regras, desligadas no board; acompanhe no chat do board.')
+                : t('A IA lê o projeto e cria de 3 a 5 skills, em "Pelo card"; acompanhe no chat do board.')
             }
             onClick={() => (assist === 'rule' ? ai.suggestRules() : ai.suggestSkills())}
           >
             {assist === 'rule' ? t('Sugerir regras com IA') : t('Sugerir skills com IA')}
-          </Button>
+          </ActionButton>
         </div>
       )}
       {assist && wizard === 'rule' && (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Badge, Button, Callout, Checkbox } from '@radix-ui/themes';
+import { Badge, Callout, Checkbox } from '@radix-ui/themes';
 import { REFERENCE_SKILL, aiToolInfo, type AiTool, type HarnessItem, type HarnessScope } from '../../../../shared/harness';
 import {
   HARNESS_CATALOG,
@@ -17,7 +17,7 @@ import { selectionKey } from '../../../../shared/harnessSelection';
 import { matchesQuery } from '../../../../shared/harnessTopics';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { IconWarning } from '../../ui';
+import { ActionButton, IconWarning } from '../../ui';
 import { SettingsCard } from '../SettingsCard';
 import { AgentsTable } from './AgentsTable';
 import { BoardInstall } from './BoardInstall';
@@ -136,29 +136,54 @@ export function HarnessGroupCard({ group, tool, scope, query, suggested, items, 
       actions={
         <>
           {g === 'skill' && (
-            <Button variant="soft" color="gray" onClick={() => toggle('install')}>
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('Procura skills numa pasta ou num repositório git e mostra a lista antes de copiar qualquer coisa.')}
+              onClick={() => toggle('install')}
+            >
               {t('Buscar skills para instalar')}
-            </Button>
+            </ActionButton>
           )}
           {permissions.length > 0 && (
-            <Button variant="soft" color="gray" onClick={() => toggle('permission')}>
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('Acrescenta uma regra de permissão ao arquivo de configurações da ferramenta.')}
+              onClick={() => toggle('permission')}
+            >
               {t('Nova regra de permissão')}
-            </Button>
+            </ActionButton>
           )}
           {hooks.length > 0 && (
-            <Button variant="soft" color="gray" onClick={() => toggle('hook')}>
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('Acrescenta um hook ao arquivo de configurações da ferramenta.')}
+              onClick={() => toggle('hook')}
+            >
               {t('Novo hook')}
-            </Button>
+            </ActionButton>
           )}
           {mcps.length > 0 && (
-            <Button variant="soft" color="gray" onClick={() => toggle('mcp')}>
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('Registra um servidor MCP no arquivo da ferramenta.')}
+              onClick={() => toggle('mcp')}
+            >
               {t('Novo servidor')}
-            </Button>
+            </ActionButton>
           )}
           {creatable.length > 0 && !agentsTable && (
-            <Button variant="soft" color="gray" onClick={() => toggle('new')}>
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('Cria um arquivo novo deste assunto na pasta da ferramenta e o abre para editar.')}
+              onClick={() => toggle('new')}
+            >
               {t('Novo')}
-            </Button>
+            </ActionButton>
           )}
         </>
       }
@@ -206,9 +231,14 @@ export function HarnessGroupCard({ group, tool, scope, query, suggested, items, 
                 'Modelos de classe e exemplos de código ficam bem numa skill própria, só quando indicada: os arquivos vão em <code>references/</code> e os cards que a indicam recebem os caminhos.',
               )}
             </span>
-            <Button variant="ghost" size="1" onClick={() => harness.createReferenceSkill()}>
+            <ActionButton
+              variant="ghost"
+              size="1"
+              hint={t('Cria a skill de referências do projeto, com a pasta references/ para modelos e exemplos.')}
+              onClick={() => harness.createReferenceSkill()}
+            >
               {t('Criar skill de modelos')}
-            </Button>
+            </ActionButton>
           </div>
         )}
       {g === 'skill' && (open === key('install') || state.harnessInstall) && <InstallSkills key={`install-skills:${tool}`} tool={tool} />}
@@ -292,9 +322,14 @@ export function HarnessGroupCard({ group, tool, scope, query, suggested, items, 
           <ul>
             {absent.map(({ src, source }) => (
               <li key={source}>
-                <Button variant="ghost" size="1" onClick={() => createFile(source)}>
+                <ActionButton
+                  variant="ghost"
+                  size="1"
+                  hint={t('Cria este arquivo na pasta indicada e o abre para editar.')}
+                  onClick={() => createFile(source)}
+                >
                   {t('Criar {path}', { path: location(source) })}
-                </Button>
+                </ActionButton>
                 {src.hint && <span className="muted small">{t(src.hint)}</span>}
               </li>
             ))}

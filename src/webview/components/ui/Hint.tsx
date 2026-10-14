@@ -16,14 +16,17 @@ export function Hint({
   disabledReason?: string | null;
   children: ReactElement<{ disabled?: boolean }>;
 }) {
-  const body = disabledReason ?? content;
-  const trigger = disabledReason ? (
-    <span tabIndex={0} className="hint-disabled-wrap">
-      {children}
-    </span>
-  ) : (
-    children
-  );
+  const body = disabledReason || content;
+  // o wrapper existe sempre que a prop foi passada (mesmo `null`): assim o botão não remonta (e não perde o foco)
+  // quando passa de habilitado a desabilitado
+  const trigger =
+    disabledReason !== undefined ? (
+      <span tabIndex={0} className="hint-disabled-wrap">
+        {children}
+      </span>
+    ) : (
+      children
+    );
   return (
     <Tooltip.Provider delayDuration={200}>
       <Tooltip.Root>

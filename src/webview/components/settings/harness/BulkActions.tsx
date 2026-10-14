@@ -1,4 +1,3 @@
-import { Button } from '@radix-ui/themes';
 import { SKILL_MODES, type HarnessItem } from '../../../../shared/harness';
 import {
   HARNESS_USAGES,
@@ -14,6 +13,7 @@ import { useAction } from '../../../useAction';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import type { ItemActions } from './useItemActions';
+import { ActionButton } from '../../ui';
 import { t } from '../../../i18n';
 
 /**
@@ -84,15 +84,15 @@ export function BulkActions({ items, actions, projectTool, onDone }: Props) {
   return (
     <>
       {toSend.length > 0 && (
-        <Button
+        <ActionButton
           size="1"
           loading={select.busy}
-          title={t('Disponibiliza para os cards deste board; o board lê o arquivo da origem na hora de usar.')}
+          hint={t('Disponibiliza para os cards deste board; o board lê o arquivo da origem na hora de usar.')}
           onClick={send}
         >
           {t('Enviar para o board')}
           {count(toSend)}
-        </Button>
+        </ActionButton>
       )}
       {x.usage.length > 0 && (
         <span className="bulk-group">
@@ -101,31 +101,32 @@ export function BulkActions({ items, actions, projectTool, onDone }: Props) {
             {count(x.usage)}
           </span>
           {usages.map((u) => (
-            <Button
+            <ActionButton
               key={u.id}
               variant="soft"
               color="gray"
               size="1"
               loading={select.busy}
-              title={t(u.hint)}
+              hint={t(u.hint)}
               onClick={() => void setUsage(u.id)}
             >
               {t(u.label)}
-            </Button>
+            </ActionButton>
           ))}
         </span>
       )}
       {toRemove.length > 0 && (
-        <Button
+        <ActionButton
           variant="soft"
           color="gray"
           size="1"
           loading={select.busy}
+          hint={t('Tira os marcados do board; os arquivos de origem ficam.')}
           onClick={() => void select.run([keys(toRemove)], null).then((ok) => ok && onDone())}
         >
           {t('Remover do board')}
           {count(toRemove)}
-        </Button>
+        </ActionButton>
       )}
       {x.mode.length > 0 && (
         <span className="bulk-group">
@@ -134,39 +135,70 @@ export function BulkActions({ items, actions, projectTool, onDone }: Props) {
             {count(x.mode)}
           </span>
           {SKILL_MODES.map((m) => (
-            <Button key={m.id} variant="soft" color="gray" size="1" title={t(m.hint)} onClick={() => actions.setMode(x.mode, m.id, onDone)}>
+            <ActionButton
+              key={m.id}
+              variant="soft"
+              color="gray"
+              size="1"
+              hint={t(m.hint)}
+              onClick={() => actions.setMode(x.mode, m.id, onDone)}
+            >
               {t(m.label)}
-            </Button>
+            </ActionButton>
           ))}
         </span>
       )}
       {x.toProject.length > 0 && (
-        <Button variant="soft" color="gray" size="1" onClick={() => actions.copy(x.toProject, 'project', onDone)}>
+        <ActionButton
+          variant="soft"
+          color="gray"
+          size="1"
+          hint={t('Cria uma cópia independente na pasta do projeto')}
+          onClick={() => actions.copy(x.toProject, 'project', onDone)}
+        >
           {t('Copiar para o projeto')}
           {count(x.toProject)}
-        </Button>
+        </ActionButton>
       )}
       {x.toUser.length > 0 && (
-        <Button variant="soft" color="gray" size="1" onClick={() => actions.copy(x.toUser, 'user', onDone)}>
+        <ActionButton
+          variant="soft"
+          color="gray"
+          size="1"
+          hint={t('Cria uma cópia na sua pasta de usuário, que vale em todos os projetos')}
+          onClick={() => actions.copy(x.toUser, 'user', onDone)}
+        >
           {t('Copiar para o global')}
           {count(x.toUser)}
-        </Button>
+        </ActionButton>
       )}
       {x.remove.length > 0 && (
-        <Button variant="soft" color="red" size="1" onClick={() => actions.remove(x.remove, onDone)}>
+        <ActionButton
+          variant="soft"
+          color="red"
+          size="1"
+          hint={t('Pede confirmação e apaga do disco os arquivos marcados.')}
+          onClick={() => actions.remove(x.remove, onDone)}
+        >
           {t('Apagar')}
           {count(x.remove)}
-        </Button>
+        </ActionButton>
       )}
       {x.entries.length > 0 && (
-        <Button variant="soft" color="red" size="1" onClick={() => actions.removeEntries(x.entries, onDone)}>
+        <ActionButton
+          variant="soft"
+          color="red"
+          size="1"
+          hint={t('Pede confirmação e tira as entradas marcadas do arquivo de configurações.')}
+          onClick={() => actions.removeEntries(x.entries, onDone)}
+        >
           {t('Remover')}
           {count(x.entries)}
-        </Button>
+        </ActionButton>
       )}
-      <Button variant="ghost" size="1" onClick={onDone}>
+      <ActionButton variant="ghost" size="1" hint={t('Desmarca tudo; nada muda.')} onClick={onDone}>
         {t('Limpar seleção')}
-      </Button>
+      </ActionButton>
     </>
   );
 }
