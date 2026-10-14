@@ -5,6 +5,10 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **The board now works with Kimi Code.** Kimi Code (`kimi`, the Moonshot AI CLI) becomes the board's third AI tool, alongside Claude Code and Cursor: choose it in Configurações → Harness de IA. The connect button registers the board server in the project's `.kimi-code/mcp.json` or in `~/.kimi-code/mcp.json` (global), runs go through `kimi -p` with the server materialized before each call, and models are read from `kimi provider list --json`. The environment diagnostic now shows every other installed tool (not just one), and the requirements banner gains a recommended item to allow the board tools at once in Kimi Code conversations (the `mcp__faz-ai__*` rule in its `config.toml`). Kimi Code hooks and seeding the factory agents into its folders come in a future version.
+
 ## 0.39.0
 
 - **Approving takes the card to the next column (#441).** Clicking **Aprovar** (approve) on a story set it to Aprovado and waited for the AI to move it; often the AI redid the same column's work and asked for review again. Now a person's approval moves the story to the next column right away, with the status starting over there (Pronto, where the AI works), and the AI works on the new phase and asks for your review when done. Only the cases the board cannot move stay with the AI: the approval that triggers the automatic merge (the card is concluded after the merge) and a conclusion refused because of an open sub-task, which leaves the card Aprovado with a notice in the conversation. Rework metrics still count the approval.

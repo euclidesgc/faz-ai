@@ -308,6 +308,7 @@ export const harness: Record<string, string> = {
   Regras: 'Rules',
   '.mcp.json (projeto)': '.mcp.json (project)',
   '.cursor/mcp.json (projeto)': '.cursor/mcp.json (project)',
+  '.kimi-code/mcp.json (projeto)': '.kimi-code/mcp.json (project)',
   'Cursor e outras ferramentas': 'Cursor and other tools',
 
   // --- RunnerSettings

@@ -13,7 +13,9 @@ export type RequirementId =
   | 'mcp-enable'
   | 'mcp-path'
   | 'skill'
-  | 'permission';
+  | 'permission'
+  /** a ferramenta pede aprovação a cada ferramenta do board nas conversas dela (a regra `allow` nas permissões) */
+  | 'permission-mcp';
 
 /** O que a pessoa pode fazer, pela própria faixa de aviso, para resolver. */
 export type RequirementAction =
@@ -32,6 +34,8 @@ export type RequirementAction =
   | { kind: 'installSkill' }
   /** gravar o caminho completo do comando nos registros que o editor não acha (o node instalado depois que ele abriu) */
   | { kind: 'pinMcp' }
+  /** liberar as ferramentas do board sem aprovação nas conversas da ferramenta (a regra `mcp__faz-ai__*` no config.toml do Kimi Code) */
+  | { kind: 'allowKimiMcp' }
   /** um comando para rodar no terminal, com botão de copiar; `terminal` soma o botão "Abrir no terminal" (só o login usa) */
   | { kind: 'command'; command: string; terminal?: true }
   /** a tela de Configurações → Harness de IA */
@@ -64,10 +68,10 @@ export interface BoardRequirement {
 }
 
 /** O comando da CLI de cada ferramenta. */
-export const CLI_COMMAND: Record<AiTool, string> = { claude: 'claude', cursor: 'cursor-agent' };
+export const CLI_COMMAND: Record<AiTool, string> = { claude: 'claude', cursor: 'cursor-agent', kimi: 'kimi' };
 
-/** O comando que faz o login na CLI de cada ferramenta (conforme a documentação de cada uma em 2026-10-11). */
-export const LOGIN_COMMAND: Record<AiTool, string> = { claude: 'claude auth login', cursor: 'cursor-agent login' };
+/** O comando que faz o login na CLI de cada ferramenta (conferido nas CLIs em 2026-10-13). */
+export const LOGIN_COMMAND: Record<AiTool, string> = { claude: 'claude auth login', cursor: 'cursor-agent login', kimi: 'kimi login' };
 
 /** Sem login a execução pelo board nem começa: usado pelos 4 gatilhos (manual, Refinar com IA, heartbeat, autopiloto). */
 export function blocksExecution(state: { requirements: BoardRequirement[]; authExpired: AiTool | null }): boolean {

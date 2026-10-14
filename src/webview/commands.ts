@@ -40,6 +40,7 @@ export const ui = {
   checkEnvironment: () => post({ type: 'environment.check' }),
   environmentSeen: () => post({ type: 'environment.seen' }),
   pinMcp: () => post({ type: 'environment.pinMcp' }),
+  allowKimiMcp: () => post({ type: 'environment.allowKimiMcp' }),
 };
 
 export const chat = {

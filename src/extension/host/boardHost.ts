@@ -18,9 +18,9 @@ import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
-import { claudeSignedIn, cursorModels, cursorSignedIn, runCli } from '../cliProbe';
-import { aiToolInfo, type AiTool, type InstallScope } from '../../shared/harness';
-import { checkRequirements, registeredServer } from '../requirements';
+import { claudeSignedIn, cursorModels, cursorSignedIn, kimiModels, kimiSignedIn, runCli } from '../cliProbe';
+import { aiToolInfo, ALL_AI_TOOLS, type AiTool, type InstallScope } from '../../shared/harness';
+import { allowKimiMcp, checkRequirements, registeredServer } from '../requirements';
 import { headlessCommand, headlessUnsupported } from '../headless';
 import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
 import { checkEnvironment, linuxFamily, type OtherToolProbe } from '../environment';
@@ -218,30 +218,33 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     log: o.log,
     file: path.join(o.storageDir, 'chat', `${workspaceKey(o.folderPath)}.json`),
   });
-  // os modelos do Cursor são os da conta, e só a CLI diz quais são: lidos ao abrir o board e ao passar
-  // a usar o Cursor, só na janela dona do board (é ela que mexe no catálogo). A primeira lista real
-  // substitui a embutida sozinha; depois, só pelo "Detectar modelos", para não trazer de volta um
-  // modelo que a pessoa tirou do catálogo. Uma leitura de cada vez.
+  // os modelos do Cursor são os da conta, e só a CLI diz quais são; os do Kimi Code vêm do
+  // `kimi provider list --json`. Lidos ao abrir o board e ao passar a usar a ferramenta, só na janela
+  // dona do board (é ela que mexe no catálogo). A primeira lista real substitui a embutida sozinha;
+  // depois, só pelo "Detectar modelos", para não trazer de volta um modelo que a pessoa tirou do
+  // catálogo. Uma leitura de cada vez.
   let readingModels: Promise<void> | null = null;
-  const readCursorModels = async () => {
-    const exe = resolveCommand('cursor-agent', pathEnv, homeDir);
+  /** as ferramentas cuja CLI lista os modelos (hoje: Cursor e Kimi Code) */
+  const readToolModels = async (tool: 'cursor' | 'kimi') => {
+    const exe = resolveCommand(CLI_COMMAND[tool], pathEnv, homeDir);
     if (!exe) return;
-    const found = await cursorModels(exe, pathEnv);
+    const found = await (tool === 'cursor' ? cursorModels(exe, pathEnv) : kimiModels(exe, pathEnv));
     if (!found.length) return;
-    rememberModels('cursor', found);
+    rememberModels(tool, found);
     const { board } = router.snapshot();
-    if (board.aiTool !== 'cursor') return;
-    if (onlyBuiltin('cursor', board.modelCatalog)) return void router.handle({ type: 'settings.models.detect', tool: 'cursor' });
+    if (board.aiTool !== tool) return;
+    if (onlyBuiltin(tool, board.modelCatalog)) return void router.handle({ type: 'settings.models.detect', tool });
+    if (tool !== 'cursor') return;
     // a pessoa ligou os modos rápidos antes de a lista ser lida (o "Detectar" daquele momento só tinha
     // a lista embutida): entram só as versões rápidas dos modelos que estão no catálogo
     const has = (id: string) => board.modelCatalog.some((o) => o.id === id);
     const fastMissing = board.rules.includeFastModels && found.some((m) => isFastVariant(m, found) && !has(m.id) && has(fastBaseId(m)));
-    if (fastMissing) router.handle({ type: 'settings.models.detect', tool: 'cursor', fastOnly: true });
+    if (fastMissing) router.handle({ type: 'settings.models.detect', tool, fastOnly: true });
   };
-  const refreshCursorModels = () => {
+  const refreshToolModels = (tool: 'cursor' | 'kimi') => {
     if (!ownsBoard || readingModels) return;
-    readingModels = readCursorModels()
-      .catch((e) => o.log(`Não foi possível ler os modelos do Cursor: ${e instanceof Error ? e.message : String(e)}`))
+    readingModels = readToolModels(tool)
+      .catch((e) => o.log(`Não foi possível ler os modelos do ${aiToolInfo(tool).label}: ${e instanceof Error ? e.message : String(e)}`))
       .finally(() => (readingModels = null));
   };
   // o que falta para o board trabalhar com a ferramenta (CLI, login, servidor MCP, permissão): vira a
@@ -257,7 +260,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     return tool ? selectedItems(s, 'skill', 'always').some((i) => i.name === FLOW_SKILL_NAME) : undefined;
   };
   let checking: Promise<void> | null = null;
-  let cursorBlocked = false;
+  let modelsBlocked = false;
   let enableTimer: NodeJS.Timeout | null = null;
   let checkAgain = false;
   let forceSigninCheck = false;
@@ -265,12 +268,17 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let disposed = false;
   const SIGNIN_CACHE_MS = 3 * 60_000;
   const signinCache = new Map<AiTool, { at: number; value: boolean | null }>();
-  // dispatch por ferramenta: `cursor` e `claude` têm probe; quando o probe não sabe dizer (`null`), vale
-  // só o sinal reativo de falha na execução
+  // dispatch por ferramenta: cada uma tem o seu probe (o do Kimi Code não usa o executável: lê a
+  // pasta de credenciais); quando o probe não sabe dizer (`null`), vale só o sinal reativo de falha
+  // na execução
   const probeSignedIn = async (tool: AiTool, exe: string, force: boolean): Promise<boolean | null> => {
     const cached = !force && signinCache.get(tool);
     if (cached && Date.now() - cached.at < SIGNIN_CACHE_MS) return cached.value;
-    const value = await (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : claudeSignedIn(exe, pathEnv));
+    const value = await (tool === 'cursor'
+      ? cursorSignedIn(exe, pathEnv)
+      : tool === 'kimi'
+        ? kimiSignedIn(homeDir)
+        : claudeSignedIn(exe, pathEnv));
     signinCache.set(tool, { at: Date.now(), value });
     return value;
   };
@@ -303,10 +311,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       .then((list) => {
         // a conferência (com o probe de login, que chama a CLI) pode terminar depois do encerramento
         if (disposed) return;
-        // a CLI do Cursor acabou de ficar pronta (instalada, com login): só agora dá para ler os modelos da conta
-        const blocked = board.aiTool === 'cursor' && list.some((r) => r.id === 'cli' || r.id === 'signin');
-        if (cursorBlocked && !blocked && router.snapshot().board.aiTool === 'cursor') refreshCursorModels();
-        cursorBlocked = blocked;
+        // a CLI da ferramenta que lista modelos (Cursor, Kimi Code) acabou de ficar pronta (instalada,
+        // com login): só agora dá para ler os modelos da conta
+        const modelReader = board.aiTool === 'cursor' || board.aiTool === 'kimi' ? board.aiTool : null;
+        const blocked = !!modelReader && list.some((r) => r.id === 'cli' || r.id === 'signin');
+        if (modelsBlocked && !blocked && modelReader && router.snapshot().board.aiTool === modelReader) refreshToolModels(modelReader);
+        modelsBlocked = blocked;
         router.setRequirements(list);
         // o sinal reativo (RF6) limpa quando o probe da própria ferramenta volta a confirmar o login —
         // a essa altura `signinCache` já tem o valor fresco desta conferência (lido pelo `signedIn` acima);
@@ -386,23 +396,27 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     }
   };
   /**
-   * A ferramenta de IA que não é a do projeto, quando está na máquina: a CLI no PATH ou, no Cursor, o
-   * próprio editor em que o board está aberto. null quando não foi encontrada.
+   * As ferramentas de IA que não são a do projeto, quando estão na máquina: a CLI no PATH ou, no
+   * Cursor, o próprio editor em que o board está aberto.
    */
-  const otherTool = async (tool: AiTool): Promise<OtherToolProbe | null> => {
+  const otherTools = async (tool: AiTool): Promise<OtherToolProbe[]> => {
     const s = router.snapshot();
-    const other: AiTool = tool === 'claude' ? 'cursor' : 'claude';
-    const cli = resolveHere(CLI_COMMAND[other]);
-    if (!cli && !(other === 'cursor' && o.editor?.name === 'cursor')) return null;
-    const inventory = s.harness.inventory.find((t) => t.tool === other);
-    return {
-      tool: other,
-      cli,
-      signedIn: cli ? await probeSignedIn(other, cli, false) : null,
-      mcp: !!registeredServer(other, o.folderPath, homeDir),
-      skill: !!inventory?.items.some((i) => i.kind === 'skill' && i.name === FLOW_SKILL_NAME),
-      permission: headlessUnsupported(other, s.board.runner.permission),
-    };
+    const out: OtherToolProbe[] = [];
+    for (const other of ALL_AI_TOOLS) {
+      if (other === tool) continue;
+      const cli = resolveHere(CLI_COMMAND[other]);
+      if (!cli && !(other === 'cursor' && o.editor?.name === 'cursor')) continue;
+      const inventory = s.harness.inventory.find((t) => t.tool === other);
+      out.push({
+        tool: other,
+        cli,
+        signedIn: cli ? await probeSignedIn(other, cli, false) : null,
+        mcp: !!registeredServer(other, o.folderPath, homeDir),
+        skill: !!inventory?.items.some((i) => i.kind === 'skill' && i.name === FLOW_SKILL_NAME),
+        permission: headlessUnsupported(other, s.board.runner.permission),
+      });
+    }
+    return out;
   };
   let diagnosing: Promise<void> | null = null;
   const diagnose = () => {
@@ -426,7 +440,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           requirements: syntheticSignin ? [...s.requirements, syntheticSignin] : s.requirements,
           workspaceDir: o.folderPath,
           skillInstalled,
-          other: await otherTool(tool),
+          others: await otherTools(tool),
           crgMcp: crgRegistered(tool),
           platform: process.platform,
           homeDir,
@@ -457,6 +471,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         pinMcp();
         void diagnose();
       },
+      allowKimiMcp: () => {
+        if (allowKimiMcp(homeDir))
+          o.log('Ferramentas do board liberadas nas conversas do Kimi Code (a regra "mcp__faz-ai__*" entrou no config.toml dele).');
+        void diagnose();
+      },
       seen: () => {
         try {
           fs.mkdirSync(o.storageDir, { recursive: true });
@@ -474,7 +493,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
 
   let toolInUse = router.snapshot().board.aiTool;
   let permissionInUse = router.snapshot().board.runner.permission;
-  if (toolInUse === 'cursor') refreshCursorModels();
+  if (toolInUse === 'cursor' || toolInUse === 'kimi') refreshToolModels(toolInUse);
   // a skill do fluxo instalada ou apagada (pelo Diagnóstico, pelo Harness de IA, à mão) muda o aviso
   let skillInUse = flowSkillInstalled();
   router.onDidChange(() => {
@@ -491,7 +510,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     // o sinal reativo só vale para a ferramenta que falhou; trocando de ferramenta, ele não diz nada sobre a nova
     if (toolChanged) router.setAuthExpired(null);
     void checkNow();
-    if (toolChanged && board.aiTool === 'cursor') refreshCursorModels();
+    if (toolChanged && (board.aiTool === 'cursor' || board.aiTool === 'kimi')) refreshToolModels(board.aiTool);
   });
   const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
   // sem timers próprios: a detecção de merges acontece em cada rodada do heartbeat, e o arquivamento das

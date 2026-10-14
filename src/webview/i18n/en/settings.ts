@@ -224,6 +224,8 @@ export const settings: Record<string, string> = {
     'list built into the extension (Claude Code does not keep the list in a file)',
   'lida do comando cursor-agent models, com a conta em uso; sem a CLI autenticada, lista embutida na extensão':
     'read from the cursor-agent models command, with the account in use; without the CLI signed in, the list built into the extension',
+  'lida do comando kimi provider list --json, com os provedores configurados; sem a CLI, lista embutida na extensão':
+    'read from the kimi provider list --json command, with the configured providers; without the CLI, the list built into the extension',
   'Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness de IA.':
     'Models of the tool in use in the project, with the effort levels of each. This is where the options of the cards\' "Model" field come from. The tool is chosen in AI harness.',
   '{count} modelo(s)': '{count} model(s)',

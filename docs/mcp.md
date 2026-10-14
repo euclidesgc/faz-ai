@@ -14,8 +14,9 @@ vale em qualquer projeto aberto com o board, sem arquivo nenhum no repositório:
 | --- | --- | --- | --- |
 | Claude Code | `~/.claude.json`, por `claude mcp add-json --scope user` | variável `CLAUDE_PROJECT_DIR`, que o Claude Code passa ao servidor | Abra uma sessão nova (`/mcp` mostra o estado) |
 | Cursor (chat do editor e `cursor-agent`) | **no projeto**, `.cursor/mcp.json` (fora do git), gravado sozinho ao abrir a pasta no Cursor | a pasta fixa no registro | Na primeira vez: recarregue a janela e ligue o `faz-ai` em Cursor Settings → MCP |
+| Kimi Code | `~/.kimi-code/mcp.json`, gravado pelo board (é um JSON só de servidores, seguro de escrever) | o diretório em que a CLI inicia o servidor (a pasta da sessão) | Abra uma sessão nova (`/mcp` mostra o estado) |
 
-**Instalar neste projeto** grava em `.mcp.json` ou `.cursor/mcp.json`, com a pasta fixa. Esses arquivos guardam caminhos desta
+**Instalar neste projeto** grava em `.mcp.json`, `.cursor/mcp.json` ou `.kimi-code/mcp.json`, com a pasta fixa. Esses arquivos guardam caminhos desta
 máquina, e o registro do projeto vale no lugar do global naquele projeto. Por isso um registro
 quebrado ali (de outra pasta, de um node que sumiu) estraga o global. A faixa de requisitos mostra
 **Corrigir o registro**, que tira o registro do arquivo do projeto e deixa o global valendo.
@@ -50,6 +51,9 @@ servidor à mão, e aí vale para todas as janelas). Os formatos gravados pelo b
 ```json
 // .cursor/mcp.json do projeto (Cursor)
 { "mcpServers": { "faz-ai": { "type": "stdio", "command": "node", "args": ["<bridge.js>", "<pasta do projeto>"] } } }
+
+// .kimi-code/mcp.json do projeto (Kimi Code; a CLI documenta a entrada stdio sem o campo "type")
+{ "mcpServers": { "faz-ai": { "command": "node", "args": ["<bridge.js>", "<pasta do projeto>"] } } }
 ```
 
 Outros clientes MCP com transporte stdio (Gemini CLI em `~/.gemini/settings.json`, por exemplo)
@@ -138,6 +142,7 @@ pasta própria (a global fica em `~/`):
 | --- | --- | --- | --- |
 | Claude Code | `.claude/agents` | `<nome>.md` (frontmatter YAML) | `model` |
 | Cursor | `.cursor/agents` | `<nome>.md` | `model` |
+| Kimi Code | `.kimi-code/agents` | `<nome>.md` (frontmatter YAML; aceita os mesmos globs `mcp__*` em `tools`) | — |
 
 ### Projeto, global e plugins
 
@@ -193,6 +198,7 @@ linha de comando da ferramenta aceita é imposto por parâmetro:
 | --- | --- | --- |
 | Claude Code | agente (inline, `--agents` + `--agent`), servidores MCP (`--strict-mcp-config`), ferramentas, modelo e esforço, contexto vazio (`--setting-sources ""`, `--disable-slash-commands`) | skills e rules (vão pelo caminho do arquivo) |
 | Cursor | modelo | todo o resto |
+| Kimi Code | modelo (`-m`), servidor do board (materializado no `.kimi-code/mcp.json`) | todo o resto (não há `--agents`, `--allowedTools` nem `--mcp-config`; em `-p` a permissão é sempre "auto") |
 
 ### Pendências
 
@@ -216,6 +222,7 @@ manda trabalhar no card. Os comandos, conforme a documentação de cada ferramen
 | --- | --- | --- |
 | Claude Code | `claude -p` (prompt pela entrada padrão) | `--permission-mode dontAsk` com `--allowedTools "mcp__faz-ai__*" Read Glob Grep`; `acceptEdits`; `bypassPermissions` |
 | Cursor | `cursor-agent -p --output-format stream-json --force --approve-mcps --trust` (servidor do board gravado no `.cursor/mcp.json` antes de rodar) | `--allowed-tools` com as ferramentas de leitura e de MCP; mais as de edição; sem `--allowed-tools` |
+| Kimi Code | `kimi -p --output-format stream-json` (prompt como valor do `-p`; servidor do board gravado no `.kimi-code/mcp.json` antes de rodar) | em `-p` a permissão é sempre "auto"; nas conversas, a regra `mcp__faz-ai__*` no `~/.kimi-code/config.toml` dispensa aprovações |
 
 Uma imagem colada numa mensagem ou na descrição do card aparece no texto como `attachment:<nome>`; o
 arquivo é o anexo de mesmo nome em `attachments` de `get_card`.

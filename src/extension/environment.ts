@@ -16,7 +16,7 @@ export function linuxFamily(osRelease: string | null): LinuxFamily | null {
   return null;
 }
 
-/** A outra ferramenta de IA, como o host a encontrou na máquina. */
+/** Outra ferramenta de IA, como o host a encontrou na máquina. */
 export interface OtherToolProbe {
   tool: AiTool;
   /** o executável da CLI, ou null (a ferramenta foi achada pelo editor: o board está aberto no Cursor) */
@@ -38,8 +38,8 @@ export interface EnvironmentProbe {
   workspaceDir: string;
   /** a skill do fluxo está pronta para a ferramenta do projeto */
   skillInstalled: boolean;
-  /** a outra ferramenta, quando encontrada na máquina */
-  other: OtherToolProbe | null;
+  /** as outras ferramentas encontradas na máquina */
+  others: OtherToolProbe[];
   /** o MCP do Code Review Graph está registrado na ferramenta do projeto */
   crgMcp: boolean;
   /** o sistema: no Windows, os comandos de instalação são os do PowerShell */
@@ -64,7 +64,7 @@ const FROM: Partial<Record<EnvCheckId, RequirementId[]>> = {
   cli: ['cli'],
   signin: ['signin'],
   mcp: ['mcp', 'mcp-stale', 'mcp-elsewhere', 'mcp-outdated', 'mcp-reload', 'mcp-enable', 'mcp-path'],
-  permission: ['permission'],
+  permission: ['permission', 'permission-mcp'],
   skill: ['skill'],
 };
 
@@ -72,9 +72,11 @@ const FROM: Partial<Record<EnvCheckId, RequirementId[]>> = {
 const CRG_PLATFORM: Record<AiTool, string> = {
   claude: 'claude-code',
   cursor: 'cursor',
+  // ainda sem plataforma própria no Code Review Graph: o nome genérico, a conferir quando ele suportar
+  kimi: 'kimi',
 };
 
-/** Onde cada item explica como instalar ou configurar (conferido em 2026-10-11). */
+/** Onde cada item explica como instalar ou configurar (conferido em 2026-10-13). */
 const BOARD_DOCS = 'https://github.com/euclidesgc/faz-ai#usando-com-ia';
 const CRG_DOCS = 'https://github.com/tirth8205/code-review-graph';
 const DOCS: Partial<Record<EnvCheckId, string>> = {
@@ -90,6 +92,7 @@ const DOCS: Partial<Record<EnvCheckId, string>> = {
 const TOOL_DOCS: Record<AiTool, Partial<Record<EnvCheckId, string>>> = {
   claude: { cli: 'https://code.claude.com/docs/en/setup', permission: 'https://code.claude.com/docs/en/iam' },
   cursor: { cli: 'https://cursor.com/docs/cli/installation', permission: 'https://cursor.com/docs/cli/reference/permissions' },
+  kimi: { cli: 'https://www.kimi.com/code/docs/en/', permission: 'https://www.kimi.com/code/docs/en/' },
 };
 
 /**
@@ -99,12 +102,13 @@ const TOOL_DOCS: Record<AiTool, Partial<Record<EnvCheckId, string>>> = {
  */
 const steps = (...commands: string[]): InstallStep[] => commands.map((command) => ({ command }));
 const NVM: InstallStep = { command: 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash', step: 'nvm' };
-const INSTALL: Record<'unix' | 'windows', Record<'node' | 'claude' | 'cursor' | 'uv', InstallStep[]>> = {
+const INSTALL: Record<'unix' | 'windows', Record<'node' | AiTool | 'uv', InstallStep[]>> = {
   unix: {
     // o Node.js pelo nvm, como o site do Node.js ensina: primeiro o nvm, depois o Node com ele
     node: [NVM, { command: '. "$HOME/.nvm/nvm.sh"', step: 'nvm-load' }, { command: `nvm install ${NODE_MIN_MAJOR}`, step: 'node' }],
     claude: steps('curl -fsSL https://claude.ai/install.sh | bash'),
     cursor: steps('curl https://cursor.com/install -fsS | bash'),
+    kimi: steps('npm install -g @moonshot-ai/kimi-code'),
     uv: steps('curl -LsSf https://astral.sh/uv/install.sh | sh'),
   },
   // no Windows, o instalador de cada um já põe o programa no PATH: falta só abrir um terminal novo
@@ -112,6 +116,7 @@ const INSTALL: Record<'unix' | 'windows', Record<'node' | 'claude' | 'cursor' | 
     node: steps('winget install OpenJS.NodeJS.LTS'),
     claude: steps('irm https://claude.ai/install.ps1 | iex'),
     cursor: steps("irm 'https://cursor.com/install?win32=true' | iex"),
+    kimi: steps('npm install -g @moonshot-ai/kimi-code'),
     uv: steps('powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"'),
   },
 };
@@ -242,10 +247,9 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     { id: 'permission', tool, status: statusOf(!req('permission')), docs: TOOL_DOCS[tool].permission, requirement: req('permission') },
   ]);
 
-  // a outra ferramenta: o board só confere; ele instala o MCP e a skill quando ela vira a do projeto
+  // as outras ferramentas: o board só confere; ele instala o MCP e a skill quando uma vira a do projeto
   const optional: EnvCheck[] = [];
-  const o = p.other;
-  if (o)
+  for (const o of p.others) {
     optional.push(
       toolGroup(o.tool, [
         {
@@ -263,6 +267,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
         { id: 'permission', tool: o.tool, status: statusOf(!o.permission), docs: TOOL_DOCS[o.tool].permission },
       ]),
     );
+  }
 
   const gitExe = p.resolve('git');
   const repo = gitExe ? (await p.run(gitExe, ['rev-parse', '--is-inside-work-tree'], p.workspaceDir))?.trim() === 'true' : false;

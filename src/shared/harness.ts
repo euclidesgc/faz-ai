@@ -220,7 +220,7 @@ export interface Harness {
 }
 
 /** Ferramentas de IA que o board sabe configurar. O projeto trabalha com uma por vez. */
-export type AiTool = 'claude' | 'cursor';
+export type AiTool = 'claude' | 'cursor' | 'kimi';
 
 /** Onde e como uma ferramenta guarda os agentes do projeto (conforme a documentação de cada uma em 2026-10-02). */
 export interface AgentSpec {
@@ -257,6 +257,15 @@ export const AI_TOOLS: {
     mcp: '.cursor/mcp.json (projeto)',
     mcpUser: '.cursor/mcp.json (projeto; o global não funciona no Cursor)',
     agents: { dir: '.cursor/agents', ext: '.md' },
+  },
+  {
+    id: 'kimi',
+    label: 'Kimi Code',
+    rules: 'AGENTS.md',
+    skills: '.kimi-code/skills',
+    mcp: '.kimi-code/mcp.json (projeto)',
+    mcpUser: '~/.kimi-code/mcp.json',
+    agents: { dir: '.kimi-code/agents', ext: '.md' },
   },
 ];
 

@@ -174,11 +174,11 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
           </Callout.Text>
         </Callout.Root>
       )}
-      {g === 'plugin' && (
+      {g === 'plugin' && PLUGIN_COMMANDS[tool] && (
         <div className="muted small">
-          {t('Plugins são instalados pela própria ferramenta, {where}:', { where: t(PLUGIN_COMMANDS[tool].where) })}
+          {t('Plugins são instalados pela própria ferramenta, {where}:', { where: t(PLUGIN_COMMANDS[tool]!.where) })}
           <ul>
-            {PLUGIN_COMMANDS[tool].commands.map((c) => (
+            {PLUGIN_COMMANDS[tool]!.commands.map((c) => (
               <li key={c}>
                 <code>{t(c)}</code>
               </li>

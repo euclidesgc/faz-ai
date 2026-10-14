@@ -22,6 +22,7 @@ const splitList = (s: string): string[] =>
 const SOURCES: Record<AiTool, string> = {
   claude: 'lista embutida na extensão (o Claude Code não guarda a lista em arquivo)',
   cursor: 'lida do comando cursor-agent models, com a conta em uso; sem a CLI autenticada, lista embutida na extensão',
+  kimi: 'lida do comando kimi provider list --json, com os provedores configurados; sem a CLI, lista embutida na extensão',
 };
 
 const EMPTY_DRAFT = { model: '', label: '', efforts: '' };

@@ -5,7 +5,7 @@ import { LOGIN_COMMAND, type BoardRequirement } from '../shared/requirements';
 import type { RunnerPermission } from '../shared/runner';
 import { byPath, samePath } from './samePath';
 import { headlessCommand, headlessUnsupported } from './headless';
-import { fixedFolder } from './mcp/clientConfig';
+import { fixedFolder, kimiHome } from './mcp/clientConfig';
 import { editorFinds, trackedInGit } from './mcp/pinCommands';
 
 /** Onde a ferramenta lê o servidor do board, e o que está registrado lá. */
@@ -80,6 +80,12 @@ export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: st
     // o global do Cursor é um processo só para todas as janelas e não sabe qual board atender: não conta
     case 'cursor':
       return fromJson(inProject('.cursor/mcp.json'), '.cursor/mcp.json', server);
+    // Kimi Code: primeiro o do projeto (que vale sobre o global), depois o da pasta de dados dele
+    case 'kimi':
+      return (
+        fromJson(inProject('.kimi-code/mcp.json'), '.kimi-code/mcp.json', server) ??
+        fromJson(path.join(kimiHome(homeDir), 'mcp.json'), '~/.kimi-code/mcp.json', server)
+      );
   }
 }
 
@@ -90,7 +96,43 @@ const INSTALL: Record<AiTool, { command: string | null; where: string }> = {
     command: process.platform === 'win32' ? null : 'curl https://cursor.com/install -fsS | bash',
     where: 'https://cursor.com/cli',
   },
+  // o pacote npm oficial vale nos dois sistemas
+  kimi: { command: 'npm install -g @moonshot-ai/kimi-code', where: 'https://www.kimi.com/code/docs/en/' },
 };
+
+/** A regra que libera as ferramentas do board sem aprovação nas conversas do Kimi Code. */
+export const KIMI_MCP_PERMISSION = { decision: 'allow', pattern: 'mcp__faz-ai__*' } as const;
+
+/** O config.toml do Kimi Code já tem uma regra `allow` para as ferramentas do board. */
+export function kimiMcpAllowed(homeDir: string): boolean {
+  let text: string;
+  try {
+    text = fs.readFileSync(path.join(kimiHome(homeDir), 'config.toml'), 'utf8');
+  } catch {
+    return false;
+  }
+  // cada bloco [[permission.rules]] é conferido sozinho: a decisão e o padrão precisam estar no mesmo
+  return text
+    .split('[[permission.rules]]')
+    .slice(1)
+    .some((block) => /decision\s*=\s*"allow"/.test(block) && /pattern\s*=\s*"mcp__faz-ai__\*"/.test(block));
+}
+
+/**
+ * Grava a regra que libera as ferramentas do board no config.toml do Kimi Code, ACRESCENTANDO o bloco
+ * ao final do arquivo: o conteúdo existente nunca é reescrito (não há parser de TOML nas dependências,
+ * e um reescrita manual arriscaria perder o que a pessoa tem lá). Cria a pasta e o arquivo quando não
+ * existem. Devolve true quando gravou; false quando a regra já estava lá.
+ */
+export function allowKimiMcp(homeDir: string): boolean {
+  if (kimiMcpAllowed(homeDir)) return false;
+  const file = path.join(kimiHome(homeDir), 'config.toml');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  const block = `[[permission.rules]]\ndecision = "${KIMI_MCP_PERMISSION.decision}"\npattern = "${KIMI_MCP_PERMISSION.pattern}"\n`;
+  fs.writeFileSync(file, `${current}${current && !current.endsWith('\n') ? '\n' : ''}${block}`);
+  return true;
+}
 
 export interface RequirementProbe {
   tool: AiTool;
@@ -233,6 +275,11 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
 
   const unsupported = headlessUnsupported(tool, p.permission);
   if (unsupported) out.push({ id: 'permission', tool, reason: unsupported, action: { kind: 'settings' } });
+
+  // Kimi Code: sem a regra `allow` no config.toml, as ferramentas do board pedem aprovação uma a uma
+  // nas conversas interativas (nas execuções pelo board, em `-p`, nada é perguntado): recomendado, não bloqueia
+  if (tool === 'kimi' && !kimiMcpAllowed(p.homeDir))
+    out.push({ id: 'permission-mcp', tool, file: '~/.kimi-code/config.toml', optional: true, action: { kind: 'allowKimiMcp' } });
 
   return out;
 }

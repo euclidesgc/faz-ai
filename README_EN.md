@@ -67,7 +67,7 @@ In five minutes you have a task moving on the board, with the AI working on it.
    marketplace), open your project's folder and click the **Faz AI** icon in the sidebar. Each
    folder has its own board, already set up with the workflow phases.
 2. **Connect the AI to the board.** In **Configurações → Harness de IA** (Settings → AI harness),
-   pick the project's tool (Claude Code or Cursor). In the **Projeto** (project) tab, click
+   pick the project's tool (Claude Code, Cursor or Kimi Code). In the **Projeto** (project) tab, click
    **Instalar (padrão da ferramenta)** (install, tool default) in the **Servidores MCP** (MCP servers)
    group and again in the **Skills** group, for the flow skill, which teaches the AI to drive the
    phases.
@@ -258,8 +258,8 @@ navegador**; the terminal `faz-ai` warns and does not start.
 
 ## Using it with AI
 
-1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code or
-   Cursor).
+1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code,
+   Cursor or Kimi Code).
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads.
 3. In the **Skills** group of the same tab, click **Instalar (padrão da ferramenta)** for the
@@ -271,8 +271,8 @@ buttons:
 
 | | Where it writes | When to use |
 |---|---|---|
-| **Instalar (padrão da ferramenta)** (tool default) | global config: `~/.claude.json` (through `claude mcp add --scope user`), `~/.cursor/mcp.json`; the skill in `~/.claude/skills`, `~/.cursor/skills` and equivalents | recommended: the board works in any repository opened with it, with no file in the project |
-| **Instalar neste projeto** (this project) | `.mcp.json` or `.cursor/mcp.json`; the skill in `.claude/skills`, `.cursor/skills` and equivalents | pinning a version in a repository or a fork, or a skill tailored for the team |
+| **Instalar (padrão da ferramenta)** (tool default) | global config: `~/.claude.json` (through `claude mcp add --scope user`), `~/.cursor/mcp.json` (Cursor's is written to the project), `~/.kimi-code/mcp.json`; the skill in `~/.claude/skills`, `~/.cursor/skills`, `~/.kimi-code/skills` and equivalents | recommended: the board works in any repository opened with it, with no file in the project |
+| **Instalar neste projeto** (this project) | `.mcp.json`, `.cursor/mcp.json` or `.kimi-code/mcp.json`; the skill in `.claude/skills`, `.cursor/skills`, `.kimi-code/skills` and equivalents | pinning a version in a repository or a fork, or a skill tailored for the team |
 
 The global registration does not pin the project folder: Claude Code passes the folder in the
 `CLAUDE_PROJECT_DIR` variable, and the board's bridge finds the board by walking up from the folder
@@ -298,7 +298,7 @@ and the **Verificar ambiente** (Check environment) button get a warning icon. It
 missing, with each item's name, and each item's explanation and action are in the environment check.
 The chat panel, which has no Settings, keeps a bar with the same items. The check looks at Node.js (the board's server runs on
 it), the tool's command line, its sign-in (for Cursor, through `cursor-agent status`; for Claude
-Code, through `claude auth status`), the board's
+Code, through `claude auth status`; for Kimi Code, through its credentials folder), the board's
 server registration in the file the tool reads (for Claude, the registration for your user from
 `claude mcp add -s user` also counts), a registration pointing to a node or path that no longer
 exists, to another folder or to the bridge of an earlier version, and the permission level. Each

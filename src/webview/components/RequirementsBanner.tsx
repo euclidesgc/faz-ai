@@ -135,6 +135,14 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
       };
     case 'permission':
       return { title: t('O {tool} não roda com o nível de permissão escolhido', { tool }), detail: t(r.reason ?? '') };
+    case 'permission-mcp':
+      return {
+        title: t('O {tool} pede aprovação para cada ferramenta do board', { tool }),
+        detail: t(
+          'Nas conversas com o {tool} fora do board, cada ferramenta do MCP "faz-ai" pede uma aprovação. Uma regra no {file} libera todas de uma vez; sem ela tudo funciona, mas com uma pergunta a cada chamada. As execuções pelo board não pedem nada.',
+          { tool, file: r.file ?? '' },
+        ),
+      };
   }
 }
 
@@ -191,7 +199,14 @@ function actionable(r: BoardRequirement, compact: boolean): boolean {
   // recarregar a janela e abrir os MCPs do editor só existem dentro do editor; no navegador, fica a explicação
   if (kind === 'reload' || kind === 'openEditorMcp') return !isWeb;
   if (kind === 'settings') return !compact;
-  return kind === 'command' || kind === 'connect' || kind === 'fixProject' || kind === 'pinMcp' || kind === 'installSkill';
+  return (
+    kind === 'command' ||
+    kind === 'connect' ||
+    kind === 'fixProject' ||
+    kind === 'pinMcp' ||
+    kind === 'installSkill' ||
+    kind === 'allowKimiMcp'
+  );
 }
 
 /**
@@ -274,6 +289,19 @@ export function RequirementFix({
           }}
         >
           <IconConnect /> {t('Corrigir o caminho')}
+        </Button>
+      );
+    case 'allowKimiMcp':
+      return (
+        <Button
+          size="small"
+          variant={variant}
+          onClick={() => {
+            ui.allowKimiMcp();
+            onFixed?.();
+          }}
+        >
+          <IconConnect /> {t('Liberar as ferramentas do board')}
         </Button>
       );
     case 'openEditorMcp':

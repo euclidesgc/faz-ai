@@ -22,6 +22,9 @@ const CLIENT_NAMES: Record<string, string> = {
   'claude-ai': 'Claude',
   cursor: 'Cursor',
   'cursor-vscode': 'Cursor',
+  // o nome que a CLI do Kimi Code manda no clientInfo; a calibrar se uma versão nova usar outro
+  'kimi-code': 'Kimi Code',
+  kimi: 'Kimi Code',
 };
 
 /**

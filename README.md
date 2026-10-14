@@ -61,7 +61,7 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    própria ferramenta), abra a pasta do seu projeto e clique no ícone **Faz AI** na barra lateral.
    Cada pasta tem o seu board, já com as fases do fluxo.
 2. **Conecte a IA ao board.** Em **Configurações → Harness de IA**, escolha a ferramenta do projeto
-   (Claude Code ou Cursor). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
+   (Claude Code, Cursor ou Kimi Code). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
    grupo **Servidores MCP** e de novo no grupo **Skills**, para a skill do fluxo, que ensina a IA a
    conduzir as fases.
 3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
@@ -245,8 +245,8 @@ o `faz-ai` do terminal avisa e não inicia.
 
 ## Usando com IA
 
-1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code ou
-   Cursor).
+1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Cursor ou
+   Kimi Code).
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
    global que a ferramenta lê.
 3. No grupo **Skills** da mesma aba, clique em **Instalar (padrão da ferramenta)** para a
@@ -258,8 +258,8 @@ com dois botões:
 
 | | Onde grava | Quando usar |
 |---|---|---|
-| **Instalar (padrão da ferramenta)** | configuração global: `~/.claude.json` (por `claude mcp add --scope user`), `~/.cursor/mcp.json`; a skill em `~/.claude/skills`, `~/.cursor/skills` e equivalentes | o recomendado: o board funciona em qualquer repositório aberto com ele, sem nenhum arquivo no projeto |
-| **Instalar neste projeto** | `.mcp.json` ou `.cursor/mcp.json`; a skill em `.claude/skills`, `.cursor/skills` e equivalentes | fixar uma versão num repositório ou num fork, ou uma skill ajustada para o time |
+| **Instalar (padrão da ferramenta)** | configuração global: `~/.claude.json` (por `claude mcp add --scope user`), `~/.cursor/mcp.json` (o do Cursor é gravado no projeto), `~/.kimi-code/mcp.json`; a skill em `~/.claude/skills`, `~/.cursor/skills`, `~/.kimi-code/skills` e equivalentes | o recomendado: o board funciona em qualquer repositório aberto com ele, sem nenhum arquivo no projeto |
+| **Instalar neste projeto** | `.mcp.json`, `.cursor/mcp.json` ou `.kimi-code/mcp.json`; a skill em `.claude/skills`, `.cursor/skills`, `.kimi-code/skills` e equivalentes | fixar uma versão num repositório ou num fork, ou uma skill ajustada para o time |
 
 O registro global não fixa a pasta do projeto: o Claude Code informa a pasta pela variável
 `CLAUDE_PROJECT_DIR`, e a ponte do board acha o board subindo a partir da pasta em que a ferramenta
@@ -283,7 +283,7 @@ botão **Verificar ambiente** ganham um ícone de atenção. O hint dele resume 
 de cada item, e a explicação com a ação de cada um fica no Diagnóstico do ambiente. No painel de
 chat, que não tem as Configurações, fica uma faixa com os mesmos itens. A conferência olha o Node.js (o servidor do board roda
 com ele), a linha de comando da ferramenta, o login dela (no Cursor por `cursor-agent status`, no
-Claude Code por `claude auth status`), o
+Claude Code por `claude auth status`, no Kimi Code pela pasta de credenciais dele), o
 registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
 para o seu usuário, de `claude mcp add -s user`), um registro apontando para um node ou um caminho
 que não existe mais, para outra pasta ou para a ponte de uma versão anterior, e o nível de
