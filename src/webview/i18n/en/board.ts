@@ -14,6 +14,8 @@ export const board: Record<string, string> = {
   'Atualizando o board…': 'Updating the board…',
   'Importando o board…': 'Importing the board…',
   'Esvaziando a lixeira…': 'Emptying the trash…',
+  'Movendo {n} história(s)…': 'Moving {n} story(ies)…',
+  'Concluindo {n} história(s)…': 'Completing {n} story(ies)…',
   Board: 'Board',
   Lixeira: 'Trash',
   Configurações: 'Settings',

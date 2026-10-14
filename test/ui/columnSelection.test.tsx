@@ -1,4 +1,4 @@
-import { choose, lastSent, sentOf, seedBoard, syncStore, type SeededBoard } from './setup';
+import { choose, confirmLast, lastSent, sentOf, seedBoard, syncStore, type SeededBoard } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -288,6 +288,12 @@ describe('Column: ações em lote (RF8-RF11)', () => {
     const sent = lastSent('card.moveMany');
     expect(sent.cardIds.slice().sort()).toEqual([board.storyId, secondId].sort());
     expect(sent.columnId).toBe(destination.id);
+    // a seleção só limpa quando o host confirma o lote; até lá a barra mostra o status
+    expect(useBoardStore.getState().bulkBusy).toBe('Movendo 2 história(s)…');
+    expect(useBoardStore.getState().selectedIds.size).toBe(2);
+    confirmLast();
+    await act(async () => {});
+    expect(useBoardStore.getState().bulkBusy).toBeNull();
     expect(useBoardStore.getState().selectedIds.size).toBe(0);
   });
 
@@ -305,6 +311,8 @@ describe('Column: ações em lote (RF8-RF11)', () => {
     const sent = lastSent('card.moveMany');
     expect(sent.cardIds.slice().sort()).toEqual([board.storyId, secondId].sort());
     expect(sent.columnId).toBe(doneColumn.id);
+    confirmLast();
+    await act(async () => {});
     expect(useBoardStore.getState().selectedIds.size).toBe(0);
   });
 

@@ -5,6 +5,7 @@ import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelValue, type ModelRule,
 import type { BoardState } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
+import { useAction } from '../../useAction';
 import { t, dt } from '../../i18n';
 import { ModelEditor } from '../FieldRenderer';
 import { Button, Card, IconButton, Switch, TextField } from '@radix-ui/themes';
@@ -184,6 +185,7 @@ export function ModelRulesEditor() {
   const { modelRules: rules, modelCatalog: allModels, aiTool } = state.board;
   const catalog = allModels.filter((o) => o.tool === aiTool);
   const [editing, setEditing] = useState<ModelRule | null>(null);
+  const suggest = useAction(() => settings.suggestModelRules(aiTool));
 
   // as mudanças partem da última lista enviada (ver useSentList)
   const sent = useSentList(rules, settings.setModelRules);
@@ -226,8 +228,9 @@ export function ModelRulesEditor() {
               variant="soft"
               color="gray"
               disabled={!hasEffort}
+              loading={suggest.busy}
               title={t('Gera Baixo, Médio e Alto com um modelo leve, um intermediário e um forte do {tool}', { tool: tool.label })}
-              onClick={() => settings.suggestModelRules(aiTool)}
+              onClick={() => void suggest.run()}
             >
               {t('Recriar as regras de "{field}"', { field: dt(EFFORT_FIELD) })}
             </Button>

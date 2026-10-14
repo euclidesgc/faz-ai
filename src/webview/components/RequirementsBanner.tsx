@@ -204,6 +204,34 @@ export function aiBlockedReason(state: BoardState): string | null {
     : t('A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.', { tool: aiToolInfo(cli.tool).label });
 }
 
+/** Botão que resolve um requisito pelo host (CLI, disco): mostra a espera até ele confirmar, e avisa quem confere de novo. */
+function FixButton({
+  variant,
+  run,
+  onFixed,
+  children,
+}: {
+  variant?: ButtonVariant;
+  run: () => Promise<void>;
+  onFixed?: () => void;
+  children: ReactNode;
+}) {
+  const fix = useAction(run);
+  return (
+    <Button
+      size="small"
+      variant={variant}
+      loading={fix.busy}
+      onClick={() => {
+        void fix.run();
+        onFixed?.();
+      }}
+    >
+      {children}
+    </Button>
+  );
+}
+
 /** Se o requisito tem um botão ou comando que o resolve por aqui (na versão compacta, sem o atalho para as Configurações). */
 function actionable(r: BoardRequirement, compact: boolean): boolean {
   const kind = r.action?.kind;
@@ -258,42 +286,21 @@ export function RequirementFix({
       );
     case 'fixProject':
       return (
-        <Button
-          size="small"
-          variant={variant}
-          onClick={() => {
-            ui.fixProjectMcp(action.file);
-            onFixed?.();
-          }}
-        >
+        <FixButton variant={variant} run={() => ui.fixProjectMcp(action.file)} onFixed={onFixed}>
           <IconConnect /> {t('Corrigir o registro')}
-        </Button>
+        </FixButton>
       );
     case 'installSkill':
       return (
-        <Button
-          size="small"
-          variant={variant}
-          onClick={() => {
-            harness.installFlowSkill(r.tool, 'user');
-            onFixed?.();
-          }}
-        >
+        <FixButton variant={variant} run={() => harness.installFlowSkill(r.tool, 'user')} onFixed={onFixed}>
           {t('Instalar a skill')}
-        </Button>
+        </FixButton>
       );
     case 'pinMcp':
       return (
-        <Button
-          size="small"
-          variant={variant}
-          onClick={() => {
-            ui.pinMcp();
-            onFixed?.();
-          }}
-        >
+        <FixButton variant={variant} run={() => ui.pinMcp()} onFixed={onFixed}>
           <IconConnect /> {t('Corrigir o caminho')}
-        </Button>
+        </FixButton>
       );
     case 'openEditorMcp':
       return (

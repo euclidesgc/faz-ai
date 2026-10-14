@@ -112,6 +112,9 @@ interface BoardStore extends UiState, ViewState {
   /** véu sobre o board inteiro enquanto uma ação que troca todo o estado roda (ver `withOverlay`) */
   busyOverlay: { label: string } | null;
   setBusyOverlay(overlay: { label: string } | null): void;
+  /** uma ação em lote sobre os cards selecionados está esperando o host (texto do status) */
+  bulkBusy: string | null;
+  setBulkBusy(label: string | null): void;
   setState(state: BoardState, attachmentsBaseUri: string): void;
   setViewState(view: ViewState): void;
   setError(msg: string | null): void;
@@ -199,6 +202,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     setBackupBusy: (backupBusy) => set({ backupBusy }),
     busyOverlay: null,
     setBusyOverlay: (busyOverlay) => set({ busyOverlay }),
+    bulkBusy: null,
+    setBulkBusy: (bulkBusy) => set({ bulkBusy }),
     // o Diagnóstico é de passagem: ao reabrir, volta para o board
     view: persisted?.view === 'environment' ? 'board' : (persisted?.view ?? 'board'),
     settingsTab: persisted?.settingsTab ?? 'columns',

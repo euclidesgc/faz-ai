@@ -31,7 +31,7 @@ export function BackupSettings() {
           )}
         </p>
         <div className="row">
-          <Button variant="primary" disabled={busy !== null} onClick={() => start('export')}>
+          <Button variant="primary" disabled={busy !== null} loading={busy === 'export'} onClick={() => start('export')}>
             {busy === 'export' ? t('Exportando…') : t('Exportar board')}
           </Button>
         </div>
@@ -47,6 +47,7 @@ export function BackupSettings() {
         <div className="row">
           <Button
             disabled={busy !== null || running}
+            loading={busy === 'import'}
             title={running ? t('Espere a execução da IA terminar') : undefined}
             onClick={() => start('import')}
           >
