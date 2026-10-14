@@ -3,6 +3,7 @@ import { cardRef, type Card } from '../../../shared/model';
 import { storyOf } from '../../../shared/story';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
+import { useAction } from '../../useAction';
 import { Button, IconBranch, IconCheck, IconExternal, IconPr } from '../ui';
 import { t } from '../../i18n';
 
@@ -11,6 +12,8 @@ export function WorkspaceBar({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const mode = state.board.git.mode;
   const [copied, setCopied] = useState(false);
+  // o git roda no host e pode levar segundos: o botão mostra a espera até a branch (ou o erro) voltar
+  const prepare = useAction(() => cards.prepareWorkspace(card.id));
   const [copyFailed, setCopyFailed] = useState(false);
   // o "Copiado" some sozinho, para o botão voltar a dizer o que o clique faz
   useEffect(() => {
@@ -71,10 +74,11 @@ export function WorkspaceBar({ card }: { card: Card }) {
         <Button
           variant="ghost"
           size="small"
+          loading={prepare.busy}
           title={t('Cria a branch da história e, no modo worktree, a pasta de trabalho dela')}
-          onClick={() => cards.prepareWorkspace(card.id)}
+          onClick={() => void prepare.run()}
         >
-          {t('Criar branch da história')}
+          {prepare.busy ? t('Criando a branch…') : t('Criar branch da história')}
         </Button>
       )}
       {origin && (

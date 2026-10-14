@@ -269,6 +269,28 @@ it('backup pelo navegador: GET /backup/export baixa o arquivo e POST /backup/imp
   page.close();
 });
 
+it('POST /message com requestId: a página recebe o done pelo canal de eventos', async () => {
+  const page = await events('cliente-done-1234');
+  const first = page.next('boardState');
+  await post('cliente-done-1234', { type: 'ready' });
+  await first;
+  const done = page.next('done');
+  await post('cliente-done-1234', { type: 'harness.refresh', requestId: 'h1' } as WebviewToHost);
+  expect(await done).toEqual({ type: 'done', requestId: 'h1', ok: true });
+  page.close();
+});
+
+it('POST /message com requestId: a página recebe o done pelo canal de eventos', async () => {
+  const page = await events('cliente-done-1234');
+  const first = page.next('boardState');
+  await post('cliente-done-1234', { type: 'ready' });
+  await first;
+  const done = page.next('done');
+  await post('cliente-done-1234', { type: 'harness.refresh', requestId: 'h1' } as WebviewToHost);
+  expect(await done).toEqual({ type: 'done', requestId: 'h1', ok: true });
+  page.close();
+});
+
 it('cada pasta tem o seu banco, partindo de uma cópia do banco único das versões anteriores', () => {
   const storage = path.join(dir, 'dados');
   fs.mkdirSync(storage);

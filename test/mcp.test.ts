@@ -476,6 +476,7 @@ describe('harness e padrões pelo MCP', () => {
       group: 'skill',
       scope: 'user',
       usage: 'contextual',
+      key: '~/.claude/skills/commit/SKILL.md',
       name: 'commit',
       mode: 'auto',
       description: 'Escreve o commit',
@@ -1097,6 +1098,12 @@ describe('status do card e checkpoint de revisão', () => {
     await call('set_ai_tool', { tool: 'cursor' });
     await call('create_agent', { name: 'verificador', description: 'd', content: 'c', scope: 'project' });
     expect(fs.existsSync(path.join(dir, '.cursor/agents/verificador.md'))).toBe(true);
+    // no Cursor o arquivo guarda somente leitura e segundo plano; update_agent liga e desliga
+    await call('create_agent', { name: 'leitor', description: 'd', content: 'c', scope: 'project', readonly: true });
+    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).toContain('readonly: true\n');
+    await call('update_agent', { agent: 'leitor', readonly: false, background: true });
+    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).toMatch(/is_background: true\n/);
+    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).not.toContain('readonly');
     await call('set_ai_tool', { tool: 'claude' });
 
     await call('delete_agent', { agent: 'planejador' });

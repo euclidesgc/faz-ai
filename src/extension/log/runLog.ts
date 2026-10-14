@@ -20,10 +20,10 @@ export interface RunLog {
   /** Grava o consumo e o inventário medidos, de uma vez, junto do desfecho. `measure: 'none'` grava só "não medido". */
   measure(id: string, report: RunReport): void;
   /**
-   * Marca como `unknown` as execuções que a sessão anterior não chegou a fechar. Chamada na abertura
-   * do board, só pela janela dona dele.
+   * Marca como `unknown` as execuções que a sessão anterior não chegou a fechar e devolve os cards
+   * delas. Chamada na abertura do board, só pela janela dona dele.
    */
-  closeOpen(at: number): void;
+  closeOpen(at: number): string[];
 }
 
 /** O `RunLog` que grava em `ai_runs`. `log` é o canal onde as falhas do próprio log aparecem. */
@@ -62,7 +62,12 @@ export function createRunLog(db: Database, log?: (line: string) => void): RunLog
       guard(() => runs.measure(id, report));
     },
     closeOpen(at) {
-      guard(() => runs.closeOpen(at));
+      try {
+        return runs.closeOpen(at);
+      } catch (e) {
+        fail(e);
+        return [];
+      }
     },
   };
 }

@@ -79,10 +79,12 @@ describe('FieldsSettings', () => {
 
   it('os campos do board não aparecem, e a descrição diz quais são', () => {
     show();
-    for (const name of ['Fase', 'Tags', 'Modelo', 'Skills', 'Rules', 'Esforço da atividade', 'Criticidade'])
+    for (const name of ['Fase', 'Tags', 'Modelo', 'Skills', 'Rules', 'MCPs', 'Esforço da atividade', 'Criticidade'])
       expect(screen.queryByLabelText(`Campo ${name}`)).toBeNull();
     expect(
-      screen.getByText(/Os campos do board \(Fase, Tags, Modelo, Skills, Rules, Esforço da atividade, Criticidade\) não aparecem aqui/),
+      screen.getByText(
+        /Os campos do board \(Fase, Tags, Modelo, Skills, Rules, MCPs, Esforço da atividade, Criticidade\) não aparecem aqui/,
+      ),
     ).toBeInTheDocument();
     expect(screen.getAllByLabelText(/^Campo /)).toHaveLength(1);
   });

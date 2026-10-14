@@ -4,13 +4,14 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import { Theme } from '@radix-ui/themes';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import type { WebviewToHost } from '../../src/shared/messages';
+import type { Tracked, WebviewToHost } from '../../src/shared/messages';
 import { EMPTY_FILTERS } from '../../src/shared/filters';
+import { cancelPendingRequests } from '../../src/webview/request';
 import { openInMemory } from '../../src/extension/db/database';
 import { MessageRouter } from '../../src/extension/panel/messageRouter';
 import { useBoardStore } from '../../src/webview/store/boardStore';
@@ -21,11 +22,38 @@ export const posted = vi.fn<(msg: WebviewToHost) => void>();
 // tanto os comandos (src/webview/commands.ts) quanto os filtros compartilhados (`view.set`) chamam postToHost; trocar só ele cobre os dois.
 // `isWeb` (modo navegador) pode ser ligado por um arquivo de teste com `vi.hoisted(() => { globalThis.__fazaiTestWeb = true })`:
 // um segundo vi.mock do mesmo módulo no arquivo de teste seria sobrescrito por este ao importar o setup.
+// As ações que esperam confirmação (`request()`) mandam um `requestId`: ele fica fora de `posted`, para os testes
+// compararem a mensagem inteira, e vai para `requestIds`; `confirmLast()` simula o `done` do host.
+// (`vi.hoisted`: o `vi.mock` abaixo sobe para antes das constantes deste módulo.) As leituras com resposta própria
+// (metrics.query, attachment.read...) têm o seu requestId e seguem inteiras.
+const { requestIds, SELF_ANSWERING } = vi.hoisted(() => ({
+  requestIds: [] as string[],
+  SELF_ANSWERING: new Set<string>(['attachment.read', 'harness.file.read', 'harness.project.profile', 'metrics.query', 'card.usage.query']),
+}));
+export { requestIds };
 vi.mock('../../src/webview/vscode', async (original) => {
   const mod = await original<typeof import('../../src/webview/vscode')>();
   const web = (globalThis as { __fazaiTestWeb?: boolean }).__fazaiTestWeb;
-  return { ...mod, isWeb: web ?? mod.isWeb, postToHost: (msg: WebviewToHost) => posted(msg) };
+  return {
+    ...mod,
+    isWeb: web ?? mod.isWeb,
+    postToHost: (sent: Tracked) => {
+      if (SELF_ANSWERING.has(sent.type)) return posted(sent as WebviewToHost);
+      const { requestId, ...msg } = sent;
+      if (requestId) requestIds.push(requestId);
+      posted(msg as WebviewToHost);
+    },
+  };
 });
+
+/** Simula o `done` do host para o último pedido com confirmação (`ok: false` leva o erro). */
+export function confirmLast(ok = true, error?: string): void {
+  const requestId = requestIds.at(-1);
+  if (!requestId) throw new Error('nenhum pedido com requestId foi enviado');
+  act(() => {
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'done', requestId, ok, error } }));
+  });
+}
 
 // jsdom não implementa matchMedia (useAppearance/applyTheme) nem scrollIntoView
 Object.defineProperty(window, 'matchMedia', {
@@ -119,6 +147,9 @@ export function syncStore(router: MessageRouter): void {
 afterEach(() => {
   cleanup();
   posted.mockClear();
+  requestIds.length = 0;
+  // um pedido que o teste não confirmou não pode estourar o tempo no meio de outro caso
+  cancelPendingRequests();
   // estado de tela volta ao padrão para um teste não vazar no outro
   useBoardStore.setState({
     dialog: null,
@@ -128,5 +159,7 @@ afterEach(() => {
     selectedParentId: null,
     collapsed: {},
     view: 'board',
+    // a origem do Harness fica no store: volta ao padrão para um teste não enxergar a escolha do anterior
+    harnessOrigin: 'project',
   });
 });

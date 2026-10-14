@@ -152,6 +152,7 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
   // arquivar ou excluir cards que a pessoa não está vendo seria pior do que deixá-los de fora
   const selectedHistories = visibleCards.filter((c) => selectedIds.has(c.id) && isLive(c));
   const selectedHere = selectedHistories.length > 0;
+  const allSelected = visibleLiveIds.length > 0 && visibleLiveIds.every((id) => selectedIds.has(id));
   const otherColumns = siblings.filter((c) => c.id !== column.id);
   const doneColumn = siblings.find((c) => c.category === 'done');
   if (collapsed) {
@@ -200,6 +201,27 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
           </span>
         )}
         <span className="column-count">{count}</span>
+        {workflow.kind === 'parent' && visibleLiveIds.length > 0 && (
+          <input
+            type="checkbox"
+            className="column-select"
+            checked={allSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = !allSelected && selectedHere;
+            }}
+            aria-label={
+              allSelected
+                ? t('Desmarcar todos de {name}', { name: dt(column.name) })
+                : t('Selecionar todos de {name}', { name: dt(column.name) })
+            }
+            title={
+              allSelected
+                ? t('Desmarcar todos de {name}', { name: dt(column.name) })
+                : t('Selecionar todos de {name}', { name: dt(column.name) })
+            }
+            onChange={() => (allSelected ? clearSelected() : selectMany(visibleLiveIds))}
+          />
+        )}
         <Menu
           title={t('Ações da coluna')}
           items={[

@@ -6,6 +6,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { HostBridge, exportNotice, importNotice, type HostEnv } from '../src/extension/host/hostBridge';
 import { parseExportFile } from '../src/extension/db/boardExport';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { HARNESS_CATALOG } from '../src/shared/harnessCatalog';
 import type { HostToWebview } from '../src/shared/messages';
 
 let router: MessageRouter;
@@ -36,6 +37,84 @@ beforeEach(async () => {
   shown = [];
   env = { showChat: () => void shown.push('chat'), attachmentsBaseUri: () => '' } as unknown as HostEnv;
   bridge = new HostBridge((m) => sent.push(m), router, { get: () => ({}), onDidChange: () => () => {}, update: () => {} } as never, env);
+});
+
+describe('HostBridge: done (confirmação por requestId)', () => {
+  it('mensagem com requestId recebe done ok depois do boardState; sem requestId, nada muda', async () => {
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const create = {
+      type: 'card.create' as const,
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+      parentId: null,
+      title: 'Com confirmação',
+    };
+    await bridge.handle({ ...create, requestId: 'q1' });
+    expect(sent.slice(-2).map((m) => m.type)).toEqual(['boardState', 'done']);
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'q1', ok: true });
+
+    await bridge.handle({ ...create, title: 'Sem confirmação' });
+    expect(sent.at(-1)!.type).toBe('boardState');
+  });
+
+  it('handler que lança vira o toast de erro e o done com ok:false e a mesma mensagem', async () => {
+    await bridge.handle({ type: 'chat.send', text: 'oi', model: null, requestId: 'q2' });
+    expect(sent.slice(-2)).toEqual([
+      { type: 'error', message: 'O chat não está disponível neste board.' },
+      { type: 'done', requestId: 'q2', ok: false, error: 'O chat não está disponível neste board.' },
+    ]);
+  });
+
+  it('leitura com resposta própria correlacionada não ganha done por cima', async () => {
+    await bridge.handle({ type: 'card.usage.query', requestId: 'u9', cardId: 'nada' });
+    expect(sent.filter((m) => m.type === 'done')).toEqual([]);
+    expect(sent.at(-1)!.type).toBe('card.usage.result');
+  });
+
+  it('a falha de uma tarefa em segundo plano chega à interface como erro', () => {
+    router.reportError('A conferência do ambiente falhou: CLI não respondeu.');
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'A conferência do ambiente falhou: CLI não respondeu.' });
+  });
+});
+
+describe('HostBridge: done (confirmação por requestId)', () => {
+  it('mensagem com requestId recebe done ok depois do boardState; sem requestId, nada muda', async () => {
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const create = {
+      type: 'card.create' as const,
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+      parentId: null,
+      title: 'Com confirmação',
+    };
+    await bridge.handle({ ...create, requestId: 'q1' });
+    expect(sent.slice(-2).map((m) => m.type)).toEqual(['boardState', 'done']);
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'q1', ok: true });
+
+    await bridge.handle({ ...create, title: 'Sem confirmação' });
+    expect(sent.at(-1)!.type).toBe('boardState');
+  });
+
+  it('handler que lança vira o toast de erro e o done com ok:false e a mesma mensagem', async () => {
+    await bridge.handle({ type: 'chat.send', text: 'oi', model: null, requestId: 'q2' });
+    expect(sent.slice(-2)).toEqual([
+      { type: 'error', message: 'O chat não está disponível neste board.' },
+      { type: 'done', requestId: 'q2', ok: false, error: 'O chat não está disponível neste board.' },
+    ]);
+  });
+
+  it('leitura com resposta própria correlacionada não ganha done por cima', async () => {
+    await bridge.handle({ type: 'card.usage.query', requestId: 'u9', cardId: 'nada' });
+    expect(sent.filter((m) => m.type === 'done')).toEqual([]);
+    expect(sent.at(-1)!.type).toBe('card.usage.result');
+  });
+
+  it('a falha de uma tarefa em segundo plano chega à interface como erro', () => {
+    router.reportError('A conferência do ambiente falhou: CLI não respondeu.');
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'A conferência do ambiente falhou: CLI não respondeu.' });
+  });
 });
 
 describe('HostBridge: chat', () => {
@@ -75,7 +154,7 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
       path: rule,
       content: '---\ndescription: Estilo do código\n---\n# Estilo\n',
     });
-    expect(sent.at(-1)).toEqual({ type: 'harness.file.writeResult', requestId: 'w1', ok: true });
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'w1', ok: true });
     expect(fs.readFileSync(rule, 'utf8')).toContain('Estilo do código');
     const item = router
       .snapshot()
@@ -113,6 +192,76 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
     expect(result()).toMatchObject({ readonly: true });
     await bridge.handle({ type: 'harness.file.write', requestId: 'w3', path: claudeJson, content: '{}' });
     expect(result()).toMatchObject({ ok: false, error: 'Este arquivo não pode ser alterado pelo board.' });
+  });
+});
+
+describe('HostBridge: harness.item.write e harness.project.profile (assistentes de regras e skills)', () => {
+  const sourceOf = (tool: 'claude' | 'cursor', scope: 'project' | 'user', test: (s: { path: string; layout: string }) => boolean) =>
+    HARNESS_CATALOG[tool].findIndex((s) => s.scope === scope && !s.builtin && !s.noCreate && test(s));
+
+  it('uma regra por assunto nasce com o texto pronto, abre no editor e entra na varredura', async () => {
+    const source = sourceOf('claude', 'project', (s) => s.path === '.claude/rules' && s.layout === 'files');
+    await bridge.handle({
+      type: 'harness.item.write',
+      tool: 'claude',
+      source,
+      name: 'testes',
+      content: '---\ndescription: "Testes"\n---\n\n- Pequenos.\n',
+    });
+    const file = path.join(dir, '.claude', 'rules', 'testes.md');
+    expect(fs.readFileSync(file, 'utf8')).toBe('---\ndescription: "Testes"\n---\n\n- Pequenos.\n');
+    expect(sent.at(-1)).toEqual({ type: 'harness.item.created', path: file });
+    expect(
+      router
+        .snapshot()
+        .harness.inventory.flatMap((t) => t.items)
+        .find((i) => i.path === file)?.description,
+    ).toBe('Testes');
+  });
+
+  it('o arquivo principal que já existe recebe o texto no fim, só com append; sem ele dá erro e nada muda', async () => {
+    const source = sourceOf('claude', 'project', (s) => s.path === 'CLAUDE.md');
+    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), '# Projeto\n');
+    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n- A\n' });
+    expect((sent.at(-1) as { type: string }).type).toBe('error');
+    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('# Projeto\n');
+    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n- A\n', append: true });
+    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('# Projeto\n\n## Regras\n- A\n');
+    // sem o arquivo, o append cria
+    fs.rmSync(path.join(dir, 'CLAUDE.md'));
+    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n', append: true });
+    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('## Regras\n');
+  });
+
+  it('uma skill é criada com o SKILL.md pronto e os arquivos de apoio vazios; nome de arquivo inválido não cria nada', async () => {
+    const source = sourceOf('claude', 'project', (s) => s.layout === 'skills');
+    const content = '---\nname: migracao\ndescription: "Escrever uma migração."\n---\n\n# migracao\n';
+    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: 'migracao', content, files: ['../fora.md'] });
+    expect((sent.at(-1) as { type: string }).type).toBe('error');
+    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'migracao'))).toBe(false);
+    await bridge.handle({
+      type: 'harness.item.write',
+      tool: 'claude',
+      source,
+      name: 'migracao',
+      content,
+      files: ['references/exemplo.md', 'scripts/rodar.sh'],
+    });
+    const folder = path.join(dir, '.claude', 'skills', 'migracao');
+    expect(fs.readFileSync(path.join(folder, 'SKILL.md'), 'utf8')).toBe(content);
+    expect(fs.readFileSync(path.join(folder, 'references', 'exemplo.md'), 'utf8')).toBe('');
+    expect(fs.existsSync(path.join(folder, 'scripts', 'rodar.sh'))).toBe(true);
+    expect(router.snapshot().harness.skills.map((k) => k.name)).toContain('migracao');
+  });
+
+  it('o perfil do projeto responde com o requestId, ou com o erro na própria resposta', async () => {
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ scripts: { test: 'vitest' } }));
+    await bridge.handle({ type: 'harness.project.profile', requestId: 'p1' });
+    expect(sent.at(-1)).toMatchObject({
+      type: 'harness.project.profileResult',
+      requestId: 'p1',
+      profile: { languages: ['JavaScript'], scripts: { test: 'vitest' } },
+    });
   });
 });
 
@@ -157,14 +306,11 @@ describe('HostBridge: plugins pela CLI do Claude Code', () => {
       ['plugin', 'disable', 'design@synced', '--json'],
       ['plugin', 'disable', 'fmt@loja', '--json'],
     ]);
-    expect(sent.slice(-2)).toEqual([
-      {
-        type: 'notice',
-        message:
-          'Plugins desativados: design, fmt. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
-      },
-      { type: 'harness.plugin.done' },
-    ]);
+    expect(sent.at(-1)).toEqual({
+      type: 'notice',
+      message:
+        'Plugins desativados: design, fmt. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
+    });
     // a lista é consultada de novo depois da ação
     expect(calls.filter((c) => c[1] === 'list').length).toBe(2);
   });
@@ -180,10 +326,7 @@ describe('HostBridge: plugins pela CLI do Claude Code', () => {
     );
     await flush();
     await bridge.handle({ type: 'harness.plugin.apply', tool: 'claude', action: 'uninstall', ids: ['design@synced'] });
-    expect(sent.slice(-2)).toEqual([
-      { type: 'harness.plugin.done' },
-      { type: 'error', message: 'Nenhum dos plugins escolhidos aceita essa ação.' },
-    ]);
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'Nenhum dos plugins escolhidos aceita essa ação.' });
   });
 });
 
@@ -223,14 +366,14 @@ describe('HostBridge: attachment.read / attachment.write', () => {
   it('grava o conteúdo editado de volta no arquivo do anexo', async () => {
     const id = createAttachment('original');
     await bridge.handle({ type: 'attachment.write', requestId: 'w1', attachmentId: id, content: 'editado' });
-    expect(sent.at(-1)).toEqual({ type: 'attachment.writeResult', requestId: 'w1', ok: true });
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'w1', ok: true });
     const a = router.getAttachment(id)!;
     expect(fs.readFileSync(router.store.pathOf(a), 'utf8')).toBe('editado');
   });
 
   it('attachment.write de anexo inexistente devolve ok:false', async () => {
     await bridge.handle({ type: 'attachment.write', requestId: 'w2', attachmentId: 'nope', content: 'x' });
-    expect(sent.at(-1)).toEqual({ type: 'attachment.writeResult', requestId: 'w2', ok: false, error: 'Anexo não encontrado' });
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'w2', ok: false, error: 'Anexo não encontrado' });
   });
 
   it('attachment.write que falha na escrita devolve ok:false com o erro, sem derrubar a sessão', async () => {
@@ -239,7 +382,7 @@ describe('HostBridge: attachment.read / attachment.write', () => {
     fs.rmSync(path.dirname(router.store.pathOf(a)), { recursive: true, force: true });
     await bridge.handle({ type: 'attachment.write', requestId: 'w3', attachmentId: id, content: 'novo' });
     const last = sent.at(-1) as { type: string; ok: boolean; error?: string };
-    expect(last.type).toBe('attachment.writeResult');
+    expect(last.type).toBe('done');
     expect(last.ok).toBe(false);
     expect(last.error).toBeTruthy();
   });

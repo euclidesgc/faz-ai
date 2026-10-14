@@ -146,17 +146,19 @@ describe('contexto estimado de um card', () => {
     ]);
   });
 
-  it('o card sem nada marcado não tem grupo de rules nem de skills além do contexto fixo; o que sumiu do disco fica sem medida', () => {
+  it('o card sem nada marcado não tem grupo de rules nem de skills além do contexto fixo; o que saiu do board não entra', () => {
     const story = card('h1');
     const s = stateWith({
       cards: [story],
       harnessSelection: [],
+      harnessImports: [],
       fieldValues: [{ cardId: 'h1', fieldId: 'f-skills', value: ['apagada'] }],
     });
     const e = estimateContext(s, story);
     expect(group(e, 'rules')).toBeUndefined();
-    expect(group(e, 'skills')!.entries).toEqual([{ kind: 'skill', name: 'apagada', tokens: null }]);
-    expect(e.unmeasured).toBe(1);
+    // a skill listada no card que não está mais no board fica de fora da execução, e por isso da conta
+    expect(group(e, 'skills')).toBeUndefined();
+    expect(e.unmeasured).toBe(0);
   });
 
   it('o agente entra com as instruções; numa história no Claude Code, os outros agentes entram como subagentes, só com nome e descrição', () => {

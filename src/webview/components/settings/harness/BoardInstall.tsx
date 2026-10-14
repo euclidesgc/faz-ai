@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { aiToolInfo, type AiTool, type HarnessItem, type InstallScope } from '../../../../shared/harness';
 import { FLOW_SKILL_NAME } from '../../../../shared/harnessProject';
 import { copyTarget } from '../../../../shared/harnessCatalog';
+import { useAction } from '../../../useAction';
 import { harness, ui } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { Badge, Button, Card } from '@radix-ui/themes';
+import { Badge, Card } from '@radix-ui/themes';
 import { withGlobalWarning } from './text';
+import { ActionButton } from '../../ui';
 import { t } from '../../../i18n';
 import { rich } from '../../../i18n/rich';
 
@@ -35,8 +38,16 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
   const where = places(artifact, tool);
   const label = aiToolInfo(tool).label;
 
-  const run = (scope: InstallScope, replace: boolean) =>
-    artifact === 'mcp' ? ui.connectAI(tool, scope) : harness.installFlowSkill(tool, scope, replace);
+  // registrar o servidor chama a CLI da ferramenta; o botão clicado mostra a espera até o host confirmar
+  const installing = useAction((scope: InstallScope, replace: boolean) =>
+    artifact === 'mcp' ? ui.connectAI(tool, scope) : harness.installFlowSkill(tool, scope, replace),
+  );
+  const [which, setWhich] = useState<InstallScope | null>(null);
+  const run = (scope: InstallScope, replace: boolean) => {
+    setWhich(scope);
+    void installing.run(scope, replace);
+  };
+  const loading = (scope: InstallScope) => installing.busy && which === scope;
 
   const install = (scope: InstallScope) => {
     const here = installedIn(scope);
@@ -88,9 +99,13 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
           )}
         </p>
         <div className="row">
-          <Button onClick={() => run('project', false)}>
+          <ActionButton
+            loading={loading('project')}
+            hint={t('Grava o registro do board em .cursor/mcp.json, na pasta do projeto.')}
+            onClick={() => run('project', false)}
+          >
             {installedIn('project') ? t('Reinstalar neste projeto') : t('Instalar neste projeto')}
-          </Button>
+          </ActionButton>
         </div>
       </Card>
     );
@@ -118,12 +133,30 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
             )}
       </p>
       <div className="row">
-        <Button onClick={() => install('user')}>
+        <ActionButton
+          loading={loading('user')}
+          hint={
+            artifact === 'mcp'
+              ? t('Registra o servidor do board no global da ferramenta: vale em todos os projetos, sem arquivo no repositório.')
+              : t('Instala a skill na sua pasta de usuário: vale em todos os projetos.')
+          }
+          onClick={() => install('user')}
+        >
           {installedIn('user') ? t('Reinstalar (padrão da ferramenta)') : t('Instalar (padrão da ferramenta)')}
-        </Button>
-        <Button variant="soft" color="gray" onClick={() => install('project')}>
+        </ActionButton>
+        <ActionButton
+          variant="soft"
+          color="gray"
+          loading={loading('project')}
+          hint={
+            artifact === 'mcp'
+              ? t('Grava o registro na pasta do projeto, que vai no repositório; aqui ele vale sobre o global.')
+              : t('Instala a skill na pasta do projeto, que vai no repositório; aqui ela vale sobre a global.')
+          }
+          onClick={() => install('project')}
+        >
           {installedIn('project') ? t('Reinstalar neste projeto') : t('Instalar neste projeto')}
-        </Button>
+        </ActionButton>
       </div>
     </Card>
   );

@@ -1,4 +1,4 @@
-import { selectedItems, selectedSkillNames, selectedRuleLocations } from '../shared/harnessSelection';
+import { selectedItems, selectedMcpNames, selectedSkillNames, selectedRuleLocations } from '../shared/harnessSelection';
 import type { BoardState, Card } from '../shared/model';
 import { requiredRules, requiredSkills } from './mcp/format';
 
@@ -42,15 +42,23 @@ export function contextLines(s: BoardState, c?: Card): { always: string[]; card:
   };
 }
 
-/** O que o "Refinar com IA" pode indicar num card: só o que o Harness marcou como "usar quando fizer sentido", e os agentes disponíveis. */
+/**
+ * O que o "Refinar com IA" e o planejamento podem indicar num card: só os artefatos do board em modo
+ * "Pelo card" (nunca o catálogo Global, Projeto ou Importados), e os agentes disponíveis. O que está em
+ * modo "Sempre" já vai em toda execução e não precisa ser indicado.
+ */
 export interface RefineCatalog {
   agents: { name: string; description: string; default: boolean }[];
   rules: { location: string; description: string }[];
   skills: { name: string; description: string }[];
+  mcps: { name: string; description: string }[];
+  /** o que entra em toda execução deste board, só para a IA saber que já conta com isso */
+  always: { kind: 'rule' | 'skill' | 'mcp'; name: string }[];
 }
 
 export function refineCatalog(s: BoardState): RefineCatalog {
-  const items = selectedItems(s, 'skill', 'contextual');
+  const skills = selectedItems(s, 'skill', 'contextual');
+  const mcps = selectedItems(s, 'mcp', 'contextual');
   return {
     agents: s.board.execProfiles
       .filter((p) => p.scope !== 'builtin')
@@ -58,21 +66,34 @@ export function refineCatalog(s: BoardState): RefineCatalog {
     rules: selectedItems(s, 'instructions', 'contextual').map((i) => ({ location: i.location, description: i.description })),
     skills: selectedSkillNames(s, 'contextual').map((name) => ({
       name,
-      description: items.find((i) => i.name === name)?.description ?? '',
+      description: skills.find((i) => i.name === name)?.description ?? '',
     })),
+    mcps: selectedMcpNames(s, 'contextual').map((name) => ({ name, description: mcps.find((i) => i.name === name)?.description ?? '' })),
+    always: [
+      ...alwaysRefs(s).map((r) => ({ kind: r.kind, name: r.name })),
+      ...selectedMcpNames(s, 'always').map((name) => ({ kind: 'mcp' as const, name })),
+    ],
   };
 }
 
-/** Linhas do pedido de refinar que listam o catálogo; é tudo o que existe para a IA indicar. */
+/**
+ * Linhas do pedido de refinar que listam o catálogo; é tudo o que existe para a IA indicar. Minimalismo:
+ * no máximo uma skill por assunto, sempre a mais próxima do objetivo; excesso produz o efeito contrário.
+ */
 export function catalogLines(catalog: RefineCatalog): string[] {
   const item = (name: string, description: string) => (description ? `${name} (${description})` : name);
   return [
-    'Catálogo deste board. Só isto existe para você indicar num card; nada fora da lista:',
+    'Catálogo deste board: só os artefatos que a pessoa enviou ao board em modo "Pelo card". Só isto existe para você indicar num card; nada fora da lista, mesmo que exista no projeto ou na máquina:',
     `- Agentes (escolha um com set_card_profile): ${
       catalog.agents.map((a) => item(a.name, `${a.description}${a.default ? '; padrão' : ''}`)).join('; ') || 'nenhum além do agente padrão'
     }.`,
     `- Rules (campo Rules; o valor é o caminho mostrado): ${catalog.rules.map((r) => item(r.location, r.description)).join('; ') || 'nenhuma'}.`,
     `- Skills (campo Skills): ${catalog.skills.map((k) => item(k.name, k.description)).join('; ') || 'nenhuma'}.`,
+    `- Servidores MCP (campo MCPs; o do board vai sempre): ${catalog.mcps.map((m) => item(m.name, m.description)).join('; ') || 'nenhum'}.`,
+    ...(catalog.always.length
+      ? [`Já entram em toda execução, sem precisar indicar: ${catalog.always.map((a) => `${a.kind} ${a.name}`).join('; ')}.`]
+      : []),
+    'Indique só o mínimo que a tarefa pede: no máximo uma skill por assunto (a mais próxima do objetivo; pode haver mais de uma se forem de assuntos diferentes, como navegação e acesso a dados), e só os servidores MCP de que a tarefa precisa. Excesso de artefatos piora o resultado.',
   ];
 }
 

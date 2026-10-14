@@ -386,9 +386,9 @@ describe('migração 24 → 25 (branch_created_at)', () => {
   });
 });
 
-describe('migração 29 → 30 (branch_kind do tipo de card)', () => {
+describe('migração 30 → 31 (branch_kind do tipo de card)', () => {
   const SQL_SETUP = `
-    INSERT INTO meta VALUES ('schema_version', '29');
+    INSERT INTO meta VALUES ('schema_version', '30');
     INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto');
     INSERT INTO workflows (id, board_id, name, position, kind) VALUES ('w', 'b', 'Histórias', 0, 'parent');
     INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t1', 'b', 'História', '#fff', 'w');
@@ -402,13 +402,13 @@ describe('migração 29 → 30 (branch_kind do tipo de card)', () => {
   it('Bug vira hotfix, Retrabalho vira bugfix e os outros tipos ficam em feature', async () => {
     const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
     const old = new SQL.Database();
-    migrate(old, 29);
-    old.run(SQL_SETUP.replace("INSERT INTO meta VALUES ('schema_version', '29');", ''));
+    migrate(old, 30);
+    old.run(SQL_SETUP.replace("INSERT INTO meta VALUES ('schema_version', '30');", ''));
 
     migrate(old);
 
     expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
-    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(30);
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(31);
     expect(kinds(old)).toEqual({ História: 'feature', Bug: 'hotfix', Retrabalho: 'bugfix', 'Débito técnico': 'feature' });
   });
 

@@ -3,8 +3,19 @@ export const board: Record<string, string> = {
   'Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.':
     'No connection to Faz AI. Reopen the board from the editor or the terminal.',
   'Sem ligação com o Faz AI.': 'No connection to Faz AI.',
+  'A sessão com o Faz AI acabou. Abra o board de novo pelo editor ou pelo terminal.':
+    'The session with Faz AI ended. Open the board again from the editor or the terminal.',
+  'O Faz AI demorou para responder. Confira se o editor ou o comando faz-ai ainda está aberto.':
+    'Faz AI took too long to answer. Check that the editor or the faz-ai command is still open.',
   'Carregando board…': 'Loading board…',
   'Carregando…': 'Loading…',
+  'Isso leva alguns segundos.': 'This takes a few seconds.',
+  'Recriando o board…': 'Recreating the board…',
+  'Atualizando o board…': 'Updating the board…',
+  'Importando o board…': 'Importing the board…',
+  'Esvaziando a lixeira…': 'Emptying the trash…',
+  'Movendo {n} história(s)…': 'Moving {n} story(ies)…',
+  'Concluindo {n} história(s)…': 'Completing {n} story(ies)…',
   Board: 'Board',
   Lixeira: 'Trash',
   Configurações: 'Settings',
@@ -334,6 +345,17 @@ export const board: Record<string, string> = {
     'Autonomous mode paused.{detail} {n} story(ies) waiting. Click to resume.',
   'Pausar modo autônomo': 'Pause autonomous mode',
   'Retomar modo autônomo': 'Resume autonomous mode',
+  'Ligar o modo autônomo em {n} história(s) selecionada(s)?': 'Turn on autonomous mode for {n} selected story(ies)?',
+  'Ligar o modo autônomo em todas as {n} história(s) em aberto?': 'Turn on autonomous mode for all {n} open story(ies)?',
+  'Ligar o modo autônomo nas histórias selecionadas ({refs}): elas entram na fila e a IA as toca sozinha.':
+    'Turn on autonomous mode for the selected stories ({refs}): they join the queue and the AI drives them on its own.',
+  'Ligar o modo autônomo em todas as histórias em aberto: elas entram na fila e a IA as toca sozinha, na ordem do board.':
+    'Turn on autonomous mode for every open story: they join the queue and the AI drives them on its own, in board order.',
+  'Fila {n}': 'Queue {n}',
+  '{n}ª na fila do modo autônomo: a IA trata esta história depois das anteriores, respeitando as dependências.':
+    'Position {n} in the autonomous-mode queue: the AI takes this story after the ones before it, respecting dependencies.',
+  'Selecionar todos de {name}': 'Select all in {name}',
+  'Desmarcar todos de {name}': 'Deselect all in {name}',
   'Ver todos os cards': 'See all cards',
   'Ver {n} com você': 'See {n} with you',
   'Abrir chat': 'Open chat',

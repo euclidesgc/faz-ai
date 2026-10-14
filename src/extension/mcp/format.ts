@@ -1,6 +1,6 @@
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
-import { isSelectableKind, usageOf } from '../../shared/harnessSelection';
+import { isSelectableKind, selectionKey, usageOf } from '../../shared/harnessSelection';
 import { groupOf } from '../../shared/harnessCatalog';
 import { norm } from '../../shared/filters';
 import {
@@ -268,7 +268,7 @@ function supportFiles(skillMd: string, files: string[]) {
 export function requiredRules(s: BoardState, c: Card) {
   return manifestOf(s, c).rules.map((location) => {
     const item = toolItems(s).find((i) => i.kind === 'instructions' && i.location === location);
-    return item ? { name: location, scope: item.scope, path: item.path } : { name: location, note: 'rule não encontrada' };
+    return item ? { name: location, scope: item.scope, path: item.path } : { name: location, note: 'rule fora do board ou não encontrada' };
   });
 }
 
@@ -464,6 +464,8 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...cardSummary(s, c),
     ...(chosen ? { model: { ...describeModel(s, chosen), note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
+    harnessNote:
+      'Skills, rules, servidores MCP e agente do card: escolha só entre o que está no board em modo "Pelo card" (get_harness). O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.',
     ...(rules.length
       ? {
           requiredRules: rules,
@@ -638,8 +640,8 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
     aiTool: s.board.aiTool,
     defaultAgent: s.board.execProfiles.find((p) => p.isDefault)?.id ?? null,
     note: onlySelected
-      ? 'Só o que está marcado em Configurações → Harness: é tudo o que as execuções do board usam. `usage` "always" entra em toda execução; "contextual" só quando indicado no card (campos Rules e Skills) ou escolhido no refinar. Para ver tudo que a ferramenta carrega, chame get_harness com onlySelected = false.'
-      : 'Tudo que a ferramenta carrega nesta máquina; `usage` diz como o board marcou cada item (null = não marcado: invisível para as execuções do board).',
+      ? 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "always" (Sempre) entra em toda execução; "contextual" (Pelo card) só quando indicado no card (campos Rules, Skills e MCPs) ou escolhido no planejamento e no refinar; "off" (Desligado) está no board sem entrar em nada. Para ver tudo que a ferramenta carrega, chame get_harness com onlySelected = false.'
+      : 'Tudo que a ferramenta carrega nesta máquina, e o que há nas pastas importadas; `usage` diz o modo de cada item no board (null = fora do board: invisível para as execuções).',
     ruleFiles: s.harness.rules.map((r) => ({ name: r.name, exists: r.exists, ...(r.exists ? { bytes: r.content.length } : {}) })),
     skills: s.harness.skills
       .filter((k) => !onlySelected || toolItems(s).some((i) => i.kind === 'skill' && i.location === k.path && usage(i)))
@@ -657,14 +659,15 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
         usage: usageOf(s.harnessSelection, { kind: 'agent', location: a.location }),
         path: a.location,
       })),
-    // o que a ferramenta em uso carrega, com o escopo (project, user ou plugin) e a marcação do board
+    // o que a ferramenta em uso carrega, com o escopo (project, user, plugin ou imported) e o modo no board
     inventory: inventory.map((i) => ({
       kind: i.kind,
       // o grupo em que a tela de Harness mostra o item (main, topic, memory, skill… plugin, managed)
       group: groupOf(s.board.aiTool, i),
       scope: i.scope,
       name: i.name,
-      ...(isSelectableKind(i.kind) ? { usage: usage(i) } : {}),
+      // a identidade do item no board (para set_harness_selection): o caminho; num servidor MCP, `arquivo#nome`
+      ...(isSelectableKind(i.kind) ? { usage: usage(i), key: selectionKey(i) } : {}),
       ...(i.mode ? { mode: i.mode } : {}),
       ...(i.files?.length ? { files: i.files } : {}),
       ...(i.description ? { description: i.description } : {}),

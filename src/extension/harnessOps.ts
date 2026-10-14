@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { SKILL_FILE_PATTERN, SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type HarnessItem, type SkillMode } from '../shared/harness';
 import { HARNESS_CATALOG, copyTarget, type HarnessSource } from '../shared/harnessCatalog';
 import { renderAgentFile } from './agentFiles';
-import { skillTemplate } from './harness';
+import { parseFrontmatter, skillTemplate } from './harness';
 import { setSkillMode } from './skillMode';
 
 /** Conteúdo inicial de um arquivo novo do harness, no formato que a ferramenta espera. */
@@ -61,6 +61,37 @@ export class HarnessOps {
     if (fs.existsSync(file)) throw new Error(`Já existe: ${file}`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, template(tool, src, file, name, description));
+    return file;
+  }
+
+  /**
+   * Cria o item já com o conteúdo (os assistentes de regras e de skills): é o `create` com o arquivo regravado. Numa
+   * skill, `files` são arquivos de apoio criados vazios na pasta dela. Com `append`, um arquivo fixo que já existe
+   * (CLAUDE.md, AGENTS.md) ganha o conteúdo no fim, separado por uma linha em branco, em vez de dar erro.
+   */
+  write(tool: AiTool, source: number, name: string, content: string, files: string[] = [], append = false): string {
+    const src = HARNESS_CATALOG[tool][source];
+    if (append && src && !src.builtin && !src.noCreate && src.layout === 'file') {
+      const file = path.join(this.base(src.scope), src.path);
+      if (fs.existsSync(file)) {
+        const text = fs.readFileSync(file, 'utf8');
+        fs.writeFileSync(file, `${text}${text === '' || text.endsWith('\n\n') ? '' : text.endsWith('\n') ? '\n' : '\n\n'}${content}`);
+        return file;
+      }
+    }
+    // os arquivos de apoio são conferidos antes: nada é criado se um nome não vale
+    for (const rel of files)
+      if (!SKILL_FILE_PATTERN.test(rel) || rel.split('/').includes('..') || rel === 'SKILL.md')
+        throw new Error('Nome de arquivo inválido: use pasta/arquivo.ext, com letras, números, hífen, ponto e sublinhado.');
+    if (files.length && src?.layout !== 'skills') throw new Error('Só skills têm arquivos de apoio.');
+    const description = src?.layout === 'skills' || src?.kind === 'agent' ? (parseFrontmatter(content).description ?? '') : '';
+    const file = this.create(tool, source, name, description);
+    fs.writeFileSync(file, content);
+    for (const rel of files) {
+      const target = path.join(path.dirname(file), ...rel.split('/'));
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      if (!fs.existsSync(target)) fs.writeFileSync(target, '');
+    }
     return file;
   }
 

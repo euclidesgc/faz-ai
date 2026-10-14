@@ -1,6 +1,6 @@
 import { t } from '../../i18n';
 import { useBoardStore } from '../../store/boardStore';
-import { Button } from '../ui';
+import { Button, Placeholder } from '../ui';
 import { Horizon } from './Horizon';
 import { MetricsFilters, isInvertedRange } from './MetricsFilters';
 import { MetricsBlocks } from './MetricsBlocks';
@@ -58,11 +58,8 @@ export function MetricsView() {
       )}
 
       {result === null ? (
-        !error && (
-          <p className="metrics-state" aria-busy="true">
-            <span className="spinner" aria-hidden="true" /> {t('Carregando métricas…')}
-          </p>
-        )
+        // primeira carga: a forma dos totais e das tabelas; numa recarga os números ficam e o cabeçalho diz "Atualizando…"
+        !error && <Placeholder className="metrics-placeholder" label={t('Carregando métricas…')} lines={6} />
       ) : (
         <div className="metrics-body" aria-busy={loading || undefined}>
           <PeriodNote result={result} />

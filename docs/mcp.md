@@ -130,8 +130,10 @@ Um agente do board é um arquivo de agente da ferramenta, do projeto ou da pasta
 em `usage`), e `get_agent`, `create_agent`, `update_agent` e `delete_agent` os gerenciam: o padrão de
 criação é a pasta global (`scope: "user"`), e o agente criado já nasce disponível. `create_agent` e
 `update_agent` aceitam, além das instruções, `description`, `model` (valor do campo Modelo, ex.:
-`claude:sonnet@medium`), `tools`, `deniedTools`, `skills` e `mcp`; o board grava o que é só dele em
-chaves `faz-ai-*` do frontmatter. Cada ferramenta guarda os seus numa
+`claude:sonnet@medium`), `tools`, `deniedTools`, `skills` e `mcp`, e, no Cursor (que não tem lista de
+ferramentas, skills nem MCP por subagente), `readonly` e `background` (`readonly: true` e
+`is_background: true` no frontmatter); o board grava o que é só dele em chaves `faz-ai-*` do
+frontmatter. Cada ferramenta guarda os seus numa
 pasta própria (a global fica em `~/`):
 
 | Ferramenta | Pasta | Arquivo | Modelo por agente |
@@ -151,11 +153,17 @@ por assunto), `memory` (memória automática do Claude Code), `skill`, `agent`, 
 `settings`, `style` (estilos de saída), `plugin` e `managed` (política da organização, só leitura).
 De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
 
-Toda execução pelo board parte de contexto vazio: só entra o que está marcado em Configurações →
-Harness. `set_harness_selection` marca rules (`instructions`), skills e agentes: `always` entra em
-toda execução pelo caminho do arquivo; `contextual` vira opção dos campos "Rules" e "Skills" dos
-cards (e agente disponível); `null` desmarca. Os campos "Rules" e "Skills" dos cards só oferecem o
-marcado como `contextual`. Em `get_card`, `requiredRules` e `requiredSkills` trazem o caminho de cada
+Toda execução pelo board parte de contexto vazio: só entra o que está no board (Configurações →
+Harness). `set_harness_selection` envia ao board rules (`instructions`), skills, agentes e servidores
+MCP (`mcp`), muda o modo deles ou os tira do board: `always` (Sempre) entra em toda execução, pelo
+caminho do arquivo ou na configuração de servidores da execução; `contextual` (Pelo card) vira opção
+dos campos "Rules", "Skills" e "MCPs" dos cards (e agente disponível); `off` (Desligado) fica no
+board sem entrar em nada, que é como as regras entram, para revisão; `null` tira do board. Cada item do
+inventário traz em `key` a identidade para `set_harness_selection`: o caminho; num servidor MCP, o
+arquivo mais o nome (`.mcp.json#github`). O `name` também serve para agente, skill e servidor. Os campos "Rules",
+"Skills" e "MCPs" dos cards só oferecem o que está em `contextual`; o servidor do board vai sempre, sem
+marcação. O inventário traz também o escopo `imported`: artefatos de pastas que a pessoa importou, que
+a ferramenta não carrega sozinha. Em `get_card`, `requiredRules` e `requiredSkills` trazem o caminho de cada
 arquivo que o card exige; para skills fora do projeto, `path` é o caminho absoluto do `SKILL.md`.
 Quando uma skill existe no projeto e fora dele com o mesmo nome, vale a do projeto. `create_skill` e
 `install_flow_skill` já marcam o que criam (`contextual` e `always`, respectivamente).

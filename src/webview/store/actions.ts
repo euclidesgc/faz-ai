@@ -213,6 +213,20 @@ export function requestTrashMany(histories: Card[], after?: () => void): void {
   });
 }
 
+/** Um lote de cards vai ao host: a barra de seleção mostra o status até ele confirmar, e só então `after` roda. */
+async function moveManyWithStatus(ids: Id[], columnId: Id, label: string, after?: () => void): Promise<void> {
+  const { setBulkBusy } = useBoardStore.getState();
+  setBulkBusy(label);
+  try {
+    await cards.moveMany(ids, columnId);
+    after?.();
+  } catch {
+    /* o erro já virou toast; a seleção fica para a pessoa tentar de novo */
+  } finally {
+    setBulkBusy(null);
+  }
+}
+
 /** Move o lote inteiro para a coluna escolhida no diálogo. */
 export function requestMoveMany(histories: Card[], destinations: Column[], after?: () => void): void {
   const { ask } = useBoardStore.getState();
@@ -221,13 +235,13 @@ export function requestMoveMany(histories: Card[], destinations: Column[], after
     message: t('Quem as regras do board impedirem de mudar de coluna (sub-tarefa em aberto) fica de fora.'),
     choices: { label: t('Coluna'), options: destinations.map((c) => ({ value: c.id, label: dt(c.name) })) },
     confirmLabel: t('Mover'),
-    onConfirm: (columnId) => {
-      cards.moveMany(
+    onConfirm: (columnId) =>
+      void moveManyWithStatus(
         histories.map((c) => c.id),
         columnId!,
-      );
-      after?.();
-    },
+        t('Movendo {n} história(s)…', { n: histories.length }),
+        after,
+      ),
   });
 }
 
@@ -241,12 +255,12 @@ export function requestConcludeMany(histories: Card[], doneColumn: Column, after
     title: t('Concluir {n} história(s)?', { n: histories.length }),
     message: t('Vão para "{column}". Quem ainda tiver sub-tarefa em aberto fica de fora.', { column: dt(doneColumn.name) }),
     confirmLabel: t('Concluir'),
-    onConfirm: () => {
-      cards.moveMany(
+    onConfirm: () =>
+      void moveManyWithStatus(
         histories.map((c) => c.id),
         doneColumn.id,
-      );
-      after?.();
-    },
+        t('Concluindo {n} história(s)…', { n: histories.length }),
+        after,
+      ),
   });
 }

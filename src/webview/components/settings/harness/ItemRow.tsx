@@ -3,8 +3,8 @@ import { SKILL_MODES, type AiTool, type HarnessItem, type SkillMode } from '../.
 import { HARNESS_CATALOG } from '../../../../shared/harnessCatalog';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { Badge, Button, Checkbox, IconButton } from '@radix-ui/themes';
-import { DeleteButton, IconTrash, SelectField } from '../../ui';
+import { Badge, Checkbox } from '@radix-ui/themes';
+import { ActionIconButton, ActionButton, DeleteButton, IconTrash, SelectField } from '../../ui';
 import { SkillFiles } from './SkillFiles';
 import { withGlobalWarning } from './text';
 import type { ItemActions } from './useItemActions';
@@ -26,17 +26,32 @@ interface Props {
   unread?: string;
   /** controle extra antes das ações, como o uso do item nas execuções do board */
   usage?: ReactNode;
+  /** por que "Indicar artefatos" apontou este item; aparece como selo */
+  suggestion?: string;
   /** arquivos de apoio da skill à mostra, numa linha logo abaixo */
   filesOpen: boolean;
   onToggleFiles: () => void;
 }
 
 /** Um item do inventário: seleção, nome, descrição como dica, o caminho do arquivo (que abre no editor) e o que dá para fazer com ele. */
-export function ItemRow({ tool, item: i, actions, selected = false, onSelect, explain, unread, usage, filesOpen, onToggleFiles }: Props) {
+export function ItemRow({
+  tool,
+  item: i,
+  actions,
+  selected = false,
+  onSelect,
+  explain,
+  unread,
+  usage,
+  suggestion,
+  filesOpen,
+  onToggleFiles,
+}: Props) {
   const { copyable, twin, copy, setMode, deletable, remove, entryRemovable } = actions;
   const src = i.source === undefined ? undefined : HARNESS_CATALOG[tool][i.source];
   const inProject = i.scope !== 'project' ? twin(i, 'project') : undefined;
-  const editable = i.scope !== 'plugin' && i.layout !== 'entry';
+  // o modo nativo da skill (automática ou só quando indicada) não vale no board, e numa pasta importada ele é de quem a mantém
+  const editable = i.scope !== 'plugin' && i.scope !== 'imported' && i.layout !== 'entry';
   return (
     <li className={selected ? 'item-row selected' : 'item-row'}>
       <span className="item-check">
@@ -69,6 +84,11 @@ export function ItemRow({ tool, item: i, actions, selected = false, onSelect, ex
           {explain && !unread && src?.loads === 'on-demand' && (
             <Badge color="gray" variant="soft" title={t('A ferramenta só lê o conteúdo quando a tarefa pede ou quando você chama')}>
               {t('sob demanda')}
+            </Badge>
+          )}
+          {suggestion !== undefined && (
+            <Badge color="green" variant="soft" title={suggestion || t('Indicado pela IA')}>
+              {t('indicado')}
             </Badge>
           )}
           {inProject && (
@@ -126,46 +146,57 @@ export function ItemRow({ tool, item: i, actions, selected = false, onSelect, ex
             <Badge
               color="gray"
               variant="outline"
-              title={t('Skill de plugin: o modo não pode ser alterado aqui. Para mudar, copie a skill para o projeto.')}
+              title={
+                i.scope === 'imported'
+                  ? t('Skill importada: o modo nativo é de quem mantém a pasta, e no board o que vale é o modo do artefato.')
+                  : t('Skill de plugin: o modo não pode ser alterado aqui. Para mudar, copie a skill para o projeto.')
+              }
             >
               {t(SKILL_MODES.find((m) => m.id === i.mode)!.label)}
             </Badge>
           ))}
         {i.layout === 'skills' && (
-          <Button
+          <ActionButton
             variant={filesOpen ? 'soft' : 'ghost'}
             size="1"
             aria-pressed={filesOpen}
-            title={t('Referências, modelos e scripts da pasta da skill')}
+            hint={t('Mostra as referências, os modelos e os scripts da pasta da skill.')}
             onClick={onToggleFiles}
           >
             {t('Arquivos ({n})', { n: i.files?.length ?? 0 })}
-          </Button>
+          </ActionButton>
         )}
         {copyable(i, 'project') && !inProject && (
-          <Button
+          <ActionButton
             variant="ghost"
             size="1"
-            title={t('Cria uma cópia independente na pasta do projeto')}
+            hint={t('Cria uma cópia independente na pasta do projeto')}
             onClick={() => copy([i], 'project')}
           >
             {t('Copiar para o projeto')}
-          </Button>
+          </ActionButton>
         )}
         {copyable(i, 'user') && !twin(i, 'user') && (
-          <Button
+          <ActionButton
             variant="ghost"
             size="1"
-            title={t('Cria uma cópia na sua pasta de usuário, que vale em todos os projetos')}
+            hint={t('Cria uma cópia na sua pasta de usuário, que vale em todos os projetos')}
             onClick={() => copy([i], 'user')}
           >
             {t('Copiar para o global')}
-          </Button>
+          </ActionButton>
         )}
         {deletable(i) && (
-          <IconButton variant="ghost" color="red" size="1" title={t('Apagar')} aria-label={t('Apagar')} onClick={() => remove([i])}>
+          <ActionIconButton
+            variant="ghost"
+            color="red"
+            size="1"
+            hint={t('Pede confirmação e apaga o arquivo (ou a pasta da skill) do disco.')}
+            aria-label={t('Apagar')}
+            onClick={() => remove([i])}
+          >
             <IconTrash />
-          </IconButton>
+          </ActionIconButton>
         )}
         {i.kind === 'hook' && entryRemovable(i) && (
           <DeleteButton

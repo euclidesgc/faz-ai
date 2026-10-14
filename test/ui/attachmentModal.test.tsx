@@ -1,4 +1,4 @@
-import { lastSent, renderThemed, seedBoard, sentOf } from './setup';
+import { lastSent, renderThemed, seedBoard, sentOf, confirmLast } from './setup';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -120,8 +120,8 @@ describe('AttachmentModal', () => {
     await userEvent.clear(screen.getByRole('textbox', { name: 'Conteúdo do anexo' }));
     await userEvent.type(screen.getByRole('textbox', { name: 'Conteúdo do anexo' }), '# depois');
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
-    const write = lastSent('attachment.write');
-    reply({ type: 'attachment.writeResult', requestId: write.requestId, ok: true });
+    expect(lastSent('attachment.write').content).toBe('# depois');
+    confirmLast();
     expect(await screen.findByRole('heading', { name: 'depois' })).toBeInTheDocument();
   });
 
@@ -166,7 +166,8 @@ describe('AttachmentModal', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
     const write = lastSent('attachment.write');
     expect(write.content).toBe('depois');
-    reply({ type: 'attachment.writeResult', requestId: write.requestId, ok: true });
+    confirmLast();
+    await act(async () => {});
     expect(await screen.findByText('depois')).toBeInTheDocument();
     expect(screen.queryByRole('textbox')).toBeNull();
   });
@@ -179,8 +180,8 @@ describe('AttachmentModal', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Editar' }));
     await userEvent.type(screen.getByRole('textbox', { name: 'Conteúdo do anexo' }), '!');
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
-    const write = lastSent('attachment.write');
-    reply({ type: 'attachment.writeResult', requestId: write.requestId, ok: false, error: 'Anexo não encontrado' });
+    expect(lastSent('attachment.write').content).toBe('antes!');
+    confirmLast(false, 'Anexo não encontrado');
     expect(await screen.findByRole('alert')).toHaveTextContent('Anexo não encontrado');
     expect(screen.getByRole('textbox', { name: 'Conteúdo do anexo' })).toHaveValue('antes!');
   });
