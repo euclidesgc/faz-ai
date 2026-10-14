@@ -3,6 +3,7 @@ import { Badge, Button, Card, Checkbox, Text, TextArea, TextField } from '@radix
 import type { Agent, InstallScope } from '../../../../shared/harness';
 import { isFreeName, toItemName, type AiToolInfo } from '../../../../shared/harnessProject';
 import { usageOf } from '../../../../shared/harnessSelection';
+import { matchesQuery } from '../../../../shared/harnessTopics';
 import { ai, harness, settings } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { ModelEditor } from '../../FieldRenderer';
@@ -19,12 +20,12 @@ const EMPTY = { name: '', description: '', body: '', model: '' };
  * Os agentes de um escopo: arquivos de agente da ferramenta, com a marcação "disponível no board" em cada
  * um, o padrão, e as ações de criar (à mão, pela IA ou os de fábrica), editar e apagar.
  */
-export function AgentsTable({ tool, scope }: { tool: AiToolInfo; scope: InstallScope }) {
+export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; scope: InstallScope; query?: string }) {
   const state = useBoardStore((s) => s.state)!;
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState(EMPTY);
-  const agents = state.harness.agents.filter((a) => a.scope === scope);
+  const agents = state.harness.agents.filter((a) => a.scope === scope && matchesQuery(query, a.name, a.description));
   const defaultName = state.board.execProfiles.find((p) => p.isDefault && p.scope !== 'builtin')?.id ?? '';
   const available = (a: Agent) => usageOf(state.harnessSelection, { kind: 'agent', location: a.location }) !== null;
   const busy = state.chat.busy;
@@ -52,7 +53,7 @@ export function AgentsTable({ tool, scope }: { tool: AiToolInfo; scope: InstallS
     );
 
   return (
-    <div className="agents-table">
+    <div id="harness-agents" className="agents-table">
       <p className="muted small">
         {rich(
           'Um agente é um arquivo de agente do {tool} em <code>{dir}</code>: as instruções são o papel da sessão, e o frontmatter diz o modelo, as ferramentas, as skills e os servidores MCP que ela recebe. <b>Disponível no board</b> é o que os cards e as fases podem escolher; o <b>padrão</b> executa quando nenhum deles escolhe.',
@@ -248,7 +249,7 @@ export function AgentsTable({ tool, scope }: { tool: AiToolInfo; scope: InstallS
           {agents.length === 0 && (
             <tr>
               <td colSpan={6} className="muted small">
-                {t('Nenhum agente do {tool} neste escopo.', { tool: tool.label })}
+                {query.trim() ? t('Nada encontrado para a busca.') : t('Nenhum agente do {tool} neste escopo.', { tool: tool.label })}
               </td>
             </tr>
           )}

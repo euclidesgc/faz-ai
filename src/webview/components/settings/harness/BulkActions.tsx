@@ -1,7 +1,16 @@
 import { Button } from '@radix-ui/themes';
 import { SKILL_MODES, type HarnessItem } from '../../../../shared/harness';
-import { HARNESS_USAGES, isSelectableKind, selectionKey, usageOptions, type HarnessUsage } from '../../../../shared/harnessSelection';
+import {
+  HARNESS_USAGES,
+  defaultUsage,
+  isSelectableKind,
+  selectionKey,
+  usageOf,
+  usageOptions,
+  type HarnessUsage,
+} from '../../../../shared/harnessSelection';
 import { harness } from '../../../commands';
+import { useBoardStore } from '../../../store/boardStore';
 import type { ItemActions } from './useItemActions';
 import { t } from '../../../i18n';
 
@@ -12,8 +21,9 @@ import { t } from '../../../i18n';
 export function bulkTargets(items: HarnessItem[], actions: ItemActions, projectTool: boolean) {
   const { copyable, twin, deletable, entryRemovable } = actions;
   return {
-    // a marcação das execuções só existe para a ferramenta do projeto; agentes têm a tabela própria
-    usage: projectTool ? items.filter((i) => isSelectableKind(i.kind) && i.kind !== 'agent') : [],
+    // a marcação das execuções só existe para a ferramenta do projeto; os agentes do projeto e do global têm a
+    // tabela própria, e só os achados numa pasta importada passam por aqui
+    usage: projectTool ? items.filter((i) => isSelectableKind(i.kind) && (i.kind !== 'agent' || i.scope === 'imported')) : [],
     mode: items.filter((i) => !!i.mode && i.scope !== 'plugin' && i.layout !== 'entry'),
     toProject: items.filter((i) => copyable(i, 'project') && !twin(i, 'project')),
     toUser: items.filter((i) => copyable(i, 'user') && !twin(i, 'user')),
@@ -34,22 +44,48 @@ interface Props {
   onDone: () => void;
 }
 
-/** As ações sobre os itens marcados de um grupo, conforme o que eles são. Apagar e remover pedem confirmação. */
+/**
+ * As ações sobre os itens marcados de um grupo, conforme o que eles são. A principal é enviar ao board (com
+ * o modo de entrada de cada tipo: as regras entram desligadas); apagar e remover pedem confirmação.
+ */
 export function BulkActions({ items, actions, projectTool, onDone }: Props) {
   const x = bulkTargets(items, actions, projectTool);
+  const selection = useBoardStore((s) => s.state!.harnessSelection);
+  const toSend = x.usage.filter((i) => usageOf(selection, i) === null);
+  const toRemove = x.usage.filter((i) => usageOf(selection, i) !== null);
   // quando a ação não vale para todos os marcados, o botão diz para quantos vale
   const count = (list: HarnessItem[]) => (list.length < items.length ? ` (${list.length})` : '');
-  const setUsage = (usage: HarnessUsage | null) => {
-    harness.setSelection(
-      x.usage.flatMap((i) => (isSelectableKind(i.kind) ? [{ kind: i.kind, location: selectionKey(i) }] : [])),
-      usage,
-    );
+  const keys = (list: HarnessItem[]) =>
+    list.flatMap((i) => (isSelectableKind(i.kind) ? [{ kind: i.kind, location: selectionKey(i) }] : []));
+  const setUsage = (usage: HarnessUsage) => {
+    harness.setSelection(keys(x.usage), usage);
+    onDone();
+  };
+  // cada tipo entra com o seu modo (`defaultUsage`): uma mensagem por modo
+  const send = () => {
+    const byUsage = new Map<HarnessUsage, HarnessItem[]>();
+    for (const i of toSend) {
+      if (!isSelectableKind(i.kind)) continue;
+      const usage = defaultUsage(i.kind);
+      byUsage.set(usage, [...(byUsage.get(usage) ?? []), i]);
+    }
+    for (const [usage, list] of byUsage) harness.setSelection(keys(list), usage);
     onDone();
   };
   // só os modos que valem para todos os marcados (uma regra aceita "Desligado"; uma skill, não)
   const usages = HARNESS_USAGES.filter((u) => x.usage.every((i) => isSelectableKind(i.kind) && usageOptions(i.kind).includes(u.id)));
   return (
     <>
+      {toSend.length > 0 && (
+        <Button
+          size="1"
+          title={t('Disponibiliza para os cards deste board; o board lê o arquivo da origem na hora de usar.')}
+          onClick={send}
+        >
+          {t('Enviar para o board')}
+          {count(toSend)}
+        </Button>
+      )}
       {x.usage.length > 0 && (
         <span className="bulk-group">
           <span className="muted small">
@@ -61,10 +97,21 @@ export function BulkActions({ items, actions, projectTool, onDone }: Props) {
               {t(u.label)}
             </Button>
           ))}
-          <Button variant="soft" color="gray" size="1" onClick={() => setUsage(null)}>
-            {t('Fora do board')}
-          </Button>
         </span>
+      )}
+      {toRemove.length > 0 && (
+        <Button
+          variant="soft"
+          color="gray"
+          size="1"
+          onClick={() => {
+            harness.setSelection(keys(toRemove), null);
+            onDone();
+          }}
+        >
+          {t('Remover do board')}
+          {count(toRemove)}
+        </Button>
       )}
       {x.mode.length > 0 && (
         <span className="bulk-group">

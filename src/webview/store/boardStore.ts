@@ -39,8 +39,9 @@ export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
 
 /** `environment`: o Diagnóstico do ambiente, aberto pelas Configurações ou sozinho na primeira abertura */
 export type View = 'board' | 'archived' | 'trash' | 'settings' | 'metrics' | 'environment';
-/** Abas da tela de Harness de IA: a ferramenta e a execução, o que é do projeto, e tudo que a ferramenta carrega. */
-export type HarnessTab = 'tool' | 'project' | 'user';
+/** Abas da tela de Harness de IA: a ferramenta e a execução, ou uma ferramenta de IA (ver `harnessTopics.ts`). */
+export type { HarnessTab };
+import { resolveHarnessTab, type HarnessTab, type HarnessTopic } from '../../shared/harnessTopics';
 import { type SettingsTab } from '../../shared/settingsTab';
 import { SETTINGS_SECTIONS } from '../../shared/settingsSections';
 export type { SettingsTab };
@@ -88,6 +89,8 @@ interface UiState {
 
 interface BoardStore extends UiState, ViewState {
   state: BoardState | null;
+  /** o assunto aberto dentro da aba da ferramenta no Harness; fica na memória, não é guardado */
+  harnessTopic: HarnessTopic;
   /** o chat está aberto no painel lateral do board (no navegador; no editor ele fica na barra lateral) */
   chatOpen: boolean;
   setChatOpen(open: boolean): void;
@@ -165,6 +168,10 @@ interface BoardStore extends UiState, ViewState {
   closeHarnessFile(): void;
 }
 
+/** A aba de Harness de uma seção: `project` e `user` levam à ferramenta do projeto, que só se sabe com o board carregado. */
+const harnessTabOf = (raw: string, state: BoardState | null): HarnessTab =>
+  state ? resolveHarnessTab(raw, state.board.aiTool) : (raw as HarnessTab);
+
 const persisted = getUiState<Partial<UiState>>();
 
 export const useBoardStore = create<BoardStore>((set, get) => {
@@ -187,8 +194,10 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     // o Diagnóstico é de passagem: ao reabrir, volta para o board
     view: persisted?.view === 'environment' ? 'board' : (persisted?.view ?? 'board'),
     settingsTab: persisted?.settingsTab ?? 'columns',
-    // a aba "Tudo que a ferramenta carrega" (`all`) saiu: quem a deixou aberta volta para a da ferramenta
+    // as abas Projeto e Global (`project`, `user`) viraram uma aba por ferramenta e a `all` saiu: quem deixou uma
+    // delas aberta guarda o valor antigo, que a tela resolve para a ferramenta do projeto (`resolveHarnessTab`)
     harnessTab: persisted?.harnessTab && persisted.harnessTab !== ('all' as string) ? persisted.harnessTab : 'tool',
+    harnessTopic: 'rules',
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
@@ -234,7 +243,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
         set({
           view: 'settings',
           settingsTab: info.tab,
-          ...(info.harnessTab && { harnessTab: info.harnessTab as HarnessTab }),
+          ...(info.harnessTab && { harnessTab: harnessTabOf(info.harnessTab, get().state) }),
+          ...(info.harnessTopic && { harnessTopic: info.harnessTopic }),
           pendingSettingsSection: section,
         });
         persist(get());
@@ -341,7 +351,8 @@ export function useHostSync(): void {
         s.openSettings(msg.tab);
         useBoardStore.setState({
           pendingSettingsSection: msg.section ?? null,
-          ...(info?.harnessTab && { harnessTab: info.harnessTab as HarnessTab }),
+          ...(info?.harnessTab && { harnessTab: harnessTabOf(info.harnessTab, s.state) }),
+          ...(info?.harnessTopic && { harnessTopic: info.harnessTopic }),
         });
       } else if (msg.type === 'ui.openView') s.setView(msg.view);
     });

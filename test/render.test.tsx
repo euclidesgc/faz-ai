@@ -270,10 +270,16 @@ describe('telas montam sem erro', () => {
     const toggle = html(<ThemeToggle />);
     for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
-    // cada aba do Harness é montada por vez: juntamos o texto das quatro
-    const harness = (['tool', 'project', 'user'] as const)
-      .map((harnessTab) => {
-        useBoardStore.setState({ harnessTab });
+    // cada aba do Harness (e cada assunto da ferramenta) é montada por vez: juntamos o texto de todas
+    const harness = [
+      ...(['tool', 'cursor'] as const).map((harnessTab) => ({ harnessTab, harnessTopic: 'rules' as const })),
+      ...(['rules', 'skill', 'agent', 'mcp', 'command', 'hook', 'other'] as const).map((harnessTopic) => ({
+        harnessTab: 'claude' as const,
+        harnessTopic,
+      })),
+    ]
+      .map((nav) => {
+        useBoardStore.setState(nav);
         return html(<HarnessSettings />);
       })
       .join('\n');
@@ -283,8 +289,11 @@ describe('telas montam sem erro', () => {
       'Claude Code',
       'Cursor',
       'AGENTS.md',
-      'Harness do projeto',
-      'Harness global',
+      'Harness do Claude Code',
+      'Harness do Cursor',
+      'Importar artefatos',
+      'Sub-agentes',
+      'A linha de comando do Cursor não desliga artefatos',
       'Regras principais',
       'Modo no board',
       'revisar-spec',

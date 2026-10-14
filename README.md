@@ -951,30 +951,41 @@ disponíveis, `set_card_profile` escolhe o de um card e `create_agent`, `update_
 ![Skills do projeto e globais, com a instalação da skill do fluxo no global ou no projeto](docs/images/harness.png)
 
 Toda execução pelo board parte de **contexto vazio**: nenhuma regra, skill ou agente da sua máquina
-ou do projeto entra por conta própria. Em Configurações → **Harness de IA** você vê tudo que a
-ferramenta de IA carrega e marca o que entra nas execuções do board, em três abas:
-**Ferramenta e execução** (a IA do projeto, a permissão, o agente padrão e o heartbeat), **Projeto**
-e **Global**.
+ou do projeto entra por conta própria. Só entra o que você **envia ao board**. Em Configurações →
+**Harness de IA** a tela tem três níveis:
 
-**Projeto** mostra o que a ferramenta lê na pasta do projeto; **Global**, o que ela lê da sua pasta
-de usuário (`~/.claude`, `~/.cursor`…), dos plugins instalados e da sua organização. As duas abas
-abrem na ferramenta do projeto, e um seletor no topo mostra o que a outra (Claude Code ou Cursor)
-carrega. O conteúdo vem separado em grupos, sempre na mesma ordem:
+1. **Uma aba por ferramenta.** **Ferramenta e execução** (a IA do projeto, a permissão, o agente
+   padrão e o heartbeat) e uma aba para o **Claude Code** e outra para o **Cursor**, a da ferramenta
+   do projeto primeiro, com o selo **ferramenta deste projeto**. Na outra, a marcação do board não
+   vale (as execuções usam a ferramenta do projeto): ela serve para ler e editar os arquivos.
+2. **Um assunto por aba**: **Regras**, **Skills**, **Sub-agentes**, **MCPs**, **Comandos**, **Hooks** e
+   **Demais** (memória, configurações e permissões, estilos de saída, plugins e a política da
+   organização). Só aparecem os assuntos que a ferramenta tem. Só o assunto à vista é montado, o que
+   mantém a tela leve num ambiente com muitos artefatos.
+3. **A origem dos artefatos**, num seletor dentro do assunto: **Board**, **Projeto**, **Global** e,
+   quando há pasta importada, **Importados**. Projeto, Global e Importados são o **catálogo**: tudo que
+   a ferramenta carrega naquela fonte, e existir no catálogo não ocupa o contexto da IA. **Projeto** é
+   o que a ferramenta lê na pasta do projeto; **Global**, o que ela lê da sua pasta de usuário
+   (`~/.claude`, `~/.cursor`…), dos plugins instalados e da sua organização; **Importados**, o que o
+   board achou nas pastas que você indicou. **Board** é o que você enviou, com o modo de cada um.
 
-| Grupo | O que é | Exemplos |
-| --- | --- | --- |
-| Regras principais | Entram no começo de toda conversa; as de subpasta, quando a IA mexe nela | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `~/.claude/CLAUDE.md`, `packages/api/CLAUDE.md`; no Cursor, `AGENTS.md` (também de subpastas) e o aviso das User Rules (que ficam nas configurações dele) |
-| Regras por assunto | Regras por tema; algumas só entram quando a IA mexe em certos arquivos | `.claude/rules/*.md`, `~/.claude/rules/*.md`, `.cursor/rules/*.mdc` |
-| Memória (Projeto) | Anotações que o Claude Code guarda sozinho sobre o projeto | `~/.claude/projects/<projeto>/memory/` |
-| Skills | Instruções e arquivos de apoio carregados quando a tarefa pede | `.claude/skills/<nome>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
-| Subagentes | Ajudantes para os quais a IA delega trabalho | `.claude/agents/*.md`, `.cursor/agents/*.md` |
-| Comandos | Prompts prontos, chamados com `/nome` | `.claude/commands/*.md`, `.cursor/commands/*.md` |
-| Hooks | Comandos que a ferramenta roda sozinha em certos eventos | `hooks` do `.claude/settings.json`, `.cursor/hooks.json` |
-| Servidores MCP | Servidores que dão ferramentas extras à IA | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
-| Configurações e permissões | Como a ferramenta se comporta e o que a IA faz sem perguntar | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
-| Estilos de saída | Mudam o jeito de a IA responder | `.claude/output-styles/*.md` |
-| Plugins (Global) | Pacotes instalados, um bloco por plugin com o que ele traz | os que `claude plugin list` mostra, `~/.cursor/plugins/local` |
-| Organização (Global) | A política da empresa, só leitura | `CLAUDE.md` e `managed-settings.json` da pasta do sistema (`/Library/Application Support/ClaudeCode` no macOS) |
+Cada assunto tem um campo de **busca** que filtra as linhas por parte do nome ou da descrição, no
+catálogo e no Board. Os grupos do catálogo são sempre os mesmos, na mesma ordem:
+
+| Assunto | Grupo | O que é | Exemplos |
+| --- | --- | --- | --- |
+| Regras | Regras principais | Entram no começo de toda conversa; as de subpasta, quando a IA mexe nela | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `~/.claude/CLAUDE.md`, `packages/api/CLAUDE.md`; no Cursor, `AGENTS.md` (também de subpastas) e o aviso das User Rules (que ficam nas configurações dele) |
+| Regras | Regras por assunto | Regras por tema; algumas só entram quando a IA mexe em certos arquivos | `.claude/rules/*.md`, `~/.claude/rules/*.md`, `.cursor/rules/*.mdc` |
+| Demais | Memória (Projeto) | Anotações que o Claude Code guarda sozinho sobre o projeto | `~/.claude/projects/<projeto>/memory/` |
+| Skills | Skills | Instruções e arquivos de apoio carregados quando a tarefa pede | `.claude/skills/<nome>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
+| Sub-agentes | Subagentes | Ajudantes para os quais a IA delega trabalho | `.claude/agents/*.md`, `.cursor/agents/*.md` |
+| Comandos | Comandos | Prompts prontos, chamados com `/nome` | `.claude/commands/*.md`, `.cursor/commands/*.md` |
+| Hooks | Hooks | Comandos que a ferramenta roda sozinha em certos eventos | `hooks` do `.claude/settings.json`, `.cursor/hooks.json` |
+| MCPs | Servidores MCP | Servidores que dão ferramentas extras à IA | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
+| Demais | Configurações e permissões | Como a ferramenta se comporta e o que a IA faz sem perguntar | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
+| Demais | Estilos de saída | Mudam o jeito de a IA responder | `.claude/output-styles/*.md` |
+| Demais | Plugins (Global) | Pacotes instalados, um bloco por plugin com o que ele traz | os que `claude plugin list` mostra, `~/.cursor/plugins/local` |
+| Demais | Organização (Global) | A política da empresa, só leitura | `CLAUDE.md` e `managed-settings.json` da pasta do sistema (`/Library/Application Support/ClaudeCode` no macOS) |
 
 Cada item mostra o nome, **o que é numa frase simples**, se é **sempre carregado** ou **sob
 demanda**, a descrição do próprio arquivo e o caminho. Nas instruções do Claude Code aparecem também
@@ -993,9 +1004,13 @@ Claude Code lê o `AGENTS.md` apenas quando não há `CLAUDE.md`, `.claude/CLAUD
 aparece como **não lido pelo Claude Code**, com o `@import` que resolve. Se tem só o `AGENTS.md`, o
 board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo.
 
-Nas rules, skills e servidores MCP da ferramenta do projeto, cada linha tem a escolha **Modo no
+Na origem **Board** de Regras, Skills, Sub-agentes e MCPs ficam os artefatos que você enviou, cada um
+com o seletor de **modo**, a origem (Projeto, Global, Importados ou plugin) e o botão **Remover do
 board**. O board **referencia** o artefato pelo caminho de origem, não o copia: uma mudança no arquivo
-vale no board, e uma origem apagada deixa o artefato **ausente**, sem quebrar os cards que o listam.
+vale no board, e uma origem apagada deixa o artefato com o selo **ausente** na mesma lista, sem
+quebrar os cards que o listam (**Remover do board** tira a marcação). Nas rules, skills e servidores
+MCP do catálogo, a linha da ferramenta do projeto também tem o seletor de modo, com a opção **Fora do
+board**.
 
 - **Sempre**: entra em toda execução (trabalhar a fase, refinar, chat do board), independente do
   card. É o lugar da skill do fluxo, do servidor do board e das regras que valem sempre.
@@ -1004,23 +1019,32 @@ vale no board, e uma origem apagada deixa o artefato **ausente**, sem quebrar os
   quando a tarefa pede, escolhendo só entre o que está no board. Vale o mínimo: no máximo uma skill
   por assunto, e só os servidores de que a tarefa precisa.
 - **Desligado** (só nas regras): está no board, mas não entra em nada. Toda regra entra assim, porque
-  um `CLAUDE.md` escrito para outro contexto pode conflitar com o fluxo e as definições do board:
-  revise o texto antes de ativar.
+  um `CLAUDE.md` escrito para outro contexto pode conflitar com o fluxo e as definições do board: a
+  origem Board das Regras avisa e convida a revisar o texto antes de ativar.
 - **Fora do board**: a execução não o vê, mesmo que a ferramenta o carregue numa conversa sua.
 
-**Pastas importadas.** Nem todo artefato útil está no projeto ou na pasta global. O board aceita
-importar pastas de fora (outro repositório, uma coleção do time, uma pasta baixada): ele varre a pasta
-atrás do que a ferramenta reconhece num projeto (regras, skills, agentes, comandos, hooks, servidores
-MCP e configurações, ou a própria pasta como pasta de skills) e lista o que achou com a origem
-**Importados**. Nada entra no board sem você enviar. As pastas ficam guardadas no board e são
-varridas de novo a cada leitura; tirar uma pasta da lista tira dela também os artefatos do board.
+O card mostra tudo que vai ser usado: além do que o agente e o planejamento indicam, os artefatos em
+modo **Sempre** aparecem no resumo do agente marcados com **(sempre)**, para você ver o custo
+completo e decidir se mantém algum sempre ligado.
 
-**Ações em massa.** Cada linha que aceita alguma ação tem uma caixa, e a do topo do grupo marca todas.
-A barra que aparece mostra só o que vale para o que foi marcado: o uso nas execuções do board (rules
-e skills), o modo da skill, copiar para o projeto ou para o global, **Apagar** (arquivos e pastas) e
-**Remover** (entradas de hook, regra de permissão e servidor MCP). Quando uma ação vale só para
-parte dos marcados, o botão diz para quantos. Apagar e remover pedem confirmação antes. A política
-da organização, que é só leitura, não tem caixa.
+**Importar artefatos.** Nem todo artefato útil está no projeto ou na pasta global. O botão
+**Importar artefatos**, no alto da aba de cada ferramenta, abre o seletor de pasta do editor (no modo
+navegador, um campo para digitar o caminho no computador onde o board roda) e importa uma pasta de
+fora (outro repositório, uma coleção do time, uma pasta baixada): o board varre a pasta
+atrás do que a ferramenta reconhece num projeto (regras, skills, agentes, comandos, hooks, servidores
+MCP e configurações, ou a própria pasta como pasta de skills) e lista o que achou na origem
+**Importados**, que só aparece quando há pasta importada. Nada entra no board sem você enviar. As
+pastas ficam guardadas no board e são varridas de novo a cada leitura; em Importados, cada pasta tem
+**Remover pasta**, que pede confirmação e tira dela também os artefatos do board.
+
+**Seleção múltipla e ações em massa.** Cada linha do catálogo que aceita alguma ação tem uma caixa, e
+a do topo do grupo marca todas. A ação principal da barra que aparece é **Enviar para o board**, que
+leva os marcados com o modo de entrada de cada tipo (**Pelo card**; as regras entram **Desligadas**).
+Também há o modo no board (Sempre, Pelo card, Desligado), **Remover do board** (para o que já está
+nele), o modo da skill, copiar para o projeto ou para o global, **Apagar** (arquivos e pastas) e
+**Remover** (entradas de hook, regra de permissão e servidor MCP). A barra mostra só o que vale para o
+que foi marcado; quando uma ação vale só para parte dos marcados, o botão diz para quantos. Apagar e
+remover pedem confirmação antes. A política da organização, que é só leitura, não tem caixa.
 
 **Plugins.** A lista do Claude Code vem de `claude plugin list --json`: só aparece o que ele carrega,
 nunca o catálogo dos marketplaces. Marcando plugins, a barra oferece **Desativar**, **Ativar** e
@@ -1030,11 +1054,14 @@ desativam. No Cursor, que não tem comando para isso, desinstalar tira a pasta d
 `~/.cursor/plugins/local`. Desinstalar pede confirmação, e a mudança vale na próxima sessão da
 ferramenta (no Claude Code, também depois de `/reload-plugins`).
 
-Os subagentes da ferramenta do projeto têm a tabela própria, com **Disponível no board**, o padrão e
-o editor dos campos do board. Uma marcação cujo arquivo sumiu aparece num aviso no topo da aba, com
-**Desmarcar**. Skills e agentes criados ou instalados pelo board já nascem marcados. O que ainda
-entra apesar do contexto vazio depende da ferramenta: no Claude Code 2.1 nada da sua pasta nem do
-projeto (verificado na CLI); no Cursor, tudo o que a ferramenta carregar, e o board só orienta.
+Os sub-agentes da ferramenta do projeto têm a tabela própria nas origens Projeto e Global, com
+**Disponível no board**, o padrão e o editor dos campos do board; na origem Board, a lista dos agentes
+disponíveis, com **Remover do board**. Skills e agentes criados ou instalados pelo board já nascem
+marcados. O que ainda entra apesar do contexto vazio depende da ferramenta: no Claude Code 2.1 nada
+da sua pasta nem do projeto (verificado na CLI). **No Cursor**, a linha de comando não desliga
+artefatos: regras, servidores MCP e o mais que estiver no projeto entram conforme o Cursor decidir.
+A aba do Cursor traz um aviso fixo: para o "tudo desligado" valer, desligue nas configurações do
+Cursor ou remova do projeto o que você não quer no contexto das tarefas; o board só avisa.
 
 O que mais dá para fazer em cada grupo:
 
@@ -1049,14 +1076,14 @@ O que mais dá para fazer em cada grupo:
 **Mudanças feitas por fora.** O board relê o harness sozinho quando um arquivo muda fora dele (no
 editor, pela IA, pelo git), e junta numa releitura só as mudanças de uma mesma rajada (300 ms). No
 projeto, valem o `CLAUDE.md`, o `AGENTS.md`, o `.mcp.json` e tudo de `.claude/`, `.cursor/` e
-`.agents/`. Na pasta do usuário, só as pastas e os arquivos que a aba Global mostra, nunca a home
+`.agents/`. Na pasta do usuário, só as pastas e os arquivos que a origem Global mostra, nunca a home
 inteira: o `~/.claude/CLAUDE.md`, as pastas de regras, skills, subagentes, comandos e estilos, os
 settings, o `~/.claude.json` e os equivalentes do Cursor; de `~/.claude/projects`, só a pasta
 `memory` deste projeto (o resto recebe as transcrições das sessões o tempo todo); dos plugins, o
 registro de instalados do Claude Code e os plugins locais do Cursor. Uma skill ou um subagente
 instalado como link para outra pasta também é observado. No editor, a pasta do usuário passa a ser
 observada quando o board carrega. No modo navegador, são observados os mesmos arquivos globais e, no
-projeto, as pastas e os arquivos que a aba Projeto mostra (sem as worktrees que ficam em `.claude/`),
+projeto, as pastas e os arquivos que a origem Projeto mostra (sem as worktrees que ficam em `.claude/`),
 e o board relê tudo a cada minuto para o que um watcher não vê. As regras
 de subpasta e a política da organização não são observadas: entram na releitura seguinte.
 
@@ -1102,7 +1129,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, Esforço da atividade e Criticidade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido e as [áreas críticas](#áreas-críticas-núcleo) |
-| Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; abas Projeto e Global com tudo que cada ferramenta carrega, em grupos, com o que cada arquivo é, o caminho que abre no editor do board e a marcação do que as execuções usam (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
+| Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; uma aba por ferramenta, com assuntos (regras, skills, sub-agentes, MCPs…) e, em cada um, as origens Board, Projeto, Global e Importados: tudo que cada ferramenta carrega, com o que cada arquivo é, o caminho que abre no editor do board, a busca e o modo do que vai ao board (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Fica só na aba Git do modo navegador; no editor, aponta para o Settings (Faz AI › Git) |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English; fica no Settings do editor junto com tema, fonte e tamanho); status (nome e cor, na aba Fluxos; aqui só no modo navegador) |

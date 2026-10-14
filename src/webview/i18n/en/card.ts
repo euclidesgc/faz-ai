@@ -270,4 +270,5 @@ export const card: Record<string, string> = {
     "Runs up to {month} were kept only in the board's monthly totals (detail retention) and do not show up here.",
   'Não foi possível ler o consumo do card.': "Could not read the card's usage.",
   'A consulta do consumo demorou demais. Tente de novo.': 'The usage query took too long. Try again.',
+  '{name} (sempre)': '{name} (always)',
 };

@@ -89,16 +89,10 @@ export const harness: Record<string, string> = {
   'O Claude Code está lendo o {path}. Criar um CLAUDE.md ou CLAUDE.local.md faz ele parar de ler, a menos que o arquivo novo importe com @{path}.':
     'Claude Code is reading {path}. Creating a CLAUDE.md or CLAUDE.local.md makes it stop, unless the new file imports it with @{path}.',
   'Criar {path}': 'Create {path}',
-  'Tudo que a ferramenta de IA lê nesta pasta, por tipo: vai no repositório (menos os arquivos locais e a memória). Clique no caminho para abrir o arquivo aqui mesmo e editar. Nas rules e skills, escolha como as execuções do board usam cada uma; o que fica fora não existe para elas.':
-    'Everything the AI tool reads in this folder, by type: it goes in the repository (except local files and memory). Click the path to open the file right here and edit it. For rules and skills, choose how board runs use each one; what is left out does not exist for them.',
-  'Tudo que a ferramenta de IA lê da sua pasta de usuário, dos plugins instalados e da sua organização: vale na sua máquina, em qualquer projeto. Clique no caminho para abrir o arquivo aqui mesmo e editar. A marcação das execuções é deste board.':
-    'Everything the AI tool reads from your user folder, installed plugins and your organization: it applies on your machine, in any project. Click the path to open the file right here and edit it. The marking for runs belongs to this board.',
   'ferramenta deste projeto': "this project's tool",
   'Mostrando o que o {tool} carrega. As execuções do board usam o {board}: a marcação só vale para ele.':
     'Showing what {tool} loads. Board runs use {board}: the marking only applies to it.',
   'não encontrada nesta máquina': 'not found on this machine',
-  'Marcados para as execuções do board, mas o arquivo não existe mais:': 'Marked for board runs, but the file no longer exists:',
-  Desmarcar: 'Unmark',
   'Entra no começo de toda conversa da ferramenta': 'Loaded at the start of every conversation of the tool',
   'sempre carregado': 'always loaded',
   'A ferramenta só lê o conteúdo quando a tarefa pede ou quando você chama':
@@ -301,8 +295,6 @@ export const harness: Record<string, string> = {
 
   // --- ProjectTool
   'Ferramenta deste projeto': "This project's tool",
-  'O projeto trabalha com uma ferramenta de IA por vez. Ela define o arquivo de regras, a pasta das skills, onde o servidor MCP é registrado e os modelos oferecidos nos cards. Pastas de outras ferramentas podem existir no projeto, mas o board não mexe nelas. O botão registra o servidor do board em {mcp}.':
-    'The project works with one AI tool at a time. It defines the rules file, the skills folder, where the MCP server is registered and the models offered on cards. Folders for other tools can exist in the project, but the board does not touch them. The button registers the board server in {mcp}.',
   'Ferramenta de IA do projeto': 'Project AI tool',
   Ferramenta: 'Tool',
   Regras: 'Rules',
@@ -421,15 +413,9 @@ export const harness: Record<string, string> = {
   'Instalar neste projeto': 'Install in this project',
   'A skill do fluxo do board é instalada em "Tudo que a ferramenta carrega" → {tool} → Skills: no global (padrão) ou neste projeto.':
     'The board flow skill is installed in "Everything the tool loads" → {tool} → Skills: globally (default) or in this project.',
-  'O projeto trabalha com uma ferramenta de IA por vez. Ela define o arquivo de regras, a pasta das skills, onde o servidor MCP é registrado e os modelos oferecidos nos cards. Pastas de outras ferramentas podem existir no projeto, mas o board não mexe nelas. O servidor MCP do board e a skill do fluxo são instalados em "Tudo que a ferramenta carrega", nas seções Servidores MCP e Skills de cada ferramenta.':
-    'The project works with one AI tool at a time. It defines the rules file, the skills folder, where the MCP server is registered and the models offered on cards. Folders of other tools may exist in the project, but the board does not touch them. The board MCP server and the flow skill are installed in "Everything the tool loads", in each tool\'s MCP servers and Skills sections.',
   'No Cursor, o servidor do board fica em <code>{project}</code>, fora do git. O global do Cursor é um processo só para todas as janelas e não sabe qual board atender. O board grava este registro sozinho ao abrir no Cursor; se o "faz-ai" aparecer desligado em Cursor Settings → MCP, ligue.':
     'In Cursor, the board server lives in <code>{project}</code>, outside git. Cursor\'s global scope is a single process for all windows and cannot tell which board to serve. The board writes this registration on its own when it opens in Cursor; if "faz-ai" shows as off in Cursor Settings → MCP, turn it on.',
   // --- HarnessSettings (contexto vazio)
-  'Toda execução pelo board parte de <b>contexto vazio</b>: nenhuma regra, skill ou agente da sua máquina ou do projeto entra por conta própria. Só entra o que você marcar aqui. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão. <b>Projeto</b> e <b>Global</b> mostram tudo que a ferramenta carrega, separado por tipo, com o que cada arquivo é e onde fica; clique no caminho para abrir e editar.':
-    'Every run through the board starts from <b>empty context</b>: no rule, skill or agent from your machine or the project gets in on its own. Only what you mark here gets in. <b>Ferramenta e execução</b> (Tool and run) picks the AI, the permission and the default agent. <b>Projeto</b> (Project) and <b>Global</b> show everything the tool loads, split by type, with what each file is and where it lives; click the path to open and edit it.',
-  'Harness do projeto': 'Project harness',
-  'Harness global': 'Global harness',
   Rules: 'Rules',
   // --- SelectionTable
   Sempre: 'Always',
@@ -485,8 +471,55 @@ export const harness: Record<string, string> = {
   'Agente embutido (sem instruções)': 'Built-in agent (no instructions)',
   'Agente padrão': 'Default agent',
   'agentes marcados como disponíveis': 'agents checked as available',
-  'em Harness › Projeto ou Global': 'in Harness › Project or Global',
   // --- EXEC_ASPECTS
   'Skills e rules': 'Skills and rules',
   'Contexto vazio': 'Empty context',
+  // --- Harness por ferramenta e por assunto
+  'O projeto trabalha com uma ferramenta de IA por vez. Ela define o arquivo de regras, a pasta das skills, onde o servidor MCP é registrado e os modelos oferecidos nos cards. Pastas de outras ferramentas podem existir no projeto, mas o board não mexe nelas. O servidor MCP do board e a skill do fluxo são instalados na aba de cada ferramenta, nos assuntos MCPs e Skills, em Projeto.':
+    "The project works with one AI tool at a time. It defines the rules file, the skills folder, where the MCP server is registered and the models offered on cards. Folders of other tools may exist in the project, but the board does not touch them. The board MCP server and the flow skill are installed in each tool's tab, under the MCPs and Skills topics, in Project.",
+  'Toda execução pelo board parte de <b>contexto vazio</b>: nenhuma regra, skill ou agente da sua máquina ou do projeto entra por conta própria. Só entra o que você enviar ao <b>Board</b>. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão. Cada ferramenta tem a sua aba, com um assunto por vez (regras, skills, sub-agentes…); em cada um, escolha a origem: o que está no Board, no Projeto, no Global ou nas pastas importadas.':
+    'Every run through the board starts from <b>empty context</b>: no rule, skill or agent from your machine or the project gets in on its own. Only what you send to the <b>Board</b> gets in. <b>Tool and execution</b> picks the AI, the permission and the default agent. Each tool has its own tab, with one topic at a time (rules, skills, sub-agents…); in each one, pick the origin: what is on the Board, in the Project, Global or in imported folders.',
+  'Harness do {tool}': '{tool} harness',
+  'Tudo que o {tool} carrega, por assunto. O <b>catálogo</b> (Projeto, Global e Importados) mostra o que existe e não ocupa o contexto da IA. Só o que você envia ao <b>Board</b> pode ser usado pelas execuções, no modo de cada artefato.':
+    'Everything {tool} loads, by topic. The <b>catalog</b> (Project, Global and Imported) shows what exists and takes no space in the AI context. Only what you send to the <b>Board</b> can be used by runs, in the mode of each artifact.',
+  'A linha de comando do {tool} não desliga artefatos: regras, servidores MCP e o mais que estiver no projeto entram no contexto conforme o {tool} decidir. Para o "tudo desligado" valer, desligue nas configurações do {tool} ou remova do projeto o que você não quer no contexto das tarefas. O board só avisa.':
+    '{tool}\'s command line does not turn artifacts off: rules, MCP servers and anything else in the project enter the context as {tool} sees fit. For "everything off" to hold, turn them off in {tool}\'s settings or remove from the project what you do not want in the context of tasks. The board only warns.',
+  'Sub-agentes': 'Sub-agents',
+  MCPs: 'MCPs',
+  Comandos: 'Commands',
+  Demais: 'Other',
+  'em Harness › Sub-agentes': 'in Harness › Sub-agents',
+  'Origem dos artefatos': 'Origin of the artifacts',
+  'O que você enviou ao board: só isso entra nas execuções, no modo de cada um (Sempre, Pelo card ou Desligado).':
+    'What you sent to the board: only this gets into runs, in the mode of each one (Always, By card or Off).',
+  'Arquivos desta pasta; valem só aqui.': 'Files in this folder; they apply only here.',
+  'Arquivos da sua pasta de usuário; valem em todos os projetos.': 'Files in your user folder; they apply to all projects.',
+  'Buscar por nome ou descrição': 'Search by name or description',
+  'Buscar por nome ou descrição…': 'Search by name or description…',
+  'Nada encontrado para a busca.': 'Nothing found for the search.',
+  'Nada neste assunto foi enviado ao board. Escolha, em Projeto, Global ou Importados, o que os cards podem usar.':
+    'Nothing on this topic was sent to the board. Pick, in Project, Global or Imported, what cards may use.',
+  'As regras entram desligadas: escritas para outro contexto, elas podem conflitar com o fluxo e as definições do board (fases, aprovação, uso do MCP). Leia o texto de cada uma antes de ativar; regra ativa entra em toda execução.':
+    'Rules come in off: written for another context, they may conflict with the board flow and settings (phases, approval, MCP use). Read the text of each one before turning it on; an active rule goes into every run.',
+  'Remover do board': 'Remove from the board',
+  'Remover do board: {name}': 'Remove from the board: {name}',
+  ausente: 'missing',
+  'O arquivo de origem não existe mais; os cards que o listam continuam intactos.':
+    'The source file no longer exists; the cards that list it stay intact.',
+  'Os cards e as fases podem escolher este agente.': 'Cards and phases may pick this agent.',
+  'Enviar para o board': 'Send to the board',
+  'Disponibiliza para os cards deste board; o board lê o arquivo da origem na hora de usar.':
+    "Makes it available to this board's cards; the board reads the source file when using it.",
+  'Pastas importadas:': 'Imported folders:',
+  'Remover pasta': 'Remove folder',
+  'Remover pasta: {dir}': 'Remove folder: {dir}',
+  'Remover a pasta importada?': 'Remove the imported folder?',
+  '{dir}\n\nOs artefatos dela saem do board e deixam de aparecer em Importados. A pasta em si não é tocada.':
+    '{dir}\n\nIts artifacts leave the board and stop showing in Imported. The folder itself is not touched.',
+  'Importar artefatos': 'Import artifacts',
+  'Escolhe uma pasta e procura nela skills, agentes, comandos, hooks e servidores MCP no formato da ferramenta.':
+    'Picks a folder and looks in it for skills, agents, commands, hooks and MCP servers in the format of the tool.',
+  'Caminho da pasta a importar': 'Path of the folder to import',
+  'Caminho da pasta, no computador onde o board roda': 'Folder path, on the computer where the board runs',
+  Importar: 'Import',
 };
