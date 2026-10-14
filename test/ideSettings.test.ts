@@ -761,6 +761,31 @@ describe('IdeSettings: gitflow (#462)', () => {
     expect(fakeConfig.values.global[GIT_BRANCH_PATTERN_KEY]).toBe('{fluxo}{numero}-{titulo}');
   });
 
+  it('B5: padrão antigo ou prefixo vazio no settings.json do projeto: o board normaliza sem regravar o arquivo', async () => {
+    const link = await makeLink();
+    fakeConfig.values.workspace[GIT_BRANCH_PATTERN_KEY] = LEGACY_BRANCH_PATTERN;
+    fakeConfig.values.workspace['fazai.git.featurePrefix'] = '';
+    fakeConfig.values.folder['fazai.git.bugfixPrefix'] = '';
+    new IdeSettings(workspace).bind(link);
+    await settled();
+    const git = () => link.router.snapshot().board.git;
+    expect(git()).toMatchObject({ branchPattern: '{fluxo}{numero}-{titulo}', featurePrefix: 'feature/', bugfixPrefix: 'bugfix/' });
+    // o arquivo versionado fica como está: regravá-lo sujaria o repositório de quem abre o board
+    expect(fakeConfig.updates).toEqual([]);
+    expect(fakeConfig.values.workspace['fazai.git.featurePrefix']).toBe('');
+
+    // editar o arquivo do projeto depois, com o board aberto, também não o regrava
+    fakeConfig.set('workspace', 'fazai.git.featurePrefix', 'feat/');
+    expect(git().featurePrefix).toBe('feat/');
+    fakeConfig.set('workspace', 'fazai.git.featurePrefix', '');
+    await settled();
+    expect(git().featurePrefix).toBe('feature/');
+    // e outra mudança no board não leva o valor normalizado ao arquivo
+    link.router.handle({ type: 'settings.board.update', patch: { git: { releasePrefix: 'rel/' } } });
+    await settled();
+    expect(fakeConfig.updates).toEqual([{ key: 'fazai.git.releasePrefix', value: 'rel/', target: ConfigurationTarget.Global }]);
+  });
+
   it('padrão personalizado no Settings continua como está', async () => {
     const link = await makeLink();
     fakeConfig.values.global[GIT_BRANCH_PATTERN_KEY] = 'x/{numero}';

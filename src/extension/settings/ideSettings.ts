@@ -265,6 +265,8 @@ export interface BoardLink {
 export class IdeSettings {
   /** Último valor que esta camada gravou, por chave: o eco dessa gravação não vira outra gravação. */
   private readonly lastWritten = new Map<string, unknown>();
+  /** Chave que o `copyToBoard` está levando ao board: o eco dessa gravação é tratado por ele, não pelo `onDidChange`. */
+  private receiving: string | undefined;
 
   constructor(
     private readonly api: IdeSettingsApi,
@@ -321,6 +323,7 @@ export class IdeSettings {
       this.reconcileOnOpen(router);
       unsubscribe = router.onDidChange(() => {
         for (const synced of SYNCED_KEYS) {
+          if (synced.key === this.receiving) continue;
           const value = synced.fromBoard(router.snapshot().board);
           if (Object.is(value, this.lastWritten.get(synced.key))) continue;
           this.copyToSettings(synced, value);
@@ -397,12 +400,21 @@ export class IdeSettings {
   private copyToBoard(router: BoardLink, synced: SyncedKey<unknown>, value: unknown): void {
     if (Object.is(value, synced.fromBoard(router.snapshot().board))) return;
     this.lastWritten.set(synced.key, value);
-    router.handle({ type: 'settings.board.update', patch: synced.toBoardPatch(value) });
+    this.receiving = synced.key;
+    try {
+      router.handle({ type: 'settings.board.update', patch: synced.toBoardPatch(value) });
+    } finally {
+      this.receiving = undefined;
+    }
     // O board normaliza o que recebe (prefixo vazio vira `feature/`, padrão de nome antigo vira o novo) e,
-    // na abertura, o `onDidChange` ainda não está ligado: sem este passo, o Settings ficaria com o valor
-    // que o board recusou até a próxima mudança do board.
+    // na abertura, o `onDidChange` ainda não está ligado: sem este passo, o Settings do Usuário ficaria com o
+    // valor que o board recusou até a próxima mudança do board. No projeto (Workspace ou pasta) o valor está
+    // num `.vscode/settings.json` que costuma ser versionado: regravá-lo só por abrir o board sujaria o
+    // repositório, então a normalização fica só em memória (e o eco do board não o leva ao arquivo).
     const stored = synced.fromBoard(router.snapshot().board);
-    if (!Object.is(stored, value) && !Object.is(stored, this.lastWritten.get(synced.key))) this.copyToSettings(synced, stored);
+    if (Object.is(stored, value)) return;
+    if (this.targetFor(synced.key) === ConfigurationTarget.Global) this.copyToSettings(synced, stored);
+    else this.lastWritten.set(synced.key, stored);
   }
 
   /**

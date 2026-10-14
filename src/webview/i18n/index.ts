@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { Locale } from '../../shared/language';
-import { DEFAULT_NAMES_EN, EN } from './en';
+import { DEFAULT_NAMES_EN, EN, GIT_NOTICES_EN } from './en';
 
 // Internacionalização. O texto em português é a chave: `t('Novo card')`. Em português, a chave volta como está;
 // em inglês, vem de ./en. O que falta no dicionário aparece em português (e o teste de i18n barra a omissão).
@@ -31,25 +31,28 @@ export function useLocale(): Locale {
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Entradas do dicionário com `{parâmetro}`, como expressões: casam textos que já chegaram preenchidos (mensagens do host). */
-let patterns: { re: RegExp; names: string[]; value: string; weight: number }[] = [];
-let patternsFor = '';
-function matchPatterns(text: string): string | undefined {
+type Dictionary = Record<string, string>;
+type Pattern = { re: RegExp; names: string[]; value: string; weight: number };
+
+/** Entradas de um dicionário com `{parâmetro}`, como expressões: casam textos que já chegaram preenchidos (mensagens do host). */
+const patternCache = new Map<Dictionary, { signature: string; patterns: Pattern[] }>();
+function matchPatterns(dict: Dictionary, text: string): string | undefined {
   // recalcula só se as chaves do dicionário mudaram (nos testes ele recebe entradas)
-  const signature = Object.keys(EN).join('\u0000');
-  if (signature !== patternsFor) {
-    patternsFor = signature;
-    patterns = buildPatterns();
+  const signature = Object.keys(dict).join('\u0000');
+  let cached = patternCache.get(dict);
+  if (cached?.signature !== signature) {
+    cached = { signature, patterns: buildPatterns(dict) };
+    patternCache.set(dict, cached);
   }
-  for (const p of patterns) {
+  for (const p of cached.patterns) {
     const m = p.re.exec(text);
     if (m) return fill(p.value, Object.fromEntries(p.names.map((n, i) => [n, m[i + 1]!])));
   }
   return undefined;
 }
 
-function buildPatterns(): typeof patterns {
-  return Object.entries(EN)
+function buildPatterns(dict: Dictionary): Pattern[] {
+  return Object.entries(dict)
     .filter(([k]) => /\{\w+\}/.test(k))
     .map(([k, value]) => {
       const names: string[] = [];
@@ -70,12 +73,23 @@ export function fill(text: string, params?: Params): string {
 
 /** O dicionário em inglês para um texto em português; undefined se não houver. */
 export function translation(key: string): string | undefined {
-  return current === 'en' ? (EN[key] ?? matchPatterns(key)) : undefined;
+  return current === 'en' ? (EN[key] ?? matchPatterns(EN, key)) : undefined;
 }
 
 /** Traduz um texto da interface. O texto em português é a chave; `{nome}` é preenchido por `params`. */
 export function t(key: string, params?: Params): string {
   return fill(translation(key) ?? key, params);
+}
+
+/**
+ * Um comentário que o board escreveu na conversa, no idioma da interface. Só os avisos do gitflow são traduzidos: o board
+ * os grava em português e o idioma só se resolve na tela. O resto (autopiloto, runner, merge) fica como foi escrito, e
+ * por isso o casamento é só contra as chaves desses avisos: os moldes curtos do dicionário inteiro, como '{a} e {b}',
+ * casariam com qualquer frase que tenha " e ".
+ */
+export function translateGitNotice(body: string): string {
+  if (current !== 'en') return body;
+  return GIT_NOTICES_EN[body] ?? matchPatterns(GIT_NOTICES_EN, body) ?? body;
 }
 
 /**
