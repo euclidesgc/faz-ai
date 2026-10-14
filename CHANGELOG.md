@@ -4,7 +4,7 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não publicado
+## Não lançado
 
 - **Cards presos em "Em execução" voltam para a IA.** Um card ficava "Em execução" para sempre quando a sessão que o marcou acabava sem passar a vez: a janela do editor fechada com a IA rodando, a sub-tarefa marcada por `start_work` numa sessão da história que terminou, ou uma sessão fora do board que caiu. O autopiloto e o heartbeat pulavam a história (achavam que ela estava rodando) e nada mais acontecia. Agora: ao abrir o board, os cards das execuções que a sessão anterior deixou abertas voltam para Pronto na hora (e as sub-tarefas delas junto); ao terminar a sessão de uma história, as sub-tarefas que ela deixou "Em execução" voltam para Pronto; e, a cada minuto, um card "Em execução" sem nenhuma execução do board há mais tempo que o limite de uma execução (Configurações → Harness de IA → tempo máximo) volta para Pronto, com a explicação na conversa. O autopiloto também deixou de devolver para Pronto, a cada mudança do board, a sub-tarefa que a sessão viva da história tinha acabado de marcar.
 - **Fila do modo autônomo visível no card.** Com o modo autônomo ligado, cada história que espera a vez mostra o selo **Fila N** (1 = a próxima). O número só existe enquanto ela espera: some quando a IA começa nela, quando ela passa para você (bloqueada, aguardando resposta) e quando ela é concluída; pausar o modo apaga todos. A ordem respeita as precedências: uma história que depende de outra da fila (vínculo "depende de", inclusive por uma sub-tarefa) ou derivada dela vem depois, por mais acima que esteja no board; o autopiloto segue a mesma ordem.
