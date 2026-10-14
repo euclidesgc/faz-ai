@@ -294,3 +294,32 @@ describe('Diagnóstico do ambiente', () => {
     expect(router.snapshot().environmentFirstRun).toBe(false);
   });
 });
+
+describe('Diagnóstico do ambiente: definição do harness', () => {
+  it('o item fica dentro da ferramenta, com um filho por falta, cada um explicando como resolver', async () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    const r = report();
+    const tool = r.required[1]!;
+    tool.children!.splice(3, 0, {
+      id: 'harness',
+      tool: 'cursor',
+      status: 'missing',
+      requirement: { id: 'harness', tool: 'cursor', optional: true, harnessIssues: ['artifacts', 'cursor'], action: { kind: 'settings' } },
+      children: [
+        { id: 'harness-artifacts', tool: 'cursor', status: 'missing' },
+        { id: 'harness-agents', tool: 'cursor', status: 'ok' },
+        { id: 'harness-rules', tool: 'cursor', status: 'ok' },
+        { id: 'harness-missing', tool: 'cursor', status: 'ok' },
+        { id: 'harness-cursor', tool: 'cursor', status: 'missing' },
+      ],
+    });
+    show(r);
+    const harness = item('Definição do harness');
+    expect(within(harness).getByText('Artefatos no board')).toBeInTheDocument();
+    expect(within(harness).getByText('Artefatos do projeto fora do board')).toBeInTheDocument();
+    expect(within(harness).getByRole('button', { name: 'Abrir Harness de IA' })).toBeInTheDocument();
+    fireEvent.focus(screen.getByText('Artefatos do projeto fora do board'));
+    expect((await screen.findByRole('tooltip')).textContent).toMatch(/não desliga nada/);
+  });
+});

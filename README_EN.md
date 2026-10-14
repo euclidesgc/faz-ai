@@ -341,8 +341,14 @@ on another item shows inside it (the sign-in inside the command line, the graph 
 Graph). Hover over an item to see how the board uses it.
 
 - **Required:** Node.js 22 or newer and the project's AI tool, with its command line, the sign-in
-  (`claude auth login` or `cursor-agent login`), the board's MCP, the flow skill and the permission
-  level.
+  (`claude auth login` or `cursor-agent login`), the board's MCP, the flow skill, the **harness
+  definition** and the permission level. The harness definition is a recommendation, not a blocker:
+  the board works without it, only without the context savings and precision. It points out, one
+  child per gap, what the artifact bank lacks: no skill, agent or MCP server in Pelo card mode (use
+  "Indicar artefatos"), no board agent, rules sent and still off, an artifact that vanished from its
+  source and, in Cursor, project rules, servers or hooks that enter the context without going
+  through the board. The same shows in the banner at the top of the board as a discreet
+  recommendation line, with the shortcut to the AI Harness.
 - **Optional:** the other AI tool, when it is on the machine (its command line on the PATH or, in
   Cursor, the editor itself). A project on Claude Code shows Cursor here, and vice versa. The list only
   shows the state: the board installs its MCP and skill there when it becomes the project's tool.
