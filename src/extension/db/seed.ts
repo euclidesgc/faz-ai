@@ -6,7 +6,6 @@ import { EFFORT_FIELD, EFFORT_LEVELS } from '../../shared/models';
 import { CRITICALITY_FIELD, CRITICALITY_LEVELS } from '../../shared/critical';
 import { MCPS_FIELD, MODEL_FIELD, PHASE_FIELD, RULES_FIELD, SKILLS_FIELD, TAGS_FIELD } from '../../shared/boardFields';
 import { DEFAULT_BRANCH_KINDS } from '../../shared/git';
-import { MODEL_FIELD, PHASE_FIELD, RULES_FIELD, SKILLS_FIELD, TAGS_FIELD } from '../../shared/boardFields';
 
 /** Cria o board padrão para um workspace e devolve seu id. */
 export function seedBoard(db: Database, workspaceKey: string, name: string): string {
