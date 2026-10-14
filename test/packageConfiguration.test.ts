@@ -102,6 +102,13 @@ describe('contributes.configuration', () => {
     expect(en['config.git.branchPattern']).toContain('{fluxo}');
     expect(pt['config.git.branchPattern']).toContain('{fluxo}');
   });
+  it('fazai.git.branchPattern: com o gitflow desligado a descrição diz que {fluxo} vira <tipo>/, como flowPrefix, nas duas línguas', () => {
+    // flowPrefix devolve `<tipo>/` sem gitflow; a descrição não pode prometer `{fluxo}` vazio
+    expect(en['config.git.branchPattern']).toContain('`<type>/`');
+    expect(en['config.git.branchPattern']).not.toMatch(/empty with/i);
+    expect(pt['config.git.branchPattern']).toContain('`<tipo>/`');
+    expect(pt['config.git.branchPattern']).not.toMatch(/vazio com/i);
+  });
   it('os padrões de fazai.git.* iguais aos de DEFAULT_GIT onde há campo correspondente', () => {
     const props = sections[2]!.properties;
     for (const f of ['mode', 'worktreeDir', 'autoMerge', 'mergeMethod', 'decisionRecords'] as const)

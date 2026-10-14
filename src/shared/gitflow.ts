@@ -80,7 +80,8 @@ export type GitNotice =
   | { kind: 'fetchFailed'; branch: string; base: string; error: string }
   | { kind: 'developCreated'; develop: string; main: string }
   | { kind: 'developLocalOnly'; develop: string; main: string; error: string }
-  | { kind: 'developNotPushed'; develop: string };
+  | { kind: 'developNotPushed'; develop: string }
+  | { kind: 'baseMissing'; branch: string; missing: string; base: string };
 
 /** o texto do aviso na conversa, em português; a tradução fica em i18n/en/host.ts */
 export function gitNoticeText(n: GitNotice): string {
@@ -95,5 +96,7 @@ export function gitNoticeText(n: GitNotice): string {
       return `A branch ${n.develop} não existia: o board a criou a partir de ${n.main}, mas não conseguiu enviá-la ao origin (${n.error}). Envie à mão: git push -u origin ${n.develop}`;
     case 'developNotPushed':
       return `A branch ${n.develop} existe só nesta máquina: o pull request para ela só abre depois de enviá-la ao origin (git push -u origin ${n.develop}).`;
+    case 'baseMissing':
+      return `A branch ${n.missing}, de onde a ${n.branch} tinha partido, não existe mais nesta máquina nem no origin: a ${n.branch} foi recriada a partir de ${n.base}, que passa a ser a base do pull request.`;
   }
 }

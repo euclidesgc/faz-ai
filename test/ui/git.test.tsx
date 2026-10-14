@@ -125,6 +125,9 @@ describe('GitSettings', () => {
       ).toEqual(['dev', 'branch de integração', 'main', '—']);
       const feature = within(rowOf('feature/')).getAllByRole('cell');
       expect(feature[1]).toHaveTextContent('História');
+      // só os tipos das histórias geram branch: a Sub-tarefa (workflow filho, 'feature' no seed) fica fora da linha
+      expect(feature[1]).not.toHaveTextContent('Sub-tarefa');
+      expect(feature[1]!.textContent).toBe('História, Débito técnico');
       expect([feature[2]!.textContent, feature[3]!.textContent]).toEqual(['dev', 'dev']);
       expect(within(rowOf('bugfix/')).getAllByRole('cell')[1]).toHaveTextContent('Retrabalho');
       const hotfix = within(rowOf('fix/')).getAllByRole('cell');

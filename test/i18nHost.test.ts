@@ -127,6 +127,10 @@ describe('i18n do host: mensagens preenchidas', () => {
         { kind: 'developNotPushed', develop: 'develop' },
         'Branch develop exists only on this machine: the pull request to it can only be opened after pushing it to origin (git push -u origin develop).',
       ],
+      [
+        { kind: 'baseMissing', branch: 'feature/2-y', missing: 'feature/1-x', base: 'develop' },
+        'Branch feature/1-x, which feature/2-y had started from, no longer exists on this machine or on origin: feature/2-y was recreated from develop, which becomes the pull request base.',
+      ],
     ];
     for (const [notice, en] of cases) expect(t(gitNoticeText(notice))).toBe(en);
   });

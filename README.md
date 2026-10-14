@@ -684,10 +684,14 @@ da branch, e cada tipo sai de um lugar e volta para outro:
 - A **branch principal é detectada sozinha**, sem rede: o HEAD do `origin`; senão `main` ou `master`;
   senão a branch atual. A seção do gitflow na aba Git mostra qual foi e por quê.
 - Se a `develop` não existe, o board a cria a partir da principal e a envia ao `origin`; se não
-  conseguir enviar, avisa na conversa da história com o comando para fazer à mão.
+  conseguir enviar, avisa na conversa da história com o comando para fazer à mão. Ele não a cria
+  quando o `git fetch` falhou (ela pode já existir no `origin`) nem quando a principal saiu da branch
+  atual: recusa e diz o que fazer (verificar a rede, ou rodar `git remote set-head origin -a`).
 - Antes de criar a branch, o board roda `git fetch origin` (até 20 s, sem pedir senha) e parte de
   `origin/<base>`, sem upstream (`--no-track`). Sem `origin` ou com o fetch falhando, parte das refs
   locais e avisa na conversa.
+- Uma branch apagada é recriada da base gravada; se essa base também sumiu (a história anterior da
+  pilha já foi mesclada), volta da base do fluxo e a conversa avisa que o PR muda de destino.
 - A IA lê a base do PR em `workspace.prBase` do `get_card` e abre o pull request com `--base`. Em
   histórias empilhadas (modo autônomo ou derivadas), a base é a branch da história anterior.
 - Um defeito numa funcionalidade que ainda só está na `develop` é **Retrabalho**, não Bug. O tipo de

@@ -30,15 +30,26 @@ conclusão limpa e a release (#464), a limpeza de órfãs (#465) e o renomear da
 - **`git fetch origin` síncrono, com limite de 20 s.** O fetch roda uma vez, na criação da branch,
   com `GIT_TERMINAL_PROMPT=0`. O host espera, e a interface pode congelar por até 20 s. Sem `origin`
   ou com o fetch falhando, a branch parte das refs locais e a conversa recebe um aviso.
+  Com o fetch falhando e sem a `develop` nesta máquina, o board recusa: ela pode já existir no
+  `origin`, e criá-la de uma principal atrasada deixaria uma `develop` local divergente.
 - **`--no-track`.** A branch (e a worktree) é criada sem upstream. Com `push.default=upstream`, um
   `git push` sem argumentos iria para a `develop` ou para a principal em vez de uma branch própria.
 - **`develop` criada quando falta.** Sem ela local nem no `origin`, o board a cria da principal e roda
   `git push -u origin <develop>`, sem força. É a única coisa que a entrega cria no `origin`; nada é
   apagado, renomeado nem reescrito. Se o envio falha, ou se a `develop` existe só na máquina, o aviso
-  traz o comando `git push -u origin <develop>`.
+  traz o comando `git push -u origin <develop>`. Sem `origin`, a `develop` só é criada, e o aviso é
+  o de sem `origin`.
 - **Principal detectada sem rede.** `detectMainBranch` usa o HEAD do `origin`; senão `main` ou
   `master` (local ou já baixada); senão a branch atual. Ela fica em cache no contexto do board e no
-  snapshot, e a tela Git a detecta de novo ao abrir.
+  snapshot, e a tela Git a detecta de novo ao abrir. A branch atual é um palpite: serve de base para
+  `hotfix/` e para o gitflow desligado, como antes, mas não para criar a `develop` compartilhada; nesse
+  caso o board recusa e pede `git remote set-head origin -a`.
+- **Base de branch que já existe ou que sumiu.** Branch ou worktree da história já existentes (criadas
+  à mão, board reimportado) gravam a base que o board usaria ao criar. Uma branch apagada volta da
+  base gravada; se ela também sumiu, da base do fluxo, com aviso na conversa e a base do PR trocada.
+- **Settings do projeto não é regravado.** O board normaliza o padrão antigo e o prefixo vazio que
+  vêm do Settings; só regrava o valor no escopo do Usuário. No `.vscode/settings.json`, que costuma ser
+  versionado, a normalização fica em memória.
 - **O que a IA lê.** `get_card` traz `workspace.baseBranch`, `prBase` e `prNote`, e `prepare_workspace`
   devolve a `prBase`. A skill, as instruções do MCP, a nota do modo autônomo e o texto padrão da
   Homologação mandam usar `--base <prBase>`. O template do board foi para a versão 10 (a 9 já
@@ -66,7 +77,9 @@ flowchart TD
   F -- feature ou bugfix --> G[Base: develop]
   F -- hotfix ou gitflow desligado --> H[Base: principal]
   G --> I{develop existe?}
-  I -- não --> J[Cria da principal e envia ao origin]
+  I -- não --> N{fetch ok e principal detectada?}
+  N -- não --> O[Recusa, dizendo o que fazer]
+  N -- sim --> J[Cria da principal e envia ao origin]
   I -- sim --> K[Parte de origin/develop]
   J --> K
   H --> L[Parte de origin/principal]

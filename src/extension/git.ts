@@ -88,51 +88,100 @@ function startPointOf(repo: string, branch: string): string | null {
   return null;
 }
 
+/** De onde partir quando a base gravada sumiu: a base do fluxo de hoje (a develop, ou a principal no hotfix). */
+export interface FlowFallback {
+  base: string;
+  /** como em `developFrom`: a principal de onde criar a develop quando ela não existe */
+  developFrom?: string;
+}
+
+interface StartInput {
+  branch: string;
+  stack?: string;
+  base: string;
+  developFrom?: string;
+  mainGuessed?: boolean;
+  fallback?: FlowFallback;
+}
+
+/** A branch anterior da pilha, de preferência a local, que é onde a IA acabou de trabalhar; null se sumiu. */
+function stackedStart(repo: string, stack: string | undefined): string | null {
+  if (!stack) return null;
+  if (branchExists(repo, stack)) return stack;
+  return remoteBranchExists(repo, stack) ? `origin/${stack}` : null;
+}
+
+/**
+ * A develop não existe nesta máquina: cria a partir da principal e a envia ao origin. Recusa quando não
+ * dá para fazer isso com segurança: sem um fetch que acabou de dar certo, ela pode já existir no origin
+ * (a local nasceria divergente e o push travaria até o limite de tempo); com a principal adivinhada pela
+ * branch atual, a develop compartilhada nasceria de uma branch de trabalho qualquer.
+ */
+function createDevelop(
+  repo: string,
+  develop: string,
+  main: string,
+  opts: { fetchError: string | null; mainGuessed?: boolean; origin: boolean },
+  notices: GitNotice[],
+): void {
+  if (opts.fetchError)
+    throw new Error(
+      `Não foi possível atualizar as refs do origin (${opts.fetchError}) e a branch ${develop} não existe nesta máquina: sem saber se ela já existe no origin, o board não a cria nem a envia. Verifique a rede e as credenciais do git (git fetch origin no terminal) e tente de novo.`,
+    );
+  if (opts.mainGuessed)
+    throw new Error(
+      opts.origin
+        ? `Não foi possível saber qual é a branch principal (o origin não informa a dele e não há main nem master), e a branch ${develop} não existe: o board não a cria a partir da branch atual (${main}). Rode git remote set-head origin -a e tente de novo.`
+        : `Não foi possível saber qual é a branch principal (não há origin, main nem master), e a branch ${develop} não existe: o board não a cria a partir da branch atual (${main}). Crie a ${develop} à mão a partir da principal (git branch ${develop} <principal>) e tente de novo.`,
+    );
+  const start = startPointOf(repo, main);
+  if (!start) throw new Error(`A branch ${main} não existe neste repositório nem no origin.`);
+  git(repo, ['branch', '--no-track', develop, start]);
+  // sem origin não há para onde enviar: o aviso noOrigin, que sai junto, já diz que tudo partiu do local
+  if (!opts.origin) return;
+  try {
+    git(repo, ['push', '-u', 'origin', develop], { timeout: FETCH_TIMEOUT_MS, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+    notices.push({ kind: 'developCreated', develop, main });
+  } catch (e) {
+    // a história segue com a develop local; o aviso traz o erro e o comando para enviá-la à mão
+    notices.push({ kind: 'developLocalOnly', develop, main, error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
 /**
  * Resolve o ponto de partida de uma branch nova (ver o fluxograma do SPEC da #462): a anterior da
  * pilha, senão a base, criando a develop quando ela não existe em lugar nenhum. Só cria a develop e,
  * nela, faz `push -u origin` sem força: nada mais é apagado, renomeado nem reescrito (RF17).
+ * `fetchError` é a mensagem do fetch que acabou de falhar (null quando atualizou ou não há origin).
  */
-function resolveStart(
-  repo: string,
-  input: { branch: string; stack?: string; base: string; developFrom?: string },
-  notices: GitNotice[],
-): { start: string; base: string } {
-  if (input.stack) {
-    // a branch anterior da pilha, de preferência a local, que é onde a IA acabou de trabalhar
-    const stacked = branchExists(repo, input.stack) ? input.stack : remoteBranchExists(repo, input.stack) ? `origin/${input.stack}` : null;
-    if (stacked) return { start: stacked, base: input.stack };
-  }
+function resolveStart(repo: string, input: StartInput, fetchError: string | null, notices: GitNotice[]): { start: string; base: string } {
+  const stacked = stackedStart(repo, input.stack);
+  if (stacked && input.stack) return { start: stacked, base: input.stack };
   let start = startPointOf(repo, input.base);
+  if (!start && input.fallback) {
+    // a base gravada sumiu (a anterior da pilha já mesclada e apagada): parte da base do fluxo, e a
+    // conversa diz que o pull request muda de destino
+    const { fallback } = input;
+    if (fallback.base !== input.base) notices.push({ kind: 'baseMissing', branch: input.branch, missing: input.base, base: fallback.base });
+    const next: StartInput = {
+      branch: input.branch,
+      base: fallback.base,
+      developFrom: fallback.developFrom,
+      mainGuessed: input.mainGuessed,
+    };
+    return resolveStart(repo, next, fetchError, notices);
+  }
+  const origin = hasOrigin(repo);
   let created = false;
   if (!start && input.developFrom) {
     created = true;
-    const main = startPointOf(repo, input.developFrom);
-    if (!main) throw new Error(`A branch ${input.developFrom} não existe neste repositório nem no origin.`);
-    git(repo, ['branch', '--no-track', input.base, main]);
-    if (!hasOrigin(repo)) {
-      // sem origin não há para onde enviar: o aviso de noOrigin, adiante, já explica
-      notices.push({ kind: 'developLocalOnly', develop: input.base, main: input.developFrom, error: 'o repositório não tem origin' });
-    } else {
-      try {
-        git(repo, ['push', '-u', 'origin', input.base], { timeout: FETCH_TIMEOUT_MS, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
-        notices.push({ kind: 'developCreated', develop: input.base, main: input.developFrom });
-      } catch (e) {
-        notices.push({
-          kind: 'developLocalOnly',
-          develop: input.base,
-          main: input.developFrom,
-          error: e instanceof Error ? e.message : String(e),
-        });
-      }
-    }
+    createDevelop(repo, input.base, input.developFrom, { fetchError, mainGuessed: input.mainGuessed, origin }, notices);
     start = startPointOf(repo, input.base);
   }
   if (!start) throw new Error(`A branch ${input.base} não existe neste repositório nem no origin.`);
   // develop que já existia só nesta máquina, com origin: o pull request para ela não abre; o aviso traz o
   // comando, e o board não a envia sozinho (RF17). A recém-criada já avisou (developLocalOnly) se o push falhou.
-  if (input.developFrom && !created && start === input.base && hasOrigin(repo))
-    notices.push({ kind: 'developNotPushed', develop: input.base });
+  if (input.developFrom && !created && start === input.base && origin) notices.push({ kind: 'developNotPushed', develop: input.base });
   return { start, base: input.base };
 }
 
@@ -151,6 +200,10 @@ export function prepareWorkspace(input: {
   base: string;
   /** a base é a develop do gitflow: criada a partir desta principal quando não existe em lugar nenhum */
   developFrom?: string;
+  /** a principal saiu da branch atual (sem origin/HEAD, main nem master): não serve para criar a develop */
+  mainGuessed?: boolean;
+  /** para onde ir quando `base` não existe mais (a branch gravada de uma história já mesclada e apagada) */
+  fallback?: FlowFallback;
 }): PreparedWorkspace {
   const repo = tryGit(input.projectDir, ['rev-parse', '--show-toplevel']);
   if (!repo) throw new Error('A pasta do projeto não é um repositório git.');
@@ -161,14 +214,17 @@ export function prepareWorkspace(input: {
   // a branch nova parte do que está no origin: o fetch só roda aqui, uma vez por história
   const createBranch = (): { start: string; base: string } => {
     const fetched = fetchOrigin(repo);
-    const resolved = resolveStart(repo, input, notices);
+    const resolved = resolveStart(repo, input, fetched === 'noOrigin' ? null : fetched, notices);
     if (fetched === 'noOrigin') notices.push({ kind: 'noOrigin', branch: input.branch, base: resolved.base });
     else if (fetched) notices.push({ kind: 'fetchFailed', branch: input.branch, base: resolved.base, error: fetched });
     return resolved;
   };
+  // branch ou worktree que já existem (criadas à mão, board reimportado): a base é a que o board usaria ao
+  // criar agora, para o pull request não cair na principal por falta dela. Sem fetch e sem criar a develop.
+  const plannedBase = (): string => (stackedStart(repo, input.stack) && input.stack ? input.stack : input.base);
 
   if (input.mode === 'branch') {
-    if (branchExists(repo, input.branch)) return { branch: input.branch, path: repo, base: '', notices };
+    if (branchExists(repo, input.branch)) return { branch: input.branch, path: repo, base: plannedBase(), notices };
     const { start, base } = createBranch();
     // --no-track: com push.default=upstream, um `git push` iria para a develop ou para a principal
     git(repo, ['branch', '--no-track', input.branch, start]);
@@ -181,12 +237,12 @@ export function prepareWorkspace(input: {
   const registered = git(repo, ['worktree', 'list', '--porcelain'])
     .split(/\r?\n/)
     .some((l) => l.startsWith('worktree ') && (samePath(l.slice('worktree '.length), real) || samePath(l.slice('worktree '.length), dir)));
-  if (registered) return { branch: input.branch, path: dir, base: '', notices };
+  if (registered) return { branch: input.branch, path: dir, base: plannedBase(), notices };
   if (fs.existsSync(dir) && fs.readdirSync(dir).length) throw new Error(`A pasta ${dir} já existe e não é uma worktree deste repositório.`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   if (branchExists(repo, input.branch)) {
     git(repo, ['worktree', 'add', dir, input.branch]);
-    return { branch: input.branch, path: dir, base: '', notices };
+    return { branch: input.branch, path: dir, base: plannedBase(), notices };
   }
   const { start, base } = createBranch();
   git(repo, ['worktree', 'add', '--no-track', '-b', input.branch, dir, start]);

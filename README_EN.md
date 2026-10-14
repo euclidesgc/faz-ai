@@ -713,10 +713,16 @@ each kind starts from one place and goes back to another:
 - The **main branch is detected on its own**, with no network: the `origin` HEAD; otherwise `main` or
   `master`; otherwise the current branch. The gitflow section on the Git tab shows which one and why.
 - If `develop` doesn't exist, the board creates it from the main branch and pushes it to `origin`; if
-  it can't push, it says so in the story's conversation, with the command to run by hand.
+  it can't push, it says so in the story's conversation, with the command to run by hand. It doesn't
+  create it when `git fetch` failed (it may already exist on `origin`) or when the main branch came
+  from the current branch: it refuses and says what to do (check the network, or run
+  `git remote set-head origin -a`).
 - Before creating the branch, the board runs `git fetch origin` (up to 20 s, no password prompt) and
   starts from `origin/<base>`, with no upstream (`--no-track`). With no `origin`, or if the fetch
   fails, it starts from the local refs and says so in the conversation.
+- A deleted branch is recreated from the recorded base; if that base is gone too (the previous story
+  in the stack was already merged), it comes back from the flow's base and the conversation says the
+  PR changes target.
 - The AI reads the PR base in `workspace.prBase` of `get_card` and opens the pull request with
   `--base`. In stacked stories (autonomous mode or derived ones) the base is the previous story's branch.
 - A defect in a feature that is still only on `develop` is **Retrabalho** (rework), not Bug. Each card
