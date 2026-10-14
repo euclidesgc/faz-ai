@@ -2,7 +2,7 @@ import { cardRef, type BoardState, type Card, type Column } from '../shared/mode
 import { columnOf, columnsOf, openChildren } from '../shared/selectors';
 import { isDelivered } from '../shared/story';
 import { gitNotice } from '../shared/gitNotices';
-import { removeWorktree } from './git';
+import { detectMainBranch, removeWorktree } from './git';
 import type { MessageRouter } from './panel/messageRouter';
 import { cleanUpStory, parsePullRequestFacts, PR_FIELDS, type CleanupDeps, type PullRequestFacts } from './storyCleanup';
 
@@ -139,14 +139,31 @@ export class AutoMerger {
         this.deps.log(`[${ref}] Consulta de ${card.prUrl} falhou: ${pr.message}`);
       }
     }
-    this.deps.log(`[${ref}] Merge de ${card.prUrl} (${state.board.git.mergeMethod}).`);
-    try {
-      await this.deps.gh(['pr', 'merge', card.prUrl, `--${state.board.git.mergeMethod}`], this.deps.cwd);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      this.deps.log(`[${ref}] Merge falhou: ${message}`);
+    const already = !(pr instanceof Error) && (pr.state === 'MERGED' || !!pr.mergedAt);
+    if (!(pr instanceof Error) && pr.state === 'CLOSED' && !already) {
       this.merging.delete(cardId);
-      return void block(`O merge de ${card.prUrl} falhou: ${message}`);
+      this.deps.log(`[${ref}] Pull request ${card.prUrl} fechado sem merge; card bloqueado.`);
+      return void block(`O pull request ${card.prUrl} foi fechado sem merge.`);
+    }
+    if (already) {
+      // o release (ou outra pessoa) já mesclou: não há o que mesclar, só concluir e limpar
+      this.deps.log(`[${ref}] Pull request ${card.prUrl} já estava mesclado; card concluído sem novo merge.`);
+    } else {
+      // com o gitflow, o PR para a principal (release/hotfix) vai sempre com merge commit; senão, o método configurado
+      let method = state.board.git.mergeMethod;
+      if (!(pr instanceof Error) && pr.baseRefName) {
+        const main = this.deps.mainBranch ? this.deps.mainBranch(this.deps.cwd) : (detectMainBranch(this.deps.cwd)?.name ?? '');
+        if (main && pr.baseRefName === main) method = 'merge';
+      }
+      this.deps.log(`[${ref}] Merge de ${card.prUrl} (${method}).`);
+      try {
+        await this.deps.gh(['pr', 'merge', card.prUrl, `--${method}`], this.deps.cwd);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        this.deps.log(`[${ref}] Merge falhou: ${message}`);
+        this.merging.delete(cardId);
+        return void block(`O merge de ${card.prUrl} falhou: ${message}`);
+      }
     }
     this.merging.delete(cardId);
     // a consulta foi feita antes do merge (state OPEN); o `gh pr merge` sem erro é a confirmação de que

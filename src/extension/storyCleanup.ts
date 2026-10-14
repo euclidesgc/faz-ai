@@ -8,9 +8,10 @@ import * as fs from 'node:fs';
 import { detectMainBranch, removeWorktree } from './git';
 import type { MessageRouter } from './panel/messageRouter';
 import { samePath } from './samePath';
-import { BOARD_AUTHOR } from '../shared/gitflow';
+import { BOARD_AUTHOR, prBaseOf } from '../shared/gitflow';
 import { fileList, gitNotice } from '../shared/gitNotices';
 import { cardRef, type Card } from '../shared/model';
+import { columnOf, isLive } from '../shared/selectors';
 
 /** O que o board sabe do pull request da história, pelo `gh pr view --json`. */
 export interface PullRequestFacts {
@@ -57,7 +58,7 @@ export function parsePullRequestFacts(out: string, url: string): PullRequestFact
 export interface CleanupDeps {
   /** o `git` assíncrono do boardHost: resolve com a saída, rejeita com a mensagem do comando */
   git(args: string[], cwd: string): Promise<string>;
-  /** idem para o `gh`; a parte 1 não o usa, a pilha e o hotfix (#480) usam */
+  /** idem para o `gh`: a troca de base dos pull requests da pilha e a volta da principal no hotfix (#480) */
   gh(args: string[], cwd: string): Promise<string>;
   log(line: string): void;
   /** pasta do projeto */
@@ -170,14 +171,155 @@ export async function updateDevelop(deps: CleanupDeps, develop: string): Promise
   }
 }
 
+/** Resultado da troca de base das histórias empilhadas (#480, RF11/RF12). */
+export interface Restack {
+  /** motivo para manter a branch remota da concluída: um pull request seguinte ainda a usa como base */
+  keepRemote: string | null;
+  /** linhas para o relatório da concluída (só avisos) */
+  lines: string[];
+}
+
+/** O PR só é editado se estiver aberto; se o `gh pr view` falhar, trata como não aberto (sem aviso). */
+async function prIsOpen(deps: CleanupDeps, url: string): Promise<boolean> {
+  try {
+    const raw = await deps.gh(['pr', 'view', url, '--json', 'state'], deps.cwd);
+    return (JSON.parse(raw) as { state?: string }).state === 'OPEN';
+  } catch (e) {
+    deps.log(`Não deu para conferir o estado de ${url} (${errorLine(e)}); o PR não será editado.`);
+    return false;
+  }
+}
+
+/**
+ * Passa para `newBase` a base das histórias empilhadas sobre a concluída: as vivas, sem pai, fora da conclusão e
+ * com `baseBranch === story.branch`. Grava a base pela mensagem `card.baseBranch.set` e, quando a seguinte tem pull
+ * request aberto, troca a base dele com `gh pr edit`. Se o `gh` falhar, a remota da concluída precisa ficar (o GitHub
+ * fecharia o PR dependente) e as duas conversas avisam. Cada seguinte recebe um comentário explicando a troca.
+ */
+export async function restackFollowers(router: MessageRouter, deps: CleanupDeps, story: Card, newBase: string): Promise<Restack> {
+  const out: Restack = { keepRemote: null, lines: [] };
+  if (!story.branch || !newBase || newBase === story.branch) return out;
+  const s = router.snapshot();
+  const followers = s.cards.filter(
+    (c) => c.id !== story.id && !c.parentId && isLive(c) && columnOf(s, c)?.category === 'open' && c.baseBranch === story.branch,
+  );
+  for (const next of followers) {
+    const parts = [gitNotice('stack.moved', { prev: story.number, old: story.branch, base: newBase })];
+    router.handle({ type: 'card.baseBranch.set', cardId: next.id, base: newBase });
+    if (next.prUrl && (await prIsOpen(deps, next.prUrl))) {
+      try {
+        await deps.gh(['pr', 'edit', next.prUrl, '--base', newBase], deps.cwd);
+        parts.push(gitNotice('stack.prMoved', { pr: next.prUrl, base: newBase }));
+      } catch (e) {
+        const error = errorLine(e);
+        parts.push(gitNotice('stack.prFailed', { pr: next.prUrl, base: newBase, error }));
+        out.keepRemote ??= error;
+        out.lines.push(
+          gitNotice('cleanup.remoteStillBase', { branch: story.branch, nextPr: next.prUrl, number: next.number, base: newBase }),
+        );
+      }
+    }
+    router.handle({ type: 'comment.add', cardId: next.id, body: parts.join('\n\n') }, { author: BOARD_AUTHOR, source: 'ai' });
+    deps.log(`[${cardRef(story)}] Base de ${cardRef(next)} passou de ${story.branch} para ${newBase}.`);
+  }
+  return out;
+}
+
+const parseJson = (out: string): unknown => {
+  try {
+    return JSON.parse(out);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Volta da principal para a `develop` depois de um hotfix (#480, RF14/RF15): com a `develop` já contendo a `main`
+ * não faz nada; senão reaproveita o pull request aberto de `main` para `develop` ou abre um, e o mescla com merge
+ * commit (`--merge`, nunca `--delete-branch`), em até 3 tentativas. Conflito deixa o PR aberto e avisa. Devolve a
+ * linha do relatório.
+ */
+export async function backMergeMain(deps: CleanupDeps, main: string, develop: string, story: Card, pr: PullRequestFacts): Promise<string> {
+  const cwd = deps.cwd;
+  try {
+    await deps.git(['fetch', '--quiet', 'origin', main, develop], cwd);
+    try {
+      await deps.git(['merge-base', '--is-ancestor', `origin/${main}`, `origin/${develop}`], cwd);
+      return gitNotice('back.already', { main, develop });
+    } catch {
+      /* a develop ainda não contém a main: segue para o pull request */
+    }
+  } catch (e) {
+    return gitNotice('back.createFailed', { main, develop, error: errorLine(e) });
+  }
+
+  let url = '';
+  try {
+    const list = parseJson(await deps.gh(['pr', 'list', '--base', develop, '--head', main, '--state', 'open', '--json', 'url'], cwd));
+    const first = Array.isArray(list) ? (list[0] as { url?: unknown } | undefined) : undefined;
+    url = str(first?.url);
+  } catch (e) {
+    deps.log(`[${cardRef(story)}] gh pr list falhou (${errorLine(e)}); tentando abrir o pull request de volta.`);
+  }
+  if (!url) {
+    try {
+      const out = await deps.gh(
+        [
+          'pr',
+          'create',
+          '--base',
+          develop,
+          '--head',
+          main,
+          '--title',
+          gitNotice('back.prTitle', { main, develop, number: story.number }),
+          '--body',
+          gitNotice('back.prBody', { pr: pr.url, main, develop }),
+        ],
+        cwd,
+      );
+      // o gh imprime o endereço do pull request na última linha
+      url =
+        out
+          .trim()
+          .split(/\r?\n/)
+          .reverse()
+          .find((l) => /^https?:\/\//.test(l.trim()))
+          ?.trim() ?? '';
+      if (!url) throw new Error(`resposta inesperada do gh: ${out.trim().slice(0, 200) || '(vazia)'}`);
+    } catch (e) {
+      return gitNotice('back.createFailed', { main, develop, error: errorLine(e) });
+    }
+  }
+
+  let error = '';
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await deps.gh(['pr', 'merge', url, '--merge'], cwd);
+      return gitNotice('back.merged', { main, develop, url });
+    } catch (e) {
+      error = errorLine(e);
+      // logo depois de criado o GitHub ainda calcula o mergeable (UNKNOWN): espera e tenta de novo
+      if (attempt < 3) await (deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))))(5000);
+    }
+  }
+  try {
+    const view = parseJson(await deps.gh(['pr', 'view', url, '--json', 'mergeable,state'], cwd)) as { mergeable?: unknown } | undefined;
+    if (view?.mergeable === 'CONFLICTING') return gitNotice('back.conflict', { main, develop, url });
+  } catch {
+    /* sem a razão, o aviso genérico serve */
+  }
+  return gitNotice('back.notMerged', { main, develop, url, error });
+}
+
 /**
  * Limpa a história concluída, na ordem: proteções (RF8), pendências (RF6), worktree (RF1), branch
  * local (RF2, RF7), branch remota (RF3, RF8), `develop` local (RF4, RF5). Nunca rejeita: cada passo
  * falha sozinho e vira aviso (RF9). Grava um único comentário, com os avisos antes do que foi feito.
  *
- * Pontos de extensão da parte 2 (#480): a troca de base das histórias empilhadas entra depois das
- * pendências e antes da worktree (e pode segurar a remota); a volta da principal para a `develop`
- * no hotfix (`pr.baseRefName === main`) entra depois da `develop`.
+ * Parte 2 (#480): a troca de base das histórias empilhadas (RF11, RF12) entra depois das pendências e
+ * antes da worktree, mesmo com pendência (o merge já aconteceu), e pode segurar a remota; a volta da
+ * principal para a `develop` no hotfix (`pr.baseRefName === main`, RF14–RF16) entra depois da `develop`.
  */
 export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, story: Card, pr: PullRequestFacts): Promise<void> {
   const ref = cardRef(story);
@@ -210,6 +352,15 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
         // sem saber o que está pendente, não apaga; o git falhando aqui é raro e vai para o log
         deps.log(`[${ref}] Limpeza pulada: não deu para conferir as pendências (${errorLine(e)}).`);
       }
+    }
+
+    // a pilha é refeita antes de apagar a branch: a base das seguintes passa para a base real do PR (D3)
+    let keepRemote: string | null = null;
+    if (safe) {
+      const newBase = pr.baseRefName || story.baseBranch || prBaseOf(router.snapshot(), story)?.baseBranch || '';
+      const restack = await restackFollowers(router, deps, story, newBase);
+      keepRemote = restack.keepRemote;
+      restack.lines.forEach(say);
     }
 
     let worktrees = await listWorktrees(deps);
@@ -253,7 +404,8 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
       say(gitNotice('cleanup.noOrigin', { develop }));
     }
 
-    if (clean && hasOrigin) {
+    if (clean && hasOrigin && keepRemote) deps.log(`[${ref}] Branch remota ${branch} mantida: ${keepRemote}`);
+    if (clean && hasOrigin && !keepRemote) {
       try {
         // `refs/heads/` casa o nome exato; só o nome casaria também `outra/<branch>` pelo fim
         const remote = (await deps.git(['ls-remote', '--heads', 'origin', `refs/heads/${branch}`], projectDir)).trim();
@@ -270,6 +422,9 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
     }
 
     if (hasOrigin) say(await updateDevelop(deps, develop));
+    // hotfix: a base real do PR é a principal, e a develop precisa receber a correção (RF14)
+    if (merged && hasOrigin && main && pr.baseRefName === main && develop !== main)
+      say(await backMergeMain(deps, main, develop, story, pr));
   } catch (e) {
     deps.log(`[${ref}] Falha inesperada na limpeza: ${errorLine(e)}`);
   }

@@ -103,6 +103,28 @@ export const gitNotices: Record<string, string> = {
     '**Warning:** The cleanup deleted nothing: the pull request {pr} could not be confirmed through gh ({error}).',
   '**Aviso:** O repositório não tem o remoto origin: a branch remota e a {develop} não foram tocadas.':
     '**Warning:** The repository has no origin remote: the remote branch and {develop} were not touched.',
+
+  // pilha e volta da principal no hotfix (#480)
+  '**Aviso:** A branch remota origin/{branch} não foi apagada: o pull request {nextPr} da história #{number} ainda a usa como base. Troque a base dele (gh pr edit {nextPr} --base {base}) e apague com: git push origin --delete {branch}':
+    '**Warning:** The remote branch origin/{branch} was not deleted: the pull request {nextPr} of story #{number} still uses it as its base. Change its base (gh pr edit {nextPr} --base {base}) and delete it with: git push origin --delete {branch}',
+  'A história #{prev}, sobre a qual esta estava empilhada, foi concluída: a base desta história passou de {old} para {base}. Antes de continuar, traga a nova base para a branch (git fetch origin {base} e git merge origin/{base}), sem rebase nem push forçado.':
+    "Story #{prev}, which this one was stacked on, was completed: this story's base changed from {old} to {base}. Before continuing, bring the new base into the branch (git fetch origin {base} and git merge origin/{base}), without rebase or force push.",
+  'A base do pull request {pr} também passou para {base}.': 'The base of the pull request {pr} also changed to {base}.',
+  '**Aviso:** a base do pull request {pr} não foi trocada: {error}. Troque com: gh pr edit {pr} --base {base}':
+    '**Warning:** the base of the pull request {pr} was not changed: {error}. Change it with: gh pr edit {pr} --base {base}',
+  'A {main} voltou para a {develop} pelo pull request {url}, com merge commit.':
+    '{main} was merged back into {develop} through the pull request {url}, with a merge commit.',
+  'A {develop} já contém a {main}: não foi preciso abrir o pull request de volta.':
+    '{develop} already contains {main}: no back-merge pull request was needed.',
+  '**Aviso:** O pull request {url} da {main} para a {develop} tem conflito e ficou aberto. O board não resolve conflitos: resolva-o no GitHub ou localmente e faça o merge com merge commit (gh pr merge {url} --merge).':
+    '**Warning:** The pull request {url} from {main} to {develop} has a conflict and was left open. The board does not resolve conflicts: resolve it on GitHub or locally and merge it with a merge commit (gh pr merge {url} --merge).',
+  '**Aviso:** O pull request {url} da {main} para a {develop} ficou aberto: {error}. Faça o merge com merge commit: gh pr merge {url} --merge':
+    '**Warning:** The pull request {url} from {main} to {develop} was left open: {error}. Merge it with a merge commit: gh pr merge {url} --merge',
+  '**Aviso:** O pull request da {main} para a {develop} não foi aberto: {error}. Abra com: gh pr create --base {develop} --head {main}':
+    '**Warning:** The pull request from {main} to {develop} was not opened: {error}. Open it with: gh pr create --base {develop} --head {main}',
+  'Volta da {main} para a {develop} depois do hotfix #{number}': 'Merge {main} back into {develop} after hotfix #{number}',
+  'Aberto pelo Faz AI depois do merge de {pr}. Faça o merge com merge commit, não com squash: a {develop} precisa conter os commits da {main}.':
+    "Opened by Faz AI after {pr} was merged. Merge it with a merge commit, not squash: {develop} must contain {main}'s commits.",
 };
 
 export const host: Record<string, string> = {

@@ -23,6 +23,27 @@ describe('gitNotice', () => {
     expect(gitNotice('cleanup.title')).toBe('Limpeza da história depois do merge:');
   });
 
+  it('pilha e volta da principal (#480): avisos com **Aviso:**, linhas de sucesso sem, e o título/corpo do PR de volta', () => {
+    expect(gitNotice('cleanup.remoteStillBase', { branch: 'b', nextPr: 'u', number: 3, base: 'develop' })).toBe(
+      '**Aviso:** A branch remota origin/b não foi apagada: o pull request u da história #3 ainda a usa como base. Troque a base dele (gh pr edit u --base develop) e apague com: git push origin --delete b',
+    );
+    expect(gitNotice('stack.moved', { prev: 1, old: 'b', base: 'develop' })).toMatch(
+      /^A história #1, .*passou de b para develop\..*sem rebase nem push forçado\.$/,
+    );
+    expect(gitNotice('stack.prMoved', { pr: 'u', base: 'develop' })).toBe('A base do pull request u também passou para develop.');
+    expect(gitNotice('stack.prFailed', { pr: 'u', base: 'develop', error: 'x' })).toMatch(/^\*\*Aviso:\*\* /);
+    expect(gitNotice('back.merged', { main: 'main', develop: 'develop', url: 'u' })).toBe(
+      'A main voltou para a develop pelo pull request u, com merge commit.',
+    );
+    expect(gitNotice('back.already', { main: 'main', develop: 'develop' })).not.toMatch(/Aviso/);
+    for (const key of ['back.conflict', 'back.notMerged', 'back.createFailed'] as const)
+      expect(gitNotice(key, { main: 'main', develop: 'develop', url: 'u', error: 'x' }), key).toMatch(/^\*\*Aviso:\*\* /);
+    expect(gitNotice('back.prTitle', { main: 'main', develop: 'develop', number: 7 })).toBe(
+      'Volta da main para a develop depois do hotfix #7',
+    );
+    expect(gitNotice('back.prBody', { pr: 'u', main: 'main', develop: 'develop' })).toContain('não com squash');
+  });
+
   it('o aviso de pendência cita a limpeza de órfãs', () => {
     expect(gitNotice('cleanup.dirty', { path: '/p', files: 'a.ts', branch: 'b' })).toContain('limpeza de branches e worktrees órfãs');
     expect(gitNotice('cleanup.unpushed', { branch: 'b', count: 1, pr: 'u', path: '/p' })).toContain(

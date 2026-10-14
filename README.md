@@ -772,6 +772,18 @@ nada muda: a conclusão só remove a worktree, como antes. Não há opção para
 do gitflow. Branches e worktrees que já sobraram de antes ficam para a limpeza de órfãs, que vem em
 outra entrega.
 
+#### Pilha e hotfix
+
+- **História empilhada.** Se outra história foi criada sobre a branch da que acabou de ser concluída,
+  o board troca a base dela para a `develop` (e a base do PR dela também) **antes** de apagar a branch
+  remota. Se a troca falhar, a remota fica e a conversa avisa.
+- **Merge commit para a principal.** O PR que entra na branch principal (hotfix ou release) é mesclado
+  com merge commit, seja qual for o tipo de merge configurado. O commit de merge das histórias fica
+  assim na tag, e o arquivamento das histórias publicadas depende disso.
+- **Depois de um hotfix.** O board abre e mescla um PR `main → develop`, também com merge commit, para
+  a `develop` receber a correção. Nunca há push direto. Se houver conflito, o PR fica aberto e a
+  conversa do card avisa para você resolver.
+
 ### Registros de decisão
 
 Com **Faz AI › Git › Registros de decisão** (`fazai.git.decisionRecords`) apontando para uma pasta
@@ -1489,6 +1501,10 @@ com o push concluído, faz o merge (squash). Por fim atualiza a main local, apag
 (local e remota) e cria a tag e a GitHub Release com o `.vsix`. Se algo parar depois da publicação,
 `npm run release -- finish` retoma de onde parou (na branch de release ou na main), sem publicar de
 novo. `--dry-run` ensaia sem publicar. As opções estão no topo de `scripts/release.mjs`.
+
+Num hotfix (card do tipo Bug, branch `hotfix/...`), rode `npm run release` na worktree da `hotfix/`
+**antes** de aprovar o card. Aprovado antes, o PR entra na principal sem versão e a correção só sai
+no próximo release da `develop`.
 
 Entre empacotar e publicar, o release abre o `.vsix` e confere os quatro arquivos de vitrine
 (`README.md`, `README_EN.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`): o changelog precisa ter o título

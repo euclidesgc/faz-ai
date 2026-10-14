@@ -806,6 +806,18 @@ branch") nothing changes: the conclusion only removes the worktree, as before. T
 turn the cleanup off separately from gitflow. Branches and worktrees left over from before are for
 the orphan cleanup, which comes in another delivery.
 
+#### Stack and hotfix
+
+- **Stacked story.** If another story was created on top of the branch of the one just concluded, the
+  board changes its base to `develop` (and its PR's base too) **before** deleting the remote branch.
+  If the change fails, the remote branch stays and the conversation says so.
+- **Merge commit into the main branch.** The PR that goes into the main branch (hotfix or release) is
+  merged with a merge commit, whatever merge type is configured. That keeps the stories' merge commit
+  in the tag, and archiving the published stories depends on it.
+- **After a hotfix.** The board opens and merges a `main → develop` PR, also with a merge commit, so
+  `develop` receives the fix. There is never a direct push. On conflict, the PR stays open and the
+  card's conversation tells you to resolve it.
+
 ### Decision records
 
 With **Faz AI › Git › Registros de decisão** (decision records, `fazai.git.decisionRecords`) pointing
@@ -1563,6 +1575,10 @@ Then it updates the local main, deletes the release branch (local and remote) an
 and the GitHub Release with the `.vsix`. If anything stops after publishing,
 `npm run release -- finish` picks up where it left off (on the release branch or on main), without
 publishing again. `--dry-run` rehearses without publishing. The options are at the top of `scripts/release.mjs`.
+
+For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `hotfix/` worktree
+**before** approving the card. Approved first, the PR goes into main without a version and the fix
+only ships in the next release from `develop`.
 
 Between packaging and publishing, the release opens the `.vsix` and checks the four showcase files
 (`README.md`, `README_EN.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`): the changelog needs the version

@@ -277,11 +277,18 @@ describe('limpeza depois do merge', () => {
 
   it('RF8: nunca apaga a principal nem a develop, mesmo com o PR vindo delas', async () => {
     await storyWithWork();
+    await call('create_card', { title: 'Viva', column: 'Implementação' });
+    const liveId = router.snapshot().cards[router.snapshot().cards.length - 1]!.id;
+    router.handle({ type: 'card.baseBranch.set', cardId: liveId, base: 'develop' });
     for (const branch of ['main', 'develop']) {
       await cleanUpStory(router, deps, { ...card(1), branch }, prFacts(branch));
       expect(hasRef(repo, `refs/heads/${branch}`)).toBe(true);
       expect(remoteHas(branch)).toBe(true);
     }
+    // uma história viva empilhada na develop não é tocada
+    const live = router.snapshot().cards.find((c) => c.id === liveId)!;
+    expect(live.baseBranch).toBe('develop');
+    expect(notices(live.number)).toEqual([]);
     const bodies = notices(1);
     expect(bodies).toHaveLength(2);
     expect(bodies[0]).toContain(
@@ -507,5 +514,307 @@ describe('pendingWork', () => {
     commit(story.worktreePath, 'z.ts', '2');
     expect(await pendingWork(deps, repo, story, pr)).toEqual({ dirtyFiles: [], extraCommits: 2 });
     expect(await pendingWork(deps, repo, story, { ...pr, headRefOid: '0'.repeat(40) })).toMatchObject({ extraCommits: 1 });
+  });
+});
+
+/** o `gh` falso da parte 2 (#480): registra as chamadas e responde pelo `answer` */
+const fakeGh = (answer: (args: string[]) => string | Promise<string> = () => '') => {
+  const calls: string[][] = [];
+  deps.gh = async (args) => {
+    calls.push(args);
+    return answer(args);
+  };
+  return calls;
+};
+const PR2 = 'https://github.com/acme/app/pull/8';
+const BACK = 'https://github.com/acme/app/pull/9';
+
+/** Mescla a branch em `target` no origin (squash, como o GitHub) sem mexer no clone do board. */
+function mergeOnOrigin(branch: string, target: string): void {
+  const other = path.join(base, 'outro');
+  fs.rmSync(other, { recursive: true, force: true });
+  git(base, 'clone', '-q', origin, other);
+  identity(other);
+  // o clone já abre na main; qualquer outra branch é criada a partir do origin
+  if (target === 'main') git(other, 'switch', '-q', 'main');
+  else git(other, 'switch', '-q', '-c', target, `origin/${target}`);
+  git(other, 'merge', '--squash', `origin/${branch}`);
+  git(other, 'commit', '-q', '-m', `squash de ${branch}`);
+  git(other, 'push', '-q', 'origin', target);
+  fs.rmSync(other, { recursive: true, force: true });
+}
+
+/** Cria a história seguinte, derivada da anterior: a branch dela parte da branch da anterior (pilha). */
+async function stackedOn(prev: Card, title = 'Parte 2'): Promise<Card> {
+  await call('create_card', { title, column: 'Implementação', derived_from: prev.number });
+  const n = router.snapshot().cards.length;
+  await call('prepare_workspace', { card: n });
+  const c = card(n);
+  expect(c.baseBranch).toBe(prev.branch);
+  commit(c.worktreePath, 'b.ts', 'export {};');
+  git(c.worktreePath, 'push', '-q', '-u', 'origin', c.branch);
+  return card(n);
+}
+
+/** Cria um Bug (hotfix/ a partir da principal) com commit e push. */
+async function hotfixWithWork(): Promise<Card> {
+  await call('create_card', { title: 'Crash', type: 'Bug', column: 'Implementação' });
+  const n = router.snapshot().cards.length;
+  await call('prepare_workspace', { card: n });
+  const c = card(n);
+  expect(c.branch).toMatch(/^hotfix\//);
+  expect(c.baseBranch).toBe('main');
+  // um arquivo por card: a main já traz o do hotfix anterior quando há dois no mesmo teste
+  commit(c.worktreePath, `fix-${n}.ts`, 'export {};');
+  git(c.worktreePath, 'push', '-q', '-u', 'origin', c.branch);
+  return card(n);
+}
+
+describe('pilha: troca de base das seguintes', () => {
+  it('RF11: história empilhada passa a ter a develop como base e o get_card mostra workspace.baseBranch = develop sem stackNote', async () => {
+    const prev = await storyWithWork();
+    const next = await stackedOn(prev);
+    const before = (await call('get_card', { card: next.number })).data.workspace;
+    expect(before).toMatchObject({ baseBranch: prev.branch, prBase: prev.branch });
+    expect(before.stackNote).toContain(`empilhada sobre ${prev.branch}`);
+    squashMergeOnOrigin(prev.branch);
+
+    await cleanUpStory(router, deps, prev, prFacts(prev.branch));
+
+    expect(card(next.number).baseBranch).toBe('develop');
+    const after = (await call('get_card', { card: next.number })).data.workspace;
+    expect(after).toMatchObject({ baseBranch: 'develop', prBase: 'develop' });
+    expect(after.stackNote).toBeUndefined();
+    // a concluída foi limpa normalmente
+    expect(remoteHas(prev.branch)).toBe(false);
+    expect(hasRef(repo, `refs/heads/${prev.branch}`)).toBe(false);
+    expect(report(prev.number).some((l) => l.includes('**Aviso:**'))).toBe(false);
+  });
+
+  it('RF11: comentário na seguinte explica a troca', async () => {
+    const prev = await storyWithWork();
+    const next = await stackedOn(prev);
+    squashMergeOnOrigin(prev.branch);
+    await cleanUpStory(router, deps, prev, prFacts(prev.branch));
+    expect(notices(next.number)).toEqual([
+      `A história #${prev.number}, sobre a qual esta estava empilhada, foi concluída: a base desta história passou de ${prev.branch} para develop. Antes de continuar, traga a nova base para a branch (git fetch origin develop e git merge origin/develop), sem rebase nem push forçado.`,
+    ]);
+    // sem PR na seguinte, o gh não é chamado
+    expect(log.some((l) => l.includes(`passou de ${prev.branch} para develop`))).toBe(true);
+  });
+
+  it('RF11: a troca acontece mesmo com pendência na concluída, e só para as seguintes vivas e em aberto', async () => {
+    const prev = await storyWithWork();
+    const next = await stackedOn(prev);
+    const done = await stackedOn(prev, 'Já concluída');
+    await call('move_card', { card: done.number, column: 'Concluído' });
+    squashMergeOnOrigin(prev.branch);
+    fs.writeFileSync(path.join(prev.worktreePath, 'a.ts'), 'mudou');
+    await cleanUpStory(router, deps, prev, prFacts(prev.branch));
+    expect(card(next.number).baseBranch).toBe('develop');
+    expect(card(done.number).baseBranch).toBe(prev.branch);
+    expect(notices(done.number)).toEqual([]);
+    expect(remoteHas(prev.branch)).toBe(true);
+    expect(report(prev.number)[0]).toContain('mudanças não commitadas');
+  });
+
+  it('RF12: seguinte com PR: chama gh pr edit <url> --base develop antes de apagar a remota', async () => {
+    const prev = await storyWithWork();
+    const next = await stackedOn(prev);
+    router.handle({ type: 'card.pr.set', cardId: next.id, url: PR2 });
+    squashMergeOnOrigin(prev.branch);
+    let remoteAtEdit: boolean | null = null;
+    const calls = fakeGh((args) => {
+      if (args[1] === 'view') return '{"state":"OPEN"}';
+      if (args[1] === 'edit') remoteAtEdit = remoteHas(prev.branch);
+      return '';
+    });
+
+    await cleanUpStory(router, deps, prev, prFacts(prev.branch));
+
+    expect(calls).toEqual([
+      ['pr', 'view', PR2, '--json', 'state'],
+      ['pr', 'edit', PR2, '--base', 'develop'],
+    ]);
+    expect(remoteAtEdit).toBe(true);
+    expect(remoteHas(prev.branch)).toBe(false);
+    expect(card(next.number).baseBranch).toBe('develop');
+    expect(notices(next.number)[0]).toContain(`A base do pull request ${PR2} também passou para develop.`);
+  });
+
+  it('RF12: gh pr edit falha: a remota da anterior não é apagada e há aviso nas duas conversas', async () => {
+    const prev = await storyWithWork();
+    const next = await stackedOn(prev);
+    router.handle({ type: 'card.pr.set', cardId: next.id, url: PR2 });
+    squashMergeOnOrigin(prev.branch);
+    fakeGh((args) => {
+      if (args[1] === 'view') return '{"state":"OPEN"}';
+      throw new Error('HTTP 422: base inválida\ndetalhe');
+    });
+
+    await cleanUpStory(router, deps, prev, prFacts(prev.branch));
+
+    expect(remoteHas(prev.branch)).toBe(true);
+    // o local e a worktree são limpos: só a remota fica, porque o PR seguinte ainda aponta para ela
+    expect(hasRef(repo, `refs/heads/${prev.branch}`)).toBe(false);
+    expect(report(prev.number)[0]).toBe(
+      `- **Aviso:** A branch remota origin/${prev.branch} não foi apagada: o pull request ${PR2} da história #${next.number} ainda a usa como base. Troque a base dele (gh pr edit ${PR2} --base develop) e apague com: git push origin --delete ${prev.branch}`,
+    );
+    expect(card(next.number).baseBranch).toBe('develop');
+    const [body] = notices(next.number);
+    expect(body).toContain(`a base desta história passou de ${prev.branch} para develop`);
+    expect(body).toContain(
+      `**Aviso:** a base do pull request ${PR2} não foi trocada: HTTP 422: base inválida. Troque com: gh pr edit ${PR2} --base develop`,
+    );
+  });
+});
+
+describe('pilha: PR da seguinte já mesclado', () => {
+  it('seguinte com PR já mesclado: troca a base no card sem gh pr edit e sem aviso', async () => {
+    const prev = await storyWithWork();
+    const next = await stackedOn(prev);
+    router.handle({ type: 'card.pr.set', cardId: next.id, url: PR2 });
+    squashMergeOnOrigin(prev.branch);
+    const calls = fakeGh(() => '{"state":"MERGED"}');
+
+    await cleanUpStory(router, deps, prev, prFacts(prev.branch));
+
+    expect(calls.some((c) => c[1] === 'edit')).toBe(false);
+    expect(card(next.number).baseBranch).toBe('develop');
+    expect(remoteHas(prev.branch)).toBe(false);
+    const [body] = notices(next.number);
+    expect(body).toContain('a base desta história passou de');
+    expect(body).not.toContain('pull request');
+    expect(report(prev.number).some((l) => l.includes('**Aviso:**'))).toBe(false);
+  });
+});
+
+describe('hotfix: volta da principal para a develop', () => {
+  it('RF14: hotfix mesclado: abre gh pr create --base develop --head main, mescla com --merge (sem --delete-branch) e põe o link na conversa', async () => {
+    const story = await hotfixWithWork();
+    const pr = prFacts(story.branch, { baseRefName: 'main' });
+    mergeOnOrigin(story.branch, 'main');
+    const calls = fakeGh((args) => (args[1] === 'list' ? '[]' : args[1] === 'create' ? `Creating pull request\n${BACK}\n` : ''));
+
+    await cleanUpStory(router, deps, story, pr);
+
+    expect(calls).toEqual([
+      ['pr', 'list', '--base', 'develop', '--head', 'main', '--state', 'open', '--json', 'url'],
+      [
+        'pr',
+        'create',
+        '--base',
+        'develop',
+        '--head',
+        'main',
+        '--title',
+        `Volta da main para a develop depois do hotfix #${story.number}`,
+        '--body',
+        `Aberto pelo Faz AI depois do merge de ${PR}. Faça o merge com merge commit, não com squash: a develop precisa conter os commits da main.`,
+      ],
+      ['pr', 'merge', BACK, '--merge'],
+    ]);
+    expect(calls.flat()).not.toContain('--delete-branch');
+    expect(report(story.number).at(-1)).toBe(`- A main voltou para a develop pelo pull request ${BACK}, com merge commit.`);
+  });
+
+  it('RF14: PR main→develop já aberto: reaproveita', async () => {
+    const story = await hotfixWithWork();
+    mergeOnOrigin(story.branch, 'main');
+    const calls = fakeGh((args) => (args[1] === 'list' ? JSON.stringify([{ url: BACK }]) : ''));
+    await cleanUpStory(router, deps, story, prFacts(story.branch, { baseRefName: 'main' }));
+    expect(calls.map((c) => c[1])).toEqual(['list', 'merge']);
+    expect(calls[1]).toEqual(['pr', 'merge', BACK, '--merge']);
+    expect(report(story.number).at(-1)).toContain(`pelo pull request ${BACK}, com merge commit`);
+  });
+
+  it('RF14: develop já contém a main: não abre PR', async () => {
+    const story = await hotfixWithWork();
+    mergeOnOrigin(story.branch, 'main');
+    // alguém já levou a main para a develop no origin
+    git(repo, 'fetch', '-q', 'origin');
+    git(repo, 'push', '-q', 'origin', 'origin/main:develop');
+    const calls = fakeGh();
+    await cleanUpStory(router, deps, story, prFacts(story.branch, { baseRefName: 'main' }));
+    expect(calls).toEqual([]);
+    expect(report(story.number).at(-1)).toBe('- A develop já contém a main: não foi preciso abrir o pull request de volta.');
+  });
+
+  it('PR para a develop (feature): não há volta da principal', async () => {
+    const story = await storyWithWork();
+    squashMergeOnOrigin(story.branch);
+    const calls = fakeGh();
+    await cleanUpStory(router, deps, story, prFacts(story.branch));
+    expect(calls).toEqual([]);
+    expect(report(story.number).join('\n')).not.toContain('pull request de volta');
+  });
+
+  it('RF15: volta com conflito (pr merge falha e mergeable=CONFLICTING): PR fica aberto e a conversa cita o conflito e o link', async () => {
+    const story = await hotfixWithWork();
+    mergeOnOrigin(story.branch, 'main');
+    let sleeps = 0;
+    deps.sleep = async (ms) => {
+      expect(ms).toBe(5000);
+      sleeps++;
+    };
+    const calls = fakeGh((args) => {
+      if (args[1] === 'list') return '[]';
+      if (args[1] === 'create') return `${BACK}\n`;
+      if (args[1] === 'merge') throw new Error('GraphQL: Pull Request is not mergeable');
+      if (args[1] === 'view') return JSON.stringify({ mergeable: 'CONFLICTING', state: 'OPEN' });
+      return '';
+    });
+    await cleanUpStory(router, deps, story, prFacts(story.branch, { baseRefName: 'main' }));
+    expect(calls.filter((c) => c[1] === 'merge')).toHaveLength(3);
+    expect(sleeps).toBe(2);
+    expect(calls.at(-1)).toEqual(['pr', 'view', BACK, '--json', 'mergeable,state']);
+    expect(report(story.number)).toContain(
+      `- **Aviso:** O pull request ${BACK} da main para a develop tem conflito e ficou aberto. O board não resolve conflitos: resolva-o no GitHub ou localmente e faça o merge com merge commit (gh pr merge ${BACK} --merge).`,
+    );
+  });
+
+  it('RF9: merge não feito sem conflito e criação do PR falhando: avisos com o erro e o comando', async () => {
+    const story = await hotfixWithWork();
+    mergeOnOrigin(story.branch, 'main');
+    fakeGh((args) => {
+      if (args[1] === 'list') return '[]';
+      if (args[1] === 'create') return `${BACK}\n`;
+      if (args[1] === 'merge') throw new Error('HTTP 405: proteção da branch');
+      return JSON.stringify({ mergeable: 'MERGEABLE', state: 'OPEN' });
+    });
+    await cleanUpStory(router, deps, story, prFacts(story.branch, { baseRefName: 'main' }));
+    expect(report(story.number)).toContain(
+      `- **Aviso:** O pull request ${BACK} da main para a develop ficou aberto: HTTP 405: proteção da branch. Faça o merge com merge commit: gh pr merge ${BACK} --merge`,
+    );
+
+    const story2 = await hotfixWithWork();
+    mergeOnOrigin(story2.branch, 'main');
+    fakeGh((args) => {
+      if (args[1] === 'list') throw new Error('sem rede');
+      if (args[1] === 'create') throw new Error('gh: not logged in');
+      return '';
+    });
+    await cleanUpStory(router, deps, story2, prFacts(story2.branch, { baseRefName: 'main' }));
+    expect(report(story2.number)).toContain(
+      '- **Aviso:** O pull request da main para a develop não foi aberto: gh: not logged in. Abra com: gh pr create --base develop --head main',
+    );
+  });
+
+  it('RF16: hotfix: depois do merge na principal, a worktree e a hotfix/... local e remota não existem', async () => {
+    const story = await hotfixWithWork();
+    mergeOnOrigin(story.branch, 'main');
+    fakeGh((args) => (args[1] === 'list' ? '[]' : args[1] === 'create' ? `${BACK}\n` : ''));
+    await cleanUpStory(router, deps, story, prFacts(story.branch, { baseRefName: 'main' }));
+    expect(worktrees()).toHaveLength(1);
+    expect(fs.existsSync(story.worktreePath)).toBe(false);
+    expect(hasRef(repo, `refs/heads/${story.branch}`)).toBe(false);
+    expect(remoteHas(story.branch)).toBe(false);
+    expect(remoteHas('main')).toBe(true);
+    expect(remoteHas('develop')).toBe(true);
+    expect(report(story.number).slice(0, 3)).toEqual([
+      `- pasta de trabalho ${story.worktreePath} removida`,
+      `- branch local ${story.branch} apagada`,
+      `- branch remota origin/${story.branch} apagada`,
+    ]);
   });
 });

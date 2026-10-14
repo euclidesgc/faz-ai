@@ -132,4 +132,10 @@ export const workspaceHandlers = {
     ctx.cards.setMergeCommit(storyId, msg.commit.trim());
     return true;
   },
+  // Corrige de qual branch a história parte (ex.: a base mudou para a develop quando a anterior foi mesclada).
+  'card.baseBranch.set': (msg, ctx) => {
+    const storyId = storyOfCard(ctx, msg.cardId).id;
+    ctx.cards.setBaseBranch(storyId, msg.base.trim());
+    return true;
+  },
 } satisfies Partial<HandlerMap>;

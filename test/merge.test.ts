@@ -196,6 +196,48 @@ describe('pull request e merge na homologação', () => {
     expect(report[0]!.body).not.toContain('**Aviso:**');
   });
 
+  describe('gitflow e a base do pull request', () => {
+    const setup = async (view: string, mergeMethod: 'squash' | 'merge' | 'rebase' = 'squash') => {
+      (merger as any).deps.mainBranch = () => 'main';
+      router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true, gitflow: true, mergeMethod } } });
+      await call('set_pull_request', { card: 1, url: PR });
+      ghResult = async () => (calls.at(-1)![1] === 'view' ? view : '');
+    };
+    const open = (base: string, over: Record<string, unknown> = {}) =>
+      mergedView(PR, 'historia/1-login', { state: 'OPEN', mergedAt: null, mergeCommit: null, baseRefName: base, ...over });
+
+    it('gitflow ligado e PR para a principal: merge com --merge mesmo com mergeMethod squash', async () => {
+      await setup(open('main'));
+      await approve(1);
+      expect(calls.at(-1)).toEqual(['pr', 'merge', PR, '--merge']);
+      expect(columnOf(1)).toBe('Concluído');
+    });
+
+    it('PR para a develop: usa o mergeMethod configurado', async () => {
+      await setup(open('develop'));
+      await approve(1);
+      expect(calls.at(-1)).toEqual(['pr', 'merge', PR, '--squash']);
+      expect(columnOf(1)).toBe('Concluído');
+    });
+
+    it('PR já mesclado pelo release: não chama pr merge e conclui', async () => {
+      await setup(mergedView(PR, 'historia/1-login', { baseRefName: 'main' }));
+      await approve(1);
+      expect(calls.map((a) => a[1])).toEqual(['view']);
+      expect(columnOf(1)).toBe('Concluído');
+      expect(card(1).status).toBeNull();
+    });
+
+    it('PR fechado sem merge: bloqueia e não conclui', async () => {
+      await setup(open('develop', { state: 'CLOSED' }));
+      await approve(1);
+      expect(calls.map((a) => a[1])).toEqual(['view']);
+      expect(columnOf(1)).toBe('Homologação');
+      expect(card(1).status).toBe('blocked');
+      expect(JSON.stringify(router.snapshot())).toContain(`O pull request ${PR} foi fechado sem merge.`);
+    });
+  });
+
   it('merge que falha no AutoMerger: nenhuma limpeza', async () => {
     router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true, mode: 'worktree', gitflow: true } } });
     await call('set_pull_request', { card: 1, url: PR });

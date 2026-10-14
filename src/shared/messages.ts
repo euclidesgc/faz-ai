@@ -97,6 +97,7 @@ export type WebviewToHost =
   | { type: 'card.pr.set'; cardId: Id; url: string }
   /** registra o commit do merge do pull request da história do card; sem efeito colateral (ao contrário do card.pr.set) */
   | { type: 'card.merge.set'; cardId: Id; commit: string }
+  | { type: 'card.baseBranch.set'; cardId: Id; base: string }
   /**
    * liga ou desliga o modo autônomo (YOLO) da história do card. `until` é a coluna até onde ele vai (a IA
    * faz o trabalho dela, pede a revisão e o modo se desliga); ausente ou null = até a última coluna da IA.
