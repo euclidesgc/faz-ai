@@ -621,3 +621,19 @@ describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada 
     });
   });
 });
+
+describe('HarnessSettings: aviso de como usar', () => {
+  it('aparece até a pessoa dispensar, fica guardado, e volta pelo "Como funciona"', async () => {
+    useBoardStore.setState({ harnessIntroSeen: false });
+    renderTab('claude');
+    const note = () => screen.queryByRole('note', { name: 'Como usar o Harness' });
+    expect(note()).toBeInTheDocument();
+    expect(note()).toHaveTextContent('Por onde começar');
+    expect(screen.queryByRole('button', { name: 'Como funciona' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Entendi, não mostrar de novo' }));
+    expect(note()).toBeNull();
+    expect(useBoardStore.getState().harnessIntroSeen).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Como funciona' }));
+    expect(note()).toBeInTheDocument();
+  });
+});

@@ -2777,6 +2777,23 @@ body.host-web .drawer {
 .harness-callout {
   margin-bottom: var(--sp-12);
 }
+.harness-intro {
+  margin-bottom: var(--sp-16);
+}
+.harness-intro ul {
+  margin: var(--sp-8) 0;
+  padding-left: var(--sp-16);
+  display: grid;
+  gap: var(--sp-4);
+}
+.topic-badge {
+  margin-left: var(--sp-4);
+}
+.board-empty {
+  display: grid;
+  gap: var(--sp-8);
+  padding: var(--sp-8) 0;
+}
 .imported-folders {
   display: grid;
   gap: var(--sp-4);

@@ -507,7 +507,7 @@ describe('ToolHarness: origem Board', () => {
 
   it('um assunto vazio no board orienta a enviar do catálogo', async () => {
     await show('skill', 'Board');
-    expect(screen.getByText(/Nada neste assunto foi enviado ao board/)).toBeInTheDocument();
+    expect(screen.getByText(/Nada neste assunto no board/)).toBeInTheDocument();
   });
 
   it('os sub-agentes do board aparecem como disponíveis, sem seletor de modo', async () => {
@@ -784,5 +784,53 @@ describe('ToolHarness: plugins', () => {
     setClaudeItems([{ ...plugin('velho', 'x', []), install: undefined }]);
     await show('other', 'Global');
     expect(card('Plugins').queryByRole('checkbox')).toBeNull();
+  });
+});
+
+describe('ToolHarness: clareza de uso', () => {
+  const skill = (name: string) =>
+    item({
+      kind: 'skill',
+      name,
+      location: `.claude/skills/${name}/SKILL.md`,
+      layout: 'skills',
+      mode: 'auto',
+      source: sourceOf('claude', '.claude/skills'),
+    });
+  const select = (selection: HarnessSelection[]) => {
+    const s = useBoardStore.getState().state!;
+    useBoardStore.setState({ state: { ...s, harnessSelection: selection } });
+  };
+
+  it('o título da aba diz quantos artefatos estão no board e quantas regras esperam revisão', async () => {
+    setClaudeItems([...CLAUDE_ITEMS, skill('sql'), skill('web')]);
+    select([
+      { kind: 'skill', location: '.claude/skills/sql/SKILL.md', usage: 'contextual' },
+      { kind: 'skill', location: '.claude/skills/sumiu/SKILL.md', usage: 'contextual' },
+      { kind: 'instructions', location: 'CLAUDE.md', usage: 'off' },
+    ]);
+    await show('skill');
+    // o ausente também conta: ele está no board
+    expect(screen.getByRole('tab', { name: /Skills/ })).toHaveTextContent('2 no board');
+    expect(screen.getByRole('tab', { name: /Regras/ })).toHaveTextContent('1 no board, 1 desligadas');
+    expect(screen.getByRole('tab', { name: /Hooks/ })).not.toHaveTextContent('no board');
+  });
+
+  it('na outra ferramenta não há contagem: a marcação só vale para a do projeto', async () => {
+    await show('rules', undefined, 'cursor');
+    expect(screen.getByRole('tab', { name: /Regras/ })).not.toHaveTextContent('no board');
+  });
+
+  it('o Board vazio diz o próximo passo e leva ao catálogo', async () => {
+    setClaudeItems([skill('sql')]);
+    await show('skill', 'Board');
+    expect(screen.getByText(/use "Indicar artefatos" e envie ao board/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ir para Global' }));
+    expect(screen.getByRole('radio', { name: 'Global' })).toHaveAttribute('aria-checked', 'true');
+    cleanup();
+    await show('agent', 'Board');
+    expect(screen.getByText(/Criar agente com ajuda/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ir para Projeto' }));
+    expect(screen.getByRole('button', { name: 'Criar agente com ajuda' })).toBeInTheDocument();
   });
 });

@@ -1,9 +1,10 @@
 import { aiToolInfo } from '../../../shared/harness';
-import { Tabs } from '@radix-ui/themes';
+import { Button, Tabs } from '@radix-ui/themes';
 import { resolveHarnessTab, toolsInOrder } from '../../../shared/harnessTopics';
 import { useBoardStore, type HarnessTab } from '../../store/boardStore';
 import { ProjectTool } from './harness/ProjectTool';
 import { RunnerSettings } from './harness/RunnerSettings';
+import { HarnessIntro } from './harness/HarnessIntro';
 import { ToolHarness } from './harness/ToolHarness';
 import { toolLabel } from './harness/text';
 import { PageHeader } from './PageHeader';
@@ -17,6 +18,8 @@ import { rich } from '../../i18n/rich';
  */
 export function HarnessSettings() {
   const projectTool = useBoardStore((s) => s.state!.board.aiTool);
+  const introSeen = useBoardStore((s) => s.harnessIntroSeen);
+  const setIntroSeen = useBoardStore((s) => s.setHarnessIntroSeen);
   const tool = aiToolInfo(projectTool);
   // um valor antigo (as abas Projeto e Global) cai na ferramenta do projeto
   const tab = resolveHarnessTab(
@@ -27,9 +30,18 @@ export function HarnessSettings() {
     <div>
       <PageHeader title={t('Harness de IA')}>
         {rich(
-          'Toda execução pelo board parte de <b>contexto vazio</b>: nenhuma regra, skill ou agente da sua máquina ou do projeto entra por conta própria. Só entra o que você enviar ao <b>Board</b>. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão. Cada ferramenta tem a sua aba, com um assunto por vez (regras, skills, sub-agentes…); em cada um, escolha a origem: o que está no Board, no Projeto, no Global ou nas pastas importadas.',
+          'O que a IA pode usar nas execuções do board. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; cada ferramenta tem a sua aba, com um assunto por vez, e em cada um a origem: Board, Projeto, Global ou Importados.',
+        )}
+        {introSeen && (
+          <>
+            {' '}
+            <Button variant="ghost" size="1" onClick={() => setIntroSeen(false)}>
+              {t('Como funciona')}
+            </Button>
+          </>
         )}
       </PageHeader>
+      <HarnessIntro />
       <Tabs.Root value={tab} onValueChange={(harnessTab) => useBoardStore.setState({ harnessTab: harnessTab as HarnessTab })}>
         <Tabs.List className="harness-tabs">
           <Tabs.Trigger value="tool">{t('Ferramenta e execução')}</Tabs.Trigger>
