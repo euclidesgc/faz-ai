@@ -49,6 +49,15 @@ partes; cada PR traz só o que é dele.
   de não fazer push direto. Em conflito, o PR fica aberto e o board avisa em vez de resolver.
 - **`release.mjs` pela branch atual.** Na `develop`, faz o release normal; numa `hotfix/...`, publica
   a correção; em qualquer outra, recusa. Evita uma opção nova de linha de comando.
+- **Hotfix reconhecido pela base real do PR (D3, parte 2 / #480).** O board trata a história como
+  hotfix pela base do PR (a principal), não pelo tipo do card nem pelo nome da branch: é a base que
+  decide se a principal precisa voltar para a `develop`.
+- **Troca da base da pilha antes de apagar a remota (#480).** A base da história seguinte e a do PR
+  dela mudam para a `develop` antes do `push --delete`. Se a troca falha, a remota é mantida e a
+  conversa avisa; apagá-la fecharia o PR dependente.
+- **Volta da principal sempre por PR com merge commit (#480).** Depois do hotfix o board abre e
+  mescla `main → develop` por PR, nunca por push direto. Em conflito, o PR fica aberto e a conversa
+  avisa.
 - **Avisos em pt e en**, conforme o idioma do board, num único comentário por conclusão.
 - **Sem migração de banco**: a troca da base usa a coluna `base_branch` que já existe, e o resultado
   da limpeza só vira comentário.

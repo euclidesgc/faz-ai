@@ -255,6 +255,15 @@ e o PR é aberto com `--base` nela. Enquanto a parte anterior, aberta, ainda nã
 `workspace.pullRequest`. A IA não faz o merge: com o merge automático ligado, é o board que roda
 `gh pr merge <url> --squash|--merge|--rebase` quando a pessoa aprova a homologação.
 
+Quando a história anterior de uma pilha é concluída, o board passa a base da seguinte (e a do pull
+request dela) para a base da anterior, normalmente a `develop`, e avisa na conversa. A IA segue
+sempre o `workspace.baseBranch` atual e, se ele mudou, traz a nova base para a branch com
+`git fetch origin <base>` e `git merge origin/<base>`, sem rebase nem push forçado.
+
+No pull request para a principal (hotfix), o merge é sempre por merge commit. Depois do merge, o
+board abre o pull request da principal para a `develop`; a IA não o abre. Ao concluir a história, o
+board apaga a worktree, a branch local e a remota, e atualiza a `develop` local.
+
 ### Fases e documentos
 
 Cada coluna em que a IA atua é uma fase. `get_card` devolve em `phase` a instrução da fase, o nome

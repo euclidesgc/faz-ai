@@ -112,6 +112,25 @@ describe('workspace do get_card (#462)', () => {
     expect(ws.stackNote).toContain('empilhada sobre feature/99-anterior');
   });
 
+  it('get_card: stackNote só quando a base é branch de outra história', async () => {
+    const dev = await withBranch({ branch: 'feature/1-card', worktreePath: '/w', baseBranch: 'develop' });
+    expect(detail(dev.s, dev.card).workspace).not.toHaveProperty('stackNote');
+
+    const outra = { ...(await withBranch({})).card, id: 'anterior', number: 99, branch: 'feature/99-anterior', parentId: null };
+    const viva = await withBranch({ branch: 'feature/1-card', worktreePath: '/w', baseBranch: 'feature/99-anterior' }, undefined, [outra]);
+    expect(detail(viva.s, viva.card).workspace!.stackNote).toContain('empilhada sobre feature/99-anterior');
+
+    // a anterior concluída (coluna done) já foi mesclada: a base continua exposta, a nota some
+    const done = viva.s.columns.find(
+      (c) => c.category === 'done' && c.workflowId === viva.s.columns.find((k) => k.id === viva.card.columnId)?.workflowId,
+    );
+    expect(done).toBeDefined();
+    const s2 = { ...viva.s, cards: viva.s.cards.map((c) => (c.id === 'anterior' ? { ...c, columnId: done!.id } : c)) };
+    const ws = detail(s2, viva.card).workspace!;
+    expect(ws.baseBranch).toBe('feature/99-anterior');
+    expect(ws).not.toHaveProperty('stackNote');
+  });
+
   it('a nota do modo autônomo na última coluna manda abrir o pull request com --base na base do PR', async () => {
     const { s, card } = await withBranch((s0) => ({
       branch: 'feature/1-card',

@@ -40,6 +40,17 @@ beforeEach(async () => {
   });
 });
 
+describe('card.baseBranch.set', () => {
+  it('grava a base na história, mesmo chamado de uma sub-tarefa', () => {
+    create('História', parentColumnName());
+    create('Sub-tarefa', childColumnName(), 1);
+
+    router.handle({ type: 'card.baseBranch.set', cardId: card(2).id, base: ' develop ' });
+
+    expect(card(1).baseBranch).toBe('develop');
+  });
+});
+
 describe('card.merge.set', () => {
   it('grava o commit do merge numa história', () => {
     create('História', parentColumnName());

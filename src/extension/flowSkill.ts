@@ -82,7 +82,7 @@ derivadas, em ordem, cada uma com \`derived_from\` = a parte anterior (a primeir
 história; a segunda, da primeira derivada, e assim por diante). No modo autônomo, use
 \`autonomous_from\` = esta história em todas, na ordem: a fila já empilha cada uma sobre a anterior. A
 branch de cada derivada parte da branch da anterior, e o pull request dela é empilhado sobre o da
-anterior (\`workspace.baseBranch\` e \`workspace.prBase\` no \`get_card\`).
+anterior (\`workspace.baseBranch\` e \`workspace.prBase\` no \`get_card\`). Quando a anterior é concluída, o board passa a base da seguinte (e a do pull request dela) para a base da anterior, normalmente a \`develop\`, e avisa na conversa: siga sempre o \`workspace.baseBranch\` atual e, se ele mudou, traga a nova base para a branch com \`git fetch origin <base>\` e \`git merge origin/<base>\`, sem rebase nem push forçado.
 
 Declare a ordem entre elas: em \`create_card\`, \`depends_on\` lista as sub-tarefas que precisam
 terminar antes (ou use \`link_cards\` com \`depends_on\` depois). Uma sub-tarefa depende de outra
@@ -190,6 +190,8 @@ A entrega é para a pessoa testar, então o roteiro de testes é parte dela, em 
 Não faça o merge: ele depende da aprovação da pessoa. Com o merge automático ligado (Configurações →
 Git), a aprovação dela faz o merge e leva a história a Concluído; desligado, a IA move o card aprovado.
 
+Num hotfix (pull request para a principal), não abra pull request da principal para a \`develop\`: depois do merge, o board faz isso.
+
 ## Modo autônomo (YOLO)
 
 Quando o card (ou a história dele) mostra \`autonomous: true\`, a pessoa liberou a história para
@@ -228,7 +230,7 @@ rodar sozinha: ninguém aprova nem responde. Então:
   uma alternativa ao fluxo normal com PR, só vale quando de fato não há PR a registrar;
 - histórias em modo autônomo formam uma fila e uma pilha de pull requests: cada uma parte da branch da
   anterior (\`workspace.baseBranch\` no \`get_card\`) e o PR é aberto com \`--base\` em \`workspace.prBase\`
-  (a branch da anterior). Para dividir um pedido grande, crie as próximas histórias com \`create_card\` e \`autonomous_from\`, em ordem de dependência.
+  (a branch da anterior). Quando a anterior é concluída, o board passa a base da seguinte (e a do pull request dela) para a base da anterior, normalmente a \`develop\`, e avisa na conversa: siga sempre o \`workspace.baseBranch\` atual e, se ele mudou, traga a nova base para a branch com \`git fetch origin <base>\` e \`git merge origin/<base>\`, sem rebase nem push forçado. Para dividir um pedido grande, crie as próximas histórias com \`create_card\` e \`autonomous_from\`, em ordem de dependência.
 
 ## Quando parar
 

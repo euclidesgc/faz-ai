@@ -390,7 +390,7 @@ function criticalAreasOf(s: BoardState, c: Card) {
  * A base do pull request (#462): sempre que a história tem branch, a IA lê aqui para onde abri-lo. Sem repositório
  * detectado e com a base vazia (história anterior ao gitflow), `prBase` fica de fora e a nota manda usar a principal.
  */
-function prBaseFields(base: PrBase | null) {
+function prBaseFields(base: PrBase | null, stackedOnLive: boolean) {
   if (!base) return {};
   if (!base.prBase) {
     return { prNote: 'Abra o pull request contra a branch principal do repositório (ex.: gh pr create --base <a branch principal>).' };
@@ -399,7 +399,7 @@ function prBaseFields(base: PrBase | null) {
     baseBranch: base.baseBranch,
     prBase: base.prBase,
     prNote: `Abra o pull request com --base ${base.prBase} (ex.: gh pr create --base ${base.prBase}).`,
-    ...(base.stacked
+    ...(stackedOnLive
       ? {
           stackNote: `Esta história está empilhada sobre ${base.baseBranch}: diga na descrição do pull request de qual pull request ele depende.`,
         }
@@ -416,7 +416,12 @@ function workspaceOf(s: BoardState, c: Card) {
       workspace: {
         branch: story.branch,
         path: story.worktreePath,
-        ...prBaseFields(base),
+        ...prBaseFields(
+          base,
+          // a nota só vale enquanto a história da base está viva: já concluída, o PR dela foi mesclado e não há do que depender
+          !!base?.stacked &&
+            s.cards.some((o) => o.id !== story.id && !o.parentId && o.branch === story.baseBranch && cardStatus(s, o) === 'open'),
+        ),
         ...(story.prUrl ? { pullRequest: story.prUrl } : {}),
         ...(story.mergeCommit ? { mergeCommit: story.mergeCommit } : {}),
         note:
