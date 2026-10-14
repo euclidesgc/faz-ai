@@ -41,7 +41,7 @@ export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
 export type View = 'board' | 'archived' | 'trash' | 'settings' | 'metrics' | 'environment';
 /** Abas da tela de Harness de IA: a ferramenta e a execução, ou uma ferramenta de IA (ver `harnessTopics.ts`). */
 export type { HarnessTab };
-import { resolveHarnessTab, type HarnessTab, type HarnessTopic } from '../../shared/harnessTopics';
+import { resolveHarnessTab, type HarnessOrigin, type HarnessTab, type HarnessTopic } from '../../shared/harnessTopics';
 import { type SettingsTab } from '../../shared/settingsTab';
 import { SETTINGS_SECTIONS } from '../../shared/settingsSections';
 export type { SettingsTab };
@@ -93,6 +93,8 @@ interface BoardStore extends UiState, ViewState {
   state: BoardState | null;
   /** o assunto aberto dentro da aba da ferramenta no Harness; fica na memória, não é guardado */
   harnessTopic: HarnessTopic;
+  /** a origem escolhida na aba da ferramenta (Board, Projeto, Global, Importados); vale para todos os assuntos, fica na memória */
+  harnessOrigin: HarnessOrigin;
   /** o chat está aberto no painel lateral do board (no navegador; no editor ele fica na barra lateral) */
   chatOpen: boolean;
   setChatOpen(open: boolean): void;
@@ -211,6 +213,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     // delas aberta guarda o valor antigo, que a tela resolve para a ferramenta do projeto (`resolveHarnessTab`)
     harnessTab: persisted?.harnessTab && persisted.harnessTab !== ('all' as string) ? persisted.harnessTab : 'tool',
     harnessTopic: 'rules',
+    harnessOrigin: 'project',
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
@@ -259,6 +262,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
           settingsTab: info.tab,
           ...(info.harnessTab && { harnessTab: harnessTabOf(info.harnessTab, get().state) }),
           ...(info.harnessTopic && { harnessTopic: info.harnessTopic }),
+          ...(info.harnessOrigin && { harnessOrigin: info.harnessOrigin }),
           pendingSettingsSection: section,
         });
         persist(get());
@@ -372,6 +376,7 @@ export function useHostSync(): void {
           pendingSettingsSection: msg.section ?? null,
           ...(info?.harnessTab && { harnessTab: harnessTabOf(info.harnessTab, s.state) }),
           ...(info?.harnessTopic && { harnessTopic: info.harnessTopic }),
+          ...(info?.harnessOrigin && { harnessOrigin: info.harnessOrigin }),
         });
       } else if (msg.type === 'ui.openView') s.setView(msg.view);
     });

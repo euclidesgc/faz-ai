@@ -1055,21 +1055,24 @@ review, and an empty Board goes straight to Projeto or Global. The screen has th
    project's tool first, with the **ferramenta deste projeto** (this project's tool) badge. On the
    other one the board marks do not apply (runs use the project's tool): it is there to read and
    edit files.
-2. **One subject per tab**: **Regras** (rules), **Skills**, **Sub-agentes** (sub-agents), **MCPs**,
+2. **Where to look**, in a selector above the subject tabs that applies to all of them: **Board**,
+   **Projeto** (project), **Global** and, when there is an imported folder, **Importados**
+   (imported). Project, Global and Imported are the **catalog**: everything the tool loads from that
+   source, and being in the catalog takes no space in the AI context. **Projeto** is what the tool
+   reads in the project folder; **Global**, what it reads from your user folder (`~/.claude`,
+   `~/.cursor`…), installed plugins and your organization; **Importados**, what the board found in
+   the folders you pointed to. **Board** is what you sent, with the mode of each one. Switching
+   subject keeps the choice.
+3. **One subject per tab**: **Regras** (rules), **Skills**, **Sub-agentes** (sub-agents), **MCPs**,
    **Comandos** (commands), **Hooks** and **Demais** (other: memory, settings and permissions,
-   output styles, plugins and the organization policy). Only the subjects the tool has show up. Only
-   the subject in view is mounted, which keeps the screen light in an environment with many
-   artifacts.
-3. **The origin of the artifacts**, in a selector inside the subject: **Board**, **Projeto**
-   (project), **Global** and, when there is an imported folder, **Importados** (imported). Project,
-   Global and Imported are the **catalog**: everything the tool loads from that source, and being in
-   the catalog takes no space in the AI context. **Projeto** is what the tool reads in the project
-   folder; **Global**, what it reads from your user folder (`~/.claude`, `~/.cursor`…), installed
-   plugins and your organization; **Importados**, what the board found in the folders you pointed
-   to. **Board** is what you sent, with the mode of each one.
+   output styles, plugins and the organization policy). Only the subjects the tool has show up, and
+   each tab's title counts what the chosen scope has ("3 no board" on the Board; the number of
+   artifacts in the catalog). On the Board, Comandos, Hooks and Demais say they do not go on the
+   board. Only the subject in view is mounted, which keeps the screen light in an environment with
+   many artifacts.
 
-Each subject has a **search** field that filters rows by part of the name or the description, in the
-catalog and on the Board. Every action button on the screen (Reler pastas, Novo agente, Sugerir
+Next to the selector is the **search** field, which filters rows by part of the name or the
+description, in the catalog and on the Board. Every action button on the screen (Reler pastas, Novo agente, Sugerir
 agentes com IA, Enviar para o board…) has a **hint** that says what the click does, opened on hover
 or on keyboard focus; when disabled, the hint says why. The catalog groups are always the same, in
 the same order:

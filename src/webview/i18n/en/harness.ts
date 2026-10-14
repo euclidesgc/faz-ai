@@ -887,4 +887,10 @@ export const harness: Record<string, string> = {
     'Asks the tool to enable the checked plugins; takes effect in its next session.',
   'Pede confirmação e desinstala os plugins marcados pela ferramenta.':
     'Asks for confirmation and uninstalls the checked plugins through the tool.',
+  'O que a IA pode usar nas execuções do board. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; cada ferramenta tem a sua aba: primeiro onde olhar (Board, Projeto, Global ou Importados), depois um assunto por vez.':
+    'What the AI can use in board runs. <b>Ferramenta e execução</b> (tool and execution) picks the AI, the permission and the default agent; each tool has its own tab: first where to look (Board, Projeto, Global or Importados), then one subject at a time.',
+  'Tudo que o {tool} carrega. Escolha onde olhar e depois o assunto: o <b>catálogo</b> (Projeto, Global e Importados) mostra o que existe e não ocupa o contexto da IA; só o que você envia ao <b>Board</b> pode ser usado pelas execuções, no modo de cada artefato.':
+    'Everything {tool} loads. Pick where to look and then the subject: the <b>catalog</b> (Projeto, Global and Importados) shows what exists and takes no space in the AI context; only what you send to the <b>Board</b> can be used by runs, in the mode of each artifact.',
+  'Este assunto não entra no board: a ferramenta carrega esses arquivos por conta própria. Veja em Projeto ou Global.':
+    'This subject does not go on the board: the tool loads these files on its own. See Projeto or Global.',
 };

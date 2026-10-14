@@ -1,5 +1,5 @@
-// A organização da tela do Harness: uma aba por ferramenta, nela uma aba por assunto e, em cada assunto,
-// a origem dos artefatos (Board, Projeto, Global, Importados). Lógica pura, para a tela e os testes.
+// A organização da tela do Harness: uma aba por ferramenta; nela, a origem dos artefatos (Board, Projeto, Global,
+// Importados) escolhida antes; e, na origem, uma aba por assunto. Lógica pura, para a tela e os testes.
 import { AI_TOOLS, type AiTool, type HarnessItem } from './harness';
 import { HARNESS_CATALOG, HARNESS_NOTES, groupOf, type HarnessGroup } from './harnessCatalog';
 import { missingSelections, selectedItems, type SelectableKind } from './harnessSelection';
@@ -41,6 +41,20 @@ export const HARNESS_TOPICS: TopicInfo[] = [
 
 /** Onde o artefato está: no banco do board ou numa das três fontes do catálogo. */
 export type HarnessOrigin = 'board' | 'project' | 'user' | 'imported';
+
+/**
+ * As origens que a aba de uma ferramenta oferece, na ordem do seletor: Board só na ferramenta do projeto (a marcação
+ * vale só para ela); Importados só com pasta importada.
+ */
+export function originsOf(projectTool: boolean, hasImports: boolean): HarnessOrigin[] {
+  return [...(projectTool ? (['board'] as const) : []), 'project', 'user', ...(hasImports ? (['imported'] as const) : [])];
+}
+
+/** Quantos artefatos do assunto existem nesta fonte do catálogo: o número que a aba do assunto mostra fora do Board. */
+export function topicCount(tool: AiTool, items: HarnessItem[], topic: TopicInfo, origin: Exclude<HarnessOrigin, 'board'>): number {
+  const groups = groupsFor(topic, origin);
+  return items.filter((i) => catalogOriginOf(tool, i) === origin && groups.includes(groupOf(tool, i))).length;
+}
 
 /** Os assuntos que fazem sentido para a ferramenta: têm fonte no catálogo, item no inventário ou nota. */
 export function topicsOf(tool: AiTool, items: HarnessItem[]): TopicInfo[] {
