@@ -2186,6 +2186,38 @@ button.heartbeat.stopped:hover {
   gap: var(--sp-4);
 }
 
+/* véu de espera sobre o board inteiro (recriar, atualizar, importar): acima das janelas (60) e abaixo dos avisos (80) */
+.busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.busy-overlay-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+  padding: var(--sp-20) var(--sp-24);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-md);
+  color: var(--fg);
+}
+.busy-overlay-card > .spinner {
+  width: 18px;
+  height: 18px;
+  border-color: var(--accent);
+  border-top-color: transparent;
+}
+.busy-overlay-card p {
+  margin: 0;
+}
 /* avisos flutuantes: não empurram o board nem somem atrás do card aberto */
 .toasts {
   position: fixed;

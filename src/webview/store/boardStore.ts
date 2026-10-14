@@ -109,6 +109,9 @@ interface BoardStore extends UiState, ViewState {
   /** backup do board em andamento: exportando, ou lendo o arquivo escolhido para importar */
   backupBusy: 'export' | 'import' | null;
   setBackupBusy(busy: 'export' | 'import' | null): void;
+  /** véu sobre o board inteiro enquanto uma ação que troca todo o estado roda (ver `withOverlay`) */
+  busyOverlay: { label: string } | null;
+  setBusyOverlay(overlay: { label: string } | null): void;
   setState(state: BoardState, attachmentsBaseUri: string): void;
   setViewState(view: ViewState): void;
   setError(msg: string | null): void;
@@ -194,6 +197,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     harnessFile: null,
     backupBusy: null,
     setBackupBusy: (backupBusy) => set({ backupBusy }),
+    busyOverlay: null,
+    setBusyOverlay: (busyOverlay) => set({ busyOverlay }),
     // o Diagnóstico é de passagem: ao reabrir, volta para o board
     view: persisted?.view === 'environment' ? 'board' : (persisted?.view ?? 'board'),
     settingsTab: persisted?.settingsTab ?? 'columns',
@@ -377,6 +382,22 @@ export function useFilteredIds(): Set<Id> | null {
   return useMemo(() => (state ? applyFilters(state, filters) : null), [state, filters]);
 }
 
+/**
+ * Roda uma ação que troca o board inteiro com o véu de espera na tela (`BusyOverlay`): o véu fecha quando o host
+ * confirma ou falha (o erro já virou toast). Para ações que cabem num botão ou numa seção, use `useAction`.
+ */
+export async function withOverlay(label: string, fn: () => Promise<void>): Promise<void> {
+  const { setBusyOverlay } = useBoardStore.getState();
+  setBusyOverlay({ label });
+  try {
+    await fn();
+  } catch {
+    /* o toast de erro já apareceu; o que importa aqui é tirar o véu */
+  } finally {
+    setBusyOverlay(null);
+  }
+}
+
 /** O diálogo de confirmação da importação: o resumo do arquivo e o aviso de que o board atual será apagado. */
 export function importDialog(token: string, summary: ImportSummary): DialogSpec {
   const when = summary.exportedAt ? formatDateTime(Date.parse(summary.exportedAt)) : '?';
@@ -401,7 +422,7 @@ export function importDialog(token: string, summary: ImportSummary): DialogSpec 
     message: `${intro}${large} ${warning}`,
     confirmLabel: t('Importar e substituir'),
     danger: true,
-    onConfirm: () => backup.importApply(token),
+    onConfirm: () => withOverlay(t('Importando o board…'), () => backup.importApply(token)),
     onCancel: () => backup.importCancel(token),
   };
 }
