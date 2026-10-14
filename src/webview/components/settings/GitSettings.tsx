@@ -1,4 +1,5 @@
 import { DEFAULT_GIT, MERGE_METHODS, WORKSPACE_MODES, branchName, type GitConfig } from '../../../shared/git';
+import { flowPrefix } from '../../../shared/gitflow';
 import { useBoardStore } from '../../store/boardStore';
 import { settings, ui } from '../../commands';
 import { isWeb } from '../../vscode';
@@ -8,11 +9,21 @@ import { Button, Callout, Card, TextField } from '@radix-ui/themes';
 import { FormField, IconWarning, SelectField, SwitchField } from '../ui';
 import { SectionHeader } from './SectionHeader';
 import { PageHeader } from './PageHeader';
+import { GitFlowSection } from './GitFlowSection';
 
 export function GitSettings() {
-  const git = useBoardStore((s) => s.state)!.board.git;
+  const state = useBoardStore((s) => s.state)!;
+  const git = state.board.git;
   const set = (patch: Partial<GitConfig>) => settings.updateBoard({ git: patch });
   const off = git.mode === 'off';
+  // o exemplo usa o prefixo de uma história de verdade: o do tipo de branch do tipo História
+  const story = state.cardTypes.find((ct) => ct.name === 'História');
+  const exemplo = branchName(git.branchPattern, {
+    type: t('História'),
+    number: 12,
+    title: t('Login com Google'),
+    flow: flowPrefix(git, story?.branchKind ?? 'feature', t('História')),
+  });
 
   return (
     <div>
@@ -21,6 +32,8 @@ export function GitSettings() {
           'Cada história trabalha numa branch própria, criada pelo board com um nome previsível. As sub-tarefas fazem commits na branch da história. A branch é criada quando a IA chama <code>prepare_workspace</code> (a fase de Implementação padrão pede isso) ou pelo botão no card.',
         )}
       </PageHeader>
+
+      <GitFlowSection />
 
       {!isWeb && (
         <Card className="form-card">
@@ -67,10 +80,8 @@ export function GitSettings() {
             <FormField
               label={t('Nome da branch')}
               hint={rich(
-                'Aceita <code>{tipo}</code>, <code>{numero}</code> (obrigatório) e <code>{titulo}</code>. Exemplo: <code>{exemplo}</code>',
-                {
-                  exemplo: branchName(git.branchPattern, { type: t('História'), number: 12, title: t('Login com Google') }),
-                },
+                'Aceita <code>{fluxo}</code> (o prefixo do tipo de branch), <code>{tipo}</code>, <code>{numero}</code> (obrigatório) e <code>{titulo}</code>. Exemplo: <code>{exemplo}</code>',
+                { exemplo },
               )}
             >
               {(id) => (

@@ -6,6 +6,7 @@ import { isLive } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { usePending } from '../../usePending';
 import { ai, comments } from '../../commands';
+import { BOARD_AUTHOR } from '../../../shared/gitflow';
 import { formatDateTime, t } from '../../i18n';
 import { useAttachmentRefs } from './attachmentRefs';
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
@@ -143,6 +144,8 @@ function CommentItem({
   priorIds: string[];
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  // o board escreve os avisos em português (o idioma só se resolve na tela): os do próprio board passam pelo dicionário
+  const shown = comment.author === BOARD_AUTHOR ? t(comment.body) : comment.body;
 
   const save = () => {
     if (editing?.trim() && editing !== comment.body) comments.update(comment.id, editing.trim());
@@ -179,7 +182,7 @@ function CommentItem({
         )}
       </header>
       {editing === null ? (
-        <div className="markdown plain" dangerouslySetInnerHTML={{ __html: renderMarkdown(render(comment.body)) }} />
+        <div className="markdown plain" dangerouslySetInnerHTML={{ __html: renderMarkdown(render(shown)) }} />
       ) : (
         <>
           <MarkdownEditor compact autoFocus minRows={3} value={editing} onChange={setEditing} onSubmit={save} resolveRefs={render} />

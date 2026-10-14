@@ -7,7 +7,8 @@ import { THEMES, FONTS } from '../src/shared/appearance';
 import { EXEC_ASPECTS, TOOL_PRESETS, defaultAgent } from '../src/shared/execution';
 import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS, SKILL_MODES } from '../src/shared/harness';
 import { HARNESS_CATALOG, HARNESS_GROUPS, HARNESS_NOTES, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS } from '../src/shared/harnessCatalog';
-import { MERGE_METHODS, WORKSPACE_MODES } from '../src/shared/git';
+import { BRANCH_KINDS, MERGE_METHODS, WORKSPACE_MODES } from '../src/shared/git';
+import { gitNoticeText, type GitNotice } from '../src/shared/gitflow';
 import { EFFORT_FIELD, EFFORT_LABELS, EFFORT_LEVELS, MODEL_EFFORT_LABEL } from '../src/shared/models';
 import { RUNNER_PERMISSIONS, heartbeatState } from '../src/shared/runner';
 import { CARD_STATUSES, OWNER_LABEL } from '../src/shared/status';
@@ -103,6 +104,33 @@ describe('i18n do host: mensagens preenchidas', () => {
     expect(t(pt)).toBe(en);
   });
 
+  it('os avisos do gitflow na conversa (gitNoticeText) saem em inglês, com os valores no lugar', () => {
+    setLocale('en');
+    const cases: [GitNotice, string][] = [
+      [
+        { kind: 'noOrigin', branch: 'feature/1-x', base: 'develop' },
+        'The repository has no origin: branch feature/1-x started from develop as it is on this machine.',
+      ],
+      [
+        { kind: 'fetchFailed', branch: 'feature/1-x', base: 'develop', error: 'timeout (20 s)' },
+        'Could not update the origin refs before creating branch feature/1-x (timeout (20 s)). It started from develop as it is on this machine, which may be out of date.',
+      ],
+      [
+        { kind: 'developCreated', develop: 'dev', main: 'trunk' },
+        'Branch dev did not exist: the board created it from trunk and pushed it to origin.',
+      ],
+      [
+        { kind: 'developLocalOnly', develop: 'develop', main: 'main', error: 'remote: protected branch' },
+        'Branch develop did not exist: the board created it from main, but could not push it to origin (remote: protected branch). Push it by hand: git push -u origin develop',
+      ],
+      [
+        { kind: 'developNotPushed', develop: 'develop' },
+        'Branch develop exists only on this machine: the pull request to it can only be opened after pushing it to origin (git push -u origin develop).',
+      ],
+    ];
+    for (const [notice, en] of cases) expect(t(gitNoticeText(notice))).toBe(en);
+  });
+
   it('em português a mensagem fica como chegou', () => {
     expect(t('Tipo em uso por 4 card(s)')).toBe('Tipo em uso por 4 card(s)');
   });
@@ -177,6 +205,7 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     ['RUNNER_PERMISSIONS', RUNNER_PERMISSIONS.flatMap((x) => [x.label, x.hint])],
     ['MERGE_METHODS', MERGE_METHODS.map((x) => x.label)],
     ['WORKSPACE_MODES', WORKSPACE_MODES.flatMap((x) => [x.label, x.hint])],
+    ['BRANCH_KINDS', BRANCH_KINDS.map((x) => x.label)],
     ['EXEC_ASPECTS', EXEC_ASPECTS.map((x) => x.label)],
     ['TOOL_PRESETS', TOOL_PRESETS.flatMap((x) => [x.label, x.hint])],
     ['agente padrão', [defaultAgent().name]],
