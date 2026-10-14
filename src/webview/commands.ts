@@ -56,6 +56,10 @@ export const ai = {
   runHeartbeat: () => post({ type: 'ai.heartbeat.run' }),
   /** a IA lê o projeto e propõe os agentes do board; o resultado vai para o chat do board */
   suggestAgents: () => post({ type: 'ai.suggestAgents' }),
+  /** a IA lê o projeto e propõe regras, gravadas e enviadas ao board desligadas */
+  suggestRules: () => post({ type: 'ai.suggestRules' }),
+  /** a IA lê o projeto e propõe skills, gravadas e enviadas ao board em "Pelo card" */
+  suggestSkills: () => post({ type: 'ai.suggestSkills' }),
   pauseAutopilot: () => post({ type: 'ai.autopilot.pause' }),
   resumeAutopilot: () => post({ type: 'ai.autopilot.resume' }),
 };
@@ -155,6 +159,17 @@ export const harness = {
   openItem: (path: string) => post({ type: 'harness.item.open', path }),
   createItem: (tool: AiTool, source: number, name: string, description: string) =>
     post({ type: 'harness.item.create', tool, source, name, description }),
+  /** cria o item já com o conteúdo (assistentes de regras e skills); `append` acrescenta a um arquivo fixo que já existe */
+  writeItem: (tool: AiTool, source: number, name: string, content: string, files?: string[], append?: boolean) =>
+    post({
+      type: 'harness.item.write',
+      tool,
+      source,
+      name,
+      content,
+      ...(files?.length ? { files } : {}),
+      ...(append ? { append } : {}),
+    }),
   deleteItem: (tool: AiTool, kind: HarnessKind, path: string) => post({ type: 'harness.item.delete', tool, kind, path }),
   applyPlugins: (tool: AiTool, action: PluginAction, ids: string[]) => post({ type: 'harness.plugin.apply', tool, action, ids }),
   copyItems: (tool: AiTool, items: { kind: HarnessKind; path: string }[], to: HarnessScope) =>

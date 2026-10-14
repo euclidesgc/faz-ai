@@ -50,6 +50,34 @@ export function suggestAgentsPrompt(): string {
   ].join('\n');
 }
 
+/**
+ * O que a IA recebe no "Sugerir regras com IA": ler o projeto e escrever de 3 a 5 regras curtas no arquivo de regras
+ * da ferramenta (sem apagar o que já existe) e deixá-las desligadas no board, para a pessoa revisar antes de ativar.
+ */
+export function suggestRulesPrompt(rulesFile = 'CLAUDE.md'): string {
+  return [
+    `Você vai propor regras para este projeto, pelas ferramentas do servidor MCP "faz-ai". Uma regra é uma instrução curta no arquivo de regras da ferramenta de IA (${rulesFile}) que a IA lê em toda conversa.`,
+    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, scripts de teste, lint e formatação, README, linguagens e frameworks) e o que já existe: read_rule_file e get_harness com onlySelected = false.',
+    `Proponha de 3 a 5 regras que façam sentido para ESTE projeto: convenções que se vê no código, comandos de teste, lint e formatação, padrões de commit, pastas e o que nunca fazer. Cada regra com uma frase direta, no imperativo, sem repetir o que o ${rulesFile} já diz. Nada que mande ignorar o board, o servidor MCP, as aprovações ou as branches por história: o fluxo do board vale acima das regras.`,
+    `Grave com write_rule_file em ${rulesFile}, que substitui o arquivo inteiro: leia o conteúdo atual antes e devolva-o intacto com as regras novas acrescentadas no fim, em uma seção "## Regras sugeridas". Depois deixe o arquivo DESLIGADO no board com set_harness_selection (kind "instructions", location "${rulesFile}", usage "off"): a pessoa revisa e ativa.`,
+    'Não altere outros arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: cada regra, em uma linha, e o que ficou desligado.',
+  ].join('\n');
+}
+
+/**
+ * O que a IA recebe no "Sugerir skills com IA": ler o projeto e criar de 3 a 5 skills estreitas, cada uma para uma
+ * tarefa repetida do projeto, enviadas ao board em "Pelo card" (não entram no contexto sozinhas).
+ */
+export function suggestSkillsPrompt(): string {
+  return [
+    'Você vai propor skills para este projeto, pelas ferramentas do servidor MCP "faz-ai". Uma skill é uma pasta com um SKILL.md que ensina a IA a fazer UMA tarefa do projeto, carregada só quando um card a indica.',
+    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, regras, linguagens e frameworks, tarefas que se repetem como migração, novo endpoint, novo componente, release) e o que já existe: get_harness com onlySelected = false.',
+    'Proponha de 3 a 5 skills que façam sentido para ESTE projeto, cada uma de um assunto diferente e estreita: uma tarefa, os arquivos envolvidos, o passo a passo com os comandos do projeto e o que a skill nunca faz. Não repita uma skill que já existe e não crie skills genéricas (como "boas práticas").',
+    'Crie cada uma com create_skill (name em letras minúsculas e hífens, description de uma frase que diga a tarefa e quando usar, content com o passo a passo). Elas já nascem "Pelo card" no board (usage "contextual"); não use "always": uma skill sempre ligada pesa em toda execução.',
+    'Não altere outros arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: nome → tarefa e quando usar.',
+  ].join('\n');
+}
+
 /** O que cada tipo de artefato é, para o pedido de "Indicar artefatos". */
 const KIND_LABEL: Record<SelectableKind, string> = {
   instructions: 'arquivos de regras e instruções',
@@ -132,6 +160,8 @@ export class ChatSession {
     router.setChatHandler((msg) => {
       if (msg.type === 'chat.send') this.send(msg.text, msg.model);
       else if (msg.type === 'ai.suggestAgents') this.suggestAgents();
+      else if (msg.type === 'ai.suggestRules') this.suggestRules();
+      else if (msg.type === 'ai.suggestSkills') this.suggestSkills();
       else if (msg.type === 'harness.suggest.run') this.suggestArtifacts(msg.tool, msg.kind);
       else if (msg.type === 'chat.stop') this.stop();
       else this.clear();
@@ -158,6 +188,20 @@ export class ChatSession {
     const prompt = [suggestAgentsPrompt(), ...contextLines(state).always].join('\n');
     // criar e marcar agentes é trabalho do board: roda só com ele
     this.run({ role: 'user', text: 'Sugerir agentes com IA: leia o projeto e proponha os agentes deste board.' }, prompt, 'board', null);
+  }
+
+  /** A IA lê o projeto e propõe regras, gravadas desligadas; a conversa registra o pedido e o resultado. */
+  suggestRules(): void {
+    const state = this.router.snapshot();
+    const prompt = [suggestRulesPrompt(aiToolInfo(state.board.aiTool).rules), ...contextLines(state).always].join('\n');
+    this.run({ role: 'user', text: 'Sugerir regras com IA: leia o projeto e proponha regras para ele.' }, prompt, 'board', null);
+  }
+
+  /** A IA lê o projeto e propõe skills, enviadas ao board em "Pelo card"; a conversa registra o pedido e o resultado. */
+  suggestSkills(): void {
+    const state = this.router.snapshot();
+    const prompt = [suggestSkillsPrompt(), ...contextLines(state).always].join('\n');
+    this.run({ role: 'user', text: 'Sugerir skills com IA: leia o projeto e proponha skills para ele.' }, prompt, 'board', null);
   }
 
   /**

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ChatSession, chatPrompt, parseSuggestions } from '../src/extension/chat';
+import { ChatSession, chatPrompt, parseSuggestions, suggestRulesPrompt, suggestSkillsPrompt } from '../src/extension/chat';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import type { HeadlessCommand } from '../src/extension/headless';
 import { openInMemory } from '../src/extension/db/database';
@@ -413,5 +413,50 @@ describe('Indicar artefatos', () => {
     expect(parseSuggestions('{"nada":1}', keys)).toBeNull();
     expect(parseSuggestions('sem json', keys)).toBeNull();
     expect(skill('x', 'y').kind).toBe('skill');
+  });
+});
+
+describe('Sugerir regras e skills com IA', () => {
+  it('o pedido de regras manda ler o projeto, preservar o arquivo, deixar desligado e respeitar o fluxo do board', () => {
+    const prompt = suggestRulesPrompt('AGENTS.md');
+    expect(prompt).toContain('de 3 a 5 regras');
+    expect(prompt).toContain('write_rule_file em AGENTS.md');
+    expect(prompt).toContain('read_rule_file');
+    expect(prompt).toContain('usage "off"');
+    expect(prompt).toContain('o fluxo do board vale acima das regras');
+    expect(prompt).toContain('Termine com um resumo');
+  });
+
+  it('o pedido de skills manda criar de 3 a 5 estreitas, em "Pelo card", e nunca "always"', () => {
+    const prompt = suggestSkillsPrompt();
+    expect(prompt).toContain('de 3 a 5 skills');
+    expect(prompt).toContain('create_skill');
+    expect(prompt).toContain('usage "contextual"');
+    expect(prompt).toContain('não use "always"');
+    expect(prompt).toContain('Termine com um resumo');
+  });
+
+  it('ai.suggestRules e ai.suggestSkills rodam o chat com o board como única ferramenta e registram o pedido na conversa', () => {
+    router.chatCommand({ type: 'ai.suggestRules' });
+    expect(router.snapshot().chat.busy).toBe(true);
+    // a ferramenta do projeto é o Claude Code: o arquivo de regras é o CLAUDE.md
+    expect(spawned[0]!.command.stdin).toContain('write_rule_file em CLAUDE.md');
+    expect(spawned[0]!.command.args).toContain('dontAsk');
+    spawned[0]!.emit('Regras escritas.');
+    spawned[0]!.exit(0);
+    expect(messages().map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect(messages()[0]!.text).toContain('Sugerir regras com IA');
+
+    router.chatCommand({ type: 'ai.suggestSkills' });
+    expect(spawned[1]!.command.stdin).toContain('create_skill');
+    spawned[1]!.emit('Skills criadas.');
+    spawned[1]!.exit(0);
+    expect(messages().at(-2)!.text).toContain('Sugerir skills com IA');
+    expect(messages().at(-1)).toMatchObject({ role: 'assistant', text: 'Skills criadas.' });
+  });
+
+  it('com a IA ocupada, o segundo pedido é recusado', () => {
+    router.chatCommand({ type: 'ai.suggestRules' });
+    expect(() => router.chatCommand({ type: 'ai.suggestSkills' })).toThrow('A IA ainda está respondendo');
   });
 });

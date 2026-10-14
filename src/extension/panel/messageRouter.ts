@@ -8,6 +8,8 @@ import type { ImportSummary } from '../../shared/backup';
 import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
 import type { AiTool, HarnessSuggestions, PluginAction } from '../../shared/harness';
+import type { ProjectProfile } from '../../shared/projectProfile';
+import { readProjectProfile } from '../projectProfile';
 import type { ClaudeCli } from '../plugins';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import { agentProfiles } from '../../shared/execution';
@@ -50,7 +52,7 @@ export interface EnvironmentHooks {
 /** As mensagens do webview que o chat executa. */
 export type ChatMessageIn = Extract<
   WebviewToHost,
-  { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' | 'harness.suggest.run' }
+  { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' | 'ai.suggestRules' | 'ai.suggestSkills' | 'harness.suggest.run' }
 >;
 
 /** Tratadas pela ponte do webview (dependem do VSCode): aqui não mudam o board. */
@@ -73,6 +75,8 @@ const bridgeOnly = {
   'chat.stop': viaBridge,
   'chat.clear': viaBridge,
   'ai.suggestAgents': viaBridge,
+  'ai.suggestRules': viaBridge,
+  'ai.suggestSkills': viaBridge,
   'harness.suggest.run': viaBridge,
   'harness.suggest.clear': viaBridge,
   'ui.showChat': viaBridge,
@@ -88,6 +92,8 @@ const bridgeOnly = {
   'harness.plugin.apply': viaBridge,
   'harness.file.write': viaBridge,
   'harness.item.create': viaBridge,
+  'harness.item.write': viaBridge,
+  'harness.project.profile': viaBridge,
   'harness.skill.file.create': viaBridge,
   'harness.skill.file.open': viaBridge,
   'harness.install.scan': viaBridge,
@@ -500,6 +506,18 @@ export class MessageRouter {
     const file = this.ctx.harness.createItem(tool, source, name, description);
     this.changed();
     return file;
+  }
+
+  /** Cria um item do harness com o conteúdo pronto e devolve o caminho do arquivo, para abrir no editor. */
+  writeHarnessItem(tool: AiTool, source: number, name: string, content: string, files?: string[], append?: boolean): string {
+    const file = this.ctx.harness.writeItem(tool, source, name, content, files, append);
+    this.changed();
+    return file;
+  }
+
+  /** O perfil do projeto aberto, para os assistentes de regras e de skills. */
+  projectProfile(): ProjectProfile {
+    return readProjectProfile(this.ctx.opts.workspaceDir ?? '');
   }
 
   private notify(): void {

@@ -926,11 +926,47 @@ Na aba Agentes de cada escopo:
 - **Disponível no board**: os cards e as fases podem escolher o agente. **Tornar padrão** o faz
   executar quando nenhum deles escolhe.
 - **Novo agente**: nome, descrição (é por ela que o Refinar com IA escolhe), modelo e instruções.
-- **Editar**: cada campo do frontmatter grava ao sair; as instruções têm Salvar. As skills vêm da
-  mesma janela do card (só as marcadas); as ferramentas têm conjuntos prontos (**Só leitura**,
-  **Editar código**).
+- **Criar agente com ajuda**: um assistente de sete passos para um agente de escopo reduzido (ver
+  abaixo).
+- **Sugestões prontas**: revisor somente leitura, escritor de testes, redator de documentação e
+  executor de migrações; cada uma abre o assistente com as respostas preenchidas, para você ajustar
+  e confirmar. São locais, sem IA.
+- **Editar**: o editor mostra só o que a ferramenta do agente aceita (tabela abaixo). Cada campo
+  do frontmatter grava ao sair; as instruções têm Salvar. As skills vêm da mesma janela do card (só as
+  marcadas). No Claude Code, as ferramentas disponíveis e as negadas são **listas marcáveis**
+  agrupadas por escopo (leitura, edição de arquivos, comandos, rede, outros agentes e outras), com o
+  aviso **amplia o escopo** nos grupos que dão mais poder ao agente, e há conjuntos prontos (**Só
+  leitura**, **Editar código**). O que o arquivo já tem e a lista não conhece (como
+  `mcp__github__*` ou `Bash(git diff *)`) aparece como um chip marcado que dá para tirar, e dá para
+  acrescentar um servidor MCP do board como `mcp__<nome>__*`. No Cursor não há lista de ferramentas:
+  o editor mostra só **Somente leitura** e **Em segundo plano**.
 - **Sugerir agentes com IA**: a IA lê o projeto (estrutura, dependências, README) e cria ou ajusta
   de 3 a 8 agentes para ele, pelo MCP, deixando-os disponíveis. O resultado fica no chat do board.
+
+O que o arquivo de agente de cada ferramenta aceita (documentação oficial lida em 2026-10-14):
+
+| Ferramenta | Frontmatter do agente | O editor mostra |
+| --- | --- | --- |
+| Claude Code | `description`, `tools`, `disallowedTools`, `model`, `skills`, entre outros | instruções, modelo e esforço, skills, servidores MCP, ferramentas disponíveis e negadas |
+| Cursor | `description`, `model`, `readonly`, `is_background`; sem lista de ferramentas, skills nem MCP (herda tudo da conversa principal) | instruções, modelo e esforço, **Somente leitura** e **Em segundo plano** |
+
+Um agente criado para uma ferramenta fica na pasta dela e só aparece na aba dela.
+
+**Criar agente com ajuda.** Um passo por vez, num cartão, com **Voltar** e **Continuar**; cada passo
+traz um exemplo de resposta e uma sugestão, sem esconder as outras opções, e nada é gravado antes do
+último. (1) **Para que serve**: o papel e o objetivo (exemplo: "Revisa o diff de uma branch antes do
+pull request e aponta bugs, sem alterar nada."). (2) **Ferramentas**: o conjunto mínimo pela
+diretriz (revisar, ler e analisar: `Read`, `Grep`, `Glob`; editar, implementar e corrigir: também
+`Edit`, `Write` e `Bash`; testar e rodar: `Bash`; pesquisar na web: `WebFetch` e `WebSearch`; nunca
+`Agent` por padrão), com o porquê de cada uma, a lista completa e o aviso do que amplia o escopo;
+no Cursor o passo é a escolha de **Somente leitura**. (3) **Servidores MCP**: só o do board, que vai
+sempre; os outros do board como opções. (4) **Skills de apoio**: as do board em modo Pelo card, com as
+ligadas à diretriz sugeridas e a regra de uma por assunto. (5) **Modelo e esforço**: leitura e
+revisão pedem o menor modelo do catálogo com esforço baixo; planejamento, arquitetura e
+implementação, um maior. (6) **Instruções**: um rascunho gerado das respostas (como trabalha,
+padrões, o que nunca faz), editável. (7) **Resumo**: o agente inteiro e o nome (derivado da diretriz,
+editável e validado); só **Criar agente** grava. No Cursor, os passos de servidores MCP e de skills
+avisam que o arquivo do agente não os aceita.
 
 Cada execução pelo board ("Trabalhar na fase", "Refinar com IA" e heartbeat) é uma sessão nova, de
 contexto vazio, só com o que está no card. O agente vira parâmetros da linha de comando onde a
@@ -1068,6 +1104,29 @@ escopo em que o plugin está instalado). Os sincronizados do claude.ai e os da o
 desativam. No Cursor, que não tem comando para isso, desinstalar tira a pasta do plugin de
 `~/.cursor/plugins/local`. Desinstalar pede confirmação, e a mudança vale na próxima sessão da
 ferramenta (no Claude Code, também depois de `/reload-plugins`).
+
+**Criar regra e skill com ajuda.** Quem começa um projeto do zero com o board não tem regra nem
+skill nenhuma. Nas origens Projeto e Global da ferramenta do projeto, os assuntos **Regras** e
+**Skills** têm um assistente, com os mesmos princípios do de agentes (pergunta a pergunta, exemplo
+de resposta em cada uma, sugestões sem esconder as opções, nada gravado antes do último passo):
+
+- **Criar regra com ajuda** (5 passos): (1) onde vale: a regra **principal** (o arquivo de regras
+  da ferramenta, criado ou acrescentado ao fim se já existir) ou **por assunto** (um arquivo novo em
+  `.claude/rules/<nome>.md` ou `.cursor/rules/<nome>.mdc`, com `paths:` no Claude Code ou `globs:` no
+  Cursor); (2) o que ela garante; (3) convenções do projeto, que o board lê sem IA (linguagens,
+  comandos de teste, lint e formatação do `package.json`, ferramentas como eslint, prettier, vitest,
+  pytest e ruff, e as pastas principais) e oferece como itens marcáveis; (4) conferência contra o
+  fluxo do board, que aponta os trechos que mandam não usar o MCP, ignorar o board, não pedir revisão,
+  pular a aprovação, commitar direto na main ou não criar branch; (5) rascunho editável e resumo. A
+  regra **entra no board desligada**; um arquivo que já estava no board mantém o modo que você deu.
+- **Criar skill com ajuda** (6 passos): (1) a tarefa que a skill ensina, que vira a descrição; (2)
+  quando usar, que entra na descrição; (3) o passo a passo, proposto a partir dos verbos da tarefa e
+  dos comandos do projeto, em lista editável; (4) o que a skill nunca faz; (5) arquivos de apoio
+  opcionais em `references/`, `assets/` e `scripts/`, criados vazios; (6) o `SKILL.md` completo e o
+  resumo. A skill é gravada no Projeto ou no Global e enviada ao board em **Pelo card**.
+- **Sugerir regras com IA** e **Sugerir skills com IA**: a IA lê o projeto e escreve de 3 a 5 itens
+  já preenchidos (as regras no arquivo de regras da ferramenta, sem apagar o que existe, e
+  desligadas no board; as skills em Pelo card). O resultado fica no chat do board.
 
 Os sub-agentes da ferramenta do projeto têm a tabela própria nas origens Projeto e Global, com
 **Disponível no board**, o padrão e o editor dos campos do board; na origem Board, a lista dos agentes

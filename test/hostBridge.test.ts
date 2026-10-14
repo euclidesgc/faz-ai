@@ -6,6 +6,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { HostBridge, exportNotice, importNotice, type HostEnv } from '../src/extension/host/hostBridge';
 import { parseExportFile } from '../src/extension/db/boardExport';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { HARNESS_CATALOG } from '../src/shared/harnessCatalog';
 import type { HostToWebview } from '../src/shared/messages';
 
 let router: MessageRouter;
@@ -113,6 +114,76 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
     expect(result()).toMatchObject({ readonly: true });
     await bridge.handle({ type: 'harness.file.write', requestId: 'w3', path: claudeJson, content: '{}' });
     expect(result()).toMatchObject({ ok: false, error: 'Este arquivo não pode ser alterado pelo board.' });
+  });
+});
+
+describe('HostBridge: harness.item.write e harness.project.profile (assistentes de regras e skills)', () => {
+  const sourceOf = (tool: 'claude' | 'cursor', scope: 'project' | 'user', test: (s: { path: string; layout: string }) => boolean) =>
+    HARNESS_CATALOG[tool].findIndex((s) => s.scope === scope && !s.builtin && !s.noCreate && test(s));
+
+  it('uma regra por assunto nasce com o texto pronto, abre no editor e entra na varredura', async () => {
+    const source = sourceOf('claude', 'project', (s) => s.path === '.claude/rules' && s.layout === 'files');
+    await bridge.handle({
+      type: 'harness.item.write',
+      tool: 'claude',
+      source,
+      name: 'testes',
+      content: '---\ndescription: "Testes"\n---\n\n- Pequenos.\n',
+    });
+    const file = path.join(dir, '.claude', 'rules', 'testes.md');
+    expect(fs.readFileSync(file, 'utf8')).toBe('---\ndescription: "Testes"\n---\n\n- Pequenos.\n');
+    expect(sent.at(-1)).toEqual({ type: 'harness.item.created', path: file });
+    expect(
+      router
+        .snapshot()
+        .harness.inventory.flatMap((t) => t.items)
+        .find((i) => i.path === file)?.description,
+    ).toBe('Testes');
+  });
+
+  it('o arquivo principal que já existe recebe o texto no fim, só com append; sem ele dá erro e nada muda', async () => {
+    const source = sourceOf('claude', 'project', (s) => s.path === 'CLAUDE.md');
+    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), '# Projeto\n');
+    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n- A\n' });
+    expect((sent.at(-1) as { type: string }).type).toBe('error');
+    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('# Projeto\n');
+    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n- A\n', append: true });
+    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('# Projeto\n\n## Regras\n- A\n');
+    // sem o arquivo, o append cria
+    fs.rmSync(path.join(dir, 'CLAUDE.md'));
+    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n', append: true });
+    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('## Regras\n');
+  });
+
+  it('uma skill é criada com o SKILL.md pronto e os arquivos de apoio vazios; nome de arquivo inválido não cria nada', async () => {
+    const source = sourceOf('claude', 'project', (s) => s.layout === 'skills');
+    const content = '---\nname: migracao\ndescription: "Escrever uma migração."\n---\n\n# migracao\n';
+    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: 'migracao', content, files: ['../fora.md'] });
+    expect((sent.at(-1) as { type: string }).type).toBe('error');
+    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'migracao'))).toBe(false);
+    await bridge.handle({
+      type: 'harness.item.write',
+      tool: 'claude',
+      source,
+      name: 'migracao',
+      content,
+      files: ['references/exemplo.md', 'scripts/rodar.sh'],
+    });
+    const folder = path.join(dir, '.claude', 'skills', 'migracao');
+    expect(fs.readFileSync(path.join(folder, 'SKILL.md'), 'utf8')).toBe(content);
+    expect(fs.readFileSync(path.join(folder, 'references', 'exemplo.md'), 'utf8')).toBe('');
+    expect(fs.existsSync(path.join(folder, 'scripts', 'rodar.sh'))).toBe(true);
+    expect(router.snapshot().harness.skills.map((k) => k.name)).toContain('migracao');
+  });
+
+  it('o perfil do projeto responde com o requestId, ou com o erro na própria resposta', async () => {
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ scripts: { test: 'vitest' } }));
+    await bridge.handle({ type: 'harness.project.profile', requestId: 'p1' });
+    expect(sent.at(-1)).toMatchObject({
+      type: 'harness.project.profileResult',
+      requestId: 'p1',
+      profile: { languages: ['JavaScript'], scripts: { test: 'vitest' } },
+    });
   });
 });
 
