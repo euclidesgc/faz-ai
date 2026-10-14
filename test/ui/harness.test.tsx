@@ -4,7 +4,9 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
-import { HarnessScopeView } from '../../src/webview/components/settings/harness/HarnessScopeView';
+import { ToolHarness } from '../../src/webview/components/settings/harness/ToolHarness';
+import type { HarnessTopic } from '../../src/shared/harnessTopics';
+import type { AiTool } from '../../src/shared/harness';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { HarnessItem, ToolInventory } from '../../src/shared/harness';
 import { createTargets, hookTargets, mcpTargets, permissionTargets } from '../../src/shared/harnessCatalog';
@@ -58,28 +60,31 @@ beforeEach(async () => {
   posted.mockClear();
 });
 
-const renderScreen = (scope: 'project' | 'user' = 'project') =>
-  render(
+/** Abre o assunto da ferramenta e a origem (Projeto abre por padrão). */
+const renderScreen = async (topic: HarnessTopic, origin: 'Projeto' | 'Global' = 'Projeto', tool: AiTool = 'claude') => {
+  useBoardStore.setState({ harnessTopic: topic });
+  const view = render(
     <Theme>
-      <HarnessScopeView scope={scope} />
+      <ToolHarness tool={tool} />
       <Dialog />
     </Theme>,
   );
+  if (origin !== 'Projeto') await userEvent.click(screen.getByRole('radio', { name: origin }));
+  return view;
+};
 const section = (label: string) => document.querySelector<HTMLElement>(`.settings-card[aria-label="${label}"]`)!;
 /** os agentes da ferramenta do projeto têm a tabela própria: o formulário genérico aparece no Cursor */
-const cursor = () => userEvent.click(screen.getByRole('radio', { name: 'Cursor' }));
 const dialog = () => within(screen.getByRole('dialog'));
 const userAgents = () => createTargets('cursor').find((t) => t.kind === 'agent' && t.scope === 'user')!;
 
 describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e Global', () => {
-  it('relê o harness ao abrir a tela', () => {
-    renderScreen();
+  it('relê o harness ao abrir a tela', async () => {
+    await renderScreen('rules');
     expect(sentOf('harness.refresh')).toHaveLength(1);
   });
 
   it('criar um agente no projeto envia sem pedir confirmação e fecha o formulário', async () => {
-    renderScreen();
-    await cursor();
+    await renderScreen('agent', 'Projeto', 'cursor');
     const agents = section('Subagentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
     // o destino começa no primeiro lugar possível do projeto
@@ -102,8 +107,7 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
   });
 
   it('na aba Global, criar pede confirmação e só envia depois de confirmar', async () => {
-    renderScreen('user');
-    await cursor();
+    await renderScreen('agent', 'Global', 'cursor');
     const agents = section('Subagentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
     await choose(within(agents).getByRole('combobox', { name: 'Onde' }), `Global: ${userAgents().label}`);
@@ -121,8 +125,7 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
   });
 
   it('cancelar a confirmação global não envia e mantém o formulário aberto', async () => {
-    renderScreen('user');
-    await cursor();
+    await renderScreen('agent', 'Global', 'cursor');
     const agents = section('Subagentes');
     await userEvent.click(within(agents).getByRole('button', { name: 'Novo' }));
     await userEvent.type(within(agents).getByPlaceholderText('revisar-spec'), 'x');
@@ -135,7 +138,7 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
   });
 
   it('Cancelar fecha o formulário sem enviar nada', async () => {
-    renderScreen();
+    await renderScreen('command');
     const commands = section('Comandos');
     posted.mockClear();
     await userEvent.click(within(commands).getByRole('button', { name: 'Novo' }));
@@ -145,7 +148,7 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
   });
 
   it('servidor MCP: monta o servidor com argumentos e variáveis', async () => {
-    renderScreen();
+    await renderScreen('mcp');
     const mcp = section('Servidores MCP');
     await userEvent.click(within(mcp).getByRole('button', { name: 'Novo servidor' }));
     await userEvent.type(within(mcp).getByPlaceholderText('github'), 'github');
@@ -164,7 +167,7 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
   });
 
   it('hook: sempre pede confirmação, mesmo no projeto', async () => {
-    renderScreen();
+    await renderScreen('hook');
     const hooks = section('Hooks');
     await userEvent.click(within(hooks).getByRole('button', { name: 'Novo hook' }));
     await userEvent.type(within(hooks).getByPlaceholderText('./scripts/verificar.sh'), 'echo oi');
@@ -185,7 +188,7 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
   });
 
   it('regra de permissão global: escolhe a lista e confirma', async () => {
-    renderScreen('user');
+    await renderScreen('other', 'Global');
     const settings = section('Configurações e permissões');
     await userEvent.click(within(settings).getByRole('button', { name: 'Nova regra de permissão' }));
     const user = permissionTargets('claude').find((t) => t.scope === 'user')!;
@@ -208,7 +211,7 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
   });
 
   it('ações da linha: abrir, copiar para o projeto e apagar com confirmação', async () => {
-    renderScreen('user');
+    await renderScreen('skill', 'Global');
     const row = screen.getByText('global-skill').closest('li')!;
     await userEvent.click(within(row).getByRole('button', { name: '~/.claude/skills/global-skill/SKILL.md' }));
     // o caminho abre o arquivo no editor do board
@@ -234,7 +237,7 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
   });
 
   it('modo da skill global pede confirmação; arquivos de apoio abrem e são criados', async () => {
-    const { unmount } = renderScreen('user');
+    const { unmount } = await renderScreen('skill', 'Global');
     await choose(
       within(screen.getByText('global-skill').closest('li')!).getByRole('combobox', { name: 'Modo da skill global-skill' }),
       /Só quando indicada/,
@@ -248,7 +251,7 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
       mode: 'manual',
     });
     unmount();
-    renderScreen('project');
+    await renderScreen('skill');
     const row = screen.getByText('revisar-spec').closest('li')!;
     await userEvent.click(within(row).getByRole('button', { name: 'Arquivos (1)' }));
     const files = document.querySelector<HTMLElement>('.skill-files')!;
@@ -270,8 +273,8 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
     });
   });
 
-  it('a linha mostra a descrição do arquivo e o caminho numa linha própria', () => {
-    renderScreen();
+  it('a linha mostra a descrição do arquivo e o caminho numa linha própria', async () => {
+    await renderScreen('skill');
     const row = within(section('Skills')).getByText('revisar-spec').closest('li')!;
     expect(within(row).getByText('Descrição de revisar-spec')).toBeInTheDocument();
     expect(within(row).getByRole('button', { name: '.claude/skills/revisar-spec/SKILL.md' })).toBeInTheDocument();
@@ -280,7 +283,7 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
   });
 
   it('buscar e instalar: Enter procura as skills da origem', async () => {
-    renderScreen();
+    await renderScreen('skill');
     await userEvent.click(screen.getByRole('button', { name: 'Buscar skills para instalar' }));
     await userEvent.type(screen.getByPlaceholderText(/dono\/repositorio/), 'dono/repo{Enter}');
     expect(lastSent('harness.install.scan')).toEqual({ type: 'harness.install.scan', source: 'dono/repo' });

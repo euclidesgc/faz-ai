@@ -93,8 +93,8 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
                   <DependsOn
                     label={t('agentes marcados como disponíveis')}
                     satisfied={hasAvailableAgent}
-                    target={{ kind: 'board', section: 'harness-project' }}
-                    targetHint={t('em Harness › Projeto ou Global')}
+                    target={{ kind: 'board', section: 'harness-agents' }}
+                    targetHint={t('em Harness › Sub-agentes')}
                   />
                 )}
               </>

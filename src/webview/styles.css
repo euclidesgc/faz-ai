@@ -2755,6 +2755,51 @@ body.host-web .drawer {
   gap: var(--sp-4);
   margin-right: var(--sp-8);
 }
+/* assunto de uma ferramenta: origem e busca, depois a lista */
+.topic-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8) var(--sp-12);
+  margin-bottom: var(--sp-4);
+}
+.topic-search {
+  flex: 1 1 200px;
+  max-width: 360px;
+}
+.topic-origin-hint {
+  margin: 0 0 var(--sp-12);
+}
+.board-list {
+  display: grid;
+  gap: var(--sp-8);
+}
+.harness-callout {
+  margin-bottom: var(--sp-12);
+}
+.imported-folders {
+  display: grid;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-12);
+}
+.imported-folders ul {
+  display: grid;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.imported-folders li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4) var(--sp-12);
+}
+.import-form {
+  display: grid;
+  gap: var(--sp-6);
+  min-width: 320px;
+}
 .item-hint {
   margin: var(--sp-2) 0 0;
   color: var(--muted);

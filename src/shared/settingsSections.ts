@@ -9,11 +9,13 @@ import type { SettingsTab } from './settingsTab';
 export interface SettingsSectionInfo {
   tab: SettingsTab;
   /**
-   * Sub-aba de Harness ('tool' | 'project' | 'user'), quando a seção está lá dentro. Não usa o tipo
-   * `HarnessTab` do `boardStore.ts` para não criar um import cruzado `shared → webview`; quem consome
-   * faz o cast.
+   * Sub-aba de Harness, quando a seção está lá dentro: `tool` é a de Ferramenta e execução; `project` e `user`
+   * levam à aba da ferramenta do projeto (o que elas mostravam mora lá, por assunto). Quem consome resolve
+   * com `resolveHarnessTab` de `harnessTopics.ts`.
    */
   harnessTab?: 'tool' | 'project' | 'user';
+  /** O assunto aberto dentro da aba da ferramenta (`HarnessTopic` de `harnessTopics.ts`). */
+  harnessTopic?: 'rules' | 'skill' | 'agent' | 'mcp' | 'command' | 'hook' | 'other';
 }
 
 export const SETTINGS_SECTIONS: Record<string, SettingsSectionInfo> = {
@@ -22,4 +24,5 @@ export const SETTINGS_SECTIONS: Record<string, SettingsSectionInfo> = {
   heartbeat: { tab: 'harness', harnessTab: 'tool' },
   'harness-project': { tab: 'harness', harnessTab: 'project' },
   'harness-user': { tab: 'harness', harnessTab: 'user' },
+  'harness-agents': { tab: 'harness', harnessTab: 'project', harnessTopic: 'agent' },
 };
