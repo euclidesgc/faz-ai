@@ -7,7 +7,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { usePending } from '../../usePending';
 import { ai, comments } from '../../commands';
 import { BOARD_AUTHOR } from '../../../shared/gitflow';
-import { formatDateTime, t } from '../../i18n';
+import { formatDateTime, t, translateGitNotice } from '../../i18n';
 import { useAttachmentRefs } from './attachmentRefs';
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
 import { aiBlockedReason } from '../RequirementsBanner';
@@ -144,8 +144,9 @@ function CommentItem({
   priorIds: string[];
 }) {
   const [editing, setEditing] = useState<string | null>(null);
-  // o board escreve os avisos em português (o idioma só se resolve na tela): os do próprio board passam pelo dicionário
-  const shown = comment.author === BOARD_AUTHOR ? t(comment.body) : comment.body;
+  // o board grava os avisos do gitflow em português (o idioma só se resolve na tela); os outros comentários dele e os das
+  // pessoas aparecem como foram escritos
+  const shown = comment.author === BOARD_AUTHOR ? translateGitNotice(comment.body) : comment.body;
 
   const save = () => {
     if (editing?.trim() && editing !== comment.body) comments.update(comment.id, editing.trim());

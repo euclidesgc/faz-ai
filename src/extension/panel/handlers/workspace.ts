@@ -51,8 +51,11 @@ function prepareStoryWorkspace(ctx: BoardContext, cardId: string): void {
     throw new Error(
       `#${story.number} deriva de #${origin.number}, que ainda não tem branch: a branch desta parte parte da dela. Implemente #${origin.number} antes.`,
     );
-  // sem repositório a principal não é detectada: o git recusa adiante, com a mensagem de sempre
-  const main = ctx.mainBranch()?.name ?? '';
+  // detecta de novo: o cache pode ser de antes de a pasta virar repositório (git init depois de abrir o
+  // board), e com a principal vazia a base sairia sem nome ("A branch  não existe")
+  const main = ctx.mainBranch(true)?.name;
+  // a detecção só falha fora de um repositório: a mesma mensagem que o git daria adiante
+  if (!main) throw new Error('A pasta do projeto não é um repositório git.');
   const kind = branchKindOf(s, story);
   const typeName = s.cardTypes.find((t) => t.id === story.typeId)?.name ?? '';
   // a branch já registrada vale mesmo que o título ou o padrão tenham mudado depois

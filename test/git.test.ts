@@ -631,6 +631,26 @@ describe('branch e worktree por história', () => {
     expect((await call('prepare_workspace', { card: 2 })).error).toBe(false);
   });
 
+  it('board aberto antes do git init: o prepare detecta a principal de novo em vez de usar a do cache', async () => {
+    fs.rmSync(path.join(repo, '.git'), { recursive: true, force: true });
+    expect(router.snapshot().mainBranch).toBeNull(); // o cache guarda "sem repositório"
+    git(repo, 'init', '-q', '-b', 'main');
+    identity(repo);
+    git(repo, 'add', '.');
+    git(repo, 'commit', '-q', '-m', 'inicial');
+
+    await call('create_card', { title: 'Tela', column: 'Implementação' });
+    await call('create_card', { title: 'Crash', type: 'Bug', column: 'Implementação' });
+    const story = await call('prepare_workspace', { card: 1 });
+    expect(story.error).toBe(false);
+    // sem develop em lugar nenhum, ela nasce da principal recém-detectada
+    expect(story.data).toMatchObject({ branch: 'feature/1-tela', baseBranch: 'develop' });
+    expect(rev(repo, 'develop')).toBe(rev(repo, 'main'));
+    const bug = await call('prepare_workspace', { card: 2 });
+    expect(bug.error).toBe(false);
+    expect(bug.data).toMatchObject({ branch: 'hotfix/2-crash', baseBranch: 'main' });
+  });
+
   it('explica quando a pasta não é um repositório git', async () => {
     fs.rmSync(path.join(repo, '.git'), { recursive: true, force: true });
     await call('create_card', { title: 'X', column: 'Implementação' });

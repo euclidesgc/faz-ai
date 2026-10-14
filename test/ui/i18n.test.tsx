@@ -96,6 +96,22 @@ describe('i18n do gitflow na tela', () => {
     expect(screen.getAllByText(notice)).toHaveLength(1);
   });
 
+  it('os outros comentários do board (autopiloto, runner) ficam como foram escritos, mesmo com " e " no texto', async () => {
+    const { router, storyId } = await seedBoard();
+    // o molde curto '{a} e {b}' do dicionário casaria com esta frase e trocaria o " e " do meio por " and "
+    const autopilot =
+      'O autopiloto parou: 3 execuções seguidas não avançaram a história. Veja a conversa e o log, destrave o card e retome.';
+    router.handle({ type: 'comment.add', cardId: storyId, body: autopilot }, { author: BOARD_AUTHOR });
+    syncStore(router);
+    setLocale('en');
+    render(
+      <Theme>
+        <CommentsTab cardId={storyId} />
+      </Theme>,
+    );
+    expect(screen.getByText(autopilot)).toBeInTheDocument();
+  });
+
   it('a seção do gitflow na tela Git sai em inglês', async () => {
     const { router } = await seedBoard();
     syncStore(router);
