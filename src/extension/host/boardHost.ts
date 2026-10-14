@@ -18,6 +18,7 @@ import { removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
+import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
 import { claudeSignedIn, cursorModels, cursorSignedIn, runCli } from '../cliProbe';
 import { aiToolInfo, type AiTool, type InstallScope } from '../../shared/harness';
 import { checkRequirements, registeredServer } from '../requirements';
@@ -72,6 +73,11 @@ export interface BoardHost {
   chat: ChatSession;
   /** toca sozinho as histórias em modo autônomo (YOLO) */
   autopilot: Autopilot;
+  /**
+   * Devolve para a IA os cards presos em "Em execução" sem nenhuma execução em curso (a sessão que os
+   * marcou acabou sem passar a vez). Chamada a cada minuto pela janela dona do board.
+   */
+  sweepStaleRuns(): void;
   /**
    * Registra o servidor MCP do board numa ferramenta de IA (padrão: a do projeto) e devolve o resumo do
    * que foi feito. `user` (o padrão) instala na configuração global da ferramenta; `project`, só aqui.
@@ -140,7 +146,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       o.log(`Não foi possível ${what} ao abrir o board: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
-  if (ownsBoard) maintain('fechar as execuções de IA que ficaram abertas', () => runLog.closeOpen(Date.now()));
+  // os cards dessas execuções ficaram "Em execução" sem execução: voltam para a IA na hora
+  if (ownsBoard)
+    maintain('fechar as execuções de IA que ficaram abertas', () => recoverAfterRestart(router, runLog.closeOpen(Date.now()), o.log));
   // a retenção: fora da janela, o detalhe do mês vira total em `log_months`. Roda aqui, na abertura,
   // no máximo uma vez por dia — nunca durante uma mutação do board, para não entrar no custo de uma
   // operação comum da pessoa mesmo que fique lenta.
@@ -528,6 +536,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const api: BoardHost = {
     router,
     runner,
+    sweepStaleRuns: () => {
+      if (!o.ownsBoard || o.ownsBoard()) sweepStaleRuns(router, runner.running, Date.now(), o.log);
+    },
     heartbeat,
     mergeWatcher,
     chat,

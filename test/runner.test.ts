@@ -469,6 +469,24 @@ describe('executor da IA', () => {
       expect(procs[0]!.command.stdin).toContain('MODO AUTÔNOMO');
     });
 
+    it('a sub-tarefa que a sessão da história deixou "Em execução" volta para Pronto quando a sessão termina', () => {
+      yolo();
+      const s = router.snapshot();
+      const wf = s.workflows.find((w) => w.kind === 'child')!;
+      const subId = router.createCard({
+        typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+        columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+        parentId: storyId,
+        title: 'Passo',
+      });
+      runner.start(storyId);
+      ai({ type: 'card.status.set', cardId: subId, status: 'running' }); // start_work na sub-tarefa
+      ai({ type: 'comment.add', cardId: storyId, body: 'Implementei parte.' });
+      procs[0]!.exit(0);
+      expect(router.snapshot().cards.find((c) => c.id === subId)!.status).toBe('ready');
+      expect(log.join('\n')).toContain('sub-tarefa "Em execução"');
+    });
+
     it('se a IA só respondeu na conversa, o card volta para ela em vez de esperar uma pessoa', () => {
       yolo();
       runner.start(storyId);

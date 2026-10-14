@@ -173,6 +173,53 @@ describe('modo autônomo no painel do card', () => {
   });
 });
 
+describe('retomar com histórias fora do modo', () => {
+  it('pausado e com história em aberto fora do modo: "Retomar" confirma, liga nelas e retoma', async () => {
+    const s = useBoardStore.getState().state!;
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const otherId = board.router.createCard({
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: board.router.snapshot().cards.find((c) => c.id === board.storyId)!.columnId,
+      parentId: null,
+      title: 'Fora do modo',
+    });
+    syncStore(board.router);
+    patchState((st) => ({ cards: st.cards.map((c) => (c.parentId || c.id === otherId ? c : { ...c, yolo: true })) }));
+    autopilot({ active: false, note: null });
+    render(
+      <Theme>
+        <AutopilotButton />
+        <Dialog />
+      </Theme>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Retomar modo autônomo' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ligar modo autônomo' }));
+    expect(lastSent('card.yolo.setMany')).toMatchObject({ cardIds: [otherId], enabled: true });
+    expect(lastSent('ai.autopilot.resume')).toBeTruthy();
+  });
+});
+
+describe('posição na fila do modo autônomo no card', () => {
+  it('com o autopiloto ligado, a história que espera a vez mostra a posição; desligado ou em execução, não', () => {
+    patchCard(board.storyId, { yolo: true });
+    autopilot({ active: true, note: null });
+    const { rerender, unmount } = render(<Board />);
+    expect(screen.getByText('Fila 1')).toBeInTheDocument();
+
+    act(() => patchCard(board.storyId, { status: 'running' }));
+    rerender(<Board />);
+    expect(screen.queryByText('Fila 1')).toBeNull();
+
+    act(() => {
+      patchCard(board.storyId, { status: 'ready' });
+      autopilot({ active: false, note: null });
+    });
+    rerender(<Board />);
+    expect(screen.queryByText('Fila 1')).toBeNull();
+    unmount();
+  });
+});
+
 describe('selo no card do board', () => {
   it('a história em modo autônomo ganha o selo, que é também o botão de desligar (#416)', () => {
     patchCard(board.storyId, { yolo: true });
@@ -184,13 +231,52 @@ describe('selo no card do board', () => {
 });
 
 describe('botão do autopiloto no topo', () => {
-  it('não aparece sem história em modo autônomo na fila', () => {
-    render(<AutopilotButton />);
-    expect(screen.queryByRole('button')).toBeNull();
+  it('sem história em modo autônomo oferece "Ligar": confirma e põe no modo todas as histórias em aberto', async () => {
+    render(
+      <Theme>
+        <AutopilotButton />
+        <Dialog />
+      </Theme>,
+    );
+    // outros testes criam histórias no mesmo roteador: o lote é tudo o que está em aberto, seja quanto for
+    const open = useBoardStore
+      .getState()
+      .state!.cards.filter((c) => !c.parentId && c.deletedAt === null && c.archivedAt === null)
+      .map((c) => c.id);
+    await userEvent.click(screen.getByRole('button', { name: 'Ligar modo autônomo' }));
+    expect(screen.getByText(new RegExp(`todas as ${open.length} história\\(s\\) em aberto`))).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ligar modo autônomo' }));
+    expect(lastSent('card.yolo.setMany')).toMatchObject({ cardIds: open, enabled: true, until: null });
   });
 
-  it('tocando: um clique pausa; pausado: um clique retoma', async () => {
-    patchCard(board.storyId, { yolo: true });
+  it('com histórias selecionadas, "Ligar" vale só para elas', async () => {
+    const s = useBoardStore.getState().state!;
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const otherId = board.router.createCard({
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: board.router.snapshot().cards.find((c) => c.id === board.storyId)!.columnId,
+      parentId: null,
+      title: 'Outra história',
+    });
+    syncStore(board.router);
+    act(() => useBoardStore.getState().selectMany([otherId]));
+    render(
+      <Theme>
+        <AutopilotButton />
+        <Dialog />
+      </Theme>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Ligar modo autônomo' }));
+    expect(screen.getByText(/1 história\(s\) selecionada\(s\)/)).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ligar modo autônomo' }));
+    expect(lastSent('card.yolo.setMany')).toMatchObject({ cardIds: [otherId], enabled: true });
+    expect(useBoardStore.getState().selectedIds.size).toBe(0);
+    useBoardStore.getState().clearSelected();
+  });
+
+  it('tocando: um clique pausa; pausado, com todas as histórias já no modo: um clique retoma direto', async () => {
+    // todas as histórias em aberto já estão no modo: não há o que ligar, só retomar
+    patchState((s) => ({ cards: s.cards.map((c) => (c.parentId ? c : { ...c, yolo: true })) }));
     autopilot({ active: true, note: null });
     const { rerender } = render(<AutopilotButton />);
     const button = screen.getByRole('button', { name: /modo autônomo/ });

@@ -334,6 +334,17 @@ export const board: Record<string, string> = {
     'Autonomous mode paused.{detail} {n} story(ies) waiting. Click to resume.',
   'Pausar modo autônomo': 'Pause autonomous mode',
   'Retomar modo autônomo': 'Resume autonomous mode',
+  'Ligar o modo autônomo em {n} história(s) selecionada(s)?': 'Turn on autonomous mode for {n} selected story(ies)?',
+  'Ligar o modo autônomo em todas as {n} história(s) em aberto?': 'Turn on autonomous mode for all {n} open story(ies)?',
+  'Ligar o modo autônomo nas histórias selecionadas ({refs}): elas entram na fila e a IA as toca sozinha.':
+    'Turn on autonomous mode for the selected stories ({refs}): they join the queue and the AI drives them on its own.',
+  'Ligar o modo autônomo em todas as histórias em aberto: elas entram na fila e a IA as toca sozinha, na ordem do board.':
+    'Turn on autonomous mode for every open story: they join the queue and the AI drives them on its own, in board order.',
+  'Fila {n}': 'Queue {n}',
+  '{n}ª na fila do modo autônomo: a IA trata esta história depois das anteriores, respeitando as dependências.':
+    'Position {n} in the autonomous-mode queue: the AI takes this story after the ones before it, respecting dependencies.',
+  'Selecionar todos de {name}': 'Select all in {name}',
+  'Desmarcar todos de {name}': 'Deselect all in {name}',
   'Ver todos os cards': 'See all cards',
   'Ver {n} com você': 'See {n} with you',
   'Abrir chat': 'Open chat',
