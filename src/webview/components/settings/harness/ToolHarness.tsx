@@ -21,7 +21,7 @@ export function ToolHarness({ tool }: { tool: AiTool }) {
   const state = useBoardStore((s) => s.state)!;
   const topicId = useBoardStore((s) => s.harnessTopic);
   // a pasta do usuário não é vigiada: relê ao abrir a aba
-  useEffect(() => harness.refresh(), []);
+  useEffect(() => void harness.refresh(), []);
 
   const inventory = state.harness.inventory.find((x) => x.tool === tool);
   const projectTool = tool === state.board.aiTool;

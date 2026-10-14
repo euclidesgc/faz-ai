@@ -1948,9 +1948,17 @@ button.topbar-pending.on:hover:where(:not(:disabled)) {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .spinner {
+  .spinner,
+  .rt-Spinner span {
     animation-duration: 3s;
   }
+}
+/* botão nosso em espera: o spinner entra antes do texto, na cor do texto */
+button[aria-busy='true'] > .spinner {
+  border-color: currentColor;
+  border-top-color: transparent;
+  margin-right: var(--sp-6);
+  vertical-align: -1px;
 }
 /* coração do heartbeat: cinza e imóvel (desligado ou parado); vermelho e batendo (lub-dub) enquanto roda */
 .heartbeat {
