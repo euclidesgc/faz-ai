@@ -131,6 +131,20 @@ export function CommentsTab({
   );
 }
 
+/**
+ * Traduz um comentário do board linha a linha: o relatório da limpeza da história junta o título e
+ * uma linha "- " por item, e cada uma tem a própria chave no dicionário. Linha sem tradução fica como está.
+ */
+function boardNotice(body: string): string {
+  return body
+    .split('\n')
+    .map((line) => {
+      const m = /^(\s*(?:[-*]\s+)?)(.*)$/.exec(line)!;
+      return m[1]! + t(m[2]!);
+    })
+    .join('\n');
+}
+
 function CommentItem({
   comment,
   mine,
@@ -145,7 +159,7 @@ function CommentItem({
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   // o board escreve os avisos em português (o idioma só se resolve na tela): os do próprio board passam pelo dicionário
-  const shown = comment.author === BOARD_AUTHOR ? t(comment.body) : comment.body;
+  const shown = comment.author === BOARD_AUTHOR ? boardNotice(comment.body) : comment.body;
 
   const save = () => {
     if (editing?.trim() && editing !== comment.body) comments.update(comment.id, editing.trim());
