@@ -10,7 +10,7 @@ vi.hoisted(() => {
   (globalThis as { __fazaiTestWeb?: boolean }).__fazaiTestWeb = true;
 });
 
-import { choose, lastSent, posted, seedBoard, sentOf } from './setup';
+import { choose, confirmLast, lastSent, posted, seedBoard, sentOf } from './setup';
 import { RUNNER_PERMISSIONS } from '../../src/shared/runner';
 import { profileOfAgent } from '../../src/shared/execution';
 import { Dialog } from '../../src/webview/components/Dialog';
@@ -203,7 +203,10 @@ describe('HarnessSettings: importar artefatos no navegador', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Caminho da pasta a importar' }), '  /srv/colecao  ');
     await userEvent.click(importar);
     expect(lastSent('harness.import.add')).toEqual({ type: 'harness.import.add', tool: 'claude', dir: '/srv/colecao' });
-    // o campo fecha depois de importar
+    // o campo fica, mostrando a espera, e fecha quando o host confirma a importação
+    expect(screen.getByRole('textbox', { name: 'Caminho da pasta a importar' })).toBeInTheDocument();
+    confirmLast();
+    await act(async () => {});
     expect(screen.queryByRole('textbox', { name: 'Caminho da pasta a importar' })).toBeNull();
   });
 
@@ -596,6 +599,8 @@ describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada 
     await userEvent.click(installBlock('Servidor do board').getByRole('button', { name: 'Instalar neste projeto' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(lastSent('ui.connectAI')).toEqual({ type: 'ui.connectAI', tool: 'claude', scope: 'project' });
+    confirmLast();
+    await act(async () => {});
 
     posted.mockClear();
     act(() => withItems([item('mcp', 'user', 'faz-ai')]));

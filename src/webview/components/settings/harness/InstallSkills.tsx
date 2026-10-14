@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AiTool } from '../../../../shared/harness';
 import { harness, type HarnessScope } from '../../../commands';
+import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
 import { Badge, Button, Card, Checkbox, TextField } from '@radix-ui/themes';
 import { SelectField, type EnumOption } from '../../ui';
@@ -29,6 +30,9 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
   );
   const installable = preview?.skills.filter((k) => k.valid && !existing.has(k.name)) ?? [];
   const picked = chosen.filter((rel) => installable.some((k) => k.rel === rel));
+  // clonar o repositório e copiar as pastas levam segundos: os botões mostram a espera até o host confirmar
+  const scan = useAction(() => harness.scanInstall(source));
+  const install = useAction(() => harness.applyInstall(tool, to, picked));
   const apply = () =>
     ask({
       title: t('Instalar {n} skill(s)?', { n: picked.length }),
@@ -40,9 +44,8 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
         to,
       ),
       confirmLabel: t('Instalar'),
-      onConfirm: () => {
-        harness.applyInstall(tool, to, picked);
-        setChosen([]);
+      onConfirm: async () => {
+        if (await install.run()) setChosen([]);
       },
     });
   return (
@@ -54,12 +57,17 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
           onChange={(e) => setSource(e.target.value)}
           placeholder={t('dono/repositorio, endereço git (https ou ssh) ou o caminho de uma pasta')}
           spellCheck={false}
-          onKeyDown={(e) => e.key === 'Enter' && source.trim() && harness.scanInstall(source)}
+          onKeyDown={(e) => e.key === 'Enter' && source.trim() && void scan.run()}
         />
-        <Button disabled={!source.trim()} onClick={() => harness.scanInstall(source)}>
+        <Button disabled={!source.trim()} loading={scan.busy} onClick={() => void scan.run()}>
           {t('Procurar skills')}
         </Button>
       </div>
+      {scan.busy && (
+        <p role="status" className="muted small">
+          <span className="spinner" aria-hidden /> {t('Buscando a origem e procurando skills…')}
+        </p>
+      )}
       <p className="muted small">
         {t(
           'Um repositório é clonado numa pasta temporária, sem rodar nada dele. Você vê as skills encontradas antes de copiar qualquer coisa.',
@@ -126,7 +134,7 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
             >
               {t('Fechar')}
             </Button>
-            <Button disabled={picked.length === 0} onClick={apply}>
+            <Button disabled={picked.length === 0} loading={install.busy} onClick={apply}>
               {t('Instalar {n} selecionada(s)', { n: picked.length || '' })}
             </Button>
           </div>

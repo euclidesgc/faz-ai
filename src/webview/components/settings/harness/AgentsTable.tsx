@@ -6,6 +6,7 @@ import { isFreeName, toItemName, type AiToolInfo } from '../../../../shared/harn
 import { usageOf } from '../../../../shared/harnessSelection';
 import { matchesQuery } from '../../../../shared/harnessTopics';
 import { ai, harness, settings } from '../../../commands';
+import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
 import { ModelEditor } from '../../FieldRenderer';
 import { DeleteButton, FormField, IconAgents, IconPlus } from '../../ui';
@@ -33,6 +34,7 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
   const defaultName = state.board.execProfiles.find((p) => p.isDefault && p.scope !== 'builtin')?.id ?? '';
   const available = (a: Agent) => usageOf(state.harnessSelection, { kind: 'agent', location: a.location }) !== null;
   const busy = state.chat.busy;
+  const seed = useAction(() => harness.seedAgents(true));
   const nameOk = isFreeName(draft.name, state.harness.agents);
   const create = () => {
     harness.createAgent(scope, {
@@ -116,8 +118,9 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
           <Button
             variant="ghost"
             size="1"
+            loading={seed.busy}
             title={t('Cria de novo os agentes de fábrica que não existem mais; não mexe nos que existem.')}
-            onClick={() => harness.seedAgents(true)}
+            onClick={() => void seed.run()}
           >
             {t('Recriar os agentes padrão')}
           </Button>

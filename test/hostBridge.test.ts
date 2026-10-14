@@ -306,14 +306,11 @@ describe('HostBridge: plugins pela CLI do Claude Code', () => {
       ['plugin', 'disable', 'design@synced', '--json'],
       ['plugin', 'disable', 'fmt@loja', '--json'],
     ]);
-    expect(sent.slice(-2)).toEqual([
-      {
-        type: 'notice',
-        message:
-          'Plugins desativados: design, fmt. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
-      },
-      { type: 'harness.plugin.done' },
-    ]);
+    expect(sent.at(-1)).toEqual({
+      type: 'notice',
+      message:
+        'Plugins desativados: design, fmt. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
+    });
     // a lista é consultada de novo depois da ação
     expect(calls.filter((c) => c[1] === 'list').length).toBe(2);
   });
@@ -329,10 +326,7 @@ describe('HostBridge: plugins pela CLI do Claude Code', () => {
     );
     await flush();
     await bridge.handle({ type: 'harness.plugin.apply', tool: 'claude', action: 'uninstall', ids: ['design@synced'] });
-    expect(sent.slice(-2)).toEqual([
-      { type: 'harness.plugin.done' },
-      { type: 'error', message: 'Nenhum dos plugins escolhidos aceita essa ação.' },
-    ]);
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'Nenhum dos plugins escolhidos aceita essa ação.' });
   });
 });
 

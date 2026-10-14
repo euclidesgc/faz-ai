@@ -1,4 +1,4 @@
-import { choose, lastSent, posted, renderThemed, seedBoard, sentOf } from './setup';
+import { choose, confirmLast, lastSent, posted, renderThemed, seedBoard, sentOf } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, cleanup, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -102,6 +102,24 @@ const card = (title: string) => within(document.querySelector<HTMLElement>(`.set
 const titles = () => [...document.querySelectorAll('.settings-card h4')].map((h) => h.textContent);
 
 describe('ToolHarness: assuntos', () => {
+  it('ao abrir relê as pastas e diz que está relendo até o host confirmar; "Reler pastas" faz o mesmo', async () => {
+    await show('rules');
+    expect(sentOf('harness.refresh')).toHaveLength(1);
+    expect(screen.getByText('Relendo as pastas e os plugins…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reler pastas/ })).toHaveAttribute('data-disabled');
+    confirmLast();
+    await act(async () => {});
+    expect(screen.queryByText('Relendo as pastas e os plugins…')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Reler pastas' }));
+    expect(sentOf('harness.refresh')).toHaveLength(2);
+    expect(screen.getByText('Relendo as pastas e os plugins…')).toBeInTheDocument();
+    confirmLast(false, 'A CLI não respondeu.');
+    await act(async () => {});
+    // a falha (já no toast) destrava o botão
+    expect(screen.queryByText('Relendo as pastas e os plugins…')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Reler pastas' })).toBeEnabled();
+  });
+
   it('uma aba por assunto, na ordem; só o assunto à vista é montado', async () => {
     await show('rules');
     const tabs = screen.getAllByRole('tab');
@@ -564,7 +582,10 @@ describe('ToolHarness: ações em massa', () => {
       ],
       usage: 'contextual',
     });
-    // feita a ação, a seleção é limpa
+    // o botão espera o host; confirmada a ação, a seleção é limpa
+    expect(skills.getByRole('button', { name: 'Enviar para o board' })).toHaveAttribute('data-disabled');
+    confirmLast();
+    await act(async () => {});
     expect(skills.getByRole('checkbox', { name: 'Selecionar commit' })).not.toBeChecked();
   });
 
@@ -591,6 +612,8 @@ describe('ToolHarness: ações em massa', () => {
     await userEvent.click(skills.getByRole('checkbox', { name: 'Selecionar todos: Skills' }));
     await userEvent.click(skills.getByRole('button', { name: 'Enviar para o board (1)' }));
     expect(lastSent('harness.selection.set').items).toEqual([{ kind: 'skill', location: '.claude/skills/revisar/SKILL.md' }]);
+    confirmLast();
+    await act(async () => {});
     await userEvent.click(skills.getByRole('checkbox', { name: 'Selecionar todos: Skills' }));
     await userEvent.click(skills.getByRole('button', { name: 'Remover do board (1)' }));
     expect(lastSent('harness.selection.set')).toEqual({

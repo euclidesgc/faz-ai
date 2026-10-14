@@ -8,7 +8,9 @@ import {
   usageOf,
   usageOptions,
   type HarnessUsage,
+  type SelectableKind,
 } from '../../../../shared/harnessSelection';
+import { useAction } from '../../../useAction';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import type { ItemActions } from './useItemActions';
@@ -57,9 +59,12 @@ export function BulkActions({ items, actions, projectTool, onDone }: Props) {
   const count = (list: HarnessItem[]) => (list.length < items.length ? ` (${list.length})` : '');
   const keys = (list: HarnessItem[]) =>
     list.flatMap((i) => (isSelectableKind(i.kind) ? [{ kind: i.kind, location: selectionKey(i) }] : []));
-  const setUsage = (usage: HarnessUsage) => {
-    harness.setSelection(keys(x.usage), usage);
-    onDone();
+  // a marcação é gravada no banco: a seleção só limpa quando o host confirma, e o botão mostra a espera
+  const select = useAction(async (list: { kind: SelectableKind; location: string }[][], usage: HarnessUsage | null) => {
+    for (const items of list) await harness.setSelection(items, usage);
+  });
+  const setUsage = async (usage: HarnessUsage) => {
+    if (await select.run([keys(x.usage)], usage)) onDone();
   };
   // cada tipo entra com o seu modo (`defaultUsage`): uma mensagem por modo
   const send = () => {
@@ -69,8 +74,10 @@ export function BulkActions({ items, actions, projectTool, onDone }: Props) {
       const usage = defaultUsage(i.kind);
       byUsage.set(usage, [...(byUsage.get(usage) ?? []), i]);
     }
-    for (const [usage, list] of byUsage) harness.setSelection(keys(list), usage);
-    onDone();
+    void (async () => {
+      for (const [usage, list] of byUsage) if (!(await select.run([keys(list)], usage))) return;
+      onDone();
+    })();
   };
   // só os modos que valem para todos os marcados (uma regra aceita "Desligado"; uma skill, não)
   const usages = HARNESS_USAGES.filter((u) => x.usage.every((i) => isSelectableKind(i.kind) && usageOptions(i.kind).includes(u.id)));
@@ -79,6 +86,7 @@ export function BulkActions({ items, actions, projectTool, onDone }: Props) {
       {toSend.length > 0 && (
         <Button
           size="1"
+          loading={select.busy}
           title={t('Disponibiliza para os cards deste board; o board lê o arquivo da origem na hora de usar.')}
           onClick={send}
         >
@@ -93,7 +101,15 @@ export function BulkActions({ items, actions, projectTool, onDone }: Props) {
             {count(x.usage)}
           </span>
           {usages.map((u) => (
-            <Button key={u.id} variant="soft" color="gray" size="1" title={t(u.hint)} onClick={() => setUsage(u.id)}>
+            <Button
+              key={u.id}
+              variant="soft"
+              color="gray"
+              size="1"
+              loading={select.busy}
+              title={t(u.hint)}
+              onClick={() => void setUsage(u.id)}
+            >
               {t(u.label)}
             </Button>
           ))}
@@ -104,10 +120,8 @@ export function BulkActions({ items, actions, projectTool, onDone }: Props) {
           variant="soft"
           color="gray"
           size="1"
-          onClick={() => {
-            harness.setSelection(keys(toRemove), null);
-            onDone();
-          }}
+          loading={select.busy}
+          onClick={() => void select.run([keys(toRemove)], null).then((ok) => ok && onDone())}
         >
           {t('Remover do board')}
           {count(toRemove)}

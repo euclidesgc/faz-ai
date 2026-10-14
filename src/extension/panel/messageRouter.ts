@@ -91,6 +91,7 @@ const bridgeOnly = {
   'harness.item.open': viaBridge,
   'harness.file.read': viaBridge,
   'harness.plugin.apply': viaBridge,
+  'harness.refresh': viaBridge,
   'harness.file.write': viaBridge,
   'harness.item.create': viaBridge,
   'harness.item.write': viaBridge,
@@ -460,6 +461,15 @@ export class MessageRouter {
   /** Relê regras e skills do disco (chamado quando os arquivos mudam por fora) e avisa os webviews se algo mudou. */
   refreshHarness(): void {
     if (this.ctx.harness.refresh()) this.changed();
+  }
+
+  /**
+   * O "Reler pastas" da tela: relê o disco e espera também a lista de plugins da CLI, para o `done` da mensagem
+   * só sair quando tudo o que a tela vai mostrar já chegou.
+   */
+  async refreshHarnessAndPlugins(): Promise<void> {
+    this.refreshHarness();
+    await this.ctx.harness.refreshPlugins();
   }
 
   /** Liga a CLI do Claude Code, que diz quais plugins estão instalados e os desinstala, desativa e ativa. */

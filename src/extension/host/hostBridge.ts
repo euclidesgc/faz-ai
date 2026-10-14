@@ -228,12 +228,11 @@ export class HostBridge {
         }
         return;
       }
+      case 'harness.refresh':
+        await this.router.refreshHarnessAndPlugins();
+        return;
       case 'harness.plugin.apply':
-        try {
-          this.post({ type: 'notice', message: await this.router.applyPlugins(msg.tool, msg.action, msg.ids) });
-        } finally {
-          this.post({ type: 'harness.plugin.done' });
-        }
+        this.post({ type: 'notice', message: await this.router.applyPlugins(msg.tool, msg.action, msg.ids) });
         return;
       case 'harness.file.write': {
         try {

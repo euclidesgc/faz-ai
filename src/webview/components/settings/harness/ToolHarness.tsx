@@ -3,6 +3,7 @@ import { Badge, Button, Callout, Tabs } from '@radix-ui/themes';
 import { aiToolInfo, type AiTool } from '../../../../shared/harness';
 import { TOOL_REGIME, topicBadge, topicsOf, type HarnessTopic } from '../../../../shared/harnessTopics';
 import { harness } from '../../../commands';
+import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
 import { IconWarning } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
@@ -20,8 +21,13 @@ import { rich } from '../../../i18n/rich';
 export function ToolHarness({ tool }: { tool: AiTool }) {
   const state = useBoardStore((s) => s.state)!;
   const topicId = useBoardStore((s) => s.harnessTopic);
-  // a pasta do usuário não é vigiada: relê ao abrir a aba
-  useEffect(() => void harness.refresh(), []);
+  // a pasta do usuário não é vigiada: relê ao abrir a aba. A releitura espera a lista de plugins da CLI, por isso
+  // a tela diz que está relendo até o host confirmar
+  const refresh = useAction(() => harness.refresh());
+  useEffect(() => {
+    void refresh.run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const inventory = state.harness.inventory.find((x) => x.tool === tool);
   const projectTool = tool === state.board.aiTool;
@@ -36,7 +42,20 @@ export function ToolHarness({ tool }: { tool: AiTool }) {
         title={t('Harness do {tool}', { tool: label })}
         actions={
           <>
-            <Button variant="soft" color="gray" title={t('Relê as pastas do projeto e do usuário')} onClick={() => harness.refresh()}>
+            <span role="status" className="small muted">
+              {refresh.busy && (
+                <>
+                  <span className="spinner" aria-hidden /> {t('Relendo as pastas e os plugins…')}
+                </>
+              )}
+            </span>
+            <Button
+              variant="soft"
+              color="gray"
+              loading={refresh.busy}
+              title={t('Relê as pastas do projeto e do usuário')}
+              onClick={() => void refresh.run()}
+            >
               {t('Reler pastas')}
             </Button>
             <ImportArtifacts tool={tool} />

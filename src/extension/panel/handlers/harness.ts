@@ -400,7 +400,6 @@ const isSelected = (ctx: BoardContext, location: string): boolean =>
 
 /** Harness: regras, skills, agentes, hooks, permissões, servidores MCP e instalação de skills. */
 export const harnessHandlers = {
-  'harness.refresh': (_msg, ctx) => ctx.harness.refresh(),
   'harness.install.apply': (msg, ctx) => {
     const h = ctx.harness;
     if (!h.install) throw new Error('Nenhuma origem de skills carregada. Procure de novo.');
