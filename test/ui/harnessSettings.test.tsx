@@ -186,9 +186,10 @@ describe('HarnessSettings: abas', () => {
     setState((s) => ({ board: { ...s.board, aiTool: 'cursor' } }));
     useBoardStore.setState({ harnessTab: 'tool', harnessTopic: 'rules' });
     useBoardStore.getState().goToSection('harness-user');
-    expect(useBoardStore.getState().harnessTab).toBe('cursor');
+    expect(useBoardStore.getState()).toMatchObject({ harnessTab: 'cursor', harnessOrigin: 'user' });
+    // a pendência "nenhum agente do board" cai no Board, onde se vê o que falta enviar
     useBoardStore.getState().goToSection('harness-agents');
-    expect(useBoardStore.getState()).toMatchObject({ harnessTab: 'cursor', harnessTopic: 'agent' });
+    expect(useBoardStore.getState()).toMatchObject({ harnessTab: 'cursor', harnessTopic: 'agent', harnessOrigin: 'board' });
   });
 });
 

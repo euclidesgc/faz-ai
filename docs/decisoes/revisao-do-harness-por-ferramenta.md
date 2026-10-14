@@ -33,6 +33,18 @@ tem, e novas ferramentas seguirão o mesmo padrão com suas próprias particular
 **Escopo**: dentro de cada aba de assunto, separar Projeto e Global quando a ferramenta distinguir
 os dois, mais a aba Importados quando houver pasta importada, organizada da mesma forma.
 
+> **Adendo de 2026-10-14: o escopo sobe para antes do assunto.** Usando a tela, a pergunta que a
+> pessoa faz é "o que está no board?" ou "o que há no projeto?", e não "quais skills existem em todo
+> lugar?". Com o escopo dentro de cada assunto, trocar de assunto voltava o seletor para Projeto e a
+> busca para vazio, e para ver o Board inteiro era preciso escolher Board sete vezes. A ordem passa a
+> ser **ferramenta → escopo → assunto**: o seletor (Board, Projeto, Global, Importados) e a busca
+> ficam uma vez só, acima das abas de assunto, e valem para todas elas. As abas de assunto não
+> mudam: mesma lista e mesma ordem do nível 2 acima, em todos os escopos; no Board, os assuntos sem
+> marcação (Comandos, Hooks, Demais) dizem que não entram no board. O título de cada aba passa a
+> contar o que há naquele escopo ("3 no board" no Board; o número de artefatos no catálogo). Os
+> atalhos de outras telas levam ao escopo certo: a pendência "nenhum agente do board" cai em Board →
+> Sub-agentes; os de Projeto e Global, no escopo de cada um.
+
 **Motivação**: a tela atual está pesada e lenta. A organização em abas deve carregar e renderizar
 só o que está visível, economizando memória e deixando a leitura rápida.
 

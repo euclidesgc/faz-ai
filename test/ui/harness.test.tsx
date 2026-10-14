@@ -62,7 +62,8 @@ beforeEach(async () => {
 
 /** Abre o assunto da ferramenta e a origem (Projeto abre por padrão). */
 const renderScreen = async (topic: HarnessTopic, origin: 'Projeto' | 'Global' = 'Projeto', tool: AiTool = 'claude') => {
-  useBoardStore.setState({ harnessTopic: topic });
+  // a origem fica no store e vale para a aba inteira: começa em Projeto a cada render deste helper
+  useBoardStore.setState({ harnessTopic: topic, harnessOrigin: 'project' });
   const view = render(
     <Theme>
       <ToolHarness tool={tool} />

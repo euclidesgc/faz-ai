@@ -674,9 +674,10 @@ describe('ToolHarness: ações em massa', () => {
     expect(sentOf('harness.hook.remove').map((m) => m.command)).toEqual(['npm test', 'npm run lint']);
   });
 
-  it('o assunto de hooks não tem a origem Board', async () => {
-    await show('hook');
-    expect(screen.queryByRole('radio', { name: 'Board' })).toBeNull();
+  it('no Board, o assunto de hooks só diz que não entra no board', async () => {
+    await show('hook', 'Board');
+    expect(screen.getByText(/Este assunto não entra no board/)).toBeInTheDocument();
+    expect(document.querySelector('.settings-card')).toBeNull();
   });
 
   it('o que não tem ação em massa fica sem caixa', async () => {
@@ -832,11 +833,32 @@ describe('ToolHarness: clareza de uso', () => {
       { kind: 'skill', location: '.claude/skills/sumiu/SKILL.md', usage: 'contextual' },
       { kind: 'instructions', location: 'CLAUDE.md', usage: 'off' },
     ]);
-    await show('skill');
+    await show('skill', 'Board');
     // o ausente também conta: ele está no board
     expect(screen.getByRole('tab', { name: /Skills/ })).toHaveTextContent('2 no board');
     expect(screen.getByRole('tab', { name: /Regras/ })).toHaveTextContent('1 no board, 1 desligadas');
     expect(screen.getByRole('tab', { name: /Hooks/ })).not.toHaveTextContent('no board');
+    // no catálogo, a aba conta o que a fonte tem naquele assunto (as duas skills do projeto mais as da base)
+    await userEvent.click(screen.getByRole('radio', { name: 'Projeto' }));
+    expect(screen.getByRole('tab', { name: /Skills/ })).not.toHaveTextContent('no board');
+    expect(screen.getByRole('tab', { name: /Skills/ }).textContent).toMatch(/Skills\d+/);
+  });
+
+  it('a origem vale para todos os assuntos: trocar de aba não a perde, e ela fica no store', async () => {
+    await show('rules', 'Global');
+    expect(useBoardStore.getState().harnessOrigin).toBe('user');
+    await userEvent.click(screen.getByRole('tab', { name: /^Skills/ }));
+    expect(screen.getByRole('radio', { name: 'Global' })).toBeChecked();
+    // o seletor é um só, acima das abas de assunto
+    expect(screen.getAllByRole('radiogroup', { name: 'Origem dos artefatos' })).toHaveLength(1);
+    expect(screen.getAllByRole('searchbox')).toHaveLength(1);
+  });
+
+  it('uma origem que a aba não tem cai em Projeto: o Board não existe na ferramenta que não é a do projeto', async () => {
+    useBoardStore.setState({ harnessOrigin: 'board' });
+    await show('rules', undefined, 'cursor');
+    expect(screen.queryByRole('radio', { name: 'Board' })).toBeNull();
+    expect(screen.getByRole('radio', { name: 'Projeto' })).toBeChecked();
   });
 
   it('na outra ferramenta não há contagem: a marcação só vale para a do projeto', async () => {

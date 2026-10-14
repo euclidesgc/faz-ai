@@ -159,5 +159,7 @@ afterEach(() => {
     selectedParentId: null,
     collapsed: {},
     view: 'board',
+    // a origem do Harness fica no store: volta ao padrão para um teste não enxergar a escolha do anterior
+    harnessOrigin: 'project',
   });
 });

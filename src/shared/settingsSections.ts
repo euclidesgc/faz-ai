@@ -16,13 +16,16 @@ export interface SettingsSectionInfo {
   harnessTab?: 'tool' | 'project' | 'user';
   /** O assunto aberto dentro da aba da ferramenta (`HarnessTopic` de `harnessTopics.ts`). */
   harnessTopic?: 'rules' | 'skill' | 'agent' | 'mcp' | 'command' | 'hook' | 'other';
+  /** A origem escolhida na aba da ferramenta (`HarnessOrigin` de `harnessTopics.ts`); vale para todos os assuntos. */
+  harnessOrigin?: 'board' | 'project' | 'user';
 }
 
 export const SETTINGS_SECTIONS: Record<string, SettingsSectionInfo> = {
   'model-rules': { tab: 'models' },
   'harness-tool': { tab: 'harness', harnessTab: 'tool' },
   heartbeat: { tab: 'harness', harnessTab: 'tool' },
-  'harness-project': { tab: 'harness', harnessTab: 'project' },
-  'harness-user': { tab: 'harness', harnessTab: 'user' },
-  'harness-agents': { tab: 'harness', harnessTab: 'project', harnessTopic: 'agent' },
+  'harness-project': { tab: 'harness', harnessTab: 'project', harnessOrigin: 'project' },
+  'harness-user': { tab: 'harness', harnessTab: 'user', harnessOrigin: 'user' },
+  // a pendência "nenhum agente do board" leva ao Board, onde se vê o que falta enviar
+  'harness-agents': { tab: 'harness', harnessTab: 'project', harnessOrigin: 'board', harnessTopic: 'agent' },
 };
