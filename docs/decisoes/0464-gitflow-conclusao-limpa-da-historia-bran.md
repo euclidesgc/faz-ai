@@ -102,3 +102,15 @@ flowchart TD
   as outras histórias da mesma rodada.
 - Não validados aqui: a troca de base dos PRs e o merge de `main` para `develop` num repositório real,
   e o release completo no fluxo novo (será conferido no primeiro release).
+
+## Desvios do plano e revisão
+
+- **Estado do PR depois do `gh pr merge`.** Na revisão, achou-se que o `AutoMerger` consultava o PR
+  antes do `gh pr merge` (estado `OPEN`), e a limpeza pulava tudo. Correção: quando o `gh pr merge`
+  sai sem erro, a limpeza recebe `state: 'MERGED'`. O teste agora responde `OPEN` antes do merge, como
+  o gh real.
+- **`ls-remote` com `refs/heads/<branch>`.** Só o nome da branch casaria também outra branch com o
+  mesmo sufixo.
+- **Sugestões da revisão não aplicadas**, por mudarem o combinado no SPEC: `--force-with-lease` ao
+  apagar a remota; falha qualquer do `git remote get-url origin` tratada como "sem origin"; `NaN` do
+  `rev-list --count`; pasta da worktree apagada à mão continua no card.
