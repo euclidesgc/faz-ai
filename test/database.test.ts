@@ -386,6 +386,59 @@ describe('migração 24 → 25 (branch_created_at)', () => {
   });
 });
 
+describe('migração 30 → 31 (branch_kind do tipo de card)', () => {
+  const SQL_SETUP = `
+    INSERT INTO meta VALUES ('schema_version', '30');
+    INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto');
+    INSERT INTO workflows (id, board_id, name, position, kind) VALUES ('w', 'b', 'Histórias', 0, 'parent');
+    INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t1', 'b', 'História', '#fff', 'w');
+    INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t2', 'b', 'Bug', '#fff', 'w');
+    INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t3', 'b', 'Retrabalho', '#fff', 'w');
+    INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t4', 'b', 'Débito técnico', '#fff', 'w');
+  `;
+  const kinds = (db: import('sql.js').Database) =>
+    Object.fromEntries(db.exec('SELECT name, branch_kind FROM card_types')[0]!.values.map((r) => [String(r[0]), String(r[1])]));
+
+  it('Bug vira hotfix, Retrabalho vira bugfix e os outros tipos ficam em feature', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 30);
+    old.run(SQL_SETUP.replace("INSERT INTO meta VALUES ('schema_version', '30');", ''));
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(31);
+    expect(kinds(old)).toEqual({ História: 'feature', Bug: 'hotfix', Retrabalho: 'bugfix', 'Débito técnico': 'feature' });
+  });
+
+  it('renomear o tipo depois da migração não muda o tipo de branch', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const db = new SQL.Database();
+    migrate(db);
+    db.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    db.run("INSERT INTO workflows (id, board_id, name, position, kind) VALUES ('w', 'b', 'Histórias', 0, 'parent')");
+    db.run(
+      "INSERT INTO card_types (id, board_id, name, color, default_workflow_id, branch_kind) VALUES ('t', 'b', 'Bug', '#fff', 'w', 'hotfix')",
+    );
+
+    db.run("UPDATE card_types SET name = 'Defeito' WHERE id = 't'");
+
+    expect(kinds(db)).toEqual({ Defeito: 'hotfix' });
+  });
+
+  it('tipo criado sem informar o tipo de branch nasce em feature', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const db = new SQL.Database();
+    migrate(db);
+    db.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    db.run("INSERT INTO workflows (id, board_id, name, position, kind) VALUES ('w', 'b', 'Histórias', 0, 'parent')");
+    db.run("INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t', 'b', 'Novo', '#fff', 'w')");
+
+    expect(kinds(db)).toEqual({ Novo: 'feature' });
+  });
+});
+
 describe('banco novo', () => {
   it('chega na versão atual do esquema e já tem a coluna merge_commit', async () => {
     const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });

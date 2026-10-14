@@ -47,6 +47,25 @@ const connectAI: Record<string, string> = Object.fromEntries(
   ]),
 );
 
+/**
+ * Avisos do board na conversa ao criar a branch (gitNoticeText, em src/shared/gitflow.ts). Ficam à parte porque a
+ * conversa traduz os comentários do board só por estas chaves (translateGitNotice, em ../index.ts).
+ */
+export const gitNotices: Record<string, string> = {
+  'O repositório não tem origin: a branch {branch} partiu de {base} como está nesta máquina.':
+    'The repository has no origin: branch {branch} started from {base} as it is on this machine.',
+  'Não foi possível atualizar as refs do origin antes de criar a branch {branch} ({error}). Ela partiu de {base} como está nesta máquina, que pode estar desatualizada.':
+    'Could not update the origin refs before creating branch {branch} ({error}). It started from {base} as it is on this machine, which may be out of date.',
+  'A branch {develop} não existia: o board a criou a partir de {main} e a enviou ao origin.':
+    'Branch {develop} did not exist: the board created it from {main} and pushed it to origin.',
+  'A branch {develop} não existia: o board a criou a partir de {main}, mas não conseguiu enviá-la ao origin ({error}). Envie à mão: git push -u origin {develop}':
+    'Branch {develop} did not exist: the board created it from {main}, but could not push it to origin ({error}). Push it by hand: git push -u origin {develop}',
+  'A branch {develop} existe só nesta máquina: o pull request para ela só abre depois de enviá-la ao origin (git push -u origin {develop}).':
+    'Branch {develop} exists only on this machine: the pull request to it can only be opened after pushing it to origin (git push -u origin {develop}).',
+  'A branch {missing}, de onde a {branch} tinha partido, não existe mais nesta máquina nem no origin: a {branch} foi recriada a partir de {base}, que passa a ser a base do pull request.':
+    'Branch {missing}, which {branch} had started from, no longer exists on this machine or on origin: {branch} was recreated from {base}, which becomes the pull request base.',
+};
+
 export const host: Record<string, string> = {
   ...commandNotFound,
   ...connectAI,
@@ -170,6 +189,12 @@ export const host: Record<string, string> = {
     'The repository has no commits yet: make the first commit before creating story branches.',
   'A pasta {dir} já existe e não é uma worktree deste repositório.':
     'The folder {dir} already exists and is not a worktree of this repository.',
+  'Não foi possível atualizar as refs do origin ({error}) e a branch {develop} não existe nesta máquina: sem saber se ela já existe no origin, o board não a cria nem a envia. Verifique a rede e as credenciais do git (git fetch origin no terminal) e tente de novo.':
+    'Could not update the origin refs ({error}) and branch {develop} does not exist on this machine: without knowing whether it already exists on origin, the board neither creates nor pushes it. Check the network and the git credentials (git fetch origin in the terminal) and try again.',
+  'Não foi possível saber qual é a branch principal (o origin não informa a dele e não há main nem master), e a branch {develop} não existe: o board não a cria a partir da branch atual ({current}). Rode git remote set-head origin -a e tente de novo.':
+    'Could not tell which branch is the main one (origin does not report its own and there is no main or master), and branch {develop} does not exist: the board does not create it from the current branch ({current}). Run git remote set-head origin -a and try again.',
+  'Não foi possível saber qual é a branch principal (não há origin, main nem master), e a branch {develop} não existe: o board não a cria a partir da branch atual ({current}). Crie a {develop} à mão a partir da principal (git branch {develop} <principal>) e tente de novo.':
+    'Could not tell which branch is the main one (there is no origin, main or master), and branch {develop} does not exist: the board does not create it from the current branch ({current}). Create {develop} by hand from the main branch (git branch {develop} <main>) and try again.',
   'o comando "gh" (GitHub CLI) não foi encontrado.': 'the "gh" command (GitHub CLI) was not found.',
 
   // execução pela IA e chat
@@ -287,4 +312,6 @@ export const host: Record<string, string> = {
   '{ref} está bloqueado: {reason}': '{ref} is blocked: {reason}',
   '{ref} está esperando uma pessoa.': '{ref} is waiting for a person.',
   '{ref} não tem nada pendente com a IA, mas ainda não foi concluído.': '{ref} has nothing pending with the AI, but is not finished yet.',
+
+  ...gitNotices,
 };

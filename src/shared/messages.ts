@@ -10,7 +10,7 @@ import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
-import type { GitConfig } from './git';
+import type { BranchKind, GitConfig } from './git';
 import type { ProjectProfile } from './projectProfile';
 
 /** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
@@ -52,6 +52,8 @@ export type WebviewToHost =
   | { type: 'ui.openInBrowser' }
   /** pede ao editor para abrir o Settings nativo filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */
   | { type: 'ui.openIdeSettings'; key?: string }
+  /** a tela Git pede para detectar de novo a branch principal */
+  | { type: 'git.main.refresh' }
   /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */
   /** `mode`: trabalhar a fase (padrão) ou só refinar o card */
   | { type: 'ai.run'; cardId: Id; mode?: AiRunMode }
@@ -177,7 +179,7 @@ export type WebviewToHost =
   | {
       type: 'settings.type.update';
       typeId: Id;
-      patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue> };
+      patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue>; branchKind?: BranchKind };
     }
   | { type: 'settings.type.delete'; typeId: Id }
   | {

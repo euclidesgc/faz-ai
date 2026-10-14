@@ -300,6 +300,30 @@ describe('atualização do board para o padrão atual', () => {
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 
+  it('versão 10: a Homologação com o texto da 0.39 passa a abrir o pull request com --base em workspace.prBase; a personalizada fica', () => {
+    upgradeBoard(db, boardId);
+    expect(BOARD_TEMPLATE_VERSION).toBe(10);
+    const settings = new SettingsRepo(db);
+    const v9 = PHASE_HISTORY['Homologação']!.instructions.at(-1)!;
+    // o texto de fábrica anterior é o atual sem a base do PR
+    expect(v9).toContain('(ex.: gh pr create)');
+    expect(v9).not.toContain('prBase');
+    settings.updateColumn(col('Homologação').id, { aiInstruction: v9 });
+    run(db, 'UPDATE boards SET template_version = 9 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([`Coluna "Homologação": ${PHASE_HISTORY['Homologação']!.change}.`]);
+    upgradeBoard(db, boardId);
+    expect(col('Homologação').aiInstruction).toBe(PHASE_DEFAULTS['Homologação']!.instruction);
+    expect(col('Homologação').aiInstruction).toContain('gh pr create --base <workspace.prBase do get_card>');
+    expect(snap().board.templateVersion).toBe(10);
+
+    // editada à mão: não é mexida
+    settings.updateColumn(col('Homologação').id, { aiInstruction: 'minha homologação' });
+    run(db, 'UPDATE boards SET template_version = 9 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+    upgradeBoard(db, boardId);
+    expect(col('Homologação').aiInstruction).toBe('minha homologação');
+  });
+
   it('pelo roteador: o board antigo avisa o que muda e é atualizado por mensagem, com cópia de segurança', () => {
     let backups = 0;
     const handle = { db, scheduleSave: () => {}, backup: () => backups++, close: async () => {} };

@@ -217,6 +217,7 @@ export class MessageRouter {
       environmentFirstRun: this.environmentFirstRun,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
       harnessSuggestions: this.suggestions,
+      mainBranch: this.ctx.mainBranch(),
     };
   }
 

@@ -149,6 +149,7 @@ const state: BoardState = {
   environmentFirstRun: false,
   harnessInstall: null,
   harnessSuggestions: null,
+  mainBranch: null,
 };
 
 const run = (f: Partial<Filters>) => [...(applyFilters(state, { ...EMPTY_FILTERS, includeRelated: false, ...f }, NOW) ?? [])].sort();

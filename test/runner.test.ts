@@ -60,6 +60,7 @@ it('com o modo autônomo só até uma fase, o pedido diz até onde e, na própri
 it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
   expect(AUTONOMOUS_ADVICE).not.toContain('coluna de conclusão');
   expect(AUTONOMOUS_ADVICE).toContain('set_pull_request');
+  expect(AUTONOMOUS_ADVICE).toContain('abra o pull request com --base em workspace.prBase');
   expect(AUTONOMOUS_ADVICE).toMatch(/pare/);
 });
 

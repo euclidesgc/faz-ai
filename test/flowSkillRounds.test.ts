@@ -76,6 +76,23 @@ describe('fases do fluxo na skill', () => {
   });
 });
 
+describe('base do pull request (#462)', () => {
+  it('a skill manda abrir o pull request com --base em workspace.prBase: Homologação, prepare_workspace e pilha do modo autônomo', () => {
+    const body = FLOW_SKILL.body;
+    const homologacao = body.slice(body.indexOf('## Homologação'), body.indexOf('## Modo autônomo'));
+    expect(homologacao).toMatch(/`--base` em\s+`workspace.prBase`/);
+    expect(homologacao).toContain('gh pr create --base <prBase>');
+    const prepare = body.slice(
+      body.indexOf('chame `prepare_workspace` na história'),
+      body.indexOf('Na Implementação, trabalhe em rodadas'),
+    );
+    expect(prepare).toMatch(/base do fluxo[\s\S]*`workspace.prBase`/);
+    const yolo = body.slice(body.indexOf('## Modo autônomo'), body.indexOf('## Quando parar'));
+    // a pilha mantém o baseBranch da anterior e abre o PR com a base dela
+    expect(yolo).toMatch(/`workspace.baseBranch`[\s\S]*`--base` em `workspace.prBase`/);
+  });
+});
+
 describe('Revisão antes do pull request', () => {
   it('a skill manda checar, revisar com o revisor-de-codigo, corrigir o que tem diretriz e perguntar o ambíguo', () => {
     const revisao = FLOW_SKILL.body.slice(FLOW_SKILL.body.indexOf('## Revisão'), FLOW_SKILL.body.indexOf('## Homologação'));

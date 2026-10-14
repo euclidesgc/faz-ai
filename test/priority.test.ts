@@ -5,8 +5,8 @@ import { boardState, card } from './fakes/board';
 const ids = (cards: { id: string }[]) => cards.map((c) => c.id);
 
 const types = [
-  { id: 'bug', boardId: 'b', name: BUG_TYPE, color: '#000', defaultWorkflowId: 'wp', defaults: {} },
-  { id: 'story', boardId: 'b', name: 'História', color: '#000', defaultWorkflowId: 'wp', defaults: {} },
+  { id: 'bug', boardId: 'b', name: BUG_TYPE, color: '#000', defaultWorkflowId: 'wp', defaults: {}, branchKind: 'hotfix' as const },
+  { id: 'story', boardId: 'b', name: 'História', color: '#000', defaultWorkflowId: 'wp', defaults: {}, branchKind: 'feature' as const },
 ];
 
 describe('isBug', () => {

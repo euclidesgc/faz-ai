@@ -116,6 +116,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     environmentFirstRun: false,
     harnessInstall: null,
     harnessSuggestions: null,
+    mainBranch: null,
     ...over,
   };
 }

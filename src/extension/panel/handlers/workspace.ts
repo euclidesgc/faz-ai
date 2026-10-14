@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Card } from '../../../shared/model';
 import { branchName, slug } from '../../../shared/git';
+import { BOARD_AUTHOR, branchKindOf, flowBaseOf, flowPrefix, gitNoticeText } from '../../../shared/gitflow';
 import { isPullRequestUrl, stackBaseOf, storyOf } from '../../../shared/story';
 import { columnOf, isLive } from '../../../shared/selectors';
 import { settleDelivery } from '../../delivery';
@@ -50,35 +51,58 @@ function prepareStoryWorkspace(ctx: BoardContext, cardId: string): void {
     throw new Error(
       `#${story.number} deriva de #${origin.number}, que ainda não tem branch: a branch desta parte parte da dela. Implemente #${origin.number} antes.`,
     );
+  // detecta de novo: o cache pode ser de antes de a pasta virar repositório (git init depois de abrir o
+  // board), e com a principal vazia a base sairia sem nome ("A branch  não existe"). A origem da detecção
+  // também conta: a principal adivinhada pela branch atual não serve para criar a develop (ver git.ts)
+  const detected = ctx.mainBranch(true);
+  // a detecção só falha fora de um repositório: a mesma mensagem que o git daria adiante
+  if (!detected) throw new Error('A pasta do projeto não é um repositório git.');
+  const main = detected.name;
+  const kind = branchKindOf(s, story);
+  const typeName = s.cardTypes.find((t) => t.id === story.typeId)?.name ?? '';
   // a branch já registrada vale mesmo que o título ou o padrão tenham mudado depois
   const branch =
     story.branch ||
-    branchName(git.branchPattern, {
-      type: s.cardTypes.find((t) => t.id === story.typeId)?.name ?? '',
-      number: story.number,
-      title: story.title,
-    });
+    branchName(git.branchPattern, { type: typeName, number: story.number, title: story.title, flow: flowPrefix(git, kind, typeName) });
   const worktreePath =
     story.worktreePath || path.join(worktreeRoot(ctx) ?? projectDir, `${story.number}-${slug(story.title) || 'historia'}`);
-  // a história derivada parte da branch da origem, e a do modo autônomo, da anterior na fila; a base escolhida na primeira vez vale daí em diante
+  // a base escolhida na primeira vez vale daí em diante (RF16): história com branch volta a ela (ou à principal,
+  // quando é anterior ao gitflow) e, se essa base sumiu, à base do fluxo; a nova parte da anterior na pilha (derivada
+  // ou modo autônomo), senão da base do fluxo
+  const flowBase = flowBaseOf(git, kind, main);
+  const toFlow = { base: flowBase.base, developFrom: flowBase.isDevelop ? main : undefined };
   const ws = prepareWorkspace({
     projectDir,
     mode: git.mode,
     branch,
     worktreePath,
-    base: story.branch ? story.baseBranch : (stackBaseOf(s, story)?.branch ?? ''),
+    stack: story.branch ? undefined : stackBaseOf(s, story)?.branch,
+    ...(story.branch ? { base: story.baseBranch || main, fallback: toFlow } : toFlow),
+    mainGuessed: detected.source === 'current',
   });
   ctx.cards.setWorkspace(story.id, ws.branch, ws.path);
   if (!story.branch) {
     ctx.cards.setBaseBranch(story.id, ws.base);
     ctx.cards.setBranchCreatedAt(story.id, now());
+  } else if (ws.notices.some((n) => n.kind === 'baseMissing')) {
+    // a base gravada sumiu e a branch voltou da base do fluxo: o pull request vai para ela agora
+    ctx.cards.setBaseBranch(story.id, ws.base);
   }
+  // os avisos vão em português, assinados pelo board; a tela traduz pelo autor (RF25)
+  for (const n of ws.notices) ctx.comments.add(story.id, BOARD_AUTHOR, gitNoticeText(n), 'ai');
+  // criar a develop ou a primeira branch pode mudar o que a detecção enxerga
+  ctx.mainBranch(true);
 }
 
 /** Branch, worktree e pull request da história. */
 export const workspaceHandlers = {
   'card.workspace.prepare': (msg, ctx) => {
     prepareStoryWorkspace(ctx, msg.cardId);
+    return true;
+  },
+  // a tela Git pede para detectar de novo a principal; devolve true para o snapshot novo chegar a ela
+  'git.main.refresh': (_msg, ctx) => {
+    ctx.mainBranch(true);
     return true;
   },
   'card.workspace.clear': (msg, ctx) => {

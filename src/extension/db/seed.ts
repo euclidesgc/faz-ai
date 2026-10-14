@@ -5,6 +5,7 @@ import { newId } from './ids';
 import { EFFORT_FIELD, EFFORT_LEVELS } from '../../shared/models';
 import { CRITICALITY_FIELD, CRITICALITY_LEVELS } from '../../shared/critical';
 import { MCPS_FIELD, MODEL_FIELD, PHASE_FIELD, RULES_FIELD, SKILLS_FIELD, TAGS_FIELD } from '../../shared/boardFields';
+import { DEFAULT_BRANCH_KINDS } from '../../shared/git';
 
 /** Cria o board padrão para um workspace e devolve seu id. */
 export function seedBoard(db: Database, workspaceKey: string, name: string): string {
@@ -37,7 +38,14 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
       [subtaskType, 'Sub-tarefa', '#2ecc71', childWf],
     ];
     types.forEach(([id, n, c, wf]) =>
-      db.run('INSERT INTO card_types(id, board_id, name, color, default_workflow_id) VALUES (?,?,?,?,?)', [id, boardId, n, c, wf]),
+      db.run('INSERT INTO card_types(id, board_id, name, color, default_workflow_id, branch_kind) VALUES (?,?,?,?,?,?)', [
+        id,
+        boardId,
+        n,
+        c,
+        wf,
+        DEFAULT_BRANCH_KINDS[n] ?? 'feature',
+      ]),
     );
 
     db.run(

@@ -215,6 +215,37 @@ describe('settings', () => {
     expect(() => settings.deleteType(t.id)).toThrow();
   });
 
+  it('o board novo traz o tipo de branch de cada tipo: Bug em hotfix, Retrabalho em bugfix, o resto em feature', () => {
+    const kinds = Object.fromEntries(snap().cardTypes.map((t) => [t.name, t.branchKind]));
+    expect(kinds).toEqual({
+      História: 'feature',
+      Retrabalho: 'bugfix',
+      Bug: 'hotfix',
+      'Débito técnico': 'feature',
+      'Sub-tarefa': 'feature',
+    });
+  });
+
+  it('tipo criado nasce em feature, e updateType troca o tipo de branch sem mexer no resto', () => {
+    const id = settings.createType(boardId, 'Melhoria', '#123456', parentWf().id);
+    expect(snap().cardTypes.find((t) => t.id === id)?.branchKind).toBe('feature');
+
+    settings.updateType(id, { branchKind: 'bugfix' });
+    expect(snap().cardTypes.find((t) => t.id === id)).toMatchObject({ name: 'Melhoria', color: '#123456', branchKind: 'bugfix' });
+
+    // renomear não muda o tipo de branch (RF06)
+    settings.updateType(id, { name: 'Ajuste' });
+    expect(snap().cardTypes.find((t) => t.id === id)).toMatchObject({ name: 'Ajuste', branchKind: 'bugfix' });
+  });
+
+  it('updateType recusa tipo de branch fora de feature, bugfix e hotfix (inclusive release) e não grava nada do patch', () => {
+    const bug = typeNamed('Bug');
+    for (const bad of ['release', 'develop', '']) {
+      expect(() => settings.updateType(bug.id, { name: 'Outro', branchKind: bad as never })).toThrow(/Tipo de branch inválido/);
+    }
+    expect(typeNamed('Bug')).toMatchObject({ name: 'Bug', branchKind: 'hotfix' });
+  });
+
   it('cria e atualiza campo custom', () => {
     const id = settings.createField(boardId, {
       name: 'Prioridade',

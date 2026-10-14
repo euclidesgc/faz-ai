@@ -661,7 +661,7 @@ economizar tokens.
 
 ### Branch e pasta de trabalho por história
 
-Cada história trabalha numa branch própria, criada pelo board (ex.: `historia/12-login-com-google`).
+Cada história trabalha numa branch própria, criada pelo board (ex.: `feature/12-login-com-google`).
 Por padrão ela vem com uma worktree: uma pasta de trabalho separada, ao lado do projeto, onde a IA
 altera o código sem tocar na sua pasta nem nas suas alterações em andamento. As sub-tarefas fazem
 commits na branch da história.
@@ -675,6 +675,52 @@ commits na branch da história.
   editor](#configurações-no-settings-do-editor)); no navegador seguem na aba Git e no bloco de
   paralelo do Harness, como antes.
 - Cada worktree é uma cópia de trabalho: as dependências precisam ser instaladas nela.
+
+#### Gitflow
+
+As branches seguem o gitflow, ligado por padrão (`fazai.git.gitflow`). O tipo do card define o tipo
+da branch, e cada tipo sai de um lugar e volta para outro:
+
+| Branch | Gerada por | Parte de | O PR vai para |
+| --- | --- | --- | --- |
+| principal (`main`, `master`...) | — | — | — |
+| `develop` | — | a principal | — |
+| `feature/` | História e Débito técnico | `develop` | `develop` |
+| `bugfix/` | Retrabalho | `develop` | `develop` |
+| `hotfix/` | Bug | a principal | a principal |
+| `release/` | nenhum tipo de card (só o prefixo) | `develop` | a principal |
+
+- A **branch principal é detectada sozinha**, sem rede: o HEAD do `origin`; senão `main` ou `master`;
+  senão a branch atual. A seção do gitflow na aba Git mostra qual foi e por quê.
+- Se a `develop` não existe, o board a cria a partir da principal e a envia ao `origin`; se não
+  conseguir enviar, avisa na conversa da história com o comando para fazer à mão. Ele não a cria
+  quando o `git fetch` falhou (ela pode já existir no `origin`) nem quando a principal saiu da branch
+  atual: recusa e diz o que fazer (verificar a rede, ou rodar `git remote set-head origin -a`).
+- Antes de criar a branch, o board roda `git fetch origin` (até 20 s, sem pedir senha) e parte de
+  `origin/<base>`, sem upstream (`--no-track`). Sem `origin` ou com o fetch falhando, parte das refs
+  locais e avisa na conversa.
+- Uma branch apagada é recriada da base gravada; se essa base também sumiu (a história anterior da
+  pilha já foi mesclada), volta da base do fluxo e a conversa avisa que o PR muda de destino.
+- A IA lê a base do PR em `workspace.prBase` do `get_card` e abre o pull request com `--base`. Em
+  histórias empilhadas (modo autônomo ou derivadas), a base é a branch da história anterior.
+- Um defeito numa funcionalidade que ainda só está na `develop` é **Retrabalho**, não Bug. O tipo de
+  branch de cada tipo de card se escolhe na aba Git.
+- O nome da branch usa `{fluxo}` (o prefixo do tipo: `feature/`, `bugfix/`, `hotfix/`). O padrão
+  antigo `{tipo}/{numero}-{titulo}` é convertido para `{fluxo}{numero}-{titulo}` ao ler a configuração.
+
+Opções em **Faz AI › Git**, no Settings do editor:
+
+| Opção | Padrão | O que faz |
+| --- | --- | --- |
+| `fazai.git.gitflow` | ligado | Desligado, toda branch parte da principal e `{fluxo}` vira `<tipo>/`. |
+| `fazai.git.developBranch` | `develop` | Branch de integração. |
+| `fazai.git.featurePrefix` | `feature/` | Prefixo das branches de feature. |
+| `fazai.git.bugfixPrefix` | `bugfix/` | Prefixo das branches de bugfix. |
+| `fazai.git.hotfixPrefix` | `hotfix/` | Prefixo das branches de hotfix. |
+| `fazai.git.releasePrefix` | `release/` | Só informativo: nenhum tipo de card gera release. |
+
+Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. A limpeza das branches e worktrees
+ao concluir a história, a das órfãs e o renomear da principal no `origin` vêm em entregas seguintes.
 
 ### Pull request e merge na Homologação
 

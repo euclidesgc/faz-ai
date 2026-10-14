@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { needsTriage } from '../src/extension/mcp/format';
+import { cardDetail, needsTriage } from '../src/extension/mcp/format';
+import type { BoardState, Card } from '../src/shared/model';
 
 async function setup() {
   const db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
@@ -50,5 +51,91 @@ describe('needsTriage', () => {
     };
     const card = s.cards.find((c) => c.id === cardId)!;
     expect(needsTriage(s, card)).toBe(true);
+  });
+});
+
+describe('workspace do get_card (#462)', () => {
+  /** monta o estado à mão: a principal detectada vem do BoardState e as branches, do cartão */
+  async function withBranch(
+    patch: Partial<Card> | ((s0: BoardState) => Partial<Card>),
+    mainBranch: BoardState['mainBranch'] = { name: 'main', source: 'origin' },
+    extra: Card[] = [],
+  ) {
+    const { router, cardId } = await setup();
+    const s0 = router.snapshot();
+    const s: BoardState = {
+      ...s0,
+      mainBranch,
+      cards: [...s0.cards.map((c) => (c.id === cardId ? { ...c, ...(typeof patch === 'function' ? patch(s0) : patch) } : c)), ...extra],
+    };
+    return { s, card: s.cards.find((c) => c.id === cardId)! };
+  }
+  const detail = (s: BoardState, c: Card) =>
+    cardDetail(s, c, () => '/anexo') as { workspace?: Record<string, unknown>; phase?: { autonomousNote?: string } };
+
+  it('traz baseBranch, prBase e prNote com o comando, sem stackNote fora da pilha', async () => {
+    const { s, card } = await withBranch({ branch: 'feature/1-card', worktreePath: '/w', baseBranch: 'develop' });
+    const ws = detail(s, card).workspace!;
+    expect(ws).toMatchObject({
+      branch: 'feature/1-card',
+      baseBranch: 'develop',
+      prBase: 'develop',
+      prNote: 'Abra o pull request com --base develop (ex.: gh pr create --base develop).',
+    });
+    expect(ws).not.toHaveProperty('stackNote');
+  });
+
+  it('história anterior ao gitflow (base vazia): prBase é a principal detectada', async () => {
+    const { s, card } = await withBranch(
+      { branch: 'historia/1-card', worktreePath: '/w', baseBranch: '' },
+      { name: 'master', source: 'name' },
+    );
+    expect(detail(s, card).workspace).toMatchObject({ baseBranch: 'master', prBase: 'master' });
+  });
+
+  it('sem repositório detectado e com a base vazia: prBase fica de fora e a nota fala da branch principal', async () => {
+    const { s, card } = await withBranch({ branch: 'historia/1-card', worktreePath: '/w', baseBranch: '' }, null);
+    const ws = detail(s, card).workspace!;
+    expect(ws).not.toHaveProperty('prBase');
+    expect(ws).not.toHaveProperty('baseBranch');
+    expect(ws.prNote).toContain('a branch principal do repositório');
+  });
+
+  it('na pilha: prBase é a branch da história anterior e a stackNote diz de qual PR ela depende', async () => {
+    const { s, card } = await withBranch({ branch: 'feature/1-card', worktreePath: '/w', baseBranch: 'feature/99-anterior' }, undefined, [
+      // a anterior é outra história com essa branch
+      { ...(await withBranch({})).card, id: 'anterior', number: 99, branch: 'feature/99-anterior' },
+    ]);
+    const ws = detail(s, card).workspace!;
+    expect(ws).toMatchObject({ baseBranch: 'feature/99-anterior', prBase: 'feature/99-anterior' });
+    expect(ws.prNote).toContain('--base feature/99-anterior');
+    expect(ws.stackNote).toContain('empilhada sobre feature/99-anterior');
+  });
+
+  it('a nota do modo autônomo na última coluna manda abrir o pull request com --base na base do PR', async () => {
+    const { s, card } = await withBranch((s0) => ({
+      branch: 'feature/1-card',
+      worktreePath: '/w',
+      baseBranch: 'develop',
+      yolo: true,
+      columnId: s0.columns.find((c) => c.name === 'Homologação')!.id,
+    }));
+    expect(detail(s, card).phase?.autonomousNote).toContain('abra o pull request com --base develop e registre-o');
+  });
+
+  it('sub-tarefa mostra o workspace e a base do PR da história', async () => {
+    const { router, cardId } = await setup();
+    const s0 = router.snapshot();
+    const childCol = s0.columns.find((c) => s0.workflows.find((w) => w.id === c.workflowId)?.kind === 'child')!;
+    const childType = s0.cardTypes.find((t) => t.defaultWorkflowId === childCol.workflowId)!;
+    const childId = router.createCard({ typeId: childType.id, columnId: childCol.id, parentId: cardId, title: 'sub' });
+    const s1 = router.snapshot();
+    const s: BoardState = {
+      ...s1,
+      mainBranch: { name: 'main', source: 'origin' },
+      cards: s1.cards.map((c) => (c.id === cardId ? { ...c, branch: 'feature/1-card', worktreePath: '/w', baseBranch: 'develop' } : c)),
+    };
+    const sub = s.cards.find((c) => c.id === childId)!;
+    expect(detail(s, sub).workspace).toMatchObject({ branch: 'feature/1-card', prBase: 'develop' });
   });
 });
