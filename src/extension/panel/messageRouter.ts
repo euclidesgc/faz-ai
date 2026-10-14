@@ -86,6 +86,7 @@ const bridgeOnly = {
   'harness.skill.file.create': viaBridge,
   'harness.skill.file.open': viaBridge,
   'harness.install.scan': viaBridge,
+  'harness.import.pick': viaBridge,
   'attachment.pick': viaBridge,
   'attachment.reveal': viaBridge,
   'attachment.read': viaBridge,

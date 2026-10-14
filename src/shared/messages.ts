@@ -255,10 +255,17 @@ export type WebviewToHost =
   /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
   | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
   /**
-   * marca (ou desmarca, com `usage` null) itens do harness para as execuções do board: `location` como o
-   * inventário o mostra (relativo ao projeto ou a partir de `~`)
+   * envia artefatos ao board com um modo, muda o modo dos que já estão nele, ou os tira do board (com
+   * `usage` null): `location` é a identidade do item na marcação (`selectionKey`: o caminho como o
+   * inventário o mostra, mais `#nome` numa entrada de configuração)
    */
   | { type: 'harness.selection.set'; items: { kind: SelectableKind; location: string }[]; usage: HarnessUsage | null }
+  /** abre o seletor de pasta do editor e importa a pasta escolhida para a ferramenta (só no editor) */
+  | { type: 'harness.import.pick'; tool: AiTool }
+  /** importa uma pasta: o board a varre atrás de artefatos no formato da ferramenta e os lista em "Importados" */
+  | { type: 'harness.import.add'; tool: AiTool; dir: string }
+  /** tira a pasta importada da lista; os artefatos dela saem do board */
+  | { type: 'harness.import.remove'; tool: AiTool; dir: string }
   /** cria um agente na pasta de agentes da ferramenta (global por padrão) e o marca como disponível no board */
   | { type: 'harness.agent.create'; scope?: InstallScope; input: AgentInput }
   /** reescreve o frontmatter (o que vier em `patch`) e, se vier, o corpo de um agente, preservando o resto */

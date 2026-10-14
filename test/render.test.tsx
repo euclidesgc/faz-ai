@@ -286,7 +286,7 @@ describe('telas montam sem erro', () => {
       'Harness do projeto',
       'Harness global',
       'Regras principais',
-      'Uso nas execuções do board',
+      'Modo no board',
       'revisar-spec',
       '.cursor/skills',
       'Servidores MCP',

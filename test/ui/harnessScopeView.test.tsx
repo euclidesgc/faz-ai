@@ -80,6 +80,7 @@ beforeEach(async () => {
         ],
       },
       harnessSelection: [],
+      harnessImports: [],
       harnessInstall: null,
     },
   });
@@ -177,12 +178,12 @@ describe('HarnessScopeView: Projeto', () => {
 
   it('o seletor mostra a outra ferramenta, sem a marcação das execuções', async () => {
     renderThemed(<HarnessScopeView scope="project" />);
-    expect(card('Regras principais').getByRole('combobox', { name: 'Uso nas execuções do board: CLAUDE.md' })).toBeInTheDocument();
+    expect(card('Regras principais').getByRole('combobox', { name: 'Modo no board: CLAUDE.md' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'Cursor' }));
     expect(screen.getByText('não encontrada nesta máquina')).toBeInTheDocument();
     expect(card('Regras principais').getByRole('button', { name: 'Criar AGENTS.md' })).toBeInTheDocument();
     expect(card('Regras por assunto').getByText('Nada aqui ainda.')).toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: /Uso nas execuções do board/ })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /Modo no board/ })).toBeNull();
   });
 });
 
@@ -275,7 +276,7 @@ describe('HarnessScopeView: ações em massa', () => {
     expect(skills.getByRole('checkbox', { name: 'Selecionar commit' })).toBeChecked();
     expect(skills.getByRole('checkbox', { name: 'Selecionar revisar' })).toBeChecked();
     expect(skills.getByText('2 marcados')).toBeInTheDocument();
-    await userEvent.click(skills.getByRole('button', { name: 'Incluir em todo contexto' }));
+    await userEvent.click(skills.getByRole('button', { name: 'Sempre' }));
     expect(lastSent('harness.selection.set')).toEqual({
       type: 'harness.selection.set',
       items: [
@@ -321,7 +322,7 @@ describe('HarnessScopeView: ações em massa', () => {
     const hooks = card('Hooks');
     await userEvent.click(hooks.getByRole('checkbox', { name: 'Selecionar todos: Hooks' }));
     // hook não tem uso nas execuções, modo nem cópia
-    expect(hooks.queryByRole('button', { name: 'Incluir em todo contexto' })).toBeNull();
+    expect(hooks.queryByRole('button', { name: 'Sempre' })).toBeNull();
     expect(hooks.queryByRole('button', { name: 'Apagar' })).toBeNull();
     await userEvent.click(hooks.getByRole('button', { name: 'Remover' }));
     act(() => useBoardStore.getState().dialog!.onConfirm());

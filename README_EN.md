@@ -520,8 +520,8 @@ card's model, a bar per group and each item, with how much it takes.
 - **Agents.** The instructions of the session's agent and, for a story in Claude Code, the name and
   description of each subagent (a subagent's instructions go into its own context, not the
   session's).
-- **Rules and Skills.** The ones marked **Incluir em todo contexto** (include in every context) and
-  the ones the card or the agent asks for, by the size of the file the session reads.
+- **Rules and Skills.** The ones on the board in **Sempre** (always) mode and the ones the card or
+  the agent asks for, by the size of the file the session reads.
 - **Card.** Title and description, checklist, conversation, the phase's instructions and template,
   and the phase documents.
 
@@ -1038,16 +1038,30 @@ In Claude Code's **Regras principais** (main rules), the board offers to create 
 `@import` that fixes it. If it has only `AGENTS.md`, the board warns that creating a `CLAUDE.md`
 makes Claude Code stop reading it.
 
-For rules and skills of the project's tool, each row has the **Uso nas execuções do board** (use in
-board runs) choice:
+For rules, skills and MCP servers of the project's tool, each row has the **Modo no board** (mode on
+the board) choice. The board **references** the artifact by its source path, it does not copy it: a
+change in the file counts on the board, and a deleted source leaves the artifact **ausente**
+(missing) without breaking the cards that list it.
 
-- **Incluir em todo contexto** (include in every context): the file goes into every run (work the
-  phase, refine, board chat), by path. It is where the flow skill and the always-on rules go.
-- **Usar quando fizer sentido** (use when it fits): becomes an option of the cards' **Rules** and
-  **Skills** fields (and of the agents' skills), and **Refinar com IA** picks it when the request
-  calls for it.
-- **Fora das execuções** (not in runs): the run does not see it, even if the tool loads it in a
+- **Sempre** (always): goes into every run (work the phase, refine, board chat), whatever the card.
+  It is where the flow skill, the board server and the always-on rules go.
+- **Pelo card** (per card): does not get in on its own. Becomes an option of the cards' **Rules**,
+  **Skills** and **MCPs** fields (and of the agents' skills and servers), and the phase planning or
+  **Refinar com IA** picks it when the task calls for it, choosing only among what is on the board.
+  The minimum wins: at most one skill per subject, and only the servers the task needs.
+- **Desligado** (off, rules only): it is on the board, but gets into nothing. Every rule starts like
+  this, because a `CLAUDE.md` written for another context may conflict with the board's flow and
+  definitions: review the text before turning it on.
+- **Fora do board** (off the board): the run does not see it, even if the tool loads it in a
   conversation of yours.
+
+**Imported folders.** Not every useful artifact lives in the project or in the global folder. The
+board can import outside folders (another repository, a team collection, a downloaded folder): it
+scans the folder for what the tool recognizes in a project (rules, skills, agents, commands, hooks,
+MCP servers and settings, or the folder itself as a skills folder) and lists what it found with the
+**Importados** (imported) origin. Nothing enters the board until you send it. The folders are kept by
+the board and scanned again on every read; removing a folder from the list also removes its artifacts
+from the board.
 
 **Bulk actions.** Every row that accepts some action has a checkbox, and the one at the top of the
 group checks them all. The bar that shows up offers only what applies to the checked items: the use
@@ -1107,7 +1121,7 @@ Each skill has a mode:
 
 The mode says how the tool treats the skill in a conversation of yours; in board runs what counts is
 the check mark. The card's "Skills" field shows a summary of what is selected and opens a window to
-choose among the skills checked as **Usar quando fizer sentido**: search by name or description,
+choose among the skills on the board in **Pelo card** mode: search by name or description,
 **Todas / Marcadas / Projeto / Globais / Plugins** tabs (all / selected / project / global / plugins)
 and one checkbox per skill, with its origin in view. The "Rules" field does the same with the checked
 instruction files. The card hands the AI the path of each file, so it does not need to be visible to

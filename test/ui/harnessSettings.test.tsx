@@ -152,9 +152,9 @@ const item = (name: string) => within(screen.getAllByText(name, { selector: '.it
 describe('HarnessSettings: rules', () => {
   it('marcar e desmarcar uma rule do projeto grava a marcação; o global mostra os arquivos da pasta do usuário', async () => {
     renderScreen('project');
-    const usage = () => item('AGENTS.md').getByRole('combobox', { name: 'Uso nas execuções do board: AGENTS.md' });
-    expect(usage()).toHaveTextContent('Fora das execuções');
-    await choose(usage(), 'Incluir em todo contexto');
+    const usage = () => item('AGENTS.md').getByRole('combobox', { name: 'Modo no board: AGENTS.md' });
+    expect(usage()).toHaveTextContent('Fora do board');
+    await choose(usage(), 'Sempre');
     expect(lastSent('harness.selection.set')).toEqual({
       type: 'harness.selection.set',
       items: [{ kind: 'instructions', location: 'AGENTS.md' }],
@@ -163,8 +163,8 @@ describe('HarnessSettings: rules', () => {
     act(() =>
       setState((s) => ({ harnessSelection: [...s.harnessSelection, { kind: 'instructions', location: 'AGENTS.md', usage: 'always' }] })),
     );
-    expect(usage()).toHaveTextContent('Incluir em todo contexto');
-    await choose(usage(), 'Fora das execuções');
+    expect(usage()).toHaveTextContent('Sempre');
+    await choose(usage(), 'Fora do board');
     expect(lastSent('harness.selection.set').usage).toBeNull();
     // o CLAUDE.md global não aparece na aba do projeto
     expect(screen.queryByRole('button', { name: '~/.claude/CLAUDE.md' })).toBeNull();
@@ -197,9 +197,9 @@ describe('HarnessSettings: rules', () => {
 describe('HarnessSettings: skills', () => {
   it('o uso nas execuções troca entre as duas marcações', async () => {
     renderScreen('project');
-    const usage = item('revisar-spec').getByRole('combobox', { name: 'Uso nas execuções do board: revisar-spec' });
-    expect(usage).toHaveTextContent('Incluir em todo contexto');
-    await choose(usage, 'Usar quando fizer sentido');
+    const usage = item('revisar-spec').getByRole('combobox', { name: 'Modo no board: revisar-spec' });
+    expect(usage).toHaveTextContent('Sempre');
+    await choose(usage, 'Pelo card');
     expect(lastSent('harness.selection.set')).toEqual({
       type: 'harness.selection.set',
       items: [{ kind: 'skill', location: '.claude/skills/revisar-spec/SKILL.md' }],

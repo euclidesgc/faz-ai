@@ -1,5 +1,5 @@
 import type { Agent, AiTool } from './harness';
-import type { HarnessSelection } from './harnessSelection';
+import { BOARD_MCP_NAME, selectedMcpNames, type HarnessSelection } from './harnessSelection';
 import type { BoardState, Card } from './model';
 import { parseModelValue, type ModelOption } from './models';
 import { columnOf, valueOf } from './selectors';
@@ -254,9 +254,13 @@ export function manifestOf(s: BoardState, c: Card): ExecManifest {
     agent: profile && profile.scope !== 'builtin' ? profile.id : '',
     purpose: profile?.purpose ?? '',
     instructions: profile?.instructions ?? '',
+    // as skills "Sempre" entram pelo contexto fixo (promptContext), não por aqui
     skills: [...new Set([...(profile?.skills ?? []), ...listField(s, c, 'skills')])],
     rules: listField(s, c, 'rules'),
-    mcpServers: profile?.mcpServers ?? [],
+    // os servidores do agente, os do campo MCPs do card e os do board em modo "Sempre"; o do board vai sempre, sem marcação
+    mcpServers: [...new Set([...(profile?.mcpServers ?? []), ...listField(s, c, 'mcps'), ...selectedMcpNames(s, 'always')])].filter(
+      (n) => n !== BOARD_MCP_NAME,
+    ),
     tools: profile?.tools ?? [],
     deniedTools: profile?.deniedTools ?? [],
     model: option

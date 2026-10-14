@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ALL_AI_TOOLS, RULE_FILES, type AiTool, type InstallScope } from '../../../shared/harness';
-import { SELECTABLE_KINDS, type HarnessUsage, type SelectableKind } from '../../../shared/harnessSelection';
+import { SELECTABLE_KINDS, selectionKey, type HarnessUsage, type SelectableKind } from '../../../shared/harnessSelection';
 import { FLOW_SKILL } from '../../flowSkill';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { harnessOverview } from '../format';
@@ -44,7 +44,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'get_harness',
-    'O harness que as execuções do board usam: a ferramenta em uso, o agente padrão e, com a marcação (`usage`), as rules, skills e agentes marcados em Configurações → Harness. Toda execução parte de contexto vazio: o que não está marcado não existe para ela. Com onlySelected = false, lista tudo que a ferramenta carrega nesta máquina (projeto, pasta do usuário e plugins), marcado ou não.',
+    'O banco de artefatos do board: a ferramenta em uso, o agente padrão e, com o modo (`usage`), as rules, skills, agentes e servidores MCP enviados ao board em Configurações → Harness. Toda execução parte de contexto vazio: o que não está no board não existe para ela. Com onlySelected = false, lista tudo que a ferramenta carrega nesta máquina (projeto, pasta do usuário, plugins e pastas importadas), esteja no board ou não.',
     {
       onlySelected: z
         .boolean()
@@ -57,7 +57,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'set_harness_selection',
-    'Marca (ou desmarca) rules, skills e agentes para as execuções do board. "always": entra em toda execução; "contextual": disponível para indicar no card (campos Rules e Skills) ou escolher como agente; null: desmarca. Identifique o item por `location`, como get_harness o mostra (relativo ao projeto ou a partir de ~); um agente ou uma skill também pelo nome.',
+    'Envia rules, skills, agentes e servidores MCP ao board, muda o modo deles ou os tira do board. "always" (Sempre): entra em toda execução; "contextual" (Pelo card): disponível para indicar no card (campos Rules, Skills e MCPs) ou escolher como agente; "off" (Desligado): fica no board sem entrar em nada (é como as regras entram, para revisão); null: tira do board. Identifique o item por `location`, como get_harness o mostra; um agente, uma skill ou um servidor MCP também pelo nome.',
     {
       items: z
         .array(
@@ -68,7 +68,7 @@ export function registerHarnessTools(tool: DefineTool): void {
           }),
         )
         .min(1),
-      usage: z.enum(['always', 'contextual']).nullable(),
+      usage: z.enum(['always', 'contextual', 'off']).nullable(),
     },
     (a, router) => {
       const s = router.snapshot();
@@ -76,7 +76,7 @@ export function registerHarnessTools(tool: DefineTool): void {
       const resolved = a.items.map((i) => {
         const found = items.find((x) => x.kind === i.kind && (i.location ? x.location === i.location : x.name === i.name));
         if (!found) throw new Error(`Item ${i.kind} "${i.location ?? i.name ?? ''}" não encontrado no harness da ferramenta em uso.`);
-        return { kind: i.kind, location: found.location };
+        return { kind: i.kind, location: selectionKey(found) };
       });
       router.handle({ type: 'harness.selection.set', items: resolved, usage: a.usage as HarnessUsage | null });
       return harness(router);

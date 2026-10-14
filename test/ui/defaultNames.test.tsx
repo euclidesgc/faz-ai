@@ -17,7 +17,21 @@ beforeEach(() => syncStore(board.router));
 afterEach(() => setLocale('pt-BR'));
 
 /** Nomes do board padrão que são iguais nos dois idiomas. */
-const SAME = new Set(['Backlog', 'Discovery', 'PRD', 'Spec', 'Plan', 'Bug', 'Tags', 'Skills', 'frontend', 'backend', 'infra', 'docs']);
+const SAME = new Set([
+  'Backlog',
+  'Discovery',
+  'PRD',
+  'Spec',
+  'Plan',
+  'Bug',
+  'Tags',
+  'Skills',
+  'MCPs',
+  'frontend',
+  'backend',
+  'infra',
+  'docs',
+]);
 
 describe('nomes do board padrão em inglês', () => {
   it('todo nome que o board novo cria tem tradução, ou é igual nos dois idiomas', () => {
