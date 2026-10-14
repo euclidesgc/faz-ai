@@ -149,7 +149,11 @@ export class HostBridge {
         case 'chat.stop':
         case 'chat.clear':
         case 'ai.suggestAgents':
+        case 'harness.suggest.run':
           this.router.chatCommand(msg);
+          return;
+        case 'harness.suggest.clear':
+          this.router.setSuggestions(null);
           return;
         case 'ui.openInBrowser':
           await this.env.openInBrowser?.();

@@ -1,7 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
-import { aiToolInfo } from '../shared/harness';
+import { aiToolInfo, type AiTool, type HarnessItem } from '../shared/harness';
+import { selectionKey, usageOf, type SelectableKind } from '../shared/harnessSelection';
 import type { RunnerPermission } from '../shared/runner';
 import { effortToRun } from '../shared/execution';
 import { parseModelValue } from '../shared/models';
@@ -49,6 +50,64 @@ export function suggestAgentsPrompt(): string {
   ].join('\n');
 }
 
+/** O que cada tipo de artefato é, para o pedido de "Indicar artefatos". */
+const KIND_LABEL: Record<SelectableKind, string> = {
+  instructions: 'arquivos de regras e instruções',
+  skill: 'skills',
+  agent: 'agentes (subagentes)',
+  mcp: 'servidores MCP',
+};
+
+/**
+ * O que a IA recebe no "Indicar artefatos": ler o projeto e escolher, só entre os candidatos listados
+ * (o catálogo daquele assunto que ainda não está no board), os que fazem mais sentido para ele. A
+ * resposta é um JSON e nada mais: é a pessoa quem confirma na tela; a IA só sugere.
+ */
+export function suggestArtifactsPrompt(kind: SelectableKind, candidates: HarnessItem[]): string {
+  const list = candidates.map(
+    (i) => `- key: ${selectionKey(i)} | nome: ${i.name} | origem: ${i.scope}${i.description ? ` | ${i.description}` : ''}`,
+  );
+  return [
+    `Você vai indicar quais ${KIND_LABEL[kind]} deste projeto valem a pena entrar no board Faz AI, para as execuções dos cards poderem usá-los. Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, CLAUDE.md, linguagens e frameworks). Não altere nada: só leia.`,
+    `Candidatos (só estes existem; não invente outros):`,
+    ...list,
+    `Escolha os que fazem sentido para ESTE projeto e as tarefas que ele costuma ter, poucos e precisos: excesso de artefatos piora o resultado. ${
+      kind === 'skill' ? 'No máximo uma skill por assunto: entre duas do mesmo assunto, a mais próxima do projeto. ' : ''
+    }Deixe de fora o que é genérico demais, de outra stack, ou redundante com algo já escolhido.`,
+    'Responda SOMENTE com um JSON neste formato, sem texto antes nem depois: {"items":[{"key":"<key do candidato>","reason":"<por que, numa frase curta, em português do Brasil>"}]}. Sem nenhum candidato útil, responda {"items":[]}.',
+  ].join('\n');
+}
+
+/**
+ * Lê a resposta de "Indicar artefatos": o primeiro JSON com `items` no texto (a IA às vezes escreve
+ * algo em volta). Só valem as chaves dos candidatos; o resto é descartado.
+ */
+export function parseSuggestions(text: string, candidates: readonly string[]): { location: string; reason: string }[] | null {
+  const allowed = new Set(candidates);
+  const start = text.indexOf('{');
+  for (let from = start; from >= 0 && from < text.length; from = text.indexOf('{', from + 1)) {
+    const end = text.lastIndexOf('}');
+    if (end <= from) break;
+    try {
+      const v: unknown = JSON.parse(text.slice(from, end + 1));
+      const items =
+        v && typeof v === 'object' && Array.isArray((v as { items?: unknown }).items) ? (v as { items: unknown[] }).items : null;
+      if (!items) continue;
+      const seen = new Set<string>();
+      return items.flatMap((raw) => {
+        const r = raw as { key?: unknown; reason?: unknown };
+        const key = typeof r?.key === 'string' ? r.key : '';
+        if (!allowed.has(key) || seen.has(key)) return [];
+        seen.add(key);
+        return [{ location: key, reason: typeof r.reason === 'string' ? r.reason.trim() : '' }];
+      });
+    } catch {
+      /* não era o JSON: tenta o próximo `{` */
+    }
+  }
+  return null;
+}
+
 /** O modelo escolhido no chat, no formato que a linha de comando da ferramenta pede; null = o padrão dela. */
 function modelFor(s: BoardState, model: string | null): ExecInput['model'] {
   const chosen = parseModelValue(model);
@@ -73,6 +132,7 @@ export class ChatSession {
     router.setChatHandler((msg) => {
       if (msg.type === 'chat.send') this.send(msg.text, msg.model);
       else if (msg.type === 'ai.suggestAgents') this.suggestAgents();
+      else if (msg.type === 'harness.suggest.run') this.suggestArtifacts(msg.tool, msg.kind);
       else if (msg.type === 'chat.stop') this.stop();
       else this.clear();
     });
@@ -100,8 +160,54 @@ export class ChatSession {
     this.run({ role: 'user', text: 'Sugerir agentes com IA: leia o projeto e proponha os agentes deste board.' }, prompt, 'board', null);
   }
 
+  /**
+   * "Indicar artefatos": a IA lê o projeto e o catálogo do assunto (o que ainda não está no board, da
+   * ferramenta do projeto) e devolve os que fazem mais sentido; a tela os pré-seleciona e a pessoa
+   * confirma. Fica fora da conversa do chat: o resultado vai em `harnessSuggestions`. Só a ferramenta
+   * do projeto, porque só a marcação dela vale.
+   */
+  suggestArtifacts(tool: AiTool, kind: SelectableKind): void {
+    const state = this.router.snapshot();
+    if (tool !== state.board.aiTool) throw new Error('Indicar artefatos só vale para a ferramenta do projeto.');
+    const items = state.harness.inventory.find((t) => t.tool === tool)?.items ?? [];
+    const candidates = items.filter((i) => i.kind === kind && !usageOf(state.harnessSelection, i));
+    if (!candidates.length) {
+      this.router.setSuggestions({ tool, kind, items: [], error: 'Não há artefatos fora do board neste assunto.' });
+      return;
+    }
+    const keys = candidates.map(selectionKey);
+    this.router.setSuggestions(null);
+    // só leitura: a IA lê o projeto e responde; nada é gravado sem a pessoa confirmar na tela
+    this.start(suggestArtifactsPrompt(kind, candidates), 'board', null, {
+      done: (text) => {
+        const parsed = parseSuggestions(text, keys);
+        this.router.setSuggestions(
+          parsed ? { tool, kind, items: parsed } : { tool, kind, items: [], error: 'A IA não respondeu no formato esperado.' },
+        );
+      },
+      failed: (error) => this.router.setSuggestions({ tool, kind, items: [], error }),
+    });
+  }
+
   /** Uma execução do chat pelo gateway: a mensagem entra na conversa quando o processo começa, e a resposta (ou o erro) no fim. */
   private run(message: Omit<ChatMessage, 'id' | 'at'>, prompt: string, permission: RunnerPermission, model: string | null): void {
+    this.start(prompt, permission, model, {
+      started: () => this.add(message),
+      done: (text) => this.add({ role: 'assistant', text: text || 'A IA terminou sem escrever uma resposta.' }),
+      failed: (error) => this.add({ role: 'error', text: error }),
+    });
+  }
+
+  /**
+   * Uma execução pelo gateway, sem card: contexto vazio, só o servidor do board e o modelo escolhido.
+   * `started` roda quando o processo abre; `done` recebe a resposta final; `failed`, a explicação do erro.
+   */
+  private start(
+    prompt: string,
+    permission: RunnerPermission,
+    model: string | null,
+    hooks: { started?: () => void; done: (text: string) => void; failed: (error: string) => void },
+  ): void {
     if (this.running) throw new Error('A IA ainda está respondendo. Espere ou interrompa.');
     const state = this.router.snapshot();
     const tool = aiToolInfo(state.board.aiTool);
@@ -143,7 +249,7 @@ export class ChatSession {
         }),
         beforeSpawn: () => {
           started = true;
-          this.add(message);
+          hooks.started?.();
         },
         log: (raw) => {
           const line = raw.replace(ANSI, '');
@@ -162,7 +268,7 @@ export class ChatSession {
       // antes da pergunta entrar na conversa (ferramenta sem suporte para a permissão): quem enviou fica sabendo
       if (!started) throw e;
       // sem processo não há desfecho a medir: o log já fechou a linha como `unsupported`
-      this.add({ role: 'error', text: e instanceof Error ? e.message : String(e) });
+      hooks.failed(e instanceof Error ? e.message : String(e));
       return;
     }
     this.running = execution;
@@ -170,16 +276,17 @@ export class ChatSession {
 
     execution.onExit((end) => {
       this.running = null;
+      // a tela deixa de mostrar "respondendo" mesmo quando o resultado não entra na conversa
+      this.publish();
       // a resposta é o texto final que a ferramenta deu, nunca o fluxo de eventos
       const text = end.report.answer.replace(ANSI, '').trim();
-      if (end.stopped) this.add({ role: 'error', text: 'Interrompido.' });
-      else if (end.timedOut)
-        this.add({ role: 'error', text: `A resposta passou do tempo limite (${state.board.runner.timeoutMinutes} min) e foi encerrada.` });
-      else if (end.error) this.add({ role: 'error', text: `Não foi possível executar o ${tool.label}: ${end.error.message}` });
+      if (end.stopped) hooks.failed('Interrompido.');
+      else if (end.timedOut) hooks.failed(`A resposta passou do tempo limite (${state.board.runner.timeoutMinutes} min) e foi encerrada.`);
+      else if (end.error) hooks.failed(`Não foi possível executar o ${tool.label}: ${end.error.message}`);
       else if (end.code !== 0) {
         const lines = tail.join('\n');
-        this.add({ role: 'error', text: `O ${tool.label} terminou com erro (código ${end.code}).${lines ? `\n\n${lines}` : ''}` });
-      } else this.add({ role: 'assistant', text: text || 'A IA terminou sem escrever uma resposta.' });
+        hooks.failed(`O ${tool.label} terminou com erro (código ${end.code}).${lines ? `\n\n${lines}` : ''}`);
+      } else hooks.done(text);
     });
   }
 

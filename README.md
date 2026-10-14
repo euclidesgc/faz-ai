@@ -1037,6 +1037,21 @@ MCP e configurações, ou a própria pasta como pasta de skills) e lista o que a
 pastas ficam guardadas no board e são varridas de novo a cada leitura; em Importados, cada pasta tem
 **Remover pasta**, que pede confirmação e tira dela também os artefatos do board.
 
+**Indicar artefatos.** Como o ambiente pode ter muitas skills, agentes e servidores, cada assunto
+da ferramenta do projeto tem o botão **Indicar artefatos** (nas origens Projeto, Global e Importados).
+A IA lê o projeto (estrutura, dependências, README, `CLAUDE.md`) e o catálogo daquele assunto, só o que
+ainda não está no board, e devolve os que fazem mais sentido, poucos e com o motivo de cada um; a tela
+os deixa **pré-selecionados**, com o selo **indicado**, para você conferir e usar **Enviar para o
+board** ou desmarcar alguns antes. Nada entra no board sem a sua confirmação, e a execução é só de
+leitura (nada é gravado). A indicação roda pela mesma ferramenta do chat do board, sem entrar na
+conversa; **Descartar indicação** limpa a pré-seleção.
+
+**O planejamento escolhe só do board.** O **Refinar com IA** e o planejamento da fase (a skill do
+fluxo, no Plan) indicam skills, rules, servidores MCP e agente escolhendo **só entre o que está no
+board em modo Pelo card**; o catálogo Global, Projeto e Importados não existe para eles. Vale o
+mínimo: no máximo uma skill por assunto (pode haver mais de uma, se forem de assuntos diferentes) e só
+os servidores de que a tarefa precisa, tanto na história quanto em cada sub-tarefa.
+
 **Seleção múltipla e ações em massa.** Cada linha do catálogo que aceita alguma ação tem uma caixa, e
 a do topo do grupo marca todas. A ação principal da barra que aparece é **Enviar para o board**, que
 leva os marcados com o modo de entrada de cada tipo (**Pelo card**; as regras entram **Desligadas**).

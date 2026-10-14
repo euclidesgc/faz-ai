@@ -172,6 +172,18 @@ export const harness: Record<string, string> = {
   Projeto: 'Project',
   Global: 'Global',
   Importados: 'Imported',
+  'Indicar artefatos': 'Suggest artifacts',
+  'Indicando…': 'Suggesting…',
+  'A IA lê o projeto e o catálogo deste assunto e deixa pré-selecionados os artefatos que fazem mais sentido; você confirma.':
+    "The AI reads the project and this subject's catalog and pre-selects the artifacts that make the most sense; you confirm.",
+  '{n} indicados: confira a seleção e use "Enviar para o board".': '{n} suggested: check the selection and use "Enviar para o board".',
+  'A IA não indicou nenhum artefato deste assunto.': 'The AI suggested no artifact of this subject.',
+  'Descartar indicação': 'Discard suggestion',
+  'Não há artefatos fora do board neste assunto.': 'There are no artifacts off the board in this subject.',
+  'A IA não respondeu no formato esperado.': 'The AI did not answer in the expected format.',
+  'Indicar artefatos só vale para a ferramenta do projeto.': 'Suggesting artifacts only works for the project tool.',
+  'Indicado pela IA': 'Suggested by the AI',
+  indicado: 'suggested',
   'Encontrados nas pastas que você importou; a ferramenta não os carrega sozinha.':
     'Found in the folders you imported; the tool does not load them on its own.',
   'De pastas importadas: só entram nas execuções quando enviados ao board.':

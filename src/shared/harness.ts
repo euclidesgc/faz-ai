@@ -79,6 +79,19 @@ export type HarnessKind = 'instructions' | 'memory' | 'skill' | 'agent' | 'comma
  */
 export type HarnessScope = 'project' | 'user' | 'plugin' | 'imported';
 
+/**
+ * O resultado de "Indicar artefatos": os artefatos de um assunto que a IA achou mais úteis para o
+ * projeto, pré-selecionados na tela para a pessoa confirmar. Nada entra no board sem ela.
+ */
+export interface HarnessSuggestions {
+  tool: AiTool;
+  kind: 'instructions' | 'skill' | 'agent' | 'mcp';
+  /** `location` é a identidade do item na marcação (`selectionKey`) */
+  items: { location: string; reason: string }[];
+  /** a IA não respondeu no formato esperado, ou a execução falhou */
+  error?: string;
+}
+
 /** Uma pasta importada: o board a varre atrás de artefatos no formato da ferramenta e os oferece ao board. */
 export interface HarnessImport {
   tool: AiTool;

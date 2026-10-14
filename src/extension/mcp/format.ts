@@ -446,7 +446,7 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
       ? {
           requiredSkills: skills,
           requiredSkillsNote:
-            'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em `files` estão os arquivos de apoio de cada skill (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.',
+            'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em `files` estão os arquivos de apoio de cada skill (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar. Ao planejar, indique só o que está no board em modo "Pelo card" (get_harness), no mínimo: uma skill por assunto.',
         }
       : {}),
     ...(phase ? { phase } : {}),

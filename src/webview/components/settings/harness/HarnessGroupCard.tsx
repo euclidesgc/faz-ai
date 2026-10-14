@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge, Button, Callout, Checkbox } from '@radix-ui/themes';
 import { REFERENCE_SKILL, aiToolInfo, type AiTool, type HarnessItem, type HarnessScope } from '../../../../shared/harness';
 import {
@@ -13,6 +13,7 @@ import {
   permissionTargets,
   type HARNESS_GROUPS,
 } from '../../../../shared/harnessCatalog';
+import { selectionKey } from '../../../../shared/harnessSelection';
 import { matchesQuery } from '../../../../shared/harnessTopics';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
@@ -43,6 +44,8 @@ interface Props {
   scope: HarnessScope;
   /** a busca da tela: com texto, só aparece o que casa e as sugestões de criar ficam de fora */
   query: string;
+  /** o resultado de "Indicar artefatos" (`selectionKey` → motivo): pré-seleciona as linhas e mostra o motivo */
+  suggested?: Record<string, string>;
   /** os itens deste grupo nesta aba, já filtrados pela busca */
   items: HarnessItem[];
   /** todos os itens da ferramenta, para saber o que já foi copiado ou instalado */
@@ -58,7 +61,7 @@ interface Props {
  * de cada um e o caminho que abre no editor do board, os arquivos que a ferramenta leria mas ainda não
  * existem, os avisos do que não fica em arquivo e as ações de criar do grupo.
  */
-export function HarnessGroupCard({ group, tool, scope, query, items, all, actions, open, onOpen }: Props) {
+export function HarnessGroupCard({ group, tool, scope, query, suggested, items, all, actions, open, onOpen }: Props) {
   const state = useBoardStore((s) => s.state)!;
   const [filesOpen, setFilesOpen] = useState<string | null>(null);
   // linhas marcadas para as ações em massa, pela chave da linha
@@ -109,6 +112,12 @@ export function HarnessGroupCard({ group, tool, scope, query, items, all, action
       }
       return next;
     });
+
+  // uma indicação nova pré-seleciona o que a IA apontou (e só isso); descartar limpa
+  useEffect(() => {
+    setPicked(new Set(suggested ? pickable.filter((i) => selectionKey(i) in suggested).map(keyOf) : []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggested]);
 
   if (g === 'managed' && items.length === 0 && notes.length === 0) return null;
   if (searching && !agentsTable && items.length === 0 && notes.length === 0) return null;
@@ -254,6 +263,7 @@ export function HarnessGroupCard({ group, tool, scope, query, items, all, action
                 explain
                 unread={unread(i)}
                 usage={projectTool ? <UsageSelect item={i} /> : undefined}
+                suggestion={suggested?.[selectionKey(i)]}
                 filesOpen={filesOpen === i.path}
                 onToggleFiles={() => setFilesOpen(filesOpen === i.path ? null : i.path)}
               />

@@ -1088,6 +1088,22 @@ until you send it. The folders are kept by the board and scanned again on every 
 each folder has **Remover pasta** (remove folder), which asks for confirmation and also removes its
 artifacts from the board.
 
+**Indicar artefatos (suggest artifacts).** Since an environment may have many skills, agents and
+servers, every subject of the project's tool has the **Indicar artefatos** button (in the Projeto,
+Global and Importados origins). The AI reads the project (structure, dependencies, README,
+`CLAUDE.md`) and that subject's catalog, only what is not on the board yet, and returns the ones that
+make the most sense, few and each with its reason; the screen leaves them **pre-selected**, with the
+**indicado** (suggested) badge, for you to check and use **Enviar para o board** or uncheck some
+first. Nothing enters the board without your confirmation, and the run is read-only (nothing is
+written). The suggestion runs through the same tool as the board chat, without entering the
+conversation; **Descartar indicação** (discard suggestion) clears the pre-selection.
+
+**The planning picks only from the board.** **Refinar com IA** and the phase planning (the flow
+skill, in Plan) pick skills, rules, MCP servers and the agent **only among what is on the board in
+Pelo card mode**; the Global, Projeto and Importados catalog does not exist for them. The minimum
+wins: at most one skill per subject (more than one is fine if they are of different subjects) and only
+the servers the task needs, for the story and for each sub-task.
+
 **Multiple selection and bulk actions.** Every catalog row that accepts some action has a checkbox,
 and the one at the top of the group checks them all. The main action of the bar that shows up is
 **Enviar para o board** (send to the board), which takes the checked items in the entry mode of each

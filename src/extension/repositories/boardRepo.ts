@@ -458,6 +458,7 @@ export class BoardRepo {
       environment: null,
       environmentFirstRun: false,
       harnessInstall: null,
+      harnessSuggestions: null,
     };
   }
 }

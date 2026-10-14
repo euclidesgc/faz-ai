@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { SegmentedControl, TextField } from '@radix-ui/themes';
+import { useEffect, useState } from 'react';
+import { Button, Callout, SegmentedControl, TextField } from '@radix-ui/themes';
 import { HARNESS_SCOPES, type AiTool } from '../../../../shared/harness';
 import { HARNESS_GROUPS, groupOf } from '../../../../shared/harnessCatalog';
 import { catalogOriginOf, groupsFor, matchesQuery, type HarnessOrigin, type TopicInfo } from '../../../../shared/harnessTopics';
+import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
+import { IconWarning } from '../../ui';
 import { BoardList } from './BoardList';
 import { HarnessGroupCard } from './HarnessGroupCard';
 import { ImportedFolders } from './ImportedFolders';
@@ -39,6 +41,23 @@ export function TopicView({ tool, topic }: { tool: AiTool; topic: TopicInfo }) {
     ...(hasImports ? (['imported'] as const) : []),
   ];
   const origin = origins.includes(chosen) ? chosen : 'project';
+  // "Indicar artefatos": a IA pré-seleciona no catálogo; o resultado vale para este assunto e esta ferramenta
+  const suggestions = state.harnessSuggestions;
+  const suggested =
+    suggestions && suggestions.tool === tool && suggestions.kind === topic.kind
+      ? Object.fromEntries(suggestions.items.map((x) => [x.location, x.reason]))
+      : undefined;
+  const [asked, setAsked] = useState(false);
+  const busy = state.chat.busy;
+  // a resposta chegou (ou falhou): o botão volta ao normal
+  useEffect(() => {
+    if (suggestions || !busy) setAsked(false);
+  }, [suggestions, busy]);
+  const canSuggest = !!topic.kind && projectTool && origin !== 'board';
+  const suggest = () => {
+    setAsked(true);
+    harness.suggest(tool, topic.kind!);
+  };
 
   const fromCatalog =
     origin === 'board' ? [] : all.filter((i) => catalogOriginOf(tool, i) === origin && matchesQuery(query, i.name, i.description));
@@ -76,6 +95,46 @@ export function TopicView({ tool, topic }: { tool: AiTool; topic: TopicInfo }) {
         />
       </div>
       <p className="muted small topic-origin-hint">{t(ORIGIN_HINTS[origin])}</p>
+      {canSuggest && (
+        <div className="row wrap topic-suggest">
+          <Button
+            variant="soft"
+            color="gray"
+            size="1"
+            disabled={busy}
+            title={
+              busy
+                ? t('A IA ainda está respondendo no chat do board.')
+                : t(
+                    'A IA lê o projeto e o catálogo deste assunto e deixa pré-selecionados os artefatos que fazem mais sentido; você confirma.',
+                  )
+            }
+            onClick={suggest}
+          >
+            {asked && busy ? t('Indicando…') : t('Indicar artefatos')}
+          </Button>
+          {suggested && !suggestions?.error && (
+            <span className="muted small">
+              {suggestions!.items.length
+                ? t('{n} indicados: confira a seleção e use "Enviar para o board".', { n: suggestions!.items.length })
+                : t('A IA não indicou nenhum artefato deste assunto.')}
+            </span>
+          )}
+          {suggested && (
+            <Button variant="ghost" size="1" onClick={() => harness.clearSuggestions()}>
+              {t('Descartar indicação')}
+            </Button>
+          )}
+        </div>
+      )}
+      {canSuggest && suggestions?.tool === tool && suggestions.kind === topic.kind && suggestions.error && (
+        <Callout.Root color="amber" size="1">
+          <Callout.Icon>
+            <IconWarning />
+          </Callout.Icon>
+          <Callout.Text>{t(suggestions.error)}</Callout.Text>
+        </Callout.Root>
+      )}
       {origin === 'board' && topic.kind && <BoardList kind={topic.kind} query={query} />}
       {origin === 'imported' && <ImportedFolders tool={tool} />}
       {nothingFound && <p className="muted small scope-empty">{t('Nada encontrado para a busca.')}</p>}
@@ -87,6 +146,7 @@ export function TopicView({ tool, topic }: { tool: AiTool; topic: TopicInfo }) {
             tool={tool}
             scope={origin === 'board' ? 'project' : origin}
             query={query}
+            suggested={suggested}
             items={fromCatalog.filter((i) => groupOf(tool, i) === g.id)}
             all={all}
             actions={actions}

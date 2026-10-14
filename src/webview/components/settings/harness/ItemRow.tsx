@@ -26,13 +26,27 @@ interface Props {
   unread?: string;
   /** controle extra antes das ações, como o uso do item nas execuções do board */
   usage?: ReactNode;
+  /** por que "Indicar artefatos" apontou este item; aparece como selo */
+  suggestion?: string;
   /** arquivos de apoio da skill à mostra, numa linha logo abaixo */
   filesOpen: boolean;
   onToggleFiles: () => void;
 }
 
 /** Um item do inventário: seleção, nome, descrição como dica, o caminho do arquivo (que abre no editor) e o que dá para fazer com ele. */
-export function ItemRow({ tool, item: i, actions, selected = false, onSelect, explain, unread, usage, filesOpen, onToggleFiles }: Props) {
+export function ItemRow({
+  tool,
+  item: i,
+  actions,
+  selected = false,
+  onSelect,
+  explain,
+  unread,
+  usage,
+  suggestion,
+  filesOpen,
+  onToggleFiles,
+}: Props) {
   const { copyable, twin, copy, setMode, deletable, remove, entryRemovable } = actions;
   const src = i.source === undefined ? undefined : HARNESS_CATALOG[tool][i.source];
   const inProject = i.scope !== 'project' ? twin(i, 'project') : undefined;
@@ -69,6 +83,11 @@ export function ItemRow({ tool, item: i, actions, selected = false, onSelect, ex
           {explain && !unread && src?.loads === 'on-demand' && (
             <Badge color="gray" variant="soft" title={t('A ferramenta só lê o conteúdo quando a tarefa pede ou quando você chama')}>
               {t('sob demanda')}
+            </Badge>
+          )}
+          {suggestion !== undefined && (
+            <Badge color="green" variant="soft" title={suggestion || t('Indicado pela IA')}>
+              {t('indicado')}
             </Badge>
           )}
           {inProject && (

@@ -139,7 +139,7 @@ export function executionPlan(
     if (board) defs[BOARD_SERVER] = { type: 'stdio', ...board };
     if (!defs[BOARD_SERVER] && allowed.length)
       throw new Error(
-        'O agente libera servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Instale o servidor em Configurações → Harness de IA → Tudo que a ferramenta carrega → Claude Code → Servidores MCP.',
+        'O agente libera servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Instale o servidor em Configurações → Harness de IA → Claude Code → MCPs.',
       );
     const missing = allowed.filter((n) => !defs[n]);
     if (missing.length) throw new Error(`Servidores MCP do agente não encontrados na configuração do Claude Code: ${missing.join(', ')}.`);
