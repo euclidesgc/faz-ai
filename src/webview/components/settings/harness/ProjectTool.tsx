@@ -2,12 +2,15 @@ import { RadioGroup } from '@radix-ui/themes';
 import { AI_TOOLS, type AiTool } from '../../../../shared/harness';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { settings } from '../../../commands';
+import { useAction } from '../../../useAction';
 import { SectionHeader } from '../SectionHeader';
 import { t } from '../../../i18n';
 
 /** Escolha da ferramenta de IA do projeto (uma por vez). */
 export function ProjectTool({ tool }: { tool: AiToolInfo }) {
-  const chooseTool = (id: AiTool) => id !== tool.id && settings.updateBoard({ aiTool: id });
+  // trocar a ferramenta relê o harness e confere a CLI nova: a tabela mostra a espera até o host confirmar
+  const change = useAction((id: AiTool) => settings.updateBoard({ aiTool: id }));
+  const chooseTool = (id: AiTool) => id !== tool.id && void change.run(id);
   return (
     <>
       <SectionHeader id="harness-tool" title={t('Ferramenta deste projeto')}>
@@ -15,7 +18,17 @@ export function ProjectTool({ tool }: { tool: AiToolInfo }) {
           'O projeto trabalha com uma ferramenta de IA por vez. Ela define o arquivo de regras, a pasta das skills, onde o servidor MCP é registrado e os modelos oferecidos nos cards. Pastas de outras ferramentas podem existir no projeto, mas o board não mexe nelas. O servidor MCP do board e a skill do fluxo são instalados na aba de cada ferramenta, nos assuntos MCPs e Skills, em Projeto.',
         )}
       </SectionHeader>
-      <RadioGroup.Root value={tool.id} onValueChange={(id) => chooseTool(id as AiTool)} aria-label={t('Ferramenta de IA do projeto')}>
+      {change.busy && (
+        <p role="status" className="muted small">
+          <span className="spinner" aria-hidden /> {t('Trocando a ferramenta e relendo o harness…')}
+        </p>
+      )}
+      <RadioGroup.Root
+        value={tool.id}
+        disabled={change.busy}
+        onValueChange={(id) => chooseTool(id as AiTool)}
+        aria-label={t('Ferramenta de IA do projeto')}
+      >
         <table className="table">
           <thead>
             <tr>

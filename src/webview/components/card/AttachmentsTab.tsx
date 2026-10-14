@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { cardRef } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { attachments } from '../../commands';
+import { useAction } from '../../useAction';
 import { Button, DeleteButton } from '../ui';
 import { formatDateTime, t } from '../../i18n';
 
@@ -25,6 +26,9 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
   const setError = useBoardStore((s) => s.setError);
   const openAttachmentModal = useBoardStore((s) => s.openAttachmentModal);
   const [over, setOver] = useState(false);
+  // cada arquivo é codificado e gravado pelo host: a lista mostra "Enviando…" até ele confirmar
+  const [sending, setSending] = useState<string[]>([]);
+  const pick = useAction(() => attachments.pick(cardId));
   const cardAttachments = state.attachments.filter((a) => a.cardId === cardId);
   // os documentos das fases ficam na história; a sub-tarefa só aponta para eles
   const parent = state.cards.find((c) => c.id === state.cards.find((x) => x.id === cardId)?.parentId);
@@ -36,7 +40,15 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
         setError(t('"{name}" tem mais de 20 MB e não foi anexado.', { name: file.name }));
         continue;
       }
-      attachments.addData({ cardId, filename: file.name || `colado-${Date.now()}.png`, base64: await toBase64(file) });
+      const filename = file.name || `colado-${Date.now()}.png`;
+      setSending((cur) => [...cur, filename]);
+      try {
+        await attachments.addData({ cardId, filename, base64: await toBase64(file) });
+      } catch {
+        /* o erro já virou toast */
+      } finally {
+        setSending((cur) => cur.filter((n) => n !== filename));
+      }
     }
   };
 
@@ -96,13 +108,18 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
           void addFiles(Array.from(e.dataTransfer.files));
         }}
       >
-        <Button variant="primary" onClick={() => attachments.pick(cardId)}>
+        <Button variant="primary" loading={pick.busy} onClick={() => void pick.run()}>
           {t('Escolher arquivos…')}
         </Button>
         <span className="muted">{t('ou arraste arquivos para cá (segure Shift ao soltar), ou cole uma imagem. Até 20 MB cada.')}</span>
       </div>
 
-      {cardAttachments.length === 0 && <p className="muted">{t('Nenhum anexo.')}</p>}
+      {sending.map((name) => (
+        <p key={name} role="status" className="muted small">
+          <span className="spinner" aria-hidden /> {t('Enviando {name}…', { name })}
+        </p>
+      ))}
+      {cardAttachments.length === 0 && sending.length === 0 && <p className="muted">{t('Nenhum anexo.')}</p>}
       <ul className="attachments">
         {cardAttachments.map((a) => (
           <li key={a.id}>

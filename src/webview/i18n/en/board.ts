@@ -3,8 +3,19 @@ export const board: Record<string, string> = {
   'Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.':
     'No connection to Faz AI. Reopen the board from the editor or the terminal.',
   'Sem ligação com o Faz AI.': 'No connection to Faz AI.',
+  'A sessão com o Faz AI acabou. Abra o board de novo pelo editor ou pelo terminal.':
+    'The session with Faz AI ended. Open the board again from the editor or the terminal.',
+  'O Faz AI demorou para responder. Confira se o editor ou o comando faz-ai ainda está aberto.':
+    'Faz AI took too long to answer. Check that the editor or the faz-ai command is still open.',
   'Carregando board…': 'Loading board…',
   'Carregando…': 'Loading…',
+  'Isso leva alguns segundos.': 'This takes a few seconds.',
+  'Recriando o board…': 'Recreating the board…',
+  'Atualizando o board…': 'Updating the board…',
+  'Importando o board…': 'Importing the board…',
+  'Esvaziando a lixeira…': 'Emptying the trash…',
+  'Movendo {n} história(s)…': 'Moving {n} story(ies)…',
+  'Concluindo {n} história(s)…': 'Completing {n} story(ies)…',
   Board: 'Board',
   Lixeira: 'Trash',
   Configurações: 'Settings',

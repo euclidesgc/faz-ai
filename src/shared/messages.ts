@@ -135,7 +135,8 @@ export type WebviewToHost =
   /** lê o conteúdo de um anexo de texto/JSON para exibir ou editar na modal */
   | { type: 'attachment.read'; requestId: string; attachmentId: Id }
   /** grava o conteúdo editado de volta no arquivo do anexo */
-  | { type: 'attachment.write'; requestId: string; attachmentId: Id; content: string }
+  /** grava o texto editado no arquivo do anexo; a confirmação vem pelo `done` do `requestId` */
+  | { type: 'attachment.write'; attachmentId: Id; content: string }
   /** consulta o log para o painel de métricas; não altera nada, a resposta é `metrics.result` */
   | { type: 'metrics.query'; requestId: string; query: MetricsPanelQuery }
   /** consulta o que o card já gastou nas execuções de IA (o log); não altera nada, a resposta é `card.usage.result` */
@@ -221,7 +222,8 @@ export type WebviewToHost =
   /** lê, para o editor do board, um arquivo que a varredura do harness listou */
   | { type: 'harness.file.read'; requestId: string; path: string }
   /** grava o texto editado no board num arquivo do harness; recusa os que são só leitura */
-  | { type: 'harness.file.write'; requestId: string; path: string; content: string }
+  /** grava o texto editado num arquivo do harness; a confirmação vem pelo `done` do `requestId` */
+  | { type: 'harness.file.write'; path: string; content: string }
   /** cria um item num lugar do catálogo da ferramenta (`source` é o índice em HARNESS_CATALOG) e abre o arquivo no editor */
   | { type: 'harness.item.create'; tool: AiTool; source: number; name: string; description: string }
   /**
@@ -334,18 +336,12 @@ export type HostToWebview =
   | { type: 'notice'; message: string }
   /** resposta a `attachment.read`, correlacionada por `requestId` */
   | { type: 'attachment.readResult'; requestId: string; content?: string; error?: string }
-  /** resposta a `attachment.write`, correlacionada por `requestId` */
-  | { type: 'attachment.writeResult'; requestId: string; ok: boolean; error?: string }
-  /** terminou o `harness.plugin.apply` (com aviso ou erro): a tela para de mostrar que está trabalhando */
-  | { type: 'harness.plugin.done' }
   /** resposta a `harness.file.read`: o conteúdo e se o arquivo pode ser alterado pelo board */
   | { type: 'harness.file.readResult'; requestId: string; content?: string; readonly?: boolean; error?: string }
   /** item do harness criado pela tela: ela abre o arquivo no editor do board */
   | { type: 'harness.item.created'; path: string }
   /** resposta a `harness.project.profile`, correlacionada por `requestId` */
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
-  /** resposta a `harness.file.write`, correlacionada por `requestId` */
-  | { type: 'harness.file.writeResult'; requestId: string; ok: boolean; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
   /** resposta a `card.usage.query`, correlacionada por `requestId` */
@@ -357,6 +353,14 @@ export type HostToWebview =
   /** o host pede à interface para trocar de aba das Configurações, opcionalmente rolando até uma seção */
   | { type: 'ui.openSettings'; tab: SettingsTab; section?: string }
   /** o host pede à interface para abrir uma tela fora das Configurações */
-  | { type: 'ui.openView'; view: 'environment' };
+  | { type: 'ui.openView'; view: 'environment' }
+  /** o host terminou de tratar a mensagem enviada com este `requestId` (qualquer tipo): deu certo, ou falhou com o erro já mostrado em `error` */
+  | { type: 'done'; requestId: string; ok: boolean; error?: string };
+
+/**
+ * Envelope opcional de qualquer mensagem da interface: com `requestId`, o host responde `done` quando termina de tratá-la.
+ * É o que permite à tela mostrar que está esperando (ver `request()` em `src/webview/request.ts`).
+ */
+export type Tracked<M = WebviewToHost> = M & { requestId?: string };
 
 export type { WorkflowKind };

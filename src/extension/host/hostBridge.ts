@@ -3,11 +3,20 @@ import * as fs from 'node:fs/promises';
 import { fetchSource, parseSource } from '../skillInstall';
 import { MAX_ATTACHMENT_BYTES } from '../attachments';
 import { parseExportFile, type ImportResult } from '../db/boardExport';
-import type { HostToWebview, WebviewToHost } from '../../shared/messages';
+import type { HostToWebview, Tracked, WebviewToHost } from '../../shared/messages';
 import type { AiRunMode } from '../../shared/runner';
 import type { AiTool, InstallScope } from '../../shared/harness';
 import type { ViewStateStore } from '../viewState';
 import type { MessageRouter } from '../panel/messageRouter';
+
+/** Mensagens que já respondem com o próprio `requestId` (payload de leitura ou resultado de gravação): não ganham `done`. */
+const SELF_ANSWERING = new Set<WebviewToHost['type']>([
+  'attachment.read',
+  'harness.file.read',
+  'harness.project.profile',
+  'metrics.query',
+  'card.usage.query',
+]);
 
 /** O que depende de onde o board está rodando: dentro do editor ou num navegador. */
 export interface HostEnv {
@@ -83,6 +92,7 @@ export class HostBridge {
     private onReady?: () => void,
   ) {
     this.subs.push(router.onDidChange(() => this.postBoard()));
+    this.subs.push(router.onDidError((message) => this.post({ type: 'error', message })));
     this.subs.push(viewState.onDidChange((view, origin) => origin !== this && this.post({ type: 'viewState', view })));
   }
 
@@ -99,278 +109,267 @@ export class HostBridge {
     this.post({ type: 'boardState', state: this.router.snapshot(), attachmentsBaseUri: this.env.attachmentsBaseUri() });
   }
 
-  async handle(msg: WebviewToHost): Promise<void> {
+  /**
+   * Trata a mensagem e, se ela veio com `requestId`, confirma com `done` ao terminar (depois do `boardState`, que
+   * o roteador já reenviou de forma síncrona). Uma exceção vira o toast de erro e um `done` com `ok: false`.
+   * As leituras que têm resposta própria correlacionada (`*.readResult`, `metrics.result`...) não recebem `done`.
+   */
+  async handle(msg: Tracked): Promise<void> {
+    const requestId = SELF_ANSWERING.has(msg.type) ? undefined : msg.requestId;
     try {
-      switch (msg.type) {
-        case 'ready':
-          this.post({ type: 'viewState', view: this.viewState.get() });
-          this.postBoard();
-          this.onReady?.();
-          return;
-        case 'view.set':
-          this.viewState.update(msg.patch, this);
-          return;
-        case 'ui.showFilters':
-          await this.env.showFilters();
-          return;
-        case 'ui.connectAI': {
-          const notice = await this.env.connectAI({ tool: msg.tool, scope: msg.scope });
-          if (typeof notice === 'string') this.post({ type: 'notice', message: notice });
-          return;
-        }
-        case 'ui.fixProjectMcp':
-          this.post({ type: 'notice', message: await this.env.fixProjectMcp(msg.file) });
-          return;
-        case 'ui.reloadWindow':
-          await this.env.reloadWindow?.();
-          return;
-        case 'ui.openEditorMcp':
-          await this.env.openEditorMcp?.();
-          return;
-        case 'ui.openTerminal':
-          this.router.openTerminal(msg.command);
-          return;
-        case 'ui.showChat':
-          await this.env.showChat?.();
-          return;
-        case 'requirements.check':
-          this.router.recheckRequirements();
-          return;
-        case 'environment.check':
-          this.router.checkEnvironment();
-          return;
-        case 'environment.seen':
-          this.router.markEnvironmentSeen();
-          return;
-        case 'environment.pinMcp':
-          this.router.pinEnvironmentMcp();
-          return;
-        case 'chat.send':
-        case 'chat.stop':
-        case 'chat.clear':
-        case 'ai.suggestAgents':
-        case 'ai.suggestRules':
-        case 'ai.suggestSkills':
-        case 'harness.suggest.run':
-          this.router.chatCommand(msg);
-          return;
-        case 'harness.suggest.clear':
-          this.router.setSuggestions(null);
-          return;
-        case 'ui.openInBrowser':
-          await this.env.openInBrowser?.();
-          return;
-        case 'ui.openIdeSettings':
-          await this.env.openIdeSettings?.(msg.key);
-          return;
-        case 'ai.run':
-          await this.env.runAi(msg.cardId, msg.mode);
-          return;
-        case 'ai.stop':
-          await this.env.stopAi(msg.cardId);
-          return;
-        case 'ai.autopilot.pause':
-          await this.env.pauseAutopilot();
-          return;
-        case 'ai.autopilot.resume':
-          await this.env.resumeAutopilot();
-          return;
-        case 'card.workspace.open': {
-          const cards = this.router.snapshot().cards;
-          const card = cards.find((c) => c.id === msg.cardId);
-          const story = card?.parentId ? cards.find((c) => c.id === card.parentId) : card;
-          if (!story?.worktreePath) throw new Error('Esta história ainda não tem pasta de trabalho.');
-          await this.env.openFolder(story.worktreePath);
-          return;
-        }
-        case 'harness.item.open': {
-          // só abre arquivos que a varredura do harness listou
-          const known = this.router.snapshot().harness.inventory.some((t) => t.items.some((i) => i.path === msg.path));
-          if (!known) throw new Error('Arquivo fora do harness.');
-          await this.env.openFile(msg.path);
-          return;
-        }
-        case 'harness.file.read': {
-          try {
-            const { content, readonly } = this.router.readHarnessFile(msg.path);
-            this.post({ type: 'harness.file.readResult', requestId: msg.requestId, content, readonly });
-          } catch (e) {
-            this.post({ type: 'harness.file.readResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
-          }
-          return;
-        }
-        case 'harness.plugin.apply':
-          try {
-            this.post({ type: 'notice', message: await this.router.applyPlugins(msg.tool, msg.action, msg.ids) });
-          } finally {
-            this.post({ type: 'harness.plugin.done' });
-          }
-          return;
-        case 'harness.file.write': {
-          try {
-            this.router.writeHarnessFile(msg.path, msg.content);
-            this.post({ type: 'harness.file.writeResult', requestId: msg.requestId, ok: true });
-          } catch (e) {
-            this.post({
-              type: 'harness.file.writeResult',
-              requestId: msg.requestId,
-              ok: false,
-              error: e instanceof Error ? e.message : String(e),
-            });
-          }
-          return;
-        }
-        case 'harness.skill.file.create':
-          await this.env.openFile(this.router.createSkillFile(msg.tool, msg.path, msg.file, msg.link));
-          return;
-        case 'harness.skill.file.open':
-          await this.env.openFile(this.router.skillFilePath(msg.tool, msg.path, msg.file));
-          return;
-        case 'harness.install.scan': {
-          const fetched = await fetchSource(parseSource(msg.source, os.homedir()));
-          this.router.setInstall(msg.source.trim(), fetched.dir, fetched.cleanup);
-          return;
-        }
-        case 'harness.import.pick': {
-          if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
-          const dir = await this.env.pickFolder('Importar artefatos de uma pasta');
-          if (dir) this.router.handle({ type: 'harness.import.add', tool: msg.tool, dir });
-          return;
-        }
-        case 'harness.item.create':
-          // o arquivo novo abre no editor do board, onde a pessoa já escreve o conteúdo
-          this.post({ type: 'harness.item.created', path: this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description) });
-          return;
-        case 'harness.item.write':
-          // o arquivo criado abre no editor do board, para a pessoa ler o que o assistente gravou
-          this.post({
-            type: 'harness.item.created',
-            path: this.router.writeHarnessItem(msg.tool, msg.source, msg.name, msg.content, msg.files, msg.append),
-          });
-          return;
-        case 'harness.project.profile':
-          // ler o projeto não muda o board: o erro vai na própria resposta
-          try {
-            this.post({ type: 'harness.project.profileResult', requestId: msg.requestId, profile: this.router.projectProfile() });
-          } catch (e) {
-            this.post({
-              type: 'harness.project.profileResult',
-              requestId: msg.requestId,
-              error: e instanceof Error ? e.message : String(e),
-            });
-          }
-          return;
-        case 'ai.heartbeat.run': {
-          const notice = await this.env.runHeartbeat();
-          if (typeof notice === 'string') this.post({ type: 'notice', message: notice });
-          return;
-        }
-        case 'attachment.pick': {
-          const files = await this.env.pickFiles();
-          if (files?.length) this.router.addAttachmentFiles(msg.cardId, files);
-          return;
-        }
-        case 'attachment.reveal': {
-          const a = this.router.getAttachment(msg.attachmentId);
-          if (!a) throw new Error('Anexo não encontrado');
-          await this.env.revealFile(this.router.store.pathOf(a));
-          return;
-        }
-        case 'attachment.saveAs': {
-          const a = this.router.getAttachment(msg.attachmentId);
-          if (!a) throw new Error('Anexo não encontrado');
-          await this.env.saveFileAs?.(this.router.store.pathOf(a), a.filename);
-          return;
-        }
-        case 'attachment.read': {
-          const a = this.router.getAttachment(msg.attachmentId);
-          if (!a) {
-            this.post({ type: 'attachment.readResult', requestId: msg.requestId, error: 'Anexo não encontrado' });
-            return;
-          }
-          const file = this.router.store.pathOf(a);
-          const stat = await fs.stat(file);
-          if (stat.size > MAX_ATTACHMENT_BYTES) {
-            this.post({ type: 'attachment.readResult', requestId: msg.requestId, error: 'Anexo maior que 20 MB' });
-            return;
-          }
-          const content = await fs.readFile(file, 'utf8');
-          this.post({ type: 'attachment.readResult', requestId: msg.requestId, content });
-          return;
-        }
-        case 'metrics.query': {
-          // ler o log não é mutação do board: não passa por `router.handle`; o erro vai na própria resposta
-          try {
-            this.post({ type: 'metrics.result', requestId: msg.requestId, result: this.router.panelMetrics(msg.query) });
-          } catch (e) {
-            this.post({ type: 'metrics.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
-          }
-          return;
-        }
-        case 'card.usage.query': {
-          // ler o log não é mutação do board, como em `metrics.query`
-          try {
-            this.post({ type: 'card.usage.result', requestId: msg.requestId, usage: this.router.cardUsage(msg.cardId) });
-          } catch (e) {
-            this.post({ type: 'card.usage.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
-          }
-          return;
-        }
-        case 'backup.export': {
-          const { text, name, warnings } = this.router.exportBoardFile();
-          const saved = await this.env.saveTextAs?.(text, name);
-          this.post({ type: 'backup.done' });
-          if (!saved) return;
-          this.post({ type: 'notice', message: exportNotice(saved, warnings) });
-          return;
-        }
-        case 'backup.import.pick': {
-          const file = this.env.pickBackupFile ? await this.env.pickBackupFile() : (await this.env.pickFiles())?.[0];
-          if (!file) return void this.post({ type: 'backup.done' });
-          try {
-            const text = await fs.readFile(file, 'utf8');
-            const parsed = parseExportFile(text);
-            const { token, summary } = this.router.parkImport(parsed, Buffer.byteLength(text));
-            this.post({ type: 'backup.import.summary', token, summary });
-          } finally {
-            this.post({ type: 'backup.done' });
-          }
-          return;
-        }
-        case 'backup.import.cancel':
-          this.router.discardImport(msg.token);
-          return;
-        case 'backup.import.apply': {
-          const result = this.router.applyImport(msg.token);
-          this.post({ type: 'notice', message: importNotice(result) });
-          return;
-        }
-        case 'attachment.write': {
-          const a = this.router.getAttachment(msg.attachmentId);
-          if (!a) {
-            this.post({ type: 'attachment.writeResult', requestId: msg.requestId, ok: false, error: 'Anexo não encontrado' });
-            return;
-          }
-          const file = this.router.store.pathOf(a);
-          try {
-            await fs.writeFile(file, msg.content, 'utf8');
-            this.post({ type: 'attachment.writeResult', requestId: msg.requestId, ok: true });
-          } catch (e) {
-            this.post({
-              type: 'attachment.writeResult',
-              requestId: msg.requestId,
-              ok: false,
-              error: e instanceof Error ? e.message : String(e),
-            });
-          }
-          return;
-        }
-        default:
-          // mutações disparam router.onDidChange, que reenvia o board para todas as interfaces
-          this.router.handle(msg);
-      }
+      await this.dispatch(msg);
+      if (requestId) this.post({ type: 'done', requestId, ok: true });
     } catch (e) {
-      this.post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
+      const message = e instanceof Error ? e.message : String(e);
+      this.post({ type: 'error', message });
+      if (requestId) this.post({ type: 'done', requestId, ok: false, error: message });
+    }
+  }
+
+  private async dispatch(msg: WebviewToHost): Promise<void> {
+    switch (msg.type) {
+      case 'ready':
+        this.post({ type: 'viewState', view: this.viewState.get() });
+        this.postBoard();
+        this.onReady?.();
+        return;
+      case 'view.set':
+        this.viewState.update(msg.patch, this);
+        return;
+      case 'ui.showFilters':
+        await this.env.showFilters();
+        return;
+      case 'ui.connectAI': {
+        const notice = await this.env.connectAI({ tool: msg.tool, scope: msg.scope });
+        if (typeof notice === 'string') this.post({ type: 'notice', message: notice });
+        return;
+      }
+      case 'ui.fixProjectMcp':
+        this.post({ type: 'notice', message: await this.env.fixProjectMcp(msg.file) });
+        return;
+      case 'ui.reloadWindow':
+        await this.env.reloadWindow?.();
+        return;
+      case 'ui.openEditorMcp':
+        await this.env.openEditorMcp?.();
+        return;
+      case 'ui.openTerminal':
+        this.router.openTerminal(msg.command);
+        return;
+      case 'ui.showChat':
+        await this.env.showChat?.();
+        return;
+      // a conferência demora (CLIs, login): o `done` só sai quando ela termina, para a tela saber quando parou
+      case 'requirements.check':
+        await this.router.recheckRequirements();
+        return;
+      case 'environment.check':
+        await this.router.checkEnvironment();
+        return;
+      case 'environment.seen':
+        this.router.markEnvironmentSeen();
+        return;
+      case 'environment.pinMcp':
+        await this.router.pinEnvironmentMcp();
+        return;
+      case 'chat.send':
+      case 'chat.stop':
+      case 'chat.clear':
+      case 'ai.suggestAgents':
+      case 'ai.suggestRules':
+      case 'ai.suggestSkills':
+      case 'harness.suggest.run':
+        this.router.chatCommand(msg);
+        return;
+      case 'harness.suggest.clear':
+        this.router.setSuggestions(null);
+        return;
+      case 'ui.openInBrowser':
+        await this.env.openInBrowser?.();
+        return;
+      case 'ui.openIdeSettings':
+        await this.env.openIdeSettings?.(msg.key);
+        return;
+      case 'ai.run':
+        await this.env.runAi(msg.cardId, msg.mode);
+        return;
+      case 'ai.stop':
+        await this.env.stopAi(msg.cardId);
+        return;
+      case 'ai.autopilot.pause':
+        await this.env.pauseAutopilot();
+        return;
+      case 'ai.autopilot.resume':
+        await this.env.resumeAutopilot();
+        return;
+      case 'card.workspace.open': {
+        const cards = this.router.snapshot().cards;
+        const card = cards.find((c) => c.id === msg.cardId);
+        const story = card?.parentId ? cards.find((c) => c.id === card.parentId) : card;
+        if (!story?.worktreePath) throw new Error('Esta história ainda não tem pasta de trabalho.');
+        await this.env.openFolder(story.worktreePath);
+        return;
+      }
+      case 'harness.item.open': {
+        // só abre arquivos que a varredura do harness listou
+        const known = this.router.snapshot().harness.inventory.some((t) => t.items.some((i) => i.path === msg.path));
+        if (!known) throw new Error('Arquivo fora do harness.');
+        await this.env.openFile(msg.path);
+        return;
+      }
+      case 'harness.file.read': {
+        try {
+          const { content, readonly } = this.router.readHarnessFile(msg.path);
+          this.post({ type: 'harness.file.readResult', requestId: msg.requestId, content, readonly });
+        } catch (e) {
+          this.post({ type: 'harness.file.readResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'harness.refresh':
+        await this.router.refreshHarnessAndPlugins();
+        return;
+      case 'harness.plugin.apply':
+        this.post({ type: 'notice', message: await this.router.applyPlugins(msg.tool, msg.action, msg.ids) });
+        return;
+      case 'harness.file.write':
+        // a falha (JSON inválido, sem permissão) vira o erro do `done`, e a tela mantém o texto
+        this.router.writeHarnessFile(msg.path, msg.content);
+        return;
+      case 'harness.skill.file.create':
+        await this.env.openFile(this.router.createSkillFile(msg.tool, msg.path, msg.file, msg.link));
+        return;
+      case 'harness.skill.file.open':
+        await this.env.openFile(this.router.skillFilePath(msg.tool, msg.path, msg.file));
+        return;
+      case 'harness.install.scan': {
+        const fetched = await fetchSource(parseSource(msg.source, os.homedir()));
+        this.router.setInstall(msg.source.trim(), fetched.dir, fetched.cleanup);
+        return;
+      }
+      case 'harness.import.pick': {
+        if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
+        const dir = await this.env.pickFolder('Importar artefatos de uma pasta');
+        if (dir) this.router.handle({ type: 'harness.import.add', tool: msg.tool, dir });
+        return;
+      }
+      case 'harness.item.create':
+        // o arquivo novo abre no editor do board, onde a pessoa já escreve o conteúdo
+        this.post({ type: 'harness.item.created', path: this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description) });
+        return;
+      case 'harness.item.write':
+        // o arquivo criado abre no editor do board, para a pessoa ler o que o assistente gravou
+        this.post({
+          type: 'harness.item.created',
+          path: this.router.writeHarnessItem(msg.tool, msg.source, msg.name, msg.content, msg.files, msg.append),
+        });
+        return;
+      case 'harness.project.profile':
+        // ler o projeto não muda o board: o erro vai na própria resposta
+        try {
+          this.post({ type: 'harness.project.profileResult', requestId: msg.requestId, profile: this.router.projectProfile() });
+        } catch (e) {
+          this.post({
+            type: 'harness.project.profileResult',
+            requestId: msg.requestId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+        return;
+      case 'ai.heartbeat.run': {
+        const notice = await this.env.runHeartbeat();
+        if (typeof notice === 'string') this.post({ type: 'notice', message: notice });
+        return;
+      }
+      case 'attachment.pick': {
+        const files = await this.env.pickFiles();
+        if (files?.length) this.router.addAttachmentFiles(msg.cardId, files);
+        return;
+      }
+      case 'attachment.reveal': {
+        const a = this.router.getAttachment(msg.attachmentId);
+        if (!a) throw new Error('Anexo não encontrado');
+        await this.env.revealFile(this.router.store.pathOf(a));
+        return;
+      }
+      case 'attachment.saveAs': {
+        const a = this.router.getAttachment(msg.attachmentId);
+        if (!a) throw new Error('Anexo não encontrado');
+        await this.env.saveFileAs?.(this.router.store.pathOf(a), a.filename);
+        return;
+      }
+      case 'attachment.read': {
+        const a = this.router.getAttachment(msg.attachmentId);
+        if (!a) {
+          this.post({ type: 'attachment.readResult', requestId: msg.requestId, error: 'Anexo não encontrado' });
+          return;
+        }
+        const file = this.router.store.pathOf(a);
+        const stat = await fs.stat(file);
+        if (stat.size > MAX_ATTACHMENT_BYTES) {
+          this.post({ type: 'attachment.readResult', requestId: msg.requestId, error: 'Anexo maior que 20 MB' });
+          return;
+        }
+        const content = await fs.readFile(file, 'utf8');
+        this.post({ type: 'attachment.readResult', requestId: msg.requestId, content });
+        return;
+      }
+      case 'metrics.query': {
+        // ler o log não é mutação do board: não passa por `router.handle`; o erro vai na própria resposta
+        try {
+          this.post({ type: 'metrics.result', requestId: msg.requestId, result: this.router.panelMetrics(msg.query) });
+        } catch (e) {
+          this.post({ type: 'metrics.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'card.usage.query': {
+        // ler o log não é mutação do board, como em `metrics.query`
+        try {
+          this.post({ type: 'card.usage.result', requestId: msg.requestId, usage: this.router.cardUsage(msg.cardId) });
+        } catch (e) {
+          this.post({ type: 'card.usage.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'backup.export': {
+        const { text, name, warnings } = this.router.exportBoardFile();
+        const saved = await this.env.saveTextAs?.(text, name);
+        this.post({ type: 'backup.done' });
+        if (!saved) return;
+        this.post({ type: 'notice', message: exportNotice(saved, warnings) });
+        return;
+      }
+      case 'backup.import.pick': {
+        const file = this.env.pickBackupFile ? await this.env.pickBackupFile() : (await this.env.pickFiles())?.[0];
+        if (!file) return void this.post({ type: 'backup.done' });
+        try {
+          const text = await fs.readFile(file, 'utf8');
+          const parsed = parseExportFile(text);
+          const { token, summary } = this.router.parkImport(parsed, Buffer.byteLength(text));
+          this.post({ type: 'backup.import.summary', token, summary });
+        } finally {
+          this.post({ type: 'backup.done' });
+        }
+        return;
+      }
+      case 'backup.import.cancel':
+        this.router.discardImport(msg.token);
+        return;
+      case 'backup.import.apply': {
+        const result = this.router.applyImport(msg.token);
+        this.post({ type: 'notice', message: importNotice(result) });
+        return;
+      }
+      case 'attachment.write': {
+        const a = this.router.getAttachment(msg.attachmentId);
+        if (!a) throw new Error('Anexo não encontrado');
+        await fs.writeFile(this.router.store.pathOf(a), msg.content, 'utf8');
+        return;
+      }
+      default:
+        // mutações disparam router.onDidChange, que reenvia o board para todas as interfaces
+        this.router.handle(msg);
     }
   }
 }

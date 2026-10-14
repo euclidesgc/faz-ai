@@ -1948,9 +1948,17 @@ button.topbar-pending.on:hover:where(:not(:disabled)) {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .spinner {
+  .spinner,
+  .rt-Spinner span {
     animation-duration: 3s;
   }
+}
+/* botão nosso em espera: o spinner entra antes do texto, na cor do texto */
+button[aria-busy='true'] > .spinner {
+  border-color: currentColor;
+  border-top-color: transparent;
+  margin-right: var(--sp-6);
+  vertical-align: -1px;
 }
 /* coração do heartbeat: cinza e imóvel (desligado ou parado); vermelho e batendo (lub-dub) enquanto roda */
 .heartbeat {
@@ -2178,6 +2186,81 @@ button.heartbeat.stopped:hover {
   gap: var(--sp-4);
 }
 
+/* esqueleto da primeira carga: blocos no lugar do que vai aparecer (Placeholder, BoardPlaceholder) */
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-8) 0;
+}
+.placeholder-line {
+  height: 14px;
+  width: 100%;
+}
+.metrics-placeholder {
+  padding: var(--sp-16) 0;
+}
+.placeholder-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+  padding: var(--sp-12);
+  height: 100%;
+}
+.placeholder-topbar {
+  height: 32px;
+  width: 100%;
+}
+.placeholder-columns {
+  display: flex;
+  gap: var(--sp-12);
+  flex: 1;
+}
+.placeholder-column {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.placeholder-card {
+  height: 64px;
+  width: 100%;
+}
+/* véu de espera sobre o board inteiro (recriar, atualizar, importar): acima das janelas (60) e abaixo dos avisos (80) */
+.busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.busy-overlay-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+  padding: var(--sp-20) var(--sp-24);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-md);
+  color: var(--fg);
+}
+.busy-overlay-card > .spinner {
+  width: 18px;
+  height: 18px;
+  border-color: var(--accent);
+  border-top-color: transparent;
+}
+.busy-overlay-card p {
+  margin: 0;
+}
 /* avisos flutuantes: não empurram o board nem somem atrás do card aberto */
 .toasts {
   position: fixed;

@@ -7,6 +7,7 @@ export const environment: Record<string, string> = {
   'Ver o diagnóstico completo': 'See the full environment check',
   'Ir para o board': 'Go to the board',
   'Conferindo o ambiente…': 'Checking the environment…',
+  'A conferência falhou. Tente de novo.': 'The check failed. Try again.',
   'Falta 1 item necessário para o board trabalhar com a IA.': '1 required item is missing for the board to work with the AI.',
   'Faltam {n} itens necessários para o board trabalhar com a IA.': '{n} required items are missing for the board to work with the AI.',
   'O board está pronto para trabalhar com a IA. Há {n} recomendação para aproveitar melhor.':

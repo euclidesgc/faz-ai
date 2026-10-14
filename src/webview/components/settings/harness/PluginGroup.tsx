@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Badge, Button, Checkbox } from '@radix-ui/themes';
 import { pluginActions, type AiTool, type HarnessItem, type PluginAction } from '../../../../shared/harness';
 import { harness } from '../../../commands';
+import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
-import { onHostMessage } from '../../../vscode';
 import { ItemRow } from './ItemRow';
 import type { ItemActions } from './useItemActions';
 import { t } from '../../../i18n';
@@ -27,14 +27,9 @@ export function PluginGroup({ tool, items, actions }: Props) {
   const ask = useBoardStore((s) => s.ask);
   const [filesOpen, setFilesOpen] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  // a ferramenta leva alguns segundos por plugin: a barra diz que está trabalhando até o host responder
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (!busy) return;
-    return onHostMessage((msg) => {
-      if (msg.type === 'harness.plugin.done') setBusy(false);
-    });
-  }, [busy]);
+  // a ferramenta leva alguns segundos por plugin: a barra diz que está trabalhando até o host confirmar
+  const apply = useAction((action: PluginAction, ids: string[]) => harness.applyPlugins(tool, action, ids));
+  const busy = apply.busy;
 
   // um bloco por plugin, pelo nome; o item do próprio plugin (o manifesto) diz como ele está instalado
   const plugins = [...new Set(items.map((i) => i.plugin ?? ''))].map((name) => ({
@@ -56,13 +51,11 @@ export function PluginGroup({ tool, items, actions }: Props) {
   const those = (action: PluginAction) => chosen.filter((p) => pluginActions(tool, p.install).includes(action));
   const count = (list: HarnessItem[]) => (list.length < chosen.length ? ` (${list.length})` : '');
   const run = (action: PluginAction, list: HarnessItem[]) => {
-    harness.applyPlugins(
-      tool,
+    void apply.run(
       action,
       list.map((p) => p.install!.id),
     );
     setPicked(new Set());
-    setBusy(true);
   };
   const uninstall = (list: HarnessItem[]) =>
     ask({

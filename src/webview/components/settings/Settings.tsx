@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { TextField } from '@radix-ui/themes';
-import { useBoardStore, type SettingsTab } from '../../store/boardStore';
+import { useBoardStore, type SettingsTab, withOverlay } from '../../store/boardStore';
 import { t } from '../../i18n';
 import { settings, ui } from '../../commands';
 import { isWeb } from '../../vscode';
@@ -161,7 +161,7 @@ export function Settings() {
                     changes: state.pendingUpgrade.map((c) => t(c)).join(' '),
                   }),
                   confirmLabel: t('Atualizar board'),
-                  onConfirm: () => settings.upgradeBoard(),
+                  onConfirm: () => withOverlay(t('Atualizando o board…'), () => settings.upgradeBoard()),
                 })
               }
               {...navProps(collapsed, t('Atualizar board'), IconUpgrade)}
@@ -176,7 +176,7 @@ export function Settings() {
               { count: state.cards.length },
             )}
             confirmLabel={t('Apagar tudo e recriar')}
-            onConfirm={() => settings.resetBoard()}
+            onConfirm={() => withOverlay(t('Recriando o board…'), () => settings.resetBoard())}
             {...navProps(collapsed, t('Recriar board padrão'), IconReset)}
             title={t('Apaga todos os cards e configurações e recria o board com o padrão atual')}
           />

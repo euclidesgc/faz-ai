@@ -1,4 +1,4 @@
-import { posted, renderThemed, seedBoard, sentOf, syncStore } from './setup';
+import { posted, renderThemed, seedBoard, sentOf, syncStore, confirmLast } from './setup';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -218,6 +218,7 @@ describe('Diagnóstico do ambiente', () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);
     show(report());
+    confirmLast();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.now() + 5000);
     await userEvent.click(within(item('Skill do fluxo (faz-ai-fluxo)')).getByRole('button', { name: 'Instalar a skill' }));
@@ -225,8 +226,10 @@ describe('Diagnóstico do ambiente', () => {
     const skill = item('Skill do fluxo (faz-ai-fluxo)');
     expect(within(skill).getByText('Aplicando e conferindo de novo…')).toBeInTheDocument();
     expect(within(skill).queryByRole('button', { name: 'Instalar a skill' })).toBeNull();
-    // a resposta chega com a skill instalada: o item vira "Pronto"
+    // a resposta chega com a skill instalada e o host confirma a conferência: o item vira "Pronto"
     show({ ...report({ skill: 'ok' }), checkedAt: Date.now() + 1 });
+    confirmLast();
+    await act(async () => {});
     expect(within(item('Skill do fluxo (faz-ai-fluxo)')).getByText('Pronto:')).toBeInTheDocument();
     expect(screen.queryByText('Aplicando e conferindo de novo…')).toBeNull();
     vi.useRealTimers();
@@ -236,12 +239,17 @@ describe('Diagnóstico do ambiente', () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);
     show(report());
+    confirmLast();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.now() + 5000);
     await userEvent.click(screen.getByRole('button', { name: 'Verificar de novo' }));
     expect(sentOf('environment.check')).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Verificar de novo' })).toBeDisabled();
     show({ ...report(), checkedAt: Date.now() + 1 });
+    // o relatório chegou, mas o botão só volta quando o host confirma que a conferência acabou
+    expect(screen.getByRole('button', { name: 'Verificar de novo' })).toBeDisabled();
+    confirmLast();
+    await act(async () => {});
     expect(screen.getByRole('button', { name: 'Verificar de novo' })).toBeEnabled();
     vi.useRealTimers();
   });

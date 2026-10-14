@@ -49,6 +49,8 @@ export const card: Record<string, string> = {
   'Escolher arquivos…': 'Choose files…',
   'ou arraste arquivos para cá (segure Shift ao soltar), ou cole uma imagem. Até 20 MB cada.':
     'or drag files here (hold Shift when dropping), or paste an image. Up to 20 MB each.',
+  'Enviando {name}…': 'Uploading {name}…',
+  'Criando a branch…': 'Creating the branch…',
   'Nenhum anexo.': 'No attachments.',
   'Documento de uma fase': 'A phase document',
   artefato: 'artifact',
@@ -60,7 +62,6 @@ export const card: Record<string, string> = {
   'Copiar conteúdo': 'Copy content',
   'Só anexos de texto têm conteúdo para copiar.': 'Only text attachments have content to copy.',
   'Salvar como…': 'Save as…',
-  'Não foi possível salvar o anexo.': 'Could not save the attachment.',
   'Remover anexo': 'Remove attachment',
   'Remover "{name}"?': 'Remove "{name}"?',
   'O arquivo anexado será apagado.': 'The attached file will be deleted.',

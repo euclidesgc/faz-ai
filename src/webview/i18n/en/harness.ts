@@ -105,7 +105,6 @@ export const harness: Record<string, string> = {
   'Somente leitura: este arquivo é mantido pela ferramenta ou por um plugin.':
     'Read-only: this file is maintained by the tool or by a plugin.',
   'Conteúdo do arquivo': 'File content',
-  'Não foi possível salvar o arquivo.': 'The file could not be saved.',
   'Modo da skill {name}': 'Mode of skill {name}',
   'Skill importada: o modo nativo é de quem mantém a pasta, e no board o que vale é o modo do artefato.':
     "Imported skill: the native mode belongs to whoever keeps the folder, and on the board what counts is the artifact's mode.",
@@ -386,6 +385,9 @@ export const harness: Record<string, string> = {
     "The skill's folder is removed, along with all its files: {location}",
   'O arquivo é removido: {location}': 'The file is removed: {location}',
   'Reler pastas': 'Reread folders',
+  'Relendo as pastas e os plugins…': 'Rereading the folders and the plugins…',
+  'Buscando a origem e procurando skills…': 'Fetching the source and looking for skills…',
+  'Trocando a ferramenta e relendo o harness…': 'Switching the tool and rereading the harness…',
   'Rodar o heartbeat agora': 'Run the heartbeat now',
   'Buscar skills para instalar': 'Find skills to install',
   'Abrir no editor': 'Open in editor',

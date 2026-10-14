@@ -5,6 +5,7 @@ import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { harness, ui } from '../commands';
+import { useAction } from '../useAction';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { isWeb } from '../vscode';
 import { Button, IconCheck, IconConnect, IconWarning, type ButtonVariant } from './ui';
@@ -203,6 +204,34 @@ export function aiBlockedReason(state: BoardState): string | null {
     : t('A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.', { tool: aiToolInfo(cli.tool).label });
 }
 
+/** Botão que resolve um requisito pelo host (CLI, disco): mostra a espera até ele confirmar, e avisa quem confere de novo. */
+function FixButton({
+  variant,
+  run,
+  onFixed,
+  children,
+}: {
+  variant?: ButtonVariant;
+  run: () => Promise<void>;
+  onFixed?: () => void;
+  children: ReactNode;
+}) {
+  const fix = useAction(run);
+  return (
+    <Button
+      size="small"
+      variant={variant}
+      loading={fix.busy}
+      onClick={() => {
+        void fix.run();
+        onFixed?.();
+      }}
+    >
+      {children}
+    </Button>
+  );
+}
+
 /** Se o requisito tem um botão ou comando que o resolve por aqui (na versão compacta, sem o atalho para as Configurações). */
 function actionable(r: BoardRequirement, compact: boolean): boolean {
   const kind = r.action?.kind;
@@ -257,42 +286,21 @@ export function RequirementFix({
       );
     case 'fixProject':
       return (
-        <Button
-          size="small"
-          variant={variant}
-          onClick={() => {
-            ui.fixProjectMcp(action.file);
-            onFixed?.();
-          }}
-        >
+        <FixButton variant={variant} run={() => ui.fixProjectMcp(action.file)} onFixed={onFixed}>
           <IconConnect /> {t('Corrigir o registro')}
-        </Button>
+        </FixButton>
       );
     case 'installSkill':
       return (
-        <Button
-          size="small"
-          variant={variant}
-          onClick={() => {
-            harness.installFlowSkill(r.tool, 'user');
-            onFixed?.();
-          }}
-        >
+        <FixButton variant={variant} run={() => harness.installFlowSkill(r.tool, 'user')} onFixed={onFixed}>
           {t('Instalar a skill')}
-        </Button>
+        </FixButton>
       );
     case 'pinMcp':
       return (
-        <Button
-          size="small"
-          variant={variant}
-          onClick={() => {
-            ui.pinMcp();
-            onFixed?.();
-          }}
-        >
+        <FixButton variant={variant} run={() => ui.pinMcp()} onFixed={onFixed}>
           <IconConnect /> {t('Corrigir o caminho')}
-        </Button>
+        </FixButton>
       );
     case 'openEditorMcp':
       return (
@@ -334,21 +342,21 @@ function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
 
 /** "Verificar de novo", com retorno: conferindo, e o resultado quando nada mudou. */
 function RecheckButton() {
-  const checkedAt = useBoardStore((s) => s.state?.requirementsCheckedAt ?? 0);
-  const [askedAt, setAskedAt] = useState<number | null>(null);
-  const done = askedAt !== null && checkedAt > askedAt;
+  // o host confirma (`done`) quando a conferência termina; a falha chega como erro e destrava o botão
+  const check = useAction(() => ui.checkRequirements());
+  const [checked, setChecked] = useState(false);
   return (
     <>
       <span role="status" className="small muted">
-        {askedAt !== null && (done ? t('Conferido agora: nada mudou.') : t('Conferindo…'))}
+        {check.busy ? t('Conferindo…') : checked ? t('Conferido agora: nada mudou.') : null}
       </span>
       <Button
         size="small"
         variant="ghost"
-        disabled={askedAt !== null && !done}
-        onClick={() => {
-          setAskedAt(Date.now());
-          ui.checkRequirements();
+        loading={check.busy}
+        onClick={async () => {
+          setChecked(false);
+          setChecked(await check.run());
         }}
       >
         {t('Verificar de novo')}

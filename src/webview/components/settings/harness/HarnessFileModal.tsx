@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { request } from '../../../request';
+import { useAction } from '../../../useAction';
 import { SegmentedControl } from '@radix-ui/themes';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
@@ -45,14 +47,11 @@ export function HarnessFileModal() {
   const [viewMode, setViewMode] = useState<'formatted' | 'raw'>('formatted');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [unsavedNotice, setUnsavedNotice] = useState(false);
   const dirty = editing && draft !== (content ?? '');
   const guard = useRef({ dirty, close });
   guard.current = { dirty, close };
   const requestClose = () => (guard.current.dirty ? setUnsavedNotice(true) : guard.current.close());
-  const pendingWrite = useRef<(() => void) | null>(null);
-  useEffect(() => () => pendingWrite.current?.(), []);
 
   useEffect(() => {
     if (!file) return;
@@ -100,26 +99,19 @@ export function HarnessFileModal() {
     };
   }, [file]);
 
+  // o host confirma a gravação pelo `done`; se falhou (JSON inválido, sem permissão), o texto fica na tela
+  const write = useAction(() => request({ type: 'harness.file.write', path: file ?? '', content: draft }));
+  const saving = write.busy;
+
   if (!file) return null;
 
-  const save = () => {
+  const save = async () => {
     if (saving) return;
     setError(null);
-    setSaving(true);
-    const requestId = crypto.randomUUID();
-    const off = onHostMessage((msg) => {
-      if (msg.type !== 'harness.file.writeResult' || msg.requestId !== requestId) return;
-      off();
-      pendingWrite.current = null;
-      setSaving(false);
-      // falhou (JSON inválido, sem permissão): o texto fica na tela para a pessoa corrigir
-      if (!msg.ok) return setError(msg.error ?? t('Não foi possível salvar o arquivo.'));
-      setContent(draft);
-      setEditing(false);
-      setUnsavedNotice(false);
-    });
-    pendingWrite.current = off;
-    postToHost({ type: 'harness.file.write', requestId, path: file, content: draft });
+    if (!(await write.run())) return; // o erro do host fica em `write.error`
+    setContent(draft);
+    setEditing(false);
+    setUnsavedNotice(false);
   };
 
   const markdown = isMarkdownFile(file);
@@ -159,9 +151,9 @@ export function HarnessFileModal() {
               </Button>
             </p>
           )}
-          {error && (
+          {(error ?? write.error) && (
             <p className="banner warn" role="alert">
-              {t(error)}
+              {t(error ?? write.error ?? '')}
             </p>
           )}
           {readonly && content !== null && (
@@ -185,7 +177,7 @@ export function HarnessFileModal() {
           {editing ? (
             <>
               <Button onClick={() => setEditing(false)}>{t('Cancelar')}</Button>
-              <Button variant="primary" onClick={save} disabled={saving}>
+              <Button variant="primary" onClick={() => void save()} loading={saving}>
                 {t('Salvar')}
               </Button>
             </>

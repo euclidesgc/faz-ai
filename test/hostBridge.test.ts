@@ -39,6 +39,84 @@ beforeEach(async () => {
   bridge = new HostBridge((m) => sent.push(m), router, { get: () => ({}), onDidChange: () => () => {}, update: () => {} } as never, env);
 });
 
+describe('HostBridge: done (confirmação por requestId)', () => {
+  it('mensagem com requestId recebe done ok depois do boardState; sem requestId, nada muda', async () => {
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const create = {
+      type: 'card.create' as const,
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+      parentId: null,
+      title: 'Com confirmação',
+    };
+    await bridge.handle({ ...create, requestId: 'q1' });
+    expect(sent.slice(-2).map((m) => m.type)).toEqual(['boardState', 'done']);
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'q1', ok: true });
+
+    await bridge.handle({ ...create, title: 'Sem confirmação' });
+    expect(sent.at(-1)!.type).toBe('boardState');
+  });
+
+  it('handler que lança vira o toast de erro e o done com ok:false e a mesma mensagem', async () => {
+    await bridge.handle({ type: 'chat.send', text: 'oi', model: null, requestId: 'q2' });
+    expect(sent.slice(-2)).toEqual([
+      { type: 'error', message: 'O chat não está disponível neste board.' },
+      { type: 'done', requestId: 'q2', ok: false, error: 'O chat não está disponível neste board.' },
+    ]);
+  });
+
+  it('leitura com resposta própria correlacionada não ganha done por cima', async () => {
+    await bridge.handle({ type: 'card.usage.query', requestId: 'u9', cardId: 'nada' });
+    expect(sent.filter((m) => m.type === 'done')).toEqual([]);
+    expect(sent.at(-1)!.type).toBe('card.usage.result');
+  });
+
+  it('a falha de uma tarefa em segundo plano chega à interface como erro', () => {
+    router.reportError('A conferência do ambiente falhou: CLI não respondeu.');
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'A conferência do ambiente falhou: CLI não respondeu.' });
+  });
+});
+
+describe('HostBridge: done (confirmação por requestId)', () => {
+  it('mensagem com requestId recebe done ok depois do boardState; sem requestId, nada muda', async () => {
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const create = {
+      type: 'card.create' as const,
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+      parentId: null,
+      title: 'Com confirmação',
+    };
+    await bridge.handle({ ...create, requestId: 'q1' });
+    expect(sent.slice(-2).map((m) => m.type)).toEqual(['boardState', 'done']);
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'q1', ok: true });
+
+    await bridge.handle({ ...create, title: 'Sem confirmação' });
+    expect(sent.at(-1)!.type).toBe('boardState');
+  });
+
+  it('handler que lança vira o toast de erro e o done com ok:false e a mesma mensagem', async () => {
+    await bridge.handle({ type: 'chat.send', text: 'oi', model: null, requestId: 'q2' });
+    expect(sent.slice(-2)).toEqual([
+      { type: 'error', message: 'O chat não está disponível neste board.' },
+      { type: 'done', requestId: 'q2', ok: false, error: 'O chat não está disponível neste board.' },
+    ]);
+  });
+
+  it('leitura com resposta própria correlacionada não ganha done por cima', async () => {
+    await bridge.handle({ type: 'card.usage.query', requestId: 'u9', cardId: 'nada' });
+    expect(sent.filter((m) => m.type === 'done')).toEqual([]);
+    expect(sent.at(-1)!.type).toBe('card.usage.result');
+  });
+
+  it('a falha de uma tarefa em segundo plano chega à interface como erro', () => {
+    router.reportError('A conferência do ambiente falhou: CLI não respondeu.');
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'A conferência do ambiente falhou: CLI não respondeu.' });
+  });
+});
+
 describe('HostBridge: chat', () => {
   it('as mensagens do chat vão à sessão registrada no roteador', async () => {
     const got: unknown[] = [];
@@ -76,7 +154,7 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
       path: rule,
       content: '---\ndescription: Estilo do código\n---\n# Estilo\n',
     });
-    expect(sent.at(-1)).toEqual({ type: 'harness.file.writeResult', requestId: 'w1', ok: true });
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'w1', ok: true });
     expect(fs.readFileSync(rule, 'utf8')).toContain('Estilo do código');
     const item = router
       .snapshot()
@@ -228,14 +306,11 @@ describe('HostBridge: plugins pela CLI do Claude Code', () => {
       ['plugin', 'disable', 'design@synced', '--json'],
       ['plugin', 'disable', 'fmt@loja', '--json'],
     ]);
-    expect(sent.slice(-2)).toEqual([
-      {
-        type: 'notice',
-        message:
-          'Plugins desativados: design, fmt. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
-      },
-      { type: 'harness.plugin.done' },
-    ]);
+    expect(sent.at(-1)).toEqual({
+      type: 'notice',
+      message:
+        'Plugins desativados: design, fmt. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
+    });
     // a lista é consultada de novo depois da ação
     expect(calls.filter((c) => c[1] === 'list').length).toBe(2);
   });
@@ -251,10 +326,7 @@ describe('HostBridge: plugins pela CLI do Claude Code', () => {
     );
     await flush();
     await bridge.handle({ type: 'harness.plugin.apply', tool: 'claude', action: 'uninstall', ids: ['design@synced'] });
-    expect(sent.slice(-2)).toEqual([
-      { type: 'harness.plugin.done' },
-      { type: 'error', message: 'Nenhum dos plugins escolhidos aceita essa ação.' },
-    ]);
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'Nenhum dos plugins escolhidos aceita essa ação.' });
   });
 });
 
@@ -294,14 +366,14 @@ describe('HostBridge: attachment.read / attachment.write', () => {
   it('grava o conteúdo editado de volta no arquivo do anexo', async () => {
     const id = createAttachment('original');
     await bridge.handle({ type: 'attachment.write', requestId: 'w1', attachmentId: id, content: 'editado' });
-    expect(sent.at(-1)).toEqual({ type: 'attachment.writeResult', requestId: 'w1', ok: true });
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'w1', ok: true });
     const a = router.getAttachment(id)!;
     expect(fs.readFileSync(router.store.pathOf(a), 'utf8')).toBe('editado');
   });
 
   it('attachment.write de anexo inexistente devolve ok:false', async () => {
     await bridge.handle({ type: 'attachment.write', requestId: 'w2', attachmentId: 'nope', content: 'x' });
-    expect(sent.at(-1)).toEqual({ type: 'attachment.writeResult', requestId: 'w2', ok: false, error: 'Anexo não encontrado' });
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'w2', ok: false, error: 'Anexo não encontrado' });
   });
 
   it('attachment.write que falha na escrita devolve ok:false com o erro, sem derrubar a sessão', async () => {
@@ -310,7 +382,7 @@ describe('HostBridge: attachment.read / attachment.write', () => {
     fs.rmSync(path.dirname(router.store.pathOf(a)), { recursive: true, force: true });
     await bridge.handle({ type: 'attachment.write', requestId: 'w3', attachmentId: id, content: 'novo' });
     const last = sent.at(-1) as { type: string; ok: boolean; error?: string };
-    expect(last.type).toBe('attachment.writeResult');
+    expect(last.type).toBe('done');
     expect(last.ok).toBe(false);
     expect(last.error).toBeTruthy();
   });

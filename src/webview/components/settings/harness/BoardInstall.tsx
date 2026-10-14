@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { aiToolInfo, type AiTool, type HarnessItem, type InstallScope } from '../../../../shared/harness';
 import { FLOW_SKILL_NAME } from '../../../../shared/harnessProject';
 import { copyTarget } from '../../../../shared/harnessCatalog';
+import { useAction } from '../../../useAction';
 import { harness, ui } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { Badge, Button, Card } from '@radix-ui/themes';
@@ -35,8 +37,16 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
   const where = places(artifact, tool);
   const label = aiToolInfo(tool).label;
 
-  const run = (scope: InstallScope, replace: boolean) =>
-    artifact === 'mcp' ? ui.connectAI(tool, scope) : harness.installFlowSkill(tool, scope, replace);
+  // registrar o servidor chama a CLI da ferramenta; o botão clicado mostra a espera até o host confirmar
+  const installing = useAction((scope: InstallScope, replace: boolean) =>
+    artifact === 'mcp' ? ui.connectAI(tool, scope) : harness.installFlowSkill(tool, scope, replace),
+  );
+  const [which, setWhich] = useState<InstallScope | null>(null);
+  const run = (scope: InstallScope, replace: boolean) => {
+    setWhich(scope);
+    void installing.run(scope, replace);
+  };
+  const loading = (scope: InstallScope) => installing.busy && which === scope;
 
   const install = (scope: InstallScope) => {
     const here = installedIn(scope);
@@ -88,7 +98,7 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
           )}
         </p>
         <div className="row">
-          <Button onClick={() => run('project', false)}>
+          <Button loading={loading('project')} onClick={() => run('project', false)}>
             {installedIn('project') ? t('Reinstalar neste projeto') : t('Instalar neste projeto')}
           </Button>
         </div>
@@ -118,10 +128,10 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
             )}
       </p>
       <div className="row">
-        <Button onClick={() => install('user')}>
+        <Button loading={loading('user')} onClick={() => install('user')}>
           {installedIn('user') ? t('Reinstalar (padrão da ferramenta)') : t('Instalar (padrão da ferramenta)')}
         </Button>
-        <Button variant="soft" color="gray" onClick={() => install('project')}>
+        <Button variant="soft" color="gray" loading={loading('project')} onClick={() => install('project')}>
           {installedIn('project') ? t('Reinstalar neste projeto') : t('Instalar neste projeto')}
         </Button>
       </div>

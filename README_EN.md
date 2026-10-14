@@ -176,6 +176,10 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    story is archived asks for confirmation and restores the whole story (a sub-task of an active
    story comes back on its own, with no confirmation).
 
+Every action that takes time (creating the branch, recreating the board, importing a backup,
+rereading the harness…) shows it is working, on the button, in the section or as a veil over the
+board, and tells you if it failed.
+
 ![Open card: status, approval, fields, description and checklist](docs/images/card_en.png)
 
 By default, a story is not completed and does not advance a phase while it has open sub-tasks of

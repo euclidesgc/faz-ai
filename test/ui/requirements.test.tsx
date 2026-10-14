@@ -1,4 +1,4 @@
-import { lastSent, posted, renderThemed, seedBoard, sentOf, syncStore } from './setup';
+import { lastSent, posted, renderThemed, seedBoard, sentOf, syncStore, confirmLast } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -80,9 +80,21 @@ describe('faixa de requisitos do board', () => {
     expect(lastSent('requirements.check')).toEqual({ type: 'requirements.check' });
     expect(screen.getByText('Conferindo…')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Verificar de novo' })).toBeDisabled();
-    await new Promise((r) => setTimeout(r, 2));
     set([CLI, MCP, PERMISSION]);
+    confirmLast();
+    await act(async () => {});
     expect(screen.getByText('Conferido agora: nada mudou.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Verificar de novo' })).toBeEnabled();
+  });
+
+  it('a conferência que falha destrava "Verificar de novo" sem dizer que nada mudou', async () => {
+    missing();
+    renderThemed(<RequirementsBanner />);
+    await userEvent.click(screen.getByRole('button', { name: 'Verificar de novo' }));
+    confirmLast(false, 'Não foi possível conferir os requisitos do board: CLI não respondeu.');
+    await act(async () => {});
+    expect(screen.queryByText('Conferindo…')).toBeNull();
+    expect(screen.queryByText('Conferido agora: nada mudou.')).toBeNull();
     expect(screen.getByRole('button', { name: 'Verificar de novo' })).toBeEnabled();
   });
 
