@@ -1591,6 +1591,10 @@ For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `ho
 **before** approving the card. Approved first, the PR goes into main without a version and the fix
 only ships in the next release from `develop`.
 
+For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `hotfix/` worktree
+**before** approving the card. Approved first, the PR goes into main without a version and the fix
+only ships in the next release from `develop`.
+
 Between packaging and publishing, the release opens the `.vsix` and checks the four showcase files
 (`README.md`, `README_EN.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`): the changelog needs the version
 being released as its top heading, with no leftover "Não lançado"/"Unreleased" anywhere, and the

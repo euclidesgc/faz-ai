@@ -1517,6 +1517,10 @@ Num hotfix (card do tipo Bug, branch `hotfix/...`), rode `npm run release` na wo
 **antes** de aprovar o card. Aprovado antes, o PR entra na principal sem versão e a correção só sai
 no próximo release da `develop`.
 
+Num hotfix (card do tipo Bug, branch `hotfix/...`), rode `npm run release` na worktree da `hotfix/`
+**antes** de aprovar o card. Aprovado antes, o PR entra na principal sem versão e a correção só sai
+no próximo release da `develop`.
+
 Entre empacotar e publicar, o release abre o `.vsix` e confere os quatro arquivos de vitrine
 (`README.md`, `README_EN.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`): o changelog precisa ter o título
 da versão que está saindo no topo, sem nenhum "Não lançado"/"Unreleased" sobrando em lugar nenhum, e
