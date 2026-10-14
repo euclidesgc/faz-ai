@@ -357,6 +357,14 @@ export type HostToWebview =
   /** o host pede à interface para trocar de aba das Configurações, opcionalmente rolando até uma seção */
   | { type: 'ui.openSettings'; tab: SettingsTab; section?: string }
   /** o host pede à interface para abrir uma tela fora das Configurações */
-  | { type: 'ui.openView'; view: 'environment' };
+  | { type: 'ui.openView'; view: 'environment' }
+  /** o host terminou de tratar a mensagem enviada com este `requestId` (qualquer tipo): deu certo, ou falhou com o erro já mostrado em `error` */
+  | { type: 'done'; requestId: string; ok: boolean; error?: string };
+
+/**
+ * Envelope opcional de qualquer mensagem da interface: com `requestId`, o host responde `done` quando termina de tratá-la.
+ * É o que permite à tela mostrar que está esperando (ver `request()` em `src/webview/request.ts`).
+ */
+export type Tracked<M = WebviewToHost> = M & { requestId?: string };
 
 export type { WorkflowKind };

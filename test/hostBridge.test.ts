@@ -39,6 +39,84 @@ beforeEach(async () => {
   bridge = new HostBridge((m) => sent.push(m), router, { get: () => ({}), onDidChange: () => () => {}, update: () => {} } as never, env);
 });
 
+describe('HostBridge: done (confirmação por requestId)', () => {
+  it('mensagem com requestId recebe done ok depois do boardState; sem requestId, nada muda', async () => {
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const create = {
+      type: 'card.create' as const,
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+      parentId: null,
+      title: 'Com confirmação',
+    };
+    await bridge.handle({ ...create, requestId: 'q1' });
+    expect(sent.slice(-2).map((m) => m.type)).toEqual(['boardState', 'done']);
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'q1', ok: true });
+
+    await bridge.handle({ ...create, title: 'Sem confirmação' });
+    expect(sent.at(-1)!.type).toBe('boardState');
+  });
+
+  it('handler que lança vira o toast de erro e o done com ok:false e a mesma mensagem', async () => {
+    await bridge.handle({ type: 'chat.send', text: 'oi', model: null, requestId: 'q2' });
+    expect(sent.slice(-2)).toEqual([
+      { type: 'error', message: 'O chat não está disponível neste board.' },
+      { type: 'done', requestId: 'q2', ok: false, error: 'O chat não está disponível neste board.' },
+    ]);
+  });
+
+  it('leitura com resposta própria correlacionada não ganha done por cima', async () => {
+    await bridge.handle({ type: 'card.usage.query', requestId: 'u9', cardId: 'nada' });
+    expect(sent.filter((m) => m.type === 'done')).toEqual([]);
+    expect(sent.at(-1)!.type).toBe('card.usage.result');
+  });
+
+  it('a falha de uma tarefa em segundo plano chega à interface como erro', () => {
+    router.reportError('A conferência do ambiente falhou: CLI não respondeu.');
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'A conferência do ambiente falhou: CLI não respondeu.' });
+  });
+});
+
+describe('HostBridge: done (confirmação por requestId)', () => {
+  it('mensagem com requestId recebe done ok depois do boardState; sem requestId, nada muda', async () => {
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const create = {
+      type: 'card.create' as const,
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+      parentId: null,
+      title: 'Com confirmação',
+    };
+    await bridge.handle({ ...create, requestId: 'q1' });
+    expect(sent.slice(-2).map((m) => m.type)).toEqual(['boardState', 'done']);
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'q1', ok: true });
+
+    await bridge.handle({ ...create, title: 'Sem confirmação' });
+    expect(sent.at(-1)!.type).toBe('boardState');
+  });
+
+  it('handler que lança vira o toast de erro e o done com ok:false e a mesma mensagem', async () => {
+    await bridge.handle({ type: 'chat.send', text: 'oi', model: null, requestId: 'q2' });
+    expect(sent.slice(-2)).toEqual([
+      { type: 'error', message: 'O chat não está disponível neste board.' },
+      { type: 'done', requestId: 'q2', ok: false, error: 'O chat não está disponível neste board.' },
+    ]);
+  });
+
+  it('leitura com resposta própria correlacionada não ganha done por cima', async () => {
+    await bridge.handle({ type: 'card.usage.query', requestId: 'u9', cardId: 'nada' });
+    expect(sent.filter((m) => m.type === 'done')).toEqual([]);
+    expect(sent.at(-1)!.type).toBe('card.usage.result');
+  });
+
+  it('a falha de uma tarefa em segundo plano chega à interface como erro', () => {
+    router.reportError('A conferência do ambiente falhou: CLI não respondeu.');
+    expect(sent.at(-1)).toEqual({ type: 'error', message: 'A conferência do ambiente falhou: CLI não respondeu.' });
+  });
+});
+
 describe('HostBridge: chat', () => {
   it('as mensagens do chat vão à sessão registrada no roteador', async () => {
     const got: unknown[] = [];

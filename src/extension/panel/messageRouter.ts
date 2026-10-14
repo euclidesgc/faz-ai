@@ -127,6 +127,7 @@ const HANDLERS: HandlerMap = {
 export class MessageRouter {
   private ctx: BoardContext;
   private listeners = new Set<() => void>();
+  private errorListeners = new Set<(message: string) => void>();
   private approveListeners: ((cardId: string) => void)[] = [];
   private aiRuns: string[] = [];
   private aiActivity: AiActivity[] = [];
@@ -174,6 +175,17 @@ export class MessageRouter {
   onDidChange(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  /** Avisa de uma falha que não veio de uma mensagem da interface (tarefa em segundo plano); a interface mostra como erro. */
+  onDidError(fn: (message: string) => void): () => void {
+    this.errorListeners.add(fn);
+    return () => this.errorListeners.delete(fn);
+  }
+
+  /** Uma tarefa em segundo plano falhou: além do log, a pessoa precisa ver, senão a tela fica esperando para sempre. */
+  reportError(message: string): void {
+    this.errorListeners.forEach((fn) => fn(message));
   }
 
   /** Avisa quando uma pessoa aprova um card (usado pelo merge automático). */
