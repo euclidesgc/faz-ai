@@ -297,4 +297,43 @@ export const host: Record<string, string> = {
     'Branch {develop} did not exist: the board created it from {main}, but could not push it to origin ({error}). Push it by hand: git push -u origin {develop}',
   'A branch {develop} existe só nesta máquina: o pull request para ela só abre depois de enviá-la ao origin (git push -u origin {develop}).':
     'Branch {develop} exists only on this machine: the pull request to it can only be opened after pushing it to origin (git push -u origin {develop}).',
+
+  // avisos da limpeza da história concluída (gitNotice, em src/shared/gitNotices.ts)
+  'Limpeza da história depois do merge:': 'Story cleanup after the merge:',
+  'pasta de trabalho {path} removida': 'work folder {path} removed',
+  'branch local {branch} apagada': 'local branch {branch} deleted',
+  'branch remota origin/{branch} apagada': 'remote branch origin/{branch} deleted',
+  'branch remota origin/{branch} já tinha sido apagada': 'remote branch origin/{branch} had already been deleted',
+  '{develop} local atualizada até origin/{develop}': 'local {develop} updated to origin/{develop}',
+  '{develop} local já estava atualizada': 'local {develop} was already up to date',
+  '**Aviso:** A {develop} local não foi atualizada: ela está aberta em {path}, e o board não mexe nos arquivos dessa pasta. Atualize lá com: git pull --ff-only origin {develop}':
+    '**Warning:** Local {develop} was not updated: it is checked out in {path}, and the board does not touch the files in that folder. Update it there with: git pull --ff-only origin {develop}',
+  '**Aviso:** A {develop} local não foi atualizada: ela tem {count} commit(s) que não estão em origin/{develop}, e o board não força a atualização. Envie esses commits num pull request ou descarte-os, e depois rode: git fetch origin {develop}:{develop}':
+    '**Warning:** Local {develop} was not updated: it has {count} commit(s) that are not in origin/{develop}, and the board does not force the update. Send those commits in a pull request or discard them, then run: git fetch origin {develop}:{develop}',
+  '**Aviso:** A {develop} local não foi atualizada: {error}. Atualize com: git fetch origin {develop}:{develop}':
+    '**Warning:** Local {develop} was not updated: {error}. Update it with: git fetch origin {develop}:{develop}',
+  '**Aviso:** A limpeza não apagou nada: a pasta de trabalho {path} tem mudanças não commitadas ({files}). A worktree, a branch local {branch} e a remota continuam. Para não perder essas mudanças, faça o commit e envie-as num pull request novo, ou copie os arquivos. Atenção: como a história já foi entregue, a limpeza de branches e worktrees órfãs vai descartar essas mudanças pendentes depois.':
+    '**Warning:** The cleanup deleted nothing: the work folder {path} has uncommitted changes ({files}). The worktree, the local branch {branch} and the remote one are kept. To keep these changes, commit them and send them in a new pull request, or copy the files. Note: since the story was delivered, the cleanup of orphan branches and worktrees will later discard these pending changes.',
+  '**Aviso:** A limpeza não apagou nada: a pasta de trabalho {path} tem mudanças não commitadas ({files} e mais {n}). A worktree, a branch local {branch} e a remota continuam. Para não perder essas mudanças, faça o commit e envie-as num pull request novo, ou copie os arquivos. Atenção: como a história já foi entregue, a limpeza de branches e worktrees órfãs vai descartar essas mudanças pendentes depois.':
+    '**Warning:** The cleanup deleted nothing: the work folder {path} has uncommitted changes ({files} and {n} more). The worktree, the local branch {branch} and the remote one are kept. To keep these changes, commit them and send them in a new pull request, or copy the files. Note: since the story was delivered, the cleanup of orphan branches and worktrees will later discard these pending changes.',
+  '**Aviso:** A limpeza não apagou nada: a branch local {branch} tem {count} commit(s) que não estão no pull request {pr}. A worktree {path} e as branches local e remota continuam. Envie esses commits num pull request novo. Atenção: como a história já foi entregue, a limpeza de branches e worktrees órfãs vai descartar esses commits depois.':
+    '**Warning:** The cleanup deleted nothing: the local branch {branch} has {count} commit(s) that are not in the pull request {pr}. The worktree {path} and the local and remote branches are kept. Send those commits in a new pull request. Note: since the story was delivered, the cleanup of orphan branches and worktrees will later discard these commits.',
+  '**Aviso:** A branch local {branch} não foi apagada: a pasta do projeto ({path}) está nela, e o board não troca a branch da sua pasta. Troque de branch (por exemplo, git switch {develop}) e apague-a com: git branch -D {branch}':
+    "**Warning:** The local branch {branch} was not deleted: the project folder ({path}) is on it, and the board does not switch your folder's branch. Switch branches (for example, git switch {develop}) and delete it with: git branch -D {branch}",
+  '**Aviso:** A branch local {branch} não foi apagada: ela está aberta em {path}. Feche essa pasta ou troque a branch dela e apague com: git branch -D {branch}':
+    '**Warning:** The local branch {branch} was not deleted: it is checked out in {path}. Close that folder or switch its branch, then delete it with: git branch -D {branch}',
+  '**Aviso:** A pasta de trabalho {path} não foi removida: {error}. A branch local {branch} ficou porque a pasta ainda a usa. Remova com: git worktree remove {path}':
+    '**Warning:** The work folder {path} was not removed: {error}. The local branch {branch} was kept because the folder still uses it. Remove it with: git worktree remove {path}',
+  '**Aviso:** A branch local {branch} não foi apagada: {error}. Apague com: git branch -D {branch}':
+    '**Warning:** The local branch {branch} was not deleted: {error}. Delete it with: git branch -D {branch}',
+  '**Aviso:** A branch remota origin/{branch} não foi apagada: {error}. Apague com: git push origin --delete {branch}':
+    '**Warning:** The remote branch origin/{branch} was not deleted: {error}. Delete it with: git push origin --delete {branch}',
+  '**Aviso:** A branch remota origin/{branch} não foi apagada: ela recebeu commits depois do pull request {pr}. Confira e, se não precisar deles, apague com: git push origin --delete {branch}':
+    "**Warning:** The remote branch origin/{branch} was not deleted: it received commits after the pull request {pr}. Check them and, if you don't need them, delete it with: git push origin --delete {branch}",
+  '**Aviso:** A limpeza não apagou nada: o pull request {pr} é da branch {head}, e a branch registrada no card é {branch}.':
+    '**Warning:** The cleanup deleted nothing: the pull request {pr} is from branch {head}, and the branch recorded on the card is {branch}.',
+  '**Aviso:** A limpeza não apagou nada: não foi possível confirmar o pull request {pr} pelo gh ({error}).':
+    '**Warning:** The cleanup deleted nothing: the pull request {pr} could not be confirmed through gh ({error}).',
+  '**Aviso:** O repositório não tem o remoto origin: a branch remota e a {develop} não foram tocadas.':
+    '**Warning:** The repository has no origin remote: the remote branch and {develop} were not touched.',
 };
