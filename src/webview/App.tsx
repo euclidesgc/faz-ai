@@ -14,6 +14,7 @@ import { CardDrawer } from './components/CardDrawer';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { Dialog } from './components/Dialog';
 import { BusyOverlay } from './components/BusyOverlay';
+import { BoardPlaceholder } from './components/ui';
 import { FilterBar } from './components/FilterBar';
 import { SelectionBar } from './components/SelectionBar';
 import { AutopilotButton } from './components/AutopilotButton';
@@ -84,11 +85,12 @@ export function App() {
     ui.environmentSeen();
   }, [firstRun, setView]);
 
+  // antes do primeiro estado a tela mostra a forma do board, não um texto solto
   if (!state)
-    return (
-      <div className="loading">
-        {offline ? t('Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.') : t('Carregando board…')}
-      </div>
+    return offline ? (
+      <div className="loading">{t('Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.')}</div>
+    ) : (
+      <BoardPlaceholder />
     );
   const trashCount = state.cards.filter((c) => c.deletedAt !== null).length;
   const withYou = humanQueue(state, pendingWork(state)).length;
