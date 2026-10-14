@@ -1,4 +1,4 @@
-import type { HostToWebview, WebviewToHost } from '../shared/messages';
+import type { HostToWebview, Tracked } from '../shared/messages';
 
 interface VsCodeApi {
   postMessage(msg: unknown): void;
@@ -19,21 +19,30 @@ const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 // ---- transporte no navegador: SSE (host → página) e POST (página → host) ----
 let connected = false;
 const connectionListeners = new Set<(online: boolean) => void>();
-const queue: WebviewToHost[] = [];
+const queue: Tracked[] = [];
 const clientId = Array.from({ length: 16 }, () => Math.random().toString(36)[2] ?? '0').join('');
 
 function deliver(msg: HostToWebview): void {
   window.dispatchEvent(new MessageEvent('message', { data: msg }));
 }
 
-function sendWeb(msg: WebviewToHost): void {
+/** Falha antes de o host ver a mensagem: quem pediu confirmação não pode ficar esperando o `done` que nunca vem. */
+function failLocally(msg: Tracked, message: string): void {
+  deliver({ type: 'error', message });
+  if (msg.requestId) deliver({ type: 'done', requestId: msg.requestId, ok: false, error: message });
+}
+
+function sendWeb(msg: Tracked): void {
   void fetch(`/message?c=${clientId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msg) })
     .then((res) => {
-      if (res.status === 413) deliver({ type: 'error', message: 'O arquivo é grande demais para enviar (limite de 20 MB).' });
-      else if (res.status === 401)
-        deliver({ type: 'error', message: 'O acesso a este board expirou. Abra o board de novo pelo editor ou pelo terminal.' });
+      if (res.status === 413) failLocally(msg, 'O arquivo é grande demais para enviar (limite de 20 MB).');
+      else if (res.status === 401) failLocally(msg, 'O acesso a este board expirou. Abra o board de novo pelo editor ou pelo terminal.');
+      else if (!res.ok) failLocally(msg, 'A sessão com o Faz AI acabou. Abra o board de novo pelo editor ou pelo terminal.');
     })
-    .catch(() => setConnected(false));
+    .catch(() => {
+      setConnected(false);
+      if (msg.requestId) deliver({ type: 'done', requestId: msg.requestId, ok: false, error: 'Sem ligação com o Faz AI.' });
+    });
 }
 
 function setConnected(online: boolean): void {
@@ -108,9 +117,14 @@ function pickBackupInBrowser(): void {
   input.click();
 }
 
-export function postToHost(msg: WebviewToHost): void {
+export function postToHost(msg: Tracked): void {
   if (api) return api.postMessage(msg);
-  if (!isWeb) return console.log('[dev] postMessage', msg);
+  if (!isWeb) {
+    // fora do editor e do navegador não há host: confirma na hora para a tela não ficar esperando
+    console.log('[dev] postMessage', msg);
+    if (msg.requestId) deliver({ type: 'done', requestId: msg.requestId, ok: true });
+    return;
+  }
   if (msg.type === 'attachment.pick') return pickFilesInBrowser(msg.cardId);
   if (msg.type === 'backup.export') return exportInBrowser();
   if (msg.type === 'backup.import.pick') return pickBackupInBrowser();

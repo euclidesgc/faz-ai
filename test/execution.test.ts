@@ -202,6 +202,8 @@ describe('agentProfiles: o padrão do board', () => {
     skills: [],
     mcp: [],
     seed: false,
+    readonly: false,
+    background: false,
   });
   const marked = (names: string[]) =>
     names.map((n) => ({ kind: 'agent' as const, location: `~/.claude/agents/${n}.md`, usage: 'contextual' as const }));

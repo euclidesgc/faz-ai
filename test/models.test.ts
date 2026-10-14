@@ -131,6 +131,7 @@ describe('suggestModelRule e suggestModel', () => {
     currentUser: 'a',
     harness: EMPTY_HARNESS,
     harnessSelection: [],
+    harnessImports: [],
     boardServer: null,
     pendingUpgrade: [],
     chat: EMPTY_CHAT,
@@ -144,6 +145,7 @@ describe('suggestModelRule e suggestModel', () => {
     environment: null,
     environmentFirstRun: false,
     harnessInstall: null,
+    harnessSuggestions: null,
     authExpired: null,
     mainBranch: null,
   });

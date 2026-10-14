@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import type { AiTool } from '../shared/harness';
 import { NODE_MIN_MAJOR, type EnvCheck, type EnvCheckId, type EnvironmentReport, type InstallStep } from '../shared/environment';
+import { HARNESS_ISSUES, type HarnessIssue } from '../shared/harnessStatus';
 import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement, type RequirementId } from '../shared/requirements';
 
 /** As famílias de distribuição Linux com gerenciador de pacotes conhecido. */
@@ -38,6 +39,8 @@ export interface EnvironmentProbe {
   workspaceDir: string;
   /** a skill do fluxo está pronta para a ferramenta do projeto */
   skillInstalled: boolean;
+  /** o que falta no banco de artefatos do board; null quando não dá para saber (sem o inventário) */
+  harnessIssues: HarnessIssue[] | null;
   /** a outra ferramenta, quando encontrada na máquina */
   other: OtherToolProbe | null;
   /** o MCP do Code Review Graph está registrado na ferramenta do projeto */
@@ -66,6 +69,7 @@ const FROM: Partial<Record<EnvCheckId, RequirementId[]>> = {
   mcp: ['mcp', 'mcp-stale', 'mcp-elsewhere', 'mcp-outdated', 'mcp-reload', 'mcp-enable', 'mcp-path'],
   permission: ['permission'],
   skill: ['skill'],
+  harness: ['harness'],
 };
 
 /** O nome da ferramenta no `code-review-graph install --platform`. */
@@ -81,6 +85,7 @@ const DOCS: Partial<Record<EnvCheckId, string>> = {
   node: 'https://nodejs.org/en/download',
   mcp: BOARD_DOCS,
   skill: BOARD_DOCS,
+  harness: `https://github.com/euclidesgc/faz-ai#harness-de-ia`,
   git: 'https://git-scm.com/downloads',
   gh: 'https://cli.github.com',
   crg: CRG_DOCS,
@@ -180,13 +185,31 @@ async function hasEmbeddings(p: EnvironmentProbe, python: string | null): Promis
 
 const statusOf = (ok: boolean, parentOk = true): EnvCheck['status'] => (!parentOk ? 'skipped' : ok ? 'ok' : 'missing');
 
-/** O bloco de uma ferramenta: pronto só quando tudo dentro dele está pronto. */
+/** O bloco de uma ferramenta: pronto só quando tudo dentro dele está pronto; o harness é recomendação e não pesa. */
 function toolGroup(tool: AiTool, children: EnvCheck[]): EnvCheck {
+  const required = children.filter((c) => c.id !== 'harness');
   return {
     id: 'tool',
     tool,
-    status: children.every((c) => c.status === 'ok' && (c.children ?? []).every((g) => g.status === 'ok')) ? 'ok' : 'missing',
+    status: required.every((c) => c.status === 'ok' && (c.children ?? []).every((g) => g.status === 'ok')) ? 'ok' : 'missing',
     children,
+  };
+}
+
+/**
+ * A definição do harness: o que falta no banco de artefatos do board, um filho por falta. Pulado
+ * enquanto a ferramenta não está instalada (sem ela nada roda) ou sem o inventário. É recomendação:
+ * o requisito do aviso do topo é `optional`.
+ */
+function harnessCheck(tool: AiTool, issues: HarnessIssue[] | null, cliMissing: boolean, requirement?: BoardRequirement): EnvCheck {
+  const known = !cliMissing && issues !== null;
+  return {
+    id: 'harness',
+    tool,
+    status: statusOf(known && issues.length === 0, known),
+    docs: DOCS.harness,
+    requirement,
+    children: HARNESS_ISSUES.map((issue) => ({ id: `harness-${issue}` as const, tool, status: statusOf(!issues?.includes(issue), known) })),
   };
 }
 
@@ -239,6 +262,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     },
     { id: 'mcp', tool, status: statusOf(!req('mcp')), docs: DOCS.mcp, requirement: req('mcp') },
     { id: 'skill', tool, status: statusOf(p.skillInstalled), docs: DOCS.skill, requirement: skill },
+    harnessCheck(tool, p.harnessIssues, cliMissing, req('harness')),
     { id: 'permission', tool, status: statusOf(!req('permission')), docs: TOOL_DOCS[tool].permission, requirement: req('permission') },
   ]);
 

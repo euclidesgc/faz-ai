@@ -1,4 +1,4 @@
-import { lastSent, posted, renderThemed, seedBoard, sentOf, syncStore } from './setup';
+import { lastSent, posted, renderThemed, seedBoard, sentOf, syncStore, confirmLast } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -7,6 +7,7 @@ import { useBoardStore } from '../../src/webview/store/boardStore';
 import { App } from '../../src/webview/App';
 import type { MessageRouter } from '../../src/extension/panel/messageRouter';
 import type { BoardRequirement } from '../../src/shared/requirements';
+import { setLocale } from '../../src/webview/i18n';
 
 let router: MessageRouter;
 
@@ -63,10 +64,10 @@ describe('faixa de requisitos do board', () => {
     // uma região, não um alerta: o leitor de tela não relê tudo a cada vez que a faixa aparece
     expect(screen.queryByRole('alert')).toBeNull();
 
-    // leva à seção Servidores MCP da ferramenta, onde se escolhe entre global e projeto
+    // leva ao assunto MCPs da aba da ferramenta do projeto, onde se escolhe entre global e projeto
     await userEvent.click(screen.getByRole('button', { name: /Instalar o MCP do board/ }));
     expect(sentOf('ui.connectAI')).toHaveLength(0);
-    expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness', harnessTab: 'project' });
+    expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness', harnessTab: 'claude', harnessTopic: 'mcp' });
     useBoardStore.setState({ view: 'board' });
     await userEvent.click(screen.getByRole('button', { name: 'Abrir Harness de IA' }));
     expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness' });
@@ -79,9 +80,21 @@ describe('faixa de requisitos do board', () => {
     expect(lastSent('requirements.check')).toEqual({ type: 'requirements.check' });
     expect(screen.getByText('Conferindo…')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Verificar de novo' })).toBeDisabled();
-    await new Promise((r) => setTimeout(r, 2));
     set([CLI, MCP, PERMISSION]);
+    confirmLast();
+    await act(async () => {});
     expect(screen.getByText('Conferido agora: nada mudou.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Verificar de novo' })).toBeEnabled();
+  });
+
+  it('a conferência que falha destrava "Verificar de novo" sem dizer que nada mudou', async () => {
+    missing();
+    renderThemed(<RequirementsBanner />);
+    await userEvent.click(screen.getByRole('button', { name: 'Verificar de novo' }));
+    confirmLast(false, 'Não foi possível conferir os requisitos do board: CLI não respondeu.');
+    await act(async () => {});
+    expect(screen.queryByText('Conferindo…')).toBeNull();
+    expect(screen.queryByText('Conferido agora: nada mudou.')).toBeNull();
     expect(screen.getByRole('button', { name: 'Verificar de novo' })).toBeEnabled();
   });
 
@@ -217,5 +230,22 @@ describe('aviso compacto do que falta (no lugar da faixa no topo do board)', () 
     expect(document.querySelector('.requirements-alert.error')).not.toBeNull();
     setAuthExpired(null);
     expect(document.querySelector('.requirements-alert')).toBeNull();
+  });
+});
+
+describe('faixa de requisitos: definição do harness', () => {
+  it('é só recomendação: a linha discreta diz o que falta e leva ao Harness de IA', async () => {
+    // o teste anterior monta o App, que deixa a interface no idioma do navegador (inglês no jsdom)
+    setLocale('pt-BR');
+    set([{ id: 'harness', tool: 'cursor', optional: true, harnessIssues: ['artifacts', 'rules'], action: { kind: 'settings' } }]);
+    renderThemed(<RequirementsBanner />);
+    expect(region()).toHaveClass('recommended');
+    expect(screen.getByText('Recomendado: defina o harness para as execuções gastarem menos contexto')).toBeInTheDocument();
+    expect(screen.getByText('O harness do board ainda não está definido')).toBeInTheDocument();
+    expect(
+      screen.getByText(/nenhuma skill, agente ou servidor MCP em modo "Pelo card"; regras no board ainda desligadas/),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir Harness de IA' }));
+    expect(useBoardStore.getState().view).toBe('settings');
   });
 });

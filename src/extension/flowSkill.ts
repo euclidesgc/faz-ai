@@ -27,7 +27,7 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
 1. \`get_card\` traz a descrição, a conversa, os anexos e:
    - \`phase\`: a instrução da fase e, se houver, o documento que ela produz e o modelo dele;
    - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, delegue a um subagente com essa configuração; se não for possível, avise a pessoa na conversa;
-   - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no caminho indicado, mesmo que não apareça na sua lista de skills: as execuções do board partem de contexto vazio e só conhecem o que o Harness marcou.
+   - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no caminho indicado, mesmo que não apareça na sua lista de skills: as execuções do board partem de contexto vazio e só conhecem o que está no board (Configurações → Harness).
 2. Chame \`start_work\` antes de começar.
 3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história),
    quando houver. Uma história pode ser criada ou movida direto para uma fase adiante (o Plan, por
@@ -71,8 +71,13 @@ conversa dizendo o que mudou e chame \`request_review\` de novo.
 ## Sub-tarefas de implementação
 
 No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da
-atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e as Skills
-necessárias. Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como
+atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e os artefatos que a
+execução pede: os campos Skills, Rules e MCPs, e o agente (\`set_card_profile\`). Escolha **só entre o
+que está no board em modo "Pelo card"** (\`get_harness\`; o que está em "Sempre" já entra sozinho):
+nada do catálogo do projeto ou da máquina existe para a execução. Vale o mínimo: no máximo uma skill
+por assunto (a mais próxima do objetivo; pode haver mais de uma se forem de assuntos diferentes, como
+navegação e acesso a dados) e só os servidores MCP de que a tarefa precisa. Excesso de artefatos
+produz o efeito contrário. O mesmo vale para a história. Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como
 verificá-la (teste, typecheck, comando ou tela). Recortar por camada (dados, regras de negócio, tela)
 vale, desde que cada parte seja verificável.
 

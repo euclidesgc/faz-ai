@@ -12,7 +12,7 @@ const PAGE = 120;
 /** Quantas skills marcadas aparecem por nome no resumo; as outras viram "+N". */
 const SUMMARY = 5;
 
-const SCOPE_LABEL: Record<CatalogSkill['scope'], string> = { project: 'projeto', user: 'global', plugin: 'plugin' };
+const SCOPE_LABEL: Record<CatalogSkill['scope'], string> = { project: 'projeto', user: 'global', plugin: 'plugin', imported: 'importada' };
 
 interface Props {
   value: string[];

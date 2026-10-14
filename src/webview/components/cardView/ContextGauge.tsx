@@ -129,7 +129,7 @@ export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
   const [opened] = useState(harnessPart);
   // um arquivo editado fora do board (uma skill global, no modo navegador) só entra quando o board relê
   // o disco: o detalhe relê ao abrir, e o resultado chega como um estado novo do board
-  useEffect(() => harness.refresh(), []);
+  useEffect(() => void harness.refresh(), []);
   const changed = harnessPart !== opened;
   return (
     <div className="context-detail">

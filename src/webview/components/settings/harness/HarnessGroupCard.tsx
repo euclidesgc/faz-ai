@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Badge, Button, Callout, Checkbox } from '@radix-ui/themes';
-import { REFERENCE_SKILL, aiToolInfo, type AiTool, type HarnessItem, type InstallScope } from '../../../../shared/harness';
+import { useEffect, useState } from 'react';
+import { Badge, Callout, Checkbox } from '@radix-ui/themes';
+import { REFERENCE_SKILL, aiToolInfo, type AiTool, type HarnessItem, type HarnessScope } from '../../../../shared/harness';
 import {
   HARNESS_CATALOG,
   HARNESS_NOTES,
@@ -13,10 +13,11 @@ import {
   permissionTargets,
   type HARNESS_GROUPS,
 } from '../../../../shared/harnessCatalog';
-import { HARNESS_USAGES, isSelectableKind, usageOf, type HarnessUsage } from '../../../../shared/harnessSelection';
+import { selectionKey } from '../../../../shared/harnessSelection';
+import { matchesQuery } from '../../../../shared/harnessTopics';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { IconWarning, SelectField } from '../../ui';
+import { ActionButton, IconWarning } from '../../ui';
 import { SettingsCard } from '../SettingsCard';
 import { AgentsTable } from './AgentsTable';
 import { BoardInstall } from './BoardInstall';
@@ -28,6 +29,7 @@ import { NewItem } from './NewItem';
 import { NewMcpServer } from './NewMcpServer';
 import { NewPermission } from './NewPermission';
 import { PluginGroup } from './PluginGroup';
+import { UsageSelect } from './UsageSelect';
 import type { ItemActions } from './useItemActions';
 import { t } from '../../../i18n';
 import { rich } from '../../../i18n/rich';
@@ -35,30 +37,16 @@ import { rich } from '../../../i18n/rich';
 /** Chave estável de uma linha: o mesmo arquivo pode trazer várias entradas (hooks, regras de permissão). */
 const keyOf = (i: HarnessItem) => `${i.path}|${i.name}|${i.detail ?? ''}`;
 
-/** Como as execuções do board usam uma rule ou skill: fora, em todo contexto ou quando fizer sentido. */
-function UsageSelect({ item }: { item: HarnessItem }) {
-  const selection = useBoardStore((s) => s.state!.harnessSelection);
-  if (!isSelectableKind(item.kind) || item.kind === 'agent') return null;
-  const kind = item.kind;
-  const usage = usageOf(selection, item);
-  return (
-    <SelectField<HarnessUsage | 'none'>
-      size="1"
-      steady
-      aria-label={t('Uso nas execuções do board: {name}', { name: item.name })}
-      title={t('Só o que está marcado entra nas execuções do board; o resto fica invisível para elas.')}
-      options={[{ value: 'none', label: t('Fora das execuções') }, ...HARNESS_USAGES.map((u) => ({ value: u.id, label: t(u.label) }))]}
-      value={usage ?? 'none'}
-      onChange={(v) => harness.setSelection([{ kind, location: item.location }], v === 'none' ? null : v)}
-    />
-  );
-}
-
 interface Props {
   group: (typeof HARNESS_GROUPS)[number];
   tool: AiTool;
-  scope: InstallScope;
-  /** os itens deste grupo nesta aba */
+  /** a fonte que a aba mostra; em Importados não há fonte fixa do catálogo, só os itens achados na pasta */
+  scope: HarnessScope;
+  /** a busca da tela: com texto, só aparece o que casa e as sugestões de criar ficam de fora */
+  query: string;
+  /** o resultado de "Indicar artefatos" (`selectionKey` → motivo): pré-seleciona as linhas e mostra o motivo */
+  suggested?: Record<string, string>;
+  /** os itens deste grupo nesta aba, já filtrados pela busca */
   items: HarnessItem[];
   /** todos os itens da ferramenta, para saber o que já foi copiado ou instalado */
   all: HarnessItem[];
@@ -69,11 +57,11 @@ interface Props {
 }
 
 /**
- * Um grupo das abas Projeto e Global (Regras principais, Skills, Hooks…): o que é, os itens com a frase
+ * Um grupo de um assunto, na origem Projeto, Global ou Importados (Regras principais, Skills, Hooks…): o que é, os itens com a frase
  * de cada um e o caminho que abre no editor do board, os arquivos que a ferramenta leria mas ainda não
  * existem, os avisos do que não fica em arquivo e as ações de criar do grupo.
  */
-export function HarnessGroupCard({ group, tool, scope, items, all, actions, open, onOpen }: Props) {
+export function HarnessGroupCard({ group, tool, scope, query, suggested, items, all, actions, open, onOpen }: Props) {
   const state = useBoardStore((s) => s.state)!;
   const [filesOpen, setFilesOpen] = useState<string | null>(null);
   // linhas marcadas para as ações em massa, pela chave da linha
@@ -82,17 +70,20 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
   const projectTool = tool === state.board.aiTool;
   const catalog = HARNESS_CATALOG[tool];
   const sources = catalog.flatMap((src, source) => (src.group === g && src.scope === scope ? [{ src, source }] : []));
-  const notes = HARNESS_NOTES[tool].filter((n) => n.group === g && n.scope === scope);
+  const searching = query.trim() !== '';
+  const notes = HARNESS_NOTES[tool].filter((n) => n.group === g && n.scope === scope && matchesQuery(query, n.name, n.hint));
   // por padrão o Claude Code lê o AGENTS.md do projeto só quando não há CLAUDE.md, .claude/CLAUDE.md nem CLAUDE.local.md
   const { claudeMd, agentsMd } = g === 'main' && scope === 'project' ? instructionRoles(tool, all) : { claudeMd: [], agentsMd: [] };
   // arquivo fixo que a ferramenta leria, mas que ainda não existe: dá para criar daqui
-  const absent = sources.filter(
-    ({ src, source }) =>
-      src.layout === 'file' &&
-      !src.noCreate &&
-      !items.some((i) => i.source === source) &&
-      !(src.role === 'agents-md' && claudeMd.length > 0),
-  );
+  const absent = searching
+    ? []
+    : sources.filter(
+        ({ src, source }) =>
+          src.layout === 'file' &&
+          !src.noCreate &&
+          !items.some((i) => i.source === source) &&
+          !(src.role === 'agents-md' && claudeMd.length > 0),
+      );
   // um CLAUDE.md que importa o AGENTS.md com @ faz ele entrar junto
   const unread = (i: HarnessItem) =>
     claudeMd[0] && agentsMd.includes(i) && !claudeMd.some((c) => c.imports?.some((x) => x.path === i.path))
@@ -106,7 +97,8 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
   const mcps = g === 'mcp' ? mcpTargets(tool).filter((x) => x.scope === scope) : [];
   const permissions = g === 'settings' ? permissionTargets(tool).filter((x) => x.scope === scope) : [];
   // os agentes da ferramenta do projeto têm a tabela própria, com a marcação, o padrão e o editor do board
-  const agentsTable = g === 'agent' && projectTool && !!aiToolInfo(tool).agents;
+  const agentsScope = scope === 'project' || scope === 'user' ? scope : null;
+  const agentsTable = g === 'agent' && projectTool && !!aiToolInfo(tool).agents && agentsScope !== null;
 
   // plugins e a política da organização são só leitura; os agentes da ferramenta do projeto têm a tabela própria
   const pickable = g === 'plugin' || g === 'managed' || agentsTable ? [] : items.filter((i) => bulkSelectable(i, actions, projectTool));
@@ -121,7 +113,14 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
       return next;
     });
 
+  // uma indicação nova pré-seleciona o que a IA apontou (e só isso); descartar limpa
+  useEffect(() => {
+    setPicked(new Set(suggested ? pickable.filter((i) => selectionKey(i) in suggested).map(keyOf) : []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggested]);
+
   if (g === 'managed' && items.length === 0 && notes.length === 0) return null;
+  if (searching && !agentsTable && items.length === 0 && notes.length === 0) return null;
   if (g !== 'plugin' && items.length === 0 && sources.length === 0 && notes.length === 0) return null;
 
   const key = (what: string) => `${g}:${what}`;
@@ -137,29 +136,54 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
       actions={
         <>
           {g === 'skill' && (
-            <Button variant="soft" color="gray" onClick={() => toggle('install')}>
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('Procura skills numa pasta ou num repositório git e mostra a lista antes de copiar qualquer coisa.')}
+              onClick={() => toggle('install')}
+            >
               {t('Buscar skills para instalar')}
-            </Button>
+            </ActionButton>
           )}
           {permissions.length > 0 && (
-            <Button variant="soft" color="gray" onClick={() => toggle('permission')}>
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('Acrescenta uma regra de permissão ao arquivo de configurações da ferramenta.')}
+              onClick={() => toggle('permission')}
+            >
               {t('Nova regra de permissão')}
-            </Button>
+            </ActionButton>
           )}
           {hooks.length > 0 && (
-            <Button variant="soft" color="gray" onClick={() => toggle('hook')}>
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('Acrescenta um hook ao arquivo de configurações da ferramenta.')}
+              onClick={() => toggle('hook')}
+            >
               {t('Novo hook')}
-            </Button>
+            </ActionButton>
           )}
           {mcps.length > 0 && (
-            <Button variant="soft" color="gray" onClick={() => toggle('mcp')}>
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('Registra um servidor MCP no arquivo da ferramenta.')}
+              onClick={() => toggle('mcp')}
+            >
               {t('Novo servidor')}
-            </Button>
+            </ActionButton>
           )}
           {creatable.length > 0 && !agentsTable && (
-            <Button variant="soft" color="gray" onClick={() => toggle('new')}>
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('Cria um arquivo novo deste assunto na pasta da ferramenta e o abre para editar.')}
+              onClick={() => toggle('new')}
+            >
               {t('Novo')}
-            </Button>
+            </ActionButton>
           )}
         </>
       }
@@ -193,11 +217,12 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
           )}
         </p>
       )}
-      {scope === 'project' && (g === 'mcp' || g === 'skill') && (
+      {scope === 'project' && !searching && (g === 'mcp' || g === 'skill') && (
         <BoardInstall key={`board-install:${tool}`} artifact={g} tool={tool} items={all} />
       )}
       {g === 'skill' &&
         scope === 'project' &&
+        !searching &&
         projectTool &&
         !all.some((i) => i.kind === 'skill' && i.scope === 'project' && i.name === REFERENCE_SKILL.name) && (
           <div className="row">
@@ -206,9 +231,14 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
                 'Modelos de classe e exemplos de código ficam bem numa skill própria, só quando indicada: os arquivos vão em <code>references/</code> e os cards que a indicam recebem os caminhos.',
               )}
             </span>
-            <Button variant="ghost" size="1" onClick={() => harness.createReferenceSkill()}>
+            <ActionButton
+              variant="ghost"
+              size="1"
+              hint={t('Cria a skill de referências do projeto, com a pasta references/ para modelos e exemplos.')}
+              onClick={() => harness.createReferenceSkill()}
+            >
               {t('Criar skill de modelos')}
-            </Button>
+            </ActionButton>
           </div>
         )}
       {g === 'skill' && (open === key('install') || state.harnessInstall) && <InstallSkills key={`install-skills:${tool}`} tool={tool} />}
@@ -231,7 +261,7 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
         <NewPermission key={`new-permission:${tool}`} tool={tool} targets={permissions} onClose={() => onOpen(null)} />
       )}
       {agentsTable ? (
-        <AgentsTable tool={aiToolInfo(tool)} scope={scope} />
+        <AgentsTable tool={aiToolInfo(tool)} scope={agentsScope!} query={query} />
       ) : g === 'plugin' ? (
         <PluginGroup tool={tool} items={items} actions={actions} />
       ) : (
@@ -263,6 +293,7 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
                 explain
                 unread={unread(i)}
                 usage={projectTool ? <UsageSelect item={i} /> : undefined}
+                suggestion={suggested?.[selectionKey(i)]}
                 filesOpen={filesOpen === i.path}
                 onToggleFiles={() => setFilesOpen(filesOpen === i.path ? null : i.path)}
               />
@@ -291,9 +322,14 @@ export function HarnessGroupCard({ group, tool, scope, items, all, actions, open
           <ul>
             {absent.map(({ src, source }) => (
               <li key={source}>
-                <Button variant="ghost" size="1" onClick={() => createFile(source)}>
+                <ActionButton
+                  variant="ghost"
+                  size="1"
+                  hint={t('Cria este arquivo na pasta indicada e o abre para editar.')}
+                  onClick={() => createFile(source)}
+                >
                   {t('Criar {path}', { path: location(source) })}
-                </Button>
+                </ActionButton>
                 {src.hint && <span className="muted small">{t(src.hint)}</span>}
               </li>
             ))}

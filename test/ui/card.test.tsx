@@ -519,6 +519,63 @@ describe('CardDrawer', () => {
     expect(lastSent('card.execProfile.set').profileId).toBeNull();
   });
 
+  it('agente de execução: mostra também o que está em modo Sempre no board, marcado "(sempre)"', () => {
+    const profile = {
+      id: 'p1',
+      name: 'Revisor',
+      purpose: 'Revisa',
+      instructions: 'Revise.',
+      skills: ['tdd', 'lint'],
+      mcpServers: [],
+      tools: [],
+      deniedTools: [],
+      model: '',
+      isDefault: false,
+      scope: 'user' as const,
+      path: '/home/u/.claude/agents/p1.md',
+    };
+    const entry = (kind: 'skill' | 'instructions' | 'mcp', name: string, location: string) => ({
+      kind,
+      scope: 'project' as const,
+      name,
+      description: '',
+      path: `/abs/${location}`,
+      location,
+      layout: kind === 'mcp' ? ('entry' as const) : ('file' as const),
+    });
+    patchState((s) => ({
+      board: { ...s.board, execProfiles: [profile] },
+      harness: {
+        ...s.harness,
+        inventory: [
+          {
+            tool: s.board.aiTool,
+            installed: true,
+            items: [
+              entry('skill', 'tdd', '.claude/skills/tdd/SKILL.md'),
+              entry('skill', 'lint', '.claude/skills/lint/SKILL.md'),
+              entry('skill', 'doc', '.claude/skills/doc/SKILL.md'),
+              entry('instructions', 'CLAUDE.md', 'CLAUDE.md'),
+              entry('instructions', 'estilo', '.claude/rules/estilo.md'),
+              entry('mcp', 'github', '.mcp.json'),
+            ],
+          },
+        ],
+      },
+      harnessSelection: [
+        // tdd já é do agente: ganha a marca; doc está desligada em "Pelo card" e não aparece; a regra desligada também não
+        { kind: 'skill', location: '.claude/skills/tdd/SKILL.md', usage: 'always' },
+        { kind: 'skill', location: '.claude/skills/doc/SKILL.md', usage: 'contextual' },
+        { kind: 'instructions', location: 'CLAUDE.md', usage: 'always' },
+        { kind: 'instructions', location: '.claude/rules/estilo.md', usage: 'off' },
+        { kind: 'mcp', location: '.mcp.json#github', usage: 'always' },
+      ],
+    }));
+    act(() => patchCard(board.storyId, { execProfile: 'p1' }));
+    openStory();
+    expect(screen.getByText('skills: tdd (sempre), lint · rules: CLAUDE.md (sempre) · MCP: board + github (sempre)')).toBeInTheDocument();
+  });
+
   it('Ações: arquivar uma sub-tarefa sem dependentes envia card.archive e fecha', async () => {
     openCardDrawer(board.subId);
     await userEvent.click(screen.getByRole('button', { name: 'Ações' }));

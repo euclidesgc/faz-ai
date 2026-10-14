@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowUp,
   Bold,
+  BookOpen,
   Bot,
   BrainCircuit,
   Check,
@@ -149,6 +150,7 @@ export const IconFields = icon(TextCursorInput, 'IconFields');
 export const IconRules = icon(Scale, 'IconRules');
 export const IconHarness = icon(BrainCircuit, 'IconHarness');
 export const IconAgents = icon(UserCog, 'IconAgents');
+export const IconSkills = icon(BookOpen, 'IconSkills');
 export const IconModels = icon(Cpu, 'IconModels');
 export const IconAppearance = icon(Palette, 'IconAppearance');
 export const IconConnect = icon(Plug, 'IconConnect');

@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Badge, Button, Checkbox } from '@radix-ui/themes';
+import { useState } from 'react';
+import { Badge, Checkbox } from '@radix-ui/themes';
 import { pluginActions, type AiTool, type HarnessItem, type PluginAction } from '../../../../shared/harness';
 import { harness } from '../../../commands';
+import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
-import { onHostMessage } from '../../../vscode';
 import { ItemRow } from './ItemRow';
 import type { ItemActions } from './useItemActions';
+import { ActionButton } from '../../ui';
 import { t } from '../../../i18n';
 
 /** Chave estável de uma linha: o mesmo arquivo pode trazer várias entradas (hooks, regras de permissão). */
@@ -27,14 +28,9 @@ export function PluginGroup({ tool, items, actions }: Props) {
   const ask = useBoardStore((s) => s.ask);
   const [filesOpen, setFilesOpen] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  // a ferramenta leva alguns segundos por plugin: a barra diz que está trabalhando até o host responder
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (!busy) return;
-    return onHostMessage((msg) => {
-      if (msg.type === 'harness.plugin.done') setBusy(false);
-    });
-  }, [busy]);
+  // a ferramenta leva alguns segundos por plugin: a barra diz que está trabalhando até o host confirmar
+  const apply = useAction((action: PluginAction, ids: string[]) => harness.applyPlugins(tool, action, ids));
+  const busy = apply.busy;
 
   // um bloco por plugin, pelo nome; o item do próprio plugin (o manifesto) diz como ele está instalado
   const plugins = [...new Set(items.map((i) => i.plugin ?? ''))].map((name) => ({
@@ -56,13 +52,11 @@ export function PluginGroup({ tool, items, actions }: Props) {
   const those = (action: PluginAction) => chosen.filter((p) => pluginActions(tool, p.install).includes(action));
   const count = (list: HarnessItem[]) => (list.length < chosen.length ? ` (${list.length})` : '');
   const run = (action: PluginAction, list: HarnessItem[]) => {
-    harness.applyPlugins(
-      tool,
+    void apply.run(
       action,
       list.map((p) => p.install!.id),
     );
     setPicked(new Set());
-    setBusy(true);
   };
   const uninstall = (list: HarnessItem[]) =>
     ask({
@@ -94,26 +88,50 @@ export function PluginGroup({ tool, items, actions }: Props) {
           {chosen.length > 0 && (
             <>
               {those('disable').length > 0 && (
-                <Button variant="soft" color="gray" size="1" disabled={busy} onClick={() => run('disable', those('disable'))}>
+                <ActionButton
+                  variant="soft"
+                  color="gray"
+                  size="1"
+                  disabled={busy}
+                  disabledReason={t('A ferramenta ainda está aplicando a ação anterior.')}
+                  hint={t('Pede à ferramenta para desativar os plugins marcados; vale na próxima sessão dela.')}
+                  onClick={() => run('disable', those('disable'))}
+                >
                   {t('Desativar')}
                   {count(those('disable'))}
-                </Button>
+                </ActionButton>
               )}
               {those('enable').length > 0 && (
-                <Button variant="soft" color="gray" size="1" disabled={busy} onClick={() => run('enable', those('enable'))}>
+                <ActionButton
+                  variant="soft"
+                  color="gray"
+                  size="1"
+                  disabled={busy}
+                  disabledReason={t('A ferramenta ainda está aplicando a ação anterior.')}
+                  hint={t('Pede à ferramenta para ativar os plugins marcados; vale na próxima sessão dela.')}
+                  onClick={() => run('enable', those('enable'))}
+                >
                   {t('Ativar')}
                   {count(those('enable'))}
-                </Button>
+                </ActionButton>
               )}
               {those('uninstall').length > 0 && (
-                <Button variant="soft" color="red" size="1" disabled={busy} onClick={() => uninstall(those('uninstall'))}>
+                <ActionButton
+                  variant="soft"
+                  color="red"
+                  size="1"
+                  disabled={busy}
+                  disabledReason={t('A ferramenta ainda está aplicando a ação anterior.')}
+                  hint={t('Pede confirmação e desinstala os plugins marcados pela ferramenta.')}
+                  onClick={() => uninstall(those('uninstall'))}
+                >
                   {t('Desinstalar')}
                   {count(those('uninstall'))}
-                </Button>
+                </ActionButton>
               )}
-              <Button variant="ghost" size="1" onClick={() => setPicked(new Set())}>
+              <ActionButton variant="ghost" size="1" hint={t('Desmarca tudo; nada muda.')} onClick={() => setPicked(new Set())}>
                 {t('Limpar seleção')}
-              </Button>
+              </ActionButton>
             </>
           )}
         </div>

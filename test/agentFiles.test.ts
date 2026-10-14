@@ -102,6 +102,29 @@ describe('arquivos de agente', () => {
     expect(lacksBoardTools(cursor, parseAgentFile(cursor, found, renderAgentFile(cursor, input)))).toBe(false);
   });
 
+  it('no Cursor, readonly e is_background são gravados e lidos; no Claude Code não existem', () => {
+    const cursor = aiToolInfo('cursor').agents;
+    const found = { name: 'x', scope: 'user' as const, path: '/h/x.md', location: '~/x.md' };
+    const text = renderAgentFile(cursor, { ...input, tools: [], deniedTools: [], skills: [], mcp: [], readonly: true, background: true });
+    expect(text).toContain('model: sonnet\nreadonly: true\nis_background: true\n');
+    const agent = parseAgentFile(cursor, found, text);
+    expect(agent).toMatchObject({ readonly: true, background: true });
+    expect(agentInputOf(agent)).toMatchObject({ readonly: true, background: true });
+    // desmarcar tira as chaves do arquivo
+    expect(renderAgentFile(cursor, { ...input, readonly: false, background: false })).not.toMatch(/readonly|is_background/);
+    // o arquivo sem as chaves volta falso, e o board não as acrescenta ao agente que não as tem
+    const plain = parseAgentFile(cursor, found, renderAgentFile(cursor, input));
+    expect(plain).toMatchObject({ readonly: false, background: false });
+    expect(agentInputOf(plain)).toEqual({ ...input, name: 'x' });
+    // a pasta do Claude Code não grava nem lê as chaves do Cursor
+    const claude = aiToolInfo('claude').agents;
+    expect(renderAgentFile(claude, { ...input, readonly: true, background: true })).not.toMatch(/readonly|is_background/);
+    expect(parseAgentFile(claude, found, '---\nname: x\ndescription: "d"\nreadonly: true\nis_background: true\n---\nC\n')).toMatchObject({
+      readonly: false,
+      background: false,
+    });
+  });
+
   it('o modelo nativo é o id sem a ferramenta nem o esforço', () => {
     expect(nativeModelOf('claude:sonnet@medium')).toBe('sonnet');
     expect(nativeModelOf('cursor:gpt-6-luna@high')).toBe('gpt-6-luna');

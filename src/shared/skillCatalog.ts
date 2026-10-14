@@ -5,8 +5,8 @@ import { selectedSkillNames, type HarnessUsage } from './harnessSelection';
 export interface CatalogSkill {
   name: string;
   description: string;
-  /** de onde vem: do projeto, da pasta do usuário ou de um plugin */
-  scope: 'project' | 'user' | 'plugin';
+  /** de onde vem: do projeto, da pasta do usuário, de um plugin ou de uma pasta importada */
+  scope: 'project' | 'user' | 'plugin' | 'imported';
   plugin?: string;
 }
 
@@ -72,10 +72,10 @@ export function skillCatalog(s: BoardState, usage?: HarnessUsage): CatalogSkill[
   for (const i of items) {
     const current = byName.get(i.name);
     const scope = i.scope;
-    // a cópia do projeto vale sobre a global; entre global e plugin, a global
-    if (current && (current.scope === 'project' || scope === 'plugin')) continue;
+    // a cópia do projeto vale sobre a global; entre global e plugin ou importada, a global
+    if (current && (current.scope === 'project' || scope === 'plugin' || scope === 'imported')) continue;
     byName.set(i.name, { name: i.name, description: i.description, scope, plugin: i.plugin });
   }
-  const order = { project: 0, user: 1, plugin: 2 };
+  const order = { project: 0, user: 1, imported: 2, plugin: 3 };
   return [...byName.values()].sort((a, b) => order[a.scope] - order[b.scope] || a.name.localeCompare(b.name));
 }

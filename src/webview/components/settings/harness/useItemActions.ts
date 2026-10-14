@@ -60,9 +60,12 @@ export function useItemActions(tool: AiTool, items: HarnessItem[]) {
       });
     else run();
   };
-  /** só o que é um arquivo ou pasta própria, fora de plugin e da política da organização, pode ser apagado daqui */
+  /**
+   * só o que é um arquivo ou pasta própria, fora de plugin e da política da organização, pode ser apagado daqui; uma
+   * pasta importada é de outro lugar (outro repositório, a coleção do time): o board a lê, não a apaga
+   */
   const deletable = (i: HarnessItem) =>
-    i.scope !== 'plugin' && i.layout !== 'entry' && i.kind !== 'settings' && groupOf(tool, i) !== 'managed';
+    i.scope !== 'plugin' && i.scope !== 'imported' && i.layout !== 'entry' && i.kind !== 'settings' && groupOf(tool, i) !== 'managed';
   const remove = (list: HarnessItem[], after?: () => void) => {
     const global = list.some((i) => i.scope === 'user') ? 'user' : 'project';
     ask({
@@ -86,6 +89,7 @@ export function useItemActions(tool: AiTool, items: HarnessItem[]) {
   /** entrada de um arquivo de configuração (hook, regra de permissão, servidor MCP) que o board sabe tirar de lá */
   const entryRemovable = (i: HarnessItem) =>
     i.scope !== 'plugin' &&
+    i.scope !== 'imported' &&
     ((i.kind === 'hook' && hookTargets(tool).length > 0 && i.path.endsWith('.json')) ||
       (i.kind === 'settings' && i.layout === 'entry') ||
       (i.kind === 'mcp' && mcpTargets(tool).some((x) => x.label === i.location)));

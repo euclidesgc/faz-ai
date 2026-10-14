@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ChatSession, chatPrompt } from '../src/extension/chat';
+import { ChatSession, chatPrompt, parseSuggestions, suggestRulesPrompt, suggestSkillsPrompt } from '../src/extension/chat';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import type { HeadlessCommand } from '../src/extension/headless';
 import { openInMemory } from '../src/extension/db/database';
@@ -326,5 +326,137 @@ describe('ChatSession no log das execuções', () => {
       turns: 5,
     });
     expect(runs.usage(only().id)).toContainEqual({ kind: 'agent', name: 'Explore', calls: 1 });
+  });
+});
+
+describe('Indicar artefatos', () => {
+  const skill = (name: string, description: string) => ({
+    kind: 'skill' as const,
+    scope: 'project' as const,
+    name,
+    description,
+    path: `${dir}/.claude/skills/${name}/SKILL.md`,
+    location: `.claude/skills/${name}/SKILL.md`,
+    layout: 'skills' as const,
+  });
+
+  it('o pedido lista só os candidatos fora do board, e a resposta em JSON vira a pré-seleção', () => {
+    // dois no catálogo, um já no board: só o de fora é candidato
+    fs.mkdirSync(path.join(dir, '.claude/skills/sql'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.claude/skills/sql/SKILL.md'), '---\nname: sql\ndescription: Consultas SQL\n---\n');
+    fs.mkdirSync(path.join(dir, '.claude/skills/web'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.claude/skills/web/SKILL.md'), '---\nname: web\ndescription: Navega na web\n---\n');
+    router.refreshHarness();
+    router.handle({
+      type: 'harness.selection.set',
+      items: [{ kind: 'skill', location: '.claude/skills/web/SKILL.md' }],
+      usage: 'contextual',
+    });
+    router.chatCommand({ type: 'harness.suggest.run', tool: 'claude', kind: 'skill' });
+    expect(router.snapshot().chat.busy).toBe(true);
+    // nada entra na conversa: o resultado vai para a tela
+    expect(messages()).toEqual([]);
+    const stdin = spawned[0]!.command.stdin!;
+    expect(stdin).toContain('key: .claude/skills/sql/SKILL.md | nome: sql');
+    expect(stdin).not.toContain('nome: web');
+    expect(stdin).toContain('uma skill por assunto');
+    // só leitura: a permissão "board"
+    expect(spawned[0]!.command.args).toContain('dontAsk');
+    spawned[0]!.emit(
+      'Analisei o projeto.\n{"items":[{"key":".claude/skills/sql/SKILL.md","reason":"O projeto usa Postgres"},{"key":"inventado","reason":"x"}]}',
+    );
+    spawned[0]!.exit(0);
+    expect(router.snapshot().chat.busy).toBe(false);
+    expect(router.snapshot().harnessSuggestions).toEqual({
+      tool: 'claude',
+      kind: 'skill',
+      items: [{ location: '.claude/skills/sql/SKILL.md', reason: 'O projeto usa Postgres' }],
+    });
+    expect(messages()).toEqual([]);
+    router.setSuggestions(null);
+    expect(router.snapshot().harnessSuggestions).toBeNull();
+  });
+
+  it('resposta fora do formato, erro da ferramenta e assunto sem candidatos viram avisos na tela', () => {
+    router.chatCommand({ type: 'harness.suggest.run', tool: 'claude', kind: 'mcp' });
+    expect(spawned).toHaveLength(0);
+    expect(router.snapshot().harnessSuggestions).toMatchObject({
+      kind: 'mcp',
+      items: [],
+      error: 'Não há artefatos fora do board neste assunto.',
+    });
+
+    fs.mkdirSync(path.join(dir, '.claude/skills/sql'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.claude/skills/sql/SKILL.md'), '---\nname: sql\ndescription: SQL\n---\n');
+    router.refreshHarness();
+    router.chatCommand({ type: 'harness.suggest.run', tool: 'claude', kind: 'skill' });
+    spawned[0]!.emit('não sei');
+    spawned[0]!.exit(0);
+    expect(router.snapshot().harnessSuggestions).toMatchObject({
+      kind: 'skill',
+      items: [],
+      error: 'A IA não respondeu no formato esperado.',
+    });
+
+    router.chatCommand({ type: 'harness.suggest.run', tool: 'claude', kind: 'skill' });
+    spawned[1]!.exit(2);
+    expect(router.snapshot().harnessSuggestions?.error).toContain('terminou com erro (código 2)');
+    expect(() => router.chatCommand({ type: 'harness.suggest.run', tool: 'cursor', kind: 'skill' })).toThrow('ferramenta do projeto');
+  });
+
+  it('parseSuggestions acha o JSON no meio do texto e ignora chaves fora dos candidatos e repetidas', () => {
+    const keys = ['a', 'b'];
+    expect(parseSuggestions('Veja: {"items":[{"key":"b","reason":"r"},{"key":"b"},{"key":"z"}]} fim', keys)).toEqual([
+      { location: 'b', reason: 'r' },
+    ]);
+    expect(parseSuggestions('{"items":[]}', keys)).toEqual([]);
+    expect(parseSuggestions('{"nada":1}', keys)).toBeNull();
+    expect(parseSuggestions('sem json', keys)).toBeNull();
+    expect(skill('x', 'y').kind).toBe('skill');
+  });
+});
+
+describe('Sugerir regras e skills com IA', () => {
+  it('o pedido de regras manda ler o projeto, preservar o arquivo, deixar desligado e respeitar o fluxo do board', () => {
+    const prompt = suggestRulesPrompt('AGENTS.md');
+    expect(prompt).toContain('de 3 a 5 regras');
+    expect(prompt).toContain('write_rule_file em AGENTS.md');
+    expect(prompt).toContain('read_rule_file');
+    expect(prompt).toContain('usage "off"');
+    expect(prompt).toContain('o fluxo do board vale acima das regras');
+    expect(prompt).toContain('Termine com um resumo');
+  });
+
+  it('o pedido de skills manda criar de 3 a 5 estreitas, em "Pelo card", e nunca "always"', () => {
+    const prompt = suggestSkillsPrompt();
+    expect(prompt).toContain('de 3 a 5 skills');
+    expect(prompt).toContain('create_skill');
+    expect(prompt).toContain('usage "contextual"');
+    expect(prompt).toContain('não use "always"');
+    expect(prompt).toContain('Termine com um resumo');
+  });
+
+  it('ai.suggestRules e ai.suggestSkills rodam o chat com o board como única ferramenta e registram o pedido na conversa', () => {
+    router.chatCommand({ type: 'ai.suggestRules' });
+    expect(router.snapshot().chat.busy).toBe(true);
+    // a ferramenta do projeto é o Claude Code: o arquivo de regras é o CLAUDE.md
+    expect(spawned[0]!.command.stdin).toContain('write_rule_file em CLAUDE.md');
+    expect(spawned[0]!.command.args).toContain('dontAsk');
+    spawned[0]!.emit('Regras escritas.');
+    spawned[0]!.exit(0);
+    expect(messages().map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect(messages()[0]!.text).toContain('Sugerir regras com IA');
+
+    router.chatCommand({ type: 'ai.suggestSkills' });
+    expect(spawned[1]!.command.stdin).toContain('create_skill');
+    spawned[1]!.emit('Skills criadas.');
+    spawned[1]!.exit(0);
+    expect(messages().at(-2)!.text).toContain('Sugerir skills com IA');
+    expect(messages().at(-1)).toMatchObject({ role: 'assistant', text: 'Skills criadas.' });
+  });
+
+  it('com a IA ocupada, o segundo pedido é recusado', () => {
+    router.chatCommand({ type: 'ai.suggestRules' });
+    expect(() => router.chatCommand({ type: 'ai.suggestSkills' })).toThrow('A IA ainda está respondendo');
   });
 });
