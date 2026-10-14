@@ -16,6 +16,7 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 - **Tela Configurações → Git.** Nova seção do gitflow: liga e desliga, mostra a principal detectada, a tabela das branches com os nomes configurados, o tipo de branch de cada tipo de card e o botão para abrir as opções no Settings do editor.
 - **Seis opções novas no Settings do editor**, em **Faz AI › Git**: `fazai.git.gitflow`, `fazai.git.developBranch`, `fazai.git.featurePrefix`, `fazai.git.bugfixPrefix`, `fazai.git.hotfixPrefix` e `fazai.git.releasePrefix` (esta só informativa: nenhum tipo de card gera `release/`). Um prefixo ou nome vazio ou que o git não aceita volta ao padrão.
 - A limpeza das branches e worktrees ao concluir a história, a das órfãs e o renomear da principal no `origin` vêm nas próximas entregas.
+- **Aprovar chama a IA na hora (#475).** Aprovar uma história agora inicia a IA imediatamente, respeitando os tetos de execuções em paralelo, sem esperar a próxima rodada do heartbeat e mesmo com ele desligado.
 
 ## 0.39.0
 
