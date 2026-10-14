@@ -131,6 +131,21 @@ export function CommentsTab({
   );
 }
 
+/**
+ * Traduz um comentário do board linha a linha, só pelas chaves dos avisos do gitflow (translateGitNotice): o relatório
+ * da limpeza da história junta o título e uma linha "- " por item, e cada uma tem a própria chave. Linha sem tradução
+ * fica como está, e os outros comentários do board (autopiloto, runner) não são tocados.
+ */
+function boardNotice(body: string): string {
+  return body
+    .split('\n')
+    .map((line) => {
+      const m = /^(\s*(?:[-*]\s+)?)(.*)$/.exec(line)!;
+      return m[1]! + translateGitNotice(m[2]!);
+    })
+    .join('\n');
+}
+
 function CommentItem({
   comment,
   mine,
@@ -146,7 +161,7 @@ function CommentItem({
   const [editing, setEditing] = useState<string | null>(null);
   // o board grava os avisos do gitflow em português (o idioma só se resolve na tela); os outros comentários dele e os das
   // pessoas aparecem como foram escritos
-  const shown = comment.author === BOARD_AUTHOR ? translateGitNotice(comment.body) : comment.body;
+  const shown = comment.author === BOARD_AUTHOR ? boardNotice(comment.body) : comment.body;
 
   const save = () => {
     if (editing?.trim() && editing !== comment.body) comments.update(comment.id, editing.trim());

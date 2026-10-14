@@ -7,6 +7,7 @@ import { setLocale, t, tn } from '../../src/webview/i18n';
 import { rich } from '../../src/webview/i18n/rich';
 import { resolveLocale } from '../../src/shared/language';
 import { BOARD_AUTHOR, gitNoticeText } from '../../src/shared/gitflow';
+import { gitNotice } from '../../src/shared/gitNotices';
 import { CommentsTab } from '../../src/webview/components/card/CommentsTab';
 import { GitSettings } from '../../src/webview/components/settings/GitSettings';
 import { useBoardStore } from '../../src/webview/store/boardStore';
@@ -94,6 +95,31 @@ describe('i18n do gitflow na tela', () => {
     );
     expect(screen.getAllByText('Branch develop did not exist: the board created it from main and pushed it to origin.')).toHaveLength(1);
     expect(screen.getAllByText(notice)).toHaveLength(1);
+  });
+
+  it('o relatório da limpeza (várias linhas) sai em inglês linha a linha, e a linha sem tradução fica como está', async () => {
+    const { router, storyId } = await seedBoard();
+    const body = [
+      gitNotice('cleanup.title'),
+      `- ${gitNotice('cleanup.remoteMoved', { branch: 'feature/1-x', pr: 'https://github.com/a/b/pull/1' })}`,
+      `- ${gitNotice('cleanup.localDeleted', { branch: 'feature/1-x' })}`,
+      '- linha que o dicionário não conhece',
+    ].join('\n');
+    router.handle({ type: 'comment.add', cardId: storyId, body }, { author: BOARD_AUTHOR, source: 'ai' });
+    syncStore(router);
+    setLocale('en');
+    render(
+      <Theme>
+        <CommentsTab cardId={storyId} />
+      </Theme>,
+    );
+    expect(screen.getByText('Story cleanup after the merge:')).toBeTruthy();
+    expect(screen.getByText('local branch feature/1-x deleted')).toBeTruthy();
+    expect(
+      screen.getByText(/The remote branch origin\/feature\/1-x was not deleted: it received commits after the pull request/),
+    ).toBeTruthy();
+    expect(screen.getByText('linha que o dicionário não conhece')).toBeTruthy();
+    expect(screen.queryByText(/apagada/)).toBeNull();
   });
 
   it('os outros comentários do board (autopiloto, runner) ficam como foram escritos, mesmo com " e " no texto', async () => {

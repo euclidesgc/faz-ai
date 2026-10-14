@@ -719,8 +719,8 @@ Opções em **Faz AI › Git**, no Settings do editor:
 | `fazai.git.hotfixPrefix` | `hotfix/` | Prefixo das branches de hotfix. |
 | `fazai.git.releasePrefix` | `release/` | Só informativo: nenhum tipo de card gera release. |
 
-Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. A limpeza das branches e worktrees
-ao concluir a história, a das órfãs e o renomear da principal no `origin` vêm em entregas seguintes.
+Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. A limpeza das órfãs e o renomear da
+principal no `origin` vêm em entregas seguintes.
 
 ### Pull request e merge na Homologação
 
@@ -741,6 +741,37 @@ O merge não acontece se a história não tiver PR registrado ou ainda tiver sub
 o merge automático desligado, aprovar leva o card para Concluído na hora (ou o deixa Aprovado, com o
 aviso na conversa, se uma sub-tarefa em aberto impedir a conclusão).
 
+### Conclusão da história no gitflow
+
+Com o gitflow ligado, quando uma história é concluída com o PR mesclado, o board não deixa nada dela
+para trás. Isso vale para o merge feito pelo board e para o merge
+[detectado](#detecção-automática-de-merges). Em ordem:
+
+1. remove a worktree (pasta de trabalho) da história;
+2. apaga a branch local, mesmo quando o merge foi squash (o PR já confirmou o merge);
+3. apaga a branch remota (`origin/<branch>`). Se o GitHub já a apagou, não é erro nem aviso;
+4. atualiza a `develop` local **só por fast-forward**, sem trocar a branch da pasta do projeto e
+   sem mexer nos arquivos dela.
+
+O board só apaga a branch registrada no card e só depois do merge confirmado. Quando a limpeza não é
+segura, ele **não apaga o que está em risco**, conclui o card do mesmo jeito e conta o motivo num
+comentário na conversa, com o comando para você fazer à mão:
+
+- a worktree tem mudanças não commitadas: nada é apagado (nem worktree, nem as branches), e o aviso
+  traz o caminho e os arquivos pendentes;
+- a branch local tem commits que não estão no PR: nada é apagado;
+- a branch remota recebeu commits depois do PR: ela fica;
+- a pasta do projeto está na branch da história: a branch local fica (o board nunca troca a branch da
+  sua pasta) e a remota é apagada;
+- a `develop` local tem commits que não estão no `origin`, ou está aberta em alguma pasta: ela não é
+  atualizada;
+- qualquer falha do `git` ou do `gh` (sem permissão de push, sem rede, sem o `gh`) também vira aviso.
+
+Nenhuma falha da limpeza impede a conclusão do card. Com o gitflow desligado ("direto na principal")
+nada muda: a conclusão só remove a worktree, como antes. Não há opção para desligar a limpeza à parte
+do gitflow. Branches e worktrees que já sobraram de antes ficam para a limpeza de órfãs, que vem em
+outra entrega.
+
 ### Registros de decisão
 
 Com **Faz AI › Git › Registros de decisão** (`fazai.git.decisionRecords`) apontando para uma pasta
@@ -760,7 +791,9 @@ desligado, ela só acontece quando você pede uma rodada. Quando o merge é dete
 
 1. o board grava o commit do merge no card;
 2. registra na conversa que a história foi concluída;
-3. move o card para Concluído e remove a pasta de trabalho.
+3. move o card para Concluído e remove a pasta de trabalho. Com o gitflow ligado, faz também o resto
+   da [conclusão da história no gitflow](#conclusão-da-história-no-gitflow): apaga as branches e
+   atualiza a `develop` local.
 
 Se o pull request é fechado sem merge, o board registra um aviso na conversa uma única vez. O merge
 continua sendo feito pela pessoa, manualmente ou pelo merge automático; o board só observa. Falhas

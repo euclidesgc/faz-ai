@@ -751,9 +751,8 @@ Options under **Faz AI › Git** in the editor Settings:
 | `fazai.git.hotfixPrefix` | `hotfix/` | Prefix of hotfix branches. |
 | `fazai.git.releasePrefix` | `release/` | Informational only: no card type produces a release. |
 
-An empty prefix or name, or one git doesn't accept, goes back to the default. Cleaning up branches and
-worktrees when a story is concluded, orphan cleanup and renaming the main branch on `origin` come in
-later deliveries.
+An empty prefix or name, or one git doesn't accept, goes back to the default. Orphan cleanup and
+renaming the main branch on `origin` come in later deliveries.
 
 ### Pull request and merge in Homologação
 
@@ -774,6 +773,38 @@ approve a story that is in the last column before completion:
 The merge does not happen if the story has no PR recorded or still has open sub-tasks. With
 automatic merge off, approving takes the card to Concluído right away (or leaves it Aprovado, with a
 notice in the conversation, if an open sub-task prevents the conclusion).
+
+### Story completion with gitflow
+
+With gitflow on, when a story is concluded with its PR merged, the board leaves nothing of it
+behind. This holds for a merge done by the board and for a merge
+[detected](#automatic-merge-detection) by it. In order:
+
+1. removes the story's worktree (working folder);
+2. deletes the local branch, even after a squash merge (the PR already confirmed the merge);
+3. deletes the remote branch (`origin/<branch>`). If GitHub already deleted it, that is neither an
+   error nor a warning;
+4. updates the local `develop` **by fast-forward only**, without switching the project folder's
+   branch and without touching its files.
+
+The board only deletes the branch recorded on the card, and only after the merge is confirmed. When
+the cleanup is not safe, it **does not delete what is at risk**, concludes the card anyway and says
+why in a comment in the conversation, with the command to run by hand:
+
+- the worktree has uncommitted changes: nothing is deleted (neither the worktree nor the branches),
+  and the notice brings the path and the pending files;
+- the local branch has commits that are not in the PR: nothing is deleted;
+- the remote branch received commits after the PR: it stays;
+- the project folder is on the story's branch: the local branch stays (the board never switches your
+  folder's branch) and the remote one is deleted;
+- the local `develop` has commits that are not on `origin`, or is checked out in some folder: it is
+  not updated;
+- any `git` or `gh` failure (no push permission, no network, no `gh`) also becomes a notice.
+
+No cleanup failure prevents the card from being concluded. With gitflow off ("straight to the main
+branch") nothing changes: the conclusion only removes the worktree, as before. There is no option to
+turn the cleanup off separately from gitflow. Branches and worktrees left over from before are for
+the orphan cleanup, which comes in another delivery.
 
 ### Decision records
 
@@ -796,7 +827,9 @@ detected:
 
 1. the board records the merge commit on the card;
 2. registers in the conversation that the story was completed;
-3. moves the card to Concluído and removes the working folder.
+3. moves the card to Concluído and removes the working folder. With gitflow on, it also does the rest
+   of the [story completion with gitflow](#story-completion-with-gitflow): deletes the branches and
+   updates the local `develop`.
 
 If the pull request is closed without a merge, the board registers a warning in the conversation
 once only. The merge is still done by the person, manually or through automatic merge; the board
