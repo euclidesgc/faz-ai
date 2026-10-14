@@ -179,10 +179,21 @@ export interface Restack {
   lines: string[];
 }
 
+/** O PR só é editado se estiver aberto; se o `gh pr view` falhar, trata como não aberto (sem aviso). */
+async function prIsOpen(deps: CleanupDeps, url: string): Promise<boolean> {
+  try {
+    const raw = await deps.gh(['pr', 'view', url, '--json', 'state'], deps.cwd);
+    return (JSON.parse(raw) as { state?: string }).state === 'OPEN';
+  } catch (e) {
+    deps.log(`Não deu para conferir o estado de ${url} (${errorLine(e)}); o PR não será editado.`);
+    return false;
+  }
+}
+
 /**
  * Passa para `newBase` a base das histórias empilhadas sobre a concluída: as vivas, sem pai, fora da conclusão e
  * com `baseBranch === story.branch`. Grava a base pela mensagem `card.baseBranch.set` e, quando a seguinte tem pull
- * request, troca a base dele com `gh pr edit`. Se o `gh` falhar, a remota da concluída precisa ficar (o GitHub
+ * request aberto, troca a base dele com `gh pr edit`. Se o `gh` falhar, a remota da concluída precisa ficar (o GitHub
  * fecharia o PR dependente) e as duas conversas avisam. Cada seguinte recebe um comentário explicando a troca.
  */
 export async function restackFollowers(router: MessageRouter, deps: CleanupDeps, story: Card, newBase: string): Promise<Restack> {
@@ -195,7 +206,7 @@ export async function restackFollowers(router: MessageRouter, deps: CleanupDeps,
   for (const next of followers) {
     const parts = [gitNotice('stack.moved', { prev: story.number, old: story.branch, base: newBase })];
     router.handle({ type: 'card.baseBranch.set', cardId: next.id, base: newBase });
-    if (next.prUrl) {
+    if (next.prUrl && (await prIsOpen(deps, next.prUrl))) {
       try {
         await deps.gh(['pr', 'edit', next.prUrl, '--base', newBase], deps.cwd);
         parts.push(gitNotice('stack.prMoved', { pr: next.prUrl, base: newBase }));
@@ -345,7 +356,7 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
 
     // a pilha é refeita antes de apagar a branch: a base das seguintes passa para a base real do PR (D3)
     let keepRemote: string | null = null;
-    if (merged && branch) {
+    if (safe) {
       const newBase = pr.baseRefName || story.baseBranch || prBaseOf(router.snapshot(), story)?.baseBranch || '';
       const restack = await restackFollowers(router, deps, story, newBase);
       keepRemote = restack.keepRemote;

@@ -277,11 +277,18 @@ describe('limpeza depois do merge', () => {
 
   it('RF8: nunca apaga a principal nem a develop, mesmo com o PR vindo delas', async () => {
     await storyWithWork();
+    await call('create_card', { title: 'Viva', column: 'Implementação' });
+    const liveId = router.snapshot().cards[router.snapshot().cards.length - 1]!.id;
+    router.handle({ type: 'card.baseBranch.set', cardId: liveId, base: 'develop' });
     for (const branch of ['main', 'develop']) {
       await cleanUpStory(router, deps, { ...card(1), branch }, prFacts(branch));
       expect(hasRef(repo, `refs/heads/${branch}`)).toBe(true);
       expect(remoteHas(branch)).toBe(true);
     }
+    // uma história viva empilhada na develop não é tocada
+    const live = router.snapshot().cards.find((c) => c.id === liveId)!;
+    expect(live.baseBranch).toBe('develop');
+    expect(notices(live.number)).toEqual([]);
     const bodies = notices(1);
     expect(bodies).toHaveLength(2);
     expect(bodies[0]).toContain(
@@ -618,13 +625,17 @@ describe('pilha: troca de base das seguintes', () => {
     squashMergeOnOrigin(prev.branch);
     let remoteAtEdit: boolean | null = null;
     const calls = fakeGh((args) => {
+      if (args[1] === 'view') return '{"state":"OPEN"}';
       if (args[1] === 'edit') remoteAtEdit = remoteHas(prev.branch);
       return '';
     });
 
     await cleanUpStory(router, deps, prev, prFacts(prev.branch));
 
-    expect(calls).toEqual([['pr', 'edit', PR2, '--base', 'develop']]);
+    expect(calls).toEqual([
+      ['pr', 'view', PR2, '--json', 'state'],
+      ['pr', 'edit', PR2, '--base', 'develop'],
+    ]);
     expect(remoteAtEdit).toBe(true);
     expect(remoteHas(prev.branch)).toBe(false);
     expect(card(next.number).baseBranch).toBe('develop');
@@ -636,7 +647,8 @@ describe('pilha: troca de base das seguintes', () => {
     const next = await stackedOn(prev);
     router.handle({ type: 'card.pr.set', cardId: next.id, url: PR2 });
     squashMergeOnOrigin(prev.branch);
-    fakeGh(() => {
+    fakeGh((args) => {
+      if (args[1] === 'view') return '{"state":"OPEN"}';
       throw new Error('HTTP 422: base inválida\ndetalhe');
     });
 
@@ -654,6 +666,26 @@ describe('pilha: troca de base das seguintes', () => {
     expect(body).toContain(
       `**Aviso:** a base do pull request ${PR2} não foi trocada: HTTP 422: base inválida. Troque com: gh pr edit ${PR2} --base develop`,
     );
+  });
+});
+
+describe('pilha: PR da seguinte já mesclado', () => {
+  it('seguinte com PR já mesclado: troca a base no card sem gh pr edit e sem aviso', async () => {
+    const prev = await storyWithWork();
+    const next = await stackedOn(prev);
+    router.handle({ type: 'card.pr.set', cardId: next.id, url: PR2 });
+    squashMergeOnOrigin(prev.branch);
+    const calls = fakeGh(() => '{"state":"MERGED"}');
+
+    await cleanUpStory(router, deps, prev, prFacts(prev.branch));
+
+    expect(calls.some((c) => c[1] === 'edit')).toBe(false);
+    expect(card(next.number).baseBranch).toBe('develop');
+    expect(remoteHas(prev.branch)).toBe(false);
+    const [body] = notices(next.number);
+    expect(body).toContain('a base desta história passou de');
+    expect(body).not.toContain('pull request');
+    expect(report(prev.number).some((l) => l.includes('**Aviso:**'))).toBe(false);
   });
 });
 
