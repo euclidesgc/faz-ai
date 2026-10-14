@@ -212,6 +212,7 @@ export const card: Record<string, string> = {
   projeto: 'project',
   global: 'global',
   plugin: 'plugin',
+  importada: 'imported',
   'Nenhuma skill com "{query}".': 'No skill matching "{query}".',
   'Nenhuma skill nesta aba.': 'No skills in this tab.',
   'Mostrando {shown} de {total}: refine a busca para ver as outras.': 'Showing {shown} of {total}: refine the search to see the rest.',

@@ -151,11 +151,16 @@ por assunto), `memory` (memória automática do Claude Code), `skill`, `agent`, 
 `settings`, `style` (estilos de saída), `plugin` e `managed` (política da organização, só leitura).
 De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
 
-Toda execução pelo board parte de contexto vazio: só entra o que está marcado em Configurações →
-Harness. `set_harness_selection` marca rules (`instructions`), skills e agentes: `always` entra em
-toda execução pelo caminho do arquivo; `contextual` vira opção dos campos "Rules" e "Skills" dos
-cards (e agente disponível); `null` desmarca. Os campos "Rules" e "Skills" dos cards só oferecem o
-marcado como `contextual`. Em `get_card`, `requiredRules` e `requiredSkills` trazem o caminho de cada
+Toda execução pelo board parte de contexto vazio: só entra o que está no board (Configurações →
+Harness). `set_harness_selection` envia ao board rules (`instructions`), skills, agentes e servidores
+MCP (`mcp`), muda o modo deles ou os tira do board: `always` (Sempre) entra em toda execução, pelo
+caminho do arquivo ou na configuração de servidores da execução; `contextual` (Pelo card) vira opção
+dos campos "Rules", "Skills" e "MCPs" dos cards (e agente disponível); `off` (Desligado) fica no
+board sem entrar em nada, que é como as regras entram, para revisão; `null` tira do board. Um servidor
+MCP é identificado pelo arquivo mais o nome (`.mcp.json#github`) ou só pelo `name`. Os campos "Rules",
+"Skills" e "MCPs" dos cards só oferecem o que está em `contextual`; o servidor do board vai sempre, sem
+marcação. O inventário traz também o escopo `imported`: artefatos de pastas que a pessoa importou, que
+a ferramenta não carrega sozinha. Em `get_card`, `requiredRules` e `requiredSkills` trazem o caminho de cada
 arquivo que o card exige; para skills fora do projeto, `path` é o caminho absoluto do `SKILL.md`.
 Quando uma skill existe no projeto e fora dele com o mesmo nome, vale a do projeto. `create_skill` e
 `install_flow_skill` já marcam o que criam (`contextual` e `always`, respectivamente).

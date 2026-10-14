@@ -13,7 +13,14 @@ import {
   permissionTargets,
   type HARNESS_GROUPS,
 } from '../../../../shared/harnessCatalog';
-import { HARNESS_USAGES, isSelectableKind, usageOf, type HarnessUsage } from '../../../../shared/harnessSelection';
+import {
+  HARNESS_USAGES,
+  isSelectableKind,
+  selectionKey,
+  usageOf,
+  usageOptions,
+  type HarnessUsage,
+} from '../../../../shared/harnessSelection';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { IconWarning, SelectField } from '../../ui';
@@ -35,21 +42,22 @@ import { rich } from '../../../i18n/rich';
 /** Chave estável de uma linha: o mesmo arquivo pode trazer várias entradas (hooks, regras de permissão). */
 const keyOf = (i: HarnessItem) => `${i.path}|${i.name}|${i.detail ?? ''}`;
 
-/** Como as execuções do board usam uma rule ou skill: fora, em todo contexto ou quando fizer sentido. */
+/** O modo de uma rule, skill ou servidor MCP no board: fora do board, Sempre, Pelo card ou Desligado (regras). */
 function UsageSelect({ item }: { item: HarnessItem }) {
   const selection = useBoardStore((s) => s.state!.harnessSelection);
   if (!isSelectableKind(item.kind) || item.kind === 'agent') return null;
   const kind = item.kind;
   const usage = usageOf(selection, item);
+  const options = usageOptions(kind).map((id) => HARNESS_USAGES.find((u) => u.id === id)!);
   return (
     <SelectField<HarnessUsage | 'none'>
       size="1"
       steady
-      aria-label={t('Uso nas execuções do board: {name}', { name: item.name })}
-      title={t('Só o que está marcado entra nas execuções do board; o resto fica invisível para elas.')}
-      options={[{ value: 'none', label: t('Fora das execuções') }, ...HARNESS_USAGES.map((u) => ({ value: u.id, label: t(u.label) }))]}
+      aria-label={t('Modo no board: {name}', { name: item.name })}
+      title={t('Só o que está no board entra nas execuções; o resto fica invisível para elas.')}
+      options={[{ value: 'none', label: t('Fora do board') }, ...options.map((u) => ({ value: u.id, label: t(u.label) }))]}
       value={usage ?? 'none'}
-      onChange={(v) => harness.setSelection([{ kind, location: item.location }], v === 'none' ? null : v)}
+      onChange={(v) => harness.setSelection([{ kind, location: selectionKey(item) }], v === 'none' ? null : v)}
     />
   );
 }

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  ALL_AI_TOOLS,
   EMPTY_HARNESS,
   REFERENCE_SKILL,
   aiToolInfo,
@@ -14,8 +15,14 @@ import {
   pluginActions,
 } from '../../../shared/harness';
 import { copyTarget } from '../../../shared/harnessCatalog';
-import { RULES_FIELD, SKILLS_FIELD } from '../../../shared/boardFields';
-import { isSelectableKind, selectedRuleLocations, selectedSkillNames } from '../../../shared/harnessSelection';
+import { MCPS_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../../shared/boardFields';
+import {
+  isSelectableKind,
+  selectedMcpNames,
+  selectedRuleLocations,
+  selectedSkillNames,
+  selectionKey,
+} from '../../../shared/harnessSelection';
 import { CONDUCTOR_AGENT, migrateExecProfiles, seedAgents } from '../../agentSeeds';
 import { FLOW_SKILL } from '../../flowSkill';
 import { skillTemplate, type HarnessStore } from '../../harness';
@@ -62,8 +69,12 @@ export class BoardHarness {
    */
   load(): void {
     if (!this.store) return;
-    this.current = this.store.scan();
     const state = this.ctx.state();
+    // as pastas importadas são do board: a varredura as recebe a cada leitura, para a aba refletir o que está lá
+    this.store.imports = Object.fromEntries(
+      ALL_AI_TOOLS.map((tool) => [tool, state.harnessImports.filter((x) => x.tool === tool).map((x) => x.dir)]),
+    );
+    this.current = this.store.scan();
     const view = { board: state.board, harness: this.current, harnessSelection: state.harnessSelection };
     const sync = (name: string, options: string[]) => {
       const field = state.fieldDefs.find((f) => f.name.toLowerCase() === name.toLowerCase() && f.kind === 'multiselect');
@@ -71,6 +82,20 @@ export class BoardHarness {
     };
     sync(SKILLS_FIELD, selectedSkillNames(view, 'contextual'));
     sync(RULES_FIELD, selectedRuleLocations(view, 'contextual'));
+    sync(MCPS_FIELD, selectedMcpNames(view, 'contextual'));
+  }
+
+  /** Importa uma pasta para a ferramenta: precisa existir, e vale o caminho absoluto. */
+  addImport(tool: AiTool, dir: string): void {
+    const abs = path.resolve(dir.trim());
+    if (!dir.trim() || !fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) throw new Error(`Pasta não encontrada: ${dir}`);
+    this.ctx.boards.addImport(this.ctx.boardId, tool, abs);
+    this.load();
+  }
+
+  removeImport(tool: AiTool, dir: string): void {
+    this.ctx.boards.removeImport(this.ctx.boardId, tool, dir);
+    this.load();
   }
 
   /**
@@ -407,19 +432,30 @@ export const harnessHandlers = {
   'harness.permission.remove': (msg, { harness: h }) =>
     h.change(() => h.hooksAndPermissions.removePermission(msg.tool, h.entry(msg.tool, 'settings', msg.path, msg.rule, msg.list))),
   'harness.mcp.add': (msg, { harness: h }) => h.change(() => h.mcpServers.add(msg.tool, msg.source, msg.server)),
-  'harness.mcp.remove': (msg, { harness: h }) => {
+  'harness.mcp.remove': (msg, ctx) => {
+    const h = ctx.harness;
     const item = h.current.inventory
       .find((t) => t.tool === msg.tool)
       ?.items.find((i) => i.kind === 'mcp' && i.path === msg.path && i.name === msg.name);
     if (!item) throw new Error('Servidor não encontrado no harness. Atualize a lista e tente de novo.');
-    return h.change(() => h.mcpServers.remove(msg.tool, item));
+    const changed = h.change(() => h.mcpServers.remove(msg.tool, item));
+    ctx.boards.setSelection(ctx.boardId, [{ kind: 'mcp', location: selectionKey(item) }], null);
+    return changed;
+  },
+  'harness.import.add': (msg, ctx) => {
+    ctx.harness.addImport(msg.tool, msg.dir);
+    return true;
+  },
+  'harness.import.remove': (msg, ctx) => {
+    ctx.harness.removeImport(msg.tool, msg.dir);
+    return true;
   },
   'harness.item.delete': (msg, ctx) => {
     const h = ctx.harness;
     const item = h.item(msg.tool, msg.kind, msg.path);
     const changed = h.change(() => h.ops.remove(item));
-    // o que saiu do disco sai da marcação
-    if (isSelectableKind(item.kind)) ctx.boards.setSelection(ctx.boardId, [{ kind: item.kind, location: item.location }], null);
+    // o que saiu do disco sai do board
+    if (isSelectableKind(item.kind)) ctx.boards.setSelection(ctx.boardId, [{ kind: item.kind, location: selectionKey(item) }], null);
     return changed;
   },
   'harness.item.copy': (msg, { harness: h }) => {

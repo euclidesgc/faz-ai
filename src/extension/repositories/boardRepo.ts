@@ -27,7 +27,7 @@ import type { HarnessSelection, HarnessUsage, SelectableKind } from '../../share
 import { parseGit, type GitConfig } from '../../shared/git';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
-import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool } from '../../shared/harness';
+import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool, type HarnessImport } from '../../shared/harness';
 
 export class BoardRepo {
   constructor(private db: Database) {}
@@ -202,6 +202,30 @@ export class BoardRepo {
             usage,
           ]);
       }
+    });
+  }
+
+  /** As pastas importadas deste board, por ferramenta. */
+  imports(boardId: string): HarnessImport[] {
+    return all(this.db, 'SELECT tool, dir FROM harness_imports WHERE board_id = ? ORDER BY tool, dir', [boardId]).map((r) => ({
+      tool: str(r.tool) as AiTool,
+      dir: str(r.dir),
+    }));
+  }
+
+  addImport(boardId: string, tool: AiTool, dir: string): void {
+    run(this.db, 'INSERT OR IGNORE INTO harness_imports(board_id, tool, dir) VALUES (?,?,?)', [boardId, tool, dir]);
+  }
+
+  /** Tira a pasta da lista e, com ela, os artefatos dela que estavam no board (a identidade deles é o caminho absoluto). */
+  removeImport(boardId: string, tool: AiTool, dir: string): void {
+    transaction(this.db, () => {
+      run(this.db, 'DELETE FROM harness_imports WHERE board_id = ? AND tool = ? AND dir = ?', [boardId, tool, dir]);
+      run(this.db, "DELETE FROM harness_selection WHERE board_id = ? AND (location = ? OR location LIKE ? ESCAPE '\\')", [
+        boardId,
+        dir,
+        `${dir.replace(/[%_]/g, '\\$&')}/%`,
+      ]);
     });
   }
 
@@ -419,6 +443,7 @@ export class BoardRepo {
       currentUser,
       harness: EMPTY_HARNESS,
       harnessSelection: this.selection(boardId),
+      harnessImports: this.imports(boardId),
       boardServer: null,
       pendingUpgrade: pendingUpgrade(db, boardId),
       chat: EMPTY_CHAT,

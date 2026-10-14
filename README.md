@@ -96,10 +96,10 @@ necessário, na hora certa:
   Claude Code isso é imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um
   arquivo de servidores MCP só com o do board); nas outras ferramentas, o que a linha de comando
   aceita (ver a tabela de [Agentes](#agentes)).
-- **Rules e skills marcadas, não descobertas.** Cada arquivo tem duas marcações: **Incluir em todo
-  contexto** (entra em toda execução, pelo caminho) ou **Usar quando fizer sentido** (vira opção dos
-  campos Rules e Skills do card, e o Refinar com IA a indica quando o pedido pede). O que não está
-  marcado não existe para a execução.
+- **Artefatos enviados ao board, não descobertos.** Rules, skills e servidores MCP entram no board
+  num modo: **Sempre** (entra em toda execução, pelo caminho) ou **Pelo card** (vira opção dos campos
+  Rules, Skills e MCPs do card, e o planejamento ou o Refinar com IA o indica quando a tarefa pede).
+  Regras entram **desligadas**, para revisão. O que não está no board não existe para a execução.
 - **Agentes com o mínimo.** Um agente libera só os servidores MCP e as ferramentas de que precisa,
   carrega as skills dele e tem instruções curtas; o resto fica de fora.
 - **Documentos como anexos.** PRD, Spec e Plan ficam anexados à história; a IA os lê quando o card
@@ -492,8 +492,8 @@ uma barra por grupo e cada item, com quanto ocupa.
   abre.
 - **Agentes.** As instruções do agente da sessão e, numa história no Claude Code, o nome e a descrição
   de cada subagente (as instruções de um subagente vão para o contexto dele, não para o da sessão).
-- **Rules e Skills.** As marcadas como **Incluir em todo contexto** e as indicadas no card ou no
-  agente, pelo tamanho do arquivo que a sessão lê.
+- **Rules e Skills.** As que estão no board em modo **Sempre** e as indicadas no card ou no agente,
+  pelo tamanho do arquivo que a sessão lê.
 - **Card.** Título e descrição, checklist, conversa, instruções e modelo da fase, e os documentos das
   fases.
 
@@ -993,14 +993,27 @@ Claude Code lê o `AGENTS.md` apenas quando não há `CLAUDE.md`, `.claude/CLAUD
 aparece como **não lido pelo Claude Code**, com o `@import` que resolve. Se tem só o `AGENTS.md`, o
 board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo.
 
-Nas rules e skills da ferramenta do projeto, cada linha tem a escolha **Uso nas execuções do
-board**:
+Nas rules, skills e servidores MCP da ferramenta do projeto, cada linha tem a escolha **Modo no
+board**. O board **referencia** o artefato pelo caminho de origem, não o copia: uma mudança no arquivo
+vale no board, e uma origem apagada deixa o artefato **ausente**, sem quebrar os cards que o listam.
 
-- **Incluir em todo contexto**: o arquivo entra em toda execução (trabalhar a fase, refinar, chat do
-  board), pelo caminho. É o lugar da skill do fluxo e das regras que valem sempre.
-- **Usar quando fizer sentido**: vira opção dos campos **Rules** e **Skills** dos cards (e das skills
-  dos agentes), e o **Refinar com IA** a indica quando o pedido pede.
-- **Fora das execuções**: a execução não o vê, mesmo que a ferramenta o carregue numa conversa sua.
+- **Sempre**: entra em toda execução (trabalhar a fase, refinar, chat do board), independente do
+  card. É o lugar da skill do fluxo, do servidor do board e das regras que valem sempre.
+- **Pelo card**: não entra sozinho. Vira opção dos campos **Rules**, **Skills** e **MCPs** dos cards
+  (e das skills e servidores dos agentes), e o planejamento da fase ou o **Refinar com IA** o indica
+  quando a tarefa pede, escolhendo só entre o que está no board. Vale o mínimo: no máximo uma skill
+  por assunto, e só os servidores de que a tarefa precisa.
+- **Desligado** (só nas regras): está no board, mas não entra em nada. Toda regra entra assim, porque
+  um `CLAUDE.md` escrito para outro contexto pode conflitar com o fluxo e as definições do board:
+  revise o texto antes de ativar.
+- **Fora do board**: a execução não o vê, mesmo que a ferramenta o carregue numa conversa sua.
+
+**Pastas importadas.** Nem todo artefato útil está no projeto ou na pasta global. O board aceita
+importar pastas de fora (outro repositório, uma coleção do time, uma pasta baixada): ele varre a pasta
+atrás do que a ferramenta reconhece num projeto (regras, skills, agentes, comandos, hooks, servidores
+MCP e configurações, ou a própria pasta como pasta de skills) e lista o que achou com a origem
+**Importados**. Nada entra no board sem você enviar. As pastas ficam guardadas no board e são
+varridas de novo a cada leitura; tirar uma pasta da lista tira dela também os artefatos do board.
 
 **Ações em massa.** Cada linha que aceita alguma ação tem uma caixa, e a do topo do grupo marca todas.
 A barra que aparece mostra só o que vale para o que foi marcado: o uso nas execuções do board (rules
@@ -1058,7 +1071,7 @@ Cada skill tem um modo:
 
 O modo diz como a ferramenta trata a skill numa conversa sua; nas execuções do board o que vale é a
 marcação. O campo "Skills" do card mostra um resumo do que está marcado e abre uma janela para
-escolher entre as skills marcadas como **Usar quando fizer sentido**: busca por nome ou descrição,
+escolher entre as skills que estão no board em modo **Pelo card**: busca por nome ou descrição,
 abas **Todas / Marcadas / Projeto / Globais / Plugins** e uma caixa de seleção por skill, com a
 origem à vista. O campo "Rules" faz o mesmo com os arquivos de instruções marcados. O card entrega à
 IA o caminho de cada arquivo, então ele não precisa estar à vista da ferramenta para ser usado. Assim

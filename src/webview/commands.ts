@@ -170,9 +170,13 @@ export const harness = {
     post({ type: 'harness.skill.file.create', tool, path, file, link }),
   openSkillFile: (tool: AiTool, path: string, file: string) => post({ type: 'harness.skill.file.open', tool, path, file }),
   deleteSkillFile: (tool: AiTool, path: string, file: string) => post({ type: 'harness.skill.file.delete', tool, path, file }),
-  /** marca ou desmarca (usage null) itens para as execuções do board */
+  /** envia artefatos ao board com um modo, muda o modo, ou os tira do board (usage null); `location` é a `selectionKey` */
   setSelection: (items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null) =>
     post({ type: 'harness.selection.set', items, usage }),
+  /** abre o seletor de pasta do editor para importar artefatos */
+  pickImport: (tool: AiTool) => post({ type: 'harness.import.pick', tool }),
+  addImport: (tool: AiTool, dir: string) => post({ type: 'harness.import.add', tool, dir }),
+  removeImport: (tool: AiTool, dir: string) => post({ type: 'harness.import.remove', tool, dir }),
   createAgent: (scope: InstallScope, input: AgentInput) => post({ type: 'harness.agent.create', scope, input }),
   updateAgent: (name: string, scope: InstallScope, patch: Partial<AgentInput>, body?: string) =>
     post({ type: 'harness.agent.update', name, scope, patch, ...(body !== undefined ? { body } : {}) }),

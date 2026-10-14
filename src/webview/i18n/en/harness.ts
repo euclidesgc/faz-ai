@@ -52,10 +52,6 @@ export const harness: Record<string, string> = {
   'Selecionar {name}': 'Select {name}',
   'copiada no projeto': 'copied in the project',
   'no projeto, com conteúdo diferente': 'in the project, with different content',
-  'Uso nas execuções do board: {name}': 'Use in board runs: {name}',
-  'Só o que está marcado entra nas execuções do board; o resto fica invisível para elas.':
-    'Only what is marked goes into board runs; the rest is invisible to them.',
-  'Fora das execuções': 'Not in runs',
   'Novo hook': 'New hook',
   'Novo servidor': 'New server',
   'sem arquivo': 'no file',
@@ -79,7 +75,6 @@ export const harness: Record<string, string> = {
   'Instalado pela sua organização: dá para desativar, não para desinstalar':
     'Installed by your organization: it can be disabled, not uninstalled',
   'da organização': 'from the organization',
-  'Uso nas execuções do board': 'Use in board runs',
   'Modo da skill': 'Skill mode',
   'Ações nos itens marcados': 'Actions on the checked items',
   'Selecionar todos: {group}': 'Select all: {group}',
@@ -182,6 +177,11 @@ export const harness: Record<string, string> = {
   // --- Escopos
   Projeto: 'Project',
   Global: 'Global',
+  Importados: 'Imported',
+  'Encontrados nas pastas que você importou; a ferramenta não os carrega sozinha.':
+    'Found in the folders you imported; the tool does not load them on its own.',
+  'De pastas importadas: só entram nas execuções quando enviados ao board.':
+    'From imported folders: they only get into runs when sent to the board.',
   'Fazem parte deste projeto e vão no repositório.': 'They are part of this project and go in the repository.',
   'Da sua máquina: valem em todos os seus projetos, mas não vão no repositório.':
     'From your machine: they apply to all your projects, but do not go in the repository.',
@@ -432,12 +432,19 @@ export const harness: Record<string, string> = {
   'Harness global': 'Global harness',
   Rules: 'Rules',
   // --- SelectionTable
-  'Incluir em todo contexto': 'Include in every context',
-  'Entra em toda execução do board (trabalhar a fase, refinar, chat), pelo caminho do arquivo.':
-    'Goes into every board run (work the phase, refine, chat), by file path.',
-  'Usar quando fizer sentido': 'Use when it fits',
-  'Fica disponível para o card: a pessoa marca no card, ou o "Refinar com IA" marca quando o pedido pede.':
-    'Available to the card: the person checks it on the card, or "Refine with AI" checks it when the request calls for it.',
+  Sempre: 'Always',
+  'Entra em toda execução do board (trabalhar a fase, refinar, chat), independente do card.':
+    'Goes into every board run (work the phase, refine, chat), whatever the card.',
+  'Pelo card': 'Per card',
+  'Não entra sozinho: só quando o card o lista, pela escolha do planejamento, do "Refinar com IA" ou sua.':
+    'Does not get in on its own: only when the card lists it, chosen by the planning, by "Refine with AI" or by you.',
+  Desligado: 'Off',
+  'Está no board, mas não entra em nenhuma execução até você ativar.': 'It is on the board, but gets into no run until you turn it on.',
+  'Fora do board': 'Off the board',
+  'Modo no board: {name}': 'Mode on the board: {name}',
+  'Só o que está no board entra nas execuções; o resto fica invisível para elas.':
+    'Only what is on the board goes into runs; the rest is invisible to them.',
+  'Modo no board': 'Mode on the board',
   // --- AgentsTable
   'O {tool} não define agentes em arquivos; o board executa os cards com o agente embutido.':
     '{tool} does not define agents in files; the board runs cards with the built-in agent.',

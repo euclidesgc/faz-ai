@@ -4,7 +4,7 @@ import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION, STORY_PHASES, insertColumn } fr
 import { newId } from './ids';
 import { EFFORT_FIELD, EFFORT_LEVELS } from '../../shared/models';
 import { CRITICALITY_FIELD, CRITICALITY_LEVELS } from '../../shared/critical';
-import { MODEL_FIELD, PHASE_FIELD, RULES_FIELD, SKILLS_FIELD, TAGS_FIELD } from '../../shared/boardFields';
+import { MCPS_FIELD, MODEL_FIELD, PHASE_FIELD, RULES_FIELD, SKILLS_FIELD, TAGS_FIELD } from '../../shared/boardFields';
 
 /** Cria o board padrão para um workspace e devolve seu id. */
 export function seedBoard(db: Database, workspaceKey: string, name: string): string {
@@ -62,6 +62,11 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
       [newId(), boardId, RULES_FIELD, 'multiselect', '[]', null, 'chip', 5],
     );
+    // as opções vêm dos servidores MCP do board em modo "Pelo card" e são sincronizadas pelo roteador
+    db.run(
+      'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
+      [newId(), boardId, MCPS_FIELD, 'multiselect', '[]', null, 'chip', 6],
+    );
     // esforço da tarefa: as regras de modelo sugerem um modelo a partir dele
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
@@ -78,7 +83,7 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
         JSON.stringify(CRITICALITY_LEVELS),
         JSON.stringify(types.filter(([, , , wf]) => wf === parentWf).map(([id]) => id)),
         'badge',
-        6,
+        7,
       ],
     );
     db.exec('COMMIT;');

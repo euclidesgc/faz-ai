@@ -1,6 +1,6 @@
 import { Button } from '@radix-ui/themes';
 import { SKILL_MODES, type HarnessItem } from '../../../../shared/harness';
-import { HARNESS_USAGES, isSelectableKind, type HarnessUsage } from '../../../../shared/harnessSelection';
+import { HARNESS_USAGES, isSelectableKind, selectionKey, usageOptions, type HarnessUsage } from '../../../../shared/harnessSelection';
 import { harness } from '../../../commands';
 import type { ItemActions } from './useItemActions';
 import { t } from '../../../i18n';
@@ -41,26 +41,28 @@ export function BulkActions({ items, actions, projectTool, onDone }: Props) {
   const count = (list: HarnessItem[]) => (list.length < items.length ? ` (${list.length})` : '');
   const setUsage = (usage: HarnessUsage | null) => {
     harness.setSelection(
-      x.usage.flatMap((i) => (isSelectableKind(i.kind) ? [{ kind: i.kind, location: i.location }] : [])),
+      x.usage.flatMap((i) => (isSelectableKind(i.kind) ? [{ kind: i.kind, location: selectionKey(i) }] : [])),
       usage,
     );
     onDone();
   };
+  // só os modos que valem para todos os marcados (uma regra aceita "Desligado"; uma skill, não)
+  const usages = HARNESS_USAGES.filter((u) => x.usage.every((i) => isSelectableKind(i.kind) && usageOptions(i.kind).includes(u.id)));
   return (
     <>
       {x.usage.length > 0 && (
         <span className="bulk-group">
           <span className="muted small">
-            {t('Uso nas execuções do board')}
+            {t('Modo no board')}
             {count(x.usage)}
           </span>
-          {HARNESS_USAGES.map((u) => (
-            <Button key={u.id} variant="soft" color="gray" size="1" onClick={() => setUsage(u.id)}>
+          {usages.map((u) => (
+            <Button key={u.id} variant="soft" color="gray" size="1" title={t(u.hint)} onClick={() => setUsage(u.id)}>
               {t(u.label)}
             </Button>
           ))}
           <Button variant="soft" color="gray" size="1" onClick={() => setUsage(null)}>
-            {t('Fora das execuções')}
+            {t('Fora do board')}
           </Button>
         </span>
       )}

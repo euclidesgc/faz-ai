@@ -128,6 +128,14 @@ export function executionPlan(
   let mcpConfig: string | null = null;
   if (tool === 'claude') {
     const defs = allowed.length || !board ? claudeServers(projectDir, homeDir) : {};
+    // um servidor do board que vem de uma pasta importada não está na configuração do Claude Code: a
+    // definição é lida do arquivo em que a varredura o encontrou
+    for (const name of allowed)
+      if (!defs[name]) {
+        const item = items.find((i) => i.kind === 'mcp' && i.name === name && i.path.endsWith('.json'));
+        const def = item && obj(readJson(item.path).mcpServers)[name];
+        if (def) defs[name] = def;
+      }
     if (board) defs[BOARD_SERVER] = { type: 'stdio', ...board };
     if (!defs[BOARD_SERVER] && allowed.length)
       throw new Error(

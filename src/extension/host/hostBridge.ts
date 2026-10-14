@@ -45,6 +45,8 @@ export interface HostEnv {
   saveTextAs?(content: string, suggestedName: string): Promise<string | undefined>;
   /** deixa a pessoa escolher um arquivo de export do board; sem ele, vale `pickFiles` */
   pickBackupFile?(): Promise<string | undefined>;
+  /** deixa a pessoa escolher uma pasta para importar artefatos; undefined quando ela desiste (só no editor) */
+  pickFolder?(title: string): Promise<string | undefined>;
   /** abre o board no navegador (só faz sentido dentro do editor) */
   openInBrowser?(): unknown;
   /** abre o Settings do editor filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */
@@ -221,6 +223,12 @@ export class HostBridge {
         case 'harness.install.scan': {
           const fetched = await fetchSource(parseSource(msg.source, os.homedir()));
           this.router.setInstall(msg.source.trim(), fetched.dir, fetched.cleanup);
+          return;
+        }
+        case 'harness.import.pick': {
+          if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
+          const dir = await this.env.pickFolder('Importar artefatos de uma pasta');
+          if (dir) this.router.handle({ type: 'harness.import.add', tool: msg.tool, dir });
           return;
         }
         case 'harness.item.create':

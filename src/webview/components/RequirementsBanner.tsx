@@ -123,7 +123,7 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
       return {
         title: t('A skill do fluxo ({name}) não está pronta para o {tool}', { name: FLOW_SKILL_NAME, tool }),
         detail: t(
-          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem de contexto vazio: a skill precisa existir e estar marcada em "Incluir em todo contexto" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.',
+          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem de contexto vazio: a skill precisa existir e estar no board em modo "Sempre" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.',
         ),
       };
     case 'mcp-enable':
