@@ -14,9 +14,17 @@ const PR = 'https://github.com/acme/app/pull/7';
 let router: MessageRouter;
 let client: Client;
 let calls: string[][];
+/** as chamadas ao `git` assíncrono (a limpeza, #464) */
+let gitCalls: string[][];
 let removed: string[];
 let ghResult: () => Promise<string>;
+/** o `git` falso: responde pelos argumentos; por padrão, um repositório sem origin e sem a branch */
+let gitResult: (args: string[], cwd: string) => Promise<string>;
 let merger: AutoMerger;
+const noGit = async (args: string[]) => {
+  if (args[0] === 'rev-parse' || args[0] === 'remote') throw new Error('fatal: não existe');
+  return '';
+};
 
 const call = async (name: string, args: Record<string, unknown> = {}) => {
   const res = await client.callTool({ name, arguments: args });
@@ -56,8 +64,10 @@ beforeEach(async () => {
   client = new Client({ name: 'claude-code', version: '1' });
   await client.connect(b);
   calls = [];
+  gitCalls = [];
   removed = [];
   ghResult = async () => '';
+  gitResult = noGit;
   merger = new AutoMerger(router, {
     cwd: '/projeto',
     log: () => {},
@@ -65,12 +75,32 @@ beforeEach(async () => {
       calls.push(args);
       return ghResult();
     },
+    git: (args, cwd) => {
+      gitCalls.push(args);
+      return gitResult(args, cwd);
+    },
     removeWorktree: (_dir, p) => {
       removed.push(p);
     },
   });
+  // o gitflow vem ligado por padrão (#462); os cenários de antes da limpeza (#464) rodam sem ele
+  router.handle({ type: 'settings.board.update', patch: { git: { gitflow: false } } });
   await call('create_card', { title: 'Login', column: 'Homologação' });
 });
+
+/** o `gh pr view` do pull request `url` mergeado a partir de `branch` (os campos da limpeza) */
+const mergedView = (url: string, branch: string, over: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    state: 'MERGED',
+    mergedAt: '2026-10-13T10:00:00Z',
+    mergeCommit: { oid: 'abc123' },
+    baseRefName: 'develop',
+    headRefName: branch,
+    headRefOid: 'feed01',
+    ...over,
+  });
+const cleanupComments = (n: number) =>
+  router.snapshot().comments.filter((c) => c.cardId === card(n).id && c.body.startsWith('Limpeza da história depois do merge:'));
 
 describe('pull request e merge na homologação', () => {
   it('registra o PR na história, inclusive a partir da sub-tarefa', async () => {
@@ -101,6 +131,81 @@ describe('pull request e merge na homologação', () => {
     expect(card(1)).toMatchObject({ status: null, branch: 'historia/1-login', worktreePath: '' });
     expect(removed).toEqual(['/projeto.worktrees/1-login']);
     expect(router.snapshot().comments.at(-1)).toMatchObject({ author: 'Faz AI', body: `Merge de ${PR} feito.` });
+    expect(gitCalls).toEqual([]);
+  });
+
+  it('gitflow desligado: só remove a worktree, branches continuam, sem comentário de limpeza', async () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true, mode: 'worktree', gitflow: false } } });
+    await call('set_pull_request', { card: 1, url: PR });
+    (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
+    await approve(1);
+    // nenhum `pr view` e nenhum git: o board não toca nas branches
+    expect(calls).toEqual([['pr', 'merge', PR, '--squash']]);
+    expect(gitCalls).toEqual([]);
+    expect(removed).toEqual(['/projeto.worktrees/1-login']);
+    expect(columnOf(1)).toBe('Concluído');
+    expect(card(1)).toMatchObject({ branch: 'historia/1-login', worktreePath: '' });
+    expect(cleanupComments(1)).toHaveLength(0);
+  });
+
+  it('gitflow ligado: consulta o pull request antes do merge e limpa depois dele', async () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true, mode: 'worktree', gitflow: true } } });
+    await call('set_pull_request', { card: 1, url: PR });
+    (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
+    ghResult = async () => (calls.at(-1)![1] === 'view' ? mergedView(PR, 'historia/1-login') : '');
+    await approve(1);
+    expect(calls).toEqual([
+      ['pr', 'view', PR, '--json', 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid'],
+      ['pr', 'merge', PR, '--squash'],
+    ]);
+    expect(columnOf(1)).toBe('Concluído');
+    expect(card(1).status).toBeNull();
+    // a limpeza conferiu as pendências e as branches pelo git, e deixou um relatório só
+    expect(gitCalls.some((a) => a[0] === 'worktree' && a[1] === 'list')).toBe(true);
+    expect(cleanupComments(1)).toHaveLength(1);
+    // a worktree da limpeza é a da `cleanUpStory`: sem worktree listada pelo git, nada a remover
+    expect(removed).toEqual([]);
+  });
+
+  it('merge que falha no AutoMerger: nenhuma limpeza', async () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true, gitflow: true } } });
+    await call('set_pull_request', { card: 1, url: PR });
+    (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
+    ghResult = async () => {
+      if (calls.at(-1)![1] === 'view') return JSON.stringify({ state: 'OPEN', mergedAt: null, headRefName: 'historia/1-login' });
+      throw new Error('Pull request is not mergeable');
+    };
+    await approve(1);
+    expect(calls.map((a) => a[1])).toEqual(['view', 'merge']);
+    expect(columnOf(1)).toBe('Homologação');
+    expect(card(1).status).toBe('blocked');
+    expect(gitCalls).toEqual([]);
+    expect(removed).toEqual([]);
+    expect(cleanupComments(1)).toHaveLength(0);
+  });
+
+  it('falha do gh pr view no AutoMerger: merge segue, limpeza não apaga e avisa', async () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true, gitflow: true } } });
+    await call('set_pull_request', { card: 1, url: PR });
+    (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
+    ghResult = async () => {
+      if (calls.at(-1)![1] === 'view') throw new Error('HTTP 401: Bad credentials');
+      return '';
+    };
+    await approve(1);
+    expect(calls.map((a) => a[1])).toEqual(['view', 'merge']);
+    expect(columnOf(1)).toBe('Concluído');
+    expect(card(1).status).toBeNull();
+    // sem confirmar o pull request, nada é apagado: nem git, nem worktree
+    expect(gitCalls).toEqual([]);
+    expect(removed).toEqual([]);
+    expect(card(1).branch).toBe('historia/1-login');
+    expect(cleanupComments(1)).toHaveLength(0);
+    const warn = router.snapshot().comments.at(-1)!;
+    expect(warn.author).toBe('Faz AI');
+    expect(warn.body).toContain('A limpeza não apagou nada');
+    expect(warn.body).toContain(PR);
+    expect(warn.body).toContain('HTTP 401: Bad credentials');
   });
 
   it('merge que falha bloqueia o card, que continua na homologação', async () => {
@@ -157,6 +262,7 @@ describe('MergeWatcher', () => {
   const CLOSED = json({ state: 'CLOSED', mergedAt: null, mergeCommit: null });
   const OPEN = json({ state: 'OPEN', mergedAt: null, mergeCommit: null });
   const prOf = (n: number) => `https://github.com/acme/app/pull/${n}`;
+  const FIELDS = 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid';
   const comments = (n: number) => router.snapshot().comments.filter((c) => c.cardId === card(n).id && c.author === 'Faz AI');
   /** deixa a história entregue: modo autônomo, pull request registrado e status com a pessoa */
   const deliver = async (n: number, url = prOf(n)) => {
@@ -175,6 +281,10 @@ describe('MergeWatcher', () => {
       gh: (args) => {
         calls.push(args);
         return ghResult();
+      },
+      git: (args, cwd) => {
+        gitCalls.push(args);
+        return gitResult(args, cwd);
       },
       removeWorktree: (_dir, p) => {
         removed.push(p);
@@ -208,8 +318,8 @@ describe('MergeWatcher', () => {
     ghResult = OPEN;
     expect(await watcher.runNow()).toBe(2);
     expect(calls).toEqual([
-      ['pr', 'view', prOf(1), '--json', 'state,mergedAt,mergeCommit'],
-      ['pr', 'view', prOf(2), '--json', 'state,mergedAt,mergeCommit'],
+      ['pr', 'view', prOf(1), '--json', FIELDS],
+      ['pr', 'view', prOf(2), '--json', FIELDS],
     ]);
   });
 
@@ -379,8 +489,8 @@ describe('MergeWatcher', () => {
     ghResult = OPEN;
     await watcher.runNow();
     expect(calls).toEqual([
-      ['pr', 'view', prOf(1), '--json', 'state,mergedAt,mergeCommit'],
-      ['pr', 'view', prOf(2), '--json', 'state,mergedAt,mergeCommit'],
+      ['pr', 'view', prOf(1), '--json', FIELDS],
+      ['pr', 'view', prOf(2), '--json', FIELDS],
     ]);
     // uma vez só, e com as duas consultas já feitas: o gancho vem depois do laço de merges
     expect(afterRuns).toEqual([2]);
@@ -397,5 +507,60 @@ describe('MergeWatcher', () => {
     // o `busy` voltou a false: a rodada seguinte acontece
     await expect(watcher.runNow()).resolves.toBe(1);
     expect(afterRuns).toHaveLength(2);
+  });
+
+  it('PR fechado sem merge no MergeWatcher: nenhuma branch apagada', async () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree', gitflow: true } } });
+    (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
+    ghResult = json({ state: 'CLOSED', mergedAt: null, mergeCommit: null, headRefName: 'historia/1-login', headRefOid: 'feed01' });
+    await watcher.runNow();
+    expect(columnOf(1)).toBe('Homologação');
+    expect(gitCalls).toEqual([]);
+    expect(removed).toEqual([]);
+    expect(card(1)).toMatchObject({ branch: 'historia/1-login', worktreePath: '/projeto.worktrees/1-login' });
+    expect(cleanupComments(1)).toHaveLength(0);
+    expect(comments(1).filter((c) => c.body.includes('fechado sem merge'))).toHaveLength(1);
+  });
+
+  it('mergeado com o gitflow ligado: conclui e limpa (worktree, branches e develop) com um relatório só', async () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree', gitflow: true } } });
+    (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
+    ghResult = async () => mergedView(prOf(1), 'historia/1-login');
+    // um repositório limpo, com origin: a branch existe nas duas pontas e a develop local está atrás
+    gitResult = async (args, cwd) => {
+      const a = args.join(' ');
+      if (a === 'worktree list --porcelain')
+        return removed.length
+          ? 'worktree /projeto\nHEAD 1111\nbranch refs/heads/main\n'
+          : 'worktree /projeto\nHEAD 1111\nbranch refs/heads/main\n\nworktree /projeto.worktrees/1-login\nHEAD feed01\nbranch refs/heads/historia/1-login\n';
+      if (a === 'status --porcelain') return '';
+      if (a.startsWith('rev-parse --verify --quiet refs/heads/')) return 'ok';
+      if (a.startsWith('merge-base --is-ancestor')) return '';
+      if (a === 'ls-remote --heads origin historia/1-login') return 'feed01\trefs/heads/historia/1-login\n';
+      if (a === 'rev-list --count origin/develop..develop') return '0\n';
+      if (a === 'rev-parse develop') return 'aaa\n';
+      if (a === 'rev-parse origin/develop') return 'bbb\n';
+      expect(cwd).toBe('/projeto');
+      return '';
+    };
+    await watcher.runNow();
+    expect(columnOf(1)).toBe('Concluído');
+    expect(card(1)).toMatchObject({ mergeCommit: 'abc123', worktreePath: '', status: null });
+    expect(removed).toEqual(['/projeto.worktrees/1-login']);
+    expect(gitCalls).toContainEqual(['branch', '-D', 'historia/1-login']);
+    expect(gitCalls).toContainEqual(['push', '--quiet', 'origin', '--delete', 'historia/1-login']);
+    expect(gitCalls).toContainEqual(['fetch', '--quiet', 'origin', 'develop:develop']);
+    const report = cleanupComments(1);
+    expect(report).toHaveLength(1);
+    expect(report[0]!.body).toContain('/projeto.worktrees/1-login');
+    expect(report[0]!.body).toContain('historia/1-login');
+    expect(report[0]!.body).toContain('develop');
+    expect(report[0]!.body).not.toContain('**Aviso:**');
+    // o relatório vem depois do comentário de conclusão, e a limpeza fica no log
+    const mine = comments(1);
+    expect(mine.at(-2)!.body).toContain('História concluída pelo board');
+    expect(mine.at(-1)!.body.startsWith('Limpeza da história depois do merge:')).toBe(true);
+    expect(log[0]).toBe(`[#1] Pull request ${prOf(1)} mergeado (abc123); história concluída.`);
+    expect(log.at(-1)).toContain('Limpeza da história');
   });
 });

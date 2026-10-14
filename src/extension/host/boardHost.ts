@@ -14,7 +14,7 @@ import { registerClients, removeProjectServer } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
-import { removeWorktree } from '../git';
+import { detectMainBranch, removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
@@ -201,11 +201,15 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     });
   const gh = run('gh');
   const git = run('git');
+  // o `git` e a principal são da limpeza da história depois do merge (#464)
+  const mainBranch = (repo: string) => detectMainBranch(repo)?.name ?? '';
   new AutoMerger(router, {
     cwd: o.folderPath,
     log: o.log,
     gh,
+    git,
     removeWorktree,
+    mainBranch,
   });
   const chat = new ChatSession(router, {
     gateway,
@@ -501,7 +505,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     cwd: o.folderPath,
     log: o.log,
     gh,
+    git,
     removeWorktree,
+    mainBranch,
     afterRound: () => releaseWatcher.sweep(),
   });
   const heartbeat = new Heartbeat(runner, {
