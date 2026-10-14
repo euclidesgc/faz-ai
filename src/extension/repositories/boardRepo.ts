@@ -24,10 +24,15 @@ import { isCardStatus } from '../../shared/status';
 import { parseRunner, type RunnerConfig } from '../../shared/runner';
 import { parseProfiles, type LegacyExecProfile } from '../../shared/execution';
 import type { HarnessSelection, HarnessUsage, SelectableKind } from '../../shared/harnessSelection';
-import { parseGit, type GitConfig } from '../../shared/git';
+import { BRANCH_KINDS, parseGit, type BranchKind, type GitConfig } from '../../shared/git';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
 import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool } from '../../shared/harness';
+
+/** Valor gravado fora de BRANCH_KINDS (banco editado à mão) cai em feature, o padrão da coluna. */
+function branchKindOf(v: unknown): BranchKind {
+  return BRANCH_KINDS.find((k) => k.value === v)?.value ?? 'feature';
+}
 
 export class BoardRepo {
   constructor(private db: Database) {}
@@ -307,6 +312,7 @@ export class BoardRepo {
       color: str(r.color),
       defaultWorkflowId: str(r.default_workflow_id),
       defaults: JSON.parse(str(r.defaults_json) || '{}') as CardType['defaults'],
+      branchKind: branchKindOf(r.branch_kind),
     }));
 
     const cards: Card[] = all(db, 'SELECT * FROM cards WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
@@ -433,6 +439,8 @@ export class BoardRepo {
       environment: null,
       environmentFirstRun: false,
       harnessInstall: null,
+      // detectada pelo router, que tem a pasta do projeto; o banco não sabe
+      mainBranch: null,
     };
   }
 }

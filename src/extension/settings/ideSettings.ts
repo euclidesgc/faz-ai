@@ -146,6 +146,61 @@ const gitDecisionRecordsKey: SyncedKey<string> = {
   defaultValue: DEFAULT_GIT.decisionRecords,
 };
 
+/**
+ * O gitflow (#462): nasceram no Settings, então não passam pela migração do Git. As cinco de texto aceitam
+ * qualquer string: o vazio chega ao board, o `parseGit` o troca pelo padrão e a sincronização devolve o
+ * padrão ao Settings (RF04).
+ */
+const gitGitflowKey: SyncedKey<boolean> = {
+  key: 'git.gitflow',
+  fromBoard: (board) => board.git.gitflow,
+  toBoardPatch: (value) => ({ git: { gitflow: value } }),
+  isValid: (value): value is boolean => typeof value === 'boolean',
+  defaultValue: DEFAULT_GIT.gitflow,
+};
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+const gitDevelopBranchKey: SyncedKey<string> = {
+  key: 'git.developBranch',
+  fromBoard: (board) => board.git.developBranch,
+  toBoardPatch: (value) => ({ git: { developBranch: value } }),
+  isValid: isString,
+  defaultValue: DEFAULT_GIT.developBranch,
+};
+
+const gitFeaturePrefixKey: SyncedKey<string> = {
+  key: 'git.featurePrefix',
+  fromBoard: (board) => board.git.featurePrefix,
+  toBoardPatch: (value) => ({ git: { featurePrefix: value } }),
+  isValid: isString,
+  defaultValue: DEFAULT_GIT.featurePrefix,
+};
+
+const gitBugfixPrefixKey: SyncedKey<string> = {
+  key: 'git.bugfixPrefix',
+  fromBoard: (board) => board.git.bugfixPrefix,
+  toBoardPatch: (value) => ({ git: { bugfixPrefix: value } }),
+  isValid: isString,
+  defaultValue: DEFAULT_GIT.bugfixPrefix,
+};
+
+const gitHotfixPrefixKey: SyncedKey<string> = {
+  key: 'git.hotfixPrefix',
+  fromBoard: (board) => board.git.hotfixPrefix,
+  toBoardPatch: (value) => ({ git: { hotfixPrefix: value } }),
+  isValid: isString,
+  defaultValue: DEFAULT_GIT.hotfixPrefix,
+};
+
+const gitReleasePrefixKey: SyncedKey<string> = {
+  key: 'git.releasePrefix',
+  fromBoard: (board) => board.git.releasePrefix,
+  toBoardPatch: (value) => ({ git: { releasePrefix: value } }),
+  isValid: isString,
+  defaultValue: DEFAULT_GIT.releasePrefix,
+};
+
 /** As sete chaves de Git/paralelo: as únicas que passam pela migração única. */
 export const GIT_KEYS: SyncedKey<unknown>[] = [
   gitModeKey,
@@ -157,7 +212,7 @@ export const GIT_KEYS: SyncedKey<unknown>[] = [
   gitMergeMethodKey,
 ] as SyncedKey<unknown>[];
 
-/** Chaves ligadas ao board: idioma, tema, fonte, tamanho da fonte e as sete de Git/paralelo. */
+/** Chaves ligadas ao board: idioma, tema, fonte, tamanho da fonte, as sete de Git/paralelo, os registros de decisão e as seis do gitflow. */
 export const SYNCED_KEYS: SyncedKey<unknown>[] = [
   languageKey,
   themeKey,
@@ -165,6 +220,12 @@ export const SYNCED_KEYS: SyncedKey<unknown>[] = [
   fontSizeKey,
   ...GIT_KEYS,
   gitDecisionRecordsKey,
+  gitGitflowKey,
+  gitDevelopBranchKey,
+  gitFeaturePrefixKey,
+  gitBugfixPrefixKey,
+  gitHotfixPrefixKey,
+  gitReleasePrefixKey,
 ] as SyncedKey<unknown>[];
 
 /** Marca em `meta`, por banco: a migração do Git/paralelo para o Settings já rodou. */
@@ -337,6 +398,11 @@ export class IdeSettings {
     if (Object.is(value, synced.fromBoard(router.snapshot().board))) return;
     this.lastWritten.set(synced.key, value);
     router.handle({ type: 'settings.board.update', patch: synced.toBoardPatch(value) });
+    // O board normaliza o que recebe (prefixo vazio vira `feature/`, padrão de nome antigo vira o novo) e,
+    // na abertura, o `onDidChange` ainda não está ligado: sem este passo, o Settings ficaria com o valor
+    // que o board recusou até a próxima mudança do board.
+    const stored = synced.fromBoard(router.snapshot().board);
+    if (!Object.is(stored, value) && !Object.is(stored, this.lastWritten.get(synced.key))) this.copyToSettings(synced, stored);
   }
 
   /**

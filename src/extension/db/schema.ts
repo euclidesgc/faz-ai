@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 30;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -366,6 +366,14 @@ const MIGRATIONS: Record<number, string> = {
     -- até onde vai o modo autônomo da história: a coluna em que a IA faz o trabalho, pede a revisão e o
     -- modo se desliga. '' = até a última coluna em que a IA atua (o pull request).
     ALTER TABLE cards ADD COLUMN yolo_until TEXT NOT NULL DEFAULT '';
+  `,
+  30: `
+    -- #462: tipo de branch do gitflow que cada tipo de card gera ('feature' | 'bugfix' | 'hotfix').
+    -- Fica no tipo, não no nome: renomear o tipo não muda a branch. Os nomes guardados são sempre os em
+    -- português (ver BUG_TYPE em shared/priority.ts), então o padrão dos boards existentes sai pelo nome.
+    ALTER TABLE card_types ADD COLUMN branch_kind TEXT NOT NULL DEFAULT 'feature';
+    UPDATE card_types SET branch_kind = 'hotfix' WHERE name = 'Bug';
+    UPDATE card_types SET branch_kind = 'bugfix' WHERE name = 'Retrabalho';
   `,
 };
 

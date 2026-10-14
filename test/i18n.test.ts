@@ -10,6 +10,8 @@ import { settings } from '../src/webview/i18n/en/settings';
 import { shared } from '../src/webview/i18n/en/shared';
 import { workflows } from '../src/webview/i18n/en/workflows';
 import { fill, setLocale, t, tn } from '../src/webview/i18n';
+import { flowRows } from '../src/shared/gitflow';
+import { DEFAULT_GIT } from '../src/shared/git';
 
 const ROOT = path.resolve(__dirname, '../src/webview');
 
@@ -85,5 +87,38 @@ describe('i18n: t, tn e mensagens do host', () => {
 
   it('fill deixa o que não tem parâmetro como está', () => {
     expect(fill('Olá {nome} e {outro}', { nome: 'Ana' })).toBe('Olá Ana e {outro}');
+  });
+});
+
+describe('i18n: gitflow', () => {
+  it('os textos fixos da seção do gitflow e das linhas da tabela têm tradução', () => {
+    const rows = flowRows(DEFAULT_GIT, [], 'main').map((r) => r.kind);
+    expect(rows).toEqual(['main', 'develop', 'feature', 'bugfix', 'hotfix', 'release']);
+    for (const text of [
+      'branch principal do repositório',
+      'branch de integração',
+      'processo de release do projeto',
+      'nenhum tipo de card',
+      'branch padrão do origin',
+      'nome local',
+      'branch atual',
+      'Gerada por',
+      'Parte de',
+      'PR para',
+      'Usar o gitflow',
+      'Branch de integração',
+    ])
+      expect(EN, text).toHaveProperty([text]);
+  });
+
+  it('em inglês as origens da principal e as colunas da tabela saem traduzidas', () => {
+    setLocale('en');
+    expect([t('branch padrão do origin'), t('Gerada por'), t('Parte de'), t('PR para')]).toEqual([
+      "origin's default branch",
+      'Created by',
+      'Starts from',
+      'PR to',
+    ]);
+    setLocale('pt-BR');
   });
 });

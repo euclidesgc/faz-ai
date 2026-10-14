@@ -185,8 +185,8 @@ export const settings: Record<string, string> = {
     "Each story works on its own branch, created by the board with a predictable name. Sub-tasks commit to the story's branch. The branch is created when the AI calls <code>prepare_workspace</code> (the default Implementation phase asks for it) or by the button on the card.",
   'Onde a IA mexe no código': 'Where the AI works on the code',
   'Nome da branch': 'Branch name',
-  'Aceita <code>{tipo}</code>, <code>{numero}</code> (obrigatório) e <code>{titulo}</code>. Exemplo: <code>{exemplo}</code>':
-    'Accepts <code>{tipo}</code>, <code>{numero}</code> (required) and <code>{titulo}</code>. Example: <code>{exemplo}</code>',
+  'Aceita <code>{fluxo}</code> (o prefixo do tipo de branch), <code>{tipo}</code>, <code>{numero}</code> (obrigatório) e <code>{titulo}</code>. Exemplo: <code>{exemplo}</code>':
+    'Accepts <code>{fluxo}</code> (the branch type prefix), <code>{tipo}</code>, <code>{numero}</code> (required) and <code>{titulo}</code>. Example: <code>{exemplo}</code>',
   História: 'Story',
   'Login com Google': 'Sign in with Google',
   'Pasta das worktrees': 'Worktrees folder',
@@ -374,4 +374,46 @@ export const settings: Record<string, string> = {
   'mais abaixo, nesta mesma aba': 'further down, in this same tab',
   'A IA lê o arquivo de cada skill marcada ao executar. Só aparecem as skills marcadas em Configurações → Harness. Busque pelo nome ou pela descrição.':
     'The AI reads the file of every checked skill when it runs. Only skills checked in Settings → Harness are listed. Search by name or description.',
+
+  // gitflow (#462)
+  'Com o gitflow, funcionalidades e correções partem da branch de integração (develop) e voltam para ela; só o hotfix parte da principal. O prefixo da branch mostra o tipo de trabalho.':
+    'With gitflow, features and fixes start from the integration branch (develop) and go back to it; only the hotfix starts from the main branch. The branch prefix shows the kind of work.',
+  'Principal: <code>{name}</code> ({origin})': 'Main: <code>{name}</code> ({origin})',
+  'Principal: não detectada (esta pasta não é um repositório git).': 'Main: not detected (this folder is not a git repository).',
+  'branch padrão do origin': "origin's default branch",
+  'nome local': 'local name',
+  'branch atual': 'current branch',
+  principal: 'main',
+  'Branches do gitflow': 'Gitflow branches',
+  Branch: 'Branch',
+  'Gerada por': 'Created by',
+  'Parte de': 'Starts from',
+  'PR para': 'PR to',
+  'branch principal do repositório': 'main branch of the repository',
+  'branch de integração': 'integration branch',
+  'processo de release do projeto': "the project's release process",
+  'nenhum tipo de card': 'no card type',
+  'Quando usar Retrabalho': 'When to use Rework',
+  '<b>Quando usar Retrabalho:</b> um defeito numa funcionalidade que ainda só está na <code>{develop}</code> é Retrabalho (bugfix), não Bug (hotfix). Bug é o defeito que já está na principal (<code>{main}</code>) e precisa de correção urgente.':
+    '<b>When to use Rework:</b> a defect in a feature that is still only on <code>{develop}</code> is Rework (bugfix), not Bug (hotfix). Bug is the defect that is already on the main branch (<code>{main}</code>) and needs an urgent fix.',
+  'As branches saem da principal (<code>{main}</code>) e os pull requests vão para ela.':
+    'Branches start from the main branch (<code>{main}</code>) and pull requests go to it.',
+  'Usar o gitflow': 'Use gitflow',
+  'Branch de integração': 'Integration branch',
+  'Prefixo de feature': 'Feature prefix',
+  'Prefixo de bugfix': 'Bugfix prefix',
+  'Prefixo de hotfix': 'Hotfix prefix',
+  'Prefixo de release': 'Release prefix',
+  'Vazio volta ao padrão (<code>{padrao}</code>).': 'Empty goes back to the default (<code>{padrao}</code>).',
+  'Valores no Settings do editor': 'Values in the editor Settings',
+  sim: 'yes',
+  não: 'no',
+  'Abrir o gitflow no Settings do editor': 'Open gitflow in the editor Settings',
+  'Tipo de branch por tipo de card': 'Branch kind per card type',
+  'Cada tipo de card das histórias gera um tipo de branch. A escolha fica no tipo: renomear o tipo não muda a branch. A release não sai de um tipo de card; é o processo de release do projeto.':
+    "Each story card type creates a branch kind. The choice stays on the type: renaming the type does not change the branch. The release does not come from a card type; it is the project's release process.",
+  'Tipo de branch de {name}': 'Branch kind of {name}',
+  Feature: 'Feature',
+  Bugfix: 'Bugfix',
+  Hotfix: 'Hotfix',
 };

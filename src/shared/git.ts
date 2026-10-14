@@ -2,9 +2,27 @@
 
 export type WorkspaceMode = 'worktree' | 'branch' | 'off';
 
+/** Tipo de branch do gitflow que um tipo de card gera. */
+export type BranchKind = 'feature' | 'bugfix' | 'hotfix';
+/** release só tem prefixo nesta entrega: nenhum tipo de card gera release (#462, RF08) */
+export const BRANCH_KINDS: { value: BranchKind; label: string }[] = [
+  { value: 'feature', label: 'Feature' },
+  { value: 'bugfix', label: 'Bugfix' },
+  { value: 'hotfix', label: 'Hotfix' },
+];
+/** nomes guardados (sempre em português) dos tipos do board padrão que não geram feature */
+export const DEFAULT_BRANCH_KINDS: Record<string, BranchKind> = { Retrabalho: 'bugfix', Bug: 'hotfix' };
+
+/** De onde veio a branch principal detectada: o HEAD do origin, o nome (main/master) ou a branch atual. */
+export type MainSource = 'origin' | 'name' | 'current';
+export interface MainBranch {
+  name: string;
+  source: MainSource;
+}
+
 export interface GitConfig {
   mode: WorkspaceMode;
-  /** nome da branch; aceita {tipo}, {numero} e {titulo} */
+  /** nome da branch; aceita {fluxo}, {tipo}, {numero} e {titulo} */
   branchPattern: string;
   /** pasta onde ficam as worktrees, relativa à pasta do projeto; aceita {repo} */
   worktreeDir: string;
@@ -16,6 +34,16 @@ export interface GitConfig {
    * história, a partir da Spec aprovada, e o leva no pull request; '' = desligado
    */
   decisionRecords: string;
+  /** gitflow: feature e bugfix partem da develop e voltam para ela; hotfix parte da principal */
+  gitflow: boolean;
+  /** branch de integração do gitflow */
+  developBranch: string;
+  /** prefixos que entram em {fluxo}, com a barra (ou sem: `feat-` gera `feat-12-...`) */
+  featurePrefix: string;
+  bugfixPrefix: string;
+  hotfixPrefix: string;
+  /** só informativo nesta entrega: nenhum tipo de card gera release */
+  releasePrefix: string;
 }
 
 export type MergeMethod = 'squash' | 'merge' | 'rebase';
@@ -40,14 +68,41 @@ export const WORKSPACE_MODES: { value: WorkspaceMode; label: string; hint: strin
   { value: 'off', label: 'Desligado', hint: 'O board não cria branches nem worktrees.' },
 ];
 
+/** padrão de fábrica até a 0.37.0: convertido para o novo ao ler (#462, RF07) */
+export const LEGACY_BRANCH_PATTERN = '{tipo}/{numero}-{titulo}';
+
 export const DEFAULT_GIT: GitConfig = {
   mode: 'worktree',
-  branchPattern: '{tipo}/{numero}-{titulo}',
+  branchPattern: '{fluxo}{numero}-{titulo}',
   worktreeDir: '../{repo}.worktrees',
   autoMerge: false,
   mergeMethod: 'squash',
   decisionRecords: '',
+  gitflow: true,
+  developBranch: 'develop',
+  featurePrefix: 'feature/',
+  bugfixPrefix: 'bugfix/',
+  hotfixPrefix: 'hotfix/',
+  releasePrefix: 'release/',
 };
+
+/** O que o git aceita num nome de ref: só [A-Za-z0-9._/-], sem '..', '//', '@{', sem começar com '/', '.' ou '-'. */
+const validRef = (v: string): boolean =>
+  /^[A-Za-z0-9._/-]+$/.test(v) && !v.includes('..') && !v.includes('//') && !v.includes('@{') && !/^[/.-]/.test(v);
+
+/** Prefixo de branch aceito pelo git, ou o padrão: vazio ou inválido volta ao padrão (RF04). */
+export function cleanPrefix(v: unknown, fallback: string): string {
+  if (typeof v !== 'string') return fallback;
+  const p = v.trim();
+  return p && validRef(p) ? p : fallback;
+}
+
+/** Nome de branch aceito pelo git (as regras do prefixo, e sem '/' no fim), ou o padrão. */
+export function cleanBranchName(v: unknown, fallback: string): string {
+  if (typeof v !== 'string') return fallback;
+  const n = v.trim();
+  return n && validRef(n) && !n.endsWith('/') ? n : fallback;
+}
 
 /** A pasta dos registros de decisão, limpa: relativa, com barras normais e sem barra nas pontas; '' quando não vale. */
 export function cleanDecisionDir(v: unknown): string {
@@ -73,7 +128,9 @@ export function parseGit(json: string | null | undefined): GitConfig {
   } catch {
     /* inválido: usa os padrões */
   }
-  const pattern = text(raw.branchPattern, DEFAULT_GIT.branchPattern);
+  let pattern = text(raw.branchPattern, DEFAULT_GIT.branchPattern);
+  // o padrão de fábrica antigo é indistinguível de uma escolha deliberada: vira o novo na leitura (RF07)
+  if (pattern === LEGACY_BRANCH_PATTERN) pattern = DEFAULT_GIT.branchPattern;
   return {
     mode: WORKSPACE_MODES.some((m) => m.value === raw.mode) ? (raw.mode as WorkspaceMode) : DEFAULT_GIT.mode,
     // sem o número, duas histórias de mesmo título disputariam a mesma branch
@@ -82,6 +139,13 @@ export function parseGit(json: string | null | undefined): GitConfig {
     autoMerge: raw.autoMerge === true,
     mergeMethod: MERGE_METHODS.some((m) => m.value === raw.mergeMethod) ? (raw.mergeMethod as MergeMethod) : DEFAULT_GIT.mergeMethod,
     decisionRecords: cleanDecisionDir(raw.decisionRecords),
+    // ausente vale ligado, também em board antigo (RF01)
+    gitflow: raw.gitflow !== false,
+    developBranch: cleanBranchName(raw.developBranch, DEFAULT_GIT.developBranch),
+    featurePrefix: cleanPrefix(raw.featurePrefix, DEFAULT_GIT.featurePrefix),
+    bugfixPrefix: cleanPrefix(raw.bugfixPrefix, DEFAULT_GIT.bugfixPrefix),
+    hotfixPrefix: cleanPrefix(raw.hotfixPrefix, DEFAULT_GIT.hotfixPrefix),
+    releasePrefix: cleanPrefix(raw.releasePrefix, DEFAULT_GIT.releasePrefix),
   };
 }
 
@@ -96,8 +160,10 @@ export const slug = (s: string, max = 40): string =>
     .slice(0, max)
     .replace(/-+$/, '');
 
-export function branchName(pattern: string, card: { type: string; number: number; title: string }): string {
+/** {fluxo} recebe o prefixo como veio (com a barra); ver `flowPrefix` em gitflow.ts. */
+export function branchName(pattern: string, card: { type: string; number: number; title: string; flow: string }): string {
   const name = pattern
+    .replace(/\{fluxo\}/g, card.flow)
     .replace(/\{tipo\}/g, slug(card.type) || 'card')
     .replace(/\{numero\}/g, String(card.number))
     .replace(/\{titulo\}/g, slug(card.title) || 'sem-titulo');

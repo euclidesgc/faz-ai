@@ -135,7 +135,15 @@ describe('campos', () => {
 });
 
 describe('typesOf / checklistOf / subtaskSlot', () => {
-  const type = (id: string, defaultWorkflowId: string) => ({ id, boardId: 'b', name: id, color: '#000', defaultWorkflowId, defaults: {} });
+  const type = (id: string, defaultWorkflowId: string) => ({
+    id,
+    boardId: 'b',
+    name: id,
+    color: '#000',
+    defaultWorkflowId,
+    defaults: {},
+    branchKind: 'feature' as const,
+  });
   const item = (id: string, cardId: string, position: number) => ({ id, cardId, text: id, done: false, position });
 
   it('typesOf traz só os tipos que nascem no workflow', () => {
@@ -178,7 +186,12 @@ describe('workflowDeleteBlocker', () => {
     const s = boardState();
     expect(workflowDeleteBlocker({ ...s, workflows: s.workflows.slice(0, 1) }, 'wp')).toBe('O board precisa de ao menos um workflow');
     expect(workflowDeleteBlocker({ ...s, cards: [card('c1', { workflowId: 'wc', archivedAt: 1 })] }, 'wc')).toContain('1 card(s)');
-    const withType = { ...s, cardTypes: [{ id: 't', boardId: 'b', name: 'T', color: '#000', defaultWorkflowId: 'wc', defaults: {} }] };
+    const withType = {
+      ...s,
+      cardTypes: [
+        { id: 't', boardId: 'b', name: 'T', color: '#000', defaultWorkflowId: 'wc', defaults: {}, branchKind: 'feature' as const },
+      ],
+    };
     expect(workflowDeleteBlocker(withType, 'wc')).toContain('1 tipo(s)');
     expect(workflowDeleteBlocker(s, 'nao-existe')).toBe('Workflow não encontrado');
   });

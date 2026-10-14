@@ -138,6 +138,21 @@ describe('servidor MCP', () => {
     expect(description('get_harness')).toContain('contexto vazio');
   });
 
+  it('o pull request é aberto com --base em workspace.prBase: instruções, prepare_workspace, set_pull_request e nota do modo autônomo (#462)', async () => {
+    const tools = (await client.listTools()).tools;
+    const description = (name: string) => tools.find((t) => t.name === name)!.description;
+    expect(client.getInstructions()).toContain('Pull request: sempre com --base em workspace.prBase do get_card.');
+    expect(description('prepare_workspace')).toMatch(/parte da base do fluxo[\s\S]*`prBase`/);
+    expect(description('set_pull_request')).toContain('`--base` em `workspace.prBase`');
+    // a história ainda sem branch não sabe a base: a nota manda ler workspace.prBase do get_card
+    await call('create_card', { title: 'Login', column: 'Backlog' });
+    router.handle({ type: 'card.yolo.set', cardId: router.snapshot().cards[0]!.id, enabled: true });
+    await call('move_card', { card: 1, column: 'Homologação' });
+    expect((await call('get_card', { card: 1 })).data.phase.autonomousNote).toContain(
+      'abra o pull request com --base em workspace.prBase do get_card',
+    );
+  });
+
   it('parâmetro desconhecido é erro com o nome dele, e nada é criado', async () => {
     // um nome errado não pode virar o comportamento padrão: `story` no lugar de `parent` criaria uma história
     const res = await call('create_card', { title: 'Subtrair', story: 1 });

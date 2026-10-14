@@ -14,6 +14,8 @@ import { ChecklistRepo } from '../../repositories/checklistRepo';
 import { LinkRepo } from '../../repositories/linkRepo';
 import { CommentRepo } from '../../repositories/commentRepo';
 import { SettingsRepo } from '../../repositories/settingsRepo';
+import { detectMainBranch } from '../../git';
+import type { MainBranch } from '../../../shared/git';
 import { BoardHarness } from './harness';
 
 export interface RouterOptions {
@@ -56,6 +58,8 @@ export class BoardContext {
   readonly pendingImports = new Map<string, BoardExportFile>();
   /** resultado da última importação, para a mensagem de resultado */
   lastImport: ImportResult | null = null;
+  /** a principal detectada; undefined enquanto não foi calculada (ver `mainBranch`) */
+  private main: MainBranch | null | undefined;
 
   constructor(
     readonly dbHandle: DbHandle,
@@ -85,6 +89,16 @@ export class BoardContext {
 
   get home(): string {
     return this.opts.homeDir ?? '';
+  }
+
+  /**
+   * A branch principal do repositório do projeto, em cache: rodar git a cada snapshot custaria caro.
+   * Calculada na primeira leitura (a abertura) e recalculada com `refresh` (depois de cada criação de
+   * branch e quando a tela Git pede). null fora de um repositório git ou sem pasta de projeto.
+   */
+  mainBranch(refresh = false): MainBranch | null {
+    if (refresh || this.main === undefined) this.main = this.opts.workspaceDir ? detectMainBranch(this.opts.workspaceDir) : null;
+    return this.main;
   }
 }
 

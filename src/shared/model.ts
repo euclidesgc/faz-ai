@@ -11,7 +11,7 @@ import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { AiRunOrigin } from './log';
-import type { GitConfig } from './git';
+import type { BranchKind, GitConfig, MainBranch } from './git';
 
 export type Id = string;
 
@@ -86,6 +86,8 @@ export interface CardType {
   defaultWorkflowId: Id;
   /** valores de campos aplicados a cada card novo deste tipo (fieldId → valor) */
   defaults: Record<Id, FieldValue>;
+  /** tipo de branch do gitflow que as histórias deste tipo geram; fica no tipo para renomear não mudar a branch */
+  branchKind: BranchKind;
 }
 
 export interface Card {
@@ -117,7 +119,7 @@ export interface Card {
   branch: string;
   /** pasta em que o código da história é alterado: a worktree, ou a pasta do projeto no modo "branch" */
   worktreePath: string;
-  /** branch de onde a da história partiu, quando não é a principal (histórias empilhadas); vazio = a principal */
+  /** branch de onde a da história partiu (develop, a principal ou a anterior da pilha); vazio = a principal (histórias anteriores ao gitflow) */
   baseBranch: string;
   /** quando a branch da história foi criada (epoch ms em texto); vazio enquanto a branch não existe */
   branchCreatedAt: string;
@@ -283,4 +285,6 @@ export interface BoardState {
   environmentFirstRun: boolean;
   /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */
   harnessInstall: InstallPreview | null;
+  /** branch principal detectada no repositório do projeto; null fora de um repositório git */
+  mainBranch: MainBranch | null;
 }
