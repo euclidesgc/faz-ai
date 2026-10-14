@@ -119,6 +119,30 @@ describe('heartbeat', () => {
     expect(rounds).toBe(2);
   });
 
+  it('enqueue inicia a história na hora, mesmo com o heartbeat desligado, sem duplicar', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false } } });
+    create('A', 'Implementação'); // #1
+    heartbeat.enqueue(card(1).id);
+    heartbeat.enqueue(card(1).id);
+    expect(runner.started.map(number)).toEqual([1]);
+    expect(runner.origins).toEqual(['heartbeat']);
+  });
+
+  it('enqueue respeita o teto: o que não cabe espera na fila, na ordem', () => {
+    create('A', 'Implementação'); // #1
+    create('B', 'Implementação'); // #2
+    create('C', 'Implementação'); // #3
+    heartbeat.enqueue(card(1).id);
+    heartbeat.enqueue(card(3).id);
+    heartbeat.enqueue(card(2).id);
+    expect(runner.started.map(number)).toEqual([1]);
+    expect(heartbeat.queued).toBe(2);
+    runner.finish();
+    expect(runner.started.map(number)).toEqual([1, 3]);
+    runner.finish();
+    expect(runner.started.map(number)).toEqual([1, 3, 2]);
+  });
+
   it('escolhe uma execução por história, na ordem da fila', () => {
     create('A', 'PRD'); // #1 pronto
     create('Sub de A', 'A fazer', 1); // #2: tratada junto com #1

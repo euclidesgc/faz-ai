@@ -101,6 +101,18 @@ export class Heartbeat {
     return this.queue.length ? this.queue.length : this.round();
   }
 
+  /**
+   * Enfileira a história do card (ou o próprio card, se for uma história) e tenta iniciar na hora, sem
+   * esperar a rodada e sem depender de `runner.heartbeat`: é o que a aprovação de uma pessoa pede.
+   * Respeita os tetos de paralelismo; sem vaga, a história fica na fila.
+   */
+  enqueue(cardId: string): void {
+    const card = this.deps.snapshot().cards.find((c) => c.id === cardId);
+    const storyId = card?.parentId ?? card?.id;
+    if (storyId && !this.queue.includes(storyId)) this.queue.push(storyId);
+    this.pump();
+  }
+
   /** Esvazia a fila e interrompe a execução em andamento. */
   stop(): void {
     this.queue = [];
