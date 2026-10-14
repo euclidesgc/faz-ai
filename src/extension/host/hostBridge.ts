@@ -12,9 +12,7 @@ import type { MessageRouter } from '../panel/messageRouter';
 /** Mensagens que já respondem com o próprio `requestId` (payload de leitura ou resultado de gravação): não ganham `done`. */
 const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'attachment.read',
-  'attachment.write',
   'harness.file.read',
-  'harness.file.write',
   'harness.project.profile',
   'metrics.query',
   'card.usage.query',
@@ -234,20 +232,10 @@ export class HostBridge {
       case 'harness.plugin.apply':
         this.post({ type: 'notice', message: await this.router.applyPlugins(msg.tool, msg.action, msg.ids) });
         return;
-      case 'harness.file.write': {
-        try {
-          this.router.writeHarnessFile(msg.path, msg.content);
-          this.post({ type: 'harness.file.writeResult', requestId: msg.requestId, ok: true });
-        } catch (e) {
-          this.post({
-            type: 'harness.file.writeResult',
-            requestId: msg.requestId,
-            ok: false,
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
+      case 'harness.file.write':
+        // a falha (JSON inválido, sem permissão) vira o erro do `done`, e a tela mantém o texto
+        this.router.writeHarnessFile(msg.path, msg.content);
         return;
-      }
       case 'harness.skill.file.create':
         await this.env.openFile(this.router.createSkillFile(msg.tool, msg.path, msg.file, msg.link));
         return;
@@ -375,22 +363,8 @@ export class HostBridge {
       }
       case 'attachment.write': {
         const a = this.router.getAttachment(msg.attachmentId);
-        if (!a) {
-          this.post({ type: 'attachment.writeResult', requestId: msg.requestId, ok: false, error: 'Anexo não encontrado' });
-          return;
-        }
-        const file = this.router.store.pathOf(a);
-        try {
-          await fs.writeFile(file, msg.content, 'utf8');
-          this.post({ type: 'attachment.writeResult', requestId: msg.requestId, ok: true });
-        } catch (e) {
-          this.post({
-            type: 'attachment.writeResult',
-            requestId: msg.requestId,
-            ok: false,
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
+        if (!a) throw new Error('Anexo não encontrado');
+        await fs.writeFile(this.router.store.pathOf(a), msg.content, 'utf8');
         return;
       }
       default:

@@ -154,7 +154,7 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
       path: rule,
       content: '---\ndescription: Estilo do código\n---\n# Estilo\n',
     });
-    expect(sent.at(-1)).toEqual({ type: 'harness.file.writeResult', requestId: 'w1', ok: true });
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'w1', ok: true });
     expect(fs.readFileSync(rule, 'utf8')).toContain('Estilo do código');
     const item = router
       .snapshot()
@@ -366,14 +366,14 @@ describe('HostBridge: attachment.read / attachment.write', () => {
   it('grava o conteúdo editado de volta no arquivo do anexo', async () => {
     const id = createAttachment('original');
     await bridge.handle({ type: 'attachment.write', requestId: 'w1', attachmentId: id, content: 'editado' });
-    expect(sent.at(-1)).toEqual({ type: 'attachment.writeResult', requestId: 'w1', ok: true });
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'w1', ok: true });
     const a = router.getAttachment(id)!;
     expect(fs.readFileSync(router.store.pathOf(a), 'utf8')).toBe('editado');
   });
 
   it('attachment.write de anexo inexistente devolve ok:false', async () => {
     await bridge.handle({ type: 'attachment.write', requestId: 'w2', attachmentId: 'nope', content: 'x' });
-    expect(sent.at(-1)).toEqual({ type: 'attachment.writeResult', requestId: 'w2', ok: false, error: 'Anexo não encontrado' });
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'w2', ok: false, error: 'Anexo não encontrado' });
   });
 
   it('attachment.write que falha na escrita devolve ok:false com o erro, sem derrubar a sessão', async () => {
@@ -382,7 +382,7 @@ describe('HostBridge: attachment.read / attachment.write', () => {
     fs.rmSync(path.dirname(router.store.pathOf(a)), { recursive: true, force: true });
     await bridge.handle({ type: 'attachment.write', requestId: 'w3', attachmentId: id, content: 'novo' });
     const last = sent.at(-1) as { type: string; ok: boolean; error?: string };
-    expect(last.type).toBe('attachment.writeResult');
+    expect(last.type).toBe('done');
     expect(last.ok).toBe(false);
     expect(last.error).toBeTruthy();
   });

@@ -62,7 +62,6 @@ export const card: Record<string, string> = {
   'Copiar conteúdo': 'Copy content',
   'Só anexos de texto têm conteúdo para copiar.': 'Only text attachments have content to copy.',
   'Salvar como…': 'Save as…',
-  'Não foi possível salvar o anexo.': 'Could not save the attachment.',
   'Remover anexo': 'Remove attachment',
   'Remover "{name}"?': 'Remove "{name}"?',
   'O arquivo anexado será apagado.': 'The attached file will be deleted.',

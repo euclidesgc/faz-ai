@@ -105,7 +105,6 @@ export const harness: Record<string, string> = {
   'Somente leitura: este arquivo é mantido pela ferramenta ou por um plugin.':
     'Read-only: this file is maintained by the tool or by a plugin.',
   'Conteúdo do arquivo': 'File content',
-  'Não foi possível salvar o arquivo.': 'The file could not be saved.',
   'Modo da skill {name}': 'Mode of skill {name}',
   'Skill importada: o modo nativo é de quem mantém a pasta, e no board o que vale é o modo do artefato.':
     "Imported skill: the native mode belongs to whoever keeps the folder, and on the board what counts is the artifact's mode.",
