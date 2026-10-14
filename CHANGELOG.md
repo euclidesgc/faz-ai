@@ -4,7 +4,7 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+## 0.42.0
 
 - **Harness mais claro de usar.** A tela de Harness de IA abre com o aviso **Como usar o Harness**: para que a área serve, por que o board trabalha com contexto vazio e por onde começar (Indicar artefatos, criar um agente com ajuda, revisar as regras desligadas), com **Entendi, não mostrar de novo**; o botão **Como funciona** no cabeçalho traz o aviso de volta. As abas de assunto da ferramenta do projeto passam a dizer no título quantos artefatos estão no board e, nas regras, quantas esperam revisão. A origem Board de um assunto vazio explica o próximo passo e leva direto a Projeto ou Global.
 

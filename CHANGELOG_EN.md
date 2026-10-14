@@ -5,7 +5,7 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+## 0.42.0
 
 - **Clearer Harness.** The AI Harness screen opens with the **Como usar o Harness** (how to use the Harness) notice: what the area is for, why the board works from an empty context and where to start (Indicar artefatos, create an agent with help, review the rules that entered off), with **Entendi, não mostrar de novo** (got it, do not show again); the **Como funciona** (how it works) button in the header brings the notice back. The subject tabs of the project's tool now say in their title how many artifacts are on the board and, for rules, how many await review. The Board origin of an empty subject explains the next step and goes straight to Projeto or Global.
 
