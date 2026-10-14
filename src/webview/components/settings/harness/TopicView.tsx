@@ -95,7 +95,7 @@ export function TopicView({ tool, topic }: { tool: AiTool; topic: TopicInfo }) {
         >
           {origins.map((id) => (
             <SegmentedControl.Item key={id} value={id}>
-              {id === 'board' ? 'Board' : t(HARNESS_SCOPES.find((x) => x.id === id)!.label)}
+              {id === 'board' ? t('Board') : t(HARNESS_SCOPES.find((x) => x.id === id)!.label)}
             </SegmentedControl.Item>
           ))}
         </SegmentedControl.Root>

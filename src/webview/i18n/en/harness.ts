@@ -107,6 +107,8 @@ export const harness: Record<string, string> = {
   'Conteúdo do arquivo': 'File content',
   'Não foi possível salvar o arquivo.': 'The file could not be saved.',
   'Modo da skill {name}': 'Mode of skill {name}',
+  'Skill importada: o modo nativo é de quem mantém a pasta, e no board o que vale é o modo do artefato.':
+    "Imported skill: the native mode belongs to whoever keeps the folder, and on the board what counts is the artifact's mode.",
   'Skill de plugin: o modo não pode ser alterado aqui. Para mudar, copie a skill para o projeto.':
     'Plugin skill: the mode cannot be changed here. To change it, copy the skill to the project.',
   'Referências, modelos e scripts da pasta da skill': "References, templates and scripts from the skill's folder",

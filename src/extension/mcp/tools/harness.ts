@@ -63,8 +63,8 @@ export function registerHarnessTools(tool: DefineTool): void {
         .array(
           z.object({
             kind: z.enum(SELECTABLE_KINDS as [SelectableKind, ...SelectableKind[]]),
-            location: z.string().optional().describe('Caminho como em get_harness'),
-            name: z.string().optional().describe('Nome do agente ou da skill, quando não souber o caminho'),
+            location: z.string().optional().describe('A `key` como em get_harness (o caminho; num servidor MCP, `arquivo#nome`)'),
+            name: z.string().optional().describe('Nome do agente, da skill ou do servidor MCP, quando não souber a chave'),
           }),
         )
         .min(1),
@@ -74,7 +74,10 @@ export function registerHarnessTools(tool: DefineTool): void {
       const s = router.snapshot();
       const items = s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
       const resolved = a.items.map((i) => {
-        const found = items.find((x) => x.kind === i.kind && (i.location ? x.location === i.location : x.name === i.name));
+        // `location` é a `key` do get_harness (num servidor MCP, arquivo mais `#nome`); o caminho sem o nome também vale
+        const found = items.find(
+          (x) => x.kind === i.kind && (i.location ? selectionKey(x) === i.location || x.location === i.location : x.name === i.name),
+        );
         if (!found) throw new Error(`Item ${i.kind} "${i.location ?? i.name ?? ''}" não encontrado no harness da ferramenta em uso.`);
         return { kind: i.kind, location: selectionKey(found) };
       });

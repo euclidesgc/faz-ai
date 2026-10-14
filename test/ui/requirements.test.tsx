@@ -224,7 +224,7 @@ describe('aviso compacto do que falta (no lugar da faixa no topo do board)', () 
 describe('faixa de requisitos: definição do harness', () => {
   it('é só recomendação: a linha discreta diz o que falta e leva ao Harness de IA', async () => {
     // o teste anterior monta o App, que deixa a interface no idioma do navegador (inglês no jsdom)
-    setLocale('pt');
+    setLocale('pt-BR');
     set([{ id: 'harness', tool: 'cursor', optional: true, harnessIssues: ['artifacts', 'rules'], action: { kind: 'settings' } }]);
     renderThemed(<RequirementsBanner />);
     expect(region()).toHaveClass('recommended');

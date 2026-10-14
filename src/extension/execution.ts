@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { EXEC_ENFORCEMENT, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
 import type { AiTool } from '../shared/harness';
+import { selectedMcpNames } from '../shared/harnessSelection';
 import { byPath } from './samePath';
 import type { BoardState, Card } from '../shared/model';
 
@@ -239,15 +240,35 @@ export function executionPlan(
   };
 }
 
-/** Execução sem agente e sem card (chat do board, sugestão de agentes): contexto vazio, só o servidor do board. */
-export function bareExec(model: ExecInput['model'], board?: BoardServerSpec): ExecInput {
+/**
+ * Execução sem agente e sem card (chat do board, sugestões, "Indicar artefatos"): contexto vazio, só o
+ * servidor do board e, com `s`, os servidores do board em modo "Sempre" (eles entram em toda
+ * interação). Um servidor Sempre sem definição conhecida fica de fora, sem erro: o chat não pode parar
+ * por causa dele.
+ */
+export function bareExec(
+  model: ExecInput['model'],
+  board?: BoardServerSpec,
+  s?: BoardState,
+  dirs?: { projectDir: string; homeDir: string },
+): ExecInput {
+  const always = s && s.board.aiTool === 'claude' && dirs ? selectedMcpNames(s, 'always') : [];
+  const defs = always.length ? claudeServers(dirs!.projectDir, dirs!.homeDir) : {};
+  for (const name of always)
+    if (!defs[name]) {
+      const item = s!.harness.inventory.find((t) => t.tool === 'claude')?.items.find((i) => i.kind === 'mcp' && i.name === name);
+      const def = item?.path.endsWith('.json') ? obj(readJson(item.path).mcpServers)[name] : undefined;
+      if (def) defs[name] = def;
+    }
+  const allowed = always.filter((n) => defs[n]);
+  if (board) defs[BOARD_SERVER] = { type: 'stdio', ...board };
   return {
     agent: '',
     agentDefinition: null,
     delegates: [],
-    mcpAllowed: [],
+    mcpAllowed: allowed,
     mcpBlocked: [],
-    mcpConfig: board ? boardOnlyMcpConfig(board) : null,
+    mcpConfig: board ? JSON.stringify({ mcpServers: Object.fromEntries([BOARD_SERVER, ...allowed].map((n) => [n, defs[n]])) }) : null,
     tools: [],
     deniedTools: [],
     model,

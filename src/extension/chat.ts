@@ -59,7 +59,7 @@ export function suggestRulesPrompt(rulesFile = 'CLAUDE.md'): string {
     `Você vai propor regras para este projeto, pelas ferramentas do servidor MCP "faz-ai". Uma regra é uma instrução curta no arquivo de regras da ferramenta de IA (${rulesFile}) que a IA lê em toda conversa.`,
     'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, scripts de teste, lint e formatação, README, linguagens e frameworks) e o que já existe: read_rule_file e get_harness com onlySelected = false.',
     `Proponha de 3 a 5 regras que façam sentido para ESTE projeto: convenções que se vê no código, comandos de teste, lint e formatação, padrões de commit, pastas e o que nunca fazer. Cada regra com uma frase direta, no imperativo, sem repetir o que o ${rulesFile} já diz. Nada que mande ignorar o board, o servidor MCP, as aprovações ou as branches por história: o fluxo do board vale acima das regras.`,
-    `Grave com write_rule_file em ${rulesFile}, que substitui o arquivo inteiro: leia o conteúdo atual antes e devolva-o intacto com as regras novas acrescentadas no fim, em uma seção "## Regras sugeridas". Depois deixe o arquivo DESLIGADO no board com set_harness_selection (kind "instructions", location "${rulesFile}", usage "off"): a pessoa revisa e ativa.`,
+    `Grave com write_rule_file em ${rulesFile}, que substitui o arquivo inteiro: leia o conteúdo atual antes e devolva-o intacto com as regras novas acrescentadas no fim, em uma seção "## Regras sugeridas". Depois, se get_harness mostrar o arquivo FORA do board (sem usage), envie-o desligado com set_harness_selection (kind "instructions", location "${rulesFile}", usage "off"), para a pessoa revisar e ativar; se ele já estiver no board, não mude o modo dele.`,
     'Não altere outros arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: cada regra, em uma linha, e o que ficou desligado.',
   ].join('\n');
 }
@@ -112,26 +112,27 @@ export function suggestArtifactsPrompt(kind: SelectableKind, candidates: Harness
  */
 export function parseSuggestions(text: string, candidates: readonly string[]): { location: string; reason: string }[] | null {
   const allowed = new Set(candidates);
-  const start = text.indexOf('{');
-  for (let from = start; from >= 0 && from < text.length; from = text.indexOf('{', from + 1)) {
-    const end = text.lastIndexOf('}');
-    if (end <= from) break;
+  const parsed = (from: number, end: number): unknown[] | null => {
     try {
       const v: unknown = JSON.parse(text.slice(from, end + 1));
-      const items =
-        v && typeof v === 'object' && Array.isArray((v as { items?: unknown }).items) ? (v as { items: unknown[] }).items : null;
-      if (!items) continue;
-      const seen = new Set<string>();
-      return items.flatMap((raw) => {
-        const r = raw as { key?: unknown; reason?: unknown };
-        const key = typeof r?.key === 'string' ? r.key : '';
-        if (!allowed.has(key) || seen.has(key)) return [];
-        seen.add(key);
-        return [{ location: key, reason: typeof r.reason === 'string' ? r.reason.trim() : '' }];
-      });
+      return v && typeof v === 'object' && Array.isArray((v as { items?: unknown }).items) ? (v as { items: unknown[] }).items : null;
     } catch {
-      /* não era o JSON: tenta o próximo `{` */
+      return null;
     }
+  };
+  for (let from = text.indexOf('{'); from >= 0; from = text.indexOf('{', from + 1)) {
+    // a IA às vezes escreve algo com chaves depois do JSON: vale o primeiro trecho que é o JSON esperado
+    let items: unknown[] | null = null;
+    for (let end = text.lastIndexOf('}'); end > from && !items; end = text.lastIndexOf('}', end - 1)) items = parsed(from, end);
+    if (!items) continue;
+    const seen = new Set<string>();
+    return items.flatMap((raw) => {
+      const r = raw as { key?: unknown; reason?: unknown };
+      const key = typeof r?.key === 'string' ? r.key : '';
+      if (!allowed.has(key) || seen.has(key)) return [];
+      seen.add(key);
+      return [{ location: key, reason: typeof r.reason === 'string' ? r.reason.trim() : '' }];
+    });
   }
   return null;
 }
@@ -255,8 +256,11 @@ export class ChatSession {
     if (this.running) throw new Error('A IA ainda está respondendo. Espere ou interrompa.');
     const state = this.router.snapshot();
     const tool = aiToolInfo(state.board.aiTool);
-    // sem card não há agente: contexto vazio, só o servidor do board e o modelo escolhido
-    const plan = bareExec(modelFor(state, model), boardServer(this.deps));
+    // sem card não há agente: contexto vazio, só o servidor do board, os servidores em modo "Sempre" e o modelo escolhido
+    const plan = bareExec(modelFor(state, model), boardServer(this.deps), state, {
+      projectDir: this.deps.cwd,
+      homeDir: this.deps.homeDir ?? '',
+    });
     // as últimas linhas legíveis, para explicar um erro; nunca a saída crua, que no modo estruturado é JSONL
     const tail: string[] = [];
     let started = false;

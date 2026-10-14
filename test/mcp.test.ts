@@ -461,6 +461,7 @@ describe('harness e padrões pelo MCP', () => {
       group: 'skill',
       scope: 'user',
       usage: 'contextual',
+      key: '~/.claude/skills/commit/SKILL.md',
       name: 'commit',
       mode: 'auto',
       description: 'Escreve o commit',

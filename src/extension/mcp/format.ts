@@ -1,6 +1,6 @@
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
-import { isSelectableKind, usageOf } from '../../shared/harnessSelection';
+import { isSelectableKind, selectionKey, usageOf } from '../../shared/harnessSelection';
 import { groupOf } from '../../shared/harnessCatalog';
 import { norm } from '../../shared/filters';
 import {
@@ -267,7 +267,7 @@ function supportFiles(skillMd: string, files: string[]) {
 export function requiredRules(s: BoardState, c: Card) {
   return manifestOf(s, c).rules.map((location) => {
     const item = toolItems(s).find((i) => i.kind === 'instructions' && i.location === location);
-    return item ? { name: location, scope: item.scope, path: item.path } : { name: location, note: 'rule não encontrada' };
+    return item ? { name: location, scope: item.scope, path: item.path } : { name: location, note: 'rule fora do board ou não encontrada' };
   });
 }
 
@@ -435,6 +435,8 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...cardSummary(s, c),
     ...(chosen ? { model: { ...describeModel(s, chosen), note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
+    harnessNote:
+      'Skills, rules, servidores MCP e agente do card: escolha só entre o que está no board em modo "Pelo card" (get_harness). O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.',
     ...(rules.length
       ? {
           requiredRules: rules,
@@ -446,7 +448,7 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
       ? {
           requiredSkills: skills,
           requiredSkillsNote:
-            'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em `files` estão os arquivos de apoio de cada skill (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar. Ao planejar, indique só o que está no board em modo "Pelo card" (get_harness), no mínimo: uma skill por assunto.',
+            'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em `files` estão os arquivos de apoio de cada skill (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.',
         }
       : {}),
     ...(phase ? { phase } : {}),
@@ -635,7 +637,8 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
       group: groupOf(s.board.aiTool, i),
       scope: i.scope,
       name: i.name,
-      ...(isSelectableKind(i.kind) ? { usage: usage(i) } : {}),
+      // a identidade do item no board (para set_harness_selection): o caminho; num servidor MCP, `arquivo#nome`
+      ...(isSelectableKind(i.kind) ? { usage: usage(i), key: selectionKey(i) } : {}),
       ...(i.mode ? { mode: i.mode } : {}),
       ...(i.files?.length ? { files: i.files } : {}),
       ...(i.description ? { description: i.description } : {}),

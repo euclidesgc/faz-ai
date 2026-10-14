@@ -158,8 +158,9 @@ Harness). `set_harness_selection` envia ao board rules (`instructions`), skills,
 MCP (`mcp`), muda o modo deles ou os tira do board: `always` (Sempre) entra em toda execução, pelo
 caminho do arquivo ou na configuração de servidores da execução; `contextual` (Pelo card) vira opção
 dos campos "Rules", "Skills" e "MCPs" dos cards (e agente disponível); `off` (Desligado) fica no
-board sem entrar em nada, que é como as regras entram, para revisão; `null` tira do board. Um servidor
-MCP é identificado pelo arquivo mais o nome (`.mcp.json#github`) ou só pelo `name`. Os campos "Rules",
+board sem entrar em nada, que é como as regras entram, para revisão; `null` tira do board. Cada item do
+inventário traz em `key` a identidade para `set_harness_selection`: o caminho; num servidor MCP, o
+arquivo mais o nome (`.mcp.json#github`). O `name` também serve para agente, skill e servidor. Os campos "Rules",
 "Skills" e "MCPs" dos cards só oferecem o que está em `contextual`; o servidor do board vai sempre, sem
 marcação. O inventário traz também o escopo `imported`: artefatos de pastas que a pessoa importou, que
 a ferramenta não carrega sozinha. Em `get_card`, `requiredRules` e `requiredSkills` trazem o caminho de cada
