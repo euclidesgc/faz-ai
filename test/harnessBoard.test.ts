@@ -9,8 +9,10 @@ import { openInMemory } from '../src/extension/db/database';
 import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
 import { scanInventory } from '../src/extension/harnessScan';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { catalogLines, refineCatalog } from '../src/extension/promptContext';
-import { executionPlan } from '../src/extension/execution';
+import { bareExec, executionPlan } from '../src/extension/execution';
+import { parseSuggestions } from '../src/extension/chat';
 import { manifestOf } from '../src/shared/execution';
 import type { HarnessItem } from '../src/shared/harness';
 import {
@@ -269,5 +271,138 @@ describe('migração 29 → 30 (banco de artefatos)', () => {
     db.run("DELETE FROM boards WHERE id = 'b'");
     expect(db.exec('SELECT count(*) FROM harness_selection')[0]!.values[0]![0]).toBe(0);
     expect(db.exec('SELECT count(*) FROM harness_imports')[0]!.values[0]![0]).toBe(0);
+  });
+});
+
+describe('revisão: o que a pilha corrigiu', () => {
+  it('o card só leva o que está no board: skill, rule e servidor que saíram (ou passaram a Desligado) ficam de fora sem erro', () => {
+    const s = boardState({
+      harness: {
+        rules: [],
+        skills: [],
+        agents: [],
+        inventory: [
+          {
+            tool: 'claude',
+            installed: true,
+            items: [
+              item({ kind: 'skill', name: 'sql', location: '.claude/skills/sql/SKILL.md', layout: 'skills' }),
+              item({ kind: 'instructions', name: 'CLAUDE.md', location: 'CLAUDE.md' }),
+              item({ kind: 'mcp', name: 'github', location: '.mcp.json', layout: 'entry' }),
+            ],
+          },
+        ],
+      },
+      harnessSelection: [
+        { kind: 'skill', location: '.claude/skills/sql/SKILL.md', usage: 'contextual' },
+        { kind: 'instructions', location: 'CLAUDE.md', usage: 'off' },
+      ],
+      fieldDefs: [
+        {
+          id: 'f-skills',
+          boardId: 'b',
+          name: 'Skills',
+          kind: 'multiselect',
+          options: [],
+          appliesToTypes: null,
+          display: 'chip',
+          position: 0,
+        },
+        {
+          id: 'f-rules',
+          boardId: 'b',
+          name: 'Rules',
+          kind: 'multiselect',
+          options: [],
+          appliesToTypes: null,
+          display: 'chip',
+          position: 1,
+        },
+        { id: 'f-mcps', boardId: 'b', name: 'MCPs', kind: 'multiselect', options: [], appliesToTypes: null, display: 'chip', position: 2 },
+      ],
+      cards: [card('c')],
+      fieldValues: [
+        { cardId: 'c', fieldId: 'f-skills', value: ['sql', 'sumiu'] },
+        { cardId: 'c', fieldId: 'f-rules', value: ['CLAUDE.md'] },
+        { cardId: 'c', fieldId: 'f-mcps', value: ['github'] },
+      ],
+    });
+    const m = manifestOf(s, card('c'));
+    expect(m.skills).toEqual(['sql']);
+    expect(m.rules).toEqual([]);
+    expect(m.mcpServers).toEqual([]);
+  });
+
+  it('parseSuggestions aceita texto com chaves depois do JSON', () => {
+    expect(parseSuggestions('{"items":[{"key":"a","reason":"r"}]}\nObs.: {x}', ['a'])).toEqual([{ location: 'a', reason: 'r' }]);
+  });
+
+  it('o chat leva os servidores do board em modo Sempre, com a definição do arquivo em que a varredura os achou', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-bare-'));
+    try {
+      fs.writeFileSync(path.join(root, 'col.json'), JSON.stringify({ mcpServers: { memoria: { command: 'mem' } } }));
+      const s = boardState({
+        harness: {
+          rules: [],
+          skills: [],
+          agents: [],
+          inventory: [
+            {
+              tool: 'claude',
+              installed: true,
+              items: [
+                item({
+                  kind: 'mcp',
+                  name: 'memoria',
+                  location: path.join(root, 'col.json'),
+                  layout: 'entry',
+                  scope: 'imported',
+                  path: path.join(root, 'col.json'),
+                }),
+                item({ kind: 'mcp', name: 'fantasma', location: '.mcp.json', layout: 'entry', path: path.join(root, 'nao-existe.json') }),
+              ],
+            },
+          ],
+        },
+        harnessSelection: [
+          { kind: 'mcp', location: `${path.join(root, 'col.json')}#memoria`, usage: 'always' },
+          { kind: 'mcp', location: '.mcp.json#fantasma', usage: 'always' },
+        ],
+      });
+      const plan = bareExec(null, { command: 'node', args: ['b.js'] }, s, { projectDir: root, homeDir: '' });
+      expect(plan.mcpAllowed).toEqual(['memoria']);
+      expect(Object.keys(JSON.parse(plan.mcpConfig!).mcpServers).sort()).toEqual(['faz-ai', 'memoria']);
+      // sem estado, só o servidor do board, como antes
+      expect(JSON.parse(bareExec(null, { command: 'node', args: [] }).mcpConfig!).mcpServers).toEqual({
+        'faz-ai': { type: 'stdio', command: 'node', args: [] },
+      });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('tirar a pasta importada apaga a marcação dos artefatos dela, em qualquer separador', async () => {
+    const db = await openInMemory(WASM_DIR);
+    const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+      workspaceKey: 'ws',
+      folderName: 'P',
+      author: 'Pessoa',
+      attachmentsDir: path.join(os.tmpdir(), 'fazai-att-x'),
+    });
+    const boardId = router.snapshot().board.id;
+    router.handle({
+      type: 'harness.selection.set',
+      items: [
+        { kind: 'skill', location: '/col/web/SKILL.md' },
+        { kind: 'skill', location: '/colecao/x/SKILL.md' },
+        { kind: 'mcp', location: 'C:\\col\\.mcp.json#github' },
+      ],
+      usage: 'contextual',
+    });
+    new BoardRepo(db).removeImport(boardId, 'claude', '/col');
+    // a marcação sai ordenada por tipo (mcp antes de skill) e caminho
+    expect(router.snapshot().harnessSelection.map((x) => x.location)).toEqual(['C:\\col\\.mcp.json#github', '/colecao/x/SKILL.md']);
+    new BoardRepo(db).removeImport(boardId, 'claude', 'C:\\col');
+    expect(router.snapshot().harnessSelection.map((x) => x.location)).toEqual(['/colecao/x/SKILL.md']);
   });
 });

@@ -221,11 +221,18 @@ export class BoardRepo {
   removeImport(boardId: string, tool: AiTool, dir: string): void {
     transaction(this.db, () => {
       run(this.db, 'DELETE FROM harness_imports WHERE board_id = ? AND tool = ? AND dir = ?', [boardId, tool, dir]);
-      run(this.db, "DELETE FROM harness_selection WHERE board_id = ? AND (location = ? OR location LIKE ? ESCAPE '\\')", [
-        boardId,
-        dir,
-        `${dir.replace(/[%_]/g, '\\$&')}/%`,
-      ]);
+      // a comparação é em JS: um caminho do Windows tem `\\`, que o LIKE trataria como escape
+      const gone = all(this.db, 'SELECT kind, location FROM harness_selection WHERE board_id = ?', [boardId]).filter((r) => {
+        const location = str(r.location);
+        // os dois separadores: a marcação pode ter vindo num export de outro sistema
+        return location === dir || (location.startsWith(dir) && (location[dir.length] === '/' || location[dir.length] === '\\'));
+      });
+      for (const r of gone)
+        run(this.db, 'DELETE FROM harness_selection WHERE board_id = ? AND kind = ? AND location = ?', [
+          boardId,
+          str(r.kind),
+          str(r.location),
+        ]);
     });
   }
 

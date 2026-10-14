@@ -24,6 +24,8 @@ export interface ExportTable {
   where: string;
   /** a tabela tem chave primária `id` (as demais usam chave composta) */
   hasId: boolean;
+  /** a versão do banco que criou a tabela: um export de versão anterior não a tem, e ela vale como vazia */
+  since?: number;
 }
 
 const byCard = 'card_id IN (SELECT id FROM cards WHERE board_id = ?)';
@@ -50,7 +52,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   // a marcação do harness é deste board: vai junto (os caminhos relativos ao projeto e a `~` valem na outra máquina)
   { name: 'harness_selection', where: 'board_id = ?', hasId: false },
   // as pastas importadas são caminhos absolutos desta máquina: vão junto, e na outra máquina os artefatos ficam ausentes até a pessoa reimportar
-  { name: 'harness_imports', where: 'board_id = ?', hasId: false },
+  { name: 'harness_imports', where: 'board_id = ?', hasId: false, since: 30 },
 ];
 
 /** Tabelas que ficam fora do arquivo mesmo tendo `board_id` (o teste do `sqlite_master` as ignora). */
@@ -181,6 +183,8 @@ export function parseExportFile(text: string): BoardExportFile {
   if (!f.tables || typeof f.tables !== 'object' || Array.isArray(f.tables)) throw invalid('faltam as tabelas.');
   const tables = f.tables as Record<string, unknown>;
   for (const t of EXPORT_TABLES) {
+    // tabela que ainda não existia na versão que gerou o arquivo: vale vazia
+    if (tables[t.name] === undefined && t.since !== undefined && f.schemaVersion < t.since) tables[t.name] = [];
     const rows = tables[t.name];
     if (!Array.isArray(rows)) throw invalid(`falta a tabela "${t.name}".`);
     for (const row of rows) {

@@ -65,7 +65,7 @@ export class BoardHarness {
 
   /**
    * Relê o disco. As opções dos campos "Skills" e "Rules" acompanham a marcação do Harness: só o que está
-   * marcado como "usar quando fizer sentido" pode ser indicado num card (o "sempre" já vai em toda execução).
+   * está no board em "Pelo card" pode ser indicado num card (o "Sempre" já vai em toda execução).
    */
   load(): void {
     if (!this.store) return;
@@ -383,7 +383,7 @@ export function flowSkillFile(ctx: BoardContext, tool: AiTool, scope: InstallSco
   return path.join(base, target.path, FLOW_SKILL.name, 'SKILL.md');
 }
 
-/** Marca como "usar quando fizer sentido" uma skill da ferramenta em uso, pelo nome e escopo: criar ou instalar uma skill pelo board é querer usá-la. */
+/** Envia ao board em "Pelo card" uma skill da ferramenta em uso, pelo nome e escopo: criar ou instalar uma skill pelo board é querer usá-la. */
 function markSkill(ctx: BoardContext, name: string, scope: 'project' | 'user' = 'project'): void {
   ctx.harness.load();
   const item = ctx.harness.current.inventory

@@ -21,10 +21,10 @@ import { t } from '../../../i18n';
 export function bulkTargets(items: HarnessItem[], actions: ItemActions, projectTool: boolean) {
   const { copyable, twin, deletable, entryRemovable } = actions;
   return {
-    // a marcação das execuções só existe para a ferramenta do projeto; os agentes do projeto e do global têm a
-    // tabela própria, e só os achados numa pasta importada passam por aqui
-    usage: projectTool ? items.filter((i) => isSelectableKind(i.kind) && (i.kind !== 'agent' || i.scope === 'imported')) : [],
-    mode: items.filter((i) => !!i.mode && i.scope !== 'plugin' && i.layout !== 'entry'),
+    // a marcação das execuções só existe para a ferramenta do projeto; os agentes têm a tabela própria, e um agente
+    // de pasta importada não vai ao board: o board só executa agentes do projeto ou do global (copie-o antes)
+    usage: projectTool ? items.filter((i) => isSelectableKind(i.kind) && i.kind !== 'agent') : [],
+    mode: items.filter((i) => !!i.mode && i.scope !== 'plugin' && i.scope !== 'imported' && i.layout !== 'entry'),
     toProject: items.filter((i) => copyable(i, 'project') && !twin(i, 'project')),
     toUser: items.filter((i) => copyable(i, 'user') && !twin(i, 'user')),
     remove: items.filter(deletable),

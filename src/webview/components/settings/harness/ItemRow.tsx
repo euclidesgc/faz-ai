@@ -50,7 +50,8 @@ export function ItemRow({
   const { copyable, twin, copy, setMode, deletable, remove, entryRemovable } = actions;
   const src = i.source === undefined ? undefined : HARNESS_CATALOG[tool][i.source];
   const inProject = i.scope !== 'project' ? twin(i, 'project') : undefined;
-  const editable = i.scope !== 'plugin' && i.layout !== 'entry';
+  // o modo nativo da skill (automática ou só quando indicada) não vale no board, e numa pasta importada ele é de quem a mantém
+  const editable = i.scope !== 'plugin' && i.scope !== 'imported' && i.layout !== 'entry';
   return (
     <li className={selected ? 'item-row selected' : 'item-row'}>
       <span className="item-check">
@@ -145,7 +146,11 @@ export function ItemRow({
             <Badge
               color="gray"
               variant="outline"
-              title={t('Skill de plugin: o modo não pode ser alterado aqui. Para mudar, copie a skill para o projeto.')}
+              title={
+                i.scope === 'imported'
+                  ? t('Skill importada: o modo nativo é de quem mantém a pasta, e no board o que vale é o modo do artefato.')
+                  : t('Skill de plugin: o modo não pode ser alterado aqui. Para mudar, copie a skill para o projeto.')
+              }
             >
               {t(SKILL_MODES.find((m) => m.id === i.mode)!.label)}
             </Badge>

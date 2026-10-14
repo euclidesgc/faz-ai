@@ -404,7 +404,9 @@ export function scanInventory(
         tool === 'claude' && i.kind === 'instructions' && i.scope !== 'plugin' && i.path.endsWith('.md') ? importsOf(i.path, homeDir) : [];
       return {
         ...i,
-        location: location(i.path),
+        // um artefato importado é identificado pelo caminho absoluto, esteja a pasta onde estiver (dentro
+        // da home ou do projeto): é por esse prefixo que tirar a pasta tira os artefatos dela do board
+        location: i.scope === 'imported' ? i.path : location(i.path),
         ...(imports.length ? { imports: imports.map((x) => ({ ...x, location: location(x.path) })) } : {}),
       };
     });
