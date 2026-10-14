@@ -15,8 +15,8 @@ import { settings, ui } from '../../commands';
 import { isWeb } from '../../vscode';
 import { t, dt } from '../../i18n';
 import { rich } from '../../i18n/rich';
-import { Button, Callout, Card, TextField } from '@radix-ui/themes';
-import { FormField, IconWarning, SelectField, SwitchField } from '../ui';
+import { Button, Card, TextField } from '@radix-ui/themes';
+import { FormField, SelectField, SwitchField } from '../ui';
 import { SectionHeader } from './SectionHeader';
 
 /** De onde veio a principal detectada, como a tela diz. */
@@ -27,7 +27,9 @@ const MAIN_SOURCE: Record<MainBranch['source'], string> = {
 };
 
 /** Os prefixos e a branch de integração, com o rótulo e a chave do Settings. */
-const NAME_FIELDS: { key: 'developBranch' | 'featurePrefix' | 'bugfixPrefix' | 'hotfixPrefix' | 'releasePrefix'; label: string }[] = [
+type NameKey = 'developBranch' | 'featurePrefix' | 'bugfixPrefix' | 'hotfixPrefix' | 'releasePrefix';
+
+const NAME_FIELDS: { key: NameKey; label: string }[] = [
   { key: 'developBranch', label: 'Branch de integração' },
   { key: 'featurePrefix', label: 'Prefixo de feature' },
   { key: 'bugfixPrefix', label: 'Prefixo de bugfix' },
@@ -54,6 +56,12 @@ export function GitFlowSection() {
   const off = git.mode === 'off';
   const mainName = main?.name ?? t('principal');
   const set = (patch: Partial<GitConfig>) => settings.updateBoard({ git: patch });
+  // um campo de nome por vez; o objeto tipado pela chave dispensa o cast de `{ [key]: value }`, que o TS alarga para string
+  const setName = (key: NameKey, value: string) => {
+    const patch: Partial<Pick<GitConfig, NameKey>> = {};
+    patch[key] = value;
+    set(patch);
+  };
 
   // a principal é detectada de novo ao abrir a tela: o repositório pode ter mudado desde a abertura do board
   useEffect(() => {
@@ -62,7 +70,8 @@ export function GitFlowSection() {
 
   const parentWorkflows = new Set(state.workflows.filter((w) => w.kind === 'parent').map((w) => w.id));
   const storyTypes = state.cardTypes.filter((ct) => parentWorkflows.has(ct.defaultWorkflowId));
-  const rows = flowRows(git, state.cardTypes, mainName);
+  // só os tipos das histórias geram branch: a sub-tarefa trabalha na branch da história dela
+  const rows = flowRows(git, storyTypes, mainName);
 
   return (
     <>
@@ -102,17 +111,12 @@ export function GitFlowSection() {
                 ))}
               </tbody>
             </table>
-            <Callout.Root size="1" color="blue" role="note" aria-label={t('Quando usar Retrabalho')}>
-              <Callout.Icon>
-                <IconWarning />
-              </Callout.Icon>
-              <Callout.Text>
-                {rich(
-                  '<b>Quando usar Retrabalho:</b> um defeito numa funcionalidade que ainda só está na <code>{develop}</code> é Retrabalho (bugfix), não Bug (hotfix). Bug é o defeito que já está na principal (<code>{main}</code>) e precisa de correção urgente.',
-                  { develop: git.developBranch, main: mainName },
-                )}
-              </Callout.Text>
-            </Callout.Root>
+            <p className="muted small" role="note" aria-label={t('Quando usar Retrabalho')}>
+              {rich(
+                '<b>Quando usar Retrabalho:</b> um defeito numa funcionalidade que ainda só está na <code>{develop}</code> é Retrabalho (bugfix), não Bug (hotfix). Bug é o defeito que já está na principal (<code>{main}</code>) e precisa de correção urgente.',
+                { develop: git.developBranch, main: mainName },
+              )}
+            </p>
           </>
         ) : (
           <p>{rich('As branches saem da principal (<code>{main}</code>) e os pull requests vão para ela.', { main: mainName })}</p>
@@ -144,7 +148,7 @@ export function GitFlowSection() {
                           ? cleanBranchName(e.target.value, DEFAULT_GIT[f.key])
                           : cleanPrefix(e.target.value, DEFAULT_GIT[f.key]);
                       e.target.value = clean;
-                      if (clean !== git[f.key]) set({ [f.key]: e.target.value } as Partial<GitConfig>);
+                      if (clean !== git[f.key]) setName(f.key, clean);
                     }}
                     onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                   />

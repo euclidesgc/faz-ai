@@ -242,7 +242,10 @@ detectada, `baseBranch` e `prBase` ficam de fora e a `prNote` manda abrir o PR c
 principal. Numa história empilhada vem também `stackNote`, para dizer na descrição do PR de qual PR
 ele depende. A resposta de `prepare_workspace` traz a `prBase`. Antes de criar a branch, o board roda
 `git fetch origin` e parte de `origin/<base>`; o que não deu certo (sem `origin`, fetch que falhou,
-`develop` criada ou não enviada) vai como comentário do "Faz AI" na conversa da história.
+`develop` criada ou não enviada, base gravada que sumiu) vai como comentário do "Faz AI" na conversa da
+história. Quando a `develop` falta e o fetch falhou, ou a principal não pôde ser detectada (sem o HEAD
+do `origin`, `main` nem `master`), `prepare_workspace` recusa em vez de criá-la, e a mensagem diz o que
+fazer.
 
 Uma história criada com `create_card` e `derived_from` (a próxima parte de uma funcionalidade dividida
 em entregas, quando ela passa de umas 400 linhas; `derived_from` aponta para a parte anterior) parte
