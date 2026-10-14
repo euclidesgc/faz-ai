@@ -1,7 +1,7 @@
-import { Button } from '@radix-ui/themes';
 import type { AiTool } from '../../../../shared/harness';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
+import { ActionButton } from '../../ui';
 import { t } from '../../../i18n';
 
 /**
@@ -18,9 +18,10 @@ export function ImportedFolders({ tool }: { tool: AiTool }) {
         {dirs.map((x) => (
           <li key={x.dir}>
             <code>{x.dir}</code>
-            <Button
+            <ActionButton
               variant="ghost"
               size="1"
+              hint={t('Pede confirmação e tira a pasta e os artefatos dela do board; a pasta no disco não é tocada.')}
               aria-label={t('Remover pasta: {dir}', { dir: x.dir })}
               onClick={() =>
                 ask({
@@ -35,7 +36,7 @@ export function ImportedFolders({ tool }: { tool: AiTool }) {
               }
             >
               {t('Remover pasta')}
-            </Button>
+            </ActionButton>
           </li>
         ))}
       </ul>

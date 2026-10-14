@@ -12,3 +12,4 @@ export { FormField } from './FormField';
 export { Hint } from './Hint';
 export * from './icons';
 export { Placeholder, BoardPlaceholder } from './Placeholder';
+export { ActionButton, ActionIconButton, type ActionButtonProps } from './ActionButton';

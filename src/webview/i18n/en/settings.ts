@@ -374,4 +374,12 @@ export const settings: Record<string, string> = {
   'mais abaixo, nesta mesma aba': 'further down, in this same tab',
   'A IA lê o arquivo de cada skill marcada ao executar. Só aparecem as skills marcadas em Configurações → Harness. Busque pelo nome ou pela descrição.':
     'The AI reads the file of every checked skill when it runs. Only skills checked in Settings → Harness are listed. Search by name or description.',
+  'Gera o arquivo .fazai.json e abre o diálogo para salvar.': 'Generates the .fazai.json file and opens the save dialog.',
+  'Abre o seletor de arquivo; você confirma depois de ver o resumo.': 'Opens the file picker; you confirm after seeing the summary.',
+  'Cadastre um modelo antes.': 'Add a model first.',
+  'Termine a regra que está aberta.': 'Finish the rule that is open.',
+  'Abre o formulário de uma regra nova.': 'Opens the form for a new rule.',
+  'O formulário já está aberto logo abaixo.': 'The form is already open right below.',
+  'Abre o formulário de um modelo novo.': 'Opens the form for a new model.',
+  'O board não tem o campo "{field}".': 'The board has no "{field}" field.',
 };

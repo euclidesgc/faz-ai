@@ -3,8 +3,8 @@ import type { AiTool } from '../../../../shared/harness';
 import { harness, type HarnessScope } from '../../../commands';
 import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
-import { Badge, Button, Card, Checkbox, TextField } from '@radix-ui/themes';
-import { SelectField, type EnumOption } from '../../ui';
+import { Badge, Card, Checkbox, TextField } from '@radix-ui/themes';
+import { ActionButton, SelectField, type EnumOption } from '../../ui';
 import { withGlobalWarning } from './text';
 import { t } from '../../../i18n';
 
@@ -59,9 +59,15 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
           spellCheck={false}
           onKeyDown={(e) => e.key === 'Enter' && source.trim() && void scan.run()}
         />
-        <Button disabled={!source.trim()} loading={scan.busy} onClick={() => void scan.run()}>
+        <ActionButton
+          disabled={!source.trim()}
+          disabledReason={t('Informe a origem: dono/repositório, endereço git ou o caminho de uma pasta.')}
+          loading={scan.busy}
+          hint={t('Clona ou lê a origem numa pasta temporária, sem rodar nada, e lista as skills encontradas.')}
+          onClick={() => void scan.run()}
+        >
           {t('Procurar skills')}
-        </Button>
+        </ActionButton>
       </div>
       {scan.busy && (
         <p role="status" className="muted small">
@@ -120,23 +126,35 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
           {preview.skills.length === 0 && <p className="muted small">{t('Nenhuma pasta com SKILL.md nessa origem.')}</p>}
           <div className="form-actions">
             {installable.length > 1 && (
-              <Button variant="ghost" size="1" onClick={() => setChosen(installable.map((k) => k.rel))}>
+              <ActionButton
+                variant="ghost"
+                size="1"
+                hint={t('Marca todas as skills que podem ser instaladas.')}
+                onClick={() => setChosen(installable.map((k) => k.rel))}
+              >
                 {t('Selecionar todas')}
-              </Button>
+              </ActionButton>
             )}
-            <Button
+            <ActionButton
               variant="soft"
               color="gray"
+              hint={t('Descarta a lista e apaga a pasta temporária; nada foi instalado.')}
               onClick={() => {
                 harness.cancelInstall();
                 setChosen([]);
               }}
             >
               {t('Fechar')}
-            </Button>
-            <Button disabled={picked.length === 0} loading={install.busy} onClick={apply}>
+            </ActionButton>
+            <ActionButton
+              disabled={picked.length === 0}
+              disabledReason={t('Marque pelo menos uma skill.')}
+              loading={install.busy}
+              hint={t('Copia as pastas das skills marcadas para o destino escolhido.')}
+              onClick={apply}
+            >
               {t('Instalar {n} selecionada(s)', { n: picked.length || '' })}
-            </Button>
+            </ActionButton>
           </div>
         </>
       )}

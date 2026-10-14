@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
-import { Badge, Button, Callout, Tabs } from '@radix-ui/themes';
+import { Badge, Callout, Tabs } from '@radix-ui/themes';
 import { aiToolInfo, type AiTool } from '../../../../shared/harness';
 import { TOOL_REGIME, topicBadge, topicsOf, type HarnessTopic } from '../../../../shared/harnessTopics';
 import { harness } from '../../../commands';
 import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
-import { IconWarning } from '../../ui';
+import { ActionButton, IconWarning } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
 import { ImportArtifacts } from './ImportArtifacts';
 import { TopicView } from './TopicView';
@@ -49,15 +49,15 @@ export function ToolHarness({ tool }: { tool: AiTool }) {
                 </>
               )}
             </span>
-            <Button
+            <ActionButton
               variant="soft"
               color="gray"
               loading={refresh.busy}
-              title={t('Relê as pastas do projeto e do usuário')}
+              hint={t('Relê as pastas do projeto e a global e atualiza o catálogo; espera também a lista de plugins da ferramenta.')}
               onClick={() => void refresh.run()}
             >
               {t('Reler pastas')}
-            </Button>
+            </ActionButton>
             <ImportArtifacts tool={tool} />
           </>
         }

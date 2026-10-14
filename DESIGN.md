@@ -123,6 +123,13 @@ olho.
   - `SelectField` (seletor tipado), `SwitchField` (interruptor com rótulo) e `NumberField` /
     `TextField` de `components/ui` no lugar de `<select>`, `<input>` e `EnumSelect`;
   - o Select do Radix não aceita `value` vazio: use um item sentinela (`'__none'`).
+- Ação de uma toolbar das Configurações é `ActionButton` (`components/ui/ActionButton.tsx`): o
+  `Button` do Radix com o `hint` obrigatório, uma frase que diz o que o clique faz, aberta no hover e
+  no foco (o `title` nativo não abre pelo teclado nem no toque e não serve de dica). `disabledReason`
+  diz por que está desabilitado, no lugar do hint. Tamanho 2 por padrão; o 1 fica para as ações de
+  linha (Editar, Remover do board) e para chips como as "Sugestões prontas". Botão só com ícone é
+  `ActionIconButton`, com `aria-label`. A toolbar é `.actions-toolbar` (gap `--sp-8` × `--sp-12`), e
+  `.toolbar-group` separa a criação (Novo, Criar com ajuda) das ações de IA e de manutenção.
 - Seletores (`SelectField`), caixas de seleção, campos de busca e de adicionar, e a nota de status são do Radix em toda a interface, no board, no card aberto e nos filtros. Seguem nativos, de propósito, só os campos que têm de parecer texto (título do card, item da checklist, renomear coluna e workflow, o editor de markdown) e o seletor de cor (`<input type="color">`).
 
 ## Estados de espera

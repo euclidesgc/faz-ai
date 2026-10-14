@@ -4,7 +4,7 @@ import { missingSelections, selectedItems, selectionKey, usageOptions, type Sele
 import { matchesQuery, type HarnessOrigin } from '../../../../shared/harnessTopics';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { IconWarning } from '../../ui';
+import { ActionButton, IconWarning } from '../../ui';
 import { UsageSelect } from './UsageSelect';
 import { t } from '../../../i18n';
 
@@ -111,14 +111,15 @@ export function BoardList({
                   {t('Disponível no board')}
                 </Badge>
               )}
-              <Button
+              <ActionButton
                 variant="ghost"
                 size="1"
+                hint={t('Tira do board; o arquivo de origem não é tocado.')}
                 onClick={() => remove(selectionKey(i))}
                 aria-label={t('Remover do board: {name}', { name: i.name })}
               >
                 {t('Remover do board')}
-              </Button>
+              </ActionButton>
             </div>
           </li>
         ))}

@@ -224,7 +224,7 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
       items: [{ kind: 'skill', path: '/abs/~/.claude/skills/global-skill/SKILL.md' }],
       to: 'project',
     });
-    await userEvent.click(within(row).getByTitle('Apagar'));
+    await userEvent.click(within(row).getByRole('button', { name: 'Apagar' }));
     expect(useBoardStore.getState().dialog).toMatchObject({ title: 'Apagar "global-skill"?', danger: true });
     expect(useBoardStore.getState().dialog?.message).toContain(GLOBAL_WARNING);
     await userEvent.click(dialog().getByRole('button', { name: 'Apagar' }));
