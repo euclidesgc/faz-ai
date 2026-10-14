@@ -165,6 +165,9 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    cuja história está arquivada pede confirmação e restaura a história inteira (uma sub-tarefa de
    história ativa volta sozinha, sem confirmação).
 
+Toda ação que leva tempo (criar a branch, recriar o board, importar um backup, reler o harness…)
+mostra que está trabalhando, no botão, na seção ou num véu sobre o board, e avisa se falhou.
+
 ![Card aberto: status, aprovação, campos, descrição e checklist](docs/images/card.png)
 
 Por padrão, uma história não é concluída nem avança de fase enquanto tiver sub-tarefas em aberto

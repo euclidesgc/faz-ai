@@ -125,6 +125,33 @@ olho.
   - o Select do Radix não aceita `value` vazio: use um item sentinela (`'__none'`).
 - Seletores (`SelectField`), caixas de seleção, campos de busca e de adicionar, e a nota de status são do Radix em toda a interface, no board, no card aberto e nos filtros. Seguem nativos, de propósito, só os campos que têm de parecer texto (título do card, item da checklist, renomear coluna e workflow, o editor de markdown) e o seletor de cor (`<input type="color">`).
 
+## Estados de espera
+
+- Toda ação que o host leva mais de um instante para concluir mostra que está esperando; nada
+  acontece em silêncio. A tela pede confirmação com `request()` (`src/webview/request.ts`), que
+  manda a mensagem com `requestId` e espera o `done` do host, e `useAction` (`src/webview/useAction.ts`)
+  liga `busy` enquanto isso. O `boardState` chega sempre antes do `done`: quando a espera acaba, o que
+  mudou já está na tela. As ações demoradas de `commands.ts` devolvem a promessa (`req`); as demais
+  seguem `post`.
+- Três intensidades, e a regra de escolha: **botão** (`loading` do nosso `Button` ou do Radix) para a
+  ação curta que afeta só o controle clicado; **seção** (`role="status"` com `.spinner` e um texto
+  curto, `aria-busy` na seção que vai mudar) quando a espera tem um "onde" e a pessoa pode fazer outra
+  coisa; **véu** (`BusyOverlay`, `withOverlay` em `boardStore.ts`) só para o que troca o board inteiro:
+  recriar, atualizar, importar, esvaziar a lixeira. Se a espera cabe no botão, fica no botão; se tem
+  um "onde", vai na seção; se não tem, vira véu.
+- `usePending` é para valor otimista (um switch que deve virar na hora), não para espera de ação.
+  Processo com vida própria (IA rodando, chat, heartbeat) mostra progresso pelo estado do board
+  (`aiRuns`, `chat.busy`), não por `useAction`.
+- `Placeholder` e `BoardPlaceholder` (`Skeleton` do Radix) só na primeira carga de uma tela com forma
+  conhecida (board, Métricas, Consumo); nunca por cima de dado que já está na tela: na recarga, os
+  números ficam e a tela diz "Atualizando…".
+- Erro do host vira toast (`error`) e destrava o que esperava (`done` com `ok: false`); o host nunca
+  engole uma falha só no log: tarefa em segundo plano avisa por `router.reportError`. Um handler cujo
+  resultado visível depende de algo assíncrono (reler plugins, conferir requisitos) ganha um `case`
+  na `HostBridge` que o aguarda, para o `done` só sair no fim. Animações respeitam
+  `prefers-reduced-motion` (`.spinner` e `.rt-Spinner`).
+- Nos testes de UI, `confirmLast()` (`test/ui/setup.tsx`) simula o `done` do último pedido.
+
 ## Textos e idiomas
 
 - A interface fala português (Brasil) e inglês. O **texto em português é a chave**: `t('Novo card')`.

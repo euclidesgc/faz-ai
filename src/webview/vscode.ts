@@ -1,4 +1,4 @@
-import type { HostToWebview, Tracked, WebviewToHost } from '../shared/messages';
+import type { HostToWebview, Tracked } from '../shared/messages';
 
 interface VsCodeApi {
   postMessage(msg: unknown): void;
