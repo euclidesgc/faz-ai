@@ -28,6 +28,7 @@ import { checkEnvironment, linuxFamily, type OtherToolProbe } from '../environme
 import { editorMcpFiles, pinEditorCommands, registeredIn } from '../mcp/pinCommands';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { selectedItems } from '../../shared/harnessSelection';
+import { harnessIssues } from '../../shared/harnessStatus';
 import { resolveCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { cleanStaleTemp } from '../aiOutput/measured';
@@ -282,6 +283,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     signinCache.set(tool, { at: Date.now(), value });
     return value;
   };
+  /** O que falta no banco de artefatos; undefined sem o inventário lido (a pasta do projeto não existe). */
+  const harnessIssuesNow = (): ReturnType<typeof harnessIssues> | undefined => {
+    const s = router.snapshot();
+    return s.harness.inventory.some((t) => t.tool === s.board.aiTool) ? harnessIssues(s) : undefined;
+  };
   const checkNow = (): Promise<void> => {
     if (disposed) return Promise.resolve();
     if (checking) {
@@ -307,6 +313,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       windowStartedAt: o.editor?.startedAt,
       editorPath: o.editor ? (process.env.PATH ?? '') : undefined,
       skillInstalled: flowSkillInstalled(),
+      harnessIssues: harnessIssuesNow(),
     })
       .then((list) => {
         // a conferência (com o probe de login, que chama a CLI) pode terminar depois do encerramento
@@ -434,6 +441,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           requirements: syntheticSignin ? [...s.requirements, syntheticSignin] : s.requirements,
           workspaceDir: o.folderPath,
           skillInstalled,
+          harnessIssues: harnessIssuesNow() ?? null,
           other: await otherTool(tool),
           crgMcp: crgRegistered(tool),
           platform: process.platform,

@@ -55,6 +55,45 @@ function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string 
         title: t('Skill do fluxo ({name})', { name: FLOW_SKILL_NAME }),
         hint: t('Ensina a IA do {tool} a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências.', { tool }),
       };
+    case 'harness':
+      return {
+        title: t('Definição do harness'),
+        hint: t(
+          'O banco de artefatos do board: as skills, agentes, servidores MCP e regras que as execuções podem usar, no modo de cada um. Sem ele o board funciona, mas sem o ganho de economia e precisão.',
+        ),
+      };
+    case 'harness-artifacts':
+      return {
+        title: t('Artefatos no board'),
+        hint: t(
+          'Nenhuma skill, agente ou servidor MCP em modo "Pelo card": o planejamento dos cards não tem de onde escolher. Use "Indicar artefatos" na aba do {tool} no Harness.',
+          { tool },
+        ),
+      };
+    case 'harness-agents':
+      return {
+        title: t('Agente do board'),
+        hint: t('Sem agente, toda execução roda com o escopo cheio. Crie um com "Criar agente com ajuda" ou "Sugerir agentes com IA".'),
+      };
+    case 'harness-rules':
+      return {
+        title: t('Regras revisadas'),
+        hint: t('Há regras enviadas ao board ainda desligadas: revise o texto na aba Regras e ative, ou tire do board.'),
+      };
+    case 'harness-missing':
+      return {
+        title: t('Artefatos presentes'),
+        hint: t(
+          'Um artefato do board sumiu da origem; a aba do assunto mostra quais estão ausentes, para tirar do board ou repor o arquivo.',
+        ),
+      };
+    case 'harness-cursor':
+      return {
+        title: t('Artefatos do projeto fora do board'),
+        hint: t(
+          'A linha de comando do Cursor não desliga nada: regras, servidores MCP e hooks do projeto entram no contexto sem passar pelo board. Desligue nas configurações do Cursor ou remova do projeto; o board só confere.',
+        ),
+      };
     case 'permission':
       return {
         title: t('Nível de permissão das execuções'),

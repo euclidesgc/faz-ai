@@ -103,4 +103,34 @@ export const environment: Record<string, string> = {
   'Busca semântica': 'Semantic search',
   'Deixa a IA buscar o código pelo significado ("onde validamos o login?"), e não só pelo nome. Com o provedor local, o código não sai da sua máquina.':
     'Lets the AI search the code by meaning ("where do we validate the login?"), not just by name. With the local provider, the code does not leave your machine.',
+
+  // --- Definição do harness
+  'Definição do harness': 'Harness definition',
+  'O banco de artefatos do board: as skills, agentes, servidores MCP e regras que as execuções podem usar, no modo de cada um. Sem ele o board funciona, mas sem o ganho de economia e precisão.':
+    "The board's artifact bank: the skills, agents, MCP servers and rules runs may use, each in its mode. The board works without it, but without the context savings and precision.",
+  'Artefatos no board': 'Artifacts on the board',
+  'Nenhuma skill, agente ou servidor MCP em modo "Pelo card": o planejamento dos cards não tem de onde escolher. Use "Indicar artefatos" na aba do {tool} no Harness.':
+    'No skill, agent or MCP server in "Pelo card" mode: the cards\' planning has nothing to pick from. Use "Indicar artefatos" in the {tool} tab of the Harness.',
+  'Agente do board': 'Board agent',
+  'Sem agente, toda execução roda com o escopo cheio. Crie um com "Criar agente com ajuda" ou "Sugerir agentes com IA".':
+    'Without an agent, every run has the full scope. Create one with "Criar agente com ajuda" or "Sugerir agentes com IA".',
+  'Regras revisadas': 'Rules reviewed',
+  'Há regras enviadas ao board ainda desligadas: revise o texto na aba Regras e ative, ou tire do board.':
+    'There are rules sent to the board still off: review the text in the Regras tab and turn them on, or remove them from the board.',
+  'Artefatos presentes': 'Artifacts present',
+  'Um artefato do board sumiu da origem; a aba do assunto mostra quais estão ausentes, para tirar do board ou repor o arquivo.':
+    "A board artifact vanished from its source; the subject's tab shows which are missing, to remove from the board or restore the file.",
+  'Artefatos do projeto fora do board': 'Project artifacts outside the board',
+  'A linha de comando do Cursor não desliga nada: regras, servidores MCP e hooks do projeto entram no contexto sem passar pelo board. Desligue nas configurações do Cursor ou remova do projeto; o board só confere.':
+    "Cursor's command line turns nothing off: the project's rules, MCP servers and hooks enter the context without going through the board. Turn them off in Cursor's settings or remove them from the project; the board only checks.",
+  'nenhuma skill, agente ou servidor MCP em modo "Pelo card"': 'no skill, agent or MCP server in "Pelo card" mode',
+  'nenhum agente do board': 'no board agent',
+  'regras no board ainda desligadas, sem revisão': 'rules on the board still off, not reviewed',
+  'artefato do board que sumiu da origem': 'a board artifact that vanished from its source',
+  'artefatos do projeto que entram no contexto sem passar pelo board':
+    'project artifacts that enter the context without going through the board',
+  'O harness do board ainda não está definido': "The board's harness is not defined yet",
+  'Recomendado: defina o harness para as execuções gastarem menos contexto': 'Recommended: define the harness so runs spend less context',
+  'O board funciona assim, mas as execuções não ganham a economia e a precisão de um harness definido. Falta: {list}. Resolva em Configurações → Harness de IA.':
+    'The board works like this, but runs do not get the savings and precision of a defined harness. Missing: {list}. Fix it in Settings → AI Harness.',
 };

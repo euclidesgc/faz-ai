@@ -324,8 +324,14 @@ linha de comando, o grafo dentro do Code Review Graph). Passe o mouse sobre um i
 board o usa.
 
 - **Necessários:** o Node.js 22 ou mais novo e a ferramenta de IA do projeto, com a linha de comando,
-  o login (`claude auth login` ou `cursor-agent login`), o MCP do board, a skill do fluxo e o nível de
-  permissão.
+  o login (`claude auth login` ou `cursor-agent login`), o MCP do board, a skill do fluxo, a
+  **definição do harness** e o nível de permissão. A definição do harness é recomendação, não bloqueio:
+  o board trabalha sem ela, só sem o ganho de economia e precisão. Ela aponta, um filho por falta, o que
+  falta no banco de artefatos: nenhuma skill, agente ou servidor MCP em modo Pelo card (use "Indicar
+  artefatos"), nenhum agente do board, regras enviadas e ainda desligadas, artefato que sumiu da
+  origem e, no Cursor, regras, servidores ou hooks do projeto que entram no contexto sem passar pelo
+  board. O mesmo aparece no aviso do topo do board como linha discreta de recomendação, com o atalho
+  para o Harness de IA.
 - **Opcionais:** a outra ferramenta de IA, quando está na máquina (a linha de comando no PATH ou, no
   Cursor, o próprio editor). Projeto com o Claude Code mostra o Cursor aqui, e vice-versa. A lista só
   mostra o estado: o board instala o MCP e a skill nela quando ela vira a ferramenta do projeto.
