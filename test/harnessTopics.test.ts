@@ -6,8 +6,10 @@ import {
   catalogOriginOf,
   groupsFor,
   matchesQuery,
+  originsOf,
   resolveHarnessTab,
   toolsInOrder,
+  topicCount,
   topicsOf,
 } from '../src/shared/harnessTopics';
 
@@ -61,6 +63,30 @@ describe('harnessTopics: fonte e grupos', () => {
     expect(catalogOriginOf('claude', item({ scope: 'plugin' }))).toBe('user');
     expect(catalogOriginOf('claude', item({ scope: 'user' }))).toBe('user');
     expect(catalogOriginOf('claude', item({ scope: 'imported' }))).toBe('imported');
+  });
+
+  it('as origens da aba: Board só na ferramenta do projeto, Importados só com pasta importada', () => {
+    expect(originsOf(true, false)).toEqual(['board', 'project', 'user']);
+    expect(originsOf(true, true)).toEqual(['board', 'project', 'user', 'imported']);
+    expect(originsOf(false, false)).toEqual(['project', 'user']);
+  });
+
+  it('a contagem da aba de um assunto é o que a fonte tem naquele assunto', () => {
+    const skills = HARNESS_TOPICS.find((t) => t.id === 'skill')!;
+    const items = [
+      item({ name: 'a', scope: 'project' }),
+      item({ name: 'b', scope: 'project' }),
+      item({ name: 'c', scope: 'user' }),
+      item({ name: 'd', scope: 'plugin' }),
+      item({ name: 'e', scope: 'imported' }),
+      item({ kind: 'agent', name: 'f', scope: 'project' }),
+    ];
+    expect(topicCount('claude', items, skills, 'project')).toBe(2);
+    // a skill de plugin mora no bloco do plugin, em Demais: não conta em Skills
+    expect(topicCount('claude', items, skills, 'user')).toBe(1);
+    expect(topicCount('claude', items, other, 'user')).toBe(1);
+    expect(topicCount('claude', items, skills, 'imported')).toBe(1);
+    expect(topicCount('claude', items, other, 'project')).toBe(0);
   });
 
   it('plugins e organização só no global; memória só no projeto', () => {

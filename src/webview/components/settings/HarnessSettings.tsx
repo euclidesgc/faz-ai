@@ -30,7 +30,7 @@ export function HarnessSettings() {
     <div>
       <PageHeader title={t('Harness de IA')}>
         {rich(
-          'O que a IA pode usar nas execuções do board. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; cada ferramenta tem a sua aba, com um assunto por vez, e em cada um a origem: Board, Projeto, Global ou Importados.',
+          'O que a IA pode usar nas execuções do board. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; cada ferramenta tem a sua aba: primeiro onde olhar (Board, Projeto, Global ou Importados), depois um assunto por vez.',
         )}
         {introSeen && (
           <>

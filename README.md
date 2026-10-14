@@ -1007,19 +1007,22 @@ Global. A tela tem três níveis:
    padrão e o heartbeat) e uma aba para o **Claude Code** e outra para o **Cursor**, a da ferramenta
    do projeto primeiro, com o selo **ferramenta deste projeto**. Na outra, a marcação do board não
    vale (as execuções usam a ferramenta do projeto): ela serve para ler e editar os arquivos.
-2. **Um assunto por aba**: **Regras**, **Skills**, **Sub-agentes**, **MCPs**, **Comandos**, **Hooks** e
+2. **Onde olhar**, num seletor acima das abas de assunto, que vale para todas elas: **Board**,
+   **Projeto**, **Global** e, quando há pasta importada, **Importados**. Projeto, Global e Importados
+   são o **catálogo**: tudo que a ferramenta carrega naquela fonte, e existir no catálogo não ocupa o
+   contexto da IA. **Projeto** é o que a ferramenta lê na pasta do projeto; **Global**, o que ela lê
+   da sua pasta de usuário (`~/.claude`, `~/.cursor`…), dos plugins instalados e da sua organização;
+   **Importados**, o que o board achou nas pastas que você indicou. **Board** é o que você enviou, com
+   o modo de cada um. Trocar de assunto não muda a escolha.
+3. **Um assunto por aba**: **Regras**, **Skills**, **Sub-agentes**, **MCPs**, **Comandos**, **Hooks** e
    **Demais** (memória, configurações e permissões, estilos de saída, plugins e a política da
-   organização). Só aparecem os assuntos que a ferramenta tem. Só o assunto à vista é montado, o que
-   mantém a tela leve num ambiente com muitos artefatos.
-3. **A origem dos artefatos**, num seletor dentro do assunto: **Board**, **Projeto**, **Global** e,
-   quando há pasta importada, **Importados**. Projeto, Global e Importados são o **catálogo**: tudo que
-   a ferramenta carrega naquela fonte, e existir no catálogo não ocupa o contexto da IA. **Projeto** é
-   o que a ferramenta lê na pasta do projeto; **Global**, o que ela lê da sua pasta de usuário
-   (`~/.claude`, `~/.cursor`…), dos plugins instalados e da sua organização; **Importados**, o que o
-   board achou nas pastas que você indicou. **Board** é o que você enviou, com o modo de cada um.
+   organização). Só aparecem os assuntos que a ferramenta tem, e o título de cada aba conta o que há
+   no escopo escolhido ("3 no board" no Board; o número de artefatos no catálogo). No Board, Comandos,
+   Hooks e Demais dizem que não entram no board. Só o assunto à vista é montado, o que mantém a tela
+   leve num ambiente com muitos artefatos.
 
-Cada assunto tem um campo de **busca** que filtra as linhas por parte do nome ou da descrição, no
-catálogo e no Board. Todo botão de ação da tela (Reler pastas, Novo agente, Sugerir agentes com IA,
+Ao lado do seletor há o campo de **busca**, que filtra as linhas por parte do nome ou da descrição,
+no catálogo e no Board. Todo botão de ação da tela (Reler pastas, Novo agente, Sugerir agentes com IA,
 Enviar para o board…) tem um **hint** que diz o que o clique faz, aberto ao passar o mouse ou ao
 focar pelo teclado; desabilitado, o hint diz por quê. Os grupos do catálogo são sempre os mesmos, na
 mesma ordem:

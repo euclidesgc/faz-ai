@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Callout, SegmentedControl, TextField } from '@radix-ui/themes';
-import { HARNESS_SCOPES, type AiTool } from '../../../../shared/harness';
+import { Callout } from '@radix-ui/themes';
+import type { AiTool } from '../../../../shared/harness';
 import { HARNESS_GROUPS, groupOf } from '../../../../shared/harnessCatalog';
 import { catalogOriginOf, groupsFor, matchesQuery, type HarnessOrigin, type TopicInfo } from '../../../../shared/harnessTopics';
 import { ai, harness } from '../../../commands';
@@ -14,37 +14,24 @@ import { SkillWizard } from './SkillWizard';
 import { useItemActions } from './useItemActions';
 import { t } from '../../../i18n';
 
-/** O que cada origem é, numa frase, antes da lista. */
-const ORIGIN_HINTS: Record<HarnessOrigin, string> = {
-  board: 'O que você enviou ao board: só isso entra nas execuções, no modo de cada um (Sempre, Pelo card ou Desligado).',
-  project: 'Arquivos desta pasta; valem só aqui.',
-  user: 'Arquivos da sua pasta de usuário; valem em todos os projetos.',
-  imported: 'Encontrados nas pastas que você importou; a ferramenta não os carrega sozinha.',
-};
-
 /**
- * Um assunto de uma ferramenta (Regras, Skills, Sub-agentes…): a busca, a origem (Board, Projeto, Global ou
- * Importados) e, na origem, os grupos do catálogo ou a lista do board. Só a origem à vista é renderizada.
+ * Um assunto de uma ferramenta (Regras, Skills, Sub-agentes…) numa origem (Board, Projeto, Global ou Importados),
+ * escolhida na aba da ferramenta junto com a busca: os grupos do catálogo ou a lista do board.
  */
-export function TopicView({ tool, topic }: { tool: AiTool; topic: TopicInfo }) {
+export function TopicView({ tool, topic, origin, query }: { tool: AiTool; topic: TopicInfo; origin: HarnessOrigin; query: string }) {
   const state = useBoardStore((s) => s.state)!;
-  const [query, setQuery] = useState('');
-  const [chosen, setChosen] = useState<HarnessOrigin>('project');
   const [open, setOpen] = useState<string | null>(null);
   // o assistente de criação aberto (regra ou skill); vale para a origem à vista
   const [wizard, setWizard] = useState<'rule' | 'skill' | null>(null);
+  // trocar de origem fecha o formulário e o assistente abertos: eles eram da origem anterior
+  useEffect(() => {
+    setOpen(null);
+    setWizard(null);
+  }, [origin]);
   const all = state.harness.inventory.find((x) => x.tool === tool)?.items ?? [];
   const actions = useItemActions(tool, all);
   const projectTool = tool === state.board.aiTool;
-  const hasImports = state.harnessImports.some((x) => x.tool === tool);
-  // a marcação do board só vale para a ferramenta do projeto
-  const origins: HarnessOrigin[] = [
-    ...(topic.kind && projectTool ? (['board'] as const) : []),
-    'project',
-    'user',
-    ...(hasImports ? (['imported'] as const) : []),
-  ];
-  const origin = origins.includes(chosen) ? chosen : 'project';
+  const setChosen = (next: HarnessOrigin) => useBoardStore.setState({ harnessOrigin: next });
   // "Indicar artefatos": a IA pré-seleciona no catálogo; o resultado vale para este assunto e esta ferramenta
   const suggestions = state.harnessSuggestions;
   const suggested =
@@ -80,35 +67,18 @@ export function TopicView({ tool, topic }: { tool: AiTool; topic: TopicInfo }) {
   const nothingFound =
     query.trim() !== '' && !ownTable && origin !== 'board' && !fromCatalog.some((i) => groups.some((g) => g.id === groupOf(tool, i)));
 
+  // comandos, hooks e os demais não têm marcação: a ferramenta os carrega sozinha, e no Board só há o aviso
+  if (origin === 'board' && !topic.kind)
+    return (
+      <div className="topic-view">
+        <p className="muted small scope-empty">
+          {t('Este assunto não entra no board: a ferramenta carrega esses arquivos por conta própria. Veja em Projeto ou Global.')}
+        </p>
+      </div>
+    );
+
   return (
     <div className="topic-view">
-      <div className="topic-bar">
-        <SegmentedControl.Root
-          size="1"
-          value={origin}
-          onValueChange={(next) => {
-            setChosen(next as HarnessOrigin);
-            setOpen(null);
-            setWizard(null);
-          }}
-          aria-label={t('Origem dos artefatos')}
-        >
-          {origins.map((id) => (
-            <SegmentedControl.Item key={id} value={id}>
-              {id === 'board' ? t('Board') : t(HARNESS_SCOPES.find((x) => x.id === id)!.label)}
-            </SegmentedControl.Item>
-          ))}
-        </SegmentedControl.Root>
-        <TextField.Root
-          className="topic-search"
-          type="search"
-          aria-label={t('Buscar por nome ou descrição')}
-          placeholder={t('Buscar por nome ou descrição…')}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
-      <p className="muted small topic-origin-hint">{t(ORIGIN_HINTS[origin])}</p>
       {canSuggest && (
         <div className="actions-toolbar topic-suggest">
           <ActionButton
