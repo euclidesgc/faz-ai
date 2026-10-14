@@ -993,8 +993,12 @@ disponíveis, `set_card_profile` escolhe o de um card e `create_agent`, `update_
 ![Skills do projeto e globais, com a instalação da skill do fluxo no global ou no projeto](docs/images/harness.png)
 
 Toda execução pelo board parte de **contexto vazio**: nenhuma regra, skill ou agente da sua máquina
-ou do projeto entra por conta própria. Só entra o que você **envia ao board**. Em Configurações →
-**Harness de IA** a tela tem três níveis:
+ou do projeto entra por conta própria. Só entra o que você **envia ao board**. Ao abrir Configurações →
+**Harness de IA** pela primeira vez, o aviso **Como usar o Harness** resume isso e diz por onde
+começar (Indicar artefatos, um agente com ajuda, revisar as regras desligadas); **Entendi, não mostrar
+de novo** o dispensa, e **Como funciona** o traz de volta. As abas de assunto dizem no título quantos
+artefatos estão no board e quantas regras esperam revisão, e um Board vazio leva direto a Projeto ou
+Global. A tela tem três níveis:
 
 1. **Uma aba por ferramenta.** **Ferramenta e execução** (a IA do projeto, a permissão, o agente
    padrão e o heartbeat) e uma aba para o **Claude Code** e outra para o **Cursor**, a da ferramenta

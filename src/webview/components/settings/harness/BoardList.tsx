@@ -1,7 +1,7 @@
 import { Badge, Button, Callout } from '@radix-ui/themes';
 import { HARNESS_SCOPES, type HarnessItem } from '../../../../shared/harness';
 import { missingSelections, selectedItems, selectionKey, usageOptions, type SelectableKind } from '../../../../shared/harnessSelection';
-import { matchesQuery } from '../../../../shared/harnessTopics';
+import { matchesQuery, type HarnessOrigin } from '../../../../shared/harnessTopics';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { IconWarning } from '../../ui';
@@ -16,7 +16,16 @@ const originLabel = (item: HarnessItem): string => t(HARNESS_SCOPES.find((x) => 
  * entra nas execuções), de onde vem e como tirar. Uma origem que sumiu aparece como ausente na mesma
  * lista, sem quebrar os cards que a listam.
  */
-export function BoardList({ kind, query }: { kind: SelectableKind; query: string }) {
+export function BoardList({
+  kind,
+  query,
+  onOpenCatalog,
+}: {
+  kind: SelectableKind;
+  query: string;
+  /** leva à origem do catálogo (Projeto ou Global), de onde se envia ao board */
+  onOpenCatalog: (origin: HarnessOrigin) => void;
+}) {
   const state = useBoardStore((s) => s.state)!;
   const items = selectedItems(state, kind).filter((i) => matchesQuery(query, i.name, i.description));
   const missing = missingSelections(state).filter((x) => x.kind === kind && matchesQuery(query, x.location));
@@ -39,9 +48,29 @@ export function BoardList({ kind, query }: { kind: SelectableKind; query: string
         </Callout.Root>
       )}
       {total === 0 && (
-        <p className="muted small scope-empty">
-          {t('Nada neste assunto foi enviado ao board. Escolha, em Projeto, Global ou Importados, o que os cards podem usar.')}
-        </p>
+        <div className="board-empty">
+          <p className="muted small">
+            {kind === 'agent'
+              ? t(
+                  'Nenhum agente no board: toda execução roda com o escopo cheio. Crie um em Projeto ou Global, com "Criar agente com ajuda" ou pelas sugestões prontas.',
+                )
+              : kind === 'instructions'
+                ? t(
+                    'Nenhuma regra no board. Envie as do projeto a partir de Projeto ou Global; elas entram desligadas, para você revisar antes de ativar.',
+                  )
+                : t(
+                    'Nada neste assunto no board: o planejamento dos cards não tem de onde escolher. Vá a Projeto ou Global, use "Indicar artefatos" e envie ao board.',
+                  )}
+          </p>
+          <div className="row">
+            <Button size="1" variant="soft" onClick={() => onOpenCatalog('project')}>
+              {t('Ir para Projeto')}
+            </Button>
+            <Button size="1" variant="soft" color="gray" onClick={() => onOpenCatalog('user')}>
+              {t('Ir para Global')}
+            </Button>
+          </div>
+        </div>
       )}
       {total > 0 && items.length + missing.length === 0 && <p className="muted small scope-empty">{t('Nada encontrado para a busca.')}</p>}
       <ul className="item-list">

@@ -491,8 +491,27 @@ export const harness: Record<string, string> = {
   // --- Harness por ferramenta e por assunto
   'O projeto trabalha com uma ferramenta de IA por vez. Ela define o arquivo de regras, a pasta das skills, onde o servidor MCP é registrado e os modelos oferecidos nos cards. Pastas de outras ferramentas podem existir no projeto, mas o board não mexe nelas. O servidor MCP do board e a skill do fluxo são instalados na aba de cada ferramenta, nos assuntos MCPs e Skills, em Projeto.':
     "The project works with one AI tool at a time. It defines the rules file, the skills folder, where the MCP server is registered and the models offered on cards. Folders of other tools may exist in the project, but the board does not touch them. The board MCP server and the flow skill are installed in each tool's tab, under the MCPs and Skills topics, in Project.",
-  'Toda execução pelo board parte de <b>contexto vazio</b>: nenhuma regra, skill ou agente da sua máquina ou do projeto entra por conta própria. Só entra o que você enviar ao <b>Board</b>. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão. Cada ferramenta tem a sua aba, com um assunto por vez (regras, skills, sub-agentes…); em cada um, escolha a origem: o que está no Board, no Projeto, no Global ou nas pastas importadas.':
-    'Every run through the board starts from <b>empty context</b>: no rule, skill or agent from your machine or the project gets in on its own. Only what you send to the <b>Board</b> gets in. <b>Tool and execution</b> picks the AI, the permission and the default agent. Each tool has its own tab, with one topic at a time (rules, skills, sub-agents…); in each one, pick the origin: what is on the Board, in the Project, Global or in imported folders.',
+  'O que a IA pode usar nas execuções do board. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; cada ferramenta tem a sua aba, com um assunto por vez, e em cada um a origem: Board, Projeto, Global ou Importados.':
+    'What the AI may use in board runs. <b>Ferramenta e execução</b> (Tool and run) picks the AI, the permission and the default agent; each tool has its tab, one subject at a time, and in each one the origin: Board, Projeto, Global or Importados.',
+  'Como funciona': 'How it works',
+  'Como usar o Harness': 'How to use the Harness',
+  '<b>Para que serve.</b> Toda execução do board parte de contexto vazio. Esta tela é o catálogo do que existe na sua máquina e no projeto; o <b>Board</b> é só o que a IA pode usar.':
+    '<b>What it is for.</b> Every board run starts from an empty context. This screen is the catalog of what exists on your machine and in the project; the <b>Board</b> is only what the AI may use.',
+  '<b>Por que assim.</b> Menos contexto por execução é resposta mais rápida, mais barata e mais precisa. O planejamento de cada card escolhe o mínimo entre o que está no Board.':
+    '<b>Why this way.</b> Less context per run means faster, cheaper and more precise answers. The planning of each card picks the minimum among what is on the Board.',
+  '<b>Por onde começar.</b> 1) Abra a aba da ferramenta do projeto e, em Skills e MCPs, use <b>Indicar artefatos</b> e envie ao Board. 2) Em Sub-agentes, crie um agente com ajuda. 3) Em Regras, revise as que entraram desligadas e ative as que valem.':
+    "<b>Where to start.</b> 1) Open the project tool's tab and, in Skills and MCPs, use <b>Indicar artefatos</b> and send to the Board. 2) In Sub-agentes, create an agent with help. 3) In Regras, review the ones that entered off and turn on the ones that apply.",
+  'Entendi, não mostrar de novo': 'Got it, do not show again',
+  '{n} no board, {off} desligadas': '{n} on the board, {off} off',
+  '{n} no board': '{n} on the board',
+  'Nenhum agente no board: toda execução roda com o escopo cheio. Crie um em Projeto ou Global, com "Criar agente com ajuda" ou pelas sugestões prontas.':
+    'No agent on the board: every run has the full scope. Create one in Projeto or Global, with "Criar agente com ajuda" or from the ready-made suggestions.',
+  'Nenhuma regra no board. Envie as do projeto a partir de Projeto ou Global; elas entram desligadas, para você revisar antes de ativar.':
+    'No rule on the board. Send the project ones from Projeto or Global; they enter off, for you to review before turning on.',
+  'Nada neste assunto no board: o planejamento dos cards não tem de onde escolher. Vá a Projeto ou Global, use "Indicar artefatos" e envie ao board.':
+    'Nothing of this subject on the board: the cards\' planning has nothing to pick from. Go to Projeto or Global, use "Indicar artefatos" and send to the board.',
+  'Ir para Projeto': 'Go to Projeto',
+  'Ir para Global': 'Go to Global',
   'Harness do {tool}': '{tool} harness',
   'Tudo que o {tool} carrega, por assunto. O <b>catálogo</b> (Projeto, Global e Importados) mostra o que existe e não ocupa o contexto da IA. Só o que você envia ao <b>Board</b> pode ser usado pelas execuções, no modo de cada artefato.':
     'Everything {tool} loads, by topic. The <b>catalog</b> (Project, Global and Imported) shows what exists and takes no space in the AI context. Only what you send to the <b>Board</b> can be used by runs, in the mode of each artifact.',
@@ -511,8 +530,6 @@ export const harness: Record<string, string> = {
   'Buscar por nome ou descrição': 'Search by name or description',
   'Buscar por nome ou descrição…': 'Search by name or description…',
   'Nada encontrado para a busca.': 'Nothing found for the search.',
-  'Nada neste assunto foi enviado ao board. Escolha, em Projeto, Global ou Importados, o que os cards podem usar.':
-    'Nothing on this topic was sent to the board. Pick, in Project, Global or Imported, what cards may use.',
   'As regras entram desligadas: escritas para outro contexto, elas podem conflitar com o fluxo e as definições do board (fases, aprovação, uso do MCP). Leia o texto de cada uma antes de ativar; regra ativa entra em toda execução.':
     'Rules come in off: written for another context, they may conflict with the board flow and settings (phases, approval, MCP use). Read the text of each one before turning it on; an active rule goes into every run.',
   'Remover do board': 'Remove from the board',

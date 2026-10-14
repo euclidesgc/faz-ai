@@ -189,7 +189,7 @@ export function TopicView({ tool, topic }: { tool: AiTool; topic: TopicInfo }) {
           <Callout.Text>{t(suggestions.error)}</Callout.Text>
         </Callout.Root>
       )}
-      {origin === 'board' && topic.kind && <BoardList kind={topic.kind} query={query} />}
+      {origin === 'board' && topic.kind && <BoardList kind={topic.kind} query={query} onOpenCatalog={(next) => setChosen(next)} />}
       {origin === 'imported' && <ImportedFolders tool={tool} />}
       {nothingFound && <p className="muted small scope-empty">{t('Nada encontrado para a busca.')}</p>}
       {!nothingFound &&

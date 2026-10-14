@@ -2,10 +2,22 @@
 // a origem dos artefatos (Board, Projeto, Global, Importados). Lógica pura, para a tela e os testes.
 import { AI_TOOLS, type AiTool, type HarnessItem } from './harness';
 import { HARNESS_CATALOG, HARNESS_NOTES, groupOf, type HarnessGroup } from './harnessCatalog';
-import type { SelectableKind } from './harnessSelection';
+import { missingSelections, selectedItems, type SelectableKind } from './harnessSelection';
+import type { BoardState } from './model';
 
 /** Os assuntos de uma ferramenta, na ordem das abas. */
 export type HarnessTopic = 'rules' | 'skill' | 'agent' | 'mcp' | 'command' | 'hook' | 'other';
+
+/** O que a aba de um assunto resume no título: quantos artefatos estão no board e quantas regras esperam revisão. */
+export function topicBadge(
+  s: Pick<BoardState, 'board' | 'harness' | 'harnessSelection'>,
+  topic: TopicInfo,
+): { board: number; pending: number } {
+  if (!topic.kind) return { board: 0, pending: 0 };
+  const board = selectedItems(s, topic.kind).length + missingSelections(s).filter((x) => x.kind === topic.kind).length;
+  const pending = topic.kind === 'instructions' ? selectedItems(s, 'instructions', 'off').length : 0;
+  return { board, pending };
+}
 
 export interface TopicInfo {
   id: HarnessTopic;

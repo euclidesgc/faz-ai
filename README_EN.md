@@ -1039,8 +1039,12 @@ available agents, `set_card_profile` picks one for a card, and `create_agent`, `
 ![Project and global skills, with the flow skill install, global or in the project](docs/images/harness_en.png)
 
 Every run started by the board starts from an **empty context**: no rule, skill or agent from your
-machine or the project gets in on its own. Only what you **send to the board** gets in. Under
-Configurações → **Harness de IA** the screen has three levels:
+machine or the project gets in on its own. Only what you **send to the board** gets in. The first
+time you open Configurações → **Harness de IA**, the **Como usar o Harness** (how to use the Harness)
+notice sums this up and says where to start (Indicar artefatos, an agent with help, reviewing the rules
+that entered off); **Entendi, não mostrar de novo** dismisses it and **Como funciona** brings it back.
+The subject tabs say in their title how many artifacts are on the board and how many rules await
+review, and an empty Board goes straight to Projeto or Global. The screen has three levels:
 
 1. **One tab per tool.** **Ferramenta e execução** (tool and run: the project's AI, the permission,
    the default agent and the heartbeat) and one tab for **Claude Code** and one for **Cursor**, the

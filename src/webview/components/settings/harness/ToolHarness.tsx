@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Badge, Button, Callout, Tabs } from '@radix-ui/themes';
 import { aiToolInfo, type AiTool } from '../../../../shared/harness';
-import { TOOL_REGIME, topicsOf, type HarnessTopic } from '../../../../shared/harnessTopics';
+import { TOOL_REGIME, topicBadge, topicsOf, type HarnessTopic } from '../../../../shared/harnessTopics';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { IconWarning } from '../../ui';
@@ -82,11 +82,22 @@ export function ToolHarness({ tool }: { tool: AiTool }) {
       )}
       <Tabs.Root value={active.id} onValueChange={(next) => useBoardStore.setState({ harnessTopic: next as HarnessTopic })}>
         <Tabs.List className="harness-tabs">
-          {topics.map((x) => (
-            <Tabs.Trigger key={x.id} value={x.id}>
-              {t(x.label)}
-            </Tabs.Trigger>
-          ))}
+          {topics.map((x) => {
+            // o título da aba já diz onde há trabalho: quantos estão no board e, nas regras, quantas esperam revisão
+            const badge = projectTool ? topicBadge(state, x) : { board: 0, pending: 0 };
+            return (
+              <Tabs.Trigger key={x.id} value={x.id}>
+                {t(x.label)}
+                {badge.board > 0 && (
+                  <Badge color={badge.pending > 0 ? 'amber' : 'indigo'} variant="soft" size="1" className="topic-badge">
+                    {badge.pending > 0
+                      ? t('{n} no board, {off} desligadas', { n: badge.board, off: badge.pending })
+                      : t('{n} no board', { n: badge.board })}
+                  </Badge>
+                )}
+              </Tabs.Trigger>
+            );
+          })}
         </Tabs.List>
         {topics.map((x) => (
           <Tabs.Content key={x.id} value={x.id}>

@@ -85,6 +85,8 @@ interface UiState {
   dontWarnYolo: boolean;
   /** o nome da coluna escolhida por último em "Até onde" ao ligar o modo autônomo; '' = até o fim */
   yoloUntilName: string;
+  /** a pessoa já dispensou o aviso de como usar o Harness ("Entendi, não mostrar de novo") */
+  harnessIntroSeen: boolean;
 }
 
 interface BoardStore extends UiState, ViewState {
@@ -126,6 +128,7 @@ interface BoardStore extends UiState, ViewState {
   clearPendingSettingsSection(): void;
   setSettingsNavCollapsed(collapsed: boolean): void;
   setDontWarnYolo(value: boolean): void;
+  setHarnessIntroSeen(seen: boolean): void;
   setYoloUntilName(name: string): void;
   selectParent(id: Id | null): void;
   /**
@@ -202,6 +205,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
     dontWarnYolo: persisted?.dontWarnYolo ?? false,
+    harnessIntroSeen: persisted?.harnessIntroSeen ?? false,
     yoloUntilName: persisted?.yoloUntilName ?? '',
     chatOpen: false,
     setChatOpen: (chatOpen) => set({ chatOpen }),
@@ -260,6 +264,10 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     },
     setDontWarnYolo(dontWarnYolo) {
       set({ dontWarnYolo });
+      persist(get());
+    },
+    setHarnessIntroSeen(harnessIntroSeen) {
+      set({ harnessIntroSeen });
       persist(get());
     },
     setYoloUntilName(yoloUntilName) {
@@ -323,6 +331,7 @@ function persist(s: BoardStore): void {
     chatModel: s.chatModel,
     dontWarnYolo: s.dontWarnYolo,
     yoloUntilName: s.yoloUntilName,
+    harnessIntroSeen: s.harnessIntroSeen,
   };
   setUiState(ui);
 }
