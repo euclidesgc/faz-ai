@@ -6,6 +6,7 @@ import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { useBoardStore } from '../store/boardStore';
 import { t, tn } from '../i18n';
 import { ui } from '../commands';
+import { useAction } from '../useAction';
 import { isWeb } from '../vscode';
 import { PageHeader } from './settings/PageHeader';
 import { CopyCommand, RequirementFix, requirementTexts } from './RequirementsBanner';
@@ -307,16 +308,23 @@ export function EnvironmentView() {
   const report = useBoardStore((s) => s.state?.environment ?? null);
   const tool = useBoardStore((s) => s.state!.board.aiTool);
   const setView = useBoardStore((s) => s.setView);
-  const [askedAt, setAskedAt] = useState(() => Date.now());
-  const checking = !report || report.checkedAt < askedAt;
+  // a espera é a da mensagem: o host confirma (`done`) quando o relatório já está no board, ou avisa a falha
+  const check = useAction(() => ui.checkEnvironment());
+  const checking = check.busy;
   // confere ao abrir: a pessoa pode ter instalado algo desde a última vez
   useEffect(() => {
-    ui.checkEnvironment();
+    void check.run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const recheck = () => {
-    setAskedAt(Date.now());
-    ui.checkEnvironment();
-  };
+  // um pedido no meio de uma conferência (instalou a skill enquanto a abertura ainda confere) roda logo depois
+  const [again, setAgain] = useState(false);
+  const recheck = () => (check.busy ? setAgain(true) : void check.run());
+  useEffect(() => {
+    if (check.busy || !again) return;
+    setAgain(false);
+    void check.run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [check.busy, again]);
   // recarregar a janela reinicia a extensão: as execuções de IA em andamento param, então pergunta antes
   const ask = useBoardStore((s) => s.ask);
   const running = useBoardStore((s) => s.state?.aiRuns.length ?? 0);
@@ -345,7 +353,9 @@ export function EnvironmentView() {
   const missing = report ? missingCount(report.required) : 0;
   const suggested = report ? missingCount(report.recommended) : 0;
   const summary = !report
-    ? t('Conferindo o ambiente…')
+    ? check.error
+      ? t('A conferência falhou. Tente de novo.')
+      : t('Conferindo o ambiente…')
     : missing
       ? missing === 1
         ? t('Falta 1 item necessário para o board trabalhar com a IA.')

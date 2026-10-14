@@ -5,6 +5,7 @@ import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { harness, ui } from '../commands';
+import { useAction } from '../useAction';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { isWeb } from '../vscode';
 import { Button, IconCheck, IconConnect, IconWarning, type ButtonVariant } from './ui';
@@ -334,21 +335,21 @@ function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
 
 /** "Verificar de novo", com retorno: conferindo, e o resultado quando nada mudou. */
 function RecheckButton() {
-  const checkedAt = useBoardStore((s) => s.state?.requirementsCheckedAt ?? 0);
-  const [askedAt, setAskedAt] = useState<number | null>(null);
-  const done = askedAt !== null && checkedAt > askedAt;
+  // o host confirma (`done`) quando a conferência termina; a falha chega como erro e destrava o botão
+  const check = useAction(() => ui.checkRequirements());
+  const [checked, setChecked] = useState(false);
   return (
     <>
       <span role="status" className="small muted">
-        {askedAt !== null && (done ? t('Conferido agora: nada mudou.') : t('Conferindo…'))}
+        {check.busy ? t('Conferindo…') : checked ? t('Conferido agora: nada mudou.') : null}
       </span>
       <Button
         size="small"
         variant="ghost"
-        disabled={askedAt !== null && !done}
-        onClick={() => {
-          setAskedAt(Date.now());
-          ui.checkRequirements();
+        loading={check.busy}
+        onClick={async () => {
+          setChecked(false);
+          setChecked(await check.run());
         }}
       >
         {t('Verificar de novo')}

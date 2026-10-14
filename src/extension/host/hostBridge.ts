@@ -161,17 +161,18 @@ export class HostBridge {
       case 'ui.showChat':
         await this.env.showChat?.();
         return;
+      // a conferência demora (CLIs, login): o `done` só sai quando ela termina, para a tela saber quando parou
       case 'requirements.check':
-        this.router.recheckRequirements();
+        await this.router.recheckRequirements();
         return;
       case 'environment.check':
-        this.router.checkEnvironment();
+        await this.router.checkEnvironment();
         return;
       case 'environment.seen':
         this.router.markEnvironmentSeen();
         return;
       case 'environment.pinMcp':
-        this.router.pinEnvironmentMcp();
+        await this.router.pinEnvironmentMcp();
         return;
       case 'chat.send':
       case 'chat.stop':

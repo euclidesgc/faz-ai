@@ -270,6 +270,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let enableTimer: NodeJS.Timeout | null = null;
   let checkAgain = false;
   let forceSigninCheck = false;
+  /** a última conferência dos requisitos falhou com este erro (null quando deu certo) */
+  let lastCheckError: string | null = null;
+  /** a conferência em curso foi pedida pela tela: o erro volta pelo `done`, não pelo aviso solto */
+  let requestedCheck = false;
   /** o host encerrou: nenhuma conferência nova começa e a que estava em andamento não mexe mais no board */
   let disposed = false;
   const SIGNIN_CACHE_MS = 3 * 60_000;
@@ -300,6 +304,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     const hadNode = !!nodePath;
     nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
     if (!hadNode && nodePath) pinMcp();
+    lastCheckError = null;
     checking = checkRequirements({
       tool: board.aiTool,
       permission: board.runner.permission,
@@ -342,7 +347,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           enableTimer = null;
         }
       })
-      .catch((e) => o.log(`Não foi possível conferir os requisitos do board: ${e instanceof Error ? e.message : String(e)}`))
+      .catch((e) => {
+        lastCheckError = `Não foi possível conferir os requisitos do board: ${e instanceof Error ? e.message : String(e)}`;
+        o.log(lastCheckError);
+        // sem isto a falha ficava só no log e a tela esperava a conferência para sempre
+        if (!requestedCheck) router.reportError(lastCheckError);
+      })
       .finally(() => {
         checking = null;
         forceSigninCheck = false;
@@ -355,11 +365,16 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   // o "Verificar de novo" relê também o PATH do terminal, para achar o que acabou de ser instalado, e
   // pula o cache do login: é o clique da pessoa depois de entrar na conta, não pode esperar o TTL de 3 min
-  router.onRequirementsCheck(() => {
+  router.onRequirementsCheck(async () => {
     forceSigninCheck = true;
-    void loginShellPath(true)
-      .then((fresh) => (pathEnv = fresh ?? pathEnv))
-      .finally(() => void checkNow());
+    requestedCheck = true;
+    try {
+      pathEnv = (await loginShellPath(true)) ?? pathEnv;
+      await checkNow();
+    } finally {
+      requestedCheck = false;
+    }
+    if (lastCheckError) throw new Error(lastCheckError);
   });
   // "Abrir no terminal" do aviso de login: o board só abre o terminal, a pessoa faz o login nele
   router.onOpenTerminal((command) => o.runInTerminal?.('Faz AI: login', command, o.folderPath));
@@ -420,8 +435,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     };
   };
   let diagnosing: Promise<void> | null = null;
+  /** o último Diagnóstico falhou com este erro (null quando deu certo) */
+  let lastDiagnoseError: string | null = null;
   const diagnose = () => {
     diagnosing ??= (async () => {
+      lastDiagnoseError = null;
       pathEnv = (await loginShellPath(true)) ?? pathEnv;
       await checkNow();
       const s = router.snapshot();
@@ -461,17 +479,25 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         }),
       );
     })()
-      .catch((e) => o.log(`Não foi possível rodar o Diagnóstico do ambiente: ${e instanceof Error ? e.message : String(e)}`))
+      .catch((e) => {
+        lastDiagnoseError = `Não foi possível rodar o Diagnóstico do ambiente: ${e instanceof Error ? e.message : String(e)}`;
+        o.log(lastDiagnoseError);
+      })
       .finally(() => (diagnosing = null));
+  };
+  /** O Diagnóstico pela tela: a falha volta pelo `done` da mensagem, e a tela sai do "Conferindo…". */
+  const diagnoseForScreen = async () => {
+    await diagnose();
+    if (lastDiagnoseError) throw new Error(lastDiagnoseError);
   };
   // a tela abre sozinha uma vez por máquina (a marca fica na pasta de dados da extensão, fora do board)
   const seenFile = path.join(o.storageDir, 'environment-seen');
   router.onEnvironment(
     {
-      check: () => void diagnose(),
+      check: diagnoseForScreen,
       pinMcp: () => {
         pinMcp();
-        void diagnose();
+        return diagnoseForScreen();
       },
       seen: () => {
         try {

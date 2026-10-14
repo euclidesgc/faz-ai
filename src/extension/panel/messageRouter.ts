@@ -43,10 +43,11 @@ export interface Origin {
 
 /** O que o host faz pelo Diagnóstico do ambiente. */
 export interface EnvironmentHooks {
-  check(): void;
+  /** roda o Diagnóstico; resolve quando o relatório já está no board e rejeita se a conferência falhou */
+  check(): Promise<void>;
   seen(): void;
   /** grava o caminho completo dos MCPs que o editor não acha, e confere de novo */
-  pinMcp?(): void;
+  pinMcp?(): Promise<void>;
 }
 
 /** As mensagens do webview que o chat executa. */
@@ -138,7 +139,7 @@ export class MessageRouter {
   private autopilot: Autopilot = { active: false, note: null };
   private requirements: BoardRequirement[] = [];
   private requirementsCheckedAt = 0;
-  private requirementsCheck: (() => void) | null = null;
+  private requirementsCheck: (() => Promise<void>) | null = null;
   private authExpired: AiTool | null = null;
   private openTerminalHook: ((command: string) => void) | null = null;
   private environment: EnvironmentReport | null = null;
@@ -272,13 +273,13 @@ export class MessageRouter {
     this.notify();
   }
 
-  /** Quem confere os requisitos quando a pessoa pede "Verificar de novo". */
-  onRequirementsCheck(fn: () => void): void {
+  /** Quem confere os requisitos quando a pessoa pede "Verificar de novo"; resolve ao terminar e rejeita se falhou. */
+  onRequirementsCheck(fn: () => Promise<void>): void {
     this.requirementsCheck = fn;
   }
 
-  recheckRequirements(): void {
-    this.requirementsCheck?.();
+  recheckRequirements(): Promise<void> {
+    return this.requirementsCheck?.() ?? Promise.resolve();
   }
 
   /** Quem abre um terminal do editor e roda o comando pedido (o login de uma CLI); a pessoa conclui o login. */
@@ -317,12 +318,12 @@ export class MessageRouter {
     this.environmentFirstRun = firstRun;
   }
 
-  checkEnvironment(): void {
-    this.environmentHooks?.check();
+  checkEnvironment(): Promise<void> {
+    return this.environmentHooks?.check() ?? Promise.resolve();
   }
 
-  pinEnvironmentMcp(): void {
-    this.environmentHooks?.pinMcp?.();
+  pinEnvironmentMcp(): Promise<void> {
+    return this.environmentHooks?.pinMcp?.() ?? Promise.resolve();
   }
 
   /** A tela abriu sozinha uma vez: nas próximas aberturas, só pelo botão. */
