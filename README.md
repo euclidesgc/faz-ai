@@ -1340,13 +1340,24 @@ por exemplo), eles precisam ser refeitos:
 | `.claude/skills/publicar-extensao/` | passo a passo da publicação para a IA | copiar a pasta da máquina original |
 
 Os três últimos só são necessários para publicar. A `main` só aceita mudanças por pull request, e o
-script já cuida disso: `npm run release -- <patch|minor|major>` parte da main atualizada e limpa,
-testa, cria a branch `release/vX.Y.Z` e nela ajusta a versão e os CHANGELOGs ("Não lançado" vira a
-versão), faz o commit e empacota. Publica nas duas lojas, envia a branch, abre o PR para a main e,
-com o push concluído, faz o merge (squash). Por fim atualiza a main local, apaga a branch de release
-(local e remota) e cria a tag e a GitHub Release com o `.vsix`. Se algo parar depois da publicação,
-`npm run release -- finish` retoma de onde parou (na branch de release ou na main), sem publicar de
-novo. `--dry-run` ensaia sem publicar. As opções estão no topo de `scripts/release.mjs`.
+script já cuida disso. Com o gitflow, o release parte da branch em que você está:
+
+- na `develop`: `npm run release -- <patch|minor|major>` exige a `develop` atualizada e limpa, testa,
+  cria a branch `release/vX.Y.Z` e nela ajusta a versão e os CHANGELOGs ("Não lançado" vira a
+  versão), faz o commit e empacota;
+- numa `hotfix/...`: o commit da versão vai na própria branch da correção, e o PR dela, se já
+  estiver aberto, é reaproveitado;
+- em qualquer outra branch, o script recusa e diz de onde rodar (a opção `--allow-branch` deixou de
+  existir).
+
+Depois publica nas duas lojas, envia a branch e abre o PR para a main, que entra com **merge commit**
+(nunca squash, para o commit de merge das histórias ficar na tag), e a branch não é apagada nesse
+merge. A tag e a GitHub Release com o `.vsix` saem sobre `origin/main`, sem trocar a branch da sua
+pasta. Por fim a main volta para a `develop` por PR, também com merge commit. Se algo parar depois da
+publicação, `npm run release -- finish` retoma de onde parou: cada passo confere se já foi feito
+(PR, tag, release, main contida na `develop`, branches) e não publica de novo. Se a volta para a
+`develop` der conflito, resolva no PR aberto e rode `finish`. `--dry-run` ensaia sem publicar. As
+opções estão no topo de `scripts/release.mjs`.
 
 Num hotfix (card do tipo Bug, branch `hotfix/...`), rode `npm run release` na worktree da `hotfix/`
 **antes** de aprovar o card. Aprovado antes, o PR entra na principal sem versão e a correção só sai
