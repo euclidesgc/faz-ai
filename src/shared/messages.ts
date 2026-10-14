@@ -260,6 +260,9 @@ export type WebviewToHost =
    * inventário o mostra, mais `#nome` numa entrada de configuração)
    */
   | { type: 'harness.selection.set'; items: { kind: SelectableKind; location: string }[]; usage: HarnessUsage | null }
+  /** a IA analisa o projeto e o catálogo do assunto e pré-seleciona os artefatos que fazem mais sentido (resultado em `harnessSuggestions`) */
+  | { type: 'harness.suggest.run'; tool: AiTool; kind: SelectableKind }
+  | { type: 'harness.suggest.clear' }
   /** abre o seletor de pasta do editor e importa a pasta escolhida para a ferramenta (só no editor) */
   | { type: 'harness.import.pick'; tool: AiTool }
   /** importa uma pasta: o board a varre atrás de artefatos no formato da ferramenta e os lista em "Importados" */

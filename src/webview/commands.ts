@@ -173,6 +173,9 @@ export const harness = {
   /** envia artefatos ao board com um modo, muda o modo, ou os tira do board (usage null); `location` é a `selectionKey` */
   setSelection: (items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null) =>
     post({ type: 'harness.selection.set', items, usage }),
+  /** a IA pré-seleciona os artefatos do assunto que fazem mais sentido para o projeto */
+  suggest: (tool: AiTool, kind: SelectableKind) => post({ type: 'harness.suggest.run', tool, kind }),
+  clearSuggestions: () => post({ type: 'harness.suggest.clear' }),
   /** abre o seletor de pasta do editor para importar artefatos */
   pickImport: (tool: AiTool) => post({ type: 'harness.import.pick', tool }),
   addImport: (tool: AiTool, dir: string) => post({ type: 'harness.import.add', tool, dir }),

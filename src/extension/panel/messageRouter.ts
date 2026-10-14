@@ -7,7 +7,7 @@ import { newId } from '../db/ids';
 import type { ImportSummary } from '../../shared/backup';
 import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
-import type { AiTool, PluginAction } from '../../shared/harness';
+import type { AiTool, HarnessSuggestions, PluginAction } from '../../shared/harness';
 import type { ClaudeCli } from '../plugins';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import { agentProfiles } from '../../shared/execution';
@@ -48,7 +48,10 @@ export interface EnvironmentHooks {
 }
 
 /** As mensagens do webview que o chat executa. */
-export type ChatMessageIn = Extract<WebviewToHost, { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' }>;
+export type ChatMessageIn = Extract<
+  WebviewToHost,
+  { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' | 'harness.suggest.run' }
+>;
 
 /** Tratadas pela ponte do webview (dependem do VSCode): aqui não mudam o board. */
 const viaBridge = () => false;
@@ -70,6 +73,8 @@ const bridgeOnly = {
   'chat.stop': viaBridge,
   'chat.clear': viaBridge,
   'ai.suggestAgents': viaBridge,
+  'harness.suggest.run': viaBridge,
+  'harness.suggest.clear': viaBridge,
   'ui.showChat': viaBridge,
   'requirements.check': viaBridge,
   'environment.check': viaBridge,
@@ -122,6 +127,7 @@ export class MessageRouter {
   private heartbeatNextAt: number | null = null;
   private chat: ChatState = EMPTY_CHAT;
   private chatHandler: ((msg: ChatMessageIn) => void) | null = null;
+  private suggestions: HarnessSuggestions | null = null;
   private autopilot: Autopilot = { active: false, note: null };
   private requirements: BoardRequirement[] = [];
   private requirementsCheckedAt = 0;
@@ -190,6 +196,7 @@ export class MessageRouter {
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
+      harnessSuggestions: this.suggestions,
     };
   }
 
@@ -353,6 +360,12 @@ export class MessageRouter {
     // o .bak já foi gravado e a pessoa pode fechar o editor logo depois: grava agora, sem esperar o debounce
     void this.ctx.dbHandle.flush?.().catch((e: unknown) => console.error('[fazai] falha ao salvar o board importado', e));
     return result;
+  }
+
+  /** O resultado de "Indicar artefatos" (informado pela sessão de chat), ou null para descartar. */
+  setSuggestions(suggestions: HarnessSuggestions | null): void {
+    this.suggestions = suggestions;
+    this.notify();
   }
 
   /** O chat com a IA (informado pela sessão de chat): as mensagens e se a IA está respondendo. */

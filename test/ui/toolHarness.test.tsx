@@ -6,6 +6,7 @@ import type { HarnessSelection } from '../../src/shared/harnessSelection';
 import { HARNESS_CATALOG } from '../../src/shared/harnessCatalog';
 import type { AiTool, HarnessItem } from '../../src/shared/harness';
 import type { HarnessTopic } from '../../src/shared/harnessTopics';
+import type { BoardState } from '../../src/shared/model';
 import { ToolHarness } from '../../src/webview/components/settings/harness/ToolHarness';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
@@ -84,6 +85,7 @@ beforeEach(async () => {
       harnessSelection: [],
       harnessImports: [],
       harnessInstall: null,
+      harnessSuggestions: null,
     },
   });
 });
@@ -341,6 +343,74 @@ describe('ToolHarness: busca', () => {
     await userEvent.type(search, 'nada disso');
     expect(names()).toEqual([]);
     expect(screen.getByText('Nada encontrado para a busca.')).toBeInTheDocument();
+  });
+});
+
+describe('ToolHarness: Indicar artefatos', () => {
+  const skill = (name: string, description = '') =>
+    item({
+      kind: 'skill',
+      name,
+      description,
+      location: `.claude/skills/${name}/SKILL.md`,
+      layout: 'skills',
+      mode: 'auto',
+      source: sourceOf('claude', '.claude/skills'),
+    });
+  const setSuggestions = (suggestions: BoardState['harnessSuggestions'], busy = false) => {
+    const s = useBoardStore.getState().state!;
+    useBoardStore.setState({ state: { ...s, harnessSuggestions: suggestions, chat: { ...s.chat, busy } } });
+  };
+
+  it('o botão pede a indicação do assunto; a resposta pré-seleciona as linhas com o motivo, e "Enviar para o board" manda só elas', async () => {
+    setClaudeItems([skill('sql', 'Consultas'), skill('web', 'Navega'), skill('docs')]);
+    await show('skill');
+    await userEvent.click(screen.getByRole('button', { name: 'Indicar artefatos' }));
+    expect(lastSent('harness.suggest.run')).toEqual({ type: 'harness.suggest.run', tool: 'claude', kind: 'skill' });
+    act(() => setSuggestions(null, true));
+    expect(screen.getByRole('button', { name: 'Indicando…' })).toBeDisabled();
+    act(() =>
+      setSuggestions({
+        tool: 'claude',
+        kind: 'skill',
+        items: [{ location: '.claude/skills/sql/SKILL.md', reason: 'O projeto usa Postgres' }],
+      }),
+    );
+    expect(screen.getByText('1 indicados: confira a seleção e use "Enviar para o board".')).toBeInTheDocument();
+    const skills = card('Skills');
+    expect(skills.getByRole('checkbox', { name: 'Selecionar sql' })).toBeChecked();
+    expect(skills.getByRole('checkbox', { name: 'Selecionar web' })).not.toBeChecked();
+    expect(skills.getByTitle('O projeto usa Postgres')).toHaveTextContent('indicado');
+    await userEvent.click(skills.getByRole('button', { name: /^Enviar para o board/ }));
+    expect(lastSent('harness.selection.set')).toEqual({
+      type: 'harness.selection.set',
+      items: [{ kind: 'skill', location: '.claude/skills/sql/SKILL.md' }],
+      usage: 'contextual',
+    });
+    // descartar limpa a indicação no host
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar indicação' }));
+    expect(lastSent('harness.suggest.clear')).toEqual({ type: 'harness.suggest.clear' });
+  });
+
+  it('uma indicação de outro assunto não pré-seleciona nada; o erro aparece como aviso', async () => {
+    setClaudeItems([skill('sql')]);
+    act(() => setSuggestions({ tool: 'claude', kind: 'mcp', items: [{ location: 'x', reason: '' }] }));
+    await show('skill');
+    expect(card('Skills').getByRole('checkbox', { name: 'Selecionar sql' })).not.toBeChecked();
+    act(() => setSuggestions({ tool: 'claude', kind: 'skill', items: [], error: 'A IA não respondeu no formato esperado.' }));
+    expect(screen.getByText('A IA não respondeu no formato esperado.')).toBeInTheDocument();
+  });
+
+  it('não existe na origem Board, nos hooks nem na ferramenta que não é a do projeto', async () => {
+    setClaudeItems([skill('sql')]);
+    await show('skill', 'Board');
+    expect(screen.queryByRole('button', { name: 'Indicar artefatos' })).toBeNull();
+    cleanup();
+    await show('hook');
+    expect(screen.queryByRole('button', { name: 'Indicar artefatos' })).toBeNull();
+    cleanup();
+    await show('skill', undefined, 'cursor');
+    expect(screen.queryByRole('button', { name: 'Indicar artefatos' })).toBeNull();
   });
 });
 
