@@ -1069,7 +1069,10 @@ review, and an empty Board goes straight to Projeto or Global. The screen has th
    to. **Board** is what you sent, with the mode of each one.
 
 Each subject has a **search** field that filters rows by part of the name or the description, in the
-catalog and on the Board. The catalog groups are always the same, in the same order:
+catalog and on the Board. Every action button on the screen (Reler pastas, Novo agente, Sugerir
+agentes com IA, Enviar para o board…) has a **hint** that says what the click does, opened on hover
+or on keyboard focus; when disabled, the hint says why. The catalog groups are always the same, in
+the same order:
 
 | Subject | Group | What it is | Examples |
 | --- | --- | --- | --- |

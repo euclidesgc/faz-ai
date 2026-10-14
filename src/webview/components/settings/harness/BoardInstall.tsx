@@ -5,8 +5,9 @@ import { copyTarget } from '../../../../shared/harnessCatalog';
 import { useAction } from '../../../useAction';
 import { harness, ui } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { Badge, Button, Card } from '@radix-ui/themes';
+import { Badge, Card } from '@radix-ui/themes';
 import { withGlobalWarning } from './text';
+import { ActionButton } from '../../ui';
 import { t } from '../../../i18n';
 import { rich } from '../../../i18n/rich';
 
@@ -98,9 +99,13 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
           )}
         </p>
         <div className="row">
-          <Button loading={loading('project')} onClick={() => run('project', false)}>
+          <ActionButton
+            loading={loading('project')}
+            hint={t('Grava o registro do board em .cursor/mcp.json, na pasta do projeto.')}
+            onClick={() => run('project', false)}
+          >
             {installedIn('project') ? t('Reinstalar neste projeto') : t('Instalar neste projeto')}
-          </Button>
+          </ActionButton>
         </div>
       </Card>
     );
@@ -128,12 +133,30 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
             )}
       </p>
       <div className="row">
-        <Button loading={loading('user')} onClick={() => install('user')}>
+        <ActionButton
+          loading={loading('user')}
+          hint={
+            artifact === 'mcp'
+              ? t('Registra o servidor do board no global da ferramenta: vale em todos os projetos, sem arquivo no repositório.')
+              : t('Instala a skill na sua pasta de usuário: vale em todos os projetos.')
+          }
+          onClick={() => install('user')}
+        >
           {installedIn('user') ? t('Reinstalar (padrão da ferramenta)') : t('Instalar (padrão da ferramenta)')}
-        </Button>
-        <Button variant="soft" color="gray" loading={loading('project')} onClick={() => install('project')}>
+        </ActionButton>
+        <ActionButton
+          variant="soft"
+          color="gray"
+          loading={loading('project')}
+          hint={
+            artifact === 'mcp'
+              ? t('Grava o registro na pasta do projeto, que vai no repositório; aqui ele vale sobre o global.')
+              : t('Instala a skill na pasta do projeto, que vai no repositório; aqui ela vale sobre a global.')
+          }
+          onClick={() => install('project')}
+        >
           {installedIn('project') ? t('Reinstalar neste projeto') : t('Instalar neste projeto')}
-        </Button>
+        </ActionButton>
       </div>
     </Card>
   );

@@ -3,8 +3,8 @@ import { SKILL_MODES, type AiTool, type HarnessItem, type SkillMode } from '../.
 import { HARNESS_CATALOG } from '../../../../shared/harnessCatalog';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { Badge, Button, Checkbox, IconButton } from '@radix-ui/themes';
-import { DeleteButton, IconTrash, SelectField } from '../../ui';
+import { Badge, Checkbox } from '@radix-ui/themes';
+import { ActionIconButton, ActionButton, DeleteButton, IconTrash, SelectField } from '../../ui';
 import { SkillFiles } from './SkillFiles';
 import { withGlobalWarning } from './text';
 import type { ItemActions } from './useItemActions';
@@ -156,40 +156,47 @@ export function ItemRow({
             </Badge>
           ))}
         {i.layout === 'skills' && (
-          <Button
+          <ActionButton
             variant={filesOpen ? 'soft' : 'ghost'}
             size="1"
             aria-pressed={filesOpen}
-            title={t('Referências, modelos e scripts da pasta da skill')}
+            hint={t('Mostra as referências, os modelos e os scripts da pasta da skill.')}
             onClick={onToggleFiles}
           >
             {t('Arquivos ({n})', { n: i.files?.length ?? 0 })}
-          </Button>
+          </ActionButton>
         )}
         {copyable(i, 'project') && !inProject && (
-          <Button
+          <ActionButton
             variant="ghost"
             size="1"
-            title={t('Cria uma cópia independente na pasta do projeto')}
+            hint={t('Cria uma cópia independente na pasta do projeto')}
             onClick={() => copy([i], 'project')}
           >
             {t('Copiar para o projeto')}
-          </Button>
+          </ActionButton>
         )}
         {copyable(i, 'user') && !twin(i, 'user') && (
-          <Button
+          <ActionButton
             variant="ghost"
             size="1"
-            title={t('Cria uma cópia na sua pasta de usuário, que vale em todos os projetos')}
+            hint={t('Cria uma cópia na sua pasta de usuário, que vale em todos os projetos')}
             onClick={() => copy([i], 'user')}
           >
             {t('Copiar para o global')}
-          </Button>
+          </ActionButton>
         )}
         {deletable(i) && (
-          <IconButton variant="ghost" color="red" size="1" title={t('Apagar')} aria-label={t('Apagar')} onClick={() => remove([i])}>
+          <ActionIconButton
+            variant="ghost"
+            color="red"
+            size="1"
+            hint={t('Pede confirmação e apaga o arquivo (ou a pasta da skill) do disco.')}
+            aria-label={t('Apagar')}
+            onClick={() => remove([i])}
+          >
             <IconTrash />
-          </IconButton>
+          </ActionIconButton>
         )}
         {i.kind === 'hook' && entryRemovable(i) && (
           <DeleteButton

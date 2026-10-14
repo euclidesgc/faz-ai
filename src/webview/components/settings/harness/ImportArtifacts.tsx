@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, TextField } from '@radix-ui/themes';
+import { TextField } from '@radix-ui/themes';
+import { ActionButton } from '../../ui';
 import type { AiTool } from '../../../../shared/harness';
 import { harness } from '../../../commands';
 import { useAction } from '../../../useAction';
@@ -21,15 +22,15 @@ export function ImportArtifacts({ tool }: { tool: AiTool }) {
   const title = t('Escolhe uma pasta e procura nela skills, agentes, comandos, hooks e servidores MCP no formato da ferramenta.');
   if (!isWeb)
     return (
-      <Button variant="soft" color="gray" title={title} loading={pick.busy} onClick={() => void pick.run()}>
+      <ActionButton variant="soft" color="gray" hint={title} loading={pick.busy} onClick={() => void pick.run()}>
         {t('Importar artefatos')}
-      </Button>
+      </ActionButton>
     );
   if (!typing)
     return (
-      <Button variant="soft" color="gray" title={title} onClick={() => setTyping(true)}>
+      <ActionButton variant="soft" color="gray" hint={title} onClick={() => setTyping(true)}>
         {t('Importar artefatos')}
-      </Button>
+      </ActionButton>
     );
   const close = () => {
     setTyping(false);

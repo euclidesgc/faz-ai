@@ -1019,7 +1019,10 @@ Global. A tela tem três níveis:
    board achou nas pastas que você indicou. **Board** é o que você enviou, com o modo de cada um.
 
 Cada assunto tem um campo de **busca** que filtra as linhas por parte do nome ou da descrição, no
-catálogo e no Board. Os grupos do catálogo são sempre os mesmos, na mesma ordem:
+catálogo e no Board. Todo botão de ação da tela (Reler pastas, Novo agente, Sugerir agentes com IA,
+Enviar para o board…) tem um **hint** que diz o que o clique faz, aberto ao passar o mouse ou ao
+focar pelo teclado; desabilitado, o hint diz por quê. Os grupos do catálogo são sempre os mesmos, na
+mesma ordem:
 
 | Assunto | Grupo | O que é | Exemplos |
 | --- | --- | --- | --- |

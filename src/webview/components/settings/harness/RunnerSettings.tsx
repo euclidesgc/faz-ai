@@ -4,7 +4,7 @@ import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { useBoardStore } from '../../../store/boardStore';
 import { ai, settings, ui } from '../../../commands';
 import { isWeb } from '../../../vscode';
-import { FormField, IconWarning, NumberField, SelectField, SwitchField } from '../../ui';
+import { ActionButton, FormField, IconWarning, NumberField, SelectField, SwitchField } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
 import { DependsOn } from '../DependsOn';
 import { t } from '../../../i18n';
@@ -23,14 +23,14 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
         title={t('Execução pela conversa e heartbeat')}
         actions={
           !unsupported && (
-            <Button
+            <ActionButton
               variant="soft"
               color="gray"
-              title={t('Começa uma rodada agora, mesmo com o heartbeat desligado')}
+              hint={t('Começa uma rodada agora, mesmo com o heartbeat desligado')}
               onClick={() => ai.runHeartbeat()}
             >
               {t('Rodar o heartbeat agora')}
-            </Button>
+            </ActionButton>
           )
         }
       >

@@ -831,4 +831,60 @@ export const harness: Record<string, string> = {
   'Pastas principais: {list}': 'Main folders: {list}',
   'Arquivos de teste': 'Test files',
   'Pasta {name}': 'Folder {name}',
+  'Relê as pastas do projeto e a global e atualiza o catálogo; espera também a lista de plugins da ferramenta.':
+    "Rereads the project and global folders and refreshes the catalog; also waits for the tool's plugin list.",
+  'Limpa a pré-seleção indicada pela IA; nada foi enviado ao board.':
+    "Clears the AI's suggested pre-selection; nothing was sent to the board.",
+  'Vai a "Ferramenta deste projeto", na aba Ferramenta e execução.':
+    'Goes to "Ferramenta deste projeto" (project tool), in the Ferramenta e execução tab.',
+  'Abre o formulário de um agente novo; o arquivo é gravado na pasta da ferramenta ao salvar.':
+    "Opens the form for a new agent; the file is written to the tool's folder on save.",
+  'Fecha o editor; o que não foi salvo se perde.': 'Closes the editor; unsaved changes are lost.',
+  'Abre o editor do agente logo abaixo da linha.': 'Opens the agent editor right below the row.',
+  'Grava o registro do board em .cursor/mcp.json, na pasta do projeto.':
+    "Writes the board's entry to .cursor/mcp.json, in the project folder.",
+  'Registra o servidor do board no global da ferramenta: vale em todos os projetos, sem arquivo no repositório.':
+    "Registers the board server in the tool's global config: valid in every project, with no file in the repository.",
+  'Instala a skill na sua pasta de usuário: vale em todos os projetos.': 'Installs the skill in your user folder: valid in every project.',
+  'Grava o registro na pasta do projeto, que vai no repositório; aqui ele vale sobre o global.':
+    'Writes the entry in the project folder, which goes into the repository; here it takes precedence over the global one.',
+  'Instala a skill na pasta do projeto, que vai no repositório; aqui ela vale sobre a global.':
+    'Installs the skill in the project folder, which goes into the repository; here it takes precedence over the global one.',
+  'Tira do board; o arquivo de origem não é tocado.': 'Removes it from the board; the source file is not touched.',
+  'Tira os marcados do board; os arquivos de origem ficam.': 'Removes the checked ones from the board; the source files stay.',
+  'Pede confirmação e apaga do disco os arquivos marcados.': 'Asks for confirmation and deletes the checked files from disk.',
+  'Pede confirmação e tira as entradas marcadas do arquivo de configurações.':
+    'Asks for confirmation and removes the checked entries from the settings file.',
+  'Desmarca tudo; nada muda.': 'Unchecks everything; nothing changes.',
+  'Procura skills numa pasta ou num repositório git e mostra a lista antes de copiar qualquer coisa.':
+    'Looks for skills in a folder or a git repository and shows the list before copying anything.',
+  'Acrescenta uma regra de permissão ao arquivo de configurações da ferramenta.': "Adds a permission rule to the tool's settings file.",
+  'Acrescenta um hook ao arquivo de configurações da ferramenta.': "Adds a hook to the tool's settings file.",
+  'Registra um servidor MCP no arquivo da ferramenta.': "Registers an MCP server in the tool's file.",
+  'Cria um arquivo novo deste assunto na pasta da ferramenta e o abre para editar.':
+    "Creates a new file of this subject in the tool's folder and opens it for editing.",
+  'Cria a skill de referências do projeto, com a pasta references/ para modelos e exemplos.':
+    "Creates the project's references skill, with the references/ folder for templates and examples.",
+  'Cria este arquivo na pasta indicada e o abre para editar.': 'Creates this file in the folder shown and opens it for editing.',
+  'Pede confirmação e tira a pasta e os artefatos dela do board; a pasta no disco não é tocada.':
+    'Asks for confirmation and removes the folder and its artifacts from the board; the folder on disk is not touched.',
+  'Informe a origem: dono/repositório, endereço git ou o caminho de uma pasta.':
+    'Enter the source: owner/repository, a git address or a folder path.',
+  'Clona ou lê a origem numa pasta temporária, sem rodar nada, e lista as skills encontradas.':
+    'Clones or reads the source into a temporary folder, without running anything, and lists the skills found.',
+  'Marca todas as skills que podem ser instaladas.': 'Checks every skill that can be installed.',
+  'Descarta a lista e apaga a pasta temporária; nada foi instalado.':
+    'Discards the list and deletes the temporary folder; nothing was installed.',
+  'Marque pelo menos uma skill.': 'Check at least one skill.',
+  'Copia as pastas das skills marcadas para o destino escolhido.': 'Copies the folders of the checked skills to the chosen destination.',
+  'Mostra as referências, os modelos e os scripts da pasta da skill.': "Shows the references, templates and scripts in the skill's folder.",
+  'Pede confirmação e apaga o arquivo (ou a pasta da skill) do disco.':
+    "Asks for confirmation and deletes the file (or the skill's folder) from disk.",
+  'A ferramenta ainda está aplicando a ação anterior.': 'The tool is still applying the previous action.',
+  'Pede à ferramenta para desativar os plugins marcados; vale na próxima sessão dela.':
+    'Asks the tool to disable the checked plugins; takes effect in its next session.',
+  'Pede à ferramenta para ativar os plugins marcados; vale na próxima sessão dela.':
+    'Asks the tool to enable the checked plugins; takes effect in its next session.',
+  'Pede confirmação e desinstala os plugins marcados pela ferramenta.':
+    'Asks for confirmation and uninstalls the checked plugins through the tool.',
 };
