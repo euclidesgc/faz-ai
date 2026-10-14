@@ -255,7 +255,8 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
 
     if (clean && hasOrigin) {
       try {
-        const remote = (await deps.git(['ls-remote', '--heads', 'origin', branch], projectDir)).trim();
+        // `refs/heads/` casa o nome exato; só o nome casaria também `outra/<branch>` pelo fim
+        const remote = (await deps.git(['ls-remote', '--heads', 'origin', `refs/heads/${branch}`], projectDir)).trim();
         const sha = remote.split(/\s+/)[0] ?? '';
         if (!remote) say(gitNotice('cleanup.remoteGone', { branch }));
         else if (sha !== pr.headRefOid) say(gitNotice('cleanup.remoteMoved', { branch, pr: pr.url }));

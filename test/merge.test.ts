@@ -99,6 +99,29 @@ const mergedView = (url: string, branch: string, over: Record<string, unknown> =
     headRefOid: 'feed01',
     ...over,
   });
+/**
+ * O `git` falso de um repositório limpo, com origin, em que a branch da história existe nas duas pontas
+ * (com o sha do pull request), a worktree dela está listada até ser removida e a `develop` local está
+ * atrás da remota. É o cenário comum depois de um merge, e o que a limpeza precisa apagar.
+ */
+const cleanRepo =
+  (branch: string, worktree: string) =>
+  async (args: string[], cwd: string): Promise<string> => {
+    const a = args.join(' ');
+    if (a === 'worktree list --porcelain')
+      return removed.length
+        ? 'worktree /projeto\nHEAD 1111\nbranch refs/heads/main\n'
+        : `worktree /projeto\nHEAD 1111\nbranch refs/heads/main\n\nworktree ${worktree}\nHEAD feed01\nbranch refs/heads/${branch}\n`;
+    if (a === 'status --porcelain') return '';
+    if (a.startsWith('rev-parse --verify --quiet refs/heads/')) return 'ok';
+    if (a.startsWith('merge-base --is-ancestor')) return '';
+    if (a === `ls-remote --heads origin refs/heads/${branch}`) return `feed01\trefs/heads/${branch}\n`;
+    if (a === 'rev-list --count origin/develop..develop') return '0\n';
+    if (a === 'rev-parse develop') return 'aaa\n';
+    if (a === 'rev-parse origin/develop') return 'bbb\n';
+    expect(cwd).toBe('/projeto');
+    return '';
+  };
 const cleanupComments = (n: number) =>
   router.snapshot().comments.filter((c) => c.cardId === card(n).id && c.body.startsWith('Limpeza da história depois do merge:'));
 
@@ -152,29 +175,37 @@ describe('pull request e merge na homologação', () => {
     router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true, mode: 'worktree', gitflow: true } } });
     await call('set_pull_request', { card: 1, url: PR });
     (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
-    ghResult = async () => (calls.at(-1)![1] === 'view' ? mergedView(PR, 'historia/1-login') : '');
+    // como no gh real: antes do merge o pull request ainda está aberto
+    ghResult = async () =>
+      calls.at(-1)![1] === 'view' ? mergedView(PR, 'historia/1-login', { state: 'OPEN', mergedAt: null, mergeCommit: null }) : '';
+    gitResult = cleanRepo('historia/1-login', '/projeto.worktrees/1-login');
     await approve(1);
     expect(calls).toEqual([
       ['pr', 'view', PR, '--json', 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid'],
       ['pr', 'merge', PR, '--squash'],
     ]);
     expect(columnOf(1)).toBe('Concluído');
-    expect(card(1).status).toBeNull();
-    // a limpeza conferiu as pendências e as branches pelo git, e deixou um relatório só
-    expect(gitCalls.some((a) => a[0] === 'worktree' && a[1] === 'list')).toBe(true);
-    expect(cleanupComments(1)).toHaveLength(1);
-    // a worktree da limpeza é a da `cleanUpStory`: sem worktree listada pelo git, nada a remover
-    expect(removed).toEqual([]);
+    expect(card(1)).toMatchObject({ status: null, worktreePath: '' });
+    // o merge sem erro confirma o pull request: a limpeza remove a worktree e as branches da história
+    expect(removed).toEqual(['/projeto.worktrees/1-login']);
+    expect(gitCalls).toContainEqual(['branch', '-D', 'historia/1-login']);
+    expect(gitCalls).toContainEqual(['push', '--quiet', 'origin', '--delete', 'historia/1-login']);
+    expect(gitCalls).toContainEqual(['fetch', '--quiet', 'origin', 'develop:develop']);
+    const report = cleanupComments(1);
+    expect(report).toHaveLength(1);
+    expect(report[0]!.body).not.toContain('**Aviso:**');
   });
 
   it('merge que falha no AutoMerger: nenhuma limpeza', async () => {
-    router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true, gitflow: true } } });
+    router.handle({ type: 'settings.board.update', patch: { git: { autoMerge: true, mode: 'worktree', gitflow: true } } });
     await call('set_pull_request', { card: 1, url: PR });
     (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
     ghResult = async () => {
-      if (calls.at(-1)![1] === 'view') return JSON.stringify({ state: 'OPEN', mergedAt: null, headRefName: 'historia/1-login' });
+      if (calls.at(-1)![1] === 'view') return mergedView(PR, 'historia/1-login', { state: 'OPEN', mergedAt: null, mergeCommit: null });
       throw new Error('Pull request is not mergeable');
     };
+    // o repositório tem o que apagar: a ausência de limpeza vem do merge que falhou, não do git
+    gitResult = cleanRepo('historia/1-login', '/projeto.worktrees/1-login');
     await approve(1);
     expect(calls.map((a) => a[1])).toEqual(['view', 'merge']);
     expect(columnOf(1)).toBe('Homologação');
@@ -526,23 +557,7 @@ describe('MergeWatcher', () => {
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree', gitflow: true } } });
     (router as any).ctx.cards.setWorkspace(card(1).id, 'historia/1-login', '/projeto.worktrees/1-login');
     ghResult = async () => mergedView(prOf(1), 'historia/1-login');
-    // um repositório limpo, com origin: a branch existe nas duas pontas e a develop local está atrás
-    gitResult = async (args, cwd) => {
-      const a = args.join(' ');
-      if (a === 'worktree list --porcelain')
-        return removed.length
-          ? 'worktree /projeto\nHEAD 1111\nbranch refs/heads/main\n'
-          : 'worktree /projeto\nHEAD 1111\nbranch refs/heads/main\n\nworktree /projeto.worktrees/1-login\nHEAD feed01\nbranch refs/heads/historia/1-login\n';
-      if (a === 'status --porcelain') return '';
-      if (a.startsWith('rev-parse --verify --quiet refs/heads/')) return 'ok';
-      if (a.startsWith('merge-base --is-ancestor')) return '';
-      if (a === 'ls-remote --heads origin historia/1-login') return 'feed01\trefs/heads/historia/1-login\n';
-      if (a === 'rev-list --count origin/develop..develop') return '0\n';
-      if (a === 'rev-parse develop') return 'aaa\n';
-      if (a === 'rev-parse origin/develop') return 'bbb\n';
-      expect(cwd).toBe('/projeto');
-      return '';
-    };
+    gitResult = cleanRepo('historia/1-login', '/projeto.worktrees/1-login');
     await watcher.runNow();
     expect(columnOf(1)).toBe('Concluído');
     expect(card(1)).toMatchObject({ mergeCommit: 'abc123', worktreePath: '', status: null });

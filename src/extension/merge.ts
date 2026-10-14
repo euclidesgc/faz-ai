@@ -149,6 +149,9 @@ export class AutoMerger {
       return void block(`O merge de ${card.prUrl} falhou: ${message}`);
     }
     this.merging.delete(cardId);
+    // a consulta foi feita antes do merge (state OPEN); o `gh pr merge` sem erro é a confirmação de que
+    // está mesclado, e sem isso a limpeza trataria o pull request como aberto e não apagaria nada
+    if (!(pr instanceof Error)) pr = { ...pr, state: 'MERGED' };
     this.deps.log(`[${ref}] Merge feito; card concluído.`);
     await concludeAndCleanUp(this.router, this.deps, card, done, `Merge de ${card.prUrl} feito.`, pr);
   }
