@@ -13,8 +13,8 @@ export const BRANCH_KINDS: { value: BranchKind; label: string }[] = [
 /** nomes guardados (sempre em português) dos tipos do board padrão que não geram feature */
 export const DEFAULT_BRANCH_KINDS: Record<string, BranchKind> = { Retrabalho: 'bugfix', Bug: 'hotfix' };
 
-/** De onde veio a branch principal detectada: o HEAD do origin, o nome (main/master) ou a branch atual. */
-export type MainSource = 'origin' | 'name' | 'current';
+/** De onde veio a branch principal: o HEAD do origin, o nome (main/master), a branch atual ou o nome configurado (`mainBranch`). */
+export type MainSource = 'origin' | 'name' | 'current' | 'config';
 export interface MainBranch {
   name: string;
   source: MainSource;
@@ -36,6 +36,8 @@ export interface GitConfig {
   decisionRecords: string;
   /** gitflow: feature e bugfix partem da develop e voltam para ela; hotfix parte da principal */
   gitflow: boolean;
+  /** a branch principal quando a pessoa a fixa; '' = detectada (origin/HEAD, main ou master, branch atual) */
+  mainBranch: string;
   /** branch de integração do gitflow */
   developBranch: string;
   /** prefixos que entram em {fluxo}, com a barra (ou sem: `feat-` gera `feat-12-...`) */
@@ -79,6 +81,7 @@ export const DEFAULT_GIT: GitConfig = {
   mergeMethod: 'squash',
   decisionRecords: '',
   gitflow: true,
+  mainBranch: '',
   developBranch: 'develop',
   featurePrefix: 'feature/',
   bugfixPrefix: 'bugfix/',
@@ -141,6 +144,8 @@ export function parseGit(json: string | null | undefined): GitConfig {
     decisionRecords: cleanDecisionDir(raw.decisionRecords),
     // ausente vale ligado, também em board antigo (RF01)
     gitflow: raw.gitflow !== false,
+    // vazio ou inválido volta a ser detectada
+    mainBranch: cleanBranchName(raw.mainBranch, DEFAULT_GIT.mainBranch),
     developBranch: cleanBranchName(raw.developBranch, DEFAULT_GIT.developBranch),
     featurePrefix: cleanPrefix(raw.featurePrefix, DEFAULT_GIT.featurePrefix),
     bugfixPrefix: cleanPrefix(raw.bugfixPrefix, DEFAULT_GIT.bugfixPrefix),

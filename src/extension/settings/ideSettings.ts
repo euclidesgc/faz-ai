@@ -169,6 +169,14 @@ const gitDevelopBranchKey: SyncedKey<string> = {
   defaultValue: DEFAULT_GIT.developBranch,
 };
 
+/** A principal fixada pela pessoa ('' = detectada): o nome novo dispara a renomeação no repositório (#466). */
+const gitMainBranchKey: SyncedKey<string> = {
+  key: 'git.mainBranch',
+  fromBoard: (board) => board.git.mainBranch,
+  toBoardPatch: (value) => ({ git: { mainBranch: value } }),
+  isValid: isString,
+  defaultValue: DEFAULT_GIT.mainBranch,
+};
 const gitFeaturePrefixKey: SyncedKey<string> = {
   key: 'git.featurePrefix',
   fromBoard: (board) => board.git.featurePrefix,
@@ -212,7 +220,7 @@ export const GIT_KEYS: SyncedKey<unknown>[] = [
   gitMergeMethodKey,
 ] as SyncedKey<unknown>[];
 
-/** Chaves ligadas ao board: idioma, tema, fonte, tamanho da fonte, as sete de Git/paralelo, os registros de decisão e as seis do gitflow. */
+/** Chaves ligadas ao board: idioma, tema, fonte, tamanho da fonte, as sete de Git/paralelo, os registros de decisão e as sete do gitflow. */
 export const SYNCED_KEYS: SyncedKey<unknown>[] = [
   languageKey,
   themeKey,
@@ -221,6 +229,7 @@ export const SYNCED_KEYS: SyncedKey<unknown>[] = [
   ...GIT_KEYS,
   gitDecisionRecordsKey,
   gitGitflowKey,
+  gitMainBranchKey,
   gitDevelopBranchKey,
   gitFeaturePrefixKey,
   gitBugfixPrefixKey,

@@ -37,6 +37,11 @@ function branchKindOf(v: unknown): BranchKind {
 export class BoardRepo {
   constructor(private db: Database) {}
 
+  /** O JSON da configuração de git do board, como está salvo (vazio quando o board não existe). */
+  gitJson(boardId: string): string {
+    return str(one(this.db, 'SELECT git_json FROM boards WHERE id = ?', [boardId])?.git_json);
+  }
+
   /** Lê um valor da tabela meta (chave/valor livre), ou undefined se não existir. */
   getMeta(key: string): string | undefined {
     const row = one(this.db, 'SELECT value FROM meta WHERE key = ?', [key]);

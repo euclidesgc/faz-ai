@@ -24,9 +24,10 @@ const GIT_AUTO_MERGE_KEY = 'fazai.git.autoMerge';
 const GIT_MERGE_METHOD_KEY = 'fazai.git.mergeMethod';
 const GIT_DECISION_RECORDS_KEY = 'fazai.git.decisionRecords';
 
-/** As seis chaves do gitflow (#462): a chave no Settings, o campo do `GitConfig` e um valor diferente do padrão. */
+/** As sete chaves do gitflow (#462 e #466): a chave no Settings, o campo do `GitConfig` e um valor diferente do padrão. */
 const GITFLOW_KEYS = [
   { setting: 'fazai.git.gitflow', field: 'gitflow', custom: false },
+  { setting: 'fazai.git.mainBranch', field: 'mainBranch', custom: 'trunk' },
   { setting: 'fazai.git.developBranch', field: 'developBranch', custom: 'integracao' },
   { setting: 'fazai.git.featurePrefix', field: 'featurePrefix', custom: 'feat/' },
   { setting: 'fazai.git.bugfixPrefix', field: 'bugfixPrefix', custom: 'fix/' },

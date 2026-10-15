@@ -389,6 +389,7 @@ export const settings: Record<string, string> = {
   'Principal: <code>{name}</code> ({origin})': 'Main: <code>{name}</code> ({origin})',
   'Principal: não detectada (esta pasta não é um repositório git).': 'Main: not detected (this folder is not a git repository).',
   'branch padrão do origin': "origin's default branch",
+  'definida nas configurações': 'set in the settings',
   'nome local': 'local name',
   'branch atual': 'current branch',
   principal: 'main',

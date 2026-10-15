@@ -8,7 +8,7 @@ import type { GitNotice } from '../shared/gitflow';
 /** Limite do `git fetch origin` antes de criar uma branch: o host fica travado esse tempo (#462, Riscos). */
 export const FETCH_TIMEOUT_MS = 20_000;
 
-const git = (cwd: string, args: string[], opts: { timeout?: number; env?: NodeJS.ProcessEnv } = {}): string => {
+export const git = (cwd: string, args: string[], opts: { timeout?: number; env?: NodeJS.ProcessEnv } = {}): string => {
   try {
     return execFileSync('git', args, {
       cwd,
@@ -26,7 +26,7 @@ const git = (cwd: string, args: string[], opts: { timeout?: number; env?: NodeJS
   }
 };
 
-const tryGit = (cwd: string, args: string[]): string | null => {
+export const tryGit = (cwd: string, args: string[]): string | null => {
   try {
     return git(cwd, args);
   } catch {
@@ -34,13 +34,13 @@ const tryGit = (cwd: string, args: string[]): string | null => {
   }
 };
 
-const branchExists = (repo: string, branch: string): boolean =>
+export const branchExists = (repo: string, branch: string): boolean =>
   tryGit(repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]) !== null;
 
-const remoteBranchExists = (repo: string, branch: string): boolean =>
+export const remoteBranchExists = (repo: string, branch: string): boolean =>
   tryGit(repo, ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]) !== null;
 
-const hasOrigin = (repo: string): boolean => tryGit(repo, ['remote', 'get-url', 'origin']) !== null;
+export const hasOrigin = (repo: string): boolean => tryGit(repo, ['remote', 'get-url', 'origin']) !== null;
 
 /**
  * A branch principal do repositório, sem rede (RF09): o HEAD do origin; senão main ou master, local

@@ -15,7 +15,7 @@ import { LinkRepo } from '../../repositories/linkRepo';
 import { CommentRepo } from '../../repositories/commentRepo';
 import { SettingsRepo } from '../../repositories/settingsRepo';
 import { detectMainBranch } from '../../git';
-import type { MainBranch } from '../../../shared/git';
+import { parseGit, type MainBranch } from '../../../shared/git';
 import { BoardHarness } from './harness';
 
 export interface RouterOptions {
@@ -98,7 +98,9 @@ export class BoardContext {
    */
   mainBranch(refresh = false): MainBranch | null {
     if (refresh || this.main === undefined) this.main = this.opts.workspaceDir ? detectMainBranch(this.opts.workspaceDir) : null;
-    return this.main;
+    // a principal fixada nas configurações vale sobre a detectada, desde que haja repositório
+    const fixed = this.main ? parseGit(this.boards.gitJson(this.boardId)).mainBranch : '';
+    return fixed ? { name: fixed, source: 'config' } : this.main;
   }
 }
 

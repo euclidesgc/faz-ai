@@ -24,6 +24,7 @@ const MAIN_SOURCE: Record<MainBranch['source'], string> = {
   origin: 'branch padrão do origin',
   name: 'nome local',
   current: 'branch atual',
+  config: 'definida nas configurações',
 };
 
 /** Os prefixos e a branch de integração, com o rótulo e a chave do Settings. */
