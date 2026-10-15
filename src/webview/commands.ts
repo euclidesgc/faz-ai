@@ -153,6 +153,14 @@ export const settings = {
   suggestModelRules: (tool: AiTool) => req({ type: 'settings.modelRules.suggest', tool }),
 };
 
+/** Branches e worktrees órfãs (#465): o host decide o que é seguro; a tela só pede e, nas de decisão, envia o que a pessoa viu. */
+export const orphans = {
+  scan: () => req({ type: 'git.orphans.scan' }),
+  clean: (id: string, acceptLoss?: { dirtyFiles: number; uniqueCommits: number }) =>
+    req({ type: 'git.orphans.clean', id, ...(acceptLoss ? { acceptLoss } : {}) }),
+  cleanSafe: () => req({ type: 'git.orphans.cleanSafe' }),
+};
+
 export const backup = {
   export: () => post({ type: 'backup.export' }),
   importPick: () => post({ type: 'backup.import.pick' }),

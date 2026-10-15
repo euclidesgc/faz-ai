@@ -713,14 +713,38 @@ Opções em **Faz AI › Git**, no Settings do editor:
 | Opção | Padrão | O que faz |
 | --- | --- | --- |
 | `fazai.git.gitflow` | ligado | Desligado, toda branch parte da principal e `{fluxo}` vira `<tipo>/`. |
+| `fazai.git.mainBranch` | vazio | Branch principal fixa; vazio detecta (HEAD do `origin`, `main` ou `master`). |
 | `fazai.git.developBranch` | `develop` | Branch de integração. |
 | `fazai.git.featurePrefix` | `feature/` | Prefixo das branches de feature. |
 | `fazai.git.bugfixPrefix` | `bugfix/` | Prefixo das branches de bugfix. |
 | `fazai.git.hotfixPrefix` | `hotfix/` | Prefixo das branches de hotfix. |
 | `fazai.git.releasePrefix` | `release/` | Só informativo: nenhum tipo de card gera release. |
 
-Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. A limpeza das órfãs e o renomear da
-principal no `origin` vêm em entregas seguintes.
+Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. Branches e worktrees que sobram
+depois da história são tratadas em [Branches e worktrees órfãs](#branches-e-worktrees-órfãs).
+
+##### Renomear a principal ou a `develop` no `origin`
+
+Mudar `fazai.git.mainBranch` ou `fazai.git.developBranch` para um nome que ainda não existe, com a
+branch antiga existindo, abre um aviso no editor (a mudança também vale no `origin`, e o board não a
+faz sozinho). As opções são **Renomear** e **Desfazer**; fechar a caixa mantém o pedido e a pergunta
+volta ao reabrir o board.
+
+- **Renomear** age nesta ordem: a branch no GitHub pelo `gh` (`gh api .../branches/<antiga>/rename`);
+  `git fetch --prune`; `git branch -m` no clone (inclusive a que está numa worktree); o upstream
+  (`origin/<nova>`); e, só na principal, o `origin/HEAD`. O GitHub redireciona os PRs abertos e leva a
+  branch padrão para o nome novo (conforme a documentação da API, não testado com conta real).
+- **Sem `gh`, fora do GitHub ou sem permissão**: nada é executado. O aviso mostra os comandos prontos
+  para este clone e para os outros, com **Copiar comandos**.
+- **Falha no meio**: a mensagem diz o que já mudou e o que falta. Cada passo confere o estado antes de
+  agir, então repetir é seguro. O remoto vem primeiro: se ele falha, nada local muda.
+- **Desfazer** devolve o nome anterior à configuração e não toca o repositório.
+- **Recusado** enquanto a IA executa uma história (a mensagem traz os números).
+- **Não muda**: workflows de CI, regras de proteção, a branch padrão do GitHub (na `develop`) e os
+  outros clones. A IA não renomeia branches: não há ferramenta nova no MCP.
+
+O diálogo no navegador, os campos na tela Git e o item no Diagnóstico do ambiente vêm em uma entrega
+seguinte (#498).
 
 ### Pull request e merge na Homologação
 
@@ -769,8 +793,8 @@ comentário na conversa, com o comando para você fazer à mão:
 
 Nenhuma falha da limpeza impede a conclusão do card. Com o gitflow desligado ("direto na principal")
 nada muda: a conclusão só remove a worktree, como antes. Não há opção para desligar a limpeza à parte
-do gitflow. Branches e worktrees que já sobraram de antes ficam para a limpeza de órfãs, que vem em
-outra entrega.
+do gitflow. Branches e worktrees que já sobraram de antes são tratadas em
+[Branches e worktrees órfãs](#branches-e-worktrees-órfãs).
 
 #### Pilha e hotfix
 
@@ -783,6 +807,28 @@ outra entrega.
 - **Depois de um hotfix.** O board abre e mescla um PR `main → develop`, também com merge commit, para
   a `develop` receber a correção. Nunca há push direto. Se houver conflito, o PR fica aberto e a
   conversa do card avisa para você resolver.
+
+#### Branches e worktrees órfãs
+
+Órfã é a branch ou a worktree que o board criou e cuja história já terminou (mesclada, concluída,
+cancelada, arquivada ou na lixeira) ou nem existe mais no board. Nunca entram a branch principal, a
+`develop`, as branches em uso fora da pasta das worktrees e as bases de histórias ainda ativas
+(a pilha de PRs). O board mede o git na abertura e a cada rodada do heartbeat (depois de conferir os
+merges) e dá um veredito a cada item:
+
+- **Segura**: não há nada a perder (worktree sem arquivos alterados; branch sem commits só dela, ou
+  já mesclada na base). O board a limpa sozinho: remove a worktree e apaga a branch **local** com
+  `git branch -D`. A branch remota não é tocada por esta limpeza.
+- **Precisa de decisão**: tem arquivos não commitados, commits que só existem nela, uma história que o
+  board não conhece ou uma branch ainda em uso por uma worktree. Nada é apagado sozinho.
+
+Em **Configurações → Git → Branches e worktrees órfãs** cada item mostra a história, a situação e o
+veredito. **Limpar** remove um item; num item de decisão abre uma confirmação que diz quantos arquivos
+e commits se perdem, e só depois de confirmar o board os remove (e confere de novo no disco, antes). **Limpar
+todas as seguras** age sobre todas as seguras de uma vez; **Verificar de novo** refaz a medição.
+Quando um item não pôde ser removido, a linha mostra "Não removido" com o motivo, e a próxima rodada
+tenta de novo. Enquanto houver órfãs de decisão, o topo do board mostra o selo **N órfãs**, que abre
+essa seção. Sem heartbeat ligado, o board mede só na abertura e no **Verificar de novo**.
 
 ### Registros de decisão
 
@@ -1126,7 +1172,7 @@ mesma ordem:
 | Skills | Skills | Instruções e arquivos de apoio carregados quando a tarefa pede | `.claude/skills/<nome>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
 | Sub-agentes | Subagentes | Ajudantes para os quais a IA delega trabalho | `.claude/agents/*.md`, `.cursor/agents/*.md` |
 | Comandos | Comandos | Prompts prontos, chamados com `/nome` | `.claude/commands/*.md`, `.cursor/commands/*.md` |
-| Hooks | Hooks | Comandos que a ferramenta roda sozinha em certos eventos | `hooks` do `.claude/settings.json`, `.cursor/hooks.json` |
+| Hooks | Hooks | Comandos que a ferramenta roda sozinha em certos eventos | `hooks` do `.claude/settings.json`, `.cursor/hooks.json`, `[[hooks]]` do `~/.kimi-code/config.toml` |
 | MCPs | Servidores MCP | Servidores que dão ferramentas extras à IA | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
 | Demais | Configurações e permissões | Como a ferramenta se comporta e o que a IA faz sem perguntar | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
 | Demais | Estilos de saída | Mudam o jeito de a IA responder | `.claude/output-styles/*.md` |

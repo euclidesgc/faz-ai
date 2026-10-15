@@ -10,6 +10,7 @@ import { FormField, IconWarning, SelectField, SwitchField } from '../ui';
 import { SectionHeader } from './SectionHeader';
 import { PageHeader } from './PageHeader';
 import { GitFlowSection } from './GitFlowSection';
+import { OrphansSection } from './OrphansSection';
 
 export function GitSettings() {
   const state = useBoardStore((s) => s.state)!;
@@ -43,6 +44,9 @@ export function GitSettings() {
           </Button>
         </Card>
       )}
+
+      {/* fora do `isWeb`: a limpeza vale no editor também */}
+      <OrphansSection />
 
       {isWeb && (
         <>

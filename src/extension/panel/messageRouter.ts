@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import type { BoardRequirement } from '../../shared/requirements';
 import type { EnvironmentReport } from '../../shared/environment';
+import { EMPTY_ORPHANS, type OrphanReport } from '../../shared/orphans';
 import type { DbHandle } from '../db/database';
 import { exportBoard, exportFileName, summarize, type BoardExportFile, type ImportResult } from '../db/boardExport';
 import { newId } from '../db/ids';
@@ -31,6 +32,7 @@ import { cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers } from './handlers/models';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
+import { branchRenameHandlers } from './handlers/branchRename';
 import { settleDelivery } from '../delivery';
 
 export type { RouterOptions };
@@ -50,6 +52,16 @@ export interface EnvironmentHooks {
   pinMcp?(): Promise<void>;
   /** libera as ferramentas do board sem aprovação nas conversas do Kimi Code (a regra no config.toml), e confere de novo */
   allowKimiMcp?(): void;
+}
+
+/** O que o host faz pela limpeza de branches e worktrees órfãs (#465). O relatório sai por `setOrphans`. */
+export interface OrphanHooks {
+  /** varre e publica, sem remover nada; nunca rejeita */
+  scan(): Promise<void>;
+  /** limpa um item, revalidado no host; resolve com o aviso para a pessoa */
+  clean(id: string, acceptLoss?: { dirtyFiles: number; uniqueCommits: number }): Promise<string>;
+  /** remove todas as seguras (revalidadas); resolve com o resumo */
+  cleanSafe(): Promise<string>;
 }
 
 /** As mensagens do webview que o chat executa. */
@@ -84,6 +96,10 @@ const bridgeOnly = {
   'harness.suggest.clear': viaBridge,
   'ui.showChat': viaBridge,
   'requirements.check': viaBridge,
+  // a limpeza das órfãs é ligada ao host nas partes seguintes (#489, #492): até lá, nada responde a elas
+  'git.orphans.scan': viaBridge,
+  'git.orphans.clean': viaBridge,
+  'git.orphans.cleanSafe': viaBridge,
   'environment.check': viaBridge,
   'environment.seen': viaBridge,
   'environment.pinMcp': viaBridge,
@@ -122,6 +138,7 @@ const HANDLERS: HandlerMap = {
   ...cardHandlers,
   ...cardContentHandlers,
   ...workspaceHandlers,
+  ...branchRenameHandlers,
   ...boardSettingsHandlers,
   ...boardBackupHandlers,
   ...modelHandlers,
@@ -149,6 +166,8 @@ export class MessageRouter {
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
   private environmentHooks: EnvironmentHooks | null = null;
+  private orphans: OrphanReport = EMPTY_ORPHANS;
+  private orphanHooks: OrphanHooks | null = null;
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
 
@@ -221,6 +240,7 @@ export class MessageRouter {
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
       harnessSuggestions: this.suggestions,
       mainBranch: this.ctx.mainBranch(),
+      orphans: this.orphans,
     };
   }
 
@@ -343,6 +363,11 @@ export class MessageRouter {
     this.notify();
   }
 
+  /** O nome da branch principal em uso (a fixada nas configurações ou a detectada); '' fora de um repositório. */
+  mainBranchName(): string {
+    return this.ctx.mainBranch()?.name ?? '';
+  }
+
   /** Execuções de IA em curso, uma por card (informado pelo executor); `aiRuns` é derivado delas. */
   setAiRuns(runs: AiActivity[]): void {
     this.aiActivity = runs;
@@ -356,6 +381,33 @@ export class MessageRouter {
     if (state.nextRoundAt === this.heartbeatNextAt) return;
     this.heartbeatNextAt = state.nextRoundAt;
     this.notify();
+  }
+
+  /**
+   * O relatório das órfãs (informado pelo varredor do host); só notifica quando o conteúdo muda, como
+   * `setHeartbeat`: o varredor publica a cada rodada e a tela não pode redesenhar por nada.
+   */
+  setOrphans(report: OrphanReport): void {
+    if (JSON.stringify(report) === JSON.stringify(this.orphans)) return;
+    this.orphans = report;
+    this.notify();
+  }
+
+  /** Quem varre e limpa as órfãs (o `OrphanSweeper` do host). */
+  onOrphans(hooks: OrphanHooks): void {
+    this.orphanHooks = hooks;
+  }
+
+  scanOrphans(): Promise<void> {
+    return this.orphanHooks?.scan() ?? Promise.resolve();
+  }
+
+  cleanOrphan(id: string, acceptLoss?: { dirtyFiles: number; uniqueCommits: number }): Promise<string> {
+    return this.orphanHooks?.clean(id, acceptLoss) ?? Promise.resolve('A limpeza de órfãs não está disponível.');
+  }
+
+  cleanSafeOrphans(): Promise<string> {
+    return this.orphanHooks?.cleanSafe() ?? Promise.resolve('A limpeza de órfãs não está disponível.');
   }
 
   /** O board como arquivo de export (texto JSON), o nome sugerido e os cards com anexo sem arquivo. */

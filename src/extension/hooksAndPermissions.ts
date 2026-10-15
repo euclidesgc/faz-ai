@@ -1,8 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool, HarnessItem } from '../shared/harness';
-import { HARNESS_CATALOG, hookTargets, type HarnessSource, type HookInput } from '../shared/harnessCatalog';
+import { HARNESS_CATALOG, HOOK_EVENTS, hookTargets, type HarnessSource, type HookInput } from '../shared/harnessCatalog';
 import { hookCommand } from './harnessScan';
+import { appendKimiHook, removeKimiHook, validateKimiHook } from '../shared/kimiHooks';
 
 type Json = Record<string, unknown>;
 const obj = (v: unknown): Json => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Json) : {});
@@ -56,6 +57,16 @@ export class HooksAndPermissions {
     const event = input.event.trim();
     const command = input.command.trim();
     const matcher = input.matcher.trim();
+    if (target.format === 'toml') {
+      const hook = { event, matcher, command, timeout: Number.isFinite(input.timeout) ? input.timeout : 0 };
+      const error = validateKimiHook(hook, HOOK_EVENTS[tool]);
+      if (error) throw new Error(error);
+      const tomlFile = path.join(this.base(src.scope), src.path);
+      const text = fs.existsSync(tomlFile) ? fs.readFileSync(tomlFile, 'utf8') : '';
+      fs.mkdirSync(path.dirname(tomlFile), { recursive: true });
+      fs.writeFileSync(tomlFile, appendKimiHook(text, hook));
+      return tomlFile;
+    }
     if (!/^[A-Za-z][A-Za-z0-9]*$/.test(event)) throw new Error('Informe o evento do hook.');
     if (!command) throw new Error('Informe o comando do hook.');
     const timeout = Number.isFinite(input.timeout) && input.timeout > 0 ? Math.round(input.timeout) : 0;
@@ -81,7 +92,12 @@ export class HooksAndPermissions {
 
   /** Remove do arquivo o hook listado (o evento e o comando do item). */
   removeHook(tool: AiTool, item: HarnessItem): void {
-    this.sourceOf(tool, item, (x) => x.kind === 'hook' && x.layout === 'json-keys');
+    const src = this.sourceOf(tool, item, (x) => x.kind === 'hook' && (x.layout === 'json-keys' || x.layout === 'toml-hooks'));
+    if (src.layout === 'toml-hooks') {
+      const text = fs.existsSync(item.path) ? fs.readFileSync(item.path, 'utf8') : '';
+      fs.writeFileSync(item.path, removeKimiHook(text, item.name, item.detail ?? ''));
+      return;
+    }
     const config = readForWrite(item.path);
     const hooks = { ...obj(config.hooks) };
     const command = item.detail ?? '';
