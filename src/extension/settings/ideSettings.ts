@@ -281,6 +281,8 @@ export class IdeSettings {
     private readonly api: IdeSettingsApi,
     private readonly folderUri?: unknown,
     private readonly log: (line: string) => void = () => {},
+    /** mostra uma recusa do board à pessoa (no editor, um aviso) */
+    private readonly notify: (message: string) => void = () => {},
   ) {}
 
   /** Valor efetivo: pasta > workspace > usuário > default. */
@@ -412,6 +414,16 @@ export class IdeSettings {
     this.receiving = synced.key;
     try {
       router.handle({ type: 'settings.board.update', patch: synced.toBoardPatch(value) });
+    } catch (e) {
+      // o board recusou (ex.: renomear a branch com a IA executando): a configuração volta ao que o
+      // board tem e a pessoa lê o motivo
+      const reason = e instanceof Error ? e.message : String(e);
+      this.log(`Faz AI: ${SECTION}.${synced.key} não foi aplicada: ${reason}`);
+      this.notify(reason);
+      this.lastWritten.delete(synced.key);
+      this.receiving = undefined;
+      this.copyToSettings(synced, synced.fromBoard(router.snapshot().board));
+      return;
     } finally {
       this.receiving = undefined;
     }

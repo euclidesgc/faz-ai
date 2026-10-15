@@ -3,6 +3,7 @@ import type { Id } from '../../../shared/model';
 import { workflowDeleteBlocker } from '../../../shared/selectors';
 import { upgradeBoard } from '../../db/boardTemplate';
 import type { BoardContext, HandlerMap } from './context';
+import { clearRenames, guardGitPatch, registerRenames } from './branchRename';
 import { applyFastModels, initModels, useTool } from './models';
 
 /** Configurações do board: colunas, tipos, campos, workflows, regras, agentes de execução e o próprio board. */
@@ -73,7 +74,11 @@ export const boardSettingsHandlers = {
     return true;
   },
   'settings.board.update': (msg, ctx) => {
+    // mudar o nome da principal ou da develop pede a renomeação no repositório (#466): a configuração
+    // grava na hora e o pedido espera Renomear ou Desfazer. Com a IA executando, a mudança é recusada.
+    const renames = msg.patch.git ? guardGitPatch(ctx, msg.patch.git) : [];
     ctx.boards.updateBoard(ctx.boardId, msg.patch);
+    if (msg.patch.git) registerRenames(ctx, msg.patch.git, renames);
     if (msg.patch.aiTool) useTool(ctx, ctx.state().board.aiTool);
     return true;
   },
@@ -81,6 +86,7 @@ export const boardSettingsHandlers = {
     ctx.boards.deleteBoard(ctx.boardId).forEach((id) => ctx.store.removeCard(id));
     ctx.boardId = ctx.boards.getOrCreate(ctx.opts.workspaceKey, ctx.opts.folderName).id;
     initModels(ctx);
+    clearRenames(ctx);
     return true;
   },
   'settings.board.upgrade': (_msg, ctx) => {

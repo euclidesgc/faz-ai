@@ -117,6 +117,8 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     harnessInstall: null,
     harnessSuggestions: null,
     mainBranch: null,
+    branchRenames: [],
+    branchRenameResult: null,
     ...over,
   };
 }

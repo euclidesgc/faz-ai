@@ -711,6 +711,29 @@ describe('IdeSettings: gitflow (#462)', () => {
     },
   );
 
+  it('o board recusa a mudança (ex.: IA executando): o Settings volta ao valor do board e a pessoa é avisada', async () => {
+    const link = await makeLink();
+    const notices: string[] = [];
+    const refusing = {
+      ...link,
+      handle: (msg: WebviewToHost) => {
+        if (msg.type === 'settings.board.update') throw new Error('Não dá para renomear a branch agora: a IA está executando #7.');
+        return link.handle(msg);
+      },
+    };
+    new IdeSettings(
+      workspace,
+      undefined,
+      () => {},
+      (m) => notices.push(m),
+    ).bind(refusing);
+    await settled();
+    fakeConfig.set('global', 'fazai.git.developBranch', 'dev');
+    expect(notices).toEqual(['Não dá para renomear a branch agora: a IA está executando #7.']);
+    expect(link.router.snapshot().board.git.developBranch).toBe('develop');
+    expect(fakeConfig.updates.at(-1)).toEqual({ key: 'fazai.git.developBranch', value: 'develop', target: ConfigurationTarget.Global });
+  });
+
   it('as seis chaves não passam pela migração única do Git', async () => {
     const link = await makeLink();
     link.router.handle({ type: 'settings.board.update', patch: { git: { featurePrefix: 'feat/' } } });

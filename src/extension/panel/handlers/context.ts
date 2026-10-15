@@ -15,6 +15,7 @@ import { LinkRepo } from '../../repositories/linkRepo';
 import { CommentRepo } from '../../repositories/commentRepo';
 import { SettingsRepo } from '../../repositories/settingsRepo';
 import { detectMainBranch } from '../../git';
+import { ghProcess, type GhRunner } from '../../branchRename';
 import { parseGit, type MainBranch } from '../../../shared/git';
 import { BoardHarness } from './harness';
 
@@ -33,6 +34,8 @@ export interface RouterOptions {
   extensionVersion?: string;
   /** cria os agentes de fábrica na pasta global da ferramenta na abertura (o produto liga; os testes não) */
   seedAgents?: boolean;
+  /** o `gh` que renomeia branches no GitHub (#466); sem ele, o processo `gh` do PATH */
+  gh?: GhRunner;
 }
 
 /** Repositórios, anexos e harness do board aberto, compartilhados pelo router e pelos handlers. */
@@ -58,6 +61,8 @@ export class BoardContext {
   readonly pendingImports = new Map<string, BoardExportFile>();
   /** resultado da última importação, para a mensagem de resultado */
   lastImport: ImportResult | null = null;
+  /** o `gh` com que a renomeação de branches age no GitHub; injetado nos testes */
+  readonly gh: GhRunner;
   /** a principal detectada; undefined enquanto não foi calculada (ver `mainBranch`) */
   private main: MainBranch | null | undefined;
 
@@ -66,6 +71,7 @@ export class BoardContext {
     readonly opts: RouterOptions,
   ) {
     const db = dbHandle.db;
+    this.gh = opts.gh ?? ghProcess();
     this.boards = new BoardRepo(db);
     this.cards = new CardRepo(db);
     this.checklist = new ChecklistRepo(db);

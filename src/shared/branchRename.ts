@@ -95,3 +95,35 @@ export function otherCloneCommands(req: RenameRequest): string[] {
   if (req.kind === 'main') cmds.push('git remote set-head origin -a');
   return cmds;
 }
+
+/** Chaves em `meta` do pedido à espera de Renomear/Desfazer e do resultado da última renomeação. */
+export const RENAME_PENDING_KEY = 'branch_rename_pending';
+export const RENAME_RESULT_KEY = 'branch_rename_result';
+
+/** Os pedidos guardados, um por tipo no máximo. Texto ausente ou inválido vira lista vazia. */
+export function parsePending(json: string | undefined): BranchRenamePending[] {
+  try {
+    const v: unknown = JSON.parse(json ?? '[]');
+    if (!Array.isArray(v)) return [];
+    return v.filter(
+      (p): p is BranchRenamePending =>
+        !!p &&
+        (p.kind === 'main' || p.kind === 'develop') &&
+        typeof p.from === 'string' &&
+        typeof p.to === 'string' &&
+        typeof p.previous === 'string',
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** O resultado guardado da última renomeação; null quando ausente ou inválido. */
+export function parseResult(json: string | undefined): RenameOutcome | null {
+  try {
+    const v: unknown = JSON.parse(json ?? 'null');
+    return v && typeof v === 'object' && typeof (v as RenameOutcome).status === 'string' ? (v as RenameOutcome) : null;
+  } catch {
+    return null;
+  }
+}

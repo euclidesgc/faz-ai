@@ -132,7 +132,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       router.onDidChange(onBoardChange);
       onBoardChange();
       // Settings do editor (fazai.*) ↔ SQLite do board
-      context.subscriptions.push(new IdeSettings(vscode.workspace, f.uri, log).bind(router));
+      context.subscriptions.push(
+        new IdeSettings(vscode.workspace, f.uri, log, (m) => void vscode.window.showWarningMessage(m)).bind(router),
+      );
       runner = host.runner;
       heartbeat = host.heartbeat;
       autopilot = host.autopilot;

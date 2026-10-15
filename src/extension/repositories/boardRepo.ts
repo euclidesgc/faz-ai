@@ -28,6 +28,7 @@ import { BRANCH_KINDS, parseGit, type BranchKind, type GitConfig } from '../../s
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
 import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool, type HarnessImport } from '../../shared/harness';
+import { RENAME_PENDING_KEY, RENAME_RESULT_KEY, parsePending, parseResult } from '../../shared/branchRename';
 
 /** Valor gravado fora de BRANCH_KINDS (banco editado à mão) cai em feature, o padrão da coluna. */
 function branchKindOf(v: unknown): BranchKind {
@@ -479,6 +480,8 @@ export class BoardRepo {
       harnessSuggestions: null,
       // detectada pelo router, que tem a pasta do projeto; o banco não sabe
       mainBranch: null,
+      branchRenames: parsePending(this.getMeta(RENAME_PENDING_KEY)),
+      branchRenameResult: parseResult(this.getMeta(RENAME_RESULT_KEY)),
     };
   }
 }

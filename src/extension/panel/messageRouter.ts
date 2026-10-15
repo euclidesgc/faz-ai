@@ -31,6 +31,7 @@ import { cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers } from './handlers/models';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
+import { branchRenameHandlers } from './handlers/branchRename';
 import { settleDelivery } from '../delivery';
 
 export type { RouterOptions };
@@ -119,6 +120,7 @@ const HANDLERS: HandlerMap = {
   ...cardHandlers,
   ...cardContentHandlers,
   ...workspaceHandlers,
+  ...branchRenameHandlers,
   ...boardSettingsHandlers,
   ...boardBackupHandlers,
   ...modelHandlers,

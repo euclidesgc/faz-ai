@@ -15,6 +15,7 @@ import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
 import { detectMainBranch, removeWorktree } from '../git';
+import { ghProcess } from '../branchRename';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
@@ -131,6 +132,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     extensionVersion: o.version,
     // os agentes de fábrica nascem na pasta global da ferramenta na primeira abertura
     seedAgents: true,
+    // a renomeação de branches (#466) usa o PATH do shell de login, como o `gh` das rotinas de fundo
+    gh: ghProcess(() => ({ ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) })),
   });
   const runLog = createRunLog(handle.db, o.log);
   // execuções que a sessão anterior não fechou (a janela caiu, a máquina desligou) viram 'unknown' em

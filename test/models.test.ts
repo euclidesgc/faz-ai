@@ -148,6 +148,8 @@ describe('suggestModelRule e suggestModel', () => {
     harnessSuggestions: null,
     authExpired: null,
     mainBranch: null,
+    branchRenames: [],
+    branchRenameResult: null,
   });
 
   const rule = (over: Partial<ModelRule> = {}): ModelRule => ({
