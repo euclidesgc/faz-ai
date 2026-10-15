@@ -91,6 +91,8 @@ const RUNNER_AUTHOR = 'Faz AI';
 const AUTH_FAILURE_PATTERNS: Record<AiTool, RegExp[]> = {
   claude: [/oauth session expired/i, /failed to authenticate/i, /not logged in/i, /invalid api key/i],
   cursor: [/not authenticated/i, /please (log|sign) in/i],
+  // calibrável: a CLI 2.1.1 não documenta os textos de erro de autenticação; amplie com saídas reais
+  kimi: [/\b401\b/i, /unauthorized/i, /not logged in/i, /login required/i, /invalid api key/i],
 };
 
 const TAIL_LINES = 12;

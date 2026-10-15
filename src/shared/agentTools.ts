@@ -105,12 +105,27 @@ export const AGENT_TOOLS: Record<AiTool, ToolGroup[]> = {
     },
   ],
   cursor: [],
+  // a CLI 2.1.1 do Kimi Code não documenta uma lista completa de ferramentas embutidas para o subagente:
+  // aqui vai só a rede (FetchURL, documentação 2.1.1); os globs `mcp__<servidor>__*` o board grava sozinho
+  kimi: [
+    {
+      id: 'net',
+      label: 'Rede',
+      hint: 'Acessa a internet.',
+      widens: true,
+      tools: [
+        { name: 'FetchURL', hint: 'Baixa e lê uma página.' },
+        { name: 'WebSearch', hint: 'Pesquisa na web.' },
+      ],
+    },
+  ],
 };
 
 /** O que o arquivo de agente de cada ferramenta aceita; o resto da tela some quando a ferramenta não aceita. */
 export const AGENT_FORMAT: Record<AiTool, { tools: boolean; skills: boolean; mcp: boolean; readonly: boolean; background: boolean }> = {
   claude: { tools: true, skills: true, mcp: true, readonly: false, background: false },
   cursor: { tools: false, skills: false, mcp: false, readonly: true, background: true },
+  kimi: { tools: true, skills: false, mcp: false, readonly: false, background: false },
 };
 
 /**

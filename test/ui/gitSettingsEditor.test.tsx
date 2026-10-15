@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { choose, lastSent, seedBoard, type SeededBoard } from './setup';
 import { GitSettings } from '../../src/webview/components/settings/GitSettings';
+import { BranchRenameDialog } from '../../src/webview/components/BranchRenameDialog';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 let board: SeededBoard;
@@ -29,6 +30,21 @@ describe('GitSettings dentro do editor', () => {
     expect(screen.queryByRole('textbox', { name: 'Nome da branch' })).toBeNull();
     expect(screen.queryByRole('switch', { name: 'Usar o gitflow' })).toBeNull();
     expect(screen.queryByLabelText('Prefixo de feature')).toBeNull();
+    // a principal e a explicação da renomeação são do navegador: no editor, o Settings é a fonte
+    expect(screen.queryByLabelText('Branch principal')).toBeNull();
+    expect(screen.queryByRole('note', { name: 'Renomear a principal ou a develop' })).toBeNull();
+  });
+
+  it('o diálogo de renomeação não abre no editor, onde quem pergunta é o modal da extensão', () => {
+    const pending = { kind: 'main' as const, from: 'master', to: 'main', previous: '' };
+    useBoardStore.setState({ state: { ...board.router.snapshot(), branchRenames: [pending] } });
+    render(
+      <Theme>
+        <BranchRenameDialog />
+      </Theme>,
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    useBoardStore.setState({ state: { ...board.router.snapshot(), branchRenames: [] } });
   });
 
   it('mostra a explicação, a tabela e a principal', () => {

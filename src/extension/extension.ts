@@ -3,6 +3,7 @@ import type { AiRunMode } from '../shared/runner';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
+import { bindBranchRenamePrompt } from './branchRenamePrompt';
 import { createBoardHost, type BoardHost } from './host/boardHost';
 import { startMcpServer } from './mcp/server';
 import { socketPath, stableBridgePath, workspaceKey } from './mcp/socketPath';
@@ -19,7 +20,7 @@ import { ChatViewProvider } from './sidebar/ChatViewProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
 import { ViewStateStore } from './viewState';
 import type { AiRunner } from './runner';
-import type { Autopilot } from './autopilot';
+import { Autopilot } from './autopilot';
 import type { Heartbeat } from './heartbeat';
 import { revealInSystem } from './web/osOpen';
 import { HarnessWatcher, userWatchTargets, type WatchFn } from './harnessWatch';
@@ -131,8 +132,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       };
       router.onDidChange(onBoardChange);
       onBoardChange();
+      // mudar o nome da principal ou da develop pergunta se renomeia a branch também no origin (#466)
+      context.subscriptions.push(
+        bindBranchRenamePrompt(router, {
+          warn: (message, modal, ...items) => vscode.window.showWarningMessage(message, { modal }, ...items),
+          info: (message, ...items) => vscode.window.showInformationMessage(message, ...items),
+          error: (message, ...items) => vscode.window.showErrorMessage(message, ...items),
+          copy: (text) => vscode.env.clipboard.writeText(text),
+        }),
+      );
       // Settings do editor (fazai.*) ↔ SQLite do board
-      context.subscriptions.push(new IdeSettings(vscode.workspace, f.uri, log).bind(router));
+      context.subscriptions.push(
+        new IdeSettings(vscode.workspace, f.uri, log, (m) => void vscode.window.showWarningMessage(m)).bind(router),
+      );
       runner = host.runner;
       heartbeat = host.heartbeat;
       autopilot = host.autopilot;
@@ -360,7 +372,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.autopilot.pause', () => autopilot?.pause()),
     vscode.commands.registerCommand('fazai.autopilot.resume', async () => {
       if (!(await getRouter()) || !autopilot) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
-      autopilot.resume();
+      // sem ser a dona do board, esta janela não pode tocar a fila: avisa em vez de parecer que o botão não fez nada
+      if (!autopilot.resume()) void vscode.window.showWarningMessage(`Faz AI: ${Autopilot.NOT_OWNER_NOTE}`);
     }),
     vscode.commands.registerCommand('fazai.upgradeBoard', async () => {
       const router = await getRouter();
@@ -377,7 +390,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const watcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(
         wf,
-        '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.cursor/**}',
+        '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.cursor/**,.kimi-code/**}',
       ),
     );
     const refresh = () => harnessWatch?.notify();

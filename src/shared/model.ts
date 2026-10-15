@@ -1,3 +1,4 @@
+import type { OrphanReport } from './orphans';
 import type { BoardRequirement } from './requirements';
 import type { EnvironmentReport } from './environment';
 import type { ExecProfile } from './execution';
@@ -12,6 +13,7 @@ import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { AiRunOrigin } from './log';
 import type { BranchKind, GitConfig, MainBranch } from './git';
+import type { BranchRenamePending, RenameOutcome } from './branchRename';
 
 export type Id = string;
 
@@ -281,6 +283,8 @@ export interface BoardState {
   requirementsCheckedAt: number;
   /** a ferramenta ativa falhou por login vencido numa execução; null quando não há aviso reativo ativo */
   authExpired: AiTool | null;
+  /** branches e worktrees órfãs, varridas pelo host; vazio antes da primeira varredura (runtime, não vai para o banco) */
+  orphans: OrphanReport;
   /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */
   environment: EnvironmentReport | null;
   /** o Diagnóstico ainda não abriu sozinho nesta máquina: a interface abre a tela uma vez */
@@ -291,4 +295,8 @@ export interface BoardState {
   harnessSuggestions: HarnessSuggestions | null;
   /** branch principal detectada no repositório do projeto; null fora de um repositório git */
   mainBranch: MainBranch | null;
+  /** mudanças de nome da principal ou da develop à espera de Renomear ou Desfazer (#466) */
+  branchRenames: BranchRenamePending[];
+  /** o resultado da última renomeação, até ser dispensado; null sem resultado */
+  branchRenameResult: RenameOutcome | null;
 }

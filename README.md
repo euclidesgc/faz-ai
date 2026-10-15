@@ -61,7 +61,7 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    própria ferramenta), abra a pasta do seu projeto e clique no ícone **Faz AI** na barra lateral.
    Cada pasta tem o seu board, já com as fases do fluxo.
 2. **Conecte a IA ao board.** Em **Configurações → Harness de IA**, escolha a ferramenta do projeto
-   (Claude Code ou Cursor). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
+   (Claude Code, Cursor ou Kimi Code). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
    grupo **Servidores MCP** e de novo no grupo **Skills**, para a skill do fluxo, que ensina a IA a
    conduzir as fases.
 3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
@@ -248,8 +248,8 @@ o `faz-ai` do terminal avisa e não inicia.
 
 ## Usando com IA
 
-1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code ou
-   Cursor).
+1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Cursor ou
+   Kimi Code).
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
    global que a ferramenta lê.
 3. No grupo **Skills** da mesma aba, clique em **Instalar (padrão da ferramenta)** para a
@@ -261,8 +261,8 @@ com dois botões:
 
 | | Onde grava | Quando usar |
 |---|---|---|
-| **Instalar (padrão da ferramenta)** | configuração global: `~/.claude.json` (por `claude mcp add --scope user`), `~/.cursor/mcp.json`; a skill em `~/.claude/skills`, `~/.cursor/skills` e equivalentes | o recomendado: o board funciona em qualquer repositório aberto com ele, sem nenhum arquivo no projeto |
-| **Instalar neste projeto** | `.mcp.json` ou `.cursor/mcp.json`; a skill em `.claude/skills`, `.cursor/skills` e equivalentes | fixar uma versão num repositório ou num fork, ou uma skill ajustada para o time |
+| **Instalar (padrão da ferramenta)** | configuração global: `~/.claude.json` (por `claude mcp add --scope user`), `~/.cursor/mcp.json` (o do Cursor é gravado no projeto), `~/.kimi-code/mcp.json`; a skill em `~/.claude/skills`, `~/.cursor/skills`, `~/.kimi-code/skills` e equivalentes | o recomendado: o board funciona em qualquer repositório aberto com ele, sem nenhum arquivo no projeto |
+| **Instalar neste projeto** | `.mcp.json`, `.cursor/mcp.json` ou `.kimi-code/mcp.json`; a skill em `.claude/skills`, `.cursor/skills`, `.kimi-code/skills` e equivalentes | fixar uma versão num repositório ou num fork, ou uma skill ajustada para o time |
 
 O registro global não fixa a pasta do projeto: o Claude Code informa a pasta pela variável
 `CLAUDE_PROJECT_DIR`, e a ponte do board acha o board subindo a partir da pasta em que a ferramenta
@@ -286,7 +286,7 @@ botão **Verificar ambiente** ganham um ícone de atenção. O hint dele resume 
 de cada item, e a explicação com a ação de cada um fica no Diagnóstico do ambiente. No painel de
 chat, que não tem as Configurações, fica uma faixa com os mesmos itens. A conferência olha o Node.js (o servidor do board roda
 com ele), a linha de comando da ferramenta, o login dela (no Cursor por `cursor-agent status`, no
-Claude Code por `claude auth status`), o
+Claude Code por `claude auth status`, no Kimi Code pela pasta de credenciais dele), o
 registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
 para o seu usuário, de `claude mcp add -s user`), um registro apontando para um node ou um caminho
 que não existe mais, para outra pasta ou para a ponte de uma versão anterior, e o nível de
@@ -713,14 +713,44 @@ Opções em **Faz AI › Git**, no Settings do editor:
 | Opção | Padrão | O que faz |
 | --- | --- | --- |
 | `fazai.git.gitflow` | ligado | Desligado, toda branch parte da principal e `{fluxo}` vira `<tipo>/`. |
+| `fazai.git.mainBranch` | vazio | Branch principal fixa; vazio detecta (HEAD do `origin`, `main` ou `master`). |
 | `fazai.git.developBranch` | `develop` | Branch de integração. |
 | `fazai.git.featurePrefix` | `feature/` | Prefixo das branches de feature. |
 | `fazai.git.bugfixPrefix` | `bugfix/` | Prefixo das branches de bugfix. |
 | `fazai.git.hotfixPrefix` | `hotfix/` | Prefixo das branches de hotfix. |
 | `fazai.git.releasePrefix` | `release/` | Só informativo: nenhum tipo de card gera release. |
 
-Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. A limpeza das órfãs e o renomear da
-principal no `origin` vêm em entregas seguintes.
+Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. Branches e worktrees que sobram
+depois da história são tratadas em [Branches e worktrees órfãs](#branches-e-worktrees-órfãs).
+
+##### Renomear a principal ou a `develop` no `origin`
+
+Mudar `fazai.git.mainBranch` ou `fazai.git.developBranch` para um nome que ainda não existe, com a
+branch antiga existindo, abre um aviso no editor (a mudança também vale no `origin`, e o board não a
+faz sozinho). As opções são **Renomear** e **Desfazer**; fechar a caixa mantém o pedido e a pergunta
+volta ao reabrir o board.
+
+- **Renomear** age nesta ordem: a branch no GitHub pelo `gh` (`gh api .../branches/<antiga>/rename`);
+  `git fetch --prune`; `git branch -m` no clone (inclusive a que está numa worktree); o upstream
+  (`origin/<nova>`); e, só na principal, o `origin/HEAD`. O GitHub redireciona os PRs abertos e leva a
+  branch padrão para o nome novo (conforme a documentação da API, não testado com conta real).
+- **Sem `gh`, fora do GitHub ou sem permissão**: nada é executado. O aviso mostra os comandos prontos
+  para este clone e para os outros, com **Copiar comandos**.
+- **Falha no meio**: a mensagem diz o que já mudou e o que falta. Cada passo confere o estado antes de
+  agir, então repetir é seguro. O remoto vem primeiro: se ele falha, nada local muda.
+- **Desfazer** devolve o nome anterior à configuração e não toca o repositório.
+- **Recusado** enquanto a IA executa uma história (a mensagem traz os números).
+- **Não muda**: workflows de CI, regras de proteção, a branch padrão do GitHub (na `develop`) e os
+  outros clones. A IA não renomeia branches: não há ferramenta nova no MCP.
+
+No navegador (fora do editor) a pergunta é um diálogo do board, em qualquer tela: **Renomear** (foco
+inicial), **Desfazer** e **Fechar** (ou Esc, que não envia nada e não volta na sessão). Depois de
+Renomear, o diálogo mostra os passos feitos, o que falta, o erro e os comandos prontos, cada um com
+**Copiar comando**; na falha parcial há **Renomear de novo**. Em **Configurações → Git** ficam os campos
+**Branch principal** (vazio = detectada) e **Branch de integração**, que gravam ao sair do campo, com a
+explicação do que a renomeação faz e do que não altera. No **Diagnóstico do ambiente**, o item
+**Nome da branch principal/develop** (recomendação, não bloqueia) fica pendente enquanto houver pedido
+à espera, com o comando do clone local e o botão **Abrir a tela Git**.
 
 ### Pull request e merge na Homologação
 
@@ -769,8 +799,8 @@ comentário na conversa, com o comando para você fazer à mão:
 
 Nenhuma falha da limpeza impede a conclusão do card. Com o gitflow desligado ("direto na principal")
 nada muda: a conclusão só remove a worktree, como antes. Não há opção para desligar a limpeza à parte
-do gitflow. Branches e worktrees que já sobraram de antes ficam para a limpeza de órfãs, que vem em
-outra entrega.
+do gitflow. Branches e worktrees que já sobraram de antes são tratadas em
+[Branches e worktrees órfãs](#branches-e-worktrees-órfãs).
 
 #### Pilha e hotfix
 
@@ -783,6 +813,28 @@ outra entrega.
 - **Depois de um hotfix.** O board abre e mescla um PR `main → develop`, também com merge commit, para
   a `develop` receber a correção. Nunca há push direto. Se houver conflito, o PR fica aberto e a
   conversa do card avisa para você resolver.
+
+#### Branches e worktrees órfãs
+
+Órfã é a branch ou a worktree que o board criou e cuja história já terminou (mesclada, concluída,
+cancelada, arquivada ou na lixeira) ou nem existe mais no board. Nunca entram a branch principal, a
+`develop`, as branches em uso fora da pasta das worktrees e as bases de histórias ainda ativas
+(a pilha de PRs). O board mede o git na abertura e a cada rodada do heartbeat (depois de conferir os
+merges) e dá um veredito a cada item:
+
+- **Segura**: não há nada a perder (worktree sem arquivos alterados; branch sem commits só dela, ou
+  já mesclada na base). O board a limpa sozinho: remove a worktree e apaga a branch **local** com
+  `git branch -D`. A branch remota não é tocada por esta limpeza.
+- **Precisa de decisão**: tem arquivos não commitados, commits que só existem nela, uma história que o
+  board não conhece ou uma branch ainda em uso por uma worktree. Nada é apagado sozinho.
+
+Em **Configurações → Git → Branches e worktrees órfãs** cada item mostra a história, a situação e o
+veredito. **Limpar** remove um item; num item de decisão abre uma confirmação que diz quantos arquivos
+e commits se perdem, e só depois de confirmar o board os remove (e confere de novo no disco, antes). **Limpar
+todas as seguras** age sobre todas as seguras de uma vez; **Verificar de novo** refaz a medição.
+Quando um item não pôde ser removido, a linha mostra "Não removido" com o motivo, e a próxima rodada
+tenta de novo. Enquanto houver órfãs de decisão, o topo do board mostra o selo **N órfãs**, que abre
+essa seção. Sem heartbeat ligado, o board mede só na abertura e no **Verificar de novo**.
 
 ### Registros de decisão
 
@@ -1126,7 +1178,7 @@ mesma ordem:
 | Skills | Skills | Instruções e arquivos de apoio carregados quando a tarefa pede | `.claude/skills/<nome>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
 | Sub-agentes | Subagentes | Ajudantes para os quais a IA delega trabalho | `.claude/agents/*.md`, `.cursor/agents/*.md` |
 | Comandos | Comandos | Prompts prontos, chamados com `/nome` | `.claude/commands/*.md`, `.cursor/commands/*.md` |
-| Hooks | Hooks | Comandos que a ferramenta roda sozinha em certos eventos | `hooks` do `.claude/settings.json`, `.cursor/hooks.json` |
+| Hooks | Hooks | Comandos que a ferramenta roda sozinha em certos eventos | `hooks` do `.claude/settings.json`, `.cursor/hooks.json`, `[[hooks]]` do `~/.kimi-code/config.toml` |
 | MCPs | Servidores MCP | Servidores que dão ferramentas extras à IA | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
 | Demais | Configurações e permissões | Como a ferramenta se comporta e o que a IA faz sem perguntar | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
 | Demais | Estilos de saída | Mudam o jeito de a IA responder | `.claude/output-styles/*.md` |
@@ -1477,6 +1529,25 @@ Precisa de Docker sem `sudo`. Há dois modos, escolhidos sozinhos:
   `FAZAI_E2E_MODO=novnc` força este modo num Linux com Wayland.
 
 Os arquivos ficam em `scripts/e2e-cursor/`.
+
+### Teste e2e numa máquina recém-instalada (Kimi Code)
+
+`npm run e2e:kimi` sobe um contêiner Docker com Ubuntu 24.04 limpo (sem git, gh, uv, Code Review Graph
+nem a CLI `kimi`; só o Node que roda o board e o `socat`) e abre nele o board do Faz AI da branch
+atual, pelo `src/cli` (não há editor no contêiner), no projeto de teste `meu-app`. A CLI do Kimi Code
+não vem na imagem: você a instala dentro do contêiner e faz o `kimi login`, seguindo o
+[roteiro](scripts/e2e-kimi/ROTEIRO.md). Os links (login) abrem no navegador do computador. Dentro
+dele, o usuário `dev` tem `sudo` sem senha. O resultado do roteiro fica em `docs/decisoes/`.
+
+| Comando | O que faz |
+|---|---|
+| `npm run e2e:kimi` | do zero: contêiner novo, com o board da branch atual |
+| `npm run e2e:kimi -- continuar` | o mesmo contêiner (login e instalações ficam), com o board atualizado |
+| `npm run e2e:kimi -- parar` | para o contêiner |
+| `npm run e2e:kimi -- remover` | apaga o contêiner e a imagem |
+
+O board abre em `http://localhost:7878` (`FAZAI_E2E_PORTA` troca a porta, publicada só em
+`127.0.0.1`). Precisa de Docker sem `sudo` e de uma conta Kimi Code para o login.
 
 ### Preparar o ambiente de desenvolvimento
 

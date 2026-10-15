@@ -12,11 +12,12 @@ function probe(o: {
   skillInstalled?: boolean;
   harnessIssues?: EnvironmentProbe['harnessIssues'];
   tool?: EnvironmentProbe['tool'];
-  other?: OtherToolProbe | null;
+  others?: OtherToolProbe[];
   crgMcp?: boolean;
   platform?: NodeJS.Platform;
   pathDirs?: string[];
   linux?: LinuxFamily | null;
+  branchRenames?: EnvironmentProbe['branchRenames'];
 }): EnvironmentProbe & { ran: string[] } {
   const ran: string[] = [];
   return {
@@ -26,8 +27,9 @@ function probe(o: {
     workspaceDir: '/proj',
     skillInstalled: o.skillInstalled ?? false,
     harnessIssues: o.harnessIssues === undefined ? [] : o.harnessIssues,
-    other: o.other ?? null,
+    others: o.others ?? [],
     crgMcp: o.crgMcp ?? false,
+    branchRenames: o.branchRenames,
     platform: o.platform ?? 'linux',
     homeDir: '/home/u',
     pathDirs: o.pathDirs ?? ['/usr/bin', '/home/u/.local/bin'],
@@ -90,6 +92,7 @@ describe('Diagnóstico do ambiente', () => {
     expect(r.optional).toEqual([]);
     expect(shape(r.recommended)).toEqual([
       ['git', 'missing', [['repo', 'skipped']]],
+      ['branch-name', 'ok'],
       ['gh', 'missing', [['gh-auth', 'skipped']]],
       // na ordem de instalar: o uv, depois o Code Review Graph, depois o que ele faz no projeto
       [
@@ -110,6 +113,29 @@ describe('Diagnóstico do ambiente', () => {
     ]);
     // o bloco da ferramenta só resume: contam o Node, a CLI e a skill
     expect(missingCount(r.required)).toBe(3);
+  });
+
+  it('o nome da branch fica pendente, em recomendados, enquanto houver renomeação à espera', async () => {
+    const none = await checkEnvironment(probe({ tool: 'claude' }));
+    expect(find(none.recommended, 'branch-name').status).toBe('ok');
+    expect(find(none.recommended, 'branch-name').command).toBeUndefined();
+    const pending = await checkEnvironment(
+      probe({
+        tool: 'claude',
+        branchRenames: [
+          { kind: 'main', from: 'master', to: 'main', previous: '' },
+          { kind: 'develop', from: 'dev', to: 'develop', previous: 'dev' },
+        ],
+      }),
+    );
+    expect(find(pending.recommended, 'branch-name')).toMatchObject({
+      status: 'missing',
+      command: 'git branch -m master main && git branch -m dev develop',
+      inProject: true,
+    });
+    // recomendação: não entra na contagem do que falta para a IA trabalhar
+    expect(missingCount(pending.required)).toBe(missingCount(none.required));
+    expect(pending.required.some((c) => c.id === 'branch-name')).toBe(false);
   });
 
   it('o board não instala nada de terceiros: cada item traz o site ou o comando para copiar', async () => {
@@ -151,7 +177,7 @@ describe('Diagnóstico do ambiente', () => {
 
   it('a outra ferramenta encontrada na máquina entra nos opcionais, só com o estado de cada item', async () => {
     const claude: OtherToolProbe = { tool: 'claude', cli: '/bin/claude', signedIn: false, mcp: true, skill: false, permission: null };
-    const r = await checkEnvironment(probe({ other: claude, outputs: { '/bin/claude --version': '2.1.4 (Claude Code)' } }));
+    const r = await checkEnvironment(probe({ others: [claude], outputs: { '/bin/claude --version': '2.1.4 (Claude Code)' } }));
     expect(shape(r.optional)).toEqual([
       [
         'tool',
@@ -170,7 +196,7 @@ describe('Diagnóstico do ambiente', () => {
     expect(flat(r.optional).some((c) => c.requirement)).toBe(false);
     // a ferramenta achada pelo editor, sem a CLI: o login espera a CLI
     const editor = await checkEnvironment(
-      probe({ tool: 'claude', other: { tool: 'cursor', cli: null, signedIn: null, mcp: false, skill: false, permission: null } }),
+      probe({ tool: 'claude', others: [{ tool: 'cursor', cli: null, signedIn: null, mcp: false, skill: false, permission: null }] }),
     );
     expect(find(editor.optional, 'cli').status).toBe('missing');
     expect(find(editor.optional, 'signin').status).toBe('skipped');
@@ -258,7 +284,7 @@ describe('Diagnóstico do ambiente', () => {
     expect(find(before.recommended, 'crg').status).toBe('missing');
     expect(commands(find(before.recommended, 'crg'))).toEqual(['uv tool install code-review-graph']);
     const after = await checkEnvironment(probe({ commands: { ...uv.commands, 'code-review-graph': CRG }, files: { [CRG]: `#!${UV_PY}` } }));
-    expect(after.recommended.map((c) => c.id)).toEqual(['git', 'gh', 'crg']);
+    expect(after.recommended.map((c) => c.id)).toEqual(['git', 'branch-name', 'gh', 'crg']);
     expect(find(after.recommended, 'crg').install).toBeUndefined();
     // a busca semântica: o pacote pelo mesmo caminho do Code Review Graph, depois o embed
     expect(commands(find(after.recommended, 'crg-embeddings'))).toEqual(['uv tool install --reinstall "code-review-graph[embeddings]"']);
@@ -291,7 +317,7 @@ describe('Diagnóstico do ambiente', () => {
     expect(windows.curlMissing).toBeUndefined();
     // a outra ferramenta, achada pelo editor sem a CLI: o comando da CLI dela
     const cursor = await checkEnvironment(
-      probe({ tool: 'claude', other: { tool: 'cursor', cli: null, signedIn: null, mcp: false, skill: false, permission: null } }),
+      probe({ tool: 'claude', others: [{ tool: 'cursor', cli: null, signedIn: null, mcp: false, skill: false, permission: null }] }),
     );
     expect(commands(find(cursor.optional, 'cli'))).toEqual(['curl https://cursor.com/install -fsS | bash']);
   });

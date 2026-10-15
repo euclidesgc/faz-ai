@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { checkRequirements, registeredServer, type RequirementProbe } from '../src/extension/requirements';
+import { allowKimiMcp, checkRequirements, kimiMcpAllowed, registeredServer, type RequirementProbe } from '../src/extension/requirements';
 import { registerClients } from '../src/extension/mcp/clientConfig';
 import { blocksExecution } from '../src/shared/requirements';
 import type { BoardRequirement } from '../src/shared/requirements';
@@ -234,5 +234,68 @@ describe('blocksExecution', () => {
 
   it('bloqueia pelo sinal reativo mesmo sem "signin" nos requisitos (o probe não soube dizer)', () => {
     expect(blocksExecution({ requirements: [], authExpired: 'cursor' })).toBe(true);
+  });
+});
+
+describe('Kimi Code', () => {
+  // a sonda de registro lê a pasta de dados do Kimi Code; isola do KIMI_CODE_HOME da máquina
+  const saved = process.env.KIMI_CODE_HOME;
+  beforeEach(() => delete process.env.KIMI_CODE_HOME);
+  afterEach(() => {
+    if (saved === undefined) delete process.env.KIMI_CODE_HOME;
+    else process.env.KIMI_CODE_HOME = saved;
+  });
+
+  it('registra o servidor do board no .kimi-code/mcp.json do projeto, sem o campo type, e fora do git', () => {
+    fs.mkdirSync(path.join(project, '.git', 'info'), { recursive: true });
+    connect('kimi');
+    const file = path.join(project, '.kimi-code', 'mcp.json');
+    // a CLI 2.1.1 documenta a entrada stdio sem o campo `type`
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).mcpServers['faz-ai']).toEqual({ command: process.execPath, args: [BRIDGE, project] });
+    expect(fs.readFileSync(path.join(project, '.git', 'info', 'exclude'), 'utf8')).toContain('.kimi-code/mcp.json');
+    expect(registeredServer('kimi', project, home)).toMatchObject({ file: '.kimi-code/mcp.json', args: [BRIDGE, project] });
+  });
+
+  it('no escopo do usuário grava no mcp.json da pasta de dados dele, e ele vale para o projeto', async () => {
+    registerClients(['kimi'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
+    const file = path.join(home, '.kimi-code', 'mcp.json');
+    // o global não prende a pasta: o bridge acha o projeto pelo diretório em que a CLI o inicia
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).mcpServers['faz-ai']).toMatchObject({ command: process.execPath, args: [BRIDGE] });
+    expect(registeredServer('kimi', project, home)).toMatchObject({ file: '~/.kimi-code/mcp.json' });
+    // com o servidor registrado e a regra de permissão, nada falta
+    allowKimiMcp(home);
+    expect(await checkRequirements(probe({ tool: 'kimi' }))).toEqual([]);
+  });
+
+  it('sem a regra de permissão no config.toml, o aviso recomendado; com ela, some', async () => {
+    connect('kimi');
+    expect(await checkRequirements(probe({ tool: 'kimi' }))).toEqual([
+      { id: 'permission-mcp', tool: 'kimi', file: '~/.kimi-code/config.toml', optional: true, action: { kind: 'allowKimiMcp' } },
+    ]);
+    expect(allowKimiMcp(home)).toBe(true);
+    expect(await checkRequirements(probe({ tool: 'kimi' }))).toEqual([]);
+    // a regra já está lá: não grava de novo
+    expect(allowKimiMcp(home)).toBe(false);
+  });
+
+  it('a regra é acrescentada ao config.toml sem tocar no que já está lá', () => {
+    fs.mkdirSync(path.join(home, '.kimi-code'));
+    const existing = 'default_model = "kimi-code/k3"\n';
+    fs.writeFileSync(path.join(home, '.kimi-code', 'config.toml'), existing);
+    expect(allowKimiMcp(home)).toBe(true);
+    const text = fs.readFileSync(path.join(home, '.kimi-code', 'config.toml'), 'utf8');
+    expect(text.startsWith(existing)).toBe(true);
+    expect(text).toContain('[[permission.rules]]');
+    expect(text).toContain('pattern = "mcp__faz-ai__*"');
+    expect(kimiMcpAllowed(home)).toBe(true);
+  });
+
+  it('uma regra allow de outro padrão não vale: a do board precisa estar no mesmo bloco', () => {
+    fs.mkdirSync(path.join(home, '.kimi-code'));
+    fs.writeFileSync(
+      path.join(home, '.kimi-code', 'config.toml'),
+      '[[permission.rules]]\ndecision = "allow"\npattern = "mcp__github__*"\n',
+    );
+    expect(kimiMcpAllowed(home)).toBe(false);
   });
 });

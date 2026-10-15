@@ -145,11 +145,14 @@ const state: BoardState = {
   requirements: [],
   requirementsCheckedAt: 0,
   authExpired: null,
+  orphans: { items: [], failed: {}, scannedAt: null },
   environment: null,
   environmentFirstRun: false,
   harnessInstall: null,
   harnessSuggestions: null,
   mainBranch: null,
+  branchRenames: [],
+  branchRenameResult: null,
 };
 
 const run = (f: Partial<Filters>) => [...(applyFilters(state, { ...EMPTY_FILTERS, includeRelated: false, ...f }, NOW) ?? [])].sort();

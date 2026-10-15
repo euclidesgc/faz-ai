@@ -37,6 +37,10 @@ describe('i18n do host: mensagens preenchidas', () => {
     ['2 tipo(s) de card nascem neste workflow', '2 card type(s) are created in this workflow'],
     ['A IA já está trabalhando em #12.', 'The AI is already working on #12.'],
     [
+      'Não dá para renomear a branch agora: a IA está executando #12, #13. Espere terminar e tente de novo.',
+      'Cannot rename the branch now: the AI is running #12, #13. Wait for it to finish and try again.',
+    ],
+    [
       'A pasta /tmp/x.worktrees/a já existe e não é uma worktree deste repositório.',
       'The folder /tmp/x.worktrees/a already exists and is not a worktree of this repository.',
     ],
@@ -274,6 +278,6 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     expect(t(EXEC_ASPECTS[4]!.label)).toBe('Model and effort');
     expect(t(TOOL_PRESETS[0]!.label)).toBe('Read-only');
     expect(t(EFFORT_LABELS.xhigh!)).toBe('very high');
-    expect(t(PLUGIN_COMMANDS.claude.where)).toBe('in the terminal');
+    expect(t(PLUGIN_COMMANDS.claude!.where)).toBe('in the terminal');
   });
 });

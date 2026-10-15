@@ -17,7 +17,7 @@ import { createRunLog } from '../src/extension/log/runLog';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiRunner } from '../src/extension/runner';
 import { providerFor } from '../src/extension/ai/providers';
-import { ALL_AI_TOOLS } from '../src/shared/harness';
+import { ALL_AI_TOOLS, type AiTool } from '../src/shared/harness';
 import { monthOf, type AiRunOrigin } from '../src/shared/log';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -176,19 +176,26 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
 });
 
 describe('um provider por ferramenta', () => {
-  it('o Claude Code é medido com custo e o Cursor só com tokens', () => {
+  it('o Claude Code é medido com custo; Cursor e Kimi Code, só com tokens', () => {
     expect(Object.fromEntries(ALL_AI_TOOLS.map((t) => [t, providerFor(t).measure]))).toEqual({
       claude: 'cost',
       cursor: 'tokens',
+      kimi: 'tokens',
     });
   });
 
   it('o formato que o comando anuncia é o que o leitor do mesmo provider entende', () => {
-    for (const tool of ['claude', 'cursor'] as const) {
+    // a primeira linha válida de cada formato de stream
+    const hello: Record<AiTool, string> = {
+      claude: JSON.stringify({ type: 'system', subtype: 'init', session_id: 's' }),
+      cursor: JSON.stringify({ type: 'system', subtype: 'init', session_id: 's' }),
+      kimi: JSON.stringify({ role: 'meta', type: 'system.version', version: '2.1.1' }),
+    };
+    for (const tool of ALL_AI_TOOLS) {
       const command = providerFor(tool).command({ prompt: 'p', permission: 'full', structured: true })!;
       expect(command.format, tool).not.toBe('text');
       const reader = providerFor(tool).reader(command.format, { model: null });
-      reader.push(JSON.stringify({ type: 'system', subtype: 'init', session_id: 's' }), 'stdout');
+      reader.push(hello[tool], 'stdout');
       expect(reader.sawEvent, tool).toBe(true);
     }
   });

@@ -149,6 +149,8 @@ export function commandNotFound(command: string): string {
   const install: Record<string, string> = {
     claude: 'Instale o Claude Code (https://claude.com/claude-code) ou a extensão dele no editor.',
     'cursor-agent': 'Instale a CLI do Cursor (curl https://cursor.com/install -fsS | bash) e entre na conta com "cursor-agent login".',
+    // o Kimi Code não tem pasta especial nem binário embutido em editor: o npm global cobre
+    kimi: 'Instale o Kimi Code (npm install -g @moonshot-ai/kimi-code) e entre na conta com "kimi login".',
   };
   return `comando "${command}" não encontrado no PATH, nas pastas de instalação usuais nem nas extensões do editor. ${install[command] ?? 'Instale a ferramenta.'} Depois confira no terminal se "${command} --version" responde.`;
 }

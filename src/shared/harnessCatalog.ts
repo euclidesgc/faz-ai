@@ -56,6 +56,8 @@ interface SourceMeta {
  * documentação de cada uma lida em 2026-10-12:
  * - Claude Code: code.claude.com/docs (memory, skills, sub-agents, hooks-guide, mcp, settings, plugins)
  * - Cursor: cursor.com/docs (rules, ignore-files, skills, subagents, hooks, mcp, plugins, cli/reference/configuration)
+ * - Kimi Code: CLI 2.1.1 sondada em 2026-10-13 (AGENTS.md, skills, agents, mcp.json, config.toml;
+ *   a pasta de dados é ~/.kimi-code, ou $KIMI_CODE_HOME quando a variável existe — a varredura usa a home padrão)
  *
  * A varredura e a tela são genéricas sobre esta tabela: mudar um caminho é mudar um dado aqui. Os
  * índices são usados nas mensagens da tela (`source`): fonte nova entra no fim da lista da ferramenta.
@@ -81,6 +83,8 @@ export type HarnessSource = {
     | { layout: 'json-permissions'; lists: string[] }
     /** arquivos com um destes nomes nas subpastas do projeto (a raiz já tem as fontes próprias) */
     | { layout: 'nested'; names: string[] }
+    /** blocos `[[hooks]]` de um arquivo TOML (Kimi Code) */
+    | { layout: 'toml-hooks' }
   );
 
 type Src = HarnessSource;
@@ -133,6 +137,8 @@ const AGENTS_MD =
   'Instruções no padrão aberto AGENTS.md, lidas também pelo Cursor; o Claude Code só as lê quando o projeto não tem CLAUDE.md.';
 const CURSOR_SKILL = 'Instruções e arquivos de apoio que o Cursor carrega quando a tarefa pede; só a descrição fica sempre à vista.';
 const CURSOR_AGENT = 'Ajudante com instruções próprias, para o qual o Cursor delega partes do trabalho.';
+const KIMI_SKILL = 'Instruções e arquivos de apoio que o Kimi Code carrega quando a tarefa pede; só a descrição fica sempre à vista.';
+const KIMI_AGENT = 'Ajudante com instruções próprias, para o qual o Kimi Code delega partes do trabalho.';
 
 export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
   claude: [
@@ -319,6 +325,36 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
       hint: 'Instruções de uma subpasta: valem quando o Cursor trabalha nela, acima das da raiz.',
     },
   ],
+  kimi: [
+    file('instructions', 'project', 'AGENTS.md', {
+      group: 'main',
+      loads: 'always',
+      hint: 'Instruções do projeto no padrão aberto AGENTS.md, lidas pelo Kimi Code em toda sessão.',
+    }),
+    file('instructions', 'user', '.kimi-code/AGENTS.md', {
+      group: 'main',
+      loads: 'always',
+      hint: 'Suas instruções no padrão AGENTS.md, lidas pelo Kimi Code em qualquer projeto.',
+    }),
+    ...skills('project', ['.kimi-code/skills'], { group: 'skill', loads: 'on-demand', hint: KIMI_SKILL }),
+    ...skills('user', ['.kimi-code/skills'], { group: 'skill', loads: 'on-demand', hint: KIMI_SKILL }),
+    files('agent', 'project', '.kimi-code/agents', '.md', { group: 'agent', loads: 'on-demand', hint: KIMI_AGENT }),
+    files('agent', 'user', '.kimi-code/agents', '.md', { group: 'agent', loads: 'on-demand', hint: KIMI_AGENT }),
+    mcp('project', '.kimi-code/mcp.json', 'Servidor que dá ferramentas extras à IA neste projeto.'),
+    mcp('user', '.kimi-code/mcp.json', 'Servidor que dá ferramentas extras à IA em todos os projetos.'),
+    file('settings', 'user', '.kimi-code/config.toml', {
+      group: 'settings',
+      hint: 'Suas configurações do Kimi Code (modelo, provedores e as regras permanentes de permissão), em todos os projetos.',
+    }),
+    {
+      kind: 'hook',
+      scope: 'user',
+      layout: 'toml-hooks',
+      path: '.kimi-code/config.toml',
+      group: 'hook',
+      hint: 'Comando que roda num momento da sessão do Kimi Code. Falha em aberto (erro ou tempo esgotado deixam passar): não é controle de segurança.',
+    },
+  ],
 };
 
 /**
@@ -327,6 +363,7 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
  */
 export const HARNESS_NOTES: Record<AiTool, { group: HarnessGroup; scope: Scope; name: string; hint: string }[]> = {
   claude: [],
+  kimi: [],
   cursor: [
     {
       group: 'main',
@@ -392,6 +429,8 @@ export function groupOf(tool: AiTool, item: { scope: string; kind: HarnessKind; 
 export const PLUGIN_ROOTS: Record<AiTool, { path: string; manifests: string[] }[]> = {
   claude: [{ path: '.claude/plugins', manifests: ['.claude-plugin/plugin.json'] }],
   cursor: [{ path: '.cursor/plugins/local', manifests: ['.cursor-plugin/plugin.json', 'plugin.json'] }],
+  // o Kimi Code copia os plugins instalados para a pasta gerenciada (documentação da CLI 2.1.1)
+  kimi: [{ path: '.kimi-code/plugins/managed', manifests: ['kimi.plugin.json', '.kimi-plugin/plugin.json'] }],
 };
 
 /** Um lugar onde o board pode criar um item novo: arquivo fixo que ainda não existe, arquivo de uma pasta ou pasta de skill. */
@@ -462,12 +501,15 @@ export const MCP_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
  * Formato dos hooks em cada arquivo (páginas de hooks de cada ferramenta, lidas em 2026-10-02):
  * - `nested` (Claude Code): evento → grupos `{ matcher, hooks: [{ type: "command", command, timeout }] }`
  * - `flat` (Cursor): `{ version: 1, hooks: { evento: [{ command, matcher, timeout }] } }`
+ * Sem entrada aqui, a ferramenta não tem alvos de hook. Os hooks do Kimi Code são `[[hooks]]` em TOML
+ * no `~/.kimi-code/config.toml` (documentação da CLI 2.1.1), lidos e gravados por `shared/kimiHooks.ts`.
  */
-export type HookFormat = 'nested' | 'flat';
+export type HookFormat = 'nested' | 'flat' | 'toml';
 
-const HOOK_FORMAT: Record<AiTool, HookFormat> = {
+const HOOK_FORMAT: Partial<Record<AiTool, HookFormat>> = {
   claude: 'nested',
   cursor: 'flat',
+  kimi: 'toml',
 };
 
 export interface HookTarget {
@@ -480,8 +522,9 @@ export interface HookTarget {
 /** Arquivos de hooks que o board edita. */
 export function hookTargets(tool: AiTool): HookTarget[] {
   const format = HOOK_FORMAT[tool];
+  if (!format) return [];
   return HARNESS_CATALOG[tool].flatMap((src, source): HookTarget[] => {
-    if (src.kind !== 'hook' || src.layout !== 'json-keys') return [];
+    if (src.kind !== 'hook' || (format === 'toml' ? src.layout !== 'toml-hooks' : src.layout !== 'json-keys')) return [];
     return [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}`, format }];
   });
 }
@@ -530,6 +573,29 @@ export const HOOK_EVENTS: Record<AiTool, string[]> = {
     'beforeTabFileRead',
     'afterTabFileEdit',
   ],
+  // documentação da CLI 2.1.1: bloqueiam (saída 2) UserPromptSubmit, PreToolUse e Stop
+  kimi: [
+    'UserPromptSubmit',
+    'UserPromptQueued',
+    'PreToolUse',
+    'Stop',
+    'TurnStarted',
+    'PostToolUse',
+    'PostToolUseFailure',
+    'PermissionRequest',
+    'PermissionResult',
+    'SessionStart',
+    'SessionEnd',
+    'SessionHeartbeat',
+    'SubagentStart',
+    'SubagentStop',
+    'TaskStarted',
+    'StopFailure',
+    'Interrupt',
+    'PreCompact',
+    'PostCompact',
+    'Notification',
+  ],
 };
 
 export interface HookInput {
@@ -561,8 +627,9 @@ export const PERMISSION_LIST_LABEL: Record<string, string> = { allow: 'permitir'
 /**
  * Como instalar plugins em cada ferramenta, pelos comandos que a documentação delas descreve.
  * O board mostra os comandos; quem os roda é a pessoa, no terminal ou na sessão da ferramenta.
+ * Ferramenta sem plugins documentados (o Kimi Code) fica de fora: o grupo de plugins não mostra o bloco.
  */
-export const PLUGIN_COMMANDS: Record<AiTool, { where: string; commands: string[] }> = {
+export const PLUGIN_COMMANDS: Partial<Record<AiTool, { where: string; commands: string[] }>> = {
   claude: {
     where: 'no terminal',
     commands: [

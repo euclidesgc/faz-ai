@@ -1,4 +1,5 @@
 import { EMPTY_CHAT } from '../../shared/chat';
+import { EMPTY_ORPHANS } from '../../shared/orphans';
 import type { Database } from 'sql.js';
 import type {
   Attachment,
@@ -28,6 +29,7 @@ import { BRANCH_KINDS, parseGit, type BranchKind, type GitConfig } from '../../s
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
 import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool, type HarnessImport } from '../../shared/harness';
+import { RENAME_PENDING_KEY, RENAME_RESULT_KEY, parsePending, parseResult } from '../../shared/branchRename';
 
 /** Valor gravado fora de BRANCH_KINDS (banco editado à mão) cai em feature, o padrão da coluna. */
 function branchKindOf(v: unknown): BranchKind {
@@ -36,6 +38,11 @@ function branchKindOf(v: unknown): BranchKind {
 
 export class BoardRepo {
   constructor(private db: Database) {}
+
+  /** O JSON da configuração de git do board, como está salvo (vazio quando o board não existe). */
+  gitJson(boardId: string): string {
+    return str(one(this.db, 'SELECT git_json FROM boards WHERE id = ?', [boardId])?.git_json);
+  }
 
   /** Lê um valor da tabela meta (chave/valor livre), ou undefined se não existir. */
   getMeta(key: string): string | undefined {
@@ -468,12 +475,15 @@ export class BoardRepo {
       requirements: [],
       requirementsCheckedAt: 0,
       authExpired: null,
+      orphans: EMPTY_ORPHANS,
       environment: null,
       environmentFirstRun: false,
       harnessInstall: null,
       harnessSuggestions: null,
       // detectada pelo router, que tem a pasta do projeto; o banco não sabe
       mainBranch: null,
+      branchRenames: parsePending(this.getMeta(RENAME_PENDING_KEY)),
+      branchRenameResult: parseResult(this.getMeta(RENAME_RESULT_KEY)),
     };
   }
 }

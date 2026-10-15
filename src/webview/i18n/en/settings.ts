@@ -224,6 +224,8 @@ export const settings: Record<string, string> = {
     'list built into the extension (Claude Code does not keep the list in a file)',
   'lida do comando cursor-agent models, com a conta em uso; sem a CLI autenticada, lista embutida na extensão':
     'read from the cursor-agent models command, with the account in use; without the CLI signed in, the list built into the extension',
+  'lida do comando kimi provider list --json, com os provedores configurados; sem a CLI, lista embutida na extensão':
+    'read from the kimi provider list --json command, with the configured providers; without the CLI, the list built into the extension',
   'Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness de IA.':
     'Models of the tool in use in the project, with the effort levels of each. This is where the options of the cards\' "Model" field come from. The tool is chosen in AI harness.',
   '{count} modelo(s)': '{count} model(s)',
@@ -383,12 +385,21 @@ export const settings: Record<string, string> = {
   'Abre o formulário de um modelo novo.': 'Opens the form for a new model.',
   'O board não tem o campo "{field}".': 'The board has no "{field}" field.',
 
+  // renomeação da principal e da develop (#498)
+  'Branch principal': 'Main branch',
+  detectada: 'detected',
+  'Vazio = a detectada (<code>main</code>, <code>master</code>...). Mudar o nome de uma branch que já existe pede a sua confirmação para renomeá-la também no <code>origin</code>.':
+    'Empty = the detected one (<code>main</code>, <code>master</code>...). Changing the name of a branch that already exists asks for your confirmation to rename it on <code>origin</code> too.',
+  'Renomear a principal ou a develop': 'Rename the main or develop branch',
+  '<b>Ao mudar o nome da principal ou da develop</b>, o board pergunta Renomear ou Desfazer. Renomear muda a branch no GitHub (com o <code>gh</code>), no clone local, o upstream e, na principal, o <code>origin/HEAD</code>. <b>Não muda:</b> workflows de CI, regras de proteção, a branch padrão do GitHub (na develop) e os clones de outras pessoas; os comandos deles aparecem depois.':
+    "<b>When you change the main or develop branch name</b>, the board asks Rename or Undo. Rename changes the branch on GitHub (with <code>gh</code>), in the local clone, the upstream and, for main, <code>origin/HEAD</code>. <b>Does not change:</b> CI workflows, protection rules, the GitHub default branch (for develop) and other people's clones; their commands show up afterwards.",
   // gitflow (#462)
   'Com o gitflow, funcionalidades e correções partem da branch de integração (develop) e voltam para ela; só o hotfix parte da principal. O prefixo da branch mostra o tipo de trabalho.':
     'With gitflow, features and fixes start from the integration branch (develop) and go back to it; only the hotfix starts from the main branch. The branch prefix shows the kind of work.',
   'Principal: <code>{name}</code> ({origin})': 'Main: <code>{name}</code> ({origin})',
   'Principal: não detectada (esta pasta não é um repositório git).': 'Main: not detected (this folder is not a git repository).',
   'branch padrão do origin': "origin's default branch",
+  'definida nas configurações': 'set in the settings',
   'nome local': 'local name',
   'branch atual': 'current branch',
   principal: 'main',
@@ -424,4 +435,89 @@ export const settings: Record<string, string> = {
   Feature: 'Feature',
   Bugfix: 'Bugfix',
   Hotfix: 'Hotfix',
+
+  // branches e worktrees órfãs (#465)
+  'Branches e worktrees órfãs': 'Orphan branches and worktrees',
+  'Branches e worktrees que o board criou e cuja história já terminou ou não existe mais. As seguras não perdem nada e o board as limpa sozinho; as que dependem de decisão têm arquivos ou commits que só existem ali.':
+    'Branches and worktrees the board created whose story has finished or no longer exists. The safe ones lose nothing and the board cleans them on its own; the ones that need a decision have files or commits that exist only there.',
+  'Nenhuma branch ou worktree órfã.': 'No orphan branches or worktrees.',
+  'Verificado em {quando}.': 'Checked at {quando}.',
+  'Confere de novo as branches e worktrees criadas pelo board.': 'Checks the branches and worktrees created by the board again.',
+  'Limpar todas as seguras': 'Clear all the safe ones',
+  'Nenhuma órfã segura para limpar.': 'No safe orphan to clean.',
+  'Remove todas as órfãs seguras de uma vez; as que dependem de decisão ficam.':
+    'Removes all the safe orphans at once; the ones that need a decision stay.',
+  'Pede confirmação antes de remover, porque algo se perde.': 'Asks for confirmation before removing, because something is lost.',
+  'Remove; não há nada a perder.': 'Removes it; there is nothing to lose.',
+  'Limpar {ref}': 'Clear {ref}',
+  'Limpar mesmo assim?': 'Clear anyway?',
+  'Limpar mesmo assim': 'Clear anyway',
+  '{what} {ref} será removida e isto se perde, sem volta: {losses}.': '{what} {ref} will be removed and this is lost for good: {losses}.',
+  '{what} {ref} será removida e não dá para desfazer.': '{what} {ref} will be removed and this cannot be undone.',
+  'A worktree': 'The worktree',
+  'A branch': 'The branch',
+  Worktree: 'Worktree',
+  branch: 'branch',
+  Item: 'Item',
+  Situação: 'Status',
+  Veredito: 'Verdict',
+  Segura: 'Safe',
+  'Precisa de decisão': 'Needs a decision',
+  'Não removido': 'Not removed',
+  'Não removido: {erro}': 'Not removed: {erro}',
+  'história com merge feito': 'story merged',
+  'história cancelada': 'story cancelled',
+  'história concluída': 'story done',
+  'história arquivada': 'story archived',
+  'história na lixeira': 'story in the trash',
+  'sem história no board': 'no story on the board',
+  'a pasta não existe mais': 'the folder no longer exists',
+  'sem arquivos alterados': 'no changed files',
+  'sem commits só dela': 'no commits only it has',
+  'já mesclada na base': 'already merged into the base',
+  '{n} arquivo não commitado': '{n} uncommitted file',
+  '{n} arquivos não commitados': '{n} uncommitted files',
+  '{n} commit só nesta branch': '{n} commit only on this branch',
+  '{n} commits só nesta branch': '{n} commits only on this branch',
+  'nenhuma história do board tem este número': 'no board story has this number',
+  'branch em uso por uma worktree': 'branch in use by a worktree',
+  '{n} órfã': '{n} orphan',
+  '{n} órfãs': '{n} orphans',
+  'Há branches ou worktrees órfãs que dependem da sua decisão. Clique para ver na aba Git das Configurações.':
+    'There are orphan branches or worktrees waiting for your decision. Click to see them in the Git tab of Settings.',
+  // Aviso de renomeação da principal e da develop no navegador (BranchRenameDialog, #466/#498)
+  'atualizar as referências do origin': 'refresh the origin references',
+  'renomear no GitHub': 'rename on GitHub',
+  'renomear a branch local': 'rename the local branch',
+  'ajustar o upstream': 'adjust the upstream',
+  'apontar o origin/HEAD para a nova': 'point origin/HEAD to the new one',
+  'A branch {from} agora se chama {to} ({steps}).': 'The branch {from} is now called {to} ({steps}).',
+  'Nada a renomear: {to} já existe ou {from} não existe mais. O board passa a usar {to}.':
+    'Nothing to rename: {to} already exists or {from} no longer exists. The board now uses {to}.',
+  'O board não alterou o repositório nem o remoto ({reason}). Para renomear {from} para {to}, rode:':
+    'The board changed neither the repository nor the remote ({reason}). To rename {from} to {to}, run:',
+  'sem o gh': 'without gh',
+  'A renomeação parou em "{step}": {error}': 'The rename stopped at "{step}": {error}',
+  'um passo': 'a step',
+  erro: 'error',
+  'Já feito: {steps}.': 'Already done: {steps}.',
+  'Nada foi alterado.': 'Nothing was changed.',
+  'O que falta, neste clone:': 'What is left, in this clone:',
+  'Neste clone, rode:': 'In this clone, run:',
+  'Nos outros clones do repositório, rode:': 'In the other clones of the repository, run:',
+  'Resultado da renomeação': 'Rename result',
+  'Renomear a branch principal?': 'Rename the main branch?',
+  'Renomear a develop?': 'Rename the develop branch?',
+  'A branch {from} passa a se chamar {to}. O nome novo já está nas configurações.':
+    'The branch {from} will be called {to}. The new name is already in the settings.',
+  'Para o repositório ficar coerente, o board vai:': 'To keep the repository consistent, the board will:',
+  'renomear a branch no GitHub, com o <code>gh</code> (instalado e autenticado);':
+    'rename the branch on GitHub, with <code>gh</code> (installed and signed in);',
+  'renomear a branch no clone local e ajustar o upstream;': 'rename the branch in the local clone and adjust the upstream;',
+  'apontar o <code>origin/HEAD</code> para a nova.': 'point <code>origin/HEAD</code> to the new one.',
+  'Sem o gh, fora do GitHub ou sem permissão, o board não mexe no remoto e mostra os comandos prontos. Não muda: workflows de CI, regras de proteção, a branch padrão do GitHub e os clones de outras pessoas.':
+    "Without gh, outside GitHub or without permission, the board does not touch the remote and shows the ready commands. Does not change: CI workflows, protection rules, the GitHub default branch and other people's clones.",
+  'Desfazer volta o nome para {from} sem tocar o repositório.': 'Undo puts the name back to {from} without touching the repository.',
+  Desfazer: 'Undo',
+  'Renomear de novo': 'Rename again',
 };
