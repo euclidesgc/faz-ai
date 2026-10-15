@@ -24,6 +24,15 @@ const BUILTIN: Record<AiTool, Seed[]> = {
     ['auto', 'Auto', [], null],
     ['composer-2.5', 'Composer 2.5', [], null],
   ],
+  // ids e esforços conferidos em `kimi provider list --json` (CLI 2.1.1, 2026-10-13); a lista real
+  // vem desse comando. Só o kimi-for-coding teve `supportEfforts` confirmado; nos demais, o
+  // `defaultEffort` informado pela CLI
+  kimi: [
+    ['kimi-code/kimi-for-coding', 'K2.8 Preview', ['low', 'high', 'max'], 'max'],
+    ['kimi-code/kimi-for-coding-highspeed', 'K2.7 Code Highspeed', [], null],
+    ['kimi-code/k3', 'K3', [], 'high'],
+    ['kimi-code/k3-256k', 'K3-256k', [], 'high'],
+  ],
 };
 
 /** Modelo sugerido por nível de esforço da tarefa (Baixo, Médio, Alto), como [modelo, esforço]. */
@@ -39,6 +48,11 @@ const TIERS: Record<AiTool, [string, string | null][]> = {
     ['auto', null],
     ['auto', null],
     ['auto', null],
+  ],
+  kimi: [
+    ['kimi-code/kimi-for-coding-highspeed', null],
+    ['kimi-code/k3-256k', null],
+    ['kimi-code/kimi-for-coding', null],
   ],
 };
 
@@ -138,7 +152,33 @@ export function parseCursorModels(text: string): ModelOption[] {
   });
 }
 
-/** Listas lidas da própria ferramenta por um comando (o Cursor), guardadas para o próximo "Detectar". */
+/**
+ * Lê a saída de `kimi provider list --json` (CLI 2.1.1): um objeto com `models`, em que cada chave é
+ * o id completo do modelo (`kimi-code/kimi-for-coding`) e o valor traz `displayName`,
+ * `supportEfforts` e `defaultEffort`. O id completo é o que `-m` aceita e o que distingue dois
+ * provedores do mesmo modelo, então é ele que fica no catálogo.
+ */
+export function parseKimiModels(text: string): ModelOption[] {
+  let root: unknown;
+  try {
+    root = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  const models = (root as { models?: unknown } | null)?.models;
+  if (!models || typeof models !== 'object' || Array.isArray(models)) return [];
+  const out: ModelOption[] = [];
+  for (const [id, raw] of Object.entries(models as Record<string, unknown>)) {
+    const m = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+    const label = typeof m.displayName === 'string' && m.displayName.trim() ? m.displayName.trim() : id;
+    const efforts = Array.isArray(m.supportEfforts) ? m.supportEfforts.filter((e): e is string => typeof e === 'string') : [];
+    const defaultEffort = typeof m.defaultEffort === 'string' && m.defaultEffort ? m.defaultEffort : null;
+    out.push({ ...option('kimi', [id, label, efforts, defaultEffort]), fromTool: true as const });
+  }
+  return out;
+}
+
+/** Listas lidas da própria ferramenta por um comando (o Cursor, o Kimi Code), guardadas para o próximo "Detectar". */
 const fromCli = new Map<AiTool, ModelOption[]>();
 
 /** Guarda a lista que a ferramenta informou; uma lista vazia não apaga a anterior. */
@@ -151,7 +191,7 @@ export function forgetModels(tool: AiTool): void {
   fromCli.delete(tool);
 }
 
-/** Modelos lidos da ferramenta: do último comando de listagem (Cursor). */
+/** Modelos lidos da ferramenta: do último comando de listagem (Cursor, Kimi Code). */
 export function discoverModels(tool: AiTool): ModelOption[] {
   return fromCli.get(tool) ?? [];
 }
@@ -177,6 +217,7 @@ export function detectTools(homeDir: string): AiTool[] {
   const dirs: Record<AiTool, string[]> = {
     claude: ['.claude'],
     cursor: ['.cursor'],
+    kimi: ['.kimi-code'],
   };
   return (Object.keys(dirs) as AiTool[]).filter((t) => dirs[t].some((d) => fs.existsSync(path.join(homeDir, d))));
 }

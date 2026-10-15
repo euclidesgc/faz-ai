@@ -145,8 +145,8 @@ describe('HarnessSettings: abas', () => {
   it('uma aba por ferramenta, a do projeto primeiro, depois de Ferramenta e execução', async () => {
     renderTool();
     const tabs = screen.getAllByRole('tab');
-    [/^Ferramenta e execução/, /^Claude Code/, /^Cursor/].forEach((name, i) => expect(tabs[i]).toHaveAccessibleName(name));
-    expect(tabs).toHaveLength(3);
+    [/^Ferramenta e execução/, /^Claude Code/, /^Cursor/, /^Kimi Code/].forEach((name, i) => expect(tabs[i]).toHaveAccessibleName(name));
+    expect(tabs).toHaveLength(4);
     expect(screen.getByText('Ferramenta deste projeto')).toBeInTheDocument();
     expect(screen.queryByText('Harness do Claude Code')).toBeNull();
     await userEvent.click(screen.getByRole('tab', { name: /^Claude Code/ }));

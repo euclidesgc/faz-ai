@@ -1,6 +1,9 @@
 import { execFile } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { ModelOption } from '../shared/models';
-import { parseCursorModels } from './models';
+import { parseCursorModels, parseKimiModels } from './models';
+import { kimiHome } from './mcp/clientConfig';
 import { launchSpec } from './spawn';
 
 export interface CliRun {
@@ -72,4 +75,25 @@ export async function claudeSignedIn(executable: string, pathEnv: string | undef
 export async function cursorModels(executable: string, pathEnv: string | undefined): Promise<ModelOption[]> {
   const run = await runCli(executable, ['models'], pathEnv);
   return run.code === 0 ? parseCursorModels(run.stdout) : [];
+}
+
+/**
+ * Se o Kimi Code está autenticado. A CLI não tem `auth status` (2.1.1): o sinal é a existência de um
+ * arquivo de credenciais OAuth em `credentials/` da pasta de dados ($KIMI_CODE_HOME ou ~/.kimi-code).
+ * A sonda só roda com a CLI presente, então a pasta ausente é "nunca entrou na conta" (false), e só
+ * um erro de leitura deixa a dúvida (null).
+ */
+export function kimiSignedIn(homeDir: string): boolean | null {
+  const dir = path.join(kimiHome(homeDir), 'credentials');
+  try {
+    return fs.readdirSync(dir).some((n) => n.endsWith('.json'));
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'ENOENT' ? false : null;
+  }
+}
+
+/** Os modelos que o Kimi Code oferece (`kimi provider list --json`); vazio com erro ou sem a CLI. */
+export async function kimiModels(executable: string, pathEnv: string | undefined): Promise<ModelOption[]> {
+  const run = await runCli(executable, ['provider', 'list', '--json'], pathEnv);
+  return run.code === 0 ? parseKimiModels(run.stdout) : [];
 }

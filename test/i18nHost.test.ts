@@ -278,6 +278,6 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     expect(t(EXEC_ASPECTS[4]!.label)).toBe('Model and effort');
     expect(t(TOOL_PRESETS[0]!.label)).toBe('Read-only');
     expect(t(EFFORT_LABELS.xhigh!)).toBe('very high');
-    expect(t(PLUGIN_COMMANDS.claude.where)).toBe('in the terminal');
+    expect(t(PLUGIN_COMMANDS.claude!.where)).toBe('in the terminal');
   });
 });

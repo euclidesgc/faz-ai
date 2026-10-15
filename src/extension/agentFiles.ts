@@ -37,14 +37,19 @@ function frontmatterList(fm: string, key: string): string[] {
 }
 
 /**
- * A pasta de agentes é a do Claude Code: só ele lê `mcp__<servidor>__*` na lista de ferramentas. No
- * arquivo, a lista vai sempre com as do servidor do board (uma lista fechada deixaria o board de fora
- * quando o agente roda no chat do editor); na leitura ela sai, e a pessoa só vê e edita o resto.
+ * A pasta de agentes é de uma ferramenta que lê `mcp__<servidor>__*` na lista de ferramentas (o
+ * Claude Code; o Kimi Code, que aceita os mesmos globs no frontmatter — documentação da CLI 2.1.1).
+ * No arquivo, a lista vai sempre com as do servidor do board (uma lista fechada deixaria o board de
+ * fora quando o agente roda na conversa da ferramenta); na leitura ela sai, e a pessoa só vê e edita
+ * o resto.
  */
-const readsBoardTools = (spec: AgentSpec): boolean => spec.dir.startsWith('.claude/');
+const readsBoardTools = (spec: AgentSpec): boolean => spec.dir.startsWith('.claude/') || spec.dir.startsWith('.kimi-code/');
 
 /** O `model` nativo que vai no frontmatter: o id do modelo, sem a ferramenta nem o esforço (`claude:sonnet@medium` → `sonnet`). */
 const isCursor = (spec: AgentSpec): boolean => spec.dir.startsWith('.cursor/');
+
+/** O Kimi Code ignora `model:` e `skills:` no arquivo de agente e lê `subagents` (documentação da CLI 2.1.1). */
+const isKimi = (spec: AgentSpec): boolean => spec.dir.startsWith('.kimi-code/');
 
 export const nativeModelOf = (modelValue: string): string => modelValue.replace(/@.*$/, '').replace(/^[^:]+:/, '');
 
@@ -85,7 +90,7 @@ export function parseAgentFile(
 export function renderAgentFile(spec: AgentSpec, input: AgentInput, seed = false): string {
   const oneLine = input.description.replace(/\r?\n/g, ' ').trim();
   const tools = readsBoardTools(spec) ? withBoardTools(input.tools) : input.tools;
-  const native = input.model.trim() ? nativeModelOf(input.model.trim()) : '';
+  const native = input.model.trim() && !isKimi(spec) ? nativeModelOf(input.model.trim()) : '';
   const body = input.body.trim();
   const lines = [
     `name: ${JSON.stringify(input.name)}`,
@@ -95,7 +100,8 @@ export function renderAgentFile(spec: AgentSpec, input: AgentInput, seed = false
     ...(native ? [`model: ${native}`] : []),
     ...(isCursor(spec) && input.readonly ? ['readonly: true'] : []),
     ...(isCursor(spec) && input.background ? ['is_background: true'] : []),
-    ...(input.skills.length ? [`skills: ${input.skills.join(', ')}`] : []),
+    ...(isKimi(spec) && tools.includes('Agent') ? ['subagents: "*"'] : []),
+    ...(input.skills.length && !isKimi(spec) ? [`skills: ${input.skills.join(', ')}`] : []),
     ...(input.model.trim() ? [`faz-ai-model: ${JSON.stringify(input.model.trim())}`] : []),
     ...(input.mcp.length ? [`faz-ai-mcp: ${input.mcp.join(', ')}`] : []),
     ...(seed ? ['faz-ai-seed: true'] : []),

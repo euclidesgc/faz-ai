@@ -5,13 +5,15 @@ import { HARNESS_CATALOG, MCP_NAME_PATTERN, type HarnessSource, type McpServerIn
 
 /**
  * Entrada de um servidor no formato de cada arquivo, como a documentação de cada ferramenta descreve:
- * `type: stdio|http` no Claude Code, `type: stdio` ou só `url` no Cursor (cursor.com/docs/context/mcp).
+ * `type: stdio|http` no Claude Code, `type: stdio` ou só `url` no Cursor (cursor.com/docs/context/mcp),
+ * e sem o campo `type` no Kimi Code (CLI 2.1.1: stdio é `command`+`args`, http é `url`).
  */
 function jsonEntry(tool: AiTool, s: McpServerInput): Record<string, unknown> {
   const stdio = s.transport === 'stdio';
   const body = stdio
     ? { command: s.command, ...(s.args.length ? { args: s.args } : {}), ...(Object.keys(s.env).length ? { env: s.env } : {}) }
     : { url: s.url, ...(Object.keys(s.headers).length ? { headers: s.headers } : {}) };
+  if (tool === 'kimi') return body;
   if (tool === 'cursor') return stdio ? { type: 'stdio', ...body } : body;
   return { type: stdio ? 'stdio' : 'http', ...body };
 }
