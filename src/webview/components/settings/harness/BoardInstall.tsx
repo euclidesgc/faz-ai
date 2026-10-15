@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { aiToolInfo, type AiTool, type HarnessItem, type InstallScope } from '../../../../shared/harness';
 import { FLOW_SKILL_NAME } from '../../../../shared/harnessProject';
 import { copyTarget } from '../../../../shared/harnessCatalog';
@@ -16,68 +15,44 @@ export type BoardArtifact = 'mcp' | 'skill';
 
 const NAMES: Record<BoardArtifact, string> = { mcp: 'faz-ai', skill: FLOW_SKILL_NAME };
 
-/** Onde cada escopo grava, como a pessoa reconhece o arquivo ou a pasta. */
-function places(artifact: BoardArtifact, tool: AiTool): Record<InstallScope, string> {
-  const info = aiToolInfo(tool);
-  if (artifact === 'mcp') return { user: t(info.mcpUser), project: t(info.mcp) };
-  const dir = (scope: InstallScope) =>
-    `${scope === 'user' ? '~/' : ''}${copyTarget(tool, 'skill', 'skills', scope)?.path ?? ''}/${FLOW_SKILL_NAME}`;
-  return { user: dir('user'), project: dir('project') };
+/** Onde o global grava, como a pessoa reconhece o arquivo ou a pasta. */
+function place(artifact: BoardArtifact, tool: AiTool): string {
+  if (artifact === 'mcp') return t(aiToolInfo(tool).mcpUser);
+  return `~/${copyTarget(tool, 'skill', 'skills', 'user')?.path ?? ''}/${FLOW_SKILL_NAME}`;
 }
 
 /**
- * Instalação do que o board oferece à ferramenta, na seção do tipo (Servidores MCP, Skills): o padrão
- * da ferramenta é o escopo global, que vale em todo projeto sem nenhum arquivo no repositório; "neste
- * projeto" grava na pasta do projeto, que vale sobre o global aqui, e por isso pergunta antes quando
- * já há um global.
+ * Instalação do que o board oferece à ferramenta, na seção do tipo (Servidores MCP, Skills): só o escopo
+ * global, que vale em todo projeto sem nenhum arquivo no repositório. A exceção é o servidor no Cursor,
+ * que fica no projeto.
  */
 export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifact; tool: AiTool; items: HarnessItem[] }) {
   const ask = useBoardStore((s) => s.ask);
   const name = NAMES[artifact];
   const installedIn = (scope: InstallScope) => items.some((i) => i.kind === artifact && i.scope === scope && i.name === name);
-  const where = places(artifact, tool);
+  const where = place(artifact, tool);
   const label = aiToolInfo(tool).label;
 
   // registrar o servidor chama a CLI da ferramenta; o botão clicado mostra a espera até o host confirmar
-  const installing = useAction((scope: InstallScope, replace: boolean) =>
-    artifact === 'mcp' ? ui.connectAI(tool, scope) : harness.installFlowSkill(tool, scope, replace),
-  );
-  const [which, setWhich] = useState<InstallScope | null>(null);
-  const run = (scope: InstallScope, replace: boolean) => {
-    setWhich(scope);
-    void installing.run(scope, replace);
-  };
-  const loading = (scope: InstallScope) => installing.busy && which === scope;
+  const installing = useAction((replace: boolean) => (artifact === 'mcp' ? ui.connectAI(tool) : harness.installFlowSkill(tool, replace)));
+  const run = (replace: boolean) => void installing.run(replace);
 
-  const install = (scope: InstallScope) => {
-    const here = installedIn(scope);
+  const install = () => {
     // o servidor é só a linha de registro do board, refeita com os caminhos atuais; a skill pode ter sido ajustada à mão
-    const replacing = here && artifact === 'skill';
-    const shadowing = scope === 'project' && installedIn('user');
-    if (scope === 'project' && !here && !shadowing) return run(scope, false);
-    const lines = [
-      replacing
-        ? t(
-            'Já existe uma skill "{name}" em {where}. Ela será substituída pela versão desta extensão, e o que foi ajustado nela se perde.',
-            {
-              name,
-              where: where[scope],
-            },
-          )
-        : artifact === 'mcp'
-          ? t('O registro será gravado em {where}.', { where: where[scope] })
-          : t('A skill será instalada em {where}.', { where: where[scope] }),
-      shadowing &&
-        t(
-          'Já está instalado no global. O do projeto passa a valer aqui no lugar dele, e o global continua valendo nos outros projetos. Para o board em qualquer repositório, o global basta.',
-        ),
-    ].filter(Boolean) as string[];
+    const replacing = installedIn('user') && artifact === 'skill';
+    const message = replacing
+      ? t('Já existe uma skill "{name}" em {where}. Ela será substituída pela versão desta extensão, e o que foi ajustado nela se perde.', {
+          name,
+          where,
+        })
+      : artifact === 'mcp'
+        ? t('O registro será gravado em {where}.', { where })
+        : t('A skill será instalada em {where}.', { where });
     ask({
-      title:
-        scope === 'user' ? t('Instalar no global do {tool}?', { tool: label }) : t('Instalar neste projeto, no {tool}?', { tool: label }),
-      message: withGlobalWarning(lines.join('\n\n'), scope),
+      title: t('Instalar no global do {tool}?', { tool: label }),
+      message: withGlobalWarning(message, 'user'),
       confirmLabel: replacing ? t('Substituir') : t('Instalar'),
-      onConfirm: () => run(scope, replacing),
+      onConfirm: () => run(replacing),
     });
   };
 
@@ -100,9 +75,9 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
         </p>
         <div className="row">
           <ActionButton
-            loading={loading('project')}
+            loading={installing.busy}
             hint={t('Grava o registro do board em .cursor/mcp.json, na pasta do projeto.')}
-            onClick={() => run('project', false)}
+            onClick={() => run(false)}
           >
             {installedIn('project') ? t('Reinstalar neste projeto') : t('Instalar neste projeto')}
           </ActionButton>
@@ -117,45 +92,29 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
         <Badge color={installedIn('user') ? 'green' : 'gray'} variant="soft">
           {installedIn('user') ? t('global: instalado') : t('global: não instalado')}
         </Badge>
-        <Badge color={installedIn('project') ? 'green' : 'gray'} variant="soft">
-          {installedIn('project') ? t('neste projeto: instalado') : t('neste projeto: não instalado')}
-        </Badge>
       </div>
       <p className="muted small">
         {artifact === 'mcp'
           ? rich(
-              'Deixa a IA ler e atualizar o board nas suas conversas. As execuções pelo board não dependem disso. <b>Padrão da ferramenta</b> grava no global (<code>{user}</code>) sem a pasta do projeto: vale em qualquer repositório aberto com o board, sem arquivo nenhum no projeto. <b>Neste projeto</b> grava em <code>{project}</code>: use para fixar uma versão neste repositório ou num fork.',
-              { user: where.user, project: where.project },
+              'Deixa a IA ler e atualizar o board nas suas conversas. As execuções pelo board não dependem disso. Grava no global (<code>{user}</code>): vale em qualquer repositório aberto com o board, sem arquivo nenhum no projeto.',
+              { user: where },
             )
           : rich(
-              'Ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. <b>Padrão da ferramenta</b> instala em <code>{user}</code>, para todos os seus projetos. <b>Neste projeto</b> instala em <code>{project}</code>, que vai no repositório: use para fixar uma versão ajustada para este time.',
-              { user: where.user, project: where.project },
+              'Ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. Instala em <code>{user}</code>, para todos os seus projetos.',
+              { user: where },
             )}
       </p>
       <div className="row">
         <ActionButton
-          loading={loading('user')}
+          loading={installing.busy}
           hint={
             artifact === 'mcp'
               ? t('Registra o servidor do board no global da ferramenta: vale em todos os projetos, sem arquivo no repositório.')
               : t('Instala a skill na sua pasta de usuário: vale em todos os projetos.')
           }
-          onClick={() => install('user')}
+          onClick={install}
         >
           {installedIn('user') ? t('Reinstalar (padrão da ferramenta)') : t('Instalar (padrão da ferramenta)')}
-        </ActionButton>
-        <ActionButton
-          variant="soft"
-          color="gray"
-          loading={loading('project')}
-          hint={
-            artifact === 'mcp'
-              ? t('Grava o registro na pasta do projeto, que vai no repositório; aqui ele vale sobre o global.')
-              : t('Instala a skill na pasta do projeto, que vai no repositório; aqui ela vale sobre a global.')
-          }
-          onClick={() => install('project')}
-        >
-          {installedIn('project') ? t('Reinstalar neste projeto') : t('Instalar neste projeto')}
         </ActionButton>
       </div>
     </Card>

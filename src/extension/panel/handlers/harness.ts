@@ -10,7 +10,6 @@ import {
   type HarnessItem,
   type HarnessKind,
   type InstallableSkill,
-  type InstallScope,
   type PluginAction,
   pluginActions,
 } from '../../../shared/harness';
@@ -375,12 +374,11 @@ export class BoardHarness {
   }
 }
 
-/** O SKILL.md da skill do fluxo na pasta de skills da ferramenta, no projeto ou na pasta do usuário. */
-export function flowSkillFile(ctx: BoardContext, tool: AiTool, scope: InstallScope): string {
-  const target = copyTarget(tool, 'skill', 'skills', scope);
-  const base = scope === 'project' ? ctx.opts.workspaceDir : ctx.home;
-  if (!target || !base) throw new Error('Esta ferramenta não tem uma pasta de skills nesse escopo.');
-  return path.join(base, target.path, FLOW_SKILL.name, 'SKILL.md');
+/** O SKILL.md da skill do fluxo na pasta de skills da ferramenta, na pasta do usuário: os artefatos padrão do board nunca entram no projeto. */
+export function flowSkillFile(ctx: BoardContext, tool: AiTool): string {
+  const target = copyTarget(tool, 'skill', 'skills', 'user');
+  if (!target || !ctx.home) throw new Error('Esta ferramenta não tem uma pasta de skills na pasta do usuário.');
+  return path.join(ctx.home, target.path, FLOW_SKILL.name, 'SKILL.md');
 }
 
 /** Envia ao board em "Pelo card" uma skill da ferramenta em uso, pelo nome e escopo: criar ou instalar uma skill pelo board é querer usá-la. */
@@ -524,8 +522,7 @@ export const harnessHandlers = {
   // pessoa desmarcou) é "instalar" de novo que a põe em todo contexto
   'harness.flowSkill.install': (msg, ctx) => {
     const tool = msg.tool ?? ctx.state().board.aiTool;
-    const scope = msg.scope ?? 'user';
-    const file = flowSkillFile(ctx, tool, scope);
+    const file = flowSkillFile(ctx, tool);
     const written =
       fs.existsSync(file) && !msg.replace
         ? false
@@ -537,7 +534,7 @@ export const harnessHandlers = {
     ctx.harness.load();
     const item = ctx.harness.current.inventory
       .find((t) => t.tool === tool)
-      ?.items.find((i) => i.kind === 'skill' && i.scope === scope && i.name === FLOW_SKILL.name);
+      ?.items.find((i) => i.kind === 'skill' && i.scope === 'user' && i.name === FLOW_SKILL.name);
     const marked =
       !!item && !ctx.state().harnessSelection.some((x) => x.kind === 'skill' && x.location === item.location && x.usage === 'always');
     if (item && marked) {

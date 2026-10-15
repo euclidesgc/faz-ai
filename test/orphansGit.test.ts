@@ -360,6 +360,44 @@ describe('sweep', () => {
   });
 });
 
+describe('idle', () => {
+  it('resolve na hora quando não há varredura em andamento nem na fila', async () => {
+    const sw = sweeper();
+    await expect(sw.idle()).resolves.toBeUndefined();
+  });
+
+  it('só resolve depois que a varredura em andamento termina (o caso do dispose)', async () => {
+    // segura a primeira chamada ao git: a varredura fica "em andamento" até o teste liberar
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let firstCall = true;
+    const sw = sweeper({
+      git: async (args, cwd) => {
+        if (firstCall) {
+          firstCall = false;
+          await gate;
+        }
+        return gitAsync(args, cwd);
+      },
+    });
+
+    const running = sw.sweep(); // sem await, como o setInterval do boardHost
+    let idleDone = false;
+    const idleP = sw.idle().then(() => {
+      idleDone = true;
+    });
+
+    // dá tempo de qualquer microtask resolver: com a varredura travada, idle não pode resolver
+    await new Promise((r) => setTimeout(r, 20));
+    expect(idleDone).toBe(false);
+
+    release();
+    await running;
+    await idleP;
+    expect(idleDone).toBe(true);
+  });
+});
+
 describe('clean', () => {
   it('revalida: recusa o que sujou depois da listagem, aceita a perda com os números iguais e recusa com números diferentes', async () => {
     const c = await story('Revalida');

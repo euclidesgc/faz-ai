@@ -147,22 +147,20 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'install_flow_skill',
-    'Instala a skill "faz-ai-fluxo", que ensina a conduzir os cards pelo fluxo do board (fases, documentos, revisão, pendências), e a marca como "incluir em todo contexto" neste board. O padrão é o escopo global da ferramenta; "project" instala só neste projeto. Não sobrescreve uma skill de mesmo nome no destino, a menos que replace seja true.',
+    'Instala a skill "faz-ai-fluxo", que ensina a conduzir os cards pelo fluxo do board (fases, documentos, revisão, pendências), e a marca como "incluir em todo contexto" neste board. Sempre no global da ferramenta (~/.claude/skills, ~/.cursor/skills, ~/.kimi-code/skills), para todos os projetos: nada entra na pasta do projeto. Não sobrescreve uma skill de mesmo nome no destino, a menos que replace seja true.',
     {
       tool: z.enum(ALL_AI_TOOLS).optional().describe('Ferramenta de IA; padrão: a do projeto'),
-      scope: z.enum(['user', 'project']).optional().describe('"user" (global, padrão) ou "project" (só neste projeto)'),
       replace: z.boolean().optional().describe('Troca a skill de mesmo nome que já esteja no destino'),
     },
     (a, router) => {
       const tool = a.tool ?? router.snapshot().board.aiTool;
-      const scope = a.scope ?? 'user';
       const found = () =>
         router
           .snapshot()
           .harness.inventory.find((t) => t.tool === tool)
-          ?.items.find((i) => i.kind === 'skill' && i.scope === scope && i.name === FLOW_SKILL.name);
+          ?.items.find((i) => i.kind === 'skill' && i.scope === 'user' && i.name === FLOW_SKILL.name);
       const had = !!found();
-      router.handle({ type: 'harness.flowSkill.install', tool, scope, replace: a.replace });
+      router.handle({ type: 'harness.flowSkill.install', tool, replace: a.replace });
       return {
         installed: !had || !!a.replace,
         note:

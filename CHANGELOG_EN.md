@@ -5,6 +5,12 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **The board's MCP server is installed only in the tool's global scope (#563).** Claude Code registers it in `~/.claude.json` (through `claude mcp add-json --scope user`) and Kimi Code in `~/.kimi-code/mcp.json`. The **Instalar neste projeto** (install in this project) option is gone (MCP and flow skill, in the Harness screen and in the `install_flow_skill` tool), and the board's default artifacts no longer go into the project folder, which may be shared with people who do not have the extension. Cursor remains the exception: the project's `.cursor/mcp.json`, kept out of git through `.git/info/exclude`, because its global scope is a single process for all windows. To keep a copy of the skill in the project, use **Copiar para o projeto** (copy to the project) in the Harness. The **Adicionar ao .gitignore** warning and button of the **Conectar IA** command are gone too. An old project registration (`.mcp.json`, `.kimi-code/mcp.json`) is not migrated: the requirements banner still offers **Corrigir o registro** (fix the registration), which removes it and redoes the global. **Behavior change:** `install_flow_skill` loses the `scope` parameter and refuses calls that send it; anyone who automated it with `scope` must drop it.
+- **The MCP registration is redone when the extension updates (#563).** On the first activation of a new version, the board redoes the global registration on the tools that already had it (Claude Code and Kimi Code; Cursor is already redone every time a folder opens). If it fails, the reason goes to Output → Faz AI and the requirements banner keeps warning.
+- **Fix: the `faz-ai-fluxo` skill did not load in Cursor (#563).** Cursor showed "Error parsing skill" because the `SKILL.md` `description` had an unquoted `: `, which breaks the YAML. The `description` is now quoted in the flow skill and also in the skills and `.mdc` rules created by the board. If you already had the skill installed, click **Reinstalar** (reinstall) in the Harness.
+
 ## 0.45.0
 
 - **Resuming autonomous mode in a window that does not own the board now warns.** When the folder's board is served elsewhere (another editor window or the `faz-ai` command in a terminal), the resume button seemed to do nothing. It now shows a warning saying where autonomous mode runs, and the activity bar keeps the reason.

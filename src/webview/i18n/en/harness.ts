@@ -407,10 +407,7 @@ export const harness: Record<string, string> = {
   'A skill será instalada em {where}.': 'The skill will be installed in {where}.',
   'Já existe uma skill "{name}" em {where}. Ela será substituída pela versão desta extensão, e o que foi ajustado nela se perde.':
     'A "{name}" skill already exists in {where}. It will be replaced by this extension\'s version, and any changes made to it will be lost.',
-  'Já está instalado no global. O do projeto passa a valer aqui no lugar dele, e o global continua valendo nos outros projetos. Para o board em qualquer repositório, o global basta.':
-    'It is already installed globally. The project one takes its place here, and the global one keeps applying to your other projects. For the board in any repository, the global one is enough.',
   'Instalar no global do {tool}?': 'Install globally in {tool}?',
-  'Instalar neste projeto, no {tool}?': 'Install in this project, in {tool}?',
   Substituir: 'Replace',
   'Servidor do board': 'Board server',
   'Skill do fluxo': 'Flow skill',
@@ -420,10 +417,10 @@ export const harness: Record<string, string> = {
   'global: não instalado': 'global: not installed',
   'neste projeto: instalado': 'this project: installed',
   'neste projeto: não instalado': 'this project: not installed',
-  'Deixa a IA ler e atualizar o board nas suas conversas. As execuções pelo board não dependem disso. <b>Padrão da ferramenta</b> grava no global (<code>{user}</code>) sem a pasta do projeto: vale em qualquer repositório aberto com o board, sem arquivo nenhum no projeto. <b>Neste projeto</b> grava em <code>{project}</code>: use para fixar uma versão neste repositório ou num fork.':
-    'Lets the AI read and update the board in your conversations. Runs from the board do not depend on it. <b>Tool default</b> writes to the global config (<code>{user}</code>) without the project folder: it works in any repository opened with the board, with no file in the project. <b>In this project</b> writes to <code>{project}</code>: use it to pin a version in this repository or in a fork.',
-  'Ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. <b>Padrão da ferramenta</b> instala em <code>{user}</code>, para todos os seus projetos. <b>Neste projeto</b> instala em <code>{project}</code>, que vai no repositório: use para fixar uma versão ajustada para este time.':
-    'Teaches the AI to move cards through the board flow: phases, documents, review and pending items. <b>Tool default</b> installs to <code>{user}</code>, for all your projects. <b>In this project</b> installs to <code>{project}</code>, which goes in the repository: use it to pin a version tailored for this team.',
+  'Deixa a IA ler e atualizar o board nas suas conversas. As execuções pelo board não dependem disso. Grava no global (<code>{user}</code>): vale em qualquer repositório aberto com o board, sem arquivo nenhum no projeto.':
+    'Lets the AI read and update the board in your conversations. Runs from the board do not depend on it. Writes to the global config (<code>{user}</code>): it works in any repository opened with the board, with no file in the project.',
+  'Ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. Instala em <code>{user}</code>, para todos os seus projetos.':
+    'Teaches the AI to move cards through the board flow: phases, documents, review and pending items. Installs to <code>{user}</code>, for all your projects.',
   'Reinstalar (padrão da ferramenta)': 'Reinstall (tool default)',
   'Instalar (padrão da ferramenta)': 'Install (tool default)',
   'Reinstalar neste projeto': 'Reinstall in this project',
@@ -847,10 +844,6 @@ export const harness: Record<string, string> = {
   'Registra o servidor do board no global da ferramenta: vale em todos os projetos, sem arquivo no repositório.':
     "Registers the board server in the tool's global config: valid in every project, with no file in the repository.",
   'Instala a skill na sua pasta de usuário: vale em todos os projetos.': 'Installs the skill in your user folder: valid in every project.',
-  'Grava o registro na pasta do projeto, que vai no repositório; aqui ele vale sobre o global.':
-    'Writes the entry in the project folder, which goes into the repository; here it takes precedence over the global one.',
-  'Instala a skill na pasta do projeto, que vai no repositório; aqui ela vale sobre a global.':
-    'Installs the skill in the project folder, which goes into the repository; here it takes precedence over the global one.',
   'Tira do board; o arquivo de origem não é tocado.': 'Removes it from the board; the source file is not touched.',
   'Tira os marcados do board; os arquivos de origem ficam.': 'Removes the checked ones from the board; the source files stay.',
   'Pede confirmação e apaga do disco os arquivos marcados.': 'Asks for confirmation and deletes the checked files from disk.',

@@ -303,7 +303,6 @@ describe('telas montam sem erro', () => {
       'deste projeto',
       'não encontrada',
       'Instalar (padrão da ferramenta)',
-      'Instalar neste projeto',
       'Execução pela conversa e heartbeat',
       'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',

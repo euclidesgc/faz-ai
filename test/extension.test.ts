@@ -51,7 +51,7 @@ afterEach(() => {
   // fecha os painéis como o editor faria: o BoardPanel é estático e sobreviveria ao próximo teste
   for (const panel of fake.panels) panel.dispose();
   vi.unstubAllEnvs();
-  fs.rmSync(root, { recursive: true, force: true });
+  fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
 /** Ativa a extensão com um `context` de mentira apontando para as pastas temporárias do teste. */

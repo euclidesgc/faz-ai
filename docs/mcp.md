@@ -16,10 +16,12 @@ vale em qualquer projeto aberto com o board, sem arquivo nenhum no repositório:
 | Cursor (chat do editor e `cursor-agent`) | **no projeto**, `.cursor/mcp.json` (fora do git), gravado sozinho ao abrir a pasta no Cursor | a pasta fixa no registro | Na primeira vez: recarregue a janela e ligue o `faz-ai` em Cursor Settings → MCP |
 | Kimi Code | `~/.kimi-code/mcp.json`, gravado pelo board (é um JSON só de servidores, seguro de escrever) | o diretório em que a CLI inicia o servidor (a pasta da sessão) | Abra uma sessão nova (`/mcp` mostra o estado) |
 
-**Instalar neste projeto** grava em `.mcp.json`, `.cursor/mcp.json` ou `.kimi-code/mcp.json`, com a pasta fixa. Esses arquivos guardam caminhos desta
-máquina, e o registro do projeto vale no lugar do global naquele projeto. Por isso um registro
+O board registra o servidor só no global da ferramenta (a exceção é o Cursor, acima). Ao atualizar a
+extensão, o registro global é refeito nas ferramentas em que já estava; falha vai para Saída → Faz AI
+e a faixa de requisitos continua avisando. Um registro de projeto antigo (`.mcp.json`,
+`.kimi-code/mcp.json`) não é migrado e vale no lugar do global naquele projeto, então um registro
 quebrado ali (de outra pasta, de um node que sumiu) estraga o global. A faixa de requisitos mostra
-**Corrigir o registro**, que tira o registro do arquivo do projeto e deixa o global valendo.
+**Corrigir o registro**, que tira o registro do arquivo do projeto e refaz o global.
 
 ### Registro manual
 
@@ -218,7 +220,7 @@ linha de comando da ferramenta aceita é imposto por parâmetro:
 - `ready`: cards prontos para trabalhar (sub-tarefas de uma história que está com a pessoa ficam de fora).
 
 `withPerson` lista o que espera a pessoa. Cada mensagem da conversa traz `from` (`human` ou `ai`).
-A skill `faz-ai-fluxo`, instalada por `install_flow_skill` ou pelo botão em Harness de IA, descreve
+A skill `faz-ai-fluxo`, instalada por `install_flow_skill` (sem `scope`: instala no global da ferramenta, para todos os projetos) ou pelo botão em Harness de IA, descreve
 o ciclo completo para a IA.
 
 ### Execução pela conversa
