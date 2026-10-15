@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import type { BranchRenamePending } from '../shared/branchRename';
 import type { AiTool } from '../shared/harness';
 import { NODE_MIN_MAJOR, type EnvCheck, type EnvCheckId, type EnvironmentReport, type InstallStep } from '../shared/environment';
 import { HARNESS_ISSUES, type HarnessIssue } from '../shared/harnessStatus';
@@ -43,6 +44,8 @@ export interface EnvironmentProbe {
   harnessIssues: HarnessIssue[] | null;
   /** a outra ferramenta, quando encontrada na máquina */
   other: OtherToolProbe | null;
+  /** as renomeações de branch à espera de Renomear/Desfazer (#466): o item "Nome da branch" fica pendente enquanto houver */
+  branchRenames?: BranchRenamePending[];
   /** o MCP do Code Review Graph está registrado na ferramenta do projeto */
   crgMcp: boolean;
   /** o sistema: no Windows, os comandos de instalação são os do PowerShell */
@@ -300,6 +303,15 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     children: [{ id: 'repo', status: statusOf(repo, !!gitExe), command: 'git init', inProject: true }],
   };
 
+  // o nome novo da principal ou da develop já está nas configurações, mas o repositório ainda não o segue:
+  // o comando é o do clone local; a lista completa (GitHub, upstream, origin/HEAD) vem no aviso de renomeação
+  const renames = p.branchRenames ?? [];
+  const branchName: EnvCheck = {
+    id: 'branch-name',
+    status: statusOf(renames.length === 0),
+    ...(renames.length ? { command: renames.map((r) => `git branch -m ${r.from} ${r.to}`).join(' && '), inProject: true as const } : {}),
+  };
+
   const ghExe = p.resolve('gh');
   // `gh auth status` sai com erro sem login (ou com o token vencido)
   const ghAuth = ghExe ? (await p.run(ghExe, ['auth', 'status'])) !== null : false;
@@ -370,7 +382,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     tool,
     required: [node, own],
     optional,
-    recommended: [git, gh, codeGraph],
+    recommended: [git, branchName, gh, codeGraph],
     // os instaladores do Linux e do macOS baixam pelo curl, que um Ubuntu desktop novo não traz
     ...(!windows && !p.resolve('curl') ? { curlMissing: true as const } : {}),
     checkedAt: Date.now(),

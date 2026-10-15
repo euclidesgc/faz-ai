@@ -468,6 +468,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           workspaceDir: o.folderPath,
           skillInstalled,
           harnessIssues: harnessIssuesNow() ?? null,
+          branchRenames: s.branchRenames,
           other: await otherTool(tool),
           crgMcp: crgRegistered(tool),
           platform: process.platform,
