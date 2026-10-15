@@ -5,7 +5,7 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+## 0.44.0
 
 - **Gitflow on the branches the board creates (#462).** Gitflow is on by default (`fazai.git.gitflow`, also on existing boards). The card type sets the branch kind: História (story) and Débito técnico (tech debt) produce `feature/`, Retrabalho (rework) produces `bugfix/` and Bug produces `hotfix/`. `feature/` and `bugfix/` start from `develop`; `hotfix/` starts from the main branch; a new card type, or one without a branch kind, starts from `develop` as a feature. In the autonomous-mode stack and in derived stories the base is still the previous story's branch. Off, every branch starts from the main branch, as before.
 - **`develop` created when missing.** If `develop` exists neither locally nor on `origin`, the board creates it from the main branch and pushes it with `git push -u origin develop` (with no `origin`, it only creates it); if the push fails, or it exists only on the machine, a notice in the conversation brings the command to push it by hand. If `git fetch` fails, or the main branch is unknown (no `origin` HEAD, `main` or `master`), the board doesn't create `develop` and refuses to create the branch, saying what to do. The board does not delete, rename or rewrite any branch in this delivery.

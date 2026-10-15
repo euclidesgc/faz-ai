@@ -4,7 +4,7 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+## 0.44.0
 
 - **Gitflow nas branches criadas pelo board (#462).** O gitflow vem ligado por padrão (`fazai.git.gitflow`, também em boards que já existem). O tipo de card define o tipo de branch: História e Débito técnico geram `feature/`, Retrabalho gera `bugfix/` e Bug gera `hotfix/`. `feature/` e `bugfix/` partem da `develop`; `hotfix/` parte da branch principal; qualquer tipo de card novo ou sem tipo de branch parte da `develop` como feature. Na pilha do modo autônomo e nas histórias derivadas, a base continua sendo a branch da história anterior. Desligado, toda branch parte da principal, como antes.
 - **`develop` criada quando falta.** Se a `develop` não existe nem local nem no `origin`, o board a cria a partir da principal e a envia com `git push -u origin develop` (sem `origin`, só a cria); se o envio falha, ou se ela existe só na máquina, um aviso na conversa traz o comando para enviá-la à mão. Com o `git fetch` falhando, ou sem saber qual é a principal (sem o HEAD do `origin`, `main` nem `master`), o board não cria a `develop` e recusa criar a branch, dizendo o que fazer. O board não apaga, renomeia nem reescreve nenhuma branch nesta entrega.
