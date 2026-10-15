@@ -261,6 +261,8 @@ export const cardPrompt = (
 export class AiRunner {
   private runs = new Map<string, Run>();
   private finishListeners: ((cardId: string, mode: AiRunMode) => void)[] = [];
+  /** a última execução terminou por limite de uso do plano: o heartbeat não insiste até uma execução voltar a funcionar */
+  usageLimited = false;
 
   constructor(
     private router: MessageRouter,
@@ -462,6 +464,7 @@ export class AiRunner {
         ),
       );
       let retry: ToolModel | undefined;
+      this.usageLimited = !end.stopped && !!end.report.usageLimitReached;
       try {
         // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
         // mudança de status que explicam o fim da execução ficam ligados a ela
@@ -601,6 +604,22 @@ export class AiRunner {
         { author: RUNNER_AUTHOR, source: 'ai' },
       );
       return run.fallbackPending;
+    }
+    // limite de uso do plano sem reserva: o limite renova sozinho, então o card volta para a IA em vez de
+    // ficar bloqueado esperando a pessoa (o heartbeat tenta de novo na próxima rodada)
+    if (failure && end.report.usageLimitReached) {
+      this.router.handle(
+        {
+          type: 'comment.add',
+          cardId,
+          body: `O limite de uso do plano do ${toolLabel} esgotou. O card voltou para a IA e a execução é repetida quando o limite renovar.${output}`,
+        },
+        { author: RUNNER_AUTHOR, source: 'ai' },
+      );
+      return void this.router.handle(
+        { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
+        { author: RUNNER_AUTHOR },
+      );
     }
     if (failure) return void this.block(cardId, failure);
     // o pull request pode ter sido registrado antes do card chegar na última coluna da IA (ex.: a

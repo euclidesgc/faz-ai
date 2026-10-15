@@ -1291,7 +1291,7 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     expect(card().status).toBe('waiting_answer');
   });
 
-  it('a reserva também esgota o limite (ou falha por qualquer motivo): bloqueio final, sem uma terceira tentativa', () => {
+  it('a reserva também esgota o limite (ou falha por qualquer motivo): o card volta para a IA (#551), sem uma terceira tentativa', () => {
     useSonnetMedium();
     ruleWithFallback(modelValue(fable().id, 'low'));
     runner.start(storyId);
@@ -1302,20 +1302,20 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     procs[1]!.emit(usageLimitResult());
     procs[1]!.exit(1);
     expect(procs).toHaveLength(2); // nenhuma terceira chamada: a retentativa não recebe fallbackPending
-    expect(card().status).toBe('blocked');
+    expect(card().status).toBe('ready');
   });
 
-  it('card sem reserva (regra sem fallback) + limite esgotado: bloqueio imediato, sem segunda chamada', () => {
+  it('card sem reserva (regra sem fallback) + limite esgotado: o card volta para a IA (#551), sem segunda chamada', () => {
     useSonnetMedium();
     ruleWithFallback(null);
     runner.start(storyId);
     procs[0]!.emit(usageLimitResult());
     procs[0]!.exit(1);
     expect(procs).toHaveLength(1);
-    expect(card().status).toBe('blocked');
+    expect(card().status).toBe('ready');
   });
 
-  it('modelo escolhido à mão sem bater com a regra + limite esgotado: bloqueio imediato, sem segunda chamada', () => {
+  it('modelo escolhido à mão sem bater com a regra + limite esgotado: o card volta para a IA (#551), sem segunda chamada', () => {
     // a regra sugeriria sonnet@medium, mas o campo Modelo do card foi trocado à mão para fable@high
     ruleWithFallback(modelValue(fable().id, 'low'));
     setModelo(modelValue(fable().id, 'high'));
@@ -1323,7 +1323,7 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     procs[0]!.emit(usageLimitResult());
     procs[0]!.exit(1);
     expect(procs).toHaveLength(1);
-    expect(card().status).toBe('blocked');
+    expect(card().status).toBe('ready');
   });
 
   it('falha comum (sem limite esgotado), mesmo com reserva disponível: bloqueio imediato, sem segunda chamada', () => {

@@ -4,6 +4,11 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **Heartbeat diz por que não executou (#551).** Quando uma rodada não inicia nada, o log (Saída → Faz AI) traz o motivo: login vencido, história em modo autônomo, execução já em andamento, história com a pessoa sem mensagem pendente ou à espera de outro card. Antes aparecia sempre "nada pendente com a IA".
+- **Limite de uso esgotado não bloqueia mais o card (#551).** Quando o plano da ferramenta atinge o limite (renova a cada 5 h), o card volta para a IA com um aviso na conversa, e o heartbeat testa uma história por rodada até o limite voltar, sem bloquear tudo.
+
 ## 0.44.0
 
 - **Gitflow nas branches criadas pelo board (#462).** O gitflow vem ligado por padrão (`fazai.git.gitflow`, também em boards que já existem). O tipo de card define o tipo de branch: História e Débito técnico geram `feature/`, Retrabalho gera `bugfix/` e Bug gera `hotfix/`. `feature/` e `bugfix/` partem da `develop`; `hotfix/` parte da branch principal; qualquer tipo de card novo ou sem tipo de branch parte da `develop` como feature. Na pilha do modo autônomo e nas histórias derivadas, a base continua sendo a branch da história anterior. Desligado, toda branch parte da principal, como antes.
