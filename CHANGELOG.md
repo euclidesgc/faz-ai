@@ -4,6 +4,10 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **Limite de uso esgotado do Kimi Code não bloqueia mais o card (#570).** O erro de cota da CLI (`provider.auth_error` 403 "usage limit") agora é reconhecido: o card volta para a IA, como já acontecia no Claude Code, em vez de ficar bloqueado.
+
 ## 0.45.0
 
 - **Retomar o modo autônomo numa janela que não é a dona do board agora avisa.** Quando o board da pasta está sendo atendido em outro lugar (outra janela do editor ou o comando `faz-ai` no terminal), o botão de retomar parecia não fazer nada. Agora ele mostra um aviso dizendo onde o modo autônomo roda, e a barra de atividade guarda o motivo.

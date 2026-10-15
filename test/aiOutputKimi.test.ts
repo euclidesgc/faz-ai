@@ -72,4 +72,19 @@ describe('stream-json do Kimi Code', () => {
     expect(reader.push('{"role":"assistant","content":"não é evento"}', 'stderr')).toHaveLength(1);
     expect(reader.sawEvent).toBe(false);
   });
+
+  it('marca usageLimitReached quando o stderr traz o erro de cota (403, usage limit)', () => {
+    const reader = kimiReader();
+    reader.push(
+      "error: failed to run prompt: provider.auth_error: 403 You've reached your 5-hour usage limit. Your quota will reset when the current 5-hour window ends.",
+      'stderr',
+    );
+    expect(reader.report().usageLimitReached).toBe(true);
+  });
+
+  it('não marca o limite em erro de autenticação sem cota', () => {
+    const reader = kimiReader();
+    reader.push('error: provider.auth_error: 401 invalid token', 'stderr');
+    expect(reader.report().usageLimitReached).toBe(false);
+  });
 });

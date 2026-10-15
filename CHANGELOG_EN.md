@@ -5,6 +5,10 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **Kimi Code usage limit no longer blocks the card (#570).** The CLI quota error (`provider.auth_error` 403 "usage limit") is now recognized: the card goes back to the AI, as it already did with Claude Code, instead of staying blocked.
+
 ## 0.45.0
 
 - **Resuming autonomous mode in a window that does not own the board now warns.** When the folder's board is served elsewhere (another editor window or the `faz-ai` command in a terminal), the resume button seemed to do nothing. It now shows a warning saying where autonomous mode runs, and the activity bar keeps the reason.
