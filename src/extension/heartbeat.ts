@@ -12,6 +12,8 @@ import { autopilotStep } from './autopilot';
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
 export interface HeartbeatRunner {
   readonly running: string[];
+  /** a última execução terminou por limite de uso do plano */
+  readonly usageLimited?: boolean;
   start(cardId: string, origin?: AiRunOrigin): void;
   stop(cardId: string): void;
   onDidFinish(listener: (cardId: string) => void): void;
@@ -108,6 +110,12 @@ export class Heartbeat {
     this.lastRoundAt = deps.now();
     runner.onDidFinish((cardId) => {
       this.yieldToAutopilot = !this.isAutopilotRun(cardId);
+      // limite de uso esgotado: as demais histórias da fila falhariam do mesmo jeito; fica para a próxima rodada
+      if (this.runner.usageLimited && this.queue.length) {
+        this.deps.log(`Heartbeat: limite de uso da ferramenta esgotado; ${this.queue.length} história(s) ficam para a próxima rodada.`);
+        this.queue = [];
+        return this.changed();
+      }
       this.pump();
     });
   }
@@ -214,6 +222,12 @@ export class Heartbeat {
       try {
         this.runner.start(id, 'heartbeat');
         counts[kind]++;
+        // o limite de uso esgotou na última execução: só uma de teste, as outras esperam o resultado dela
+        if (this.runner.usageLimited) {
+          const left = this.queue.slice(this.queue.indexOf(id) + 1);
+          rest.push(...left);
+          break;
+        }
       } catch (e) {
         this.deps.log(`Heartbeat: ${e instanceof Error ? e.message : String(e)}`);
         // sem como executar a ferramenta, não adianta tentar as demais

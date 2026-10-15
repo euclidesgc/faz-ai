@@ -8,6 +8,7 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 ## Unreleased
 
 - **Heartbeat says why it did not run (#551).** When a round starts nothing, the log (Output → Faz AI) gives the reason: expired login, story in autonomous mode, an execution already running, story with the person and no pending message, or waiting for another card. Before, it always said "nothing pending with the AI".
+- **Usage limit no longer blocks the card (#551).** When the tool's plan hits its limit (renews every 5 h), the card goes back to the AI with a note in the conversation, and the heartbeat tries one story per round until the limit is back, instead of blocking everything.
 
 ## 0.44.0
 

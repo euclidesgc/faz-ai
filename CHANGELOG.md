@@ -7,6 +7,7 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 ## Não lançado
 
 - **Heartbeat diz por que não executou (#551).** Quando uma rodada não inicia nada, o log (Saída → Faz AI) traz o motivo: login vencido, história em modo autônomo, execução já em andamento, história com a pessoa sem mensagem pendente ou à espera de outro card. Antes aparecia sempre "nada pendente com a IA".
+- **Limite de uso esgotado não bloqueia mais o card (#551).** Quando o plano da ferramenta atinge o limite (renova a cada 5 h), o card volta para a IA com um aviso na conversa, e o heartbeat testa uma história por rodada até o limite voltar, sem bloquear tudo.
 
 ## 0.44.0
 
