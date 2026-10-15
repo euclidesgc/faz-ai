@@ -11,6 +11,8 @@ vi.hoisted(() => {
 
 import { choose, lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { GitSettings } from '../../src/webview/components/settings/GitSettings';
+import { BranchRenameDialog } from '../../src/webview/components/BranchRenameDialog';
+import type { BranchRenamePending, RenameOutcome } from '../../src/shared/branchRename';
 import { WORKSPACE_MODES } from '../../src/shared/git';
 import type { MainBranch } from '../../src/shared/git';
 import { useBoardStore } from '../../src/webview/store/boardStore';
@@ -226,5 +228,128 @@ describe('GitSettings', () => {
       await userEvent.click(screen.getByRole('combobox', { name: 'Tipo de branch de História' }));
       expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['Feature', 'Bugfix', 'Hotfix']);
     });
+  });
+});
+
+describe('BranchRenameDialog (navegador)', () => {
+  const pending: BranchRenamePending = { kind: 'main', from: 'master', to: 'main', previous: '' };
+  const outcome = (o: Partial<RenameOutcome>): RenameOutcome => ({
+    status: 'done',
+    request: { kind: 'main', from: 'master', to: 'main' },
+    done: [],
+    commands: [],
+    otherClones: [],
+    ...o,
+  });
+  const setRename = (branchRenames: BranchRenamePending[], branchRenameResult: RenameOutcome | null = null) =>
+    useBoardStore.setState({ state: { ...board.router.snapshot(), branchRenames, branchRenameResult } });
+  const open = () =>
+    render(
+      <Theme>
+        <BranchRenameDialog />
+      </Theme>,
+    );
+  const dialog = () => screen.getByRole('dialog', { name: 'Renomear a branch principal?' });
+  afterEach(() => setRename([]));
+
+  it('sem pedido guardado, nada aparece', () => {
+    setRename([]);
+    open();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('com o pedido, abre com Renomear e Desfazer e a explicação do que muda e do que não muda', () => {
+    setRename([pending]);
+    open();
+    const d = dialog();
+    expect(d).toHaveAttribute('aria-modal', 'true');
+    expect(within(d).getByRole('button', { name: 'Renomear' })).toHaveFocus();
+    expect(within(d).getByRole('button', { name: 'Desfazer' })).toBeInTheDocument();
+    expect(d).toHaveTextContent('origin/HEAD');
+    expect(d).toHaveTextContent('workflows de CI');
+  });
+
+  it('a develop tem o próprio título e não fala do origin/HEAD', () => {
+    setRename([{ kind: 'develop', from: 'develop', to: 'dev', previous: '' }]);
+    open();
+    const d = screen.getByRole('dialog', { name: 'Renomear a develop?' });
+    expect(d).not.toHaveTextContent('origin/HEAD para a nova');
+  });
+
+  it('fechar e Esc não enviam nada e o aviso não volta na sessão', async () => {
+    setRename([pending]);
+    const first = open();
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Fechar' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(sentOf('git.rename.resolve')).toHaveLength(0);
+    first.unmount();
+    open();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(sentOf('git.rename.resolve')).toHaveLength(0);
+  });
+
+  it('Renomear e Desfazer enviam a resposta do pedido que a pessoa viu', async () => {
+    setRename([pending]);
+    const first = open();
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Renomear' }));
+    expect(lastSent('git.rename.resolve')).toEqual({
+      type: 'git.rename.resolve',
+      kind: 'main',
+      from: 'master',
+      to: 'main',
+      action: 'confirm',
+    });
+    first.unmount();
+    open();
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Desfazer' }));
+    expect(lastSent('git.rename.resolve').action).toBe('undo');
+  });
+
+  it('o resultado de sucesso mostra os passos feitos e os comandos dos outros clones, que copiam', async () => {
+    const user = userEvent.setup();
+    const write = vi.spyOn(navigator.clipboard, 'writeText');
+    setRename([], outcome({ status: 'done', done: ['remote', 'local'], otherClones: ['git branch -m master main'] }));
+    open();
+    const d = screen.getByRole('dialog', { name: 'Resultado da renomeação' });
+    expect(d).toHaveTextContent('agora se chama');
+    expect(d).toHaveTextContent('renomear no GitHub, renomear a branch local');
+    await user.click(within(d).getByRole('button', { name: 'Copiar comando' }));
+    expect(write).toHaveBeenCalledWith('git branch -m master main');
+  });
+
+  it('a falha parcial mostra o passo, o erro, o que falta e deixa Renomear de novo', async () => {
+    setRename(
+      [pending],
+      outcome({
+        status: 'failed',
+        done: ['fetch'],
+        failed: { step: 'remote', error: 'HTTP 403' },
+        commands: ['git push -u origin main'],
+      }),
+    );
+    open();
+    const d = screen.getByRole('dialog', { name: 'Resultado da renomeação' });
+    expect(within(d).getByRole('alert')).toHaveTextContent('"renomear no GitHub": HTTP 403');
+    expect(d).toHaveTextContent('Já feito: atualizar as referências do origin.');
+    expect(d).toHaveTextContent('O que falta, neste clone:');
+    expect(d).toHaveTextContent('git push -u origin main');
+    await userEvent.click(within(d).getByRole('button', { name: 'Renomear de novo' }));
+    expect(lastSent('git.rename.resolve').action).toBe('confirm');
+  });
+
+  it('só comandos (sem o gh): lista a ordem pronta e dispensa o resultado ao fechar', async () => {
+    setRename(
+      [pending],
+      outcome({ status: 'manual', reason: 'o gh não está instalado', commands: ['git branch -m master main', 'git push -u origin main'] }),
+    );
+    open();
+    const d = screen.getByRole('dialog', { name: 'Resultado da renomeação' });
+    expect(d).toHaveTextContent('o gh não está instalado');
+    expect(d).toHaveTextContent('git branch -m master main');
+    expect(within(d).queryByRole('button', { name: 'Renomear de novo' })).toBeNull();
+    await userEvent.click(within(d).getByRole('button', { name: 'Fechar' }));
+    expect(lastSent('git.rename.resolve')).toMatchObject({ action: 'dismiss' });
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

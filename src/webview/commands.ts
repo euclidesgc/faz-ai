@@ -1,4 +1,5 @@
 import type { WebviewToHost } from '../shared/messages';
+import type { BranchRenamePending } from '../shared/branchRename';
 import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from '../shared/harness';
 import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
 import type { AgentInput } from '../shared/messages';
@@ -124,6 +125,12 @@ export const attachments = {
   delete: (attachmentId: Id) => post({ type: 'attachment.delete', attachmentId }),
   /** pede ao host para abrir o diálogo nativo de "salvar como" (só faz sentido fora da web) */
   saveAs: (attachmentId: Id) => post({ type: 'attachment.saveAs', attachmentId }),
+};
+
+/** Renomear a principal ou a develop também no origin (#466): as três respostas do aviso. Renomear chama o git e o gh, então espera mais. */
+export const gitRename = {
+  resolve: (p: Pick<BranchRenamePending, 'kind' | 'from' | 'to'>, action: 'confirm' | 'undo' | 'dismiss') =>
+    request({ type: 'git.rename.resolve', kind: p.kind, from: p.from, to: p.to, action }, { timeout: 120_000 }),
 };
 
 export const settings = {
