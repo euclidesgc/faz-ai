@@ -82,6 +82,10 @@ const bridgeOnly = {
   'harness.suggest.clear': viaBridge,
   'ui.showChat': viaBridge,
   'requirements.check': viaBridge,
+  // a limpeza das órfãs é ligada ao host nas partes seguintes (#489, #492): até lá, nada responde a elas
+  'git.orphans.scan': viaBridge,
+  'git.orphans.clean': viaBridge,
+  'git.orphans.cleanSafe': viaBridge,
   'environment.check': viaBridge,
   'environment.seen': viaBridge,
   'environment.pinMcp': viaBridge,

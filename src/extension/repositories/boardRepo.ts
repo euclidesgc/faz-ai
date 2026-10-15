@@ -1,4 +1,5 @@
 import { EMPTY_CHAT } from '../../shared/chat';
+import { EMPTY_ORPHANS } from '../../shared/orphans';
 import type { Database } from 'sql.js';
 import type {
   Attachment,
@@ -468,6 +469,7 @@ export class BoardRepo {
       requirements: [],
       requirementsCheckedAt: 0,
       authExpired: null,
+      orphans: EMPTY_ORPHANS,
       environment: null,
       environmentFirstRun: false,
       harnessInstall: null,

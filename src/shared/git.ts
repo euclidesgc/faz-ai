@@ -173,3 +173,43 @@ export function branchName(pattern: string, card: { type: string; number: number
     .replace(/\/{2,}/g, '/')
     .replace(/^[/.-]+|[/.-]+$/g, '');
 }
+
+/** nomes que nunca são órfãs, qualquer que seja a configuração: a principal e a develop mais comuns (#465) */
+export const PROTECTED_BRANCH = /^(main|master|develop)$/;
+
+const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * O inverso de `branchName`: um reconhecedor do padrão de branch. Devolve o número do card que o nome
+ * traz, ou null quando o nome não casa com o padrão. `{fluxo}` aceita qualquer prefixo (`feature/`,
+ * `feat-`, `<tipo>/`), o mais curto que deixa o resto casar; o número é o primeiro `{numero}`.
+ */
+export function branchMatcher(pattern: string): (branch: string) => number | null {
+  let numbered = false;
+  const source = pattern
+    .split(/(\{fluxo\}|\{tipo\}|\{numero\}|\{titulo\})/)
+    .map((part) => {
+      switch (part) {
+        case '{fluxo}':
+          return '[A-Za-z0-9._/-]*?';
+        case '{tipo}':
+          return '[a-z0-9-]+';
+        case '{numero}':
+          if (numbered) return '\\1';
+          numbered = true;
+          return '(\\d+)';
+        case '{titulo}':
+          return '[A-Za-z0-9._/-]*';
+        default:
+          return escapeRe(part);
+      }
+    })
+    .join('');
+  // sem {numero} não há como saber o dono: nada casa (parseGit já impede esse padrão)
+  if (!numbered) return () => null;
+  const re = new RegExp(`^${source}$`);
+  return (branch) => {
+    const n = Number(re.exec(branch)?.[1]);
+    return Number.isInteger(n) && n > 0 ? n : null;
+  };
+}
