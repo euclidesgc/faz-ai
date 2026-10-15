@@ -58,6 +58,18 @@ partes; cada PR traz só o que é dele.
 - **Volta da principal sempre por PR com merge commit (#480).** Depois do hotfix o board abre e
   mescla `main → develop` por PR, nunca por push direto. Em conflito, o PR fica aberto e a conversa
   avisa.
+- **Release no gitflow (#481).** `release.mjs` decide pela branch atual por funções puras em
+  `scripts/releaseFlow.mjs` (`releaseSource`, `wrongBranchMessage`, `finishPlan`): na `develop` cria
+  `release/vX.Y.Z`; na `hotfix/...` faz o commit da versão na própria branch e reaproveita o PR
+  aberto; outra branch é recusada e a opção `--allow-branch` sai. O PR para a principal usa
+  `--merge`, sem `--delete-branch`. A tag e a GitHub Release saem sobre `origin/main`, sem
+  `git switch main`. A principal volta para a `develop` por PR com merge commit; em conflito o
+  script falha com a instrução de resolver o PR e rodar `finish`. O `finish` é retomável: cada passo
+  confere o estado (PR, tag, release, principal contida na `develop`, branch local e remota).
+  Um teste em `test/release.test.ts` cobre o squash na `develop`, a release mesclada na principal
+  com `--no-ff` e a `publishedVersion` achando a tag.
+- **Aviso do hotfix no README, não no CHANGELOG.** Rodar `npm run release` na worktree da `hotfix/`
+  antes de aprovar o card é instrução de desenvolvimento e fica em "Desenvolvimento" do README.
 - **Avisos em pt e en**, conforme o idioma do board, num único comentário por conclusão.
 - **Sem migração de banco**: a troca da base usa a coluna `base_branch` que já existe, e o resultado
   da limpeza só vira comentário.
