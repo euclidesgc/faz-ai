@@ -169,6 +169,14 @@ const gitDevelopBranchKey: SyncedKey<string> = {
   defaultValue: DEFAULT_GIT.developBranch,
 };
 
+/** A principal fixada pela pessoa ('' = detectada): o nome novo dispara a renomeação no repositório (#466). */
+const gitMainBranchKey: SyncedKey<string> = {
+  key: 'git.mainBranch',
+  fromBoard: (board) => board.git.mainBranch,
+  toBoardPatch: (value) => ({ git: { mainBranch: value } }),
+  isValid: isString,
+  defaultValue: DEFAULT_GIT.mainBranch,
+};
 const gitFeaturePrefixKey: SyncedKey<string> = {
   key: 'git.featurePrefix',
   fromBoard: (board) => board.git.featurePrefix,
@@ -212,7 +220,7 @@ export const GIT_KEYS: SyncedKey<unknown>[] = [
   gitMergeMethodKey,
 ] as SyncedKey<unknown>[];
 
-/** Chaves ligadas ao board: idioma, tema, fonte, tamanho da fonte, as sete de Git/paralelo, os registros de decisão e as seis do gitflow. */
+/** Chaves ligadas ao board: idioma, tema, fonte, tamanho da fonte, as sete de Git/paralelo, os registros de decisão e as sete do gitflow. */
 export const SYNCED_KEYS: SyncedKey<unknown>[] = [
   languageKey,
   themeKey,
@@ -221,6 +229,7 @@ export const SYNCED_KEYS: SyncedKey<unknown>[] = [
   ...GIT_KEYS,
   gitDecisionRecordsKey,
   gitGitflowKey,
+  gitMainBranchKey,
   gitDevelopBranchKey,
   gitFeaturePrefixKey,
   gitBugfixPrefixKey,
@@ -272,6 +281,8 @@ export class IdeSettings {
     private readonly api: IdeSettingsApi,
     private readonly folderUri?: unknown,
     private readonly log: (line: string) => void = () => {},
+    /** mostra uma recusa do board à pessoa (no editor, um aviso) */
+    private readonly notify: (message: string) => void = () => {},
   ) {}
 
   /** Valor efetivo: pasta > workspace > usuário > default. */
@@ -403,6 +414,16 @@ export class IdeSettings {
     this.receiving = synced.key;
     try {
       router.handle({ type: 'settings.board.update', patch: synced.toBoardPatch(value) });
+    } catch (e) {
+      // o board recusou (ex.: renomear a branch com a IA executando): a configuração volta ao que o
+      // board tem e a pessoa lê o motivo
+      const reason = e instanceof Error ? e.message : String(e);
+      this.log(`Faz AI: ${SECTION}.${synced.key} não foi aplicada: ${reason}`);
+      this.notify(reason);
+      this.lastWritten.delete(synced.key);
+      this.receiving = undefined;
+      this.copyToSettings(synced, synced.fromBoard(router.snapshot().board));
+      return;
     } finally {
       this.receiving = undefined;
     }

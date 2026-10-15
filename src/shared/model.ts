@@ -13,6 +13,7 @@ import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { AiRunOrigin } from './log';
 import type { BranchKind, GitConfig, MainBranch } from './git';
+import type { BranchRenamePending, RenameOutcome } from './branchRename';
 
 export type Id = string;
 
@@ -294,4 +295,8 @@ export interface BoardState {
   harnessSuggestions: HarnessSuggestions | null;
   /** branch principal detectada no repositório do projeto; null fora de um repositório git */
   mainBranch: MainBranch | null;
+  /** mudanças de nome da principal ou da develop à espera de Renomear ou Desfazer (#466) */
+  branchRenames: BranchRenamePending[];
+  /** o resultado da última renomeação, até ser dispensado; null sem resultado */
+  branchRenameResult: RenameOutcome | null;
 }

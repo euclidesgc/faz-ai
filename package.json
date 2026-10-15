@@ -251,25 +251,32 @@
             "order": 7,
             "markdownDescription": "%config.git.releasePrefix%"
           },
+          "fazai.git.mainBranch": {
+            "type": "string",
+            "default": "",
+            "scope": "resource",
+            "order": 8,
+            "markdownDescription": "%config.git.mainBranch%"
+          },
           "fazai.git.branchPattern": {
             "type": "string",
             "default": "{fluxo}{numero}-{titulo}",
             "scope": "resource",
-            "order": 8,
+            "order": 9,
             "markdownDescription": "%config.git.branchPattern%"
           },
           "fazai.git.worktreeDir": {
             "type": "string",
             "default": "../{repo}.worktrees",
             "scope": "resource",
-            "order": 9,
+            "order": 10,
             "markdownDescription": "%config.git.worktreeDir%"
           },
           "fazai.git.parallel": {
             "type": "boolean",
             "default": false,
             "scope": "resource",
-            "order": 10,
+            "order": 11,
             "markdownDescription": "%config.git.parallel%"
           },
           "fazai.git.parallelStories": {
@@ -278,14 +285,14 @@
             "maximum": 6,
             "default": 2,
             "scope": "resource",
-            "order": 11,
+            "order": 12,
             "markdownDescription": "%config.git.parallelStories%"
           },
           "fazai.git.autoMerge": {
             "type": "boolean",
             "default": false,
             "scope": "resource",
-            "order": 12,
+            "order": 13,
             "markdownDescription": "%config.git.autoMerge%"
           },
           "fazai.git.mergeMethod": {
@@ -302,14 +309,14 @@
             ],
             "default": "squash",
             "scope": "resource",
-            "order": 13,
+            "order": 14,
             "markdownDescription": "%config.git.mergeMethod%"
           },
           "fazai.git.decisionRecords": {
             "type": "string",
             "default": "",
             "scope": "resource",
-            "order": 14,
+            "order": 15,
             "markdownDescription": "%config.git.decisionRecords%"
           }
         }

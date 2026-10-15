@@ -149,6 +149,8 @@ describe('suggestModelRule e suggestModel', () => {
     authExpired: null,
     orphans: { items: [], failed: {}, scannedAt: null },
     mainBranch: null,
+    branchRenames: [],
+    branchRenameResult: null,
   });
 
   const rule = (over: Partial<ModelRule> = {}): ModelRule => ({
