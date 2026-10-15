@@ -383,6 +383,14 @@ export const settings: Record<string, string> = {
   'Abre o formulário de um modelo novo.': 'Opens the form for a new model.',
   'O board não tem o campo "{field}".': 'The board has no "{field}" field.',
 
+  // renomeação da principal e da develop (#498)
+  'Branch principal': 'Main branch',
+  detectada: 'detected',
+  'Vazio = a detectada (<code>main</code>, <code>master</code>...). Mudar o nome de uma branch que já existe pede a sua confirmação para renomeá-la também no <code>origin</code>.':
+    'Empty = the detected one (<code>main</code>, <code>master</code>...). Changing the name of a branch that already exists asks for your confirmation to rename it on <code>origin</code> too.',
+  'Renomear a principal ou a develop': 'Rename the main or develop branch',
+  '<b>Ao mudar o nome da principal ou da develop</b>, o board pergunta Renomear ou Desfazer. Renomear muda a branch no GitHub (com o <code>gh</code>), no clone local, o upstream e, na principal, o <code>origin/HEAD</code>. <b>Não muda:</b> workflows de CI, regras de proteção, a branch padrão do GitHub (na develop) e os clones de outras pessoas; os comandos deles aparecem depois.':
+    "<b>When you change the main or develop branch name</b>, the board asks Rename or Undo. Rename changes the branch on GitHub (with <code>gh</code>), in the local clone, the upstream and, for main, <code>origin/HEAD</code>. <b>Does not change:</b> CI workflows, protection rules, the GitHub default branch (for develop) and other people's clones; their commands show up afterwards.",
   // gitflow (#462)
   'Com o gitflow, funcionalidades e correções partem da branch de integração (develop) e voltam para ela; só o hotfix parte da principal. O prefixo da branch mostra o tipo de trabalho.':
     'With gitflow, features and fixes start from the integration branch (develop) and go back to it; only the hotfix starts from the main branch. The branch prefix shows the kind of work.',

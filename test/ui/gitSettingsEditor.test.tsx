@@ -29,6 +29,9 @@ describe('GitSettings dentro do editor', () => {
     expect(screen.queryByRole('textbox', { name: 'Nome da branch' })).toBeNull();
     expect(screen.queryByRole('switch', { name: 'Usar o gitflow' })).toBeNull();
     expect(screen.queryByLabelText('Prefixo de feature')).toBeNull();
+    // a principal e a explicação da renomeação são do navegador: no editor, o Settings é a fonte
+    expect(screen.queryByLabelText('Branch principal')).toBeNull();
+    expect(screen.queryByRole('note', { name: 'Renomear a principal ou a develop' })).toBeNull();
   });
 
   it('mostra a explicação, a tabela e a principal', () => {

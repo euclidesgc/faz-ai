@@ -75,6 +75,25 @@ describe('GitSettings', () => {
     expect(lastSent('settings.board.update').patch).toEqual({ git: { branchPattern: 'feat/{numero}' } });
   });
 
+  it('a branch principal grava ao sair do campo e a explicação da renomeação aparece', async () => {
+    show();
+    const main = screen.getByLabelText('Branch principal');
+    expect(main).toHaveAttribute('placeholder', 'detectada');
+    await userEvent.type(main, 'trunk');
+    expect(sentOf('settings.board.update')).toHaveLength(0);
+    await userEvent.tab();
+    expect(lastSent('settings.board.update').patch).toEqual({ git: { mainBranch: 'trunk' } });
+    const note = screen.getByRole('note', { name: 'Renomear a principal ou a develop' });
+    expect(note).toHaveTextContent('Renomear ou Desfazer');
+    expect(note).toHaveTextContent('origin/HEAD');
+    expect(note).toHaveTextContent('workflows de CI');
+    // a develop já tem o campo na seção Gitflow, e grava no blur do mesmo jeito
+    await userEvent.clear(screen.getByLabelText('Branch de integração'));
+    await userEvent.type(screen.getByLabelText('Branch de integração'), 'dev');
+    await userEvent.tab();
+    expect(lastSent('settings.board.update').patch).toEqual({ git: { developBranch: 'dev' } });
+  });
+
   it('o merge automático liga com aviso, e só então o tipo de merge fica disponível', async () => {
     show();
     const method = screen.getByRole('combobox', { name: 'Tipo de merge' });
