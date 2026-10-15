@@ -10,6 +10,7 @@ function probe(o: {
   files?: Record<string, string>;
   requirements?: BoardRequirement[];
   skillInstalled?: boolean;
+  harnessIssues?: EnvironmentProbe['harnessIssues'];
   tool?: EnvironmentProbe['tool'];
   others?: OtherToolProbe[];
   crgMcp?: boolean;
@@ -24,6 +25,7 @@ function probe(o: {
     requirements: o.requirements ?? [],
     workspaceDir: '/proj',
     skillInstalled: o.skillInstalled ?? false,
+    harnessIssues: o.harnessIssues === undefined ? [] : o.harnessIssues,
     others: o.others ?? [],
     crgMcp: o.crgMcp ?? false,
     platform: o.platform ?? 'linux',
@@ -69,6 +71,18 @@ describe('Diagnóstico do ambiente', () => {
           ['cli', 'missing', [['signin', 'skipped']]],
           ['mcp', 'ok'],
           ['skill', 'missing'],
+          // o harness depende da CLI: sem ela, nem ele nem o que falta nele dá para conferir
+          [
+            'harness',
+            'skipped',
+            [
+              ['harness-artifacts', 'skipped'],
+              ['harness-agents', 'skipped'],
+              ['harness-rules', 'skipped'],
+              ['harness-missing', 'skipped'],
+              ['harness-cursor', 'skipped'],
+            ],
+          ],
           ['permission', 'ok'],
         ],
       ],

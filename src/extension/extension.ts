@@ -146,6 +146,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // só a janela que serve o board desta pasta (dona do servidor MCP) roda o heartbeat, para duas janelas não chamarem a IA em dobro
       heartbeatTimer = setInterval(() => {
         if (stopMcp) {
+          host?.sweepStaleRuns();
           heartbeat?.tick();
         }
       }, 60_000);

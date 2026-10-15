@@ -8,7 +8,9 @@ import { frontmatterOf, frontmatterValue } from './frontmatter';
  * Code e Cursor). As chaves `description`, `tools`, `disallowedTools`, `model` e `skills` são as que a
  * própria ferramenta entende; o board guarda o que é só dele em chaves `faz-ai-*`, planas, que as
  * ferramentas ignoram: `faz-ai-model` (o valor do campo Modelo, com esforço), `faz-ai-mcp` (servidores
- * além do do board) e `faz-ai-seed` (criado de fábrica).
+ * além do do board) e `faz-ai-seed` (criado de fábrica). O Cursor guarda `readonly` e `is_background`
+ * (cursor.com/docs/context/subagents, lida em 2026-10-14); ele não tem lista de ferramentas, skills nem MCP por
+ * subagente, e essas chaves só são lidas e gravadas na pasta dele.
  */
 
 const list = (raw: string | undefined): string[] =>
@@ -44,6 +46,8 @@ function frontmatterList(fm: string, key: string): string[] {
 const readsBoardTools = (spec: AgentSpec): boolean => spec.dir.startsWith('.claude/') || spec.dir.startsWith('.kimi-code/');
 
 /** O `model` nativo que vai no frontmatter: o id do modelo, sem a ferramenta nem o esforço (`claude:sonnet@medium` → `sonnet`). */
+const isCursor = (spec: AgentSpec): boolean => spec.dir.startsWith('.cursor/');
+
 export const nativeModelOf = (modelValue: string): string => modelValue.replace(/@.*$/, '').replace(/^[^:]+:/, '');
 
 /** O arquivo de agente tem lista de ferramentas sem as do servidor do board: foi gravado antes desta regra. */
@@ -52,7 +56,7 @@ export const lacksBoardTools = (spec: AgentSpec, a: Agent): boolean =>
 
 /** Lê um arquivo de agente. `scope`, `path` e `location` vêm de quem o encontrou. */
 export function parseAgentFile(
-  _spec: AgentSpec,
+  spec: AgentSpec,
   found: { name: string; scope: 'project' | 'user'; path: string; location: string },
   content: string,
 ): Agent {
@@ -70,6 +74,8 @@ export function parseAgentFile(
     skills: frontmatterList(fm, 'skills'),
     mcp: frontmatterList(fm, 'faz-ai-mcp'),
     seed: frontmatterValue(fm, 'faz-ai-seed') === 'true',
+    readonly: isCursor(spec) && frontmatterValue(fm, 'readonly') === 'true',
+    background: isCursor(spec) && frontmatterValue(fm, 'is_background') === 'true',
   };
 }
 
@@ -89,6 +95,8 @@ export function renderAgentFile(spec: AgentSpec, input: AgentInput, seed = false
     ...(tools.length ? [`tools: ${tools.join(', ')}`] : []),
     ...(input.deniedTools.length ? [`disallowedTools: ${input.deniedTools.join(', ')}`] : []),
     ...(native ? [`model: ${native}`] : []),
+    ...(isCursor(spec) && input.readonly ? ['readonly: true'] : []),
+    ...(isCursor(spec) && input.background ? ['is_background: true'] : []),
     ...(input.skills.length ? [`skills: ${input.skills.join(', ')}`] : []),
     ...(input.model.trim() ? [`faz-ai-model: ${JSON.stringify(input.model.trim())}`] : []),
     ...(input.mcp.length ? [`faz-ai-mcp: ${input.mcp.join(', ')}`] : []),
@@ -107,4 +115,6 @@ export const agentInputOf = (a: Agent): AgentInput => ({
   deniedTools: a.deniedTools,
   skills: a.skills,
   mcp: a.mcp,
+  ...(a.readonly ? { readonly: true } : {}),
+  ...(a.background ? { background: true } : {}),
 });

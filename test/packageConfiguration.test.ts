@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { LANGUAGES } from '../src/shared/language';
 import { FONTS, FONT_SIZE_RANGE, THEMES } from '../src/shared/appearance';
+import { DEFAULT_GIT } from '../src/shared/git';
 
 const read = (f: string) => JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8'));
 const pkg = read('package.json');
@@ -72,6 +73,46 @@ describe('contributes.configuration', () => {
     expect(p.scope).toBe('application');
     expect(p.markdownDescription).toBeTruthy();
     nls(String(p.markdownDescription));
+  });
+
+  it('gitflow: as seis chaves novas vêm logo depois de fazai.git.mode, com os padrões de DEFAULT_GIT e escopo resource', () => {
+    const props = sections[2]!.properties;
+    const keys = Object.keys(props);
+    const novas = ['gitflow', 'developBranch', 'featurePrefix', 'bugfixPrefix', 'hotfixPrefix', 'releasePrefix'] as const;
+    expect(keys.slice(keys.indexOf('fazai.git.mode') + 1, keys.indexOf('fazai.git.mode') + 1 + novas.length)).toEqual(
+      novas.map((n) => `fazai.git.${n}`),
+    );
+    for (const n of novas) {
+      const p = props[`fazai.git.${n}`]!;
+      expect(p.type, n).toBe(n === 'gitflow' ? 'boolean' : 'string');
+      expect(p.default, n).toBe(DEFAULT_GIT[n]);
+      expect(p.scope, n).toBe('resource');
+      nls(String(p.markdownDescription));
+    }
+    expect(props['fazai.git.gitflow']!.default).toBe(true);
+  });
+  it('git: a ordem das chaves é crescente e sem repetição', () => {
+    const orders = Object.values(sections[2]!.properties).map((p) => p.order as number);
+    expect(orders).toEqual([...orders].sort((a, b) => a - b));
+    expect(new Set(orders).size).toBe(orders.length);
+  });
+  it('fazai.git.branchPattern: o padrão é o de DEFAULT_GIT e a descrição cita {fluxo}, nas duas línguas', () => {
+    expect(sections[2]!.properties['fazai.git.branchPattern']!.default).toBe(DEFAULT_GIT.branchPattern);
+    expect(DEFAULT_GIT.branchPattern).toBe('{fluxo}{numero}-{titulo}');
+    expect(en['config.git.branchPattern']).toContain('{fluxo}');
+    expect(pt['config.git.branchPattern']).toContain('{fluxo}');
+  });
+  it('fazai.git.branchPattern: com o gitflow desligado a descrição diz que {fluxo} vira <tipo>/, como flowPrefix, nas duas línguas', () => {
+    // flowPrefix devolve `<tipo>/` sem gitflow; a descrição não pode prometer `{fluxo}` vazio
+    expect(en['config.git.branchPattern']).toContain('`<type>/`');
+    expect(en['config.git.branchPattern']).not.toMatch(/empty with/i);
+    expect(pt['config.git.branchPattern']).toContain('`<tipo>/`');
+    expect(pt['config.git.branchPattern']).not.toMatch(/vazio com/i);
+  });
+  it('os padrões de fazai.git.* iguais aos de DEFAULT_GIT onde há campo correspondente', () => {
+    const props = sections[2]!.properties;
+    for (const f of ['mode', 'worktreeDir', 'autoMerge', 'mergeMethod', 'decisionRecords'] as const)
+      expect(props[`fazai.git.${f}`]!.default, f).toBe(DEFAULT_GIT[f]);
   });
 
   it('a seção Instalação aponta para o Diagnóstico', () => {

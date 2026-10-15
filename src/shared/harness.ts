@@ -68,16 +68,43 @@ export interface Agent {
   mcp: string[];
   /** criado pelo board como agente padrão de fábrica */
   seed: boolean;
+  /** só no Cursor (`readonly: true` no frontmatter): o agente não edita arquivos nem roda comandos que mudem estado */
+  readonly: boolean;
+  /** só no Cursor (`is_background: true`): o agente roda em segundo plano */
+  background: boolean;
 }
 
 /** Tipos de componente do harness de uma ferramenta, na ordem em que a tela os mostra. */
 export type HarnessKind = 'instructions' | 'memory' | 'skill' | 'agent' | 'command' | 'hook' | 'mcp' | 'plugin' | 'settings';
 
-/** De onde a ferramenta carrega o item: da pasta do projeto, da pasta do usuário (vale para todos os projetos) ou de um plugin. */
-export type HarnessScope = 'project' | 'user' | 'plugin';
+/**
+ * De onde o item vem: da pasta do projeto, da pasta do usuário (vale para todos os projetos), de um
+ * plugin, ou de uma pasta importada (que a ferramenta não carrega sozinha: só o board a conhece).
+ */
+export type HarnessScope = 'project' | 'user' | 'plugin' | 'imported';
+
+/**
+ * O resultado de "Indicar artefatos": os artefatos de um assunto que a IA achou mais úteis para o
+ * projeto, pré-selecionados na tela para a pessoa confirmar. Nada entra no board sem ela.
+ */
+export interface HarnessSuggestions {
+  tool: AiTool;
+  kind: 'instructions' | 'skill' | 'agent' | 'mcp';
+  /** `location` é a identidade do item na marcação (`selectionKey`) */
+  items: { location: string; reason: string }[];
+  /** a IA não respondeu no formato esperado, ou a execução falhou */
+  error?: string;
+}
+
+/** Uma pasta importada: o board a varre atrás de artefatos no formato da ferramenta e os oferece ao board. */
+export interface HarnessImport {
+  tool: AiTool;
+  /** caminho absoluto da pasta */
+  dir: string;
+}
 
 /** Onde o board instala o servidor MCP e a skill do fluxo: global (`user`, o padrão) ou só neste projeto. */
-export type InstallScope = Exclude<HarnessScope, 'plugin'>;
+export type InstallScope = 'project' | 'user';
 
 export const HARNESS_KINDS: { id: HarnessKind; label: string; hint: string }[] = [
   {
@@ -113,6 +140,12 @@ export const HARNESS_SCOPES: { id: HarnessScope; label: string; hint: string; su
     label: 'Plugins',
     hint: 'Vêm de plugins instalados ou da própria ferramenta; não são editáveis.',
     summary: 'Vêm de plugins e não podem ser alterados, só copiados.',
+  },
+  {
+    id: 'imported',
+    label: 'Importados',
+    hint: 'Encontrados nas pastas que você importou; a ferramenta não os carrega sozinha.',
+    summary: 'De pastas importadas: só entram nas execuções quando enviados ao board.',
   },
 ];
 

@@ -14,10 +14,11 @@ import { registerClients, removeProjectServer } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
-import { removeWorktree } from '../git';
+import { detectMainBranch, removeWorktree } from '../git';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
+import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
 import { claudeSignedIn, cursorModels, cursorSignedIn, kimiModels, kimiSignedIn, runCli } from '../cliProbe';
 import { aiToolInfo, ALL_AI_TOOLS, type AiTool, type InstallScope } from '../../shared/harness';
 import { allowKimiMcp, checkRequirements, registeredServer } from '../requirements';
@@ -27,6 +28,7 @@ import { checkEnvironment, linuxFamily, type OtherToolProbe } from '../environme
 import { editorMcpFiles, pinEditorCommands, registeredIn } from '../mcp/pinCommands';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { selectedItems } from '../../shared/harnessSelection';
+import { harnessIssues } from '../../shared/harnessStatus';
 import { resolveCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { cleanStaleTemp } from '../aiOutput/measured';
@@ -72,6 +74,11 @@ export interface BoardHost {
   chat: ChatSession;
   /** toca sozinho as histórias em modo autônomo (YOLO) */
   autopilot: Autopilot;
+  /**
+   * Devolve para a IA os cards presos em "Em execução" sem nenhuma execução em curso (a sessão que os
+   * marcou acabou sem passar a vez). Chamada a cada minuto pela janela dona do board.
+   */
+  sweepStaleRuns(): void;
   /**
    * Registra o servidor MCP do board numa ferramenta de IA (padrão: a do projeto) e devolve o resumo do
    * que foi feito. `user` (o padrão) instala na configuração global da ferramenta; `project`, só aqui.
@@ -140,7 +147,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       o.log(`Não foi possível ${what} ao abrir o board: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
-  if (ownsBoard) maintain('fechar as execuções de IA que ficaram abertas', () => runLog.closeOpen(Date.now()));
+  // os cards dessas execuções ficaram "Em execução" sem execução: voltam para a IA na hora
+  if (ownsBoard)
+    maintain('fechar as execuções de IA que ficaram abertas', () => recoverAfterRestart(router, runLog.closeOpen(Date.now()), o.log));
   // a retenção: fora da janela, o detalhe do mês vira total em `log_months`. Roda aqui, na abertura,
   // no máximo uma vez por dia — nunca durante uma mutação do board, para não entrar no custo de uma
   // operação comum da pessoa mesmo que fique lenta.
@@ -201,11 +210,15 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     });
   const gh = run('gh');
   const git = run('git');
+  // o `git` e a principal são da limpeza da história depois do merge (#464)
+  const mainBranch = (repo: string) => detectMainBranch(repo)?.name ?? '';
   new AutoMerger(router, {
     cwd: o.folderPath,
     log: o.log,
     gh,
+    git,
     removeWorktree,
+    mainBranch,
   });
   const chat = new ChatSession(router, {
     gateway,
@@ -264,6 +277,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let enableTimer: NodeJS.Timeout | null = null;
   let checkAgain = false;
   let forceSigninCheck = false;
+  /** a última conferência dos requisitos falhou com este erro (null quando deu certo) */
+  let lastCheckError: string | null = null;
+  /** a conferência em curso foi pedida pela tela: o erro volta pelo `done`, não pelo aviso solto */
+  let requestedCheck = false;
   /** o host encerrou: nenhuma conferência nova começa e a que estava em andamento não mexe mais no board */
   let disposed = false;
   const SIGNIN_CACHE_MS = 3 * 60_000;
@@ -282,6 +299,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     signinCache.set(tool, { at: Date.now(), value });
     return value;
   };
+  /** O que falta no banco de artefatos; undefined sem o inventário lido (a pasta do projeto não existe). */
+  const harnessIssuesNow = (): ReturnType<typeof harnessIssues> | undefined => {
+    const s = router.snapshot();
+    return s.harness.inventory.some((t) => t.tool === s.board.aiTool) ? harnessIssues(s) : undefined;
+  };
   const checkNow = (): Promise<void> => {
     if (disposed) return Promise.resolve();
     if (checking) {
@@ -294,6 +316,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     const hadNode = !!nodePath;
     nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
     if (!hadNode && nodePath) pinMcp();
+    lastCheckError = null;
     checking = checkRequirements({
       tool: board.aiTool,
       permission: board.runner.permission,
@@ -307,6 +330,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       windowStartedAt: o.editor?.startedAt,
       editorPath: o.editor ? (process.env.PATH ?? '') : undefined,
       skillInstalled: flowSkillInstalled(),
+      harnessIssues: harnessIssuesNow(),
     })
       .then((list) => {
         // a conferência (com o probe de login, que chama a CLI) pode terminar depois do encerramento
@@ -337,7 +361,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           enableTimer = null;
         }
       })
-      .catch((e) => o.log(`Não foi possível conferir os requisitos do board: ${e instanceof Error ? e.message : String(e)}`))
+      .catch((e) => {
+        lastCheckError = `Não foi possível conferir os requisitos do board: ${e instanceof Error ? e.message : String(e)}`;
+        o.log(lastCheckError);
+        // sem isto a falha ficava só no log e a tela esperava a conferência para sempre
+        if (!requestedCheck) router.reportError(lastCheckError);
+      })
       .finally(() => {
         checking = null;
         forceSigninCheck = false;
@@ -350,11 +379,16 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   // o "Verificar de novo" relê também o PATH do terminal, para achar o que acabou de ser instalado, e
   // pula o cache do login: é o clique da pessoa depois de entrar na conta, não pode esperar o TTL de 3 min
-  router.onRequirementsCheck(() => {
+  router.onRequirementsCheck(async () => {
     forceSigninCheck = true;
-    void loginShellPath(true)
-      .then((fresh) => (pathEnv = fresh ?? pathEnv))
-      .finally(() => void checkNow());
+    requestedCheck = true;
+    try {
+      pathEnv = (await loginShellPath(true)) ?? pathEnv;
+      await checkNow();
+    } finally {
+      requestedCheck = false;
+    }
+    if (lastCheckError) throw new Error(lastCheckError);
   });
   // "Abrir no terminal" do aviso de login: o board só abre o terminal, a pessoa faz o login nele
   router.onOpenTerminal((command) => o.runInTerminal?.('Faz AI: login', command, o.folderPath));
@@ -419,8 +453,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     return out;
   };
   let diagnosing: Promise<void> | null = null;
+  /** o último Diagnóstico falhou com este erro (null quando deu certo) */
+  let lastDiagnoseError: string | null = null;
   const diagnose = () => {
     diagnosing ??= (async () => {
+      lastDiagnoseError = null;
       pathEnv = (await loginShellPath(true)) ?? pathEnv;
       await checkNow();
       const s = router.snapshot();
@@ -440,6 +477,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           requirements: syntheticSignin ? [...s.requirements, syntheticSignin] : s.requirements,
           workspaceDir: o.folderPath,
           skillInstalled,
+          harnessIssues: harnessIssuesNow() ?? null,
           others: await otherTools(tool),
           crgMcp: crgRegistered(tool),
           platform: process.platform,
@@ -459,17 +497,25 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         }),
       );
     })()
-      .catch((e) => o.log(`Não foi possível rodar o Diagnóstico do ambiente: ${e instanceof Error ? e.message : String(e)}`))
+      .catch((e) => {
+        lastDiagnoseError = `Não foi possível rodar o Diagnóstico do ambiente: ${e instanceof Error ? e.message : String(e)}`;
+        o.log(lastDiagnoseError);
+      })
       .finally(() => (diagnosing = null));
+  };
+  /** O Diagnóstico pela tela: a falha volta pelo `done` da mensagem, e a tela sai do "Conferindo…". */
+  const diagnoseForScreen = async () => {
+    await diagnose();
+    if (lastDiagnoseError) throw new Error(lastDiagnoseError);
   };
   // a tela abre sozinha uma vez por máquina (a marca fica na pasta de dados da extensão, fora do board)
   const seenFile = path.join(o.storageDir, 'environment-seen');
   router.onEnvironment(
     {
-      check: () => void diagnose(),
+      check: diagnoseForScreen,
       pinMcp: () => {
         pinMcp();
-        void diagnose();
+        return diagnoseForScreen();
       },
       allowKimiMcp: () => {
         if (allowKimiMcp(homeDir))
@@ -520,7 +566,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     cwd: o.folderPath,
     log: o.log,
     gh,
+    git,
     removeWorktree,
+    mainBranch,
     afterRound: () => releaseWatcher.sweep(),
   });
   const heartbeat = new Heartbeat(runner, {
@@ -536,6 +584,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // router.onDidChange → publishHeartbeat → setHeartbeat → notify
   const publishHeartbeat = () => router.setHeartbeat({ nextRoundAt: heartbeat.nextRoundAt });
   heartbeat.onDidChange(publishHeartbeat);
+  // aprovar uma história chama a IA na hora, respeitando os tetos de paralelismo, com ou sem heartbeat ligado
+  router.onDidApprove((cardId) => {
+    if (!o.ownsBoard || o.ownsBoard()) heartbeat.enqueue(cardId);
+  });
   router.onDidChange(publishHeartbeat);
   publishHeartbeat();
 
@@ -543,6 +595,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const api: BoardHost = {
     router,
     runner,
+    sweepStaleRuns: () => {
+      if (!o.ownsBoard || o.ownsBoard()) sweepStaleRuns(router, runner.running, Date.now(), o.log);
+    },
     heartbeat,
     mergeWatcher,
     chat,

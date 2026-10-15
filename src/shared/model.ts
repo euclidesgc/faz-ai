@@ -3,7 +3,7 @@ import type { EnvironmentReport } from './environment';
 import type { ExecProfile } from './execution';
 import type { ChatState } from './chat';
 import type { McpFootprint } from './contextEstimate';
-import type { AiTool, Harness, InstallPreview } from './harness';
+import type { AiTool, Harness, HarnessImport, HarnessSuggestions, InstallPreview } from './harness';
 import type { HarnessSelection } from './harnessSelection';
 import type { ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
@@ -11,7 +11,7 @@ import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { AiRunOrigin } from './log';
-import type { GitConfig } from './git';
+import type { BranchKind, GitConfig, MainBranch } from './git';
 
 export type Id = string;
 
@@ -86,6 +86,8 @@ export interface CardType {
   defaultWorkflowId: Id;
   /** valores de campos aplicados a cada card novo deste tipo (fieldId → valor) */
   defaults: Record<Id, FieldValue>;
+  /** tipo de branch do gitflow que as histórias deste tipo geram; fica no tipo para renomear não mudar a branch */
+  branchKind: BranchKind;
 }
 
 export interface Card {
@@ -117,7 +119,7 @@ export interface Card {
   branch: string;
   /** pasta em que o código da história é alterado: a worktree, ou a pasta do projeto no modo "branch" */
   worktreePath: string;
-  /** branch de onde a da história partiu, quando não é a principal (histórias empilhadas); vazio = a principal */
+  /** branch de onde a da história partiu (develop, a principal ou a anterior da pilha); vazio = a principal (histórias anteriores ao gitflow) */
   baseBranch: string;
   /** quando a branch da história foi criada (epoch ms em texto); vazio enquanto a branch não existe */
   branchCreatedAt: string;
@@ -253,8 +255,10 @@ export interface BoardState {
   currentUser: string;
   /** arquivos de regras e skills do projeto */
   harness: Harness;
-  /** o que as execuções do board podem usar do harness (rules, skills e agentes marcados), por projeto */
+  /** o banco de artefatos do board: o que as execuções podem usar (rules, skills, agentes e servidores MCP), por projeto */
   harnessSelection: HarnessSelection[];
+  /** as pastas importadas, por ferramenta: varridas a cada leitura do harness e listadas em "Importados" */
+  harnessImports: HarnessImport[];
   /** o que o servidor MCP do board põe em cada sessão (nomes, instruções e definições das ferramentas), para estimar o contexto de um card; null antes da medição */
   boardServer: McpFootprint | null;
   /** mudanças que a atualização para o board padrão atual faria; vazio quando não há o que atualizar */
@@ -283,4 +287,8 @@ export interface BoardState {
   environmentFirstRun: boolean;
   /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */
   harnessInstall: InstallPreview | null;
+  /** o último "Indicar artefatos": pré-seleção para a pessoa confirmar; null antes de pedir ou depois de descartar */
+  harnessSuggestions: HarnessSuggestions | null;
+  /** branch principal detectada no repositório do projeto; null fora de um repositório git */
+  mainBranch: MainBranch | null;
 }

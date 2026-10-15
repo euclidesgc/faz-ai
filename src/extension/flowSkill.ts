@@ -27,7 +27,7 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
 1. \`get_card\` traz a descrição, a conversa, os anexos e:
    - \`phase\`: a instrução da fase e, se houver, o documento que ela produz e o modelo dele;
    - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, delegue a um subagente com essa configuração; se não for possível, avise a pessoa na conversa;
-   - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no caminho indicado, mesmo que não apareça na sua lista de skills: as execuções do board partem de contexto vazio e só conhecem o que o Harness marcou.
+   - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no caminho indicado, mesmo que não apareça na sua lista de skills: as execuções do board partem de contexto vazio e só conhecem o que está no board (Configurações → Harness).
 2. Chame \`start_work\` antes de começar.
 3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história),
    quando houver. Uma história pode ser criada ou movida direto para uma fase adiante (o Plan, por
@@ -71,8 +71,13 @@ conversa dizendo o que mudou e chame \`request_review\` de novo.
 ## Sub-tarefas de implementação
 
 No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da
-atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e as Skills
-necessárias. Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como
+atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e os artefatos que a
+execução pede: os campos Skills, Rules e MCPs, e o agente (\`set_card_profile\`). Escolha **só entre o
+que está no board em modo "Pelo card"** (\`get_harness\`; o que está em "Sempre" já entra sozinho):
+nada do catálogo do projeto ou da máquina existe para a execução. Vale o mínimo: no máximo uma skill
+por assunto (a mais próxima do objetivo; pode haver mais de uma se forem de assuntos diferentes, como
+navegação e acesso a dados) e só os servidores MCP de que a tarefa precisa. Excesso de artefatos
+produz o efeito contrário. O mesmo vale para a história. Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como
 verificá-la (teste, typecheck, comando ou tela). Recortar por camada (dados, regras de negócio, tela)
 vale, desde que cada parte seja verificável.
 
@@ -82,7 +87,7 @@ derivadas, em ordem, cada uma com \`derived_from\` = a parte anterior (a primeir
 história; a segunda, da primeira derivada, e assim por diante). No modo autônomo, use
 \`autonomous_from\` = esta história em todas, na ordem: a fila já empilha cada uma sobre a anterior. A
 branch de cada derivada parte da branch da anterior, e o pull request dela é empilhado sobre o da
-anterior (\`workspace.baseBranch\` no \`get_card\`).
+anterior (\`workspace.baseBranch\` e \`workspace.prBase\` no \`get_card\`). Quando a anterior é concluída, o board passa a base da seguinte (e a do pull request dela) para a base da anterior, normalmente a \`develop\`, e avisa na conversa: siga sempre o \`workspace.baseBranch\` atual e, se ele mudou, traga a nova base para a branch com \`git fetch origin <base>\` e \`git merge origin/<base>\`, sem rebase nem push forçado.
 
 Declare a ordem entre elas: em \`create_card\`, \`depends_on\` lista as sub-tarefas que precisam
 terminar antes (ou use \`link_cards\` com \`depends_on\` depois). Uma sub-tarefa depende de outra
@@ -92,7 +97,9 @@ igualmente fáceis de revisar, prefira o que deixa cada passo em arquivos difere
 
 Antes de alterar código do projeto, chame \`prepare_workspace\` na história: o board cria a branch e a
 pasta de trabalho dela e devolve onde trabalhar (também em \`workspace\` no \`get_card\`). Altere o
-código só ali e não crie branches por conta própria.
+código só ali e não crie branches por conta própria. A branch parte da base do fluxo (a develop, a
+principal ou, na pilha, a branch da anterior); \`workspace.baseBranch\` diz qual foi e
+\`workspace.prBase\` é a branch para a qual o pull request deve ser aberto.
 
 Na Implementação, trabalhe em rodadas. \`get_card\` na história traz em \`subtasksNow\` o que pode
 rodar agora (\`canRunTogether\`), o que espera outra sub-tarefa (\`waiting\`) e, quando houver, o que
@@ -172,7 +179,8 @@ A entrega é para a pessoa testar, então o roteiro de testes é parte dela, em 
    à descrição da história com \`update_card\`, sem apagar o que já está lá.
 2. Se \`phase.decisionRecord\` vier no \`get_card\`, grave antes o registro de decisão no caminho
    indicado (a decisão da Spec aprovada, as alternativas descartadas e os diagramas) e faça o commit.
-3. Envie a branch da história, abra o pull request (se ainda não existir) e registre o endereço com
+3. Envie a branch da história, abra o pull request (se ainda não existir) com \`--base\` em
+   \`workspace.prBase\` do \`get_card\` (ex.: \`gh pr create --base <prBase>\`) e registre o endereço com
    \`set_pull_request\`. O corpo explica a entrega para quem vai revisar o código, nesta ordem:
    - **Objetivo**: o problema e o resultado, em poucas frases;
    - **O que foi feito**: o resumo das mudanças;
@@ -186,6 +194,8 @@ A entrega é para a pessoa testar, então o roteiro de testes é parte dela, em 
 
 Não faça o merge: ele depende da aprovação da pessoa. Com o merge automático ligado (Configurações →
 Git), a aprovação dela faz o merge e leva a história a Concluído; desligado, a IA move o card aprovado.
+
+Num hotfix (pull request para a principal), não abra pull request da principal para a \`develop\`: depois do merge, o board faz isso.
 
 ## Modo autônomo (YOLO)
 
@@ -224,8 +234,8 @@ rodar sozinha: ninguém aprova nem responde. Então:
   entregue (o status vai para "aguardando revisão", o mesmo estado da entrega com PR) e pare: não é
   uma alternativa ao fluxo normal com PR, só vale quando de fato não há PR a registrar;
 - histórias em modo autônomo formam uma fila e uma pilha de pull requests: cada uma parte da branch da
-  anterior (\`workspace.baseBranch\` no \`get_card\`) e o PR é aberto com \`--base\` nela. Para dividir um
-  pedido grande, crie as próximas histórias com \`create_card\` e \`autonomous_from\`, em ordem de dependência.
+  anterior (\`workspace.baseBranch\` no \`get_card\`) e o PR é aberto com \`--base\` em \`workspace.prBase\`
+  (a branch da anterior). Quando a anterior é concluída, o board passa a base da seguinte (e a do pull request dela) para a base da anterior, normalmente a \`develop\`, e avisa na conversa: siga sempre o \`workspace.baseBranch\` atual e, se ele mudou, traga a nova base para a branch com \`git fetch origin <base>\` e \`git merge origin/<base>\`, sem rebase nem push forçado. Para dividir um pedido grande, crie as próximas histórias com \`create_card\` e \`autonomous_from\`, em ordem de dependência.
 
 ## Quando parar
 

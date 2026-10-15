@@ -123,7 +123,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'prepare_workspace',
-    'Cria (ou reaproveita) a branch da história e a pasta em que o código dela deve ser alterado. Chame antes de mexer em código do projeto; pode ser chamada de uma sub-tarefa. Fora do modo worktree, só chame na fase de código (fase que só produz documento não precisa de branch). O nome da branch e a pasta são definidos pelo board: não crie branches por conta própria.',
+    'Cria (ou reaproveita) a branch da história e a pasta em que o código dela deve ser alterado. Chame antes de mexer em código do projeto; pode ser chamada de uma sub-tarefa. Fora do modo worktree, só chame na fase de código (fase que só produz documento não precisa de branch). O nome da branch e a pasta são definidos pelo board: não crie branches por conta própria. A branch parte da base do fluxo (a develop, a principal ou a branch anterior da pilha) e a resposta traz `prBase`, a branch para a qual o pull request deve ser aberto.',
     { card: cardArg },
     (a, router) => {
       const s = router.snapshot();
@@ -159,7 +159,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'set_pull_request',
-    'Registra na história o endereço do pull request aberto para a branch dela. Chame logo depois de abrir o PR (ex.: com `gh pr create`); pode ser chamada de uma sub-tarefa. Não faça o merge: ele depende da aprovação da pessoa na homologação.',
+    'Registra na história o endereço do pull request aberto para a branch dela. Abra o PR com `--base` em `workspace.prBase` (ex.: `gh pr create --base <prBase>`) e chame logo depois; pode ser chamada de uma sub-tarefa. Não faça o merge: ele depende da aprovação da pessoa na homologação.',
     { card: cardArg, url: z.string().url().describe('Endereço do pull request') },
     (a, router) => {
       const card = live(findCard(router.snapshot(), a.card));

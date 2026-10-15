@@ -1,5 +1,5 @@
 import type { Agent, AiTool } from './harness';
-import type { HarnessSelection } from './harnessSelection';
+import { BOARD_MCP_NAME, selectedMcpNames, selectedRuleLocations, selectedSkillNames, type HarnessSelection } from './harnessSelection';
 import type { BoardState, Card } from './model';
 import { parseModelValue, type ModelOption } from './models';
 import { columnOf, valueOf } from './selectors';
@@ -243,8 +243,20 @@ const listField = (s: BoardState, c: Card, name: string): string[] => {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 };
 
+/** O nome está no board em "Pelo card" ou "Sempre" (o "Desligado" e o que saiu do board não valem). */
+const inBoard = (names: Set<string>, name: string): boolean => names.has(name);
+
 export function manifestOf(s: BoardState, c: Card): ExecManifest {
   const profile = profileOf(s, c);
+  // uma skill do projeto desligada (movida para a pasta ao lado) some do inventário, mas o card que já a
+  // indicava continua recebendo o caminho dela: desligar é guardar, não tirar do board
+  const skillNames = new Set([
+    ...selectedSkillNames(s, 'contextual'),
+    ...selectedSkillNames(s, 'always'),
+    ...s.harness.skills.filter((k) => !k.enabled).map((k) => k.name),
+  ]);
+  const ruleLocations = new Set([...selectedRuleLocations(s, 'contextual'), ...selectedRuleLocations(s, 'always')]);
+  const mcpNames = new Set([...selectedMcpNames(s, 'contextual'), ...selectedMcpNames(s, 'always')]);
   const modelField = s.fieldDefs.find((f) => f.kind === 'model');
   const chosen = parseModelValue(modelField ? valueOf(s, c.id, modelField.id) : undefined) ?? parseModelValue(profile?.model || null);
   const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
@@ -254,9 +266,18 @@ export function manifestOf(s: BoardState, c: Card): ExecManifest {
     agent: profile && profile.scope !== 'builtin' ? profile.id : '',
     purpose: profile?.purpose ?? '',
     instructions: profile?.instructions ?? '',
-    skills: [...new Set([...(profile?.skills ?? []), ...listField(s, c, 'skills')])],
-    rules: listField(s, c, 'rules'),
-    mcpServers: profile?.mcpServers ?? [],
+    // as skills "Sempre" entram pelo contexto fixo (promptContext), não por aqui; o que o card lista e saiu do
+    // board (ou passou para "Desligado") fica de fora sem quebrar o card: o board referencia, não copia
+    skills: [...new Set([...(profile?.skills ?? []), ...listField(s, c, 'skills').filter((n) => inBoard(skillNames, n))])],
+    rules: listField(s, c, 'rules').filter((l) => inBoard(ruleLocations, l)),
+    // os servidores do agente, os do campo MCPs do card e os do board em modo "Sempre"; o do board vai sempre, sem marcação
+    mcpServers: [
+      ...new Set([
+        ...(profile?.mcpServers ?? []),
+        ...listField(s, c, 'mcps').filter((n) => inBoard(mcpNames, n)),
+        ...selectedMcpNames(s, 'always'),
+      ]),
+    ].filter((n) => n !== BOARD_MCP_NAME),
     tools: profile?.tools ?? [],
     deniedTools: profile?.deniedTools ?? [],
     model: option

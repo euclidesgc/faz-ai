@@ -60,6 +60,7 @@ it('com o modo autônomo só até uma fase, o pedido diz até onde e, na própri
 it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
   expect(AUTONOMOUS_ADVICE).not.toContain('coluna de conclusão');
   expect(AUTONOMOUS_ADVICE).toContain('set_pull_request');
+  expect(AUTONOMOUS_ADVICE).toContain('abra o pull request com --base em workspace.prBase');
   expect(AUTONOMOUS_ADVICE).toMatch(/pare/);
 });
 
@@ -467,6 +468,24 @@ describe('executor da IA', () => {
       });
       runner.start(subId);
       expect(procs[0]!.command.stdin).toContain('MODO AUTÔNOMO');
+    });
+
+    it('a sub-tarefa que a sessão da história deixou "Em execução" volta para Pronto quando a sessão termina', () => {
+      yolo();
+      const s = router.snapshot();
+      const wf = s.workflows.find((w) => w.kind === 'child')!;
+      const subId = router.createCard({
+        typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+        columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+        parentId: storyId,
+        title: 'Passo',
+      });
+      runner.start(storyId);
+      ai({ type: 'card.status.set', cardId: subId, status: 'running' }); // start_work na sub-tarefa
+      ai({ type: 'comment.add', cardId: storyId, body: 'Implementei parte.' });
+      procs[0]!.exit(0);
+      expect(router.snapshot().cards.find((c) => c.id === subId)!.status).toBe('ready');
+      expect(log.join('\n')).toContain('sub-tarefa "Em execução"');
     });
 
     it('se a IA só respondeu na conversa, o card volta para ela em vez de esperar uma pessoa', () => {

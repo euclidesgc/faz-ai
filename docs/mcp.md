@@ -134,8 +134,10 @@ Um agente do board é um arquivo de agente da ferramenta, do projeto ou da pasta
 em `usage`), e `get_agent`, `create_agent`, `update_agent` e `delete_agent` os gerenciam: o padrão de
 criação é a pasta global (`scope: "user"`), e o agente criado já nasce disponível. `create_agent` e
 `update_agent` aceitam, além das instruções, `description`, `model` (valor do campo Modelo, ex.:
-`claude:sonnet@medium`), `tools`, `deniedTools`, `skills` e `mcp`; o board grava o que é só dele em
-chaves `faz-ai-*` do frontmatter. Cada ferramenta guarda os seus numa
+`claude:sonnet@medium`), `tools`, `deniedTools`, `skills` e `mcp`, e, no Cursor (que não tem lista de
+ferramentas, skills nem MCP por subagente), `readonly` e `background` (`readonly: true` e
+`is_background: true` no frontmatter); o board grava o que é só dele em chaves `faz-ai-*` do
+frontmatter. Cada ferramenta guarda os seus numa
 pasta própria (a global fica em `~/`):
 
 | Ferramenta | Pasta | Arquivo | Modelo por agente |
@@ -156,11 +158,17 @@ por assunto), `memory` (memória automática do Claude Code), `skill`, `agent`, 
 `settings`, `style` (estilos de saída), `plugin` e `managed` (política da organização, só leitura).
 De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
 
-Toda execução pelo board parte de contexto vazio: só entra o que está marcado em Configurações →
-Harness. `set_harness_selection` marca rules (`instructions`), skills e agentes: `always` entra em
-toda execução pelo caminho do arquivo; `contextual` vira opção dos campos "Rules" e "Skills" dos
-cards (e agente disponível); `null` desmarca. Os campos "Rules" e "Skills" dos cards só oferecem o
-marcado como `contextual`. Em `get_card`, `requiredRules` e `requiredSkills` trazem o caminho de cada
+Toda execução pelo board parte de contexto vazio: só entra o que está no board (Configurações →
+Harness). `set_harness_selection` envia ao board rules (`instructions`), skills, agentes e servidores
+MCP (`mcp`), muda o modo deles ou os tira do board: `always` (Sempre) entra em toda execução, pelo
+caminho do arquivo ou na configuração de servidores da execução; `contextual` (Pelo card) vira opção
+dos campos "Rules", "Skills" e "MCPs" dos cards (e agente disponível); `off` (Desligado) fica no
+board sem entrar em nada, que é como as regras entram, para revisão; `null` tira do board. Cada item do
+inventário traz em `key` a identidade para `set_harness_selection`: o caminho; num servidor MCP, o
+arquivo mais o nome (`.mcp.json#github`). O `name` também serve para agente, skill e servidor. Os campos "Rules",
+"Skills" e "MCPs" dos cards só oferecem o que está em `contextual`; o servidor do board vai sempre, sem
+marcação. O inventário traz também o escopo `imported`: artefatos de pastas que a pessoa importou, que
+a ferramenta não carrega sozinha. Em `get_card`, `requiredRules` e `requiredSkills` trazem o caminho de cada
 arquivo que o card exige; para skills fora do projeto, `path` é o caminho absoluto do `SKILL.md`.
 Quando uma skill existe no projeto e fora dele com o mesmo nome, vale a do projeto. `create_skill` e
 `install_flow_skill` já marcam o que criam (`contextual` e `always`, respectivamente).
@@ -235,15 +243,44 @@ pasta em que o código deve ser alterado. O nome da branch e a pasta são defini
 não deve criar branches por conta própria. Nas execuções pelo board, a pasta das worktrees é
 passada à ferramenta como pasta de trabalho extra (`--add-dir`).
 
+Com o gitflow ligado (`fazai.git.gitflow`, o padrão), a branch parte da `develop` (História, Débito
+técnico e Retrabalho) ou da branch principal (Bug, que gera `hotfix/`); a pilha do modo autônomo e as
+histórias derivadas partem da branch da história anterior. `workspace` ganha três campos:
+
+- `baseBranch`: a branch de onde a da história partiu (nome curto, sem `origin/`);
+- `prBase`: a branch para a qual o pull request deve ser aberto (hoje igual a `baseBranch`);
+- `prNote`: a instrução pronta, `Abra o pull request com --base <prBase> (ex.: gh pr create --base
+  <prBase>).`
+
+Numa história anterior ao gitflow (sem base gravada), a base é a principal detectada; se ela não foi
+detectada, `baseBranch` e `prBase` ficam de fora e a `prNote` manda abrir o PR contra a branch
+principal. Numa história empilhada vem também `stackNote`, para dizer na descrição do PR de qual PR
+ele depende. A resposta de `prepare_workspace` traz a `prBase`. Antes de criar a branch, o board roda
+`git fetch origin` e parte de `origin/<base>`; o que não deu certo (sem `origin`, fetch que falhou,
+`develop` criada ou não enviada, base gravada que sumiu) vai como comentário do "Faz AI" na conversa da
+história. Quando a `develop` falta e o fetch falhou, ou a principal não pôde ser detectada (sem o HEAD
+do `origin`, `main` nem `master`), `prepare_workspace` recusa em vez de criá-la, e a mensagem diz o que
+fazer.
+
 Uma história criada com `create_card` e `derived_from` (a próxima parte de uma funcionalidade dividida
 em entregas, quando ela passa de umas 400 linhas; `derived_from` aponta para a parte anterior) parte
 da branch da parte anterior enquanto o PR dela não foi mesclado; `workspace.baseBranch` traz essa base,
 e o PR é aberto com `--base` nela. Enquanto a parte anterior, aberta, ainda não tem branch,
 `prepare_workspace` recusa a derivada. `get_card` mostra a origem em `derivedFrom`.
 
-`set_pull_request` registra na história o endereço do PR aberto pela IA; ele volta em
+`set_pull_request` registra na história o endereço do PR aberto pela IA, que o abre com `--base` em
+`workspace.prBase` (ex.: `gh pr create --base <prBase>`); ele volta em
 `workspace.pullRequest`. A IA não faz o merge: com o merge automático ligado, é o board que roda
 `gh pr merge <url> --squash|--merge|--rebase` quando a pessoa aprova a homologação.
+
+Quando a história anterior de uma pilha é concluída, o board passa a base da seguinte (e a do pull
+request dela) para a base da anterior, normalmente a `develop`, e avisa na conversa. A IA segue
+sempre o `workspace.baseBranch` atual e, se ele mudou, traz a nova base para a branch com
+`git fetch origin <base>` e `git merge origin/<base>`, sem rebase nem push forçado.
+
+No pull request para a principal (hotfix), o merge é sempre por merge commit. Depois do merge, o
+board abre o pull request da principal para a `develop`; a IA não o abre. Ao concluir a história, o
+board apaga a worktree, a branch local e a remota, e atualiza a `develop` local.
 
 ### Fases e documentos
 

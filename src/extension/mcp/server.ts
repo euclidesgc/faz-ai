@@ -46,6 +46,7 @@ export const MCP_INSTRUCTIONS =
   'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_question); registre ali decisões e resultados. ' +
   'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +
   'Ficou algo dependendo da pessoa (decisão, dado, ponto em aberto que ela precisa avaliar)? Não registre só num comentário: entregue com request_review e `pending`, e o card fica com ela. No modo autônomo nada disso segura o card: decida você, registre e siga. ' +
+  'Pull request: sempre com --base em workspace.prBase do get_card. ' +
   'Uso, tokens e tempo: get_metrics. Rules, skills e agentes do projeto: get_harness. Modelos e regras de sugestão: get_models. ' +
   'O detalhe vem onde você precisa: na descrição de cada ferramenta, nas notas do get_card e na skill faz-ai-fluxo.';
 

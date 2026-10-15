@@ -7,7 +7,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import type { WebviewToHost } from '../src/shared/messages';
 import { ConfigurationTarget, GIT_SETTINGS_MIGRATED, IdeSettings, type IdeSettingsApi } from '../src/extension/settings/ideSettings';
-import { DEFAULT_GIT } from '../src/shared/git';
+import { DEFAULT_GIT, LEGACY_BRANCH_PATTERN, type GitConfig } from '../src/shared/git';
 import { DEFAULT_RUNNER } from '../src/shared/runner';
 
 const KEY = 'fazai.appearance.language';
@@ -24,6 +24,16 @@ const GIT_AUTO_MERGE_KEY = 'fazai.git.autoMerge';
 const GIT_MERGE_METHOD_KEY = 'fazai.git.mergeMethod';
 const GIT_DECISION_RECORDS_KEY = 'fazai.git.decisionRecords';
 
+/** As seis chaves do gitflow (#462): a chave no Settings, o campo do `GitConfig` e um valor diferente do padrão. */
+const GITFLOW_KEYS = [
+  { setting: 'fazai.git.gitflow', field: 'gitflow', custom: false },
+  { setting: 'fazai.git.developBranch', field: 'developBranch', custom: 'integracao' },
+  { setting: 'fazai.git.featurePrefix', field: 'featurePrefix', custom: 'feat/' },
+  { setting: 'fazai.git.bugfixPrefix', field: 'bugfixPrefix', custom: 'fix/' },
+  { setting: 'fazai.git.hotfixPrefix', field: 'hotfixPrefix', custom: 'urgente/' },
+  { setting: 'fazai.git.releasePrefix', field: 'releasePrefix', custom: 'rel/' },
+] as const satisfies readonly { setting: string; field: keyof GitConfig; custom: boolean | string }[];
+
 beforeEach(() => {
   fakeConfig.reset();
   fakeConfig.values.default[KEY] = 'auto';
@@ -38,6 +48,7 @@ beforeEach(() => {
   fakeConfig.values.default[GIT_AUTO_MERGE_KEY] = DEFAULT_GIT.autoMerge;
   fakeConfig.values.default[GIT_MERGE_METHOD_KEY] = DEFAULT_GIT.mergeMethod;
   fakeConfig.values.default[GIT_DECISION_RECORDS_KEY] = DEFAULT_GIT.decisionRecords;
+  for (const k of GITFLOW_KEYS) fakeConfig.values.default[k.setting] = DEFAULT_GIT[k.field];
 });
 
 describe('IdeSettings: ler', () => {
@@ -657,5 +668,130 @@ describe('IdeSettings: paralelo no runner_json', () => {
     await settled();
     expect(link.router.snapshot().board.runner.parallel).toBe(true);
     expect(link.router.snapshot().board.runner.parallelStories).toBe(3);
+  });
+});
+
+describe('IdeSettings: gitflow (#462)', () => {
+  it.each(GITFLOW_KEYS)('$setting: Settings → SQLite grava no board uma vez', async ({ setting, field, custom }) => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    await settled();
+    fakeConfig.set('global', setting, custom);
+    expect(link.updates).toEqual([{ git: { [field]: custom } }]);
+    expect(link.router.snapshot().board.git[field]).toBe(custom);
+  });
+
+  it.each(GITFLOW_KEYS)('$setting: SQLite → Settings escreve no Usuário uma vez', async ({ setting, field, custom }) => {
+    const link = await makeLink();
+    new IdeSettings(workspace).bind(link);
+    await settled();
+    link.router.handle({ type: 'settings.board.update', patch: { git: { [field]: custom } } });
+    expect(fakeConfig.updates).toEqual([{ key: setting, value: custom, target: ConfigurationTarget.Global }]);
+  });
+
+  it.each(GITFLOW_KEYS)('$setting: na abertura, Settings explícito manda no board', async ({ setting, field, custom }) => {
+    const link = await makeLink();
+    fakeConfig.values.global[setting] = custom;
+    new IdeSettings(workspace).bind(link);
+    await settled();
+    expect(link.router.snapshot().board.git[field]).toBe(custom);
+    expect(fakeConfig.updates).toEqual([]);
+  });
+
+  it.each(GITFLOW_KEYS)(
+    '$setting: na abertura, Settings vazio e board personalizado: o Settings recebe o valor',
+    async ({ setting, field, custom }) => {
+      const link = await makeLink();
+      link.router.handle({ type: 'settings.board.update', patch: { git: { [field]: custom } } });
+      new IdeSettings(workspace).bind(link);
+      await settled();
+      expect(fakeConfig.values.global[setting]).toBe(custom);
+      expect(fakeConfig.updates).toHaveLength(1);
+    },
+  );
+
+  it('as seis chaves não passam pela migração única do Git', async () => {
+    const link = await makeLink();
+    link.router.handle({ type: 'settings.board.update', patch: { git: { featurePrefix: 'feat/' } } });
+    new IdeSettings(workspace).bind(link);
+    await settled();
+    // a escrita vem da reconciliação (uma só, no Usuário), e a marca da migração não depende da chave
+    expect(fakeConfig.updates).toEqual([{ key: 'fazai.git.featurePrefix', value: 'feat/', target: ConfigurationTarget.Global }]);
+  });
+
+  it.each(GITFLOW_KEYS.filter((k) => typeof k.custom === 'string'))(
+    '$setting: vazio no Settings volta ao padrão no board e no Settings (RF04)',
+    async ({ setting, field }) => {
+      const link = await makeLink();
+      new IdeSettings(workspace).bind(link);
+      await settled();
+      fakeConfig.set('global', setting, 'x/');
+      fakeConfig.updates.length = 0;
+      fakeConfig.set('global', setting, '');
+      await settled();
+      expect(link.router.snapshot().board.git[field]).toBe(DEFAULT_GIT[field]);
+      expect(fakeConfig.values.global[setting]).toBe(DEFAULT_GIT[field]);
+    },
+  );
+
+  it('prefixo vazio já gravado no Settings, na abertura, volta como feature/', async () => {
+    const link = await makeLink();
+    fakeConfig.values.global['fazai.git.featurePrefix'] = '';
+    new IdeSettings(workspace).bind(link);
+    await settled();
+    expect(link.router.snapshot().board.git.featurePrefix).toBe('feature/');
+    expect(fakeConfig.values.global['fazai.git.featurePrefix']).toBe('feature/');
+  });
+
+  it('prefixo que o git recusa volta ao padrão e a tela mostra o padrão', async () => {
+    const link = await makeLink();
+    fakeConfig.values.global['fazai.git.bugfixPrefix'] = '../fora';
+    new IdeSettings(workspace).bind(link);
+    await settled();
+    expect(link.router.snapshot().board.git.bugfixPrefix).toBe('bugfix/');
+    expect(fakeConfig.values.global['fazai.git.bugfixPrefix']).toBe('bugfix/');
+  });
+
+  it('padrão antigo explícito no Settings converge para o novo, no board e no Settings (RF07)', async () => {
+    const link = await makeLink();
+    fakeConfig.values.global[GIT_BRANCH_PATTERN_KEY] = LEGACY_BRANCH_PATTERN;
+    new IdeSettings(workspace).bind(link);
+    await settled();
+    expect(link.router.snapshot().board.git.branchPattern).toBe('{fluxo}{numero}-{titulo}');
+    expect(fakeConfig.values.global[GIT_BRANCH_PATTERN_KEY]).toBe('{fluxo}{numero}-{titulo}');
+  });
+
+  it('B5: padrão antigo ou prefixo vazio no settings.json do projeto: o board normaliza sem regravar o arquivo', async () => {
+    const link = await makeLink();
+    fakeConfig.values.workspace[GIT_BRANCH_PATTERN_KEY] = LEGACY_BRANCH_PATTERN;
+    fakeConfig.values.workspace['fazai.git.featurePrefix'] = '';
+    fakeConfig.values.folder['fazai.git.bugfixPrefix'] = '';
+    new IdeSettings(workspace).bind(link);
+    await settled();
+    const git = () => link.router.snapshot().board.git;
+    expect(git()).toMatchObject({ branchPattern: '{fluxo}{numero}-{titulo}', featurePrefix: 'feature/', bugfixPrefix: 'bugfix/' });
+    // o arquivo versionado fica como está: regravá-lo sujaria o repositório de quem abre o board
+    expect(fakeConfig.updates).toEqual([]);
+    expect(fakeConfig.values.workspace['fazai.git.featurePrefix']).toBe('');
+
+    // editar o arquivo do projeto depois, com o board aberto, também não o regrava
+    fakeConfig.set('workspace', 'fazai.git.featurePrefix', 'feat/');
+    expect(git().featurePrefix).toBe('feat/');
+    fakeConfig.set('workspace', 'fazai.git.featurePrefix', '');
+    await settled();
+    expect(git().featurePrefix).toBe('feature/');
+    // e outra mudança no board não leva o valor normalizado ao arquivo
+    link.router.handle({ type: 'settings.board.update', patch: { git: { releasePrefix: 'rel/' } } });
+    await settled();
+    expect(fakeConfig.updates).toEqual([{ key: 'fazai.git.releasePrefix', value: 'rel/', target: ConfigurationTarget.Global }]);
+  });
+
+  it('padrão personalizado no Settings continua como está', async () => {
+    const link = await makeLink();
+    fakeConfig.values.global[GIT_BRANCH_PATTERN_KEY] = 'x/{numero}';
+    new IdeSettings(workspace).bind(link);
+    await settled();
+    expect(link.router.snapshot().board.git.branchPattern).toBe('x/{numero}');
+    expect(fakeConfig.values.global[GIT_BRANCH_PATTERN_KEY]).toBe('x/{numero}');
   });
 });

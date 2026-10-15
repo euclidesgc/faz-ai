@@ -133,6 +133,7 @@ const state: BoardState = {
   currentUser: 'a',
   harness: EMPTY_HARNESS,
   harnessSelection: [],
+  harnessImports: [],
   boardServer: null,
   pendingUpgrade: [],
   chat: EMPTY_CHAT,
@@ -147,6 +148,8 @@ const state: BoardState = {
   environment: null,
   environmentFirstRun: false,
   harnessInstall: null,
+  harnessSuggestions: null,
+  mainBranch: null,
 };
 
 const run = (f: Partial<Filters>) => [...(applyFilters(state, { ...EMPTY_FILTERS, includeRelated: false, ...f }, NOW) ?? [])].sort();

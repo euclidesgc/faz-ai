@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ALL_AI_TOOLS, RULE_FILES, type AiTool, type InstallScope } from '../../../shared/harness';
-import { SELECTABLE_KINDS, type HarnessUsage, type SelectableKind } from '../../../shared/harnessSelection';
+import { SELECTABLE_KINDS, selectionKey, type HarnessUsage, type SelectableKind } from '../../../shared/harnessSelection';
 import { FLOW_SKILL } from '../../flowSkill';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { harnessOverview } from '../format';
@@ -44,7 +44,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'get_harness',
-    'O harness que as execuções do board usam: a ferramenta em uso, o agente padrão e, com a marcação (`usage`), as rules, skills e agentes marcados em Configurações → Harness. Toda execução parte de contexto vazio: o que não está marcado não existe para ela. Com onlySelected = false, lista tudo que a ferramenta carrega nesta máquina (projeto, pasta do usuário e plugins), marcado ou não.',
+    'O banco de artefatos do board: a ferramenta em uso, o agente padrão e, com o modo (`usage`), as rules, skills, agentes e servidores MCP enviados ao board em Configurações → Harness. Toda execução parte de contexto vazio: o que não está no board não existe para ela. Com onlySelected = false, lista tudo que a ferramenta carrega nesta máquina (projeto, pasta do usuário, plugins e pastas importadas), esteja no board ou não.',
     {
       onlySelected: z
         .boolean()
@@ -57,26 +57,29 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'set_harness_selection',
-    'Marca (ou desmarca) rules, skills e agentes para as execuções do board. "always": entra em toda execução; "contextual": disponível para indicar no card (campos Rules e Skills) ou escolher como agente; null: desmarca. Identifique o item por `location`, como get_harness o mostra (relativo ao projeto ou a partir de ~); um agente ou uma skill também pelo nome.',
+    'Envia rules, skills, agentes e servidores MCP ao board, muda o modo deles ou os tira do board. "always" (Sempre): entra em toda execução; "contextual" (Pelo card): disponível para indicar no card (campos Rules, Skills e MCPs) ou escolher como agente; "off" (Desligado): fica no board sem entrar em nada (é como as regras entram, para revisão); null: tira do board. Identifique o item por `location`, como get_harness o mostra; um agente, uma skill ou um servidor MCP também pelo nome.',
     {
       items: z
         .array(
           z.object({
             kind: z.enum(SELECTABLE_KINDS as [SelectableKind, ...SelectableKind[]]),
-            location: z.string().optional().describe('Caminho como em get_harness'),
-            name: z.string().optional().describe('Nome do agente ou da skill, quando não souber o caminho'),
+            location: z.string().optional().describe('A `key` como em get_harness (o caminho; num servidor MCP, `arquivo#nome`)'),
+            name: z.string().optional().describe('Nome do agente, da skill ou do servidor MCP, quando não souber a chave'),
           }),
         )
         .min(1),
-      usage: z.enum(['always', 'contextual']).nullable(),
+      usage: z.enum(['always', 'contextual', 'off']).nullable(),
     },
     (a, router) => {
       const s = router.snapshot();
       const items = s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
       const resolved = a.items.map((i) => {
-        const found = items.find((x) => x.kind === i.kind && (i.location ? x.location === i.location : x.name === i.name));
+        // `location` é a `key` do get_harness (num servidor MCP, arquivo mais `#nome`); o caminho sem o nome também vale
+        const found = items.find(
+          (x) => x.kind === i.kind && (i.location ? selectionKey(x) === i.location || x.location === i.location : x.name === i.name),
+        );
         if (!found) throw new Error(`Item ${i.kind} "${i.location ?? i.name ?? ''}" não encontrado no harness da ferramenta em uso.`);
-        return { kind: i.kind, location: found.location };
+        return { kind: i.kind, location: selectionKey(found) };
       });
       router.handle({ type: 'harness.selection.set', items: resolved, usage: a.usage as HarnessUsage | null });
       return harness(router);
@@ -245,6 +248,11 @@ export function registerHarnessTools(tool: DefineTool): void {
       deniedTools: listArg('Ferramentas retiradas da sessão'),
       skills: listArg('Skills que toda execução com o agente lê (só as marcadas em get_harness)'),
       mcp: listArg('Servidores MCP liberados além do do board'),
+      readonly: z
+        .boolean()
+        .optional()
+        .describe('Só no Cursor: o agente não edita arquivos nem roda comandos que mudem estado (`readonly: true`)'),
+      background: z.boolean().optional().describe('Só no Cursor: o agente roda em segundo plano (`is_background: true`)'),
     },
     (a, router) => {
       router.handle({
@@ -259,6 +267,8 @@ export function registerHarnessTools(tool: DefineTool): void {
           deniedTools: a.deniedTools ?? [],
           skills: a.skills ?? [],
           mcp: a.mcp ?? [],
+          ...(a.readonly !== undefined ? { readonly: a.readonly } : {}),
+          ...(a.background !== undefined ? { background: a.background } : {}),
         },
       });
       return harness(router);
@@ -279,6 +289,8 @@ export function registerHarnessTools(tool: DefineTool): void {
       deniedTools: listArg('Ferramentas retiradas'),
       skills: listArg('Skills do agente'),
       mcp: listArg('Servidores MCP além do do board'),
+      readonly: z.boolean().optional().describe('Só no Cursor: sem edição de arquivos nem comandos que mudem estado'),
+      background: z.boolean().optional().describe('Só no Cursor: roda em segundo plano'),
     },
     (a, router) => {
       const found = agent(router, a.agent, a.scope as InstallScope | undefined);
@@ -295,6 +307,8 @@ export function registerHarnessTools(tool: DefineTool): void {
             ...(a.deniedTools ? { deniedTools: a.deniedTools } : {}),
             ...(a.skills ? { skills: a.skills } : {}),
             ...(a.mcp ? { mcp: a.mcp } : {}),
+            ...(a.readonly !== undefined ? { readonly: a.readonly } : {}),
+            ...(a.background !== undefined ? { background: a.background } : {}),
           },
           body: a.body,
         });

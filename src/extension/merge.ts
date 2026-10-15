@@ -1,23 +1,26 @@
 import { cardRef, type BoardState, type Card, type Column } from '../shared/model';
 import { columnOf, columnsOf, openChildren } from '../shared/selectors';
 import { isDelivered } from '../shared/story';
-import { removeWorktree } from './git';
+import { gitNotice } from '../shared/gitNotices';
+import { detectMainBranch, removeWorktree } from './git';
 import type { MessageRouter } from './panel/messageRouter';
+import { cleanUpStory, parsePullRequestFacts, PR_FIELDS, type CleanupDeps, type PullRequestFacts } from './storyCleanup';
 
-export interface MergeDeps {
-  /** roda o `gh` na pasta do projeto; rejeita com a mensagem de erro do comando */
-  gh(args: string[], cwd: string): Promise<string>;
-  log(line: string): void;
-  cwd: string;
-  /** remove a pasta de trabalho da história depois do merge */
-  removeWorktree?: (projectDir: string, worktreePath: string) => void;
-}
+/**
+ * O que o merge precisa além da limpeza (#464): o `gh`, o `git` assíncrono e o detector da principal
+ * vêm de `CleanupDeps`, com o `git` obrigatório como no `ReleaseDeps`.
+ */
+export type MergeDeps = CleanupDeps;
 
 const AUTHOR = 'Faz AI';
 
+/** A limpeza depois do merge (#464) só existe com o gitflow ligado e o git do board em uso. */
+const cleanupOn = (s: BoardState): boolean => s.board.git.gitflow && s.board.git.mode !== 'off';
+
 /**
- * Conclui a história: comenta, move para a coluna de conclusão e, no modo `worktree`, remove a
- * pasta de trabalho. Se a remoção falhar, o motivo vai para o log e a conclusão permanece.
+ * Conclui a história: comenta, move para a coluna de conclusão e, no modo `worktree` com o gitflow
+ * desligado, remove a pasta de trabalho (com o gitflow ligado a worktree é da `cleanUpStory`, que
+ * antes confere o que está pendente). Se a remoção falhar, o motivo vai para o log e a conclusão permanece.
  *
  * `extra`, quando presente, acrescenta um aviso ao corpo do comentário — é o gancho que o `MergeWatcher`
  * usa para o aviso de sub-tarefas em aberto; `allowOpenChildren` deixa o `card.move` concluir a história
@@ -39,7 +42,8 @@ export function concludeStory(
     { author: AUTHOR },
   );
 
-  if (router.snapshot().board.git.mode === 'worktree' && card.worktreePath) {
+  const s = router.snapshot();
+  if (s.board.git.mode === 'worktree' && !cleanupOn(s) && card.worktreePath) {
     try {
       (deps.removeWorktree ?? removeWorktree)(deps.cwd, card.worktreePath);
       router.handle({ type: 'card.workspace.clear', cardId: card.id });
@@ -47,6 +51,40 @@ export function concludeStory(
       // alterações não commitadas na worktree: fica para a pessoa decidir
       deps.log(`[${ref}] A pasta de trabalho ${card.worktreePath} não foi removida: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+}
+
+/**
+ * Conclui a história e, com o gitflow ligado, limpa o que o merge deixou para trás (worktree, branches,
+ * `develop`). Sem `pr` (o `gh pr view` falhou), a limpeza não apaga nada e avisa na conversa: apagar
+ * uma branch sem confirmar o pull request é o risco que o RF8 proíbe. Nunca rejeita.
+ */
+export async function concludeAndCleanUp(
+  router: MessageRouter,
+  deps: MergeDeps,
+  card: Card,
+  done: Column,
+  body: string,
+  pr: PullRequestFacts | Error,
+  extra?: string,
+  allowOpenChildren = false,
+): Promise<void> {
+  concludeStory(router, deps, card, done, body, extra, allowOpenChildren);
+  if (!cleanupOn(router.snapshot())) return;
+  const ref = cardRef(card);
+  try {
+    if (pr instanceof Error) {
+      router.handle(
+        { type: 'comment.add', cardId: card.id, body: gitNotice('cleanup.noPullRequest', { pr: card.prUrl, error: pr.message }) },
+        { author: AUTHOR, source: 'ai' },
+      );
+      deps.log(`[${ref}] Limpeza pulada: não deu para confirmar o pull request ${card.prUrl} (${pr.message}).`);
+      return;
+    }
+    await cleanUpStory(router, deps, card, pr);
+  } catch (e) {
+    // a limpeza trata as próprias falhas; isto é só a rede de segurança da conclusão
+    deps.log(`[${ref}] Falha inesperada na limpeza: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
@@ -90,18 +128,49 @@ export class AutoMerger {
     this.merging.add(cardId);
     // "Em execução" tira o card da fila da IA enquanto o merge acontece
     this.router.handle({ type: 'card.status.set', cardId, status: 'running' }, { author: AUTHOR, source: 'ai' });
-    this.deps.log(`[${ref}] Merge de ${card.prUrl} (${state.board.git.mergeMethod}).`);
-    try {
-      await this.deps.gh(['pr', 'merge', card.prUrl, `--${state.board.git.mergeMethod}`], this.deps.cwd);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      this.deps.log(`[${ref}] Merge falhou: ${message}`);
+    // com o gitflow ligado, a limpeza precisa dos fatos do pull request (branch, sha); sem eles o
+    // merge segue como sempre e a limpeza só avisa. Desligado, nenhuma chamada a mais ao gh.
+    let pr: PullRequestFacts | Error = new Error('gitflow desligado');
+    if (cleanupOn(state)) {
+      try {
+        pr = parsePullRequestFacts(await this.deps.gh(['pr', 'view', card.prUrl, '--json', PR_FIELDS], this.deps.cwd), card.prUrl);
+      } catch (e) {
+        pr = e instanceof Error ? e : new Error(String(e));
+        this.deps.log(`[${ref}] Consulta de ${card.prUrl} falhou: ${pr.message}`);
+      }
+    }
+    const already = !(pr instanceof Error) && (pr.state === 'MERGED' || !!pr.mergedAt);
+    if (!(pr instanceof Error) && pr.state === 'CLOSED' && !already) {
       this.merging.delete(cardId);
-      return void block(`O merge de ${card.prUrl} falhou: ${message}`);
+      this.deps.log(`[${ref}] Pull request ${card.prUrl} fechado sem merge; card bloqueado.`);
+      return void block(`O pull request ${card.prUrl} foi fechado sem merge.`);
+    }
+    if (already) {
+      // o release (ou outra pessoa) já mesclou: não há o que mesclar, só concluir e limpar
+      this.deps.log(`[${ref}] Pull request ${card.prUrl} já estava mesclado; card concluído sem novo merge.`);
+    } else {
+      // com o gitflow, o PR para a principal (release/hotfix) vai sempre com merge commit; senão, o método configurado
+      let method = state.board.git.mergeMethod;
+      if (!(pr instanceof Error) && pr.baseRefName) {
+        const main = this.deps.mainBranch ? this.deps.mainBranch(this.deps.cwd) : (detectMainBranch(this.deps.cwd)?.name ?? '');
+        if (main && pr.baseRefName === main) method = 'merge';
+      }
+      this.deps.log(`[${ref}] Merge de ${card.prUrl} (${method}).`);
+      try {
+        await this.deps.gh(['pr', 'merge', card.prUrl, `--${method}`], this.deps.cwd);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        this.deps.log(`[${ref}] Merge falhou: ${message}`);
+        this.merging.delete(cardId);
+        return void block(`O merge de ${card.prUrl} falhou: ${message}`);
+      }
     }
     this.merging.delete(cardId);
+    // a consulta foi feita antes do merge (state OPEN); o `gh pr merge` sem erro é a confirmação de que
+    // está mesclado, e sem isso a limpeza trataria o pull request como aberto e não apagaria nada
+    if (!(pr instanceof Error)) pr = { ...pr, state: 'MERGED' };
     this.deps.log(`[${ref}] Merge feito; card concluído.`);
-    concludeStory(this.router, this.deps, card, done, `Merge de ${card.prUrl} feito.`);
+    await concludeAndCleanUp(this.router, this.deps, card, done, `Merge de ${card.prUrl} feito.`, pr);
   }
 }
 
@@ -115,32 +184,6 @@ export interface MergeWatchDeps extends MergeDeps {
 
 /** Histórias cujo pull request o watcher consulta: as entregues (`isDelivered`), sem regra nova. */
 export const mergeWatchTargets = (s: BoardState): Card[] => s.cards.filter((c) => isDelivered(s, c));
-
-/** O que o `gh pr view --json state,mergedAt,mergeCommit` devolve, no que interessa. */
-interface PullRequestView {
-  state: string;
-  mergedAt: string | null;
-  mergeCommit: { oid?: string } | null;
-}
-
-/** Converte a saída do `gh`; qualquer coisa fora do formato esperado é falha de consulta, não "aberto". */
-function parsePullRequest(out: string): PullRequestView {
-  let data: unknown;
-  try {
-    data = JSON.parse(out);
-  } catch {
-    throw new Error(`resposta inesperada do gh: ${out.trim().slice(0, 200) || '(vazia)'}`);
-  }
-  if (!data || typeof data !== 'object' || typeof (data as { state?: unknown }).state !== 'string')
-    throw new Error(`resposta inesperada do gh: ${out.trim().slice(0, 200) || '(vazia)'}`);
-  const d = data as { state: string; mergedAt?: unknown; mergeCommit?: unknown };
-  const oid = d.mergeCommit && typeof d.mergeCommit === 'object' ? (d.mergeCommit as { oid?: unknown }).oid : undefined;
-  return {
-    state: d.state,
-    mergedAt: typeof d.mergedAt === 'string' && d.mergedAt ? d.mergedAt : null,
-    mergeCommit: typeof oid === 'string' ? { oid } : null,
-  };
-}
 
 /** Coluna de conclusão logo depois da coluna da história, se houver. */
 function doneAfter(s: BoardState, card: Card): Column | null {
@@ -204,15 +247,16 @@ export class MergeWatcher {
 
   private async check(card: Card): Promise<void> {
     if (this.checking.has(card.id)) return;
-    let pr: PullRequestView;
+    let pr: PullRequestFacts;
     try {
-      pr = parsePullRequest(await this.deps.gh(['pr', 'view', card.prUrl, '--json', 'state,mergedAt,mergeCommit'], this.deps.cwd));
+      pr = parsePullRequestFacts(await this.deps.gh(['pr', 'view', card.prUrl, '--json', PR_FIELDS], this.deps.cwd), card.prUrl);
     } catch (e) {
       return this.noteFailure(e instanceof Error ? e.message : String(e));
     }
     this.lastFailure = null;
     try {
-      if (pr.state === 'MERGED' || pr.mergedAt) this.finish(card, pr.mergeCommit?.oid ?? '');
+      // a limpeza roda em série, dentro da rodada: ordem previsível e sem dois gits na mesma branch
+      if (pr.state === 'MERGED' || pr.mergedAt) await this.finish(card, pr);
       else if (pr.state === 'CLOSED') this.announceClosed(card);
     } catch (e) {
       this.noteFailure(`[${cardRef(card)}] ${e instanceof Error ? e.message : String(e)}`);
@@ -220,7 +264,8 @@ export class MergeWatcher {
   }
 
   /** Grava o commit do merge e conclui a história. O commit vai antes do movimento: nunca falta numa história já concluída. */
-  private finish(card: Card, oid: string): void {
+  private async finish(card: Card, pr: PullRequestFacts): Promise<void> {
+    const oid = pr.mergeCommit;
     const s = this.router.snapshot();
     const live = s.cards.find((c) => c.id === card.id);
     // a situação pode ter mudado enquanto o gh respondia (outra rodada concluiu, a pessoa moveu)
@@ -233,16 +278,17 @@ export class MergeWatcher {
       this.router.handle({ type: 'card.merge.set', cardId: live.id, commit: oid }, { author: AUTHOR });
       const openKids = openChildren(s, live.id).length;
       const extra = openKids ? `Havia ${openKids} sub-tarefa(s) em aberto no momento do merge.` : undefined;
-      concludeStory(
+      this.deps.log(`[${ref}] Pull request ${live.prUrl} mergeado (${oid || 'sem commit'}); história concluída.`);
+      await concludeAndCleanUp(
         this.router,
         this.deps,
         live,
         done,
         `Pull request ${live.prUrl} mergeado (commit ${oid || 'não informado'}). História concluída pelo board.`,
+        pr,
         extra,
         openKids > 0,
       );
-      this.deps.log(`[${ref}] Pull request ${live.prUrl} mergeado (${oid || 'sem commit'}); história concluída.`);
     } finally {
       this.checking.delete(live.id);
     }

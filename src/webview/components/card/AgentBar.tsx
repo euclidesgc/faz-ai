@@ -1,4 +1,5 @@
 import { manifestOf, profileOf } from '../../../shared/execution';
+import { selectedMcpNames, selectedRuleLocations, selectedSkillNames } from '../../../shared/harnessSelection';
 import type { Card } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
@@ -16,6 +17,20 @@ export function AgentBar({ card }: { card: Card }) {
   const manifest = manifestOf(state, card);
   // o agente que vale quando o card não escolhe um: o da fase ou o padrão do board
   const inherited = profileOf(state, { ...card, execProfile: null });
+  // o que está em modo "Sempre" no board entra em toda execução, sem o card indicar: a pessoa vê o custo completo
+  const always = {
+    skills: selectedSkillNames(state, 'always'),
+    rules: selectedRuleLocations(state, 'always'),
+    mcps: selectedMcpNames(state, 'always'),
+  };
+  const withAlways = (own: string[], on: string[]) => [
+    ...own.map((n) => (on.includes(n) ? t('{name} (sempre)', { name: n }) : n)),
+    ...on.filter((n) => !own.includes(n)).map((n) => t('{name} (sempre)', { name: n })),
+  ];
+  const skills = withAlways(manifest.skills, always.skills);
+  const rules = withAlways(manifest.rules, always.rules);
+  // os do modo Sempre já vêm no manifesto; aqui só ganham a marca
+  const mcps = withAlways(manifest.mcpServers, always.mcps);
 
   return (
     <div
@@ -35,12 +50,12 @@ export function AgentBar({ card }: { card: Card }) {
         value={card.execProfile ?? FROM_PHASE}
         onChange={(id) => cards.setExecProfile(card.id, id === FROM_PHASE ? null : id)}
       />
-      {manifest.profile && (
+      {(manifest.profile || skills.length > 0 || rules.length > 0) && (
         <span className="muted small">
           {[
-            manifest.skills.length && t('skills: {list}', { list: manifest.skills.join(', ') }),
-            manifest.rules.length && t('rules: {list}', { list: manifest.rules.join(', ') }),
-            manifest.mcpServers.length ? t('MCP: board + {list}', { list: manifest.mcpServers.join(', ') }) : t('MCP: board'),
+            skills.length && t('skills: {list}', { list: skills.join(', ') }),
+            rules.length && t('rules: {list}', { list: rules.join(', ') }),
+            mcps.length ? t('MCP: board + {list}', { list: mcps.join(', ') }) : t('MCP: board'),
             manifest.model &&
               (manifest.model.effort
                 ? t('modelo {name} · {effort}', { name: manifest.model.name, effort: manifest.model.effort })

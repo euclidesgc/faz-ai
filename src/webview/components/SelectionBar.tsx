@@ -23,6 +23,7 @@ export function SelectionBar() {
   const setDontWarnYolo = useBoardStore((s) => s.setDontWarnYolo);
   const untilName = useBoardStore((s) => s.yoloUntilName);
   const setUntilName = useBoardStore((s) => s.setYoloUntilName);
+  const bulkBusy = useBoardStore((s) => s.bulkBusy);
 
   // defesa extra: a caixa de marcação (card 324) só existe em histórias vivas, mas confere de novo aqui
   const selectedStories = state.cards.filter((c) => selectedIds.has(c.id));
@@ -83,6 +84,11 @@ export function SelectionBar() {
   return (
     <div className="selectionbar">
       <span>{t('{n} selecionados', { n })}</span>
+      {bulkBusy && (
+        <span role="status" className="muted small">
+          <span className="spinner" aria-hidden /> {bulkBusy}
+        </span>
+      )}
       <Button variant="ghost" size="small" onClick={clearSelected}>
         {t('Limpar')}
       </Button>

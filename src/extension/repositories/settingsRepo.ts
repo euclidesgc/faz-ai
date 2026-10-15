@@ -1,4 +1,5 @@
 import type { Database } from 'sql.js';
+import { BRANCH_KINDS, type BranchKind } from '../../shared/git';
 import type { ColumnCategory, FieldDisplay, FieldKind, FieldValue } from '../../shared/model';
 import { newId } from '../db/ids';
 import { all, num, one, run, str, transaction } from '../db/query';
@@ -103,12 +104,23 @@ export class SettingsRepo {
 
   updateType(
     typeId: string,
-    patch: { name?: string; color?: string; defaultWorkflowId?: string; defaults?: Record<string, FieldValue> },
+    patch: {
+      name?: string;
+      color?: string;
+      defaultWorkflowId?: string;
+      defaults?: Record<string, FieldValue>;
+      branchKind?: BranchKind;
+    },
   ): void {
+    // release não é tipo de branch de card (#462, RF08), e a coluna não tem CHECK: valida antes de gravar,
+    // e antes de qualquer outro campo do patch, para a recusa não deixar o tipo pela metade
+    if (patch.branchKind !== undefined && !BRANCH_KINDS.some((k) => k.value === patch.branchKind))
+      throw new Error(`Tipo de branch inválido: "${String(patch.branchKind)}" (use feature, bugfix ou hotfix)`);
     if (patch.name !== undefined) run(this.db, 'UPDATE card_types SET name = ? WHERE id = ?', [patch.name, typeId]);
     if (patch.color !== undefined) run(this.db, 'UPDATE card_types SET color = ? WHERE id = ?', [patch.color, typeId]);
     if (patch.defaultWorkflowId !== undefined)
       run(this.db, 'UPDATE card_types SET default_workflow_id = ? WHERE id = ?', [patch.defaultWorkflowId, typeId]);
+    if (patch.branchKind !== undefined) run(this.db, 'UPDATE card_types SET branch_kind = ? WHERE id = ?', [patch.branchKind, typeId]);
     if (patch.defaults !== undefined) {
       const clean = Object.fromEntries(
         Object.entries(patch.defaults).filter(([, v]) => v !== null && v !== '' && v !== false && !(Array.isArray(v) && v.length === 0)),

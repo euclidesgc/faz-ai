@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
-import { MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
+import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 31;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -366,6 +366,42 @@ const MIGRATIONS: Record<number, string> = {
     -- até onde vai o modo autônomo da história: a coluna em que a IA faz o trabalho, pede a revisão e o
     -- modo se desliga. '' = até a última coluna em que a IA atua (o pull request).
     ALTER TABLE cards ADD COLUMN yolo_until TEXT NOT NULL DEFAULT '';
+  `,
+  30: `
+    -- o banco de artefatos do board: a marcação passa a aceitar servidores MCP (kind 'mcp') e o modo
+    -- 'off' (no board, mas desligado: é como as regras entram, para revisão). O SQLite não altera um
+    -- CHECK: a tabela é recriada com o mesmo conteúdo.
+    CREATE TABLE harness_selection_v30 (
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL CHECK (kind IN ('instructions','skill','agent','mcp')),
+      location TEXT NOT NULL,
+      usage TEXT NOT NULL CHECK (usage IN ('always','contextual','off')),
+      PRIMARY KEY (board_id, kind, location)
+    );
+    INSERT INTO harness_selection_v30(board_id, kind, location, usage) SELECT board_id, kind, location, usage FROM harness_selection;
+    DROP TABLE harness_selection;
+    ALTER TABLE harness_selection_v30 RENAME TO harness_selection;
+    -- pastas importadas por ferramenta: o board as varre atrás de artefatos e os lista em "Importados"
+    CREATE TABLE IF NOT EXISTS harness_imports (
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      tool TEXT NOT NULL,
+      dir TEXT NOT NULL,
+      PRIMARY KEY (board_id, tool, dir)
+    );
+    -- campo MCPs: os servidores do board em modo "Pelo card" que a execução do card recebe
+    INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position)
+    SELECT lower(hex(randomblob(16))), b.id, '${MCPS_FIELD}', 'multiselect', '[]', NULL, 'chip',
+           (SELECT COALESCE(MAX(position), -1) + 1 FROM field_defs f WHERE f.board_id = b.id)
+    FROM boards b
+    WHERE NOT EXISTS (SELECT 1 FROM field_defs f WHERE f.board_id = b.id AND lower(f.name) = 'mcps');
+  `,
+  31: `
+    -- #462: tipo de branch do gitflow que cada tipo de card gera ('feature' | 'bugfix' | 'hotfix').
+    -- Fica no tipo, não no nome: renomear o tipo não muda a branch. Os nomes guardados são sempre os em
+    -- português (ver BUG_TYPE em shared/priority.ts), então o padrão dos boards existentes sai pelo nome.
+    ALTER TABLE card_types ADD COLUMN branch_kind TEXT NOT NULL DEFAULT 'feature';
+    UPDATE card_types SET branch_kind = 'hotfix' WHERE name = 'Bug';
+    UPDATE card_types SET branch_kind = 'bugfix' WHERE name = 'Retrabalho';
   `,
 };
 

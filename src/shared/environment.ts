@@ -1,9 +1,11 @@
 import type { AiTool } from './harness';
+import type { HarnessIssue } from './harnessStatus';
 import type { BoardRequirement } from './requirements';
 
 /**
  * Os itens do Diagnóstico do ambiente. `tool` é o bloco de uma ferramenta de IA, com a CLI, o login,
- * o MCP do board, a skill do fluxo e o nível de permissão dentro dele.
+ * o MCP do board, a skill do fluxo, a definição do harness (com o que falta nela) e o nível de
+ * permissão dentro dele.
  */
 export type EnvCheckId =
   | 'node'
@@ -12,6 +14,8 @@ export type EnvCheckId =
   | 'signin'
   | 'mcp'
   | 'skill'
+  | 'harness'
+  | `harness-${HarnessIssue}`
   | 'permission'
   | 'git'
   | 'repo'
@@ -87,7 +91,13 @@ export interface EnvironmentReport {
 /** A versão mínima do Node.js (a que o Claude Code pede e a LTS mais antiga ainda com suporte). */
 export const NODE_MIN_MAJOR = 22;
 
-/** Os itens que faltam na árvore, sem contar o bloco da ferramenta (que só resume os de dentro). */
+/**
+ * Os itens que faltam na árvore, sem contar o bloco da ferramenta (que só resume os de dentro) nem o
+ * do harness (que só resume o que falta nele: cada falta é um filho).
+ */
 export function missingCount(checks: EnvCheck[]): number {
-  return checks.reduce((n, c) => n + (c.id !== 'tool' && c.status === 'missing' ? 1 : 0) + missingCount(c.children ?? []), 0);
+  return checks.reduce(
+    (n, c) => n + (c.id !== 'tool' && c.id !== 'harness' && c.status === 'missing' ? 1 : 0) + missingCount(c.children ?? []),
+    0,
+  );
 }

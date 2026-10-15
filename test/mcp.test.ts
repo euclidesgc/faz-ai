@@ -138,6 +138,21 @@ describe('servidor MCP', () => {
     expect(description('get_harness')).toContain('contexto vazio');
   });
 
+  it('o pull request é aberto com --base em workspace.prBase: instruções, prepare_workspace, set_pull_request e nota do modo autônomo (#462)', async () => {
+    const tools = (await client.listTools()).tools;
+    const description = (name: string) => tools.find((t) => t.name === name)!.description;
+    expect(client.getInstructions()).toContain('Pull request: sempre com --base em workspace.prBase do get_card.');
+    expect(description('prepare_workspace')).toMatch(/parte da base do fluxo[\s\S]*`prBase`/);
+    expect(description('set_pull_request')).toContain('`--base` em `workspace.prBase`');
+    // a história ainda sem branch não sabe a base: a nota manda ler workspace.prBase do get_card
+    await call('create_card', { title: 'Login', column: 'Backlog' });
+    router.handle({ type: 'card.yolo.set', cardId: router.snapshot().cards[0]!.id, enabled: true });
+    await call('move_card', { card: 1, column: 'Homologação' });
+    expect((await call('get_card', { card: 1 })).data.phase.autonomousNote).toContain(
+      'abra o pull request com --base em workspace.prBase do get_card',
+    );
+  });
+
   it('parâmetro desconhecido é erro com o nome dele, e nada é criado', async () => {
     // um nome errado não pode virar o comportamento padrão: `story` no lugar de `parent` criaria uma história
     const res = await call('create_card', { title: 'Subtrair', story: 1 });
@@ -461,6 +476,7 @@ describe('harness e padrões pelo MCP', () => {
       group: 'skill',
       scope: 'user',
       usage: 'contextual',
+      key: '~/.claude/skills/commit/SKILL.md',
       name: 'commit',
       mode: 'auto',
       description: 'Escreve o commit',
@@ -1082,6 +1098,12 @@ describe('status do card e checkpoint de revisão', () => {
     await call('set_ai_tool', { tool: 'cursor' });
     await call('create_agent', { name: 'verificador', description: 'd', content: 'c', scope: 'project' });
     expect(fs.existsSync(path.join(dir, '.cursor/agents/verificador.md'))).toBe(true);
+    // no Cursor o arquivo guarda somente leitura e segundo plano; update_agent liga e desliga
+    await call('create_agent', { name: 'leitor', description: 'd', content: 'c', scope: 'project', readonly: true });
+    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).toContain('readonly: true\n');
+    await call('update_agent', { agent: 'leitor', readonly: false, background: true });
+    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).toMatch(/is_background: true\n/);
+    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).not.toContain('readonly');
     await call('set_ai_tool', { tool: 'claude' });
 
     await call('delete_agent', { agent: 'planejador' });

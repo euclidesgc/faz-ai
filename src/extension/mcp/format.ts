@@ -1,6 +1,6 @@
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
-import { isSelectableKind, usageOf } from '../../shared/harnessSelection';
+import { isSelectableKind, selectionKey, usageOf } from '../../shared/harnessSelection';
 import { groupOf } from '../../shared/harnessCatalog';
 import { norm } from '../../shared/filters';
 import {
@@ -20,6 +20,7 @@ import { isAtYoloStop, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../../s
 import { CORE, CRITICALITY_FIELD, PERIPHERY, isCoreStory } from '../../shared/critical';
 import { isBoardField } from '../../shared/boardFields';
 import { slug } from '../../shared/git';
+import { prBaseOf, type PrBase } from '../../shared/gitflow';
 import {
   cardRef,
   type BoardState,
@@ -267,7 +268,7 @@ function supportFiles(skillMd: string, files: string[]) {
 export function requiredRules(s: BoardState, c: Card) {
   return manifestOf(s, c).rules.map((location) => {
     const item = toolItems(s).find((i) => i.kind === 'instructions' && i.location === location);
-    return item ? { name: location, scope: item.scope, path: item.path } : { name: location, note: 'rule não encontrada' };
+    return item ? { name: location, scope: item.scope, path: item.path } : { name: location, note: 'rule fora do board ou não encontrada' };
   });
 }
 
@@ -321,6 +322,12 @@ function decisionRecordOf(s: BoardState, story: Card, col: Column) {
   };
 }
 
+/** " com --base <prBase>" para a nota do modo autônomo; sem a base conhecida (história sem branch, repositório não detectado), manda ler workspace.prBase */
+function prBaseClause(s: BoardState, story: Card): string {
+  const base = prBaseOf(s, story)?.prBase;
+  return base ? ` com --base ${base}` : ' com --base em workspace.prBase do get_card';
+}
+
 /**
  * A fase em que o card está: o que a IA deve fazer e o documento que a fase produz. Numa
  * sub-tarefa, é a fase da história, porque o artefato é construído na sub-tarefa mas pertence à história.
@@ -353,7 +360,7 @@ function phaseOf(s: BoardState, c: Card) {
           autonomousNote: isAtYoloStop(s, story)
             ? `Modo autônomo (YOLO) na história ${cardRef(story)} até ${col.name}, a fase atual: é a última que a pessoa liberou para você rodar sozinho. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare: o modo autônomo se desliga e a revisão desta fase é da pessoa.`
             : col.id === lastAiColumn(s, story.workflowId)?.id
-              ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
+              ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request${prBaseClause(s, story)} e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
               : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde, nem mesmo numa história do núcleo ou com pendência. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Siga os padrões do projeto e as regras de arquitetura dele, escolha o caminho menos complexo entre os que os seguem, responda você mesmo as perguntas do documento da fase (seção "Perguntas para você", com a recomendação) e registre as decisões na conversa.`,
         }
       : col.requiresApproval
@@ -379,20 +386,42 @@ function criticalAreasOf(s: BoardState, c: Card) {
   };
 }
 
+/**
+ * A base do pull request (#462): sempre que a história tem branch, a IA lê aqui para onde abri-lo. Sem repositório
+ * detectado e com a base vazia (história anterior ao gitflow), `prBase` fica de fora e a nota manda usar a principal.
+ */
+function prBaseFields(base: PrBase | null, stackedOnLive: boolean) {
+  if (!base) return {};
+  if (!base.prBase) {
+    return { prNote: 'Abra o pull request contra a branch principal do repositório (ex.: gh pr create --base <a branch principal>).' };
+  }
+  return {
+    baseBranch: base.baseBranch,
+    prBase: base.prBase,
+    prNote: `Abra o pull request com --base ${base.prBase} (ex.: gh pr create --base ${base.prBase}).`,
+    ...(stackedOnLive
+      ? {
+          stackNote: `Esta história está empilhada sobre ${base.baseBranch}: diga na descrição do pull request de qual pull request ele depende.`,
+        }
+      : {}),
+  };
+}
+
 /** Onde o código da história deve ser alterado (sub-tarefas usam a branch e a pasta da história). */
 function workspaceOf(s: BoardState, c: Card) {
   const story = storyOf(s, c) ?? c;
   if (story.branch) {
+    const base = prBaseOf(s, story);
     return {
       workspace: {
         branch: story.branch,
         path: story.worktreePath,
-        ...(story.baseBranch
-          ? {
-              baseBranch: story.baseBranch,
-              stackNote: `Esta história está empilhada sobre ${story.baseBranch}: abra o pull request com --base ${story.baseBranch} (ex.: gh pr create --base ${story.baseBranch}) e diga na descrição de qual pull request ele depende.`,
-            }
-          : {}),
+        ...prBaseFields(
+          base,
+          // a nota só vale enquanto a história da base está viva: já concluída, o PR dela foi mesclado e não há do que depender
+          !!base?.stacked &&
+            s.cards.some((o) => o.id !== story.id && !o.parentId && o.branch === story.baseBranch && cardStatus(s, o) === 'open'),
+        ),
         ...(story.prUrl ? { pullRequest: story.prUrl } : {}),
         ...(story.mergeCommit ? { mergeCommit: story.mergeCommit } : {}),
         note:
@@ -435,6 +464,8 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...cardSummary(s, c),
     ...(chosen ? { model: { ...describeModel(s, chosen), note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
+    harnessNote:
+      'Skills, rules, servidores MCP e agente do card: escolha só entre o que está no board em modo "Pelo card" (get_harness). O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.',
     ...(rules.length
       ? {
           requiredRules: rules,
@@ -609,8 +640,8 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
     aiTool: s.board.aiTool,
     defaultAgent: s.board.execProfiles.find((p) => p.isDefault)?.id ?? null,
     note: onlySelected
-      ? 'Só o que está marcado em Configurações → Harness: é tudo o que as execuções do board usam. `usage` "always" entra em toda execução; "contextual" só quando indicado no card (campos Rules e Skills) ou escolhido no refinar. Para ver tudo que a ferramenta carrega, chame get_harness com onlySelected = false.'
-      : 'Tudo que a ferramenta carrega nesta máquina; `usage` diz como o board marcou cada item (null = não marcado: invisível para as execuções do board).',
+      ? 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "always" (Sempre) entra em toda execução; "contextual" (Pelo card) só quando indicado no card (campos Rules, Skills e MCPs) ou escolhido no planejamento e no refinar; "off" (Desligado) está no board sem entrar em nada. Para ver tudo que a ferramenta carrega, chame get_harness com onlySelected = false.'
+      : 'Tudo que a ferramenta carrega nesta máquina, e o que há nas pastas importadas; `usage` diz o modo de cada item no board (null = fora do board: invisível para as execuções).',
     ruleFiles: s.harness.rules.map((r) => ({ name: r.name, exists: r.exists, ...(r.exists ? { bytes: r.content.length } : {}) })),
     skills: s.harness.skills
       .filter((k) => !onlySelected || toolItems(s).some((i) => i.kind === 'skill' && i.location === k.path && usage(i)))
@@ -628,14 +659,15 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
         usage: usageOf(s.harnessSelection, { kind: 'agent', location: a.location }),
         path: a.location,
       })),
-    // o que a ferramenta em uso carrega, com o escopo (project, user ou plugin) e a marcação do board
+    // o que a ferramenta em uso carrega, com o escopo (project, user, plugin ou imported) e o modo no board
     inventory: inventory.map((i) => ({
       kind: i.kind,
       // o grupo em que a tela de Harness mostra o item (main, topic, memory, skill… plugin, managed)
       group: groupOf(s.board.aiTool, i),
       scope: i.scope,
       name: i.name,
-      ...(isSelectableKind(i.kind) ? { usage: usage(i) } : {}),
+      // a identidade do item no board (para set_harness_selection): o caminho; num servidor MCP, `arquivo#nome`
+      ...(isSelectableKind(i.kind) ? { usage: usage(i), key: selectionKey(i) } : {}),
       ...(i.mode ? { mode: i.mode } : {}),
       ...(i.files?.length ? { files: i.files } : {}),
       ...(i.description ? { description: i.description } : {}),

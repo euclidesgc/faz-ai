@@ -54,6 +54,9 @@ export class HarnessStore {
    */
   claudePlugins: PluginInstall[] | null = null;
 
+  /** As pastas importadas de cada ferramenta (caminhos absolutos), varridas junto com o resto. */
+  imports: Partial<Record<AiTool, string[]>> = {};
+
   setTool(tool: AiTool): void {
     this.tool = tool;
   }
@@ -82,7 +85,14 @@ export class HarnessStore {
     return ALL_AI_TOOLS.map((tool) => ({
       tool,
       installed: installed.includes(tool),
-      items: scanInventory(tool, this.workspaceDir, this.homeDir, undefined, tool === 'claude' ? this.claudePlugins : null),
+      items: scanInventory(
+        tool,
+        this.workspaceDir,
+        this.homeDir,
+        undefined,
+        tool === 'claude' ? this.claudePlugins : null,
+        this.imports[tool] ?? [],
+      ),
     }));
   }
 

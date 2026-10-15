@@ -8,6 +8,7 @@ import type { ModelOption, ModelRule } from '../shared/models';
 import type { BoardRules } from '../shared/rules';
 import type { FieldValue, Id, LinkKind, WorkflowKind } from '../shared/model';
 import { postToHost } from './vscode';
+import { request } from './request';
 
 /** Patch de cada mensagem `*.update`, tirado do protocolo para não repetir a forma aqui. */
 type PatchOf<T extends WebviewToHost['type']> = Extract<WebviewToHost, { type: T }> extends { patch: infer P } ? P : never;
@@ -20,6 +21,8 @@ export type FieldInput = Payload<'settings.field.create'>;
 export type HarnessScope = 'project' | 'user';
 
 const post = (msg: WebviewToHost): void => postToHost(msg);
+/** Como `post`, mas espera o `done` do host: para as ações que demoram e precisam mostrar a espera (`useAction`). */
+const req = (msg: WebviewToHost): Promise<void> => request(msg);
 
 /**
  * Tudo o que o front pede ao host, com nome de ação. Os componentes chamam `cards.trash(id)`
@@ -28,18 +31,20 @@ const post = (msg: WebviewToHost): void => postToHost(msg);
 export const ui = {
   showFilters: () => post({ type: 'ui.showFilters' }),
   /** instala o servidor MCP do board: padrão é a ferramenta do projeto, no escopo global */
-  connectAI: (tool?: AiTool, scope?: InstallScope) => post({ type: 'ui.connectAI', tool, scope }),
+  connectAI: (tool?: AiTool, scope?: InstallScope) => req({ type: 'ui.connectAI', tool, scope }),
   openInBrowser: () => post({ type: 'ui.openInBrowser' }),
   openIdeSettings: (key?: string) => post({ type: 'ui.openIdeSettings', key }),
+  /** a tela Git pede para detectar de novo a branch principal (sem rede) */
+  refreshMainBranch: () => post({ type: 'git.main.refresh' }),
   showChat: () => post({ type: 'ui.showChat' }),
-  checkRequirements: () => post({ type: 'requirements.check' }),
-  fixProjectMcp: (file: string) => post({ type: 'ui.fixProjectMcp', file }),
+  checkRequirements: () => req({ type: 'requirements.check' }),
+  fixProjectMcp: (file: string) => req({ type: 'ui.fixProjectMcp', file }),
   reloadWindow: () => post({ type: 'ui.reloadWindow' }),
   openEditorMcp: () => post({ type: 'ui.openEditorMcp' }),
   openTerminal: (command: string) => post({ type: 'ui.openTerminal', command }),
-  checkEnvironment: () => post({ type: 'environment.check' }),
+  checkEnvironment: () => req({ type: 'environment.check' }),
   environmentSeen: () => post({ type: 'environment.seen' }),
-  pinMcp: () => post({ type: 'environment.pinMcp' }),
+  pinMcp: () => req({ type: 'environment.pinMcp' }),
   allowKimiMcp: () => post({ type: 'environment.allowKimiMcp' }),
 };
 
@@ -57,6 +62,10 @@ export const ai = {
   runHeartbeat: () => post({ type: 'ai.heartbeat.run' }),
   /** a IA lê o projeto e propõe os agentes do board; o resultado vai para o chat do board */
   suggestAgents: () => post({ type: 'ai.suggestAgents' }),
+  /** a IA lê o projeto e propõe regras, gravadas e enviadas ao board desligadas */
+  suggestRules: () => post({ type: 'ai.suggestRules' }),
+  /** a IA lê o projeto e propõe skills, gravadas e enviadas ao board em "Pelo card" */
+  suggestSkills: () => post({ type: 'ai.suggestSkills' }),
   pauseAutopilot: () => post({ type: 'ai.autopilot.pause' }),
   resumeAutopilot: () => post({ type: 'ai.autopilot.resume' }),
 };
@@ -78,17 +87,17 @@ export const cards = {
   setYoloMany: (cardIds: Id[], enabled: boolean, until?: Id | null) => post({ type: 'card.yolo.setMany', cardIds, enabled, until }),
   archiveMany: (cardIds: Id[]) => post({ type: 'card.archiveMany', cardIds }),
   trashMany: (cardIds: Id[]) => post({ type: 'card.trashMany', cardIds }),
-  moveMany: (cardIds: Id[], columnId: Id) => post({ type: 'card.moveMany', cardIds, columnId }),
+  moveMany: (cardIds: Id[], columnId: Id) => req({ type: 'card.moveMany', cardIds, columnId }),
   setExecProfile: (cardId: Id, profileId: Id | null) => post({ type: 'card.execProfile.set', cardId, profileId }),
   setField: (cardId: Id, fieldId: Id, value: FieldValue) => post({ type: 'field.setValue', cardId, fieldId, value }),
   setPr: (cardId: Id, url: string) => post({ type: 'card.pr.set', cardId, url }),
-  prepareWorkspace: (cardId: Id) => post({ type: 'card.workspace.prepare', cardId }),
+  prepareWorkspace: (cardId: Id) => req({ type: 'card.workspace.prepare', cardId }),
   openWorkspace: (cardId: Id) => post({ type: 'card.workspace.open', cardId }),
   clearWorkspace: (cardId: Id) => post({ type: 'card.workspace.clear', cardId }),
 };
 
 export const trash = {
-  empty: () => post({ type: 'trash.empty' }),
+  empty: () => req({ type: 'trash.empty' }),
 };
 
 export const comments = {
@@ -111,7 +120,7 @@ export const links = {
 
 export const attachments = {
   pick: (cardId: Id) => post({ type: 'attachment.pick', cardId }),
-  addData: (input: Payload<'attachment.addData'>) => post({ type: 'attachment.addData', ...input }),
+  addData: (input: Payload<'attachment.addData'>) => req({ type: 'attachment.addData', ...input }),
   reveal: (attachmentId: Id) => post({ type: 'attachment.reveal', attachmentId }),
   delete: (attachmentId: Id) => post({ type: 'attachment.delete', attachmentId }),
   /** pede ao host para abrir o diálogo nativo de "salvar como" (só faz sentido fora da web) */
@@ -119,9 +128,9 @@ export const attachments = {
 };
 
 export const settings = {
-  updateBoard: (patch: BoardPatch) => post({ type: 'settings.board.update', patch }),
-  resetBoard: () => post({ type: 'settings.board.reset' }),
-  upgradeBoard: () => post({ type: 'settings.board.upgrade' }),
+  updateBoard: (patch: BoardPatch) => req({ type: 'settings.board.update', patch }),
+  resetBoard: () => req({ type: 'settings.board.reset' }),
+  upgradeBoard: () => req({ type: 'settings.board.upgrade' }),
   createWorkflow: (name: string, kind: WorkflowKind) => post({ type: 'settings.workflow.create', name, kind }),
   updateWorkflow: (workflowId: Id, patch: PatchOf<'settings.workflow.update'>) =>
     post({ type: 'settings.workflow.update', workflowId, patch }),
@@ -139,27 +148,38 @@ export const settings = {
   deleteField: (fieldId: Id) => post({ type: 'settings.field.delete', fieldId }),
   updateRules: (patch: Partial<BoardRules>) => post({ type: 'settings.rules.update', patch }),
   setModels: (catalog: ModelOption[]) => post({ type: 'settings.models.set', catalog }),
-  detectModels: (tool: AiTool) => post({ type: 'settings.models.detect', tool }),
+  detectModels: (tool: AiTool) => req({ type: 'settings.models.detect', tool }),
   setModelRules: (rules: ModelRule[]) => post({ type: 'settings.modelRules.set', rules }),
-  suggestModelRules: (tool: AiTool) => post({ type: 'settings.modelRules.suggest', tool }),
+  suggestModelRules: (tool: AiTool) => req({ type: 'settings.modelRules.suggest', tool }),
 };
 
 export const backup = {
   export: () => post({ type: 'backup.export' }),
   importPick: () => post({ type: 'backup.import.pick' }),
-  importApply: (token: string) => post({ type: 'backup.import.apply', token }),
+  importApply: (token: string) => req({ type: 'backup.import.apply', token }),
   importCancel: (token: string) => post({ type: 'backup.import.cancel', token }),
 };
 
 export const harness = {
-  refresh: () => post({ type: 'harness.refresh' }),
+  refresh: () => req({ type: 'harness.refresh' }),
   openItem: (path: string) => post({ type: 'harness.item.open', path }),
   createItem: (tool: AiTool, source: number, name: string, description: string) =>
     post({ type: 'harness.item.create', tool, source, name, description }),
+  /** cria o item já com o conteúdo (assistentes de regras e skills); `append` acrescenta a um arquivo fixo que já existe */
+  writeItem: (tool: AiTool, source: number, name: string, content: string, files?: string[], append?: boolean) =>
+    post({
+      type: 'harness.item.write',
+      tool,
+      source,
+      name,
+      content,
+      ...(files?.length ? { files } : {}),
+      ...(append ? { append } : {}),
+    }),
   deleteItem: (tool: AiTool, kind: HarnessKind, path: string) => post({ type: 'harness.item.delete', tool, kind, path }),
-  applyPlugins: (tool: AiTool, action: PluginAction, ids: string[]) => post({ type: 'harness.plugin.apply', tool, action, ids }),
+  applyPlugins: (tool: AiTool, action: PluginAction, ids: string[]) => req({ type: 'harness.plugin.apply', tool, action, ids }),
   copyItems: (tool: AiTool, items: { kind: HarnessKind; path: string }[], to: HarnessScope) =>
-    post({ type: 'harness.item.copy', tool, items, to }),
+    req({ type: 'harness.item.copy', tool, items, to }),
   writeRule: (name: string, content: string) => post({ type: 'harness.rule.write', name, content }),
   deleteRule: (name: string) => post({ type: 'harness.rule.delete', name }),
   createSkill: (name: string, description: string, content: string) => post({ type: 'harness.skill.create', name, description, content }),
@@ -171,15 +191,22 @@ export const harness = {
     post({ type: 'harness.skill.file.create', tool, path, file, link }),
   openSkillFile: (tool: AiTool, path: string, file: string) => post({ type: 'harness.skill.file.open', tool, path, file }),
   deleteSkillFile: (tool: AiTool, path: string, file: string) => post({ type: 'harness.skill.file.delete', tool, path, file }),
-  /** marca ou desmarca (usage null) itens para as execuções do board */
+  /** envia artefatos ao board com um modo, muda o modo, ou os tira do board (usage null); `location` é a `selectionKey` */
   setSelection: (items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null) =>
-    post({ type: 'harness.selection.set', items, usage }),
+    req({ type: 'harness.selection.set', items, usage }),
+  /** a IA pré-seleciona os artefatos do assunto que fazem mais sentido para o projeto */
+  suggest: (tool: AiTool, kind: SelectableKind) => post({ type: 'harness.suggest.run', tool, kind }),
+  clearSuggestions: () => post({ type: 'harness.suggest.clear' }),
+  /** abre o seletor de pasta do editor para importar artefatos */
+  pickImport: (tool: AiTool) => req({ type: 'harness.import.pick', tool }),
+  addImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.add', tool, dir }),
+  removeImport: (tool: AiTool, dir: string) => post({ type: 'harness.import.remove', tool, dir }),
   createAgent: (scope: InstallScope, input: AgentInput) => post({ type: 'harness.agent.create', scope, input }),
   updateAgent: (name: string, scope: InstallScope, patch: Partial<AgentInput>, body?: string) =>
     post({ type: 'harness.agent.update', name, scope, patch, ...(body !== undefined ? { body } : {}) }),
   writeAgent: (name: string, scope: InstallScope, content: string) => post({ type: 'harness.agent.write', name, scope, content }),
   deleteAgent: (name: string, scope: InstallScope) => post({ type: 'harness.agent.delete', name, scope }),
-  seedAgents: (force = false) => post({ type: 'harness.agents.seed', force }),
+  seedAgents: (force = false) => req({ type: 'harness.agents.seed', force }),
   addMcp: (tool: AiTool, source: number, server: McpServerInput) => post({ type: 'harness.mcp.add', tool, source, server }),
   removeMcp: (tool: AiTool, path: string, name: string) => post({ type: 'harness.mcp.remove', tool, path, name }),
   addHook: (tool: AiTool, source: number, hook: HookInput) => post({ type: 'harness.hook.add', tool, source, hook }),
@@ -191,8 +218,8 @@ export const harness = {
     post({ type: 'harness.permission.remove', tool, path, list, rule }),
   createReferenceSkill: () => post({ type: 'harness.referenceSkill.create' }),
   installFlowSkill: (tool: AiTool, scope: InstallScope, replace = false) =>
-    post({ type: 'harness.flowSkill.install', tool, scope, replace }),
-  scanInstall: (source: string) => post({ type: 'harness.install.scan', source }),
-  applyInstall: (tool: AiTool, to: HarnessScope, rels: string[]) => post({ type: 'harness.install.apply', tool, to, rels }),
+    req({ type: 'harness.flowSkill.install', tool, scope, replace }),
+  scanInstall: (source: string) => req({ type: 'harness.install.scan', source }),
+  applyInstall: (tool: AiTool, to: HarnessScope, rels: string[]) => req({ type: 'harness.install.apply', tool, to, rels }),
   cancelInstall: () => post({ type: 'harness.install.cancel' }),
 };

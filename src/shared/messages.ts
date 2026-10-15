@@ -10,7 +10,8 @@ import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
-import type { GitConfig } from './git';
+import type { BranchKind, GitConfig } from './git';
+import type { ProjectProfile } from './projectProfile';
 
 /** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
 export interface AgentInput {
@@ -25,6 +26,10 @@ export interface AgentInput {
   skills: string[];
   /** servidores MCP além do do board */
   mcp: string[];
+  /** só no Cursor (`readonly: true`): o agente não edita arquivos nem roda comandos que mudem estado */
+  readonly?: boolean;
+  /** só no Cursor (`is_background: true`): o agente roda em segundo plano, sem esperar a conversa */
+  background?: boolean;
 }
 import type { SettingsTab } from './settingsTab';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
@@ -47,6 +52,8 @@ export type WebviewToHost =
   | { type: 'ui.openInBrowser' }
   /** pede ao editor para abrir o Settings nativo filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */
   | { type: 'ui.openIdeSettings'; key?: string }
+  /** a tela Git pede para detectar de novo a branch principal */
+  | { type: 'git.main.refresh' }
   /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */
   /** `mode`: trabalhar a fase (padrão) ou só refinar o card */
   | { type: 'ai.run'; cardId: Id; mode?: AiRunMode }
@@ -90,6 +97,7 @@ export type WebviewToHost =
   | { type: 'card.pr.set'; cardId: Id; url: string }
   /** registra o commit do merge do pull request da história do card; sem efeito colateral (ao contrário do card.pr.set) */
   | { type: 'card.merge.set'; cardId: Id; commit: string }
+  | { type: 'card.baseBranch.set'; cardId: Id; base: string }
   /**
    * liga ou desliga o modo autônomo (YOLO) da história do card. `until` é a coluna até onde ele vai (a IA
    * faz o trabalho dela, pede a revisão e o modo se desliga); ausente ou null = até a última coluna da IA.
@@ -130,7 +138,8 @@ export type WebviewToHost =
   /** lê o conteúdo de um anexo de texto/JSON para exibir ou editar na modal */
   | { type: 'attachment.read'; requestId: string; attachmentId: Id }
   /** grava o conteúdo editado de volta no arquivo do anexo */
-  | { type: 'attachment.write'; requestId: string; attachmentId: Id; content: string }
+  /** grava o texto editado no arquivo do anexo; a confirmação vem pelo `done` do `requestId` */
+  | { type: 'attachment.write'; attachmentId: Id; content: string }
   /** consulta o log para o painel de métricas; não altera nada, a resposta é `metrics.result` */
   | { type: 'metrics.query'; requestId: string; query: MetricsPanelQuery }
   /** consulta o que o card já gastou nas execuções de IA (o log); não altera nada, a resposta é `card.usage.result` */
@@ -171,7 +180,7 @@ export type WebviewToHost =
   | {
       type: 'settings.type.update';
       typeId: Id;
-      patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue> };
+      patch: { name?: string; color?: string; defaultWorkflowId?: Id; defaults?: Record<Id, FieldValue>; branchKind?: BranchKind };
     }
   | { type: 'settings.type.delete'; typeId: Id }
   | {
@@ -216,9 +225,18 @@ export type WebviewToHost =
   /** lê, para o editor do board, um arquivo que a varredura do harness listou */
   | { type: 'harness.file.read'; requestId: string; path: string }
   /** grava o texto editado no board num arquivo do harness; recusa os que são só leitura */
-  | { type: 'harness.file.write'; requestId: string; path: string; content: string }
+  /** grava o texto editado num arquivo do harness; a confirmação vem pelo `done` do `requestId` */
+  | { type: 'harness.file.write'; path: string; content: string }
   /** cria um item num lugar do catálogo da ferramenta (`source` é o índice em HARNESS_CATALOG) e abre o arquivo no editor */
   | { type: 'harness.item.create'; tool: AiTool; source: number; name: string; description: string }
+  /**
+   * cria um item já com o conteúdo (os assistentes de regras e de skills) e abre o arquivo no editor do board. Numa
+   * skill, `files` são arquivos de apoio criados vazios na pasta dela. Com `append`, um arquivo fixo que já existe
+   * (CLAUDE.md, AGENTS.md) ganha o conteúdo no fim em vez de dar erro
+   */
+  | { type: 'harness.item.write'; tool: AiTool; source: number; name: string; content: string; files?: string[]; append?: boolean }
+  /** o perfil do projeto (linguagens, comandos, ferramentas, pastas) para os assistentes; a resposta é `harness.project.profileResult` */
+  | { type: 'harness.project.profile'; requestId: string }
   /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
   | { type: 'harness.item.delete'; tool: AiTool; kind: HarnessKind; path: string }
   /** desinstala, desativa ou ativa plugins pela ferramenta; `ids` são os de `HarnessItem.install` */
@@ -255,10 +273,20 @@ export type WebviewToHost =
   /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
   | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
   /**
-   * marca (ou desmarca, com `usage` null) itens do harness para as execuções do board: `location` como o
-   * inventário o mostra (relativo ao projeto ou a partir de `~`)
+   * envia artefatos ao board com um modo, muda o modo dos que já estão nele, ou os tira do board (com
+   * `usage` null): `location` é a identidade do item na marcação (`selectionKey`: o caminho como o
+   * inventário o mostra, mais `#nome` numa entrada de configuração)
    */
   | { type: 'harness.selection.set'; items: { kind: SelectableKind; location: string }[]; usage: HarnessUsage | null }
+  /** a IA analisa o projeto e o catálogo do assunto e pré-seleciona os artefatos que fazem mais sentido (resultado em `harnessSuggestions`) */
+  | { type: 'harness.suggest.run'; tool: AiTool; kind: SelectableKind }
+  | { type: 'harness.suggest.clear' }
+  /** abre o seletor de pasta do editor e importa a pasta escolhida para a ferramenta (só no editor) */
+  | { type: 'harness.import.pick'; tool: AiTool }
+  /** importa uma pasta: o board a varre atrás de artefatos no formato da ferramenta e os lista em "Importados" */
+  | { type: 'harness.import.add'; tool: AiTool; dir: string }
+  /** tira a pasta importada da lista; os artefatos dela saem do board */
+  | { type: 'harness.import.remove'; tool: AiTool; dir: string }
   /** cria um agente na pasta de agentes da ferramenta (global por padrão) e o marca como disponível no board */
   | { type: 'harness.agent.create'; scope?: InstallScope; input: AgentInput }
   /** reescreve o frontmatter (o que vier em `patch`) e, se vier, o corpo de um agente, preservando o resto */
@@ -269,6 +297,10 @@ export type WebviewToHost =
   | { type: 'harness.agents.seed'; force?: boolean }
   /** a IA lê o projeto e propõe os agentes do board (cria, ajusta e marca); o resultado vai para o chat do board */
   | { type: 'ai.suggestAgents' }
+  /** a IA lê o projeto e propõe de 3 a 5 regras, gravadas e enviadas ao board desligadas; o resultado vai para o chat */
+  | { type: 'ai.suggestRules' }
+  /** a IA lê o projeto e propõe de 3 a 5 skills, gravadas e enviadas ao board em "Pelo card"; o resultado vai para o chat */
+  | { type: 'ai.suggestSkills' }
   /** chat com a IA do projeto: envia uma mensagem (com o modelo escolhido, ou null para o padrão), interrompe ou limpa a conversa */
   | { type: 'chat.send'; text: string; model: string | null }
   | { type: 'chat.stop' }
@@ -309,16 +341,12 @@ export type HostToWebview =
   | { type: 'notice'; message: string }
   /** resposta a `attachment.read`, correlacionada por `requestId` */
   | { type: 'attachment.readResult'; requestId: string; content?: string; error?: string }
-  /** resposta a `attachment.write`, correlacionada por `requestId` */
-  | { type: 'attachment.writeResult'; requestId: string; ok: boolean; error?: string }
-  /** terminou o `harness.plugin.apply` (com aviso ou erro): a tela para de mostrar que está trabalhando */
-  | { type: 'harness.plugin.done' }
   /** resposta a `harness.file.read`: o conteúdo e se o arquivo pode ser alterado pelo board */
   | { type: 'harness.file.readResult'; requestId: string; content?: string; readonly?: boolean; error?: string }
   /** item do harness criado pela tela: ela abre o arquivo no editor do board */
   | { type: 'harness.item.created'; path: string }
-  /** resposta a `harness.file.write`, correlacionada por `requestId` */
-  | { type: 'harness.file.writeResult'; requestId: string; ok: boolean; error?: string }
+  /** resposta a `harness.project.profile`, correlacionada por `requestId` */
+  | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
   /** resposta a `card.usage.query`, correlacionada por `requestId` */
@@ -330,6 +358,14 @@ export type HostToWebview =
   /** o host pede à interface para trocar de aba das Configurações, opcionalmente rolando até uma seção */
   | { type: 'ui.openSettings'; tab: SettingsTab; section?: string }
   /** o host pede à interface para abrir uma tela fora das Configurações */
-  | { type: 'ui.openView'; view: 'environment' };
+  | { type: 'ui.openView'; view: 'environment' }
+  /** o host terminou de tratar a mensagem enviada com este `requestId` (qualquer tipo): deu certo, ou falhou com o erro já mostrado em `error` */
+  | { type: 'done'; requestId: string; ok: boolean; error?: string };
+
+/**
+ * Envelope opcional de qualquer mensagem da interface: com `requestId`, o host responde `done` quando termina de tratá-la.
+ * É o que permite à tela mostrar que está esperando (ver `request()` em `src/webview/request.ts`).
+ */
+export type Tracked<M = WebviewToHost> = M & { requestId?: string };
 
 export type { WorkflowKind };

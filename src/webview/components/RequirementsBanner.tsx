@@ -5,6 +5,7 @@ import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { harness, ui } from '../commands';
+import { useAction } from '../useAction';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { isWeb } from '../vscode';
 import { Button, IconCheck, IconConnect, IconWarning, type ButtonVariant } from './ui';
@@ -123,7 +124,7 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
       return {
         title: t('A skill do fluxo ({name}) não está pronta para o {tool}', { name: FLOW_SKILL_NAME, tool }),
         detail: t(
-          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem de contexto vazio: a skill precisa existir e estar marcada em "Incluir em todo contexto" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.',
+          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem de contexto vazio: a skill precisa existir e estar no board em modo "Sempre" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.',
         ),
       };
     case 'mcp-enable':
@@ -133,6 +134,24 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
           'O MCP "faz-ai" é o canal pelo qual a IA do chat do Cursor lê e atualiza os cards deste board. O Cursor deixa desativado todo MCP novo de um projeto, e só você pode ativá-lo: em Abrir MCPs do Cursor, clique em "faz-ai" e ligue a chave deste projeto.',
         ),
       };
+    case 'harness': {
+      const issue: Record<string, string> = {
+        artifacts: t('nenhuma skill, agente ou servidor MCP em modo "Pelo card"'),
+        agents: t('nenhum agente do board'),
+        rules: t('regras no board ainda desligadas, sem revisão'),
+        missing: t('artefato do board que sumiu da origem'),
+        cursor: t('artefatos do projeto que entram no contexto sem passar pelo board'),
+      };
+      return {
+        title: t('O harness do board ainda não está definido'),
+        detail: t(
+          'O board funciona assim, mas as execuções não ganham a economia e a precisão de um harness definido. Falta: {list}. Resolva em Configurações → Harness de IA.',
+          {
+            list: (r.harnessIssues ?? []).map((i) => issue[i] ?? i).join('; '),
+          },
+        ),
+      };
+    }
     case 'permission':
       return { title: t('O {tool} não roda com o nível de permissão escolhido', { tool }), detail: t(r.reason ?? '') };
     case 'permission-mcp':
@@ -193,6 +212,34 @@ export function aiBlockedReason(state: BoardState): string | null {
     : t('A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.', { tool: aiToolInfo(cli.tool).label });
 }
 
+/** Botão que resolve um requisito pelo host (CLI, disco): mostra a espera até ele confirmar, e avisa quem confere de novo. */
+function FixButton({
+  variant,
+  run,
+  onFixed,
+  children,
+}: {
+  variant?: ButtonVariant;
+  run: () => Promise<void>;
+  onFixed?: () => void;
+  children: ReactNode;
+}) {
+  const fix = useAction(run);
+  return (
+    <Button
+      size="small"
+      variant={variant}
+      loading={fix.busy}
+      onClick={() => {
+        void fix.run();
+        onFixed?.();
+      }}
+    >
+      {children}
+    </Button>
+  );
+}
+
 /** Se o requisito tem um botão ou comando que o resolve por aqui (na versão compacta, sem o atalho para as Configurações). */
 function actionable(r: BoardRequirement, compact: boolean): boolean {
   const kind = r.action?.kind;
@@ -227,8 +274,8 @@ export function RequirementFix({
 }) {
   const openSettings = useBoardStore((s) => s.openSettings);
   const openMcpInstall = () => {
-    // a instalação do servidor do board fica no grupo Servidores MCP da aba Projeto
-    useBoardStore.setState({ harnessTab: 'project' });
+    // a instalação do servidor do board fica no assunto MCPs, em Projeto, na aba da ferramenta do projeto
+    useBoardStore.setState({ harnessTab: useBoardStore.getState().state!.board.aiTool, harnessOrigin: 'project', harnessTopic: 'mcp' });
     openSettings('harness');
   };
   if (!actionable(r, compact)) return null;
@@ -254,42 +301,21 @@ export function RequirementFix({
       );
     case 'fixProject':
       return (
-        <Button
-          size="small"
-          variant={variant}
-          onClick={() => {
-            ui.fixProjectMcp(action.file);
-            onFixed?.();
-          }}
-        >
+        <FixButton variant={variant} run={() => ui.fixProjectMcp(action.file)} onFixed={onFixed}>
           <IconConnect /> {t('Corrigir o registro')}
-        </Button>
+        </FixButton>
       );
     case 'installSkill':
       return (
-        <Button
-          size="small"
-          variant={variant}
-          onClick={() => {
-            harness.installFlowSkill(r.tool, 'user');
-            onFixed?.();
-          }}
-        >
+        <FixButton variant={variant} run={() => harness.installFlowSkill(r.tool, 'user')} onFixed={onFixed}>
           {t('Instalar a skill')}
-        </Button>
+        </FixButton>
       );
     case 'pinMcp':
       return (
-        <Button
-          size="small"
-          variant={variant}
-          onClick={() => {
-            ui.pinMcp();
-            onFixed?.();
-          }}
-        >
+        <FixButton variant={variant} run={() => ui.pinMcp()} onFixed={onFixed}>
           <IconConnect /> {t('Corrigir o caminho')}
-        </Button>
+        </FixButton>
       );
     case 'allowKimiMcp':
       return (
@@ -344,21 +370,21 @@ function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
 
 /** "Verificar de novo", com retorno: conferindo, e o resultado quando nada mudou. */
 function RecheckButton() {
-  const checkedAt = useBoardStore((s) => s.state?.requirementsCheckedAt ?? 0);
-  const [askedAt, setAskedAt] = useState<number | null>(null);
-  const done = askedAt !== null && checkedAt > askedAt;
+  // o host confirma (`done`) quando a conferência termina; a falha chega como erro e destrava o botão
+  const check = useAction(() => ui.checkRequirements());
+  const [checked, setChecked] = useState(false);
   return (
     <>
       <span role="status" className="small muted">
-        {askedAt !== null && (done ? t('Conferido agora: nada mudou.') : t('Conferindo…'))}
+        {check.busy ? t('Conferindo…') : checked ? t('Conferido agora: nada mudou.') : null}
       </span>
       <Button
         size="small"
         variant="ghost"
-        disabled={askedAt !== null && !done}
-        onClick={() => {
-          setAskedAt(Date.now());
-          ui.checkRequirements();
+        loading={check.busy}
+        onClick={async () => {
+          setChecked(false);
+          setChecked(await check.run());
         }}
       >
         {t('Verificar de novo')}
@@ -396,7 +422,9 @@ function useRequirementItems(): { items: BoardRequirement[]; missing: number; au
 /** O resumo do aviso: quantos requisitos faltam, ou o passo que falta no Cursor, ou só o recomendado. */
 function requirementsSummary(items: BoardRequirement[], missing: number): string {
   return missing === 0
-    ? t('Recomendado para a IA enxergar o board nas suas conversas')
+    ? items.every((r) => r.id === 'harness')
+      ? t('Recomendado: defina o harness para as execuções gastarem menos contexto')
+      : t('Recomendado para a IA enxergar o board nas suas conversas')
     : items.every((r) => r.id === 'mcp-reload' || r.id === 'mcp-enable')
       ? t('Falta um passo para o chat do Cursor usar o board')
       : missing === 1

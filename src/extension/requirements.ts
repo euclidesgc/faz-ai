@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool } from '../shared/harness';
+import type { HarnessIssue } from '../shared/harnessStatus';
 import { LOGIN_COMMAND, type BoardRequirement } from '../shared/requirements';
 import type { RunnerPermission } from '../shared/runner';
 import { byPath, samePath } from './samePath';
@@ -158,6 +159,8 @@ export interface RequirementProbe {
   editorPath?: string;
   /** a skill do fluxo está instalada na ferramenta; ausente quando não dá para saber (sem o inventário) */
   skillInstalled?: boolean;
+  /** o que falta no banco de artefatos do board; ausente quando não dá para saber (sem o inventário) */
+  harnessIssues?: HarnessIssue[];
   /** o arquivo do projeto está no git (por padrão, `git ls-files`) */
   isTracked?: (workspaceDir: string, rel: string) => boolean;
 }
@@ -272,6 +275,10 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
 
   // a skill ensina a IA a conduzir o fluxo do board (fases, documentos, revisão)
   if (p.skillInstalled === false) out.push({ id: 'skill', tool, action: { kind: 'installSkill' } });
+
+  // o harness definido é recomendação, não requisito: o board trabalha sem ele, só sem a economia de contexto
+  if (p.harnessIssues?.length)
+    out.push({ id: 'harness', tool, optional: true, harnessIssues: p.harnessIssues, action: { kind: 'settings' } });
 
   const unsupported = headlessUnsupported(tool, p.permission);
   if (unsupported) out.push({ id: 'permission', tool, reason: unsupported, action: { kind: 'settings' } });

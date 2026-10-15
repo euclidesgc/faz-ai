@@ -102,6 +102,15 @@ const HOMOLOGATION_INSTRUCTION_V5 = [
   'Não faça o merge: a conclusão depende da aprovação da pessoa. Depois de aprovado, se o card continuar nesta coluna, mova a história para a coluna de conclusão.',
 ].join('\n');
 
+// A instrução da Homologação da versão 9 do board (até a 0.39.0): a 10 manda abrir o pull request com --base na base do fluxo (gitflow, #462).
+const HOMOLOGATION_INSTRUCTION_V9 = [
+  'Prepare a entrega para a validação da pessoa.',
+  'Escreva o roteiro de testes: o que foi construído, como testar passo a passo (comandos, telas, dados de exemplo, resultado esperado em cada passo) e o que ficou de fora. Acrescente-o à descrição do card com update_card, numa seção "Como testar", sem apagar o que já está lá.',
+  'Envie a branch da história (git push) e abra o pull request dela, se ainda não existir (ex.: gh pr create). O corpo explica a entrega para quem vai revisar o código, nesta ordem: **Objetivo** (o problema e o resultado, em poucas frases); **O que foi feito** (o resumo das mudanças); **Como revisar** (por onde começar a ler, a ordem dos commits e o tamanho do diff em linhas de código, de testes e de documentação); **Decisões** (por que o caminho escolhido, as alternativas descartadas com o motivo de cada uma, ex.: um jeito parecido de obter a informação que deixaria a implementação mais complexa, e os desvios do plano aprovado); e o mesmo roteiro **Como testar**. Registre o endereço com set_pull_request.',
+  'Resuma na conversa o que foi feito, aponte o roteiro e peça a revisão.',
+  'Não faça o merge: a conclusão depende da aprovação da pessoa. Depois de aprovado, se o card continuar nesta coluna, mova a história para a coluna de conclusão.',
+].join('\n');
+
 /**
  * Tamanho, em linhas de código, a partir do qual o Plan propõe dividir a funcionalidade em histórias
  * derivadas, com os pull requests empilhados: acima disso a revisão fica pesada.
@@ -395,7 +404,7 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
     instruction: [
       'Prepare a entrega para a validação da pessoa.',
       'Escreva o roteiro de testes: o que foi construído, como testar passo a passo (comandos, telas, dados de exemplo, resultado esperado em cada passo) e o que ficou de fora. Acrescente-o à descrição do card com update_card, numa seção "Como testar", sem apagar o que já está lá.',
-      'Envie a branch da história (git push) e abra o pull request dela, se ainda não existir (ex.: gh pr create). O corpo explica a entrega para quem vai revisar o código, nesta ordem: **Objetivo** (o problema e o resultado, em poucas frases); **O que foi feito** (o resumo das mudanças); **Como revisar** (por onde começar a ler, a ordem dos commits e o tamanho do diff em linhas de código, de testes e de documentação); **Decisões** (por que o caminho escolhido, as alternativas descartadas com o motivo de cada uma, ex.: um jeito parecido de obter a informação que deixaria a implementação mais complexa, e os desvios do plano aprovado); e o mesmo roteiro **Como testar**. Registre o endereço com set_pull_request.',
+      'Envie a branch da história (git push) e abra o pull request dela, se ainda não existir, com `gh pr create --base <workspace.prBase do get_card>` (a branch de onde a história partiu: a develop, a principal ou a branch anterior da pilha). O corpo explica a entrega para quem vai revisar o código, nesta ordem: **Objetivo** (o problema e o resultado, em poucas frases); **O que foi feito** (o resumo das mudanças); **Como revisar** (por onde começar a ler, a ordem dos commits e o tamanho do diff em linhas de código, de testes e de documentação); **Decisões** (por que o caminho escolhido, as alternativas descartadas com o motivo de cada uma, ex.: um jeito parecido de obter a informação que deixaria a implementação mais complexa, e os desvios do plano aprovado); e o mesmo roteiro **Como testar**. Registre o endereço com set_pull_request.',
       'Resuma na conversa o que foi feito, aponte o roteiro e peça a revisão.',
       'Não faça o merge: a conclusão depende da aprovação da pessoa. Depois de aprovado, se o card continuar nesta coluna, mova a história para a coluna de conclusão.',
     ].join('\n'),
@@ -441,8 +450,9 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
   },
   Implementação: { instructions: [IMPLEMENTATION_INSTRUCTION_V5], templates: [], change: 'a fase pode começar sem sub-tarefas do Plan' },
   Homologação: {
-    instructions: [HOMOLOGATION_INSTRUCTION_V5],
+    instructions: [HOMOLOGATION_INSTRUCTION_V5, HOMOLOGATION_INSTRUCTION_V9],
     templates: [],
-    change: 'o pull request explica o objetivo, como revisar o código e as decisões tomadas, com as alternativas descartadas',
+    change:
+      'o pull request é aberto com --base na branch de onde a história partiu (workspace.prBase do get_card) e explica o objetivo, como revisar o código e as decisões tomadas, com as alternativas descartadas',
   },
 };

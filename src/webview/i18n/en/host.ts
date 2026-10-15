@@ -47,6 +47,86 @@ const connectAI: Record<string, string> = Object.fromEntries(
   ]),
 );
 
+/**
+ * Avisos do board na conversa ao criar a branch (gitNoticeText, em src/shared/gitflow.ts). Ficam à parte porque a
+ * conversa traduz os comentários do board só por estas chaves (translateGitNotice, em ../index.ts).
+ */
+export const gitNotices: Record<string, string> = {
+  'O repositório não tem origin: a branch {branch} partiu de {base} como está nesta máquina.':
+    'The repository has no origin: branch {branch} started from {base} as it is on this machine.',
+  'Não foi possível atualizar as refs do origin antes de criar a branch {branch} ({error}). Ela partiu de {base} como está nesta máquina, que pode estar desatualizada.':
+    'Could not update the origin refs before creating branch {branch} ({error}). It started from {base} as it is on this machine, which may be out of date.',
+  'A branch {develop} não existia: o board a criou a partir de {main} e a enviou ao origin.':
+    'Branch {develop} did not exist: the board created it from {main} and pushed it to origin.',
+  'A branch {develop} não existia: o board a criou a partir de {main}, mas não conseguiu enviá-la ao origin ({error}). Envie à mão: git push -u origin {develop}':
+    'Branch {develop} did not exist: the board created it from {main}, but could not push it to origin ({error}). Push it by hand: git push -u origin {develop}',
+  'A branch {develop} existe só nesta máquina: o pull request para ela só abre depois de enviá-la ao origin (git push -u origin {develop}).':
+    'Branch {develop} exists only on this machine: the pull request to it can only be opened after pushing it to origin (git push -u origin {develop}).',
+  'A branch {missing}, de onde a {branch} tinha partido, não existe mais nesta máquina nem no origin: a {branch} foi recriada a partir de {base}, que passa a ser a base do pull request.':
+    'Branch {missing}, which {branch} had started from, no longer exists on this machine or on origin: {branch} was recreated from {base}, which becomes the pull request base.',
+
+  // avisos da limpeza da história concluída (gitNotice, em src/shared/gitNotices.ts)
+  'Limpeza da história depois do merge:': 'Story cleanup after the merge:',
+  'pasta de trabalho {path} removida': 'work folder {path} removed',
+  'branch local {branch} apagada': 'local branch {branch} deleted',
+  'branch remota origin/{branch} apagada': 'remote branch origin/{branch} deleted',
+  'branch remota origin/{branch} já tinha sido apagada': 'remote branch origin/{branch} had already been deleted',
+  '{develop} local atualizada até origin/{develop}': 'local {develop} updated to origin/{develop}',
+  '{develop} local já estava atualizada': 'local {develop} was already up to date',
+  '**Aviso:** A {develop} local não foi atualizada: ela está aberta em {path}, e o board não mexe nos arquivos dessa pasta. Atualize lá com: git pull --ff-only origin {develop}':
+    '**Warning:** Local {develop} was not updated: it is checked out in {path}, and the board does not touch the files in that folder. Update it there with: git pull --ff-only origin {develop}',
+  '**Aviso:** A {develop} local não foi atualizada: ela tem {count} commit(s) que não estão em origin/{develop}, e o board não força a atualização. Envie esses commits num pull request ou descarte-os, e depois rode: git fetch origin {develop}:{develop}':
+    '**Warning:** Local {develop} was not updated: it has {count} commit(s) that are not in origin/{develop}, and the board does not force the update. Send those commits in a pull request or discard them, then run: git fetch origin {develop}:{develop}',
+  '**Aviso:** A {develop} local não foi atualizada: {error}. Atualize com: git fetch origin {develop}:{develop}':
+    '**Warning:** Local {develop} was not updated: {error}. Update it with: git fetch origin {develop}:{develop}',
+  '**Aviso:** A limpeza não apagou nada: a pasta de trabalho {path} tem mudanças não commitadas ({files}). A worktree, a branch local {branch} e a remota continuam. Para não perder essas mudanças, faça o commit e envie-as num pull request novo, ou copie os arquivos. Atenção: como a história já foi entregue, a limpeza de branches e worktrees órfãs vai descartar essas mudanças pendentes depois.':
+    '**Warning:** The cleanup deleted nothing: the work folder {path} has uncommitted changes ({files}). The worktree, the local branch {branch} and the remote one are kept. To keep these changes, commit them and send them in a new pull request, or copy the files. Note: since the story was delivered, the cleanup of orphan branches and worktrees will later discard these pending changes.',
+  '**Aviso:** A limpeza não apagou nada: a pasta de trabalho {path} tem mudanças não commitadas ({files} e mais {n}). A worktree, a branch local {branch} e a remota continuam. Para não perder essas mudanças, faça o commit e envie-as num pull request novo, ou copie os arquivos. Atenção: como a história já foi entregue, a limpeza de branches e worktrees órfãs vai descartar essas mudanças pendentes depois.':
+    '**Warning:** The cleanup deleted nothing: the work folder {path} has uncommitted changes ({files} and {n} more). The worktree, the local branch {branch} and the remote one are kept. To keep these changes, commit them and send them in a new pull request, or copy the files. Note: since the story was delivered, the cleanup of orphan branches and worktrees will later discard these pending changes.',
+  '**Aviso:** A limpeza não apagou nada: a branch local {branch} tem {count} commit(s) que não estão no pull request {pr}. A worktree {path} e as branches local e remota continuam. Envie esses commits num pull request novo. Atenção: como a história já foi entregue, a limpeza de branches e worktrees órfãs vai descartar esses commits depois.':
+    '**Warning:** The cleanup deleted nothing: the local branch {branch} has {count} commit(s) that are not in the pull request {pr}. The worktree {path} and the local and remote branches are kept. Send those commits in a new pull request. Note: since the story was delivered, the cleanup of orphan branches and worktrees will later discard these commits.',
+  '**Aviso:** A branch local {branch} não foi apagada: a pasta do projeto ({path}) está nela, e o board não troca a branch da sua pasta. Troque de branch (por exemplo, git switch {develop}) e apague-a com: git branch -D {branch}':
+    "**Warning:** The local branch {branch} was not deleted: the project folder ({path}) is on it, and the board does not switch your folder's branch. Switch branches (for example, git switch {develop}) and delete it with: git branch -D {branch}",
+  '**Aviso:** A branch local {branch} não foi apagada: ela está aberta em {path}. Feche essa pasta ou troque a branch dela e apague com: git branch -D {branch}':
+    '**Warning:** The local branch {branch} was not deleted: it is checked out in {path}. Close that folder or switch its branch, then delete it with: git branch -D {branch}',
+  '**Aviso:** A pasta de trabalho {path} não foi removida: {error}. A branch local {branch} ficou porque a pasta ainda a usa. Remova com: git worktree remove {path}':
+    '**Warning:** The work folder {path} was not removed: {error}. The local branch {branch} was kept because the folder still uses it. Remove it with: git worktree remove {path}',
+  '**Aviso:** A branch local {branch} não foi apagada: {error}. Apague com: git branch -D {branch}':
+    '**Warning:** The local branch {branch} was not deleted: {error}. Delete it with: git branch -D {branch}',
+  '**Aviso:** A branch remota origin/{branch} não foi apagada: {error}. Apague com: git push origin --delete {branch}':
+    '**Warning:** The remote branch origin/{branch} was not deleted: {error}. Delete it with: git push origin --delete {branch}',
+  '**Aviso:** A branch remota origin/{branch} não foi apagada: ela recebeu commits depois do pull request {pr}. Confira e, se não precisar deles, apague com: git push origin --delete {branch}':
+    "**Warning:** The remote branch origin/{branch} was not deleted: it received commits after the pull request {pr}. Check them and, if you don't need them, delete it with: git push origin --delete {branch}",
+  '**Aviso:** A limpeza não apagou nada: o pull request {pr} é da branch {head}, e a branch registrada no card é {branch}.':
+    '**Warning:** The cleanup deleted nothing: the pull request {pr} is from branch {head}, and the branch recorded on the card is {branch}.',
+  '**Aviso:** A limpeza não apagou nada: não foi possível confirmar o pull request {pr} pelo gh ({error}).':
+    '**Warning:** The cleanup deleted nothing: the pull request {pr} could not be confirmed through gh ({error}).',
+  '**Aviso:** O repositório não tem o remoto origin: a branch remota e a {develop} não foram tocadas.':
+    '**Warning:** The repository has no origin remote: the remote branch and {develop} were not touched.',
+
+  // pilha e volta da principal no hotfix (#480)
+  '**Aviso:** A branch remota origin/{branch} não foi apagada: o pull request {nextPr} da história #{number} ainda a usa como base. Troque a base dele (gh pr edit {nextPr} --base {base}) e apague com: git push origin --delete {branch}':
+    '**Warning:** The remote branch origin/{branch} was not deleted: the pull request {nextPr} of story #{number} still uses it as its base. Change its base (gh pr edit {nextPr} --base {base}) and delete it with: git push origin --delete {branch}',
+  'A história #{prev}, sobre a qual esta estava empilhada, foi concluída: a base desta história passou de {old} para {base}. Antes de continuar, traga a nova base para a branch (git fetch origin {base} e git merge origin/{base}), sem rebase nem push forçado.':
+    "Story #{prev}, which this one was stacked on, was completed: this story's base changed from {old} to {base}. Before continuing, bring the new base into the branch (git fetch origin {base} and git merge origin/{base}), without rebase or force push.",
+  'A base do pull request {pr} também passou para {base}.': 'The base of the pull request {pr} also changed to {base}.',
+  '**Aviso:** a base do pull request {pr} não foi trocada: {error}. Troque com: gh pr edit {pr} --base {base}':
+    '**Warning:** the base of the pull request {pr} was not changed: {error}. Change it with: gh pr edit {pr} --base {base}',
+  'A {main} voltou para a {develop} pelo pull request {url}, com merge commit.':
+    '{main} was merged back into {develop} through the pull request {url}, with a merge commit.',
+  'A {develop} já contém a {main}: não foi preciso abrir o pull request de volta.':
+    '{develop} already contains {main}: no back-merge pull request was needed.',
+  '**Aviso:** O pull request {url} da {main} para a {develop} tem conflito e ficou aberto. O board não resolve conflitos: resolva-o no GitHub ou localmente e faça o merge com merge commit (gh pr merge {url} --merge).':
+    '**Warning:** The pull request {url} from {main} to {develop} has a conflict and was left open. The board does not resolve conflicts: resolve it on GitHub or locally and merge it with a merge commit (gh pr merge {url} --merge).',
+  '**Aviso:** O pull request {url} da {main} para a {develop} ficou aberto: {error}. Faça o merge com merge commit: gh pr merge {url} --merge':
+    '**Warning:** The pull request {url} from {main} to {develop} was left open: {error}. Merge it with a merge commit: gh pr merge {url} --merge',
+  '**Aviso:** O pull request da {main} para a {develop} não foi aberto: {error}. Abra com: gh pr create --base {develop} --head {main}':
+    '**Warning:** The pull request from {main} to {develop} was not opened: {error}. Open it with: gh pr create --base {develop} --head {main}',
+  'Volta da {main} para a {develop} depois do hotfix #{number}': 'Merge {main} back into {develop} after hotfix #{number}',
+  'Aberto pelo Faz AI depois do merge de {pr}. Faça o merge com merge commit, não com squash: a {develop} precisa conter os commits da {main}.':
+    "Opened by Faz AI after {pr} was merged. Merge it with a merge commit, not squash: {develop} must contain {main}'s commits.",
+};
+
 export const host: Record<string, string> = {
   ...commandNotFound,
   ...connectAI,
@@ -170,6 +250,12 @@ export const host: Record<string, string> = {
     'The repository has no commits yet: make the first commit before creating story branches.',
   'A pasta {dir} já existe e não é uma worktree deste repositório.':
     'The folder {dir} already exists and is not a worktree of this repository.',
+  'Não foi possível atualizar as refs do origin ({error}) e a branch {develop} não existe nesta máquina: sem saber se ela já existe no origin, o board não a cria nem a envia. Verifique a rede e as credenciais do git (git fetch origin no terminal) e tente de novo.':
+    'Could not update the origin refs ({error}) and branch {develop} does not exist on this machine: without knowing whether it already exists on origin, the board neither creates nor pushes it. Check the network and the git credentials (git fetch origin in the terminal) and try again.',
+  'Não foi possível saber qual é a branch principal (o origin não informa a dele e não há main nem master), e a branch {develop} não existe: o board não a cria a partir da branch atual ({current}). Rode git remote set-head origin -a e tente de novo.':
+    'Could not tell which branch is the main one (origin does not report its own and there is no main or master), and branch {develop} does not exist: the board does not create it from the current branch ({current}). Run git remote set-head origin -a and try again.',
+  'Não foi possível saber qual é a branch principal (não há origin, main nem master), e a branch {develop} não existe: o board não a cria a partir da branch atual ({current}). Crie a {develop} à mão a partir da principal (git branch {develop} <principal>) e tente de novo.':
+    'Could not tell which branch is the main one (there is no origin, main or master), and branch {develop} does not exist: the board does not create it from the current branch ({current}). Create {develop} by hand from the main branch (git branch {develop} <main>) and try again.',
   'o comando "gh" (GitHub CLI) não foi encontrado.': 'the "gh" command (GitHub CLI) was not found.',
 
   // execução pela IA e chat
@@ -179,6 +265,8 @@ export const host: Record<string, string> = {
   'A resposta passou do tempo limite ({minutes} min) e foi encerrada.': 'The reply exceeded the time limit ({minutes} min) and was ended.',
   'Não foi possível executar o {tool}: {reason}': 'Could not run {tool}: {reason}',
   'O {tool} terminou com erro (código {code}).': '{tool} finished with an error (code {code}).',
+  'Não foi possível conferir os requisitos do board: {error}': 'Could not check the board requirements: {error}',
+  'Não foi possível rodar o Diagnóstico do ambiente: {error}': 'Could not run the environment Diagnosis: {error}',
   'O {tool} terminou com erro (código {code}).\n\n{tail}': '{tool} finished with an error (code {code}).\n\n{tail}',
   'A IA terminou sem escrever uma resposta.': 'The AI finished without writing a reply.',
   'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Instale o servidor em Configurações → Harness de IA → Tudo que a ferramenta carrega → Claude Code → Servidores MCP.':
@@ -285,4 +373,6 @@ export const host: Record<string, string> = {
   '{ref} está bloqueado: {reason}': '{ref} is blocked: {reason}',
   '{ref} está esperando uma pessoa.': '{ref} is waiting for a person.',
   '{ref} não tem nada pendente com a IA, mas ainda não foi concluído.': '{ref} has nothing pending with the AI, but is not finished yet.',
+
+  ...gitNotices,
 };

@@ -109,7 +109,7 @@ describe('suggestModelRule e suggestModel', () => {
     },
     workflows: [],
     columns: [],
-    cardTypes: [{ id: 'bug', boardId: 'b', name: 'Bug', color: '#000', defaultWorkflowId: 'wp', defaults: {} }],
+    cardTypes: [{ id: 'bug', boardId: 'b', name: 'Bug', color: '#000', defaultWorkflowId: 'wp', defaults: {}, branchKind: 'hotfix' }],
     cards: [],
     fieldDefs: [
       {
@@ -131,6 +131,7 @@ describe('suggestModelRule e suggestModel', () => {
     currentUser: 'a',
     harness: EMPTY_HARNESS,
     harnessSelection: [],
+    harnessImports: [],
     boardServer: null,
     pendingUpgrade: [],
     chat: EMPTY_CHAT,
@@ -144,7 +145,9 @@ describe('suggestModelRule e suggestModel', () => {
     environment: null,
     environmentFirstRun: false,
     harnessInstall: null,
+    harnessSuggestions: null,
     authExpired: null,
+    mainBranch: null,
   });
 
   const rule = (over: Partial<ModelRule> = {}): ModelRule => ({

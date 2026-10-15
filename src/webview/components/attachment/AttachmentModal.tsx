@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { request } from '../../request';
+import { useAction } from '../../useAction';
 import DOMPurify from 'dompurify';
 import { SegmentedControl } from '@radix-ui/themes';
 import type { Attachment } from '../../../shared/model';
@@ -41,15 +43,12 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
   const [viewMode, setViewMode] = useState<'formatted' | 'raw'>('formatted');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   // texto editado e não salvo: Esc e clique fora não o descartam sem a pessoa decidir
   const [unsavedNotice, setUnsavedNotice] = useState(false);
   const dirty = editing && draft !== (content ?? '');
   const guard = useRef({ dirty, close });
   guard.current = { dirty, close };
   const requestClose = () => (guard.current.dirty ? setUnsavedNotice(true) : guard.current.close());
-  const pendingWrite = useRef<(() => void) | null>(null);
-  useEffect(() => () => pendingWrite.current?.(), []);
 
   const attachmentId = open?.attachmentId ?? null;
   const textual = attachment ? isTextual(attachment.mime) : false;
@@ -90,6 +89,10 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
     return off;
   }, [attachmentId, textual]);
 
+  // o host confirma a gravação pelo `done`; se falhou, o texto digitado fica na tela para tentar de novo
+  const write = useAction(() => request({ type: 'attachment.write', attachmentId: attachmentId ?? '', content: draft }));
+  const saving = write.busy;
+
   if (!open) return null;
 
   const startEditing = () => {
@@ -97,24 +100,13 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
     setEditing(true);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!attachmentId || saving) return;
     setError(null);
-    setSaving(true);
-    const requestId = crypto.randomUUID();
-    const off = onHostMessage((msg) => {
-      if (msg.type !== 'attachment.writeResult' || msg.requestId !== requestId) return;
-      off();
-      pendingWrite.current = null;
-      setSaving(false);
-      // falhou: o texto digitado fica na tela para a pessoa tentar de novo
-      if (!msg.ok) return setError(msg.error ?? t('Não foi possível salvar o anexo.'));
-      setContent(draft);
-      setEditing(false);
-      setUnsavedNotice(false);
-    });
-    pendingWrite.current = off;
-    postToHost({ type: 'attachment.write', requestId, attachmentId, content: draft });
+    if (!(await write.run())) return; // o erro do host fica em `write.error`
+    setContent(draft);
+    setEditing(false);
+    setUnsavedNotice(false);
   };
 
   const image = attachment && attachment.mime.startsWith('image/') && baseUri;
@@ -151,9 +143,9 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
               </Button>
             </p>
           )}
-          {error && (
+          {(error ?? write.error) && (
             <p className="banner warn" role="alert">
-              {t(error)}
+              {t(error ?? write.error ?? '')}
             </p>
           )}
           {!attachment ? (
@@ -178,7 +170,7 @@ export function AttachmentModal({ onSaveAs }: { onSaveAs?: (attachment: Attachme
           {editing ? (
             <>
               <Button onClick={() => setEditing(false)}>{t('Cancelar')}</Button>
-              <Button variant="primary" onClick={save} disabled={saving}>
+              <Button variant="primary" onClick={() => void save()} loading={saving}>
                 {t('Salvar')}
               </Button>
             </>
