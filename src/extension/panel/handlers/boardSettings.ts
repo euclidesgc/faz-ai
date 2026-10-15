@@ -76,9 +76,9 @@ export const boardSettingsHandlers = {
   'settings.board.update': (msg, ctx) => {
     // mudar o nome da principal ou da develop pede a renomeação no repositório (#466): a configuração
     // grava na hora e o pedido espera Renomear ou Desfazer. Com a IA executando, a mudança é recusada.
-    const renames = msg.patch.git ? guardGitPatch(ctx, msg.patch.git) : [];
+    const renames = msg.patch.git ? guardGitPatch(ctx, msg.patch.git) : null;
     ctx.boards.updateBoard(ctx.boardId, msg.patch);
-    if (msg.patch.git) registerRenames(ctx, msg.patch.git, renames);
+    if (renames) registerRenames(ctx, renames);
     if (msg.patch.aiTool) useTool(ctx, ctx.state().board.aiTool);
     return true;
   },

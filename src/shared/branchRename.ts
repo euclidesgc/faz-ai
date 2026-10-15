@@ -1,3 +1,5 @@
+import { cleanBranchName } from './git';
+
 /**
  * Renomear a branch principal ou a develop também no `origin` (#466). Aqui só o que é puro: os tipos do
  * pedido e do resultado e os comandos que a pessoa roda à mão quando o board não age no remoto.
@@ -111,7 +113,12 @@ export function parsePending(json: string | undefined): BranchRenamePending[] {
         (p.kind === 'main' || p.kind === 'develop') &&
         typeof p.from === 'string' &&
         typeof p.to === 'string' &&
-        typeof p.previous === 'string',
+        typeof p.previous === 'string' &&
+        // o que vai para o git passa pela mesma validação do nome configurado
+        cleanBranchName(p.from, '') === p.from &&
+        cleanBranchName(p.to, '') === p.to &&
+        p.from !== '' &&
+        p.to !== '',
     );
   } catch {
     return [];

@@ -214,7 +214,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const gh = run('gh');
   const git = run('git');
   // o `git` e a principal são da limpeza da história depois do merge (#464)
-  const mainBranch = (repo: string) => detectMainBranch(repo)?.name ?? '';
+  // a principal fixada nas configurações vale (a mesma que a tela e o PR usam); sem ela, a detectada
+  const mainBranch = (repo: string) => router.mainBranchName() || (detectMainBranch(repo)?.name ?? '');
   new AutoMerger(router, {
     cwd: o.folderPath,
     log: o.log,

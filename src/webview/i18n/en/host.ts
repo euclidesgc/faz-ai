@@ -266,6 +266,8 @@ export const host: Record<string, string> = {
   'Não dá para renomear a branch agora: há uma execução da IA em andamento. Espere terminar e tente de novo.':
     'Cannot rename the branch now: an AI run is in progress. Wait for it to finish and try again.',
   'Não há renomeação de branch à espera de confirmação.': 'There is no branch rename waiting for confirmation.',
+  'Há uma renomeação de branch à espera de resposta (Renomear ou Desfazer): responda antes de criar a branch da história.':
+    'A branch rename is waiting for an answer (Rename or Undo): answer it before creating the story branch.',
   'Interrompido.': 'Stopped.',
   'A resposta passou do tempo limite ({minutes} min) e foi encerrada.': 'The reply exceeded the time limit ({minutes} min) and was ended.',
   'Não foi possível executar o {tool}: {reason}': 'Could not run {tool}: {reason}',

@@ -48,16 +48,18 @@ function refuseWhileRunning(ctx: BoardContext): void {
  * develop. Vale só com repositório e com o nome novo ainda inexistente (RF1). Voltar ao nome de origem de
  * um pedido guardado cancela o pedido (`to === from` com `replaces`).
  */
-function nameChanges(ctx: BoardContext, patch: Partial<GitConfig>): BranchRenamePending[] {
+function nameChanges(ctx: BoardContext, patch: Partial<GitConfig>): RenameChanges {
   const dir = ctx.opts.workspaceDir;
-  if (!dir) return [];
+  if (!dir) return { changes: [], changed: [] };
   const before = parseGit(ctx.boards.gitJson(ctx.boardId));
   const after = parseGit(JSON.stringify({ ...before, ...patch }));
   const pending = readPending(ctx);
   const out: BranchRenamePending[] = [];
+  const changed: RenameKind[] = [];
   for (const kind of ['main', 'develop'] as const) {
     const field = FIELD[kind];
     if (before[field] === after[field]) continue;
+    changed.push(kind);
     const queued = pending.find((p) => p.kind === kind);
     // sem pedido guardado, o nome de antes é o em uso; com ele, o nome de origem continua valendo
     const from = queued?.from ?? (kind === 'main' ? ctx.mainBranch()?.name : before.developBranch) ?? '';
@@ -65,32 +67,38 @@ function nameChanges(ctx: BoardContext, patch: Partial<GitConfig>): BranchRename
     const to = after[field];
     out.push({ kind, from, to, previous });
   }
-  return out.filter((c) => {
+  const changes = out.filter((c) => {
     // principal vazia volta a ser detectada: não há nome novo para criar
     if (!c.to) return false;
     // voltou ao nome de origem de um pedido guardado: cancela o pedido
     if (c.from === c.to) return true;
     return renameNeeded(dir, c.from, c.to);
   });
+  return { changes, changed };
+}
+
+/** O que o patch muda: os pedidos novos (ou cancelados, com `from === to`) e os tipos cujo nome mudou. */
+interface RenameChanges {
+  changes: BranchRenamePending[];
+  changed: RenameKind[];
 }
 
 /**
  * Antes de gravar a configuração: com a IA executando, mudar o nome de uma branch existente é recusado
  * (RF7). Quem está só voltando ao nome de origem de um pedido guardado passa.
  */
-export function guardGitPatch(ctx: BoardContext, patch: Partial<GitConfig>): BranchRenamePending[] {
-  const changes = nameChanges(ctx, patch);
-  if (changes.some((c) => c.from !== c.to)) refuseWhileRunning(ctx);
-  return changes;
+export function guardGitPatch(ctx: BoardContext, patch: Partial<GitConfig>): RenameChanges {
+  const result = nameChanges(ctx, patch);
+  if (result.changes.some((c) => c.from !== c.to)) refuseWhileRunning(ctx);
+  return result;
 }
 
 /** Depois de gravar a configuração: guarda os pedidos novos e apaga os cancelados. */
-export function registerRenames(ctx: BoardContext, patch: Partial<GitConfig>, changes: BranchRenamePending[]): void {
-  const touched = (['main', 'develop'] as const).filter((k) => FIELD[k] in patch);
-  if (!touched.length) return;
+export function registerRenames(ctx: BoardContext, { changes, changed }: RenameChanges): void {
+  if (!changed.length) return;
   let list = readPending(ctx);
   // uma mudança de nome que não cai em renomeação (nome já existe, branch antiga não existe) limpa o pedido do tipo
-  list = list.filter((p) => !touched.includes(p.kind));
+  list = list.filter((p) => !changed.includes(p.kind));
   for (const c of changes) if (c.from !== c.to) list.push({ kind: c.kind, from: c.from, to: c.to, previous: c.previous });
   writePending(ctx, list);
   writeResult(ctx, null);
@@ -98,6 +106,9 @@ export function registerRenames(ctx: BoardContext, patch: Partial<GitConfig>, ch
 }
 
 /** O board foi recriado: os pedidos e o resultado de antes não valem mais. */
+/** Há pedido de renomeação à espera de resposta: criar branches espera, para não criar o nome novo antes da hora. */
+export const hasPendingRename = (ctx: BoardContext): boolean => readPending(ctx).length > 0;
+
 export function clearRenames(ctx: BoardContext): void {
   writePending(ctx, []);
   writeResult(ctx, null);
@@ -112,7 +123,9 @@ export const branchRenameHandlers = {
       writeResult(ctx, null);
       return true;
     }
-    if (!pending) throw new Error('Não há renomeação de branch à espera de confirmação.');
+    // a resposta vale para o pedido que a pessoa viu: se ele mudou enquanto a caixa estava aberta, recusa
+    if (!pending || pending.from !== msg.from || pending.to !== msg.to)
+      throw new Error('Não há renomeação de branch à espera de confirmação.');
     const rest = list.filter((p) => p !== pending);
     if (msg.action === 'undo') {
       // só a configuração volta: nenhum comando de escrita no repositório (RF3)
@@ -127,9 +140,13 @@ export const branchRenameHandlers = {
     if (!dir) throw new Error('Nenhuma pasta de projeto aberta.');
     refuseWhileRunning(ctx);
     const outcome = runBranchRename(dir, { kind: pending.kind, from: pending.from, to: pending.to }, ctx.gh);
-    // a falha parcial mantém o pedido: repetir só faz o que faltou. O resto (feito, nada a fazer, comandos
-    // manuais) encerra o pedido; se o repositório seguir divergente, ele volta ao reabrir o board.
-    writePending(ctx, outcome.status === 'failed' ? list : rest);
+    // a falha e os comandos manuais mantêm o pedido: repetir só faz o que faltou, e a pergunta volta ao
+    // reabrir o board enquanto o repositório estiver divergente. Feito ou nada a fazer encerra o pedido.
+    const keep = outcome.status === 'failed' || outcome.status === 'manual';
+    writePending(ctx, keep ? list : rest);
+    // o pull request e o board seguem a base nova: histórias com a base antiga passam a apontar para a nova
+    if (outcome.status === 'done')
+      for (const c of ctx.state().cards) if (c.baseBranch === pending.from) ctx.cards.setBaseBranch(c.id, pending.to);
     writeResult(ctx, outcome);
     ctx.mainBranch(true);
     return true;

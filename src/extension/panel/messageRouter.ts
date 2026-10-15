@@ -338,6 +338,11 @@ export class MessageRouter {
     this.notify();
   }
 
+  /** O nome da branch principal em uso (a fixada nas configurações ou a detectada); '' fora de um repositório. */
+  mainBranchName(): string {
+    return this.ctx.mainBranch()?.name ?? '';
+  }
+
   /** Execuções de IA em curso, uma por card (informado pelo executor); `aiRuns` é derivado delas. */
   setAiRuns(runs: AiActivity[]): void {
     this.aiActivity = runs;

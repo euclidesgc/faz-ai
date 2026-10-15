@@ -13,6 +13,7 @@ let base: string;
 let repo: string;
 let origin: string;
 let router: MessageRouter;
+let db: Awaited<ReturnType<typeof openInMemory>>;
 /** as chamadas ao `gh` falso (cada uma com os argumentos) */
 let ghCalls: string[][];
 let ghFails: Error | null;
@@ -34,7 +35,7 @@ const gh: GhRunner = (args) => {
   ghCalls.push(args);
   if (args[0] === 'repo') {
     if (ghViewFails) throw ghViewFails;
-    return 'dono/projeto\n';
+    return `${path.basename(path.dirname(origin))}/origin\n`;
   }
   if (ghFails) throw ghFails;
   const from = decodeURIComponent(/branches\/(.+)\/rename$/.exec(args[3] ?? '')![1]!);
@@ -46,7 +47,7 @@ const gh: GhRunner = (args) => {
 };
 
 async function open(): Promise<void> {
-  const db = await openInMemory(WASM_DIR);
+  db = await openInMemory(WASM_DIR);
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
     folderName: 'projeto',
@@ -58,8 +59,12 @@ async function open(): Promise<void> {
 }
 
 const update = (git: Record<string, string>) => router.handle({ type: 'settings.board.update', patch: { git } });
-const resolve = (kind: 'main' | 'develop', action: 'confirm' | 'undo' | 'dismiss') =>
-  router.handle({ type: 'git.rename.resolve', kind, action });
+/** responde ao pedido guardado do tipo (ou ao `from`/`to` dados, para simular uma pergunta velha) */
+const resolve = (kind: 'main' | 'develop', action: 'confirm' | 'undo' | 'dismiss', ask?: { from: string; to: string }) => {
+  const queued = router.snapshot().branchRenames.find((p) => p.kind === kind);
+  const target = ask ?? { from: queued?.from ?? 'x', to: queued?.to ?? 'y' };
+  return router.handle({ type: 'git.rename.resolve', kind, ...target, action });
+};
 const configured = () => router.snapshot().board.git;
 
 beforeEach(async () => {
@@ -124,10 +129,70 @@ describe('mudar o nome da principal ou da develop (RF1, RF2)', () => {
     expect(router.snapshot().branchRenames).toEqual([]);
   });
 
-  it('o pedido sobrevive ao editor fechado: um board novo sobre o mesmo banco ainda o vê (RF9)', () => {
+  it('o pedido sobrevive ao editor fechado: um board novo sobre o mesmo banco ainda o vê (RF9)', async () => {
     update({ developBranch: 'dev' });
-    const meta = router.getMeta('branch_rename_pending');
-    expect(meta).toContain('"to":"dev"');
+    const again = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+      workspaceKey: 'ws',
+      folderName: 'projeto',
+      author: 'Pessoa',
+      attachmentsDir: path.join(base, 'attachments'),
+      workspaceDir: repo,
+      gh,
+    });
+    expect(again.snapshot().branchRenames).toEqual([{ kind: 'develop', from: 'develop', to: 'dev', previous: 'develop' }]);
+  });
+
+  it('a resposta vale para a pergunta que foi vista: se o pedido mudou enquanto a caixa estava aberta, recusa', () => {
+    update({ developBranch: 'dev' });
+    update({ developBranch: 'dev2' });
+    expect(() => resolve('develop', 'confirm', { from: 'develop', to: 'dev' })).toThrow(/Não há renomeação/);
+    expect(ghCalls).toEqual([]);
+    expect(has(repo, 'refs/heads/dev2')).toBe(false);
+  });
+
+  it('com o pedido à espera, criar a branch da história espera a resposta', () => {
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const id = router.createCard({
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+      parentId: null,
+      title: 'Uma história',
+    });
+    update({ developBranch: 'dev' });
+    expect(() => router.handle({ type: 'card.workspace.prepare', cardId: id })).toThrow(/à espera de resposta/);
+    expect(has(repo, 'refs/heads/dev')).toBe(false);
+    resolve('develop', 'undo');
+    router.handle({ type: 'card.workspace.prepare', cardId: id });
+    expect(router.snapshot().cards.find((c) => c.id === id)?.branch).toMatch(/^feature\//);
+  });
+
+  it('reenviar o mesmo valor não apaga o pedido de outro tipo nem o do próprio tipo', () => {
+    update({ developBranch: 'dev' });
+    update({ developBranch: 'dev', featurePrefix: 'feat/' });
+    expect(router.snapshot().branchRenames).toHaveLength(1);
+  });
+
+  it('a principal usada pelo host é a fixada nas configurações', () => {
+    git(repo, 'branch', 'trunk');
+    update({ mainBranch: 'trunk' });
+    expect(router.mainBranchName()).toBe('trunk');
+  });
+
+  it('renomeada a develop, a base gravada nas histórias passa para o nome novo', () => {
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const id = router.createCard({
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+      parentId: null,
+      title: 'Com base',
+    });
+    router.handle({ type: 'card.workspace.prepare', cardId: id });
+    expect(router.snapshot().cards.find((c) => c.id === id)?.baseBranch).toBe('develop');
+    update({ developBranch: 'dev' });
+    resolve('develop', 'confirm');
+    expect(router.snapshot().cards.find((c) => c.id === id)?.baseBranch).toBe('dev');
   });
 });
 
@@ -175,7 +240,8 @@ describe('Renomear (RF4, RF5)', () => {
     const result = router.snapshot().branchRenameResult;
     expect(result).toMatchObject({ status: 'manual', reason: expect.stringContaining('não foi encontrado') });
     expect(result?.commands).toContain('git push origin --delete develop');
-    expect(router.snapshot().branchRenames).toEqual([]);
+    // o repositório segue divergente: o pedido fica e a pergunta volta ao reabrir o board
+    expect(router.snapshot().branchRenames).toHaveLength(1);
     expect(ghCalls.filter((c) => c[0] === 'api')).toEqual([]);
     expect(refs(repo)).toEqual(before);
     expect(refs(origin)).toEqual(beforeOrigin);

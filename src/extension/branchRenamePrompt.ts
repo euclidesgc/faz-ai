@@ -95,7 +95,7 @@ export function renameResultText(r: RenameOutcome): { text: string; modal: boole
   }
 }
 
-const keyOf = (p: BranchRenamePending): string => `${p.kind}:${p.from}>${p.to}`;
+const keyOf = (p: Pick<BranchRenamePending, 'kind' | 'from' | 'to'>): string => `${p.kind}:${p.from}>${p.to}`;
 
 /**
  * Liga o aviso do editor (RF2, RF3, RF9): enquanto houver um pedido de renomeação no board, pergunta
@@ -107,19 +107,23 @@ export function bindBranchRenamePrompt(router: RenamePromptRouter, ui: RenamePro
   /** pedidos de que a pessoa fechou a caixa nesta sessão: não perguntar de novo até reabrir */
   const declined = new Set<string>();
 
-  const resolve = (kind: RenameKind, action: 'confirm' | 'undo' | 'dismiss') => router.handle({ type: 'git.rename.resolve', kind, action });
+  const resolve = (p: Pick<BranchRenamePending, 'kind' | 'from' | 'to'>, action: 'confirm' | 'undo' | 'dismiss') =>
+    router.handle({ type: 'git.rename.resolve', kind: p.kind, from: p.from, to: p.to, action });
 
   async function showResult(r: RenameOutcome): Promise<void> {
     const shown = renameResultText(r);
     const items = shown.copy ? [COPY] : [];
-    const show =
-      shown.level === 'info'
-        ? ui.info(shown.text, ...items)
-        : shown.level === 'warn'
-          ? ui.warn(shown.text, shown.modal, ...items)
-          : ui.error(shown.text, ...items);
+    // o repositório segue divergente (comandos manuais): o pedido fica, mas não é perguntado de novo nesta sessão
+    if (r.status === 'manual') declined.add(keyOf(r.request));
+    if (shown.level === 'info') {
+      // aviso sem modal: não segura as próximas perguntas até ser fechado
+      void Promise.resolve(ui.info(shown.text, ...items)).then((c) => (c === COPY ? ui.copy(shown.copy) : undefined));
+      resolve(r.request, 'dismiss');
+      return;
+    }
+    const show = shown.level === 'warn' ? ui.warn(shown.text, shown.modal, ...items) : ui.error(shown.text, ...items);
     if ((await show) === COPY) await ui.copy(shown.copy);
-    resolve(r.request.kind, 'dismiss');
+    resolve(r.request, 'dismiss');
   }
 
   /** o pedido em pergunta: se o board recusar a resposta, não perguntar de novo nesta sessão */
@@ -128,8 +132,8 @@ export function bindBranchRenamePrompt(router: RenamePromptRouter, ui: RenamePro
   async function ask(p: BranchRenamePending): Promise<void> {
     asking = p;
     const choice = await ui.warn(renameQuestion(p), true, RENAME, UNDO);
-    if (choice === UNDO) resolve(p.kind, 'undo');
-    else if (choice === RENAME) resolve(p.kind, 'confirm');
+    if (choice === UNDO) resolve(p, 'undo');
+    else if (choice === RENAME) resolve(p, 'confirm');
     else declined.add(keyOf(p));
   }
 
@@ -140,6 +144,8 @@ export function bindBranchRenamePrompt(router: RenamePromptRouter, ui: RenamePro
       // um passo por vez: o resultado de uma renomeação antes da pergunta da próxima
       for (;;) {
         const s = router.snapshot();
+        // pedido que não existe mais (desfeito, cancelado, renomeado): a pergunta futura com o mesmo nome vale de novo
+        for (const key of declined) if (!s.branchRenames.some((p) => keyOf(p) === key)) declined.delete(key);
         if (s.branchRenameResult) {
           await showResult(s.branchRenameResult);
           continue;

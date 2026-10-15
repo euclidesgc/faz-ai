@@ -26,6 +26,16 @@ function fetchPruned(repo: string): string | null {
   }
 }
 
+/** O `origin` (URL ou caminho) termina em `dono/repositório`, sem diferenciar maiúsculas nem o `.git`. */
+const isRepo = (url: string, nameWithOwner: string): boolean =>
+  url
+    .trim()
+    .replace(/\.git$/i, '')
+    .replace(/\/+$/, '')
+    .replace(/:/g, '/')
+    .toLowerCase()
+    .endsWith(`/${nameWithOwner.toLowerCase()}`);
+
 const message = (e: unknown): string => (e instanceof Error && e.message ? e.message : String(e));
 
 /** O repositório (raiz) da pasta do projeto, ou null fora de um repositório git. */
@@ -69,7 +79,8 @@ export function runBranchRename(projectDir: string, req: RenameRequest, gh: GhRu
     outcome('failed', {
       done,
       failed: { step, error },
-      commands: step === 'remote' ? manualCommands(req) : remainingCommands(req, remaining),
+      // falha antes de qualquer mudança (o remoto, ou o fetch inicial): todos os comandos, na ordem manual
+      commands: step === 'remote' || (step === 'fetch' && !done.length) ? manualCommands(req) : remainingCommands(req, remaining),
       otherClones: others,
     });
 
@@ -94,6 +105,9 @@ export function runBranchRename(projectDir: string, req: RenameRequest, gh: GhRu
     try {
       nameWithOwner = gh(['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner'], repo).trim();
       if (!/^[\w.-]+\/[\w.-]+$/.test(nameWithOwner)) throw new Error(`repositório não reconhecido: ${nameWithOwner || '(vazio)'}`);
+      // o `gh` pode preferir outro remoto (o `upstream` de um fork): só age no repositório do `origin`
+      const url = tryGit(repo, ['remote', 'get-url', 'origin']) ?? '';
+      if (!isRepo(url, nameWithOwner)) throw new Error(`o gh aponta para ${nameWithOwner}, que não é o repositório do origin (${url})`);
     } catch (e) {
       // sem gh, sem login ou remoto que não é GitHub: o board não age no remoto, nem no clone
       return outcome('manual', { reason: message(e), commands: manualCommands(req), otherClones: others });

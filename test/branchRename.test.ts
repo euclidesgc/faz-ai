@@ -22,6 +22,9 @@ const tryGit = (cwd: string, ...args: string[]): string | null => {
 const has = (cwd: string, ref: string) => tryGit(cwd, 'rev-parse', '--verify', '--quiet', ref) !== null;
 const refs = (cwd: string) => git(cwd, 'for-each-ref', '--format=%(refname) %(objectname)').split('\n').filter(Boolean);
 
+/** `dono/repositório` do origin do cenário: é o que o `gh repo view` devolve */
+const nwo = () => `${path.basename(path.dirname(origin))}/${path.basename(origin, '.git')}`;
+
 /** O `gh` que o teste injeta: `repo view` e a API de renomear, que age no repositório bare. Registra cada chamada. */
 function fakeGh(opts: { view?: string | Error; rename?: Error } = {}) {
   const calls: string[][] = [];
@@ -29,7 +32,7 @@ function fakeGh(opts: { view?: string | Error; rename?: Error } = {}) {
     calls.push(args);
     if (args[0] === 'repo') {
       if (opts.view instanceof Error) throw opts.view;
-      return `${opts.view ?? 'dono/projeto'}\n`;
+      return `${opts.view ?? nwo()}\n`;
     }
     if (opts.rename) throw opts.rename;
     const m = /^repos\/[^/]+\/[^/]+\/branches\/(.+)\/rename$/.exec(args[3] ?? '');
@@ -105,7 +108,7 @@ describe('runBranchRename: GitHub com gh (RF4, RF5)', () => {
     const r = runBranchRename(repo, { kind: 'develop', from: 'develop', to: 'dev' }, gh);
     expect(r.status).toBe('done');
     expect(r.done).toEqual(['remote', 'local', 'upstream']);
-    expect(calls[1]).toEqual(['api', '-X', 'POST', 'repos/dono/projeto/branches/develop/rename', '-f', 'new_name=dev']);
+    expect(calls[1]).toEqual(['api', '-X', 'POST', `repos/${nwo()}/branches/develop/rename`, '-f', 'new_name=dev']);
     expect(has(repo, 'refs/heads/dev')).toBe(true);
     expect(has(repo, 'refs/heads/develop')).toBe(false);
     expect(has(repo, 'refs/remotes/origin/dev')).toBe(true);
@@ -136,7 +139,7 @@ describe('runBranchRename: GitHub com gh (RF4, RF5)', () => {
     const { gh, calls } = fakeGh();
     const r = runBranchRename(repo, { kind: 'develop', from: 'release/1', to: 'release/2' }, gh);
     expect(r.status).toBe('done');
-    expect(calls[1]![3]).toBe('repos/dono/projeto/branches/release%2F1/rename');
+    expect(calls[1]![3]).toBe(`repos/${nwo()}/branches/release%2F1/rename`);
   });
 
   it('branch checada em outra worktree: o git move a HEAD dela', () => {
@@ -193,6 +196,28 @@ describe('runBranchRename: falhas (RF4, RF6, RF8)', () => {
     expect(renames()).toBe(0);
     expect(refs(repo)).toEqual(before);
     expect(refs(origin)).toEqual(beforeOrigin);
+  });
+
+  it('o gh aponta para outro repositório que o origin (fork com upstream): cai no manual e não renomeia nada', () => {
+    setup();
+    const before = refs(origin);
+    const f = fakeGh({ view: 'organizacao/projeto' });
+    const r = runBranchRename(repo, { kind: 'develop', from: 'develop', to: 'dev' }, f.gh);
+    expect(r.status).toBe('manual');
+    expect(r.reason).toContain('organizacao/projeto');
+    expect(f.renames()).toBe(0);
+    expect(refs(origin)).toEqual(before);
+  });
+
+  it('o fetch inicial falha (origin inalcançável): nada muda e os comandos vêm na ordem manual', () => {
+    setup();
+    git(repo, 'remote', 'set-url', 'origin', path.join(base, 'nao-existe.git'));
+    const f = fakeGh();
+    const r = runBranchRename(repo, { kind: 'develop', from: 'develop', to: 'dev' }, f.gh);
+    expect(r.status).toBe('failed');
+    expect(r.failed?.step).toBe('fetch');
+    expect(r.commands).toEqual(['git branch -m develop dev', 'git push -u origin dev', 'git push origin --delete develop']);
+    expect(f.calls).toEqual([]);
   });
 
   it('a descoberta devolve algo que não é dono/repositório: cai no manual', () => {

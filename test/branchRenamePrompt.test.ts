@@ -33,7 +33,7 @@ const settle = () => new Promise<void>((r) => setTimeout(r, 20));
 const gh: GhRunner = (args) => {
   if (args[0] === 'repo') {
     if (ghViewFails) throw ghViewFails;
-    return 'dono/projeto\n';
+    return `${path.basename(path.dirname(origin))}/origin\n`;
   }
   if (ghFails) throw ghFails;
   const from = decodeURIComponent(/branches\/(.+)\/rename$/.exec(args[3] ?? '')![1]!);
@@ -143,6 +143,9 @@ describe('aviso modal da renomeação no editor', () => {
     expect(result.message).toContain('git push origin --delete master');
     expect(result.message).toContain('git remote set-head origin -a');
     expect(copied[0]).toContain('git branch -m master main');
+    // o pedido fica (o repositório segue divergente), mas a pergunta não repete nesta sessão
+    expect(shown).toHaveLength(2);
+    expect(router.snapshot().branchRenames).toHaveLength(1);
     expect(git(repo, 'branch', '--list', 'master')).toContain('master');
   });
 
