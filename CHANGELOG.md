@@ -4,7 +4,7 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+## 0.46.0
 
 - **O servidor MCP do board é instalado só no global da ferramenta (#563).** O Claude Code registra em `~/.claude.json` (por `claude mcp add-json --scope user`) e o Kimi Code em `~/.kimi-code/mcp.json`. Sai a opção **Instalar neste projeto** (MCP e skill do fluxo, na tela Harness e na ferramenta `install_flow_skill`), e os artefatos padrão do board não entram mais na pasta do projeto, que pode ser compartilhada com quem não tem a extensão. O Cursor segue como exceção: o `.cursor/mcp.json` do projeto, fora do git pelo `.git/info/exclude`, porque o global dele é um processo só para todas as janelas. Quem quiser uma cópia da skill no projeto usa **Copiar para o projeto** no Harness. Some também o aviso e o botão **Adicionar ao .gitignore** do comando **Conectar IA**. Um registro de projeto antigo (`.mcp.json`, `.kimi-code/mcp.json`) não é migrado: a faixa de requisitos continua oferecendo **Corrigir o registro**, que o tira e refaz o global. **Mudança de comportamento:** `install_flow_skill` perde o parâmetro `scope` e recusa chamadas que o enviem; quem automatizou com `scope` precisa tirá-lo.
 - **O registro do MCP é refeito ao atualizar a extensão (#563).** Na primeira ativação de uma versão nova, o board refaz o registro global nas ferramentas em que ele já estava (Claude Code e Kimi Code; o Cursor já é refeito a cada abertura de pasta). Se falhar, o motivo vai para Saída → Faz AI e a faixa de requisitos continua avisando.
