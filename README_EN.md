@@ -1567,14 +1567,29 @@ machine, for example), they must be set up again:
 | `.claude/skills/publicar-extensao/` | the publishing walkthrough for the AI | copy the folder from the original machine |
 
 The last three are only needed to publish. `main` only accepts changes through pull requests, and
-the script already deals with that: `npm run release -- <patch|minor|major>` starts from an
-up-to-date, clean main, runs the tests, creates the `release/vX.Y.Z` branch and, on it, sets the
-version and the CHANGELOGs ("Unreleased" becomes the version), commits and packages. It publishes to
-both stores, pushes the branch, opens the PR to main and, once the push is done, merges it (squash).
-Then it updates the local main, deletes the release branch (local and remote) and creates the tag
-and the GitHub Release with the `.vsix`. If anything stops after publishing,
-`npm run release -- finish` picks up where it left off (on the release branch or on main), without
-publishing again. `--dry-run` rehearses without publishing. The options are at the top of `scripts/release.mjs`.
+the script already deals with that. With gitflow, the release starts from the branch you are on:
+
+- on `develop`: `npm run release -- <patch|minor|major>` requires an up-to-date, clean `develop`,
+  runs the tests, creates the `release/vX.Y.Z` branch and, on it, sets the version and the
+  CHANGELOGs ("Unreleased" becomes the version), commits and packages;
+- on a `hotfix/...`: the version commit goes on the fix's own branch, and its PR, if already open,
+  is reused;
+- on any other branch the script refuses and says where to run it from (the `--allow-branch`
+  option no longer exists).
+
+It then publishes to both stores, pushes the branch and opens the PR to main, which goes in with a
+**merge commit** (never squash, so the stories' merge commit stays in the tag); the branch is not
+deleted by that merge. The tag and the GitHub Release with the `.vsix` are created on `origin/main`,
+without switching your folder's branch. Finally main goes back to `develop` through a PR, also with
+a merge commit. If anything stops after publishing, `npm run release -- finish` picks up where it
+left off: each step checks whether it was already done (PR, tag, release, main contained in
+`develop`, branches) and does not publish again. If the way back to `develop` conflicts, resolve it
+in the open PR and run `finish`. `--dry-run` rehearses without publishing. The options are at the
+top of `scripts/release.mjs`.
+
+For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `hotfix/` worktree
+**before** approving the card. Approved first, the PR goes into main without a version and the fix
+only ships in the next release from `develop`.
 
 For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `hotfix/` worktree
 **before** approving the card. Approved first, the PR goes into main without a version and the fix

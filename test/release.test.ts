@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -500,5 +502,46 @@ describe('ReleaseWatcher: a rodada que comenta a versão e arquiva o card', () =
     };
     await expect(watcher.sweep()).resolves.toBeUndefined();
     expect(log).toEqual(['Publicações: [#1] router quebrado']);
+  });
+});
+
+describe('gitflow: a tag na main acha a história squashada na develop (RF25)', () => {
+  it('commit squash na develop, release mesclada na main com --no-ff e tag na main: publishedVersion encontra a tag', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-gitflow-'));
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-c', 'user.name=Teste', '-c', 'user.email=teste@example.com', ...args], { cwd: dir, encoding: 'utf8' }).trim();
+    try {
+      git('init', '-q', '-b', 'main');
+      fs.writeFileSync(path.join(dir, 'a.txt'), '1');
+      git('add', '.');
+      git('commit', '-q', '-m', 'base');
+      git('branch', 'develop');
+
+      // a história entra na develop por squash
+      git('switch', '-q', '-c', 'historia/1');
+      fs.writeFileSync(path.join(dir, 'b.txt'), '2');
+      git('add', '.');
+      git('commit', '-q', '-m', 'trabalho');
+      git('switch', '-q', 'develop');
+      git('merge', '--squash', 'historia/1');
+      git('commit', '-q', '-m', 'História 1 (#1)');
+      const squash = git('rev-parse', 'HEAD');
+
+      // a release sai da develop e vai para a main com merge commit
+      git('switch', '-q', '-c', 'release/v1.0.0');
+      fs.writeFileSync(path.join(dir, 'c.txt'), '3');
+      git('add', '.');
+      git('commit', '-q', '-m', 'Release v1.0.0');
+      git('switch', '-q', 'main');
+      git('merge', '--no-ff', '-q', '-m', 'Merge release/v1.0.0', 'release/v1.0.0');
+      git('tag', '-a', 'v1.0.0', '-m', 'v1.0.0');
+
+      const tags = git('tag', '--contains', squash).split('\n').filter(Boolean);
+      expect(tags).toEqual(['v1.0.0']);
+      const releases = [{ tag: 'v1.0.0', publishedAt: Date.parse('2026-01-01T00:00:00Z') }];
+      expect(publishedVersion(releases, tags)).toBe('v1.0.0');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
