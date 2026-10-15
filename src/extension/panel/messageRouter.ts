@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import type { BoardRequirement } from '../../shared/requirements';
 import type { EnvironmentReport } from '../../shared/environment';
+import { EMPTY_ORPHANS, type OrphanReport } from '../../shared/orphans';
 import type { DbHandle } from '../db/database';
 import { exportBoard, exportFileName, summarize, type BoardExportFile, type ImportResult } from '../db/boardExport';
 import { newId } from '../db/ids';
@@ -49,6 +50,16 @@ export interface EnvironmentHooks {
   seen(): void;
   /** grava o caminho completo dos MCPs que o editor não acha, e confere de novo */
   pinMcp?(): Promise<void>;
+}
+
+/** O que o host faz pela limpeza de branches e worktrees órfãs (#465). O relatório sai por `setOrphans`. */
+export interface OrphanHooks {
+  /** varre e publica, sem remover nada; nunca rejeita */
+  scan(): Promise<void>;
+  /** limpa um item, revalidado no host; resolve com o aviso para a pessoa */
+  clean(id: string, acceptLoss?: { dirtyFiles: number; uniqueCommits: number }): Promise<string>;
+  /** remove todas as seguras (revalidadas); resolve com o resumo */
+  cleanSafe(): Promise<string>;
 }
 
 /** As mensagens do webview que o chat executa. */
@@ -152,6 +163,8 @@ export class MessageRouter {
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
   private environmentHooks: EnvironmentHooks | null = null;
+  private orphans: OrphanReport = EMPTY_ORPHANS;
+  private orphanHooks: OrphanHooks | null = null;
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
 
@@ -224,6 +237,7 @@ export class MessageRouter {
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
       harnessSuggestions: this.suggestions,
       mainBranch: this.ctx.mainBranch(),
+      orphans: this.orphans,
     };
   }
 
@@ -360,6 +374,33 @@ export class MessageRouter {
     if (state.nextRoundAt === this.heartbeatNextAt) return;
     this.heartbeatNextAt = state.nextRoundAt;
     this.notify();
+  }
+
+  /**
+   * O relatório das órfãs (informado pelo varredor do host); só notifica quando o conteúdo muda, como
+   * `setHeartbeat`: o varredor publica a cada rodada e a tela não pode redesenhar por nada.
+   */
+  setOrphans(report: OrphanReport): void {
+    if (JSON.stringify(report) === JSON.stringify(this.orphans)) return;
+    this.orphans = report;
+    this.notify();
+  }
+
+  /** Quem varre e limpa as órfãs (o `OrphanSweeper` do host). */
+  onOrphans(hooks: OrphanHooks): void {
+    this.orphanHooks = hooks;
+  }
+
+  scanOrphans(): Promise<void> {
+    return this.orphanHooks?.scan() ?? Promise.resolve();
+  }
+
+  cleanOrphan(id: string, acceptLoss?: { dirtyFiles: number; uniqueCommits: number }): Promise<string> {
+    return this.orphanHooks?.clean(id, acceptLoss) ?? Promise.resolve('A limpeza de órfãs não está disponível.');
+  }
+
+  cleanSafeOrphans(): Promise<string> {
+    return this.orphanHooks?.cleanSafe() ?? Promise.resolve('A limpeza de órfãs não está disponível.');
   }
 
   /** O board como arquivo de export (texto JSON), o nome sugerido e os cards com anexo sem arquivo. */
