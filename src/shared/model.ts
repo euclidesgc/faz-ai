@@ -1,3 +1,4 @@
+import type { OrphanReport } from './orphans';
 import type { BoardRequirement } from './requirements';
 import type { EnvironmentReport } from './environment';
 import type { ExecProfile } from './execution';
@@ -281,6 +282,8 @@ export interface BoardState {
   requirementsCheckedAt: number;
   /** a ferramenta ativa falhou por login vencido numa execução; null quando não há aviso reativo ativo */
   authExpired: AiTool | null;
+  /** branches e worktrees órfãs, varridas pelo host; vazio antes da primeira varredura (runtime, não vai para o banco) */
+  orphans: OrphanReport;
   /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */
   environment: EnvironmentReport | null;
   /** o Diagnóstico ainda não abriu sozinho nesta máquina: a interface abre a tela uma vez */

@@ -309,6 +309,12 @@ export type WebviewToHost =
   | { type: 'ui.showChat' }
   /** confere de novo o que falta para o board trabalhar com a ferramenta de IA */
   | { type: 'requirements.check' }
+  /** varre de novo as branches e worktrees órfãs (o relatório sai em `BoardState.orphans`) */
+  | { type: 'git.orphans.scan' }
+  /** limpa uma órfã pelo `id`; `acceptLoss` com os números que a pessoa viu confirma a perda de uma que depende de decisão */
+  | { type: 'git.orphans.clean'; id: string; acceptLoss?: { dirtyFiles: number; uniqueCommits: number } }
+  /** limpa todas as órfãs seguras */
+  | { type: 'git.orphans.cleanSafe' }
   /** roda o Diagnóstico do ambiente (o que o board precisa, o que é opcional e o que ele aproveita) */
   | { type: 'environment.check' }
   /** o Diagnóstico já abriu sozinho nesta máquina: não abre mais na abertura do board */
