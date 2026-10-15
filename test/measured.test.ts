@@ -374,6 +374,24 @@ describe('o servidor do board para o Cursor em segundo plano', () => {
   });
 });
 
+describe('o servidor do board para o Kimi Code em segundo plano', () => {
+  const server = { command: '/usr/bin/node', args: ['/dados/bridge.js', '/projeto'] };
+
+  it('registra no .kimi-code/mcp.json antes de rodar, sem o campo type que a CLI não usa, e o exclui do git localmente', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-kimi-'));
+    try {
+      fs.mkdirSync(path.join(dir, '.git', 'info'), { recursive: true });
+      spawnMeasured('kimi', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
+      const config = JSON.parse(fs.readFileSync(path.join(dir, '.kimi-code', 'mcp.json'), 'utf8'));
+      expect(config.mcpServers['faz-ai']).toEqual(server);
+      expect(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8')).toContain('.kimi-code/mcp.json');
+      expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('pastas temporárias de execuções antigas', () => {
   it('apaga as de mais de um dia e deixa as recentes e as de outros programas', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-tmp-test-'));

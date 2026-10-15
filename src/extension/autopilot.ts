@@ -221,13 +221,27 @@ export class Autopilot {
     return this.active;
   }
 
-  /** Liga o autopiloto (limpando a pausa gravada no board e a última falha) e trata a fila agora. */
-  resume(): void {
+  /** Nota publicada quando a pessoa retoma numa janela que não é a dona do board. */
+  static readonly NOT_OWNER_NOTE =
+    'Outro lugar atende o board desta pasta (outra janela do editor ou o comando faz-ai no terminal): o modo autônomo roda lá.';
+
+  /**
+   * Liga o autopiloto (limpando a pausa gravada no board e a última falha) e trata a fila agora. Numa
+   * janela que não é a dona do board não liga: ligar sem poder rodar deixaria o estado interno aceso
+   * sem publicar nada, e o botão de retomar pareceria não fazer nada. Devolve se ligou.
+   */
+  resume(): boolean {
+    if (!this.canRun()) {
+      this.deps.log(`Autopiloto: ${Autopilot.NOT_OWNER_NOTE}`);
+      this.publish(Autopilot.NOT_OWNER_NOTE);
+      return false;
+    }
     this.held = false;
     this.active = true;
     this.progress.clear();
     if (this.paused()) this.setPaused(false);
     this.evaluate();
+    return true;
   }
 
   /**
@@ -282,7 +296,7 @@ export class Autopilot {
     const now = new Set(yoloStories(this.router.snapshot()).map((c) => c.id));
     const added = [...now].some((id) => !this.known.has(id));
     this.known = now;
-    if (added && !this.active && !this.stopping && this.canRun()) return this.resume();
+    if (added && !this.active && !this.stopping && this.canRun()) return void this.resume();
     if (!this.active) this.autoResume();
     if (!this.active) return;
     if (this.scheduled) return;

@@ -117,4 +117,5 @@ export const toolsInOrder = (projectTool: AiTool): AiTool[] => [
  * configurações da ferramenta ou remover do projeto o que não quer no contexto. Ler a documentação oficial
  * da CLI antes de classificar uma ferramenta nova.
  */
-export const TOOL_REGIME: Record<AiTool, 'cli' | 'person'> = { claude: 'cli', cursor: 'person' };
+// o Kimi Code não tem flag para desligar artefatos: como no Cursor, a pessoa desliga nas configurações dele
+export const TOOL_REGIME: Record<AiTool, 'cli' | 'person'> = { claude: 'cli', cursor: 'person', kimi: 'person' };

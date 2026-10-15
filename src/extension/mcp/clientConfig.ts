@@ -43,6 +43,9 @@ export interface Registration {
 
 const SERVER = 'faz-ai';
 
+/** A pasta de dados do Kimi Code: $KIMI_CODE_HOME quando definida, senão ~/.kimi-code. */
+export const kimiHome = (homeDir: string): string => process.env.KIMI_CODE_HOME || path.join(homeDir, '.kimi-code');
+
 /** A pasta fixa nos argumentos do registro; uma variável da ferramenta (`${workspaceFolder}`) não é pasta fixa. */
 export const fixedFolder = (arg: string | undefined): string | undefined => (arg && !/\$\{[^}]*\}/.test(arg) ? arg : undefined);
 
@@ -105,7 +108,7 @@ export function ensureProjectServer(
   relFile: string,
   entry: { command: string; args: string[]; env?: Record<string, string> },
   homeDir: string = os.homedir(),
-  opts: { useGlobal?: boolean } = {},
+  opts: { useGlobal?: boolean; stdioType?: boolean } = {},
 ): ProjectServerResult {
   const current = readEntry(path.join(workspaceDir, relFile));
   if (current === 'invalid') return 'invalid';
@@ -124,7 +127,8 @@ export function ensureProjectServer(
     if (usable) command = current.command as string;
   }
   mergeJson(path.join(workspaceDir, relFile), {
-    type: 'stdio',
+    // o Kimi Code documenta a entrada stdio sem o campo `type`; as outras ferramentas o esperam
+    ...(opts.stdioType === false ? {} : { type: 'stdio' }),
     command,
     args: entry.args,
     ...(entry.env && command === entry.command ? { env: entry.env } : {}),
@@ -148,6 +152,7 @@ function coveredByGlobal(file: string, runDir: string, entryArgs: string[]): boo
  * Registra o servidor MCP do board na configuração que cada ferramenta lê. No escopo do projeto:
  * - Claude Code: `.mcp.json` do projeto
  * - Cursor: `.cursor/mcp.json` do projeto
+ * - Kimi Code: `.kimi-code/mcp.json` do projeto
  */
 export function registerClients(tools: AiTool[], o: RegisterOptions): Registration[] {
   if (o.scope === 'user') return tools.flatMap((tool) => registerUser(tool, o));
@@ -171,6 +176,10 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
         out.push(registerCursorProject(o));
         break;
       }
+      case 'kimi': {
+        out.push(registerKimiProject(o));
+        break;
+      }
     }
   }
   return out;
@@ -184,6 +193,8 @@ export function registerClients(tools: AiTool[], o: RegisterOptions): Registrati
  *   tempo todo; gravar nele por fora arrisca perder a mudança ou a dela). A pasta chega pela variável
  *   `CLAUDE_PROJECT_DIR`, que o Claude Code passa ao servidor.
  * - Cursor: nenhum; o registro dele é sempre o do projeto (veja `registerCursorProject`)
+ * - Kimi Code: `~/.kimi-code/mcp.json` ($KIMI_CODE_HOME/mcp.json), um JSON só de servidores que a
+ *   ferramenta não regrava: a escrita direta é segura
  */
 function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
   const node = o.nodeCommand ?? 'node';
@@ -209,6 +220,19 @@ function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
     // atender. O registro do Cursor é sempre o do projeto.
     case 'cursor':
       return [registerCursorProject(o)];
+    case 'kimi': {
+      const file = path.join(kimiHome(o.homeDir), 'mcp.json');
+      // a entrada do Kimi Code não leva o campo `type` (documentação da CLI 2.1.1)
+      mergeJson(file, { command: node, args });
+      return [
+        {
+          tool,
+          file,
+          projectFile: null,
+          next: 'Kimi Code: abra uma sessão nova em qualquer projeto com o board aberto.',
+        },
+      ];
+    }
   }
 }
 
@@ -259,6 +283,32 @@ export function registerCursorProject(o: RegisterOptions): Registration {
     projectFile: rel,
     excluded: true,
     next: 'Cursor: se o "faz-ai" aparecer desligado em Cursor Settings → MCP, ligue.',
+  };
+}
+
+/**
+ * O servidor do board no Kimi Code: no `.kimi-code/mcp.json` do projeto (a CLI o lê em toda sessão
+ * na pasta), com a pasta fixa, fora do git pelo `.git/info/exclude`. A entrada vai sem o campo
+ * `type`, como a documentação da CLI 2.1.1 mostra. Um global (`~/.kimi-code/mcp.json`) que já cubra
+ * esta pasta dispensa o arquivo do projeto (`useGlobal` do `ensureProjectServer`).
+ */
+export function registerKimiProject(o: RegisterOptions): Registration {
+  const rel = '.kimi-code/mcp.json';
+  const file = path.join(o.workspaceDir, rel);
+  const result = ensureProjectServer(
+    o.workspaceDir,
+    rel,
+    { command: o.nodeCommand ?? 'node', args: [o.bridgePath, o.workspaceDir] },
+    o.homeDir,
+    { stdioType: false },
+  );
+  if (result === 'invalid') throw new Error(`${file} não é um JSON válido; corrija-o e tente de novo.`);
+  return {
+    tool: 'kimi',
+    file,
+    projectFile: rel,
+    excluded: true,
+    next: 'Kimi Code: abra uma sessão nova na pasta para ela carregar o servidor.',
   };
 }
 

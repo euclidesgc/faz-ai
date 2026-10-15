@@ -1,7 +1,7 @@
 import type { RunReport } from '../../shared/log';
 
 /** Formato que a CLI vai produzir; é ele que escolhe o leitor, dentro do provider da ferramenta. */
-export type OutputFormat = 'text' | 'claude-stream-json' | 'cursor-stream-json';
+export type OutputFormat = 'text' | 'claude-stream-json' | 'cursor-stream-json' | 'kimi-stream-json';
 
 /** De qual canal do processo a linha veio. O `stderr` é texto de gente e nunca é interpretado. */
 export type OutputStream = 'stdout' | 'stderr';

@@ -433,6 +433,10 @@ export const board: Record<string, string> = {
   '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). A ferramenta não consegue iniciar o servidor. Conecte de novo para gravar o caminho atual.':
     '{file} points to "{missing}", which no longer exists on this machine (a node replaced by nvm, or the board installed elsewhere). The tool cannot start the server. Connect again to write the current path.',
   'O {tool} não roda com o nível de permissão escolhido': '{tool} does not run with the chosen permission level',
+  'O {tool} pede aprovação para cada ferramenta do board': '{tool} asks approval for each board tool',
+  'Nas conversas com o {tool} fora do board, cada ferramenta do MCP "faz-ai" pede uma aprovação. Uma regra no {file} libera todas de uma vez; sem ela tudo funciona, mas com uma pergunta a cada chamada. As execuções pelo board não pedem nada.':
+    'In conversations with {tool} outside the board, each "faz-ai" MCP tool asks for an approval. A rule in {file} allows them all at once; without it everything still works, but with a question per call. Runs from the board never ask.',
+  'Liberar as ferramentas do board': 'Allow the board tools',
   'Instalar o MCP do board': 'Install the board MCP',
   '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). O registro do projeto vale no lugar do global, então a ferramenta não consegue iniciar o servidor. Corrigir tira o registro deste arquivo e deixa valendo o global, com os caminhos atuais.':
     '{file} points to "{missing}", which no longer exists on this machine (a node switched by nvm, or the board installed elsewhere). The project registration takes precedence over the global one, so the tool cannot start the server. Fix removes the registration from this file and leaves the global one in effect, with the current paths.',

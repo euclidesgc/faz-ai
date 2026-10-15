@@ -100,6 +100,10 @@ describe('arquivos de agente', () => {
     const cursor = aiToolInfo('cursor').agents;
     expect(renderAgentFile(cursor, input)).toContain('tools: Read, Edit\n');
     expect(lacksBoardTools(cursor, parseAgentFile(cursor, found, renderAgentFile(cursor, input)))).toBe(false);
+    // o Kimi Code lê os mesmos globs `mcp__*` no frontmatter (documentação da CLI 2.1.1): também leva as do board
+    const kimi = aiToolInfo('kimi').agents;
+    expect(renderAgentFile(kimi, input)).toContain('tools: Read, Edit, mcp__faz-ai__*\n');
+    expect(parseAgentFile(kimi, found, renderAgentFile(kimi, input)).tools).toEqual(['Read', 'Edit']);
   });
 
   it('no Cursor, readonly e is_background são gravados e lidos; no Claude Code não existem', () => {
