@@ -752,8 +752,9 @@ Options under **Faz AI › Git** in the editor Settings:
 | `fazai.git.hotfixPrefix` | `hotfix/` | Prefix of hotfix branches. |
 | `fazai.git.releasePrefix` | `release/` | Informational only: no card type produces a release. |
 
-An empty prefix or name, or one git doesn't accept, goes back to the default. Orphan cleanup comes
-in a later delivery.
+An empty prefix or name, or one git doesn't accept, goes back to the default. Branches and
+worktrees left over after a story are covered in
+[Orphan branches and worktrees](#orphan-branches-and-worktrees).
 
 ##### Renaming the main branch or `develop` on `origin`
 
@@ -827,8 +828,8 @@ why in a comment in the conversation, with the command to run by hand:
 
 No cleanup failure prevents the card from being concluded. With gitflow off ("straight to the main
 branch") nothing changes: the conclusion only removes the worktree, as before. There is no option to
-turn the cleanup off separately from gitflow. Branches and worktrees left over from before are for
-the orphan cleanup, which comes in another delivery.
+turn the cleanup off separately from gitflow. Branches and worktrees left over from before are
+covered in [Orphan branches and worktrees](#orphan-branches-and-worktrees).
 
 #### Stack and hotfix
 
@@ -841,6 +842,32 @@ the orphan cleanup, which comes in another delivery.
 - **After a hotfix.** The board opens and merges a `main → develop` PR, also with a merge commit, so
   `develop` receives the fix. There is never a direct push. On conflict, the PR stays open and the
   card's conversation tells you to resolve it.
+
+#### Orphan branches and worktrees
+
+An orphan is a branch or worktree the board created whose story has finished (merged, done,
+cancelled, archived or in the trash) or no longer exists on the board. The main branch, `develop`,
+branches in use outside the worktrees folder and the bases of stories that are still active (the PR
+stack) are never included. The board measures git on opening and on every heartbeat round (after
+checking the merges) and gives each item a verdict:
+
+- **Safe** (`Segura`): there is nothing to lose (a worktree with no changed files; a branch with no
+  commits only it has, or already merged into the base). The board cleans it on its own: removes the
+  worktree and deletes the **local** branch with `git branch -D`. The remote branch is not touched by
+  this cleanup.
+- **Needs a decision** (`Precisa de decisão`): it has uncommitted files, commits that exist only
+  there, a story the board doesn't know, or a branch still in use by a worktree. Nothing is deleted
+  on its own.
+
+Under **Settings → Git → Branches e worktrees órfãs** (orphan branches and worktrees) each item shows
+the story, the situation and the verdict. **Limpar** (Clear) removes one item; on a decision item it
+opens a confirmation saying how many files and commits are lost, and only after you confirm does the
+board remove it (checking the disk again first). **Limpar todas as seguras** (Clear all the safe
+ones) acts on all the safe ones at once; **Verificar de novo** (Check again) measures again. When an
+item could not be removed, its row shows "Não removido" (Not removed) with the reason, and the next
+round tries again. While there are decision orphans, the top of the board shows the **N órfãs**
+(N orphans) badge, which opens that section. With the heartbeat off, the board only measures on
+opening and on **Verificar de novo**.
 
 ### Decision records
 

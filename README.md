@@ -720,8 +720,8 @@ Opções em **Faz AI › Git**, no Settings do editor:
 | `fazai.git.hotfixPrefix` | `hotfix/` | Prefixo das branches de hotfix. |
 | `fazai.git.releasePrefix` | `release/` | Só informativo: nenhum tipo de card gera release. |
 
-Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. A limpeza das órfãs vem em uma
-entrega seguinte.
+Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. Branches e worktrees que sobram
+depois da história são tratadas em [Branches e worktrees órfãs](#branches-e-worktrees-órfãs).
 
 ##### Renomear a principal ou a `develop` no `origin`
 
@@ -793,8 +793,8 @@ comentário na conversa, com o comando para você fazer à mão:
 
 Nenhuma falha da limpeza impede a conclusão do card. Com o gitflow desligado ("direto na principal")
 nada muda: a conclusão só remove a worktree, como antes. Não há opção para desligar a limpeza à parte
-do gitflow. Branches e worktrees que já sobraram de antes ficam para a limpeza de órfãs, que vem em
-outra entrega.
+do gitflow. Branches e worktrees que já sobraram de antes são tratadas em
+[Branches e worktrees órfãs](#branches-e-worktrees-órfãs).
 
 #### Pilha e hotfix
 
@@ -807,6 +807,28 @@ outra entrega.
 - **Depois de um hotfix.** O board abre e mescla um PR `main → develop`, também com merge commit, para
   a `develop` receber a correção. Nunca há push direto. Se houver conflito, o PR fica aberto e a
   conversa do card avisa para você resolver.
+
+#### Branches e worktrees órfãs
+
+Órfã é a branch ou a worktree que o board criou e cuja história já terminou (mesclada, concluída,
+cancelada, arquivada ou na lixeira) ou nem existe mais no board. Nunca entram a branch principal, a
+`develop`, as branches em uso fora da pasta das worktrees e as bases de histórias ainda ativas
+(a pilha de PRs). O board mede o git na abertura e a cada rodada do heartbeat (depois de conferir os
+merges) e dá um veredito a cada item:
+
+- **Segura**: não há nada a perder (worktree sem arquivos alterados; branch sem commits só dela, ou
+  já mesclada na base). O board a limpa sozinho: remove a worktree e apaga a branch **local** com
+  `git branch -D`. A branch remota não é tocada por esta limpeza.
+- **Precisa de decisão**: tem arquivos não commitados, commits que só existem nela, uma história que o
+  board não conhece ou uma branch ainda em uso por uma worktree. Nada é apagado sozinho.
+
+Em **Configurações → Git → Branches e worktrees órfãs** cada item mostra a história, a situação e o
+veredito. **Limpar** remove um item; num item de decisão abre uma confirmação que diz quantos arquivos
+e commits se perdem, e só depois de confirmar o board os remove (e confere de novo no disco, antes). **Limpar
+todas as seguras** age sobre todas as seguras de uma vez; **Verificar de novo** refaz a medição.
+Quando um item não pôde ser removido, a linha mostra "Não removido" com o motivo, e a próxima rodada
+tenta de novo. Enquanto houver órfãs de decisão, o topo do board mostra o selo **N órfãs**, que abre
+essa seção. Sem heartbeat ligado, o board mede só na abertura e no **Verificar de novo**.
 
 ### Registros de decisão
 
