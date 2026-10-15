@@ -54,7 +54,10 @@ interface ListedWorktree {
   branch: string | null;
 }
 
-/** O `git worktree list --porcelain` em blocos; o primeiro é a pasta principal. */
+/**
+ * O `git worktree list --porcelain` em blocos; o primeiro é a pasta principal. Repete o parser de
+ * `listWorktrees` em `storyCleanup.ts` porque `WorktreeFact.branch` é `null` (não `''`) com o HEAD destacado.
+ */
 function parseWorktrees(out: string): ListedWorktree[] {
   const list: ListedWorktree[] = [];
   for (const block of out.split(/\r?\n\r?\n/)) {
@@ -127,7 +130,8 @@ export class OrphanSweeper {
     for (const w of listed.slice(1)) {
       if (!root || !isInside(root, w.path)) continue;
       const exists = fs.existsSync(w.path);
-      let dirtyFiles = 0;
+      // o que não foi medido entra como pendente: um número neutro nunca pode significar "pode apagar"
+      let dirtyFiles = exists ? 1 : 0;
       if (exists && measure(`worktree:${w.path}`)) {
         try {
           dirtyFiles = count(await this.deps.git(['status', '--porcelain'], w.path));
@@ -143,7 +147,7 @@ export class OrphanSweeper {
     const branches: BranchFact[] = [];
     for (const name of candidateBranches(state, all)) {
       if (!measure(`branch:${name}`)) {
-        branches.push({ name, uniqueCommits: 0, mergeProof: false });
+        branches.push({ name, uniqueCommits: 1, mergeProof: false });
         continue;
       }
       let uniqueCommits: number;
@@ -320,9 +324,10 @@ export class OrphanSweeper {
       const item = fresh.items.find((i) => i.id === id);
       let text: string;
       const failed = { ...this.report.failed };
+      const loss = acceptLoss ?? null;
       if (!item) text = 'Já não é órfã.';
-      else if (item.verdict !== 'safe' && !acceptLoss) text = `Não removida: ${blockerText(item)}.`;
-      else if (item.verdict !== 'safe' && (item.dirtyFiles !== acceptLoss!.dirtyFiles || item.uniqueCommits !== acceptLoss!.uniqueCommits))
+      else if (item.verdict !== 'safe' && !loss) text = `Não removida: ${blockerText(item)}.`;
+      else if (item.verdict !== 'safe' && loss && (item.dirtyFiles !== loss.dirtyFiles || item.uniqueCommits !== loss.uniqueCommits))
         text = `Não removida: mudou desde a listagem, agora são ${lossText(item.dirtyFiles, item.uniqueCommits) || 'outros números'}.`;
       else {
         try {
