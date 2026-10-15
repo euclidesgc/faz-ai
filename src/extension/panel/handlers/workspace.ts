@@ -7,15 +7,11 @@ import { isPullRequestUrl, stackBaseOf, storyOf } from '../../../shared/story';
 import { columnOf, isLive } from '../../../shared/selectors';
 import { settleDelivery } from '../../delivery';
 import { now } from '../../db/ids';
-import { prepareWorkspace } from '../../git';
+import { prepareWorkspace, worktreeRoot as rootOf } from '../../git';
 import type { BoardContext, HandlerMap } from './context';
 
 /** Pasta onde ficam as worktrees das histórias. */
-function worktreeRoot(ctx: BoardContext): string | null {
-  const dir = ctx.opts.workspaceDir;
-  const { git } = ctx.state().board;
-  return dir && git.mode === 'worktree' ? path.resolve(dir, git.worktreeDir.replace(/\{repo\}/g, path.basename(dir))) : null;
-}
+const worktreeRoot = (ctx: BoardContext): string | null => rootOf(ctx.opts.workspaceDir, ctx.state().board.git);
 
 /**
  * Pastas fora do projeto em que a IA precisa poder trabalhar: a das worktrees. Vai inteira (e
