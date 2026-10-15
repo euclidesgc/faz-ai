@@ -19,7 +19,7 @@ import { ChatViewProvider } from './sidebar/ChatViewProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
 import { ViewStateStore } from './viewState';
 import type { AiRunner } from './runner';
-import type { Autopilot } from './autopilot';
+import { Autopilot } from './autopilot';
 import type { Heartbeat } from './heartbeat';
 import { revealInSystem } from './web/osOpen';
 import { HarnessWatcher, userWatchTargets, type WatchFn } from './harnessWatch';
@@ -360,7 +360,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.autopilot.pause', () => autopilot?.pause()),
     vscode.commands.registerCommand('fazai.autopilot.resume', async () => {
       if (!(await getRouter()) || !autopilot) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
-      autopilot.resume();
+      // sem ser a dona do board, esta janela não pode tocar a fila: avisa em vez de parecer que o botão não fez nada
+      if (!autopilot.resume()) void vscode.window.showWarningMessage(`Faz AI: ${Autopilot.NOT_OWNER_NOTE}`);
     }),
     vscode.commands.registerCommand('fazai.upgradeBoard', async () => {
       const router = await getRouter();

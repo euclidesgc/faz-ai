@@ -7,6 +7,7 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Resuming autonomous mode in a window that does not own the board now warns.** When the folder's board is served elsewhere (another editor window or the `faz-ai` command in a terminal), the resume button seemed to do nothing. It now shows a warning saying where autonomous mode runs, and the activity bar keeps the reason.
 - **The board now works with Kimi Code.** Kimi Code (`kimi`, the Moonshot AI CLI) becomes the board's third AI tool, alongside Claude Code and Cursor: choose it in Configurações → Harness de IA. The connect button registers the board server in the project's `.kimi-code/mcp.json` or in `~/.kimi-code/mcp.json` (global), runs go through `kimi -p` with the server materialized before each call, and models are read from `kimi provider list --json`. The environment diagnostic now shows every other installed tool (not just one), and the requirements banner gains a recommended item to allow the board tools at once in Kimi Code conversations (the `mcp__faz-ai__*` rule in its `config.toml`). Kimi Code hooks and seeding the factory agents into its folders come in a future version.
 
 ## 0.44.0
