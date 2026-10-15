@@ -84,7 +84,8 @@ export function parseKimiHooks(toml: string): { hooks: KimiHook[]; unknownBlocks
 export function validateKimiHook(h: KimiHook, events: string[]): string | null {
   if (!events.includes(h.event)) return `Evento desconhecido: ${h.event || '(vazio)'}.`;
   if (!h.command.trim()) return 'Informe o comando do hook.';
-  if (/[\r\n]|"""|'''/.test(h.command) || /[\r\n]/.test(h.matcher)) return 'O comando e o filtro não podem ter quebra de linha nem aspas triplas.';
+  if (/[\r\n]|"""|'''/.test(h.command) || /[\r\n]/.test(h.matcher))
+    return 'O comando e o filtro não podem ter quebra de linha nem aspas triplas.';
   if (h.timeout !== 0 && (!Number.isInteger(h.timeout) || h.timeout < KIMI_HOOK_TIMEOUT.min || h.timeout > KIMI_HOOK_TIMEOUT.max))
     return `O timeout vai de ${KIMI_HOOK_TIMEOUT.min} a ${KIMI_HOOK_TIMEOUT.max} segundos.`;
   return null;

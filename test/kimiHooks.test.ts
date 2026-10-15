@@ -8,7 +8,8 @@ import { AGENT_TOOLS } from '../src/shared/agentTools';
 import { HOOK_EVENTS, hookTargets } from '../src/shared/harnessCatalog';
 import { appendKimiHook, parseKimiHooks, removeKimiHook, validateKimiHook } from '../src/shared/kimiHooks';
 
-const base = 'model = "kimi"\n\n[[hooks]]\nevent = "PreToolUse"\nmatcher = "Bash"\ncommand = "./a.sh"\ntimeout = 30\n\n[[hooks]]\nevent = "Stop"\ncommand = "./b.sh"\n';
+const base =
+  'model = "kimi"\n\n[[hooks]]\nevent = "PreToolUse"\nmatcher = "Bash"\ncommand = "./a.sh"\ntimeout = 30\n\n[[hooks]]\nevent = "Stop"\ncommand = "./b.sh"\n';
 
 describe('hooks do Kimi (TOML)', () => {
   it('lê os blocos reconhecidos e conta os desconhecidos', () => {
@@ -42,7 +43,9 @@ describe('hooks do Kimi (TOML)', () => {
   it('remove só o primeiro bloco e devolve o arquivo anterior ao append', () => {
     const h = { event: 'Stop', matcher: '', command: './novo.sh', timeout: 0 };
     expect(removeKimiHook(appendKimiHook(base, h), 'Stop', './novo.sh')).toBe(base);
-    expect(removeKimiHook(base, 'Stop', './b.sh')).toBe('model = "kimi"\n\n[[hooks]]\nevent = "PreToolUse"\nmatcher = "Bash"\ncommand = "./a.sh"\ntimeout = 30\n');
+    expect(removeKimiHook(base, 'Stop', './b.sh')).toBe(
+      'model = "kimi"\n\n[[hooks]]\nevent = "PreToolUse"\nmatcher = "Bash"\ncommand = "./a.sh"\ntimeout = 30\n',
+    );
   });
 
   it('recusa remover quando há bloco não reconhecido ou o hook não existe', () => {
