@@ -64,6 +64,16 @@ export interface OrphanHooks {
   cleanSafe(): Promise<string>;
 }
 
+/** O que o host faz pela limpeza de branches e worktrees órfãs (#465). O relatório sai por `setOrphans`. */
+export interface OrphanHooks {
+  /** varre e publica, sem remover nada; nunca rejeita */
+  scan(): Promise<void>;
+  /** limpa um item, revalidado no host; resolve com o aviso para a pessoa */
+  clean(id: string, acceptLoss?: { dirtyFiles: number; uniqueCommits: number }): Promise<string>;
+  /** remove todas as seguras (revalidadas); resolve com o resumo */
+  cleanSafe(): Promise<string>;
+}
+
 /** As mensagens do webview que o chat executa. */
 export type ChatMessageIn = Extract<
   WebviewToHost,
