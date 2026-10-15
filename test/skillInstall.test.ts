@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fetchSource, findSkills, installSkills, parseSource } from '../src/extension/skillInstall';
+import { parseFrontmatter, skillTemplate } from '../src/extension/harness';
 import { FLOW_SKILL } from '../src/extension/flowSkill';
 
 it('a skill do fluxo, no modo autônomo, manda registrar o pull request e parar na última coluna da IA, sem mover para a conclusão', () => {
@@ -84,5 +85,24 @@ describe('instalar skills de uma pasta ou repositório', () => {
     fetched.cleanup();
     expect(fs.existsSync(fetched.dir)).toBe(false);
     await expect(fetchSource({ kind: 'git', url: path.join(root, 'nao-e-repo') })).rejects.toThrow('Não foi possível clonar');
+  });
+});
+
+describe('skillTemplate: descrição como YAML válido', () => {
+  const descricaoLinha = (md: string) => md.split('\n').find((l) => l.startsWith('description:'))!;
+
+  it('grava a descrição como string JSON e o leitor devolve a original', () => {
+    const original = 'Use sempre: quando houver "aspas" e barra \\';
+    const md = skillTemplate('x', original, 'corpo');
+    const valor = descricaoLinha(md).slice('description:'.length).trim();
+    expect(valor.startsWith('"') && valor.endsWith('"')).toBe(true);
+    expect(parseFrontmatter(md).description).toBe(original);
+  });
+
+  it('a skill do fluxo, que tem ": " na descrição, sai entre aspas e volta igual', () => {
+    const md = skillTemplate(FLOW_SKILL.name, FLOW_SKILL.description, FLOW_SKILL.body);
+    const valor = descricaoLinha(md).slice('description:'.length).trim();
+    expect(valor.startsWith('"') && valor.endsWith('"')).toBe(true);
+    expect(parseFrontmatter(md).description).toBe(FLOW_SKILL.description.replace(/\r?\n/g, ' ').trim());
   });
 });

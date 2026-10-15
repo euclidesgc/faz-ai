@@ -1111,20 +1111,23 @@ describe('status do card e checkpoint de revisão', () => {
     expect((await call('delete_agent', { agent: 'planejador' })).text).toContain('não encontrado');
   });
 
-  it('instala a skill do fluxo no global por padrão, ou no projeto, sem sobrescrever', async () => {
-    const global = path.join(dir, 'home-do-usuario', '.claude', 'skills', 'faz-ai-fluxo', 'SKILL.md');
-    expect((await call('install_flow_skill')).data).toMatchObject({ installed: true });
-    expect(fs.readFileSync(global, 'utf8')).toContain('get_pending_work');
+  it('instala a skill do fluxo sempre no global da ferramenta, sem sobrescrever', async () => {
+    const file = path.join(dir, 'home-do-usuario', '.claude', 'skills', 'faz-ai-fluxo', 'SKILL.md');
+    expect((await call('install_flow_skill')).data).toMatchObject({
+      installed: true,
+      skill: expect.stringContaining('.claude/skills/faz-ai-fluxo'),
+    });
+    expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
+    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'faz-ai-fluxo'))).toBe(false);
+    // os artefatos padrão do board não entram no projeto: o escopo deixou de ser um parâmetro
+    expect((await call('install_flow_skill', { scope: 'project' })).error).toBe(true);
     expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'faz-ai-fluxo'))).toBe(false);
 
-    const file = path.join(dir, '.claude', 'skills', 'faz-ai-fluxo', 'SKILL.md');
-    expect((await call('install_flow_skill', { scope: 'project' })).data).toMatchObject({ installed: true });
-    expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
     fs.writeFileSync(file, '---\nname: faz-ai-fluxo\ndescription: minha versão\n---\nmeu texto');
-    expect((await call('install_flow_skill', { scope: 'project' })).data.installed).toBe(false);
+    expect((await call('install_flow_skill')).data.installed).toBe(false);
     expect(fs.readFileSync(file, 'utf8')).toContain('meu texto');
     // só com replace a versão da pessoa é trocada
-    expect((await call('install_flow_skill', { scope: 'project', replace: true })).data).toMatchObject({ note: 'Skill substituída.' });
+    expect((await call('install_flow_skill', { replace: true })).data).toMatchObject({ note: 'Skill substituída.' });
     expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
   });
 
@@ -1207,19 +1210,21 @@ describe('ferramentas de IA', () => {
     expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['revisar-spec']);
   });
 
-  it('registra o servidor MCP no formato de cada ferramenta', async () => {
+  it('registra o servidor MCP no formato de cada ferramenta: o Claude Code no global, o Cursor no projeto', async () => {
     const { registerClients } = await import('../src/extension/mcp/clientConfig');
     const home = path.join(dir, 'home');
     fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
     fs.writeFileSync(path.join(home, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
     const bridge = '/b/com espaço/bridge.js';
     const done = registerClients(['claude', 'cursor'], { bridgePath: bridge, workspaceDir: dir, homeDir: home });
-    expect(done.map((d) => d.projectFile)).toEqual(['.mcp.json', '.cursor/mcp.json']);
+    // o Claude Code vai pela CLI dele, sem arquivo no projeto; o Cursor é a exceção: `.cursor/mcp.json` do projeto, com a pasta fixa
+    expect(done.map((d) => d.projectFile)).toEqual([null, '.cursor/mcp.json']);
+    expect(done[0]!.run!.map((s) => s.args[1])).toEqual(['remove', 'add-json']);
+    expect(fs.existsSync(path.join(dir, '.mcp.json'))).toBe(false);
 
     const json = (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')).mcpServers;
-    expect(json(path.join(dir, '.mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir] });
     expect(json(path.join(dir, '.cursor', 'mcp.json'))['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: [bridge, dir] });
-    // no escopo do projeto, nada vai para a pasta do usuário
+    // o global do Cursor não é usado: o que a pessoa tem lá fica como está
     expect(json(path.join(home, '.cursor', 'mcp.json'))).toEqual({ outro: { command: 'x' } });
   });
 
@@ -1234,7 +1239,6 @@ describe('ferramentas de IA', () => {
       bridgePath: bridge,
       workspaceDir: project,
       homeDir: home,
-      scope: 'user',
     });
     // o projeto fica sem arquivo nenhum
     expect(fs.existsSync(project)).toBe(false);

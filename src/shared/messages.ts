@@ -40,7 +40,7 @@ export type WebviewToHost =
   | { type: 'view.set'; patch: Partial<ViewState> }
   | { type: 'ui.showFilters' }
   /** instala o servidor MCP do board numa ferramenta (padrão: a do projeto), global (padrão) ou só no projeto */
-  | { type: 'ui.connectAI'; tool?: AiTool; scope?: InstallScope }
+  | { type: 'ui.connectAI'; tool?: AiTool }
   /** tira o registro quebrado do board do arquivo do projeto (que vale sobre o global) e refaz o global */
   | { type: 'ui.fixProjectMcp'; file: string }
   /** recarrega a janela do editor, para o chat dele carregar o servidor recém-registrado */
@@ -331,7 +331,7 @@ export type WebviewToHost =
    * instala a skill do fluxo numa ferramenta (padrão: a do projeto), global (padrão) ou só no projeto;
    * `replace` troca uma skill de mesmo nome que já esteja no destino (sem ele, a que existe fica)
    */
-  | { type: 'harness.flowSkill.install'; tool?: AiTool; scope?: InstallScope; replace?: boolean }
+  | { type: 'harness.flowSkill.install'; tool?: AiTool; replace?: boolean }
   /** exporta o board num arquivo JSON (no editor, abre o "salvar como"; na web a página baixa pela rota /backup/export) */
   | { type: 'backup.export' }
   /** escolhe um arquivo de export, valida e devolve o resumo em `backup.import.summary` (na web a página envia por /backup/import) */

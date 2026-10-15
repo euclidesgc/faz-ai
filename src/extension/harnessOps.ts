@@ -23,9 +23,10 @@ function template(tool: AiTool, src: HarnessSource, file: string, name: string, 
     });
   if (file.endsWith('.json')) return '{}\n';
   if (src.layout === 'file') return '';
-  // regras por caminho e prompts: frontmatter com a descrição e o campo de aplicação de cada ferramenta
+  // regras por caminho e prompts: frontmatter com a descrição (string JSON, YAML válido mesmo com `: `)
+  // e o campo de aplicação de cada ferramenta
   const extra = file.endsWith('.mdc') ? 'alwaysApply: false\n' : '';
-  return `---\ndescription: ${oneLine}\n${extra}---\n\n`;
+  return `---\ndescription: ${JSON.stringify(oneLine)}\n${extra}---\n\n`;
 }
 
 /** Cria, apaga e copia itens do harness no projeto e na pasta do usuário. Nunca escreve em plugins. Não depende da API do VSCode. */

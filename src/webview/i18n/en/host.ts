@@ -26,25 +26,23 @@ const commandNotFound: Record<string, string> = Object.fromEntries(
   }),
 );
 
-/** Resposta de "Conectar IA": o servidor registrado e o próximo passo de cada ferramenta (de registerClients), com ou sem o aviso do .gitignore. */
+/** Resposta de "Conectar IA": o servidor registrado e o próximo passo de cada ferramenta (o `next` de cada registro em clientConfig.ts). */
 const NEXT_STEPS: [pt: string, en: string][] = [
-  [
-    'Claude Code: abra uma sessão nova na pasta e aprove o servidor (/mcp mostra o estado).',
-    'Claude Code: open a new session in the folder and approve the server (/mcp shows its state).',
-  ],
-  ['Cursor: ative o servidor em Settings → MCP.', 'Cursor: enable the server in Settings → MCP.'],
   [
     'Claude Code: abra uma sessão nova em qualquer projeto com o board aberto (/mcp mostra o estado).',
     'Claude Code: open a new session in any project with the board open (/mcp shows its state).',
   ],
+  [
+    'Kimi Code: abra uma sessão nova em qualquer projeto com o board aberto.',
+    'Kimi Code: open a new session in any project with the board open.',
+  ],
+  [
+    'Cursor: se o "faz-ai" aparecer desligado em Cursor Settings → MCP, ligue.',
+    'Cursor: if "faz-ai" shows as off in Cursor Settings → MCP, turn it on.',
+  ],
 ];
-const GITIGNORE_PT = ' Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: {ignored}.';
-const GITIGNORE_EN = ' These files hold paths from this machine: consider adding them to .gitignore: {ignored}.';
 const connectAI: Record<string, string> = Object.fromEntries(
-  NEXT_STEPS.flatMap(([pt, en]) => [
-    [`Servidor "faz-ai" registrado em: {files}. ${pt}`, `Server "faz-ai" registered in: {files}. ${en}`],
-    [`Servidor "faz-ai" registrado em: {files}. ${pt}${GITIGNORE_PT}`, `Server "faz-ai" registered in: {files}. ${en}${GITIGNORE_EN}`],
-  ]),
+  NEXT_STEPS.map(([pt, en]) => [`Servidor "faz-ai" registrado em: {files}. ${pt}`, `Server "faz-ai" registered in: {files}. ${en}`]),
 );
 
 /**
