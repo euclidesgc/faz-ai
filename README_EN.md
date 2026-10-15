@@ -1230,7 +1230,7 @@ the same order:
 | Skills  Skills | Instructions and support files loaded when the task calls for them | `.claude/skills/<name>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
 | Sub-agentes  Subagentes (subagents) | Helpers the AI delegates work to | `.claude/agents/*.md`, `.cursor/agents/*.md` |
 | Comandos  Comandos (commands) | Ready-made prompts, called with `/name` | `.claude/commands/*.md`, `.cursor/commands/*.md` |
-| Hooks  Hooks | Commands the tool runs on its own on certain events | `hooks` in `.claude/settings.json`, `.cursor/hooks.json` |
+| Hooks  Hooks | Commands the tool runs on its own on certain events | `hooks` in `.claude/settings.json`, `.cursor/hooks.json`, `[[hooks]]` in `~/.kimi-code/config.toml` |
 | MCPs  Servidores MCP (MCP servers) | Servers that give the AI extra tools | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
 | Demais  Configurações e permissões (settings and permissions) | How the tool behaves and what the AI does without asking | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
 | Demais  Estilos de saída (output styles) | Change the way the AI answers | `.claude/output-styles/*.md` |

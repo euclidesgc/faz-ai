@@ -83,6 +83,8 @@ export type HarnessSource = {
     | { layout: 'json-permissions'; lists: string[] }
     /** arquivos com um destes nomes nas subpastas do projeto (a raiz já tem as fontes próprias) */
     | { layout: 'nested'; names: string[] }
+    /** blocos `[[hooks]]` de um arquivo TOML (Kimi Code) */
+    | { layout: 'toml-hooks' }
   );
 
 type Src = HarnessSource;
@@ -344,6 +346,14 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
       group: 'settings',
       hint: 'Suas configurações do Kimi Code (modelo, provedores e as regras permanentes de permissão), em todos os projetos.',
     }),
+    {
+      kind: 'hook',
+      scope: 'user',
+      layout: 'toml-hooks',
+      path: '.kimi-code/config.toml',
+      group: 'hook',
+      hint: 'Comando que roda num momento da sessão do Kimi Code. Falha em aberto (erro ou tempo esgotado deixam passar): não é controle de segurança.',
+    },
   ],
 };
 
@@ -492,14 +502,14 @@ export const MCP_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
  * - `nested` (Claude Code): evento → grupos `{ matcher, hooks: [{ type: "command", command, timeout }] }`
  * - `flat` (Cursor): `{ version: 1, hooks: { evento: [{ command, matcher, timeout }] } }`
  * Sem entrada aqui, a ferramenta não tem alvos de hook. Os hooks do Kimi Code são `[[hooks]]` em TOML
- * no `~/.kimi-code/config.toml` (documentação da CLI 2.1.1) — um formato novo que entra numa etapa
- * seguinte, com o escritor de TOML.
+ * no `~/.kimi-code/config.toml` (documentação da CLI 2.1.1), lidos e gravados por `shared/kimiHooks.ts`.
  */
-export type HookFormat = 'nested' | 'flat';
+export type HookFormat = 'nested' | 'flat' | 'toml';
 
 const HOOK_FORMAT: Partial<Record<AiTool, HookFormat>> = {
   claude: 'nested',
   cursor: 'flat',
+  kimi: 'toml',
 };
 
 export interface HookTarget {
@@ -512,10 +522,9 @@ export interface HookTarget {
 /** Arquivos de hooks que o board edita. */
 export function hookTargets(tool: AiTool): HookTarget[] {
   const format = HOOK_FORMAT[tool];
-  // a ferramenta sem formato de hook conhecido (o Kimi Code) não tem alvos: o catálogo dela não traz fontes de hook
   if (!format) return [];
   return HARNESS_CATALOG[tool].flatMap((src, source): HookTarget[] => {
-    if (src.kind !== 'hook' || src.layout !== 'json-keys') return [];
+    if (src.kind !== 'hook' || (format === 'toml' ? src.layout !== 'toml-hooks' : src.layout !== 'json-keys')) return [];
     return [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}`, format }];
   });
 }
@@ -564,8 +573,29 @@ export const HOOK_EVENTS: Record<AiTool, string[]> = {
     'beforeTabFileRead',
     'afterTabFileEdit',
   ],
-  // os eventos de hook do Kimi Code entram junto com o formato TOML, numa etapa seguinte
-  kimi: [],
+  // documentação da CLI 2.1.1: bloqueiam (saída 2) UserPromptSubmit, PreToolUse e Stop
+  kimi: [
+    'UserPromptSubmit',
+    'UserPromptQueued',
+    'PreToolUse',
+    'Stop',
+    'TurnStarted',
+    'PostToolUse',
+    'PostToolUseFailure',
+    'PermissionRequest',
+    'PermissionResult',
+    'SessionStart',
+    'SessionEnd',
+    'SessionHeartbeat',
+    'SubagentStart',
+    'SubagentStop',
+    'TaskStarted',
+    'StopFailure',
+    'Interrupt',
+    'PreCompact',
+    'PostCompact',
+    'Notification',
+  ],
 };
 
 export interface HookInput {
