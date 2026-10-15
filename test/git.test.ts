@@ -183,6 +183,15 @@ describe('parseGit', () => {
     });
   });
 
+  it('mainBranch vazia ou inválida volta a ser detectada; um nome válido é mantido', () => {
+    expect(parseGit('{}').mainBranch).toBe('');
+    expect(parseGit(JSON.stringify({ mainBranch: 'trunk' })).mainBranch).toBe('trunk');
+    expect(parseGit(JSON.stringify({ mainBranch: ' main ' })).mainBranch).toBe('main');
+    expect(parseGit(JSON.stringify({ mainBranch: 'a b' })).mainBranch).toBe('');
+    expect(parseGit(JSON.stringify({ mainBranch: 'main/' })).mainBranch).toBe('');
+    expect(parseGit(JSON.stringify({ mainBranch: 7 })).mainBranch).toBe('');
+  });
+
   it('prefixo ou develop vazio ou inválido volta ao padrão; válido é mantido mesmo sem a barra', () => {
     expect(parseGit(JSON.stringify({ featurePrefix: '' })).featurePrefix).toBe('feature/');
     expect(parseGit(JSON.stringify({ featurePrefix: '   ' })).featurePrefix).toBe('feature/');
@@ -581,6 +590,14 @@ describe('branch e worktree por história', () => {
     git(repo, 'branch', '-m', 'main', 'trunk');
     expect(router.snapshot().mainBranch).toEqual({ name: 'main', source: 'origin' }); // em cache
     expect(router.handle({ type: 'git.main.refresh' }).mainBranch).toEqual({ name: 'main', source: 'name' }); // origin/main ainda existe
+  });
+
+  it('a principal fixada em mainBranch vale sobre a detectada; vazia, volta a detectar (#466)', () => {
+    git(repo, 'branch', 'trunk');
+    router.handle({ type: 'settings.board.update', patch: { git: { mainBranch: 'trunk' } } });
+    expect(router.snapshot().mainBranch).toEqual({ name: 'trunk', source: 'config' });
+    router.handle({ type: 'settings.board.update', patch: { git: { mainBranch: '' } } });
+    expect(router.snapshot().mainBranch).toEqual({ name: 'main', source: 'origin' });
   });
 
   it('modo branch cria a branch sem trocar a atual; desligado recusa', async () => {

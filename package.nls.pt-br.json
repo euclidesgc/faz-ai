@@ -45,6 +45,7 @@
   "config.git.mode.off": "O board não cria branches nem worktrees.",
   "config.git.gitflow": "Gitflow: as branches de feature e de bugfix partem da branch develop e voltam para ela; a de hotfix parte da principal. O tipo de branch que cada tipo de card gera se define nas configurações do board, em Git. Desligado = toda branch parte da principal.",
   "config.git.developBranch": "Branch de integração do gitflow, de onde partem as branches de feature e de bugfix e para onde vão os pull requests delas. Criada a partir da principal quando não existe. Só vale com o [Gitflow](@id:fazai.git.gitflow) ligado.",
+  "config.git.mainBranch": "Branch principal do repositório. Vazio detecta (a branch padrão do origin, depois `main` ou `master`). Trocar para um nome que ainda não existe pergunta se renomeia a branch no repositório e no `origin`.",
   "config.git.featurePrefix": "Prefixo das branches de feature, que entra em `{fluxo}` do [nome da branch](@id:fazai.git.branchPattern) (ex.: `feature/`). Vazio = `feature/`. Só vale com o [Gitflow](@id:fazai.git.gitflow) ligado.",
   "config.git.bugfixPrefix": "Prefixo das branches de bugfix, que entra em `{fluxo}` do [nome da branch](@id:fazai.git.branchPattern) (ex.: `bugfix/`). Vazio = `bugfix/`. Só vale com o [Gitflow](@id:fazai.git.gitflow) ligado.",
   "config.git.hotfixPrefix": "Prefixo das branches de hotfix, que entra em `{fluxo}` do [nome da branch](@id:fazai.git.branchPattern) (ex.: `hotfix/`). Vazio = `hotfix/`. Só vale com o [Gitflow](@id:fazai.git.gitflow) ligado.",

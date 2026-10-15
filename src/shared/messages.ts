@@ -8,6 +8,7 @@ import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { CardUsage } from './cardUsage';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
+import type { RenameKind } from './branchRename';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { BranchKind, GitConfig } from './git';
@@ -54,6 +55,8 @@ export type WebviewToHost =
   | { type: 'ui.openIdeSettings'; key?: string }
   /** a tela Git pede para detectar de novo a branch principal */
   | { type: 'git.main.refresh' }
+  /** a resposta ao aviso de renomeação da principal ou da develop (`from` e `to` são os do pedido que a pessoa viu): renomear, desfazer ou dispensar o resultado */
+  | { type: 'git.rename.resolve'; kind: RenameKind; from: string; to: string; action: 'confirm' | 'undo' | 'dismiss' }
   /** executa a ferramenta de IA do projeto em segundo plano para trabalhar neste card */
   /** `mode`: trabalhar a fase (padrão) ou só refinar o card */
   | { type: 'ai.run'; cardId: Id; mode?: AiRunMode }

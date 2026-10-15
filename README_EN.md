@@ -745,14 +745,38 @@ Options under **Faz AI › Git** in the editor Settings:
 | Option | Default | What it does |
 | --- | --- | --- |
 | `fazai.git.gitflow` | on | Off, every branch starts from the main branch and `{fluxo}` becomes `<type>/`. |
+| `fazai.git.mainBranch` | empty | Pinned main branch; empty detects it (`origin` HEAD, `main` or `master`). |
 | `fazai.git.developBranch` | `develop` | Integration branch. |
 | `fazai.git.featurePrefix` | `feature/` | Prefix of feature branches. |
 | `fazai.git.bugfixPrefix` | `bugfix/` | Prefix of bugfix branches. |
 | `fazai.git.hotfixPrefix` | `hotfix/` | Prefix of hotfix branches. |
 | `fazai.git.releasePrefix` | `release/` | Informational only: no card type produces a release. |
 
-An empty prefix or name, or one git doesn't accept, goes back to the default. Orphan cleanup and
-renaming the main branch on `origin` come in later deliveries.
+An empty prefix or name, or one git doesn't accept, goes back to the default. Orphan cleanup comes
+in a later delivery.
+
+##### Renaming the main branch or `develop` on `origin`
+
+Changing `fazai.git.mainBranch` or `fazai.git.developBranch` to a name that does not exist yet, with
+the old branch existing, opens a notice in the editor (the change also applies to `origin`, and the
+board does not do it on its own). The options are **Renomear** (Rename) and **Desfazer** (Undo); closing
+the box keeps the request and the question comes back when the board is reopened.
+
+- **Rename** acts in this order: the branch on GitHub through `gh` (`gh api .../branches/<old>/rename`);
+  `git fetch --prune`; `git branch -m` in the clone (including a branch checked out in a worktree); the
+  upstream (`origin/<new>`); and, on the main branch only, `origin/HEAD`. GitHub redirects open PRs and
+  moves the default branch to the new name (per the API documentation, not tested with a real account).
+- **Without `gh`, outside GitHub or without permission**: nothing runs. The notice shows the ready-made
+  commands for this clone and for the others, with **Copiar comandos** (Copy commands).
+- **Failure midway**: the message says what already changed and what is missing. Each step checks the
+  state before acting, so repeating is safe. The remote comes first: if it fails, nothing local changes.
+- **Undo** puts the previous name back in the setting and does not touch the repository.
+- **Refused** while the AI is running a story (the message lists the numbers).
+- **Not changed**: CI workflows, protection rules, GitHub's default branch (for `develop`) and other
+  clones. The AI does not rename branches: no new MCP tool.
+
+The browser dialog, the fields on the Git screen and the environment diagnostic item come in a later
+delivery (#498).
 
 ### Pull request and merge in Homologação
 

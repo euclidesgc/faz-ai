@@ -151,6 +151,8 @@ const state: BoardState = {
   harnessInstall: null,
   harnessSuggestions: null,
   mainBranch: null,
+  branchRenames: [],
+  branchRenameResult: null,
 };
 
 const run = (f: Partial<Filters>) => [...(applyFilters(state, { ...EMPTY_FILTERS, includeRelated: false, ...f }, NOW) ?? [])].sort();

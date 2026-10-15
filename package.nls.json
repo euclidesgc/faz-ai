@@ -45,6 +45,7 @@
   "config.git.mode.off": "The board does not create branches or worktrees.",
   "config.git.gitflow": "Gitflow: feature and bugfix branches start from the develop branch and go back to it; hotfix starts from the main branch. Which type each card type generates is set in the board settings, under Git. Off = every branch starts from the main branch.",
   "config.git.developBranch": "Integration branch of the gitflow, where feature and bugfix branches start and where their pull requests go. Created from the main branch when it does not exist. Only applies with [Gitflow](@id:fazai.git.gitflow) on.",
+  "config.git.mainBranch": "Main branch of the repository. Empty detects it (the origin's default branch, then `main` or `master`). Changing it to a name that does not exist yet asks to rename the branch on the repository and on the `origin`.",
   "config.git.featurePrefix": "Prefix of feature branches, which go in `{fluxo}` of the [branch name](@id:fazai.git.branchPattern) (for example `feature/`). Empty = `feature/`. Only applies with [Gitflow](@id:fazai.git.gitflow) on.",
   "config.git.bugfixPrefix": "Prefix of bugfix branches, which go in `{fluxo}` of the [branch name](@id:fazai.git.branchPattern) (for example `bugfix/`). Empty = `bugfix/`. Only applies with [Gitflow](@id:fazai.git.gitflow) on.",
   "config.git.hotfixPrefix": "Prefix of hotfix branches, which go in `{fluxo}` of the [branch name](@id:fazai.git.branchPattern) (for example `hotfix/`). Empty = `hotfix/`. Only applies with [Gitflow](@id:fazai.git.gitflow) on.",
