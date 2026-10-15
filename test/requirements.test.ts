@@ -33,8 +33,19 @@ const probe = (over: Partial<RequirementProbe> = {}): RequirementProbe => ({
   ...over,
 });
 
-const connect = (tool: RequirementProbe['tool'], node = process.execPath) =>
-  registerClients([tool], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: node });
+/**
+ * A instalação global de uma ferramenta. O registro do Claude Code é feito pela CLI dele (`claude mcp
+ * add-json`), que o teste não roda: grava no `~/.claude.json` a entrada que o comando receberia.
+ */
+const connect = (tool: RequirementProbe['tool'], node = process.execPath) => {
+  const done = registerClients([tool], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: node });
+  for (const step of done.flatMap((d) => d.run ?? [])) {
+    if (step.args[1] !== 'add-json') continue;
+    const entry = JSON.parse(step.args[step.args.length - 1]!);
+    fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ mcpServers: { 'faz-ai': entry } }));
+  }
+  return done;
+};
 
 describe('requisitos do board', () => {
   it('com tudo pronto, nada falta', async () => {
@@ -138,7 +149,30 @@ describe('requisitos do board', () => {
       connect(tool);
       expect(registeredServer(tool, project, home)).toMatchObject({ command: process.execPath });
     }
+    // o Claude Code vai para o global, sem a pasta fixa; o Cursor, para o projeto, com ela
+    expect(registeredServer('claude', project, home)).toMatchObject({ file: '~/.claude.json', scope: 'user', args: [BRIDGE] });
     expect(registeredServer('cursor', project, home)!.args).toEqual([BRIDGE, project]);
+  });
+
+  it('a instalação do Claude Code é pela CLI dele, no escopo do usuário, sem arquivo no projeto', () => {
+    const [done] = registerClients(['claude'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath });
+    expect(done).toMatchObject({ tool: 'claude', file: path.join(home, '.claude.json'), projectFile: null });
+    expect(done!.run!.map((s) => s.args.slice(0, 4))).toEqual([
+      ['mcp', 'remove', '--scope', 'user'],
+      ['mcp', 'add-json', '--scope', 'user'],
+    ]);
+    expect(fs.existsSync(path.join(project, '.mcp.json'))).toBe(false);
+  });
+
+  it('um registro antigo no .mcp.json do projeto ainda é reconhecido, como do projeto (o botão "Corrigir o registro")', async () => {
+    fs.writeFileSync(
+      path.join(project, '.mcp.json'),
+      JSON.stringify({ mcpServers: { 'faz-ai': { command: '/sumiu/node', args: [BRIDGE, project] } } }),
+    );
+    expect(registeredServer('claude', project, home)).toMatchObject({ file: '.mcp.json', scope: 'project' });
+    expect(await checkRequirements(probe({ tool: 'claude' }))).toEqual([
+      { id: 'mcp-stale', tool: 'claude', file: '.mcp.json', missing: '/sumiu/node', action: { kind: 'fixProject', file: '.mcp.json' } },
+    ]);
   });
 
   it('no Cursor o global não conta: o registro é sempre o do projeto, fora do git', async () => {
@@ -150,8 +184,8 @@ describe('requisitos do board', () => {
       JSON.stringify({ mcpServers: { outro: { command: 'x' }, 'faz-ai': { command: 'node', args: [BRIDGE, '${workspaceFolder}'] } } }),
     );
     expect(registeredServer('cursor', project, home)).toBeNull();
-    // instalar "no global" do Cursor grava no projeto e tira o global antigo
-    registerClients(['cursor'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
+    // instalar no Cursor grava no projeto e tira o global antigo
+    connect('cursor');
     expect(registeredServer('cursor', project, home)).toMatchObject({
       file: '.cursor/mcp.json',
       scope: 'project',
@@ -246,21 +280,25 @@ describe('Kimi Code', () => {
     else process.env.KIMI_CODE_HOME = saved;
   });
 
-  it('registra o servidor do board no .kimi-code/mcp.json do projeto, sem o campo type, e fora do git', () => {
-    fs.mkdirSync(path.join(project, '.git', 'info'), { recursive: true });
+  it('um registro antigo no .kimi-code/mcp.json do projeto vale sobre o global e ainda é reconhecido', () => {
     connect('kimi');
     const file = path.join(project, '.kimi-code', 'mcp.json');
-    // a CLI 2.1.1 documenta a entrada stdio sem o campo `type`
-    expect(JSON.parse(fs.readFileSync(file, 'utf8')).mcpServers['faz-ai']).toEqual({ command: process.execPath, args: [BRIDGE, project] });
-    expect(fs.readFileSync(path.join(project, '.git', 'info', 'exclude'), 'utf8')).toContain('.kimi-code/mcp.json');
-    expect(registeredServer('kimi', project, home)).toMatchObject({ file: '.kimi-code/mcp.json', args: [BRIDGE, project] });
+    fs.mkdirSync(path.dirname(file));
+    fs.writeFileSync(file, JSON.stringify({ mcpServers: { 'faz-ai': { command: process.execPath, args: [BRIDGE, project] } } }));
+    expect(registeredServer('kimi', project, home)).toMatchObject({
+      file: '.kimi-code/mcp.json',
+      scope: 'project',
+      args: [BRIDGE, project],
+    });
   });
 
-  it('no escopo do usuário grava no mcp.json da pasta de dados dele, e ele vale para o projeto', async () => {
-    registerClients(['kimi'], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home, nodeCommand: process.execPath, scope: 'user' });
+  it('grava no mcp.json da pasta de dados do usuário, sem o campo type e sem arquivo no projeto, e ele vale para o projeto', async () => {
+    connect('kimi');
     const file = path.join(home, '.kimi-code', 'mcp.json');
-    // o global não prende a pasta: o bridge acha o projeto pelo diretório em que a CLI o inicia
-    expect(JSON.parse(fs.readFileSync(file, 'utf8')).mcpServers['faz-ai']).toMatchObject({ command: process.execPath, args: [BRIDGE] });
+    // o global não prende a pasta: o bridge acha o projeto pelo diretório em que a CLI o inicia; a CLI
+    // 2.1.1 documenta a entrada stdio sem o campo `type`
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).mcpServers['faz-ai']).toEqual({ command: process.execPath, args: [BRIDGE] });
+    expect(fs.existsSync(path.join(project, '.kimi-code'))).toBe(false);
     expect(registeredServer('kimi', project, home)).toMatchObject({ file: '~/.kimi-code/mcp.json' });
     // com o servidor registrado e a regra de permissão, nada falta
     allowKimiMcp(home);

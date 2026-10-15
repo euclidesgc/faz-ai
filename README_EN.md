@@ -270,13 +270,17 @@ navegador**; the terminal `faz-ai` warns and does not start.
    flow skill (`faz-ai-fluxo`): it teaches the AI to take cards through the phases, write the
    documents, ask for review and pick up pending work. It can be edited.
 
-**Global or this project.** Both items live only in their section, on each tool, each with two
-buttons:
+**Global only.** The server and the flow skill live in the tool's global configuration, and none of
+it goes into the project folder (which may be shared with people who do not have the extension):
 
-| | Where it writes | When to use |
-|---|---|---|
-| **Instalar (padrão da ferramenta)** (tool default) | global config: `~/.claude.json` (through `claude mcp add --scope user`), `~/.cursor/mcp.json` (Cursor's is written to the project), `~/.kimi-code/mcp.json`; the skill in `~/.claude/skills`, `~/.cursor/skills`, `~/.kimi-code/skills` and equivalents | recommended: the board works in any repository opened with it, with no file in the project |
-| **Instalar neste projeto** (this project) | `.mcp.json`, `.cursor/mcp.json` or `.kimi-code/mcp.json`; the skill in `.claude/skills`, `.cursor/skills`, `.kimi-code/skills` and equivalents | pinning a version in a repository or a fork, or a skill tailored for the team |
+| Item | Where it writes |
+|---|---|
+| MCP server | `~/.claude.json` (through `claude mcp add-json --scope user`) and `~/.kimi-code/mcp.json` |
+| Flow skill | `~/.claude/skills`, `~/.cursor/skills`, `~/.kimi-code/skills` |
+
+To keep a copy of the skill in the project, use **Copiar para o projeto** (copy to the project) in
+the harness. When the extension updates, the board redoes the global registration on the tools that
+already had it.
 
 The global registration does not pin the project folder: Claude Code passes the folder in the
 `CLAUDE_PROJECT_DIR` variable, and the board's bridge finds the board by walking up from the folder
@@ -287,12 +291,11 @@ and cannot tell which board to serve, so the board writes the project's `.cursor
 (outside git, through `.git/info/exclude`) as soon as the folder opens in Cursor. The first time in
 each project, the banner asks you to **reload the window** (Cursor only reads project servers when
 the window opens) and then to **turn on `faz-ai`** in Cursor Settings → MCP (Cursor keeps every new
-project server off). The project one takes precedence over the global
-one in that project, so installing in the project when a global one exists asks for confirmation,
-and so does replacing a flow skill that already exists at the destination (changes made to it are
-lost). The **Faz AI: Install the board MCP (global)** palette command does the default install on
-the project's tool, and the MCP tool `install_flow_skill` takes `scope` (`user`, the default, or
-`project`).
+project server off). Replacing a flow skill that already exists at the destination asks for
+confirmation (changes made to it are lost). The **Faz AI: Install the board MCP (global)** palette
+command does the install on the project's tool. An old project registration (`.mcp.json`,
+`.kimi-code/mcp.json`) takes precedence over the global one and is not migrated: the requirements
+banner offers **Corrigir o registro** (fix the registration), which removes it and redoes the global.
 4. Open a new session of the tool in the project folder and ask, for example, "list the cards on
    the board", "take story #1 and write the PRD" or "check what is pending on the board and move it
    forward".
@@ -1193,7 +1196,7 @@ available agents, `set_card_profile` picks one for a card, and `create_agent`, `
 
 ## AI harness
 
-![Project and global skills, with the flow skill install, global or in the project](docs/images/harness_en.png)
+![Project and global skills, with the flow skill install in the global scope](docs/images/harness_en.png)
 
 Every run started by the board starts from an **empty context**: no rule, skill or agent from your
 machine or the project gets in on its own. Only what you **send to the board** gets in. The first
@@ -1638,7 +1641,7 @@ machine, for example), they must be set up again:
 | Item | What it is for | How to get it |
 |---|---|---|
 | Node.js 22+ and git | build, tests and the `faz-ai` command | regular install |
-| `.mcp.json` and `.claude/settings.local.json` | connect the AI to the board; hold machine paths | **Instalar neste projeto** (this project) in the MCP servers section of the AI harness |
+| `.mcp.json` and `.claude/settings.local.json` | connect the AI to the board; hold machine paths | the board no longer creates them (only Cursor's `.cursor/mcp.json`); an old one goes away with **Corrigir o registro** (fix the registration) in the requirements banner |
 | Board and attachments | live in the extension's storage, not in the repository | the folder's board starts empty on the other machine |
 | `.env.release` with `OVSX_PAT` | publishing to Open VSX | token at https://open-vsx.org/user-settings/tokens |
 | Azure CLI login | publishing to the VS Code Marketplace | `az login --allow-no-subscriptions`, with the account that owns the publisher |

@@ -32,7 +32,7 @@ const req = (msg: WebviewToHost): Promise<void> => request(msg);
 export const ui = {
   showFilters: () => post({ type: 'ui.showFilters' }),
   /** instala o servidor MCP do board: padrão é a ferramenta do projeto, no escopo global */
-  connectAI: (tool?: AiTool, scope?: InstallScope) => req({ type: 'ui.connectAI', tool, scope }),
+  connectAI: (tool?: AiTool) => req({ type: 'ui.connectAI', tool }),
   openInBrowser: () => post({ type: 'ui.openInBrowser' }),
   openIdeSettings: (key?: string) => post({ type: 'ui.openIdeSettings', key }),
   /** a tela Git pede para detectar de novo a branch principal (sem rede) */
@@ -232,8 +232,7 @@ export const harness = {
   removePermission: (tool: AiTool, path: string, list: string, rule: string) =>
     post({ type: 'harness.permission.remove', tool, path, list, rule }),
   createReferenceSkill: () => post({ type: 'harness.referenceSkill.create' }),
-  installFlowSkill: (tool: AiTool, scope: InstallScope, replace = false) =>
-    req({ type: 'harness.flowSkill.install', tool, scope, replace }),
+  installFlowSkill: (tool: AiTool, replace = false) => req({ type: 'harness.flowSkill.install', tool, replace }),
   scanInstall: (source: string) => req({ type: 'harness.install.scan', source }),
   applyInstall: (tool: AiTool, to: HarnessScope, rels: string[]) => req({ type: 'harness.install.apply', tool, to, rels }),
   cancelInstall: () => post({ type: 'harness.install.cancel' }),

@@ -256,13 +256,16 @@ o `faz-ai` do terminal avisa e não inicia.
    skill do fluxo (`faz-ai-fluxo`): ela ensina a IA a conduzir os cards pelas fases, gerar os
    documentos, pedir revisão e retomar pendências. Pode ser editada.
 
-**Global ou neste projeto.** Os dois itens ficam só na seção do tipo, em cada ferramenta, cada um
-com dois botões:
+**Só no global.** O servidor e a skill do fluxo ficam na configuração global da ferramenta, e nada
+disso entra na pasta do projeto (que pode ser compartilhada com quem não tem a extensão):
 
-| | Onde grava | Quando usar |
-|---|---|---|
-| **Instalar (padrão da ferramenta)** | configuração global: `~/.claude.json` (por `claude mcp add --scope user`), `~/.cursor/mcp.json` (o do Cursor é gravado no projeto), `~/.kimi-code/mcp.json`; a skill em `~/.claude/skills`, `~/.cursor/skills`, `~/.kimi-code/skills` e equivalentes | o recomendado: o board funciona em qualquer repositório aberto com ele, sem nenhum arquivo no projeto |
-| **Instalar neste projeto** | `.mcp.json`, `.cursor/mcp.json` ou `.kimi-code/mcp.json`; a skill em `.claude/skills`, `.cursor/skills`, `.kimi-code/skills` e equivalentes | fixar uma versão num repositório ou num fork, ou uma skill ajustada para o time |
+| Item | Onde grava |
+|---|---|
+| Servidor MCP | `~/.claude.json` (por `claude mcp add-json --scope user`) e `~/.kimi-code/mcp.json` |
+| Skill do fluxo | `~/.claude/skills`, `~/.cursor/skills`, `~/.kimi-code/skills` |
+
+Quem quiser uma cópia da skill no projeto usa **Copiar para o projeto** no Harness. Ao atualizar a
+extensão, o board refaz o registro global nas ferramentas em que ele já estava.
 
 O registro global não fixa a pasta do projeto: o Claude Code informa a pasta pela variável
 `CLAUDE_PROJECT_DIR`, e a ponte do board acha o board subindo a partir da pasta em que a ferramenta
@@ -273,11 +276,11 @@ sabe qual board atender, então o board grava sozinho o `.cursor/mcp.json` do pr
 pelo `.git/info/exclude`) assim que a pasta abre no Cursor. Na primeira vez em cada projeto, a faixa
 pede para **recarregar a janela** (o Cursor só lê os servidores do projeto ao abrir a janela) e depois
 para **ligar o `faz-ai`** em Cursor Settings → MCP (o Cursor deixa desligado todo servidor novo do
-projeto). O do projeto vale sobre o global naquele projeto, então
-instalar no projeto com um global já instalado pede confirmação, assim como substituir uma skill do
-fluxo que já existe no destino (o que foi ajustado nela se perde). O comando **Faz AI: Instalar o
-MCP do board (global)** da paleta faz a instalação padrão na ferramenta do projeto, e a ferramenta
-`install_flow_skill` do MCP aceita `scope` (`user`, o padrão, ou `project`).
+projeto). Substituir uma skill do fluxo que já existe no destino pede confirmação (o que foi
+ajustado nela se perde). O comando **Faz AI: Instalar o MCP do board (global)** da paleta faz a
+instalação na ferramenta do projeto. Um registro de projeto antigo (`.mcp.json`,
+`.kimi-code/mcp.json`) vale sobre o global e não é migrado: a faixa de requisitos oferece **Corrigir
+o registro**, que o tira e refaz o global.
 4. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
    board", "pegue a história #1 e escreva o PRD" ou "veja o que está pendente no board e dê andamento".
 
@@ -1136,7 +1139,7 @@ disponíveis, `set_card_profile` escolhe o de um card e `create_agent`, `update_
 
 ## Harness de IA
 
-![Skills do projeto e globais, com a instalação da skill do fluxo no global ou no projeto](docs/images/harness.png)
+![Skills do projeto e globais, com a instalação da skill do fluxo no global](docs/images/harness.png)
 
 Toda execução pelo board parte de **contexto vazio**: nenhuma regra, skill ou agente da sua máquina
 ou do projeto entra por conta própria. Só entra o que você **envia ao board**. Ao abrir Configurações →
@@ -1557,7 +1560,7 @@ por exemplo), eles precisam ser refeitos:
 | Item | Para que serve | Como obter |
 |---|---|---|
 | Node.js 22+ e git | build, testes e o comando `faz-ai` | instalação normal |
-| `.mcp.json` e `.claude/settings.local.json` | ligam a IA ao board; guardam caminhos da máquina | **Instalar neste projeto** na seção Servidores MCP do Harness de IA |
+| `.mcp.json` e `.claude/settings.local.json` | ligam a IA ao board; guardam caminhos da máquina | o board não os cria mais (só o `.cursor/mcp.json` do Cursor); um registro antigo some com **Corrigir o registro**, na faixa de requisitos |
 | Board e anexos | ficam no armazenamento da extensão, não no repositório | o board da pasta começa vazio na outra máquina |
 | `.env.release` com `OVSX_PAT` | publicar no Open VSX | token em https://open-vsx.org/user-settings/tokens |
 | Login da Azure CLI | publicar no VS Code Marketplace | `az login --allow-no-subscriptions`, com a conta dona do publisher |

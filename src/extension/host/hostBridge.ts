@@ -5,7 +5,7 @@ import { MAX_ATTACHMENT_BYTES } from '../attachments';
 import { parseExportFile, type ImportResult } from '../db/boardExport';
 import type { HostToWebview, Tracked, WebviewToHost } from '../../shared/messages';
 import type { AiRunMode } from '../../shared/runner';
-import type { AiTool, InstallScope } from '../../shared/harness';
+import type { AiTool } from '../../shared/harness';
 import type { ViewStateStore } from '../viewState';
 import type { MessageRouter } from '../panel/messageRouter';
 
@@ -23,8 +23,8 @@ export interface HostEnv {
   /** endereço base dos arquivos de anexos, como a interface os enxerga */
   attachmentsBaseUri(): string;
   showFilters(): unknown;
-  /** registra o servidor MCP do board na ferramenta de IA do projeto; o texto devolvido vira um aviso na interface */
-  connectAI(target: { tool?: AiTool; scope?: InstallScope }): unknown;
+  /** registra o servidor MCP do board no global da ferramenta de IA; o texto devolvido vira um aviso na interface */
+  connectAI(target: { tool?: AiTool }): unknown;
   /** tira o registro quebrado do board do arquivo do projeto e refaz o global; o texto devolvido vira um aviso */
   fixProjectMcp(file: string): Promise<string>;
   /** recarrega a janela do editor (só faz sentido dentro do editor) */
@@ -140,7 +140,7 @@ export class HostBridge {
         await this.env.showFilters();
         return;
       case 'ui.connectAI': {
-        const notice = await this.env.connectAI({ tool: msg.tool, scope: msg.scope });
+        const notice = await this.env.connectAI({ tool: msg.tool });
         if (typeof notice === 'string') this.post({ type: 'notice', message: notice });
         return;
       }

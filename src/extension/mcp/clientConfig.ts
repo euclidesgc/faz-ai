@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { samePath } from '../samePath';
-import type { AiTool, InstallScope } from '../../shared/harness';
+import type { AiTool } from '../../shared/harness';
 import { excludeLocally } from './pinCommands';
 
 export interface RegisterOptions {
@@ -15,12 +15,6 @@ export interface RegisterOptions {
    * com o node instalado só pelo nvm um `"command": "node"` falharia ao iniciar o servidor.
    */
   nodeCommand?: string;
-  /**
-   * `project` grava nos arquivos da pasta do projeto, com a pasta fixa nos argumentos; `user` grava na
-   * configuração global da ferramenta, sem a pasta: a ponte descobre o board pelo diretório em que a
-   * ferramenta foi aberta, e o mesmo registro serve a todos os projetos. Padrão: `project`.
-   */
-  scope?: InstallScope;
 }
 
 export interface Registration {
@@ -149,40 +143,14 @@ function coveredByGlobal(file: string, runDir: string, entryArgs: string[]): boo
 }
 
 /**
- * Registra o servidor MCP do board na configuração que cada ferramenta lê. No escopo do projeto:
- * - Claude Code: `.mcp.json` do projeto
- * - Cursor: `.cursor/mcp.json` do projeto
- * - Kimi Code: `.kimi-code/mcp.json` do projeto
+ * Registra o servidor MCP do board na configuração global de cada ferramenta, sem a pasta fixa: a
+ * ponte descobre o board pelo diretório em que a ferramenta foi aberta, e o mesmo registro serve a
+ * todos os projetos. Nada entra na pasta do projeto, que pode ser compartilhada com quem não tem a
+ * extensão (veja `registerUser`). O Cursor é a exceção documentada: o global dele não funciona, e o
+ * registro vai para o `.cursor/mcp.json` do projeto, fora do git (`registerCursorProject`).
  */
 export function registerClients(tools: AiTool[], o: RegisterOptions): Registration[] {
-  if (o.scope === 'user') return tools.flatMap((tool) => registerUser(tool, o));
-  const args = [o.bridgePath, o.workspaceDir];
-  const node = o.nodeCommand ?? 'node';
-  const out: Registration[] = [];
-  for (const tool of tools) {
-    switch (tool) {
-      case 'claude': {
-        const file = path.join(o.workspaceDir, '.mcp.json');
-        mergeJson(file, { type: 'stdio', command: node, args });
-        out.push({
-          tool,
-          file,
-          projectFile: '.mcp.json',
-          next: 'Claude Code: abra uma sessão nova na pasta e aprove o servidor (/mcp mostra o estado).',
-        });
-        break;
-      }
-      case 'cursor': {
-        out.push(registerCursorProject(o));
-        break;
-      }
-      case 'kimi': {
-        out.push(registerKimiProject(o));
-        break;
-      }
-    }
-  }
-  return out;
+  return tools.flatMap((tool) => registerUser(tool, o));
 }
 
 /**
@@ -286,30 +254,9 @@ export function registerCursorProject(o: RegisterOptions): Registration {
   };
 }
 
-/**
- * O servidor do board no Kimi Code: no `.kimi-code/mcp.json` do projeto (a CLI o lê em toda sessão
- * na pasta), com a pasta fixa, fora do git pelo `.git/info/exclude`. A entrada vai sem o campo
- * `type`, como a documentação da CLI 2.1.1 mostra. Um global (`~/.kimi-code/mcp.json`) que já cubra
- * esta pasta dispensa o arquivo do projeto (`useGlobal` do `ensureProjectServer`).
- */
-export function registerKimiProject(o: RegisterOptions): Registration {
-  const rel = '.kimi-code/mcp.json';
-  const file = path.join(o.workspaceDir, rel);
-  const result = ensureProjectServer(
-    o.workspaceDir,
-    rel,
-    { command: o.nodeCommand ?? 'node', args: [o.bridgePath, o.workspaceDir] },
-    o.homeDir,
-    { stdioType: false },
-  );
-  if (result === 'invalid') throw new Error(`${file} não é um JSON válido; corrija-o e tente de novo.`);
-  return {
-    tool: 'kimi',
-    file,
-    projectFile: rel,
-    excluded: true,
-    next: 'Kimi Code: abra uma sessão nova na pasta para ela carregar o servidor.',
-  };
+/** O argumento aponta para uma ponte do Faz AI (qualquer versão): distingue o registro do board de um "faz-ai" que a pessoa gravou à mão. */
+export function isBoardBridge(arg: string | undefined): boolean {
+  return /[\\/]mcp[\\/]bridge\.js$/.test(arg ?? '');
 }
 
 /**
@@ -321,7 +268,7 @@ export function removeUserCursorServer(homeDir: string): boolean {
   const current = readEntry(file);
   if (!current || current === 'invalid') return false;
   const bridge = Array.isArray(current.args) ? String(current.args[0] ?? '') : '';
-  if (!/[\\/]mcp[\\/]bridge\.js$/.test(bridge)) return false;
+  if (!isBoardBridge(bridge)) return false;
   const config = JSON.parse(fs.readFileSync(file, 'utf8')) as { mcpServers: Record<string, unknown> };
   delete config.mcpServers[SERVER];
   fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n');

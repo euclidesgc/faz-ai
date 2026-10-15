@@ -11,6 +11,7 @@ import { createRunLog } from '../log/runLog';
 import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
 import { registerClients, removeProjectServer } from '../mcp/clientConfig';
+import { runRegistrationSteps } from '../mcp/reinstall';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
@@ -22,7 +23,7 @@ import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
 import { claudeSignedIn, cursorModels, cursorSignedIn, kimiModels, kimiSignedIn, runCli } from '../cliProbe';
-import { aiToolInfo, ALL_AI_TOOLS, type AiTool, type InstallScope } from '../../shared/harness';
+import { aiToolInfo, ALL_AI_TOOLS, type AiTool } from '../../shared/harness';
 import { allowKimiMcp, checkRequirements, registeredServer } from '../requirements';
 import { headlessCommand, headlessUnsupported } from '../headless';
 import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
@@ -82,16 +83,16 @@ export interface BoardHost {
    */
   sweepStaleRuns(): void;
   /**
-   * Registra o servidor MCP do board numa ferramenta de IA (padrão: a do projeto) e devolve o resumo do
-   * que foi feito. `user` (o padrão) instala na configuração global da ferramenta; `project`, só aqui.
+   * Registra o servidor MCP do board na configuração global de uma ferramenta de IA (padrão: a do
+   * projeto) e devolve o resumo do que foi feito. Nada entra na pasta do projeto (o Cursor é a exceção;
+   * veja `registerClients`).
    */
-  connectAI(target?: { tool?: AiTool; scope?: InstallScope }): Promise<{ message: string; toIgnore: string[] }>;
+  connectAI(target?: { tool?: AiTool }): Promise<{ message: string }>;
   /**
    * Tira o registro quebrado do board do arquivo do projeto (que vale sobre o global na ferramenta) e
    * refaz o global com os caminhos atuais. Devolve o resumo do que foi feito.
    */
   fixProjectServer(file: string): Promise<string>;
-  addToGitignore(lines: string[]): void;
   dispose(): Promise<void>;
 }
 
@@ -620,7 +621,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // a varredura da abertura: só a janela dona limpa sozinha (o botão da tela age onde foi clicado)
   if (ownsBoard) void orphanSweeper.sweep();
 
-  const gitignore = path.join(o.folderPath, '.gitignore');
   const api: BoardHost = {
     router,
     runner,
@@ -633,52 +633,24 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     autopilot,
     async connectAI(target = {}) {
       const tool = target.tool ?? router.snapshot().board.aiTool;
-      const scope = target.scope ?? 'user';
       const done = registerClients([tool], {
         bridgePath: o.bridgePath,
         workspaceDir: o.folderPath,
         homeDir,
         nodeCommand: nodePath,
-        scope,
       });
-      for (const step of done.flatMap((d) => d.run ?? [])) {
-        const exe = resolveCommand(step.command, pathEnv, homeDir);
-        const manual = `${step.command} ${step.args.map((a) => (/[\s"{}]/.test(a) ? `'${a}'` : a)).join(' ')}`;
-        if (!exe) {
-          if (step.mayFail) continue;
-          throw new Error(`A linha de comando "${step.command}" não foi encontrada. Rode no terminal: ${manual}`);
-        }
-        const r = await runCli(exe, step.args, pathEnv);
-        if (r.code !== 0 && !step.mayFail)
-          throw new Error(
-            `"${step.command}" não conseguiu registrar o servidor (${(r.stderr || r.stdout).trim()}). Rode no terminal: ${manual}`,
-          );
-      }
+      await runRegistrationSteps(done, pathEnv, homeDir);
       router.handle({ type: 'harness.refresh' });
-      // arquivos do projeto guardam caminhos desta máquina, então normalmente não devem ir para o repositório
-      const ignored = fs.existsSync(gitignore)
-        ? fs
-            .readFileSync(gitignore, 'utf8')
-            .split(/\r?\n/)
-            .map((l) => l.trim())
-        : [];
-      const toIgnore = [
-        ...new Set(done.flatMap((d) => (d.projectFile && !d.excluded && !ignored.includes(d.projectFile) ? [d.projectFile] : []))),
-      ];
       const files = done.map((d) => d.projectFile ?? d.file.replace(homeDir, '~')).join(', ');
       void checkNow();
-      return { message: `Servidor "faz-ai" registrado em: ${files}. ${[...new Set(done.map((d) => d.next))].join(' ')}`, toIgnore };
+      return { message: `Servidor "faz-ai" registrado em: ${files}. ${[...new Set(done.map((d) => d.next))].join(' ')}` };
     },
     async fixProjectServer(file) {
       // só os arquivos do projeto que o próprio board grava; nada fora da pasta
       if (path.isAbsolute(file) || file.split(/[\\/]/).includes('..')) throw new Error(`Arquivo inválido: ${file}`);
       removeProjectServer(o.folderPath, file);
-      const { message } = await api.connectAI({ scope: 'user' });
+      const { message } = await api.connectAI();
       return `Registro do board tirado de ${file}, que valia no lugar do global. ${message}`;
-    },
-    addToGitignore(lines) {
-      const current = fs.existsSync(gitignore) ? fs.readFileSync(gitignore, 'utf8') : '';
-      fs.writeFileSync(gitignore, `${current}${current && !current.endsWith('\n') ? '\n' : ''}${lines.join('\n')}\n`);
     },
     async dispose() {
       disposed = true;

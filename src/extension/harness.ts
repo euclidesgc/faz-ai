@@ -32,8 +32,13 @@ export function parseFrontmatter(content: string): { name?: string; description?
   return { name: frontmatterValue(fm, 'name'), description: frontmatterValue(fm, 'description'), model: frontmatterValue(fm, 'model') };
 }
 
+/**
+ * Conteúdo de um SKILL.md. A descrição vai como string JSON porque, sem aspas, um `: ` no meio dela
+ * derruba o parser YAML do Cursor ("Error parsing skill"); uma string JSON é YAML válido.
+ */
 export function skillTemplate(name: string, description: string, body: string): string {
-  return `---\nname: ${name}\ndescription: ${description.replace(/\r?\n/g, ' ').trim()}\n---\n\n${body.trim()}\n`;
+  const oneLine = description.replace(/\r?\n/g, ' ').trim();
+  return `---\nname: ${name}\ndescription: ${JSON.stringify(oneLine)}\n---\n\n${body.trim()}\n`;
 }
 
 /**

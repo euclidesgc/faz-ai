@@ -4,6 +4,12 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
+## Não lançado
+
+- **O servidor MCP do board é instalado só no global da ferramenta (#563).** O Claude Code registra em `~/.claude.json` (por `claude mcp add-json --scope user`) e o Kimi Code em `~/.kimi-code/mcp.json`. Sai a opção **Instalar neste projeto** (MCP e skill do fluxo, na tela Harness e na ferramenta `install_flow_skill`), e os artefatos padrão do board não entram mais na pasta do projeto, que pode ser compartilhada com quem não tem a extensão. O Cursor segue como exceção: o `.cursor/mcp.json` do projeto, fora do git pelo `.git/info/exclude`, porque o global dele é um processo só para todas as janelas. Quem quiser uma cópia da skill no projeto usa **Copiar para o projeto** no Harness. Some também o aviso e o botão **Adicionar ao .gitignore** do comando **Conectar IA**. Um registro de projeto antigo (`.mcp.json`, `.kimi-code/mcp.json`) não é migrado: a faixa de requisitos continua oferecendo **Corrigir o registro**, que o tira e refaz o global. **Mudança de comportamento:** `install_flow_skill` perde o parâmetro `scope` e recusa chamadas que o enviem; quem automatizou com `scope` precisa tirá-lo.
+- **O registro do MCP é refeito ao atualizar a extensão (#563).** Na primeira ativação de uma versão nova, o board refaz o registro global nas ferramentas em que ele já estava (Claude Code e Kimi Code; o Cursor já é refeito a cada abertura de pasta). Se falhar, o motivo vai para Saída → Faz AI e a faixa de requisitos continua avisando.
+- **Correção: a skill `faz-ai-fluxo` não carregava no Cursor (#563).** O Cursor mostrava "Error parsing skill" porque a `description` do `SKILL.md` tinha `: ` sem aspas, o que quebra o YAML. Agora a `description` vai entre aspas na skill do fluxo e também nas skills e regras `.mdc` criadas pelo board. Quem já tinha a skill instalada clica em **Reinstalar** no Harness.
+
 ## 0.45.0
 
 - **Retomar o modo autônomo numa janela que não é a dona do board agora avisa.** Quando o board da pasta está sendo atendido em outro lugar (outra janela do editor ou o comando `faz-ai` no terminal), o botão de retomar parecia não fazer nada. Agora ele mostra um aviso dizendo onde o modo autônomo roda, e a barra de atividade guarda o motivo.

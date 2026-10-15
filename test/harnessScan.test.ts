@@ -244,12 +244,12 @@ describe('criar, copiar e apagar itens do harness', () => {
     const ops = new HarnessOps(project, home);
     const skillFile = ops.create('claude', target('claude', '~/.claude/skills/<nome>/SKILL.md'), 'commit', 'Escreve o commit');
     expect(skillFile).toBe(path.join(home, '.claude/skills/commit/SKILL.md'));
-    expect(fs.readFileSync(skillFile, 'utf8')).toContain('description: Escreve o commit');
+    expect(fs.readFileSync(skillFile, 'utf8')).toContain('description: "Escreve o commit"');
     expect(ops.create('claude', target('claude', '.claude/agents/<nome>.md'), 'revisor', 'Revisa')).toBe(
       path.join(project, '.claude/agents/revisor.md'),
     );
     expect(fs.readFileSync(ops.create('cursor', target('cursor', '.cursor/rules/<nome>.mdc'), 'estilo', 'Estilo'), 'utf8')).toBe(
-      '---\ndescription: Estilo\nalwaysApply: false\n---\n\n',
+      '---\ndescription: "Estilo"\nalwaysApply: false\n---\n\n',
     );
     expect(ops.create('claude', target('claude', '~/.claude/CLAUDE.md'), '', '')).toBe(path.join(home, '.claude/CLAUDE.md'));
     // não sobrescreve, não aceita nome fora do padrão e exige descrição em skill e agente
