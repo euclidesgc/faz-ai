@@ -14,7 +14,8 @@ import { registerClients, removeProjectServer } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
-import { detectMainBranch, removeWorktree } from '../git';
+import { deleteBranch, detectMainBranch, removeWorktree } from '../git';
+import { OrphanSweeper } from '../orphans';
 import { ghProcess } from '../branchRename';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
@@ -556,13 +557,33 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     mainBranch,
     afterRound: () => releaseWatcher.sweep(),
   });
+  // as branches e worktrees órfãs (#465): o varredor mede e remove; o roteador só guarda o relatório e
+  // entrega à tela os três pedidos da pessoa. Sem timer próprio: roda na rodada do heartbeat e na abertura.
+  const orphanSweeper = new OrphanSweeper({
+    cwd: o.folderPath,
+    log: o.log,
+    git,
+    removeWorktree,
+    deleteBranch,
+    snapshot: () => router.snapshot(),
+    publish: (report) => router.setOrphans(report),
+    clearWorkspace: (cardId) => router.handle({ type: 'card.workspace.clear', cardId }),
+  });
+  router.onOrphans({
+    scan: async () => {
+      await orphanSweeper.scan();
+    },
+    clean: (id, acceptLoss) => orphanSweeper.clean(id, acceptLoss),
+    cleanSafe: () => orphanSweeper.cleanSafe(),
+  });
   const heartbeat = new Heartbeat(runner, {
     snapshot: () => router.snapshot(),
     now: () => Date.now(),
     log: o.log,
     // como o heartbeat e o autopiloto, só a janela dona do board confere os merges, para não concluir em dobro
+    // as órfãs vêm depois dos merges: uma história recém-mesclada ainda seria "decisão" antes de concluída
     onRound: () => {
-      if (!o.ownsBoard || o.ownsBoard()) void mergeWatcher.runNow();
+      if (!o.ownsBoard || o.ownsBoard()) void mergeWatcher.runNow().then(() => orphanSweeper.sweep());
     },
   });
   // publica a próxima rodada agendada; a guarda em `setHeartbeat` (só notifica se mudou) evita o laço
@@ -575,6 +596,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   router.onDidChange(publishHeartbeat);
   publishHeartbeat();
+
+  // a varredura da abertura: só a janela dona limpa sozinha (o botão da tela age onde foi clicado)
+  if (ownsBoard) void orphanSweeper.sweep();
 
   const gitignore = path.join(o.folderPath, '.gitignore');
   const api: BoardHost = {
