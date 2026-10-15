@@ -713,14 +713,38 @@ Opções em **Faz AI › Git**, no Settings do editor:
 | Opção | Padrão | O que faz |
 | --- | --- | --- |
 | `fazai.git.gitflow` | ligado | Desligado, toda branch parte da principal e `{fluxo}` vira `<tipo>/`. |
+| `fazai.git.mainBranch` | vazio | Branch principal fixa; vazio detecta (HEAD do `origin`, `main` ou `master`). |
 | `fazai.git.developBranch` | `develop` | Branch de integração. |
 | `fazai.git.featurePrefix` | `feature/` | Prefixo das branches de feature. |
 | `fazai.git.bugfixPrefix` | `bugfix/` | Prefixo das branches de bugfix. |
 | `fazai.git.hotfixPrefix` | `hotfix/` | Prefixo das branches de hotfix. |
 | `fazai.git.releasePrefix` | `release/` | Só informativo: nenhum tipo de card gera release. |
 
-Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. A limpeza das órfãs e o renomear da
-principal no `origin` vêm em entregas seguintes.
+Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. A limpeza das órfãs vem em uma
+entrega seguinte.
+
+##### Renomear a principal ou a `develop` no `origin`
+
+Mudar `fazai.git.mainBranch` ou `fazai.git.developBranch` para um nome que ainda não existe, com a
+branch antiga existindo, abre um aviso no editor (a mudança também vale no `origin`, e o board não a
+faz sozinho). As opções são **Renomear** e **Desfazer**; fechar a caixa mantém o pedido e a pergunta
+volta ao reabrir o board.
+
+- **Renomear** age nesta ordem: a branch no GitHub pelo `gh` (`gh api .../branches/<antiga>/rename`);
+  `git fetch --prune`; `git branch -m` no clone (inclusive a que está numa worktree); o upstream
+  (`origin/<nova>`); e, só na principal, o `origin/HEAD`. O GitHub redireciona os PRs abertos e leva a
+  branch padrão para o nome novo (conforme a documentação da API, não testado com conta real).
+- **Sem `gh`, fora do GitHub ou sem permissão**: nada é executado. O aviso mostra os comandos prontos
+  para este clone e para os outros, com **Copiar comandos**.
+- **Falha no meio**: a mensagem diz o que já mudou e o que falta. Cada passo confere o estado antes de
+  agir, então repetir é seguro. O remoto vem primeiro: se ele falha, nada local muda.
+- **Desfazer** devolve o nome anterior à configuração e não toca o repositório.
+- **Recusado** enquanto a IA executa uma história (a mensagem traz os números).
+- **Não muda**: workflows de CI, regras de proteção, a branch padrão do GitHub (na `develop`) e os
+  outros clones. A IA não renomeia branches: não há ferramenta nova no MCP.
+
+O diálogo no navegador, os campos na tela Git e o item no Diagnóstico do ambiente vêm em uma entrega
+seguinte (#498).
 
 ### Pull request e merge na Homologação
 
